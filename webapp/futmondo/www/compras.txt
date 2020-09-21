@@ -1,0 +1,592 @@
+Fecha	Comprador	Vendedor	Jugador	Precio	Tipo	Foto
+22/08/2020 - 20:15:00	Pineda team	futmondo	Jozabed	1111111	COMPRA	COMPRA
+07/09/2020 - 03:22:00	futmondo	PaKeTeS ⚽️	Reguilón	20078030	COMPRA	COMPRA
+26/08/2020 - 21:15:00	echo de menos el Netliga	futmondo	Canales	51200000	COMPRA	COMPRA
+12/09/2020 - 01:15:00	HOPE TEAM S.A	Albar ÉldelBar	Kaptoum	1200000	COMPRA	COMPRA
+31/08/2020 - 05:27:00	futmondo	Luis Ragan	Iborra	10257569	COMPRA	COMPRA
+21/08/2020 - 20:15:00	jglelxino17	futmondo	Guardado	4365982	COMPRA	COMPRA
+19/08/2020 - 20:14:00	Maño's Team	futmondo	Asensio	25101000	COMPRA	COMPRA
+06/09/2020 - 03:13:00	futmondo	Hala Modric	Marcos Llorente	28663389	COMPRA	COMPRA
+04/09/2020 - 16:46:00	futmondo	Hala Modric	Kike García	4118060	COMPRA	COMPRA
+30/08/2020 - 21:40:00	futmondo	PaKeTeS ⚽️	James	4775741	COMPRA	COMPRA
+20/08/2020 - 20:14:00	Luis Ragan	futmondo	Portu	26111111	COMPRA	COMPRA
+19/08/2020 - 20:14:00	Gaditas FC	futmondo	Augusto Fernández	1450000	COMPRA	COMPRA
+28/08/2020 - 21:51:00	futmondo	PaKeTeS ⚽️	José Ángel	10464413	COMPRA	COMPRA
+11/09/2020 - 22:07:00	futmondo	echo de menos el Netliga	Nano	800000	COMPRA	COMPRA
+04/09/2020 - 16:36:00	futmondo	Hala Modric	Cheryshev	1998975	COMPRA	COMPRA
+22/08/2020 - 20:15:00	echo de menos el Netliga	futmondo	Negredo	15889685	COMPRA	COMPRA
+06/09/2020 - 21:28:00	Huevo Frito C.F.	futmondo	Balenziaga	1000000	COMPRA	COMPRA
+27/08/2020 - 21:15:00	Gaditas FC	futmondo	Brais Méndez	6100000	COMPRA	COMPRA
+19/08/2020 - 20:14:00	Pineda team	futmondo	Masip	9082236	COMPRA	COMPRA
+23/08/2020 - 20:16:00	jglelxino17	futmondo	Le Normand	12000955	COMPRA	COMPRA
+27/08/2020 - 21:15:00	Luis Ragan	futmondo	Gonzalo Verdú	5111111	COMPRA	COMPRA
+20/08/2020 - 20:14:00	HOPE TEAM S.A	futmondo	Antonio Puertas	20000000	COMPRA	COMPRA
+17/09/2020 - 15:05:00	Hala Modric	Pineda team	Iza	13617396	COMPRA	COMPRA
+12/09/2020 - 21:27:00	Maño's Team	futmondo	Rodrygo	7500000	COMPRA	COMPRA
+15/09/2020 - 15:05:00	Hala Modric	Gaditas FC	Emre Mor	3980000	COMPRA	COMPRA
+30/08/2020 - 21:18:00	Huevo Frito C.F.	futmondo	Griezmann	58101001	COMPRA	COMPRA
+29/08/2020 - 21:17:00	Hala Modric	futmondo	Enric Gallego	4899999	COMPRA	COMPRA
+20/08/2020 - 20:14:00	HOPE TEAM S.A	futmondo	Rakitic	20000000	COMPRA	COMPRA
+05/09/2020 - 21:26:00	Hala Modric	futmondo	Kadzior	3399999	COMPRA	COMPRA
+19/09/2020 - 12:37:34	echo de menos el Netliga	Sabero Valley	Andrés Fernández	3980000	CLAUSULA	CLAUSULA
+11/09/2020 - 21:26:00	Hala Modric	futmondo	Maffeo	2599999	COMPRA	COMPRA
+04/09/2020 - 16:46:00	futmondo	Hala Modric	Bigas	2763024	COMPRA	COMPRA
+12/09/2020 - 19:12:12	echo de menos el Netliga	HOPE TEAM S.A	Salvi	14008600	CLAUSULA	CLAUSULA
+18/09/2020 - 21:30:00	Luis Ragan	futmondo	William Carvalho	5222222	COMPRA	COMPRA
+11/09/2020 - 22:45:00	Maño's Team	Ruben Esteban	Son	1500000	COMPRA	COMPRA
+23/08/2020 - 20:16:00	Gaditas FC	futmondo	Álex Moreno	18000000	COMPRA	COMPRA
+18/08/2020 - 20:13:00	Sabero Valley	futmondo	José Mari	2150001	COMPRA	COMPRA
+28/08/2020 - 21:16:00	Maño's Team	futmondo	Pedro López	1864000	COMPRA	COMPRA
+17/09/2020 - 21:29:00	Ruben Esteban	futmondo	Bruno González	1401000	COMPRA	COMPRA
+25/08/2020 - 21:14:00	jglelxino17	futmondo	Rodrigo Ely	2108008	COMPRA	COMPRA
+01/09/2020 - 00:48:00	futmondo	jglelxino17	Pjanic	42420513	COMPRA	COMPRA
+25/08/2020 - 21:14:00	Ruben Esteban	futmondo	Sergi Enrich	8994225	COMPRA	COMPRA
+14/09/2020 - 22:56:00	futmondo	PaKeTeS ⚽️	Piccini	932510	COMPRA	COMPRA
+08/09/2020 - 21:30:00	jorgearaujopirez	futmondo	Miquel	1000001	COMPRA	COMPRA
+03/09/2020 - 22:46:00	futmondo	Ruben Esteban	Dmitrovic	16124196	COMPRA	COMPRA
+02/09/2020 - 21:23:00	Pineda team	futmondo	Iza	3678932	COMPRA	COMPRA
+15/09/2020 - 21:29:00	Hala Modric	futmondo	Toño	1000066	COMPRA	COMPRA
+14/09/2020 - 21:41:00	futmondo	Ruben Esteban	David Silva	41109098	COMPRA	COMPRA
+13/09/2020 - 12:39:45	Pineda team	Sabero Valley	Ferreiro	9381521	CLAUSULA	CLAUSULA
+24/08/2020 - 20:17:00	Luis Ragan	futmondo	Fali	2111111	COMPRA	COMPRA
+09/09/2020 - 05:20:00	futmondo	jglelxino17	Okay Yokuslu	4098549	COMPRA	COMPRA
+19/09/2020 - 21:28:00	echo de menos el Netliga	futmondo	Míchel Herrero	3120000	COMPRA	COMPRA
+31/08/2020 - 21:20:00	echo de menos el Netliga	futmondo	Brasanac	1340000	COMPRA	COMPRA
+26/08/2020 - 21:15:00	jglelxino17	futmondo	Sancet	2000000	COMPRA	COMPRA
+28/08/2020 - 21:16:00	Luis Ragan	futmondo	Chukwueze	17222222	COMPRA	COMPRA
+16/09/2020 - 15:05:00	echo de menos el Netliga	Gaditas FC	Aidoo	11677196	COMPRA	COMPRA
+16/09/2020 - 22:37:00	futmondo	Albar ÉldelBar	Kaptoum	1035570	COMPRA	COMPRA
+07/09/2020 - 04:37:00	Hala Modric	HOPE TEAM S.A	Okazaki	12000000	COMPRA	COMPRA
+24/08/2020 - 20:17:00	cityods	futmondo	Jovic	5249607	COMPRA	COMPRA
+20/08/2020 - 20:14:00	Hala Modric	futmondo	Mikel Rico	3999999	COMPRA	COMPRA
+18/08/2020 - 20:13:00	Luis Ragan	futmondo	Santi Mina	8000001	COMPRA	COMPRA
+17/09/2020 - 00:41:00	futmondo	Hala Modric	Iago Aspas	63225788	COMPRA	COMPRA
+06/09/2020 - 03:12:00	futmondo	Hala Modric	Joselu	24963414	COMPRA	COMPRA
+06/09/2020 - 21:28:00	David Vidal Team	futmondo	Bigas	4000128	COMPRA	COMPRA
+27/08/2020 - 21:15:00	Sabero Valley	futmondo	Mathías Olivera	1750001	COMPRA	COMPRA
+11/09/2020 - 05:12:00	futmondo	Luis Ragan	David Silva	40675228	COMPRA	COMPRA
+02/09/2020 - 21:23:00	jglelxino17	futmondo	Sanabria	4753698	COMPRA	COMPRA
+14/09/2020 - 05:44:31	Pineda team	Hala Modric	Mikel Rico	13063117	CLAUSULA	CLAUSULA
+23/08/2020 - 20:16:00	Gaditas FC	futmondo	Bartra	19000000	COMPRA	COMPRA
+19/09/2020 - 21:28:00	Luis Ragan	futmondo	Murillo	10777111	COMPRA	COMPRA
+19/08/2020 - 20:14:00	Sabero Valley	futmondo	Joaquín Fernández	4550001	COMPRA	COMPRA
+01/09/2020 - 21:22:00	Ruben Esteban	futmondo	Coutinho	31025000	COMPRA	COMPRA
+07/09/2020 - 21:29:00	David Vidal Team	futmondo	Oliveira	2500052	COMPRA	COMPRA
+30/08/2020 - 21:18:00	Ruben Esteban	futmondo	Vinícius	21158880	COMPRA	COMPRA
+13/09/2020 - 21:29:00	echo de menos el Netliga	futmondo	Tello	3909090	COMPRA	COMPRA
+27/08/2020 - 21:16:00	Luis Ragan	futmondo	Pedro León	13222222	COMPRA	COMPRA
+19/09/2020 - 21:28:00	Hala Modric	futmondo	Maksimovic	15599999	COMPRA	COMPRA
+11/09/2020 - 06:32:00	Albar ÉldelBar	Sabero Valley	Kroos	43000000	COMPRA	COMPRA
+15/09/2020 - 21:29:00	Hala Modric	futmondo	Héctor Herrera	1159999	COMPRA	COMPRA
+15/09/2020 - 00:19:00	futmondo	HOPE TEAM S.A	Joel	2050396	COMPRA	COMPRA
+09/09/2020 - 14:36:00	futmondo	Hala Modric	Orellana	34198558	COMPRA	COMPRA
+19/08/2020 - 20:14:00	jglelxino17	futmondo	Courtois	44000000	COMPRA	COMPRA
+01/09/2020 - 21:22:00	jglelxino17	futmondo	Fede Vico	1256809	COMPRA	COMPRA
+29/08/2020 - 21:17:00	echo de menos el Netliga	futmondo	Herrerín	1593999	COMPRA	COMPRA
+28/08/2020 - 21:16:00	Ruben Esteban	futmondo	Oyarzabal	47252000	COMPRA	COMPRA
+18/08/2020 - 20:13:00	Pineda team	futmondo	Juan Pérez	1000090	COMPRA	COMPRA
+21/08/2020 - 20:15:00	Ruben Esteban	futmondo	Son	1018000	COMPRA	COMPRA
+10/09/2020 - 08:17:00	Albar ÉldelBar	Luis Ragan	Íñigo Martínez	27000000	COMPRA	COMPRA
+29/08/2020 - 21:17:00	Luis Ragan	futmondo	Djené	25222222	COMPRA	COMPRA
+09/09/2020 - 21:31:00	Pineda team	futmondo	Marcos Llorente	31345678	COMPRA	COMPRA
+23/08/2020 - 20:16:00	jglelxino17	futmondo	Monreal	23000036	COMPRA	COMPRA
+16/09/2020 - 15:05:00	echo de menos el Netliga	Pineda team	Sergio González	3980000	COMPRA	COMPRA
+15/09/2020 - 21:29:00	Albar ÉldelBar	futmondo	Joaquín Muñoz	1000000	COMPRA	COMPRA
+16/09/2020 - 15:05:00	jglelxino17	Sabero Valley	Racic	3995245	COMPRA	COMPRA
+18/08/2020 - 20:13:00	echo de menos el Netliga	futmondo	Muniain	39000010	COMPRA	COMPRA
+10/09/2020 - 21:31:00	Maño's Team	futmondo	Unai Núñez	3666666	COMPRA	COMPRA
+19/08/2020 - 20:14:00	Ruben Esteban	futmondo	Carlos Fernández	11058008	COMPRA	COMPRA
+16/09/2020 - 15:05:00	jglelxino17	Maño's Team	Kang-in Lee	8607304	COMPRA	COMPRA
+14/09/2020 - 21:28:00	Hala Modric	futmondo	Benzema	76599999	COMPRA	COMPRA
+24/08/2020 - 20:17:00	Sabero Valley	futmondo	Edu Expósito	8500001	COMPRA	COMPRA
+14/09/2020 - 21:28:00	jglelxino17	futmondo	Óscar Rodríguez	24500064	COMPRA	COMPRA
+18/08/2020 - 20:13:00	cityods	futmondo	Roque Mesa	3000900	COMPRA	COMPRA
+19/08/2020 - 20:14:00	Sabero Valley	futmondo	Rochina	16200001	COMPRA	COMPRA
+15/09/2020 - 21:29:00	Sabero Valley	futmondo	Kévin	2150001	COMPRA	COMPRA
+18/08/2020 - 20:13:00	Sabero Valley	futmondo	Vezo	4750000	COMPRA	COMPRA
+09/09/2020 - 21:31:00	HOPE TEAM S.A	futmondo	Kike García	4500000	COMPRA	COMPRA
+26/08/2020 - 21:15:00	Maño's Team	futmondo	Clerc	1500000	COMPRA	COMPRA
+19/09/2020 - 12:37:34	Hala Modric	Pineda team	Iza	13617396	CLAUSULA	CLAUSULA
+04/09/2020 - 16:47:00	futmondo	Hala Modric	Guedes	31750162	COMPRA	COMPRA
+25/08/2020 - 21:14:00	Luis Ragan	futmondo	Lucas Pérez	32111111	COMPRA	COMPRA
+11/09/2020 - 12:19:00	jorgearaujopirez	Luis Ragan	Djené	200000	COMPRA	COMPRA
+12/09/2020 - 21:27:00	HOPE TEAM S.A	futmondo	Mandi	3119000	COMPRA	COMPRA
+14/09/2020 - 10:31:00	futmondo	echo de menos el Netliga	Folch	1534655	COMPRA	COMPRA
+10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Borja Garcés	1000000	COMPRA	COMPRA
+27/08/2020 - 21:15:00	Hala Modric	futmondo	Guedes	32599999	COMPRA	COMPRA
+18/08/2020 - 20:13:00	cityods	futmondo	Guardiola	15111111	COMPRA	COMPRA
+16/09/2020 - 21:29:00	Hala Modric	futmondo	Oier	6599999	COMPRA	COMPRA
+16/09/2020 - 21:29:00	Pineda team	futmondo	Jorge Pombo	5909988	COMPRA	COMPRA
+16/09/2020 - 22:43:00	futmondo	Ruben Esteban	Coutinho	35150843	COMPRA	COMPRA
+06/09/2020 - 00:20:00	futmondo	Ruben Esteban	Pjanic	40964201	COMPRA	COMPRA
+01/09/2020 - 21:22:00	Luis Ragan	futmondo	Unai Simón	23666666	COMPRA	COMPRA
+24/08/2020 - 20:17:00	Gaditas FC	futmondo	Gameiro	9350000	COMPRA	COMPRA
+18/08/2020 - 20:13:00	cityods	futmondo	Junior Firpo	5111111	COMPRA	COMPRA
+18/08/2020 - 20:13:00	Hala Modric	futmondo	Edgar Méndez	4159999	COMPRA	COMPRA
+26/08/2020 - 21:15:00	Hala Modric	futmondo	Marcos Llorente	28599999	COMPRA	COMPRA
+19/08/2020 - 20:14:00	jorgearaujopirez	futmondo	Rodrigo	38570000	COMPRA	COMPRA
+10/09/2020 - 22:19:00	futmondo	Maño's Team	Semedo	16070511	COMPRA	COMPRA
+13/09/2020 - 21:29:00	HOPE TEAM S.A	futmondo	Joel	2352015	COMPRA	COMPRA
+19/09/2020 - 12:37:34	Hala Modric	Gaditas FC	Emre Mor	3980000	CLAUSULA	CLAUSULA
+14/09/2020 - 21:28:00	PaKeTeS ⚽️	futmondo	Diakhaby	1385000	COMPRA	COMPRA
+19/09/2020 - 12:37:34	Maño's Team	Ruben Esteban	Rafa Mir	17250995	CLAUSULA	CLAUSULA
+29/08/2020 - 21:17:00	Gaditas FC	futmondo	Jaume	3200000	COMPRA	COMPRA
+30/08/2020 - 21:18:00	jorgearaujopirez	futmondo	Nino	5123999	COMPRA	COMPRA
+19/09/2020 - 12:37:34	Hala Modric	Sabero Valley	Mathías Olivera	5714960	CLAUSULA	CLAUSULA
+09/09/2020 - 21:31:00	Hala Modric	futmondo	Cheryshev	1799999	COMPRA	COMPRA
+13/09/2020 - 22:05:00	futmondo	Maño's Team	Villalibre	1056987	COMPRA	COMPRA
+16/09/2020 - 15:05:00	Pineda team	Sabero Valley	Ferreiro	9381521	COMPRA	COMPRA
+12/09/2020 - 19:11:15	echo de menos el Netliga	Gaditas FC	Aidoo	11677196	CLAUSULA	CLAUSULA
+23/08/2020 - 20:16:00	Luis Ragan	futmondo	Arambarri	15666666	COMPRA	COMPRA
+09/09/2020 - 21:31:00	Maño's Team	futmondo	Juan Carlos	1300000	COMPRA	COMPRA
+14/09/2020 - 21:28:00	Luis Ragan	futmondo	Iván Villar	3222222	COMPRA	COMPRA
+30/08/2020 - 21:18:00	Luis Ragan	futmondo	Saúl Ñíguez	27777777	COMPRA	COMPRA
+03/09/2020 - 21:24:00	Ruben Esteban	futmondo	Pjanic	40282000	COMPRA	COMPRA
+08/09/2020 - 22:05:00	futmondo	Maño's Team	Montoya	3768271	COMPRA	COMPRA
+19/08/2020 - 20:14:00	Luis Ragan	futmondo	Álvaro Fernández	4111111	COMPRA	COMPRA
+29/08/2020 - 02:44:00	futmondo	Luis Ragan	Iza	3194103	COMPRA	COMPRA
+05/09/2020 - 21:26:00	Hala Modric	futmondo	Jaime Seoane	1009999	COMPRA	COMPRA
+18/09/2020 - 23:06:00	futmondo	David Vidal Team	Malbasic	1050326	COMPRA	COMPRA
+28/08/2020 - 21:16:00	Gaditas FC	futmondo	Iñaki Williams	45000000	COMPRA	COMPRA
+29/08/2020 - 21:17:00	jorgearaujopirez	futmondo	Rubén Duarte	4756456	COMPRA	COMPRA
+23/08/2020 - 20:16:00	Huevo Frito C.F.	futmondo	Hugo Mallo	11010001	COMPRA	COMPRA
+06/09/2020 - 21:28:00	David Vidal Team	futmondo	Vukcevic	2550211	COMPRA	COMPRA
+20/08/2020 - 20:14:00	Gaditas FC	futmondo	Suso Fernández	42000000	COMPRA	COMPRA
+26/08/2020 - 21:15:00	cityods	futmondo	Edgar Badía	4666666	COMPRA	COMPRA
+18/09/2020 - 23:06:00	futmondo	David Vidal Team	Vukcevic	957029	COMPRA	COMPRA
+24/08/2020 - 20:17:00	Maño's Team	futmondo	Coquelin	18501000	COMPRA	COMPRA
+05/09/2020 - 21:26:00	Sabero Valley	futmondo	Kroos	37650000	COMPRA	COMPRA
+19/09/2020 - 12:37:34	HOPE TEAM S.A	Maño's Team	Sergio Herrera	8542473	CLAUSULA	CLAUSULA
+25/08/2020 - 21:14:00	Maño's Team	futmondo	Borja Iglesias	20555555	COMPRA	COMPRA
+20/08/2020 - 20:14:00	Maño's Team	futmondo	Thomas	19501000	COMPRA	COMPRA
+19/08/2020 - 20:14:00	Luis Ragan	futmondo	Bardhi	14666666	COMPRA	COMPRA
+25/08/2020 - 21:14:00	cityods	futmondo	Savic	16666666	COMPRA	COMPRA
+13/09/2020 - 15:32:25	Hala Modric	Pineda team	Iza	13617396	CLAUSULA	CLAUSULA
+20/08/2020 - 20:14:00	Pineda team	futmondo	Cala	8098832	COMPRA	COMPRA
+26/08/2020 - 21:15:00	Huevo Frito C.F.	futmondo	Soldado	13101001	COMPRA	COMPRA
+16/09/2020 - 21:29:00	Pineda team	futmondo	Rober Correa	2500004	COMPRA	COMPRA
+21/08/2020 - 20:15:00	jorgearaujopirez	futmondo	Sergio León	2550005	COMPRA	COMPRA
+27/08/2020 - 21:15:00	Luis Ragan	futmondo	Emerson	18666666	COMPRA	COMPRA
+17/09/2020 - 21:29:00	Albar ÉldelBar	futmondo	Aitor Ruibal	1000000	COMPRA	COMPRA
+14/09/2020 - 05:47:00	futmondo	Pineda team	Juan Pérez	800000	COMPRA	COMPRA
+31/08/2020 - 21:20:00	Hala Modric	futmondo	Iago Aspas	62599999	COMPRA	COMPRA
+10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Gudelj	1157202	COMPRA	COMPRA
+06/09/2020 - 21:28:00	Hala Modric	futmondo	Fekir	47599999	COMPRA	COMPRA
+19/09/2020 - 12:37:34	echo de menos el Netliga	HOPE TEAM S.A	Salvi	14008600	CLAUSULA	CLAUSULA
+30/08/2020 - 21:18:00	Luis Ragan	futmondo	Battaglia	6222222	COMPRA	COMPRA
+22/08/2020 - 20:15:00	cityods	futmondo	Ansu Fati	20999999	COMPRA	COMPRA
+31/08/2020 - 04:53:00	futmondo	Ruben Esteban	Carlos Fernández	11560414	COMPRA	COMPRA
+05/09/2020 - 21:26:00	Huevo Frito C.F.	futmondo	Luisinho	1111111	COMPRA	COMPRA
+16/09/2020 - 15:05:00	Hala Modric	HOPE TEAM S.A	Claudio Bravo	10393595	COMPRA	COMPRA
+21/08/2020 - 20:15:00	jorgearaujopirez	futmondo	William Carvalho	3600005	COMPRA	COMPRA
+25/08/2020 - 21:14:00	jglelxino17	futmondo	Aritz	4000000	COMPRA	COMPRA
+21/08/2020 - 20:15:00	cityods	futmondo	Trincao	19999999	COMPRA	COMPRA
+18/08/2020 - 20:13:00	echo de menos el Netliga	futmondo	Nano	1000002	COMPRA	COMPRA
+08/09/2020 - 21:30:00	Pineda team	futmondo	Vitolo	3600000	COMPRA	COMPRA
+15/09/2020 - 10:00:00	futmondo	Pineda team	Cardona	1007167	COMPRA	COMPRA
+12/09/2020 - 21:27:00	jglelxino17	futmondo	Militao	6236559	COMPRA	COMPRA
+04/09/2020 - 21:25:00	Huevo Frito C.F.	futmondo	Kodro	1000000	COMPRA	COMPRA
+11/09/2020 - 21:26:00	Maño's Team	futmondo	Manu Vallejo	1388320	COMPRA	COMPRA
+11/09/2020 - 21:26:00	Albar ÉldelBar	futmondo	Lodi	21200001	COMPRA	COMPRA
+07/09/2020 - 23:18:00	futmondo	Sabero Valley	Toni Lato	1002239	COMPRA	COMPRA
+16/09/2020 - 03:03:00	Albar ÉldelBar	HOPE TEAM S.A	Borja Garcés	1200000	COMPRA	COMPRA
+26/08/2020 - 21:15:00	Hala Modric	futmondo	Josan	2599999	COMPRA	COMPRA
+27/08/2020 - 21:15:00	jglelxino17	futmondo	Zubimendi	2500000	COMPRA	COMPRA
+19/09/2020 - 21:28:00	Ruben Esteban	futmondo	Gonalons	3417000	COMPRA	COMPRA
+12/09/2020 - 08:17:00	HOPE TEAM S.A	Luis Ragan	Enes Ünal	250000	COMPRA	COMPRA
+27/08/2020 - 21:15:00	Pineda team	futmondo	Roger Martí	18789999	COMPRA	COMPRA
+08/09/2020 - 21:30:00	Ruben Esteban	futmondo	Zubeldia	8175000	COMPRA	COMPRA
+17/09/2020 - 00:39:00	futmondo	Hala Modric	Héctor Herrera	985386	COMPRA	COMPRA
+09/09/2020 - 21:31:00	David Vidal Team	futmondo	Pjanic	45000001	COMPRA	COMPRA
+19/09/2020 - 12:37:34	Sabero Valley	jglelxino17	Yangel Herrera	7072303	CLAUSULA	CLAUSULA
+20/08/2020 - 20:14:00	PaKeTeS ⚽️	futmondo	Antoñito	1500000	COMPRA	COMPRA
+12/09/2020 - 11:25:02	Hala Modric	Gaditas FC	Emre Mor	3980000	CLAUSULA	CLAUSULA
+05/09/2020 - 21:26:00	Ruben Esteban	futmondo	Dani García	11501000	COMPRA	COMPRA
+20/08/2020 - 20:14:00	Maño's Team	futmondo	Kang-in Lee	6201000	COMPRA	COMPRA
+16/09/2020 - 21:29:00	PaKeTeS ⚽️	futmondo	Jurado	1000000	COMPRA	COMPRA
+14/09/2020 - 22:47:00	futmondo	Albar ÉldelBar	Moyá	1726824	COMPRA	COMPRA
+19/08/2020 - 20:14:00	Ruben Esteban	futmondo	Laguardia	15125880	COMPRA	COMPRA
+27/08/2020 - 21:15:00	Hala Modric	futmondo	Cheryshev	2759999	COMPRA	COMPRA
+11/09/2020 - 12:20:00	futmondo	jorgearaujopirez	Miquel	800000	COMPRA	COMPRA
+28/08/2020 - 21:16:00	Ruben Esteban	futmondo	Isak	26125000	COMPRA	COMPRA
+26/08/2020 - 21:15:00	PaKeTeS ⚽️	futmondo	James	6100000	COMPRA	COMPRA
+13/09/2020 - 13:41:16	Maño's Team	Ruben Esteban	Rafa Mir	17250995	CLAUSULA	CLAUSULA
+18/09/2020 - 22:29:00	futmondo	Ruben Esteban	Zubeldia	8213557	COMPRA	COMPRA
+20/08/2020 - 20:14:00	Maño's Team	futmondo	Vallejo	4000000	COMPRA	COMPRA
+16/09/2020 - 03:03:00	Albar ÉldelBar	HOPE TEAM S.A	Kaptoum	1200000	COMPRA	COMPRA
+17/09/2020 - 00:39:00	futmondo	Hala Modric	Lucas Vázquez	1167981	COMPRA	COMPRA
+31/08/2020 - 21:20:00	HOPE TEAM S.A	futmondo	Fede Valverde	23500000	COMPRA	COMPRA
+19/09/2020 - 12:37:34	Gaditas FC	jglelxino17	Renato Tapia	8724034	CLAUSULA	CLAUSULA
+10/09/2020 - 08:14:00	Albar ÉldelBar	Luis Ragan	Jordi Alba	26000000	COMPRA	COMPRA
+17/09/2020 - 21:29:00	Maño's Team	futmondo	Carles Aleñá	1775008	COMPRA	COMPRA
+10/09/2020 - 08:14:00	Albar ÉldelBar	Luis Ragan	Pedro León	12500000	COMPRA	COMPRA
+25/08/2020 - 21:14:00	Pineda team	futmondo	Mfulu	1230000	COMPRA	COMPRA
+15/09/2020 - 00:11:00	futmondo	Hala Modric	David Soria	21768992	COMPRA	COMPRA
+06/09/2020 - 21:28:00	David Vidal Team	futmondo	Víctor Rodríguez	3555555	COMPRA	COMPRA
+04/09/2020 - 16:38:00	futmondo	Hala Modric	Óliver Torres	4425083	COMPRA	COMPRA
+24/08/2020 - 20:17:00	Sabero Valley	futmondo	Jaime Mata	25350001	COMPRA	COMPRA
+18/08/2020 - 20:13:00	Sabero Valley	futmondo	Diop	1650001	COMPRA	COMPRA
+08/09/2020 - 21:30:00	Huevo Frito C.F.	futmondo	Diego Costa	9977241	COMPRA	COMPRA
+20/08/2020 - 20:14:00	Pineda team	futmondo	Munir	10000234	COMPRA	COMPRA
+18/09/2020 - 01:43:00	futmondo	Hala Modric	Toño	1004076	COMPRA	COMPRA
+27/08/2020 - 21:15:00	HOPE TEAM S.A	futmondo	Okazaki	4599999	COMPRA	COMPRA
+02/09/2020 - 21:23:00	Sabero Valley	futmondo	Albiol	17600001	COMPRA	COMPRA
+11/09/2020 - 05:13:00	futmondo	Luis Ragan	Santi Mina	11135218	COMPRA	COMPRA
+14/09/2020 - 22:52:00	futmondo	Maño's Team	Coquelin	16980570	COMPRA	COMPRA
+26/08/2020 - 21:15:00	Gaditas FC	futmondo	Dani Calvo	2600000	COMPRA	COMPRA
+07/09/2020 - 21:29:00	Hala Modric	futmondo	Mario Gaspar	1555555	COMPRA	COMPRA
+24/08/2020 - 20:17:00	Luis Ragan	futmondo	Íñigo Martínez	23666666	COMPRA	COMPRA
+10/09/2020 - 21:31:00	Pineda team	futmondo	De Marcos	2399900	COMPRA	COMPRA
+04/09/2020 - 21:25:00	HOPE TEAM S.A	futmondo	Vinícius	22200000	COMPRA	COMPRA
+21/08/2020 - 20:15:00	cityods	futmondo	Aitor Fernández	23666666	COMPRA	COMPRA
+13/09/2020 - 21:29:00	David Vidal Team	futmondo	Javi Galán	4000002	COMPRA	COMPRA
+12/09/2020 - 01:15:00	HOPE TEAM S.A	Albar ÉldelBar	Faycal Fajr	1000000	COMPRA	COMPRA
+24/08/2020 - 20:17:00	cityods	futmondo	Dembélé	14444444	COMPRA	COMPRA
+31/08/2020 - 04:52:00	futmondo	Ruben Esteban	Albiol	15419095	COMPRA	COMPRA
+10/09/2020 - 08:14:00	Albar ÉldelBar	Luis Ragan	Saúl Ñíguez	28000000	COMPRA	COMPRA
+09/09/2020 - 21:31:00	Pineda team	futmondo	Cardona	1100002	COMPRA	COMPRA
+24/08/2020 - 20:17:00	Luis Ragan	futmondo	Yeray	25666666	COMPRA	COMPRA
+20/08/2020 - 20:14:00	echo de menos el Netliga	futmondo	Gabriel Paulista	16000000	COMPRA	COMPRA
+12/09/2020 - 01:15:00	HOPE TEAM S.A	Albar ÉldelBar	Borja Garcés	1200000	COMPRA	COMPRA
+10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Timor	1000000	COMPRA	COMPRA
+12/09/2020 - 16:25:10	jglelxino17	Maño's Team	Kang-in Lee	8607304	CLAUSULA	CLAUSULA
+19/09/2020 - 12:37:34	Hala Modric	HOPE TEAM S.A	Claudio Bravo	10393595	CLAUSULA	CLAUSULA
+03/09/2020 - 21:24:00	HOPE TEAM S.A	futmondo	Lenglet	23400000	COMPRA	COMPRA
+18/08/2020 - 20:13:00	echo de menos el Netliga	futmondo	Jorge De Frutos	2100000	COMPRA	COMPRA
+11/09/2020 - 22:45:00	futmondo	Ruben Esteban	Laguardia	14694439	COMPRA	COMPRA
+31/08/2020 - 05:31:00	futmondo	Luis Ragan	Dani García	10651858	COMPRA	COMPRA
+14/09/2020 - 21:28:00	Hala Modric	futmondo	Jon Morcillo	3299999	COMPRA	COMPRA
+06/09/2020 - 21:28:00	Pineda team	futmondo	Guidetti	1000011	COMPRA	COMPRA
+12/09/2020 - 19:13:33	echo de menos el Netliga	Pineda team	Sergio González	3980000	CLAUSULA	CLAUSULA
+21/08/2020 - 20:15:00	PaKeTeS ⚽️	futmondo	Varane	32850000	COMPRA	COMPRA
+23/08/2020 - 20:16:00	Sabero Valley	futmondo	Rubén García	28600001	COMPRA	COMPRA
+25/08/2020 - 21:14:00	jorgearaujopirez	futmondo	Asenjo	30546798	COMPRA	COMPRA
+19/08/2020 - 20:14:00	Pineda team	futmondo	Perea	1985858	COMPRA	COMPRA
+23/08/2020 - 20:16:00	HOPE TEAM S.A	futmondo	Salvi	5500000	COMPRA	COMPRA
+08/09/2020 - 21:30:00	Maño's Team	futmondo	Palaversa	3500000	COMPRA	COMPRA
+18/08/2020 - 20:13:00	echo de menos el Netliga	futmondo	Akapo	2500000	COMPRA	COMPRA
+12/09/2020 - 01:11:00	futmondo	jorgearaujopirez	William Carvalho	2762490	COMPRA	COMPRA
+30/08/2020 - 21:18:00	PaKeTeS ⚽️	futmondo	Reguilón	22150000	COMPRA	COMPRA
+05/09/2020 - 21:26:00	Hala Modric	futmondo	Foulquier	2000109	COMPRA	COMPRA
+07/09/2020 - 21:29:00	David Vidal Team	futmondo	Etxeita	4000001	COMPRA	COMPRA
+19/09/2020 - 05:20:00	jorgearaujopirez	Luis Ragan	Yeray	200000	COMPRA	COMPRA
+25/08/2020 - 21:14:00	Maño's Team	futmondo	Pulido	6000000	COMPRA	COMPRA
+01/09/2020 - 21:22:00	jglelxino17	futmondo	Yangel Herrera	1850639	COMPRA	COMPRA
+18/08/2020 - 20:13:00	Maño's Team	futmondo	Giménez	30101000	COMPRA	COMPRA
+18/09/2020 - 23:06:00	futmondo	David Vidal Team	Rober Pier	1018029	COMPRA	COMPRA
+25/08/2020 - 21:14:00	Hala Modric	futmondo	Oier	3859999	COMPRA	COMPRA
+10/09/2020 - 21:31:00	Huevo Frito C.F.	futmondo	Arbilla	1000000	COMPRA	COMPRA
+11/09/2020 - 08:32:00	futmondo	Hala Modric	Cheryshev	1569636	COMPRA	COMPRA
+07/09/2020 - 03:15:00	futmondo	jglelxino17	Monreal	20488045	COMPRA	COMPRA
+14/09/2020 - 22:52:00	futmondo	Maño's Team	Vallejo	1791249	COMPRA	COMPRA
+25/08/2020 - 21:14:00	PaKeTeS ⚽️	futmondo	Inui	5280000	COMPRA	COMPRA
+14/09/2020 - 08:17:00	futmondo	Hala Modric	Mario Gaspar	1210132	COMPRA	COMPRA
+01/09/2020 - 21:22:00	Huevo Frito C.F.	futmondo	Sisto	1000000	COMPRA	COMPRA
+21/08/2020 - 20:15:00	Huevo Frito C.F.	futmondo	Oblak	55101000	COMPRA	COMPRA
+14/09/2020 - 22:47:00	futmondo	Albar ÉldelBar	Luna	1030329	COMPRA	COMPRA
+06/09/2020 - 21:28:00	David Vidal Team	futmondo	Edgar Méndez	5000213	COMPRA	COMPRA
+15/09/2020 - 21:29:00	echo de menos el Netliga	futmondo	Kike Pérez	1005000	COMPRA	COMPRA
+10/09/2020 - 21:31:00	Pineda team	futmondo	Melero	1456789	COMPRA	COMPRA
+18/08/2020 - 20:13:00	Sabero Valley	futmondo	Germán	8550000	COMPRA	COMPRA
+18/08/2020 - 20:13:00	Luis Ragan	futmondo	En-Nesyri	14111111	COMPRA	COMPRA
+21/08/2020 - 20:15:00	Luis Ragan	futmondo	Vadillo	5111111	COMPRA	COMPRA
+25/08/2020 - 21:14:00	PaKeTeS ⚽️	futmondo	Juanmi	2300000	COMPRA	COMPRA
+14/09/2020 - 21:28:00	David Vidal Team	futmondo	Adrián	5555555	COMPRA	COMPRA
+19/08/2020 - 20:14:00	Maño's Team	futmondo	Pedri	5101000	COMPRA	COMPRA
+18/08/2020 - 20:13:00	Gaditas FC	futmondo	Radoja	1920000	COMPRA	COMPRA
+13/09/2020 - 21:29:00	Ruben Esteban	futmondo	Joselu	25128000	COMPRA	COMPRA
+23/08/2020 - 20:16:00	jorgearaujopirez	futmondo	Loren Morón	14006311	COMPRA	COMPRA
+19/09/2020 - 21:28:00	jorgearaujopirez	futmondo	Moyano	1569214	COMPRA	COMPRA
+11/09/2020 - 16:37:00	futmondo	echo de menos el Netliga	Piqué	29706665	COMPRA	COMPRA
+26/08/2020 - 21:15:00	PaKeTeS ⚽️	futmondo	Piccini	1500000	COMPRA	COMPRA
+24/08/2020 - 20:17:00	Luis Ragan	futmondo	David Silva	35666666	COMPRA	COMPRA
+22/08/2020 - 20:15:00	jglelxino17	futmondo	Pjanic	42000009	COMPRA	COMPRA
+20/08/2020 - 20:14:00	Hala Modric	futmondo	Álex Fdez	14599999	COMPRA	COMPRA
+19/09/2020 - 12:30:00	futmondo	Hala Modric	Víctor Díaz	11881496	COMPRA	COMPRA
+23/08/2020 - 20:16:00	Pineda team	futmondo	Capa	27596969	COMPRA	COMPRA
+13/09/2020 - 23:09:00	futmondo	HOPE TEAM S.A	Rubén Martínez	1014120	COMPRA	COMPRA
+07/09/2020 - 16:49:00	futmondo	HOPE TEAM S.A	Óscar Rodríguez	16174108	COMPRA	COMPRA
+10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Sagnan	1000000	COMPRA	COMPRA
+16/09/2020 - 21:29:00	cityods	futmondo	Bautista	1333333	COMPRA	COMPRA
+18/08/2020 - 20:13:00	cityods	futmondo	Isco	13333333	COMPRA	COMPRA
+12/09/2020 - 11:50:00	futmondo	Hala Modric	Jaime Seoane	1009077	COMPRA	COMPRA
+09/09/2020 - 22:39:00	futmondo	Maño's Team	Asensio	24451897	COMPRA	COMPRA
+18/09/2020 - 21:30:00	Hala Modric	futmondo	Pervis Estupiñan	16259999	COMPRA	COMPRA
+19/08/2020 - 20:14:00	HOPE TEAM S.A	futmondo	Januzaj	14000000	COMPRA	COMPRA
+22/08/2020 - 20:15:00	Hala Modric	futmondo	Messi	81999999	COMPRA	COMPRA
+25/08/2020 - 21:14:00	Pineda team	futmondo	Jony	1099991	COMPRA	COMPRA
+16/09/2020 - 15:05:00	Gaditas FC	PaKeTeS ⚽️	Juanmi	8713766	COMPRA	COMPRA
+29/08/2020 - 21:17:00	jglelxino17	futmondo	Kounde	36495273	COMPRA	COMPRA
+23/08/2020 - 20:16:00	jglelxino17	futmondo	Dani Gómez	2200000	COMPRA	COMPRA
+16/09/2020 - 15:05:00	Maño's Team	Ruben Esteban	Rafa Mir	17250995	COMPRA	COMPRA
+11/09/2020 - 21:26:00	Sabero Valley	futmondo	Waldo Rubio	1000001	COMPRA	COMPRA
+13/09/2020 - 21:29:00	Ruben Esteban	futmondo	Pere Pons	1355000	COMPRA	COMPRA
+13/09/2020 - 21:29:00	Ruben Esteban	futmondo	Joaquín	7227000	COMPRA	COMPRA
+06/09/2020 - 21:28:00	David Vidal Team	futmondo	Dmitrovic	21000014	COMPRA	COMPRA
+12/09/2020 - 16:25:03	jglelxino17	Sabero Valley	Racic	3995245	CLAUSULA	CLAUSULA
+13/09/2020 - 12:38:14	HOPE TEAM S.A	Maño's Team	Sergio Herrera	8542473	CLAUSULA	CLAUSULA
+20/08/2020 - 20:14:00	Maño's Team	futmondo	Morata	35501000	COMPRA	COMPRA
+26/08/2020 - 21:15:00	Gaditas FC	futmondo	Fidel	3250000	COMPRA	COMPRA
+19/09/2020 - 04:40:00	futmondo	Luis Ragan	Rubén Peña	9252810	COMPRA	COMPRA
+19/08/2020 - 20:14:00	Sabero Valley	futmondo	Toni Lato	1000002	COMPRA	COMPRA
+19/08/2020 - 20:14:00	Ruben Esteban	futmondo	Rafa Mir	6108000	COMPRA	COMPRA
+18/08/2020 - 20:13:00	Sabero Valley	futmondo	Remiro	13501000	COMPRA	COMPRA
+19/08/2020 - 20:14:00	PaKeTeS ⚽️	futmondo	Néstor Araujo	7100000	COMPRA	COMPRA
+12/09/2020 - 16:20:12	Sabero Valley	jglelxino17	Yangel Herrera	7072303	CLAUSULA	CLAUSULA
+27/08/2020 - 21:15:00	Maño's Team	futmondo	Villalibre	1444444	COMPRA	COMPRA
+21/08/2020 - 20:15:00	Luis Ragan	futmondo	Iza	4111111	COMPRA	COMPRA
+02/09/2020 - 21:23:00	Ruben Esteban	futmondo	Dmitrovic	15101000	COMPRA	COMPRA
+20/08/2020 - 20:14:00	Luis Ragan	futmondo	Espino	6111111	COMPRA	COMPRA
+28/08/2020 - 21:16:00	Hala Modric	futmondo	Kike García	4699999	COMPRA	COMPRA
+23/08/2020 - 20:16:00	HOPE TEAM S.A	futmondo	Alcaraz	9000000	COMPRA	COMPRA
+10/09/2020 - 21:31:00	David Vidal Team	futmondo	Raúl García	52000130	COMPRA	COMPRA
+14/09/2020 - 00:48:00	futmondo	Albar ÉldelBar	Sagnan	1063115	COMPRA	COMPRA
+03/09/2020 - 22:46:00	futmondo	Ruben Esteban	Coutinho	31453955	COMPRA	COMPRA
+03/09/2020 - 21:24:00	Pineda team	futmondo	Odriozola	2111111	COMPRA	COMPRA
+20/08/2020 - 20:14:00	PaKeTeS ⚽️	futmondo	José Ángel	12500000	COMPRA	COMPRA
+19/09/2020 - 23:05:00	futmondo	jorgearaujopirez	Riqui Puig	9091191	COMPRA	COMPRA
+07/09/2020 - 21:29:00	PaKeTeS ⚽️	futmondo	Braithwaite	5002080	COMPRA	COMPRA
+16/09/2020 - 15:05:00	HOPE TEAM S.A	Maño's Team	Sergio Herrera	8542473	COMPRA	COMPRA
+18/08/2020 - 20:13:00	Hala Modric	futmondo	David Soria	15599999	COMPRA	COMPRA
+06/09/2020 - 21:28:00	David Vidal Team	futmondo	Pina	3558123	COMPRA	COMPRA
+01/09/2020 - 21:22:00	Hala Modric	futmondo	Ocampos	62599999	COMPRA	COMPRA
+09/09/2020 - 23:12:00	jglelxino17	HOPE TEAM S.A	Vinícius	25000000	COMPRA	COMPRA
+21/08/2020 - 20:15:00	cityods	futmondo	Zaldúa	14999999	COMPRA	COMPRA
+18/09/2020 - 23:06:00	futmondo	David Vidal Team	Víctor Rodríguez	2247790	COMPRA	COMPRA
+16/09/2020 - 15:05:00	echo de menos el Netliga	HOPE TEAM S.A	Salvi	14008600	COMPRA	COMPRA
+08/09/2020 - 21:30:00	Sabero Valley	futmondo	Montoro	6550000	COMPRA	COMPRA
+26/08/2020 - 21:15:00	echo de menos el Netliga	futmondo	Piqué	51000000	COMPRA	COMPRA
+26/08/2020 - 21:15:00	PaKeTeS ⚽️	futmondo	Vaclik	21584000	COMPRA	COMPRA
+16/09/2020 - 21:29:00	cityods	futmondo	Villalibre	1050000	COMPRA	COMPRA
+18/08/2020 - 20:13:00	Maño's Team	futmondo	Cucho	8800000	COMPRA	COMPRA
+18/08/2020 - 20:13:00	echo de menos el Netliga	futmondo	Ángel	21000000	COMPRA	COMPRA
+22/08/2020 - 20:15:00	Hala Modric	futmondo	Yuri	32599999	COMPRA	COMPRA
+04/09/2020 - 01:48:00	futmondo	Pineda team	Roger Martí	17907978	COMPRA	COMPRA
+24/08/2020 - 20:17:00	jorgearaujopirez	futmondo	Joan Jordan	15632456	COMPRA	COMPRA
+25/08/2020 - 21:14:00	HOPE TEAM S.A	futmondo	Nyom	5400000	COMPRA	COMPRA
+19/08/2020 - 20:14:00	HOPE TEAM S.A	futmondo	Mendy	30000000	COMPRA	COMPRA
+19/08/2020 - 20:14:00	Pineda team	futmondo	Borja Mayoral	4000032	COMPRA	COMPRA
+06/09/2020 - 21:28:00	Huevo Frito C.F.	futmondo	Sergi Enrich	8306971	COMPRA	COMPRA
+16/09/2020 - 22:44:00	futmondo	Ruben Esteban	Joselu	26589035	COMPRA	COMPRA
+08/09/2020 - 22:08:00	futmondo	Maño's Team	Pedro López	938878	COMPRA	COMPRA
+01/09/2020 - 03:58:00	futmondo	Luis Ragan	Javi Galán	2301842	COMPRA	COMPRA
+18/09/2020 - 21:30:00	Pineda team	futmondo	Roberto	1600001	COMPRA	COMPRA
+28/08/2020 - 21:16:00	Hala Modric	futmondo	Joselu	22999999	COMPRA	COMPRA
+22/08/2020 - 20:15:00	Huevo Frito C.F.	futmondo	De Jong	42100000	COMPRA	COMPRA
+11/09/2020 - 05:13:00	futmondo	Luis Ragan	Damián Suárez	15711728	COMPRA	COMPRA
+24/08/2020 - 20:17:00	jorgearaujopirez	futmondo	Riqui Puig	11222333	COMPRA	COMPRA
+16/09/2020 - 15:05:00	Sabero Valley	jglelxino17	Yangel Herrera	7072303	COMPRA	COMPRA
+18/08/2020 - 20:13:00	cityods	futmondo	Wass	15999999	COMPRA	COMPRA
+22/08/2020 - 20:15:00	HOPE TEAM S.A	futmondo	Rubén Martínez	3500000	COMPRA	COMPRA
+24/08/2020 - 20:17:00	Sabero Valley	futmondo	Carvajal	40250001	COMPRA	COMPRA
+04/09/2020 - 21:25:00	Hala Modric	futmondo	Maksimovic	13599999	COMPRA	COMPRA
+04/09/2020 - 16:38:00	futmondo	Hala Modric	Víctor Díaz	13341043	COMPRA	COMPRA
+18/09/2020 - 21:30:00	jorgearaujopirez	futmondo	Cheryshev	2356999	COMPRA	COMPRA
+08/09/2020 - 04:55:00	futmondo	Luis Ragan	Álvaro Fernández	3499475	COMPRA	COMPRA
+25/08/2020 - 21:14:00	PaKeTeS ⚽️	futmondo	Willian José	28500000	COMPRA	COMPRA
+11/09/2020 - 02:58:00	futmondo	HOPE TEAM S.A	Fede Valverde	24018220	COMPRA	COMPRA
+31/08/2020 - 21:20:00	Luis Ragan	futmondo	Rubén Peña	7222222	COMPRA	COMPRA
+18/08/2020 - 20:13:00	cityods	futmondo	Odegaard	31100009	COMPRA	COMPRA
+19/09/2020 - 12:37:34	Gaditas FC	PaKeTeS ⚽️	Juanmi	8713766	CLAUSULA	CLAUSULA
+30/08/2020 - 21:18:00	Ruben Esteban	futmondo	David García	2017252	COMPRA	COMPRA
+19/09/2020 - 01:05:00	futmondo	Pineda team	Masip	11469344	COMPRA	COMPRA
+14/09/2020 - 21:28:00	Maño's Team	futmondo	Moncayola	2000000	COMPRA	COMPRA
+19/08/2020 - 20:14:00	Luis Ragan	futmondo	Dani García	11111111	COMPRA	COMPRA
+16/09/2020 - 15:05:00	Gaditas FC	jglelxino17	Renato Tapia	8724034	COMPRA	COMPRA
+20/08/2020 - 20:14:00	HOPE TEAM S.A	futmondo	Hazard	80000000	COMPRA	COMPRA
+13/09/2020 - 21:29:00	Sabero Valley	futmondo	Moi Gómez	9550000	COMPRA	COMPRA
+29/08/2020 - 21:17:00	Huevo Frito C.F.	futmondo	Pere Milla	3001011	COMPRA	COMPRA
+21/08/2020 - 20:15:00	Maño's Team	futmondo	Tello	3000000	COMPRA	COMPRA
+06/09/2020 - 21:28:00	PaKeTeS ⚽️	futmondo	Sergi Roberto	13300000	COMPRA	COMPRA
+25/08/2020 - 21:14:00	PaKeTeS ⚽️	futmondo	Alberto	1850000	COMPRA	COMPRA
+16/09/2020 - 22:37:00	futmondo	Albar ÉldelBar	Borja Garcés	1019109	COMPRA	COMPRA
+23/08/2020 - 20:16:00	jglelxino17	futmondo	Nacho Martínez	8695238	COMPRA	COMPRA
+17/09/2020 - 15:05:00	Pineda team	Hala Modric	Mikel Rico	13063117	COMPRA	COMPRA
+14/09/2020 - 15:35:00	futmondo	Pineda team	Jozabed	800000	COMPRA	COMPRA
+08/09/2020 - 21:30:00	Ruben Esteban	futmondo	Joselu	24502000	COMPRA	COMPRA
+13/09/2020 - 12:53:00	futmondo	Hala Modric	Kadzior	2818849	COMPRA	COMPRA
+26/08/2020 - 21:15:00	Hala Modric	futmondo	Víctor Díaz	12159999	COMPRA	COMPRA
+09/09/2020 - 21:31:00	echo de menos el Netliga	futmondo	Maksimovic	13330000	COMPRA	COMPRA
+05/09/2020 - 21:26:00	Hala Modric	futmondo	Lucas Vázquez	1999999	COMPRA	COMPRA
+09/09/2020 - 21:31:00	Hala Modric	futmondo	Guido Rodríguez	1450000	COMPRA	COMPRA
+06/09/2020 - 21:28:00	Hala Modric	futmondo	"Choco" Lozano	4599999	COMPRA	COMPRA
+13/09/2020 - 02:59:20	Gaditas FC	jglelxino17	Renato Tapia	8724034	CLAUSULA	CLAUSULA
+04/09/2020 - 21:25:00	Hala Modric	futmondo	Lodi	22599999	COMPRA	COMPRA
+26/08/2020 - 22:46:00	futmondo	Ruben Esteban	Sergi Enrich	9604645	COMPRA	COMPRA
+03/09/2020 - 21:24:00	Sabero Valley	futmondo	Rodrigo Ely	2866000	COMPRA	COMPRA
+19/08/2020 - 20:14:00	cityods	futmondo	Luuk de Jong	13333333	COMPRA	COMPRA
+14/09/2020 - 21:28:00	Maño's Team	futmondo	Piqué	39000000	COMPRA	COMPRA
+19/08/2020 - 20:14:00	cityods	futmondo	Aridane	17111111	COMPRA	COMPRA
+21/08/2020 - 20:15:00	Maño's Team	futmondo	Bacca	3500000	COMPRA	COMPRA
+10/09/2020 - 21:31:00	Maño's Team	futmondo	Dani García	13222222	COMPRA	COMPRA
+08/09/2020 - 21:30:00	Pineda team	futmondo	San Emeterio	1244444	COMPRA	COMPRA
+27/08/2020 - 21:15:00	Maño's Team	futmondo	Montoya	5555555	COMPRA	COMPRA
+28/08/2020 - 21:16:00	Gaditas FC	futmondo	Juan Cruz	4900000	COMPRA	COMPRA
+11/09/2020 - 05:13:00	futmondo	Luis Ragan	Gonzalo Verdú	4815689	COMPRA	COMPRA
+18/08/2020 - 20:13:00	cityods	futmondo	Mariano	4500001	COMPRA	COMPRA
+10/09/2020 - 04:45:00	futmondo	Pineda team	Chimy Ávila	34212725	COMPRA	COMPRA
+20/08/2020 - 20:14:00	jglelxino17	futmondo	Benzema	90346900	COMPRA	COMPRA
+06/09/2020 - 21:28:00	David Vidal Team	futmondo	Malbasic	1555241	COMPRA	COMPRA
+18/09/2020 - 23:06:00	futmondo	David Vidal Team	Pina	1872905	COMPRA	COMPRA
+18/08/2020 - 20:13:00	Pineda team	futmondo	Domingos Duarte	19876549	COMPRA	COMPRA
+14/09/2020 - 08:16:00	futmondo	Hala Modric	"Choco" Lozano	4749435	COMPRA	COMPRA
+19/09/2020 - 12:37:34	echo de menos el Netliga	Gaditas FC	Aidoo	11677196	CLAUSULA	CLAUSULA
+13/09/2020 - 23:09:00	futmondo	HOPE TEAM S.A	Alcaraz	10351445	COMPRA	COMPRA
+09/09/2020 - 21:44:00	futmondo	Ruben Esteban	Joselu	24839376	COMPRA	COMPRA
+20/08/2020 - 20:14:00	Maño's Team	futmondo	Mosquera	3501000	COMPRA	COMPRA
+31/08/2020 - 23:15:00	futmondo	Ruben Esteban	Vinícius	21369667	COMPRA	COMPRA
+30/08/2020 - 21:18:00	echo de menos el Netliga	futmondo	Folch	2000100	COMPRA	COMPRA
+10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Álvaro Fernández	3354506	COMPRA	COMPRA
+24/08/2020 - 20:17:00	Maño's Team	futmondo	Javi Sánchez	2666666	COMPRA	COMPRA
+13/09/2020 - 11:46:54	Hala Modric	HOPE TEAM S.A	Claudio Bravo	10393595	CLAUSULA	CLAUSULA
+16/09/2020 - 03:03:00	Albar ÉldelBar	HOPE TEAM S.A	Faycal Fajr	1000000	COMPRA	COMPRA
+21/08/2020 - 20:15:00	Hala Modric	futmondo	Bigas	3359999	COMPRA	COMPRA
+19/08/2020 - 20:14:00	HOPE TEAM S.A	futmondo	Trippier	26000000	COMPRA	COMPRA
+25/08/2020 - 21:14:00	echo de menos el Netliga	futmondo	Casemiro	57000000	COMPRA	COMPRA
+13/09/2020 - 02:54:05	Gaditas FC	PaKeTeS ⚽️	Juanmi	8713766	CLAUSULA	CLAUSULA
+30/08/2020 - 21:18:00	echo de menos el Netliga	futmondo	Marcelo	10000000	COMPRA	COMPRA
+10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Chichizola	1000000	COMPRA	COMPRA
+20/08/2020 - 20:14:00	jorgearaujopirez	futmondo	Morales	23200000	COMPRA	COMPRA
+25/08/2020 - 21:14:00	Ruben Esteban	futmondo	Pacheco	15035000	COMPRA	COMPRA
+18/08/2020 - 20:13:00	cityods	futmondo	Kondogbia	9999999	COMPRA	COMPRA
+27/08/2020 - 21:15:00	Gaditas FC	futmondo	Cillessen	18500000	COMPRA	COMPRA
+28/08/2020 - 21:16:00	PaKeTeS ⚽️	futmondo	João Félix	42580000	COMPRA	COMPRA
+19/09/2020 - 12:37:34	jglelxino17	Maño's Team	Kang-in Lee	8607304	CLAUSULA	CLAUSULA
+09/09/2020 - 14:37:00	futmondo	Hala Modric	Lodi	21136159	COMPRA	COMPRA
+20/08/2020 - 20:14:00	PaKeTeS ⚽️	futmondo	Ximo Navarro	2850000	COMPRA	COMPRA
+21/08/2020 - 20:15:00	HOPE TEAM S.A	futmondo	Kubo	35000000	COMPRA	COMPRA
+10/09/2020 - 21:31:00	Huevo Frito C.F.	futmondo	Gorosabel	1000000	COMPRA	COMPRA
+04/09/2020 - 21:25:00	Sabero Valley	futmondo	Weissman	9150000	COMPRA	COMPRA
+18/08/2020 - 20:13:00	Pineda team	futmondo	Jesús Navas	45000009	COMPRA	COMPRA
+07/09/2020 - 21:29:00	Ruben Esteban	futmondo	Enric Gallego	6025000	COMPRA	COMPRA
+27/08/2020 - 21:15:00	Sabero Valley	futmondo	Marcos André	5150001	COMPRA	COMPRA
+11/09/2020 - 16:34:00	futmondo	echo de menos el Netliga	Brasanac	1192273	COMPRA	COMPRA
+19/08/2020 - 20:14:00	Sabero Valley	futmondo	Ferreiro	4601000	COMPRA	COMPRA
+01/09/2020 - 21:22:00	jglelxino17	futmondo	Deyverson	3569236	COMPRA	COMPRA
+16/09/2020 - 21:29:00	PaKeTeS ⚽️	futmondo	Marcos Mauro	1280000	COMPRA	COMPRA
+21/08/2020 - 20:15:00	Maño's Team	futmondo	Semedo	19501999	COMPRA	COMPRA
+20/08/2020 - 20:14:00	Pineda team	futmondo	Sergio González	1085858	COMPRA	COMPRA
+08/09/2020 - 21:30:00	David Vidal Team	futmondo	Jonsson	1945015	COMPRA	COMPRA
+04/09/2020 - 16:36:00	futmondo	Hala Modric	Josan	2708604	COMPRA	COMPRA
+19/09/2020 - 12:37:34	echo de menos el Netliga	Pineda team	Sergio González	3980000	CLAUSULA	CLAUSULA
+09/09/2020 - 22:48:00	Pineda team	jglelxino17	Fede Vico	2000000	COMPRA	COMPRA
+20/08/2020 - 20:14:00	Gaditas FC	futmondo	Trigueros	7150000	COMPRA	COMPRA
+27/08/2020 - 21:15:00	Gaditas FC	futmondo	Toni Villa	1500000	COMPRA	COMPRA
+08/09/2020 - 21:30:00	HOPE TEAM S.A	futmondo	Pedraza	5500000	COMPRA	COMPRA
+14/09/2020 - 00:48:00	futmondo	Albar ÉldelBar	Álvaro Fernández	3134740	COMPRA	COMPRA
+22/08/2020 - 20:15:00	echo de menos el Netliga	futmondo	Villar	1300000	COMPRA	COMPRA
+19/09/2020 - 12:37:34	jglelxino17	Sabero Valley	Racic	3995245	CLAUSULA	CLAUSULA
+19/08/2020 - 20:14:00	Ruben Esteban	futmondo	Milla	12018000	COMPRA	COMPRA
+25/08/2020 - 21:14:00	Sabero Valley	futmondo	Koke	27750001	COMPRA	COMPRA
+31/08/2020 - 21:20:00	Sabero Valley	futmondo	Guillamón	2150001	COMPRA	COMPRA
+07/09/2020 - 21:29:00	David Vidal Team	futmondo	Rober Pier	2500535	COMPRA	COMPRA
+11/09/2020 - 21:26:00	Maño's Team	futmondo	Iborra	12200000	COMPRA	COMPRA
+22/08/2020 - 20:15:00	jglelxino17	futmondo	Fran Beltrán	2346826	COMPRA	COMPRA
+15/09/2020 - 15:05:00	echo de menos el Netliga	Sabero Valley	Andrés Fernández	3980000	COMPRA	COMPRA
+13/09/2020 - 21:29:00	Hala Modric	futmondo	Víctor Díaz	13189999	COMPRA	COMPRA
+10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Faycal Fajr	1000000	COMPRA	COMPRA
+26/08/2020 - 21:15:00	HOPE TEAM S.A	futmondo	Neva	5199999	COMPRA	COMPRA
+20/08/2020 - 20:14:00	Luis Ragan	futmondo	Blanco	7111111	COMPRA	COMPRA
+19/09/2020 - 12:37:34	Pineda team	Hala Modric	Mikel Rico	13063117	CLAUSULA	CLAUSULA
+23/08/2020 - 20:16:00	jorgearaujopirez	futmondo	Parejo	49550632	COMPRA	COMPRA
+29/08/2020 - 02:44:00	futmondo	Luis Ragan	Vadillo	5963227	COMPRA	COMPRA
+22/08/2020 - 20:15:00	jglelxino17	futmondo	Renato Tapia	3246809	COMPRA	COMPRA
+19/08/2020 - 20:14:00	Huevo Frito C.F.	futmondo	Denis Suárez	18101001	COMPRA	COMPRA
+01/09/2020 - 21:22:00	HOPE TEAM S.A	futmondo	Claudio Bravo	5500000	COMPRA	COMPRA
+21/08/2020 - 20:15:00	Luis Ragan	futmondo	Maxi Gómez	26666666	COMPRA	COMPRA
+28/08/2020 - 21:16:00	Gaditas FC	futmondo	Aidoo	3800000	COMPRA	COMPRA
+10/09/2020 - 21:12:00	futmondo	Ruben Esteban	Enric Gallego	6053954	COMPRA	COMPRA
+20/08/2020 - 20:14:00	Maño's Team	futmondo	Rui Silva	21101000	COMPRA	COMPRA
+28/08/2020 - 21:16:00	Pineda team	futmondo	Cucurella	30919191	COMPRA	COMPRA
+18/09/2020 - 21:30:00	jorgearaujopirez	futmondo	Tete Morente	1100222	COMPRA	COMPRA
+07/09/2020 - 22:41:00	futmondo	Ruben Esteban	Dani García	12011523	COMPRA	COMPRA
+15/09/2020 - 21:29:00	Albar ÉldelBar	futmondo	Matheus Fernandes	1000000	COMPRA	COMPRA
+19/08/2020 - 20:14:00	Luis Ragan	futmondo	Merquelanz	3888888	COMPRA	COMPRA
+29/08/2020 - 21:17:00	Ruben Esteban	futmondo	Unai López	4283001	COMPRA	COMPRA
+03/09/2020 - 21:24:00	Hala Modric	futmondo	Diego Llorente	12199999	COMPRA	COMPRA
+29/08/2020 - 02:44:00	futmondo	Luis Ragan	Fali	1214706	COMPRA	COMPRA
+11/09/2020 - 21:26:00	Albar ÉldelBar	futmondo	Guedes	35619111	COMPRA	COMPRA
+25/08/2020 - 21:14:00	Ruben Esteban	futmondo	Mikel Merino	29652000	COMPRA	COMPRA
+10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Luna	1000000	COMPRA	COMPRA
+29/08/2020 - 21:17:00	Ruben Esteban	futmondo	Albiol	13954000	COMPRA	COMPRA
+04/09/2020 - 23:27:00	futmondo	Sabero Valley	Marcos André	5635316	COMPRA	COMPRA
+19/08/2020 - 20:14:00	Gaditas FC	futmondo	Carlos Soler	25100000	COMPRA	COMPRA
+29/08/2020 - 21:17:00	Luis Ragan	futmondo	Nacho Vidal	5222222	COMPRA	COMPRA
+24/08/2020 - 20:17:00	Pineda team	futmondo	Escudero	3000001	COMPRA	COMPRA
+25/08/2020 - 21:14:00	PaKeTeS ⚽️	futmondo	Campaña	23580000	COMPRA	COMPRA
+12/09/2020 - 21:27:00	HOPE TEAM S.A	futmondo	Modric	26601000	COMPRA	COMPRA
+31/08/2020 - 21:20:00	Luis Ragan	futmondo	Damián Suárez	15666666	COMPRA	COMPRA
+08/09/2020 - 00:21:00	futmondo	Hala Modric	Álex Fdez	16974412	COMPRA	COMPRA
+08/09/2020 - 01:02:00	futmondo	Pineda team	Jony	1043904	COMPRA	COMPRA
+27/08/2020 - 21:15:00	Luis Ragan	futmondo	Paco Alcácer	36222222	COMPRA	COMPRA
+13/09/2020 - 21:29:00	Ruben Esteban	futmondo	Coutinho	32701000	COMPRA	COMPRA
+02/09/2020 - 23:37:00	futmondo	Sabero Valley	Alberto Moreno	14203839	COMPRA	COMPRA
+04/09/2020 - 16:46:00	futmondo	Hala Modric	Edgar Méndez	2905855	COMPRA	COMPRA
+19/09/2020 - 12:37:34	Pineda team	Sabero Valley	Ferreiro	9381521	CLAUSULA	CLAUSULA
+29/08/2020 - 21:17:00	jglelxino17	futmondo	Diego Carlos	44620442	COMPRA	COMPRA
+13/09/2020 - 21:29:00	Ruben Esteban	futmondo	David Silva	40901000	COMPRA	COMPRA
+10/09/2020 - 22:19:00	futmondo	Maño's Team	Tello	995270	COMPRA	COMPRA
+28/08/2020 - 21:16:00	Gaditas FC	futmondo	Emre Mor	3500000	COMPRA	COMPRA
+10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Moyá	2200001	COMPRA	COMPRA
+28/08/2020 - 21:16:00	PaKeTeS ⚽️	futmondo	Correa	11580000	COMPRA	COMPRA
+17/09/2020 - 10:30:00	futmondo	echo de menos el Netliga	Casemiro	47255160	COMPRA	COMPRA
+04/09/2020 - 21:25:00	Hala Modric	futmondo	Orellana	33999999	COMPRA	COMPRA
+29/08/2020 - 21:17:00	Hala Modric	futmondo	Óliver Torres	4799999	COMPRA	COMPRA
+10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Kaptoum	1000000	COMPRA	COMPRA
+10/09/2020 - 08:17:00	Albar ÉldelBar	Luis Ragan	Paco Alcácer	43000000	COMPRA	COMPRA
+15/09/2020 - 00:11:00	Maño's Team	Hala Modric	Diego Llorente	15000000	COMPRA	COMPRA
+11/09/2020 - 02:57:00	futmondo	HOPE TEAM S.A	Januzaj	14950908	COMPRA	COMPRA
+11/09/2020 - 16:37:00	futmondo	echo de menos el Netliga	Ángel	9975624	COMPRA	COMPRA
+23/08/2020 - 20:16:00	Ruben Esteban	futmondo	Pau Torres	24858000	COMPRA	COMPRA
+26/08/2020 - 21:15:00	jorgearaujopirez	futmondo	Óscar Plano	13750964	COMPRA	COMPRA
+12/09/2020 - 21:27:00	PaKeTeS ⚽️	futmondo	Miramón	4085000	COMPRA	COMPRA
+19/08/2020 - 20:14:00	Sabero Valley	futmondo	Alberto Moreno	15350000	COMPRA	COMPRA
+07/09/2020 - 04:15:00	David Vidal Team	Hala Modric	Messi	100000000	COMPRA	COMPRA
+17/09/2020 - 00:39:00	futmondo	Hala Modric	Luis Rioja	1265191	COMPRA	COMPRA
+14/09/2020 - 21:28:00	PaKeTeS ⚽️	futmondo	Iñigo Pérez	2100000	COMPRA	COMPRA
+09/09/2020 - 00:27:00	futmondo	Huevo Frito C.F.	Sisto	1060825	COMPRA	COMPRA
+29/08/2020 - 21:17:00	Sabero Valley	futmondo	Racic	1010000	COMPRA	COMPRA
+29/08/2020 - 21:17:00	HOPE TEAM S.A	futmondo	Óscar Rodríguez	13200000	COMPRA	COMPRA
+21/08/2020 - 20:15:00	Huevo Frito C.F.	futmondo	Gayá	25101001	COMPRA	COMPRA
+10/09/2020 - 21:31:00	Ruben Esteban	futmondo	Córdoba	1364061	COMPRA	COMPRA
+28/08/2020 - 23:06:00	futmondo	jglelxino17	Rodrigo Ely	2309386	COMPRA	COMPRA
+09/09/2020 - 22:39:00	futmondo	Maño's Team	Morata	30570837	COMPRA	COMPRA
+17/09/2020 - 21:29:00	jglelxino17	futmondo	Lejeune	2563985	COMPRA	COMPRA
+19/09/2020 - 23:05:00	futmondo	jorgearaujopirez	Loren Morón	9974684	COMPRA	COMPRA
+06/09/2020 - 21:28:00	Hala Modric	futmondo	Luis Rioja	1009999	COMPRA	COMPRA
+19/09/2020 - 01:54:00	futmondo	Hala Modric	Yuri	26174425	COMPRA	COMPRA
+18/08/2020 - 20:13:00	Sabero Valley	futmondo	Gonalons	3100001	COMPRA	COMPRA
+12/09/2020 - 21:27:00	HOPE TEAM S.A	futmondo	Unai López	8500000	COMPRA	COMPRA
+16/09/2020 - 14:27:00	futmondo	echo de menos el Netliga	Maksimovic	10967435	COMPRA	COMPRA
+04/09/2020 - 16:38:00	futmondo	Hala Modric	Enric Gallego	5395074	COMPRA	COMPRA
+25/08/2020 - 15:00:00	futmondo	jorgearaujopirez	Rodrigo	29055684	COMPRA	COMPRA
+20/08/2020 - 20:14:00	Ruben Esteban	futmondo	Gerard Moreno	56000880	COMPRA	COMPRA
+12/09/2020 - 16:21:00	futmondo	Sabero Valley	Gonalons	2700291	COMPRA	COMPRA
+23/08/2020 - 20:16:00	jorgearaujopirez	futmondo	Sergio Ramos	53698452	COMPRA	COMPRA
+20/08/2020 - 20:14:00	Gaditas FC	futmondo	Felipe	32000001	COMPRA	COMPRA
+08/09/2020 - 22:04:00	futmondo	Maño's Team	Bacca	999994	COMPRA	COMPRA
+04/09/2020 - 16:35:00	futmondo	Hala Modric	Oier	4127793	COMPRA	COMPRA
+11/09/2020 - 21:26:00	echo de menos el Netliga	futmondo	Mangala	1251800	COMPRA	COMPRA
+24/08/2020 - 20:17:00	Luis Ragan	futmondo	Jordi Alba	25111111	COMPRA	COMPRA
+09/09/2020 - 21:44:00	futmondo	Ruben Esteban	Unai López	5402322	COMPRA	COMPRA
+18/09/2020 - 04:31:00	futmondo	Albar ÉldelBar	Faycal Fajr	1061708	COMPRA	COMPRA
+25/08/2020 - 21:14:00	PaKeTeS ⚽️	futmondo	Darwin Machís	22580000	COMPRA	COMPRA
+28/08/2020 - 21:16:00	Sabero Valley	futmondo	Andrés Fernández	1000010	COMPRA	COMPRA
+10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Rubén Sobrino	1116197	COMPRA	COMPRA
+24/08/2020 - 05:08:00	futmondo	Luis Ragan	Blanco	6450045	COMPRA	COMPRA
+26/08/2020 - 21:15:00	jorgearaujopirez	futmondo	Nolito	14222569	COMPRA	COMPRA
+11/09/2020 - 02:51:00	futmondo	HOPE TEAM S.A	Lenglet	23684154	COMPRA	COMPRA
+28/08/2020 - 05:07:00	futmondo	Luis Ragan	En-Nesyri	13812195	COMPRA	COMPRA
+26/08/2020 - 21:15:00	Sabero Valley	futmondo	Olaza	21150000	COMPRA	COMPRA
+19/08/2020 - 20:14:00	Gaditas FC	futmondo	Vrsaljko	1600000	COMPRA	COMPRA
+28/08/2020 - 05:07:00	futmondo	Luis Ragan	Merquelanz	3779809	COMPRA	COMPRA
+14/09/2020 - 10:31:00	futmondo	echo de menos el Netliga	Mangala	1228460	COMPRA	COMPRA
+21/08/2020 - 20:15:00	jglelxino17	futmondo	Okay Yokuslu	6235809	COMPRA	COMPRA
+10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Ontiveros	1228412	COMPRA	COMPRA
+18/08/2020 - 20:13:00	Luis Ragan	futmondo	Enes Ünal	7200111	COMPRA	COMPRA
+07/09/2020 - 06:55:00	futmondo	Hala Modric	Maksimovic	13943819	COMPRA	COMPRA
+09/09/2020 - 22:52:00	futmondo	jglelxino17	Benzema	79508463	COMPRA	COMPRA
+11/09/2020 - 22:06:37	echo de menos el Netliga	Sabero Valley	Andrés Fernández	3980000	CLAUSULA	CLAUSULA
+08/09/2020 - 22:05:00	futmondo	Maño's Team	Roncaglia	1040871	COMPRA	COMPRA
+22/08/2020 - 20:15:00	Maño's Team	futmondo	Roncaglia	2501000	COMPRA	COMPRA
+18/09/2020 - 21:30:00	Albar ÉldelBar	futmondo	Vesga	1000000	COMPRA	COMPRA
