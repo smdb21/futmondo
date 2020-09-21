@@ -62,7 +62,12 @@ public class Main {
 				return ret;
 			}
 			final List<String> lines = Files.readAllLines(file.toPath(), StandardCharsets.UTF_8);
+			int num = 0;
 			for (final String string : lines) {
+				num++;
+				if (num == 1) {
+					continue;
+				}
 				final Compra compra = Compra.fromLine(string);
 				ret.add(compra);
 			}
@@ -174,7 +179,7 @@ public class Main {
 		if (text == null) {
 			return 0;
 		}
-		return Integer.valueOf(text.replace(".", "").replace(",", "").replace("$", "").trim());
+		return Integer.valueOf(text.replace(".", "").replace(",", "").replace("$", "").replace("€", "").trim());
 	}
 
 }

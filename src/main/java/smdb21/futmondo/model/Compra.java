@@ -69,8 +69,8 @@ public class Compra {
 		final int precio = Integer.valueOf(split[4]);
 		final TipoCompra tipoCompra = TipoCompra.valueOf(split[5]);
 		String photoJugadorURL = null;
-		if (split.length > 5 && !"null".equals(split[5])) {
-			photoJugadorURL = split[5];
+		if (split.length > 6 && !"null".equals(split[6])) {
+			photoJugadorURL = split[6];
 		}
 		final Compra compra = new Compra(comprador, vendedor, jugador, precio, tipoCompra, fecha, photoJugadorURL);
 		return compra;
