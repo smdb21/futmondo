@@ -19,6 +19,9 @@ public class Compra {
 		super();
 		this.comprador = comprador;
 		this.vendedor = vendedor;
+		if (jugador.equals("Iza")) {
+			System.out.println("asdf");
+		}
 		this.jugador = jugador;
 		this.precio = precio;
 		this.tipoCompra = tipoCompra;

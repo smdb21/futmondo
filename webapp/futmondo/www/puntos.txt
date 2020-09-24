@@ -1,0 +1,33 @@
+jornada	jugador	posicion	puntos
+1	Luis Ragan	1	61.4
+1	Ruben Esteban	2	57.4
+1	Sabero Valley	3	55.2
+1	Maño's Team	4	48.9
+1	Hala Modric	5	42.9
+1	Gaditas FC	6	38.9
+1	jorgearaujopirez	7	37.8
+1	HOPE TEAM S.A	8	36.7
+1	Pineda team	9	27.8
+1	echo de menos el Netliga	10	25.4
+1	David Vidal Team	11	23.4
+1	Huevo Frito C.F.	12	22.4
+1	jglelxino17	13	21.3
+1	cityods	14	21.0
+1	PaKeTeS ⚽️	15	20.7
+1	Albar ÉldelBar	16	7.9
+2	Luis Ragan	1	65.8
+2	Hala Modric	2	65.2
+2	Sabero Valley	3	62.7
+2	Ruben Esteban	4	57.1
+2	HOPE TEAM S.A	5	53.9
+2	echo de menos el Netliga	6	49.3
+2	jglelxino17	7	46.2
+2	David Vidal Team	8	39.6
+2	Gaditas FC	9	35.7
+2	PaKeTeS ⚽️	10	34.7
+2	jorgearaujopirez	11	33.7
+2	Pineda team	12	32.7
+2	Huevo Frito C.F.	13	31.3
+2	Albar ÉldelBar	14	26.6
+2	Maño's Team	15	25.2
+2	cityods	16	22.4
