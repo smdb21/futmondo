@@ -60,7 +60,7 @@ public class Compra {
 	}
 
 	public static String headerString() {
-		return "Fecha\tComprador\tVendedor\tJugador\tPrecio\tTipo\tFoto";
+		return "Fecha\tComprador\tVendedor\tFutbolista\tPrecio\tTipo\tFoto";
 	}
 
 	public static Compra fromLine(String string) throws ParseException {
@@ -84,10 +84,8 @@ public class Compra {
 		final int prime = 31;
 		int result = 1;
 		result = prime * result + ((comprador == null) ? 0 : comprador.hashCode());
-		result = prime * result + ((fecha == null) ? 0 : fecha.hashCode());
 		result = prime * result + ((jugador == null) ? 0 : jugador.hashCode());
 		result = prime * result + precio;
-		result = prime * result + ((tipoCompra == null) ? 0 : tipoCompra.hashCode());
 		result = prime * result + ((vendedor == null) ? 0 : vendedor.hashCode());
 		return result;
 	}
@@ -106,11 +104,7 @@ public class Compra {
 				return false;
 		} else if (!comprador.equals(other.comprador))
 			return false;
-		if (fecha == null) {
-			if (other.fecha != null)
-				return false;
-		} else if (!fecha.equals(other.fecha))
-			return false;
+
 		if (jugador == null) {
 			if (other.jugador != null)
 				return false;
@@ -118,8 +112,7 @@ public class Compra {
 			return false;
 		if (precio != other.precio)
 			return false;
-		if (tipoCompra != other.tipoCompra)
-			return false;
+
 		if (vendedor == null) {
 			if (other.vendedor != null)
 				return false;

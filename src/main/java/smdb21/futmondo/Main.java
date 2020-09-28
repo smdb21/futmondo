@@ -51,6 +51,8 @@ public class Main {
 
 			final Set<Compra> compras = readComprasFromFile(folder);
 
+			// FIRST READ VESTUARIO BECAUSE COMPRAS INCLUDES CLAUSULAS AND THIS WAY, IN
+			// VESTUARIO, WE HAVE CLAUSULAS, AND THEY CANNOT GET OVERRIDEN BY COMPRAS
 			int originalSize = compras.size();
 			compras.addAll(readVestuario(folder));
 			System.out.println((compras.size() - originalSize) + " nuevas compras en el vestuario");

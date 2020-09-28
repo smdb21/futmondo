@@ -1,584 +1,646 @@
-Fecha	Comprador	Vendedor	Jugador	Precio	Tipo	Foto
-19/08/2020 - 20:14:00	cityods	futmondo	Luuk de Jong	13333333	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/luuk-de-jong.png
-10/09/2020 - 08:17:00	Albar ÉldelBar	Luis Ragan	Íñigo Martínez	27000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67104772.png
-18/08/2020 - 20:13:00	Maño's Team	futmondo	Giménez	30101000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/78060464.png
-09/09/2020 - 14:36:00	futmondo	Hala Modric	Orellana	34198558	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/8835313.png
-13/09/2020 - 21:29:00	Hala Modric	futmondo	Víctor Díaz	13189999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1510284.png
-24/08/2020 - 20:17:00	Maño's Team	futmondo	Javi Sánchez	2666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/javier-sanchez-de-felipe.png
-31/08/2020 - 21:20:00	Luis Ragan	futmondo	Rubén Peña	7222222	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67177699.png
-19/09/2020 - 04:40:00	futmondo	Luis Ragan	Rubén Peña	9252810	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67177699.png
-07/09/2020 - 04:37:00	Hala Modric	HOPE TEAM S.A	Okazaki	12000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/788545.png
-23/08/2020 - 20:16:00	Huevo Frito C.F.	futmondo	Hugo Mallo	11010001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67086276.png
-29/08/2020 - 21:17:00	HOPE TEAM S.A	futmondo	Óscar Rodríguez	13200000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67228635.png
-20/08/2020 - 20:14:00	Ruben Esteban	futmondo	Gerard Moreno	56000880	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67115823.png
-13/09/2020 - 02:59:20	Gaditas FC	jglelxino17	Renato Tapia	8724034	CLAUSULA	null
-19/08/2020 - 20:14:00	Gaditas FC	futmondo	Carlos Soler	25100000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67196204.png
-06/09/2020 - 21:28:00	David Vidal Team	futmondo	Víctor Rodríguez	3555555	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67070671.png
-18/09/2020 - 21:30:00	Luis Ragan	futmondo	William Carvalho	5222222	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55012106.png
-11/09/2020 - 22:07:00	futmondo	echo de menos el Netliga	Nano	800000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67172036.png
-19/09/2020 - 01:05:00	futmondo	Pineda team	Masip	11469344	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67038645.png
-23/08/2020 - 20:16:00	jorgearaujopirez	futmondo	Loren Morón	14006311	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67181072.png
-16/09/2020 - 21:29:00	PaKeTeS ⚽️	futmondo	Marcos Mauro	1280000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67175124.png
-21/08/2020 - 20:15:00	Huevo Frito C.F.	futmondo	Oblak	55101000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/64016316.png
-07/09/2020 - 03:22:00	futmondo	PaKeTeS ⚽️	Reguilón	20078030	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67211900.png
-10/09/2020 - 08:17:00	Albar ÉldelBar	Luis Ragan	Paco Alcácer	43000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67115584.png
-21/08/2020 - 20:15:00	jorgearaujopirez	futmondo	Sergio León	2550005	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67140149.png
-11/09/2020 - 21:26:00	Maño's Team	futmondo	Iborra	12200000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/iborra.png
-16/09/2020 - 14:27:00	futmondo	echo de menos el Netliga	Maksimovic	10967435	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62097340.png
-28/08/2020 - 05:07:00	futmondo	Luis Ragan	Merquelanz	3779809	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67199409.png
-04/09/2020 - 16:46:00	futmondo	Hala Modric	Edgar Méndez	2905855	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67080309.png
-18/09/2020 - 22:29:00	futmondo	Ruben Esteban	Zubeldia	8213557	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67215898.png
-06/09/2020 - 03:12:00	futmondo	Hala Modric	Joselu	24963414	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/jos-luis-mato-sanmartn.png
-16/09/2020 - 15:05:00	jglelxino17	Sabero Valley	Racic	3995245	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62189039.png
-31/08/2020 - 23:15:00	futmondo	Ruben Esteban	Vinícius	21369667	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19302146.png
-27/08/2020 - 21:15:00	Hala Modric	futmondo	Cheryshev	2759999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67011250.png
-27/08/2020 - 21:15:00	Gaditas FC	futmondo	Toni Villa	1500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67215621.png
-31/08/2020 - 04:52:00	futmondo	Ruben Esteban	Albiol	15419095	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7452450.png
-19/09/2020 - 12:37:34	Hala Modric	Sabero Valley	Mathías Olivera	5714960	CLAUSULA	null
-19/08/2020 - 20:14:00	Luis Ragan	futmondo	Bardhi	14666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/27102027.png
-13/09/2020 - 02:54:05	Gaditas FC	PaKeTeS ⚽️	Juanmi	8713766	CLAUSULA	null
-06/09/2020 - 21:28:00	Hala Modric	futmondo	Fekir	47599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/nabil-fekir.png
-06/09/2020 - 21:28:00	Hala Modric	futmondo	"Choco" Lozano	4599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/87006900.png
-15/09/2020 - 00:19:00	futmondo	HOPE TEAM S.A	Joel	2050396	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67037306.png
-01/09/2020 - 21:22:00	jglelxino17	futmondo	Fede Vico	1256809	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67142992.png
-07/09/2020 - 22:41:00	futmondo	Ruben Esteban	Dani García	12011523	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67104797.png
-10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Luna	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67034505.png
-20/09/2020 - 21:29:00	echo de menos el Netliga	futmondo	Barrenetxea	3207000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/ander-barrenetxea-muguruza.png
-04/09/2020 - 21:25:00	Hala Modric	futmondo	Maksimovic	13599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62097340.png
-01/09/2020 - 21:22:00	jglelxino17	futmondo	Yangel Herrera	1850639	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/yangel-clemente-herrera-ravelo.png
-20/08/2020 - 20:14:00	echo de menos el Netliga	futmondo	Gabriel Paulista	16000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19127830.png
-21/08/2020 - 20:15:00	cityods	futmondo	Trincao	19999999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/francisco-antonio-machado-mota-castro-trincao.png
-27/08/2020 - 21:16:00	Luis Ragan	futmondo	Pedro León	13222222	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67005397.png
-12/09/2020 - 01:15:00	HOPE TEAM S.A	Albar ÉldelBar	Faycal Fajr	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85084000.png
-04/09/2020 - 21:25:00	Hala Modric	futmondo	Lodi	22599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/renan-lodi.png
-25/08/2020 - 15:00:00	futmondo	jorgearaujopirez	Rodrigo	29055684	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67086280.png
-18/08/2020 - 20:13:00	Luis Ragan	futmondo	En-Nesyri	14111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67229630.png
-18/08/2020 - 20:13:00	Sabero Valley	futmondo	José Mari	2150001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67082063.png
-25/08/2020 - 21:14:00	Ruben Esteban	futmondo	Pacheco	15035000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67155103.png
-04/09/2020 - 16:35:00	futmondo	Hala Modric	Oier	4127793	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1509613.png
-14/09/2020 - 21:28:00	PaKeTeS ⚽️	futmondo	Diakhaby	1385000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/48036643.png
-13/09/2020 - 15:32:25	Hala Modric	Pineda team	Iza	13617396	CLAUSULA	null
+Fecha	Comprador	Vendedor	Futbolista	Precio	Tipo	Foto
 08/09/2020 - 22:05:00	futmondo	Maño's Team	Roncaglia	1040871	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/14001537.png
-26/08/2020 - 21:15:00	echo de menos el Netliga	futmondo	Canales	51200000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67053076.png
-12/09/2020 - 01:15:00	HOPE TEAM S.A	Albar ÉldelBar	Kaptoum	1200000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67185039.png
-11/09/2020 - 21:26:00	Maño's Team	futmondo	Manu Vallejo	1388320	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/manuel-javier-vallejo-galvan.png
-31/08/2020 - 21:20:00	Hala Modric	futmondo	Iago Aspas	62599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67010455.png
-09/09/2020 - 21:31:00	echo de menos el Netliga	futmondo	Maksimovic	13330000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62097340.png
-04/09/2020 - 16:46:00	futmondo	Hala Modric	Bigas	2763024	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67122014.png
-26/08/2020 - 21:15:00	Gaditas FC	futmondo	Fidel	3250000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67053759.png
-14/09/2020 - 10:31:00	futmondo	echo de menos el Netliga	Mangala	1228460	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/eliaquim-mangala.png
-31/08/2020 - 21:20:00	HOPE TEAM S.A	futmondo	Fede Valverde	23500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/78074594.png
-23/08/2020 - 20:16:00	Pineda team	futmondo	Capa	27596969	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67187680.png
-20/08/2020 - 20:14:00	Maño's Team	futmondo	Kang-in Lee	6201000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/kang-in-lee.png
-11/09/2020 - 08:32:00	futmondo	Hala Modric	Cheryshev	1569636	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67011250.png
-19/08/2020 - 20:14:00	Pineda team	futmondo	Masip	9082236	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67038645.png
-19/08/2020 - 20:14:00	Luis Ragan	futmondo	Merquelanz	3888888	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67199409.png
-25/08/2020 - 21:14:00	Ruben Esteban	futmondo	Mikel Merino	29652000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67211760.png
-06/09/2020 - 21:28:00	Hala Modric	futmondo	Luis Rioja	1009999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67196000.png
-03/09/2020 - 22:46:00	futmondo	Ruben Esteban	Dmitrovic	16124196	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62038612.png
-06/09/2020 - 21:28:00	Huevo Frito C.F.	futmondo	Balenziaga	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67029321.png
-16/09/2020 - 15:05:00	Maño's Team	Ruben Esteban	Rafa Mir	17250995	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67221051.png
-10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Faycal Fajr	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85084000.png
-10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Gudelj	1157202	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/nemanja-gudelj.png
-23/08/2020 - 20:16:00	HOPE TEAM S.A	futmondo	Salvi	5500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67193445.png
-11/09/2020 - 21:26:00	Sabero Valley	futmondo	Waldo Rubio	1000001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67211880.png
-07/09/2020 - 21:29:00	David Vidal Team	futmondo	Etxeita	4000001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67008295.png
-31/08/2020 - 21:20:00	echo de menos el Netliga	futmondo	Brasanac	1340000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62039552.png
-24/08/2020 - 20:17:00	jorgearaujopirez	futmondo	Riqui Puig	11222333	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67258407.png
-20/08/2020 - 20:14:00	Maño's Team	futmondo	Morata	35501000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/morata.png
-10/09/2020 - 08:14:00	Albar ÉldelBar	Luis Ragan	Pedro León	12500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67005397.png
-11/09/2020 - 12:20:00	futmondo	jorgearaujopirez	Miquel	800000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/28027172.png
-23/08/2020 - 20:16:00	jorgearaujopirez	futmondo	Parejo	49550632	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67030707.png
-28/08/2020 - 21:16:00	Luis Ragan	futmondo	Chukwueze	17222222	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/samuel-chukwueze.png
-12/09/2020 - 21:27:00	jglelxino17	futmondo	Militao	6236559	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/eder-militao.png
-19/08/2020 - 20:14:00	Ruben Esteban	futmondo	Laguardia	15125880	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67059116.png
-18/08/2020 - 20:13:00	echo de menos el Netliga	futmondo	Jorge De Frutos	2100000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/jorge-de-frutos-sebastian.png
-14/09/2020 - 00:48:00	futmondo	Albar ÉldelBar	Sagnan	1063115	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/modibo-sagnan.png
-01/09/2020 - 21:22:00	HOPE TEAM S.A	futmondo	Claudio Bravo	5500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/5251774.png
-23/08/2020 - 20:16:00	jglelxino17	futmondo	Le Normand	12000955	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/robin-le-normand.png
-22/08/2020 - 20:15:00	HOPE TEAM S.A	futmondo	Rubén Martínez	3500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7451904.png
-25/08/2020 - 21:14:00	PaKeTeS ⚽️	futmondo	Darwin Machís	22580000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/86017618.png
-29/08/2020 - 21:17:00	echo de menos el Netliga	futmondo	Herrerín	1593999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67018266.png
-08/09/2020 - 22:05:00	futmondo	Maño's Team	Montoya	3768271	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67053464.png
-04/09/2020 - 21:25:00	Sabero Valley	futmondo	Weissman	9150000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/42058078.png
-23/08/2020 - 20:16:00	Sabero Valley	futmondo	Rubén García	28600001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67155012.png
-03/09/2020 - 21:24:00	Ruben Esteban	futmondo	Pjanic	40282000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/8438112.png
-18/08/2020 - 20:13:00	cityods	futmondo	Junior Firpo	5111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67222900.png
-13/09/2020 - 21:29:00	echo de menos el Netliga	futmondo	Tello	3909090	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67046417.png
-06/09/2020 - 21:28:00	Huevo Frito C.F.	futmondo	Sergi Enrich	8306971	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67018561.png
-28/08/2020 - 21:16:00	Sabero Valley	futmondo	Andrés Fernández	1000010	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67015052.png
-19/08/2020 - 20:14:00	Pineda team	futmondo	Borja Mayoral	4000032	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67211912.png
-08/09/2020 - 22:04:00	futmondo	Maño's Team	Bacca	999994	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/76003938.png
-07/09/2020 - 04:15:00	David Vidal Team	Hala Modric	Messi	100000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7458500.png
-08/09/2020 - 21:30:00	Ruben Esteban	futmondo	Zubeldia	8175000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67215898.png
-21/08/2020 - 20:15:00	Maño's Team	futmondo	Tello	3000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67046417.png
-17/09/2020 - 21:29:00	Albar ÉldelBar	futmondo	Aitor Ruibal	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67220941.png
-14/09/2020 - 21:28:00	jglelxino17	futmondo	Óscar Rodríguez	24500064	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67228635.png
-20/08/2020 - 20:14:00	HOPE TEAM S.A	futmondo	Hazard	80000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/eden-hazard.png
-16/09/2020 - 22:37:00	futmondo	Albar ÉldelBar	Kaptoum	1035570	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67185039.png
-19/08/2020 - 20:14:00	Sabero Valley	futmondo	Joaquín Fernández	4550001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67184200.png
-17/09/2020 - 00:39:00	futmondo	Hala Modric	Lucas Vázquez	1167981	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67135344.png
-21/08/2020 - 20:15:00	Huevo Frito C.F.	futmondo	Gayá	25101001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67178177.png
-23/08/2020 - 20:16:00	Luis Ragan	futmondo	Arambarri	15666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/78064881.png
-19/09/2020 - 23:05:00	futmondo	jorgearaujopirez	Loren Morón	9974684	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67181072.png
-10/09/2020 - 04:45:00	futmondo	Pineda team	Chimy Ávila	34212725	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/14027117.png
-21/08/2020 - 20:15:00	Maño's Team	futmondo	Bacca	3500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/76003938.png
-24/08/2020 - 20:17:00	Pineda team	futmondo	Escudero	3000001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67065536.png
-30/08/2020 - 21:40:00	futmondo	PaKeTeS ⚽️	James	4775741	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/james-rodriguez.png
-19/08/2020 - 20:14:00	Pineda team	futmondo	Perea	1985858	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67120790.png
-14/09/2020 - 21:28:00	Maño's Team	futmondo	Moncayola	2000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67267210.png
-16/09/2020 - 15:05:00	Hala Modric	HOPE TEAM S.A	Claudio Bravo	10393595	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/5251774.png
-28/08/2020 - 21:16:00	Maño's Team	futmondo	Pedro López	1864000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7452446.png
-24/08/2020 - 20:17:00	Luis Ragan	futmondo	Íñigo Martínez	23666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67104772.png
-25/08/2020 - 21:14:00	Pineda team	futmondo	Mfulu	1230000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85080017.png
-16/09/2020 - 21:29:00	PaKeTeS ⚽️	futmondo	Jurado	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7451707.png
-11/09/2020 - 02:57:00	futmondo	HOPE TEAM S.A	Januzaj	14950908	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/18054092.png
-01/09/2020 - 21:22:00	Hala Modric	futmondo	Ocampos	62599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/lucas-ocampos.png
-16/09/2020 - 15:05:00	HOPE TEAM S.A	Maño's Team	Sergio Herrera	8542473	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67181753.png
-12/09/2020 - 08:17:00	HOPE TEAM S.A	Luis Ragan	Enes Ünal	250000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/70087488.png
-24/08/2020 - 20:17:00	cityods	futmondo	Dembélé	14444444	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85140178.png
-12/09/2020 - 16:25:10	jglelxino17	Maño's Team	Kang-in Lee	8607304	CLAUSULA	null
-07/09/2020 - 16:49:00	futmondo	HOPE TEAM S.A	Óscar Rodríguez	16174108	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67228635.png
-28/08/2020 - 21:16:00	PaKeTeS ⚽️	futmondo	Correa	11580000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/14043349.png
-08/09/2020 - 01:02:00	futmondo	Pineda team	Jony	1043904	COMPRA	https://static01.mondocore.com/futmondo/img/kits/64/elche.png
-29/08/2020 - 02:44:00	futmondo	Luis Ragan	Vadillo	5963227	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67140151.png
-27/08/2020 - 21:15:00	Maño's Team	futmondo	Villalibre	1444444	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67195730.png
-20/09/2020 - 21:29:00	echo de menos el Netliga	futmondo	Sergio Gómez	1450000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67258414.png
-09/09/2020 - 23:12:00	jglelxino17	HOPE TEAM S.A	Vinícius	25000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19302146.png
-10/09/2020 - 21:31:00	Pineda team	futmondo	Melero	1456789	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67011235.png
-18/08/2020 - 20:13:00	Gaditas FC	futmondo	Radoja	1920000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62056935.png
-13/09/2020 - 12:53:00	futmondo	Hala Modric	Kadzior	2818849	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/damian-kadzior.png
-19/09/2020 - 01:54:00	futmondo	Hala Modric	Yuri	26174425	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67035000.png
-31/08/2020 - 05:27:00	futmondo	Luis Ragan	Iborra	10257569	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/iborra.png
-14/09/2020 - 05:47:00	futmondo	Pineda team	Juan Pérez	800000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67217545.png
-23/08/2020 - 20:16:00	jglelxino17	futmondo	Dani Gómez	2200000	COMPRA	https://static01.mondocore.com/futmondo/img/kits/64/levante.png
-22/08/2020 - 20:15:00	Maño's Team	futmondo	Roncaglia	2501000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/14001537.png
-04/09/2020 - 21:25:00	HOPE TEAM S.A	futmondo	Vinícius	22200000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19302146.png
-28/08/2020 - 21:16:00	Gaditas FC	futmondo	Emre Mor	3500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/27102375.png
-02/09/2020 - 21:23:00	jglelxino17	futmondo	Sanabria	4753698	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67181404.png
-13/09/2020 - 12:39:45	Pineda team	Sabero Valley	Ferreiro	9381521	CLAUSULA	null
-10/09/2020 - 21:31:00	David Vidal Team	futmondo	Raúl García	52000130	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1502117.png
-27/08/2020 - 21:15:00	HOPE TEAM S.A	futmondo	Okazaki	4599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/788545.png
-30/08/2020 - 21:18:00	Ruben Esteban	futmondo	David García	2017252	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67215230.png
-21/08/2020 - 20:15:00	Hala Modric	futmondo	Bigas	3359999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67122014.png
-18/08/2020 - 20:13:00	cityods	futmondo	Odegaard	31100009	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/martin-degaard.png
-14/09/2020 - 22:56:00	futmondo	PaKeTeS ⚽️	Piccini	932510	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/43052618.png
-29/08/2020 - 02:44:00	futmondo	Luis Ragan	Iza	3194103	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67175525.png
-26/08/2020 - 21:15:00	Hala Modric	futmondo	Víctor Díaz	12159999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1510284.png
-26/08/2020 - 21:15:00	cityods	futmondo	Edgar Badía	4666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67080544.png
-14/09/2020 - 21:28:00	David Vidal Team	futmondo	Adrián	5555555	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1509231.png
-22/08/2020 - 20:15:00	jglelxino17	futmondo	Pjanic	42000009	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/8438112.png
-30/08/2020 - 21:18:00	Luis Ragan	futmondo	Battaglia	6222222	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/14025385.png
-12/09/2020 - 19:13:33	echo de menos el Netliga	Pineda team	Sergio González	3980000	CLAUSULA	null
-26/08/2020 - 21:15:00	jglelxino17	futmondo	Sancet	2000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/oihan-sancet.png
-20/08/2020 - 20:14:00	Maño's Team	futmondo	Thomas	19501000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67175052.png
-10/09/2020 - 22:19:00	futmondo	Maño's Team	Semedo	16070511	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55061470.png
-05/09/2020 - 21:26:00	Ruben Esteban	futmondo	Dani García	11501000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67104797.png
-15/09/2020 - 15:05:00	Hala Modric	Gaditas FC	Emre Mor	3980000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/27102375.png
-21/08/2020 - 20:15:00	Maño's Team	futmondo	Semedo	19501999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55061470.png
-18/09/2020 - 21:30:00	Albar ÉldelBar	futmondo	Vesga	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67195855.png
-25/08/2020 - 21:14:00	jglelxino17	futmondo	Rodrigo Ely	2108008	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/43080624.png
-25/08/2020 - 21:14:00	echo de menos el Netliga	futmondo	Casemiro	57000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19061518.png
-09/09/2020 - 21:31:00	Hala Modric	futmondo	Guido Rodríguez	1450000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/14043255.png
-25/08/2020 - 21:14:00	PaKeTeS ⚽️	futmondo	Campaña	23580000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67089223.png
-24/08/2020 - 20:17:00	Sabero Valley	futmondo	Jaime Mata	25350001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67121201.png
-27/08/2020 - 21:15:00	Gaditas FC	futmondo	Brais Méndez	6100000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67199158.png
-15/09/2020 - 15:05:00	echo de menos el Netliga	Sabero Valley	Andrés Fernández	3980000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67015052.png
-20/09/2020 - 21:29:00	echo de menos el Netliga	futmondo	Soares	1508010	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55038684.png
-21/08/2020 - 20:15:00	jorgearaujopirez	futmondo	William Carvalho	3600005	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55012106.png
-29/08/2020 - 21:17:00	jglelxino17	futmondo	Diego Carlos	44620442	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/diego-carlos.png
-23/08/2020 - 20:16:00	Gaditas FC	futmondo	Bartra	19000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67063004.png
-26/08/2020 - 21:15:00	Hala Modric	futmondo	Marcos Llorente	28599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67196198.png
-31/08/2020 - 04:53:00	futmondo	Ruben Esteban	Carlos Fernández	11560414	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67184485.png
-16/09/2020 - 22:43:00	futmondo	Ruben Esteban	Coutinho	35150843	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19046041.png
-11/09/2020 - 22:06:37	echo de menos el Netliga	Sabero Valley	Andrés Fernández	3980000	CLAUSULA	null
-19/08/2020 - 20:14:00	Ruben Esteban	futmondo	Milla	12018000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67191561.png
-04/09/2020 - 01:48:00	futmondo	Pineda team	Roger Martí	17907978	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67115585.png
-08/09/2020 - 21:30:00	Sabero Valley	futmondo	Montoro	6550000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67010609.png
-06/09/2020 - 03:13:00	futmondo	Hala Modric	Marcos Llorente	28663389	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67196198.png
-20/08/2020 - 20:14:00	Hala Modric	futmondo	Mikel Rico	3999999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1502244.png
-28/08/2020 - 21:16:00	PaKeTeS ⚽️	futmondo	João Félix	42580000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/joao-felix-sequeira.png
-26/08/2020 - 21:15:00	Huevo Frito C.F.	futmondo	Soldado	13101001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/soldado.png
-29/08/2020 - 21:17:00	jglelxino17	futmondo	Kounde	36495273	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/jules-kounde.png
-16/09/2020 - 21:29:00	cityods	futmondo	Villalibre	1050000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67195730.png
-02/09/2020 - 21:23:00	Sabero Valley	futmondo	Albiol	17600001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7452450.png
-19/09/2020 - 23:05:00	futmondo	jorgearaujopirez	Riqui Puig	9091191	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67258407.png
-14/09/2020 - 21:28:00	Hala Modric	futmondo	Benzema	76599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/8435089.png
-12/09/2020 - 01:15:00	HOPE TEAM S.A	Albar ÉldelBar	Borja Garcés	1200000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/borja-garces.png
-08/09/2020 - 21:30:00	Ruben Esteban	futmondo	Joselu	24502000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/jos-luis-mato-sanmartn.png
-19/08/2020 - 20:14:00	Sabero Valley	futmondo	Alberto Moreno	15350000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/alberto-moreno.png
-04/09/2020 - 16:38:00	futmondo	Hala Modric	Enric Gallego	5395074	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67136474.png
-26/08/2020 - 22:46:00	futmondo	Ruben Esteban	Sergi Enrich	9604645	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67018561.png
-18/08/2020 - 20:13:00	Pineda team	futmondo	Juan Pérez	1000090	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67217545.png
-10/09/2020 - 21:12:00	futmondo	Ruben Esteban	Enric Gallego	6053954	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67136474.png
-28/08/2020 - 21:16:00	Hala Modric	futmondo	Joselu	22999999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/jos-luis-mato-sanmartn.png
-04/09/2020 - 16:36:00	futmondo	Hala Modric	Josan	2708604	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67093858.png
-15/09/2020 - 00:11:00	futmondo	Hala Modric	David Soria	21768992	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67011248.png
-21/08/2020 - 20:15:00	PaKeTeS ⚽️	futmondo	Varane	32850000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85075627.png
-25/08/2020 - 21:14:00	jglelxino17	futmondo	Aritz	4000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67190072.png
-26/08/2020 - 21:15:00	Sabero Valley	futmondo	Olaza	21150000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/78048502.png
-28/08/2020 - 21:16:00	Ruben Esteban	futmondo	Oyarzabal	47252000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67220143.png
-14/09/2020 - 22:47:00	futmondo	Albar ÉldelBar	Luna	1030329	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67034505.png
-15/09/2020 - 00:11:00	Maño's Team	Hala Modric	Diego Llorente	15000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67011217.png
-10/09/2020 - 22:19:00	futmondo	Maño's Team	Tello	995270	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67046417.png
-05/09/2020 - 21:26:00	Sabero Valley	futmondo	Kroos	37650000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/156772.png
-04/09/2020 - 16:38:00	futmondo	Hala Modric	Víctor Díaz	13341043	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1510284.png
-08/09/2020 - 21:30:00	HOPE TEAM S.A	futmondo	Pedraza	5500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67212046.png
-17/09/2020 - 15:05:00	Hala Modric	Pineda team	Iza	13617396	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67175525.png
-13/09/2020 - 23:09:00	futmondo	HOPE TEAM S.A	Alcaraz	10351445	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67178038.png
-23/08/2020 - 20:16:00	jorgearaujopirez	futmondo	Sergio Ramos	53698452	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7458272.png
-30/08/2020 - 21:18:00	Luis Ragan	futmondo	Saúl Ñíguez	27777777	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67103336.png
-19/09/2020 - 05:20:00	jorgearaujopirez	Luis Ragan	Yeray	200000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67192475.png
-12/09/2020 - 16:21:00	futmondo	Sabero Valley	Gonalons	2700291	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/34001572.png
-18/08/2020 - 20:13:00	Sabero Valley	futmondo	Diop	1650001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/8440901.png
-03/09/2020 - 21:24:00	Hala Modric	futmondo	Diego Llorente	12199999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67011217.png
-09/09/2020 - 21:44:00	futmondo	Ruben Esteban	Unai López	5402322	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67145056.png
-18/08/2020 - 20:13:00	cityods	futmondo	Isco	13333333	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67103537.png
-21/08/2020 - 20:15:00	Ruben Esteban	futmondo	Son	1018000	COMPRA	https://static01.mondocore.com/futmondo/img/kits/64/levante.png
-23/08/2020 - 20:16:00	jglelxino17	futmondo	Nacho Martínez	8695238	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67037315.png
-19/08/2020 - 20:14:00	cityods	futmondo	Aridane	17111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67006487.png
-08/09/2020 - 21:30:00	Pineda team	futmondo	Vitolo	3600000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67072243.png
-18/09/2020 - 23:06:00	futmondo	David Vidal Team	Vukcevic	957029	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62075230.png
-07/09/2020 - 21:29:00	PaKeTeS ⚽️	futmondo	Braithwaite	5002080	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/martin-braithwaite.png
-29/08/2020 - 21:17:00	Ruben Esteban	futmondo	Unai López	4283001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67145056.png
-05/09/2020 - 21:26:00	Hala Modric	futmondo	Kadzior	3399999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/damian-kadzior.png
-10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Moyá	2200001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/824545.png
-29/08/2020 - 21:17:00	Luis Ragan	futmondo	Djené	25222222	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/211232.png
-28/08/2020 - 21:16:00	Pineda team	futmondo	Cucurella	30919191	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67215284.png
-16/09/2020 - 22:44:00	futmondo	Ruben Esteban	Joselu	26589035	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/jos-luis-mato-sanmartn.png
-30/08/2020 - 21:18:00	Ruben Esteban	futmondo	Vinícius	21158880	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19302146.png
-09/09/2020 - 21:31:00	Pineda team	futmondo	Marcos Llorente	31345678	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67196198.png
-28/08/2020 - 21:16:00	Hala Modric	futmondo	Kike García	4699999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67065538.png
-18/09/2020 - 21:30:00	Pineda team	futmondo	Roberto	1600001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1510293.png
-13/09/2020 - 23:09:00	futmondo	HOPE TEAM S.A	Rubén Martínez	1014120	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7451904.png
-18/09/2020 - 23:06:00	futmondo	David Vidal Team	Rober Pier	1018029	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67194879.png
-22/08/2020 - 20:15:00	Hala Modric	futmondo	Messi	81999999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7458500.png
-23/08/2020 - 20:16:00	HOPE TEAM S.A	futmondo	Alcaraz	9000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67178038.png
-13/09/2020 - 21:29:00	Ruben Esteban	futmondo	David Silva	40901000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7458280.png
-12/09/2020 - 19:12:12	echo de menos el Netliga	HOPE TEAM S.A	Salvi	14008600	CLAUSULA	null
-20/09/2020 - 21:29:00	Sabero Valley	futmondo	Álex Fdez	16750001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67085790.png
-27/08/2020 - 21:15:00	Luis Ragan	futmondo	Gonzalo Verdú	5111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67093485.png
-24/08/2020 - 20:17:00	Maño's Team	futmondo	Coquelin	18501000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/34012022.png
-16/09/2020 - 15:05:00	Gaditas FC	PaKeTeS ⚽️	Juanmi	8713766	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67106568.png
-02/09/2020 - 23:37:00	futmondo	Sabero Valley	Alberto Moreno	14203839	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/alberto-moreno.png
-02/09/2020 - 21:23:00	Pineda team	futmondo	Iza	3678932	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67175525.png
-09/09/2020 - 22:48:00	Pineda team	jglelxino17	Fede Vico	2000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67142992.png
-20/08/2020 - 20:14:00	jglelxino17	futmondo	Benzema	90346900	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/8435089.png
-19/09/2020 - 21:28:00	echo de menos el Netliga	futmondo	Míchel Herrero	3120000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67065401.png
-15/09/2020 - 10:00:00	futmondo	Pineda team	Cardona	1007167	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67240151.png
-06/09/2020 - 21:28:00	David Vidal Team	futmondo	Bigas	4000128	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67122014.png
-15/09/2020 - 21:29:00	Hala Modric	futmondo	Héctor Herrera	1159999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/hector-herrera.png
-25/08/2020 - 21:14:00	PaKeTeS ⚽️	futmondo	Alberto	1850000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/6705830.png
-25/08/2020 - 21:14:00	Pineda team	futmondo	Jony	1099991	COMPRA	https://static01.mondocore.com/futmondo/img/kits/64/elche.png
-18/08/2020 - 20:13:00	echo de menos el Netliga	futmondo	Akapo	2500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67178095.png
-19/08/2020 - 20:14:00	Luis Ragan	futmondo	Dani García	11111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67104797.png
-20/08/2020 - 20:14:00	HOPE TEAM S.A	futmondo	Antonio Puertas	20000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67150319.png
-14/09/2020 - 21:28:00	PaKeTeS ⚽️	futmondo	Iñigo Pérez	2100000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67018267.png
-16/09/2020 - 21:29:00	Hala Modric	futmondo	Oier	6599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1509613.png
-21/08/2020 - 20:15:00	jglelxino17	futmondo	Guardado	4365982	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/5667723.png
-19/08/2020 - 20:14:00	jglelxino17	futmondo	Courtois	44000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/18026122.png
-20/09/2020 - 21:29:00	echo de menos el Netliga	futmondo	Eugeni	1100001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67169241.png
-20/08/2020 - 20:14:00	PaKeTeS ⚽️	futmondo	Ximo Navarro	2850000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67100203.png
-29/08/2020 - 21:17:00	Gaditas FC	futmondo	Jaume	3200000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67102156.png
-08/09/2020 - 21:30:00	jorgearaujopirez	futmondo	Miquel	1000001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/28027172.png
-18/08/2020 - 20:13:00	Pineda team	futmondo	Domingos Duarte	19876549	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55063355.png
-19/08/2020 - 20:14:00	Gaditas FC	futmondo	Vrsaljko	1600000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/24004437.png
-16/09/2020 - 15:05:00	echo de menos el Netliga	HOPE TEAM S.A	Salvi	14008600	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67193445.png
-11/09/2020 - 21:26:00	Albar ÉldelBar	futmondo	Lodi	21200001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/renan-lodi.png
-10/09/2020 - 21:31:00	Huevo Frito C.F.	futmondo	Gorosabel	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67202652.png
-23/08/2020 - 20:16:00	Gaditas FC	futmondo	Álex Moreno	18000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67153373.png
-19/08/2020 - 20:14:00	Maño's Team	futmondo	Asensio	25101000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67197125.png
-29/08/2020 - 21:17:00	Ruben Esteban	futmondo	Albiol	13954000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7452450.png
-18/08/2020 - 20:13:00	Hala Modric	futmondo	David Soria	15599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67011248.png
-24/08/2020 - 20:17:00	cityods	futmondo	Jovic	5249607	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/luka-jovic.png
-11/09/2020 - 05:13:00	futmondo	Luis Ragan	Damián Suárez	15711728	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/78001192.png
-06/09/2020 - 21:28:00	Pineda team	futmondo	Guidetti	1000011	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/68007650.png
-10/09/2020 - 21:31:00	Huevo Frito C.F.	futmondo	Arbilla	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1509367.png
-08/09/2020 - 21:30:00	Pineda team	futmondo	San Emeterio	1244444	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67199082.png
-11/09/2020 - 05:13:00	futmondo	Luis Ragan	Gonzalo Verdú	4815689	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67093485.png
-20/08/2020 - 20:14:00	Gaditas FC	futmondo	Trigueros	7150000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67142545.png
-03/09/2020 - 21:24:00	Sabero Valley	futmondo	Rodrigo Ely	2866000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/43080624.png
-10/09/2020 - 21:31:00	Maño's Team	futmondo	Unai Núñez	3666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67214595.png
-07/09/2020 - 21:29:00	Hala Modric	futmondo	Mario Gaspar	1555555	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67066949.png
-18/09/2020 - 21:30:00	jorgearaujopirez	futmondo	Cheryshev	2356999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67011250.png
-15/09/2020 - 21:29:00	Hala Modric	futmondo	Toño	1000066	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67138472.png
-19/09/2020 - 21:28:00	Luis Ragan	futmondo	Murillo	10777111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/76016518.png
-10/09/2020 - 21:31:00	Maño's Team	futmondo	Dani García	13222222	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67104797.png
-02/09/2020 - 21:23:00	Ruben Esteban	futmondo	Dmitrovic	15101000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62038612.png
-14/09/2020 - 08:16:00	futmondo	Hala Modric	"Choco" Lozano	4749435	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/87006900.png
-05/09/2020 - 21:26:00	Huevo Frito C.F.	futmondo	Luisinho	1111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55006171.png
-27/08/2020 - 21:15:00	Luis Ragan	futmondo	Paco Alcácer	36222222	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67115584.png
-19/08/2020 - 20:14:00	Gaditas FC	futmondo	Augusto Fernández	1450000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/962267.png
-17/09/2020 - 21:29:00	Maño's Team	futmondo	Carles Aleñá	1775008	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67213011.png
-09/09/2020 - 14:37:00	futmondo	Hala Modric	Lodi	21136159	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/renan-lodi.png
-18/09/2020 - 21:30:00	jorgearaujopirez	futmondo	Tete Morente	1100222	COMPRA	https://static01.mondocore.com/futmondo/img/kits/64/elche.png
-19/08/2020 - 20:14:00	jorgearaujopirez	futmondo	Rodrigo	38570000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67086280.png
-26/08/2020 - 21:15:00	Maño's Team	futmondo	Clerc	1500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67147196.png
-05/09/2020 - 21:26:00	Hala Modric	futmondo	Foulquier	2000109	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85045661.png
-14/09/2020 - 10:31:00	futmondo	echo de menos el Netliga	Folch	1534655	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67191864.png
-18/09/2020 - 04:31:00	futmondo	Albar ÉldelBar	Faycal Fajr	1061708	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85084000.png
-14/09/2020 - 15:35:00	futmondo	Pineda team	Jozabed	800000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67150299.png
-25/08/2020 - 21:14:00	Maño's Team	futmondo	Pulido	6000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67037319.png
-31/08/2020 - 21:20:00	Sabero Valley	futmondo	Guillamón	2150001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67258817.png
-25/08/2020 - 21:14:00	jorgearaujopirez	futmondo	Asenjo	30546798	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67006488.png
-26/08/2020 - 21:15:00	Gaditas FC	futmondo	Dani Calvo	2600000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67218464.png
-30/08/2020 - 21:18:00	jorgearaujopirez	futmondo	Nino	5123999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/811371.png
-08/09/2020 - 21:30:00	Huevo Frito C.F.	futmondo	Diego Costa	9977241	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55002038.png
-20/08/2020 - 20:14:00	Maño's Team	futmondo	Vallejo	4000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67192921.png
-08/09/2020 - 00:21:00	futmondo	Hala Modric	Álex Fdez	16974412	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67085790.png
-24/08/2020 - 20:17:00	jorgearaujopirez	futmondo	Joan Jordan	15632456	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67187249.png
-13/09/2020 - 21:29:00	Sabero Valley	futmondo	Moi Gómez	9550000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67142544.png
-16/09/2020 - 03:03:00	Albar ÉldelBar	HOPE TEAM S.A	Borja Garcés	1200000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/borja-garces.png
-25/08/2020 - 21:14:00	Hala Modric	futmondo	Oier	3859999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1509613.png
-26/08/2020 - 21:15:00	jorgearaujopirez	futmondo	Nolito	14222569	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67017094.png
-18/08/2020 - 20:13:00	Sabero Valley	futmondo	Germán	8550000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67024721.png
-20/08/2020 - 20:14:00	Pineda team	futmondo	Cala	8098832	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67010346.png
-30/08/2020 - 21:18:00	Huevo Frito C.F.	futmondo	Griezmann	58101001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67086656.png
-16/09/2020 - 03:03:00	Albar ÉldelBar	HOPE TEAM S.A	Kaptoum	1200000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67185039.png
-25/08/2020 - 21:14:00	Sabero Valley	futmondo	Koke	27750001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67047092.png
-22/08/2020 - 20:15:00	jglelxino17	futmondo	Renato Tapia	3246809	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/renato-tapia.png
-22/08/2020 - 20:15:00	cityods	futmondo	Ansu Fati	20999999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/ansu-fati.png
-25/08/2020 - 21:14:00	PaKeTeS ⚽️	futmondo	Juanmi	2300000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67106568.png
-20/08/2020 - 20:14:00	Maño's Team	futmondo	Rui Silva	21101000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55067163.png
-10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Chichizola	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/14000746.png
-18/08/2020 - 20:13:00	echo de menos el Netliga	futmondo	Nano	1000002	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67172036.png
-20/08/2020 - 20:14:00	Luis Ragan	futmondo	Portu	26111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67115581.png
-29/08/2020 - 21:17:00	jorgearaujopirez	futmondo	Rubén Duarte	4756456	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67158096.png
-10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Álvaro Fernández	3354506	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67246951.png
-12/09/2020 - 21:27:00	HOPE TEAM S.A	futmondo	Unai López	8500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67145056.png
-19/08/2020 - 20:14:00	Sabero Valley	futmondo	Ferreiro	4601000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67044542.png
-14/09/2020 - 22:52:00	futmondo	Maño's Team	Coquelin	16980570	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/34012022.png
-18/09/2020 - 01:43:00	futmondo	Hala Modric	Toño	1004076	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67138472.png
-15/09/2020 - 21:29:00	Albar ÉldelBar	futmondo	Matheus Fernandes	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19250978.png
-18/08/2020 - 20:13:00	Sabero Valley	futmondo	Gonalons	3100001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/34001572.png
-17/09/2020 - 00:39:00	futmondo	Hala Modric	Héctor Herrera	985386	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/hector-herrera.png
-21/09/2020 - 00:41:00	futmondo	Hala Modric	Okazaki	10069596	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/788545.png
-18/08/2020 - 20:13:00	Sabero Valley	futmondo	Remiro	13501000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67183918.png
-22/08/2020 - 20:15:00	jglelxino17	futmondo	Fran Beltrán	2346826	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67232115.png
-07/09/2020 - 03:15:00	futmondo	jglelxino17	Monreal	20488045	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/ignacio-monreal.png
-09/09/2020 - 05:20:00	futmondo	jglelxino17	Okay Yokuslu	4098549	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/70052844.png
-22/08/2020 - 20:15:00	echo de menos el Netliga	futmondo	Villar	1300000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67129901.png
-10/09/2020 - 21:31:00	Pineda team	futmondo	De Marcos	2399900	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67065930.png
-07/09/2020 - 06:55:00	futmondo	Hala Modric	Maksimovic	13943819	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62097340.png
-18/08/2020 - 20:13:00	Maño's Team	futmondo	Cucho	8800000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/76043783.png
-01/09/2020 - 03:58:00	futmondo	Luis Ragan	Javi Galán	2301842	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67243881.png
-26/08/2020 - 21:15:00	jorgearaujopirez	futmondo	Óscar Plano	13750964	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67080318.png
-16/09/2020 - 22:37:00	futmondo	Albar ÉldelBar	Borja Garcés	1019109	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/borja-garces.png
-14/09/2020 - 22:52:00	futmondo	Maño's Team	Vallejo	1791249	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67192921.png
-21/08/2020 - 20:15:00	cityods	futmondo	Aitor Fernández	23666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67054783.png
-11/09/2020 - 02:58:00	futmondo	HOPE TEAM S.A	Fede Valverde	24018220	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/78074594.png
-27/08/2020 - 21:15:00	Sabero Valley	futmondo	Marcos André	5150001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19270874.png
-09/09/2020 - 21:44:00	futmondo	Ruben Esteban	Joselu	24839376	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/jos-luis-mato-sanmartn.png
-11/09/2020 - 21:26:00	echo de menos el Netliga	futmondo	Mangala	1251800	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/eliaquim-mangala.png
-25/08/2020 - 21:14:00	Ruben Esteban	futmondo	Sergi Enrich	8994225	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67018561.png
-11/09/2020 - 02:51:00	futmondo	HOPE TEAM S.A	Lenglet	23684154	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85078880.png
-19/08/2020 - 20:14:00	Huevo Frito C.F.	futmondo	Denis Suárez	18101001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67107819.png
-19/09/2020 - 21:28:00	Hala Modric	futmondo	Maksimovic	15599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62097340.png
-06/09/2020 - 21:28:00	David Vidal Team	futmondo	Vukcevic	2550211	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62075230.png
-19/08/2020 - 20:14:00	Ruben Esteban	futmondo	Rafa Mir	6108000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67221051.png
-06/09/2020 - 21:28:00	David Vidal Team	futmondo	Dmitrovic	21000014	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62038612.png
-28/08/2020 - 21:16:00	Ruben Esteban	futmondo	Isak	26125000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/alexander-isak.png
-28/08/2020 - 23:06:00	futmondo	jglelxino17	Rodrigo Ely	2309386	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/43080624.png
-13/09/2020 - 22:05:00	futmondo	Maño's Team	Villalibre	1056987	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67195730.png
-10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Timor	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67067064.png
-19/09/2020 - 21:28:00	jorgearaujopirez	futmondo	Moyano	1569214	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1512297.png
-24/08/2020 - 20:17:00	Sabero Valley	futmondo	Edu Expósito	8500001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67224139.png
-04/09/2020 - 16:36:00	futmondo	Hala Modric	Cheryshev	1998975	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67011250.png
-22/08/2020 - 20:15:00	echo de menos el Netliga	futmondo	Negredo	15889685	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1501655.png
-10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Borja Garcés	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/borja-garces.png
-04/09/2020 - 16:46:00	futmondo	Hala Modric	Kike García	4118060	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67065538.png
-26/08/2020 - 21:15:00	PaKeTeS ⚽️	futmondo	Piccini	1500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/43052618.png
-29/08/2020 - 21:17:00	Sabero Valley	futmondo	Racic	1010000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62189039.png
-11/09/2020 - 05:12:00	futmondo	Luis Ragan	David Silva	40675228	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7458280.png
-25/08/2020 - 21:14:00	Luis Ragan	futmondo	Lucas Pérez	32111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/813076.png
-16/09/2020 - 15:05:00	echo de menos el Netliga	Gaditas FC	Aidoo	11677196	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/joseph-aidoo.png
-08/09/2020 - 21:30:00	Maño's Team	futmondo	Palaversa	3500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/24055163.png
-11/09/2020 - 22:45:00	Maño's Team	Ruben Esteban	Son	1500000	COMPRA	https://static01.mondocore.com/futmondo/img/kits/64/levante.png
-13/09/2020 - 21:29:00	HOPE TEAM S.A	futmondo	Joel	2352015	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67037306.png
-10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Kaptoum	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67185039.png
-22/08/2020 - 20:15:00	Pineda team	futmondo	Jozabed	1111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67150299.png
-16/09/2020 - 21:29:00	cityods	futmondo	Bautista	1333333	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67157534.png
-20/08/2020 - 20:14:00	HOPE TEAM S.A	futmondo	Rakitic	20000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/5727652.png
-17/09/2020 - 00:39:00	futmondo	Hala Modric	Luis Rioja	1265191	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67196000.png
-26/08/2020 - 21:15:00	PaKeTeS ⚽️	futmondo	James	6100000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/james-rodriguez.png
-19/08/2020 - 20:14:00	Sabero Valley	futmondo	Toni Lato	1000002	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67203459.png
-16/09/2020 - 15:05:00	Sabero Valley	jglelxino17	Yangel Herrera	7072303	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/yangel-clemente-herrera-ravelo.png
-21/08/2020 - 20:15:00	cityods	futmondo	Zaldúa	14999999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67131394.png
-27/08/2020 - 21:15:00	jglelxino17	futmondo	Zubimendi	2500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/martin-zubimendi.png
-27/08/2020 - 21:15:00	Sabero Valley	futmondo	Mathías Olivera	1750001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/78076343.png
-20/08/2020 - 20:14:00	Gaditas FC	futmondo	Felipe	32000001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/felipe-augusto-de-almeida-monteiro.png
-18/08/2020 - 20:13:00	Hala Modric	futmondo	Edgar Méndez	4159999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67080309.png
-29/08/2020 - 21:17:00	Hala Modric	futmondo	Enric Gallego	4899999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67136474.png
-20/08/2020 - 20:14:00	Luis Ragan	futmondo	Blanco	7111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67156610.png
-19/08/2020 - 20:14:00	Sabero Valley	futmondo	Rochina	16200001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67038648.png
-09/09/2020 - 21:31:00	David Vidal Team	futmondo	Pjanic	45000001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/8438112.png
-04/09/2020 - 21:25:00	Huevo Frito C.F.	futmondo	Kodro	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/kenan-kodro.png
-11/09/2020 - 16:37:00	futmondo	echo de menos el Netliga	Piqué	29706665	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/5124470.png
-01/09/2020 - 21:22:00	jglelxino17	futmondo	Deyverson	3569236	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55062112.png
-25/08/2020 - 21:14:00	cityods	futmondo	Savic	16666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62012567.png
-28/08/2020 - 21:16:00	Gaditas FC	futmondo	Aidoo	3800000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/joseph-aidoo.png
-26/08/2020 - 21:15:00	HOPE TEAM S.A	futmondo	Neva	5199999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/carlos-neva.png
-26/08/2020 - 21:15:00	PaKeTeS ⚽️	futmondo	Vaclik	21584000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/25002958.png
-15/09/2020 - 21:29:00	Sabero Valley	futmondo	Kévin	2150001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85119246.png
-29/08/2020 - 21:17:00	Luis Ragan	futmondo	Nacho Vidal	5222222	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67184889.png
-14/09/2020 - 08:17:00	futmondo	Hala Modric	Mario Gaspar	1210132	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67066949.png
-01/09/2020 - 21:22:00	Huevo Frito C.F.	futmondo	Sisto	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/27058550.png
-21/08/2020 - 20:15:00	Luis Ragan	futmondo	Vadillo	5111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67140151.png
-12/09/2020 - 21:27:00	HOPE TEAM S.A	futmondo	Modric	26601000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/653054.png
-31/08/2020 - 21:20:00	Luis Ragan	futmondo	Damián Suárez	15666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/78001192.png
-12/09/2020 - 11:50:00	futmondo	Hala Modric	Jaime Seoane	1009077	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67220012.png
-11/09/2020 - 06:32:00	Albar ÉldelBar	Sabero Valley	Kroos	43000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/156772.png
-13/09/2020 - 11:46:54	Hala Modric	HOPE TEAM S.A	Claudio Bravo	10393595	CLAUSULA	null
-19/09/2020 - 12:30:00	futmondo	Hala Modric	Víctor Díaz	11881496	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1510284.png
-29/08/2020 - 02:44:00	futmondo	Luis Ragan	Fali	1214706	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67155014.png
-24/08/2020 - 05:08:00	futmondo	Luis Ragan	Blanco	6450045	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67156610.png
-19/08/2020 - 20:14:00	HOPE TEAM S.A	futmondo	Trippier	26000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/kieran-trippier.png
-14/09/2020 - 22:47:00	futmondo	Albar ÉldelBar	Moyá	1726824	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/824545.png
-12/09/2020 - 01:11:00	futmondo	jorgearaujopirez	William Carvalho	2762490	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55012106.png
-18/08/2020 - 20:13:00	Luis Ragan	futmondo	Enes Ünal	7200111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/70087488.png
-18/08/2020 - 20:13:00	echo de menos el Netliga	futmondo	Ángel	21000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67006826.png
-20/08/2020 - 20:14:00	Maño's Team	futmondo	Mosquera	3501000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67011240.png
-26/08/2020 - 21:15:00	Hala Modric	futmondo	Josan	2599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67093858.png
-06/09/2020 - 21:28:00	David Vidal Team	futmondo	Edgar Méndez	5000213	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67080309.png
-19/08/2020 - 20:14:00	Ruben Esteban	futmondo	Carlos Fernández	11058008	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67184485.png
-24/08/2020 - 20:17:00	Sabero Valley	futmondo	Carvajal	40250001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67139735.png
-09/09/2020 - 21:31:00	Maño's Team	futmondo	Juan Carlos	1300000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67063688.png
-05/09/2020 - 21:26:00	Hala Modric	futmondo	Jaime Seoane	1009999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67220012.png
-12/09/2020 - 16:20:12	Sabero Valley	jglelxino17	Yangel Herrera	7072303	CLAUSULA	null
-24/08/2020 - 20:17:00	Luis Ragan	futmondo	Fali	2111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67155014.png
-14/09/2020 - 05:44:31	Pineda team	Hala Modric	Mikel Rico	13063117	CLAUSULA	null
-27/08/2020 - 21:15:00	Pineda team	futmondo	Roger Martí	18789999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67115585.png
-24/08/2020 - 20:17:00	Gaditas FC	futmondo	Gameiro	9350000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/8428716.png
-04/09/2020 - 23:27:00	futmondo	Sabero Valley	Marcos André	5635316	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19270874.png
-19/08/2020 - 20:14:00	Luis Ragan	futmondo	Álvaro Fernández	4111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67246951.png
-18/08/2020 - 20:13:00	cityods	futmondo	Roque Mesa	3000900	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67148546.png
-30/08/2020 - 21:18:00	echo de menos el Netliga	futmondo	Marcelo	10000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/8832853.png
-03/09/2020 - 21:24:00	Pineda team	futmondo	Odriozola	2111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67199408.png
-20/08/2020 - 20:14:00	PaKeTeS ⚽️	futmondo	José Ángel	12500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67064652.png
-20/08/2020 - 20:14:00	Pineda team	futmondo	Munir	10000234	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67174735.png
-13/09/2020 - 13:41:16	Maño's Team	Ruben Esteban	Rafa Mir	17250995	CLAUSULA	null
-26/08/2020 - 21:15:00	echo de menos el Netliga	futmondo	Piqué	51000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/5124470.png
-07/09/2020 - 21:29:00	David Vidal Team	futmondo	Oliveira	2500052	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55024825.png
-27/08/2020 - 21:15:00	Hala Modric	futmondo	Guedes	32599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55041710.png
-21/08/2020 - 20:15:00	HOPE TEAM S.A	futmondo	Kubo	35000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/takefusa-kubo.png
-27/08/2020 - 21:15:00	Luis Ragan	futmondo	Emerson	18666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19325045.png
-28/08/2020 - 05:07:00	futmondo	Luis Ragan	En-Nesyri	13812195	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67229630.png
-20/08/2020 - 20:14:00	jorgearaujopirez	futmondo	Morales	23200000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67030120.png
-12/09/2020 - 16:25:03	jglelxino17	Sabero Valley	Racic	3995245	CLAUSULA	null
-09/09/2020 - 22:39:00	futmondo	Maño's Team	Morata	30570837	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/morata.png
-31/08/2020 - 05:31:00	futmondo	Luis Ragan	Dani García	10651858	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67104797.png
-04/09/2020 - 16:38:00	futmondo	Hala Modric	Óliver Torres	4425083	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/oliver.png
-20/08/2020 - 20:14:00	Gaditas FC	futmondo	Suso Fernández	42000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67085965.png
-29/08/2020 - 21:17:00	Huevo Frito C.F.	futmondo	Pere Milla	3001011	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67170824.png
-10/09/2020 - 21:31:00	Ruben Esteban	futmondo	Córdoba	1364061	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67200926.png
-10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Sagnan	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/modibo-sagnan.png
-20/08/2020 - 20:14:00	Luis Ragan	futmondo	Espino	6111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/78066692.png
-21/09/2020 - 06:24:50	Pineda team	Gaditas FC	Jaume	10147305	CLAUSULA	null
-01/09/2020 - 21:22:00	Luis Ragan	futmondo	Unai Simón	23666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67200923.png
-25/08/2020 - 21:14:00	PaKeTeS ⚽️	futmondo	Inui	5280000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/45005560.png
-17/09/2020 - 00:41:00	futmondo	Hala Modric	Iago Aspas	63225788	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67010455.png
-30/08/2020 - 21:18:00	PaKeTeS ⚽️	futmondo	Reguilón	22150000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67211900.png
-20/08/2020 - 20:14:00	Hala Modric	futmondo	Álex Fdez	14599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67085790.png
-14/09/2020 - 21:28:00	Maño's Team	futmondo	Piqué	39000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/5124470.png
-16/09/2020 - 15:05:00	Gaditas FC	jglelxino17	Renato Tapia	8724034	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/renato-tapia.png
-06/09/2020 - 00:20:00	futmondo	Ruben Esteban	Pjanic	40964201	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/8438112.png
-21/09/2020 - 09:03:41	Maño's Team	cityods	Ansu Fati	43826526	CLAUSULA	null
-24/08/2020 - 20:17:00	Luis Ragan	futmondo	Jordi Alba	25111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67052513.png
-21/08/2020 - 20:15:00	Luis Ragan	futmondo	Maxi Gómez	26666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/78078886.png
-06/09/2020 - 21:28:00	David Vidal Team	futmondo	Malbasic	1555241	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62039564.png
-14/09/2020 - 21:28:00	Hala Modric	futmondo	Jon Morcillo	3299999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/jon-morcillo-conesa.png
+27/08/2020 - 21:15:00	Gaditas FC	futmondo	Toni Villa	1500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67215621.png
 10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Rubén Sobrino	1116197	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67085789.png
-30/08/2020 - 21:18:00	echo de menos el Netliga	futmondo	Folch	2000100	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67191864.png
-08/09/2020 - 21:30:00	David Vidal Team	futmondo	Jonsson	1945015	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/27023729.png
-11/09/2020 - 16:34:00	futmondo	echo de menos el Netliga	Brasanac	1192273	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62039552.png
-16/09/2020 - 15:05:00	Pineda team	Sabero Valley	Ferreiro	9381521	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67044542.png
-12/09/2020 - 21:27:00	HOPE TEAM S.A	futmondo	Mandi	3119000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85079680.png
-18/09/2020 - 23:06:00	futmondo	David Vidal Team	Malbasic	1050326	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62039564.png
-11/09/2020 - 12:19:00	jorgearaujopirez	Luis Ragan	Djené	200000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/211232.png
-18/09/2020 - 21:30:00	Hala Modric	futmondo	Pervis Estupiñan	16259999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/86045976.png
-18/08/2020 - 20:13:00	Luis Ragan	futmondo	Santi Mina	8000001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67182776.png
-18/08/2020 - 20:13:00	cityods	futmondo	Wass	15999999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/936891.png
-16/09/2020 - 21:29:00	Pineda team	futmondo	Jorge Pombo	5909988	COMPRA	https://static01.mondocore.com/futmondo/img/kits/64/cadiz-cf.png
-17/09/2020 - 21:29:00	jglelxino17	futmondo	Lejeune	2563985	COMPRA	https://static01.mondocore.com/futmondo/img/kits/64/deportivo-alaves.png
-19/08/2020 - 20:14:00	HOPE TEAM S.A	futmondo	Januzaj	14000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/18054092.png
-12/09/2020 - 11:25:02	Hala Modric	Gaditas FC	Emre Mor	3980000	CLAUSULA	null
-23/08/2020 - 20:16:00	jglelxino17	futmondo	Monreal	23000036	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/ignacio-monreal.png
-18/08/2020 - 20:13:00	Pineda team	futmondo	Jesús Navas	45000009	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7456721.png
-14/09/2020 - 00:48:00	futmondo	Albar ÉldelBar	Álvaro Fernández	3134740	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67246951.png
-03/09/2020 - 22:46:00	futmondo	Ruben Esteban	Coutinho	31453955	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19046041.png
-18/08/2020 - 20:13:00	Sabero Valley	futmondo	Vezo	4750000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55067158.png
-15/09/2020 - 21:29:00	echo de menos el Netliga	futmondo	Kike Pérez	1005000	COMPRA	https://static01.mondocore.com/futmondo/img/kits/64/valladolid.png
-12/09/2020 - 21:27:00	PaKeTeS ⚽️	futmondo	Miramón	4085000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67059120.png
+28/08/2020 - 21:16:00	Hala Modric	futmondo	Joselu	22999999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/jos-luis-mato-sanmartn.png
+06/09/2020 - 21:28:00	Hala Modric	futmondo	Luis Rioja	1009999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67196000.png
+30/08/2020 - 21:18:00	jorgearaujopirez	futmondo	Nino	5123999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/811371.png
+07/09/2020 - 21:29:00	David Vidal Team	futmondo	Etxeita	4000001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67008295.png
+13/09/2020 - 23:09:00	futmondo	HOPE TEAM S.A	Alcaraz	10351445	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67178038.png
+17/09/2020 - 00:41:00	futmondo	Hala Modric	Iago Aspas	63225788	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67010455.png
+25/08/2020 - 21:14:00	Hala Modric	futmondo	Oier	3859999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1509613.png
+26/09/2020 - 09:48:00	futmondo	Sabero Valley	Weissman	5781442	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/42058078.png
+19/09/2020 - 21:28:00	Luis Ragan	futmondo	Murillo	10777111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/76016518.png
+28/08/2020 - 21:16:00	Gaditas FC	futmondo	Emre Mor	3500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/27102375.png
+26/09/2020 - 21:28:00	Ruben Esteban	futmondo	Iago Aspas	66011000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67010455.png
+12/09/2020 - 21:27:00	HOPE TEAM S.A	futmondo	Modric	26601000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/653054.png
 09/09/2020 - 00:27:00	futmondo	Huevo Frito C.F.	Sisto	1060825	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/27058550.png
-25/08/2020 - 21:14:00	HOPE TEAM S.A	futmondo	Nyom	5400000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/nyom.png
-10/09/2020 - 08:14:00	Albar ÉldelBar	Luis Ragan	Saúl Ñíguez	28000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67103336.png
-25/08/2020 - 21:14:00	Maño's Team	futmondo	Borja Iglesias	20555555	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67173048.png
-08/09/2020 - 04:55:00	futmondo	Luis Ragan	Álvaro Fernández	3499475	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67246951.png
-19/08/2020 - 20:14:00	Maño's Team	futmondo	Pedri	5101000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/pedro-gonzalez-lopez.png
-24/08/2020 - 20:17:00	Luis Ragan	futmondo	Yeray	25666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67192475.png
-19/08/2020 - 20:14:00	HOPE TEAM S.A	futmondo	Mendy	30000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/ferland-mendy.png
-01/09/2020 - 00:48:00	futmondo	jglelxino17	Pjanic	42420513	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/8438112.png
-13/09/2020 - 21:29:00	Ruben Esteban	futmondo	Pere Pons	1355000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67181341.png
-03/09/2020 - 21:24:00	HOPE TEAM S.A	futmondo	Lenglet	23400000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85078880.png
-13/09/2020 - 21:29:00	Ruben Esteban	futmondo	Joselu	25128000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/jos-luis-mato-sanmartn.png
-16/09/2020 - 15:05:00	echo de menos el Netliga	Pineda team	Sergio González	3980000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67227123.png
-24/08/2020 - 20:17:00	Luis Ragan	futmondo	David Silva	35666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7458280.png
-22/08/2020 - 20:15:00	Huevo Frito C.F.	futmondo	De Jong	42100000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/frenkie-de-jong.png
-12/09/2020 - 19:11:15	echo de menos el Netliga	Gaditas FC	Aidoo	11677196	CLAUSULA	null
-14/09/2020 - 21:28:00	Luis Ragan	futmondo	Iván Villar	3222222	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67191440.png
-13/09/2020 - 21:29:00	David Vidal Team	futmondo	Javi Galán	4000002	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67243881.png
-09/09/2020 - 22:39:00	futmondo	Maño's Team	Asensio	24451897	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67197125.png
-29/08/2020 - 21:17:00	Hala Modric	futmondo	Óliver Torres	4799999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/oliver.png
-11/09/2020 - 21:26:00	Hala Modric	futmondo	Maffeo	2599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/28095341.png
-04/09/2020 - 21:25:00	Hala Modric	futmondo	Orellana	33999999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/8835313.png
-04/09/2020 - 16:47:00	futmondo	Hala Modric	Guedes	31750162	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55041710.png
-09/09/2020 - 21:31:00	Hala Modric	futmondo	Cheryshev	1799999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67011250.png
-13/09/2020 - 21:29:00	Ruben Esteban	futmondo	Joaquín	7227000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/814555.png
-20/08/2020 - 20:14:00	PaKeTeS ⚽️	futmondo	Antoñito	1500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67032038.png
-09/09/2020 - 21:31:00	Pineda team	futmondo	Cardona	1100002	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67240151.png
-06/09/2020 - 21:28:00	PaKeTeS ⚽️	futmondo	Sergi Roberto	13300000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67063007.png
-16/09/2020 - 21:29:00	Pineda team	futmondo	Rober Correa	2500004	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67153644.png
-10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Ontiveros	1228412	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67211745.png
-11/09/2020 - 16:37:00	futmondo	echo de menos el Netliga	Ángel	9975624	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67006826.png
-07/09/2020 - 21:29:00	David Vidal Team	futmondo	Rober Pier	2500535	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67194879.png
-01/09/2020 - 21:22:00	Ruben Esteban	futmondo	Coutinho	31025000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19046041.png
-17/09/2020 - 21:29:00	Ruben Esteban	futmondo	Bruno González	1401000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67107164.png
-11/09/2020 - 21:26:00	Albar ÉldelBar	futmondo	Guedes	35619111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55041710.png
-18/08/2020 - 20:13:00	cityods	futmondo	Guardiola	15111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67138759.png
-12/09/2020 - 21:27:00	Maño's Team	futmondo	Rodrygo	7500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/rodrygo-silva-de-goes.png
-16/09/2020 - 15:05:00	jglelxino17	Maño's Team	Kang-in Lee	8607304	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/kang-in-lee.png
-27/08/2020 - 21:15:00	Gaditas FC	futmondo	Cillessen	18500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/37002936.png
-18/08/2020 - 20:13:00	cityods	futmondo	Mariano	4500001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67157152.png
-19/09/2020 - 21:28:00	Ruben Esteban	futmondo	Gonalons	3417000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/34001572.png
-28/08/2020 - 21:16:00	Gaditas FC	futmondo	Iñaki Williams	45000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67184349.png
-18/08/2020 - 20:13:00	echo de menos el Netliga	futmondo	Muniain	39000010	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67037570.png
-14/09/2020 - 21:41:00	futmondo	Ruben Esteban	David Silva	41109098	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7458280.png
-17/09/2020 - 10:30:00	futmondo	echo de menos el Netliga	Casemiro	47255160	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19061518.png
-07/09/2020 - 21:29:00	Ruben Esteban	futmondo	Enric Gallego	6025000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67136474.png
-09/09/2020 - 22:52:00	futmondo	jglelxino17	Benzema	79508463	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/8435089.png
-13/09/2020 - 12:38:14	HOPE TEAM S.A	Maño's Team	Sergio Herrera	8542473	CLAUSULA	null
-09/09/2020 - 21:31:00	HOPE TEAM S.A	futmondo	Kike García	4500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67065538.png
-08/09/2020 - 22:08:00	futmondo	Maño's Team	Pedro López	938878	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7452446.png
-21/08/2020 - 20:15:00	Luis Ragan	futmondo	Iza	4111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67175525.png
-22/08/2020 - 20:15:00	Hala Modric	futmondo	Yuri	32599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67035000.png
-23/08/2020 - 20:16:00	Ruben Esteban	futmondo	Pau Torres	24858000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67217522.png
-13/09/2020 - 21:29:00	Ruben Esteban	futmondo	Coutinho	32701000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19046041.png
-11/09/2020 - 22:45:00	futmondo	Ruben Esteban	Laguardia	14694439	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67059116.png
-11/09/2020 - 05:13:00	futmondo	Luis Ragan	Santi Mina	11135218	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67182776.png
-19/08/2020 - 20:14:00	PaKeTeS ⚽️	futmondo	Néstor Araujo	7100000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/51011883.png
-18/09/2020 - 23:06:00	futmondo	David Vidal Team	Víctor Rodríguez	2247790	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67070671.png
-05/09/2020 - 21:26:00	Hala Modric	futmondo	Lucas Vázquez	1999999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67135344.png
-10/09/2020 - 08:14:00	Albar ÉldelBar	Luis Ragan	Jordi Alba	26000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67052513.png
-15/09/2020 - 21:29:00	Albar ÉldelBar	futmondo	Joaquín Muñoz	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/kits/64/sd-huesca.png
-18/08/2020 - 20:13:00	cityods	futmondo	Kondogbia	9999999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85033422.png
-16/09/2020 - 03:03:00	Albar ÉldelBar	HOPE TEAM S.A	Faycal Fajr	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85084000.png
-25/08/2020 - 21:14:00	PaKeTeS ⚽️	futmondo	Willian José	28500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19081798.png
-17/09/2020 - 15:05:00	Pineda team	Hala Modric	Mikel Rico	13063117	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1502244.png
-28/08/2020 - 21:16:00	Gaditas FC	futmondo	Juan Cruz	4900000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/43077014.png
+16/09/2020 - 22:37:00	futmondo	Albar ÉldelBar	Borja Garcés	1019109	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/borja-garces.png
 21/08/2020 - 20:15:00	jglelxino17	futmondo	Okay Yokuslu	6235809	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/70052844.png
-07/09/2020 - 23:18:00	futmondo	Sabero Valley	Toni Lato	1002239	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67203459.png
-18/09/2020 - 23:06:00	futmondo	David Vidal Team	Pina	1872905	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67100205.png
-06/09/2020 - 21:28:00	David Vidal Team	futmondo	Pina	3558123	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67100205.png
+27/09/2020 - 06:28:00	futmondo	echo de menos el Netliga	Herrerín	1022103	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67018266.png
+23/08/2020 - 20:16:00	jglelxino17	futmondo	Nacho Martínez	8695238	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67037315.png
+26/09/2020 - 03:08:00	futmondo	Hala Modric	Héctor Herrera	1048818	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/hector-herrera.png
+14/09/2020 - 21:28:00	jglelxino17	futmondo	Óscar Rodríguez	24500064	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67228635.png
+01/09/2020 - 21:22:00	Luis Ragan	futmondo	Unai Simón	23666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67200923.png
+20/08/2020 - 20:14:00	Maño's Team	futmondo	Rui Silva	21101000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55067163.png
+09/09/2020 - 21:31:00	Hala Modric	futmondo	Guido Rodríguez	1450000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/14043255.png
+22/09/2020 - 13:58:57	HOPE TEAM S.A	Huevo Frito C.F.	Gorosabel	3980000	CLAUSULA	null
+26/08/2020 - 21:15:00	Gaditas FC	futmondo	Dani Calvo	2600000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67218464.png
+17/09/2020 - 00:39:00	futmondo	Hala Modric	Luis Rioja	1265191	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67196000.png
+19/08/2020 - 20:14:00	Ruben Esteban	futmondo	Carlos Fernández	11058008	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67184485.png
+24/08/2020 - 20:17:00	Luis Ragan	futmondo	Yeray	25666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67192475.png
+18/09/2020 - 21:30:00	Albar ÉldelBar	futmondo	Vesga	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67195855.png
+18/08/2020 - 20:13:00	echo de menos el Netliga	futmondo	Ángel	21000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67006826.png
+03/09/2020 - 21:24:00	Sabero Valley	futmondo	Rodrigo Ely	2866000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/43080624.png
+20/08/2020 - 20:14:00	Luis Ragan	futmondo	Blanco	7111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67156610.png
+08/09/2020 - 01:02:00	futmondo	Pineda team	Jony	1043904	COMPRA	https://static01.mondocore.com/futmondo/img/kits/64/elche.png
+10/09/2020 - 21:31:00	Pineda team	futmondo	Melero	1456789	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67011235.png
+15/09/2020 - 00:11:00	Maño's Team	Hala Modric	Diego Llorente	15000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67011217.png
+25/09/2020 - 21:30:00	jorgearaujopirez	futmondo	Gonalons	4632789	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/34001572.png
+06/09/2020 - 21:28:00	David Vidal Team	futmondo	Vukcevic	2550211	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62075230.png
+23/09/2020 - 23:28:00	futmondo	jglelxino17	Kounde	30444316	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/jules-kounde.png
+09/09/2020 - 22:39:00	futmondo	Maño's Team	Morata	30570837	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/morata.png
+12/09/2020 - 19:11:15	echo de menos el Netliga	Gaditas FC	Aidoo	11677196	CLAUSULA	null
+21/09/2020 - 21:30:00	Hala Modric	futmondo	Yuri	25999999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67035000.png
+20/09/2020 - 21:29:00	echo de menos el Netliga	futmondo	Sergio Gómez	1450000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67258414.png
+26/09/2020 - 03:08:00	futmondo	Hala Modric	Víctor Rodríguez	1748717	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67070671.png
+10/09/2020 - 08:17:00	Albar ÉldelBar	Luis Ragan	Íñigo Martínez	27000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67104772.png
+10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Kaptoum	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67185039.png
+16/09/2020 - 14:27:00	futmondo	echo de menos el Netliga	Maksimovic	10967435	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62097340.png
+27/08/2020 - 21:15:00	Luis Ragan	futmondo	Paco Alcácer	36222222	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67115584.png
+11/09/2020 - 21:26:00	Albar ÉldelBar	futmondo	Guedes	35619111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55041710.png
+23/08/2020 - 20:16:00	jorgearaujopirez	futmondo	Sergio Ramos	53698452	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7458272.png
+20/08/2020 - 20:14:00	Pineda team	futmondo	Cala	8098832	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67010346.png
+10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Chichizola	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/14000746.png
+29/08/2020 - 21:17:00	jglelxino17	futmondo	Kounde	36495273	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/jules-kounde.png
+12/09/2020 - 08:17:00	HOPE TEAM S.A	Luis Ragan	Enes Ünal	250000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/70087488.png
+09/09/2020 - 21:44:00	futmondo	Ruben Esteban	Joselu	24839376	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/jos-luis-mato-sanmartn.png
+21/08/2020 - 20:15:00	Huevo Frito C.F.	futmondo	Oblak	55101000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/64016316.png
+09/09/2020 - 22:52:00	futmondo	jglelxino17	Benzema	79508463	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/8435089.png
+24/08/2020 - 20:17:00	Gaditas FC	futmondo	Gameiro	9350000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/8428716.png
+29/08/2020 - 21:17:00	Luis Ragan	futmondo	Nacho Vidal	5222222	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67184889.png
+15/09/2020 - 10:00:00	futmondo	Pineda team	Cardona	1007167	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67240151.png
+13/09/2020 - 22:05:00	futmondo	Maño's Team	Villalibre	1056987	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67195730.png
+24/08/2020 - 20:17:00	Maño's Team	futmondo	Javi Sánchez	2666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/javier-sanchez-de-felipe.png
+22/09/2020 - 21:29:00	jglelxino17	futmondo	Raúl Guti	4863946	COMPRA	https://static01.mondocore.com/futmondo/img/kits/64/elche.png
+17/09/2020 - 21:29:00	Maño's Team	futmondo	Carles Aleñá	1775008	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67213011.png
+30/08/2020 - 21:18:00	Huevo Frito C.F.	futmondo	Griezmann	58101001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67086656.png
+19/08/2020 - 20:14:00	cityods	futmondo	Luuk de Jong	13333333	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/luuk-de-jong.png
+24/09/2020 - 15:08:00	futmondo	Sabero Valley	Rodrigo Ely	2210185	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/43080624.png
+23/09/2020 - 22:43:00	futmondo	Ruben Esteban	Lenglet	24382287	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85078880.png
+26/08/2020 - 22:46:00	futmondo	Ruben Esteban	Sergi Enrich	9604645	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67018561.png
+07/09/2020 - 04:37:00	Hala Modric	HOPE TEAM S.A	Okazaki	12000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/788545.png
+18/09/2020 - 21:30:00	Luis Ragan	futmondo	William Carvalho	5222222	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55012106.png
+21/09/2020 - 21:30:00	Ruben Esteban	futmondo	Orellana	37001000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/8835313.png
+22/09/2020 - 21:29:00	Hala Modric	futmondo	Jony	6059999	COMPRA	https://static01.mondocore.com/futmondo/img/kits/64/osasuna.png
+11/09/2020 - 02:51:00	futmondo	HOPE TEAM S.A	Lenglet	23684154	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85078880.png
+26/08/2020 - 21:15:00	Huevo Frito C.F.	futmondo	Soldado	13101001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/soldado.png
+07/09/2020 - 03:15:00	futmondo	jglelxino17	Monreal	20488045	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/ignacio-monreal.png
+10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Timor	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67067064.png
+18/08/2020 - 20:13:00	echo de menos el Netliga	futmondo	Jorge De Frutos	2100000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/jorge-de-frutos-sebastian.png
+09/09/2020 - 21:44:00	futmondo	Ruben Esteban	Unai López	5402322	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67145056.png
+12/09/2020 - 16:20:12	Sabero Valley	jglelxino17	Yangel Herrera	7072303	CLAUSULA	null
+19/08/2020 - 20:14:00	Ruben Esteban	futmondo	Rafa Mir	6108000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67221051.png
+09/09/2020 - 14:36:00	futmondo	Hala Modric	Orellana	34198558	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/8835313.png
+31/08/2020 - 21:20:00	Sabero Valley	futmondo	Guillamón	2150001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67258817.png
+24/09/2020 - 00:06:00	Maño's Team	Hala Modric	Jony	6500000	COMPRA	https://static01.mondocore.com/futmondo/img/kits/64/osasuna.png
+18/08/2020 - 20:13:00	Sabero Valley	futmondo	Vezo	4750000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55067158.png
+22/09/2020 - 21:29:00	echo de menos el Netliga	futmondo	David Soria	20500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67011248.png
+24/08/2020 - 20:17:00	Luis Ragan	futmondo	David Silva	35666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7458280.png
+18/08/2020 - 20:13:00	Sabero Valley	futmondo	José Mari	2150001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67082063.png
+14/09/2020 - 21:28:00	PaKeTeS ⚽️	futmondo	Diakhaby	1385000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/48036643.png
+19/08/2020 - 20:14:00	Sabero Valley	futmondo	Ferreiro	4601000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67044542.png
+19/09/2020 - 21:28:00	echo de menos el Netliga	futmondo	Míchel Herrero	3120000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67065401.png
+26/09/2020 - 15:46:54	Sabero Valley	Hala Modric	Emre Mor	7597295	CLAUSULA	null
+13/09/2020 - 21:29:00	Ruben Esteban	futmondo	Coutinho	32701000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19046041.png
+18/09/2020 - 23:06:00	futmondo	David Vidal Team	Vukcevic	957029	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62075230.png
+07/09/2020 - 22:41:00	futmondo	Ruben Esteban	Dani García	12011523	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67104797.png
+08/09/2020 - 21:30:00	Huevo Frito C.F.	futmondo	Diego Costa	9977241	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55002038.png
+29/08/2020 - 21:17:00	HOPE TEAM S.A	futmondo	Óscar Rodríguez	13200000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67228635.png
+25/08/2020 - 21:14:00	jorgearaujopirez	futmondo	Asenjo	30546798	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67006488.png
+22/08/2020 - 20:15:00	cityods	futmondo	Ansu Fati	20999999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/ansu-fati.png
+21/08/2020 - 20:15:00	jglelxino17	futmondo	Guardado	4365982	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/5667723.png
+22/09/2020 - 14:39:16	Gaditas FC	PaKeTeS ⚽️	Alberto	6152536	CLAUSULA	null
+22/08/2020 - 20:15:00	echo de menos el Netliga	futmondo	Villar	1300000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67129901.png
+28/08/2020 - 21:16:00	PaKeTeS ⚽️	futmondo	Correa	11580000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/14043349.png
+21/09/2020 - 00:41:00	futmondo	Hala Modric	Okazaki	10069596	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/788545.png
+09/09/2020 - 14:37:00	futmondo	Hala Modric	Lodi	21136159	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/renan-lodi.png
+11/09/2020 - 21:26:00	echo de menos el Netliga	futmondo	Mangala	1251800	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/eliaquim-mangala.png
+04/09/2020 - 16:46:00	futmondo	Hala Modric	Edgar Méndez	2905855	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67080309.png
+10/09/2020 - 21:12:00	futmondo	Ruben Esteban	Enric Gallego	6053954	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67136474.png
+12/09/2020 - 21:27:00	HOPE TEAM S.A	futmondo	Unai López	8500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67145056.png
+19/08/2020 - 20:14:00	Luis Ragan	futmondo	Dani García	11111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67104797.png
+25/08/2020 - 21:14:00	Ruben Esteban	futmondo	Sergi Enrich	8994225	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67018561.png
+27/08/2020 - 21:15:00	HOPE TEAM S.A	futmondo	Okazaki	4599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/788545.png
+08/09/2020 - 00:21:00	futmondo	Hala Modric	Álex Fdez	16974412	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67085790.png
+15/09/2020 - 21:29:00	Sabero Valley	futmondo	Kévin	2150001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85119246.png
+27/08/2020 - 21:15:00	Gaditas FC	futmondo	Brais Méndez	6100000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67199158.png
+07/09/2020 - 06:55:00	futmondo	Hala Modric	Maksimovic	13943819	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62097340.png
+19/08/2020 - 20:14:00	Maño's Team	futmondo	Pedri	5101000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/pedro-gonzalez-lopez.png
+11/09/2020 - 16:37:00	futmondo	echo de menos el Netliga	Ángel	9975624	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67006826.png
+22/09/2020 - 17:33:37	cityods	Maño's Team	Manu Vallejo	5578658	CLAUSULA	null
+22/08/2020 - 20:15:00	Maño's Team	futmondo	Roncaglia	2501000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/14001537.png
+29/08/2020 - 21:17:00	Sabero Valley	futmondo	Racic	1010000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62189039.png
+24/08/2020 - 20:17:00	cityods	futmondo	Jovic	5249607	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/luka-jovic.png
+30/08/2020 - 21:18:00	Ruben Esteban	futmondo	David García	2017252	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67215230.png
+26/09/2020 - 21:28:00	David Vidal Team	futmondo	Víctor Ruiz	2105101	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67046591.png
+20/08/2020 - 20:14:00	Luis Ragan	futmondo	Espino	6111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/78066692.png
+29/08/2020 - 02:44:00	futmondo	Luis Ragan	Fali	1214706	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67155014.png
+11/09/2020 - 05:13:00	futmondo	Luis Ragan	Gonzalo Verdú	4815689	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67093485.png
+14/09/2020 - 22:52:00	futmondo	Maño's Team	Vallejo	1791249	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67192921.png
+14/09/2020 - 21:28:00	David Vidal Team	futmondo	Adrián	5555555	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1509231.png
+09/09/2020 - 05:20:00	futmondo	jglelxino17	Okay Yokuslu	4098549	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/70052844.png
+02/09/2020 - 21:23:00	Pineda team	futmondo	Iza	3678932	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67175525.png
+18/08/2020 - 20:13:00	cityods	futmondo	Odegaard	31100009	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/martin-degaard.png
+01/09/2020 - 21:22:00	jglelxino17	futmondo	Fede Vico	1256809	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67142992.png
+30/08/2020 - 21:18:00	Ruben Esteban	futmondo	Vinícius	21158880	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19302146.png
+21/09/2020 - 22:30:00	futmondo	Ruben Esteban	Joaquín	6425624	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/814555.png
+21/09/2020 - 21:30:00	Hala Modric	futmondo	Arias	1699999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/76015950.png
+15/09/2020 - 21:29:00	Hala Modric	futmondo	Héctor Herrera	1159999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/hector-herrera.png
+13/09/2020 - 21:29:00	David Vidal Team	futmondo	Javi Galán	4000002	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67243881.png
+10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Luna	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67034505.png
+26/08/2020 - 21:15:00	Hala Modric	futmondo	Josan	2599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67093858.png
+22/08/2020 - 20:15:00	Pineda team	futmondo	Jozabed	1111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67150299.png
+26/09/2020 - 04:51:00	futmondo	jglelxino17	Sancet	1062220	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/oihan-sancet.png
+18/08/2020 - 20:13:00	Luis Ragan	futmondo	En-Nesyri	14111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67229630.png
+25/09/2020 - 21:30:00	Sabero Valley	futmondo	Moyá	1000001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/824545.png
+23/08/2020 - 20:16:00	jglelxino17	futmondo	Le Normand	12000955	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/robin-le-normand.png
+18/08/2020 - 20:13:00	Luis Ragan	futmondo	Enes Ünal	7200111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/70087488.png
+16/09/2020 - 22:43:00	futmondo	Ruben Esteban	Coutinho	35150843	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19046041.png
+23/08/2020 - 20:16:00	jglelxino17	futmondo	Monreal	23000036	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/ignacio-monreal.png
+10/09/2020 - 21:31:00	Huevo Frito C.F.	futmondo	Gorosabel	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67202652.png
+26/08/2020 - 21:15:00	jglelxino17	futmondo	Sancet	2000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/oihan-sancet.png
+06/09/2020 - 21:28:00	David Vidal Team	futmondo	Dmitrovic	21000014	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62038612.png
+01/09/2020 - 21:22:00	HOPE TEAM S.A	futmondo	Claudio Bravo	5500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/5251774.png
+29/08/2020 - 21:17:00	Hala Modric	futmondo	Óliver Torres	4799999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/oliver.png
+25/08/2020 - 21:14:00	Pineda team	futmondo	Jony	1099991	COMPRA	https://static01.mondocore.com/futmondo/img/kits/64/elche.png
+26/08/2020 - 21:15:00	Maño's Team	futmondo	Clerc	1500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67147196.png
+19/09/2020 - 12:30:00	futmondo	Hala Modric	Víctor Díaz	11881496	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1510284.png
+24/08/2020 - 20:17:00	cityods	futmondo	Dembélé	14444444	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85140178.png
+21/08/2020 - 20:15:00	jorgearaujopirez	futmondo	Sergio León	2550005	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67140149.png
+10/09/2020 - 08:14:00	Albar ÉldelBar	Luis Ragan	Jordi Alba	26000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67052513.png
+21/09/2020 - 09:03:41	Maño's Team	cityods	Ansu Fati	43826526	CLAUSULA	null
+21/08/2020 - 20:15:00	PaKeTeS ⚽️	futmondo	Varane	32850000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85075627.png
+10/09/2020 - 04:45:00	futmondo	Pineda team	Chimy Ávila	34212725	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/14027117.png
+10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Borja Garcés	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/borja-garces.png
+20/08/2020 - 20:14:00	echo de menos el Netliga	futmondo	Gabriel Paulista	16000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19127830.png
+11/09/2020 - 12:20:00	futmondo	jorgearaujopirez	Miquel	800000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/28027172.png
+19/08/2020 - 20:14:00	Gaditas FC	futmondo	Carlos Soler	25100000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67196204.png
+25/08/2020 - 21:14:00	jglelxino17	futmondo	Rodrigo Ely	2108008	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/43080624.png
+27/08/2020 - 21:15:00	Hala Modric	futmondo	Guedes	32599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55041710.png
+27/08/2020 - 21:15:00	Maño's Team	futmondo	Villalibre	1444444	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67195730.png
+08/09/2020 - 21:30:00	Maño's Team	futmondo	Palaversa	3500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/24055163.png
+10/09/2020 - 21:31:00	David Vidal Team	futmondo	Raúl García	52000130	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1502117.png
+24/09/2020 - 03:58:00	futmondo	Luis Ragan	Murillo	9526840	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/76016518.png
+12/09/2020 - 19:12:12	echo de menos el Netliga	HOPE TEAM S.A	Salvi	14008600	CLAUSULA	null
+07/09/2020 - 21:29:00	PaKeTeS ⚽️	futmondo	Braithwaite	5002080	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/martin-braithwaite.png
+26/09/2020 - 21:28:00	Hala Modric	futmondo	Kounde	30009999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/jules-kounde.png
+16/09/2020 - 21:29:00	cityods	futmondo	Villalibre	1050000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67195730.png
+24/08/2020 - 20:17:00	Luis Ragan	futmondo	Íñigo Martínez	23666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67104772.png
+08/09/2020 - 22:08:00	futmondo	Maño's Team	Pedro López	938878	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7452446.png
+19/09/2020 - 21:28:00	jorgearaujopirez	futmondo	Moyano	1569214	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1512297.png
+14/09/2020 - 15:35:00	futmondo	Pineda team	Jozabed	800000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67150299.png
+15/09/2020 - 21:29:00	Hala Modric	futmondo	Toño	1000066	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67138472.png
+25/08/2020 - 21:14:00	Luis Ragan	futmondo	Lucas Pérez	32111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/813076.png
+18/08/2020 - 20:13:00	echo de menos el Netliga	futmondo	Muniain	39000010	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67037570.png
+12/09/2020 - 16:25:03	jglelxino17	Sabero Valley	Racic	3995245	CLAUSULA	null
+13/09/2020 - 21:29:00	Ruben Esteban	futmondo	Joaquín	7227000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/814555.png
+19/09/2020 - 12:37:34	Hala Modric	Sabero Valley	Mathías Olivera	5714960	CLAUSULA	null
+25/09/2020 - 21:30:00	Hala Modric	futmondo	Gonzalo Verdú	4599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67093485.png
+20/09/2020 - 21:29:00	echo de menos el Netliga	futmondo	Barrenetxea	3207000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/ander-barrenetxea-muguruza.png
+12/09/2020 - 16:21:00	futmondo	Sabero Valley	Gonalons	2700291	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/34001572.png
+11/09/2020 - 22:07:00	futmondo	echo de menos el Netliga	Nano	800000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67172036.png
+28/08/2020 - 21:16:00	PaKeTeS ⚽️	futmondo	João Félix	42580000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/joao-felix-sequeira.png
+09/09/2020 - 21:31:00	HOPE TEAM S.A	futmondo	Kike García	4500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67065538.png
+19/08/2020 - 20:14:00	cityods	futmondo	Aridane	17111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67006487.png
+14/09/2020 - 21:28:00	Hala Modric	futmondo	Benzema	76599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/8435089.png
+31/08/2020 - 21:20:00	Luis Ragan	futmondo	Rubén Peña	7222222	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67177699.png
+23/08/2020 - 20:16:00	Gaditas FC	futmondo	Álex Moreno	18000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67153373.png
+18/08/2020 - 20:13:00	cityods	futmondo	Junior Firpo	5111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67222900.png
+09/09/2020 - 22:48:00	Pineda team	jglelxino17	Fede Vico	2000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67142992.png
+20/08/2020 - 20:14:00	HOPE TEAM S.A	futmondo	Hazard	80000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/eden-hazard.png
+24/08/2020 - 20:17:00	jorgearaujopirez	futmondo	Riqui Puig	11222333	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67258407.png
+20/09/2020 - 21:29:00	echo de menos el Netliga	futmondo	Soares	1508010	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55038684.png
+27/09/2020 - 09:36:31	Luis Ragan	Sabero Valley	Remiro	23533122	CLAUSULA	null
+14/09/2020 - 10:31:00	futmondo	echo de menos el Netliga	Mangala	1228460	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/eliaquim-mangala.png
+14/09/2020 - 08:17:00	futmondo	Hala Modric	Mario Gaspar	1210132	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67066949.png
+18/09/2020 - 04:31:00	futmondo	Albar ÉldelBar	Faycal Fajr	1061708	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85084000.png
+25/09/2020 - 21:30:00	Albar ÉldelBar	futmondo	Lemar	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85093001.png
+10/09/2020 - 22:19:00	futmondo	Maño's Team	Semedo	16070511	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55061470.png
+21/09/2020 - 21:30:00	echo de menos el Netliga	futmondo	Roberto López	3160000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/roberto-lopez-alcaide.png
+23/08/2020 - 20:16:00	Luis Ragan	futmondo	Arambarri	15666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/78064881.png
 20/08/2020 - 20:14:00	Pineda team	futmondo	Sergio González	1085858	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67227123.png
-27/08/2020 - 21:15:00	Maño's Team	futmondo	Montoya	5555555	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67053464.png
+24/09/2020 - 00:05:00	futmondo	Hala Modric	Sergio Álvarez	1652732	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67102287.png
+26/08/2020 - 21:15:00	jorgearaujopirez	futmondo	Nolito	14222569	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67017094.png
+19/08/2020 - 20:14:00	Maño's Team	futmondo	Asensio	25101000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67197125.png
+25/08/2020 - 21:14:00	echo de menos el Netliga	futmondo	Casemiro	57000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19061518.png
+26/09/2020 - 21:28:00	jglelxino17	futmondo	Mario Hermoso	2100000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67196188.png
+19/08/2020 - 20:14:00	Gaditas FC	futmondo	Vrsaljko	1600000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/24004437.png
+24/08/2020 - 20:17:00	Sabero Valley	futmondo	Edu Expósito	8500001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67224139.png
+29/08/2020 - 21:17:00	echo de menos el Netliga	futmondo	Herrerín	1593999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67018266.png
+18/08/2020 - 20:13:00	cityods	futmondo	Kondogbia	9999999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85033422.png
+29/08/2020 - 02:44:00	futmondo	Luis Ragan	Iza	3194103	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67175525.png
+19/08/2020 - 20:14:00	Ruben Esteban	futmondo	Laguardia	15125880	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67059116.png
+19/08/2020 - 20:14:00	Sabero Valley	futmondo	Joaquín Fernández	4550001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67184200.png
+18/08/2020 - 20:13:00	Sabero Valley	futmondo	Remiro	13501000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67183918.png
+09/09/2020 - 22:39:00	futmondo	Maño's Team	Asensio	24451897	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67197125.png
+18/09/2020 - 21:30:00	Hala Modric	futmondo	Pervis Estupiñan	16259999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/86045976.png
+14/09/2020 - 22:47:00	futmondo	Albar ÉldelBar	Moyá	1726824	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/824545.png
+07/09/2020 - 03:22:00	futmondo	PaKeTeS ⚽️	Reguilón	20078030	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67211900.png
+10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Faycal Fajr	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85084000.png
+11/09/2020 - 05:13:00	futmondo	Luis Ragan	Santi Mina	11135218	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67182776.png
+13/09/2020 - 12:39:45	Pineda team	Sabero Valley	Ferreiro	9381521	CLAUSULA	null
+28/08/2020 - 21:16:00	Gaditas FC	futmondo	Aidoo	3800000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/joseph-aidoo.png
+01/09/2020 - 21:22:00	Huevo Frito C.F.	futmondo	Sisto	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/27058550.png
+21/09/2020 - 21:30:00	Hala Modric	futmondo	Sergio Álvarez	1399999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67102287.png
+20/08/2020 - 20:14:00	Gaditas FC	futmondo	Suso Fernández	42000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67085965.png
+12/09/2020 - 19:13:33	echo de menos el Netliga	Pineda team	Sergio González	3980000	CLAUSULA	null
+14/09/2020 - 21:28:00	Luis Ragan	futmondo	Iván Villar	3222222	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67191440.png
+04/09/2020 - 23:27:00	futmondo	Sabero Valley	Marcos André	5635316	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19270874.png
+28/08/2020 - 21:16:00	Ruben Esteban	futmondo	Isak	26125000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/alexander-isak.png
+04/09/2020 - 16:46:00	futmondo	Hala Modric	Kike García	4118060	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67065538.png
+25/09/2020 - 21:30:00	jglelxino17	futmondo	Okay Yokuslu	3236523	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/70052844.png
+22/08/2020 - 20:15:00	Huevo Frito C.F.	futmondo	De Jong	42100000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/frenkie-de-jong.png
+19/08/2020 - 20:14:00	Luis Ragan	futmondo	Bardhi	14666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/27102027.png
+10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Ontiveros	1228412	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67211745.png
+07/09/2020 - 21:29:00	Ruben Esteban	futmondo	Enric Gallego	6025000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67136474.png
+06/09/2020 - 21:28:00	David Vidal Team	futmondo	Bigas	4000128	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67122014.png
+18/08/2020 - 20:13:00	echo de menos el Netliga	futmondo	Nano	1000002	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67172036.png
+16/09/2020 - 03:03:00	Albar ÉldelBar	HOPE TEAM S.A	Faycal Fajr	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85084000.png
+20/08/2020 - 20:14:00	Hala Modric	futmondo	Álex Fdez	14599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67085790.png
+24/09/2020 - 18:00:00	futmondo	Hala Modric	Arias	1527343	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/76015950.png
+14/09/2020 - 08:16:00	futmondo	Hala Modric	"Choco" Lozano	4749435	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/87006900.png
+18/08/2020 - 20:13:00	cityods	futmondo	Isco	13333333	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67103537.png
+18/08/2020 - 20:13:00	Sabero Valley	futmondo	Diop	1650001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/8440901.png
+13/09/2020 - 21:29:00	Ruben Esteban	futmondo	Pere Pons	1355000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67181341.png
+13/09/2020 - 12:38:14	HOPE TEAM S.A	Maño's Team	Sergio Herrera	8542473	CLAUSULA	null
+20/09/2020 - 21:29:00	echo de menos el Netliga	futmondo	Eugeni	1100001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67169241.png
+23/08/2020 - 20:16:00	jglelxino17	futmondo	Dani Gómez	2200000	COMPRA	https://static01.mondocore.com/futmondo/img/kits/64/levante.png
+21/08/2020 - 20:15:00	Luis Ragan	futmondo	Vadillo	5111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67140151.png
+12/09/2020 - 11:25:02	Hala Modric	Gaditas FC	Emre Mor	3980000	CLAUSULA	null
+16/09/2020 - 03:03:00	Albar ÉldelBar	HOPE TEAM S.A	Borja Garcés	1200000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/borja-garces.png
+30/08/2020 - 21:40:00	futmondo	PaKeTeS ⚽️	James	4775741	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/james-rodriguez.png
+10/09/2020 - 21:31:00	Maño's Team	futmondo	Dani García	13222222	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67104797.png
+19/09/2020 - 23:05:00	futmondo	jorgearaujopirez	Loren Morón	9974684	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67181072.png
+19/08/2020 - 20:14:00	PaKeTeS ⚽️	futmondo	Néstor Araujo	7100000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/51011883.png
+24/08/2020 - 20:17:00	Pineda team	futmondo	Escudero	3000001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67065536.png
+04/09/2020 - 16:36:00	futmondo	Hala Modric	Josan	2708604	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67093858.png
+12/09/2020 - 01:15:00	HOPE TEAM S.A	Albar ÉldelBar	Borja Garcés	1200000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/borja-garces.png
+03/09/2020 - 21:24:00	HOPE TEAM S.A	futmondo	Lenglet	23400000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85078880.png
+08/09/2020 - 21:30:00	Pineda team	futmondo	San Emeterio	1244444	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67199082.png
+20/08/2020 - 20:14:00	jorgearaujopirez	futmondo	Morales	23200000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67030120.png
+23/09/2020 - 21:30:00	Gaditas FC	futmondo	Vallejo	4500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67192921.png
+06/09/2020 - 21:28:00	Huevo Frito C.F.	futmondo	Balenziaga	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67029321.png
+11/09/2020 - 22:45:00	Maño's Team	Ruben Esteban	Son	1500000	COMPRA	https://static01.mondocore.com/futmondo/img/kits/64/levante.png
+03/09/2020 - 21:24:00	Ruben Esteban	futmondo	Pjanic	40282000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/8438112.png
+24/08/2020 - 20:17:00	Luis Ragan	futmondo	Fali	2111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67155014.png
+18/08/2020 - 20:13:00	cityods	futmondo	Mariano	4500001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67157152.png
+22/09/2020 - 21:32:00	futmondo	echo de menos el Netliga	Akapo	1063584	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67178095.png
+14/09/2020 - 05:47:00	futmondo	Pineda team	Juan Pérez	800000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67217545.png
+20/08/2020 - 20:14:00	Maño's Team	futmondo	Vallejo	4000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67192921.png
+22/08/2020 - 20:15:00	jglelxino17	futmondo	Pjanic	42000009	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/8438112.png
+07/09/2020 - 16:49:00	futmondo	HOPE TEAM S.A	Óscar Rodríguez	16174108	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67228635.png
+04/09/2020 - 21:25:00	HOPE TEAM S.A	futmondo	Vinícius	22200000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19302146.png
+03/09/2020 - 21:24:00	Hala Modric	futmondo	Diego Llorente	12199999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67011217.png
+18/08/2020 - 20:13:00	cityods	futmondo	Guardiola	15111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67138759.png
+22/08/2020 - 20:15:00	HOPE TEAM S.A	futmondo	Rubén Martínez	3500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7451904.png
+05/09/2020 - 21:26:00	Ruben Esteban	futmondo	Dani García	11501000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67104797.png
+10/09/2020 - 21:31:00	Pineda team	futmondo	De Marcos	2399900	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67065930.png
+04/09/2020 - 16:36:00	futmondo	Hala Modric	Cheryshev	1998975	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67011250.png
+14/09/2020 - 21:28:00	Maño's Team	futmondo	Piqué	39000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/5124470.png
+03/09/2020 - 21:24:00	Pineda team	futmondo	Odriozola	2111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67199408.png
+30/08/2020 - 21:18:00	echo de menos el Netliga	futmondo	Folch	2000100	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67191864.png
+24/08/2020 - 20:17:00	jorgearaujopirez	futmondo	Joan Jordan	15632456	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67187249.png
+19/08/2020 - 20:14:00	Pineda team	futmondo	Perea	1985858	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67120790.png
+21/08/2020 - 20:15:00	Maño's Team	futmondo	Bacca	3500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/76003938.png
+16/09/2020 - 21:29:00	PaKeTeS ⚽️	futmondo	Jurado	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7451707.png
+20/08/2020 - 20:14:00	HOPE TEAM S.A	futmondo	Rakitic	20000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/5727652.png
+28/08/2020 - 21:16:00	Sabero Valley	futmondo	Andrés Fernández	1000010	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67015052.png
+04/09/2020 - 16:38:00	futmondo	Hala Modric	Enric Gallego	5395074	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67136474.png
+24/09/2020 - 21:30:00	Hala Modric	futmondo	Jaime Seoane	1000009	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67220012.png
+11/09/2020 - 21:26:00	Hala Modric	futmondo	Maffeo	2599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/28095341.png
+08/09/2020 - 21:30:00	jorgearaujopirez	futmondo	Miquel	1000001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/28027172.png
+20/08/2020 - 20:14:00	HOPE TEAM S.A	futmondo	Antonio Puertas	20000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67150319.png
+23/09/2020 - 16:01:00	futmondo	Pineda team	Guidetti	800000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/68007650.png
+13/09/2020 - 21:29:00	Hala Modric	futmondo	Víctor Díaz	13189999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1510284.png
+20/08/2020 - 20:14:00	Luis Ragan	futmondo	Portu	26111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67115581.png
+23/08/2020 - 20:16:00	HOPE TEAM S.A	futmondo	Alcaraz	9000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67178038.png
+13/09/2020 - 11:46:54	Hala Modric	HOPE TEAM S.A	Claudio Bravo	10393595	CLAUSULA	null
+18/08/2020 - 20:13:00	cityods	futmondo	Roque Mesa	3000900	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67148546.png
+13/09/2020 - 23:09:00	futmondo	HOPE TEAM S.A	Rubén Martínez	1014120	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7451904.png
+26/08/2020 - 21:15:00	echo de menos el Netliga	futmondo	Canales	51200000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67053076.png
+21/09/2020 - 22:33:00	futmondo	Maño's Team	Diego Llorente	12392154	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67011217.png
+11/09/2020 - 21:26:00	Albar ÉldelBar	futmondo	Lodi	21200001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/renan-lodi.png
+18/08/2020 - 20:13:00	echo de menos el Netliga	futmondo	Akapo	2500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67178095.png
+04/09/2020 - 01:48:00	futmondo	Pineda team	Roger Martí	17907978	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67115585.png
+23/08/2020 - 20:16:00	Huevo Frito C.F.	futmondo	Hugo Mallo	11010001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67086276.png
+04/09/2020 - 16:35:00	futmondo	Hala Modric	Oier	4127793	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1509613.png
+18/08/2020 - 20:13:00	Sabero Valley	futmondo	Gonalons	3100001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/34001572.png
+20/08/2020 - 20:14:00	Gaditas FC	futmondo	Felipe	32000001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/felipe-augusto-de-almeida-monteiro.png
+11/09/2020 - 16:37:00	futmondo	echo de menos el Netliga	Piqué	29706665	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/5124470.png
+14/09/2020 - 22:52:00	futmondo	Maño's Team	Coquelin	16980570	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/34012022.png
+19/08/2020 - 20:14:00	Gaditas FC	futmondo	Augusto Fernández	1450000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/962267.png
+09/09/2020 - 21:31:00	Pineda team	futmondo	Marcos Llorente	31345678	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67196198.png
+19/08/2020 - 20:14:00	Pineda team	futmondo	Borja Mayoral	4000032	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67211912.png
+25/08/2020 - 15:00:00	futmondo	jorgearaujopirez	Rodrigo	29055684	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67086280.png
+31/08/2020 - 23:15:00	futmondo	Ruben Esteban	Vinícius	21369667	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19302146.png
+06/09/2020 - 03:13:00	futmondo	Hala Modric	Marcos Llorente	28663389	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67196198.png
+13/09/2020 - 21:29:00	Ruben Esteban	futmondo	Joselu	25128000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/jos-luis-mato-sanmartn.png
+10/09/2020 - 08:14:00	Albar ÉldelBar	Luis Ragan	Saúl Ñíguez	28000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67103336.png
+27/08/2020 - 21:15:00	Sabero Valley	futmondo	Mathías Olivera	1750001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/78076343.png
+26/08/2020 - 21:15:00	PaKeTeS ⚽️	futmondo	Piccini	1500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/43052618.png
+21/08/2020 - 20:15:00	Ruben Esteban	futmondo	Son	1018000	COMPRA	https://static01.mondocore.com/futmondo/img/kits/64/levante.png
+24/09/2020 - 21:30:00	Albar ÉldelBar	futmondo	Hervías	1200001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67115983.png
+05/09/2020 - 21:26:00	Hala Modric	futmondo	Foulquier	2000109	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85045661.png
+11/09/2020 - 08:32:00	futmondo	Hala Modric	Cheryshev	1569636	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67011250.png
+27/08/2020 - 21:15:00	Gaditas FC	futmondo	Cillessen	18500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/37002936.png
+21/08/2020 - 20:15:00	HOPE TEAM S.A	futmondo	Kubo	35000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/takefusa-kubo.png
+11/09/2020 - 12:19:00	jorgearaujopirez	Luis Ragan	Djené	200000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/211232.png
+20/08/2020 - 20:14:00	Maño's Team	futmondo	Morata	35501000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/morata.png
+25/08/2020 - 21:14:00	PaKeTeS ⚽️	futmondo	Inui	5280000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/45005560.png
+20/08/2020 - 20:14:00	Maño's Team	futmondo	Kang-in Lee	6201000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/kang-in-lee.png
+16/09/2020 - 21:29:00	Pineda team	futmondo	Jorge Pombo	5909988	COMPRA	https://static01.mondocore.com/futmondo/img/kits/64/cadiz-cf.png
+10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Gudelj	1157202	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/nemanja-gudelj.png
+19/08/2020 - 20:14:00	HOPE TEAM S.A	futmondo	Mendy	30000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/ferland-mendy.png
+14/09/2020 - 21:28:00	Hala Modric	futmondo	Jon Morcillo	3299999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/jon-morcillo-conesa.png
+20/08/2020 - 20:14:00	PaKeTeS ⚽️	futmondo	José Ángel	12500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67064652.png
+06/09/2020 - 21:28:00	Hala Modric	futmondo	Fekir	47599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/nabil-fekir.png
+08/09/2020 - 21:30:00	Ruben Esteban	futmondo	Joselu	24502000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/jos-luis-mato-sanmartn.png
+23/08/2020 - 20:16:00	jorgearaujopirez	futmondo	Parejo	49550632	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67030707.png
+19/08/2020 - 20:14:00	Sabero Valley	futmondo	Alberto Moreno	15350000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/alberto-moreno.png
+11/09/2020 - 21:26:00	Maño's Team	futmondo	Iborra	12200000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/iborra.png
 28/08/2020 - 21:51:00	futmondo	PaKeTeS ⚽️	José Ángel	10464413	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67064652.png
+27/08/2020 - 21:15:00	jglelxino17	futmondo	Zubimendi	2500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/martin-zubimendi.png
+05/09/2020 - 21:26:00	Hala Modric	futmondo	Kadzior	3399999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/damian-kadzior.png
+19/08/2020 - 20:14:00	Pineda team	futmondo	Masip	9082236	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67038645.png
+13/09/2020 - 15:32:25	Hala Modric	Pineda team	Iza	13617396	CLAUSULA	null
+07/09/2020 - 21:29:00	David Vidal Team	futmondo	Oliveira	2500052	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55024825.png
+24/09/2020 - 03:56:00	futmondo	Luis Ragan	Nacho Vidal	9925027	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67184889.png
+18/08/2020 - 20:13:00	Maño's Team	futmondo	Giménez	30101000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/78060464.png
+29/08/2020 - 21:17:00	Gaditas FC	futmondo	Jaume	3200000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67102156.png
+09/09/2020 - 21:31:00	Pineda team	futmondo	Cardona	1100002	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67240151.png
+26/08/2020 - 21:15:00	jorgearaujopirez	futmondo	Óscar Plano	13750964	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67080318.png
+08/09/2020 - 21:30:00	Pineda team	futmondo	Vitolo	3600000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67072243.png
+25/08/2020 - 21:14:00	Sabero Valley	futmondo	Koke	27750001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67047092.png
+29/08/2020 - 21:17:00	Ruben Esteban	futmondo	Albiol	13954000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7452450.png
+24/08/2020 - 20:17:00	Sabero Valley	futmondo	Carvajal	40250001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67139735.png
+18/09/2020 - 23:06:00	futmondo	David Vidal Team	Pina	1872905	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67100205.png
+26/09/2020 - 21:28:00	Luis Ragan	futmondo	Mario Gaspar	2051529	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67066949.png
+28/08/2020 - 21:16:00	Maño's Team	futmondo	Pedro López	1864000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7452446.png
+20/08/2020 - 20:14:00	PaKeTeS ⚽️	futmondo	Ximo Navarro	2850000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67100203.png
+19/09/2020 - 23:05:00	futmondo	jorgearaujopirez	Riqui Puig	9091191	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67258407.png
+27/08/2020 - 21:15:00	Luis Ragan	futmondo	Gonzalo Verdú	5111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67093485.png
+03/09/2020 - 22:46:00	futmondo	Ruben Esteban	Dmitrovic	16124196	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62038612.png
+14/09/2020 - 22:47:00	futmondo	Albar ÉldelBar	Luna	1030329	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67034505.png
+24/09/2020 - 07:18:00	futmondo	echo de menos el Netliga	Gabriel Paulista	15202843	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19127830.png
+04/09/2020 - 16:38:00	futmondo	Hala Modric	Víctor Díaz	13341043	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1510284.png
+28/08/2020 - 05:07:00	futmondo	Luis Ragan	En-Nesyri	13812195	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67229630.png
+09/09/2020 - 21:31:00	Maño's Team	futmondo	Juan Carlos	1300000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67063688.png
+21/09/2020 - 21:30:00	echo de menos el Netliga	futmondo	Guevara	1800000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/ander-guevara.png
+24/09/2020 - 21:30:00	cityods	futmondo	Pablo Ínsua	1888888	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67139775.png
+01/09/2020 - 00:48:00	futmondo	jglelxino17	Pjanic	42420513	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/8438112.png
+16/09/2020 - 21:29:00	PaKeTeS ⚽️	futmondo	Marcos Mauro	1280000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67175124.png
+13/09/2020 - 21:29:00	Ruben Esteban	futmondo	David Silva	40901000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7458280.png
+22/08/2020 - 20:15:00	Hala Modric	futmondo	Yuri	32599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67035000.png
+28/08/2020 - 05:07:00	futmondo	Luis Ragan	Merquelanz	3779809	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67199409.png
+31/08/2020 - 21:20:00	HOPE TEAM S.A	futmondo	Fede Valverde	23500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/78074594.png
+04/09/2020 - 21:25:00	Huevo Frito C.F.	futmondo	Kodro	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/kenan-kodro.png
+06/09/2020 - 00:20:00	futmondo	Ruben Esteban	Pjanic	40964201	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/8438112.png
+25/08/2020 - 21:14:00	Ruben Esteban	futmondo	Mikel Merino	29652000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67211760.png
+28/08/2020 - 21:16:00	Luis Ragan	futmondo	Chukwueze	17222222	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/samuel-chukwueze.png
+30/08/2020 - 21:18:00	Luis Ragan	futmondo	Saúl Ñíguez	27777777	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67103336.png
+17/09/2020 - 10:30:00	futmondo	echo de menos el Netliga	Casemiro	47255160	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19061518.png
+10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Álvaro Fernández	3354506	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67246951.png
+01/09/2020 - 21:22:00	jglelxino17	futmondo	Deyverson	3569236	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55062112.png
+08/09/2020 - 21:30:00	HOPE TEAM S.A	futmondo	Pedraza	5500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67212046.png
+12/09/2020 - 21:27:00	PaKeTeS ⚽️	futmondo	Miramón	4085000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67059120.png
+19/09/2020 - 01:54:00	futmondo	Hala Modric	Yuri	26174425	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67035000.png
+11/09/2020 - 05:13:00	futmondo	Luis Ragan	Damián Suárez	15711728	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/78001192.png
+20/08/2020 - 20:14:00	PaKeTeS ⚽️	futmondo	Antoñito	1500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67032038.png
+23/08/2020 - 20:16:00	jorgearaujopirez	futmondo	Loren Morón	14006311	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67181072.png
+14/09/2020 - 05:44:31	Pineda team	Hala Modric	Mikel Rico	13063117	CLAUSULA	null
+02/09/2020 - 21:23:00	jglelxino17	futmondo	Sanabria	4753698	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67181404.png
+21/09/2020 - 22:32:00	futmondo	Maño's Team	Javi Sánchez	1411683	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/javier-sanchez-de-felipe.png
+21/09/2020 - 16:40:00	futmondo	echo de menos el Netliga	Marcelo	7503118	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/8832853.png
+09/09/2020 - 21:31:00	David Vidal Team	futmondo	Pjanic	45000001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/8438112.png
+13/09/2020 - 02:54:05	Gaditas FC	PaKeTeS ⚽️	Juanmi	8713766	CLAUSULA	null
+13/09/2020 - 02:59:20	Gaditas FC	jglelxino17	Renato Tapia	8724034	CLAUSULA	null
+21/08/2020 - 20:15:00	Huevo Frito C.F.	futmondo	Gayá	25101001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67178177.png
+07/09/2020 - 21:29:00	Hala Modric	futmondo	Mario Gaspar	1555555	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67066949.png
+17/09/2020 - 00:39:00	futmondo	Hala Modric	Héctor Herrera	985386	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/hector-herrera.png
+19/08/2020 - 20:14:00	Ruben Esteban	futmondo	Milla	12018000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67191561.png
+24/08/2020 - 20:17:00	Luis Ragan	futmondo	Jordi Alba	25111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67052513.png
+29/08/2020 - 02:44:00	futmondo	Luis Ragan	Vadillo	5963227	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67140151.png
+22/09/2020 - 21:29:00	Gaditas FC	futmondo	Ibai	1500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67087553.png
+29/08/2020 - 21:17:00	Hala Modric	futmondo	Enric Gallego	4899999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67136474.png
+04/09/2020 - 21:25:00	Hala Modric	futmondo	Maksimovic	13599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62097340.png
+26/08/2020 - 21:15:00	Gaditas FC	futmondo	Fidel	3250000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67053759.png
+12/09/2020 - 11:50:00	futmondo	Hala Modric	Jaime Seoane	1009077	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67220012.png
+28/08/2020 - 21:16:00	Gaditas FC	futmondo	Iñaki Williams	45000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67184349.png
+01/09/2020 - 21:22:00	Ruben Esteban	futmondo	Coutinho	31025000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19046041.png
+29/08/2020 - 21:17:00	jglelxino17	futmondo	Diego Carlos	44620442	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/diego-carlos.png
+06/09/2020 - 21:28:00	Huevo Frito C.F.	futmondo	Sergi Enrich	8306971	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67018561.png
+08/09/2020 - 21:30:00	Ruben Esteban	futmondo	Zubeldia	8175000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67215898.png
+28/08/2020 - 21:16:00	Gaditas FC	futmondo	Juan Cruz	4900000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/43077014.png
+12/09/2020 - 01:11:00	futmondo	jorgearaujopirez	William Carvalho	2762490	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55012106.png
+25/08/2020 - 21:14:00	PaKeTeS ⚽️	futmondo	Campaña	23580000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67089223.png
+14/09/2020 - 00:48:00	futmondo	Albar ÉldelBar	Sagnan	1063115	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/modibo-sagnan.png
+21/08/2020 - 20:15:00	Maño's Team	futmondo	Tello	3000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67046417.png
+18/08/2020 - 20:13:00	Hala Modric	futmondo	David Soria	15599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67011248.png
+02/09/2020 - 23:37:00	futmondo	Sabero Valley	Alberto Moreno	14203839	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/alberto-moreno.png
+18/09/2020 - 22:29:00	futmondo	Ruben Esteban	Zubeldia	8213557	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67215898.png
+19/09/2020 - 21:28:00	Ruben Esteban	futmondo	Gonalons	3417000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/34001572.png
+19/08/2020 - 20:14:00	HOPE TEAM S.A	futmondo	Januzaj	14000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/18054092.png
+01/09/2020 - 03:58:00	futmondo	Luis Ragan	Javi Galán	2301842	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67243881.png
+21/09/2020 - 22:32:00	futmondo	Maño's Team	Dani García	11018360	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67104797.png
+05/09/2020 - 21:26:00	Huevo Frito C.F.	futmondo	Luisinho	1111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55006171.png
+15/09/2020 - 00:19:00	futmondo	HOPE TEAM S.A	Joel	2050396	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67037306.png
+25/08/2020 - 21:14:00	jglelxino17	futmondo	Aritz	4000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67190072.png
+27/08/2020 - 21:15:00	Sabero Valley	futmondo	Marcos André	5150001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19270874.png
+23/09/2020 - 21:30:00	Luis Ragan	futmondo	Luis Suárez	66666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/78000335.png
+24/08/2020 - 20:17:00	Maño's Team	futmondo	Coquelin	18501000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/34012022.png
+08/09/2020 - 21:30:00	David Vidal Team	futmondo	Jonsson	1945015	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/27023729.png
+21/08/2020 - 20:15:00	Hala Modric	futmondo	Bigas	3359999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67122014.png
+22/08/2020 - 20:15:00	echo de menos el Netliga	futmondo	Negredo	15889685	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1501655.png
+04/09/2020 - 21:25:00	Sabero Valley	futmondo	Weissman	9150000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/42058078.png
+14/09/2020 - 10:31:00	futmondo	echo de menos el Netliga	Folch	1534655	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67191864.png
+17/09/2020 - 21:29:00	Albar ÉldelBar	futmondo	Aitor Ruibal	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67220941.png
+19/08/2020 - 20:14:00	Luis Ragan	futmondo	Merquelanz	3888888	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67199409.png
+29/08/2020 - 21:17:00	jorgearaujopirez	futmondo	Rubén Duarte	4756456	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67158096.png
+23/08/2020 - 20:16:00	Gaditas FC	futmondo	Bartra	19000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67063004.png
+15/09/2020 - 21:29:00	Albar ÉldelBar	futmondo	Joaquín Muñoz	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/kits/64/sd-huesca.png
+28/08/2020 - 21:16:00	Pineda team	futmondo	Cucurella	30919191	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67215284.png
+19/09/2020 - 21:28:00	Hala Modric	futmondo	Maksimovic	15599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62097340.png
+22/09/2020 - 21:29:00	Hala Modric	futmondo	Gnagnon	1005999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/48036969.png
+12/09/2020 - 01:15:00	HOPE TEAM S.A	Albar ÉldelBar	Faycal Fajr	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85084000.png
+23/08/2020 - 20:16:00	HOPE TEAM S.A	futmondo	Salvi	5500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67193445.png
+20/08/2020 - 20:14:00	Pineda team	futmondo	Munir	10000234	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67174735.png
+08/09/2020 - 04:55:00	futmondo	Luis Ragan	Álvaro Fernández	3499475	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67246951.png
+04/09/2020 - 16:38:00	futmondo	Hala Modric	Óliver Torres	4425083	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/oliver.png
+24/09/2020 - 21:30:00	Hala Modric	futmondo	Héctor Herrera	1000003	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/hector-herrera.png
+14/09/2020 - 21:41:00	futmondo	Ruben Esteban	David Silva	41109098	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7458280.png
+11/09/2020 - 02:57:00	futmondo	HOPE TEAM S.A	Januzaj	14950908	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/18054092.png
+19/09/2020 - 05:20:00	jorgearaujopirez	Luis Ragan	Yeray	200000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67192475.png
+26/08/2020 - 21:15:00	PaKeTeS ⚽️	futmondo	Vaclik	21584000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/25002958.png
+26/08/2020 - 21:15:00	PaKeTeS ⚽️	futmondo	James	6100000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/james-rodriguez.png
+19/08/2020 - 20:14:00	jglelxino17	futmondo	Courtois	44000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/18026122.png
+26/08/2020 - 21:15:00	echo de menos el Netliga	futmondo	Piqué	51000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/5124470.png
+27/08/2020 - 21:15:00	Pineda team	futmondo	Roger Martí	18789999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67115585.png
+23/08/2020 - 20:16:00	Sabero Valley	futmondo	Rubén García	28600001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67155012.png
+22/09/2020 - 21:29:00	Ruben Esteban	futmondo	Lenglet	24242000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85078880.png
+19/09/2020 - 04:40:00	futmondo	Luis Ragan	Rubén Peña	9252810	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67177699.png
+10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Moyá	2200001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/824545.png
+26/08/2020 - 21:15:00	Hala Modric	futmondo	Víctor Díaz	12159999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1510284.png
+27/08/2020 - 21:15:00	Hala Modric	futmondo	Cheryshev	2759999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67011250.png
+06/09/2020 - 21:28:00	David Vidal Team	futmondo	Víctor Rodríguez	3555555	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67070671.png
+21/09/2020 - 22:32:00	futmondo	Maño's Team	Cucho	11428751	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/76043783.png
+01/09/2020 - 21:22:00	Hala Modric	futmondo	Ocampos	62599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/lucas-ocampos.png
+06/09/2020 - 21:28:00	Pineda team	futmondo	Guidetti	1000011	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/68007650.png
+12/09/2020 - 01:15:00	HOPE TEAM S.A	Albar ÉldelBar	Kaptoum	1200000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67185039.png
+28/08/2020 - 21:16:00	Ruben Esteban	futmondo	Oyarzabal	47252000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67220143.png
+11/09/2020 - 02:58:00	futmondo	HOPE TEAM S.A	Fede Valverde	24018220	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/78074594.png
+10/09/2020 - 21:31:00	Albar ÉldelBar	futmondo	Sagnan	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/modibo-sagnan.png
+22/09/2020 - 21:29:00	Gaditas FC	futmondo	Jason	2000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67184262.png
+08/09/2020 - 22:04:00	futmondo	Maño's Team	Bacca	999994	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/76003938.png
+30/08/2020 - 21:18:00	PaKeTeS ⚽️	futmondo	Reguilón	22150000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67211900.png
+10/09/2020 - 21:31:00	Maño's Team	futmondo	Unai Núñez	3666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67214595.png
+27/09/2020 - 10:43:00	futmondo	Pineda team	De Marcos	817380	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67065930.png
+23/08/2020 - 20:16:00	Ruben Esteban	futmondo	Pau Torres	24858000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67217522.png
+18/08/2020 - 20:13:00	Maño's Team	futmondo	Cucho	8800000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/76043783.png
+20/08/2020 - 20:14:00	Maño's Team	futmondo	Thomas	19501000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67175052.png
+21/08/2020 - 20:15:00	cityods	futmondo	Aitor Fernández	23666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67054783.png
+21/08/2020 - 20:15:00	cityods	futmondo	Trincao	19999999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/francisco-antonio-machado-mota-castro-trincao.png
+24/08/2020 - 05:08:00	futmondo	Luis Ragan	Blanco	6450045	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67156610.png
+16/09/2020 - 21:29:00	Pineda team	futmondo	Rober Correa	2500004	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67153644.png
+25/08/2020 - 21:14:00	PaKeTeS ⚽️	futmondo	Juanmi	2300000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67106568.png
+25/08/2020 - 21:14:00	Ruben Esteban	futmondo	Pacheco	15035000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67155103.png
+19/08/2020 - 20:14:00	Sabero Valley	futmondo	Rochina	16200001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67038648.png
+24/09/2020 - 03:56:00	futmondo	Luis Ragan	Lucas Pérez	32884064	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/813076.png
+21/08/2020 - 20:15:00	cityods	futmondo	Zaldúa	14999999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67131394.png
+14/09/2020 - 21:28:00	PaKeTeS ⚽️	futmondo	Iñigo Pérez	2100000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67018267.png
+20/08/2020 - 20:14:00	Ruben Esteban	futmondo	Gerard Moreno	56000880	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67115823.png
+23/09/2020 - 16:23:36	cityods	Hala Modric	Maffeo	10256552	CLAUSULA	null
+04/09/2020 - 21:25:00	Hala Modric	futmondo	Orellana	33999999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/8835313.png
+15/09/2020 - 21:29:00	echo de menos el Netliga	futmondo	Kike Pérez	1005000	COMPRA	https://static01.mondocore.com/futmondo/img/kits/64/valladolid.png
+31/08/2020 - 21:20:00	Hala Modric	futmondo	Iago Aspas	62599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67010455.png
+18/08/2020 - 20:13:00	Pineda team	futmondo	Juan Pérez	1000090	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67217545.png
+02/09/2020 - 21:23:00	Sabero Valley	futmondo	Albiol	17600001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7452450.png
+21/08/2020 - 20:15:00	Luis Ragan	futmondo	Iza	4111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67175525.png
+13/09/2020 - 21:29:00	echo de menos el Netliga	futmondo	Tello	3909090	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67046417.png
+18/08/2020 - 20:13:00	Sabero Valley	futmondo	Germán	8550000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67024721.png
+22/09/2020 - 21:32:00	futmondo	echo de menos el Netliga	Villar	1010584	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67129901.png
+25/09/2020 - 21:30:00	jglelxino17	futmondo	Acuña	11645236	COMPRA	https://static01.mondocore.com/futmondo/img/kits/64/sevilla.png
+05/09/2020 - 21:26:00	Hala Modric	futmondo	Lucas Vázquez	1999999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67135344.png
+20/09/2020 - 21:29:00	Sabero Valley	futmondo	Álex Fdez	16750001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67085790.png
+18/09/2020 - 23:06:00	futmondo	David Vidal Team	Rober Pier	1018029	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67194879.png
+09/09/2020 - 21:31:00	Hala Modric	futmondo	Cheryshev	1799999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67011250.png
+26/08/2020 - 21:15:00	HOPE TEAM S.A	futmondo	Neva	5199999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/carlos-neva.png
+11/09/2020 - 21:26:00	Sabero Valley	futmondo	Waldo Rubio	1000001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67211880.png
+18/08/2020 - 20:13:00	cityods	futmondo	Wass	15999999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/936891.png
+25/09/2020 - 21:30:00	jglelxino17	futmondo	Monreal	18059350	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/ignacio-monreal.png
+18/08/2020 - 20:13:00	Pineda team	futmondo	Domingos Duarte	19876549	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55063355.png
+06/09/2020 - 21:28:00	David Vidal Team	futmondo	Edgar Méndez	5000213	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67080309.png
+25/08/2020 - 21:14:00	cityods	futmondo	Savic	16666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62012567.png
+02/09/2020 - 21:23:00	Ruben Esteban	futmondo	Dmitrovic	15101000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62038612.png
+04/09/2020 - 21:25:00	Hala Modric	futmondo	Lodi	22599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/renan-lodi.png
+26/08/2020 - 21:15:00	Sabero Valley	futmondo	Olaza	21150000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/78048502.png
+12/09/2020 - 16:25:10	jglelxino17	Maño's Team	Kang-in Lee	8607304	CLAUSULA	null
+09/09/2020 - 23:12:00	jglelxino17	HOPE TEAM S.A	Vinícius	25000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19302146.png
+11/09/2020 - 21:26:00	Maño's Team	futmondo	Manu Vallejo	1388320	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/manuel-javier-vallejo-galvan.png
+20/08/2020 - 20:14:00	Gaditas FC	futmondo	Trigueros	7150000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67142545.png
+18/09/2020 - 21:30:00	Pineda team	futmondo	Roberto	1600001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1510293.png
+07/09/2020 - 23:18:00	futmondo	Sabero Valley	Toni Lato	1002239	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67203459.png
+11/09/2020 - 05:12:00	futmondo	Luis Ragan	David Silva	40675228	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7458280.png
+31/08/2020 - 04:52:00	futmondo	Ruben Esteban	Albiol	15419095	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7452450.png
+10/09/2020 - 08:17:00	Albar ÉldelBar	Luis Ragan	Paco Alcácer	43000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67115584.png
+01/09/2020 - 21:22:00	jglelxino17	futmondo	Yangel Herrera	1850639	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/yangel-clemente-herrera-ravelo.png
+06/09/2020 - 03:12:00	futmondo	Hala Modric	Joselu	24963414	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/jos-luis-mato-sanmartn.png
+07/09/2020 - 04:15:00	David Vidal Team	Hala Modric	Messi	100000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7458500.png
+17/09/2020 - 21:29:00	Ruben Esteban	futmondo	Bruno González	1401000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67107164.png
+04/09/2020 - 16:47:00	futmondo	Hala Modric	Guedes	31750162	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55041710.png
+27/08/2020 - 21:15:00	Maño's Team	futmondo	Montoya	5555555	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67053464.png
+29/08/2020 - 21:17:00	Ruben Esteban	futmondo	Unai López	4283001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67145056.png
+25/08/2020 - 21:14:00	PaKeTeS ⚽️	futmondo	Alberto	1850000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/6705830.png
+22/09/2020 - 22:49:00	futmondo	Ruben Esteban	Gonalons	4114021	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/34001572.png
+31/08/2020 - 05:31:00	futmondo	Luis Ragan	Dani García	10651858	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67104797.png
+13/09/2020 - 21:29:00	HOPE TEAM S.A	futmondo	Joel	2352015	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67037306.png
+24/08/2020 - 20:17:00	Sabero Valley	futmondo	Jaime Mata	25350001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67121201.png
+25/08/2020 - 21:14:00	PaKeTeS ⚽️	futmondo	Willian José	28500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19081798.png
+16/09/2020 - 21:29:00	Hala Modric	futmondo	Oier	6599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1509613.png
+18/09/2020 - 21:30:00	jorgearaujopirez	futmondo	Tete Morente	1100222	COMPRA	https://static01.mondocore.com/futmondo/img/kits/64/elche.png
+21/09/2020 - 22:32:00	futmondo	Maño's Team	Iborra	7653667	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/iborra.png
+04/09/2020 - 16:46:00	futmondo	Hala Modric	Bigas	2763024	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67122014.png
+18/08/2020 - 20:13:00	Hala Modric	futmondo	Edgar Méndez	4159999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67080309.png
+19/08/2020 - 20:14:00	HOPE TEAM S.A	futmondo	Trippier	26000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/kieran-trippier.png
+14/09/2020 - 00:48:00	futmondo	Albar ÉldelBar	Álvaro Fernández	3134740	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67246951.png
+17/09/2020 - 21:29:00	jglelxino17	futmondo	Lejeune	2563985	COMPRA	https://static01.mondocore.com/futmondo/img/kits/64/deportivo-alaves.png
+21/09/2020 - 10:05:42	Sabero Valley	Hala Modric	Guido Rodríguez	5764497	CLAUSULA	null
+26/09/2020 - 21:28:00	Luis Ragan	futmondo	Lenglet	25111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85078880.png
+24/09/2020 - 21:30:00	jorgearaujopirez	futmondo	Damián Suárez	15000123	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/78001192.png
+18/09/2020 - 21:30:00	jorgearaujopirez	futmondo	Cheryshev	2356999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67011250.png
+30/08/2020 - 21:18:00	Luis Ragan	futmondo	Battaglia	6222222	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/14025385.png
+20/08/2020 - 20:14:00	jglelxino17	futmondo	Benzema	90346900	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/8435089.png
+18/08/2020 - 20:13:00	Gaditas FC	futmondo	Radoja	1920000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62056935.png
+21/09/2020 - 21:30:00	Hala Modric	futmondo	Víctor Rodríguez	2199999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67070671.png
+23/09/2020 - 21:30:00	Pineda team	futmondo	Malbasic	1204132	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62039564.png
+09/09/2020 - 21:31:00	echo de menos el Netliga	futmondo	Maksimovic	13330000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62097340.png
+21/08/2020 - 20:15:00	Maño's Team	futmondo	Semedo	19501999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55061470.png
+10/09/2020 - 08:14:00	Albar ÉldelBar	Luis Ragan	Pedro León	12500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67005397.png
+10/09/2020 - 21:31:00	Huevo Frito C.F.	futmondo	Arbilla	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1509367.png
+20/08/2020 - 20:14:00	Hala Modric	futmondo	Mikel Rico	3999999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/1502244.png
+23/08/2020 - 20:16:00	Pineda team	futmondo	Capa	27596969	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67187680.png
+18/09/2020 - 23:06:00	futmondo	David Vidal Team	Malbasic	1050326	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62039564.png
+25/08/2020 - 21:14:00	HOPE TEAM S.A	futmondo	Nyom	5400000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/nyom.png
+27/08/2020 - 21:15:00	Luis Ragan	futmondo	Emerson	18666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19325045.png
+18/09/2020 - 23:06:00	futmondo	David Vidal Team	Víctor Rodríguez	2247790	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67070671.png
+18/08/2020 - 20:13:00	Pineda team	futmondo	Jesús Navas	45000009	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7456721.png
+31/08/2020 - 21:20:00	echo de menos el Netliga	futmondo	Brasanac	1340000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62039552.png
+27/08/2020 - 21:16:00	Luis Ragan	futmondo	Pedro León	13222222	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67005397.png
+13/09/2020 - 13:41:16	Maño's Team	Ruben Esteban	Rafa Mir	17250995	CLAUSULA	null
+30/08/2020 - 21:18:00	echo de menos el Netliga	futmondo	Marcelo	10000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/8832853.png
+21/09/2020 - 21:30:00	echo de menos el Netliga	futmondo	Aihen Muñoz	4500800	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/aihen-munoz-capellan.png
+25/08/2020 - 21:14:00	PaKeTeS ⚽️	futmondo	Darwin Machís	22580000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/86017618.png
+25/08/2020 - 21:14:00	Pineda team	futmondo	Mfulu	1230000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85080017.png
+16/09/2020 - 22:37:00	futmondo	Albar ÉldelBar	Kaptoum	1035570	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67185039.png
+16/09/2020 - 22:44:00	futmondo	Ruben Esteban	Joselu	26589035	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/jos-luis-mato-sanmartn.png
+11/09/2020 - 22:06:37	echo de menos el Netliga	Sabero Valley	Andrés Fernández	3980000	CLAUSULA	null
+21/08/2020 - 20:15:00	Luis Ragan	futmondo	Maxi Gómez	26666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/78078886.png
+26/08/2020 - 21:15:00	Hala Modric	futmondo	Marcos Llorente	28599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67196198.png
+12/09/2020 - 21:27:00	Maño's Team	futmondo	Rodrygo	7500000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/rodrygo-silva-de-goes.png
+10/09/2020 - 22:19:00	futmondo	Maño's Team	Tello	995270	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67046417.png
+25/08/2020 - 21:14:00	Maño's Team	futmondo	Pulido	6000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67037319.png
+19/08/2020 - 20:14:00	Sabero Valley	futmondo	Toni Lato	1000002	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67203459.png
+22/08/2020 - 20:15:00	jglelxino17	futmondo	Fran Beltrán	2346826	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67232115.png
+03/09/2020 - 22:46:00	futmondo	Ruben Esteban	Coutinho	31453955	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19046041.png
+22/08/2020 - 20:15:00	Hala Modric	futmondo	Messi	81999999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/7458500.png
+20/08/2020 - 20:14:00	Maño's Team	futmondo	Mosquera	3501000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67011240.png
+06/09/2020 - 21:28:00	PaKeTeS ⚽️	futmondo	Sergi Roberto	13300000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67063007.png
+18/08/2020 - 20:13:00	Luis Ragan	futmondo	Santi Mina	8000001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67182776.png
+05/09/2020 - 21:26:00	Sabero Valley	futmondo	Kroos	37650000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/156772.png
+26/08/2020 - 21:15:00	cityods	futmondo	Edgar Badía	4666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67080544.png
+16/09/2020 - 03:03:00	Albar ÉldelBar	HOPE TEAM S.A	Kaptoum	1200000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67185039.png
+21/09/2020 - 06:24:50	Pineda team	Gaditas FC	Jaume	10147305	CLAUSULA	null
+11/09/2020 - 06:32:00	Albar ÉldelBar	Sabero Valley	Kroos	43000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/156772.png
+31/08/2020 - 21:20:00	Luis Ragan	futmondo	Damián Suárez	15666666	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/78001192.png
+21/09/2020 - 21:30:00	echo de menos el Netliga	futmondo	Siovas	2780000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/36002122.png
+07/09/2020 - 21:29:00	David Vidal Team	futmondo	Rober Pier	2500535	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67194879.png
+28/08/2020 - 21:16:00	Hala Modric	futmondo	Kike García	4699999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67065538.png
+22/08/2020 - 20:15:00	jglelxino17	futmondo	Renato Tapia	3246809	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/renato-tapia.png
+06/09/2020 - 21:28:00	David Vidal Team	futmondo	Malbasic	1555241	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62039564.png
+19/09/2020 - 01:05:00	futmondo	Pineda team	Masip	11469344	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67038645.png
+12/09/2020 - 21:27:00	HOPE TEAM S.A	futmondo	Mandi	3119000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/85079680.png
+05/09/2020 - 21:26:00	Hala Modric	futmondo	Jaime Seoane	1009999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67220012.png
+15/09/2020 - 21:29:00	Albar ÉldelBar	futmondo	Matheus Fernandes	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/19250978.png
+21/09/2020 - 21:30:00	Albar ÉldelBar	futmondo	Thierry Correia	1000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/thierry-correia.png
+19/08/2020 - 20:14:00	jorgearaujopirez	futmondo	Rodrigo	38570000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67086280.png
+10/09/2020 - 21:31:00	Ruben Esteban	futmondo	Córdoba	1364061	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67200926.png
+13/09/2020 - 12:53:00	futmondo	Hala Modric	Kadzior	2818849	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/damian-kadzior.png
+17/09/2020 - 00:39:00	futmondo	Hala Modric	Lucas Vázquez	1167981	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67135344.png
+24/09/2020 - 03:58:00	futmondo	Luis Ragan	Battaglia	11095751	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/14025385.png
+12/09/2020 - 21:27:00	jglelxino17	futmondo	Militao	6236559	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/eder-militao.png
+25/08/2020 - 21:14:00	Maño's Team	futmondo	Borja Iglesias	20555555	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67173048.png
+11/09/2020 - 22:45:00	futmondo	Ruben Esteban	Laguardia	14694439	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67059116.png
+13/09/2020 - 21:29:00	Sabero Valley	futmondo	Moi Gómez	9550000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67142544.png
+18/09/2020 - 01:43:00	futmondo	Hala Modric	Toño	1004076	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67138472.png
+22/09/2020 - 10:39:00	futmondo	Sabero Valley	Joaquín Fernández	7287864	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67184200.png
+22/09/2020 - 21:29:00	PaKeTeS ⚽️	futmondo	Saponjic	1200000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/ivan-saponjic.png
+14/09/2020 - 21:28:00	Maño's Team	futmondo	Moncayola	2000000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67267210.png
+19/08/2020 - 20:14:00	Huevo Frito C.F.	futmondo	Denis Suárez	18101001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67107819.png
+29/08/2020 - 21:17:00	Luis Ragan	futmondo	Djené	25222222	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/211232.png
+14/09/2020 - 22:56:00	futmondo	PaKeTeS ⚽️	Piccini	932510	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/43052618.png
+31/08/2020 - 05:27:00	futmondo	Luis Ragan	Iborra	10257569	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/iborra.png
+08/09/2020 - 22:05:00	futmondo	Maño's Team	Montoya	3768271	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67053464.png
+06/09/2020 - 21:28:00	David Vidal Team	futmondo	Pina	3558123	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67100205.png
+31/08/2020 - 04:53:00	futmondo	Ruben Esteban	Carlos Fernández	11560414	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67184485.png
+08/09/2020 - 21:30:00	Sabero Valley	futmondo	Montoro	6550000	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67010609.png
+27/09/2020 - 06:09:00	futmondo	Luis Ragan	Yeray	23684222	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67192475.png
+21/08/2020 - 20:15:00	jorgearaujopirez	futmondo	William Carvalho	3600005	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/55012106.png
+19/08/2020 - 20:14:00	Luis Ragan	futmondo	Álvaro Fernández	4111111	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67246951.png
+27/09/2020 - 03:15:00	futmondo	Hala Modric	Gonzalo Verdú	4361823	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67093485.png
+16/09/2020 - 21:29:00	cityods	futmondo	Bautista	1333333	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67157534.png
+06/09/2020 - 21:28:00	Hala Modric	futmondo	"Choco" Lozano	4599999	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/87006900.png
+11/09/2020 - 16:34:00	futmondo	echo de menos el Netliga	Brasanac	1192273	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/62039552.png
+29/08/2020 - 21:17:00	Huevo Frito C.F.	futmondo	Pere Milla	3001011	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67170824.png
+28/08/2020 - 23:06:00	futmondo	jglelxino17	Rodrigo Ely	2309386	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/43080624.png
+24/09/2020 - 21:30:00	Albar ÉldelBar	futmondo	Luis Rioja	2000001	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67196000.png
+15/09/2020 - 00:11:00	futmondo	Hala Modric	David Soria	21768992	COMPRA	https://static01.mondocore.com/futmondo/img/faces/64/67011248.png

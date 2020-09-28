@@ -14,35 +14,51 @@ library(networkD3)
 library(data.table)
 library(colorRamps)
 library(ggplot2)
+library(pals)
 # read data
 t = read.csv("www/compras.txt",sep = "\t", encoding ="UTF-8")
 t$Fecha <- as.Date(t$Fecha,format="%d/%m/%Y - %H:%M:%S")
-setorderv(t,c("Fecha"),order = 1)
+setorderv(t,c("Fecha"),order = -1)
 num_colores = nrow(distinct(t, t[,"Comprador"]))
 colores <- primary.colors(num_colores, steps = 10, no.white = TRUE)
 usuarios <- distinct(t['Comprador'])
 usuarios <- arrange(usuarios, Comprador)
 usuarios <- add_row(usuarios, Comprador = "Todos", .before = 1)
-jugadores <- distinct(t['Jugador'])
-jugadores <- arrange(jugadores, Jugador)
-jugadores <- add_row(jugadores, Jugador = "Todos", .before = 1)
+jugadores <- distinct(t['Futbolista'])
+jugadores <- arrange(jugadores, Futbolista)
+jugadores <- add_row(jugadores, Futbolista = "Todos", .before = 1)
+# primera y ultima fecha
 primera_fecha <- summarise(t, min(Fecha))[[1]]
 ultima_fecha <- summarise(t, max(Fecha))[[1]]
+ 
 
-filter_by_usuario_jugador <- function(df, usuarioInput, jugadorInput, fechaRangoInput){
-    tmp <- t[t$Fecha >= as.Date(fechaRangoInput[1]), ]
-    if (usuarioInput == "Todos" & jugadorInput == "Todos") {
-        return(tmp[,c(0:5)])
-    }else if (usuarioInput == "Todos") {
-        return(tmp[tmp$Jugador == jugadorInput ,c(0:5)])
+
+filter_tabla_compras <- function(df, tablaCompras_UsuarioInput, jugadorInput, tablaCompras_FechaRangoInput, tipoCompraInput){
+    tmp <- t[t$Fecha >= as.Date(tablaCompras_FechaRangoInput[1]) & t$Fecha <= as.Date(tablaCompras_FechaRangoInput[2]), ]
+    # browser()
+    if (tipoCompraInput != "TODOS"){
+        if (tipoCompraInput == "COMPRA FUTMONDO"){
+            tmp <- tmp[tmp$Tipo == "COMPRA" & (tmp$Comprador=='futmondo' || tmp$Vendedor=='futmondo'),]
+        }else if (tipoCompraInput == "COMPRA JUGADORES"){
+            tmp <- tmp[tmp$Tipo == "COMPRA" & tmp$Comprador!='futmondo' & tmp$Vendedor!='futmondo',]
+        }else{
+            tmp <- tmp[tmp$Tipo == tipoCompraInput,]
+        }
+    }
+    if (tablaCompras_UsuarioInput == "Todos" & jugadorInput == "Todos") {
+        return(tmp[,c(0:6)])
+    }else if (tablaCompras_UsuarioInput == "Todos") {
+        return(tmp[tmp$Futbolista == jugadorInput ,c(0:6)])
     }else if (jugadorInput == "Todos") {
-        return(tmp[tmp$Comprador == usuarioInput ,c(0:5)])
+        return(tmp[tmp$Comprador == tablaCompras_UsuarioInput ,c(0:6)])
     }else{
-        return(tmp[tmp$Comprador == usuarioInput & tmp$Jugador == jugadorInput ,c(0:5)])
+        return(tmp[tmp$Comprador == tablaCompras_UsuarioInput & tmp$Futbolista == jugadorInput ,c(0:6)])
     }
 }
 get_jugador_foto_url <- function(df, jugador){
-    return (as.vector(df[df$Jugador==jugador,'Foto'][1])[1])
+     tmp <- df[df$Futbolista == jugador & df$Tipo == 'COMPRA','Foto']
+     url <- as.vector(tmp[1])
+     return (url)
 }
 create_jugador_network_data <- function(tabla_compras, jugadorInput){
     # if(jugadorInput != "Todos"){
@@ -55,20 +71,53 @@ create_jugador_network_data <- function(tabla_compras, jugadorInput){
     #     return
     # }
 }
+
+createComprasBarChart <- function(tabla_compras){
+    # create table with the sums of compras per usuario
+    tmp <- tabla_compras[tabla_compras$Comprador != 'futmondo',] # we discard futmondo as comprador
+    tmp <- tmp %>%  group_by(Comprador)  %>% summarise(Gastado = sum(Precio)) %>% arrange(desc(Gastado))
+    ggplot(data = tmp, 
+           aes(
+               x = reorder(Comprador,-Gastado), # order x by Gastado descending 
+               y = Gastado,
+               fill = Comprador)) + # color by Comprador
+            geom_col() + # column plot
+            scale_fill_manual(values = cols25(16)) + # 16 colors 
+            labs(title = "Total gastado por jugador", subtitle = "Ordenado de más a menos gasto", x = NULL, y = "EUR") +
+            theme_classic() +
+            theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0)) +
+            scale_y_continuous(labels = scales::label_number_si()) # makes y labels to be '600M'
+}
+
+createBarPlotJugadoresMasFichados <- function(jugadores_mas_fichados, top_n){
+    # this table has 2 columns: Futbolista and n
+    ggplot(data = jugadores_mas_fichados,
+           aes(x = reorder(Futbolista, -n), 
+               y = n,
+               fill = Futbolista)) + # color by Futbolista
+            geom_col() + # column plot
+            scale_fill_manual(values = cols25(top_n)) + # top_n colors 
+            labs(title = paste("Top ", top_n, " futbolistas más fichados"), x = "Futbolista", y = "Número de fichajes") +
+            theme_classic() +
+            theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0))
+    
+}
 #  
 #
 ui <- navbarPage("Futmondo - smdb21",
     tabPanel("Fichajes",
-             navlistPanel(widths = c(2,8),
-                 "Opciones de fichajes",
-                 tabPanel("Tabla de fichajes",
+             navlistPanel(widths = c(2,10),
+                 "Fichajes",
+                 tabPanel("Mercado",
                           sidebarLayout( 
                               sidebarPanel(
-                                  p("Filtra la tabla aquí o bien debajo de la última fila"),
-                                  selectInput("usuarioInput", "Filtra tabla por Usuario:", usuarios),
-                                  selectInput("jugadorInput", "Filtra tabla por Jugador:", jugadores),
-                                  dateRangeInput("fechaRangoInput", 
-                                                 "Fecha",
+                                  p("Filtra datos aquí:"),
+                                  selectInput("tablaCompras_UsuarioInput", "Filtra datos por Jugador:", usuarios),
+                                  selectInput("tablaCompras_jugadorInput", "Filtra datos por Futbolista:", jugadores),
+                                  radioButtons(inputId = "tablaCompras_tipoCompraInput", label="Tipo de compra", choices = c("Todos"="TODOS","Compras con futmondo"="COMPRA FUTMONDO","Compras entre jugadores"="COMPRA JUGADORES", "Clausulas"="CLAUSULA"), selected = "TODOS"),
+                                  dateRangeInput("tablaCompras_FechaRangoInput", 
+                                                 "Rango de fechas",
+                                                 separator = "-",
                                                  start = primera_fecha, 
                                                  end = ultima_fecha, 
                                                  min = primera_fecha, 
@@ -76,29 +125,32 @@ ui <- navbarPage("Futmondo - smdb21",
                                                  weekstart = 1, 
                                                  language = "es", 
                                                  format = "dd-mm-yyyy"),
-                                  htmlOutput("jugadorFoto"),
-                                  width = 3
+                                  htmlOutput("jugadorFotoCompras"),
+                                  width = 2
                               ),
                               
                               # Show the table
                               mainPanel(
-                                  dataTableOutput("tablaFichajes"),
-                                  forceNetworkOutput("jugadorGraph"),
-                                  width = 9
+                                  fluidRow(column(12, verbatimTextOutput("stats"))),
+                                  fluidRow(column(5,simpleNetworkOutput("jugadorGraphCompras")),
+                                           column(7,plotOutput("sumaComprasGraph"))),
+                                  fluidRow(column(12,dataTableOutput("tablaComprasMercado"))),
+                                  width = 10
                               )
                           )    
                  ),
-                 tabPanel("Fichajes mas comunes",
+                 tabPanel("Top Fichajes",
                           sidebarLayout( 
                               sidebarPanel(
-                                  p("Jugadores fichados más veces"),
-                                  selectInput("topFichadoInput", "Top:", c(1:25), selected = 5),
+                                  p("Futbolistas fichados más veces en el mercado"),
+                                  selectInput("tablaCompras_topFichadoInput", "Top:", c(1:25), selected = 10),
                                   width = 3
                               ),
                               
                               # Show the table
                               mainPanel(
-                                  dataTableOutput("tablaTopJugadoresFichados"),
+                                  fluidRow(plotOutput("jugadoresMasFichadosGraph")),
+                                  dataTableOutput("tablaComprasTopJugadoresFichados"),
                                   width = 9
                               )
                           )   
@@ -153,48 +205,88 @@ server <- function(input, output) {
     # })
    
     # remove last column with url
-    rv <- reactiveValues(tabla_compras = t[,c(0:5)], jugadorNetworkData = create_jugador_network_data(t, "Todos"))
-    observeEvent(input$fechaRangoInput,{
-        rv$tabla_compras <- filter_by_usuario_jugador(t, input$usuarioInput, input$jugadorInput, input$fechaRangoInput)
-        rv$jugadorNetworkData <- create_jugador_network_data(rv$tabla_compras, input$jugadorInput)
+    rv <- reactiveValues(tabla_compras = t, jugadorNetworkData = create_jugador_network_data(t, "Todos"))
+    # events from compras en mercado
+    # fecha de rango para la tabla
+    observeEvent(input$tablaCompras_FechaRangoInput,{
+        rv$tabla_compras <- filter_tabla_compras(t, input$tablaCompras_UsuarioInput, input$tablaCompras_jugadorInput, input$tablaCompras_FechaRangoInput, input$tablaCompras_tipoCompraInput)
+        rv$jugadorNetworkData <- create_jugador_network_data(rv$tabla_compras, input$tablaCompras_jugadorInput)
     })
-    observeEvent(input$usuarioInput,{
-        rv$tabla_compras <- filter_by_usuario_jugador(t, input$usuarioInput, input$jugadorInput, input$fechaRangoInput)
-        rv$jugadorNetworkData <- create_jugador_network_data(rv$tabla_compras, input$jugadorInput)
+    # filtrar por usuario
+    observeEvent(input$tablaCompras_UsuarioInput,{
+        rv$tabla_compras <- filter_tabla_compras(t, input$tablaCompras_UsuarioInput, input$tablaCompras_jugadorInput, input$tablaCompras_FechaRangoInput, input$tablaCompras_tipoCompraInput)
+        rv$jugadorNetworkData <- create_jugador_network_data(rv$tabla_compras, input$tablaCompras_jugadorInput)
     })
-    observeEvent(input$jugadorInput,{
-        rv$tabla_compras <- filter_by_usuario_jugador(t, input$usuarioInput, input$jugadorInput, input$fechaRangoInput)
-        rv$jugadorNetworkData <- create_jugador_network_data(rv$tabla_compras, input$jugadorInput)
-        if (input$jugadorInput == "Todos"){
-            output$jugadorFoto <- renderText("")
+    # filtrar por jugador
+    observeEvent(input$tablaCompras_jugadorInput,{
+        # browser()
+        rv$tabla_compras <- filter_tabla_compras(t, input$tablaCompras_UsuarioInput, input$tablaCompras_jugadorInput, input$tablaCompras_FechaRangoInput, input$tablaCompras_tipoCompraInput)
+        rv$jugadorNetworkData <- create_jugador_network_data(rv$tabla_compras, input$tablaCompras_jugadorInput)
+        if (input$tablaCompras_jugadorInput == "Todos"){
+            output$jugadorFotoCompras <- renderText("")
          }else{
-            output$jugadorFoto <- renderText({
+            output$jugadorFotoCompras <- renderText({
                 c(
-                    '<img src="', get_jugador_foto_url(t,input$jugadorInput), 
+                    '<img src="', get_jugador_foto_url(t,input$tablaCompras_jugadorInput), 
                     '" height="50px" width="50px">'
                 )
             })
         }
     })
+    observeEvent(input$tablaCompras_tipoCompraInput,{
+        rv$tabla_compras <- filter_tabla_compras(t, input$tablaCompras_UsuarioInput, input$tablaCompras_jugadorInput, input$tablaCompras_FechaRangoInput, input$tablaCompras_tipoCompraInput)
+        rv$jugadorNetworkData <- create_jugador_network_data(rv$tabla_compras, input$tablaCompras_jugadorInput)
+    })
+    # filtrar por tipo de compra
     
-    output$tablaFichajes <- renderDataTable(rv$tabla_compras,
+    ##############################
+    # OUTPUTS
+    ##############################
+    
+    # Tabla de compras en mercado
+    output$tablaComprasMercado <- renderDataTable(rv$tabla_compras,
                                     searchDelay = 200,
                                     options = list(
-        pageLength = 50
+        pageLength = 10
         # initComplete = I("function(settings, json) {alert('Done.');}")
         )
     )
+    # grafico de barras con el dinero gastado en compras
+    output$sumaComprasGraph <- renderPlot(createComprasBarChart(rv$tabla_compras))
     
-    output$tablaTopJugadoresFichados <- renderDataTable({
-                                            ranking_jugadores_fichados <- t %>% count(Jugador) %>% arrange(desc(n)) %>% slice(seq_len(input$topFichadoInput))
-                                            setnames(ranking_jugadores_fichados, c("Jugador","n"), c("Jugador","# veces fichado"))
-                                            },
-                                            searchDelay = 200,
-                                            options = list(
-                                                pageLength = 50
-                                                # initComplete = I("function(settings, json) {alert('Done.');}")
-                                            )
+    # Tabla de jugadores más fichados por compra en mercado
+    output$tablaComprasTopJugadoresFichados <- renderDataTable({
+        ranking_jugadores_fichados <- t %>% count(Futbolista) %>% arrange(desc(n)) %>% slice(seq_len(input$tablaCompras_topFichadoInput))
+        setnames(ranking_jugadores_fichados, c("Futbolista","n"), c("Futbolista","# veces fichado")) # rename column names as Futbolista
+        },
+        searchDelay = 200,
+        options = list(pageLength = 50
+                   # initComplete = I("function(settings, json) {alert('Done.');}")
+        )
     )
+    # stats with the money spent by players
+    output$stats <- renderText({
+        tmp <- rv$tabla_compras[rv$tabla_compras$Comprador != 'futmondo',] # we discard futmondo as comprador
+        tmp <- tmp %>%  group_by(Comprador)  %>% summarise(Gastado = sum(Precio)) %>% arrange(desc(Gastado))
+        jugador_max = as.character(tmp[[1,1]])
+        jugador_max_gasto = format(tmp[[1,2]], big.mark=",")
+        lastIndex = dim(tmp)[1]
+        jugador_min = as.character(tmp[[lastIndex,1]])
+        jugador_min_gasto = format(tmp[[lastIndex,2]], big.mark=",")
+        return(paste(sep="", "Estadísticas desde ", input$tablaCompras_FechaRangoInput[1], " hasta ", input$tablaCompras_FechaRangoInput[2] ,":\n", 
+                     "Media dinero gastado: ", format(mean(tmp$Gastado), big.mark=","), " eur\n",
+                     "Total dinero gastado: ", format(sum(tmp$Gastado), big.mark=","), " eur\n",
+                     "Jugador que más ha gastado: ", jugador_max, " (", jugador_max_gasto, " eur)\n",
+                     "Jugador que menos ha gastado: ", jugador_min, " (", jugador_min_gasto, " eur)\n"
+                     )
+               )
+    })
+    # bat plot con los jugadores más fichados
+    output$jugadoresMasFichadosGraph <- renderPlot({
+        ranking_jugadores_fichados <- t %>% count(Futbolista) %>% arrange(desc(n)) %>% slice(seq_len(input$tablaCompras_topFichadoInput))
+        createBarPlotJugadoresMasFichados(ranking_jugadores_fichados, input$tablaCompras_topFichadoInput)
+        })
+    
     
     output$gastosPlot <- renderPlot(
         ggplot(data=t, aes(x=Fecha, y=Precio, group=Comprador, color=Comprador)) +
@@ -223,8 +315,13 @@ server <- function(input, output) {
         )
     })
     
-    output$jugadorGraph <- renderForceNetwork({
-         simpleNetwork(rv$jugadorNetworkData, height="100px", width="100px",        
+    output$jugadorGraphCompras <- renderForceNetwork({
+         data_to_plot <- rv$jugadorNetworkData
+         if (dim(data_to_plot)[1] == 0){
+             return(NULL)
+         }
+         
+         simpleNetwork(data_to_plot, height="100px", width="100px",        
                       Source = 1,                 # column number of source
                       Target = 2,                 # column number of target
                       linkDistance = 10,          # distance between node. Increase this value to have more space between nodes
