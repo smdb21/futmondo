@@ -31,3 +31,163 @@ jornada	jugador	posicion	puntos
 2	Albar ÉldelBar	14	26.6
 2	Maño's Team	15	25.2
 2	cityods	16	22.4
+3	Pineda team	1	73.2
+3	jorgearaujopirez	2	69.3
+3	PaKeTeS ⚽️	3	68.1
+3	echo de menos el Netliga	4	59.3
+3	cityods	5	58.6
+3	Ruben Esteban	6	58.2
+3	Maño's Team	7	57.1
+3	Hala Modric	8	56.9
+3	jglelxino17	9	56.8
+3	HOPE TEAM S.A	10	54.5
+3	David Vidal Team	11	54.0
+3	Huevo Frito C.F.	12	52.2
+3	Albar ÉldelBar	13	50.9
+3	Sabero Valley	14	49.1
+3	Luis Ragan	15	47.2
+3	Gaditas FC	16	32.5
+4	Pineda team	1	75.2
+4	Hala Modric	2	67.9
+4	jorgearaujopirez	3	57.0
+4	Huevo Frito C.F.	4	53.9
+4	Maño's Team	5	53.9
+4	Albar ÉldelBar	6	53.2
+4	PaKeTeS ⚽️	7	50.6
+4	jglelxino17	8	50.0
+4	Luis Ragan	9	49.2
+4	David Vidal Team	10	49.0
+4	HOPE TEAM S.A	11	43.8
+4	Ruben Esteban	12	39.4
+4	Sabero Valley	13	35.1
+4	cityods	14	34.9
+4	Gaditas FC	15	31.5
+4	echo de menos el Netliga	16	29.0
+5	Ruben Esteban	1	89.1
+5	HOPE TEAM S.A	2	68.6
+5	Sabero Valley	3	67.7
+5	jglelxino17	4	64.6
+5	Hala Modric	5	59.8
+5	Maño's Team	6	59.3
+5	Pineda team	7	58.4
+5	jorgearaujopirez	8	56.0
+5	David Vidal Team	9	54.1
+5	PaKeTeS ⚽️	10	51.3
+5	Gaditas FC	11	46.6
+5	Albar ÉldelBar	12	44.6
+5	Luis Ragan	13	43.9
+5	Huevo Frito C.F.	14	42.1
+5	cityods	15	40.0
+5	echo de menos el Netliga	16	17.2
+6	Maño's Team	1	82.2
+6	Luis Ragan	2	79.0
+6	Ruben Esteban	3	68.0
+6	Sabero Valley	4	67.1
+6	Pineda team	5	66.5
+6	Hala Modric	6	65.0
+6	PaKeTeS ⚽️	7	60.4
+6	Huevo Frito C.F.	8	60.0
+6	HOPE TEAM S.A	9	59.8
+6	jorgearaujopirez	10	55.1
+6	Gaditas FC	11	52.0
+6	David Vidal Team	12	50.9
+6	jglelxino17	13	43.2
+6	echo de menos el Netliga	14	40.8
+6	cityods	15	33.5
+6	Albar ÉldelBar	16	33.4
+7	Sabero Valley	1	81.0
+7	Ruben Esteban	2	77.2
+7	Maño's Team	3	76.8
+7	Hala Modric	4	68.2
+7	jorgearaujopirez	5	63.7
+7	Luis Ragan	6	61.2
+7	HOPE TEAM S.A	7	59.0
+7	PaKeTeS ⚽️	8	53.4
+7	jglelxino17	9	49.1
+7	Gaditas FC	10	49.0
+7	David Vidal Team	11	48.7
+7	Albar ÉldelBar	12	44.7
+7	Pineda team	13	44.5
+7	Huevo Frito C.F.	14	43.0
+7	cityods	15	31.4
+7	echo de menos el Netliga	16	30.7
+8	Hala Modric	1	84.6
+8	Sabero Valley	2	79.5
+8	Ruben Esteban	3	67.9
+8	Maño's Team	4	66.1
+8	HOPE TEAM S.A	5	63.8
+8	PaKeTeS ⚽️	6	61.5
+8	Albar ÉldelBar	7	60.1
+8	David Vidal Team	8	52.3
+8	echo de menos el Netliga	9	50.4
+8	jglelxino17	10	48.6
+8	Gaditas FC	11	45.9
+8	Pineda team	12	45.7
+8	jorgearaujopirez	13	42.1
+8	Huevo Frito C.F.	14	36.5
+8	cityods	15	34.2
+8	Luis Ragan	16	29.8
+9	David Vidal Team	1	74.9
+9	Albar ÉldelBar	2	65.6
+9	Hala Modric	3	64.9
+9	PaKeTeS ⚽️	4	64.6
+9	jorgearaujopirez	5	63.6
+9	Gaditas FC	6	61.8
+9	HOPE TEAM S.A	7	58.4
+9	Maño's Team	8	57.6
+9	Pineda team	9	56.8
+9	Ruben Esteban	10	55.3
+9	jglelxino17	11	55.2
+9	Luis Ragan	12	50.7
+9	Huevo Frito C.F.	13	50.0
+9	echo de menos el Netliga	14	44.7
+9	Sabero Valley	15	43.4
+9	cityods	16	29.0
+10	Ruben Esteban	1	94.5
+10	Hala Modric	2	74.2
+10	PaKeTeS ⚽️	3	73.1
+10	jglelxino17	4	65.1
+10	HOPE TEAM S.A	5	62.0
+10	Luis Ragan	6	61.2
+10	Gaditas FC	7	56.2
+10	Pineda team	8	55.7
+10	David Vidal Team	9	53.5
+10	Albar ÉldelBar	10	52.6
+10	echo de menos el Netliga	11	51.4
+10	jorgearaujopirez	12	51.2
+10	Maño's Team	13	49.5
+10	Sabero Valley	14	49.0
+10	cityods	15	43.4
+10	Huevo Frito C.F.	16	33.6
+11	Ruben Esteban	1	83.4
+11	Sabero Valley	2	75.2
+11	Hala Modric	3	63.8
+11	Albar ÉldelBar	4	57.9
+11	PaKeTeS ⚽️	5	56.5
+11	Luis Ragan	6	55.7
+11	Maño's Team	7	54.5
+11	Pineda team	8	54.1
+11	echo de menos el Netliga	9	52.6
+11	Gaditas FC	10	50.2
+11	jorgearaujopirez	11	50.1
+11	David Vidal Team	12	47.8
+11	jglelxino17	13	42.5
+11	HOPE TEAM S.A	14	41.3
+11	cityods	15	36.4
+11	Huevo Frito C.F.	16	30.9
+12	David Vidal Team	1	101.2
+12	Hala Modric	2	82.3
+12	Ruben Esteban	3	72.4
+12	Maño's Team	4	71.7
+12	PaKeTeS ⚽️	5	67.3
+12	Sabero Valley	6	61.3
+12	Pineda team	7	61.2
+12	Gaditas FC	8	60.5
+12	Luis Ragan	9	59.7
+12	cityods	10	52.8
+12	jorgearaujopirez	11	46.3
+12	HOPE TEAM S.A	12	46.3
+12	echo de menos el Netliga	13	46.3
+12	Huevo Frito C.F.	14	44.2
+12	jglelxino17	15	33.0
+12	Albar ÉldelBar	16	27.4
