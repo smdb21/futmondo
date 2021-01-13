@@ -95,3 +95,11 @@ D3_network_LM <- networkD3::forceNetwork(Links = edgeList, # data frame that con
 D3_network_LM 
 
 
+
+
+##############
+puntos = fread(file = "www/puntos.txt",sep = "\t", encoding ="UTF-8")
+num_jornada <- 5
+puntos <- puntos[jornada<=num_jornada,]
+clasification <- puntos[,.(total=sum(puntos)), by=jugador]
+setorder(clasificacion, -total)

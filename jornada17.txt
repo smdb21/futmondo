@@ -1,0 +1,341 @@
+<html lang="es" style="" class=" js no-touch localstorage"><head>
+    
+        
+    
+    <title> futmondo - Fútbol fantasy manager  - futmondo</title>
+    
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+        <meta name="alexaVerifyID" content="VB8XORVWTq7eEzHSyxjrYJ1wHxA">
+        <meta name="p:domain_verify" content="fc9ff8a5a589c687ddc2c800602e928a">
+        <link type="text/plain" rel="author" href="http://www.futmondo.com/humans.txt">
+        <meta name="HandheldFriendly" content="True">
+        <meta name="MobileOptimized" content="320">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <meta http-equiv="cleartype" content="on">
+
+        
+            <link rel="shortcut icon" href="/img/favicon.ico">
+            <link rel="apple-touch-icon" href="/img/icon-iphone.png">
+            <link rel="apple-touch-icon" sizes="72x72" href="/img/icon-ipad.png">
+            <link rel="apple-touch-icon" sizes="114x114" href="/img/icon-iphone4.png">
+        
+
+        <script async="" src="https://cdn.branch.io/branch-latest.min.js"></script><script src="//d2na2p72vtqyok.cloudfront.net/client-embed/b4ae8f57-624c-4b07-9ed3-fbed4a6afcf5.js" async=""></script><script src="//cdn.onesignal.com/sdks/OneSignalSDK.js" async=""></script>
+        <script>
+        var OneSignal = window.OneSignal || [];
+        OneSignal.push(function() {
+            OneSignal.init({
+                appId: "ffa9ad62-1414-11e5-bc99-2bd3b7842201",
+                autoRegister: true,
+                notifyButton: {
+                    enable: false
+                }
+            });
+        });
+        </script>
+        <!-- Header Tag Code --><script data-cfasync="false" type="text/javascript">/*<![CDATA[*/(function (a, c, s, u){'Insticator'in a || (a.Insticator={ad:{loadAd: function (b){Insticator.ad.q.push(b)}, q: []}, helper:{}, embed:{}, version: "3.0", q: [], load: function (t, o){Insticator.q.push({t: t, o: o})}}); var b=c.createElement(s); b.src=u; b.async=!0; var d=c.getElementsByTagName(s)[0]; d.parentNode.insertBefore(b, d)})(window, document, 'script', '//d2na2p72vtqyok.cloudfront.net/client-embed/b4ae8f57-624c-4b07-9ed3-fbed4a6afcf5.js');/*]]>*/</script><!-- End Header Tag Code -->
+    
+
+    
+        <link rel="stylesheet" href="//static02.mondocore.com/futmondo/assets/css/futmondo.mobile.v5.2.8.css">
+    
+
+    
+        <script src="//static02.mondocore.com/futmondo/assets/js/futmondo.mobile.v5.2.8.js" type="text/javascript"></script><script src="https://cdn.onesignal.com/sdks/OneSignalPageSDKES6.js?v=151105" async=""></script>
+    
+    <script type="application/javascript" src="//ced.sascdn.com/tag/2036/smart.js" async=""></script>
+    <script>
+        
+            Futmondo.USER = '5b55fb19be298c4b5913fc44';
+        
+        Futmondo.UserteamCountry = '';
+        Futmondo.Site = 'futmondo.com';
+        Futmondo.Sitename = 'futmondo';
+        Futmondo.Ads = {"LDB_top":{"network":"dfp","visible":"div.headerBanner","type":"banner"},"LDB_general":{"network":"smart","siteid":"62267","pageid":"486114","formatid":"30622","type":"banner"},"MPU_right":{"network":"dfp","visible":"#dfp_MPU_right","type":"banner"},"Interstitial":{"network":"smart","siteid":"62267","pageid":"486114","formatid":"43685","type":"interstitial"}};  
+        Futmondo.AdUnits = {};
+        Futmondo.AdUnits.DFP = {};
+        moment.lang('es');
+
+        accounting.settings.currency.symbol = "€";
+        accounting.settings.currency.format = "%v %s";
+        accounting.settings.currency.thousand = ".";
+        accounting.settings.currency.decimal = ",";
+        accounting.settings.currency.precision = 0;
+        accounting.settings.number.thousand = ".";
+        accounting.settings.number.decimal = ",";
+
+        $(function () {
+            Futmondo.Settings = Futmondo.Settings || {};
+            Futmondo.Settings.FAQ = {
+                Bug: "http://help.futmondo.com/contact",
+                Suggestion: "http://help.futmondo.com/contact",
+                URL: "http://help.futmondo.com/"
+            };
+            Futmondo.Settings.Offerwalls = {
+                Enabled: true,
+                Supersonic: '32ca498d',
+                Fyber: '27434',
+                Virool: '9fad742',
+                Trialpay: '',
+                TokenAds: '5015',
+                Personaly: 'f6c624d7ec79a5156b286fa6c6d36a4b',
+                Superrewards: '',
+                Offertoro: '',
+                Peanutlabs: 'appId',
+                Wannads: '',
+                Surveytime: 'f6aaf3a727bddc36d885127e52a74f5a',
+                FutmondoStore: 'true'
+            };
+
+            //initializeSupersized();
+            Futmondo.Helpers.Utils.setNumberSettings(navigator.language || navigator.browserLanguage);
+
+            CUORE.Dom.ready(function () {
+                var currentLocale = (navigator.language || navigator.browserLanguage);
+                document.labels = {};
+                document.labels[currentLocale] = {
+                    'notext': ' '
+                };
+                $.i18n.init({
+                    lng: 'es',
+                    fallbackLng: 'es',
+                    ns: { namespaces: ['futmondo.translation'], defaultNs: 'futmondo.translation' },
+                    useLocalStorage: false,
+                    resGetPath: '/locales/resources.json?lng=__lng__&ns=__ns__&v=.v5.2.8.',
+                    dynamicLoad: true
+                }, function () {
+                    Futmondo.Helpers.Router.initialize();
+                });
+            });
+        });
+    </script>
+    
+    <script async="async" src="https://www.googletagservices.com/tag/js/gpt.js"></script>
+    <script>
+    var googletag = googletag || {};
+    googletag.cmd = googletag.cmd || [];
+    </script>
+    <script type="text/javascript">
+        
+    
+        
+    googletag.cmd.push(function() {
+        Futmondo.AdUnits.DFP.FIELD = googletag.defineSlot('/21758073471/futmondo_web_FIELD', [1, 1], 'dfp_FIELD').addService(googletag.pubads());
+        Futmondo.AdUnits.DFP.LDB_general = googletag.defineSlot('/21758073471/futmondo_web_ldb_top', [[970, 90], [728, 90], [980, 90]], 'dfp_LDB_general').addService(googletag.pubads());
+        Futmondo.AdUnits.DFP.MPU_top = googletag.defineSlot('/21758073471/futmondo_web_MPU_top', [[300, 600], [300, 250]], 'dfp_MPU_top').addService(googletag.pubads());
+        Futmondo.AdUnits.DFP.MPU_rest = googletag.defineSlot('/21758073471/futmondo_web_MPU_rest', [[300, 250]], 'dfp_MPU_rest').addService(googletag.pubads());
+        Futmondo.AdUnits.DFP.LDB_top = googletag.defineSlot('/21758073471/futmondo_web_ldb_top', [[970, 90], [728, 90], [980, 90]], 'dfp_LDB_top').addService(googletag.pubads());
+        Futmondo.AdUnits.DFP.SKY_left = googletag.defineSlot('/21758073471/futmondo_web_sky_left', [[120, 600], [120, 240], [160, 600], [160, 240]], 'dfp_SKY_left').addService(googletag.pubads());
+        Futmondo.AdUnits.DFP.SKY_right = googletag.defineSlot('/21758073471/futmondo_web_sky_right', [[120, 600], [120, 240], [160, 600], [160, 240]], 'dfp_SKY_right').addService(googletag.pubads());
+        Futmondo.AdUnits.DFP.INLINE = googletag.defineSlot('/21758073471/futmondo_web_inline', [1, 1], 'dfp_INLINE').addService(googletag.pubads());
+
+        // googletag.pubads().enableSingleRequest();
+        googletag.pubads().collapseEmptyDivs();
+        googletag.pubads().setTargeting('site', ['futmondo'])
+        googletag.enableServices();
+
+        googletag.display('dfp_FIELD');
+        googletag.display('dfp_INLINE');
+        googletag.display('dfp_LDB_general');
+        googletag.display('dfp_LDB_top');
+        //googletag.display('dfp_MPU_top');
+        //googletag.display('dfp_MPU_rest');
+        googletag.display('dfp_SKY_left');
+        googletag.display('dfp_SKY_right');
+    });
+
+    </script>
+
+    
+    
+
+
+    
+    
+    <style>
+        div.modalBox a[target='_system'] {
+            color: #669900;
+        }
+    </style>
+
+    <script async="" src="//pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+    <script>
+    (adsbygoogle = window.adsbygoogle || []).push({
+        google_ad_client: "ca-pub-1551762470650093",
+        enable_page_level_ads: true
+    });
+    </script>
+<meta http-equiv="origin-trial" content="A2shzsdPO+RKe83bUqT9oVkYwGZN6j9O7nrcOASNFPuQz8HefgVYb9qAqn6coNCSDIRtXoi6ybCrjEsYh3caFgIAAAB7eyJvcmlnaW4iOiJodHRwczovL2RvdWJsZWNsaWNrLm5ldDo0NDMiLCJmZWF0dXJlIjoiVHJ1c3RUb2tlbnMiLCJleHBpcnkiOjE2MTM0OTU4NjgsImlzU3ViZG9tYWluIjp0cnVlLCJpc1RoaXJkUGFydHkiOnRydWV9"><script src="https://securepubads.g.doubleclick.net/gpt/pubads_impl_2021011203.js?21069786" async=""></script><link rel="preload" href="https://adservice.google.com/adsid/integrator.js?domain=www.futmondo.com" as="script"><script type="text/javascript" src="https://adservice.google.com/adsid/integrator.js?domain=www.futmondo.com"></script><link rel="prefetch" href="https://90a40248c125879a02ee280bae0bd7b5.safeframe.googlesyndication.com/safeframe/1-0-37/html/container.html"><link rel="prefetch" href="https://tpc.googlesyndication.com/safeframe/1-0-37/html/container.html"><style></style><style></style><style></style><style></style></head>
+<body data-new-gr-c-s-check-loaded="14.991.0" data-gr-ext-installed="" class=""><div></div>
+    <div class="tutorialWrapper" style="display:none" id="tutorial"></div>
+    
+    
+
+    <section id="loader" class="loaderInner" style="display: none;"></section>
+    <div id="notifier"><div id="a0015" class=""></div></div>
+
+    <div class="desktopContainer">
+        <div class="desktopHeader">
+            <figure class="logo" onclick="javascript:location.href='/index'">
+                <div class="season"><strong>Temporada 20·21</strong></div>
+            </figure>
+            <div class="headerBanner" id="dfp_LDB_top">
+                <script>
+                googletag.cmd.push(function() { googletag.display('dfp_LDB_top'); });
+                </script>
+            <div id="google_ads_iframe_/21758073471/futmondo_web_ldb_top_1__container__" style="border: 0pt none; width: 970px; height: 90px;"></div></div>
+        </div>
+
+        <div class="windowContainer holdMenuContainer" style="display:none" id="strategies"></div>
+        <div class="windowContainer" style="display:none" id="playerBuyWindow"></div>
+        <div class="windowContainer" style="display:none" id="playerSellWindow"></div>
+        <div class="windowContainer" style="display:none" id="playerSummaryWindow"></div>
+        <div class="windowContainer" style="display:none" id="auctionPlayerSummaryWindow"></div>
+        <div class="windowContainer" style="display:none" id="userInvitationsModal"></div>
+        <div class="windowContainer" style="display:none" id="teamPlayerSettings"></div>
+        <div class="windowContainer" style="display:none" id="teamPlayerDoBid"></div>
+        <div class="windowContainer" style="display:none" id="showConfigurationWindow"></div>
+        <div class="windowContainer" style="display:none" id="playerRoundPoints"></div>
+        <div class="windowContainer" style="display:none" id="newMessageWindow"></div>
+        <div class="windowContainer" style="display:none" id="newLockerMessageWindow"></div>
+        <div class="windowContainer" style="display:none" id="searchChampionshipWindow"></div>
+        <div class="windowContainer" style="display:none" id="pollWindow"></div>
+        <div class="windowContainer" style="display:none" id="pushNotification"></div>
+        <div class="windowContainer" style="display:none" id="playerMoveWindow"></div>
+        <div class="windowContainer" style="display:none" id="avatarSelector"></div>
+        <div class="windowContainer" style="display:none" id="confirmationWindow"></div>
+        <div class="windowContainer" style="display:none" id="profileWindow"></div>
+        
+        <article class="container">
+            <nav class="menu push-nav-left overthrow" id="pushProfile">
+                <div class="closePanel"></div>
+                <div class="navBox">
+                    <div class="userBox" id="userProfileBox" data-target="el-1"><div class="user"><figure class="avatar"><img alt="Salvaaaa" title="Salvaaaa" src="https://static01.mondocore.com/img/avatars/female/avatar_061.png"></figure><figcaption class="username">Salvaaaa</figcaption><a class="icon-gear" href="#!/user/settings"></a><div class="mondosContainer"><div class="mondos"><a href="#!/user/mondos">2,500 <i class="icon icon-mondos"></i></a></div><div class="mondos betting"><a href="#!/user/mondos">0 <i class="icon icon-mondos"></i></a></div></div></div><a class="btnStd getMondos" href="#!/mondos/earn"><i class="icon-mondos"></i><span>Gana mondos</span></a><ul class="menuOptions"><li><a class="messages" href="#!/user/mailbox"><div class="icon"><i class="icon icon-message"></i><span>0</span></div></a></li><li><a class="reward" href="#!/user/prizes"><div class="icon"><i class="icon icon-reward"></i><span>0</span></div></a></li><li><a class="reward" href="#!/announcements"><div class="icon"><i class="icon icon-new"></i><span>2</span></div></a></li><li><div class="icon"><a href="#!/matches"><i class="icon-timer"></i></a></div></li></ul></div>
+                    <ul class="sections" id="championshipMenu" data-target="el-2"><li><a><i class="icon icon-trophy"></i>Mis campeonatos</a></li><li><a><i class="flag espana"></i>Datos <strong>Liga Santander</strong></a></li><li><a><i class="icon icon-lineup"></i>Alineación</a></li><li><a><i class="icon icon-ranking"></i>Clasificación</a></li><li><a><i class="icon icon-transfers"></i>Mercado</a></li><li><a><i class="icon icon-press"></i>Sala de prensa</a></li><li><a><i class="icon icon-locker"></i>Vestuario</a></li><li><a><i class="icon icon-squads"></i>Plantillas</a></li><li><a><i class="icon icon-cup"></i>Copa</a></li><li><a><i class="icon icon-gear"></i>Administración</a></li></ul>
+                    <div id="promoLeads"></div>
+                    
+                    <a class="play basketmondo" onclick="window.open('https://basket.mondo.link/A1tx/utYm7brOKH', '_system')" data-target="el-2">
+                        <figure class="logo"></figure>
+                        <span>Descárgate</span>
+                        <strong>Basketmondo</strong>
+                    </a>
+                    
+                </div>
+            </nav>
+            <nav class="menu push-info-right overthrow" id="pushInfoRight"><div class="closePanel"></div><div class="content"><ul class="champStats"><li class="title"><i></i>OHY CAMPEÓN </li><li class="points">Puntos: <strong>851</strong></li><li class="position">Posición: <strong>14º</strong><span class="top"></span></li><li class="budget"><strong>Fondos</strong>: <span class="pos">$ 33,777,275</span></li><li class="balance">Valor del equipo: <span class="pos">$ 128,270,781</span></li><li class="offers">Ofertas: <span class="neg">$ 0</span></li><li class="balance">Balance: <span class="pos">$ 33,777,275</span></li><li class="center"><a class="btnStd">Configuración</a></li></ul></div></nav>
+            <nav class="menu push-notif-right overthrow" id="pushNotificationsRight"><div class="closePanel"></div><div class="content navscroll" style="overflow-y: auto;"><div class="notification" data-id="5ffd37e78948c10bb92728cf"><div class="notifHeader"><i class="icon-trophy"></i><h5>Clasificación</h5><a class="close icon-close" data-id="5ffd37e78948c10bb92728cf"></a></div><p>Ya puedes consultar los puntos de tu equipo de la jornada 18 en el campeonato OHY CAMPEÓN </p><span class="time">ayer a las 21:47</span></div><div class="notification" data-id="5ff94002300a5506dc5d2a75"><div class="notifHeader"><i class="icon-trophy"></i><h5>Mercado</h5><a class="close icon-close" data-id="5ff94002300a5506dc5d2a75"></a></div><p><strong>futmondo</strong> ha aceptado tu oferta por <strong>Vesga</strong> en el campeonato <a>OHY CAMPEÓN </a>.</p><span class="time">el viernes pasado a las 21:32</span></div><div class="notification" data-id="5ff9400263001b06e5a17160"><div class="notifHeader"><i class="icon-trophy"></i><h5>Mercado</h5><a class="close icon-close" data-id="5ff9400263001b06e5a17160"></a></div><p><strong>futmondo</strong> ha aceptado tu oferta por <strong>Unai Vencedor</strong> en el campeonato <a>OHY CAMPEÓN </a>.</p><span class="time">el viernes pasado a las 21:32</span></div><div class="notification" data-id="5ff88da3e9e9287edaf56ec6"><div class="notifHeader"><i class="icon-trophy"></i><h5>Mercado</h5><a class="close icon-close" data-id="5ff88da3e9e9287edaf56ec6"></a></div><p><strong>jorgearaujopirez</strong> te ha hecho una oferta sobre <strong>Kike Pérez</strong> en el campeonato <a>OHY CAMPEÓN </a>.</p><span class="time">el viernes pasado a las 8:51</span></div><div class="notification" data-id="5ff88d70f1def67ed4ab9a5e"><div class="notifHeader"><i class="icon-trophy"></i><h5>Mercado</h5><a class="close icon-close" data-id="5ff88d70f1def67ed4ab9a5e"></a></div><p><strong>jorgearaujopirez</strong> te ha hecho una oferta sobre <strong>Barrenetxea</strong> en el campeonato <a>OHY CAMPEÓN </a>.</p><span class="time">el viernes pasado a las 8:50</span></div><div class="notification" data-id="5ff79489f2701d7eb10a69de"><div class="notifHeader"><i class="icon-trophy"></i><h5>Mercado</h5><a class="close icon-close" data-id="5ff79489f2701d7eb10a69de"></a></div><p><strong>Maño's Team</strong> ha pagado la claúsula de <strong>Dani Gómez</strong> en el campeonato <a>OHY CAMPEÓN </a>.</p><span class="time">el jueves pasado a las 15:08</span></div><div class="notification" data-id="5ff7947af1def67ed4aa362c"><div class="notifHeader"><i class="icon-trophy"></i><h5>Mercado</h5><a class="close icon-close" data-id="5ff7947af1def67ed4aa362c"></a></div><p><strong>Maño's Team</strong> ha pagado la claúsula de <strong>Fer Niño</strong> en el campeonato <a>OHY CAMPEÓN </a>.</p><span class="time">el jueves pasado a las 15:08</span></div><div class="notification" data-id="5ff69da59e2b2a06c30cb3d5"><div class="notifHeader"><i class="icon-trophy"></i><h5>Mercado</h5><a class="close icon-close" data-id="5ff69da59e2b2a06c30cb3d5"></a></div><p><strong>futmondo</strong> ha aceptado tu oferta por <strong>Nacho</strong> en el campeonato <a>OHY CAMPEÓN </a>.</p><span class="time">el miércoles pasado a las 21:35</span></div></div></nav>
+            <nav class="menu push-menu-right overthrow" id="menuRight"><div class="closePanel"></div><div id="a4059" class="rankingComponent content disabled"><section class="ranking content navscroll" style="overflow-y: auto;"><h3><i class="icon-ranking"></i>Clasificación</h3><ul class="ranking general"><li class="row"><ul class="user"><li class="pos">1º</li><li class="change top"></li><li class="name textOverflow">Hala Modric</li><li class="points">1228.6</li></ul></li><li class="row"><ul class="user"><li class="pos">2º</li><li class="change flop"></li><li class="name textOverflow">Ruben Esteban</li><li class="points">1186.1</li></ul></li><li class="row"><ul class="user"><li class="pos">3º</li><li class="change equal"></li><li class="name textOverflow">Sabero Valley</li><li class="points">1169.6</li></ul></li><li class="row"><ul class="user"><li class="pos">4º</li><li class="change equal"></li><li class="name textOverflow">David Vidal Team</li><li class="points">1082.4</li></ul></li><li class="row"><ul class="user"><li class="pos">5º</li><li class="change equal"></li><li class="name textOverflow">HOPE TEAM S.A</li><li class="points">1080.3</li></ul></li><li class="row"><ul class="user"><li class="pos">6º</li><li class="change equal"></li><li class="name textOverflow">Maño's Team</li><li class="points">1044.4</li></ul></li><li class="row"><ul class="user"><li class="pos">7º</li><li class="change equal"></li><li class="name textOverflow">PaKeTeS ⚽️</li><li class="points">1015.1</li></ul></li><li class="row"><ul class="user"><li class="pos">8º</li><li class="change flop"></li><li class="name textOverflow"><i class="icon-cup"></i>Pineda team</li><li class="points">1009.5</li></ul></li><li class="row"><ul class="user"><li class="pos">9º</li><li class="change flop"></li><li class="name textOverflow">Luis Ragan</li><li class="points">972.3</li></ul></li><li class="row"><ul class="user"><li class="pos">10º</li><li class="change top"></li><li class="name textOverflow">jorgearaujopirez</li><li class="points">956.3</li></ul></li><li class="row"><ul class="user"><li class="pos">11º</li><li class="change equal"></li><li class="name textOverflow">jglelxino17</li><li class="points">925.6</li></ul></li><li class="row"><ul class="user"><li class="pos">12º</li><li class="change equal"></li><li class="name textOverflow">Huevo Frito C.F.</li><li class="points">879.6</li></ul></li><li class="row"><ul class="user"><li class="pos">13º</li><li class="change top"></li><li class="name textOverflow current">echo de menos el Netliga</li><li class="points">851.0</li></ul></li><li class="row"><ul class="user"><li class="pos">14º</li><li class="change equal"></li><li class="name textOverflow">Gaditas FC</li><li class="points">845.6</li></ul></li><li class="row"><ul class="user"><li class="pos">15º</li><li class="change flop"></li><li class="name textOverflow">Albar ÉldelBar</li><li class="points">819.4</li></ul></li><li class="row"><ul class="user"><li class="pos">16º</li><li class="change equal"></li><li class="name textOverflow">cityods</li><li class="points">710.0</li></ul></li></ul></section></div><div id="e598" class="rankingComponent content"><section class="ranking content navscroll" style="overflow-y: auto;"><h3><i class="icon-ranking"></i>Clasificación</h3><ul class="ranking general"><li class="row"><ul class="user"><li class="pos">1º</li><li class="name textOverflow">Hala Modric</li><li class="points">75.8</li></ul></li><li class="row"><ul class="user"><li class="pos">2º</li><li class="name textOverflow">PaKeTeS ⚽️</li><li class="points">73.2</li></ul></li><li class="row"><ul class="user"><li class="pos">3º</li><li class="name textOverflow">Maño's Team</li><li class="points">72.5</li></ul></li><li class="row"><ul class="user"><li class="pos">4º</li><li class="name textOverflow">jglelxino17</li><li class="points">66.1</li></ul></li><li class="row"><ul class="user"><li class="pos">5º</li><li class="name textOverflow">Sabero Valley</li><li class="points">65.4</li></ul></li><li class="row"><ul class="user"><li class="pos">6º</li><li class="name textOverflow">HOPE TEAM S.A</li><li class="points">65.0</li></ul></li><li class="row"><ul class="user"><li class="pos">7º</li><li class="name textOverflow">David Vidal Team</li><li class="points">62.2</li></ul></li><li class="row"><ul class="user"><li class="pos">8º</li><li class="name textOverflow">jorgearaujopirez</li><li class="points">60.2</li></ul></li><li class="row"><ul class="user"><li class="pos">9º</li><li class="name textOverflow">Huevo Frito C.F.</li><li class="points">57.4</li></ul></li><li class="row"><ul class="user"><li class="pos">10º</li><li class="name textOverflow current">echo de menos el Netliga</li><li class="points">56.5</li></ul></li><li class="row"><ul class="user"><li class="pos">11º</li><li class="name textOverflow"><i class="icon-cup"></i>Pineda team</li><li class="points">52.3</li></ul></li><li class="row"><ul class="user"><li class="pos">12º</li><li class="name textOverflow">cityods</li><li class="points">41.7</li></ul></li><li class="row"><ul class="user"><li class="pos">13º</li><li class="name textOverflow">Gaditas FC</li><li class="points">36.5</li></ul></li><li class="row"><ul class="user"><li class="pos">14º</li><li class="name textOverflow">Luis Ragan</li><li class="points">35.6</li></ul></li><li class="row"><ul class="user"><li class="pos">15º</li><li class="name textOverflow">Ruben Esteban</li><li class="points">34.6</li></ul></li><li class="row"><ul class="user"><li class="pos">16º</li><li class="name textOverflow">Albar ÉldelBar</li><li class="points">20.3</li></ul></li></ul></section></div></nav>
+            <nav class="menu push-menu-left overthrow" id="menuLeft"><div class="closePanel"></div><section class="fixtures"><h4>Listado de partidos</h4><div class="day">2 de enero de 2021</div><ul class="gwFixtures"><li><div class="time">05:00</div><div class="homeTeam">VIL <img src="https://static02.mondocore.com/futmondo/img/teams/64/villarreal.png" title="Villarreal" alt="Villarreal" align="top"></div><div class="score"><span class="home">2</span> - <span>1</span></div><div class="awayTeam"><img src="https://static02.mondocore.com/futmondo/img/teams/64/levante.png" title="Levante" alt="Levante" align="top"> LEV</div><a class="icon-timer disabled ended"></a></li><li><div class="time">07:15</div><div class="homeTeam">BET <img src="https://static02.mondocore.com/futmondo/img/teams/64/betis.png" title="Betis" alt="Betis" align="top"></div><div class="score"><span class="home">1</span> - <span>1</span></div><div class="awayTeam"><img src="https://static02.mondocore.com/futmondo/img/teams/64/sevilla.png" title="Sevilla" alt="Sevilla" align="top"> SEV</div><a class="icon-timer disabled ended"></a></li><li><div class="time">09:30</div><div class="homeTeam">GET <img src="https://static02.mondocore.com/futmondo/img/teams/64/getafe.png" title="Getafe" alt="Getafe" align="top"></div><div class="score"><span class="home">0</span> - <span>1</span></div><div class="awayTeam"><img src="https://static02.mondocore.com/futmondo/img/teams/64/valladolid.png" title="Real Valladolid" alt="Real Valladolid" align="top"> VLL</div><a class="icon-timer disabled ended"></a></li><li><div class="time">12:00</div><div class="homeTeam">RMA <img src="https://static02.mondocore.com/futmondo/img/teams/64/real-madrid.png" title="Real Madrid " alt="Real Madrid " align="top"></div><div class="score"><span class="home">2</span> - <span>0</span></div><div class="awayTeam"><img src="https://static02.mondocore.com/futmondo/img/teams/64/celta-de-vigo.png" title="Celta de Vigo" alt="Celta de Vigo" align="top"> CEL</div><a class="icon-timer disabled ended"></a></li></ul><div class="day">3 de enero de 2021</div><ul class="gwFixtures"><li><div class="time">05:00</div><div class="homeTeam">ATH <img src="https://static02.mondocore.com/futmondo/img/teams/64/athletic-de-bilbao.png" title="Athletic de Bilbao" alt="Athletic de Bilbao" align="top"></div><div class="score"><span class="home">1</span> - <span>0</span></div><div class="awayTeam"><img src="https://static02.mondocore.com/futmondo/img/teams/64/elche.png" title="Elche" alt="Elche" align="top"> ELC</div><a class="icon-timer disabled ended"></a></li><li><div class="time">07:15</div><div class="homeTeam">ALA <img src="https://static02.mondocore.com/futmondo/img/teams/64/deportivo-alaves.png" title="Alavés" alt="Alavés" align="top"></div><div class="score"><span class="home">1</span> - <span>2</span></div><div class="awayTeam"><img src="https://static02.mondocore.com/futmondo/img/teams/64/atletico-de-madrid.png" title="Atlético de Madrid" alt="Atlético de Madrid" align="top"> ATM</div><a class="icon-timer disabled ended"></a></li><li><div class="time">09:30</div><div class="homeTeam">EIB <img src="https://static02.mondocore.com/futmondo/img/teams/64/sd-eibar.png" title="Eibar" alt="Eibar" align="top"></div><div class="score"><span class="home">2</span> - <span>0</span></div><div class="awayTeam"><img src="https://static02.mondocore.com/futmondo/img/teams/64/granada.png" title="Granada" alt="Granada" align="top"> GRA</div><a class="icon-timer disabled ended"></a></li><li><div class="time">09:30</div><div class="homeTeam">RSO <img src="https://static02.mondocore.com/futmondo/img/teams/64/real-sociedad.png" title="Real Sociedad" alt="Real Sociedad" align="top"></div><div class="score"><span class="home">1</span> - <span>1</span></div><div class="awayTeam"><img src="https://static02.mondocore.com/futmondo/img/teams/64/osasuna.png" title="Osasuna" alt="Osasuna" align="top"> OSA</div><a class="icon-timer disabled ended"></a></li><li><div class="time">12:00</div><div class="homeTeam">HUE <img src="https://static02.mondocore.com/futmondo/img/teams/64/sd-huesca.png" title="Huesca" alt="Huesca" align="top"></div><div class="score"><span class="home">0</span> - <span>1</span></div><div class="awayTeam"><img src="https://static02.mondocore.com/futmondo/img/teams/64/barcelona.png" title="Barcelona" alt="Barcelona" align="top"> FCB</div><a class="icon-timer disabled ended"></a></li></ul><div class="day">4 de enero de 2021</div><ul class="gwFixtures"><li><div class="time">12:00</div><div class="homeTeam">VAL <img src="https://static02.mondocore.com/futmondo/img/teams/64/valencia.png" title="Valencia" alt="Valencia" align="top"></div><div class="score"><span class="home">1</span> - <span>1</span></div><div class="awayTeam"><img src="https://static02.mondocore.com/futmondo/img/teams/64/cadiz-cf.png" title="Cádiz" alt="Cádiz" align="top"> CAD</div><a class="icon-timer disabled ended"></a></li></ul></section></nav>
+            <nav class="menu push-bench-left overthrow" id="menuAlternates"></nav>
+            <nav class="backgroundPanel">
+                <div class="innerShadow"></div>
+                <div id="dfp_MPU_top">
+                    <figure></figure>
+                    <script>
+                    //googletag.cmd.push(function() { googletag.display('dfp_MPU_top'); });
+                    </script>
+                </div>
+            </nav>
+            <header>
+                <ul class="header" id="appHeader"><li class="menu toggle-nav-left"><i class="icon-nav"></i><span class="notifications">2</span></li><li class="sectionMenu"><i class="icoSection toggle-profile-left icon-ranking"></i><div class="title">OHY CAMPEÓN <span class="category">Clasificación</span></div></li><li class="icon1"><a class="icon icon-info toggle-info-right"></a></li><li class="icon2"><a class="icon icon-mondos"></a></li><li class="options"><i class="icon-overflow"></i></li><ul class="optionsPanel" style="display: none;"><li class="toggle-notif-right">Notificaciones</li><li><a onclick="window.open(&quot;http://help.futmondo.com/&quot;, &quot;_blank&quot;);">Cómo jugar</a></li><li><a onclick="window.open(&quot;http://help.futmondo.com/contact?referrer=http%3A//www.futmondo.com/index%23%21/espana/ranking%3Fchampionship%3D5b55f9d767214483120b87cf%26userteam%3D5b55fbcbb78eda1f7593cb7f%26type%3Dsocial&quot;, &quot;_blank&quot;);">Contacto</a></li><li><a onclick="window.open(&quot;https://www.futmondo.com/info/legal&quot;, &quot;_blank&quot;);">Aviso legal</a></li><li><a onclick="window.open(&quot;https://www.futmondo.com/info/privacidad&quot;, &quot;_blank&quot;);">Privacidad</a></li><li><a onclick="window.open(&quot;https://www.futmondo.com/info/cookies&quot;, &quot;_blank&quot;);">Cookies</a></li><li><a>Desconectar</a></li></ul><div class="closeOptionsLayer" style="display: none;"></div></ul>
+            </header>
+
+            
+    <section class="wrapper" id="wrapper"><!-- Anuncio -->
+<div class="skyscraper left" id="dfp_SKY_left">
+<div id="a521b" class=""></div></div>
+<div class="skyscraper right" id="dfp_SKY_right">
+<div id="a4672" class=""></div></div>
+<section class="main ranking mainscroll" tabindex="2" style="overflow-y: hidden; outline: none; cursor: grab; touch-action: none;">
+	<div class="fieldBanner" id="banner"><div id="a5298" class=""><a><img src="https://bit.ly/luckia_202012"></a></div></div>
+
+    <div id="rounds" class=""><div class="swiper-container swiper-car gameweeks"><div class="swiper-button-prev icon-arrow-left"></div><div class="swiper-button-next icon-arrow-right"></div><div class="tns-outer" id="swiper-gameweeks-ow"><div class="tns-ovh"><div class="tns-inner" id="swiper-gameweeks-iw"><div class="swiper-wrapper tns-slider tns-carousel tns-subpixel tns-calc tns-horizontal" id="swiper-gameweeks" style="width: 1420px; transform: translate3d(0%, 0px, 0px);"><div class="swiper-slide gameweek overall tns-item tns-slide-active" id="swiper-gameweeks-item0" aria-hidden="false"><span>General</span> <strong>850.9999999999999</strong> </div><div class="swiper-slide gameweek round tns-item tns-slide-active" id="swiper-gameweeks-item1" aria-hidden="false"><span class="">Jornada 18</span> <strong class="">64.0</strong> </div><div class="swiper-slide gameweek round selected tns-item tns-slide-active" id="swiper-gameweeks-item2" aria-hidden="false"><span class="">Jornada 17</span> <strong class="">56.5</strong> </div><div class="swiper-slide gameweek round tns-item tns-slide-active" id="swiper-gameweeks-item3" aria-hidden="false"><span class="">Jornada 16</span> <strong class="">55.9</strong> </div><div class="swiper-slide gameweek round tns-item tns-slide-active" id="swiper-gameweeks-item4" aria-hidden="false"><span class="">Jornada 15</span> <strong class="">66.0</strong> </div><div class="swiper-slide gameweek round tns-item" id="swiper-gameweeks-item5" aria-hidden="true" tabindex="-1"><span class="">Jornada 14</span> <strong class="">43.0</strong> </div><div class="swiper-slide gameweek round tns-item" id="swiper-gameweeks-item6" aria-hidden="true" tabindex="-1"><span class="">Jornada 13.9</span> <strong class="">0.0</strong> </div><div class="swiper-slide gameweek round tns-item" id="swiper-gameweeks-item7" aria-hidden="true" tabindex="-1"><span class="">Jornada 13</span> <strong class="">68.5</strong> </div><div class="swiper-slide gameweek round tns-item" id="swiper-gameweeks-item8" aria-hidden="true" tabindex="-1"><span class="">Jornada 12</span> <strong class="">46.3</strong> </div><div class="swiper-slide gameweek round tns-item" id="swiper-gameweeks-item9" aria-hidden="true" tabindex="-1"><span class="">Jornada 11</span> <strong class="">52.6</strong> </div><div class="swiper-slide gameweek round tns-item" id="swiper-gameweeks-item10" aria-hidden="true" tabindex="-1"><span class="">Jornada 10</span> <strong class="">51.4</strong> </div><div class="swiper-slide gameweek round tns-item" id="swiper-gameweeks-item11" aria-hidden="true" tabindex="-1"><span class="">Jornada 9</span> <strong class="">44.7</strong> </div><div class="swiper-slide gameweek round tns-item" id="swiper-gameweeks-item12" aria-hidden="true" tabindex="-1"><span class="">Jornada 8</span> <strong class="">50.4</strong> </div><div class="swiper-slide gameweek round tns-item" id="swiper-gameweeks-item13" aria-hidden="true" tabindex="-1"><span class="">Jornada 7</span> <strong class="">30.7</strong> </div><div class="swiper-slide gameweek round tns-item" id="swiper-gameweeks-item14" aria-hidden="true" tabindex="-1"><span class="">Jornada 6</span> <strong class="">40.8</strong> </div><div class="swiper-slide gameweek round tns-item" id="swiper-gameweeks-item15" aria-hidden="true" tabindex="-1"><span class="">Jornada 5</span> <strong class="">17.2</strong> </div><div class="swiper-slide gameweek round current tns-item" id="swiper-gameweeks-item16" aria-hidden="true" tabindex="-1"><span class="">Jornada 4</span> <strong class="">29.0</strong> </div><div class="swiper-slide gameweek round tns-item" id="swiper-gameweeks-item17" aria-hidden="true" tabindex="-1"><span class="">Jornada 3</span> <strong class="">59.3</strong> </div><div class="swiper-slide gameweek round tns-item" id="swiper-gameweeks-item18" aria-hidden="true" tabindex="-1"><span class="">Jornada 2</span> <strong class="">49.3</strong> </div><div class="swiper-slide gameweek round tns-item" id="swiper-gameweeks-item19" aria-hidden="true" tabindex="-1"><span class="">Jornada 1</span> <strong class="">25.4</strong> </div></div></div></div></div></div></div>
+    <section class="field banner">
+        <div class="lineup">
+            <div class="startingLine" id="chosen"><form><ul class="of3 attack"><li><section id="player_0" class="player shake"><div class="playerPoints presstats">4<i class="icon-presstats"></i></div><figure class="photo"><img alt="" src="https://static01.mondocore.com/futmondo/img/faces/64/67229630.png" onerror="Futmondo.Helpers.Resources.onErrorPlayerPhoto(this, &quot;L&quot;, &quot;sevilla.png&quot;)"></figure><i class="crest"><img alt="" src="https://static02.mondocore.com/futmondo/img/teams/64/sevilla.png" onerror="this.parentNode.removeChild(this)"></i><div class="name Fw"><div class="corners">En-Nesyri</div></div></section></li><li><section id="player_1" class="player shake"><div class="playerPoints presstats">3<i class="icon-presstats"></i></div><figure class="photo"><img alt="" src="https://static01.mondocore.com/futmondo/img/faces/64/67231837.png" onerror="Futmondo.Helpers.Resources.onErrorPlayerPhoto(this, &quot;L&quot;, &quot;levante.png&quot;)"></figure><i class="crest"><img alt="" src="https://static02.mondocore.com/futmondo/img/teams/64/levante.png" onerror="this.parentNode.removeChild(this)"></i><div class="name Fw"><div class="corners">Dani Gómez</div></div></section></li><li><section id="player_2" class="player shake"><div class="playerPoints presstats">8.5<i class="icon-presstats"></i></div><figure class="photo"><img alt="" src="https://static01.mondocore.com/futmondo/img/faces/64/67258829.png" onerror="Futmondo.Helpers.Resources.onErrorPlayerPhoto(this, &quot;L&quot;, &quot;villarreal.png&quot;)"></figure><i class="crest"><img alt="" src="https://static02.mondocore.com/futmondo/img/teams/64/villarreal.png" onerror="this.parentNode.removeChild(this)"></i><div class="name Fw"><div class="corners">Fer Niño</div></div></section></li></ul><ul class="of3 midfield"><li><section id="player_3" class="player shake"><div class="playerPoints presstats">5.1<i class="icon-presstats"></i></div><figure class="photo"><img alt="" src="https://static01.mondocore.com/futmondo/img/faces/64/67011240.png" onerror="Futmondo.Helpers.Resources.onErrorPlayerPhoto(this, &quot;L&quot;, &quot;sd-huesca.png&quot;)"></figure><i class="crest"><img alt="" src="https://static02.mondocore.com/futmondo/img/teams/64/sd-huesca.png" onerror="this.parentNode.removeChild(this)"></i><div class="name Mf"><div class="corners">Mosquera</div></div></section></li><li><section id="player_4" class="player shake"><div class="playerPoints presstats">3.7<i class="icon-presstats"></i></div><figure class="photo"><img alt="" src="https://static01.mondocore.com/futmondo/img/faces/64/1502244.png" onerror="Futmondo.Helpers.Resources.onErrorPlayerPhoto(this, &quot;L&quot;, &quot;sd-huesca.png&quot;)"></figure><i class="crest"><img alt="" src="https://static02.mondocore.com/futmondo/img/teams/64/sd-huesca.png" onerror="this.parentNode.removeChild(this)"></i><div class="name Mf"><div class="corners">Mikel Rico</div></div></section></li><li><section id="player_5" class="player shake"><div class="playerPoints presstats">7.8<i class="icon-presstats"></i></div><figure class="photo"><img alt="" src="https://static01.mondocore.com/futmondo/img/faces/64/67148546.png" onerror="Futmondo.Helpers.Resources.onErrorPlayerPhoto(this, &quot;L&quot;, &quot;valladolid.png&quot;)"></figure><i class="crest"><img alt="" src="https://static02.mondocore.com/futmondo/img/teams/64/valladolid.png" onerror="this.parentNode.removeChild(this)"></i><div class="name Mf"><div class="corners">Roque Mesa</div></div></section></li></ul><ul class="of4 defense"><li><section id="player_6" class="player shake"><div class="playerPoints presstats">3.8<i class="icon-presstats"></i></div><figure class="photo"><img alt="" src="https://static01.mondocore.com/futmondo/img/faces/64/51011883.png" onerror="Futmondo.Helpers.Resources.onErrorPlayerPhoto(this, &quot;L&quot;, &quot;celta-de-vigo.png&quot;)"></figure><i class="crest"><img alt="" src="https://static02.mondocore.com/futmondo/img/teams/64/celta-de-vigo.png" onerror="this.parentNode.removeChild(this)"></i><div class="name Df"><div class="corners">Néstor Araujo</div></div></section></li><li><section id="player_7" class="player shake locked"><div class="playerPoints presstats">3.2<i class="icon-presstats"></i></div><figure class="photo"><i class="icon-arrow-up"></i><img alt="" src="https://static01.mondocore.com/futmondo/img/faces/64/67258411.png" onerror="Futmondo.Helpers.Resources.onErrorPlayerPhoto(this, &quot;L&quot;, &quot;betis.png&quot;)"></figure><i class="crest"><img alt="" src="https://static02.mondocore.com/futmondo/img/teams/64/betis.png" onerror="this.parentNode.removeChild(this)"></i><div class="name Df"><div class="corners">Juan Miranda</div></div></section></li><li><section id="player_8" class="player shake"><div class="playerPoints presstats">5.1<i class="icon-presstats"></i></div><figure class="photo"><img alt="" src="https://static01.mondocore.com/futmondo/img/faces/64/7452450.png" onerror="Futmondo.Helpers.Resources.onErrorPlayerPhoto(this, &quot;L&quot;, &quot;villarreal.png&quot;)"></figure><i class="crest"><img alt="" src="https://static02.mondocore.com/futmondo/img/teams/64/villarreal.png" onerror="this.parentNode.removeChild(this)"></i><div class="name Df"><div class="corners">Albiol</div></div></section></li><li><section id="player_9" class="player shake"><div class="playerPoints presstats">2.3<i class="icon-presstats"></i></div><figure class="photo"><img alt="" src="https://static01.mondocore.com/futmondo/img/faces/64/14044037.png" onerror="Futmondo.Helpers.Resources.onErrorPlayerPhoto(this, &quot;L&quot;, &quot;sevilla.png&quot;)"></figure><i class="crest"><img alt="" src="https://static02.mondocore.com/futmondo/img/teams/64/sevilla.png" onerror="this.parentNode.removeChild(this)"></i><div class="name Df"><div class="corners">Acuña</div></div></section></li></ul><ul class="of1 goalkeeper"><li><section id="player_10" class="player shake"><div class="playerPoints presstats">10<i class="icon-presstats"></i></div><figure class="photo"><img alt="" src="https://static01.mondocore.com/futmondo/img/faces/64/67038645.png" onerror="Futmondo.Helpers.Resources.onErrorPlayerPhoto(this, &quot;L&quot;, &quot;valladolid.png&quot;)"></figure><i class="crest"><img alt="" src="https://static02.mondocore.com/futmondo/img/teams/64/valladolid.png" onerror="this.parentNode.removeChild(this)"></i><div class="name Gk"><div class="corners">Masip</div></div></section></li></ul></form></div>
+            <div class="areaTop"></div>
+            <div class="centerField"></div>
+            <div class="areaBottom"></div>
+            <div class="fieldLogo" style="display: none;"></div>
+            <div id="dfp-FIELD" class="dfpadunit fieldSponsor" data-type="field"></div>
+        </div>
+        <a name="#alternateList"></a>
+        <div class="alternateList" id="bench" style=""><h1>Suplentes</h1><p>Selecciona el jugador que saldrá al campo:</p><form><ul class="alternates"><li><section id="player_0" class="player locked"><div class="playerPoints presstats">4.3<i class="icon-presstats"></i></div><figure class="photo"><img alt="" src="https://static01.mondocore.com/futmondo/img/faces/64/67157155.png" onerror="Futmondo.Helpers.Resources.onErrorPlayerPhoto(this, &quot;L&quot;, &quot;getafe.png&quot;)"></figure><div class="name Gk"><div class="corners">Rubén Yáñez</div></div></section></li><li><section id="player_1" class="player locked"><div class="playerPoints presstats">5.2<i class="icon-presstats"></i></div><figure class="photo"><img alt="" src="https://static01.mondocore.com/futmondo/img/faces/64/67228777.png" onerror="Futmondo.Helpers.Resources.onErrorPlayerPhoto(this, &quot;L&quot;, &quot;sd-eibar.png&quot;)"></figure><div class="name Mf"><div class="corners">Alejandro Pozo</div></div></section></li><li><section id="player_2" class="player locked"><div class="playerPoints presstats">3.1<i class="icon-presstats"></i></div><figure class="photo"><i class="icon-arrow-down"></i><img alt="" src="https://static01.mondocore.com/futmondo/img/faces/64/67093485.png" onerror="Futmondo.Helpers.Resources.onErrorPlayerPhoto(this, &quot;L&quot;, &quot;elche.png&quot;)"></figure><div class="name Df"><div class="corners">Gonzalo Verdú</div></div></section></li><li><section id="player_3" class="player locked"><div class="playerPoints presstats">-0.1<i class="icon-presstats"></i></div><figure class="photo"><img alt="" src="https://static01.mondocore.com/futmondo/img/faces/64/67024721.png" onerror="Futmondo.Helpers.Resources.onErrorPlayerPhoto(this, &quot;L&quot;, &quot;granada.png&quot;)"></figure><div class="name Df"><div class="corners">Germán</div></div></section></li></ul></form><a class="btnCancel">Cancelar</a></div>
+    </section>
+</section>
+
+<div class="footerOptions">
+    <div class="footerOption left icon-calendar toggle-push-left"></div>
+    <div class="footerOption centerLeft icon-topeleven"></div>
+    <div class="footerOption centerRight icon-bench toggle-bench" style="display:none"></div>
+    <div class="footerOption right icon-ranking toggle-push-right"></div>
+</div>
+
+<div id="sas_43685" class="adunit" data-type="interstitial" data-slot="Interstitial"></div>
+<div class="adunit" data-type="banner" data-slot="LDB_top" data-visible="div.headerBanner"></div>
+<div class="adunit" data-type="banner" data-slot="MPU_right" data-visible="#dfp_MPU_right"></div>
+</section>
+    <script type="application/javascript" src="https://ced.sascdn.com/tag/3121/smart.js" async=""></script>
+<div id="sas_66325"></div>
+<script type="application/javascript">
+    var sas = sas || {};
+    sas.cmd = sas.cmd || [];
+    sas.cmd.push(
+        function () {
+            sas.call(
+                { siteId: 288696, pageId: 1052798, formatId: 66325, tagId: "sas_66325" },
+                { networkId: 3121, domain: "https://www8.smartadserver.com" /*, onNoad: function() {} */ }
+            );
+        }
+    );
+</script>
+
+        </article>
+
+        <div id="notificationsPanel" style="display:none"></div>
+        <div id="modifyProfilePanel" style="display:none"></div>
+        <div class="cookiesMsg" style="display:none" id="cookiesMessage">
+            <div class="gridlayout" style="position:relative">
+                <p>Política de cookies</p>
+                <a class="close"></a>
+            </div>
+        </div>
+    <div id="ascrail2001" class="nicescroll-rails nicescroll-rails-vr" style="width: 6px; z-index: 500; cursor: grab; position: absolute; top: 159px; left: 865px; height: 676px; touch-action: none; display: none; opacity: 0;"><div class="nicescroll-cursors" style="position: relative; top: 0px; float: right; width: 6px; height: 0px; background-color: rgb(51, 51, 51); background-clip: padding-box; border-radius: 5px; touch-action: none;"></div></div></div>
+    
+    <!-- Google Analytics -->
+    <script>
+    window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+    ga('create', 'UA-27810831-7', 'auto');
+    
+        ga('set', 'userId', '5b55fb19be298c4b5913fc44'); 
+    
+    ga('send', 'pageview');
+    </script>
+    <script async="" src="//www.google-analytics.com/analytics.js"></script>
+    <!-- End Google Analytics -->
+
+    <script type="text/javascript">
+        if (typeof console === "undefined" || typeof console.log === "undefined") {
+            console = {};
+            console.log = function () {};
+        }
+    </script>
+
+    <div style="display:none" id="menuManager" class=""></div>
+    <div style="display:none" id="scrollManager" class=""></div>
+
+    <script type="text/javascript">
+
+    
+    (function(b,r,a,n,c,h,_,s,d,k){if(!b[n]||!b[n]._q){for(;s<_.length;)c(h,_[s++]);d=r.createElement(a);d.async=1;d.src="https://cdn.branch.io/branch-latest.min.js";k=r.getElementsByTagName(a)[0];k.parentNode.insertBefore(d,k);b[n]=h}})(window,document,"script","branch",function(b,r){b[r]=function(){b._q.push([r,arguments])}},{_q:[],_v:1},"addListener applyCode autoAppIndex banner closeBanner closeJourney creditHistory credits data deepview deepviewCta first getCode init link logout redeem referrals removeListener sendSMS setBranchViewData setIdentity track validateCode trackCommerceEvent".split(" "), 0);
+    
+    branch.init('key_live_ijeYrzInWWx0zc38hwKRupkaCFdOkkRG', function (err, data) {
+        // callback to handle err or data
+    });
+    
+        branch.setIdentity('5b55fb19be298c4b5913fc44');
+    
+    </script>
+    
+
+<iframe src="https://futmondo.os.tc/webPushIframe" sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts allow-top-navigation" style="display: none;"></iframe><style type="text/css">@media all and (min-width:1px){.tns-mq-test{position:absolute}}</style></body></html>
