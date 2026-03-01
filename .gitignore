@@ -1,4 +1,6 @@
 weapp2/Futmondo/.Renviron
 /webapp/futmondo/.Rproj.user
+**/.Rproj.user/**
+**.Rproj
 target/**
 **/rsconnect/**

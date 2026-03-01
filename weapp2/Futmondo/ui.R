@@ -26,7 +26,7 @@ body <- shinydashboard::dashboardBody(
         column(
           12,
           div(
-            style = "overflow-x: auto;",  # Allow horizontal scrolling
+            style = "overflow-x: auto;", # Allow horizontal scrolling
             players_in_teams_UI(id = "players_in_teams")
           )
         )
@@ -34,12 +34,10 @@ body <- shinydashboard::dashboardBody(
     ),
     shinydashboard::tabItem(
       tabName = "market",
-      h4("This is the market"),
       market_UI(id = "market")
     ),
     shinydashboard::tabItem(
       tabName = "players_in_championship",
-      h4("All players in the championship"),
       players_in_championship_UI(id = "players_in_championship")
     )
   )
