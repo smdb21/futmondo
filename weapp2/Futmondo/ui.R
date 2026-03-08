@@ -44,6 +44,7 @@ body <- shinydashboard::dashboardBody(
 )
 
 shinydashboardPlus::dashboardPage(
+  preloader = list(html = tagList(waiter::spin_1(), "Loading ..."), color = "#3c8dbc"),
   header,
   shinydashboardPlus::dashboardSidebar(
     width = 135, # pixels

@@ -1,6 +1,8 @@
 library(reactable)
 
 players_table_UI <- function(id, box_title = NULL,
+                             solidHeader = TRUE,
+                             status = "primary",
                              filter_by_position = TRUE,
                              filter_by_team = TRUE,
                              filter_by_value = TRUE,
@@ -14,7 +16,8 @@ players_table_UI <- function(id, box_title = NULL,
   tagList(
     shinydashboardPlus::box(
       width = 12,
-      solidHeader = TRUE,
+      solidHeader = solidHeader,
+      status = status,
       title = box_title,
       # enclose table in a div so that is smaller
       div(
@@ -109,7 +112,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV) {
     selected_player_RV <- reactive({
       selected_idx <- getReactableState(outputId = "players_table", name = "selected", session = session)
       req(selected_idx)
-      selected_player <- players_table_RV()[selected_idx, ]
+      selected_player <- players_table_filtered_RV()[selected_idx, ]
     })
 
     ## players_table_filtered_RV ----

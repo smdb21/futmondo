@@ -29,10 +29,9 @@ selected_player_UI <- function(id) {
       boxToolSize = "xl",
       collapsible = FALSE,
       footer = fluidRow(
-        column(3, uiOutput(ns("player_points_description_box"))),
-        column(3, uiOutput(ns("player_last_points_description_box"))),
-        column(3, uiOutput(ns("player_value_description_box"))),
-        column(3, uiOutput(ns("player_change_description_box")))
+        column(4, uiOutput(ns("player_points_description_box"))),
+        column(4, uiOutput(ns("player_last_points_description_box"))),
+        column(4, uiOutput(ns("player_value_description_box")))
       )
     )
   )
@@ -138,8 +137,7 @@ selected_player_Server <- function(id, selected_player) {
       req(selected_player)
       value <- selected_player$value
       change <- selected_player$change
-      change_pct <- (change / value) * 100
-      # browser()
+      change_pct <- selected_player$change_by_value * 100
       if (change > 0) {
         icon <- icon("caret-up")
         number_color <- "green"
@@ -152,7 +150,7 @@ selected_player_Server <- function(id, selected_player) {
       }
       descriptionBlock(
         header = format_currency(value),
-        number = paste0(format_currency(change), " (", round(change_pct, 2), "%)"),
+        number = paste0(add_sign(format_currency(change)), " (", round(change_pct, 2), "%)"),
         numberColor = number_color,
         numberIcon = icon,
         text = "Value"
@@ -192,4 +190,11 @@ selected_player_Server <- function(id, selected_player) {
       )
     })
   })
+}
+add_sign <- function(x) {
+  if (x > 0) {
+    return(paste0("+", x))
+  } else {
+    return(as.character(x))
+  }
 }

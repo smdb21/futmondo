@@ -37,6 +37,28 @@
         "Built": "R 4.5.0; ; 2025-04-05 02:55:50 UTC; unix"
       }
     },
+    "RColorBrewer": {
+      "Source": "CRAN",
+      "Repository": "https://packagemanager.posit.co/cran/latest",
+      "description": {
+        "Package": "RColorBrewer",
+        "Version": "1.1-3",
+        "Date": "2022-04-03",
+        "Title": "ColorBrewer Palettes",
+        "Authors@R": "c(person(given = \"Erich\", family = \"Neuwirth\", role = c(\"aut\",\n        \"cre\"), email = \"erich.neuwirth@univie.ac.at\"))",
+        "Author": "Erich Neuwirth [aut, cre]",
+        "Maintainer": "Erich Neuwirth <erich.neuwirth@univie.ac.at>",
+        "Depends": "R (>= 2.0.0)",
+        "Description": "Provides color schemes for maps (and other graphics)\n        designed by Cynthia Brewer as described at http://colorbrewer2.org.",
+        "License": "Apache License 2.0",
+        "Packaged": "2022-04-03 10:26:20 UTC; neuwirth",
+        "NeedsCompilation": "no",
+        "Repository": "RSPM",
+        "Date/Publication": "2022-04-03 19:20:13 UTC",
+        "Encoding": "UTF-8",
+        "Built": "R 4.5.0; ; 2025-04-05 03:00:03 UTC; unix"
+      }
+    },
     "Rcpp": {
       "Source": "CRAN",
       "Repository": "https://packagemanager.posit.co/cran/latest",
@@ -367,6 +389,32 @@
         "Repository": "RSPM",
         "Date/Publication": "2025-08-27 16:40:02 UTC",
         "Built": "R 4.5.0; ; 2025-08-28 08:11:23 UTC; unix"
+      }
+    },
+    "farver": {
+      "Source": "CRAN",
+      "Repository": "https://packagemanager.posit.co/cran/latest",
+      "description": {
+        "Type": "Package",
+        "Package": "farver",
+        "Title": "High Performance Colour Space Manipulation",
+        "Version": "2.1.2",
+        "Authors@R": "c(\n    person(\"Thomas Lin\", \"Pedersen\", , \"thomas.pedersen@posit.co\", role = c(\"cre\", \"aut\"),\n           comment = c(ORCID = \"0000-0002-5147-4711\")),\n    person(\"Berendea\", \"Nicolae\", role = \"aut\",\n           comment = \"Author of the ColorSpace C++ library\"),\n    person(\"Romain\", \"François\", , \"romain@purrple.cat\", role = \"aut\",\n           comment = c(ORCID = \"0000-0002-2444-4226\")),\n    person(\"Posit, PBC\", role = c(\"cph\", \"fnd\"))\n  )",
+        "Description": "The encoding of colour can be handled in many different ways,\n    using different colour spaces. As different colour spaces have\n    different uses, efficient conversion between these representations are\n    important. The 'farver' package provides a set of functions that gives\n    access to very fast colour space conversion and comparisons\n    implemented in C++, and offers speed improvements over the\n    'convertColor' function in the 'grDevices' package.",
+        "License": "MIT + file LICENSE",
+        "URL": "https://farver.data-imaginist.com,\nhttps://github.com/thomasp85/farver",
+        "BugReports": "https://github.com/thomasp85/farver/issues",
+        "Suggests": "covr, testthat (>= 3.0.0)",
+        "Config/testthat/edition": "3",
+        "Encoding": "UTF-8",
+        "RoxygenNote": "7.3.1",
+        "NeedsCompilation": "yes",
+        "Packaged": "2024-05-13 08:31:27 UTC; thomas",
+        "Author": "Thomas Lin Pedersen [cre, aut]\n    (<https://orcid.org/0000-0002-5147-4711>),\n  Berendea Nicolae [aut] (Author of the ColorSpace C++ library),\n  Romain François [aut] (<https://orcid.org/0000-0002-2444-4226>),\n  Posit, PBC [cph, fnd]",
+        "Maintainer": "Thomas Lin Pedersen <thomas.pedersen@posit.co>",
+        "Repository": "RSPM",
+        "Date/Publication": "2024-05-13 09:33:09 UTC",
+        "Built": "R 4.5.0; x86_64-pc-linux-gnu; 2025-04-05 03:23:53 UTC; unix"
       }
     },
     "fastmap": {
@@ -762,6 +810,29 @@
         "Repository": "RSPM",
         "Date/Publication": "2025-03-16 09:20:02 UTC",
         "Built": "R 4.5.0; ; 2025-04-05 03:28:21 UTC; unix"
+      }
+    },
+    "labeling": {
+      "Source": "CRAN",
+      "Repository": "https://packagemanager.posit.co/cran/latest",
+      "description": {
+        "Package": "labeling",
+        "Type": "Package",
+        "Title": "Axis Labeling",
+        "Version": "0.4.3",
+        "Date": "2023-08-29",
+        "Author": "Justin Talbot,",
+        "Maintainer": "Nuno Sempere <nuno.semperelh@gmail.com>",
+        "Description": "Functions which provide a range of axis labeling algorithms. ",
+        "License": "MIT + file LICENSE | Unlimited",
+        "Collate": "'labeling.R'",
+        "NeedsCompilation": "no",
+        "Imports": "stats, graphics",
+        "Packaged": "2023-08-29 21:01:57 UTC; loki",
+        "Repository": "RSPM",
+        "Date/Publication": "2023-08-29 22:20:02 UTC",
+        "Encoding": "UTF-8",
+        "Built": "R 4.5.0; ; 2025-04-05 03:00:16 UTC; unix"
       }
     },
     "later": {
@@ -1250,6 +1321,36 @@
         "Built": "R 4.5.0; x86_64-pc-linux-gnu; 2025-04-14 17:03:33 UTC; unix"
       }
     },
+    "scales": {
+      "Source": "CRAN",
+      "Repository": "https://packagemanager.posit.co/cran/latest",
+      "description": {
+        "Package": "scales",
+        "Title": "Scale Functions for Visualization",
+        "Version": "1.4.0",
+        "Authors@R": "c(\n    person(\"Hadley\", \"Wickham\", , \"hadley@posit.co\", role = \"aut\"),\n    person(\"Thomas Lin\", \"Pedersen\", , \"thomas.pedersen@posit.co\", role = c(\"cre\", \"aut\"),\n           comment = c(ORCID = \"0000-0002-5147-4711\")),\n    person(\"Dana\", \"Seidel\", role = \"aut\"),\n    person(\"Posit Software, PBC\", role = c(\"cph\", \"fnd\"),\n           comment = c(ROR = \"03wc8by49\"))\n  )",
+        "Description": "Graphical scales map data to aesthetics, and provide methods\n    for automatically determining breaks and labels for axes and legends.",
+        "License": "MIT + file LICENSE",
+        "URL": "https://scales.r-lib.org, https://github.com/r-lib/scales",
+        "BugReports": "https://github.com/r-lib/scales/issues",
+        "Depends": "R (>= 4.1)",
+        "Imports": "cli, farver (>= 2.0.3), glue, labeling, lifecycle, R6,\nRColorBrewer, rlang (>= 1.1.0), viridisLite",
+        "Suggests": "bit64, covr, dichromat, ggplot2, hms (>= 0.5.0), stringi,\ntestthat (>= 3.0.0)",
+        "Config/Needs/website": "tidyverse/tidytemplate",
+        "Config/testthat/edition": "3",
+        "Config/usethis/last-upkeep": "2025-04-23",
+        "Encoding": "UTF-8",
+        "LazyLoad": "yes",
+        "RoxygenNote": "7.3.2",
+        "NeedsCompilation": "no",
+        "Packaged": "2025-04-23 18:27:04 UTC; thomas",
+        "Author": "Hadley Wickham [aut],\n  Thomas Lin Pedersen [cre, aut]\n    (<https://orcid.org/0000-0002-5147-4711>),\n  Dana Seidel [aut],\n  Posit Software, PBC [cph, fnd] (03wc8by49)",
+        "Maintainer": "Thomas Lin Pedersen <thomas.pedersen@posit.co>",
+        "Repository": "RSPM",
+        "Date/Publication": "2025-04-24 11:00:02 UTC",
+        "Built": "R 4.5.0; ; 2025-04-25 04:28:46 UTC; unix"
+      }
+    },
     "shiny": {
       "Source": "CRAN",
       "Repository": "https://packagemanager.posit.co/cran/latest",
@@ -1533,6 +1634,33 @@
         "Built": "R 4.5.0; x86_64-pc-linux-gnu; 2026-01-24 04:34:59 UTC; unix"
       }
     },
+    "viridisLite": {
+      "Source": "CRAN",
+      "Repository": "https://packagemanager.posit.co/cran/latest",
+      "description": {
+        "Package": "viridisLite",
+        "Type": "Package",
+        "Title": "Colorblind-Friendly Color Maps (Lite Version)",
+        "Version": "0.4.2",
+        "Date": "2023-05-02",
+        "Authors@R": "c(\n      person(\"Simon\", \"Garnier\", email = \"garnier@njit.edu\", role = c(\"aut\", \"cre\")),\n      person(\"Noam\", \"Ross\", email = \"noam.ross@gmail.com\", role = c(\"ctb\", \"cph\")),\n      person(\"Bob\", \"Rudis\", email = \"bob@rud.is\", role = c(\"ctb\", \"cph\")),\n      person(\"Marco\", \"Sciaini\", email = \"sciaini.marco@gmail.com\", role = c(\"ctb\", \"cph\")),\n      person(\"Antônio Pedro\", \"Camargo\", role = c(\"ctb\", \"cph\")),\n      person(\"Cédric\", \"Scherer\", email = \"scherer@izw-berlin.de\", role = c(\"ctb\", \"cph\"))\n  )",
+        "Maintainer": "Simon Garnier <garnier@njit.edu>",
+        "Description": "Color maps designed to improve graph readability for readers with \n    common forms of color blindness and/or color vision deficiency. The color \n    maps are also perceptually-uniform, both in regular form and also when \n    converted to black-and-white for printing. This is the 'lite' version of the \n    'viridis' package that also contains 'ggplot2' bindings for discrete and \n    continuous color and fill scales and can be found at \n    <https://cran.r-project.org/package=viridis>.",
+        "License": "MIT + file LICENSE",
+        "Encoding": "UTF-8",
+        "Depends": "R (>= 2.10)",
+        "Suggests": "hexbin (>= 1.27.0), ggplot2 (>= 1.0.1), testthat, covr",
+        "URL": "https://sjmgarnier.github.io/viridisLite/,\nhttps://github.com/sjmgarnier/viridisLite/",
+        "BugReports": "https://github.com/sjmgarnier/viridisLite/issues/",
+        "RoxygenNote": "7.2.3",
+        "NeedsCompilation": "no",
+        "Packaged": "2023-05-02 21:38:46 UTC; simon",
+        "Author": "Simon Garnier [aut, cre],\n  Noam Ross [ctb, cph],\n  Bob Rudis [ctb, cph],\n  Marco Sciaini [ctb, cph],\n  Antônio Pedro Camargo [ctb, cph],\n  Cédric Scherer [ctb, cph]",
+        "Repository": "RSPM",
+        "Date/Publication": "2023-05-02 23:50:02 UTC",
+        "Built": "R 4.5.0; ; 2025-04-05 03:16:24 UTC; unix"
+      }
+    },
     "waiter": {
       "Source": "CRAN",
       "Repository": "https://packagemanager.posit.co/cran/latest",
@@ -1672,34 +1800,43 @@
   },
   "files": {
     ".Renviron": {
-      "checksum": "ece9c1d3a9c86b87a116fe5c0ab5d481"
+      "checksum": "fc5549150dd5c7a7c6649eaeb64e9e89"
     },
     "futmondo_functions.R": {
-      "checksum": "e8ae09d87abe4ea977bb88dcc5c4cf8f"
+      "checksum": "a9bdb593126f648fcf7fb34ea22185e7"
     },
     "global.R": {
-      "checksum": "0f25ed1082fef88bf7fad92094b73a2c"
+      "checksum": "2c468107402a90c887d2d36eddea15ab"
     },
     "Modules/Login_Module.R": {
-      "checksum": "ea5392c67b602a0121e092217ff897ec"
+      "checksum": "5de1cf62a6757d91041112caef39cc40"
     },
     "Modules/Market_Module.R": {
-      "checksum": "fdcca61d1392f08d7fac3884a6e8e91e"
+      "checksum": "ef70537217c74589c323de858041e7d8"
     },
     "Modules/Players_in_Championship_Module.R": {
-      "checksum": "8f72435555d8738898d3a54a424890d5"
+      "checksum": "dd1efff5041a80f98ff7ffde1dc9fa5d"
     },
     "Modules/Players_in_Teams_Module.R": {
-      "checksum": "5882e569886f7fcaec25640b3fb12b17"
+      "checksum": "0375369130ec91fb39bc4534dbff871d"
+    },
+    "Modules/Players_Table_Module.R": {
+      "checksum": "1b27ba77f5e381526f6c9ff04628093b"
     },
     "Modules/Selected_Player_Module.R": {
-      "checksum": "c025f48d2c336bb7c0332b39fe14bfc0"
+      "checksum": "eb10fd4656c0786623c08e733d155d00"
+    },
+    "player_columns_to_hide.txt": {
+      "checksum": "7072474780f11345f2823820403c10f7"
     },
     "server.R": {
-      "checksum": "8de1bfb607366d3e361537ab0d50318d"
+      "checksum": "a0397cc8d2e140714b1223141e6a855e"
     },
     "ui.R": {
-      "checksum": "d47ba26b98a9d28f1e039af2abee6951"
+      "checksum": "b5ee88413f5356b913ea5a4a076d0b9b"
+    },
+    "utils.R": {
+      "checksum": "6253d5e12d91ddef162c7e9e7624680a"
     }
   },
   "users": null

@@ -365,7 +365,7 @@ translate_player_positions <- function(players_df) {
 
 calculate_player_changes <- function(players_df) {
   players_df <- players_df %>%
-    dplyr::mutate(change_by_value = change / value * 100)
+    dplyr::mutate(change_by_value = change / value)
   return(players_df)
 }
 
