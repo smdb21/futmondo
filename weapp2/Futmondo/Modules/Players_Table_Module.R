@@ -7,7 +7,7 @@ players_table_UI <- function(id, box_title = NULL,
                              filter_by_team = TRUE,
                              filter_by_value = TRUE,
                              filter_by_change_value = TRUE,
-                             default_minimum_change_value = 0,
+                             default_minimum_change_value = NA,
                              filter_by_active_clause = TRUE,
                              filter_by_is_favorite = TRUE,
                              filter_by_is_from_futmondo = TRUE,
@@ -62,8 +62,8 @@ players_table_UI <- function(id, box_title = NULL,
           },
           if (filter_by_players_with_bid) {
             tagList(
-            checkboxInput(inputId = ns("players_you_bid_filter"), label = "Only players you bid", value = FALSE),
-            checkboxInput(inputId = ns("players_with_bid_filter"), label = "Only players with bid", value = FALSE)
+              checkboxInput(inputId = ns("players_you_bid_filter"), label = "Only players you bid", value = FALSE),
+              checkboxInput(inputId = ns("players_with_bid_filter"), label = "Only players with bid", value = FALSE)
             )
           }
         )
@@ -90,7 +90,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV) {
       }
       updateSelectInput(session, inputId = "team_filter", choices = team_choices, selected = "All")
     })
-
+    
     # observe selected_player_RV() to open popup with           selected_player_UI(id = "selected_player")
     observeEvent(
       selected_player_RV(),
@@ -114,7 +114,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV) {
       req(selected_idx)
       selected_player <- players_table_filtered_RV()[selected_idx, ]
     })
-
+    
     ## players_table_filtered_RV ----
     players_table_filtered_RV <- reactive({
       players_table <- players_table_RV()
@@ -175,7 +175,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV) {
           }
         }
       }
-      if (!is.null(input$change_value_filter)) {
+      if (!is.null(input$change_value_filter) && !is.na(input$change_value_filter)) {
         players_table <- players_table %>%
           dplyr::filter(change >= input$change_value_filter * 1000000)
       }
@@ -194,14 +194,14 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV) {
       }
       return(players_table)
     })
-
+    
     # renders ----
     ## render players_table ----
     output$players_table <- renderReactable({
       req(players_table_filtered_RV())
       players_table <- players_table_filtered_RV() %>%
         dplyr::select(!any_of(cfg_player_columns_to_hide))
-
+      
       print(paste0(nrow(players_table), " players in table"))
       # players_table <- players_table %>%
       #   dplyr::select(
@@ -209,28 +209,28 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV) {
       #
       table_columns <- get_reactable_columns_for_players(players_table)
       reactable(players_table,
-        columns = table_columns,
-        searchable = TRUE,
-        filterable = TRUE,
-        defaultPageSize = 20,
-        pagination = TRUE,
-        striped = TRUE,
-        bordered = TRUE,
-        highlight = TRUE,
-        compact = TRUE,
-        fullWidth = FALSE,
-        showPageSizeOptions = TRUE,
-        pageSizeOptions = c(5, 10, 20, 50),
-        showPagination = TRUE,
-        selection = "single",
-        borderless = TRUE,
-        onClick = "select",
-        theme = reactableTheme(
-          rowSelectedStyle = list(backgroundColor = "#eee", boxShadow = "inset 2px 0 0 0 #ffa62d")
-        )
+                columns = table_columns,
+                searchable = TRUE,
+                filterable = TRUE,
+                defaultPageSize = 20,
+                pagination = TRUE,
+                striped = TRUE,
+                bordered = TRUE,
+                highlight = TRUE,
+                compact = TRUE,
+                fullWidth = FALSE,
+                showPageSizeOptions = TRUE,
+                pageSizeOptions = c(5, 10, 20, 50),
+                showPagination = TRUE,
+                selection = "single",
+                borderless = TRUE,
+                onClick = "select",
+                theme = reactableTheme(
+                  rowSelectedStyle = list(backgroundColor = "#eee", boxShadow = "inset 2px 0 0 0 #ffa62d")
+                )
       )
     })
-
+    
     return(selected_player_RV)
   })
 }
