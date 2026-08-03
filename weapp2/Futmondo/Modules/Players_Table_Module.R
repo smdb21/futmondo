@@ -19,54 +19,59 @@ players_table_UI <- function(id, box_title = NULL,
       solidHeader = solidHeader,
       status = status,
       title = box_title,
-      # enclose table in a div so that is smaller
-      div(
-        reactableOutput(ns("players_table")),
-        style = "overflow-x: auto;font-size:80%; rowHeight: 75%"
+
+      # Top Filter Bar Grid
+      fluidRow(
+        style = "background: #f8fafc; padding: 15px; border-radius: 8px; margin: 0 0 20px 0; border: 1px solid #e2e8f0;",
+
+        # Primary Select Filters
+        if (filter_by_position) {
+          column(width = 3, selectInput(inputId = ns("position_filter"), label = "Position", choices = c("All", "Goalkeeper", "Defender", "Midfielder", "Forward"), selected = "All", width = "100%"))
+        },
+        if (filter_by_team) {
+          column(width = 3, selectInput(inputId = ns("team_filter"), label = "User Team Owner", choices = c("All"), width = "100%"))
+        },
+
+        # Valuation Range Numeric Filters
+        if (filter_by_value) {
+          tagList(
+            column(width = 2, numericInput(inputId = ns("min_value_filter"), label = "Min Val (M)", min = 0, max = 1000, value = 0, step = 10, width = "100%")),
+            column(width = 2, numericInput(inputId = ns("max_value_filter"), label = "Max Val (M)", min = 0, max = 1000, value = 1000, step = 10, width = "100%"))
+          )
+        },
+
+        # Change Trend Filter
+        if (filter_by_change_value) {
+          column(width = 2, numericInput(inputId = ns("change_value_filter"), label = "Min Trend (M)", min = 0, max = 1, value = default_minimum_change_value, step = 0.05, width = "100%"))
+        }
       ),
-      sidebar = shinydashboardPlus::boxSidebar(
-        id = ns("filters_sidebar"),
-        icon = shiny::icon("filter"),
-        # light-blue in HEX,
-        background = "#3c8dbc",
-        width = 35,
-        # depending on parameters show filters:
-        tagList(
-          if (filter_by_position) {
-            selectInput(inputId = ns("position_filter"), label = "By position", choices = c("All", "Goalkeeper", "Defender", "Midfielder", "Forward"), selected = "All")
-          },
-          if (filter_by_team) {
-            selectInput(
-              inputId = ns("team_filter"), label = "By team", choices = c("All") # to be updated in server
-            )
-          },
-          if (filter_by_value) {
-            print(paste0("Adding value filter in ", id))
-            tagList(
-              numericInput(inputId = ns("min_value_filter"), label = "Minimum value (M)", min = 0, max = 1000, value = 0, step = 10),
-              numericInput(inputId = ns("max_value_filter"), label = "Maximum value (M)", min = 0, max = 1000, value = 1000, step = 10)
-            )
-          },
-          if (filter_by_change_value) {
-            print(paste0("Adding change value filter in ", id))
-            numericInput(inputId = ns("change_value_filter"), label = "Minimum change (M)", min = 0, max = 1, value = default_minimum_change_value, step = 0.05)
-          },
+
+      # Checkboxes Inline Grid
+      if (filter_by_active_clause || filter_by_is_favorite || filter_by_is_from_futmondo || filter_by_players_with_bid) {
+        fluidRow(
+          style = "padding: 0 15px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 20px; align-items: center;",
           if (filter_by_active_clause) {
-            checkboxInput(inputId = ns("active_clause_filter"), label = "Only players with active clause", value = FALSE)
+            div(checkboxInput(inputId = ns("active_clause_filter"), label = "Active Clause Only", value = FALSE), style = "font-weight: 500;")
           },
           if (filter_by_is_favorite) {
-            checkboxInput(inputId = ns("is_favorite_filter"), label = "Only favorite players", value = FALSE)
+            div(checkboxInput(inputId = ns("is_favorite_filter"), label = "Favorites Only", value = FALSE), style = "font-weight: 500;")
           },
           if (filter_by_is_from_futmondo) {
-            checkboxInput(inputId = ns("is_from_futmondo_filter"), label = "Only free agent players", value = FALSE)
+            div(checkboxInput(inputId = ns("is_from_futmondo_filter"), label = "Free Agents Only", value = FALSE), style = "font-weight: 500;")
           },
           if (filter_by_players_with_bid) {
             tagList(
-              checkboxInput(inputId = ns("players_you_bid_filter"), label = "Only players you bid", value = FALSE),
-              checkboxInput(inputId = ns("players_with_bid_filter"), label = "Only players with bid", value = FALSE)
+              div(checkboxInput(inputId = ns("players_you_bid_filter"), label = "Your Bids Only", value = FALSE), style = "font-weight: 500;"),
+              div(checkboxInput(inputId = ns("players_with_bid_filter"), label = "Bidded Only", value = FALSE), style = "font-weight: 500;")
             )
           }
         )
+      },
+
+      # Table Container
+      div(
+        reactableOutput(ns("players_table")),
+        style = "overflow-x: auto; font-size:85%; width: 100%;"
       )
     )
   )
