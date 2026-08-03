@@ -1,13 +1,5 @@
 header <- shinydashboardPlus::dashboardHeader(
-  title = "Futmondo",
-  leftUi = tagList(
-    actionButton(
-      inputId = "refresh_all",
-      label = icon("rotate"),
-      class = "btn-refresh",
-      title = "Clear Cache & Refresh Data"
-    )
-  )
+  title = "Futmondo"
 )
 body <- shinydashboard::dashboardBody(
   # Add custom CSS here
@@ -49,6 +41,13 @@ body <- shinydashboard::dashboardBody(
       tabName = "players_in_championship",
       players_in_championship_UI(id = "players_in_championship")
     )
+  ),
+  # Floating Action Button for global cache refresh
+  actionButton(
+    inputId = "refresh_all",
+    label = icon("rotate"),
+    class = "btn-refresh-floating",
+    title = "Clear Cache & Refresh Data"
   )
 )
 

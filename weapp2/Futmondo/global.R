@@ -1,4 +1,5 @@
 source("futmondo_functions.R")
+source("supabase_connector.R")
 source("Modules/Login_Module.R")
 source("Modules/Players_in_Teams_Module.R")
 source("Modules/Selected_Player_Module.R")

@@ -719,31 +719,39 @@ get_reactable_columns_for_players <- function(table) {
       align = "center",
       cell = function(value) {
         if (is.na(value) || value == "") return("")
-        class_name <- case_when(
-          value == "Goalkeeper" ~ "badge-gk",
-          value == "Defender" ~ "badge-df",
-          value == "Midfielder" ~ "badge-md",
-          value == "Forward" ~ "badge-fw",
-          TRUE ~ "badge-df"
-        )
+        class_name <- if (value == "Goalkeeper") {
+          "badge-gk"
+        } else if (value == "Defender") {
+          "badge-df"
+        } else if (value == "Midfielder") {
+          "badge-md"
+        } else if (value == "Forward") {
+          "badge-fw"
+        } else {
+          "badge-df"
+        }
         shiny::tags$span(class = class_name, value)
       }
     )
   }
-  
+
   if ("role2" %in% colnames(table)) {
     columns[["role2"]] <- colDef(
       name = "Secondary Position",
       align = "center",
       cell = function(value) {
         if (is.na(value) || value == "") return("")
-        class_name <- case_when(
-          value == "Goalkeeper" ~ "badge-gk",
-          value == "Defender" ~ "badge-df",
-          value == "Midfielder" ~ "badge-md",
-          value == "Forward" ~ "badge-fw",
-          TRUE ~ "badge-df"
-        )
+        class_name <- if (value == "Goalkeeper") {
+          "badge-gk"
+        } else if (value == "Defender") {
+          "badge-df"
+        } else if (value == "Midfielder") {
+          "badge-md"
+        } else if (value == "Forward") {
+          "badge-fw"
+        } else {
+          "badge-df"
+        }
         shiny::tags$span(class = class_name, value)
       }
     )
@@ -773,14 +781,19 @@ get_reactable_columns_for_players <- function(table) {
           return(shiny::tags$span(style = "color: #10b981; font-weight: 500;", shiny::icon("circle-check"), " Fit"))
         }
         val_lower <- tolower(value)
-        case_when(
-          val_lower == "ok" ~ shiny::tags$span(style = "color: #10b981; font-weight: 500;", shiny::icon("circle-check"), " Fit"),
-          val_lower == "doubt" ~ shiny::tags$span(style = "color: #f59e0b; font-weight: 500;", shiny::icon("triangle-exclamation"), " Doubt"),
-          val_lower == "injured" ~ shiny::tags$span(style = "color: #ef4444; font-weight: 500;", shiny::icon("circle-minus"), " Injured"),
-          val_lower == "injured2" ~ shiny::tags$span(style = "color: #b91c1c; font-weight: 500;", shiny::icon("hospital"), " Long-term"),
-          val_lower == "redcard" ~ shiny::tags$span(style = "color: #ef4444; font-weight: 500;", shiny::icon("square"), " Suspended"),
-          TRUE ~ shiny::tags$span(style = "color: #10b981; font-weight: 500;", shiny::icon("circle-check"), " Fit")
-        )
+        if (val_lower == "ok") {
+          shiny::tags$span(style = "color: #10b981; font-weight: 500;", shiny::icon("circle-check"), " Fit")
+        } else if (val_lower == "doubt") {
+          shiny::tags$span(style = "color: #f59e0b; font-weight: 500;", shiny::icon("triangle-exclamation"), " Doubt")
+        } else if (val_lower == "injured") {
+          shiny::tags$span(style = "color: #ef4444; font-weight: 500;", shiny::icon("circle-minus"), " Injured")
+        } else if (val_lower == "injured2") {
+          shiny::tags$span(style = "color: #b91c1c; font-weight: 500;", shiny::icon("hospital"), " Long-term")
+        } else if (val_lower == "redcard") {
+          shiny::tags$span(style = "color: #ef4444; font-weight: 500;", shiny::icon("square"), " Suspended")
+        } else {
+          shiny::tags$span(style = "color: #10b981; font-weight: 500;", shiny::icon("circle-check"), " Fit")
+        }
       }
     )
   }

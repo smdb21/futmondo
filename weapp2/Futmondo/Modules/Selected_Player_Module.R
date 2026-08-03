@@ -189,6 +189,18 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       removeModal()
 
       if (success) {
+        tryCatch({
+          log_market_transaction(
+            player_id = player_id,
+            championship_id = champ_id,
+            buyer_team_id = team_id,
+            seller_team_id = if ("user_team_id" %in% colnames(sp)) sp$user_team_id else NULL,
+            price = bid_amount,
+            is_clause = FALSE
+          )
+        }, error = function(e) {
+          print(paste0("[Supabase] Bid log warning: ", e$message))
+        })
         shiny::showNotification(
           paste0("Bid of ", format_currency(bid_amount), " placed successfully on ", sp$name, "!"),
           type = "message",
@@ -252,6 +264,18 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       removeModal()
 
       if (success) {
+        tryCatch({
+          log_market_transaction(
+            player_id = player_id,
+            championship_id = champ_id,
+            buyer_team_id = team_id,
+            seller_team_id = if ("user_team_id" %in% colnames(sp)) sp$user_team_id else NULL,
+            price = clause_price,
+            is_clause = TRUE
+          )
+        }, error = function(e) {
+          print(paste0("[Supabase] Clause log warning: ", e$message))
+        })
         shiny::showNotification(
           paste0("Successfully purchased ", sp$name, " for ", format_currency(clause_price), "!"),
           type = "message",

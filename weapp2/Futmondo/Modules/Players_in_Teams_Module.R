@@ -227,6 +227,16 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
         calculate_player_changes()
       players_table <- players_table %>%
         unify_columns()
+
+      # Background Sync Roster Snapshot to Supabase
+      tryCatch({
+        sync_real_clubs_to_supabase(players_table)
+        sync_players_to_supabase(players_table)
+        log_player_history(players_table, championship_id)
+      }, error = function(e) {
+        print(paste0("[Supabase] Roster sync warning: ", e$message))
+      })
+
       return(players_table)
     })
 

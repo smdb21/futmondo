@@ -18,6 +18,14 @@ function(input, output, session) {
     req(login_token_RV())
     refresh_trigger() # Dependency to trigger re-fetch on refresh
     championship <- get_championships(login = login_token_RV(), championship_name = NULL) # "OHY CAMPEÓN ")
+    
+    # Background Sync Championship to Supabase
+    tryCatch({
+      sync_championship_to_supabase(championship)
+    }, error = function(e) {
+      print(paste0("[Supabase] Championship sync warning: ", e$message))
+    })
+    
     return(championship)
   })
   ## user_teams_RV ----
@@ -25,6 +33,16 @@ function(input, output, session) {
     req(championship_RV())
     refresh_trigger() # Dependency to trigger re-fetch on refresh
     teams <- get_teams(login = login_token_RV(), championship_id = championship_RV()["id"])
+    
+    # Background Sync User Teams Standings & History to Supabase
+    tryCatch({
+      champ_id <- championship_RV()["id"]
+      sync_user_teams_to_supabase(teams, champ_id)
+      log_user_team_history(teams)
+    }, error = function(e) {
+      print(paste0("[Supabase] Standings sync warning: ", e$message))
+    })
+    
     return(teams)
   })
   

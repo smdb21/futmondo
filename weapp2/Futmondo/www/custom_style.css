@@ -319,3 +319,86 @@ body, .content-wrapper, .right-side {
     transform: translateY(-1px);
     box-shadow: 0 6px 12px -1px rgba(245, 158, 11, 0.3) !important;
 }
+
+/* Prevent full body horizontal scrolling */
+body, .wrapper {
+    overflow-x: hidden !important;
+}
+
+/* Floating Action Button (Refresh) */
+.btn-refresh-floating {
+    position: fixed !important;
+    bottom: 25px !important;
+    right: 25px !important;
+    width: 56px !important;
+    height: 56px !important;
+    border-radius: 50% !important;
+    background-color: #0f172a !important; /* Slate Blue Dark */
+    color: #ffffff !important;
+    border: none !important;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.3) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 9999 !important; /* Ensure it stays on top of everything! */
+    font-size: 20px !important;
+    transition: all 0.2s ease !important;
+    cursor: pointer;
+    padding: 0 !important;
+}
+.btn-refresh-floating:hover, .btn-refresh-floating:focus, .btn-refresh-floating:active {
+    background-color: #1e293b !important;
+    transform: scale(1.05) rotate(45deg) !important;
+    color: #ffffff !important;
+    box-shadow: 0 6px 15px rgba(15, 23, 42, 0.4) !important;
+}
+
+/* Mobile-friendly Table scrolling and responsiveness */
+.ReactTable {
+    width: 100% !important;
+    display: block !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+}
+.ReactTable .rt-table {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+}
+
+/* Optimize Layout & Padding on Mobile devices */
+@media (max-width: 768px) {
+    .content-wrapper, .right-side {
+        padding: 5px !important;
+    }
+    .content {
+        padding: 10px 5px !important; /* Reduce padding on mobile */
+    }
+    .box-body {
+        padding: 10px !important; /* Reduce card body padding on mobile */
+    }
+    .col-sm-12, .col-xs-12 {
+        padding-left: 5px !important;
+        padding-right: 5px !important;
+    }
+    
+    /* Make description blocks stack vertically on mobile to prevent overlapping */
+    .description-block {
+        border-right: none !important;
+        border-bottom: 1px solid #f1f5f9;
+        padding-bottom: 15px !important;
+        margin-bottom: 15px !important;
+        text-align: center;
+        width: 100%;
+    }
+    .description-block:last-child {
+        border-bottom: none !important;
+        padding-bottom: 0 !important;
+        margin-bottom: 0 !important;
+    }
+    
+    /* Make custom fluidRow columns full width on card footers */
+    .widget-user .box-footer .col-sm-4 {
+        width: 100% !important;
+        display: block !important;
+    }
+}
