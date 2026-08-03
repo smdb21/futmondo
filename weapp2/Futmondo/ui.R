@@ -1,9 +1,18 @@
 header <- shinydashboardPlus::dashboardHeader(
-  title = "Futmondo"
+  title = "Futmondo",
+  leftUi = tagList(
+    actionButton(
+      inputId = "refresh_all",
+      label = icon("rotate"),
+      class = "btn-refresh",
+      title = "Clear Cache & Refresh Data"
+    )
+  )
 )
 body <- shinydashboard::dashboardBody(
   # Add custom CSS here
   tags$head(
+    tags$link(rel = "stylesheet", type = "text/css", href = "custom_style.css"),
     tags$style(HTML("
         .ReactTable .rt-thead {
           z-index: 1;

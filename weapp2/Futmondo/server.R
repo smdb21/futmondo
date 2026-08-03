@@ -4,19 +4,26 @@ function(input, output, session) {
   login_token_RV <- login_Server(id = "login") %>%
     debounce(1000)
   
-  # observers ----
+  # Caching Refresh Trigger ----
+  refresh_trigger <- reactiveVal(0)
   
+  observeEvent(input$refresh_all, {
+    clear_api_cache()
+    refresh_trigger(refresh_trigger() + 1)
+  })
   
   # reactives ----
   ## championship_RV ----
   championship_RV <- reactive({
     req(login_token_RV())
+    refresh_trigger() # Dependency to trigger re-fetch on refresh
     championship <- get_championships(login = login_token_RV(), championship_name = NULL) # "OHY CAMPEÓN ")
     return(championship)
   })
   ## user_teams_RV ----
   user_teams_RV <- reactive({
     req(championship_RV())
+    refresh_trigger() # Dependency to trigger re-fetch on refresh
     teams <- get_teams(login = login_token_RV(), championship_id = championship_RV()["id"])
     return(teams)
   })
@@ -29,7 +36,7 @@ function(input, output, session) {
     return(championship_id)
   })
   
-  ## championship_id_RV ----
+  ## user_team_id_RV ----
   user_team_id_RV <- reactive({
     req(championship_RV())
     
@@ -50,20 +57,31 @@ function(input, output, session) {
                                                 is_module_active = reactive({
                                                   input$tabs == "yourteam"
                                                 }),
-                                                login_token = login_token_RV, championship_id = championship_id_RV, user_team_id = user_team_id_RV, user_teams_RV = user_teams_RV)
-  
-  
+                                                login_token = login_token_RV, 
+                                                championship_id = championship_id_RV, 
+                                                user_team_id = user_team_id_RV, 
+                                                user_teams_RV = user_teams_RV,
+                                                refresh_trigger = refresh_trigger)
+
+
   market_Server(id = "market", 
                 is_module_active = reactive({
                   input$tabs == "market"
                 }),
-                login_token = login_token_RV, championship_id = championship_id_RV, user_team_id = user_team_id_RV, user_teams_RV = user_teams_RV)
-  
+                login_token = login_token_RV, 
+                championship_id = championship_id_RV, 
+                user_team_id = user_team_id_RV, 
+                user_teams_RV = user_teams_RV,
+                refresh_trigger = refresh_trigger)
+
   players_in_championship_Server(id = "players_in_championship", 
                                  is_module_active = reactive({
                                    input$tabs == "players_in_championship"  
                                  }),
-                                 login_token = login_token_RV, championship_id = championship_id_RV, user_teams_RV = user_teams_RV)
+                                 login_token = login_token_RV, 
+                                 championship_id = championship_id_RV, 
+                                 user_teams_RV = user_teams_RV,
+                                 refresh_trigger = refresh_trigger)
   # observers ----
   ## observe user_team_id_RV()
   observeEvent(login_token_RV(),

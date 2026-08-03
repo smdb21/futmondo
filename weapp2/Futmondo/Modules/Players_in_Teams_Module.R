@@ -15,13 +15,31 @@ players_in_teams_UI <- function(id) {
 }
 
 
-players_in_teams_Server <- function(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV) {
+players_in_teams_Server <- function(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger = NULL) {
   moduleServer(id, function(input, output, session) {
     # renders ----
     output$team_value_box <- renderUI({
       players_table <- players_table_RV()
       req(players_table)
-      user_teams <- user_teams_RV() %>%
+
+      user_teams <- user_teams_RV()
+
+      # Safeguard against missing or empty user teams data
+      if (is.null(user_teams) || nrow(user_teams) == 0 || !"points" %in% colnames(user_teams)) {
+        return(
+          tagList(
+            box(
+              title = "Championship Overview",
+              width = 12,
+              status = "warning",
+              solidHeader = TRUE,
+              "No standings or team data is currently available for this championship."
+            )
+          )
+        )
+      }
+
+      user_teams <- user_teams %>%
         dplyr::mutate(points = as.numeric(points))
 
       team_points <- user_teams %>%
@@ -30,8 +48,23 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
         dplyr::mutate(position = row_number())
       team_info_table <- team_points %>%
         dplyr::filter(teamid == user_team_id())
+
+      if (nrow(team_info_table) == 0) {
+        return(
+          tagList(
+            box(
+              title = "Championship Overview",
+              width = 12,
+              status = "warning",
+              solidHeader = TRUE,
+              "Your user team was not found in the championship participant list."
+            )
+          )
+        )
+      }
+
       team_points <- team_points %>%
-        dplyr::mutate(diff_points = points - team_info_table$points)
+        dplyr::mutate(diff_points = points - team_info_table$points[1])
       team_position <- team_points %>%
         dplyr::filter(teamid == user_team_id()) %>%
         dplyr::pull(position)
@@ -54,10 +87,15 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       team_position <- paste0(team_position, " of ", total_teams)
       team_name <- team_info_table$teamname[1]
       user_name <- team_info_table$name
-      team_value <- sum(players_table$value, na.rm = TRUE) %>%
+
+      # Safeguards for empty roster calculations
+      val_sum <- sum(players_table$value, na.rm = TRUE)
+      val_mean <- if (nrow(players_table) > 0) mean(players_table$value, na.rm = TRUE) else 0
+
+      team_value <- val_sum %>%
         # format it as currency in eur
         scales::label_currency(prefix = "€", suffix = "M", scale = 1e-6)(.)
-      average_player_value <- mean(players_table$value, na.rm = TRUE) %>%
+      average_player_value <- val_mean %>%
         # format it as currency in eur
         scales::label_currency(prefix = "€", suffix = "M", scale = 1e-6)(.)
       team_value_block <- descriptionBlock(
@@ -67,7 +105,11 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
         text = "Team value"
       )
       team_value_change <- sum(players_table$change, na.rm = TRUE)
-      team_value_change_pct <- team_value_change / (sum(players_table$value, na.rm = TRUE) - team_value_change) * 100
+      team_value_change_pct <- if (nrow(players_table) > 0 && (val_sum - team_value_change) != 0) {
+        team_value_change / (val_sum - team_value_change) * 100
+      } else {
+        0
+      }
       team_value_change_pct <- round(team_value_change_pct, 2)
       team_value_change_icon <- if (team_value_change > 0) {
         icon("caret-up")
@@ -170,6 +212,7 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       req(login_token())
       req(championship_id())
       req(user_team_id())
+      if (!is.null(refresh_trigger)) refresh_trigger() # Cache invalidation dependency
       championship_id <- championship_id()
       user_team_id <- user_team_id()
       players_table <- get_players_from_team(

@@ -15,7 +15,7 @@ players_in_championship_UI <- function(id) {
 }
 
 
-players_in_championship_Server <- function(id, is_module_active, login_token, championship_id, user_teams_RV) {
+players_in_championship_Server <- function(id, is_module_active, login_token, championship_id, user_teams_RV, refresh_trigger = NULL) {
   moduleServer(id, function(input, output, session) {
     # observers ----
 
@@ -27,6 +27,7 @@ players_in_championship_Server <- function(id, is_module_active, login_token, ch
       req(is_module_active() == TRUE)
       req(login_token())
       req(championship_id())
+      if (!is.null(refresh_trigger)) refresh_trigger() # Cache invalidation dependency
       championship_id <- championship_id()
       players_table <- get_championship_players(
         login = login_token(),

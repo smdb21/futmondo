@@ -4,3 +4,4 @@ weapp2/Futmondo/.Renviron
 **.Rproj
 target/**
 **/rsconnect/**
+*.har

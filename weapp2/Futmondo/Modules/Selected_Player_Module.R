@@ -3,25 +3,14 @@ library(reactable)
 selected_player_UI <- function(id) {
   ns <- NS(id)
   tagList(
-    # shinydashboardPlus::box(
-    #   width = 12,
-    #   solidHeader = TRUE,
-    #   reactableOutput(ns("selected_player_table"))
-    # ),
-    fluidRow(
-      column(
-        3,
-        uiOutput(ns("team"))
-      )
-    ),
     userBox(
       id = ns("selected_player_box"),
       width = 12,
       title = userDescription(
-        title = "Nadia Carmichael",
-        subtitle = "lead Developer",
-        type = 2,
-        image = "https://adminlte.io/themes/AdminLTE/dist/img/user7-128x128.jpg",
+        title = "Player Name",
+        subtitle = "Position & Team",
+        type = 1,
+        image = "https://static01.mondocore.com/futmondo/img/faces/64/null.png"
       ),
       status = "primary",
       gradient = TRUE,
@@ -45,7 +34,6 @@ selected_player_Server <- function(id, selected_player) {
         selected_player()
       },
       {
-        # update selected_player_box
         selected_player <- selected_player()
         req(selected_player)
         print(paste0("Selected player: ", selected_player$name))
@@ -55,13 +43,29 @@ selected_player_Server <- function(id, selected_player) {
           role_text <- paste(role_text, selected_player$role2, sep = ", ")
         }
 
+        # Dynamically build integrated team logo emblem & name
+        team_logo <- NULL
+        if ("team" %in% colnames(selected_player) && !is.na(selected_player$team) && selected_player$team != "") {
+          team_image_name <- get_team_image_name(selected_player$team)
+          team_logo <- shiny::tags$div(
+            style = "margin-top: 6px; display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 13px; color: #cbd5e1;",
+            img(src = paste0(TEAM_LOGO_URL, team_image_name, ".png"), style = "height: 18px; width: auto; object-fit: contain; background: transparent;", alt = selected_player$team),
+            selected_player$team
+          )
+        }
+
+        sub_title_markup <- tagList(
+          shiny::tags$span(style = "display: block; font-weight: 600; font-size: 13px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;", role_text),
+          team_logo
+        )
+
         shinydashboardPlus::updateBox(
           id = "selected_player_box",
           action = "update",
           options = list(
             title = shinydashboardPlus::userDescription(
               title = player_name,
-              subtitle = role_text,
+              subtitle = sub_title_markup,
               type = 1,
               image = paste0(PHOTO_URL, "/", selected_player$photo)
             ),
@@ -72,36 +76,23 @@ selected_player_Server <- function(id, selected_player) {
         )
       }
     )
-    ## render team ----
-    output$team <- renderUI({
-      selected_player <- selected_player()
-      req(selected_player)
-      if ("team" %in% colnames(selected_player)) {
-        team <- selected_player$team
 
-        team_image_name <- get_team_image_name(team)
-        if (!is.null(team)) {
-          team_image <- img(src = paste0(TEAM_LOGO_URL, team_image_name, ".png"), style = "height: 24px;", alt = team)
-
-          ret <- tagList(
-            team_image,
-            team
-          )
-          return(ret)
-        }
-      }
-      return(NULL)
-    })
     ## render player_points_description_box ----
     output$player_points_description_box <- renderUI({
       selected_player <- selected_player()
       req(selected_player)
       ret <- tagList()
       points <- selected_player$points
+      
+      clean_points <- if (is.null(points) || is.na(points) || points == "NaN" || points == "") {
+        "0"
+      } else {
+        as.character(points)
+      }
 
       block <- descriptionBlock(
-        header = points,
-        number = NULL, # points,
+        header = clean_points,
+        number = NULL,
         numberColor = "black",
         text = "Total Points"
       )
@@ -111,6 +102,7 @@ selected_player_Server <- function(id, selected_player) {
       )
       return(ret)
     })
+
     ## render player_last_points_description_box ----
     output$player_last_points_description_box <- renderUI({
       selected_player <- selected_player()
@@ -119,8 +111,21 @@ selected_player_Server <- function(id, selected_player) {
       total_last_points <- selected_player$average.total
       avg_last_points <- selected_player$average.averageLastFive
 
+      clean_total <- if (is.null(total_last_points) || is.na(total_last_points) || total_last_points == "NaN" || total_last_points == "") {
+        "0"
+      } else {
+        as.character(total_last_points)
+      }
+
+      # Handle NaN / "NaN" / NA in averages safely
+      if (is.null(avg_last_points) || is.na(avg_last_points) || avg_last_points == "NaN" || avg_last_points == "") {
+        header_text <- clean_total
+      } else {
+        header_text <- paste0(clean_total, " (Avg: ", round(as.numeric(avg_last_points), 1), ")")
+      }
+
       block <- descriptionBlock(
-        header = paste0(total_last_points, " (Avg: ", avg_last_points, ")"),
+        header = header_text,
         number = NULL,
         numberColor = "black",
         text = "Last 5 matches"
@@ -131,6 +136,7 @@ selected_player_Server <- function(id, selected_player) {
       )
       return(ret)
     })
+
     ## render player_value_description_box ----
     output$player_value_description_box <- renderUI({
       selected_player <- selected_player()
@@ -140,13 +146,13 @@ selected_player_Server <- function(id, selected_player) {
       change_pct <- selected_player$change_by_value * 100
       if (change > 0) {
         icon <- icon("caret-up")
-        number_color <- "green"
+        number_color = "green"
       } else if (change < 0) {
         icon <- icon("caret-down")
-        number_color <- "red"
+        number_color = "red"
       } else {
         icon <- NULL
-        number_color <- "black"
+        number_color = "black"
       }
       descriptionBlock(
         header = format_currency(value),
@@ -191,6 +197,7 @@ selected_player_Server <- function(id, selected_player) {
     })
   })
 }
+
 add_sign <- function(x) {
   if (x > 0) {
     return(paste0("+", x))

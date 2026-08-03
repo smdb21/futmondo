@@ -171,7 +171,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV) {
             players_table <- players_table %>%
               dplyr::filter(computer == TRUE)
           } else {
-            browser()
+            warning("is_from_futmondo_filter is active but 'computer' column is missing from players_table.")
           }
         }
       }
