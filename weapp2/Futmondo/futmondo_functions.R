@@ -38,6 +38,48 @@ clear_api_cache <- function() {
   rm(list = ls(envir = api_cache_env), envir = api_cache_env)
 }
 
+get_real_clubs <- function(login, championship_id) {
+  payload <- list(
+    header = list(
+      token = login[["token"]],
+      userid = login[["userid"]]
+    ),
+    query = list(
+      championshipId = championship_id
+    ),
+    answer = list()
+  )
+
+  headers <- c(
+    "Content-Type" = "application/json; charset=utf-8"
+  )
+
+  cache_key <- paste0("real_clubs_", championship_id)
+  get_cached_data(cache_key, {
+    print("Getting real clubs in the league")
+    response <- POST("https://api.futmondo.com/1/league/championshipteams", body = toJSON(payload), add_headers(.headers = headers))
+    clubs <- httr::content(response)$answer
+    
+    if (is.null(clubs) || length(clubs) == 0) {
+      return(data.frame(
+        teamId = character(0),
+        team = character(0),
+        logo = character(0),
+        stringsAsFactors = FALSE
+      ))
+    }
+    
+    lapply(clubs, FUN = function(club) {
+      data.frame(
+        teamId = club$id,
+        team = club$name,
+        logo = club$logo,
+        stringsAsFactors = FALSE
+      )
+    }) %>% bind_rows()
+  })
+}
+
 login <- function(user_name = "smdb21@msn.com", password = "pepito21") {
   if (is.null(user_name)) {
     user_name <- Sys.getenv("user_name")
@@ -226,6 +268,14 @@ get_players_from_team <- function(login, championship_id, user_team_id, teams = 
       roster <- roster %>%
         dplyr::left_join(teams %>% dplyr::distinct(id, teamname), by = c("user_team_id" = "id"))
     }
+    
+    # Join real-world team name and logo
+    clubs <- get_real_clubs(login, championship_id)
+    if (!is.null(clubs) && nrow(clubs) > 0 && "teamId" %in% colnames(roster)) {
+      roster <- roster %>% dplyr::select(!any_of(c("team", "logo")))
+      roster <- roster %>% dplyr::left_join(clubs, by = "teamId")
+    }
+    
     roster
   })
 }
@@ -326,6 +376,14 @@ get_championship_players <- function(login, championship_id) {
     ret[, numeric_cols] <- lapply(ret[, numeric_cols], FUN = function(col) {
       as.numeric(as.character(col))
     })
+    
+    # Join real-world team name and logo
+    clubs <- get_real_clubs(login, championship_id)
+    if (!is.null(clubs) && nrow(clubs) > 0 && "teamId" %in% colnames(ret)) {
+      ret <- ret %>% dplyr::select(!any_of(c("team", "logo")))
+      ret <- ret %>% dplyr::left_join(clubs, by = "teamId")
+    }
+    
     ret <- ret %>% dplyr::arrange(name)
     ret
   })
@@ -492,35 +550,55 @@ get_lineup_from_team <- function(login, championship_id, user_team_id) {
   return(lineup)
 }
 
+# Standard Date Formatter to DD-MM-YY HH:MM
+format_table_date <- function(value) {
+  if (is.null(value) || is.na(value) || value == "") return("")
+  posix_time <- tryCatch({
+    as.POSIXct(value, format = "%Y-%m-%dT%H:%M:%S", tz = "UTC")
+  }, error = function(e) {
+    as.POSIXct(value, tz = "UTC")
+  })
+  return(format(posix_time, "%d-%m-%y %H:%M"))
+}
+
+# Standard Currency Formatter in Euros
+format_table_currency <- function(value) {
+  if (is.null(value) || is.na(value) || !is.numeric(value)) return("")
+  scales::label_currency(prefix = "", suffix = " EUR", big.mark = ".", decimal.mark = ",")(value)
+}
+
 get_reactable_columns_for_players <- function(table) {
   columns <- list()
+  
+  # Core Price/Valuation Columns ----
   if ("change" %in% colnames(table)) {
-    change_col <- colDef(
-      name = "Change",
+    columns[["change"]] <- colDef(
+      name = "Trend",
       align = "right",
       cell = function(value) {
         if (is.na(value) || !is.numeric(value)) return("")
         color_class <- if (value > 0) "value-positive" else if (value < 0) "value-negative" else ""
         sign_prefix <- if (value > 0) "+" else ""
-        formatted <- scales::label_currency(prefix = sign_prefix, suffix = " EUR", big.mark = ".")(value)
+        formatted <- scales::label_currency(prefix = sign_prefix, suffix = " EUR", big.mark = ".", decimal.mark = ",")(value)
         shiny::tags$span(class = color_class, formatted)
       }
     )
-    columns[["change"]] <- change_col
   }
+  
   if ("value" %in% colnames(table)) {
-    value_col <- colDef(
-      name = "Value",
-      format = colFormat(currency = "EUR", separators = TRUE),
+    columns[["value"]] <- colDef(
+      name = "Valuation",
       align = "right",
-      # make it wider
-      width = 150
+      width = 120,
+      cell = function(value) {
+        format_table_currency(value)
+      }
     )
-    columns[["value"]] <- value_col
   }
+  
   if ("change_by_value" %in% colnames(table)) {
-    change_by_value_col <- colDef(
-      name = "Change (%)",
+    columns[["change_by_value"]] <- colDef(
+      name = "Trend (%)",
       align = "right",
       cell = function(value) {
         if (is.na(value) || !is.numeric(value)) return("")
@@ -530,17 +608,113 @@ get_reactable_columns_for_players <- function(table) {
         shiny::tags$span(class = color_class, formatted)
       }
     )
-    columns[["change_by_value"]] <- change_by_value_col
   }
-  if ("numberOfBids" %in% colnames(table)) {
-    numberOfBids_col <- colDef(
-      name = "Number of Bids",
-      align = "right"
+  
+  if ("price" %in% colnames(table)) {
+    columns[["price"]] <- colDef(
+      name = "Market Price",
+      align = "right",
+      cell = function(value) {
+        format_table_currency(value)
+      }
     )
-    columns[["numberOfBids"]] <- numberOfBids_col
   }
+  
+  if ("market_price" %in% colnames(table)) {
+    columns[["market_price"]] <- colDef(
+      name = "Market Price",
+      align = "right",
+      cell = function(value) {
+        format_table_currency(value)
+      }
+    )
+  }
+  
+  if ("bid_price" %in% colnames(table)) {
+    columns[["bid_price"]] <- colDef(
+      name = "Your Bid",
+      align = "right",
+      cell = function(value) {
+        format_table_currency(value)
+      }
+    )
+  }
+  
+  if ("clause_price" %in% colnames(table)) {
+    columns[["clause_price"]] <- colDef(
+      name = "Clause Price",
+      align = "right",
+      cell = function(value) {
+        format_table_currency(value)
+      }
+    )
+  }
+  
+  if ("clause_suggestedClause" %in% colnames(table)) {
+    columns[["clause_suggestedClause"]] <- colDef(
+      name = "Suggested Clause",
+      align = "right",
+      cell = function(value) {
+        format_table_currency(value)
+      }
+    )
+  }
+  
+  # Core Date Columns ----
+  if ("creationDate" %in% colnames(table)) {
+    columns[["creationDate"]] <- colDef(
+      name = "Availability Start",
+      align = "center",
+      cell = function(value) {
+        format_table_date(value)
+      }
+    )
+  }
+  
+  if ("expirationDate" %in% colnames(table)) {
+    columns[["expirationDate"]] <- colDef(
+      name = "Availability End",
+      align = "center",
+      cell = function(value) {
+        format_table_date(value)
+      }
+    )
+  }
+  
+  if ("clause_date" %in% colnames(table)) {
+    columns[["clause_date"]] <- colDef(
+      name = "Clause Expiration",
+      align = "center",
+      cell = function(value) {
+        format_table_date(value)
+      }
+    )
+  }
+  
+  # Identity & Status Columns ----
+  if ("userTeam" %in% colnames(table)) {
+    columns[["userTeam"]] <- colDef(
+      name = "User",
+      align = "left"
+    )
+  }
+  
+  if ("bid_user" %in% colnames(table)) {
+    columns[["bid_user"]] <- colDef(
+      name = "Bidder",
+      align = "left"
+    )
+  }
+  
+  if ("numberOfBids" %in% colnames(table)) {
+    columns[["numberOfBids"]] <- colDef(
+      name = "Bids",
+      align = "center"
+    )
+  }
+  
   if ("role" %in% colnames(table)) {
-    role_col <- colDef(
+    columns[["role"]] <- colDef(
       name = "Position",
       align = "center",
       cell = function(value) {
@@ -555,10 +729,10 @@ get_reactable_columns_for_players <- function(table) {
         shiny::tags$span(class = class_name, value)
       }
     )
-    columns[["role"]] <- role_col
   }
+  
   if ("role2" %in% colnames(table)) {
-    role2_col <- colDef(
+    columns[["role2"]] <- colDef(
       name = "Secondary Position",
       align = "center",
       cell = function(value) {
@@ -573,55 +747,103 @@ get_reactable_columns_for_players <- function(table) {
         shiny::tags$span(class = class_name, value)
       }
     )
-    columns[["role2"]] <- role2_col
   }
-  if ("market_price" %in% colnames(table)) {
-    market_price_col <- colDef(
-      name = "Market Price",
-      format = colFormat(currency = "EUR", separators = TRUE),
-      align = "right"
-    )
-    columns[["market_price"]] <- market_price_col
-  }
-  if ("bid_price" %in% colnames(table)) {
-    bid_price_col <- colDef(
-      name = "Bid Price",
-      format = colFormat(currency = "EUR", separators = TRUE),
-      align = "right"
-    )
-    columns[["bid_price"]] <- bid_price_col
-  }
-  if ("clause_price" %in% colnames(table)) {
-    clause_price_col <- colDef(
-      name = "Clause Price",
-      format = colFormat(currency = "EUR", separators = TRUE),
-      align = "right"
-    )
-    columns[["clause_price"]] <- clause_price_col
-  }
-  if ("clause_suggestedClause" %in% colnames(table)) {
-    clause_col <- colDef(
-      name = "Suggested Clause",
-      format = colFormat(currency = "EUR", separators = TRUE),
-      align = "right"
-    )
-    columns[["clause_suggestedClause"]] <- clause_col
-  }
+  
   if ("market_inMarket" %in% colnames(table)) {
-    inMarket_col <- colDef(
-      name = "In Market",
+    columns[["market_inMarket"]] <- colDef(
+      name = "Listed",
+      align = "center",
+      cell = function(value) {
+        if (is.null(value) || is.na(value)) return("")
+        if (value) {
+          shiny::tags$span(style = "color: #10b981; font-weight: 600;", "YES")
+        } else {
+          shiny::tags$span(style = "color: #94a3b8;", "NO")
+        }
+      }
+    )
+  }
+  
+  if ("status" %in% colnames(table)) {
+    columns[["status"]] <- colDef(
+      name = "Status",
+      align = "center",
+      cell = function(value) {
+        if (is.na(value) || value == "") {
+          return(shiny::tags$span(style = "color: #10b981; font-weight: 500;", shiny::icon("circle-check"), " Fit"))
+        }
+        val_lower <- tolower(value)
+        case_when(
+          val_lower == "ok" ~ shiny::tags$span(style = "color: #10b981; font-weight: 500;", shiny::icon("circle-check"), " Fit"),
+          val_lower == "doubt" ~ shiny::tags$span(style = "color: #f59e0b; font-weight: 500;", shiny::icon("triangle-exclamation"), " Doubt"),
+          val_lower == "injured" ~ shiny::tags$span(style = "color: #ef4444; font-weight: 500;", shiny::icon("circle-minus"), " Injured"),
+          val_lower == "injured2" ~ shiny::tags$span(style = "color: #b91c1c; font-weight: 500;", shiny::icon("hospital"), " Long-term"),
+          val_lower == "redcard" ~ shiny::tags$span(style = "color: #ef4444; font-weight: 500;", shiny::icon("square"), " Suspended"),
+          TRUE ~ shiny::tags$span(style = "color: #10b981; font-weight: 500;", shiny::icon("circle-check"), " Fit")
+        )
+      }
+    )
+  }
+  
+  # Averages / Points Columns ----
+  if ("average.average" %in% colnames(table)) {
+    columns[["average.average"]] <- colDef(
+      name = "Avg Points",
+      align = "center",
+      cell = function(value) {
+        if (is.null(value) || is.na(value) || value == "NaN" || value == "") return("-")
+        round(as.numeric(value), 1)
+      }
+    )
+  }
+  
+  if ("average.homeAverage" %in% colnames(table)) {
+    columns[["average.homeAverage"]] <- colDef(
+      name = "Home Avg",
+      align = "center",
+      cell = function(value) {
+        if (is.null(value) || is.na(value) || value == "NaN" || value == "") return("-")
+        round(as.numeric(value), 1)
+      }
+    )
+  }
+  
+  if ("average.awayAverage" %in% colnames(table)) {
+    columns[["average.awayAverage"]] <- colDef(
+      name = "Away Avg",
+      align = "center",
+      cell = function(value) {
+        if (is.null(value) || is.na(value) || value == "NaN" || value == "") return("-")
+        round(as.numeric(value), 1)
+      }
+    )
+  }
+  
+  if ("average.averageLastFive" %in% colnames(table)) {
+    columns[["average.averageLastFive"]] <- colDef(
+      name = "Avg Last 5",
+      align = "center",
+      cell = function(value) {
+        if (is.null(value) || is.na(value) || value == "NaN" || value == "") return("-")
+        round(as.numeric(value), 1)
+      }
+    )
+  }
+  
+  if ("average.matches" %in% colnames(table)) {
+    columns[["average.matches"]] <- colDef(
+      name = "Played",
       align = "center"
     )
-    columns[["market_inMarket"]] <- inMarket_col
   }
-  if ("clause_date" %in% colnames(table)) {
-    clause_date_col <- colDef(
-      name = "Clause Date",
-      align = "center",
-      format = colFormat(date = TRUE)
+  
+  if ("average.total" %in% colnames(table)) {
+    columns[["average.total"]] <- colDef(
+      name = "Last 5 Points",
+      align = "center"
     )
-    columns[["clause_date"]] <- clause_date_col
   }
+  
   return(columns)
 }
 
@@ -690,21 +912,7 @@ get_teams <- function(login, championship_id) {
 }
 
 
-buy_clause <- function(login, championship_id, team_id, player_id, player_slug, price) {
-  # {
-  #   "header": {
-  #     "token": "bf2d_ab97838fac849d1ed759e14ce440d637",
-  #     "userid": "5b55fb19be298c4b5913fc44"
-  #   },
-  #   "query": {
-  #     "championshipId": "5b55f9d767214483120b87cf",
-  #     "userteamId": "5b55fbcbb78eda1f7593cb7f",
-  #     "player_slug": "67245413",
-  #     "player_id": "5fbe33c11fd5fa0e8491689f",
-  #     "price": 6300065
-  #   },
-  #   "answer": {}
-  # }
+buy_clause <- function(login, championship_id, team_id, player_id, player_slug, price, isClause = TRUE) {
   payload <- list(
     header = list(
       token = login[["token"]],
@@ -716,7 +924,7 @@ buy_clause <- function(login, championship_id, team_id, player_id, player_slug, 
       player_id = player_id,
       player_slug = player_slug,
       price = price,
-      isClause = TRUE
+      isClause = isClause
     ),
     answer = list()
   )
@@ -727,7 +935,7 @@ buy_clause <- function(login, championship_id, team_id, player_id, player_slug, 
   )
 
   # Sending the POST request
-  print("Getting players from team")
+  print("Sending bid/clause purchase request")
   response <- POST(CLAUSULA_URL, body = toJSON(payload), add_headers(.headers = headers))
   operation_code <- httr::content(response)$answer$code
   return(operation_code == API_CODE_OK)

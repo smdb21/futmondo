@@ -35,7 +35,10 @@ market_Server <- function(id, is_module_active, login_token, championship_id, us
       selected_player_RV <- players_table_Server(
         id = "market_players_table",
         players_table_RV = market_players_RV,
-        user_teams_RV = user_teams_RV
+        user_teams_RV = user_teams_RV,
+        login_token = login_token,
+        championship_id = championship_id,
+        user_team_id = user_team_id
       )
     }
   )

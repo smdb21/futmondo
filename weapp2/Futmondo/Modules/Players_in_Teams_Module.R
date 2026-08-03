@@ -235,7 +235,10 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
     selected_player_RV <- players_table_Server(
       id = "players_table_in_teams",
       players_table_RV = players_table_RV,
-      user_teams_RV = user_teams_RV
+      user_teams_RV = user_teams_RV,
+      login_token = login_token,
+      championship_id = championship_id,
+      user_team_id = user_team_id
     )
 
     return(selected_player_RV)

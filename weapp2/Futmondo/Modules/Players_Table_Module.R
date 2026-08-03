@@ -73,7 +73,7 @@ players_table_UI <- function(id, box_title = NULL,
 }
 
 
-players_table_Server <- function(id, players_table_RV, user_teams_RV) {
+players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     # observers ----
@@ -106,7 +106,13 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV) {
       ignoreNULL = TRUE
     )
     # Modules ----
-    selected_player_Server(id = "selected_player", selected_player = selected_player_RV)
+    selected_player_Server(
+      id = "selected_player",
+      selected_player = selected_player_RV,
+      login_token = login_token,
+      championship_id = championship_id,
+      user_team_id = user_team_id
+    )
     # reactives ----
     ## selected_player_RV
     selected_player_RV <- reactive({
