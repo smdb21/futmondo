@@ -20,10 +20,26 @@ selected_player_UI <- function(id) {
       background = "light-blue",
       boxToolSize = "xl",
       collapsible = FALSE,
-      footer = fluidRow(
-        column(4, uiOutput(ns("player_points_description_box"))),
-        column(4, uiOutput(ns("player_last_points_description_box"))),
-        column(4, uiOutput(ns("player_value_description_box")))
+      footer = tagList(
+        fluidRow(
+          column(4, uiOutput(ns("player_points_description_box"))),
+          column(4, uiOutput(ns("player_last_points_description_box"))),
+          column(4, uiOutput(ns("player_value_description_box")))
+        ),
+        # Interactive Purchase Row
+        fluidRow(
+          column(12, align = "center", style = "margin-top: 15px; display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;",
+                 uiOutput(ns("buy_market_ui")),
+                 uiOutput(ns("buy_clause_ui")))
+        ),
+        # Plotly History Chart Row (Plot A)
+        fluidRow(
+          style = "margin-top: 25px; padding-top: 20px; border-top: 1px solid #f1f5f9;",
+          column(12,
+                 h4(style = "font-weight: 600; color: #0f172a; margin-bottom: 15px;", "Historical Valuation & Performance"),
+                 plotly::plotlyOutput(ns("player_trend_plot"), height = "280px")
+          )
+        )
       )
     ),
     # Action buttons area (market bid / clause purchase)
@@ -299,6 +315,92 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           duration = 5
         )
       }
+    })
+
+    ## render player_trend_plot (Plot A) ----
+    output$player_trend_plot <- plotly::renderPlotly({
+      sp <- selected_player()
+      req(sp)
+
+      champ_id <- if (!is.null(championship_id)) championship_id() else NULL
+      player_id <- sp$id
+
+      history_df <- NULL
+      if (!is.null(champ_id) && !is.null(player_id)) {
+        tryCatch({
+          history_df <- get_player_historical_data(player_id, champ_id)
+        }, error = function(e) {
+          print(paste0("[Plot A] Error loading history: ", e$message))
+        })
+      }
+
+      # Fallback simulated data if DB is empty or unconfigured (pre-season)
+      if (is.null(history_df) || nrow(history_df) == 0) {
+        today <- Sys.time()
+        dates <- seq(today - as.difftime(6, units="days"), today, by="1 day")
+        val_today <- if ("value" %in% colnames(sp)) as.numeric(sp$value) else 1000000
+        val_change <- if ("change" %in% colnames(sp)) as.numeric(sp$change) else 0
+
+        history_df <- data.frame(
+          recorded_at = as.character(dates),
+          value = seq(val_today - val_change, val_today, length.out = length(dates)),
+          points = c(rep(0, length(dates) - 1), if ("points" %in% colnames(sp)) as.integer(sp$points) else 0),
+          stringsAsFactors = FALSE
+        )
+      }
+
+      # Format dates
+      history_df$date <- as.POSIXct(history_df$recorded_at, format = "%Y-%m-%dT%H:%M:%S")
+      if (any(is.na(history_df$date))) {
+        history_df$date <- as.POSIXct(history_df$recorded_at)
+      }
+
+      history_df <- history_df %>% dplyr::arrange(date)
+
+      # Build interactive plotly dual-axis chart
+      plotly::plot_ly(data = history_df) %>%
+        plotly::add_lines(
+          x = ~date, y = ~value,
+          name = "Valuation (EUR)",
+          line = list(color = "#f59e0b", width = 3, shape = "spline"),
+          fill = "tozeroy", fillcolor = "rgba(245, 158, 11, 0.05)",
+          hoverinfo = "text",
+          text = ~paste0("Date: ", format(date, "%d-%m-%y"), "<br>Valuation: ", format_table_currency(value))
+        ) %>%
+        plotly::add_bars(
+          x = ~date, y = ~points,
+          name = "Points",
+          yaxis = "y2",
+          marker = list(color = "rgba(16, 185, 129, 0.6)", line = list(color = "#10b981", width = 1)),
+          hoverinfo = "text",
+          text = ~paste0("Date: ", format(date, "%d-%m-%y"), "<br>Points: ", points)
+        ) %>%
+        plotly::layout(
+          hovermode = "x unified",
+          paper_bgcolor = "rgba(0,0,0,0)",
+          plot_bgcolor = "rgba(0,0,0,0)",
+          xaxis = list(
+            title = "",
+            gridcolor = "#f1f5f9",
+            zeroline = FALSE,
+            tickformat = "%d-%m"
+          ),
+          yaxis = list(
+            title = "Valuation (EUR)",
+            gridcolor = "#f1f5f9",
+            zeroline = FALSE,
+            tickformat = "s"
+          ),
+          yaxis2 = list(
+            title = "Points",
+            overlaying = "y",
+            side = "right",
+            zeroline = FALSE,
+            showgrid = FALSE
+          ),
+          legend = list(orientation = "h", x = 0.5, y = -0.25, xanchor = "center"),
+          margin = list(l = 50, r = 50, t = 10, b = 40)
+        )
     })
 
     ## render player_points_description_box ----

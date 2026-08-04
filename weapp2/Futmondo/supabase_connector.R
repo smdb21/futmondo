@@ -163,3 +163,70 @@ log_market_transaction <- function(player_id, championship_id, buyer_team_id, se
   
   supabase_post("market_transactions", payload)
 }
+
+supabase_get <- function(table_name, query_params = list()) {
+  # Defensive check for loaded credentials
+  if (is.null(SB_URL) || SB_URL == "" || is.null(SB_KEY) || SB_KEY == "") {
+    return(NULL)
+  }
+  
+  url <- paste0(SB_URL, "/rest/v1/", table_name)
+  
+  headers <- c(
+    "apikey" = SB_KEY,
+    "Authorization" = paste("Bearer", SB_KEY),
+    "Accept" = "application/json"
+  )
+  
+  tryCatch({
+    response <- GET(url, query = query_params, add_headers(.headers = headers))
+    code <- status_code(response)
+    if (code >= 200 && code < 300) {
+      data <- fromJSON(httr::content(response, as = "text", encoding = "UTF-8"))
+      return(as.data.frame(data))
+    } else {
+      print(paste0("[Supabase] Warning: Received GET HTTP code ", code, " from table: ", table_name))
+      return(NULL)
+    }
+  }, error = function(e) {
+    print(paste0("[Supabase] GET Connection error for table ", table_name, ": ", e$message))
+    return(NULL)
+  })
+}
+
+get_player_historical_data <- function(player_id, championship_id) {
+  query <- list(
+    player_id = paste0("eq.", player_id),
+    championship_id = paste0("eq.", championship_id),
+    select = "value,change,points,recorded_at",
+    order = "recorded_at.asc"
+  )
+  supabase_get("player_history", query)
+}
+
+get_league_standings_history <- function(championship_id) {
+  query <- list(
+    select = "points,budget,position,recorded_at,user_teams!inner(name,championship_id)",
+    "user_teams.championship_id" = paste0("eq.", championship_id),
+    order = "recorded_at.asc"
+  )
+  
+  df <- supabase_get("user_team_history", query)
+  if (!is.null(df) && nrow(df) > 0 && "user_teams" %in% colnames(df)) {
+    if (is.list(df$user_teams) || is.data.frame(df$user_teams)) {
+      df$teamname <- df$user_teams$name
+    } else {
+      df$teamname <- "Unknown Team"
+    }
+    df$user_teams <- NULL
+  }
+  return(df)
+}
+
+get_user_teams_finances <- function(championship_id) {
+  query <- list(
+    championship_id = paste0("eq.", championship_id),
+    select = "id,name,budget,points,position"
+  )
+  supabase_get("user_teams", query)
+}

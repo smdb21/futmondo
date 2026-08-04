@@ -4,6 +4,7 @@ players_in_teams_UI <- function(id) {
   ns <- NS(id)
   tagList(
     uiOutput(ns("team_value_box")),
+    uiOutput(ns("charts_row")), # Dynamic Plot B & Plot C Container
     players_table_UI(
       id = ns("players_table_in_teams"), box_title = "Players in Team",
       filter_by_position = TRUE,
@@ -206,6 +207,140 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
     # observers ----
 
     # reactives ----
+    # Render Interactive Charts Grid
+    output$charts_row <- renderUI({
+      req(is_module_active() == TRUE)
+      ns <- session$ns
+
+      fluidRow(
+        column(width = 6,
+               box(
+                 title = "League Standings Evolution (Points)",
+                 width = 12,
+                 status = "primary",
+                 solidHeader = TRUE,
+                 plotly::plotlyOutput(ns("standings_evolution_plot"), height = "300px")
+               )
+        ),
+        column(width = 6,
+               box(
+                 title = "League Buying Power (Liquid Cash)",
+                 width = 12,
+                 status = "primary",
+                 solidHeader = TRUE,
+                 plotly::plotlyOutput(ns("league_finances_plot"), height = "300px")
+               )
+        )
+      )
+    })
+
+    # Plot B: Standings Evolution Scatter Plot
+    output$standings_evolution_plot <- plotly::renderPlotly({
+      req(is_module_active() == TRUE)
+
+      champ_id <- if (!is.null(championship_id)) championship_id() else NULL
+      history_df <- NULL
+      if (!is.null(champ_id)) {
+        tryCatch({
+          history_df <- get_league_standings_history(champ_id)
+        }, error = function(e) {
+          print(paste0("[Plot B] Standings fetch warning: ", e$message))
+        })
+      }
+
+      # Fallback baseline timeline if DB is empty or unconfigured (pre-season)
+      if (is.null(history_df) || nrow(history_df) == 0) {
+        teams <- user_teams_RV()
+        if (is.null(teams) || nrow(teams) == 0) {
+          teams <- data.frame(teamname = c("Team Alpha", "Team Beta"), points = c(0, 0), stringsAsFactors = FALSE)
+        }
+
+        today <- Sys.time()
+        dates <- seq(today - as.difftime(6, units="days"), today, by="1 day")
+
+        history_df <- lapply(1:nrow(teams), function(i) {
+          data.frame(
+            teamname = teams$teamname[i],
+            points = rep(as.numeric(teams$points[i]), length(dates)),
+            recorded_at = as.character(dates),
+            stringsAsFactors = FALSE
+          )
+        }) %>% bind_rows()
+      }
+
+      # Format dates
+      history_df$date <- as.POSIXct(history_df$recorded_at, format = "%Y-%m-%dT%H:%M:%S")
+      if (any(is.na(history_df$date))) {
+        history_df$date <- as.POSIXct(history_df$recorded_at)
+      }
+
+      history_df <- history_df %>% dplyr::arrange(date)
+
+      # Render multi-line spline points progression
+      plotly::plot_ly(data = history_df, x = ~date, y = ~points, color = ~teamname, type = "scatter", mode = "lines+markers",
+                      line = list(width = 2, shape = "spline"),
+                      marker = list(size = 5),
+                      hoverinfo = "text",
+                      text = ~paste0("Team: ", teamname, "<br>Date: ", format(date, "%d-%m-%y"), "<br>Points: ", points)) %>%
+        plotly::layout(
+          paper_bgcolor = "rgba(0,0,0,0)",
+          plot_bgcolor = "rgba(0,0,0,0)",
+          xaxis = list(title = "", gridcolor = "#f1f5f9", zeroline = FALSE, tickformat = "%d-%m"),
+          yaxis = list(title = "Cumulative Points", gridcolor = "#f1f5f9", zeroline = FALSE),
+          legend = list(orientation = "h", x = 0.5, y = -0.25, xanchor = "center"),
+          margin = list(l = 50, r = 20, t = 10, b = 40)
+        )
+    })
+
+    # Plot C: League Finances horizontal bar chart
+    output$league_finances_plot <- plotly::renderPlotly({
+      req(is_module_active() == TRUE)
+
+      champ_id <- if (!is.null(championship_id)) championship_id() else NULL
+      teams_df <- NULL
+      if (!is.null(champ_id)) {
+        tryCatch({
+          teams_df <- get_user_teams_finances(champ_id)
+        }, error = function(e) {
+          print(paste0("[Plot C] Finances fetch warning: ", e$message))
+        })
+      }
+
+      # Fallback to current reactive standings state if DB has no historical budget records yet
+      if (is.null(teams_df) || nrow(teams_df) == 0) {
+        teams_df <- user_teams_RV()
+      }
+
+      if (is.null(teams_df) || nrow(teams_df) == 0) {
+        teams_df <- data.frame(
+          name = c("Team Alpha", "Team Beta"),
+          budget = c(300000000, 250000000),
+          stringsAsFactors = FALSE
+        )
+      }
+
+      team_names <- if ("name" %in% colnames(teams_df)) teams_df$name else if ("teamname" %in% colnames(teams_df)) teams_df$teamname else "Unknown"
+      team_budgets <- if ("budget" %in% colnames(teams_df)) as.numeric(teams_df$budget) else 0
+
+      plot_df <- data.frame(
+        team = team_names,
+        budget = team_budgets,
+        stringsAsFactors = FALSE
+      )
+
+      plotly::plot_ly(data = plot_df, x = ~budget, y = ~team, type = "bar", orientation = "h",
+                      marker = list(color = "#f59e0b", line = list(color = "#d97706", width = 1)),
+                      hoverinfo = "text",
+                      text = ~paste0("Team: ", team, "<br>Cash Budget: ", format_table_currency(budget))) %>%
+        plotly::layout(
+          paper_bgcolor = "rgba(0,0,0,0)",
+          plot_bgcolor = "rgba(0,0,0,0)",
+          xaxis = list(title = "Liquid Cash Budget (€)", gridcolor = "#f1f5f9", zeroline = FALSE, tickformat = "s"),
+          yaxis = list(title = "", gridcolor = "#f1f5f9", zeroline = FALSE, categoryorder = "total ascending"),
+          margin = list(l = 100, r = 20, t = 10, b = 40)
+        )
+    })
+
     ## players_table_RV ----
     players_table_RV <- reactive({
       req(is_module_active() == TRUE)
