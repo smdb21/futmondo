@@ -574,7 +574,7 @@ format_table_currency <- function(value) {
   }
   if (all(is.na(value))) return(rep("", length(value)))
   
-  formatted <- scales::label_currency(prefix = "", suffix = " €", big.mark = ".", decimal.mark = ",")(value)
+  formatted <- scales::label_currency(prefix = "", suffix = " \u20ac", big.mark = ".", decimal.mark = ",")(value)
   formatted[is.na(value)] <- ""
   return(formatted)
 }
