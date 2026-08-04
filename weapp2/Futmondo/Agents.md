@@ -21,3 +21,13 @@ Every developer and AI agent making modifications or additions to the codebase *
 * **No Blocking Syncs**: Always wrap Supabase or external API network writes defensively in `tryCatch()` blocks to prevent user thread blocking or parent server crashes.
 * **Caching Respect**: All new API fetching handlers must hook into `get_cached_data()` to ensure sub-millisecond tab switches and protect accounts from API rate-limiting.
 * **Mobile-First CSS**: Avoid adding fixed-width elements. Ensure all columns, modals, and container paddings leverage standard Bootstrap fluid structures or responsive media queries in `www/custom_style.css`.
+
+---
+
+## 📦 3. Package Dependencies & Deployment
+
+* **Manifest Creation**: Whenever a new R library dependency is added to the project, you **MUST** regenerate the deployment manifest file in the project root by running:
+  ```R
+  rsconnect::writeManifest()
+  ```
+  This is required to ensure that hosting services (such as shinyapps.io, RStudio Connect, or Posit Connect) correctly identify and install the required packages.
