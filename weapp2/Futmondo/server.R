@@ -70,7 +70,28 @@ function(input, output, session) {
     user_team_name <- championship["userteam.name"]
     return(user_team_name)
   })
-  
+
+  # Background Sync: Full Player Catalog Snapshot (Zero Data Loss) ----
+  observe({
+    req(login_token_RV())
+    req(championship_id_RV())
+
+    # Run defensively in the background
+    tryCatch({
+      print("[Supabase] Initiating background full-catalog snapshot to prevent data loss...")
+      all_players <- get_championship_players(login = login_token_RV(), championship_id = championship_id_RV())
+
+      if (!is.null(all_players) && nrow(all_players) > 0) {
+        sync_real_clubs_to_supabase(all_players)
+        sync_players_to_supabase(all_players)
+        log_player_history(all_players, championship_id_RV())
+        print("[Supabase] Success: Full player catalog snapshot successfully logged to history!")
+      }
+    }, error = function(e) {
+      print(paste0("[Supabase] Full-catalog sync warning: ", e$message))
+    })
+  })
+
   selected_player_RV <- players_in_teams_Server(id = "players_in_teams", 
                                                 is_module_active = reactive({
                                                   input$tabs == "yourteam"
