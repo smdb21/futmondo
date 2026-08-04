@@ -113,14 +113,23 @@ function(input, output, session) {
                 user_teams_RV = user_teams_RV,
                 refresh_trigger = refresh_trigger)
 
-  players_in_championship_Server(id = "players_in_championship", 
-                                 is_module_active = reactive({
-                                   input$tabs == "players_in_championship"  
-                                 }),
-                                 login_token = login_token_RV, 
-                                 championship_id = championship_id_RV, 
-                                 user_teams_RV = user_teams_RV,
-                                 refresh_trigger = refresh_trigger)
+players_in_championship_Server(id = "players_in_championship", 
+                                  is_module_active = reactive({
+                                    input$tabs == "players_in_championship"  
+                                  }),
+                                  login_token = login_token_RV, 
+                                  championship_id = championship_id_RV, 
+                                  user_teams_RV = user_teams_RV,
+                                  refresh_trigger = refresh_trigger)
+
+  rivals_Server(id = "rivals",
+                is_module_active = reactive({
+                  input$tabs == "rivals"
+                }),
+                login_token = login_token_RV,
+                championship_id = championship_id_RV,
+                user_team_id = user_team_id_RV,
+                user_teams_RV = user_teams_RV)
   # observers ----
   ## observe user_team_id_RV()
   observeEvent(login_token_RV(),
@@ -139,7 +148,8 @@ function(input, output, session) {
       shinydashboard::menuItem("Login", tabName = "login", icon = icon("right-to-bracket")),
       shinydashboard::menuItem("Your team", tabName = "yourteam", icon = icon("users")),
       shinydashboard::menuItem("Market", tabName = "market", icon = icon("money-bill-trend-up")),
-      shinydashboard::menuItem("Players", tabName = "players_in_championship", icon = icon("table"))
+      shinydashboard::menuItem("Players", tabName = "players_in_championship", icon = icon("table")),
+      shinydashboard::menuItem("Rivals Explorer", tabName = "rivals", icon = icon("users-viewfinder"))
     )
   })
 }

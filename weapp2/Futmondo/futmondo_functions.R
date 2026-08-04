@@ -869,6 +869,33 @@ get_reactable_columns_for_players <- function(table) {
     )
   }
   
+  if ("buyPrice" %in% colnames(table)) {
+    columns[["buyPrice"]] <- colDef(
+      name = "Acquisition Price",
+      align = "right",
+      cell = function(value) {
+        format_table_currency(value)
+      }
+    )
+  }
+
+  if ("clause_ratio" %in% colnames(table)) {
+    columns[["clause_ratio"]] <- colDef(
+      name = "Scout Indicator",
+      align = "center",
+      cell = function(value) {
+        if (is.na(value) || !is.numeric(value)) return("")
+        if (value < 1.1) {
+          shiny::tags$span(class = "badge-md", style = "font-weight: 700; font-size: 11px; padding: 2px 8px;", "STEAL")
+        } else if (value < 1.3) {
+          shiny::tags$span(style = "color: #f59e0b; font-weight: 600;", "GOOD VALUE")
+        } else {
+          shiny::tags$span(style = "color: #94a3b8;", "OVERPRICED")
+        }
+      }
+    )
+  }
+
   return(columns)
 }
 
@@ -964,6 +991,37 @@ buy_clause <- function(login, championship_id, team_id, player_id, player_slug, 
   response <- POST(CLAUSULA_URL, body = toJSON(payload), add_headers(.headers = headers))
   operation_code <- httr::content(response)$answer$code
   return(operation_code == API_CODE_OK)
+}
+
+get_user_team_info <- function(login, championship_id, user_team_id) {
+  cache_key <- paste0("team_info_", championship_id, "_", user_team_id)
+  get_cached_data(cache_key, {
+    payload <- list(
+      header = list(
+        token = login[["token"]],
+        userid = login[["userid"]]
+      ),
+      query = list(
+        championshipId = championship_id,
+        userteamId = user_team_id,
+        type = "market"
+      ),
+      answer = list()
+    )
+
+    headers <- c("Content-Type" = "application/json; charset=utf-8")
+    url <- "https://api.futmondo.com/1/userteam/information"
+
+    print("Getting team info details")
+    response <- POST(url, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
+    ans <- httr::content(response)
+
+    if (!is.null(ans) && "answer" %in% names(ans)) {
+      return(ans[["answer"]])
+    } else {
+      return(NULL)
+    }
+  })
 }
 
 get_team_image_name <- function(team) {

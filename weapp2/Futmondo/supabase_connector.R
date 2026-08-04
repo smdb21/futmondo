@@ -108,11 +108,12 @@ sync_user_teams_to_supabase <- function(teams_df, championship_id) {
     budget = if ("budget" %in% colnames(teams_df)) as.numeric(teams_df$budget) else 0,
     points = if ("points" %in% colnames(teams_df)) as.integer(teams_df$points) else 0,
     position = if ("position" %in% colnames(teams_df)) as.integer(teams_df$position) else NA_integer_,
+    team_value = if ("teamValue" %in% colnames(teams_df)) as.numeric(teams_df$teamValue) else 0,
     stringsAsFactors = FALSE
   )
-  
+
   payload <- payload %>% dplyr::distinct(id, .keep_all = TRUE)
-  
+
   supabase_post("user_teams", payload)
 }
 
@@ -126,9 +127,10 @@ log_user_team_history <- function(teams_df) {
     points = if ("points" %in% colnames(teams_df)) as.integer(teams_df$points) else 0,
     budget = if ("budget" %in% colnames(teams_df)) as.numeric(teams_df$budget) else 0,
     position = if ("position" %in% colnames(teams_df)) as.integer(teams_df$position) else NA_integer_,
+    team_value = if ("teamValue" %in% colnames(teams_df)) as.numeric(teams_df$teamValue) else 0,
     stringsAsFactors = FALSE
   )
-  
+
   supabase_post("user_team_history", payload)
 }
 

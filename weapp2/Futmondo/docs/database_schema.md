@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS user_teams (
     budget BIGINT DEFAULT 0,
     points INTEGER DEFAULT 0,
     position INTEGER,
+    team_value BIGINT DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -58,6 +59,7 @@ CREATE TABLE IF NOT EXISTS user_team_history (
     points INTEGER NOT NULL,
     budget BIGINT NOT NULL,
     position INTEGER,
+    team_value BIGINT DEFAULT 0,
     recorded_at TIMESTAMPTZ DEFAULT NOW()
 );
 
