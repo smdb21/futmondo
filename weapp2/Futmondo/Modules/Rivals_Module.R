@@ -7,6 +7,20 @@ library(dplyr)
 rivals_UI <- function(id) {
   ns <- NS(id)
   tagList(
+    # Plot D: League Squad Value Evolution (Historical values of all teams) - placed ON TOP
+    fluidRow(
+      column(width = 12,
+             box(
+               title = "League Squad Value Evolution (Historical Valuation)",
+               width = 12,
+               status = "primary",
+               solidHeader = TRUE,
+               plotly::plotlyOutput(ns("team_valuation_history_plot"), height = "300px")
+             )
+      )
+    ),
+
+    # Scouting Target Selection row - placed BELOW Historical Valuation
     fluidRow(
       column(width = 12,
              box(
@@ -23,22 +37,9 @@ rivals_UI <- function(id) {
              )
       )
     ),
-    
+
     # Financial Standings Overview Cards row
     uiOutput(ns("rival_financial_summary_box")),
-
-    # Plot D: League Squad Value Evolution (Historical values of all teams)
-    fluidRow(
-      column(width = 12,
-             box(
-               title = "League Squad Value Evolution (Historical Valuation)",
-               width = 12,
-               status = "primary",
-               solidHeader = TRUE,
-               plotly::plotlyOutput(ns("team_valuation_history_plot"), height = "300px")
-             )
-      )
-    ),
 
     # Rival Squad Players table
     players_table_UI(

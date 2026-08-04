@@ -261,7 +261,10 @@ body, .content-wrapper, .right-side {
     left: 0 !important;
     margin: 0 auto 12px auto !important;
     transform: none !important;
-    display: block !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    width: 100% !important;
 }
 
 .widget-user-image > img {
@@ -272,6 +275,13 @@ body, .content-wrapper, .right-side {
     box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
     object-fit: cover;
     background-color: #f1f5f9;
+    margin: 0 auto !important;
+    display: block !important;
+}
+
+/* Hide duplicate widget-user-image elements caused by shinydashboardPlus updateBox */
+.widget-user .widget-user-image ~ .widget-user-image {
+    display: none !important;
 }
 
 /* Modal and Box Footer styling */

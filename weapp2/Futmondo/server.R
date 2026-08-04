@@ -149,7 +149,7 @@ players_in_championship_Server(id = "players_in_championship",
       shinydashboard::menuItem("Your team", tabName = "yourteam", icon = icon("users")),
       shinydashboard::menuItem("Market", tabName = "market", icon = icon("money-bill-trend-up")),
       shinydashboard::menuItem("Players", tabName = "players_in_championship", icon = icon("table")),
-      shinydashboard::menuItem("Rivals Explorer", tabName = "rivals", icon = icon("users-viewfinder"))
+      shinydashboard::menuItem("Rivals", tabName = "rivals", icon = icon("users-viewfinder"))
     )
   })
 }

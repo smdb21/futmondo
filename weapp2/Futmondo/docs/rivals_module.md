@@ -1,6 +1,6 @@
-# Rivals Module - Rivals Explorer Scouting Page
+# Rivals Module - Rivals Scouting Page
 
-This document describes the `Rivals_Module.R` Shiny module that implements the "Rivals Explorer" scouting page. It allows the logged-in user to select any team in the championship, view their financial overview, and inspect their full player roster with clause-to-value ratio indicators.
+This document describes the `Rivals_Module.R` Shiny module that implements the "Rivals" scouting page. It allows the logged-in user to select any team in the championship, view their financial overview, and inspect their full player roster with clause-to-value ratio indicators.
 
 ---
 
@@ -24,9 +24,10 @@ The Rivals Module provides two exported functions:
 ### Return Value
 
 Returns a `tagList` containing:
-1. A team selector box (`selectInput`) for choosing a rival to scout.
-2. A `uiOutput` placeholder for the financial summary cards.
-3. A nested `players_table_UI` call for the scouted player roster table.
+1. A League Squad Value Evolution chart (`plotlyOutput`) showing historical valuations of all teams.
+2. A Scouting Target Selection box (`selectInput`) for choosing a rival to scout.
+3. A `uiOutput` placeholder for the financial summary cards.
+4. A nested `players_table_UI` call for the scouted player roster table.
 
 ### Usage Example
 
