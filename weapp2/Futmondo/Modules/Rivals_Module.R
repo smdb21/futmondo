@@ -26,7 +26,20 @@ rivals_UI <- function(id) {
     
     # Financial Standings Overview Cards row
     uiOutput(ns("rival_financial_summary_box")),
-    
+
+    # Plot D: League Squad Value Evolution (Historical values of all teams)
+    fluidRow(
+      column(width = 12,
+             box(
+               title = "League Squad Value Evolution (Historical Valuation)",
+               width = 12,
+               status = "primary",
+               solidHeader = TRUE,
+               plotly::plotlyOutput(ns("team_valuation_history_plot"), height = "300px")
+             )
+      )
+    ),
+
     # Rival Squad Players table
     players_table_UI(
       id = ns("rival_squad_table"),
@@ -180,6 +193,64 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       )
     })
     
+    # Plot D: League Squad Value Evolution (Historical valuations of all teams)
+    output$team_valuation_history_plot <- plotly::renderPlotly({
+      req(is_module_active() == TRUE)
+
+      champ_id <- if (!is.null(championship_id)) championship_id() else NULL
+      history_df <- NULL
+      if (!is.null(champ_id)) {
+        tryCatch({
+          history_df <- get_league_standings_history(champ_id)
+        }, error = function(e) {
+          print(paste0("[Plot D] Valuation history fetch warning: ", e$message))
+        })
+      }
+
+      # Fallback baseline timeline if DB is empty or unconfigured (pre-season)
+      if (is.null(history_df) || nrow(history_df) == 0 || !"team_value" %in% colnames(history_df)) {
+        teams <- user_teams_RV()
+        if (is.null(teams) || nrow(teams) == 0) {
+          teams <- data.frame(teamname = c("Team Alpha", "Team Beta"), teamValue = c(10000000, 8000000), stringsAsFactors = FALSE)
+        }
+
+        today <- Sys.time()
+        dates <- seq(today - as.difftime(6, units="days"), today, by="1 day")
+
+        history_df <- lapply(1:nrow(teams), function(i) {
+          data.frame(
+            teamname = teams$teamname[i],
+            team_value = rep(as.numeric(if ("teamValue" %in% colnames(teams)) teams$teamValue[i] else 10000000), length(dates)),
+            recorded_at = as.character(dates),
+            stringsAsFactors = FALSE
+          )
+        }) %>% bind_rows()
+      }
+
+      # Format dates
+      history_df$date <- as.POSIXct(history_df$recorded_at, format = "%Y-%m-%dT%H:%M:%S")
+      if (any(is.na(history_df$date))) {
+        history_df$date <- as.POSIXct(history_df$recorded_at)
+      }
+
+      history_df <- history_df %>% dplyr::arrange(date)
+
+      # Render multi-line spline squad valuations progression
+      plotly::plot_ly(data = history_df, x = ~date, y = ~team_value, color = ~teamname, colors = "Set3", type = "scatter", mode = "lines+markers",
+                      line = list(width = 2, shape = "spline"),
+                      marker = list(size = 5),
+                      hoverinfo = "text",
+                      text = ~paste0("Team: ", teamname, "<br>Date: ", format(date, "%d-%m-%y"), "<br>Valuation: ", format_table_currency(team_value))) %>%
+        plotly::layout(
+          paper_bgcolor = "rgba(0,0,0,0)",
+          plot_bgcolor = "rgba(0,0,0,0)",
+          xaxis = list(title = "", gridcolor = "#f1f5f9", zeroline = FALSE, tickformat = "%d-%m"),
+          yaxis = list(title = "Squad Valuation (EUR)", gridcolor = "#f1f5f9", zeroline = FALSE, tickformat = "s"),
+          legend = list(orientation = "h", x = 0.5, y = -0.25, xanchor = "center"),
+          margin = list(l = 60, r = 20, t = 10, b = 40)
+        )
+    })
+
     # Nested table module server call
     selected_player_RV <- players_table_Server(
       id = "rival_squad_table",

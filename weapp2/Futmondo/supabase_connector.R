@@ -208,7 +208,7 @@ get_player_historical_data <- function(player_id, championship_id) {
 
 get_league_standings_history <- function(championship_id) {
   query <- list(
-    select = "points,budget,position,recorded_at,user_teams!inner(name,championship_id)",
+    select = "points,budget,position,team_value,recorded_at,user_teams!inner(name,championship_id)",
     "user_teams.championship_id" = paste0("eq.", championship_id),
     order = "recorded_at.asc"
   )
