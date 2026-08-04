@@ -550,21 +550,33 @@ get_lineup_from_team <- function(login, championship_id, user_team_id) {
   return(lineup)
 }
 
-# Standard Date Formatter to DD-MM-YY HH:MM
+# Vectorized Date Formatter to DD-MM-YY HH:MM
 format_table_date <- function(value) {
-  if (is.null(value) || is.na(value) || value == "") return("")
+  if (is.null(value)) return("")
+  if (all(is.na(value)) || all(value == "")) return(rep("", length(value)))
+  
   posix_time <- tryCatch({
     as.POSIXct(value, format = "%Y-%m-%dT%H:%M:%S", tz = "UTC")
   }, error = function(e) {
     as.POSIXct(value, tz = "UTC")
   })
-  return(format(posix_time, "%d-%m-%y %H:%M"))
+  
+  formatted <- format(posix_time, "%d-%m-%y %H:%M")
+  formatted[is.na(posix_time)] <- ""
+  return(formatted)
 }
 
-# Standard Currency Formatter in Euros
+# Vectorized Currency Formatter in Euros
 format_table_currency <- function(value) {
-  if (is.null(value) || is.na(value) || !is.numeric(value)) return("")
-  scales::label_currency(prefix = "", suffix = " EUR", big.mark = ".", decimal.mark = ",")(value)
+  if (is.null(value)) return("")
+  if (!is.numeric(value)) {
+    value <- suppressWarnings(as.numeric(value))
+  }
+  if (all(is.na(value))) return(rep("", length(value)))
+  
+  formatted <- scales::label_currency(prefix = "", suffix = " €", big.mark = ".", decimal.mark = ",")(value)
+  formatted[is.na(value)] <- ""
+  return(formatted)
 }
 
 get_reactable_columns_for_players <- function(table) {
