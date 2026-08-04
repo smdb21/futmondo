@@ -59,9 +59,19 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         team_logo <- NULL
         if ("team" %in% colnames(sp) && !is.na(sp$team) && sp$team != "") {
           team_image_name <- get_team_image_name(sp$team)
+          
+          logo_tag <- if (team_image_name != "") {
+            img(src = paste0(TEAM_LOGO_URL, team_image_name, ".png"), 
+                style = "height: 18px; width: auto; object-fit: contain; background: transparent;", 
+                alt = sp$team,
+                onerror = "this.style.display='none';")
+          } else {
+            NULL
+          }
+          
           team_logo <- shiny::tags$div(
             style = "margin-top: 6px; display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 13px; color: #cbd5e1;",
-            img(src = paste0(TEAM_LOGO_URL, team_image_name, ".png"), style = "height: 18px; width: auto; object-fit: contain; background: transparent;", alt = sp$team),
+            logo_tag,
             sp$team
           )
         }
