@@ -25,9 +25,10 @@ The Rivals Module provides two exported functions:
 
 Returns a `tagList` containing:
 1. A League Squad Value Evolution chart (`plotlyOutput`) showing historical valuations of all teams.
-2. A Scouting Target Selection box (`selectInput`) for choosing a rival to scout.
-3. A `uiOutput` placeholder for the financial summary cards.
-4. A nested `players_table_UI` call for the scouted player roster table.
+2. A League Financial Standings & Budget Left table (`reactableOutput`) displaying per-team finances.
+3. A Scouting Target Selection box (`selectInput`) for choosing a rival to scout.
+4. A `uiOutput` placeholder for the selected rival financial summary cards (Standings Position, Money Left, Spent on Purchases, Squad Valuation & Net Gain).
+5. A nested `players_table_UI` call for the scouted player roster and purchase breakdown.
 
 ### Usage Example
 
@@ -59,8 +60,25 @@ Returns `selected_player_RV`, a reactive supplied by the nested `players_table_S
 | Reactive Name                    | Purpose                                                              |
 |----------------------------------|----------------------------------------------------------------------|
 | `selected_rival_team_id`         | Holds the team ID chosen by the user in the dropdown selector.       |
+| `league_finances_RV`             | Calls `calculate_league_finances()` to compute per-team finances (total spent, budget left, squad valuation, net profit/loss) and logs snapshots to Supabase. Returns a list with `team_finances` and `all_purchases` data frames. |
 | `rival_financial_summary_box_RV` | Fetches financial stats via `get_user_team_info()` for the selected rival. |
 | `rival_players_table_RV`         | Fetches the full squad via `get_players_from_team()`, computes `clause_ratio`, and pipes through `translate_player_positions()`, `calculate_player_changes()`, and `unify_columns()`. |
+
+### `output$league_finances_table`
+
+Renders a `reactable` table bound to `league_finances_RV()$team_finances`. Displays the League Financial Standings & Budget Left for every team in the championship. Key columns include:
+
+| Column            | Description                                                  |
+|-------------------|--------------------------------------------------------------|
+| `teamname`        | Name of the user team.                                       |
+| `initial_budget`  | Baseline starting budget (default 300,000,000 EUR).          |
+| `total_spent`     | Sum of `buyPrice` across all players in the current roster.  |
+| `budget`          | Money Left = initial_budget - total_spent + point_bonus.     |
+| `team_value`      | Total squad valuation (sum of player `value`).               |
+| `net_profit_loss` | team_value - total_spent.                                    |
+| `squad_size`      | Number of players in the roster.                             |
+| `points`          | Championship points accumulated.                             |
+| `point_bonus`     | Points multiplied by 70,000 EUR.                             |
 
 ### Financial Summary Cards
 

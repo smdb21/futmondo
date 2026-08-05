@@ -1029,3 +1029,160 @@ get_team_image_name <- function(team) {
   team_image_name <- gsub("r\\.", "real", tolower(team_image_name))
   return(team_image_name)
 }
+
+get_user_team_moneymovements <- function(login, championship_id, user_team_id) {
+  cache_key <- paste0("moneymovements_", championship_id, "_", user_team_id)
+  get_cached_data(cache_key, {
+    payload <- list(
+      header = list(
+        token = login[["token"]],
+        userid = login[["userid"]]
+      ),
+      query = list(
+        championshipId = championship_id,
+        userteamId = user_team_id
+      ),
+      answer = list()
+    )
+    headers <- c("Content-Type" = "application/json; charset=utf-8")
+    url <- "https://api.futmondo.com/1/userteam/moneymovements"
+    print("Getting team money movements")
+    response <- POST(url, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
+    ans <- httr::content(response)
+    if (!is.null(ans) && "answer" %in% names(ans) && is.list(ans$answer)) {
+      movements <- ans$answer
+      if (length(movements) == 0) {
+        return(data.frame(
+          id = character(0), concept = character(0), type = character(0),
+          category = character(0), money = numeric(0), date = character(0),
+          stringsAsFactors = FALSE
+        ))
+      }
+      df <- lapply(movements, FUN = function(m) {
+        data.frame(
+          id = if (!is.null(m[["_id"]])) as.character(m[["_id"]]) else NA_character_,
+          concept = if (!is.null(m[["concept"]])) as.character(m[["concept"]]) else "",
+          type = if (!is.null(m[["type"]])) as.character(m[["type"]]) else "",
+          category = if (!is.null(m[["category"]])) as.character(m[["category"]]) else "",
+          money = if (!is.null(m[["money"]])) as.numeric(m[["money"]]) else 0,
+          date = if (!is.null(m[["date"]])) as.character(m[["date"]]) else "",
+          stringsAsFactors = FALSE
+        )
+      }) %>% bind_rows()
+      return(df)
+    }
+    return(data.frame(
+      id = character(0), concept = character(0), type = character(0),
+      category = character(0), money = numeric(0), date = character(0),
+      stringsAsFactors = FALSE
+    ))
+  })
+}
+
+calculate_league_finances <- function(login, championship_id, user_teams_df, initial_budget = 300000000) {
+  cache_key <- paste0("league_finances_calc_", championship_id)
+  get_cached_data(cache_key, {
+    if (is.null(user_teams_df) || nrow(user_teams_df) == 0) {
+      return(list(
+        team_finances = data.frame(
+          teamid = character(0), teamname = character(0), initial_budget = numeric(0),
+          total_spent = numeric(0), budget = numeric(0), team_value = numeric(0),
+          net_profit_loss = numeric(0), squad_size = numeric(0), points = numeric(0),
+          point_bonus = numeric(0), stringsAsFactors = FALSE
+        ),
+        all_purchases = data.frame()
+      ))
+    }
+    
+    finances_list <- list()
+    purchases_list <- list()
+    
+    for (i in seq_len(nrow(user_teams_df))) {
+      row <- user_teams_df[i, ]
+      tid <- if ("teamid" %in% colnames(row)) row$teamid else row$id
+      tname <- if ("teamname" %in% colnames(row)) row$teamname else row$name
+      tpoints <- if ("points" %in% colnames(row)) as.numeric(row$points) else 0
+      
+      # Fetch squad roster for this user team
+      roster <- tryCatch({
+        get_players_from_team(login = login, championship_id = championship_id, user_team_id = tid, teams = user_teams_df)
+      }, error = function(e) {
+        print(paste0("[Finances] Error fetching roster for team ", tname, ": ", e$message))
+        NULL
+      })
+      
+      total_spent <- 0
+      team_value <- 0
+      squad_size <- 0
+      
+      if (!is.null(roster) && nrow(roster) > 0) {
+        squad_size <- nrow(roster)
+        if ("buyPrice" %in% colnames(roster)) {
+          total_spent <- sum(suppressWarnings(as.numeric(roster$buyPrice)), na.rm = TRUE)
+        }
+        if ("value" %in% colnames(roster)) {
+          team_value <- sum(suppressWarnings(as.numeric(roster$value)), na.rm = TRUE)
+        }
+        
+        # Build purchase breakdown for this team
+        roster_purchases <- roster
+        roster_purchases$owner_teamid <- tid
+        roster_purchases$owner_teamname <- tname
+        if (!"buyPrice" %in% colnames(roster_purchases)) roster_purchases$buyPrice <- 0
+        if (!"value" %in% colnames(roster_purchases)) roster_purchases$value <- 0
+        roster_purchases$net_gain_loss <- roster_purchases$value - roster_purchases$buyPrice
+        purchases_list[[length(purchases_list) + 1]] <- roster_purchases
+      }
+      
+      # Point bonus calculation (70000 EUR per point)
+      point_bonus <- tpoints * 70000
+      
+      # Money Left = Initial Budget - Total Spent + Point Bonus
+      calc_money_left <- initial_budget - total_spent + point_bonus
+      
+      # If get_user_team_info provides an explicit budget for this team, use it if valid
+      actual_info <- tryCatch({
+        get_user_team_info(login = login, championship_id = championship_id, user_team_id = tid)
+      }, error = function(e) NULL)
+      
+      final_budget <- calc_money_left
+      if (!is.null(actual_info) && !is.null(actual_info$budget) && is.numeric(actual_info$budget) && actual_info$budget > 0) {
+        final_budget <- actual_info$budget
+      }
+      
+      if (!is.null(actual_info) && !is.null(actual_info$teamValue) && is.numeric(actual_info$teamValue) && actual_info$teamValue > 0) {
+        team_value <- actual_info$teamValue
+      }
+      
+      finances_list[[length(finances_list) + 1]] <- data.frame(
+        teamid = as.character(tid),
+        teamname = as.character(tname),
+        initial_budget = as.numeric(initial_budget),
+        total_spent = as.numeric(total_spent),
+        budget = as.numeric(final_budget),
+        team_value = as.numeric(team_value),
+        net_profit_loss = as.numeric(team_value - total_spent),
+        squad_size = as.numeric(squad_size),
+        points = as.numeric(tpoints),
+        point_bonus = as.numeric(point_bonus),
+        stringsAsFactors = FALSE
+      )
+    }
+    
+    finances_df <- bind_rows(finances_list)
+    purchases_df <- if (length(purchases_list) > 0) bind_rows(purchases_list) else data.frame()
+    
+    # Sync calculated financial standings to Supabase
+    tryCatch({
+      sync_user_teams_to_supabase(finances_df, championship_id)
+      log_user_team_history(finances_df)
+    }, error = function(e) {
+      print(paste0("[Finances] Supabase sync warning: ", e$message))
+    })
+    
+    return(list(
+      team_finances = finances_df,
+      all_purchases = purchases_df
+    ))
+  }, timeout_sec = 300)
+}

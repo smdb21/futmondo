@@ -127,7 +127,7 @@ log_user_team_history <- function(teams_df) {
     points = if ("points" %in% colnames(teams_df)) as.integer(teams_df$points) else 0,
     budget = if ("budget" %in% colnames(teams_df)) as.numeric(teams_df$budget) else 0,
     position = if ("position" %in% colnames(teams_df)) as.integer(teams_df$position) else NA_integer_,
-    team_value = if ("teamValue" %in% colnames(teams_df)) as.numeric(teams_df$teamValue) else 0,
+    team_value = if ("team_value" %in% colnames(teams_df)) as.numeric(teams_df$team_value) else if ("teamValue" %in% colnames(teams_df)) as.numeric(teams_df$teamValue) else 0,
     stringsAsFactors = FALSE
   )
 
@@ -231,4 +231,23 @@ get_user_teams_finances <- function(championship_id) {
     select = "id,name,budget,points,position"
   )
   supabase_get("user_teams", query)
+}
+
+get_league_finances_history <- function(championship_id) {
+  query <- list(
+    select = "budget,team_value,points,position,recorded_at,user_teams!inner(name,championship_id)",
+    "user_teams.championship_id" = paste0("eq.", championship_id),
+    order = "recorded_at.asc"
+  )
+  
+  df <- supabase_get("user_team_history", query)
+  if (!is.null(df) && nrow(df) > 0 && "user_teams" %in% colnames(df)) {
+    if (is.list(df$user_teams) || is.data.frame(df$user_teams)) {
+      df$teamname <- df$user_teams$name
+    } else {
+      df$teamname <- "Unknown Team"
+    }
+    df$user_teams <- NULL
+  }
+  return(df)
 }

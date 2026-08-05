@@ -116,30 +116,49 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         # ---- Build action buttons ----
         action_buttons <- tagList()
 
-        # "Bid on Market" button: show when player has a market_price
-        if ("market_price" %in% colnames(sp) && !is.na(sp$market_price) && !is.null(sp$market_price)) {
-          action_buttons <- tagList(
-            action_buttons,
-            actionButton(
-              ns("btn_bid_market"),
-              label = tagList(icon("shopping-cart"), " Bid on Market"),
-              class = "btn btn-buy-market"
-            )
-          )
-        }
+        current_user_team <- if (!is.null(user_team_id())) user_team_id() else NULL
+        player_owner_team <- if ("user_team_id" %in% colnames(sp)) sp$user_team_id else NULL
+        is_own_player <- (!is.null(current_user_team) && !is.null(player_owner_team) && current_user_team == player_owner_team)
 
-        # "Pay Clause" button: show when player has an active release clause
-        if ("clause_price" %in% colnames(sp) && !is.na(sp$clause_price) && !is.null(sp$clause_price) &&
-            ("isClause" %in% colnames(sp) && isTRUE(sp$isClause))) {
-          clause_label <- paste0(" Pay Clause: ", format_currency(sp$clause_price))
-          action_buttons <- tagList(
-            action_buttons,
-            actionButton(
-              ns("btn_pay_clause"),
-              label = tagList(icon("fire"), clause_label),
-              class = "btn btn-buy-clause"
+        if (!is_own_player) {
+          # Option 1: "Make Market Offer" button when player is listed on market
+          if ("market_price" %in% colnames(sp) && !is.na(sp$market_price) && !is.null(sp$market_price) && sp$market_price > 0) {
+            action_buttons <- tagList(
+              action_buttons,
+              actionButton(
+                ns("btn_bid_market"),
+                label = tagList(icon("hand-holding-dollar"), " Make Market Offer"),
+                class = "btn btn-buy-market"
+              )
             )
-          )
+          }
+
+          # Option 2: "Offer to Owner" button when player is owned by a rival user team
+          if (!is.null(player_owner_team) && player_owner_team != "" && (!("market_price" %in% colnames(sp)) || is.na(sp$market_price) || is.null(sp$market_price))) {
+            owner_name <- if ("userTeam" %in% colnames(sp) && !is.na(sp$userTeam)) sp$userTeam else if ("teamname" %in% colnames(sp) && !is.na(sp$teamname)) sp$teamname else "Owner"
+            action_buttons <- tagList(
+              action_buttons,
+              actionButton(
+                ns("btn_offer_owner"),
+                label = tagList(icon("hand-holding-dollar"), paste0(" Offer to ", owner_name)),
+                class = "btn btn-offer-money"
+              )
+            )
+          }
+
+          # Option 3: "Buy Release Clause" button when player has active release clause
+          if ("clause_price" %in% colnames(sp) && !is.na(sp$clause_price) && !is.null(sp$clause_price) && sp$clause_price > 0 &&
+              ("isClause" %in% colnames(sp) && isTRUE(sp$isClause))) {
+            clause_label <- paste0(" Buy Clause: ", format_currency(sp$clause_price))
+            action_buttons <- tagList(
+              action_buttons,
+              actionButton(
+                ns("btn_pay_clause"),
+                label = tagList(icon("bolt"), clause_label),
+                class = "btn btn-buy-clause"
+              )
+            )
+          }
         }
 
         output$action_buttons <- renderUI(action_buttons)
@@ -158,40 +177,40 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       removeUI(selector = paste0("#", ns("action_buttons_container"), " > *"))
     })
 
-    # ---- Bid on Market: modal ----
+    # ---- Option 1: Market Offer Modal ----
     observeEvent(input$btn_bid_market, {
       sp <- selected_player()
       req(sp)
       market_price <- sp$market_price
 
       showModal(modalDialog(
-        title = tagList(icon("shopping-cart"), " Place Bid on Market"),
+        title = tagList(icon("hand-holding-dollar"), " Place Market Offer"),
         p(strong(sp$name)),
         p("Current market price: ", strong(format_currency(market_price))),
         numericInput(
           ns("bid_amount"),
-          label = "Your bid amount:",
+          label = "Your offer amount (EUR):",
           value = market_price,
           min = 1,
-          step = 1
+          step = 10000
         ),
         footer = tagList(
           modalButton(),
-          actionButton(ns("submit_bid"), "Submit Bid", class = "btn btn-buy-market")
+          actionButton(ns("submit_bid"), "Submit Market Offer", class = "btn btn-buy-market")
         ),
         easyClose = TRUE,
         size = "s"
       ))
     })
 
-    # ---- Submit Bid ----
+    # ---- Submit Market Offer ----
     observeEvent(input$submit_bid, {
       sp <- selected_player()
       req(sp, login_token(), championship_id(), user_team_id())
 
       bid_amount <- input$bid_amount
       if (is.null(bid_amount) || bid_amount <= 0) {
-        shiny::showNotification("Please enter a valid bid amount.", type = "warning")
+        shiny::showNotification("Please enter a valid offer amount.", type = "warning")
         return()
       }
 
@@ -228,35 +247,122 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           print(paste0("[Supabase] Bid log warning: ", e$message))
         })
         shiny::showNotification(
-          paste0("Bid of ", format_currency(bid_amount), " placed successfully on ", sp$name, "!"),
+          paste0("Market offer of ", format_currency(bid_amount), " submitted successfully for ", sp$name, "!"),
           type = "message",
           duration = 5
         )
         clear_api_cache()
       } else {
         shiny::showNotification(
-          "Bid failed. Please try again.",
+          "Offer failed. Please verify your funds and try again.",
           type = "error",
           duration = 5
         )
       }
     })
 
-    # ---- Pay Clause: modal ----
+    # ---- Option 2: Direct Offer to Owner Modal ----
+    observeEvent(input$btn_offer_owner, {
+      sp <- selected_player()
+      req(sp)
+      default_offer <- if ("value" %in% colnames(sp) && !is.na(sp$value) && sp$value > 0) sp$value else 1000000
+      owner_name <- if ("userTeam" %in% colnames(sp) && !is.na(sp$userTeam)) sp$userTeam else if ("teamname" %in% colnames(sp) && !is.na(sp$teamname)) sp$teamname else "Owner"
+      clause_info <- if ("clause_price" %in% colnames(sp) && !is.na(sp$clause_price) && sp$clause_price > 0) paste0(" (Release Clause: ", format_currency(sp$clause_price), ")") else ""
+
+      showModal(modalDialog(
+        title = tagList(icon("hand-holding-dollar"), paste0(" Offer Money to ", owner_name)),
+        p(strong(sp$name), clause_info),
+        p("Current Market Valuation: ", strong(format_currency(default_offer))),
+        numericInput(
+          ns("owner_offer_amount"),
+          label = "Your purchase offer amount (EUR):",
+          value = default_offer,
+          min = 1,
+          step = 10000
+        ),
+        p(style = "color: #64748b; font-size: 12px;", "This offer will be submitted to the player owner and tracked in market transaction history."),
+        footer = tagList(
+          modalButton(),
+          actionButton(ns("submit_owner_offer"), "Submit Offer", class = "btn btn-offer-money")
+        ),
+        easyClose = TRUE,
+        size = "s"
+      ))
+    })
+
+    # ---- Submit Direct Offer to Owner ----
+    observeEvent(input$submit_owner_offer, {
+      sp <- selected_player()
+      req(sp, login_token(), championship_id(), user_team_id())
+
+      offer_amount <- input$owner_offer_amount
+      if (is.null(offer_amount) || offer_amount <= 0) {
+        shiny::showNotification("Please enter a valid offer amount.", type = "warning")
+        return()
+      }
+
+      login <- login_token()
+      champ_id <- championship_id()
+      team_id <- user_team_id()
+
+      player_id <- sp$id
+      player_slug <- if ("slug" %in% colnames(sp) && !is.na(sp$slug)) sp$slug else sp$name
+
+      success <- buy_clause(
+        login = login,
+        championship_id = champ_id,
+        team_id = team_id,
+        player_id = player_id,
+        player_slug = player_slug,
+        price = offer_amount,
+        isClause = FALSE
+      )
+
+      removeModal()
+
+      if (success) {
+        tryCatch({
+          log_market_transaction(
+            player_id = player_id,
+            championship_id = champ_id,
+            buyer_team_id = team_id,
+            seller_team_id = if ("user_team_id" %in% colnames(sp)) sp$user_team_id else NULL,
+            price = offer_amount,
+            is_clause = FALSE
+          )
+        }, error = function(e) {
+          print(paste0("[Supabase] Direct offer log warning: ", e$message))
+        })
+        shiny::showNotification(
+          paste0("Direct offer of ", format_currency(offer_amount), " submitted successfully for ", sp$name, "!"),
+          type = "message",
+          duration = 5
+        )
+        clear_api_cache()
+      } else {
+        shiny::showNotification(
+          "Offer failed. Please verify your funds and try again.",
+          type = "error",
+          duration = 5
+        )
+      }
+    })
+
+    # ---- Option 3: Release Clause Buyout Modal ----
     observeEvent(input$btn_pay_clause, {
       sp <- selected_player()
       req(sp)
       clause_price <- sp$clause_price
 
       showModal(modalDialog(
-        title = tagList(icon("fire"), " Confirm Clause Purchase"),
+        title = tagList(icon("bolt"), " Confirm Release Clause Buyout"),
         p(strong(sp$name)),
-        p("This will purchase the player for their release clause."),
+        p("This will instantly purchase the player for their official release clause."),
         p("Clause price: ", strong(format_currency(clause_price))),
-        p(style = "color: #f59e0b; font-size: 13px;", "Are you sure you want to proceed?"),
+        p(style = "color: #ef4444; font-size: 13px; font-weight: 600;", "Are you sure you want to trigger this clause buyout?"),
         footer = tagList(
           modalButton(),
-          actionButton(ns("submit_clause"), "Confirm Purchase", class = "btn btn-buy-clause")
+          actionButton(ns("submit_clause"), "Confirm Clause Buyout", class = "btn btn-buy-clause")
         ),
         easyClose = TRUE,
         size = "s"
@@ -303,14 +409,14 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           print(paste0("[Supabase] Clause log warning: ", e$message))
         })
         shiny::showNotification(
-          paste0("Successfully purchased ", sp$name, " for ", format_currency(clause_price), "!"),
+          paste0("Release clause buyout of ", format_currency(clause_price), " executed successfully for ", sp$name, "!"),
           type = "message",
           duration = 5
         )
         clear_api_cache()
       } else {
         shiny::showNotification(
-          "Clause purchase failed. Please try again.",
+          "Clause buyout failed. Please verify your funds and try again.",
           type = "error",
           duration = 5
         )

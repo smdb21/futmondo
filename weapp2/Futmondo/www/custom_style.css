@@ -339,6 +339,23 @@ body, .content-wrapper, .right-side {
     box-shadow: 0 6px 12px -1px rgba(245, 158, 11, 0.3) !important;
 }
 
+.btn-offer-money {
+    background-color: #059669 !important; /* Emerald green */
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    padding: 10px 24px !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 4px 6px -1px rgba(5, 150, 105, 0.2) !important;
+    margin: 5px;
+}
+.btn-offer-money:hover {
+    background-color: #047857 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 12px -1px rgba(5, 150, 105, 0.3) !important;
+}
+
 /* Prevent full body horizontal scrolling */
 body, .wrapper {
     overflow-x: hidden !important;
