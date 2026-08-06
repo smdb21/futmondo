@@ -1131,6 +1131,16 @@ calculate_league_finances <- function(login, championship_id, user_teams_df, ini
         if (!"buyPrice" %in% colnames(roster_purchases)) roster_purchases$buyPrice <- 0
         if (!"value" %in% colnames(roster_purchases)) roster_purchases$value <- 0
         roster_purchases$net_gain_loss <- roster_purchases$value - roster_purchases$buyPrice
+        
+        # Standardize column data types across all team rosters to prevent bind_rows type mismatch
+        char_cols <- c("id", "slug", "name", "team", "role", "role2", "photo", "teamId", "status", "owner_teamid", "owner_teamname", "logo")
+        for (col in colnames(roster_purchases)) {
+          if (col %in% char_cols) {
+            roster_purchases[[col]] <- as.character(roster_purchases[[col]])
+          } else if (is.numeric(roster_purchases[[col]]) || is.integer(roster_purchases[[col]])) {
+            roster_purchases[[col]] <- as.numeric(roster_purchases[[col]])
+          }
+        }
         purchases_list[[length(purchases_list) + 1]] <- roster_purchases
       }
       
@@ -1170,7 +1180,11 @@ calculate_league_finances <- function(login, championship_id, user_teams_df, ini
     }
     
     finances_df <- bind_rows(finances_list)
-    purchases_df <- if (length(purchases_list) > 0) bind_rows(purchases_list) else data.frame()
+    purchases_df <- if (length(purchases_list) > 0) {
+      data.table::rbindlist(purchases_list, fill = TRUE) %>% as.data.frame()
+    } else {
+      data.frame()
+    }
     
     # Sync calculated financial standings to Supabase
     tryCatch({
