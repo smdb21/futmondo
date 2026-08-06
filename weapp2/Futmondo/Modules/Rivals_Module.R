@@ -43,12 +43,14 @@ rivals_UI <- function(id) {
                width = 12,
                status = "primary",
                solidHeader = TRUE,
-               selectInput(
-                 inputId = ns("rival_team_select"),
-                 label = "Select League Team to Scout:",
-                 choices = NULL,
-                 width = "100%"
-               )
+selectInput(
+                  inputId = ns("rival_team_select"),
+                  label = "Select League Team to Scout:",
+                  choices = NULL,
+                  width = "100%",
+                  selectize = TRUE,
+                  options = list(dropdownParent = "body")
+                )
              )
       )
     ),

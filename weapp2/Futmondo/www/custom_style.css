@@ -70,8 +70,14 @@ body, .content-wrapper, .right-side {
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03), 0 2px 4px -1px rgba(0, 0, 0, 0.02), 0 10px 15px -3px rgba(0, 0, 0, 0.03) !important;
     background: #ffffff !important;
     margin-bottom: 24px !important;
-    overflow: hidden;
+    overflow: visible !important;
 }
+
+.box.box-solid > .box-header {
+    border-top-left-radius: 12px !important;
+    border-top-right-radius: 12px !important;
+}
+
 .box-header {
     border-bottom: 1px solid #f1f5f9 !important;
     padding: 16px 20px !important;
@@ -437,4 +443,16 @@ body, .wrapper {
         width: 100% !important;
         display: block !important;
     }
+}
+
+/* Selectize Dropdown Premium Elevation & Overlay */
+.selectize-dropdown {
+    z-index: 10000 !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+    border-radius: 8px !important;
+    border: 1px solid #cbd5e1 !important;
+}
+
+.selectize-input {
+    border-radius: 8px !important;
 }
