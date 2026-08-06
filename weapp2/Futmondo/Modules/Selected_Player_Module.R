@@ -55,6 +55,16 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
+    # ---- Safe reactive value extractor ----
+    get_reactive_val <- function(x) {
+      if (is.null(x)) return(NULL)
+      if (is.reactive(x) || is.function(x)) {
+        tryCatch(x(), error = function(e) NULL)
+      } else {
+        x
+      }
+    }
+
     # ---- Main observer: populate box + action buttons ----
     observeEvent(
       {
@@ -116,7 +126,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         # ---- Build action buttons ----
         action_buttons <- tagList()
 
-        current_user_team <- if (!is.null(user_team_id())) user_team_id() else NULL
+        current_user_team <- get_reactive_val(user_team_id)
         player_owner_team <- if ("user_team_id" %in% colnames(sp)) sp$user_team_id else NULL
         is_own_player <- (!is.null(current_user_team) && !is.null(player_owner_team) && current_user_team == player_owner_team)
 
@@ -206,17 +216,10 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     # ---- Submit Market Offer ----
     observeEvent(input$submit_bid, {
       sp <- selected_player()
-      req(sp, login_token(), championship_id(), user_team_id())
-
-      bid_amount <- input$bid_amount
-      if (is.null(bid_amount) || bid_amount <= 0) {
-        shiny::showNotification("Please enter a valid offer amount.", type = "warning")
-        return()
-      }
-
-      login <- login_token()
-      champ_id <- championship_id()
-      team_id <- user_team_id()
+      login <- get_reactive_val(login_token)
+      champ_id <- get_reactive_val(championship_id)
+      team_id <- get_reactive_val(user_team_id)
+      req(sp, login, champ_id, team_id)
 
       player_id <- sp$id
       player_slug <- if ("slug" %in% colnames(sp) && !is.na(sp$slug)) sp$slug else sp$name
@@ -293,17 +296,10 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     # ---- Submit Direct Offer to Owner ----
     observeEvent(input$submit_owner_offer, {
       sp <- selected_player()
-      req(sp, login_token(), championship_id(), user_team_id())
-
-      offer_amount <- input$owner_offer_amount
-      if (is.null(offer_amount) || offer_amount <= 0) {
-        shiny::showNotification("Please enter a valid offer amount.", type = "warning")
-        return()
-      }
-
-      login <- login_token()
-      champ_id <- championship_id()
-      team_id <- user_team_id()
+      login <- get_reactive_val(login_token)
+      champ_id <- get_reactive_val(championship_id)
+      team_id <- get_reactive_val(user_team_id)
+      req(sp, login, champ_id, team_id)
 
       player_id <- sp$id
       player_slug <- if ("slug" %in% colnames(sp) && !is.na(sp$slug)) sp$slug else sp$name
@@ -372,13 +368,10 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     # ---- Submit Clause Purchase ----
     observeEvent(input$submit_clause, {
       sp <- selected_player()
-      req(sp, login_token(), championship_id(), user_team_id())
-
-      clause_price <- sp$clause_price
-
-      login <- login_token()
-      champ_id <- championship_id()
-      team_id <- user_team_id()
+      login <- get_reactive_val(login_token)
+      champ_id <- get_reactive_val(championship_id)
+      team_id <- get_reactive_val(user_team_id)
+      req(sp, login, champ_id, team_id)
 
       player_id <- sp$id
       player_slug <- if ("slug" %in% colnames(sp) && !is.na(sp$slug)) sp$slug else sp$name
@@ -428,7 +421,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       sp <- selected_player()
       req(sp)
 
-      champ_id <- if (!is.null(championship_id)) championship_id() else NULL
+      champ_id <- get_reactive_val(championship_id)
       player_id <- sp$id
 
       history_df <- NULL
