@@ -455,24 +455,28 @@ remove_json_children <- function(json, element_name, collapse_children = FALSE) 
 }
 
 translate_player_positions <- function(players_df) {
+  if (is.null(players_df) || nrow(players_df) == 0) return(players_df)
+
   position_map <- data.frame(
     role_to = c("Goalkeeper", "Defender", "Midfielder", "Forward"),
-    role_from = c("portero", "defensa", "centrocampista", "delantero")
+    role_from = c("portero", "defensa", "centrocampista", "delantero"),
+    stringsAsFactors = FALSE
   )
-  tryCatch(
-    {
-      players_df$role <- position_map$role_to[match(players_df$role, position_map$role_from)]
-    },
-    warning = function(w) {
-      print(paste0("Warning in translating player positions: ", w))
-    },
-    error = function(e) {
-      warning(paste0("Error in translating player positions: ", e))
-    }
-  )
-  if ("role2" %in% colnames(players_df)) {
-    players_df$role2 <- position_map$role_to[match(players_df$role2, position_map$role_from)]
+
+  if ("role" %in% colnames(players_df)) {
+    translated_role <- position_map$role_to[match(players_df$role, position_map$role_from)]
+    players_df$role <- ifelse(!is.na(translated_role), translated_role, players_df$role)
   }
+
+  if ("role2" %in% colnames(players_df)) {
+    translated_role2 <- position_map$role_to[match(players_df$role2, position_map$role_from)]
+    players_df$role2 <- ifelse(!is.na(translated_role2), translated_role2, players_df$role2)
+
+    # Mutate role = paste0(role, ", ", role2) when secondary position exists
+    has_role2 <- !is.na(players_df$role2) & players_df$role2 != "" & players_df$role2 != "NA" & players_df$role2 != players_df$role
+    players_df$role <- ifelse(has_role2, paste0(players_df$role, ", ", players_df$role2), players_df$role)
+  }
+
   return(players_df)
 }
 
@@ -788,12 +792,15 @@ get_reactable_columns_for_players <- function(table) {
     columns[["role"]] <- colDef(
       name = "Position",
       align = "center",
-      cell = function(value, index) {
+      cell = function(value) {
         if (is.null(value) || is.na(value) || value == "" || value == "NA") return("")
 
-        get_badge <- function(pos) {
-          if (is.null(pos) || is.na(pos) || pos == "" || pos == "NA") return(NULL)
-          pos_clean <- trimws(as.character(pos))
+        # Split multiple positions by comma or slash
+        roles <- unlist(strsplit(as.character(value), "[,/]+"))
+
+        badges <- lapply(roles, function(pos) {
+          pos_clean <- trimws(pos)
+          if (pos_clean == "" || pos_clean == "NA") return(NULL)
 
           class_name <- if (pos_clean %in% c("Goalkeeper", "portero", "GK", "P")) {
             "badge-gk"
@@ -810,25 +817,18 @@ get_reactable_columns_for_players <- function(table) {
           display_name <- if (pos_clean %in% c("portero", "GK", "P")) "Goalkeeper" else if (pos_clean %in% c("defensa", "DF", "D")) "Defender" else if (pos_clean %in% c("centrocampista", "MD", "M")) "Midfielder" else if (pos_clean %in% c("delantero", "FW", "F")) "Forward" else pos_clean
 
           shiny::tags$span(class = class_name, display_name)
-        }
+        })
 
-        badge1 <- get_badge(value)
-        badge2 <- NULL
+        badges <- badges[!sapply(badges, is.null)]
 
-        if ("role2" %in% colnames(table)) {
-          role2_val <- as.character(table$role2[index])
-          if (length(role2_val) > 0 && !is.na(role2_val) && role2_val != "" && role2_val != "NA" && role2_val != as.character(value)) {
-            badge2 <- get_badge(role2_val)
-          }
-        }
-
-        if (is.null(badge2)) {
-          badge1
+        if (length(badges) == 0) {
+          ""
+        } else if (length(badges) == 1) {
+          badges[[1]]
         } else {
           shiny::tags$div(
             style = "display: flex; justify-content: center; align-items: center; gap: 4px; flex-wrap: nowrap;",
-            badge1,
-            badge2
+            badges
           )
         }
       }
