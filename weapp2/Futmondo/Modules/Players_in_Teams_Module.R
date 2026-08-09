@@ -10,7 +10,8 @@ players_in_teams_UI <- function(id) {
       filter_by_position = TRUE,
       filter_by_team = FALSE,
       filter_by_is_favorite = FALSE,
-      filter_by_is_from_futmondo = FALSE
+      filter_by_is_from_futmondo = FALSE,
+      show_position_breakdown = TRUE
     )
   )
 }

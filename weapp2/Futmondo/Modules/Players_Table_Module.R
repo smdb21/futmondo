@@ -11,7 +11,8 @@ players_table_UI <- function(id, box_title = NULL,
                              filter_by_active_clause = TRUE,
                              filter_by_is_favorite = TRUE,
                              filter_by_is_from_futmondo = TRUE,
-                             filter_by_players_with_bid = FALSE) {
+                             filter_by_players_with_bid = FALSE,
+                              show_position_breakdown = FALSE) {
   ns <- NS(id)
   tagList(
     shinydashboardPlus::box(
@@ -21,30 +22,52 @@ players_table_UI <- function(id, box_title = NULL,
       title = box_title,
 
       # Top Filter Bar Grid
-      fluidRow(
-        style = "background: #f8fafc; padding: 15px; border-radius: 8px; margin: 0 0 20px 0; border: 1px solid #e2e8f0;",
-
-        # Primary Select Filters
-        if (filter_by_position) {
-          column(width = 3, selectInput(inputId = ns("position_filter"), label = "Position", choices = c("All", "Goalkeeper", "Defender", "Midfielder", "Forward"), selected = "All", width = "100%"))
-        },
-        if (filter_by_team) {
-          column(width = 3, selectInput(inputId = ns("team_filter"), label = "User Team Owner", choices = c("All"), width = "100%"))
-        },
-
-        # Valuation Range Numeric Filters
-        if (filter_by_value) {
-          tagList(
-            column(width = 2, numericInput(inputId = ns("min_value_filter"), label = "Min Val (M)", min = 0, max = 1000, value = 0, step = 10, width = "100%")),
-            column(width = 2, numericInput(inputId = ns("max_value_filter"), label = "Max Val (M)", min = 0, max = 1000, value = 1000, step = 10, width = "100%"))
+      if (show_position_breakdown) {
+        fluidRow(
+          column(width = 7,
+                 fluidRow(
+                   style = "background: #f8fafc; padding: 15px; border-radius: 8px; margin: 0 0 20px 0; border: 1px solid #e2e8f0;",
+                   if (filter_by_position) {
+                     column(width = 4, selectInput(inputId = ns("position_filter"), label = "Position", choices = c("All", "Goalkeeper", "Defender", "Midfielder", "Forward"), selected = "All", width = "100%"))
+                   },
+                   if (filter_by_team) {
+                     column(width = 4, selectInput(inputId = ns("team_filter"), label = "User Team Owner", choices = c("All"), width = "100%"))
+                   },
+                   if (filter_by_value) {
+                     tagList(
+                       column(width = 4, numericInput(inputId = ns("min_value_filter"), label = "Min Val (M)", min = 0, max = 1000, value = 0, step = 10, width = "100%")),
+                       column(width = 4, numericInput(inputId = ns("max_value_filter"), label = "Max Val (M)", min = 0, max = 1000, value = 1000, step = 10, width = "100%"))
+                     )
+                   },
+                   if (filter_by_change_value) {
+                     column(width = 4, numericInput(inputId = ns("change_value_filter"), label = "Min Trend (M)", min = 0, max = 1, value = default_minimum_change_value, step = 0.05, width = "100%"))
+                   }
+                 )
+          ),
+          column(width = 5,
+                 uiOutput(ns("position_breakdown_ui"))
           )
-        },
-
-        # Change Trend Filter
-        if (filter_by_change_value) {
-          column(width = 2, numericInput(inputId = ns("change_value_filter"), label = "Min Trend (M)", min = 0, max = 1, value = default_minimum_change_value, step = 0.05, width = "100%"))
-        }
-      ),
+        )
+      } else {
+        fluidRow(
+          style = "background: #f8fafc; padding: 15px; border-radius: 8px; margin: 0 0 20px 0; border: 1px solid #e2e8f0;",
+          if (filter_by_position) {
+            column(width = 3, selectInput(inputId = ns("position_filter"), label = "Position", choices = c("All", "Goalkeeper", "Defender", "Midfielder", "Forward"), selected = "All", width = "100%"))
+          },
+          if (filter_by_team) {
+            column(width = 3, selectInput(inputId = ns("team_filter"), label = "User Team Owner", choices = c("All"), width = "100%"))
+          },
+          if (filter_by_value) {
+            tagList(
+              column(width = 2, numericInput(inputId = ns("min_value_filter"), label = "Min Val (M)", min = 0, max = 1000, value = 0, step = 10, width = "100%")),
+              column(width = 2, numericInput(inputId = ns("max_value_filter"), label = "Max Val (M)", min = 0, max = 1000, value = 1000, step = 10, width = "100%"))
+            )
+          },
+          if (filter_by_change_value) {
+            column(width = 2, numericInput(inputId = ns("change_value_filter"), label = "Min Trend (M)", min = 0, max = 1, value = default_minimum_change_value, step = 0.05, width = "100%"))
+          }
+        )
+      },
 
       # Checkboxes Inline Grid
       if (filter_by_active_clause || filter_by_is_favorite || filter_by_is_from_futmondo || filter_by_players_with_bid) {
@@ -248,6 +271,32 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       )
     })
     
+    # Position Breakdown UI Renderer
+    output$position_breakdown_ui <- renderUI({
+      df <- players_table_RV()
+      if (is.null(df) || nrow(df) == 0) return(NULL)
+
+      gk <- sum(df$role == "Goalkeeper" | df$role2 == "Goalkeeper" | df$role == "portero" | df$role2 == "portero", na.rm = TRUE)
+      df_cnt <- sum(df$role == "Defender" | df$role2 == "Defender" | df$role == "defensa" | df$role2 == "defensa", na.rm = TRUE)
+      md <- sum(df$role == "Midfielder" | df$role2 == "Midfielder" | df$role == "centrocampista" | df$role2 == "centrocampista", na.rm = TRUE)
+      fw <- sum(df$role == "Forward" | df$role2 == "Forward" | df$role == "delantero" | df$role2 == "delantero", na.rm = TRUE)
+      total_squad <- nrow(df) # Exact actual player count (distinct players)
+
+      div(
+        class = "squad-breakdown-card",
+        div(class = "squad-breakdown-title",
+            span(icon("users"), " Squad Position Breakdown"),
+            span(class = "badge", style = "background-color: #334155; color: #fff; font-size: 11px; padding: 3px 8px;", paste0("Total: ", total_squad, " Players"))
+        ),
+        div(style = "display: flex; gap: 8px; flex-wrap: wrap; justify-content: space-between; margin-top: 8px;",
+            span(class = "badge-gk squad-pos-badge", paste0("Goalkeepers: ", gk)),
+            span(class = "badge-df squad-pos-badge", paste0("Defenders: ", df_cnt)),
+            span(class = "badge-md squad-pos-badge", paste0("Midfielders: ", md)),
+            span(class = "badge-fw squad-pos-badge", paste0("Forwards: ", fw))
+        )
+      )
+    })
+
     return(selected_player_RV)
   })
 }
