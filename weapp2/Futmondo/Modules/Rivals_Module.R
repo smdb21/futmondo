@@ -20,36 +20,19 @@ rivals_UI <- function(id) {
       )
     ),
 
-    # League Financial Standings Overview
+# League Financial Standings Overview & Scouting Target Selection
     fluidRow(
       column(width = 12,
              box(
-               title = "League Financial Standings & Budget Left",
+               title = "League Financial Standings & Scouting Target Selection",
                width = 12,
                status = "primary",
                solidHeader = TRUE,
                collapsible = TRUE,
                collapsed = FALSE,
+               p(style = "color: #64748b; font-size: 13px; font-weight: 500; margin-bottom: 12px;",
+                 icon("hand-pointer"), " Select a user team from the table below to scout their squad and financial details."),
                reactable::reactableOutput(ns("league_finances_table"))
-             )
-      )
-    ),
-
-    # Scouting Target Selection row
-    fluidRow(
-      column(width = 12,
-             box(
-               title = "Scouting Target Selection",
-               width = 12,
-               status = "primary",
-               solidHeader = TRUE,
-selectizeInput(
-                   inputId = ns("rival_team_select"),
-                   label = "Select League Team to Scout:",
-                   choices = NULL,
-                   width = "100%",
-                   options = list(dropdownParent = "body")
-                 )
              )
       )
     ),
@@ -77,22 +60,25 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
     ns <- session$ns
     
     # Observers ----
-    
-    # Update Rival Team drop-down list from user_teams_RV
-    observeEvent(user_teams_RV(), {
-      teams <- user_teams_RV()
-      req(teams)
-      
-      # Map team IDs to team names for choices selection
-      choices <- setNames(teams$teamid, teams$teamname)
-      updateSelectInput(session, "rival_team_select", choices = choices)
-    })
-    
+
     # Reactives ----
-    
-    # Selected rival team ID
+
+    # Selected rival team ID derived from table selection
     selected_rival_team_id <- reactive({
-      input$rival_team_select
+      finances_data <- league_finances_RV()
+      req(finances_data, finances_data$team_finances)
+      df <- finances_data$team_finances
+      if (is.null(df) || nrow(df) == 0) return(NULL)
+
+      # Read selected row index from reactable state
+      selected_idx <- getReactableState("league_finances_table", "selected", session = session)
+
+      if (!is.null(selected_idx) && is.numeric(selected_idx) && selected_idx >= 1 && selected_idx <= nrow(df)) {
+        return(as.character(df$teamid[selected_idx]))
+      } else {
+        # Default to first team if no selection is active
+        return(as.character(df$teamid[1]))
+      }
     })
     
     # Detailed financial statistics of selected rival
@@ -192,6 +178,9 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
         striped = TRUE,
         highlight = TRUE,
         bordered = FALSE,
+        selection = "single",
+        onClick = "select",
+        defaultSelected = 1,
         defaultPageSize = 10,
         columns = list(
           Team = colDef(name = "User Team", align = "left", style = list(fontWeight = "600", color = "#0f172a")),
