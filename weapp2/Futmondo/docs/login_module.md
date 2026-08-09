@@ -21,6 +21,8 @@ Upon successful login with Futmondo API (`POST https://api.futmondo.com/5/login/
 
 ---
 
-## 3. Security Notice
+## 3. Security & Privacy Notice
 
-A lock icon badge (`fa-lock`) and the caption `"Your password is encrypted and is never saved or stored anywhere."` are displayed on the login form to reassure users that their credentials are used strictly for session authentication with the Futmondo API and are never saved to disk or database.
+The login interface includes an explicit privacy notice informing users:
+1. **Official Server Authentication**: Logs in directly using your Futmondo account to authenticate with the official Futmondo authentication server (`POST https://api.futmondo.com/5/login/with_mail`).
+2. **Zero Credential Persistence**: Passwords are used strictly in-memory during authentication and are never saved or stored anywhere on disk or in the database.
