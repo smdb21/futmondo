@@ -593,7 +593,7 @@ format_table_currency <- function(value) {
   }
   if (all(is.na(value))) return(rep("", length(value)))
   
-  formatted <- scales::label_currency(prefix = "", suffix = " \u20ac", big.mark = ".", decimal.mark = ",")(value)
+  formatted <- scales::label_currency(prefix = "", suffix = "\u00a0\u20ac", big.mark = ".", decimal.mark = ",")(value)
   formatted[is.na(value)] <- ""
   return(formatted)
 }
@@ -680,8 +680,8 @@ get_reactable_columns_for_players <- function(table) {
         if (is.na(value) || !is.numeric(value)) return("")
         color_class <- if (value > 0) "value-positive" else if (value < 0) "value-negative" else ""
         sign_prefix <- if (value > 0) "+" else ""
-        formatted <- scales::label_currency(prefix = sign_prefix, suffix = " EUR", big.mark = ".", decimal.mark = ",")(value)
-        shiny::tags$span(class = color_class, formatted)
+        formatted <- scales::label_currency(prefix = sign_prefix, suffix = "\u00a0\u20ac", big.mark = ".", decimal.mark = ",")(value)
+        shiny::tags$span(class = color_class, style = "white-space: nowrap !important;", formatted)
       }
     )
   }
@@ -694,8 +694,8 @@ get_reactable_columns_for_players <- function(table) {
         if (is.na(value) || !is.numeric(value)) return("")
         color_class <- if (value > 0) "value-positive" else if (value < 0) "value-negative" else ""
         sign_prefix <- if (value > 0) "+" else ""
-        formatted <- paste0(sign_prefix, round(value * 100, 2), " %")
-        shiny::tags$span(class = color_class, formatted)
+        formatted <- paste0(sign_prefix, round(value * 100, 2), "\u00a0%")
+        shiny::tags$span(class = color_class, style = "white-space: nowrap !important;", formatted)
       }
     )
   }
@@ -784,30 +784,35 @@ get_reactable_columns_for_players <- function(table) {
       name = "Position",
       align = "center",
       cell = function(value, index) {
-        if (is.na(value) || value == "") return("")
+        if (is.null(value) || is.na(value) || value == "" || value == "NA") return("")
 
         get_badge <- function(pos) {
-          if (is.na(pos) || pos == "") return(NULL)
-          class_name <- if (pos == "Goalkeeper" || pos == "portero") {
+          if (is.null(pos) || is.na(pos) || pos == "" || pos == "NA") return(NULL)
+          pos_clean <- trimws(as.character(pos))
+
+          class_name <- if (pos_clean %in% c("Goalkeeper", "portero", "GK", "P")) {
             "badge-gk"
-          } else if (pos == "Defender" || pos == "defensa") {
+          } else if (pos_clean %in% c("Defender", "defensa", "DF", "D")) {
             "badge-df"
-          } else if (pos == "Midfielder" || pos == "centrocampista") {
+          } else if (pos_clean %in% c("Midfielder", "centrocampista", "MD", "M")) {
             "badge-md"
-          } else if (pos == "Forward" || pos == "delantero") {
+          } else if (pos_clean %in% c("Forward", "delantero", "FW", "F")) {
             "badge-fw"
           } else {
             "badge-df"
           }
-          shiny::tags$span(class = class_name, pos)
+
+          display_name <- if (pos_clean %in% c("portero", "GK", "P")) "Goalkeeper" else if (pos_clean %in% c("defensa", "DF", "D")) "Defender" else if (pos_clean %in% c("centrocampista", "MD", "M")) "Midfielder" else if (pos_clean %in% c("delantero", "FW", "F")) "Forward" else pos_clean
+
+          shiny::tags$span(class = class_name, display_name)
         }
 
         badge1 <- get_badge(value)
         badge2 <- NULL
 
         if ("role2" %in% colnames(table)) {
-          role2_val <- table[index, "role2"]
-          if (!is.na(role2_val) && role2_val != "" && role2_val != value) {
+          role2_val <- as.character(table$role2[index])
+          if (length(role2_val) > 0 && !is.na(role2_val) && role2_val != "" && role2_val != "NA" && role2_val != as.character(value)) {
             badge2 <- get_badge(role2_val)
           }
         }

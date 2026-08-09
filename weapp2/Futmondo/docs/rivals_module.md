@@ -27,7 +27,7 @@ Returns a `tagList` containing:
 1. A League Squad Value Evolution chart (`plotlyOutput`) showing historical valuations of all teams.
 2. A League Financial Standings & Budget Left table (`reactableOutput`) displaying per-team finances.
 3. A Scouting Target Selection box (`selectInput`) for choosing a rival to scout.
-4. A `uiOutput` placeholder for the selected rival financial summary cards (Standings Position, Money Left, Spent on Purchases, Squad Valuation & Net Gain).
+4. A `uiOutput` placeholder for the selected rival financial summary cards (Standings Position, Money Left, Spent on Clauses, Squad Valuation & Net Gain).
 5. A nested `players_table_UI` call for the scouted player roster and purchase breakdown.
 
 ### Usage Example

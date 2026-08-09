@@ -37,21 +37,8 @@ rivals_UI <- function(id) {
       )
     ),
 
-    # Financial Standings Overview Cards row
-    uiOutput(ns("rival_financial_summary_box")),
-
-    # Rival Squad Players table
-    players_table_UI(
-      id = ns("rival_squad_table"),
-      box_title = "Scouted Player Roster & Purchase Breakdown",
-      filter_by_position = TRUE,
-      filter_by_team = FALSE,
-      filter_by_value = TRUE,
-      filter_by_change_value = TRUE,
-      filter_by_active_clause = TRUE,
-      filter_by_is_favorite = FALSE,
-      filter_by_is_from_futmondo = FALSE
-    )
+    # Scouted Rival Details (Summary cards + Player Roster Table)
+    uiOutput(ns("scouted_rival_details_ui"))
   )
 }
 
@@ -76,8 +63,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       if (!is.null(selected_idx) && is.numeric(selected_idx) && selected_idx >= 1 && selected_idx <= nrow(df)) {
         return(as.character(df$teamid[selected_idx]))
       } else {
-        # Default to first team if no selection is active
-        return(as.character(df$teamid[1]))
+        return(NULL)
       }
     })
     
@@ -164,7 +150,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
         dplyr::select(
           Team = teamname,
           `Initial Budget` = initial_budget,
-          `Spent on Roster` = total_spent,
+          `Spent on Clauses` = total_spent,
           `Money Left` = budget,
           `Squad Value` = team_value,
           `Net Profit/Loss` = net_profit_loss,
@@ -180,12 +166,11 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
         bordered = FALSE,
         selection = "single",
         onClick = "select",
-        defaultSelected = 1,
         defaultPageSize = 10,
         columns = list(
           Team = colDef(name = "User Team", align = "left", style = list(fontWeight = "600", color = "#0f172a")),
           `Initial Budget` = colDef(align = "right", cell = function(val) format_table_currency(val)),
-          `Spent on Roster` = colDef(align = "right", cell = function(val) format_table_currency(val)),
+          `Spent on Clauses` = colDef(align = "right", cell = function(val) format_table_currency(val)),
           `Money Left` = colDef(
             align = "right",
             cell = function(val) {
@@ -273,13 +258,13 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
         ),
         column(width = 3,
                box(
-                 title = "Spent on Purchases",
+                 title = "Spent on Clauses",
                  width = 12,
                  status = "warning",
                  solidHeader = TRUE,
                  div(style = "text-align: center; padding: 10px;",
                      h3(style = "font-weight: 700; color: #f59e0b; margin: 0; font-size: 20px;", spent_fmt),
-                     p(style = "color: #64748b; font-size: 11px; text-transform: uppercase; margin-top: 5px;", "Roster Acquisitions Cost"))
+                     p(style = "color: #64748b; font-size: 11px; text-transform: uppercase; margin-top: 5px;", "Roster Clauses Cost"))
                )
         ),
         column(width = 3,
@@ -352,6 +337,39 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
           legend = list(orientation = "h", x = 0.5, y = -0.25, xanchor = "center"),
           margin = list(l = 60, r = 20, t = 10, b = 40)
         )
+    })
+
+    # Render Scouted Rival Details (or empty state prompt if no selection)
+    output$scouted_rival_details_ui <- renderUI({
+      req(is_module_active() == TRUE)
+      rival_id <- selected_rival_team_id()
+
+      if (is.null(rival_id) || rival_id == "") {
+        div(
+          style = "text-align: center; padding: 40px 20px; background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px; margin-top: 20px; margin-bottom: 25px;",
+          shiny::tags$i(class = "fa-solid fa-user-ninja", style = "font-size: 36px; color: #94a3b8; margin-bottom: 12px;"),
+          h4(style = "font-weight: 700; color: #334155; margin: 0 0 6px 0;", "No User Team Selected"),
+          p(style = "color: #64748b; font-size: 14px; margin: 0;",
+            icon("hand-pointer", style = "color: #3b82f6; margin-right: 4px;"),
+            "Click on any user row in the table above to scout their squad roster and financial details."
+          )
+        )
+      } else {
+        tagList(
+          uiOutput(ns("rival_financial_summary_box")),
+          players_table_UI(
+            id = ns("rival_squad_table"),
+            box_title = "Scouted Player Roster & Purchase Breakdown",
+            filter_by_position = TRUE,
+            filter_by_team = FALSE,
+            filter_by_value = TRUE,
+            filter_by_change_value = TRUE,
+            filter_by_active_clause = TRUE,
+            filter_by_is_favorite = FALSE,
+            filter_by_is_from_futmondo = FALSE
+          )
+        )
+      }
     })
 
     # Nested table module server call

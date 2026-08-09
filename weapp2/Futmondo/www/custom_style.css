@@ -92,21 +92,24 @@ body, .content-wrapper, .right-side {
     padding: 20px !important;
 }
 
-/* Modern Reactable Overlays */
+/* Compact Table Styling & Single-Line No-Wrap */
 .ReactTable {
     border: none !important;
+    font-size: 12px !important;
 }
 .rt-thead {
     background-color: #f8fafc !important;
     border-bottom: 1px solid #e2e8f0 !important;
-    font-weight: 600 !important;
+    font-weight: 700 !important;
     color: #475569 !important;
-    text-transform: uppercase;
-    font-size: 11px;
-    letter-spacing: 0.5px;
+    text-transform: uppercase !important;
+    font-size: 11px !important;
+    letter-spacing: 0.5px !important;
+    white-space: nowrap !important;
 }
 .rt-thead .rt-th {
-    padding: 12px 8px !important;
+    padding: 8px 8px !important;
+    white-space: nowrap !important;
 }
 .rt-tbody .rt-tr-group {
     border-bottom: 1px solid #f1f5f9 !important;
@@ -116,8 +119,19 @@ body, .content-wrapper, .right-side {
     background-color: #f8fafc !important; /* Soft row-hover */
 }
 .rt-td {
-    padding: 12px 8px !important;
+    padding: 6px 8px !important;
     color: #334155 !important;
+    font-size: 12px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    vertical-align: middle !important;
+}
+
+/* Ensure currency values, positive/negative numbers, and badges stay strictly on one line */
+.value-positive, .value-negative, .badge-active-bid, .squad-pos-badge {
+    white-space: nowrap !important;
+    display: inline-block !important;
 }
 
 /* Custom Badges & Pill Styling */
