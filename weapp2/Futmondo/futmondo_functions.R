@@ -601,6 +601,9 @@ format_table_currency <- function(value) {
 reorder_player_table_columns <- function(df) {
   if (is.null(df) || nrow(df) == 0) return(df)
 
+  df_is_dt <- data.table::is.data.table(df)
+  df_df <- as.data.frame(df)
+
   desired_order <- c(
     "name", "role", "team", "numberOfBids", "bid_price", "bid_user",
     "points", "price", "market_price", "effective_market_price",
@@ -609,12 +612,14 @@ reorder_player_table_columns <- function(df) {
     "creationDate", "expirationDate", "userTeam"
   )
 
-  existing_cols <- colnames(df)
+  existing_cols <- colnames(df_df)
   present_desired <- intersect(desired_order, existing_cols)
   remaining_cols <- setdiff(existing_cols, present_desired)
 
   final_cols <- c(present_desired, remaining_cols)
-  return(df[, final_cols, drop = FALSE])
+  res <- df_df[, final_cols, drop = FALSE]
+  if (df_is_dt) res <- data.table::as.data.table(res)
+  return(res)
 }
 
 get_reactable_columns_for_players <- function(table) {
