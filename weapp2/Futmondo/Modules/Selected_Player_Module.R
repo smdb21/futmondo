@@ -28,9 +28,8 @@ selected_player_UI <- function(id) {
         ),
         # Interactive Purchase Row
         fluidRow(
-          column(12, align = "center", style = "margin-top: 15px; display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;",
-                 uiOutput(ns("buy_market_ui")),
-                 uiOutput(ns("buy_clause_ui")))
+          column(12, align = "center", style = "margin-top: 15px; display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;",
+                 uiOutput(ns("action_buttons")))
         ),
         # Plotly History Chart Row (Plot A)
         fluidRow(
@@ -41,11 +40,6 @@ selected_player_UI <- function(id) {
           )
         )
       )
-    ),
-    # Action buttons area (market bid / clause purchase)
-    div(
-      id = ns("action_buttons_container"),
-      style = "margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;"
     )
   )
 }
@@ -219,20 +213,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         }
 
         output$action_buttons <- renderUI(action_buttons)
-        insertUI(
-          selector = paste0("#", ns("action_buttons_container")),
-          ui = action_buttons,
-          multiple = TRUE
-        )
       }
     )
-
-    # ---- Clear stale inserted buttons on re-selection ----
-    observe({
-      selected_player()
-      # Remove previously inserted buttons before re-adding
-      removeUI(selector = paste0("#", ns("action_buttons_container"), " > *"))
-    })
 
     # ---- Option 1: Market Offer Modal ----
     observeEvent(input$btn_bid_market, {
