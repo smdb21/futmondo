@@ -45,7 +45,7 @@ selected_player_UI <- function(id) {
 }
 
 
-selected_player_Server <- function(id, selected_player, login_token = NULL, championship_id = NULL, user_team_id = NULL) {
+selected_player_Server <- function(id, selected_player, login_token = NULL, championship_id = NULL, user_team_id = NULL, on_bid_updated = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -340,6 +340,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           type = "message",
           duration = 5
         )
+        if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
+          tryCatch(on_bid_updated(), error = function(e) NULL)
+        }
         clear_api_cache()
       } else {
         shiny::showNotification(
@@ -397,6 +400,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           type = "message",
           duration = 5
         )
+        if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
+          tryCatch(on_bid_updated(), error = function(e) NULL)
+        }
         clear_api_cache()
       } else {
         shiny::showNotification(
@@ -480,6 +486,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           type = "message",
           duration = 5
         )
+        if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
+          tryCatch(on_bid_updated(), error = function(e) NULL)
+        }
         clear_api_cache()
       } else {
         shiny::showNotification(
@@ -638,6 +647,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           type = "message",
           duration = 5
         )
+        if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
+          tryCatch(on_bid_updated(), error = function(e) NULL)
+        }
         clear_api_cache()
       } else {
         shiny::showNotification(

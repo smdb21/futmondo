@@ -81,6 +81,7 @@ players_table_UI <- function(id, box_title = NULL,
 players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+    table_refresh_trigger <- reactiveVal(0)
     # observers ----
     # observe user_teams_RV to update market_player_team_filter ----
     observeEvent(user_teams_RV(), {
@@ -116,7 +117,10 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       selected_player = selected_player_RV,
       login_token = login_token,
       championship_id = championship_id,
-      user_team_id = user_team_id
+      user_team_id = user_team_id,
+      on_bid_updated = function() {
+        table_refresh_trigger(table_refresh_trigger() + 1)
+      }
     )
     # reactives ----
     ## selected_player_RV
@@ -128,6 +132,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
     
     ## players_table_filtered_RV ----
     players_table_filtered_RV <- reactive({
+      table_refresh_trigger()
       players_table <- players_table_RV()
       if (is.null(players_table)) {
         return(NULL)
@@ -211,6 +216,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
     output$players_table <- renderReactable({
       req(players_table_filtered_RV())
       players_table <- players_table_filtered_RV() %>%
+        reorder_player_table_columns() %>%
         dplyr::select(!any_of(cfg_player_columns_to_hide))
       
       print(paste0(nrow(players_table), " players in table"))
