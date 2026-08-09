@@ -49,6 +49,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
+    active_bid_info_RV <- reactiveVal(NULL)
+
     # ---- Safe reactive value extractor ----
     get_reactive_val <- function(x) {
       if (is.null(x)) return(NULL)
@@ -67,6 +69,38 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       {
         sp <- selected_player()
         req(sp)
+
+        login <- get_reactive_val(login_token)
+        champ_id <- get_reactive_val(championship_id)
+        team_id <- get_reactive_val(user_team_id)
+
+        my_bid_id <- NULL
+        my_bid_price <- NULL
+
+        if (!is.null(login) && !is.null(champ_id) && !is.null(sp$id)) {
+          summary_res <- tryCatch({
+            get_player_summary(login = login, championship_id = champ_id, user_team_id = team_id, player_id = sp$id)
+          }, error = function(e) NULL)
+
+          if (!is.null(summary_res)) {
+            my_bid_id <- summary_res$my_bid_id
+            my_bid_price <- summary_res$my_bid_price
+          }
+        }
+
+        # Fallback to sp$bid_price if summary API didn't return my_bid_price
+        if (is.null(my_bid_price) && "bid_price" %in% colnames(sp) && !is.na(sp$bid_price) && suppressWarnings(as.numeric(sp$bid_price)) > 0) {
+          my_bid_price <- suppressWarnings(as.numeric(sp$bid_price))
+          if ("bid_id" %in% colnames(sp) && !is.na(sp$bid_id)) {
+            my_bid_id <- as.character(sp$bid_id)
+          }
+        }
+
+        if (!is.null(my_bid_price) && my_bid_price > 0) {
+          active_bid_info_RV(list(id = my_bid_id, price = my_bid_price))
+        } else {
+          active_bid_info_RV(NULL)
+        }
 
         print(paste0("Selected player: ", sp$name))
         player_name <- sp$name
@@ -123,8 +157,26 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         current_user_team <- get_reactive_val(user_team_id)
         player_owner_team <- if ("user_team_id" %in% colnames(sp)) sp$user_team_id else NULL
         is_own_player <- (!is.null(current_user_team) && !is.null(player_owner_team) && current_user_team == player_owner_team)
+        has_active_bid <- !is.null(active_bid_info_RV())
 
-        if (!is_own_player) {
+        if (has_active_bid) {
+          bid_info <- active_bid_info_RV()
+          banner <- div(
+            style = "width: 100%; text-align: center; margin-bottom: 10px; padding: 10px 16px; background-color: #d1fae5; color: #047857; border: 1px solid #a7f3d0; border-radius: 8px; font-weight: 700; font-size: 14px;",
+            tagList(icon("hand-holding-dollar"), paste0(" Your Active Bid: ", format_currency(bid_info$price)))
+          )
+          btn_modify <- actionButton(
+            ns("btn_modify_bid"),
+            label = tagList(icon("pen-to-square"), " Update Bid"),
+            class = "btn btn-buy-market"
+          )
+          btn_cancel <- actionButton(
+            ns("btn_cancel_bid"),
+            label = tagList(icon("trash-can"), " Cancel Bid"),
+            class = "btn btn-cancel-bid"
+          )
+          action_buttons <- tagList(banner, btn_modify, btn_cancel)
+        } else if (!is_own_player) {
           # Extract effective market price (checking effective_market_price, market_price, and price)
           eff_market_price <- NA_real_
           if ("effective_market_price" %in% colnames(sp) && !is.na(sp$effective_market_price) && suppressWarnings(as.numeric(sp$effective_market_price)) > 0) {
@@ -215,6 +267,145 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         output$action_buttons <- renderUI(action_buttons)
       }
     )
+
+    # ---- Modify Active Bid Modal ----
+    observeEvent(input$btn_modify_bid, {
+      sp <- selected_player()
+      req(sp)
+      bid_info <- active_bid_info_RV()
+      req(bid_info)
+
+      showModal(modalDialog(
+        title = tagList(icon("pen-to-square"), " Update Your Active Bid"),
+        p(strong(sp$name)),
+        p("Current Active Bid: ", strong(format_currency(bid_info$price))),
+        numericInput(
+          ns("new_bid_amount"),
+          label = "New Bid Amount (EUR):",
+          value = bid_info$price,
+          min = 1,
+          step = 10000
+        ),
+        footer = tagList(
+          modalButton("Cancel"),
+          actionButton(ns("submit_modify_bid"), "Submit Updated Bid", class = "btn btn-buy-market")
+        ),
+        easyClose = TRUE,
+        size = "s"
+      ))
+    })
+
+    # ---- Submit Modify Active Bid ----
+    observeEvent(input$submit_modify_bid, {
+      sp <- selected_player()
+      login <- get_reactive_val(login_token)
+      champ_id <- get_reactive_val(championship_id)
+      team_id <- get_reactive_val(user_team_id)
+      bid_info <- active_bid_info_RV()
+      req(sp, login, champ_id, team_id, bid_info)
+
+      new_price <- input$new_bid_amount
+      if (is.null(new_price) || new_price <= 0) {
+        shiny::showNotification("Please enter a valid bid amount.", type = "warning")
+        return()
+      }
+
+      bid_id <- bid_info$id
+      player_id <- sp$id
+
+      success <- modify_bid(
+        login = login,
+        championship_id = champ_id,
+        team_id = team_id,
+        player_id = player_id,
+        bid_id = bid_id,
+        new_price = new_price
+      )
+
+      removeModal()
+
+      if (success) {
+        tryCatch({
+          log_market_transaction(
+            player_id = player_id,
+            championship_id = champ_id,
+            buyer_team_id = team_id,
+            seller_team_id = if ("user_team_id" %in% colnames(sp)) sp$user_team_id else NULL,
+            price = new_price,
+            is_clause = FALSE
+          )
+        }, error = function(e) NULL)
+        shiny::showNotification(
+          paste0("Active bid updated to ", format_currency(new_price), " for ", sp$name, "!"),
+          type = "message",
+          duration = 5
+        )
+        clear_api_cache()
+      } else {
+        shiny::showNotification(
+          "Failed to update bid. Please try again.",
+          type = "error",
+          duration = 5
+        )
+      }
+    })
+
+    # ---- Cancel Active Bid Modal ----
+    observeEvent(input$btn_cancel_bid, {
+      sp <- selected_player()
+      req(sp)
+      bid_info <- active_bid_info_RV()
+      req(bid_info)
+
+      showModal(modalDialog(
+        title = tagList(icon("trash-can"), " Cancel Active Bid"),
+        p(strong(sp$name)),
+        p("Are you sure you want to cancel your active bid of ", strong(format_currency(bid_info$price)), "?"),
+        p(style = "color: #ef4444; font-size: 13px;", "This will withdraw your offer from the transfer market."),
+        footer = tagList(
+          modalButton("Keep Bid"),
+          actionButton(ns("submit_cancel_bid"), "Confirm Cancel Bid", class = "btn btn-cancel-bid")
+        ),
+        easyClose = TRUE,
+        size = "s"
+      ))
+    })
+
+    # ---- Submit Cancel Active Bid ----
+    observeEvent(input$submit_cancel_bid, {
+      sp <- selected_player()
+      login <- get_reactive_val(login_token)
+      champ_id <- get_reactive_val(championship_id)
+      team_id <- get_reactive_val(user_team_id)
+      bid_info <- active_bid_info_RV()
+      req(sp, login, champ_id, team_id, bid_info)
+
+      bid_id <- bid_info$id
+
+      success <- cancel_bid(
+        login = login,
+        championship_id = champ_id,
+        team_id = team_id,
+        bid_id = bid_id
+      )
+
+      removeModal()
+
+      if (success) {
+        shiny::showNotification(
+          paste0("Active bid on ", sp$name, " cancelled successfully!"),
+          type = "message",
+          duration = 5
+        )
+        clear_api_cache()
+      } else {
+        shiny::showNotification(
+          "Failed to cancel bid. Please try again.",
+          type = "error",
+          duration = 5
+        )
+      }
+    })
 
     # ---- Option 1: Market Offer Modal ----
     observeEvent(input$btn_bid_market, {

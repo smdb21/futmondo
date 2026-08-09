@@ -456,3 +456,33 @@ body, .wrapper {
 .selectize-input {
     border-radius: 8px !important;
 }
+
+/* Cancel Bid Button Styling */
+.btn-cancel-bid {
+    background-color: #ef4444 !important; /* Crimson Red */
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    padding: 10px 24px !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.2) !important;
+    margin: 5px;
+}
+.btn-cancel-bid:hover {
+    background-color: #dc2626 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 12px -1px rgba(239, 68, 68, 0.3) !important;
+}
+
+/* Active Bid Badge Styling in Tables */
+.badge-active-bid {
+    display: inline-block;
+    background-color: #d1fae5 !important;
+    color: #047857 !important;
+    border: 1px solid #a7f3d0 !important;
+    border-radius: 6px !important;
+    font-weight: 700 !important;
+    padding: 3px 8px !important;
+    font-size: 12px !important;
+}

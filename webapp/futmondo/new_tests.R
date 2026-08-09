@@ -2,7 +2,7 @@ LOGIN_URL <- "https://api.futmondo.com/5/login/with_mail"
 ACTIVE_CHAMPIONSHIPS_URL <- "https://api.futmondo.com/2/user/activechampionships"
 TEAMS_URL <- "https://api.futmondo.com/2/championship/teams"
 ROSTER_URL <- "https://api.futmondo.com/1/userteam/roster"
-CLAUSULA_URL <- "https://api.futmondo.com/1/market/rosterclause"
+BID_URL <- "https://api.futmondo.com/1/market/rosterclause"
 MARKET_URL <- "https://api.futmondo.com/1/market/players"
 PLAYER_SUMMARY_URL <- "https://api.futmondo.com/1/player/summary"
 LINEUP_URL <- "https://api.futmondo.com/1/userteam/lineup"
@@ -287,7 +287,7 @@ comprar_clausula <- function(login, championship_id, team_id, player_id, player_
   
   # Sending the POST request
   print("Getting players from team")
-  response <- POST(CLAUSULA_URL, body = toJSON(payload), add_headers(.headers = headers))
+  response <- POST(BID_URL, body = toJSON(payload), add_headers(.headers = headers))
   operation_code <- content(response)$answer$code
   return(operation_code == API_CODE_OK)
 }

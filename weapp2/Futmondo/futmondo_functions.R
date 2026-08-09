@@ -2,9 +2,11 @@ LOGIN_URL <- "https://api.futmondo.com/5/login/with_mail"
 ACTIVE_CHAMPIONSHIPS_URL <- "https://api.futmondo.com/2/user/activechampionships"
 TEAMS_URL <- "https://api.futmondo.com/2/championship/teams"
 ROSTER_URL <- "https://api.futmondo.com/1/userteam/roster"
-CLAUSULA_URL <- "https://api.futmondo.com/1/market/bid"
+BID_URL <- "https://api.futmondo.com/1/market/bid"
 MARKET_URL <- "https://api.futmondo.com/1/market/players"
 PLAYER_SUMMARY_URL <- "https://api.futmondo.com/1/player/summary"
+MODIFY_BID_URL <- "https://api.futmondo.com/5/market/modifybid"
+CANCEL_BID_URL <- "https://api.futmondo.com/1/market/cancelbid"
 API_CODE_OK <- "api.general.ok"
 PHOTO_URL <- "https://static01.mondocore.com/futmondo/img/faces/64"
 LINEUP_URL <- "https://api.futmondo.com/1/userteam/lineup"
@@ -663,7 +665,10 @@ get_reactable_columns_for_players <- function(table) {
       name = "Your Bid",
       align = "right",
       cell = function(value) {
-        format_table_currency(value)
+        if (is.na(value) || is.null(value) || value == "" || value == 0) return("")
+        num_val <- suppressWarnings(as.numeric(value))
+        formatted <- format_table_currency(num_val)
+        shiny::tags$span(class = "badge-active-bid", formatted)
       }
     )
   }
@@ -1004,7 +1009,7 @@ buy_clause <- function(login, championship_id, team_id, player_id, player_slug, 
 
   # Sending the POST request
   print("Sending bid/clause purchase request")
-  response <- POST(CLAUSULA_URL, body = toJSON(payload), add_headers(.headers = headers))
+  response <- POST(BID_URL, body = toJSON(payload), add_headers(.headers = headers))
   operation_code <- httr::content(response)$answer$code
   return(operation_code == API_CODE_OK)
 }
@@ -1215,4 +1220,107 @@ calculate_league_finances <- function(login, championship_id, user_teams_df, ini
       all_purchases = purchases_df
     ))
   }, timeout_sec = 300)
+}
+
+get_player_summary <- function(login, championship_id, user_team_id = NULL, player_id = NULL) {
+  if (is.null(login) || is.null(championship_id) || is.null(player_id)) return(NULL)
+  
+  cache_key <- paste0("player_summary_", championship_id, "_", player_id)
+  get_cached_data(cache_key, {
+    payload <- list(
+      header = list(
+        token = login[["token"]],
+        userid = login[["userid"]]
+      ),
+      query = list(
+        championshipId = championship_id,
+        userteamId = if (!is.null(user_team_id)) user_team_id else "",
+        playerId = player_id
+      ),
+      answer = list()
+    )
+    headers <- c("Content-Type" = "application/json; charset=utf-8")
+    
+    print(paste0("[API] Fetching player summary for: ", player_id))
+    response <- POST(PLAYER_SUMMARY_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
+    ans <- httr::content(response)
+    
+    if (!is.null(ans) && "answer" %in% names(ans) && is.list(ans$answer)) {
+      ans_data <- ans$answer
+      
+      my_bid_id <- NULL
+      my_bid_price <- NULL
+      
+      # Extract bids array from market or top level
+      bids_arr <- NULL
+      if ("market" %in% names(ans_data) && is.list(ans_data$market) && "bids" %in% names(ans_data$market)) {
+        bids_arr <- ans_data$market$bids
+      } else if ("bids" %in% names(ans_data)) {
+        bids_arr <- ans_data$bids
+      }
+      
+      if (!is.null(bids_arr) && is.list(bids_arr) && length(bids_arr) > 0) {
+        for (b in bids_arr) {
+          if (is.list(b) && !is.null(b[["id"]]) && !is.null(b[["price"]])) {
+            my_bid_id <- as.character(b[["id"]])
+            my_bid_price <- suppressWarnings(as.numeric(b[["price"]]))
+          }
+        }
+      }
+      
+      return(list(
+        data = if ("data" %in% names(ans_data)) ans_data$data else NULL,
+        prices = if ("prices" %in% names(ans_data)) ans_data$prices else list(),
+        bids = bids_arr,
+        my_bid_id = my_bid_id,
+        my_bid_price = my_bid_price
+      ))
+    }
+    return(NULL)
+  }, timeout_sec = 60)
+}
+
+modify_bid <- function(login, championship_id, team_id, player_id, bid_id, new_price) {
+  payload <- list(
+    header = list(
+      token = login[["token"]],
+      userid = login[["userid"]]
+    ),
+    query = list(
+      championshipId = championship_id,
+      userteamId = team_id,
+      price = as.numeric(new_price),
+      rounds = NULL,
+      player_id = player_id,
+      bid = bid_id
+    ),
+    answer = list()
+  )
+  headers <- c("Content-Type" = "application/json; charset=utf-8")
+  print(paste0("[API] Sending modify bid request for bid: ", bid_id, " new price: ", new_price))
+  response <- POST(MODIFY_BID_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
+  ans <- httr::content(response)
+  operation_code <- if (!is.null(ans) && "answer" %in% names(ans) && "code" %in% names(ans$answer)) ans$answer$code else ""
+  return(operation_code == API_CODE_OK)
+}
+
+cancel_bid <- function(login, championship_id, team_id, bid_id) {
+  payload <- list(
+    header = list(
+      token = login[["token"]],
+      userid = login[["userid"]]
+    ),
+    query = list(
+      championshipId = championship_id,
+      userteamId = team_id,
+      bid = bid_id
+    ),
+    answer = list()
+  )
+  headers <- c("Content-Type" = "application/json; charset=utf-8")
+  print(paste0("[API] Sending cancel bid request for bid: ", bid_id))
+  response <- POST(CANCEL_BID_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
+  ans <- httr::content(response)
+  operation_code <- if (!is.null(ans) && "answer" %in% names(ans) && "code" %in% names(ans$answer)) ans$answer$code else ""
+  return(operation_code == API_CODE_OK)
 }

@@ -66,3 +66,19 @@ On successful offer or clause buyout:
 1. Calls `log_market_transaction()` to log purchase records into Supabase table `market_transactions`.
 2. Displays formatted notification toast.
 3. Calls `clear_api_cache()` to invalidate cached market and roster data.
+
+---
+
+## 4. Active Bid Management
+
+### Active Bid Check
+Calls `get_player_summary` to detect if the user has an active offer on the selected player. The response includes `my_bid_id` and `my_bid_price` fields that indicate an existing active bid.
+
+### Active Bid Banner
+Renders `"Your Active Bid: [Price]"` inside the player card, providing immediate visibility of the user's pending offer.
+
+### "Update Bid" Modal (`btn_modify_bid`)
+Prompts with `numericInput("new_bid_amount")` pre-filled with the active bid price. On submission, calls `modify_bid()` to update the existing offer to the new price.
+
+### "Cancel Bid" Modal (`btn_cancel_bid`)
+Prompts a confirmation dialog to withdraw the active bid. On confirmation, calls `cancel_bid()` to cancel the pending offer entirely.
