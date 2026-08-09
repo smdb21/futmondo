@@ -234,7 +234,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           step = 10000
         ),
         footer = tagList(
-          modalButton(),
+          modalButton("Cancel"),
           actionButton(ns("submit_bid"), "Submit Market Offer", class = "btn btn-buy-market")
         ),
         easyClose = TRUE,
@@ -249,6 +249,12 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       champ_id <- get_reactive_val(championship_id)
       team_id <- get_reactive_val(user_team_id)
       req(sp, login, champ_id, team_id)
+
+      bid_amount <- input$bid_amount
+      if (is.null(bid_amount) || bid_amount <= 0) {
+        shiny::showNotification("Please enter a valid offer amount.", type = "warning")
+        return()
+      }
 
       player_id <- sp$id
       player_slug <- if ("slug" %in% colnames(sp) && !is.na(sp$slug)) sp$slug else sp$name
@@ -314,7 +320,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         ),
         p(style = "color: #64748b; font-size: 12px;", "This offer will be submitted to the player owner and tracked in market transaction history."),
         footer = tagList(
-          modalButton(),
+          modalButton("Cancel"),
           actionButton(ns("submit_owner_offer"), "Submit Offer", class = "btn btn-offer-money")
         ),
         easyClose = TRUE,
@@ -329,6 +335,12 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       champ_id <- get_reactive_val(championship_id)
       team_id <- get_reactive_val(user_team_id)
       req(sp, login, champ_id, team_id)
+
+      offer_amount <- input$owner_offer_amount
+      if (is.null(offer_amount) || offer_amount <= 0) {
+        shiny::showNotification("Please enter a valid offer amount.", type = "warning")
+        return()
+      }
 
       player_id <- sp$id
       player_slug <- if ("slug" %in% colnames(sp) && !is.na(sp$slug)) sp$slug else sp$name
@@ -386,7 +398,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         p("Clause price: ", strong(format_currency(clause_price))),
         p(style = "color: #ef4444; font-size: 13px; font-weight: 600;", "Are you sure you want to trigger this clause buyout?"),
         footer = tagList(
-          modalButton(),
+          modalButton("Cancel"),
           actionButton(ns("submit_clause"), "Confirm Clause Buyout", class = "btn btn-buy-clause")
         ),
         easyClose = TRUE,
