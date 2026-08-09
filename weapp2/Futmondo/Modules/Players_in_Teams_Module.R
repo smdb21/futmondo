@@ -249,27 +249,38 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
         })
       }
 
-      # Fallback baseline timeline if DB is empty or unconfigured (pre-season)
-      if (is.null(history_df) || nrow(history_df) == 0) {
-        teams <- user_teams_RV()
-        if (is.null(teams) || nrow(teams) == 0) {
-          teams <- data.frame(teamname = c("Team Alpha", "Team Beta"), points = c(0, 0), stringsAsFactors = FALSE)
-        }
+      has_points <- !is.null(history_df) && nrow(history_df) > 0 && any(!is.na(history_df$points) & history_df$points > 0)
 
-        today <- Sys.time()
-        dates <- seq(today - as.difftime(6, units="days"), today, by="1 day")
-
-        history_df <- lapply(1:nrow(teams), function(i) {
-          data.frame(
-            teamname = teams$teamname[i],
-            points = rep(as.numeric(teams$points[i]), length(dates)),
-            recorded_at = as.character(dates),
-            stringsAsFactors = FALSE
-          )
-        }) %>% bind_rows()
+      if (!has_points) {
+        # Return empty-state Plotly canvas with centered message box
+        return(
+          plotly::plot_ly() %>%
+            plotly::layout(
+              paper_bgcolor = "rgba(0,0,0,0)",
+              plot_bgcolor = "rgba(0,0,0,0)",
+              xaxis = list(visible = FALSE),
+              yaxis = list(visible = FALSE),
+              annotations = list(
+                list(
+                  x = 0.5,
+                  y = 0.5,
+                  xref = "paper",
+                  yref = "paper",
+                  text = "<b>No matchday points recorded yet.</b><br><span style='font-size: 12px; color: #64748b;'>The points evolution timeline will display automatically once matchday scores are logged.</span>",
+                  showarrow = FALSE,
+                  font = list(size = 14, color = "#334155"),
+                  align = "center",
+                  bgcolor = "#f8fafc",
+                  bordercolor = "#cbd5e1",
+                  borderwidth = 1,
+                  borderpad = 16
+                )
+              )
+            )
+        )
       }
 
-      # Format dates
+      # Format dates if points exist
       history_df$date <- as.POSIXct(history_df$recorded_at, format = "%Y-%m-%dT%H:%M:%S")
       if (any(is.na(history_df$date))) {
         history_df$date <- as.POSIXct(history_df$recorded_at)
