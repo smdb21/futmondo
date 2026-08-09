@@ -131,8 +131,41 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         is_own_player <- (!is.null(current_user_team) && !is.null(player_owner_team) && current_user_team == player_owner_team)
 
         if (!is_own_player) {
+          # Extract effective market price (checking effective_market_price, market_price, and price)
+          eff_market_price <- NA_real_
+          if ("effective_market_price" %in% colnames(sp) && !is.na(sp$effective_market_price) && suppressWarnings(as.numeric(sp$effective_market_price)) > 0) {
+            eff_market_price <- suppressWarnings(as.numeric(sp$effective_market_price))
+          } else if ("market_price" %in% colnames(sp) && !is.na(sp$market_price) && suppressWarnings(as.numeric(sp$market_price)) > 0) {
+            eff_market_price <- suppressWarnings(as.numeric(sp$market_price))
+          } else if ("price" %in% colnames(sp) && !is.na(sp$price) && suppressWarnings(as.numeric(sp$price)) > 0) {
+            eff_market_price <- suppressWarnings(as.numeric(sp$price))
+          }
+
+          # Extract release clause parameters
+          clause_price_val <- if ("clause_price" %in% colnames(sp) && !is.na(sp$clause_price)) suppressWarnings(as.numeric(sp$clause_price)) else 0
+          is_clause_transferred <- if ("clause_transferred" %in% colnames(sp) && !is.na(sp$clause_transferred)) isTRUE(as.logical(sp$clause_transferred)) else FALSE
+
+          # Check clause date lock against current time
+          is_clause_date_locked <- FALSE
+          clause_date_formatted <- ""
+          if ("clause_date" %in% colnames(sp) && !is.na(sp$clause_date) && sp$clause_date != "") {
+            clause_time <- suppressWarnings(as.POSIXct(sp$clause_date, format = "%Y-%m-%dT%H:%M:%S", tz = "UTC"))
+            if (is.na(clause_time)) {
+              clause_time <- suppressWarnings(as.POSIXct(sp$clause_date, tz = "UTC"))
+            }
+            if (!is.na(clause_time)) {
+              clause_date_formatted <- format(clause_time, "%d-%m-%Y %H:%M")
+              if (clause_time > Sys.time()) {
+                is_clause_date_locked <- TRUE
+              }
+            }
+          }
+
+          # Determine if release clause is OPEN for buyout
+          is_clause_open <- (clause_price_val > 0) && !is_clause_transferred && !is_clause_date_locked
+
           # Option 1: "Make Market Offer" button when player is listed on market
-          if ("market_price" %in% colnames(sp) && !is.na(sp$market_price) && !is.null(sp$market_price) && sp$market_price > 0) {
+          if (!is.na(eff_market_price) && eff_market_price > 0) {
             action_buttons <- tagList(
               action_buttons,
               actionButton(
@@ -144,7 +177,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           }
 
           # Option 2: "Offer to Owner" button when player is owned by a rival user team
-          if (!is.null(player_owner_team) && player_owner_team != "" && (!("market_price" %in% colnames(sp)) || is.na(sp$market_price) || is.null(sp$market_price))) {
+          if (!is.null(player_owner_team) && player_owner_team != "" && (is.na(eff_market_price) || eff_market_price <= 0)) {
             owner_name <- if ("userTeam" %in% colnames(sp) && !is.na(sp$userTeam)) sp$userTeam else if ("teamname" %in% colnames(sp) && !is.na(sp$teamname)) sp$teamname else "Owner"
             action_buttons <- tagList(
               action_buttons,
@@ -156,10 +189,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
             )
           }
 
-          # Option 3: "Buy Release Clause" button when player has active release clause
-          if ("clause_price" %in% colnames(sp) && !is.na(sp$clause_price) && !is.null(sp$clause_price) && sp$clause_price > 0 &&
-              ("isClause" %in% colnames(sp) && isTRUE(sp$isClause))) {
-            clause_label <- paste0(" Buy Clause: ", format_currency(sp$clause_price))
+          # Option 3: "Buy Release Clause" button when clause is OPEN
+          if (is_clause_open) {
+            clause_label <- paste0(" Buy Clause: ", format_currency(clause_price_val))
             action_buttons <- tagList(
               action_buttons,
               actionButton(
@@ -168,7 +200,22 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
                 class = "btn btn-buy-clause"
               )
             )
+          } else if (clause_price_val > 0) {
+            # Release clause exists but is currently LOCKED
+            lock_reason <- if (clause_date_formatted != "") paste0("until ", clause_date_formatted) else "transferred/cooldown"
+            locked_badge <- div(
+              style = "display: inline-block; padding: 8px 16px; background-color: #fef3c7; color: #b45309; border: 1px solid #fde68a; border-radius: 8px; font-weight: 600; font-size: 12px; margin: 5px;",
+              tagList(icon("lock"), paste0(" Release Clause Locked ", lock_reason, " (", format_currency(clause_price_val), ")"))
+            )
+            action_buttons <- tagList(action_buttons, locked_badge)
           }
+        } else {
+          # Player is in user's own squad
+          own_badge <- div(
+            style = "display: inline-block; padding: 8px 16px; background-color: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; border-radius: 8px; font-weight: 600; font-size: 12px; margin: 5px;",
+            tagList(icon("shield-halved"), " Player in Your Squad")
+          )
+          action_buttons <- tagList(own_badge)
         }
 
         output$action_buttons <- renderUI(action_buttons)
@@ -191,7 +238,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     observeEvent(input$btn_bid_market, {
       sp <- selected_player()
       req(sp)
-      market_price <- sp$market_price
+      market_price <- if ("effective_market_price" %in% colnames(sp) && !is.na(sp$effective_market_price)) suppressWarnings(as.numeric(sp$effective_market_price)) else if ("market_price" %in% colnames(sp) && !is.na(sp$market_price)) suppressWarnings(as.numeric(sp$market_price)) else if ("price" %in% colnames(sp) && !is.na(sp$price)) suppressWarnings(as.numeric(sp$price)) else 1000000
 
       showModal(modalDialog(
         title = tagList(icon("hand-holding-dollar"), " Place Market Offer"),

@@ -481,10 +481,26 @@ calculate_player_changes <- function(players_df) {
 }
 
 unify_columns <- function(players_df) {
-  if (!"isClause" %in% colnames(players_df)) {
-    players_df <- players_df %>%
-      dplyr::mutate(isClause = !is.na(clause_price) & clause_transferred == FALSE)
+  if (is.null(players_df) || nrow(players_df) == 0) return(players_df)
+
+  # Normalize market price column across roster (market_price) and market endpoints (price)
+  if (!"effective_market_price" %in% colnames(players_df)) {
+    if ("market_price" %in% colnames(players_df)) {
+      players_df$effective_market_price <- suppressWarnings(as.numeric(players_df$market_price))
+    } else if ("price" %in% colnames(players_df)) {
+      players_df$effective_market_price <- suppressWarnings(as.numeric(players_df$price))
+    } else {
+      players_df$effective_market_price <- NA_real_
+    }
   }
+
+  # Compute active clause availability
+  clause_p <- if ("clause_price" %in% colnames(players_df)) suppressWarnings(as.numeric(players_df$clause_price)) else NA_real_
+  clause_t <- if ("clause_transferred" %in% colnames(players_df)) as.logical(players_df$clause_transferred) else FALSE
+  clause_t[is.na(clause_t)] <- FALSE
+
+  players_df$isClause <- !is.na(clause_p) & clause_p > 0 & !clause_t
+
   return(players_df)
 }
 get_lineup_from_team <- function(login, championship_id, user_team_id) {

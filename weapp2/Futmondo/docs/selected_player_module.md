@@ -12,24 +12,40 @@ The Selected Player Module provides two exported functions:
 
 ---
 
-## 2. Player Acquisition Modalities
+## 2. Player Acquisition Modalities & Detection Logic
 
-The card dynamically inspects player ownership and market status to offer three acquisition options (hidden for players owned by the logged-in user):
+The card dynamically inspects player ownership, market status, and release clause unlock timers to offer three acquisition options (hidden for players owned by the logged-in user, which display a "Player in Your Squad" badge instead):
+
+### Market Price Normalization (`effective_market_price`)
+Market prices vary depending on the API endpoint:
+- Roster endpoint (`/1/userteam/roster`) returns market prices in `market_price`.
+- Market endpoint (`/1/market/players`) returns market prices in `price`.
+The module normalizes these into `effective_market_price`, checking `effective_market_price`, `market_price`, then `price`.
+
+### Release Clause Unlock Timer & Cooldown (`is_clause_open`)
+A release clause is **OPEN** for buyout if:
+1. `clause_price` > 0
+2. `clause_transferred` == FALSE (not in cooldown lock from a recent purchase)
+3. `clause_date` <= current timestamp (clause protection timer has elapsed)
+
+If a clause exists (`clause_price > 0`) but is currently locked (`clause_transferred == TRUE` or `clause_date > Sys.time()`), a **"Release Clause Locked until [Date]"** indicator badge is displayed informing the user when the clause will unlock.
+
+---
 
 ### Option 1: Market Offer ("Make Market Offer")
-* **Condition**: Player is listed on the transfer market (`market_price` is present and > 0).
+* **Condition**: Player is listed on the transfer market (`effective_market_price` > 0).
 * **UI**: `btn_bid_market` action button.
-* **Modal**: Prompt with `numericInput` pre-filled with `market_price`.
+* **Modal**: Prompt with `numericInput` pre-filled with `effective_market_price`.
 * **API Handler**: Calls `buy_clause(..., price = offer_amount, isClause = FALSE)`.
 
 ### Option 2: Direct Offer to Owner ("Offer to [Owner]")
-* **Condition**: Player is owned by a rival user team (`user_team_id` != current user team) and not listed on the market.
+* **Condition**: Player is owned by a rival user team (`user_team_id` != current user team) and not currently listed on the market.
 * **UI**: `btn_offer_owner` action button.
 * **Modal**: Prompt displaying current market valuation (`value`) and release clause reference, with `numericInput` for custom purchase offer.
 * **API Handler**: Calls `buy_clause(..., price = offer_amount, isClause = FALSE)`.
 
 ### Option 3: Release Clause Buyout ("Buy Clause: [Price]")
-* **Condition**: Player is owned by a rival team and has an active release clause (`isClause == TRUE`, `clause_price > 0`).
+* **Condition**: Player is owned by a rival team and has an OPEN release clause (`is_clause_open == TRUE`).
 * **UI**: `btn_pay_clause` action button.
 * **Modal**: Confirmation dialog displaying fixed `clause_price`.
 * **API Handler**: Calls `buy_clause(..., price = clause_price, isClause = TRUE)`.
