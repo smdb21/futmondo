@@ -296,49 +296,67 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
     # Plot C: League Finances horizontal bar chart
     output$league_finances_plot <- plotly::renderPlotly({
       req(is_module_active() == TRUE)
+      req(login_token(), championship_id(), user_teams_RV())
 
-      champ_id <- if (!is.null(championship_id)) championship_id() else NULL
-      teams_df <- NULL
-      if (!is.null(champ_id)) {
-        tryCatch({
-          teams_df <- get_user_teams_finances(champ_id)
-        }, error = function(e) {
-          print(paste0("[Plot C] Finances fetch warning: ", e$message))
-        })
-      }
+      champ_id <- championship_id()
+      login <- login_token()
+      teams <- user_teams_RV()
 
-      # Fallback to current reactive standings state if DB has no historical budget records yet
-      if (is.null(teams_df) || nrow(teams_df) == 0) {
-        teams_df <- user_teams_RV()
-      }
-
-      if (is.null(teams_df) || nrow(teams_df) == 0) {
-        teams_df <- data.frame(
-          name = c("Team Alpha", "Team Beta"),
-          budget = c(300000000, 250000000),
-          stringsAsFactors = FALSE
+      # Calculate current league finances with liquid cash balances
+      finances_res <- tryCatch({
+        calculate_league_finances(
+          login = login,
+          championship_id = champ_id,
+          user_teams_df = teams,
+          initial_budget = 300000000
         )
+      }, error = function(e) {
+        print(paste0("[Plot C] Finances calculation warning: ", e$message))
+        NULL
+      })
+
+      teams_df <- if (!is.null(finances_res) && "team_finances" %in% names(finances_res)) finances_res$team_finances else NULL
+
+      # Fallback to Supabase get_user_teams_finances or user_teams_RV
+      if (is.null(teams_df) || nrow(teams_df) == 0) {
+        teams_df <- tryCatch(get_user_teams_finances(champ_id), error = function(e) NULL)
+      }
+      if (is.null(teams_df) || nrow(teams_df) == 0) {
+        teams_df <- teams
       }
 
-      team_names <- if ("name" %in% colnames(teams_df)) teams_df$name else if ("teamname" %in% colnames(teams_df)) teams_df$teamname else "Unknown"
+      if (is.null(teams_df) || nrow(teams_df) == 0) {
+        return(NULL)
+      }
+
+      team_names <- if ("teamname" %in% colnames(teams_df)) teams_df$teamname else if ("name" %in% colnames(teams_df)) teams_df$name else "Unknown"
       team_budgets <- if ("budget" %in% colnames(teams_df)) as.numeric(teams_df$budget) else 0
 
       plot_df <- data.frame(
-        team = team_names,
-        budget = team_budgets,
+        team = as.character(team_names),
+        budget = as.numeric(team_budgets),
         stringsAsFactors = FALSE
-      )
+      ) %>% dplyr::arrange(budget)
 
-      plotly::plot_ly(data = plot_df, x = ~budget, y = ~team, type = "bar", orientation = "h",
-                      marker = list(color = "#f59e0b", line = list(color = "#d97706", width = 1)),
-                      hoverinfo = "text",
-                      text = ~paste0("Team: ", team, "<br>Cash Budget: ", format_table_currency(budget))) %>%
+      colors <- ifelse(plot_df$budget >= 0, "#10b981", "#ef4444")
+      line_colors <- ifelse(plot_df$budget >= 0, "#059669", "#b91c1c")
+
+      plotly::plot_ly(
+        data = plot_df,
+        x = ~budget,
+        y = ~reorder(team, budget),
+        type = "bar",
+        orientation = "h",
+        marker = list(color = colors, line = list(color = line_colors, width = 1)),
+        hoverinfo = "text",
+        text = ~paste0("<b>", team, "</b><br>Liquid Cash: ", format_table_currency(budget))
+      ) %>%
         plotly::layout(
           paper_bgcolor = "rgba(0,0,0,0)",
           plot_bgcolor = "rgba(0,0,0,0)",
-          xaxis = list(title = "Liquid Cash Budget (€)", gridcolor = "#f1f5f9", zeroline = FALSE, tickformat = "s"),
-          yaxis = list(title = "", gridcolor = "#f1f5f9", zeroline = FALSE, categoryorder = "total ascending"),
-          margin = list(l = 100, r = 20, t = 10, b = 40)
+          xaxis = list(title = "Liquid Cash Budget (€)", gridcolor = "#f1f5f9", zeroline = TRUE, zerolinecolor = "#cbd5e1"),
+          yaxis = list(title = "", gridcolor = "#f1f5f9", zeroline = FALSE),
+          margin = list(l = 120, r = 20, t = 10, b = 40)
         )
     })
 

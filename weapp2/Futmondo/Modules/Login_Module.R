@@ -8,7 +8,11 @@ login_UI <- function(id) {
       solidHeader = TRUE,
       textInput(inputId = ns("user_name"), label = "User name:", placeholder = "User name", value = Sys.getenv("user_name")),
       passwordInput(inputId = ns("password"), label = "Password:", placeholder = "password", value = Sys.getenv("password")),
-      actionButton(inputId = ns("login_button"), label = "Login")
+      actionButton(inputId = ns("login_button"), label = "Login"),
+      p(style = "color: #64748b; font-size: 11px; margin-top: 15px; display: flex; align-items: center; gap: 5px;",
+        shiny::tags$i(class = "fa-solid fa-lock", style = "color: #10b981;"),
+        "Your password is encrypted and is never saved or stored anywhere."
+      )
     ),
     shinydashboardPlus::box(
       id = ns("login_result_box"),

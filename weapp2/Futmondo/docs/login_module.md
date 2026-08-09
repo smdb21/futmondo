@@ -18,3 +18,9 @@ Upon successful login with Futmondo API (`POST https://api.futmondo.com/5/login/
 1. **Security Clean-Up**: Raw API tokens are hidden from the user interface.
 2. **Welcome Card**: Renders a clean success card featuring a green checkmark icon (`fa-circle-check`), personalized greeting (`"Welcome back, [user_name]!"`), and active connection indicator.
 3. **Status Update**: Updates the result box status to `"success"`.
+
+---
+
+## 3. Security Notice
+
+A lock icon badge (`fa-lock`) and the caption `"Your password is encrypted and is never saved or stored anywhere."` are displayed on the login form to reassure users that their credentials are used strictly for session authentication with the Futmondo API and are never saved to disk or database.
