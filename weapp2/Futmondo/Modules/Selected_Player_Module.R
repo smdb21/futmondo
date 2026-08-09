@@ -105,9 +105,6 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         print(paste0("Selected player: ", sp$name))
         player_name <- sp$name
         role_text <- sp$role
-        if (!is.na(sp$role2) && sp$role2 != "") {
-          role_text <- paste(role_text, sp$role2, sep = ", ")
-        }
 
         # Dynamically build integrated team logo emblem & name
         team_logo <- NULL

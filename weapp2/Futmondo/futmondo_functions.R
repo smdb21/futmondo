@@ -792,6 +792,7 @@ get_reactable_columns_for_players <- function(table) {
     columns[["role"]] <- colDef(
       name = "Position",
       align = "center",
+      minWidth = 170,
       cell = function(value) {
         if (is.null(value) || is.na(value) || value == "" || value == "NA") return("")
 
