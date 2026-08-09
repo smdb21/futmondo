@@ -61,25 +61,36 @@ login_Server <- function(id, user, password) {
           })
           return()
         }
-        token <- login_token[["token"]]
         user_name <- login_token[["user_name"]]
         output$text <- renderUI({
-          tagList(
-            h4("Login successful"),
-            h5(paste("User name: ", user_name)),
-            h5(paste("Token: ", token))
+          div(
+            style = "padding: 10px; text-align: left;",
+            div(
+              style = "display: flex; align-items: center; gap: 12px; margin-bottom: 12px;",
+              shiny::tags$i(class = "fa-solid fa-circle-check", style = "font-size: 28px; color: #10b981;"),
+              div(
+                h3(style = "font-weight: 700; color: #0f172a; margin: 0; font-size: 18px;", paste0("Welcome back, ", user_name, "!")),
+                p(style = "color: #64748b; margin: 2px 0 0 0; font-size: 13px;", "Authenticated successfully with Futmondo")
+              )
+            ),
+            div(
+              style = "background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-top: 10px;",
+              p(style = "margin: 0; font-size: 13px; color: #334155;",
+                icon("shield-halved", style = "color: #3b82f6; margin-right: 6px;"),
+                strong("Status: "), "Connected & Active | Redirecting to your team..."
+              )
+            )
           )
         })
         updateBox(
           id = "login_result_box",
           action = "update",
           options = list(
-            title = h4("Welcome", dashboardLabel(user_name, status = "primary")),
-            status = "warning",
+            title = h4("Authentication Status"),
+            status = "success",
             solidHeader = TRUE,
             width = 8,
             background = NULL,
-            # height = "900px",
             closable = FALSE
           )
         )
