@@ -1042,26 +1042,40 @@ buy_clause <- function(login, championship_id, team_id, player_id, player_slug, 
       userid = login[["userid"]]
     ),
     query = list(
-      championshipId = championship_id,
-      userteamId = team_id,
-      player_id = player_id,
-      player_slug = player_slug,
-      price = price,
-      isClause = isClause
+      championshipId = as.character(championship_id),
+      userteamId = as.character(team_id),
+      player_id = as.character(player_id),
+      player_slug = as.character(player_slug),
+      price = as.numeric(price),
+      isClause = as.logical(isClause)
     ),
     answer = list()
   )
 
-  # Adding headers
   headers <- c(
     "Content-Type" = "application/json; charset=utf-8"
   )
 
-  # Sending the POST request
-  print("Sending bid/clause purchase request")
-  response <- POST(BID_URL, body = toJSON(payload), add_headers(.headers = headers))
-  operation_code <- httr::content(response)$answer$code
-  return(operation_code == API_CODE_OK)
+  print(paste0("[API] Sending bid/clause request for player: ", player_id, " price: ", price, " isClause: ", isClause))
+  response <- POST(BID_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
+  ans <- httr::content(response)
+
+  operation_code <- if (!is.null(ans) && "answer" %in% names(ans) && "code" %in% names(ans$answer)) ans$answer$code else ""
+  err_msg <- if (!is.null(ans) && "answer" %in% names(ans) && "msg" %in% names(ans$answer)) ans$answer$msg else if (!is.null(ans) && "answer" %in% names(ans) && "message" %in% names(ans$answer)) ans$answer$message else operation_code
+
+  is_success <- (operation_code == API_CODE_OK)
+
+  if (!is_success) {
+    print(paste0("[API] Bid request failed. Code: ", operation_code, " Msg: ", err_msg))
+  } else {
+    print("[API] Bid request succeeded (api.general.ok)")
+  }
+
+  return(list(
+    success = is_success,
+    code = operation_code,
+    message = err_msg
+  ))
 }
 
 get_user_team_info <- function(login, championship_id, user_team_id) {

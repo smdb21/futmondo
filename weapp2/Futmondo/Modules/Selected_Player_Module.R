@@ -453,7 +453,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       player_id <- sp$id
       player_slug <- if ("slug" %in% colnames(sp) && !is.na(sp$slug)) sp$slug else sp$name
 
-      success <- buy_clause(
+      res <- buy_clause(
         login = login,
         championship_id = champ_id,
         team_id = team_id,
@@ -463,9 +463,11 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         isClause = FALSE
       )
 
+      is_success <- if (is.list(res)) isTRUE(res$success) else isTRUE(res)
+
       removeModal()
 
-      if (success) {
+      if (is_success) {
         tryCatch({
           log_market_transaction(
             player_id = player_id,
@@ -483,15 +485,16 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           type = "message",
           duration = 5
         )
+        clear_api_cache()
         if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
           tryCatch(on_bid_updated(), error = function(e) NULL)
         }
-        clear_api_cache()
       } else {
+        err_msg <- if (is.list(res) && !is.null(res$message) && res$message != "") res$message else "Please verify your funds and try again."
         shiny::showNotification(
-          "Offer failed. Please verify your funds and try again.",
+          paste0("Offer failed: ", err_msg),
           type = "error",
-          duration = 5
+          duration = 6
         )
       }
     })
@@ -542,7 +545,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       player_id <- sp$id
       player_slug <- if ("slug" %in% colnames(sp) && !is.na(sp$slug)) sp$slug else sp$name
 
-      success <- buy_clause(
+      res <- buy_clause(
         login = login,
         championship_id = champ_id,
         team_id = team_id,
@@ -552,9 +555,11 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         isClause = FALSE
       )
 
+      is_success <- if (is.list(res)) isTRUE(res$success) else isTRUE(res)
+
       removeModal()
 
-      if (success) {
+      if (is_success) {
         tryCatch({
           log_market_transaction(
             player_id = player_id,
@@ -573,11 +578,15 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           duration = 5
         )
         clear_api_cache()
+        if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
+          tryCatch(on_bid_updated(), error = function(e) NULL)
+        }
       } else {
+        err_msg <- if (is.list(res) && !is.null(res$message) && res$message != "") res$message else "Please verify your funds and try again."
         shiny::showNotification(
-          "Offer failed. Please verify your funds and try again.",
+          paste0("Offer failed: ", err_msg),
           type = "error",
-          duration = 5
+          duration = 6
         )
       }
     })
@@ -614,7 +623,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       player_id <- sp$id
       player_slug <- if ("slug" %in% colnames(sp) && !is.na(sp$slug)) sp$slug else sp$name
 
-      success <- buy_clause(
+      res <- buy_clause(
         login = login,
         championship_id = champ_id,
         team_id = team_id,
@@ -624,9 +633,11 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         isClause = TRUE
       )
 
+      is_success <- if (is.list(res)) isTRUE(res$success) else isTRUE(res)
+
       removeModal()
 
-      if (success) {
+      if (is_success) {
         tryCatch({
           log_market_transaction(
             player_id = player_id,
@@ -644,15 +655,16 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           type = "message",
           duration = 5
         )
+        clear_api_cache()
         if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
           tryCatch(on_bid_updated(), error = function(e) NULL)
         }
-        clear_api_cache()
       } else {
+        err_msg <- if (is.list(res) && !is.null(res$message) && res$message != "") res$message else "Please verify your funds and try again."
         shiny::showNotification(
-          "Clause buyout failed. Please verify your funds and try again.",
+          paste0("Clause buyout failed: ", err_msg),
           type = "error",
-          duration = 5
+          duration = 6
         )
       }
     })

@@ -61,6 +61,22 @@ If a clause exists (`clause_price > 0`) but is currently locked (`clause_transfe
 * `championship_id`: Reactive returning active championship ID string.
 * `user_team_id`: Reactive returning logged-in user's team ID string.
 
+### JSON Serialization
+All outbound HTTP requests from `buy_clause()` use `toJSON(payload, auto_unbox = TRUE)` to produce compact JSON with no wrapper arrays. Scalar fields are explicitly cast to comply with Futmondo's API specifications:
+- `as.character` for string IDs (e.g., `championship_id`, `user_team_id`).
+- `as.numeric` for monetary values (e.g., `price`).
+- `as.logical` for flags (e.g., `isClause`).
+
+This ensures that numeric and boolean values are serialized as bare scalars rather than single-element arrays, which the Futmondo API rejects.
+
+### Error Response Handling
+`buy_clause()` always returns a structured list with three keys: `success`, `code`, and `message`.
+
+- On success: `success` is `TRUE`, `code` is the HTTP status, and `message` is a confirmation string.
+- On failure (offer or buyout): `success` is `FALSE`, `code` is the HTTP error code, and `message` contains Futmondo's specific error description extracted from the response body.
+
+The caller in `selected_player_Server` checks `response$success`. If `FALSE`, the module displays `response$message` in the notification toast, surfacing the API-provided error to the user without crashing.
+
 ### Transaction Logging & Cache Management
 On successful offer or clause buyout:
 1. Calls `log_market_transaction()` to log purchase records into Supabase table `market_transactions`.
