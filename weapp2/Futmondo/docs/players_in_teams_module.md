@@ -37,3 +37,10 @@ Horizontal bar chart rendering liquid cash balances across all user teams in the
 #### Return Value
 
 A `ggplot2` object suitable for rendering via `renderPlot()` in a Shiny UI.
+
+---
+
+## 3. Bulk Squad Market Listing
+
+### "Put All Players on Market" (`btn_put_all_on_market`)
+Prompts a warning modal to confirm the user's intent. On confirmation, executes a bulk listing of all squad players via `put_all_on_market()`, which calls `POST https://api.futmondo.com/5/market/putallonmarket`. On success, invalidates the API cache and displays a confirmation notification.

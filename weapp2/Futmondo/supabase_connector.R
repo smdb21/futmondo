@@ -108,7 +108,8 @@ sync_user_teams_to_supabase <- function(teams_df, championship_id) {
     budget = if ("budget" %in% colnames(teams_df)) as.numeric(teams_df$budget) else 0,
     points = if ("points" %in% colnames(teams_df)) as.integer(teams_df$points) else 0,
     position = if ("position" %in% colnames(teams_df)) as.integer(teams_df$position) else NA_integer_,
-    team_value = if ("teamValue" %in% colnames(teams_df)) as.numeric(teams_df$teamValue) else 0,
+    team_value = if ("team_value" %in% colnames(teams_df)) as.numeric(teams_df$team_value) else if ("teamValue" %in% colnames(teams_df)) as.numeric(teams_df$teamValue) else 0,
+    is_active = if ("is_active" %in% colnames(teams_df)) as.logical(teams_df$is_active) else TRUE,
     stringsAsFactors = FALSE
   )
 
@@ -117,10 +118,11 @@ sync_user_teams_to_supabase <- function(teams_df, championship_id) {
   supabase_post("user_teams", payload)
 }
 
-log_user_team_history <- function(teams_df) {
+log_user_team_history <- function(teams_df, round_number = NULL) {
   if (is.null(teams_df) || nrow(teams_df) == 0) return()
   
   team_ids <- if ("teamid" %in% colnames(teams_df)) teams_df$teamid else if ("id" %in% colnames(teams_df)) teams_df$id else return()
+  active_cnt <- length(unique(team_ids))
   
   payload <- data.frame(
     user_team_id = as.character(team_ids),
@@ -128,6 +130,8 @@ log_user_team_history <- function(teams_df) {
     budget = if ("budget" %in% colnames(teams_df)) as.numeric(teams_df$budget) else 0,
     position = if ("position" %in% colnames(teams_df)) as.integer(teams_df$position) else NA_integer_,
     team_value = if ("team_value" %in% colnames(teams_df)) as.numeric(teams_df$team_value) else if ("teamValue" %in% colnames(teams_df)) as.numeric(teams_df$teamValue) else 0,
+    round_number = if (!is.null(round_number)) as.integer(round_number) else if ("round_number" %in% colnames(teams_df)) as.integer(teams_df$round_number) else NA_integer_,
+    active_teams_count = as.integer(active_cnt),
     stringsAsFactors = FALSE
   )
 

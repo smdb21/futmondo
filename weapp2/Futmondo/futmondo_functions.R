@@ -2,11 +2,17 @@ LOGIN_URL <- "https://api.futmondo.com/5/login/with_mail"
 ACTIVE_CHAMPIONSHIPS_URL <- "https://api.futmondo.com/2/user/activechampionships"
 TEAMS_URL <- "https://api.futmondo.com/2/championship/teams"
 ROSTER_URL <- "https://api.futmondo.com/1/userteam/roster"
+DREAMTEAM_URL <- "https://api.futmondo.com/1/userteam/dreamteam"
+ROUNDS_URL <- "https://api.futmondo.com/1/userteam/rounds"
 BID_URL <- "https://api.futmondo.com/1/market/bid"
 MARKET_URL <- "https://api.futmondo.com/1/market/players"
 PLAYER_SUMMARY_URL <- "https://api.futmondo.com/1/player/summary"
 MODIFY_BID_URL <- "https://api.futmondo.com/5/market/modifybid"
 CANCEL_BID_URL <- "https://api.futmondo.com/1/market/cancelbid"
+PUT_ON_MARKET_URL <- "https://api.futmondo.com/1/market/putonmarket"
+CANCEL_SELL_URL <- "https://api.futmondo.com/1/market/cancelsell"
+PUT_ALL_ON_MARKET_URL <- "https://api.futmondo.com/5/market/putallonmarket"
+MY_PLAYERS_URL <- "https://api.futmondo.com/1/market/myplayers"
 API_CODE_OK <- "api.general.ok"
 PHOTO_URL <- "https://static01.mondocore.com/futmondo/img/faces/64"
 LINEUP_URL <- "https://api.futmondo.com/1/userteam/lineup"
@@ -1173,7 +1179,7 @@ calculate_league_finances <- function(login, championship_id, user_teams_df, ini
           teamid = character(0), teamname = character(0), initial_budget = numeric(0),
           total_spent = numeric(0), budget = numeric(0), team_value = numeric(0),
           net_profit_loss = numeric(0), squad_size = numeric(0), points = numeric(0),
-          point_bonus = numeric(0), stringsAsFactors = FALSE
+          point_bonus = numeric(0), ranking_prize = numeric(0), stringsAsFactors = FALSE
         ),
         all_purchases = data.frame()
       ))
@@ -1181,7 +1187,9 @@ calculate_league_finances <- function(login, championship_id, user_teams_df, ini
     
     finances_list <- list()
     purchases_list <- list()
-    
+
+    ranking_prizes_df <- calculate_futmondo_ranking_prizes(money = 30000000, members = nrow(user_teams_df))
+
     for (i in seq_len(nrow(user_teams_df))) {
       row <- user_teams_df[i, ]
       tid <- if ("teamid" %in% colnames(row)) row$teamid else row$id
@@ -1231,9 +1239,12 @@ calculate_league_finances <- function(login, championship_id, user_teams_df, ini
       
       # Point bonus calculation (70000 EUR per point)
       point_bonus <- tpoints * 70000
-      
-      # Money Left = Initial Budget - Total Spent + Point Bonus
-      calc_money_left <- initial_budget - total_spent + point_bonus
+
+      # Ranking prize based on team position
+      ranking_prize <- if (i <= nrow(ranking_prizes_df)) ranking_prizes_df$prize[i] else 0
+
+      # Money Left = Initial Budget - Total Spent + Point Bonus + Ranking Prize
+      calc_money_left <- initial_budget - total_spent + point_bonus + ranking_prize
       
       # If get_user_team_info provides an explicit budget for this team, use it if valid
       actual_info <- tryCatch({
@@ -1260,6 +1271,7 @@ calculate_league_finances <- function(login, championship_id, user_teams_df, ini
         squad_size = as.numeric(squad_size),
         points = as.numeric(tpoints),
         point_bonus = as.numeric(point_bonus),
+        ranking_prize = as.numeric(ranking_prize),
         stringsAsFactors = FALSE
       )
     }
@@ -1387,4 +1399,200 @@ cancel_bid <- function(login, championship_id, team_id, bid_id) {
   ans <- httr::content(response)
   operation_code <- if (!is.null(ans) && "answer" %in% names(ans) && "code" %in% names(ans$answer)) ans$answer$code else ""
   return(operation_code == API_CODE_OK)
+}
+
+get_user_team_rounds <- function(login, championship_id, user_team_id) {
+  if (is.null(login) || is.null(championship_id) || is.null(user_team_id)) return(NULL)
+  
+  cache_key <- paste0("rounds_", championship_id, "_", user_team_id)
+  get_cached_data(cache_key, {
+    payload <- list(
+      header = list(
+        token = login[["token"]],
+        userid = login[["userid"]]
+      ),
+      query = list(
+        championshipId = championship_id,
+        userteamId = user_team_id
+      ),
+      answer = list()
+    )
+    headers <- c("Content-Type" = "application/json; charset=utf-8")
+    print(paste0("[API] Fetching rounds for team: ", user_team_id))
+    response <- POST(ROUNDS_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
+    ans <- httr::content(response)
+    if (!is.null(ans) && "answer" %in% names(ans) && is.list(ans$answer)) {
+      return(ans$answer)
+    }
+    return(list())
+  })
+}
+
+get_round_dreamteam <- function(login, championship_id, round_number) {
+  if (is.null(login) || is.null(championship_id) || is.null(round_number)) return(NULL)
+  
+  cache_key <- paste0("dreamteam_", championship_id, "_", round_number)
+  get_cached_data(cache_key, {
+    payload <- list(
+      header = list(
+        token = login[["token"]],
+        userid = login[["userid"]]
+      ),
+      query = list(
+        championshipId = championship_id,
+        type = "dreamteam",
+        round = round_number
+      ),
+      answer = list()
+    )
+    headers <- c("Content-Type" = "application/json; charset=utf-8")
+    print(paste0("[API] Fetching dreamteam for round: ", round_number))
+    response <- POST(DREAMTEAM_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
+    ans <- httr::content(response)
+    if (!is.null(ans) && "answer" %in% names(ans) && is.list(ans$answer)) {
+      return(ans$answer)
+    }
+    return(list())
+  })
+}
+
+calculate_futmondo_ranking_prizes <- function(money = 30000000, members = 1) {
+  if (is.null(members) || is.na(members) || members <= 0) members <- 1
+  if (is.null(money) || is.na(money) || money <= 0) money <- 0
+
+  total_pct <- sum(seq_len(members))
+  ranks <- seq_len(members)
+  ratios <- (members - ranks + 1) / total_pct
+  prizes <- round(money * ratios)
+
+  data.frame(
+    rank = ranks,
+    ratio = ratios,
+    prize = prizes,
+    stringsAsFactors = FALSE
+  )
+}
+
+put_player_on_market <- function(login, championship_id, team_id, player_id, price) {
+  payload <- list(
+    header = list(
+      token = login[["token"]],
+      userid = login[["userid"]]
+    ),
+    query = list(
+      championshipId = as.character(championship_id),
+      userteamId = as.character(team_id),
+      price = as.numeric(price),
+      player_id = as.character(player_id),
+      isClause = NULL,
+      mode = NULL,
+      toLoan = NULL
+    ),
+    answer = list()
+  )
+  headers <- c("Content-Type" = "application/json; charset=utf-8")
+  print(paste0("[API] Putting player on market: ", player_id, " price: ", price))
+  response <- POST(PUT_ON_MARKET_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
+  ans <- httr::content(response)
+
+  operation_code <- if (!is.null(ans) && "answer" %in% names(ans) && "code" %in% names(ans$answer)) ans$answer$code else ""
+  err_msg <- if (!is.null(ans) && "answer" %in% names(ans) && "msg" %in% names(ans$answer)) ans$answer$msg else if (!is.null(ans) && "answer" %in% names(ans) && "message" %in% names(ans$answer)) ans$answer$message else operation_code
+
+  is_success <- (operation_code == API_CODE_OK)
+  return(list(
+    success = is_success,
+    code = operation_code,
+    message = err_msg
+  ))
+}
+
+cancel_player_sell <- function(login, championship_id, team_id, player_id) {
+  payload <- list(
+    header = list(
+      token = login[["token"]],
+      userid = login[["userid"]]
+    ),
+    query = list(
+      championshipId = as.character(championship_id),
+      userteamId = as.character(team_id),
+      player_id = as.character(player_id)
+    ),
+    answer = list()
+  )
+  headers <- c("Content-Type" = "application/json; charset=utf-8")
+  print(paste0("[API] Cancelling player sell for: ", player_id))
+  response <- POST(CANCEL_SELL_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
+  ans <- httr::content(response)
+
+  operation_code <- if (!is.null(ans) && "answer" %in% names(ans) && "code" %in% names(ans$answer)) ans$answer$code else ""
+  err_msg <- if (!is.null(ans) && "answer" %in% names(ans) && "msg" %in% names(ans$answer)) ans$answer$msg else if (!is.null(ans) && "answer" %in% names(ans) && "message" %in% names(ans$answer)) ans$answer$message else operation_code
+
+  is_success <- (operation_code == API_CODE_OK)
+  return(list(
+    success = is_success,
+    code = operation_code,
+    message = err_msg
+  ))
+}
+
+put_all_on_market <- function(login, championship_id, team_id) {
+  payload <- list(
+    header = list(
+      token = login[["token"]],
+      userid = login[["userid"]]
+    ),
+    query = list(
+      championshipId = as.character(championship_id),
+      userteamId = as.character(team_id)
+    ),
+    answer = list()
+  )
+  headers <- c("Content-Type" = "application/json; charset=utf-8")
+  print(paste0("[API] Putting ALL players on market for team: ", team_id))
+  response <- POST(PUT_ALL_ON_MARKET_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
+  ans <- httr::content(response)
+
+  operation_code <- if (!is.null(ans) && "answer" %in% names(ans) && "code" %in% names(ans$answer)) ans$answer$code else ""
+  err_msg <- if (!is.null(ans) && "answer" %in% names(ans) && "msg" %in% names(ans$answer)) ans$answer$msg else if (!is.null(ans) && "answer" %in% names(ans) && "message" %in% names(ans$answer)) ans$answer$message else operation_code
+
+  is_success <- (operation_code == API_CODE_OK)
+  return(list(
+    success = is_success,
+    code = operation_code,
+    message = err_msg
+  ))
+}
+
+get_my_market_players <- function(login, championship_id, user_team_id) {
+  if (is.null(login) || is.null(championship_id) || is.null(user_team_id)) return(NULL)
+
+  cache_key <- paste0("my_market_players_", championship_id, "_", user_team_id)
+  get_cached_data(cache_key, {
+    payload <- list(
+      header = list(
+        token = login[["token"]],
+        userid = login[["userid"]]
+      ),
+      query = list(
+        championshipId = as.character(championship_id),
+        userteamId = as.character(user_team_id),
+        type = "market"
+      ),
+      answer = list()
+    )
+    headers <- c("Content-Type" = "application/json; charset=utf-8")
+    print("[API] Fetching user's listed market players")
+    response <- POST(MY_PLAYERS_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
+    ans <- httr::content(response)
+
+    if (!is.null(ans) && "answer" %in% names(ans) && is.list(ans$answer)) {
+      players <- ans$answer
+      if (length(players) == 0) return(data.frame())
+      ret <- lapply(players, FUN = function(player) {
+        parse_player_json(player = player)
+      }) %>% rbindlist(fill = TRUE) %>% as.data.frame()
+      return(ret)
+    }
+    return(data.frame())
+  }, timeout_sec = 60)
 }

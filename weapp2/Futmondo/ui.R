@@ -44,6 +44,10 @@ body <- shinydashboard::dashboardBody(
     shinydashboard::tabItem(
       tabName = "rivals",
       rivals_UI(id = "rivals")
+    ),
+    shinydashboard::tabItem(
+      tabName = "classification",
+      classification_UI(id = "classification")
     )
   ),
   # Floating Action Button for global cache refresh

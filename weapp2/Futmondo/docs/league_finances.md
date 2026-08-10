@@ -55,3 +55,32 @@ Queries historical financial snapshots (`budget`, `team_value`, `points`, `posit
 
 #### Return Value
 Data frame containing historical user team financial records.
+
+---
+
+### D. `calculate_futmondo_ranking_prizes(money, members)`
+
+Computes the Futmondo official ranking prize distribution for a league using a triangular-number ratio formula.
+
+#### Parameters
+- `money`: Numeric total prize pool to distribute across all ranking positions.
+- `members`: Data frame of user teams in the championship (as returned by `get_user_teams`).
+
+#### Algorithm
+
+The function determines the active league size $N$ from the number of rows in `members` (i.e. $N = \text{nrow(user\_teams\_df)}$). Teams flagged with `is_active = FALSE` are considered inactive/former teams and are excluded from the active count.
+
+The total percentage denominator is the sum of integers from 1 to $N$:
+
+$$\text{totalPct} = \sum_{i=1}^{N} i = \frac{N(N+1)}{2}$$
+
+Each ranking position $k$ (where $k = 1$ is the top rank) receives a ratio:
+
+$$\text{ratio}_k = \frac{N - k + 1}{\text{totalPct}}$$
+
+The prize awarded to rank $k$ is:
+
+$$\text{Ranking Prize}_k = \text{round}\left(\text{moneyPerRanking} \times \text{ratio}_k\right)$$
+
+#### Return Value
+Numeric vector of length $N$ containing the rounded prize amount for each ranking position (index 1 corresponds to rank 1).

@@ -254,11 +254,46 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           }
         } else {
           # Player is in user's own squad
+          is_listed_on_market <- FALSE
+          if ("market_inMarket" %in% colnames(sp) && isTRUE(as.logical(sp$market_inMarket))) {
+            is_listed_on_market <- TRUE
+          } else if ("price" %in% colnames(sp) && !is.na(sp$price) && suppressWarnings(as.numeric(sp$price)) > 0) {
+            is_listed_on_market <- TRUE
+          } else if (!is.null(login) && !is.null(champ_id) && !is.null(team_id)) {
+            my_mkt_players <- tryCatch({
+              get_my_market_players(login = login, championship_id = champ_id, user_team_id = team_id)
+            }, error = function(e) NULL)
+            if (!is.null(my_mkt_players) && nrow(my_mkt_players) > 0 && "id" %in% colnames(my_mkt_players)) {
+              if (as.character(sp$id) %in% as.character(my_mkt_players$id)) {
+                is_listed_on_market <- TRUE
+              }
+            }
+          }
+
           own_badge <- div(
             style = "display: inline-block; padding: 8px 16px; background-color: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; border-radius: 8px; font-weight: 600; font-size: 12px; margin: 5px;",
             tagList(icon("shield-halved"), " Player in Your Squad")
           )
-          action_buttons <- tagList(own_badge)
+
+          if (is_listed_on_market) {
+            listed_badge <- div(
+              style = "display: inline-block; padding: 8px 16px; background-color: #fef3c7; color: #b45309; border: 1px solid #fde68a; border-radius: 8px; font-weight: 600; font-size: 12px; margin: 5px;",
+              tagList(icon("tags"), " Player Listed on Market")
+            )
+            btn_cancel_sell <- actionButton(
+              ns("btn_cancel_sell"),
+              label = tagList(icon("tag"), " Remove from Market"),
+              class = "btn btn-cancel-bid"
+            )
+            action_buttons <- tagList(own_badge, listed_badge, btn_cancel_sell)
+          } else {
+            btn_put_on_market <- actionButton(
+              ns("btn_put_on_market"),
+              label = tagList(icon("tags"), " Put on Market for Sale"),
+              class = "btn btn-offer-money"
+            )
+            action_buttons <- tagList(own_badge, btn_put_on_market)
+          }
         }
 
         output$action_buttons <- renderUI(action_buttons)
@@ -663,6 +698,140 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         err_msg <- if (is.list(res) && !is.null(res$message) && res$message != "") res$message else "Please verify your funds and try again."
         shiny::showNotification(
           paste0("Clause buyout failed: ", err_msg),
+          type = "error",
+          duration = 6
+        )
+      }
+    })
+
+    # ---- Put Single Player on Market Modal ----
+    observeEvent(input$btn_put_on_market, {
+      sp <- selected_player()
+      req(sp)
+      default_price <- if ("value" %in% colnames(sp) && !is.na(sp$value) && sp$value > 0) sp$value else 1000000
+
+      showModal(modalDialog(
+        title = tagList(icon("tags"), paste0(" List ", sp$name, " on Market")),
+        p(strong(sp$name)),
+        p("Current Market Valuation: ", strong(format_currency(default_price))),
+        numericInput(
+          ns("sale_price_input"),
+          label = "Asking Listing Price (EUR):",
+          value = default_price,
+          min = 1,
+          step = 10000
+        ),
+        p(style = "color: #64748b; font-size: 12px;", "This player will be listed on the transfer market for other users and computer to place bids."),
+        footer = tagList(
+          modalButton("Cancel"),
+          actionButton(ns("submit_put_on_market"), "Confirm Market Listing", class = "btn btn-offer-money")
+        ),
+        easyClose = TRUE,
+        size = "s"
+      ))
+    })
+
+    # ---- Submit Put Player on Market ----
+    observeEvent(input$submit_put_on_market, {
+      sp <- selected_player()
+      login <- get_reactive_val(login_token)
+      champ_id <- get_reactive_val(championship_id)
+      team_id <- get_reactive_val(user_team_id)
+      req(sp, login, champ_id, team_id)
+
+      sale_price <- input$sale_price_input
+      if (is.null(sale_price) || sale_price <= 0) {
+        shiny::showNotification("Please enter a valid listing price.", type = "warning")
+        return()
+      }
+
+      player_id <- sp$id
+
+      res <- put_player_on_market(
+        login = login,
+        championship_id = champ_id,
+        team_id = team_id,
+        player_id = player_id,
+        price = sale_price
+      )
+
+      is_success <- if (is.list(res)) isTRUE(res$success) else isTRUE(res)
+
+      removeModal()
+
+      if (is_success) {
+        shiny::showNotification(
+          paste0(sp$name, " listed on the transfer market for ", format_currency(sale_price), "!"),
+          type = "message",
+          duration = 5
+        )
+        clear_api_cache()
+        if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
+          tryCatch(on_bid_updated(player_id = player_id, new_bid_price = sale_price, is_cancel = FALSE), error = function(e) NULL)
+        }
+      } else {
+        err_msg <- if (is.list(res) && !is.null(res$message) && res$message != "") res$message else "Listing failed. Please try again."
+        shiny::showNotification(
+          paste0("Failed to list player: ", err_msg),
+          type = "error",
+          duration = 6
+        )
+      }
+    })
+
+    # ---- Remove Player from Market Modal ----
+    observeEvent(input$btn_cancel_sell, {
+      sp <- selected_player()
+      req(sp)
+
+      showModal(modalDialog(
+        title = tagList(icon("tag"), paste0(" Remove ", sp$name, " from Market")),
+        p(strong(sp$name)),
+        p("Are you sure you want to withdraw this player from the transfer market?"),
+        footer = tagList(
+          modalButton("Cancel"),
+          actionButton(ns("submit_cancel_sell"), "Confirm Remove from Market", class = "btn btn-cancel-bid")
+        ),
+        easyClose = TRUE,
+        size = "s"
+      ))
+    })
+
+    # ---- Submit Remove Player from Market ----
+    observeEvent(input$submit_cancel_sell, {
+      sp <- selected_player()
+      login <- get_reactive_val(login_token)
+      champ_id <- get_reactive_val(championship_id)
+      team_id <- get_reactive_val(user_team_id)
+      req(sp, login, champ_id, team_id)
+
+      player_id <- sp$id
+
+      res <- cancel_player_sell(
+        login = login,
+        championship_id = champ_id,
+        team_id = team_id,
+        player_id = player_id
+      )
+
+      is_success <- if (is.list(res)) isTRUE(res$success) else isTRUE(res)
+
+      removeModal()
+
+      if (is_success) {
+        shiny::showNotification(
+          paste0(sp$name, " removed from the transfer market!"),
+          type = "message",
+          duration = 5
+        )
+        clear_api_cache()
+        if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
+          tryCatch(on_bid_updated(player_id = player_id, new_bid_price = NA_real_, is_cancel = TRUE), error = function(e) NULL)
+        }
+      } else {
+        err_msg <- if (is.list(res) && !is.null(res$message) && res$message != "") res$message else "Withdrawal failed. Please try again."
+        shiny::showNotification(
+          paste0("Failed to remove player: ", err_msg),
           type = "error",
           duration = 6
         )

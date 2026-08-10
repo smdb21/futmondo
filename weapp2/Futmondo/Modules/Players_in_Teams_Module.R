@@ -5,6 +5,14 @@ players_in_teams_UI <- function(id) {
   tagList(
     uiOutput(ns("team_value_box")),
     uiOutput(ns("charts_row")), # Dynamic Plot B & Plot C Container
+    div(
+      style = "margin-bottom: 15px; display: flex; justify-content: flex-end;",
+      actionButton(
+        inputId = ns("btn_put_all_on_market"),
+        label = tagList(icon("tags"), " Put All Players on Market"),
+        class = "btn btn-offer-money"
+      )
+    ),
     players_table_UI(
       id = ns("players_table_in_teams"), box_title = "Players in Team",
       filter_by_position = TRUE,
@@ -206,6 +214,66 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       return(ret)
     })
     # observers ----
+    get_reactive_val <- function(x) {
+      if (is.null(x)) return(NULL)
+      if (is.reactive(x) || is.function(x)) {
+        tryCatch(x(), error = function(e) NULL)
+      } else {
+        x
+      }
+    }
+
+    # ---- Put All Players on Market Modal ----
+    observeEvent(input$btn_put_all_on_market, {
+      showModal(modalDialog(
+        title = tagList(icon("tags"), " Put All Players on Market"),
+        p("Are you sure you want to list ALL your squad players on the transfer market simultaneously?"),
+        p(style = "color: #64748b; font-size: 12px;", "Other users and the computer will be able to place bids on all your players."),
+        footer = tagList(
+          modalButton("Cancel"),
+          actionButton(ns("submit_put_all_on_market"), "Confirm Market Listing", class = "btn btn-offer-money")
+        ),
+        easyClose = TRUE,
+        size = "s"
+      ))
+    })
+
+    # ---- Submit Put All Players on Market ----
+    observeEvent(input$submit_put_all_on_market, {
+      login <- get_reactive_val(login_token)
+      champ_id <- get_reactive_val(championship_id)
+      team_id <- get_reactive_val(user_team_id)
+      req(login, champ_id, team_id)
+
+      res <- put_all_on_market(
+        login = login,
+        championship_id = champ_id,
+        team_id = team_id
+      )
+
+      is_success <- if (is.list(res)) isTRUE(res$success) else isTRUE(res)
+
+      removeModal()
+
+      if (is_success) {
+        shiny::showNotification(
+          "All squad players listed on the transfer market successfully!",
+          type = "message",
+          duration = 5
+        )
+        clear_api_cache()
+        if (!is.null(refresh_trigger)) {
+          tryCatch(refresh_trigger(), error = function(e) NULL)
+        }
+      } else {
+        err_msg <- if (is.list(res) && !is.null(res$message) && res$message != "") res$message else "Bulk listing failed. Please try again."
+        shiny::showNotification(
+          paste0("Failed to list squad on market: ", err_msg),
+          type = "error",
+          duration = 6
+        )
+      }
+    })
 
     # reactives ----
     # Render Interactive Charts Grid

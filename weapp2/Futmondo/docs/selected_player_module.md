@@ -98,3 +98,13 @@ Prompts with `numericInput("new_bid_amount")` pre-filled with the active bid pri
 
 ### "Cancel Bid" Modal (`btn_cancel_bid`)
 Prompts a confirmation dialog to withdraw the active bid. On confirmation, calls `cancel_bid()` to cancel the pending offer entirely.
+
+---
+
+## 5. Market Selling & Withdrawal
+
+### "Put on Market for Sale" (`btn_put_on_market`)
+Prompts a modal dialog with a `numericInput` for the asking price. On submission, executes the listing via `put_player_on_market()`, which calls `POST https://api.futmondo.com/1/market/putonmarket`. On success, invalidates the API cache and displays a confirmation notification.
+
+### "Remove from Market" (`btn_cancel_sell`)
+Displays a confirmation modal to withdraw the listed player from the transfer market. On confirmation, executes the withdrawal via `cancel_player_sell()`, which calls `POST https://api.futmondo.com/1/market/cancelsell`. On success, invalidates the API cache and displays a confirmation notification.
