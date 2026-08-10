@@ -177,9 +177,16 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
         next_team_block <- NULL
       }
       # Liquid Cash Box for User Team
+      user_login <- get_reactive_val(login_token)
+      user_champ_id <- get_reactive_val(championship_id)
       user_tid <- get_reactive_val(user_team_id)
+
       user_finances <- tryCatch({
-        get_user_team_info(login = login_token(), championship_id = championship_id(), user_team_id = user_tid)
+        if (!is.null(user_login) && !is.null(user_champ_id) && !is.null(user_tid)) {
+          get_user_team_info(login = user_login, championship_id = user_champ_id, user_team_id = user_tid)
+        } else {
+          NULL
+        }
       }, error = function(e) NULL)
 
       roster_players <- players_table_RV()
@@ -200,6 +207,15 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
         text = "Available Budget"
       )
 
+      team_position_box <- box(
+        title = "Classification",
+        width = 3,
+        status = "primary",
+        solidHeader = TRUE,
+        collapsible = FALSE,
+        team_position_block
+      )
+
       team_cash_box <- box(
         title = "Liquid Cash",
         width = 3,
@@ -209,18 +225,9 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
         liquid_cash_block
       )
 
-      team_position_box <- box(
-        title = "Classification",
-        width = 2,
-        status = "primary",
-        solidHeader = TRUE,
-        collapsible = FALSE,
-        team_position_block
-      )
-
       team_points_box <- box(
         title = "Points",
-        width = 3.5,
+        width = 3,
         status = "primary",
         solidHeader = TRUE,
         collapsible = FALSE,
@@ -233,7 +240,7 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
 
       team_value_box <- box(
         title = "Value",
-        width = 3.5,
+        width = 3,
         status = "primary",
         solidHeader = TRUE,
         collapsible = FALSE,
