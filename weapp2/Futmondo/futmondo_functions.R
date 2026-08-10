@@ -13,6 +13,8 @@ PUT_ON_MARKET_URL <- "https://api.futmondo.com/1/market/putonmarket"
 CANCEL_SELL_URL <- "https://api.futmondo.com/1/market/cancelsell"
 PUT_ALL_ON_MARKET_URL <- "https://api.futmondo.com/5/market/putallonmarket"
 MY_PLAYERS_URL <- "https://api.futmondo.com/1/market/myplayers"
+ACCEPT_BID_URL <- "https://api.futmondo.com/1/market/acceptbid"
+REJECT_BID_URL <- "https://api.futmondo.com/1/market/rejectbid"
 API_CODE_OK <- "api.general.ok"
 PHOTO_URL <- "https://static01.mondocore.com/futmondo/img/faces/64"
 LINEUP_URL <- "https://api.futmondo.com/1/userteam/lineup"
@@ -435,6 +437,7 @@ parse_player_json <- function(player) {
     player <- player[-which(names(player) == "bid")]
     player <- c(player, bid)
   }
+  player <- player[!is.na(names(player)) & names(player) != ""]
   ret <- data.frame(value = player)
   colnames(ret) <- names(player)
 
@@ -615,7 +618,7 @@ reorder_player_table_columns <- function(df) {
   df_df <- as.data.frame(df)
 
   desired_order <- c(
-    "name", "role", "team", "numberOfBids", "bid_price", "bid_user",
+    "name", "role", "team", "market_inMarket", "numberOfBids", "bid_price", "bid_user",
     "points", "price", "market_price", "effective_market_price",
     "change", "change_by_value", "value",
     "clause_price", "clause_suggestedClause", "clause_date",
@@ -643,16 +646,27 @@ get_reactable_columns_for_players <- function(table) {
     )
   }
 
-  # Your Bid Column ----
+  # Your Bid / Current Bid Column ----
   if ("bid_price" %in% colnames(table)) {
     columns[["bid_price"]] <- colDef(
-      name = "Your Bid",
+      name = "Received Offer",
       align = "right",
       cell = function(value) {
         if (is.na(value) || is.null(value) || value == "" || value == 0) return("")
         num_val <- suppressWarnings(as.numeric(value))
         formatted <- format_table_currency(num_val)
         shiny::tags$span(class = "badge-active-bid", formatted)
+      }
+    )
+  }
+
+  if ("bid_user" %in% colnames(table)) {
+    columns[["bid_user"]] <- colDef(
+      name = "Bidder",
+      align = "left",
+      cell = function(value) {
+        if (is.null(value) || is.na(value) || value == "") return("Computer / System")
+        value
       }
     )
   }
@@ -681,6 +695,17 @@ get_reactable_columns_for_players <- function(table) {
       name = "Market Price",
       align = "right",
       cell = function(value) {
+        format_table_currency(value)
+      }
+    )
+  }
+
+  if ("effective_market_price" %in% colnames(table)) {
+    columns[["effective_market_price"]] <- colDef(
+      name = "Effective Market Price",
+      align = "right",
+      cell = function(value) {
+        if (is.null(value) || is.na(value) || value == 0) return("")
         format_table_currency(value)
       }
     )
@@ -787,13 +812,6 @@ get_reactable_columns_for_players <- function(table) {
     )
   }
 
-  if ("bid_user" %in% colnames(table)) {
-    columns[["bid_user"]] <- colDef(
-      name = "Bidder",
-      align = "left"
-    )
-  }
-
   if ("role" %in% colnames(table)) {
     columns[["role"]] <- colDef(
       name = "Position",
@@ -846,16 +864,31 @@ get_reactable_columns_for_players <- function(table) {
     columns[["role2"]] <- colDef(show = FALSE)
   }
 
+  if ("V1" %in% colnames(table)) {
+    columns[["V1"]] <- colDef(show = FALSE)
+  }
+
   if ("market_inMarket" %in% colnames(table)) {
     columns[["market_inMarket"]] <- colDef(
-      name = "Listed",
-      align = "center",
-      cell = function(value) {
-        if (is.null(value) || is.na(value)) return("")
-        if (value) {
-          shiny::tags$span(style = "color: #10b981; font-weight: 600;", "YES")
+      name = "In market",
+      align = "left",
+      minWidth = 150,
+      cell = function(value, index) {
+        if (is.null(value) || is.na(value) || !isTRUE(as.logical(value))) return("")
+
+        asking_price <- NA_real_
+        if ("effective_market_price" %in% colnames(table)) {
+          asking_price <- suppressWarnings(as.numeric(table$effective_market_price[index]))
+        } else if ("market_price" %in% colnames(table)) {
+          asking_price <- suppressWarnings(as.numeric(table$market_price[index]))
+        } else if ("price" %in% colnames(table)) {
+          asking_price <- suppressWarnings(as.numeric(table$price[index]))
+        }
+
+        if (!is.na(asking_price) && asking_price > 0) {
+          shiny::tags$span(class = "badge-market-listed", format_table_currency(asking_price))
         } else {
-          shiny::tags$span(style = "color: #94a3b8;", "NO")
+          shiny::tags$span(class = "badge-market-listed", "YES")
         }
       }
     )
@@ -1484,9 +1517,9 @@ put_player_on_market <- function(login, championship_id, team_id, player_id, pri
       userteamId = as.character(team_id),
       price = as.numeric(price),
       player_id = as.character(player_id),
-      isClause = NULL,
-      mode = NULL,
-      toLoan = NULL
+      isClause = NA,
+      mode = NA,
+      toLoan = NA
     ),
     answer = list()
   )
@@ -1595,4 +1628,64 @@ get_my_market_players <- function(login, championship_id, user_team_id) {
     }
     return(data.frame())
   }, timeout_sec = 60)
+}
+
+accept_bid <- function(login, championship_id, team_id, player_id, bid_id) {
+  payload <- list(
+    header = list(
+      token = login[["token"]],
+      userid = login[["userid"]]
+    ),
+    query = list(
+      championshipId = as.character(championship_id),
+      userteamId = as.character(team_id),
+      bid = as.character(bid_id),
+      player_id = as.character(player_id)
+    ),
+    answer = list()
+  )
+  headers <- c("Content-Type" = "application/json; charset=utf-8")
+  print(paste0("[API] Accepting offer bid: ", bid_id, " for player: ", player_id))
+  response <- POST(ACCEPT_BID_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
+  ans <- httr::content(response)
+
+  operation_code <- if (!is.null(ans) && "answer" %in% names(ans) && "code" %in% names(ans$answer)) ans$answer$code else ""
+  err_msg <- if (!is.null(ans) && "answer" %in% names(ans) && "msg" %in% names(ans$answer)) ans$answer$msg else if (!is.null(ans) && "answer" %in% names(ans) && "message" %in% names(ans$answer)) ans$answer$message else operation_code
+
+  is_success <- (operation_code == API_CODE_OK)
+  return(list(
+    success = is_success,
+    code = operation_code,
+    message = err_msg
+  ))
+}
+
+reject_bid <- function(login, championship_id, team_id, player_id, bid_id) {
+  payload <- list(
+    header = list(
+      token = login[["token"]],
+      userid = login[["userid"]]
+    ),
+    query = list(
+      championshipId = as.character(championship_id),
+      userteamId = as.character(team_id),
+      bid = as.character(bid_id),
+      player_id = as.character(player_id)
+    ),
+    answer = list()
+  )
+  headers <- c("Content-Type" = "application/json; charset=utf-8")
+  print(paste0("[API] Rejecting offer bid: ", bid_id, " for player: ", player_id))
+  response <- POST(REJECT_BID_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
+  ans <- httr::content(response)
+
+  operation_code <- if (!is.null(ans) && "answer" %in% names(ans) && "code" %in% names(ans$answer)) ans$answer$code else ""
+  err_msg <- if (!is.null(ans) && "answer" %in% names(ans) && "msg" %in% names(ans$answer)) ans$answer$msg else if (!is.null(ans) && "answer" %in% names(ans) && "message" %in% names(ans$answer)) ans$answer$message else operation_code
+
+  is_success <- (operation_code == API_CODE_OK)
+  return(list(
+    success = is_success,
+    code = operation_code,
+    message = err_msg
+  ))
 }

@@ -61,6 +61,27 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       }
     }
 
+    # ---- Live price preview helper ----
+    render_input_price_preview <- function(val) {
+      if (is.null(val) || is.na(val) || !is.numeric(val) || val <= 0) {
+        div(
+          style = "margin-top: 6px; color: #ef4444; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;",
+          shiny::tags$i(class = "fa-solid fa-circle-exclamation"),
+          "Please enter a valid numerical price greater than 0 €."
+        )
+      } else {
+        div(
+          style = "margin-top: 6px; color: #10b981; font-size: 14px; font-weight: 700;",
+          format_table_currency(val)
+        )
+      }
+    }
+
+    output$new_bid_amount_preview <- renderUI({ render_input_price_preview(input$new_bid_amount) })
+    output$bid_amount_preview <- renderUI({ render_input_price_preview(input$bid_amount) })
+    output$owner_offer_amount_preview <- renderUI({ render_input_price_preview(input$owner_offer_amount) })
+    output$sale_price_input_preview <- renderUI({ render_input_price_preview(input$sale_price_input) })
+
     # ---- Main observer: populate box + action buttons ----
     observeEvent(
       {
@@ -217,6 +238,37 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
             )
             action_buttons <- tagList(own_badge, btn_put_on_market)
           }
+
+          # Check for received offer on squad player
+          has_received_offer <- FALSE
+          rec_offer_price <- NA_real_
+          rec_offer_bidder <- "Computer / System"
+
+          if ("bid_price" %in% colnames(sp) && !is.na(sp$bid_price) && suppressWarnings(as.numeric(sp$bid_price)) > 0) {
+            has_received_offer <- TRUE
+            rec_offer_price <- suppressWarnings(as.numeric(sp$bid_price))
+            if ("bid_user" %in% colnames(sp) && !is.na(sp$bid_user) && sp$bid_user != "") {
+              rec_offer_bidder <- as.character(sp$bid_user)
+            }
+          }
+
+          if (has_received_offer) {
+            offer_banner <- div(
+              style = "width: 100%; text-align: center; margin-bottom: 10px; padding: 10px 16px; background-color: #d1fae5; color: #047857; border: 1px solid #a7f3d0; border-radius: 8px; font-weight: 700; font-size: 14px;",
+              tagList(icon("hand-holding-dollar"), paste0(" Received Offer: ", format_currency(rec_offer_price), " from ", rec_offer_bidder))
+            )
+            btn_accept_offer <- actionButton(
+              ns("btn_accept_offer"),
+              label = tagList(icon("circle-check"), " Accept Offer"),
+              class = "btn btn-offer-money"
+            )
+            btn_reject_offer <- actionButton(
+              ns("btn_reject_offer"),
+              label = tagList(icon("circle-xmark"), " Reject Offer"),
+              class = "btn btn-cancel-bid"
+            )
+            action_buttons <- tagList(action_buttons, offer_banner, btn_accept_offer, btn_reject_offer)
+          }
         } else if (has_active_bid) {
           # ---- Player belongs to rival/market AND current user has an active BUY bid ----
           bid_info <- active_bid_info_RV()
@@ -339,6 +391,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           min = 1,
           step = 10000
         ),
+        uiOutput(ns("new_bid_amount_preview")),
         footer = tagList(
           modalButton("Cancel"),
           actionButton(ns("submit_modify_bid"), "Submit Updated Bid", class = "btn btn-buy-market")
@@ -358,8 +411,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       req(sp, login, champ_id, team_id, bid_info)
 
       new_price <- input$new_bid_amount
-      if (is.null(new_price) || new_price <= 0) {
-        shiny::showNotification("Please enter a valid bid amount.", type = "warning")
+      if (is.null(new_price) || is.na(new_price) || !is.numeric(new_price) || new_price <= 0) {
+        shiny::showNotification("Please enter a valid numerical price greater than 0 €.", type = "error")
         return()
       }
 
@@ -483,6 +536,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           min = 1,
           step = 10000
         ),
+        uiOutput(ns("bid_amount_preview")),
         footer = tagList(
           modalButton("Cancel"),
           actionButton(ns("submit_bid"), "Submit Market Offer", class = "btn btn-buy-market")
@@ -501,8 +555,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       req(sp, login, champ_id, team_id)
 
       bid_amount <- input$bid_amount
-      if (is.null(bid_amount) || bid_amount <= 0) {
-        shiny::showNotification("Please enter a valid offer amount.", type = "warning")
+      if (is.null(bid_amount) || is.na(bid_amount) || !is.numeric(bid_amount) || bid_amount <= 0) {
+        shiny::showNotification("Please enter a valid numerical price greater than 0 €.", type = "error")
         return()
       }
 
@@ -574,6 +628,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           min = 1,
           step = 10000
         ),
+        uiOutput(ns("owner_offer_amount_preview")),
         p(style = "color: #64748b; font-size: 12px;", "This offer will be submitted to the player owner and tracked in market transaction history."),
         footer = tagList(
           modalButton("Cancel"),
@@ -593,8 +648,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       req(sp, login, champ_id, team_id)
 
       offer_amount <- input$owner_offer_amount
-      if (is.null(offer_amount) || offer_amount <= 0) {
-        shiny::showNotification("Please enter a valid offer amount.", type = "warning")
+      if (is.null(offer_amount) || is.na(offer_amount) || !is.numeric(offer_amount) || offer_amount <= 0) {
+        shiny::showNotification("Please enter a valid numerical price greater than 0 €.", type = "error")
         return()
       }
 
@@ -742,6 +797,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           min = 1,
           step = 10000
         ),
+        uiOutput(ns("sale_price_input_preview")),
         p(style = "color: #64748b; font-size: 12px;", "This player will be listed on the transfer market for other users and computer to place bids."),
         footer = tagList(
           modalButton("Cancel"),
@@ -761,8 +817,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       req(sp, login, champ_id, team_id)
 
       sale_price <- input$sale_price_input
-      if (is.null(sale_price) || sale_price <= 0) {
-        shiny::showNotification("Please enter a valid listing price.", type = "warning")
+      if (is.null(sale_price) || is.na(sale_price) || !is.numeric(sale_price) || sale_price <= 0) {
+        shiny::showNotification("Please enter a valid numerical price greater than 0 €.", type = "error")
         return()
       }
 
@@ -853,6 +909,135 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         err_msg <- if (is.list(res) && !is.null(res$message) && res$message != "") res$message else "Withdrawal failed. Please try again."
         shiny::showNotification(
           paste0("Failed to remove player: ", err_msg),
+          type = "error",
+          duration = 6
+        )
+      }
+    })
+
+    # ---- Accept Received Offer Modal ----
+    observeEvent(input$btn_accept_offer, {
+      sp <- selected_player()
+      req(sp)
+      rec_offer_price <- suppressWarnings(as.numeric(sp$bid_price))
+      rec_offer_bidder <- if ("bid_user" %in% colnames(sp) && !is.na(sp$bid_user) && sp$bid_user != "") as.character(sp$bid_user) else "Computer / System"
+
+      showModal(modalDialog(
+        title = tagList(icon("circle-check"), paste0(" Accept Offer for ", sp$name)),
+        p(strong(sp$name)),
+        p("Are you sure you want to ACCEPT the received offer of ", strong(format_currency(rec_offer_price)), " from ", strong(rec_offer_bidder), "?"),
+        p(style = "color: #10b981; font-size: 13px; font-weight: 600;", "The player will be sold and funds added to your budget immediately."),
+        footer = tagList(
+          modalButton("Cancel"),
+          actionButton(ns("submit_accept_offer"), "Confirm Accept Offer", class = "btn btn-offer-money")
+        ),
+        easyClose = TRUE,
+        size = "s"
+      ))
+    })
+
+    # ---- Submit Accept Received Offer ----
+    observeEvent(input$submit_accept_offer, {
+      sp <- selected_player()
+      login <- get_reactive_val(login_token)
+      champ_id <- get_reactive_val(championship_id)
+      team_id <- get_reactive_val(user_team_id)
+      req(sp, login, champ_id, team_id)
+
+      bid_id <- if ("bid_id" %in% colnames(sp) && !is.na(sp$bid_id)) as.character(sp$bid_id) else NULL
+      player_id <- as.character(sp$id)
+      req(bid_id, player_id)
+
+      res <- accept_bid(
+        login = login,
+        championship_id = champ_id,
+        team_id = team_id,
+        player_id = player_id,
+        bid_id = bid_id
+      )
+
+      is_success <- if (is.list(res)) isTRUE(res$success) else isTRUE(res)
+
+      removeModal()
+
+      if (is_success) {
+        shiny::showNotification(
+          paste0("Offer accepted! ", sp$name, " sold successfully."),
+          type = "message",
+          duration = 5
+        )
+        clear_api_cache()
+        if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
+          tryCatch(on_bid_updated(player_id = player_id, new_bid_price = NA_real_, is_cancel = TRUE), error = function(e) NULL)
+        }
+      } else {
+        err_msg <- if (is.list(res) && !is.null(res$message) && res$message != "") res$message else "Accept failed. Please try again."
+        shiny::showNotification(
+          paste0("Failed to accept offer: ", err_msg),
+          type = "error",
+          duration = 6
+        )
+      }
+    })
+
+    # ---- Reject Received Offer Modal ----
+    observeEvent(input$btn_reject_offer, {
+      sp <- selected_player()
+      req(sp)
+      rec_offer_price <- suppressWarnings(as.numeric(sp$bid_price))
+      rec_offer_bidder <- if ("bid_user" %in% colnames(sp) && !is.na(sp$bid_user) && sp$bid_user != "") as.character(sp$bid_user) else "Computer / System"
+
+      showModal(modalDialog(
+        title = tagList(icon("circle-xmark"), paste0(" Reject Offer for ", sp$name)),
+        p(strong(sp$name)),
+        p("Are you sure you want to REJECT the received offer of ", strong(format_currency(rec_offer_price)), " from ", strong(rec_offer_bidder), "?"),
+        footer = tagList(
+          modalButton("Cancel"),
+          actionButton(ns("submit_reject_offer"), "Confirm Reject Offer", class = "btn btn-cancel-bid")
+        ),
+        easyClose = TRUE,
+        size = "s"
+      ))
+    })
+
+    # ---- Submit Reject Received Offer ----
+    observeEvent(input$submit_reject_offer, {
+      sp <- selected_player()
+      login <- get_reactive_val(login_token)
+      champ_id <- get_reactive_val(championship_id)
+      team_id <- get_reactive_val(user_team_id)
+      req(sp, login, champ_id, team_id)
+
+      bid_id <- if ("bid_id" %in% colnames(sp) && !is.na(sp$bid_id)) as.character(sp$bid_id) else NULL
+      player_id <- as.character(sp$id)
+      req(bid_id, player_id)
+
+      res <- reject_bid(
+        login = login,
+        championship_id = champ_id,
+        team_id = team_id,
+        player_id = player_id,
+        bid_id = bid_id
+      )
+
+      is_success <- if (is.list(res)) isTRUE(res$success) else isTRUE(res)
+
+      removeModal()
+
+      if (is_success) {
+        shiny::showNotification(
+          paste0("Offer rejected for ", sp$name, "."),
+          type = "message",
+          duration = 5
+        )
+        clear_api_cache()
+        if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
+          tryCatch(on_bid_updated(player_id = player_id, new_bid_price = NA_real_, is_cancel = TRUE), error = function(e) NULL)
+        }
+      } else {
+        err_msg <- if (is.list(res) && !is.null(res$message) && res$message != "") res$message else "Reject failed. Please try again."
+        shiny::showNotification(
+          paste0("Failed to reject offer: ", err_msg),
           type = "error",
           duration = 6
         )

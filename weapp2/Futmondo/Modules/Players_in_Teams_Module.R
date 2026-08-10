@@ -19,7 +19,8 @@ players_in_teams_UI <- function(id) {
       filter_by_team = FALSE,
       filter_by_is_favorite = FALSE,
       filter_by_is_from_futmondo = FALSE,
-      show_position_breakdown = TRUE
+      show_position_breakdown = TRUE,
+      hide_bid_column = TRUE
     )
   )
 }
@@ -27,6 +28,7 @@ players_in_teams_UI <- function(id) {
 
 players_in_teams_Server <- function(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger = NULL) {
   moduleServer(id, function(input, output, session) {
+    ns <- session$ns
     # renders ----
     output$team_value_box <- renderUI({
       players_table <- players_table_RV()
@@ -174,18 +176,39 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       } else {
         next_team_block <- NULL
       }
-      team_value_box <- box(
-        title = "Value",
-        width = 5,
-        status = "primary",
+      # Liquid Cash Box for User Team
+      user_tid <- get_reactive_val(user_team_id)
+      user_finances <- tryCatch({
+        get_user_team_info(login = login_token(), championship_id = championship_id(), user_team_id = user_tid)
+      }, error = function(e) NULL)
+
+      roster_players <- players_table_RV()
+      total_spent <- 0
+      if (!is.null(roster_players) && nrow(roster_players) > 0 && "buyPrice" %in% colnames(roster_players)) {
+        total_spent <- sum(suppressWarnings(as.numeric(roster_players$buyPrice)), na.rm = TRUE)
+      }
+
+      liquid_cash_val <- 300000000 - total_spent
+      if (!is.null(user_finances) && !is.null(user_finances$budget) && is.numeric(user_finances$budget) && user_finances$budget > 0) {
+        liquid_cash_val <- user_finances$budget
+      }
+
+      liquid_cash_block <- descriptionBlock(
+        header = format_table_currency(liquid_cash_val),
+        number = NULL,
+        numberColor = "green",
+        text = "Available Budget"
+      )
+
+      team_cash_box <- box(
+        title = "Liquid Cash",
+        width = 3,
+        status = "success",
         solidHeader = TRUE,
         collapsible = FALSE,
-        fluidRow(
-          column(4, team_value_block),
-          column(4, team_change_value_block),
-          column(4, team_players_value_block)
-        )
+        liquid_cash_block
       )
+
       team_position_box <- box(
         title = "Classification",
         width = 2,
@@ -194,9 +217,10 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
         collapsible = FALSE,
         team_position_block
       )
+
       team_points_box <- box(
         title = "Points",
-        width = 5,
+        width = 3.5,
         status = "primary",
         solidHeader = TRUE,
         collapsible = FALSE,
@@ -206,8 +230,23 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
           column(4, next_team_block)
         )
       )
-      ret <- tagList(
+
+      team_value_box <- box(
+        title = "Value",
+        width = 3.5,
+        status = "primary",
+        solidHeader = TRUE,
+        collapsible = FALSE,
+        fluidRow(
+          column(4, team_value_block),
+          column(4, team_change_value_block),
+          column(4, team_players_value_block)
+        )
+      )
+
+      ret <- fluidRow(
         team_position_box,
+        team_cash_box,
         team_points_box,
         team_value_box
       )
@@ -281,24 +320,15 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       req(is_module_active() == TRUE)
       ns <- session$ns
 
-      fluidRow(
-        column(width = 6,
-               box(
-                 title = "League Standings Evolution (Points)",
-                 width = 12,
-                 status = "primary",
-                 solidHeader = TRUE,
-                 plotly::plotlyOutput(ns("standings_evolution_plot"), height = "300px")
-               )
-        ),
-        column(width = 6,
-               box(
-                 title = "League Buying Power (Liquid Cash)",
-                 width = 12,
-                 status = "primary",
-                 solidHeader = TRUE,
-                 plotly::plotlyOutput(ns("league_finances_plot"), height = "300px")
-               )
+fluidRow(
+        column(width = 12,
+                box(
+                  title = "League Standings Evolution (Points)",
+                  width = 12,
+                  status = "primary",
+                  solidHeader = TRUE,
+                  plotly::plotlyOutput(ns("standings_evolution_plot"), height = "300px")
+                )
         )
       )
     })
@@ -372,73 +402,6 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
         )
     })
 
-    # Plot C: League Finances horizontal bar chart
-    output$league_finances_plot <- plotly::renderPlotly({
-      req(is_module_active() == TRUE)
-      req(login_token(), championship_id(), user_teams_RV())
-
-      champ_id <- championship_id()
-      login <- login_token()
-      teams <- user_teams_RV()
-
-      # Calculate current league finances with liquid cash balances
-      finances_res <- tryCatch({
-        calculate_league_finances(
-          login = login,
-          championship_id = champ_id,
-          user_teams_df = teams,
-          initial_budget = 300000000
-        )
-      }, error = function(e) {
-        print(paste0("[Plot C] Finances calculation warning: ", e$message))
-        NULL
-      })
-
-      teams_df <- if (!is.null(finances_res) && "team_finances" %in% names(finances_res)) finances_res$team_finances else NULL
-
-      # Fallback to Supabase get_user_teams_finances or user_teams_RV
-      if (is.null(teams_df) || nrow(teams_df) == 0) {
-        teams_df <- tryCatch(get_user_teams_finances(champ_id), error = function(e) NULL)
-      }
-      if (is.null(teams_df) || nrow(teams_df) == 0) {
-        teams_df <- teams
-      }
-
-      if (is.null(teams_df) || nrow(teams_df) == 0) {
-        return(NULL)
-      }
-
-      team_names <- if ("teamname" %in% colnames(teams_df)) teams_df$teamname else if ("name" %in% colnames(teams_df)) teams_df$name else "Unknown"
-      team_budgets <- if ("budget" %in% colnames(teams_df)) as.numeric(teams_df$budget) else 0
-
-      plot_df <- data.frame(
-        team = as.character(team_names),
-        budget = as.numeric(team_budgets),
-        stringsAsFactors = FALSE
-      ) %>% dplyr::arrange(budget)
-
-      colors <- ifelse(plot_df$budget >= 0, "#10b981", "#ef4444")
-      line_colors <- ifelse(plot_df$budget >= 0, "#059669", "#b91c1c")
-
-      plotly::plot_ly(
-        data = plot_df,
-        x = ~budget,
-        y = ~reorder(team, budget),
-        type = "bar",
-        orientation = "h",
-        marker = list(color = colors, line = list(color = line_colors, width = 1)),
-        hoverinfo = "text",
-        text = ~paste0("<b>", team, "</b><br>Liquid Cash: ", format_table_currency(budget))
-      ) %>%
-        plotly::layout(
-          paper_bgcolor = "rgba(0,0,0,0)",
-          plot_bgcolor = "rgba(0,0,0,0)",
-          xaxis = list(title = "Liquid Cash Budget (€)", gridcolor = "#f1f5f9", zeroline = TRUE, zerolinecolor = "#cbd5e1"),
-          yaxis = list(title = "", gridcolor = "#f1f5f9", zeroline = FALSE),
-          margin = list(l = 120, r = 20, t = 10, b = 40)
-        )
-    })
-
     ## players_table_RV ----
     players_table_RV <- reactive({
       req(is_module_active() == TRUE)
@@ -481,7 +444,8 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       user_teams_RV = user_teams_RV,
       login_token = login_token,
       championship_id = championship_id,
-      user_team_id = user_team_id
+      user_team_id = user_team_id,
+      hide_bid_column = TRUE
     )
 
     return(selected_player_RV)

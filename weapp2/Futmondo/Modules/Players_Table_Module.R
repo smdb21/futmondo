@@ -11,8 +11,9 @@ players_table_UI <- function(id, box_title = NULL,
                              filter_by_active_clause = TRUE,
                              filter_by_is_favorite = TRUE,
                              filter_by_is_from_futmondo = TRUE,
-                             filter_by_players_with_bid = FALSE,
-                              show_position_breakdown = FALSE) {
+filter_by_players_with_bid = FALSE,
+                             show_position_breakdown = FALSE,
+                             hide_bid_column = FALSE) {
   ns <- NS(id)
   tagList(
     shinydashboardPlus::box(
@@ -101,7 +102,7 @@ players_table_UI <- function(id, box_title = NULL,
 }
 
 
-players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL) {
+players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL, hide_bid_column = FALSE) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     table_refresh_trigger <- reactiveVal(0)
@@ -289,9 +290,13 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
     ## render players_table ----
     output$players_table <- renderReactable({
       req(players_table_filtered_RV())
+      cols_to_hide <- cfg_player_columns_to_hide
+      if (isTRUE(hide_bid_column)) {
+        cols_to_hide <- c(cols_to_hide, "bid_price")
+      }
       players_table <- players_table_filtered_RV() %>%
         reorder_player_table_columns() %>%
-        dplyr::select(!any_of(cfg_player_columns_to_hide))
+        dplyr::select(!any_of(cols_to_hide))
       
       print(paste0(nrow(players_table), " players in table"))
       # players_table <- players_table %>%
