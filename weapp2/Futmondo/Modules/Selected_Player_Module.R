@@ -156,7 +156,69 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         is_own_player <- (!is.null(current_user_team) && !is.null(player_owner_team) && current_user_team == player_owner_team)
         has_active_bid <- !is.null(active_bid_info_RV())
 
-        if (has_active_bid) {
+        if (is_own_player) {
+          # ---- Player belongs to user's OWN squad ----
+          is_listed_on_market <- FALSE
+          current_asking_price <- NA_real_
+
+          if ("effective_market_price" %in% colnames(sp) && !is.na(sp$effective_market_price) && suppressWarnings(as.numeric(sp$effective_market_price)) > 0) {
+            current_asking_price <- suppressWarnings(as.numeric(sp$effective_market_price))
+            is_listed_on_market <- TRUE
+          } else if ("market_price" %in% colnames(sp) && !is.na(sp$market_price) && suppressWarnings(as.numeric(sp$market_price)) > 0) {
+            current_asking_price <- suppressWarnings(as.numeric(sp$market_price))
+            is_listed_on_market <- TRUE
+          } else if ("price" %in% colnames(sp) && !is.na(sp$price) && suppressWarnings(as.numeric(sp$price)) > 0) {
+            current_asking_price <- suppressWarnings(as.numeric(sp$price))
+            is_listed_on_market <- TRUE
+          } else if ("market_inMarket" %in% colnames(sp) && isTRUE(as.logical(sp$market_inMarket))) {
+            is_listed_on_market <- TRUE
+          } else if (!is.null(login) && !is.null(champ_id) && !is.null(team_id)) {
+            my_mkt_players <- tryCatch({
+              get_my_market_players(login = login, championship_id = champ_id, user_team_id = team_id)
+            }, error = function(e) NULL)
+            if (!is.null(my_mkt_players) && nrow(my_mkt_players) > 0 && "id" %in% colnames(my_mkt_players)) {
+              if (as.character(sp$id) %in% as.character(my_mkt_players$id)) {
+                is_listed_on_market <- TRUE
+                match_p <- my_mkt_players[which(as.character(my_mkt_players$id) == as.character(sp$id)), ]
+                if ("price" %in% colnames(match_p) && !is.na(match_p$price)) {
+                  current_asking_price <- suppressWarnings(as.numeric(match_p$price))
+                }
+              }
+            }
+          }
+
+          own_badge <- div(
+            style = "display: inline-block; padding: 8px 16px; background-color: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; border-radius: 8px; font-weight: 600; font-size: 12px; margin: 5px;",
+            tagList(icon("shield-halved"), " Player in Your Squad")
+          )
+
+          if (is_listed_on_market) {
+            price_text <- if (!is.na(current_asking_price) && current_asking_price > 0) paste0(" (Asking: ", format_currency(current_asking_price), ")") else ""
+            listed_badge <- div(
+              style = "display: inline-block; padding: 8px 16px; background-color: #fef3c7; color: #b45309; border: 1px solid #fde68a; border-radius: 8px; font-weight: 600; font-size: 12px; margin: 5px;",
+              tagList(icon("tags"), paste0(" Listed on Market", price_text))
+            )
+            btn_update_sale <- actionButton(
+              ns("btn_put_on_market"),
+              label = tagList(icon("pen-to-square"), " Update Listing Price"),
+              class = "btn btn-offer-money"
+            )
+            btn_cancel_sell <- actionButton(
+              ns("btn_cancel_sell"),
+              label = tagList(icon("tag"), " Remove from Market"),
+              class = "btn btn-cancel-bid"
+            )
+            action_buttons <- tagList(own_badge, listed_badge, btn_update_sale, btn_cancel_sell)
+          } else {
+            btn_put_on_market <- actionButton(
+              ns("btn_put_on_market"),
+              label = tagList(icon("tags"), " Put on Market for Sale"),
+              class = "btn btn-offer-money"
+            )
+            action_buttons <- tagList(own_badge, btn_put_on_market)
+          }
+        } else if (has_active_bid) {
+          # ---- Player belongs to rival/market AND current user has an active BUY bid ----
           bid_info <- active_bid_info_RV()
           banner <- div(
             style = "width: 100%; text-align: center; margin-bottom: 10px; padding: 10px 16px; background-color: #d1fae5; color: #047857; border: 1px solid #a7f3d0; border-radius: 8px; font-weight: 700; font-size: 14px;",
@@ -173,7 +235,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
             class = "btn btn-cancel-bid"
           )
           action_buttons <- tagList(banner, btn_modify, btn_cancel)
-        } else if (!is_own_player) {
+        } else {
+          # ---- Player belongs to rival/market AND current user has NO active bid ----
           # Extract effective market price (checking effective_market_price, market_price, and price)
           eff_market_price <- NA_real_
           if ("effective_market_price" %in% colnames(sp) && !is.na(sp$effective_market_price) && suppressWarnings(as.numeric(sp$effective_market_price)) > 0) {
@@ -251,48 +314,6 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
               tagList(icon("lock"), paste0(" Release Clause Locked ", lock_reason, " (", format_currency(clause_price_val), ")"))
             )
             action_buttons <- tagList(action_buttons, locked_badge)
-          }
-        } else {
-          # Player is in user's own squad
-          is_listed_on_market <- FALSE
-          if ("market_inMarket" %in% colnames(sp) && isTRUE(as.logical(sp$market_inMarket))) {
-            is_listed_on_market <- TRUE
-          } else if ("price" %in% colnames(sp) && !is.na(sp$price) && suppressWarnings(as.numeric(sp$price)) > 0) {
-            is_listed_on_market <- TRUE
-          } else if (!is.null(login) && !is.null(champ_id) && !is.null(team_id)) {
-            my_mkt_players <- tryCatch({
-              get_my_market_players(login = login, championship_id = champ_id, user_team_id = team_id)
-            }, error = function(e) NULL)
-            if (!is.null(my_mkt_players) && nrow(my_mkt_players) > 0 && "id" %in% colnames(my_mkt_players)) {
-              if (as.character(sp$id) %in% as.character(my_mkt_players$id)) {
-                is_listed_on_market <- TRUE
-              }
-            }
-          }
-
-          own_badge <- div(
-            style = "display: inline-block; padding: 8px 16px; background-color: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; border-radius: 8px; font-weight: 600; font-size: 12px; margin: 5px;",
-            tagList(icon("shield-halved"), " Player in Your Squad")
-          )
-
-          if (is_listed_on_market) {
-            listed_badge <- div(
-              style = "display: inline-block; padding: 8px 16px; background-color: #fef3c7; color: #b45309; border: 1px solid #fde68a; border-radius: 8px; font-weight: 600; font-size: 12px; margin: 5px;",
-              tagList(icon("tags"), " Player Listed on Market")
-            )
-            btn_cancel_sell <- actionButton(
-              ns("btn_cancel_sell"),
-              label = tagList(icon("tag"), " Remove from Market"),
-              class = "btn btn-cancel-bid"
-            )
-            action_buttons <- tagList(own_badge, listed_badge, btn_cancel_sell)
-          } else {
-            btn_put_on_market <- actionButton(
-              ns("btn_put_on_market"),
-              label = tagList(icon("tags"), " Put on Market for Sale"),
-              class = "btn btn-offer-money"
-            )
-            action_buttons <- tagList(own_badge, btn_put_on_market)
           }
         }
 
