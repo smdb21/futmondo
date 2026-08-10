@@ -338,7 +338,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           duration = 5
         )
         if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
-          tryCatch(on_bid_updated(), error = function(e) NULL)
+          tryCatch(on_bid_updated(player_id = player_id, new_bid_price = new_price, is_cancel = FALSE), error = function(e) NULL)
         }
         clear_api_cache()
       } else {
@@ -398,7 +398,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           duration = 5
         )
         if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
-          tryCatch(on_bid_updated(), error = function(e) NULL)
+          tryCatch(on_bid_updated(player_id = player_id, new_bid_price = NA_real_, is_cancel = TRUE), error = function(e) NULL)
         }
         clear_api_cache()
       } else {
@@ -487,7 +487,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         )
         clear_api_cache()
         if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
-          tryCatch(on_bid_updated(), error = function(e) NULL)
+          tryCatch(on_bid_updated(player_id = player_id, new_bid_price = bid_amount, is_cancel = FALSE), error = function(e) NULL)
         }
       } else {
         err_msg <- if (is.list(res) && !is.null(res$message) && res$message != "") res$message else "Please verify your funds and try again."
@@ -579,7 +579,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         )
         clear_api_cache()
         if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
-          tryCatch(on_bid_updated(), error = function(e) NULL)
+          tryCatch(on_bid_updated(player_id = player_id, new_bid_price = offer_amount, is_cancel = FALSE), error = function(e) NULL)
         }
       } else {
         err_msg <- if (is.list(res) && !is.null(res$message) && res$message != "") res$message else "Please verify your funds and try again."

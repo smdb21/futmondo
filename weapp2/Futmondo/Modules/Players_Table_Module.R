@@ -105,6 +105,21 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     table_refresh_trigger <- reactiveVal(0)
+
+    local_bids_override <- reactiveVal(list())
+
+    handle_bid_updated <- function(player_id = NULL, new_bid_price = NULL, is_cancel = FALSE) {
+      if (!is.null(player_id) && player_id != "") {
+        current_overrides <- local_bids_override()
+        current_overrides[[as.character(player_id)]] <- list(
+          price = if (isTRUE(is_cancel)) NA_real_ else suppressWarnings(as.numeric(new_bid_price)),
+          is_cancel = isTRUE(is_cancel)
+        )
+        local_bids_override(current_overrides)
+      }
+      table_refresh_trigger(table_refresh_trigger() + 1)
+    }
+
     # observers ----
     # observe user_teams_RV to update market_player_team_filter ----
     observeEvent(user_teams_RV(), {
@@ -141,9 +156,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       login_token = login_token,
       championship_id = championship_id,
       user_team_id = user_team_id,
-      on_bid_updated = function() {
-        table_refresh_trigger(table_refresh_trigger() + 1)
-      }
+      on_bid_updated = handle_bid_updated
     )
     # reactives ----
     ## selected_player_RV
@@ -157,9 +170,47 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
     players_table_filtered_RV <- reactive({
       table_refresh_trigger()
       players_table <- players_table_RV()
-      if (is.null(players_table)) {
+      if (is.null(players_table) || nrow(players_table) == 0) {
         return(NULL)
       }
+
+      # Apply local in-memory bid overrides if present
+      overrides <- local_bids_override()
+      if (length(overrides) > 0 && "id" %in% colnames(players_table)) {
+        for (pid in names(overrides)) {
+          ov <- overrides[[pid]]
+          match_idx <- which(as.character(players_table$id) == pid)
+          if (length(match_idx) > 0) {
+            if (isTRUE(ov$is_cancel)) {
+              if ("bid_price" %in% colnames(players_table)) {
+                players_table$bid_price[match_idx] <- NA_real_
+              }
+              if ("numberOfBids" %in% colnames(players_table) && !is.na(players_table$numberOfBids[match_idx])) {
+                current_bids <- suppressWarnings(as.numeric(players_table$numberOfBids[match_idx]))
+                if (!is.na(current_bids)) {
+                  players_table$numberOfBids[match_idx] <- max(0, current_bids - 1)
+                }
+              }
+            } else {
+              old_bid <- if ("bid_price" %in% colnames(players_table)) players_table$bid_price[match_idx] else NA_real_
+              if (!"bid_price" %in% colnames(players_table)) {
+                players_table$bid_price <- NA_real_
+              }
+              players_table$bid_price[match_idx] <- ov$price
+
+              if ("numberOfBids" %in% colnames(players_table)) {
+                old_bid_val <- suppressWarnings(as.numeric(old_bid))
+                if (is.na(old_bid_val) || is.null(old_bid_val) || old_bid_val == 0) {
+                  current_bids <- suppressWarnings(as.numeric(players_table$numberOfBids[match_idx]))
+                  current_bids <- if (is.na(current_bids)) 0 else current_bids
+                  players_table$numberOfBids[match_idx] <- current_bids + 1
+                }
+              }
+            }
+          }
+        }
+      }
+
       # players_table <- players_table %>%
       #   translate_player_positions()
       # players_table <- players_table %>%
