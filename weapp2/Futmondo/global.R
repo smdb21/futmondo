@@ -1,3 +1,7 @@
+if (file.exists(".Renviron")) {
+  readRenviron(".Renviron")
+}
+
 source("futmondo_functions.R")
 source("supabase_connector.R")
 source("Modules/Login_Module.R")
@@ -13,9 +17,7 @@ library(shiny)
 library(shinydashboardPlus)
 library(dplyr)
 
-if (file.exists(".Renviron")) {
-  readRenviron(".Renviron")
-}
+init_supabase_db(verbose = FALSE)
 
 cfg_player_columns_to_hide <- fread(file = "player_columns_to_hide.txt", header = FALSE)[[1]]
 

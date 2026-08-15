@@ -6,9 +6,22 @@ library(dplyr)
 SB_URL <- Sys.getenv("supabase_project_url")
 SB_KEY <- Sys.getenv("supabase_secret_key")
 
+# Dynamic retrieval helpers -- re-check the environment each call so that
+# a later readRenviron() in global.R is respected.
+get_sb_url <- function() {
+  url <- Sys.getenv("supabase_project_url")
+  if (is.null(url) || url == "") SB_URL else url
+}
+get_sb_key <- function() {
+  key <- Sys.getenv("supabase_secret_key")
+  if (is.null(key) || key == "") SB_KEY else key
+}
+
 supabase_post <- function(table_name, payload) {
   # Defensive check for loaded credentials
-  if (is.null(SB_URL) || SB_URL == "" || is.null(SB_KEY) || SB_KEY == "") {
+  sb_url <- get_sb_url()
+  sb_key <- get_sb_key()
+  if (is.null(sb_url) || sb_url == "" || is.null(sb_key) || sb_key == "") {
     print("[Supabase] Skipping sync: Supabase environment credentials are not loaded in .Renviron.")
     return(NULL)
   }
@@ -17,11 +30,11 @@ supabase_post <- function(table_name, payload) {
     return(NULL)
   }
   
-  url <- paste0(SB_URL, "/rest/v1/", table_name)
+  url <- paste0(sb_url, "/rest/v1/", table_name)
   
   headers <- c(
-    "apikey" = SB_KEY,
-    "Authorization" = paste("Bearer", SB_KEY),
+    "apikey" = sb_key,
+    "Authorization" = paste("Bearer", sb_key),
     "Content-Type" = "application/json",
     "Prefer" = "resolution=merge-duplicates" # Upsert on PK matching
   )
@@ -172,15 +185,17 @@ log_market_transaction <- function(player_id, championship_id, buyer_team_id, se
 
 supabase_get <- function(table_name, query_params = list()) {
   # Defensive check for loaded credentials
-  if (is.null(SB_URL) || SB_URL == "" || is.null(SB_KEY) || SB_KEY == "") {
+  sb_url <- get_sb_url()
+  sb_key <- get_sb_key()
+  if (is.null(sb_url) || sb_url == "" || is.null(sb_key) || sb_key == "") {
     return(NULL)
   }
   
-  url <- paste0(SB_URL, "/rest/v1/", table_name)
+  url <- paste0(sb_url, "/rest/v1/", table_name)
   
   headers <- c(
-    "apikey" = SB_KEY,
-    "Authorization" = paste("Bearer", SB_KEY),
+    "apikey" = sb_key,
+    "Authorization" = paste("Bearer", sb_key),
     "Accept" = "application/json"
   )
   
@@ -306,4 +321,134 @@ get_pressroom_transactions_from_supabase <- function(championship_id) {
     print(paste0("[Supabase] Error fetching pressroom transactions: ", e$message))
     return(NULL)
   })
+}
+
+# ============================================================
+# Database Reset and Initialization Functions
+# ============================================================
+
+supabase_delete <- function(table_name, filter = "id=neq.00000000-0000-0000-0000-000000000000") {
+  sb_url <- get_sb_url()
+  sb_key <- get_sb_key()
+  if (is.null(sb_url) || sb_url == "" || is.null(sb_key) || sb_key == "") {
+    return(list(status = "skipped", reason = "credentials not loaded"))
+  }
+
+  url <- paste0(sb_url, "/rest/v1/", table_name)
+
+  headers <- c(
+    "apikey" = sb_key,
+    "Authorization" = paste("Bearer", sb_key),
+    "Accept" = "application/json",
+    "Prefer" = "return=minimal, count=exact"
+  )
+
+  # Parse filter string "col=op.value" into a named list for the query parameter
+  filter_parts <- strsplit(filter, "=", fixed = TRUE)[[1]]
+  filter_list <- setNames(list(filter_parts[2]), filter_parts[1])
+
+  tryCatch({
+    response <- httr::DELETE(url, query = filter_list, add_headers(.headers = headers))
+    code <- status_code(response)
+    if (code >= 200 && code < 300) {
+      return(list(status = "deleted", http_code = code))
+    } else {
+      return(list(status = "error", http_code = code))
+    }
+  }, error = function(e) {
+    return(list(status = "error", reason = e$message))
+  })
+}
+
+supabase_delete_all <- function(table_name) {
+  bigint_pk_tables <- c("user_team_history", "player_history", "market_transactions")
+  text_pk_tables <- c("championships", "real_clubs", "players", "user_teams")
+
+  if (table_name %in% bigint_pk_tables) {
+    supabase_delete(table_name, filter = "id=gte.0")
+  } else if (table_name %in% text_pk_tables) {
+    supabase_delete(table_name, filter = "id=neq.00000000-0000-0000-0000-000000000000")
+  } else {
+    print(paste0("[Supabase] Unknown PK type for table: ", table_name))
+    return(list(status = "error", reason = "unknown PK type"))
+  }
+}
+
+supabase_reset_database <- function(force = FALSE) {
+  if (!force) {
+    print("[Supabase] Reset cancelled: set force = TRUE to proceed.")
+    return(list())
+  }
+
+  reset_order <- c(
+    "market_transactions",
+    "player_history",
+    "user_team_history",
+    "user_teams",
+    "players",
+    "real_clubs",
+    "championships"
+  )
+
+  results <- list()
+
+  for (tbl in reset_order) {
+    cat(paste0("[Reset] Deleting all rows from: ", tbl, " ... "))
+    res <- supabase_delete_all(tbl)
+    results[[tbl]] <- paste0(res$status,
+                              if (!is.null(res$http_code)) paste0(" (HTTP ", res$http_code, ")") else "",
+                              if (!is.null(res$reason)) paste0(": ", res$reason) else "")
+    cat(results[[tbl]], "\n")
+  }
+
+  return(results)
+}
+
+init_supabase_db <- function(verbose = FALSE) {
+  sb_url <- get_sb_url()
+  sb_key <- get_sb_key()
+  if (is.null(sb_url) || sb_url == "" || is.null(sb_key) || sb_key == "") {
+    warning("[Init] Supabase credentials not loaded in .Renviron. Skipping database verification.")
+    return(FALSE)
+  }
+
+  required_tables <- c(
+    "championships",
+    "real_clubs",
+    "players",
+    "user_teams",
+    "user_team_history",
+    "player_history",
+    "market_transactions"
+  )
+
+  all_ok <- TRUE
+
+  for (tbl in required_tables) {
+    url <- paste0(sb_url, "/rest/v1/", tbl)
+
+    headers <- c(
+      "apikey" = sb_key,
+      "Authorization" = paste("Bearer", sb_key),
+      "Accept" = "application/json"
+    )
+
+    tryCatch({
+      response <- GET(url, query = list(select = "id", limit = "1"), add_headers(.headers = headers))
+      code <- status_code(response)
+      if (code == 200) {
+        if (verbose) cat(paste0("[Init] Table OK: ", tbl, " (HTTP 200)\n"))
+      } else {
+        all_ok <- FALSE
+        warning(paste0("[Init] Table check failed for '", tbl, "': HTTP ", code))
+        if (verbose) cat(paste0("[Init] Table FAIL: ", tbl, " (HTTP ", code, ")\n"))
+      }
+    }, error = function(e) {
+      all_ok <<- FALSE
+      warning(paste0("[Init] Table check error for '", tbl, "': ", e$message))
+      if (verbose) cat(paste0("[Init] Table ERROR: ", tbl, " (", e$message, ")\n"))
+    })
+  }
+
+  return(all_ok)
 }
