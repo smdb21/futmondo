@@ -8,11 +8,13 @@ BID_URL <- "https://api.futmondo.com/1/market/bid"
 MARKET_URL <- "https://api.futmondo.com/1/market/players"
 PLAYER_SUMMARY_URL <- "https://api.futmondo.com/1/player/summary"
 MODIFY_BID_URL <- "https://api.futmondo.com/5/market/modifybid"
+PRESSROOM_URL <- "https://api.futmondo.com/1/locker/pressroom"
 CANCEL_BID_URL <- "https://api.futmondo.com/1/market/cancelbid"
 PUT_ON_MARKET_URL <- "https://api.futmondo.com/1/market/putonmarket"
 CANCEL_SELL_URL <- "https://api.futmondo.com/1/market/cancelsell"
 PUT_ALL_ON_MARKET_URL <- "https://api.futmondo.com/5/market/putallonmarket"
 MY_PLAYERS_URL <- "https://api.futmondo.com/1/market/myplayers"
+ROSTER_BIDS_URL <- "https://api.futmondo.com/1/market/rosterbids"
 ACCEPT_BID_URL <- "https://api.futmondo.com/1/market/acceptbid"
 REJECT_BID_URL <- "https://api.futmondo.com/1/market/rejectbid"
 API_CODE_OK <- "api.general.ok"
@@ -242,15 +244,23 @@ get_players_from_team <- function(login, championship_id, user_team_id, teams = 
         if ("bids" %in% names(market)) {
           bids <- market$bids
           if (length(bids) > 0) {
-            bids <- lapply(bids, FUN = function(bid) {
-              data.frame(bid_price = bid$price, bid_user = bid$userTeam[["name"]])
-            }) %>% rbindlist(fill = T)
-            # make it a single row
-            bids <- bids %>%
-              dplyr::mutate(
-                bid_price = paste0(bid_price, collapse = ","),
-                bid_user = paste0(bid_user, collapse = ",")
+            bids_df <- lapply(bids, FUN = function(bid) {
+              b_price <- if (!is.null(bid$price)) suppressWarnings(as.numeric(bid$price)) else 0
+              b_user <- if (!is.null(bid$userTeam) && is.list(bid$userTeam) && !is.null(bid$userTeam[["name"]]) && bid$userTeam[["name"]] != "") as.character(bid$userTeam[["name"]]) else "Futmondo"
+              b_id <- if (!is.null(bid[["id"]])) as.character(bid[["id"]]) else if (!is.null(bid[["_id"]])) as.character(bid[["_id"]]) else ""
+              data.frame(bid_price = b_price, bid_user = b_user, bid_id = b_id, stringsAsFactors = FALSE)
+            }) %>% rbindlist(fill = TRUE) %>% as.data.frame()
+
+            if (nrow(bids_df) > 0) {
+              max_idx <- which.max(bids_df$bid_price)
+              bids <- list(
+                bid_price = bids_df$bid_price[max_idx],
+                bid_user = bids_df$bid_user[max_idx],
+                bid_id = bids_df$bid_id[max_idx]
               )
+            } else {
+              bids <- NULL
+            }
           }
           market <- market[-which(names(market) == "bids")]
         }
@@ -285,9 +295,36 @@ get_players_from_team <- function(login, championship_id, user_team_id, teams = 
       roster <- roster %>% dplyr::select(!any_of(c("team", "logo")))
       roster <- roster %>% dplyr::left_join(clubs, by = "teamId")
     }
-    
+
+    # Join active roster bids if present
+    roster_bids_df <- tryCatch({
+      get_roster_bids(login = login, championship_id = championship_id, user_team_id = user_team_id)
+    }, error = function(e) NULL)
+
+    if (!is.null(roster_bids_df) && nrow(roster_bids_df) > 0 && "id" %in% colnames(roster_bids_df) && "id" %in% colnames(roster)) {
+      roster <- roster %>% dplyr::select(!any_of(c("bid_price", "bid_user", "bid_id")))
+      roster <- roster %>% dplyr::left_join(roster_bids_df, by = "id")
+    }
+
+    # Join market listed status if present
+    my_mkt_df <- tryCatch({
+      get_my_market_players(login = login, championship_id = championship_id, user_team_id = user_team_id)
+    }, error = function(e) NULL)
+
+    if (!is.null(my_mkt_df) && nrow(my_mkt_df) > 0 && "id" %in% colnames(my_mkt_df) && "id" %in% colnames(roster)) {
+      mkt_ids <- as.character(my_mkt_df$id)
+      roster$market_inMarket <- as.character(roster$id) %in% mkt_ids
+
+      if ("price" %in% colnames(my_mkt_df)) {
+        mkt_prices <- my_mkt_df %>% dplyr::select(id, market_asking_price = price) %>% dplyr::distinct(id, .keep_all = TRUE)
+        roster <- roster %>% dplyr::left_join(mkt_prices, by = "id")
+        if (!"effective_market_price" %in% colnames(roster)) roster$effective_market_price <- NA_real_
+        roster$effective_market_price <- ifelse(!is.na(roster$market_asking_price) & roster$market_asking_price > 0, roster$market_asking_price, roster$effective_market_price)
+      }
+    }
+
     roster
-  })
+  }, timeout_sec = 30)
 }
 
 # Function to check if a column is character and convert to numeric
@@ -618,7 +655,7 @@ reorder_player_table_columns <- function(df) {
   df_df <- as.data.frame(df)
 
   desired_order <- c(
-    "name", "role", "team", "market_inMarket", "numberOfBids", "bid_price", "bid_user",
+    "name", "role", "team", "market_inMarket", "bid_price", "bid_user", "numberOfBids",
     "points", "price", "market_price", "effective_market_price",
     "change", "change_by_value", "value",
     "clause_price", "clause_suggestedClause", "clause_date",
@@ -646,29 +683,33 @@ get_reactable_columns_for_players <- function(table) {
     )
   }
 
-  # Your Bid / Current Bid Column ----
+  # Your Bid / Received Offer Column ----
   if ("bid_price" %in% colnames(table)) {
     columns[["bid_price"]] <- colDef(
       name = "Received Offer",
       align = "right",
-      cell = function(value) {
+      cell = function(value, index) {
         if (is.na(value) || is.null(value) || value == "" || value == 0) return("")
         num_val <- suppressWarnings(as.numeric(value))
         formatted <- format_table_currency(num_val)
-        shiny::tags$span(class = "badge-active-bid", formatted)
+
+        bidder <- if ("bid_user" %in% colnames(table) && !is.na(table$bid_user[index]) && as.character(table$bid_user[index]) != "") {
+          as.character(table$bid_user[index])
+        } else {
+          "Futmondo"
+        }
+
+        shiny::tags$span(
+          class = "badge-active-bid",
+          title = paste0("Offer from ", bidder),
+          formatted
+        )
       }
     )
   }
 
   if ("bid_user" %in% colnames(table)) {
-    columns[["bid_user"]] <- colDef(
-      name = "Bidder",
-      align = "left",
-      cell = function(value) {
-        if (is.null(value) || is.na(value) || value == "") return("Computer / System")
-        value
-      }
-    )
+    columns[["bid_user"]] <- colDef(show = FALSE)
   }
 
   # Points Column ----
@@ -871,7 +912,7 @@ get_reactable_columns_for_players <- function(table) {
   if ("market_inMarket" %in% colnames(table)) {
     columns[["market_inMarket"]] <- colDef(
       name = "In market",
-      align = "left",
+      align = "right",
       minWidth = 150,
       cell = function(value, index) {
         if (is.null(value) || is.na(value) || !isTRUE(as.logical(value))) return("")
@@ -1172,6 +1213,15 @@ get_user_team_moneymovements <- function(login, championship_id, user_team_id) {
     url <- "https://api.futmondo.com/1/userteam/moneymovements"
     print("Getting team money movements")
     response <- POST(url, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
+    status <- httr::status_code(response)
+    if (status != 200L) {
+      print(paste0("[get_user_team_moneymovements] HTTP status: ", status))
+      return(data.frame(
+        id = character(0), concept = character(0), type = character(0),
+        category = character(0), money = numeric(0), date = character(0),
+        stringsAsFactors = FALSE
+      ))
+    }
     ans <- httr::content(response)
     if (!is.null(ans) && "answer" %in% names(ans) && is.list(ans$answer)) {
       movements <- ans$answer
@@ -1182,14 +1232,23 @@ get_user_team_moneymovements <- function(login, championship_id, user_team_id) {
           stringsAsFactors = FALSE
         ))
       }
+      get_val <- function(obj, key, default = "") {
+        if (is.null(obj)) return(default)
+        nm <- names(obj)
+        if (is.null(nm) || !key %in% nm) return(default)
+        val <- obj[[key]]
+        if (is.null(val)) return(default)
+        return(val)
+      }
       df <- lapply(movements, FUN = function(m) {
+        m <- as.list(m)
         data.frame(
-          id = if (!is.null(m[["_id"]])) as.character(m[["_id"]]) else NA_character_,
-          concept = if (!is.null(m[["concept"]])) as.character(m[["concept"]]) else "",
-          type = if (!is.null(m[["type"]])) as.character(m[["type"]]) else "",
-          category = if (!is.null(m[["category"]])) as.character(m[["category"]]) else "",
-          money = if (!is.null(m[["money"]])) as.numeric(m[["money"]]) else 0,
-          date = if (!is.null(m[["date"]])) as.character(m[["date"]]) else "",
+          id = if (is.null(get_val(m, "_id"))) NA_character_ else as.character(get_val(m, "_id")),
+          concept = get_val(m, "concept", ""),
+          type = get_val(m, "type", ""),
+          category = get_val(m, "category", ""),
+          money = if (is.null(get_val(m, "money", NULL))) 0 else as.numeric(get_val(m, "money")),
+          date = get_val(m, "date", ""),
           stringsAsFactors = FALSE
         )
       }) %>% bind_rows()
@@ -1203,6 +1262,148 @@ get_user_team_moneymovements <- function(login, championship_id, user_team_id) {
   })
 }
 
+get_championship_pressroom <- function(login, championship_id) {
+  if (is.null(login) || is.null(championship_id)) {
+    return(data.frame(
+      id = character(0), created = character(0), player_id = character(0),
+      player_name = character(0), buyer_team_id = character(0),
+      buyer_team_name = character(0), seller_team_id = character(0),
+      seller_team_name = character(0), price = numeric(0),
+      stringsAsFactors = FALSE
+    ))
+  }
+
+  cache_key <- paste0("pressroom_", championship_id)
+  get_cached_data(cache_key, {
+    headers <- c("Content-Type" = "application/json; charset=utf-8")
+
+    empty_df <- data.frame(
+      id = character(0), created = character(0), player_id = character(0),
+      player_name = character(0), buyer_team_id = character(0),
+      buyer_team_name = character(0), seller_team_id = character(0),
+      seller_team_name = character(0), price = numeric(0),
+      stringsAsFactors = FALSE
+    )
+
+    get_val <- function(obj, key, default = "") {
+      if (is.null(obj)) return(default)
+      nm <- names(obj)
+      if (is.null(nm) || !key %in% nm) return(default)
+      val <- obj[[key]]
+      if (is.null(val)) return(default)
+      return(val)
+    }
+
+    parse_news_item <- function(item) {
+      item <- as.list(item)
+
+      # Extract player info
+      player_obj <- get_val(item, "_player", NULL)
+      p_id <- if (!is.null(player_obj)) as.character(get_val(player_obj, "_id", "")) else ""
+      p_name <- if (!is.null(player_obj)) as.character(get_val(player_obj, "name", "")) else ""
+
+      # Extract buyer info
+      buyer_obj <- get_val(item, "_buyer", NULL)
+      b_id <- if (!is.null(buyer_obj)) as.character(get_val(buyer_obj, "_id", "")) else ""
+      b_name <- if (!is.null(buyer_obj)) as.character(get_val(buyer_obj, "name", "")) else ""
+
+      # Extract seller info
+      seller_obj <- get_val(item, "_seller", NULL)
+      s_id <- if (!is.null(seller_obj)) as.character(get_val(seller_obj, "_id", "")) else ""
+      s_name <- if (!is.null(seller_obj)) as.character(get_val(seller_obj, "name", "")) else ""
+
+      # Extract price
+      price_val <- get_val(item, "price", 0)
+      price_num <- suppressWarnings(as.numeric(price_val))
+      if (is.na(price_num)) price_num <- 0
+
+      data.frame(
+        id = as.character(get_val(item, "_id", "")),
+        created = as.character(get_val(item, "created", "")),
+        player_id = p_id,
+        player_name = p_name,
+        buyer_team_id = b_id,
+        buyer_team_name = b_name,
+        seller_team_id = s_id,
+        seller_team_name = s_name,
+        price = price_num,
+        stringsAsFactors = FALSE
+      )
+    }
+
+    tryCatch({
+      # Cursor-based pagination loop to fetch 100% of historical pressroom transactions
+      cursor <- ""
+      all_news <- list()
+      page_count <- 0
+      max_pages <- 25
+
+      while (page_count < max_pages) {
+        page_count <- page_count + 1
+        print(paste0("[API] Fetching pressroom feed - page ", page_count, ", cursor: ", if (cursor == "") "(initial)" else cursor))
+
+        payload <- list(
+          header = list(
+            token = login[["token"]],
+            userid = login[["userid"]]
+          ),
+          query = list(
+            championshipId = as.character(championship_id),
+            from = cursor
+          ),
+          answer = list()
+        )
+
+        response <- POST(PRESSROOM_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
+        ans <- httr::content(response)
+
+        if (is.null(ans) || !("answer" %in% names(ans)) || is.null(ans$answer) || !("news" %in% names(ans$answer))) {
+          print("[Pressroom] No news data in response, stopping pagination.")
+          break
+        }
+
+        news <- ans$answer$news
+        if (is.null(news) || length(news) == 0) {
+          print("[Pressroom] Empty news array, all pages fetched.")
+          break
+        }
+
+        # Append news items to the accumulator
+        for (item in news) {
+          all_news[[length(all_news) + 1]] <- item
+        }
+
+        # Get the last item's _id to use as the cursor for the next page
+        last_item <- news[[length(news)]]
+        last_id <- get_val(as.list(last_item), "_id", "")
+
+        # If last_id is empty or same as current cursor, we've reached the end
+        if (last_id == "" || last_id == cursor) {
+          print("[Pressroom] Reached end of pagination (no new cursor).")
+          break
+        }
+
+        cursor <- last_id
+      }
+
+      print(paste0("[Pressroom] Pagination complete: ", length(all_news), " items across ", page_count, " pages."))
+
+      if (length(all_news) == 0) {
+        return(empty_df)
+      }
+
+      df <- lapply(all_news, FUN = function(item) {
+        parse_news_item(item)
+      }) %>% bind_rows()
+
+      return(df)
+    }, error = function(e) {
+      print(paste0("[Pressroom] Error fetching pressroom feed: ", e$message))
+      return(empty_df)
+    })
+  }, timeout_sec = 300)
+}
+
 calculate_league_finances <- function(login, championship_id, user_teams_df, initial_budget = 300000000) {
   cache_key <- paste0("league_finances_calc_", championship_id)
   get_cached_data(cache_key, {
@@ -1210,25 +1411,45 @@ calculate_league_finances <- function(login, championship_id, user_teams_df, ini
       return(list(
         team_finances = data.frame(
           teamid = character(0), teamname = character(0), initial_budget = numeric(0),
-          total_spent = numeric(0), budget = numeric(0), team_value = numeric(0),
-          net_profit_loss = numeric(0), squad_size = numeric(0), points = numeric(0),
-          point_bonus = numeric(0), ranking_prize = numeric(0), stringsAsFactors = FALSE
+          total_spent = numeric(0), total_sales = numeric(0), budget = numeric(0),
+          team_value = numeric(0), net_profit_loss = numeric(0), squad_size = numeric(0),
+          points = numeric(0), point_bonus = numeric(0), ranking_prize = numeric(0),
+          stringsAsFactors = FALSE
         ),
         all_purchases = data.frame()
       ))
     }
-    
+
     finances_list <- list()
     purchases_list <- list()
 
-    ranking_prizes_df <- calculate_futmondo_ranking_prizes(money = 30000000, members = nrow(user_teams_df))
+    # Fetch pressroom transaction history for the championship
+    pressroom_df <- tryCatch({
+      get_championship_pressroom(login = login, championship_id = championship_id)
+    }, error = function(e) {
+      print(paste0("[Finances] Error fetching pressroom: ", e$message))
+      data.frame(
+        id = character(0), created = character(0), player_id = character(0),
+        player_name = character(0), buyer_team_id = character(0),
+        buyer_team_name = character(0), seller_team_id = character(0),
+        seller_team_name = character(0), price = numeric(0),
+        stringsAsFactors = FALSE
+      )
+    })
+
+    # Sync pressroom transactions to Supabase
+    tryCatch({
+      sync_pressroom_transactions_to_supabase(pressroom_df, championship_id)
+    }, error = function(e) {
+      print(paste0("[Finances] Supabase pressroom sync warning: ", e$message))
+    })
 
     for (i in seq_len(nrow(user_teams_df))) {
       row <- user_teams_df[i, ]
       tid <- if ("teamid" %in% colnames(row)) row$teamid else row$id
       tname <- if ("teamname" %in% colnames(row)) row$teamname else row$name
       tpoints <- if ("points" %in% colnames(row)) as.numeric(row$points) else 0
-      
+
       # Fetch squad roster for this user team
       roster <- tryCatch({
         get_players_from_team(login = login, championship_id = championship_id, user_team_id = tid, teams = user_teams_df)
@@ -1236,11 +1457,11 @@ calculate_league_finances <- function(login, championship_id, user_teams_df, ini
         print(paste0("[Finances] Error fetching roster for team ", tname, ": ", e$message))
         NULL
       })
-      
+
       total_spent <- 0
       team_value <- 0
       squad_size <- 0
-      
+
       if (!is.null(roster) && nrow(roster) > 0) {
         squad_size <- nrow(roster)
         if ("buyPrice" %in% colnames(roster)) {
@@ -1249,7 +1470,7 @@ calculate_league_finances <- function(login, championship_id, user_teams_df, ini
         if ("value" %in% colnames(roster)) {
           team_value <- sum(suppressWarnings(as.numeric(roster$value)), na.rm = TRUE)
         }
-        
+
         # Build purchase breakdown for this team
         roster_purchases <- roster
         roster_purchases$owner_teamid <- tid
@@ -1257,7 +1478,7 @@ calculate_league_finances <- function(login, championship_id, user_teams_df, ini
         if (!"buyPrice" %in% colnames(roster_purchases)) roster_purchases$buyPrice <- 0
         if (!"value" %in% colnames(roster_purchases)) roster_purchases$value <- 0
         roster_purchases$net_gain_loss <- roster_purchases$value - roster_purchases$buyPrice
-        
+
         # Standardize column data types across all team rosters to prevent bind_rows type mismatch
         char_cols <- c("id", "slug", "name", "team", "role", "role2", "photo", "teamId", "status", "owner_teamid", "owner_teamname", "logo")
         for (col in colnames(roster_purchases)) {
@@ -1269,53 +1490,64 @@ calculate_league_finances <- function(login, championship_id, user_teams_df, ini
         }
         purchases_list[[length(purchases_list) + 1]] <- roster_purchases
       }
-      
-      # Point bonus calculation (70000 EUR per point)
-      point_bonus <- tpoints * 70000
 
-      # Ranking prize based on team position
-      ranking_prize <- if (i <= nrow(ranking_prizes_df)) ranking_prizes_df$prize[i] else 0
+      # Calculate pressroom purchases and sales for this team
+      pressroom_purchases <- 0
+      pressroom_sales <- 0
+      if (!is.null(pressroom_df) && nrow(pressroom_df) > 0) {
+        pressroom_purchases <- sum(suppressWarnings(as.numeric(pressroom_df$price[pressroom_df$buyer_team_id == tid])), na.rm = TRUE)
+        pressroom_sales <- sum(suppressWarnings(as.numeric(pressroom_df$price[pressroom_df$seller_team_id == tid])), na.rm = TRUE)
+      }
 
-      # Money Left = Initial Budget - Total Spent + Point Bonus + Ranking Prize
-      calc_money_left <- initial_budget - total_spent + point_bonus + ranking_prize
-      
+      # Use pressroom purchases as total_spent if available, otherwise fall back to roster buyPrice
+      total_spent_val <- if (pressroom_purchases > 0) pressroom_purchases else total_spent
+      total_sales_val <- pressroom_sales
+
+      # No artificial point bonus or ranking prize -- budget is purely based on actual transactions
+      point_bonus <- 0
+      ranking_prize <- 0
+
+      # Money Left = Initial Budget - Total Spent + Total Sales
+      calc_money_left <- initial_budget - total_spent_val + total_sales_val
+
       # If get_user_team_info provides an explicit budget for this team, use it if valid
       actual_info <- tryCatch({
         get_user_team_info(login = login, championship_id = championship_id, user_team_id = tid)
       }, error = function(e) NULL)
-      
+
       final_budget <- calc_money_left
       if (!is.null(actual_info) && !is.null(actual_info$budget) && is.numeric(actual_info$budget) && actual_info$budget > 0) {
         final_budget <- actual_info$budget
       }
-      
+
       if (!is.null(actual_info) && !is.null(actual_info$teamValue) && is.numeric(actual_info$teamValue) && actual_info$teamValue > 0) {
         team_value <- actual_info$teamValue
       }
-      
+
       finances_list[[length(finances_list) + 1]] <- data.frame(
         teamid = as.character(tid),
         teamname = as.character(tname),
         initial_budget = as.numeric(initial_budget),
-        total_spent = as.numeric(total_spent),
+        total_spent = as.numeric(total_spent_val),
+        total_sales = as.numeric(total_sales_val),
         budget = as.numeric(final_budget),
         team_value = as.numeric(team_value),
-        net_profit_loss = as.numeric(team_value - total_spent),
+        net_profit_loss = as.numeric(team_value - total_spent_val),
         squad_size = as.numeric(squad_size),
         points = as.numeric(tpoints),
-        point_bonus = as.numeric(point_bonus),
-        ranking_prize = as.numeric(ranking_prize),
+        point_bonus = 0,
+        ranking_prize = 0,
         stringsAsFactors = FALSE
       )
     }
-    
+
     finances_df <- bind_rows(finances_list)
     purchases_df <- if (length(purchases_list) > 0) {
       data.table::rbindlist(purchases_list, fill = TRUE) %>% as.data.frame()
     } else {
       data.frame()
     }
-    
+
     # Sync calculated financial standings to Supabase
     tryCatch({
       sync_user_teams_to_supabase(finances_df, championship_id)
@@ -1323,7 +1555,7 @@ calculate_league_finances <- function(login, championship_id, user_teams_df, ini
     }, error = function(e) {
       print(paste0("[Finances] Supabase sync warning: ", e$message))
     })
-    
+
     return(list(
       team_finances = finances_df,
       all_purchases = purchases_df
@@ -1594,6 +1826,97 @@ put_all_on_market <- function(login, championship_id, team_id) {
     code = operation_code,
     message = err_msg
   ))
+}
+
+get_roster_bids <- function(login, championship_id, user_team_id) {
+  if (is.null(login) || is.null(championship_id) || is.null(user_team_id)) return(data.frame())
+
+  cache_key <- paste0("roster_bids_", championship_id, "_", user_team_id)
+  get_cached_data(cache_key, {
+    payload <- list(
+      header = list(
+        token = login[["token"]],
+        userid = login[["userid"]]
+      ),
+      query = list(
+        championshipId = as.character(championship_id),
+        userteamId = as.character(user_team_id)
+      ),
+      answer = list()
+    )
+    headers <- c("Content-Type" = "application/json; charset=utf-8")
+    print("[API] Fetching roster bids for team")
+    response <- POST(ROSTER_BIDS_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
+    ans <- httr::content(response)
+
+    if (!is.null(ans) && "answer" %in% names(ans) && is.list(ans$answer)) {
+      items <- ans$answer
+      if (length(items) == 0) return(data.frame())
+
+      bids_list <- list()
+      for (item in items) {
+        if (!is.list(item)) next
+
+        # Resolve player ID
+        p_id <- NULL
+        if ("player_id" %in% names(item) && !is.null(item[["player_id"]])) {
+          p_id <- as.character(item[["player_id"]])
+        } else if ("player" %in% names(item)) {
+          if (is.character(item[["player"]]) || is.numeric(item[["player"]])) {
+            p_id <- as.character(item[["player"]])
+          } else if (is.list(item[["player"]])) {
+            if (!is.null(item[["player"]][["_id"]])) {
+              p_id <- as.character(item[["player"]][["_id"]])
+            } else if (!is.null(item[["player"]][["id"]])) {
+              p_id <- as.character(item[["player"]][["id"]])
+            }
+          }
+        } else if ("id" %in% names(item) && !is.null(item[["id"]])) {
+          p_id <- as.character(item[["id"]])
+        }
+
+        # Check for nested bids array or direct bid object
+        bids_arr <- NULL
+        if ("bids" %in% names(item) && is.list(item$bids)) {
+          bids_arr <- item$bids
+        } else if ("market" %in% names(item) && is.list(item$market) && "bids" %in% names(item$market)) {
+          bids_arr <- item$market$bids
+        }
+
+        if (!is.null(p_id) && !is.null(bids_arr) && length(bids_arr) > 0) {
+          b_df <- lapply(bids_arr, FUN = function(b) {
+            b_price <- if (!is.null(b[["price"]])) suppressWarnings(as.numeric(b[["price"]])) else 0
+            b_user <- if (!is.null(b[["userTeam"]]) && is.list(b[["userTeam"]]) && !is.null(b[["userTeam"]][["name"]]) && as.character(b[["userTeam"]][["name"]]) != "") as.character(b[["userTeam"]][["name"]]) else "Futmondo"
+            b_id <- if (!is.null(b[["id"]])) as.character(b[["id"]]) else if (!is.null(b[["_id"]])) as.character(b[["_id"]]) else ""
+            data.frame(id = p_id, bid_price = b_price, bid_user = b_user, bid_id = b_id, stringsAsFactors = FALSE)
+          }) %>% rbindlist(fill = TRUE) %>% as.data.frame()
+
+          if (nrow(b_df) > 0) {
+            max_idx <- which.max(b_df$bid_price)
+            bids_list[[length(bids_list) + 1]] <- b_df[max_idx, ]
+          }
+        } else if (!is.null(p_id) && "price" %in% names(item) && !is.null(item[["price"]])) {
+          # Direct bid object format
+          b_price <- suppressWarnings(as.numeric(item[["price"]]))
+          b_user <- if ("userTeam" %in% names(item) && is.list(item[["userTeam"]]) && !is.null(item[["userTeam"]][["name"]]) && as.character(item[["userTeam"]][["name"]]) != "") as.character(item[["userTeam"]][["name"]]) else "Futmondo"
+          b_id <- if ("_id" %in% names(item)) as.character(item[["_id"]]) else if ("id" %in% names(item)) as.character(item[["id"]]) else ""
+          bids_list[[length(bids_list) + 1]] <- data.frame(id = p_id, bid_price = b_price, bid_user = b_user, bid_id = b_id, stringsAsFactors = FALSE)
+        }
+      }
+
+      if (length(bids_list) > 0) {
+        ret_df <- bind_rows(bids_list)
+        # Deduplicate per player ID taking highest bid
+        ret_df <- ret_df %>%
+          dplyr::group_by(id) %>%
+dplyr::slice_max(order_by = bid_price, n = 1, with_ties = FALSE) %>%
+           dplyr::ungroup() %>%
+           as.data.frame()
+         return(ret_df)
+       }
+     }
+     return(data.frame())
+  }, timeout_sec = 15)
 }
 
 get_my_market_players <- function(login, championship_id, user_team_id) {

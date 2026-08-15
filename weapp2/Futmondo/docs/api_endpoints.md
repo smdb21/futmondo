@@ -92,6 +92,45 @@ All requests to the Futmondo API (`api.futmondo.com`) are **stateless POST reque
 
 ---
 
+## 8. Pressroom (Transfer Market Feed)
+* **Endpoint**: `POST https://api.futmondo.com/1/locker/pressroom`
+* **Query Payload**:
+  ```json
+  {
+    "championshipId": "CHAMPIONSHIP_ID",
+    "from": ""
+  }
+  ```
+* **Response**: Returns a list of transfer news items under `response$answer$news`. Each item contains:
+  ```json
+  {
+    "_id": "TRANSACTION_ID",
+    "created": "ISO_8601_TIMESTAMP",
+    "price": 15000000,
+    "_player": {
+      "_id": "PLAYER_ID",
+      "name": "Player Name"
+    },
+    "_buyer": {
+      "_id": "BUYER_TEAM_ID",
+      "name": "Buyer Team Name"
+    },
+    "_seller": {
+      "_id": "SELLER_TEAM_ID",
+      "name": "Seller Team Name"
+    }
+  }
+  ```
+* **Cursor-Based Pagination**: The endpoint supports cursor-based pagination via the `query.from` parameter. To fetch 100% of historical pressroom transactions:
+  1. Start with `"from": ""` to get the first page.
+  2. Extract the `_id` of the last item in the returned `news` array.
+  3. Set `"from": "<LAST_ITEM_ID>"` for the next request.
+  4. Repeat until the `news` array is empty or the last item's `_id` equals the current cursor (indicating no new data).
+  5. The `get_championship_pressroom()` function implements this loop internally, with a safety cap of 25 pages maximum.
+* **Usage**: This endpoint provides the complete pressroom feed for a championship, listing all player transfers (market purchases and clause buyouts). It is used by `get_championship_pressroom()` to compute per-team purchase and sale volumes for league finance calculations.
+
+---
+
 ## 🏷️ Transfer Market Bidding vs. Release Clause Purchases
 
 This section documents the underlying game mechanics and transaction rules that players encounter when trading in Futmondo championships:

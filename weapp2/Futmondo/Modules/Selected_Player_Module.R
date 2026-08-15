@@ -242,7 +242,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           # Check for received offer on squad player
           has_received_offer <- FALSE
           rec_offer_price <- NA_real_
-          rec_offer_bidder <- "Computer / System"
+          rec_offer_bidder <- "Futmondo"
 
           if ("bid_price" %in% colnames(sp) && !is.na(sp$bid_price) && suppressWarnings(as.numeric(sp$bid_price)) > 0) {
             has_received_offer <- TRUE
@@ -392,10 +392,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           step = 10000
         ),
         uiOutput(ns("new_bid_amount_preview")),
-        footer = tagList(
-          modalButton("Cancel"),
-          actionButton(ns("submit_modify_bid"), "Submit Updated Bid", class = "btn btn-buy-market")
-        ),
+        footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
+                     modalButton("Cancel"),
+                     actionButton(ns("submit_modify_bid"), "Submit Updated Bid", class = "btn btn-buy-market")),
         easyClose = TRUE,
         size = "s"
       ))
@@ -471,10 +470,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         p(strong(sp$name)),
         p("Are you sure you want to cancel your active bid of ", strong(format_currency(bid_info$price)), "?"),
         p(style = "color: #ef4444; font-size: 13px;", "This will withdraw your offer from the transfer market."),
-        footer = tagList(
-          modalButton("Keep Bid"),
-          actionButton(ns("submit_cancel_bid"), "Confirm Cancel Bid", class = "btn btn-cancel-bid")
-        ),
+        footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
+                     modalButton("Keep Bid"),
+                     actionButton(ns("submit_cancel_bid"), "Confirm Cancel Bid", class = "btn btn-cancel-bid")),
         easyClose = TRUE,
         size = "s"
       ))
@@ -537,10 +535,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           step = 10000
         ),
         uiOutput(ns("bid_amount_preview")),
-        footer = tagList(
-          modalButton("Cancel"),
-          actionButton(ns("submit_bid"), "Submit Market Offer", class = "btn btn-buy-market")
-        ),
+        footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
+                     modalButton("Cancel"),
+                     actionButton(ns("submit_bid"), "Submit Market Offer", class = "btn btn-buy-market")),
         easyClose = TRUE,
         size = "s"
       ))
@@ -630,10 +627,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         ),
         uiOutput(ns("owner_offer_amount_preview")),
         p(style = "color: #64748b; font-size: 12px;", "This offer will be submitted to the player owner and tracked in market transaction history."),
-        footer = tagList(
-          modalButton("Cancel"),
-          actionButton(ns("submit_owner_offer"), "Submit Offer", class = "btn btn-offer-money")
-        ),
+        footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
+                     modalButton("Cancel"),
+                     actionButton(ns("submit_owner_offer"), "Submit Offer", class = "btn btn-offer-money")),
         easyClose = TRUE,
         size = "s"
       ))
@@ -714,10 +710,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         p("This will instantly purchase the player for their official release clause."),
         p("Clause price: ", strong(format_currency(clause_price))),
         p(style = "color: #ef4444; font-size: 13px; font-weight: 600;", "Are you sure you want to trigger this clause buyout?"),
-        footer = tagList(
-          modalButton("Cancel"),
-          actionButton(ns("submit_clause"), "Confirm Clause Buyout", class = "btn btn-buy-clause")
-        ),
+        footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
+                     modalButton("Cancel"),
+                     actionButton(ns("submit_clause"), "Confirm Clause Buyout", class = "btn btn-buy-clause")),
         easyClose = TRUE,
         size = "s"
       ))
@@ -799,10 +794,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         ),
         uiOutput(ns("sale_price_input_preview")),
         p(style = "color: #64748b; font-size: 12px;", "This player will be listed on the transfer market for other users and computer to place bids."),
-        footer = tagList(
-          modalButton("Cancel"),
-          actionButton(ns("submit_put_on_market"), "Confirm Market Listing", class = "btn btn-offer-money")
-        ),
+        footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
+                     modalButton("Cancel"),
+                     actionButton(ns("submit_put_on_market"), "Confirm Market Listing", class = "btn btn-offer-money")),
         easyClose = TRUE,
         size = "s"
       ))
@@ -865,10 +859,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         title = tagList(icon("tag"), paste0(" Remove ", sp$name, " from Market")),
         p(strong(sp$name)),
         p("Are you sure you want to withdraw this player from the transfer market?"),
-        footer = tagList(
-          modalButton("Cancel"),
-          actionButton(ns("submit_cancel_sell"), "Confirm Remove from Market", class = "btn btn-cancel-bid")
-        ),
+        footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
+                     modalButton("Cancel"),
+                     actionButton(ns("submit_cancel_sell"), "Confirm Remove from Market", class = "btn btn-cancel-bid")),
         easyClose = TRUE,
         size = "s"
       ))
@@ -920,17 +913,16 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       sp <- selected_player()
       req(sp)
       rec_offer_price <- suppressWarnings(as.numeric(sp$bid_price))
-      rec_offer_bidder <- if ("bid_user" %in% colnames(sp) && !is.na(sp$bid_user) && sp$bid_user != "") as.character(sp$bid_user) else "Computer / System"
+      rec_offer_bidder <- if ("bid_user" %in% colnames(sp) && !is.na(sp$bid_user) && sp$bid_user != "") as.character(sp$bid_user) else "Futmondo"
 
       showModal(modalDialog(
         title = tagList(icon("circle-check"), paste0(" Accept Offer for ", sp$name)),
         p(strong(sp$name)),
         p("Are you sure you want to ACCEPT the received offer of ", strong(format_currency(rec_offer_price)), " from ", strong(rec_offer_bidder), "?"),
         p(style = "color: #10b981; font-size: 13px; font-weight: 600;", "The player will be sold and funds added to your budget immediately."),
-        footer = tagList(
-          modalButton("Cancel"),
-          actionButton(ns("submit_accept_offer"), "Confirm Accept Offer", class = "btn btn-offer-money")
-        ),
+        footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
+                     modalButton("Cancel"),
+                     actionButton(ns("submit_accept_offer"), "Confirm Accept Offer", class = "btn btn-offer-money")),
         easyClose = TRUE,
         size = "s"
       ))
@@ -944,9 +936,29 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       team_id <- get_reactive_val(user_team_id)
       req(sp, login, champ_id, team_id)
 
-      bid_id <- if ("bid_id" %in% colnames(sp) && !is.na(sp$bid_id)) as.character(sp$bid_id) else NULL
       player_id <- as.character(sp$id)
-      req(bid_id, player_id)
+      bid_id <- NULL
+
+      if ("bid_id" %in% colnames(sp) && !is.na(sp$bid_id) && sp$bid_id != "") {
+        bid_id <- as.character(sp$bid_id)
+      } else if ("bid__id" %in% colnames(sp) && !is.na(sp$bid__id) && sp$bid__id != "") {
+        bid_id <- as.character(sp$bid__id)
+      } else {
+        sum_res <- tryCatch({
+          get_player_summary(login = login, championship_id = champ_id, user_team_id = team_id, player_id = player_id)
+        }, error = function(e) NULL)
+        if (!is.null(sum_res) && !is.null(sum_res$bids) && is.list(sum_res$bids) && length(sum_res$bids) > 0) {
+          first_b <- sum_res$bids[[1]]
+          if (is.list(first_b) && !is.null(first_b[["id"]])) {
+            bid_id <- as.character(first_b[["id"]])
+          }
+        }
+      }
+
+      if (is.null(bid_id) || bid_id == "") {
+        shiny::showNotification("Could not identify the received bid ID. Please try again.", type = "error")
+        return()
+      }
 
       res <- accept_bid(
         login = login,
@@ -985,16 +997,15 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       sp <- selected_player()
       req(sp)
       rec_offer_price <- suppressWarnings(as.numeric(sp$bid_price))
-      rec_offer_bidder <- if ("bid_user" %in% colnames(sp) && !is.na(sp$bid_user) && sp$bid_user != "") as.character(sp$bid_user) else "Computer / System"
+      rec_offer_bidder <- if ("bid_user" %in% colnames(sp) && !is.na(sp$bid_user) && sp$bid_user != "") as.character(sp$bid_user) else "Futmondo"
 
       showModal(modalDialog(
         title = tagList(icon("circle-xmark"), paste0(" Reject Offer for ", sp$name)),
         p(strong(sp$name)),
         p("Are you sure you want to REJECT the received offer of ", strong(format_currency(rec_offer_price)), " from ", strong(rec_offer_bidder), "?"),
-        footer = tagList(
-          modalButton("Cancel"),
-          actionButton(ns("submit_reject_offer"), "Confirm Reject Offer", class = "btn btn-cancel-bid")
-        ),
+        footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
+                     modalButton("Cancel"),
+                     actionButton(ns("submit_reject_offer"), "Confirm Reject Offer", class = "btn btn-cancel-bid")),
         easyClose = TRUE,
         size = "s"
       ))
@@ -1008,9 +1019,29 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       team_id <- get_reactive_val(user_team_id)
       req(sp, login, champ_id, team_id)
 
-      bid_id <- if ("bid_id" %in% colnames(sp) && !is.na(sp$bid_id)) as.character(sp$bid_id) else NULL
       player_id <- as.character(sp$id)
-      req(bid_id, player_id)
+      bid_id <- NULL
+
+      if ("bid_id" %in% colnames(sp) && !is.na(sp$bid_id) && sp$bid_id != "") {
+        bid_id <- as.character(sp$bid_id)
+      } else if ("bid__id" %in% colnames(sp) && !is.na(sp$bid__id) && sp$bid__id != "") {
+        bid_id <- as.character(sp$bid__id)
+      } else {
+        sum_res <- tryCatch({
+          get_player_summary(login = login, championship_id = champ_id, user_team_id = team_id, player_id = player_id)
+        }, error = function(e) NULL)
+        if (!is.null(sum_res) && !is.null(sum_res$bids) && is.list(sum_res$bids) && length(sum_res$bids) > 0) {
+          first_b <- sum_res$bids[[1]]
+          if (is.list(first_b) && !is.null(first_b[["id"]])) {
+            bid_id <- as.character(first_b[["id"]])
+          }
+        }
+      }
+
+      if (is.null(bid_id) || bid_id == "") {
+        shiny::showNotification("Could not identify the received bid ID. Please try again.", type = "error")
+        return()
+      }
 
       res <- reject_bid(
         login = login,

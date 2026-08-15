@@ -108,9 +108,12 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
     table_refresh_trigger <- reactiveVal(0)
 
     local_bids_override <- reactiveVal(list())
+    bulk_market_override <- reactiveVal(FALSE)
 
     handle_bid_updated <- function(player_id = NULL, new_bid_price = NULL, is_cancel = FALSE) {
-      if (!is.null(player_id) && player_id != "") {
+      if (!is.null(player_id) && player_id == "ALL") {
+        bulk_market_override(TRUE)
+      } else if (!is.null(player_id) && player_id != "") {
         current_overrides <- local_bids_override()
         current_overrides[[as.character(player_id)]] <- list(
           price = if (isTRUE(is_cancel)) NA_real_ else suppressWarnings(as.numeric(new_bid_price)),
@@ -144,6 +147,8 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
         showModal(modalDialog(
           # title = "Selected player",
           selected_player_UI(id = ns("selected_player")),
+          footer = div(style = "text-align: center; width: 100%;",
+                       modalButton("Close")),
           easyClose = TRUE,
           size = "l"
         ))
@@ -186,6 +191,12 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
               if ("bid_price" %in% colnames(players_table)) {
                 players_table$bid_price[match_idx] <- NA_real_
               }
+              if ("market_inMarket" %in% colnames(players_table)) {
+                players_table$market_inMarket[match_idx] <- FALSE
+              }
+              if ("effective_market_price" %in% colnames(players_table)) {
+                players_table$effective_market_price[match_idx] <- NA_real_
+              }
               if ("numberOfBids" %in% colnames(players_table) && !is.na(players_table$numberOfBids[match_idx])) {
                 current_bids <- suppressWarnings(as.numeric(players_table$numberOfBids[match_idx]))
                 if (!is.na(current_bids)) {
@@ -209,6 +220,21 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
               }
             }
           }
+        }
+      }
+
+      # Apply bulk market listed override if active
+      if (isTRUE(bulk_market_override()) && !is.null(players_table) && nrow(players_table) > 0) {
+        players_table$market_inMarket <- TRUE
+        if (!"effective_market_price" %in% colnames(players_table)) {
+          players_table$effective_market_price <- NA_real_
+        }
+        if ("value" %in% colnames(players_table)) {
+          players_table$effective_market_price <- ifelse(
+            is.na(players_table$effective_market_price) | players_table$effective_market_price <= 0,
+            players_table$value,
+            players_table$effective_market_price
+          )
         }
       }
 
@@ -308,6 +334,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
                 columns = table_columns,
                 searchable = TRUE,
                 filterable = TRUE,
+                resizable = TRUE,
                 defaultPageSize = 20,
                 pagination = TRUE,
                 striped = TRUE,

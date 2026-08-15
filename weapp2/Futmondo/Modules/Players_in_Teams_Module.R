@@ -20,7 +20,7 @@ players_in_teams_UI <- function(id) {
       filter_by_is_favorite = FALSE,
       filter_by_is_from_futmondo = FALSE,
       show_position_breakdown = TRUE,
-      hide_bid_column = TRUE
+      hide_bid_column = FALSE
     )
   )
 }
@@ -308,7 +308,7 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
           duration = 5
         )
         clear_api_cache()
-        if (!is.null(refresh_trigger)) {
+        if (!is.null(refresh_trigger) && is.function(refresh_trigger)) {
           tryCatch(refresh_trigger(), error = function(e) NULL)
         }
       } else {
@@ -452,7 +452,7 @@ fluidRow(
       login_token = login_token,
       championship_id = championship_id,
       user_team_id = user_team_id,
-      hide_bid_column = TRUE
+      hide_bid_column = FALSE
     )
 
     return(selected_player_RV)

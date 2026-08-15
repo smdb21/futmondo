@@ -111,22 +111,24 @@ The `bid_price` column can be hidden on the Your Team tab via a configuration pa
 render_player_table(login, championship_id, team_id, hide_bid_column = TRUE)
 ```
 
-### C. "Current Bid" & "Bidder" Columns
+### C. "Received Offer" Column
 
-Two adjacent columns, `"Current Bid"` (`bid_price`) and `"Bidder"` (`bid_user`), display incoming offers and the names of the bidders.
+A single column, `"Received Offer"` (`bid_price`), displays incoming offers. The offer amount is rendered in an emerald badge with a hover tooltip (`title="Offer from [Bidder]"`). For system-generated offers where the bidder name is empty, the tooltip defaults to `"Offer from Futmondo"`.
+
+The standalone `"Bidder"` (`bid_user`) column is hidden from the table via `colDef(show = FALSE)`.
 
 #### Rendering
 
-| Column | Description |
-|--------|-------------|
-| `bid_price` ("Current Bid") | The current highest bid amount for the player. |
-| `bid_user` ("Bidder") | The username of the bidder who placed the current highest bid. |
+| Condition | Cell Content |
+|-----------|-------------|
+| Incoming offer present | Offer amount in an emerald badge with hover tooltip showing the bidder name. |
+| No incoming offer | `""` -- renders as an empty cell. |
 
 #### Data Pipeline
 
 1. **Input**: The player record from the roster API response, including `bid_price` and `bid_user` fields.
-2. **Computation**: Extracts the `bid_price` and `bid_user` values directly from the player record.
-3. **Rendering**: Displays the bid amount and bidder name adjacently in the player table to provide a clear view of incoming offers.
+2. **Computation**: Extracts the `bid_price` and `bid_user` values directly from the player record. If `bid_user` is empty (system offer), the tooltip text defaults to `"Futmondo"`.
+3. **Rendering**: Displays the offer amount in an emerald badge with a hover tooltip. The `bid_user` column is hidden via `colDef(show = FALSE)`.
 
 ### D. Sanitized V1 Column
 
@@ -137,3 +139,70 @@ Unnamed columns introduced by JSON parsing artifacts (commonly labeled `V1`) are
 - During JSON deserialization, any column with the name `V1` (or other unnamed-generic identifiers) is detected and removed from the display data frame.
 - This prevents spurious empty or malformed columns from appearing in the player table.
 - The sanitization occurs before any rendering step, ensuring clean table output regardless of API payload variations.
+
+---
+
+## 5. Resizable Columns
+
+All Reactable tables in the Players In Teams module are initialized with `resizable = TRUE`, allowing users to click and drag column borders to adjust column widths to their preference.
+
+#### Behavior
+
+- Users can resize any column by hovering over the column border until a resize cursor appears, then clicking and dragging horizontally.
+- The adjusted width persists for the current session and applies to all rows within the table.
+- This is particularly useful for columns with long text values (e.g., player names, market listings) that may be truncated at default widths.
+
+#### Configuration
+
+The `resizable` option is set directly on the `reactable()` call:
+
+```R
+reactable(
+  data,
+  resizable = TRUE,
+  # ... other options
+)
+```
+
+---
+
+## 6. Shortened Cache Timeouts
+
+Roster and bid cache timeouts have been reduced to `timeout_sec = 15-30s` across the Players In Teams module. This ensures that live offers (such as a bid of 20.097.019 € on Borja Iglesias) render immediately without unnecessary delay.
+
+#### Rationale
+
+The default cache timeout was too long for time-sensitive market data. Incoming offers, bid updates, and market listings can change rapidly during active trading periods. Shorter timeouts ensure the user sees the latest data without stale cache masking real-time updates.
+
+#### Affected Caches
+
+| Cache | Timeout | Purpose |
+|-------|---------|---------|
+| Roster cache | `15s` | Player roster data fetched from the roster API. |
+| Bid cache | `30s` | Incoming offer and bid data fetched from the bid API. |
+
+#### Implementation
+
+The timeout is passed to the `get_cached_data()` wrapper function:
+
+```R
+# Roster data with 15-second cache timeout
+get_cached_data(
+  key = paste0("roster_", team_id),
+  fetch_fn = fetch_roster,
+  timeout_sec = 15
+)
+
+# Bid data with 30-second cache timeout
+get_cached_data(
+  key = paste0("bids_", team_id),
+  fetch_fn = fetch_bids,
+  timeout_sec = 30
+)
+```
+
+#### Impact
+
+- Live offers appear within 15-30 seconds of being placed by other users.
+- Tab switches remain sub-millisecond for cached data within the timeout window.
+- API rate limits are respected since caching is still active; only the cache duration is shortened.

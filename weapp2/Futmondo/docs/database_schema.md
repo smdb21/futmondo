@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS player_history (
     recorded_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 7. Market Transactions (Offers & Clause log)
+-- 7. Market Transactions (Offers, Clause log, and Pressroom transfer feed)
 CREATE TABLE IF NOT EXISTS market_transactions (
     id BIGSERIAL PRIMARY KEY,
     player_id TEXT REFERENCES players(id) ON DELETE CASCADE,
@@ -118,3 +118,20 @@ CREATE INDEX IF NOT EXISTS idx_transactions_championship ON market_transactions(
 * **real_clubs** (1) -> (N) **players**: One real-world club has many registered players.
 * **players** (1) -> (N) **player_history**: One player logs daily valuation changes for historical curve trend plotting.
 * **players** (1) -> (N) **market_transactions**: One player receives multiple market offers/buyout clauses.
+
+---
+
+## 4. Pressroom Market Log Usage
+
+The `market_transactions` table serves dual purpose:
+
+1. **Manual transaction logging**: Individual `log_market_transaction()` calls record specific bid/clause events.
+2. **Pressroom feed sync**: `sync_pressroom_transactions_to_supabase()` bulk-inserts the full pressroom transfer feed, capturing every completed player sale across the championship. Each pressroom entry maps to:
+   - `player_id`: The transferred player.
+   - `championship_id`: The league the transfer occurred in.
+   - `buyer_team_id`: The user team that purchased the player.
+   - `seller_team_id`: The user team that sold the player.
+   - `price`: The sale price in EUR (integer scale).
+   - `created_at`: The timestamp from the pressroom feed.
+
+The pressroom data is queried back via `get_pressroom_transactions_from_supabase(championship_id)` for historical analysis and is consumed by `calculate_league_finances()` to compute per-team purchase and sale volumes.

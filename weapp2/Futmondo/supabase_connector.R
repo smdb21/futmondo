@@ -243,7 +243,7 @@ get_league_finances_history <- function(championship_id) {
     "user_teams.championship_id" = paste0("eq.", championship_id),
     order = "recorded_at.asc"
   )
-  
+
   df <- supabase_get("user_team_history", query)
   if (!is.null(df) && nrow(df) > 0 && "user_teams" %in% colnames(df)) {
     if (is.list(df$user_teams) || is.data.frame(df$user_teams)) {
@@ -254,4 +254,56 @@ get_league_finances_history <- function(championship_id) {
     df$user_teams <- NULL
   }
   return(df)
+}
+
+sync_pressroom_transactions_to_supabase <- function(pressroom_df, championship_id) {
+  if (is.null(pressroom_df) || nrow(pressroom_df) == 0) return()
+
+  required_cols <- c("player_id", "buyer_team_id", "seller_team_id", "price", "created")
+  if (!all(required_cols %in% colnames(pressroom_df))) return()
+
+  payload <- data.frame(
+    player_id = as.character(pressroom_df$player_id),
+    championship_id = as.character(championship_id),
+    buyer_team_id = as.character(pressroom_df$buyer_team_id),
+    seller_team_id = as.character(pressroom_df$seller_team_id),
+    price = as.numeric(pressroom_df$price),
+    created_at = as.character(pressroom_df$created),
+    stringsAsFactors = FALSE
+  )
+
+  # Deduplicate by player_id + championship_id + buyer_team_id + price to avoid duplicate syncs
+  payload <- payload %>% dplyr::distinct(player_id, championship_id, buyer_team_id, seller_team_id, price, created_at, .keep_all = TRUE)
+
+  # Batch large payloads to avoid payload-size limits on the Supabase REST endpoint
+  batch_size <- 500
+  n <- nrow(payload)
+  print(paste0("[Supabase] Syncing ", n, " pressroom transactions to market_transactions (batch size: ", batch_size, ")."))
+
+  tryCatch({
+    for (start_idx in seq(1, n, by = batch_size)) {
+      end_idx <- min(start_idx + batch_size - 1, n)
+      batch <- payload[start_idx:end_idx, , drop = FALSE]
+      supabase_post("market_transactions", batch)
+    }
+  }, error = function(e) {
+    print(paste0("[Supabase] Error during pressroom transaction sync: ", e$message))
+  })
+}
+
+get_pressroom_transactions_from_supabase <- function(championship_id) {
+  if (is.null(championship_id) || championship_id == "") return(NULL)
+
+  query <- list(
+    championship_id = paste0("eq.", championship_id),
+    select = "player_id,buyer_team_id,seller_team_id,price,created_at"
+  )
+
+  tryCatch({
+    df <- supabase_get("market_transactions", query)
+    return(df)
+  }, error = function(e) {
+    print(paste0("[Supabase] Error fetching pressroom transactions: ", e$message))
+    return(NULL)
+  })
 }
