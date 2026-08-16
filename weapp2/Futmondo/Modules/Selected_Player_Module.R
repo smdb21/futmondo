@@ -130,7 +130,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         # Dynamically build integrated team logo emblem & name
         team_logo <- NULL
         if ("team" %in% colnames(sp) && !is.na(sp$team) && sp$team != "") {
-          team_image_name <- get_team_image_name(sp$team)
+          team_logo_field <- if ("logo" %in% colnames(sp) && !is.na(sp$logo)) as.character(sp$logo) else NULL
+          team_image_name <- get_team_image_name(sp$team, logo = team_logo_field)
           
           logo_tag <- if (team_image_name != "") {
             img(src = paste0(TEAM_LOGO_URL, team_image_name, ".png"), 
@@ -289,6 +290,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           action_buttons <- tagList(banner, btn_modify, btn_cancel)
         } else {
           # ---- Player belongs to rival/market AND current user has NO active bid ----
+
           # Extract effective market price (checking effective_market_price, market_price, and price)
           eff_market_price <- NA_real_
           if ("effective_market_price" %in% colnames(sp) && !is.na(sp$effective_market_price) && suppressWarnings(as.numeric(sp$effective_market_price)) > 0) {
@@ -297,6 +299,62 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
             eff_market_price <- suppressWarnings(as.numeric(sp$market_price))
           } else if ("price" %in% colnames(sp) && !is.na(sp$price) && suppressWarnings(as.numeric(sp$price)) > 0) {
             eff_market_price <- suppressWarnings(as.numeric(sp$price))
+          }
+
+          # Determine owner name
+          owner_name <- if ("userTeam" %in% colnames(sp) && !is.na(sp$userTeam) && nzchar(trimws(as.character(sp$userTeam)))) {
+            trimws(as.character(sp$userTeam))
+          } else if ("user" %in% colnames(sp) && !is.na(sp$user) && nzchar(trimws(as.character(sp$user)))) {
+            trimws(as.character(sp$user))
+          } else if ("teamname" %in% colnames(sp) && !is.na(sp$teamname) && nzchar(trimws(as.character(sp$teamname)))) {
+            trimws(as.character(sp$teamname))
+          } else if ("owner_teamname" %in% colnames(sp) && !is.na(sp$owner_teamname) && nzchar(trimws(as.character(sp$owner_teamname)))) {
+            trimws(as.character(sp$owner_teamname))
+          } else {
+            NULL
+          }
+
+          # Determine if player is owned by computer / free agent vs rival
+          is_computer <- if ("computer" %in% colnames(sp) && !is.na(sp$computer)) {
+            isTRUE(as.logical(sp$computer))
+          } else {
+            is.null(owner_name) || owner_name == "Owner" || owner_name == ""
+          }
+
+          # Determine if player is listed on market
+          is_on_market <- (!is.na(eff_market_price) && eff_market_price > 0) ||
+                          ("computer" %in% colnames(sp)) ||
+                          ("market_inMarket" %in% colnames(sp) && isTRUE(as.logical(sp$market_inMarket)))
+
+          # Render the appropriate badge
+          if (!is_computer && !is.null(owner_name) && is_on_market) {
+            # Rival player on Market: "{username} / Market"
+            badge_tag <- div(
+              style = "display: inline-block; padding: 8px 16px; background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a; border-radius: 8px; font-weight: 600; font-size: 13px; margin: 5px;",
+              tagList(icon("tags"), paste0(" ", owner_name, " / Market"))
+            )
+            action_buttons <- tagList(badge_tag, action_buttons)
+          } else if (is_computer && is_on_market) {
+            # Computer / Free Agent on Market: "Free Agent / Market"
+            badge_tag <- div(
+              style = "display: inline-block; padding: 8px 16px; background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; font-size: 13px; margin: 5px;",
+              tagList(icon("building-columns"), " Free Agent / Market")
+            )
+            action_buttons <- tagList(badge_tag, action_buttons)
+          } else if (!is_computer && !is.null(owner_name)) {
+            # Rival player off Market: "Owner: {owner_name}"
+            badge_tag <- div(
+              style = "display: inline-block; padding: 8px 16px; background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a; border-radius: 8px; font-weight: 600; font-size: 13px; margin: 5px;",
+              tagList(icon("users"), paste0(" Owner: ", owner_name))
+            )
+            action_buttons <- tagList(badge_tag, action_buttons)
+          } else {
+            # Generic free agent fallback
+            badge_tag <- div(
+              style = "display: inline-block; padding: 8px 16px; background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; font-size: 13px; margin: 5px;",
+              tagList(icon("building-columns"), " Free Agent / Market")
+            )
+            action_buttons <- tagList(badge_tag, action_buttons)
           }
 
           # Extract release clause parameters
@@ -1083,6 +1141,21 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       champ_id <- get_reactive_val(championship_id)
       player_id <- sp$id
 
+      # Safe date parsing helper
+      parse_safe_datetime <- function(date_vec) {
+        if (is.null(date_vec) || length(date_vec) == 0) return(as.POSIXct(character(0)))
+        date_str <- as.character(date_vec)
+        clean_str <- gsub("T", " ", date_str)
+        clean_str <- gsub("Z", "", clean_str)
+        clean_str <- gsub("\\..*", "", clean_str)
+        parsed <- suppressWarnings(as.POSIXct(clean_str, format = "%Y-%m-%d %H:%M:%S"))
+        na_idx <- is.na(parsed)
+        if (any(na_idx)) {
+          parsed[na_idx] <- suppressWarnings(as.POSIXct(clean_str[na_idx], format = "%Y-%m-%d"))
+        }
+        return(parsed)
+      }
+
       history_df <- NULL
       if (!is.null(champ_id) && !is.null(player_id)) {
         tryCatch({
@@ -1107,29 +1180,32 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         )
       }
 
-      # Format dates
-      history_df$date <- as.POSIXct(history_df$recorded_at, format = "%Y-%m-%dT%H:%M:%S")
-      if (any(is.na(history_df$date))) {
-        history_df$date <- as.POSIXct(history_df$recorded_at)
-      }
+      # Cleanly parse dates, filter NAs, sort chronologically
+      history_df$date <- as.POSIXct(parse_safe_datetime(history_df$recorded_at))
+      history_df <- history_df %>% dplyr::filter(!is.na(date)) %>% dplyr::arrange(date)
 
-      history_df <- history_df %>% dplyr::arrange(date)
-
-      # Build interactive plotly dual-axis chart
+      # Build clean dual y-axis Plotly chart
       plotly::plot_ly(data = history_df) %>%
-        plotly::add_lines(
+        plotly::add_trace(
+          type = "scatter",
+          mode = "lines+markers",
           x = ~date, y = ~value,
-          name = "Valuation (EUR)",
-          line = list(color = "#f59e0b", width = 3, shape = "spline"),
-          fill = "tozeroy", fillcolor = "rgba(245, 158, 11, 0.05)",
+          name = "Market Valuation (\u20ac)",
+          fill = "tozeroy",
+          fillcolor = "rgba(59, 130, 246, 0.08)",
+          line = list(color = "#3b82f6", width = 2.5),
+          yaxis = "y",
           hoverinfo = "text",
           text = ~paste0("Date: ", format(date, "%d-%m-%y"), "<br>Valuation: ", format_table_currency(value))
         ) %>%
-        plotly::add_bars(
+        plotly::add_trace(
+          type = "scatter",
+          mode = "lines+markers",
           x = ~date, y = ~points,
           name = "Points",
+          line = list(color = "#10b981", width = 2, dash = "dot"),
+          marker = list(size = 7, color = "#10b981"),
           yaxis = "y2",
-          marker = list(color = "rgba(16, 185, 129, 0.6)", line = list(color = "#10b981", width = 1)),
           hoverinfo = "text",
           text = ~paste0("Date: ", format(date, "%d-%m-%y"), "<br>Points: ", points)
         ) %>%
@@ -1144,17 +1220,16 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
             tickformat = "%d-%m"
           ),
           yaxis = list(
-            title = "Valuation (EUR)",
-            gridcolor = "#f1f5f9",
-            zeroline = FALSE,
-            tickformat = "s"
+            title = "Valuation (\u20ac)",
+            tickformat = "s",
+            gridcolor = "#f1f5f9"
           ),
           yaxis2 = list(
             title = "Points",
             overlaying = "y",
             side = "right",
-            zeroline = FALSE,
-            showgrid = FALSE
+            showgrid = FALSE,
+            rangemode = "tozero"
           ),
           legend = list(orientation = "h", x = 0.5, y = -0.25, xanchor = "center"),
           margin = list(l = 50, r = 50, t = 10, b = 40)

@@ -24,14 +24,16 @@ The Rivals Module provides two exported functions:
 ### Return Value
 
 Returns a `tagList` containing:
-1. A League Squad Value Evolution chart (`plotlyOutput`) showing historical valuations of all teams.
+1. A Net Transfer Profit/Loss KPI box (standalone summary box in the top summary row).
 2. A League Financial Standings & Budget Left table (`reactableOutput`) displaying per-team finances.
-3. A League Buying Power chart (`plotlyOutput`) showing liquid cash standings. Includes a mode selector dropdown and a date range slider at the top.
+3. A League Buying Power chart (`plotlyOutput`) showing liquid cash standings. Includes a mode selector dropdown (Liquid Cash, Squad Purchases, Transaction Volume) and a date range slider at the top.
 4. A `uiOutput` placeholder (`scouted_rival_details_ui`) for the selected rival details, which renders:
-   - Financial summary cards (Standings Position, Money Left, Squad Investment, Squad Valuation & Net Gain).
-- A `tabsetPanel` (type = "pills") with two tabs:
+    - Financial summary cards (Standings Position, Money Left, Squad Investment, Squad Valuation & Net Gain).
+- A `tabsetPanel` (type = "pills") with tabs including:
       - **Tab 1: "Player Roster & Clauses"** -- Contains the `players_table_UI` call for the scouted player roster and purchase breakdown.
-      - **Tab 2: "Transaction & Financial History"** -- Contains date range and transaction type/category filters, a period cash flow KPI summary bar, and an interactive `reactable` displaying the rival's transaction log with running cash balance.
+      - **Tab 2: "Transaction & Financial History"** -- Displays all transactions directly (no filter bar). Includes a "Pivot by Player" toggle that switches the view between the full chronological transaction log and a per-player pivot summary.
+      - **Player Buy/Sell Pivot Ledger** -- A paired buy/sell comparison view for each player the rival team has ever acquired, with two-line hover tooltips, re-bought player handling, and Net P/L calculation.
+5. A League Squad Value Evolution chart (`plotlyOutput`) showing historical valuations of all teams, positioned at the bottom of the page below all interactive components.
 
 ### Usage Example
 
@@ -68,7 +70,7 @@ Returns `selected_player_RV`, a reactive supplied by the nested `players_table_S
 | `rival_players_table_RV`         | Fetches the full squad via `get_players_from_team()`, computes `clause_ratio`, and pipes through `translate_player_positions()`, `calculate_player_changes()`, and `unify_columns()`. |
 | `is_fallback`                    | `reactiveVal` flag (boolean). `TRUE` when the moneymovements API returns empty or errors for a rival team; `FALSE` when real data is available. |
 | `rival_moneymovements_raw_RV`    | Fetches raw money movements via `get_user_team_moneymovements()` inside `tryCatch()`. Parses ISO dates, sorts ascending by timestamp, and computes `running_balance = cumsum(money)` on the full chronological dataset. If the API returns empty or errors, first tries `get_championship_pressroom()` to reconstruct transactions from the public pressroom feed for the selected rival. If the pressroom yields no matching entries, falls back to `rival_players_table_RV()` (each player with `buyPrice > 0` becomes a purchase transaction). Sets `is_fallback = TRUE` in all fallback paths. |
-| `rival_moneymovements_filtered_RV` | Takes `rival_moneymovements_raw_RV()` and applies user-selected filters (date range, transaction type, category). Sorts descending by date (newest first) for display in the reactable. |
+| `rival_moneymovements_filtered_RV` | Takes `rival_moneymovements_raw_RV()` and sorts descending by date (newest first) for display in the reactable. No user-selectable filters are applied; all transactions are shown. |
 
 ### `output$league_finances_table`
 
@@ -245,11 +247,8 @@ If the API returns an empty data frame or throws an error (which can happen due 
    - `money`: Negative of `buyPrice` (e.g., `-buyPrice`).
    - `date`: Current system time (`Sys.time()`).
 4. Computes `running_balance` on the fallback dataset.
-5. Renders a styled callout alert banner informing the user of the data limitation.
 
-The callout text (in English):
-
-> Information restricted by Futmondo: The Futmondo API restricts direct access to private financial transactions for rival teams. The transactions shown below have been calculated from current squad purchases.
+**Note**: The restricted information callout banner that previously informed users about API limitations has been removed. Fallback data is now presented without a warning banner, as the reconstructed transaction history (pressroom feed + roster fallback) provides sufficient accuracy to warrant silent presentation.
 
 ### 4.3a Reconstructed Transaction History (Pressroom Fallback)
 
@@ -323,59 +322,29 @@ The four financial summary cards rendered above the transaction tab are synchron
    - **Budget**: Falls back to `300000000 - total_spent`.
 4. The "Money Left (Budget)" card can be further overridden by the API-provided `info$budget` from `get_user_team_info()` if the value is available, numeric, and positive. This ensures the summary box matches the official API value when accessible.
 
-**Period Summary Cards (within Tab 2):**
+**Summary Cards (within Tab 2):**
 
-The three KPI cards inside the Transaction History tab (Total Inflow, Total Outflow, Net Cash Flow) are computed from the **filtered** dataset (`rival_moneymovements_filtered_RV()`), which respects the user's date range, type, and category filters. This allows the user to inspect cash flow for a specific period or transaction category.
-
-| Card         | Calculation                                     |
-|--------------|-------------------------------------------------|
-| Total Inflow | Sum of positive `money` values in filtered set. |
-| Total Outflow   | Sum of negative `money` values in filtered set. |
-| Net Cash Flow   | Net sum of all `money` values in filtered set.  |
-
-The summary cards outside the tab operate on the **unfiltered** raw dataset, providing a full-picture view of the rival's finances regardless of the active filters.
-
-### 4.4 Filter Bar
-
-The tab provides three filter controls in a `fluidRow`:
-
-| Control            | Input Type        | Description                                              |
-|--------------------|-------------------|----------------------------------------------------------|
-| Date Range         | `dateRangeInput`  | Start and end date filter (format: dd/mm/yyyy, language: en). Defaults to season-to-date (see `get_season_start_date` below). `max` is capped at `Sys.Date()`. |
-| Transaction Type   | `selectInput`     | Filter by type: All, Purchases, Sales, Bonuses / Rewards, Initial Budget. |
-| Category           | `selectInput`     | Filter by category: All, Market, Rounds, Bonuses.        |
-| Reset Filters      | `actionButton`    | Resets all filters to default values (date range back to season-to-date, type and category to "All"). |
-
-#### `get_season_start_date` Helper
-
-The date range filter defaults to a season-to-date range, computed by the `get_season_start_date(raw_movements = NULL)` helper. The function programmatically identifies the season/split reset date using a three-tier priority:
-
-1. **Priority -- Budget-reset detection**: If `raw_movements` contains rows where `type == "budget"`, or where `category == "bonus"` AND `money >= 100,000,000` (initial budget allocation), the function finds the timestamp of the **most recent** such row. That timestamp is the exact moment the championship was reset by the admin. Returns `as.Date(max(reset_dates))`.
-2. **Secondary -- Earliest transaction**: If no explicit budget-reset row exists (e.g., when working with the pressroom feed fallback that lacks budget entries), the function falls back to `min(parse_safe_datetime(raw_movements$date))` -- the earliest transaction recorded in the active split.
-3. **Final fallback**: If `raw_movements` is `NULL`, empty, or all dates parse to `NA`, the function returns `Sys.Date() - 180` (180 days before today).
-
-The date range filter is auto-updated by an `observeEvent` watching `rival_moneymovements_raw_RV()`. Whenever the rival is switched or new transaction data loads, the date range resets to `[season_start, Sys.Date()]`.
-
-The filter logic is implemented in `rival_moneymovements_filtered_RV`, which:
-- Parses dates to `POSIXct`.
-- Applies date range filter (inclusive of both start and end dates).
-- Applies type filter (exact match, skipped when "All").
-- Applies category filter (exact match, skipped when "All").
-- Sorts the result **descending** by date (newest first) for display.
-
-### 4.5 Period Summary Cards
-
-Three KPI cards are computed from the **filtered** dataset:
+The three KPI cards inside the Transaction History tab (Total Inflow, Total Outflow, Net Cash Flow) are computed from the full dataset (`rival_moneymovements_filtered_RV()`), which now contains all transactions (no user filters). This provides a complete cash-flow overview for the rival.
 
 | Card         | Calculation                                     |
 |--------------|-------------------------------------------------|
-| Total Inflow | Sum of positive `money` values in filtered set. |
-| Total Outflow   | Sum of negative `money` values in filtered set. |
-| Net Cash Flow   | Net sum of all `money` values in filtered set.  |
+| Total Inflow | Sum of positive `money` values in the dataset. |
+| Total Outflow   | Sum of negative `money` values in the dataset. |
+| Net Cash Flow   | Net sum of all `money` values in the dataset.  |
 
-### 4.6 Transaction Table
+The summary cards outside the tab operate on the raw dataset, providing a full-picture view of the rival's finances.
 
-The `reactable` table displays the filtered transaction log with the following columns:
+### 4.4 Display Behavior -- No Filter Bar, Pivot by Player Toggle
+
+The filter bar (date range, transaction type, and category controls) has been removed from the Transaction & Financial History tab. All transactions are displayed directly in the reactable table, sorted descending by date (newest first). No filtering UI is present.
+
+**Pivot by Player Toggle**
+
+A toggle switch labeled "Pivot by Player" is available in the tab. When activated, it switches the view from the full chronological transaction log to a per-player pivot summary. In pivot mode, the table groups transactions by player, showing paired buy/sell rows with net P/L calculation for each player.
+
+### 4.5 Transaction Table
+
+The `reactable` table displays all transactions with the following columns:
 
 | Column                     | Formatting                                                        |
 |----------------------------|-------------------------------------------------------------------|
@@ -386,13 +355,6 @@ The `reactable` table displays the filtered transaction log with the following c
 | Money Left After Transaction | Formatted EUR via `format_table_currency()`, bold styled.      |
 
 **Note**: The column definition uses lowercase `date = colDef(...)` to match the actual column name in the data frame produced by `get_user_team_moneymovements()`. Using uppercase `Date` would cause a `reactable` error because the column name does not exist in the data.
-
-### 4.7 Reset Filters Observer
-
-An `observeEvent` on `input$tx_reset_filters` resets:
-- `tx_date_range` to `start = season_start, end = Sys.Date(), max = Sys.Date()` (season-to-date, computed via `get_season_start_date`).
-- `tx_type_filter` to `"All"`.
-- `tx_category_filter` to `"All"`.
 
 ### Usage Example
 

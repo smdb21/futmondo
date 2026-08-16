@@ -1373,10 +1373,95 @@ get_user_team_info <- function(login, championship_id, user_team_id) {
   })
 }
 
-get_team_image_name <- function(team) {
-  team_image_name <- gsub(" ", "-", tolower(team))
-  team_image_name <- gsub("r\\.", "real", tolower(team_image_name))
-  return(team_image_name)
+get_team_image_name <- function(team, logo = NULL) {
+  # If authoritative logo filename is provided directly from API/DB
+  if (!is.null(logo) && length(logo) > 0 && !is.na(logo[1]) && nzchar(as.character(logo[1]))) {
+    clean_logo <- gsub("\\.png$", "", as.character(logo[1]), ignore.case = TRUE)
+    return(clean_logo)
+  }
+
+  if (is.null(team) || length(team) == 0 || is.na(team[1]) || !nzchar(as.character(team[1]))) {
+    return("")
+  }
+
+  # Normalize team name: strip accents and special characters
+  t_name <- tolower(trimws(as.character(team[1])))
+  t_name <- gsub("[áàäâ]", "a", t_name)
+  t_name <- gsub("[éèëê]", "e", t_name)
+  t_name <- gsub("[íìïî]", "i", t_name)
+  t_name <- gsub("[óòöô]", "o", t_name)
+  t_name <- gsub("[úùüû]", "u", t_name)
+  t_name <- gsub("[ñ]", "n", t_name)
+  t_name <- gsub("[^a-z0-9 ]", "", t_name)
+  t_name <- trimws(t_name)
+
+  # Authoritative hardcoded lookup dictionary for all Spanish clubs
+  club_dict <- c(
+    "alaves"                  = "deportivo-alaves",
+    "deportivo alaves"        = "deportivo-alaves",
+    "athletic de bilbao"      = "athletic-de-bilbao",
+    "athletic club"           = "athletic-de-bilbao",
+    "athletic bilbao"         = "athletic-de-bilbao",
+    "athletic"                = "athletic-de-bilbao",
+    "atletico de madrid"      = "atletico-de-madrid",
+    "atletico madrid"         = "atletico-de-madrid",
+    "atletico"                = "atletico-de-madrid",
+    "barcelona"               = "barcelona",
+    "fc barcelona"            = "barcelona",
+    "betis"                   = "betis",
+    "real betis"              = "betis",
+    "real betis balompie"     = "betis",
+    "celta de vigo"           = "celta-de-vigo",
+    "celta vigo"              = "celta-de-vigo",
+    "celta"                   = "celta-de-vigo",
+    "deportivo de la coruna"  = "deportivo-de-la-coruna",
+    "deportivo la coruna"     = "deportivo-de-la-coruna",
+    "deportivo"               = "deportivo-de-la-coruna",
+    "elche"                   = "elche",
+    "elche cf"                = "elche",
+    "espanyol"                = "espanyol",
+    "rcd espanyol"            = "espanyol",
+    "getafe"                  = "getafe",
+    "getafe cf"               = "getafe",
+    "girona"                  = "girona",
+    "girona fc"               = "girona",
+    "las palmas"              = "las-palmas",
+    "ud las palmas"           = "las-palmas",
+    "leganes"                 = "leganes",
+    "cd leganes"              = "leganes",
+    "levante"                 = "levante",
+    "levante ud"              = "levante",
+    "malaga"                  = "malaga",
+    "malaga cf"               = "malaga",
+    "mallorca"                = "mallorca",
+    "rcd mallorca"            = "mallorca",
+    "osasuna"                 = "osasuna",
+    "ca osasuna"              = "osasuna",
+    "racing"                  = "racing-santander",
+    "racing santander"        = "racing-santander",
+    "racing de santander"     = "racing-santander",
+    "rayo vallecano"          = "rayo-vallecano",
+    "rayo"                    = "rayo-vallecano",
+    "real madrid"             = "real-madrid",
+    "real sociedad"           = "real-sociedad",
+    "sevilla"                 = "sevilla",
+    "sevilla fc"              = "sevilla",
+    "valencia"                = "valencia",
+    "valencia cf"             = "valencia",
+    "valladolid"              = "real-valladolid",
+    "real valladolid"         = "real-valladolid",
+    "villarreal"              = "villarreal",
+    "villarreal cf"           = "villarreal"
+  )
+
+  if (t_name %in% names(club_dict)) {
+    return(club_dict[[t_name]])
+  }
+
+  # Generic fallback: lowercase with hyphens
+  fallback_name <- gsub(" ", "-", t_name)
+  fallback_name <- gsub("^r-", "real-", fallback_name)
+  return(fallback_name)
 }
 
 get_user_team_moneymovements <- function(login, championship_id, user_team_id) {

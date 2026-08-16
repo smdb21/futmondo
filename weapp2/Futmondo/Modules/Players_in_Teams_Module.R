@@ -252,13 +252,13 @@ output$team_value_box <- renderUI({
            numberColor = "green",
            text = "Available Budget"
          ),
-         div(
-           style = "margin-top: 8px; font-size: 13px; color: #047857;",
-           tagList(
-             icon("sack-dollar"),
-             paste0(" Total Volume Earned: ", format_table_currency(total_volume_earned))
-           )
-         )
+div(
+            style = "margin-top: 8px; font-size: 13px; color: #047857; text-align: center;",
+            tagList(
+              icon("sack-dollar"),
+              paste0(" Total Volume Earned: ", format_table_currency(total_volume_earned))
+            )
+          )
        )
 
        # Row 2, Col 2: Squad Investment & Total Volume Spent
@@ -274,13 +274,13 @@ output$team_value_box <- renderUI({
            numberColor = "orange",
            text = "Current Squad Cost"
          ),
-         div(
-           style = "margin-top: 8px; font-size: 13px; color: #b45309;",
-           tagList(
-             icon("money-bill-transfer"),
-             paste0(" Total Volume Spent: ", format_table_currency(total_volume_spent))
-           )
-         )
+div(
+            style = "margin-top: 8px; font-size: 13px; color: #b45309; text-align: center;",
+            tagList(
+              icon("money-bill-transfer"),
+              paste0(" Total Volume Spent: ", format_table_currency(total_volume_spent))
+            )
+          )
        )
 
        ret <- tagList(

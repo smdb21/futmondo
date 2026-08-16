@@ -398,15 +398,16 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       df <- players_table_RV()
       if (is.null(df) || nrow(df) == 0) return(NULL)
 
-      gkp_roles <- c("Goalkeeper", "portero", "POR", "GKP")
-      def_roles <- c("Defender", "defensa", "DEF", "DF")
-      mid_roles <- c("Midfielder", "centrocampista", "MED", "CEN", "MID", "MF")
-      fwd_roles <- c("Forward", "delantero", "DEL", "FWD", "FW", "ATT")
+      combined_roles <- paste(
+        if ("role" %in% colnames(df)) ifelse(is.na(df$role), "", as.character(df$role)) else "",
+        if ("role2" %in% colnames(df)) ifelse(is.na(df$role2), "", as.character(df$role2)) else "",
+        sep = " "
+      )
 
-      gk <- sum(df$role %in% gkp_roles | (!is.na(df$role2) & df$role2 %in% gkp_roles), na.rm = TRUE)
-      df_cnt <- sum(df$role %in% def_roles | (!is.na(df$role2) & df$role2 %in% def_roles), na.rm = TRUE)
-      md <- sum(df$role %in% mid_roles | (!is.na(df$role2) & df$role2 %in% mid_roles), na.rm = TRUE)
-      fw <- sum(df$role %in% fwd_roles | (!is.na(df$role2) & df$role2 %in% fwd_roles), na.rm = TRUE)
+      gk <- sum(grepl("portero|goalkeeper|^1$|\\bpor\\b|\\bgkp\\b|\\bgk\\b", combined_roles, ignore.case = TRUE), na.rm = TRUE)
+      df_cnt <- sum(grepl("defensa|defender|^2$|\\bdef\\b|\\bdf\\b", combined_roles, ignore.case = TRUE), na.rm = TRUE)
+      md <- sum(grepl("centrocampista|midfielder|mediocentro|^3$|\\bmed\\b|\\bcen\\b|\\bmid\\b|\\bmf\\b|\\bmc\\b", combined_roles, ignore.case = TRUE), na.rm = TRUE)
+      fw <- sum(grepl("delantero|forward|extremo|atacante|^4$|\\bdel\\b|\\bfwd\\b|\\bfw\\b|\\batt\\b", combined_roles, ignore.case = TRUE), na.rm = TRUE)
       total_squad <- nrow(df) # Exact actual player count (distinct players)
 
       div(
