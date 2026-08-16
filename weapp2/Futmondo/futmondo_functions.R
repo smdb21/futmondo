@@ -1368,12 +1368,38 @@ get_user_team_moneymovements <- function(login, championship_id, user_team_id) {
     if (!is.null(ans) && "answer" %in% names(ans) && is.list(ans$answer)) {
       raw_ans <- ans$answer
 
+      # Detect error responses: error=TRUE, or a non-ok code without an "answer" key
+      if (isTRUE(raw_ans$error) || (!is.null(raw_ans$code) && raw_ans$code != API_CODE_OK && !("answer" %in% names(raw_ans)))) {
+        return(data.frame(
+          id = character(0), concept = character(0), type = character(0),
+          category = character(0), money = numeric(0), date = character(0),
+          stringsAsFactors = FALSE
+        ))
+      }
+
       # The API may return the movements array directly under ans$answer,
       # or nested under ans$answer$answer. Detect which shape we have.
       if (is.list(raw_ans) && "answer" %in% names(raw_ans) && is.list(raw_ans$answer)) {
         movements <- raw_ans$answer
       } else {
         movements <- raw_ans
+      }
+
+      # If movements looks like a single movement object (scalar fields like _id, date, money
+      # alongside error/code/msg), it is an error response -- return empty.
+      if (is.list(movements) && length(movements) > 0) {
+        has_scalar_error_field <- isTRUE(movements$error) ||
+          (!is.null(movements$code) && movements$code != API_CODE_OK)
+        has_scalar_msg <- !is.null(movements$msg) && is.character(movements$msg) && length(movements$msg) == 1
+        has_movement_field <- !is.null(movements[["_id"]]) || !is.null(movements$date) || !is.null(movements$money)
+        # If it has error-like scalar fields AND no nested array structure, treat as error
+        if ((has_scalar_error_field || has_scalar_msg) && !is.list(movements[[1]])) {
+          return(data.frame(
+            id = character(0), concept = character(0), type = character(0),
+            category = character(0), money = numeric(0), date = character(0),
+            stringsAsFactors = FALSE
+          ))
+        }
       }
 
       if (is.null(movements) || length(movements) == 0) {

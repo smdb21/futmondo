@@ -588,8 +588,13 @@ output$rival_financial_summary_box <- renderUI({
         NULL
       })
 
-      # ---- PRIMARY PATH: API returned data ----
-      if (!is.null(movements) && nrow(movements) > 0) {
+      # Check if movements has valid transaction data
+      is_valid_movements <- !is.null(movements) && nrow(movements) > 0 &&
+                            any(nzchar(movements$date)) &&
+                            any(nzchar(movements$concept) | movements$type == "budget")
+
+      # ---- PRIMARY PATH: API returned valid data ----
+      if (is_valid_movements) {
         is_fallback(FALSE)
 
         # Parse ISO dates
