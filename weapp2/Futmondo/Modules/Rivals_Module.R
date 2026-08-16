@@ -92,6 +92,32 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       return(parsed)
     }
 
+    # Season start date helper
+    get_season_start_date <- function(raw_movements = NULL) {
+      # If raw_movements has valid dates, return the earliest transaction date directly.
+      # This ensures that when the league admin resets the championship (whether on
+      # July 31 or in January for a mid-season reset), the filter dynamically starts
+      # exactly from the first transaction of that split.
+      if (!is.null(raw_movements) && nrow(raw_movements) > 0) {
+        parsed <- parse_safe_datetime(raw_movements$date)
+        min_tx_date <- as.Date(min(parsed, na.rm = TRUE))
+        if (!is.na(min_tx_date)) {
+          return(min_tx_date)
+        }
+      }
+
+      # Fallback: calendar-based season start
+      current_year <- as.integer(format(Sys.Date(), "%Y"))
+      current_month <- as.integer(format(Sys.Date(), "%m"))
+      if (current_month >= 7) {
+        # First split: July 31 of current year
+        return(as.Date(paste0(current_year, "-07-31")))
+      } else {
+        # Second split: January 1 of current year (mid-season reset)
+        return(as.Date(paste0(current_year, "-01-01")))
+      }
+    }
+
     # Selected rival team ID derived from table selection
     selected_rival_team_id <- reactive({
       finances_data <- league_finances_RV()
@@ -687,14 +713,26 @@ output$rival_financial_summary_box <- renderUI({
 
     # Reset filters observer
     observeEvent(input$tx_reset_filters, {
-      updateDateRangeInput(session, "tx_date_range", start = NULL, end = NULL)
+      season_start <- get_season_start_date(rival_moneymovements_raw_RV())
+      updateDateRangeInput(session, "tx_date_range", start = season_start, end = Sys.Date(), max = Sys.Date())
       updateSelectInput(session, "tx_type_filter", selected = "All")
       updateSelectInput(session, "tx_category_filter", selected = "All")
+    })
+
+    # Auto-update date range when raw movements change (e.g. rival switched or data loaded)
+    observeEvent(rival_moneymovements_raw_RV(), {
+      raw <- rival_moneymovements_raw_RV()
+      season_start <- get_season_start_date(raw)
+      updateDateRangeInput(session, "tx_date_range", start = season_start, end = Sys.Date(), max = Sys.Date())
     })
 
     # Render Tab 2 UI: Transaction History
     output$rival_transactions_tab_ui <- renderUI({
       is_fb <- is_fallback()
+
+      # Compute season-to-date defaults for the date range filter
+      season_start <- get_season_start_date(rival_moneymovements_raw_RV())
+      today_date <- Sys.Date()
 
       # Compute period summary from filtered data
       filtered_tx <- rival_moneymovements_filtered_RV()
@@ -777,8 +815,9 @@ output$rival_financial_summary_box <- renderUI({
             dateRangeInput(
               ns("tx_date_range"),
               "Date Range",
-              start = NULL,
-              end = NULL,
+              start = season_start,
+              end = today_date,
+              max = today_date,
               format = "dd/mm/yyyy",
               language = "en",
               width = "100%"

@@ -222,10 +222,21 @@ The tab provides three filter controls in a `fluidRow`:
 
 | Control            | Input Type        | Description                                              |
 |--------------------|-------------------|----------------------------------------------------------|
-| Date Range         | `dateRangeInput`  | Start and end date filter (format: dd/mm/yyyy, language: en). |
+| Date Range         | `dateRangeInput`  | Start and end date filter (format: dd/mm/yyyy, language: en). Defaults to season-to-date (see `get_season_start_date` below). `max` is capped at `Sys.Date()`. |
 | Transaction Type   | `selectInput`     | Filter by type: All, Purchases, Sales, Bonuses / Rewards, Initial Budget. |
 | Category           | `selectInput`     | Filter by category: All, Market, Rounds, Bonuses.        |
-| Reset Filters      | `actionButton`    | Resets all filters to default values.                    |
+| Reset Filters      | `actionButton`    | Resets all filters to default values (date range back to season-to-date, type and category to "All"). |
+
+#### `get_season_start_date` Helper
+
+The date range filter defaults to a season-to-date range, computed by the `get_season_start_date(raw_movements = NULL)` helper:
+
+1. **Priority -- Transaction-aware start**: If `raw_movements` is provided and has valid dates, the function computes `min_tx_date` via `parse_safe_datetime` (the earliest transaction date among active movements). This takes priority to handle custom league resets, such as a July 31 season start or mid-season resets in January. Returns `min_tx_date` when available.
+2. **Fallback -- Calendar split start**: If `raw_movements` is `NULL`, empty, or all dates parse to `NA`, the function falls back to a calendar-based split:
+   - **Split 1** (current month >= 7, i.e., July or later): season start is July 31 of the current year.
+   - **Split 2** (current month < 7, i.e., January through June): season start is January 1 of the current year.
+
+The date range filter is auto-updated by an `observeEvent` watching `rival_moneymovements_raw_RV()`. Whenever the rival is switched or new transaction data loads, the date range resets to `[season_start, Sys.Date()]`.
 
 The filter logic is implemented in `rival_moneymovements_filtered_RV`, which:
 - Parses dates to `POSIXct`.
@@ -261,7 +272,7 @@ The `reactable` table displays the filtered transaction log with the following c
 ### 4.7 Reset Filters Observer
 
 An `observeEvent` on `input$tx_reset_filters` resets:
-- `tx_date_range` to `start = NULL, end = NULL`.
+- `tx_date_range` to `start = season_start, end = Sys.Date(), max = Sys.Date()` (season-to-date, computed via `get_season_start_date`).
 - `tx_type_filter` to `"All"`.
 - `tx_category_filter` to `"All"`.
 

@@ -1224,8 +1224,17 @@ get_user_team_moneymovements <- function(login, championship_id, user_team_id) {
     }
     ans <- httr::content(response)
     if (!is.null(ans) && "answer" %in% names(ans) && is.list(ans$answer)) {
-      movements <- ans$answer
-      if (length(movements) == 0) {
+      raw_ans <- ans$answer
+
+      # The API may return the movements array directly under ans$answer,
+      # or nested under ans$answer$answer. Detect which shape we have.
+      if (is.list(raw_ans) && "answer" %in% names(raw_ans) && is.list(raw_ans$answer)) {
+        movements <- raw_ans$answer
+      } else {
+        movements <- raw_ans
+      }
+
+      if (is.null(movements) || length(movements) == 0) {
         return(data.frame(
           id = character(0), concept = character(0), type = character(0),
           category = character(0), money = numeric(0), date = character(0),
