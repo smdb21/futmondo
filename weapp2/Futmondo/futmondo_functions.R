@@ -1573,6 +1573,12 @@ get_championship_pressroom <- function(login, championship_id) {
         parse_news_item(item)
       }) %>% bind_rows()
 
+      # Deduplicate across cursor page boundaries
+      df <- df %>%
+        dplyr::filter(!is.na(id) & nzchar(id)) %>%
+        dplyr::distinct(id, .keep_all = TRUE) %>%
+        dplyr::arrange(desc(created))
+
       return(df)
     }, error = function(e) {
       print(paste0("[Pressroom] Error fetching pressroom feed: ", e$message))
@@ -1621,6 +1627,14 @@ calculate_league_finances <- function(login, championship_id, user_teams_df, ini
       print(paste0("[Finances] Supabase pressroom sync warning: ", e$message))
     })
 
+    # Fetch all championship players in 1 bulk call for fast roster grouping
+    all_players <- tryCatch({
+      get_championship_players(login = login, championship_id = championship_id)
+    }, error = function(e) {
+      print(paste0("[Finances] Error fetching all championship players: ", e$message))
+      data.frame()
+    })
+
     # Determine finished rounds to decide whether to apply ranking prizes
     finished_rounds_df <- tryCatch({
       get_finished_rounds(login = login, championship_id = championship_id)
@@ -1651,13 +1665,12 @@ calculate_league_finances <- function(login, championship_id, user_teams_df, ini
       tname <- if ("teamname" %in% colnames(row)) row$teamname else row$name
       tpoints <- if ("points" %in% colnames(row)) as.numeric(row$points) else 0
 
-      # Fetch squad roster for this user team
-      roster <- tryCatch({
-        get_players_from_team(login = login, championship_id = championship_id, user_team_id = tid, teams = user_teams_df)
-      }, error = function(e) {
-        print(paste0("[Finances] Error fetching roster for team ", tname, ": ", e$message))
-        NULL
-      })
+      # Filter roster from bulk all_players
+      roster <- if (!is.null(all_players) && nrow(all_players) > 0 && "userteamId" %in% colnames(all_players)) {
+        all_players %>% dplyr::filter(!is.na(userteamId) & as.character(userteamId) == as.character(tid))
+      } else {
+        data.frame()
+      }
 
       total_spent <- 0
       team_value <- 0
@@ -1665,12 +1678,8 @@ calculate_league_finances <- function(login, championship_id, user_teams_df, ini
 
       if (!is.null(roster) && nrow(roster) > 0) {
         squad_size <- nrow(roster)
-        if ("buyPrice" %in% colnames(roster)) {
-          total_spent <- sum(suppressWarnings(as.numeric(roster$buyPrice)), na.rm = TRUE)
-        }
-        if ("value" %in% colnames(roster)) {
-          team_value <- sum(suppressWarnings(as.numeric(roster$value)), na.rm = TRUE)
-        }
+        total_spent_from_roster <- sum(suppressWarnings(as.numeric(roster$buyPrice)), na.rm = TRUE)
+        team_value <- sum(suppressWarnings(as.numeric(roster$value)), na.rm = TRUE)
 
         # Build purchase breakdown for this team
         roster_purchases <- roster

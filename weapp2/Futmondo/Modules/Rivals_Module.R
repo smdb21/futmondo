@@ -642,6 +642,10 @@ output$rival_financial_summary_box <- renderUI({
       has_pressroom <- FALSE
       if (!is.null(pressroom_df) && nrow(pressroom_df) > 0 && !is.null(rival_id) && rival_id != "") {
         rival_tx <- pressroom_df[pressroom_df$buyer_team_id == rival_id | pressroom_df$seller_team_id == rival_id, ]
+        # Deduplicate across cursor page boundaries
+        if (nrow(rival_tx) > 0 && "id" %in% colnames(rival_tx)) {
+          rival_tx <- rival_tx %>% dplyr::distinct(id, .keep_all = TRUE)
+        }
         if (nrow(rival_tx) > 0) {
           has_pressroom <- TRUE
           # Use earliest pressroom date as season start if available
