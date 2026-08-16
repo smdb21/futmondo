@@ -488,8 +488,13 @@ admin_Server <- function(id, is_module_active, login_token, championship_id, use
 
     # ---- Populate Entire Database ----
     observeEvent(input$btn_populate_db, {
-      # Check prerequisites
-      if (is.null(login_token()) || login_token() == "") {
+      # Check prerequisites (safe scalar checks to avoid vector coercion bug)
+      tok <- login_token()
+      has_valid_token <- !is.null(tok) && length(tok) >= 1 && (
+        (!is.null(names(tok)) && !is.null(tok[["token"]]) && nzchar(tok[["token"]])) ||
+        (is.null(names(tok)) && nzchar(tok[1]))
+      )
+      if (!has_valid_token) {
         showNotification(
           "Cannot populate database: no login token available. Please log in first.",
           type = "error",
@@ -497,7 +502,10 @@ admin_Server <- function(id, is_module_active, login_token, championship_id, use
         )
         return()
       }
-      if (is.null(championship_id()) || championship_id() == "") {
+
+      cid <- championship_id()
+      has_valid_champ <- !is.null(cid) && length(cid) >= 1 && !is.na(cid[1]) && nzchar(as.character(cid[1]))
+      if (!has_valid_champ) {
         showNotification(
           "Cannot populate database: no championship ID available. Please select an active championship first.",
           type = "error",
@@ -538,8 +546,13 @@ admin_Server <- function(id, is_module_active, login_token, championship_id, use
 
     # ---- Sync Round Dream Teams ----
     observeEvent(input$btn_sync_dreamteams, {
-      # Check prerequisites
-      if (is.null(login_token()) || login_token() == "") {
+      # Check prerequisites (safe scalar checks to avoid vector coercion bug)
+      tok <- login_token()
+      has_valid_token <- !is.null(tok) && length(tok) >= 1 && (
+        (!is.null(names(tok)) && !is.null(tok[["token"]]) && nzchar(tok[["token"]])) ||
+        (is.null(names(tok)) && nzchar(tok[1]))
+      )
+      if (!has_valid_token) {
         showNotification(
           "Cannot sync dream teams: no login token available. Please log in first.",
           type = "error",
@@ -547,7 +560,10 @@ admin_Server <- function(id, is_module_active, login_token, championship_id, use
         )
         return()
       }
-      if (is.null(championship_id()) || championship_id() == "") {
+
+      cid <- championship_id()
+      has_valid_champ <- !is.null(cid) && length(cid) >= 1 && !is.na(cid[1]) && nzchar(as.character(cid[1]))
+      if (!has_valid_champ) {
         showNotification(
           "Cannot sync dream teams: no championship ID available. Please select an active championship first.",
           type = "error",
@@ -569,8 +585,10 @@ admin_Server <- function(id, is_module_active, login_token, championship_id, use
           verbose = TRUE
         )
 
-        summary_msg <- if (!is.null(result) && length(result) > 0) {
-          paste0("Dream team sync complete. ", paste(names(result), result, sep = ": ", collapse = "; "))
+        summary_msg <- if (!is.null(result) && result$total_rounds == 0) {
+          "Dream team check complete: No finished rounds to sync yet (the active round is currently in progress). Best 11 and MVP accolades will be stored once the round completes."
+        } else if (!is.null(result) && length(result) > 0) {
+          paste0("Dream team sync complete: ", result$total_rounds, " finished round(s) verified, ", result$total_players, " players and MVPs synced.")
         } else {
           "Dream team sync complete."
         }
