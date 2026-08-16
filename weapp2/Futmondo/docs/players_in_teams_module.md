@@ -70,7 +70,47 @@ A Shiny `tagList` containing four summary boxes, suitable for rendering via `ren
 ## 3. Bulk Squad Market Listing
 
 ### "Put All Players on Market" (`btn_put_all_on_market`)
-Prompts a warning modal to confirm the user's intent. On confirmation, executes a bulk listing of all squad players via `put_all_on_market()`, which calls `POST https://api.futmondo.com/5/market/putallonmarket`. On success, invalidates the API cache and displays a confirmation notification.
+
+Prompts a warning modal to confirm the user's intent. On confirmation, executes a bulk listing of all squad players via `put_all_on_market()`, which calls `POST https://api.futmondo.com/5/market/putallonmarket`.
+
+#### Workflow
+
+1. **Modal Confirmation**: The user clicks the "Put All on Market" button, triggering a confirmation modal. If the user cancels, no further action occurs.
+2. **API Call**: On confirmation, `put_all_on_market(login, championship_id, team_id)` is invoked, sending a POST request to the bulk listing endpoint.
+3. **Success Path**:
+   - A success notification is displayed to the user.
+   - **Cache Invalidation**: `clear_api_cache()` is called to purge all cached API responses, ensuring the next data fetch retrieves fresh data from the server.
+   - **Optimistic UI Update**: The current player table reactive value (`players_table_RV`) is read, and the `market_inMarket` column is set to `TRUE` for all rows. The updated table is written back via `players_table_RV(curr_table)`. This provides an instant visual update in the UI before the API data refreshes. All access to `players_table_RV()` is wrapped in `tryCatch()` to prevent errors from blocking the UI thread.
+   - **Reactive Invalidation**: `refresh_trigger(refresh_trigger() + 1)` is invoked to increment the reactive trigger value, forcing all downstream reactive expressions to re-execute and fetch fresh data from the (now-cleared) cache. The call is wrapped in `tryCatch()` for defensive error handling.
+4. **Failure Path**: An error notification is displayed with the API error message (or a generic fallback message if the message is unavailable).
+
+#### Defensive Programming
+
+All reactive operations (`players_table_RV()` reads/writes, `refresh_trigger()` increment) are wrapped in `tryCatch()` blocks to ensure that a failure in one step does not prevent subsequent steps from executing or crash the Shiny session.
+
+#### Code Example
+
+```R
+observeEvent(input$submit_put_all_on_market, {
+  # ... API call via put_all_on_market() ...
+
+  if (is_success) {
+    clear_api_cache()
+
+    # Optimistic UI update
+    curr_table <- tryCatch({ players_table_RV() }, error = function(e) NULL)
+    if (!is.null(curr_table) && nrow(curr_table) > 0) {
+      curr_table$market_inMarket <- TRUE
+      tryCatch({ players_table_RV(curr_table) }, error = function(e) NULL)
+    }
+
+    # Reactive invalidation
+    if (!is.null(refresh_trigger) && is.function(refresh_trigger)) {
+      tryCatch(refresh_trigger(refresh_trigger() + 1), error = function(e) NULL)
+    }
+  }
+})
+```
 
 ---
 

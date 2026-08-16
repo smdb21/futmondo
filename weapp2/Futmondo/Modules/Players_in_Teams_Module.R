@@ -344,8 +344,17 @@ div(
           duration = 5
         )
         clear_api_cache()
+
+        # Optimistically mark all squad players as on market for instant UI update
+        curr_table <- tryCatch({ players_table_RV() }, error = function(e) NULL)
+        if (!is.null(curr_table) && nrow(curr_table) > 0) {
+          curr_table$market_inMarket <- TRUE
+          tryCatch({ players_table_RV(curr_table) }, error = function(e) NULL)
+        }
+
+        # Trigger reactive refresh with cache-cleared fresh API data
         if (!is.null(refresh_trigger) && is.function(refresh_trigger)) {
-          tryCatch(refresh_trigger(), error = function(e) NULL)
+          tryCatch(refresh_trigger(refresh_trigger() + 1), error = function(e) NULL)
         }
       } else {
         err_msg <- if (is.list(res) && !is.null(res$message) && res$message != "") res$message else "Bulk listing failed. Please try again."
