@@ -143,6 +143,15 @@ players_in_championship_Server(id = "players_in_championship",
                         championship_id = championship_id_RV,
                         user_team_id = user_team_id_RV,
                         user_teams_RV = user_teams_RV)
+
+  admin_Server(id = "admin",
+               is_module_active = reactive({
+                 req(input$tabs); input$tabs == "admin"
+               }),
+               login_token = login_token_RV,
+               championship_id = championship_id_RV,
+               user_team_id = user_team_id_RV,
+               user_teams_RV = user_teams_RV)
   # observers ----
   ## observe user_team_id_RV()
   observeEvent(login_token_RV(),
@@ -156,8 +165,16 @@ players_in_championship_Server(id = "players_in_championship",
   # renders----
   ## render menu ----
   output$menu <- shinydashboard::renderMenu({
-    shinydashboard::sidebarMenu(
-      id = "tabs",
+    # Check if logged-in user matches the admin env var (case-insensitive, trimmed)
+    is_admin <- FALSE
+    admin_env <- trimws(Sys.getenv("admin"))
+    if (admin_env != "" && !is.null(login_token_RV()) && length(login_token_RV()) >= 3) {
+      current_user <- trimws(as.character(login_token_RV()[["user_name"]]))
+      is_admin <- tolower(current_user) == tolower(admin_env)
+    }
+
+    # Standard menu items
+    menu_items <- list(
       shinydashboard::menuItem("Login", tabName = "login", icon = icon("right-to-bracket")),
       shinydashboard::menuItem("Your team", tabName = "yourteam", icon = icon("users")),
       shinydashboard::menuItem("Market", tabName = "market", icon = icon("money-bill-trend-up")),
@@ -165,5 +182,14 @@ players_in_championship_Server(id = "players_in_championship",
       shinydashboard::menuItem("Rivals", tabName = "rivals", icon = icon("users-viewfinder")),
       shinydashboard::menuItem("Classification", tabName = "classification", icon = icon("trophy"))
     )
+
+    # Append Admin menu item as the last item if user is admin
+    if (is_admin) {
+      menu_items <- c(menu_items, list(
+        shinydashboard::menuItem("Admin", tabName = "admin", icon = icon("gears"))
+      ))
+    }
+
+    do.call(shinydashboard::sidebarMenu, c(list(id = "tabs"), menu_items))
   })
 }

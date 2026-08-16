@@ -404,6 +404,77 @@ supabase_reset_database <- function(force = FALSE) {
   return(results)
 }
 
+# ============================================================
+# Row Count Helper
+# ============================================================
+
+get_table_row_counts <- function() {
+  sb_url <- get_sb_url()
+  sb_key <- get_sb_key()
+  if (is.null(sb_url) || sb_url == "" || is.null(sb_key) || sb_key == "") {
+    warning("[Row Counts] Supabase credentials not loaded in .Renviron. Returning empty result.")
+    return(data.frame(table_name = character(), row_count = integer(), stringsAsFactors = FALSE))
+  }
+
+  tables <- c(
+    "championships",
+    "real_clubs",
+    "players",
+    "user_teams",
+    "user_team_history",
+    "player_history",
+    "market_transactions"
+  )
+
+  results <- vector("list", length(tables))
+  names(results) <- tables
+
+  for (tbl in tables) {
+    url <- paste0(sb_url, "/rest/v1/", tbl)
+
+    headers <- c(
+      "apikey" = sb_key,
+      "Authorization" = paste("Bearer", sb_key),
+      "Accept" = "application/json",
+      "Prefer" = "count=exact",
+      "Range-Unit" = "items",
+      "Range" = "0-0"
+    )
+
+    tryCatch({
+      response <- GET(url, query = list(select = "id", limit = "0"), add_headers(.headers = headers))
+      code <- status_code(response)
+
+      if (code >= 200 && code < 300) {
+        content_range <- response$headers[["content-range"]]
+        if (!is.null(content_range) && length(content_range) > 0) {
+          # content-range looks like "0-0/999" or "items 0-0/999"
+          parts <- strsplit(content_range, "/")[[1]]
+          total <- as.integer(trimws(parts[length(parts)]))
+        } else {
+          # Fallback: if no content-range, try counting via a minimal select
+          body_text <- httr::content(response, as = "text", encoding = "UTF-8")
+          total <- 0L
+        }
+        results[[tbl]] <- total
+      } else {
+        results[[tbl]] <- NA_integer_
+      }
+    }, error = function(e) {
+      results[[tbl]] <- NA_integer_
+    })
+  }
+
+  df <- data.frame(
+    table_name = names(results),
+    row_count = unlist(results),
+    stringsAsFactors = FALSE
+  )
+
+  return(df)
+}
+
+
 init_supabase_db <- function(verbose = FALSE) {
   sb_url <- get_sb_url()
   sb_key <- get_sb_key()
