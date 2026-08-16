@@ -271,7 +271,7 @@ output$team_value_box <- renderUI({
          descriptionBlock(
            header = format_table_currency(total_spent),
            number = NULL,
-           numberColor = "#b45309",
+           numberColor = "orange",
            text = "Current Squad Cost"
          ),
          div(
