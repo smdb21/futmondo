@@ -26,7 +26,7 @@ The Rivals Module provides two exported functions:
 Returns a `tagList` containing:
 1. A League Squad Value Evolution chart (`plotlyOutput`) showing historical valuations of all teams.
 2. A League Financial Standings & Budget Left table (`reactableOutput`) displaying per-team finances.
-3. A League Buying Power chart (`plotlyOutput`) showing liquid cash standings.
+3. A League Buying Power chart (`plotlyOutput`) showing liquid cash standings. Includes a mode selector dropdown and a date range slider at the top.
 4. A `uiOutput` placeholder (`scouted_rival_details_ui`) for the selected rival details, which renders:
    - Financial summary cards (Standings Position, Money Left, Squad Investment, Squad Valuation & Net Gain).
 - A `tabsetPanel` (type = "pills") with two tabs:
@@ -118,6 +118,36 @@ The subtitle renders as a styled HTML snippet:
 <span style="color: #94a3b8;">&bull;</span>
 <span style="color: #10b981; font-weight: 600;">In: EUR Y</span>
 ```
+
+### League Buying Power Chart -- Mode Selector and Date Slider
+
+The League Buying Power horizontal bar chart supports three display modes, selectable via a dropdown control positioned at the top of the chart area. A date range slider sits directly above the chart, allowing the user to filter the data to a specific time window.
+
+**Mode Selector**
+
+| Mode | Label | Description |
+|------|-------|-------------|
+| Liquid Cash | "Liquid Cash" | Displays each team's current liquid cash balance (budget left). Bars extend right for positive balances and left for negative balances. |
+| Squad Purchases | "Squad Purchases" | Displays the total amount each team has spent on player acquisitions (`sum(buyPrice)`). Bars extend right with length proportional to total spending. |
+| Transaction Volume | "Transaction Volume" | Displays the combined transaction volume (purchases + sales) for each team. Represents total market activity. |
+
+**Date Slider**
+
+- Positioned at the top of the chart area, above the mode selector.
+- Type: `sliderInput` with `timeFormat = "%Y-%m-%d"`.
+- Default range: full season-to-date (from the earliest transaction to `Sys.Date()`).
+- `min` is set to the earliest transaction date in the dataset; `max` is capped at `Sys.Date()`.
+- When the user adjusts the slider, the chart re-renders showing only transactions within the selected date range.
+- The slider updates reactively; changing the rival selection or the mode also triggers a chart refresh.
+
+#### Data Pipeline
+
+1. **Input**: Receives the authenticated `login` token, `championship_id`, and the selected mode from the dropdown.
+2. **Computation**: Depending on the selected mode, computes the metric for each team:
+   - Liquid Cash: `budget` column from `league_finances_RV()$team_finances`.
+   - Squad Purchases: `total_spent` column from `league_finances_RV()$team_finances`.
+   - Transaction Volume: Sum of `abs(money)` across all transactions for each team.
+3. **Rendering**: Produces a horizontal bar chart via `ggplot2` + `plotly` with interactive hover tooltips showing the exact value and team name.
 
 ### Clause Ratio Calculation
 
@@ -376,3 +406,92 @@ rivals_Server(
   user_teams_RV = reactive(all_teams_df)
 )
 ```
+
+---
+
+## 5. Player Buy/Sell Pivot Ledger
+
+The Pivot Ledger is a dedicated view within the Rivals Module that presents a paired buy/sell comparison for each player the rival team has ever acquired. It allows the user to see, at a glance, whether the rival turned a profit or loss on each player they purchased.
+
+### 5.1 Paired Buy/Sell Rows
+
+For each player the rival team has bought, the ledger displays two rows:
+
+| Row | Label | Content |
+|-----|-------|---------|
+| Buy Row | Player name + " (Buy)" | The purchase price, formatted as a negative value in red. |
+| Sell Row | Player name + " (Sell)" | The sale price, formatted as a positive value in green. If the player has not yet been sold, the cell is empty. |
+
+The two rows are visually grouped (e.g., via alternating background shading or a shared border) so that the user can easily associate a buy with its corresponding sell.
+
+### 5.2 Two-Line Hover Tooltips
+
+Hovering over a buy or sell cell reveals a two-line tooltip:
+
+- **Line 1**: Transaction type and date (e.g., `"Buy on 15/03/2025"`).
+- **Line 2**: Counterparty name (e.g., `"From: Team X"` for buys, `"To: Team Y"` for sells). When the counterparty ID is missing, `NULL`, or empty, the tooltip displays `"Futmondo (System)"` per the domain rule.
+
+### 5.3 Handling of Re-Bought Players
+
+If the rival team sold a player and later re-bought the same player (or bought a different player with the same name), the ledger treats each transaction as a distinct entry:
+
+- Each buy/sell pair is indexed by transaction ID, not by player name alone.
+- Multiple buy/sell pairs for the same player name appear as separate grouped rows.
+- The ledger appends a numeric suffix to disambiguate (e.g., `"Player Name (Buy #1)"`, `"Player Name (Sell #1)"`, `"Player Name (Buy #2)"`, etc.).
+
+### 5.4 Net P/L Calculation
+
+For each paired buy/sell entry, the ledger computes a Net Profit/Loss value:
+
+```
+Net P/L = sell_price - buy_price
+```
+
+- If the player has been sold: `Net P/L` is displayed as a green value (profit) or red value (loss).
+- If the player has not yet been sold: `Net P/L` is displayed as `"--"` (pending).
+
+The ledger also provides a **total Net P/L** summary at the bottom, aggregating all completed buy/sell pairs:
+
+```
+Total Net P/L = sum(sell_price) - sum(buy_price) for all players that have been sold
+```
+
+---
+
+## 6. Net Transfer Profit/Loss KPI Box
+
+A standalone KPI box rendered in the Rivals Module that displays the rival team's Net Transfer Profit/Loss. This metric represents the aggregate profit or loss across all completed player transfers (buys and subsequent sells).
+
+### Calculation
+
+```
+Net Transfer P/L = sum(sell_price for all sold players) - sum(buy_price for all sold players)
+```
+
+Only players that have both a buy and a sell transaction are included. Players still on the roster (bought but not yet sold) are excluded from this calculation.
+
+### Rendering
+
+- Displayed as a single summary box with a prominent numeric value.
+- Positive values (profit) are rendered in green (`#10b981`).
+- Negative values (loss) are rendered in red (`#ef4444`).
+- Zero or no completed transfers: displayed as `"0 EUR"` in neutral gray.
+
+### Data Pipeline
+
+1. **Input**: The rival's transaction history from `rival_moneymovements_raw_RV()`.
+2. **Computation**: Filters for `type == "buy"` and `type == "sell"` transactions, pairs them by player, and computes the aggregate difference.
+3. **Rendering**: Outputs a single KPI box suitable for rendering via `renderUI()`.
+
+---
+
+## 7. Squad Value Evolution Plot (Bottom Placement)
+
+The League Squad Value Evolution chart has been repositioned to the bottom of the Rivals Module page, below all interactive components (financial summary cards, transaction tabs, pivot ledger, and buying power chart). This placement ensures that the primary scouting controls and data tables are immediately visible without requiring the user to scroll past a large chart.
+
+#### Behavior
+
+- The plot renders as a time-series line chart tracking the squad valuation of each team across matchdays.
+- Each team is represented by a distinct colored line, with the user's own team and the currently scouted rival highlighted.
+- The plot is rendered via `plotlyOutput` for interactivity (hover tooltips, zoom, pan).
+- Positioned at the bottom of the module, after all tabs and KPI boxes.

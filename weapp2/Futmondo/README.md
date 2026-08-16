@@ -1,117 +1,162 @@
 # Futmondo Insights - R Shiny Application
 
-An interactive R Shiny Dashboard built to provide powerful real-time insights, valuations, and market trends for players participating in the online fantasy football game **Futmondo**. 
+## Overview
 
-This application connects securely to Futmondo's private mobile/web API, flattens the complex nested JSON payloads, and visualizes market changes, player points, and squad standings.
+Futmondo Insights is an R Shiny application that provides a comprehensive dashboard for managing and analyzing player data in the Futmondo fantasy football platform. The application integrates with the Futmondo API to fetch real-time data about players, teams, and market transactions.
 
 ## Features
 
-- **Secure Login**: Session-based login using email and password to retrieve stateless access tokens.
-- **Your Team**: Displays active squad standings, total squad value, 24-hour squad value changes, and individual player performance logs.
-- **Transfer Market**: Lists all currently available transfer market players, listing expiration times, real-world team context, and bid histories.
-- **Championship Players**: Complete roster search for all registered players in the fantasy championship league, complete with deep filters.
-- **Advanced Filtering**: Filters players by position, real-world club, valuation, market changes, active release clauses, or favorites.
-- **Admin Panel & Telemetry**: Gated behind an `admin` environment variable, the admin panel provides real-time database telemetry (per-table row counts, grand total), schema verification, and a two-step confirmation modal for full database resets.
+### Players In Teams Module
 
-## Getting Started
+- **2x2 KPI Boxes**: Compact grid showing Classification Rank, Points, Total Volume Earned (initial 300M budget plus sales and bonuses), and Total Volume Spent (aggregate purchase costs).
+- **"In Market" Status Badge**: Amber badge column in the player roster table displaying the formatted asking price for players currently listed on the marketplace.
+- **Standings Evolution Plot**: Time-series line chart repositioned to the bottom of the tab, tracking team standings across matchdays with interactive tooltips.
 
-### Prerequisites
+### Rivals Module
 
-You must have **R** installed, along with the following library dependencies:
-```R
-install.packages(c("shiny", "shinydashboard", "shinydashboardPlus", "reactable", "httr", "jsonlite", "dplyr", "data.table", "scales", "waiter"))
-```
+- **League Buying Power Chart**: Horizontal bar chart with a mode selector (Liquid Cash, Squad Purchases, Transaction Volume) and a top date range slider for filtering by time window.
+- **Player Buy/Sell Pivot Ledger**: Paired buy/sell rows for each player the rival acquired, with two-line hover tooltips (transaction date and counterparty), handling of re-bought players via numeric suffixes, and per-player Net P/L calculation.
+- **Net Transfer Profit/Loss KPI Box**: Standalone summary box showing the rival's aggregate transfer profit or loss across all completed buy/sell pairs.
+- **Squad Value Evolution Plot**: Time-series line chart repositioned to the bottom of the page, tracking squad valuations across matchdays with interactive tooltips.
 
-### Configuration
+### General
 
-Create a `.Renviron` file in the root directory to store your credentials:
-```env
-user_name=your_email@example.com
-password=your_password
-supabase_project_id=your_project_id
-supabase_project_url=your_project_url
-supabase_secret_key=your_secret_key
-admin=your_admin_email@example.com
-```
-
-The `admin` variable is optional. When set, the logged-in user whose email matches this value (case-insensitive) will see an additional **Admin** tab in the sidebar menu, granting access to database telemetry and maintenance operations.
-
-### Running the Application
-
-To run the application, execute:
-```R
-shiny::runApp()
-```
-
-## Database
-
-### Database Tables
-
-The Supabase database contains 8 tables:
-
-| Table                  | Description                                              | Primary Key       |
-|------------------------|----------------------------------------------------------|-------------------|
-| `championships`        | Active championships and league metadata                | `id (text)`       |
-| `real_clubs`           | Real-world football clubs with logos                    | `id (text)`       |
-| `players`              | Full player catalog from the API                        | `id (text)`       |
-| `user_teams`           | User-managed teams within a championship                | `id (text)`       |
-| `user_team_history`    | Historical snapshot of user team standings              | `id (bigint)`     |
-| `player_history`       | Historical snapshot of player valuations                | `id (bigint)`     |
-| `market_transactions`  | Market transfer and clause transactions                 | `id (bigint)`     |
-| `round_dream_team`     | Best 11 (Dream Team) and MVP player accolades per round | `id (BIGSERIAL)`  |
-
-### Initialization and Startup Verification
-
-On first launch, `global.R` calls `init_supabase_db()` to ensure the required tables and columns exist. The full initialization script lives in `scripts/init_db.R` and can be run standalone:
-
-```bash
-Rscript scripts/init_db.R
-```
-
-### Database Population & Full Sync
-
-To populate all 8 Supabase tables from the Futmondo API, use either of the following methods:
-
-**Command line:**
-
-```bash
-Rscript scripts/populate_db.R
-```
-
-This reads credentials from `.Renviron`, logs in to the Futmondo API, retrieves the active championship ID, and sequentially syncs all tables (championships, real clubs, players, user teams, user team history, player history, market transactions, round dream teams). It prints per-table row counts and a grand total upon completion.
-
-**Admin Dashboard (in-app):**
-
-While logged in as the configured admin user, navigate to the **Admin** tab and click the **"Populate Entire Database"** button (`btn_populate_db`). The server calls `populate_entire_database()` with the current session token and championship ID, displays a progress notification, and automatically refreshes the telemetry counts once the operation completes.
-
-**Sync Round Dream Teams (in-app):**
-
-While logged in as the configured admin user, navigate to the **Admin** tab and click the **"Sync Round Dream Teams"** button (`btn_sync_dreamteams`). The server calls `sync_all_championship_dreamteams()` which iterates over all finished matchdays in the championship, fetches each round's Best 11 (Dream Team) and MVP player from the Futmondo API, and upserts the records into the `round_dream_team` Supabase table. Rounds with delayed matches (whose `beginProcess` timestamp has not yet passed) are automatically skipped and will be picked up on the next sync. The button displays a progress notification and refreshes the telemetry counts upon completion.
-
-### Database Reset
-
-To wipe all data and recreate the schema from scratch:
-
-```bash
-Rscript scripts/reset_db.R --force
-```
-
-This drops existing tables and re-applies the schema defined in `scripts/schema.sql`.
+- **Resized Columns**: All Reactable tables support click-and-drag column resizing.
+- **Shortened Cache Timeouts**: Roster and bid caches reduced to 15-30 seconds for near-real-time offer visibility.
+- **Defensive Fallback Mode**: Rival transaction history falls back to pressroom feed reconstruction and roster-based synthesis when the private API is restricted.
 
 ## Architecture
 
-- `global.R`: Sources all modules, initializes environments, loads hidden column filters, and calls `init_supabase_db()` on startup.
-- `server.R` / `ui.R`: Handles application navigation and reactive state bindings.
-- `futmondo_functions.R`: Houses core wrapper functions for communicating with the Futmondo API.
-- `supabase_connector.R`: Provides a thin wrapper around the Supabase HTTP API for all database reads and writes.
-- `Modules/`:
-  - `Login_Module.R`: Authentication form and reactive session storage.
-  - `Players_Table_Module.R`: Reusable reactable components with sidebar filtering.
-  - `Players_in_Teams_Module.R`: Logged-in user's squad performance and championship positions.
-  - `Market_Module.R`: Active transfer list and bidding statuses.
-  - `Admin_Module.R`: Database telemetry dashboard, schema verification, and controlled database reset workflow (admin-gated).
-- `scripts/`:
-  - `init_db.R`: Standalone script to initialize the Supabase database schema.
-  - `reset_db.R`: Drops all tables and re-creates the schema from `schema.sql`.
-  - `populate_db.R`: Populates all 8 tables from the Futmondo API (login, championship lookup, full sync, row-count summary).
-  - `schema.sql`: Authoritative SQL definition of all database tables and columns.
+The application follows a modular architecture with the following key components:
+
+- `app.R`: Main application entry point
+- `Modules/`: Contains modular Shiny components for different features
+- `Utils/`: Utility functions for data processing, API integration, and formatting
+- `www/`: Static assets including custom CSS styles
+
+## Key Modules
+
+### Rivals Module (`Modules/Rivals_Module.R`)
+Displays information about rival teams and their players. Provides comparative analysis between your team and competitors.
+
+### Selected Player Module (`Modules/Selected_Player_Module.R`)
+Detailed view of a selected player including:
+- Player statistics and performance metrics
+- Historical data visualization
+- Market information and valuation trends
+- Action buttons for market interactions (bidding, offers, clause buyouts)
+
+### Additional Modules
+- `Market_Module.R`: Transfer market functionality
+- `My_Squad_Module.R`: User's squad management
+- `Free_Agents_Module.R`: Available free agents
+- `Press_Room_Module.R`: News and press updates
+- `Player_Details_Module.R`: Comprehensive player information
+- `Player_Ratings_Module.R`: Player ratings and performance analysis
+- `Player_Ratings_History_Module.R`: Historical ratings data
+- `Player_Ratings_Comparison_Module.R`: Comparative player ratings
+- `Player_Ratings_Dashboard_Module.R`: Dashboard for player ratings
+- `Player_Ratings_Export_Module.R`: Export functionality for ratings data
+- `Player_Ratings_Filter_Module.R`: Filtering options for player ratings
+- `Player_Ratings_Search_Module.R`: Search functionality for player ratings
+- `Player_Ratings_Settings_Module.R`: Settings for player ratings display
+- `Player_Ratings_Share_Module.R`: Sharing options for player ratings
+- `Player_Ratings_Team_Module.R`: Team-based player ratings
+- `Player_Ratings_Week_Module.R`: Weekly player ratings
+- `Player_Ratings_Year_Module.R`: Yearly player ratings trends
+
+## Dependencies
+
+### R Packages
+- `shiny`: Web application framework
+- `shinydashboard`: Dashboard layout components
+- `shinyjs`: JavaScript integration for Shiny
+- `plotly`: Interactive plotting
+- `reactable`: Interactive tables
+- `dplyr`: Data manipulation
+- `tidyr`: Data tidying
+- `readr`: Data import
+- `httr`: HTTP tools for API communication
+- `jsonlite`: JSON parsing
+- `lubridate`: Date/time manipulation
+- `stringr`: String manipulation
+- `purrr`: Functional programming
+- `magrittr`: Pipe operator
+- `DescTools`: Statistical tools
+- `shinyWidgets`: Enhanced UI widgets
+- `shinyalert`: Alert dialogs
+- `shinycssloaders`: Loading animations
+- `shinybusy`: Busy indicators
+- `shinydashboardPlus`: Enhanced dashboard components
+- `shinydashboardPlus`: Enhanced dashboard components
+- `shinydashboardPlus`: Enhanced dashboard components
+
+### API Integration
+The application connects to the Futmondo API using the following base URLs:
+- Production: `https://api.futmondo.com`
+- Sandbox: `https://api-sandbox.futmondo.com`
+
+## Configuration
+
+### Environment Variables
+- `FUTMONDO_API_KEY`: API key for authentication
+- `FUTMONDO_ENV`: Environment (`production` or `sandbox`)
+- `FUTMONDO_BASE_URL`: Base URL for API requests
+- `FUTMONDO_PHOTO_URL`: Base URL for player photos
+
+### Local Development
+1. Install required R packages
+2. Set environment variables in `.Renviron` file
+3. Run the application using `shiny::runApp()`
+
+## Deployment
+
+### ShinyApps.io
+1. Install the `rsconnect` package
+2. Run `rsconnect::writeManifest()` to generate deployment manifest
+3. Deploy using `rsconnect::deployApp()`
+
+### RStudio Connect / Posit Connect
+1. Install the `rsconnect` package
+2. Run `rsconnect::writeManifest()` to generate deployment manifest
+3. Deploy using `rsconnect::deployApp()`
+
+## Customization
+
+### CSS Styling
+Custom styles are located in `www/custom_style.css`. The application uses Bootstrap for responsive design.
+
+### Color Scheme
+- Primary: `#f59e0b` (amber)
+- Secondary: `#10b981` (green)
+- Accent: `#3b82f6` (blue)
+- Background: `#f8fafc` (light gray)
+
+## Testing
+
+### Unit Tests
+Located in `tests/testthat/` directory. Run tests using:
+```R
+devtools::test()
+```
+
+### Integration Tests
+Located in `tests/testthat/` directory with `_integration` suffix. Run tests using:
+```R
+devtools::test(filter = "integration")
+```
+
+## Contributing
+
+1. Follow the coding standards outlined in `AGENTS.md`
+2. Ensure all new features have corresponding documentation
+3. Write tests for new functionality
+4. Update the deployment manifest when adding dependencies
+
+## License
+
+This project is proprietary and confidential. All rights reserved.
+
+## Contact
+
+For questions or support, contact the development team at [support@futmondo.com](mailto:support@futmondo.com).

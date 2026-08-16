@@ -4,7 +4,6 @@ players_in_teams_UI <- function(id) {
   ns <- NS(id)
   tagList(
     uiOutput(ns("team_value_box")),
-    uiOutput(ns("charts_row")), # Dynamic Plot B & Plot C Container
     div(
       style = "margin-bottom: 15px; display: flex; justify-content: flex-end;",
       actionButton(
@@ -21,7 +20,8 @@ players_in_teams_UI <- function(id) {
       filter_by_is_from_futmondo = FALSE,
       show_position_breakdown = TRUE,
       hide_bid_column = FALSE
-    )
+    ),
+    uiOutput(ns("charts_row")) # Dynamic Plot B & Plot C Container
   )
 }
 
@@ -30,235 +30,271 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     # renders ----
-    output$team_value_box <- renderUI({
-      players_table <- players_table_RV()
-      req(players_table)
+output$team_value_box <- renderUI({
+       players_table <- players_table_RV()
+       req(players_table)
 
-      user_teams <- user_teams_RV()
+       user_teams <- user_teams_RV()
 
-      # Safeguard against missing or empty user teams data
-      if (is.null(user_teams) || nrow(user_teams) == 0 || !"points" %in% colnames(user_teams)) {
-        return(
-          tagList(
-            box(
-              title = "Championship Overview",
-              width = 12,
-              status = "warning",
-              solidHeader = TRUE,
-              "No standings or team data is currently available for this championship."
-            )
-          )
-        )
-      }
+       # Safeguard against missing or empty user teams data
+       if (is.null(user_teams) || nrow(user_teams) == 0 || !"points" %in% colnames(user_teams)) {
+         return(
+           tagList(
+             box(
+               title = "Championship Overview",
+               width = 12,
+               status = "warning",
+               solidHeader = TRUE,
+               "No standings or team data is currently available for this championship."
+             )
+           )
+         )
+       }
 
-      user_teams <- user_teams %>%
-        dplyr::mutate(points = as.numeric(points))
+       user_teams <- user_teams %>%
+         dplyr::mutate(points = as.numeric(points))
 
-      team_points <- user_teams %>%
-        dplyr::arrange(desc(points)) %>%
-        dplyr::select(teamid, teamname, points) %>%
-        dplyr::mutate(position = row_number())
-      team_info_table <- team_points %>%
-        dplyr::filter(teamid == user_team_id())
+       team_points <- user_teams %>%
+         dplyr::arrange(desc(points)) %>%
+         dplyr::select(teamid, teamname, points) %>%
+         dplyr::mutate(position = row_number())
+       team_info_table <- team_points %>%
+         dplyr::filter(teamid == user_team_id())
 
-      if (nrow(team_info_table) == 0) {
-        return(
-          tagList(
-            box(
-              title = "Championship Overview",
-              width = 12,
-              status = "warning",
-              solidHeader = TRUE,
-              "Your user team was not found in the championship participant list."
-            )
-          )
-        )
-      }
+       if (nrow(team_info_table) == 0) {
+         return(
+           tagList(
+             box(
+               title = "Championship Overview",
+               width = 12,
+               status = "warning",
+               solidHeader = TRUE,
+               "Your user team was not found in the championship participant list."
+             )
+           )
+         )
+       }
 
-      team_points <- team_points %>%
-        dplyr::mutate(diff_points = points - team_info_table$points[1])
-      team_position <- team_points %>%
-        dplyr::filter(teamid == user_team_id()) %>%
-        dplyr::pull(position)
-      if (team_position > 1) {
-        previous_team <- team_points %>%
-          dplyr::filter(position == team_position - 1)
-      } else {
-        previous_team <- NULL
-      }
-      if (team_position < nrow(user_teams)) {
-        next_team <- team_points %>%
-          dplyr::filter(position == team_position + 1)
-      } else {
-        next_team <- NULL
-      }
-      # add st, nd, rd, th to position
-      team_position <- get_ordinal_position(team_position)
+       team_points <- team_points %>%
+         dplyr::mutate(diff_points = points - team_info_table$points[1])
+       team_position <- team_points %>%
+         dplyr::filter(teamid == user_team_id()) %>%
+         dplyr::pull(position)
+       if (team_position > 1) {
+         previous_team <- team_points %>%
+           dplyr::filter(position == team_position - 1)
+       } else {
+         previous_team <- NULL
+       }
+       if (team_position < nrow(user_teams)) {
+         next_team <- team_points %>%
+           dplyr::filter(position == team_position + 1)
+       } else {
+         next_team <- NULL
+       }
+       # add st, nd, rd, th to position
+       team_position <- get_ordinal_position(team_position)
 
-      total_teams <- nrow(user_teams_RV())
-      team_position <- paste0(team_position, " of ", total_teams)
-      team_name <- team_info_table$teamname[1]
-      user_name <- team_info_table$name
+       total_teams <- nrow(user_teams_RV())
+       team_position <- paste0(team_position, " of ", total_teams)
+       team_name <- team_info_table$teamname[1]
+       user_name <- team_info_table$name
 
-      # Safeguards for empty roster calculations
-      val_sum <- sum(players_table$value, na.rm = TRUE)
-      val_mean <- if (nrow(players_table) > 0) mean(players_table$value, na.rm = TRUE) else 0
+       # Safeguards for empty roster calculations
+       val_sum <- sum(players_table$value, na.rm = TRUE)
+       val_mean <- if (nrow(players_table) > 0) mean(players_table$value, na.rm = TRUE) else 0
 
-      team_value <- val_sum %>%
-        # format it as currency in eur
-        scales::label_currency(prefix = "€", suffix = "M", scale = 1e-6)(.)
-      average_player_value <- val_mean %>%
-        # format it as currency in eur
-        scales::label_currency(prefix = "€", suffix = "M", scale = 1e-6)(.)
-      team_value_block <- descriptionBlock(
-        header = team_value,
-        number = NULL,
-        numberColor = "black",
-        text = "Team value"
-      )
-      team_value_change <- sum(players_table$change, na.rm = TRUE)
-      team_value_change_pct <- if (nrow(players_table) > 0 && (val_sum - team_value_change) != 0) {
-        team_value_change / (val_sum - team_value_change) * 100
-      } else {
-        0
-      }
-      team_value_change_pct <- round(team_value_change_pct, 2)
-      team_value_change_icon <- if (team_value_change > 0) {
-        icon("caret-up")
-      } else if (team_value_change < 0) {
-        icon("caret-down")
-      } else {
-        NULL
-      }
-      team_change_value_block <- descriptionBlock(
-        header = team_value_change %>% format_currency(),
-        number = paste0(team_value_change_pct, "%"),  
-        numberColor = "green",
-        numberIcon = team_value_change_icon,
-        text = "Team value change"
-      )
-      team_players_value_block <- descriptionBlock(
-        header = average_player_value,
-        number = NULL,
-        numberColor = "black",
-        text = "Avg player value"
-      )
-      team_position_block <- descriptionBlock(
-        header = team_position,
-        number = NULL,
-        numberColor = "black",
-        text = "General Position"
-      )
-      team_points_block <- descriptionBlock(
-        header = team_info_table$points,
-        number = NULL,
-        text = paste0(team_info_table$teamname, " (", get_ordinal_position(team_info_table$position), ")")
-      )
-      if (!is.null(previous_team)) {
-        previous_team_block <- descriptionBlock(
-          header = previous_team$points,
-          number = paste0("+", previous_team$diff_points),
-          numberColor = "red",
-          numberIcon = icon("angle-up"),
-          text = paste0(previous_team$teamname, " (", get_ordinal_position(previous_team$position), ")")
-        )
-      } else {
-        previous_team_block <- NULL
-      }
-      if (!is.null(next_team)) {
-        next_team_block <- descriptionBlock(
-          header = next_team$points,
-          number = next_team$diff_points,
-          numberColor = "green",
-          numberIcon = icon("angle-down"),
-          text = paste0(next_team$teamname, " (", get_ordinal_position(next_team$position), ")")
-        )
-      } else {
-        next_team_block <- NULL
-      }
-      # Liquid Cash Box for User Team
-      user_login <- get_reactive_val(login_token)
-      user_champ_id <- get_reactive_val(championship_id)
-      user_tid <- get_reactive_val(user_team_id)
+       team_value <- val_sum %>%
+         # format it as currency in eur
+         scales::label_currency(prefix = "€", suffix = "M", scale = 1e-6)(.)
+       average_player_value <- val_mean %>%
+         # format it as currency in eur
+         scales::label_currency(prefix = "€", suffix = "M", scale = 1e-6)(.)
+       team_value_block <- descriptionBlock(
+         header = team_value,
+         number = NULL,
+         numberColor = "black",
+         text = "Team value"
+       )
+       team_value_change <- sum(players_table$change, na.rm = TRUE)
+       team_value_change_pct <- if (nrow(players_table) > 0 && (val_sum - team_value_change) != 0) {
+         team_value_change / (val_sum - team_value_change) * 100
+       } else {
+         0
+       }
+       team_value_change_pct <- round(team_value_change_pct, 2)
+       team_value_change_icon <- if (team_value_change > 0) {
+         icon("caret-up")
+       } else if (team_value_change < 0) {
+         icon("caret-down")
+       } else {
+         NULL
+       }
+       team_change_value_block <- descriptionBlock(
+         header = team_value_change %>% format_currency(),
+         number = paste0(team_value_change_pct, "%"),
+         numberColor = "green",
+         numberIcon = team_value_change_icon,
+         text = "Team value change"
+       )
+       team_players_value_block <- descriptionBlock(
+         header = average_player_value,
+         number = NULL,
+         numberColor = "black",
+         text = "Avg player value"
+       )
+       team_position_block <- descriptionBlock(
+         header = team_position,
+         number = NULL,
+         numberColor = "black",
+         text = "General Position"
+       )
+       team_points_block <- descriptionBlock(
+         header = team_info_table$points,
+         number = NULL,
+         text = paste0(team_info_table$teamname, " (", get_ordinal_position(team_info_table$position), ")")
+       )
+       if (!is.null(previous_team)) {
+         previous_team_block <- descriptionBlock(
+           header = previous_team$points,
+           number = paste0("+", previous_team$diff_points),
+           numberColor = "red",
+           numberIcon = icon("angle-up"),
+           text = paste0(previous_team$teamname, " (", get_ordinal_position(previous_team$position), ")")
+         )
+       } else {
+         previous_team_block <- NULL
+       }
+       if (!is.null(next_team)) {
+         next_team_block <- descriptionBlock(
+           header = next_team$points,
+           number = next_team$diff_points,
+           numberColor = "green",
+           numberIcon = icon("angle-down"),
+           text = paste0(next_team$teamname, " (", get_ordinal_position(next_team$position), ")")
+         )
+       } else {
+         next_team_block <- NULL
+       }
 
-      user_finances <- tryCatch({
-        if (!is.null(user_login) && !is.null(user_champ_id) && !is.null(user_tid)) {
-          get_user_team_info(login = user_login, championship_id = user_champ_id, user_team_id = user_tid)
-        } else {
-          NULL
-        }
-      }, error = function(e) NULL)
+       # ---- Financials: Liquid Cash, Total Spent, Total Earned ----
+       user_login <- get_reactive_val(login_token)
+       user_champ_id <- get_reactive_val(championship_id)
+       user_tid <- get_reactive_val(user_team_id)
 
-      roster_players <- players_table_RV()
-      total_spent <- 0
-      if (!is.null(roster_players) && nrow(roster_players) > 0 && "buyPrice" %in% colnames(roster_players)) {
-        total_spent <- sum(suppressWarnings(as.numeric(roster_players$buyPrice)), na.rm = TRUE)
-      }
+       user_finances <- tryCatch({
+         if (!is.null(user_login) && !is.null(user_champ_id) && !is.null(user_tid)) {
+           get_user_team_info(login = user_login, championship_id = user_champ_id, user_team_id = user_tid)
+         } else {
+           NULL
+         }
+       }, error = function(e) NULL)
 
-      liquid_cash_val <- 300000000 - total_spent
-      if (!is.null(user_finances) && !is.null(user_finances$budget) && is.numeric(user_finances$budget) && user_finances$budget > 0) {
-        liquid_cash_val <- user_finances$budget
-      }
+       roster_players <- players_table_RV()
+       total_spent <- 0
+       if (!is.null(roster_players) && nrow(roster_players) > 0 && "buyPrice" %in% colnames(roster_players)) {
+         total_spent <- sum(suppressWarnings(as.numeric(roster_players$buyPrice)), na.rm = TRUE)
+       }
 
-      liquid_cash_block <- descriptionBlock(
-        header = format_table_currency(liquid_cash_val),
-        number = NULL,
-        numberColor = "green",
-        text = "Available Budget"
-      )
+       liquid_cash_val <- 300000000 - total_spent
+       if (!is.null(user_finances) && !is.null(user_finances$budget) && is.numeric(user_finances$budget) && user_finances$budget > 0) {
+         liquid_cash_val <- user_finances$budget
+       }
 
-      team_position_box <- box(
-        title = "Classification",
-        width = 3,
-        status = "primary",
-        solidHeader = TRUE,
-        collapsible = FALSE,
-        team_position_block
-      )
+       # total_volume_earned = liquid_cash_val + total_spent
+       # (equivalent to 300000000 + user_sales + point_bonus + ranking_prize)
+       total_volume_earned <- liquid_cash_val + total_spent
 
-      team_cash_box <- box(
-        title = "Liquid Cash",
-        width = 3,
-        status = "success",
-        solidHeader = TRUE,
-        collapsible = FALSE,
-        liquid_cash_block
-      )
+       # total_volume_spent = total purchases from pressroom (or total_spent from roster)
+       total_volume_spent <- total_spent
 
-      team_points_box <- box(
-        title = "Points",
-        width = 3,
-        status = "primary",
-        solidHeader = TRUE,
-        collapsible = FALSE,
-        fluidRow(
-          column(4, previous_team_block),
-          column(4, team_points_block),
-          column(4, next_team_block)
-        )
-      )
+       # ---- Build 2x2 Grid Layout ----
 
-      team_value_box <- box(
-        title = "Value",
-        width = 3,
-        status = "primary",
-        solidHeader = TRUE,
-        collapsible = FALSE,
-        fluidRow(
-          column(4, team_value_block),
-          column(4, team_change_value_block),
-          column(4, team_players_value_block)
-        )
-      )
+       # Row 1, Col 1: Classification & Standings
+       classification_standings_box <- box(
+         title = "Classification & Standings",
+         width = 6,
+         status = "primary",
+         solidHeader = TRUE,
+         collapsible = FALSE,
+         team_position_block,
+         fluidRow(
+           column(4, previous_team_block),
+           column(4, team_points_block),
+           column(4, next_team_block)
+         )
+       )
 
-      ret <- fluidRow(
-        team_position_box,
-        team_cash_box,
-        team_points_box,
-        team_value_box
-      )
-      return(ret)
-    })
+       # Row 1, Col 2: Squad Valuation & Market Trends
+       squad_valuation_box <- box(
+         title = "Squad Valuation & Market Trends",
+         width = 6,
+         status = "primary",
+         solidHeader = TRUE,
+         collapsible = FALSE,
+         fluidRow(
+           column(4, team_value_block),
+           column(4, team_change_value_block),
+           column(4, team_players_value_block)
+         )
+       )
+
+       # Row 2, Col 1: Available Liquid Cash & Total Volume Earned
+       liquid_cash_box <- box(
+         title = "Available Liquid Cash & Total Volume Earned",
+         width = 6,
+         status = "success",
+         solidHeader = TRUE,
+         collapsible = FALSE,
+         descriptionBlock(
+           header = format_table_currency(liquid_cash_val),
+           number = NULL,
+           numberColor = "green",
+           text = "Available Budget"
+         ),
+         div(
+           style = "margin-top: 8px; font-size: 13px; color: #047857;",
+           tagList(
+             icon("sack-dollar"),
+             paste0(" Total Volume Earned: ", format_table_currency(total_volume_earned))
+           )
+         )
+       )
+
+       # Row 2, Col 2: Squad Investment & Total Volume Spent
+       squad_investment_box <- box(
+         title = "Squad Investment & Total Volume Spent",
+         width = 6,
+         status = "warning",
+         solidHeader = TRUE,
+         collapsible = FALSE,
+         descriptionBlock(
+           header = format_table_currency(total_spent),
+           number = NULL,
+           numberColor = "#b45309",
+           text = "Current Squad Cost"
+         ),
+         div(
+           style = "margin-top: 8px; font-size: 13px; color: #b45309;",
+           tagList(
+             icon("money-bill-transfer"),
+             paste0(" Total Volume Spent: ", format_table_currency(total_volume_spent))
+           )
+         )
+       )
+
+       ret <- tagList(
+         fluidRow(
+           classification_standings_box,
+           squad_valuation_box
+         ),
+         fluidRow(
+           liquid_cash_box,
+           squad_investment_box
+         )
+       )
+       return(ret)
+     })
     # observers ----
     get_reactive_val <- function(x) {
       if (is.null(x)) return(NULL)
@@ -430,6 +466,26 @@ fluidRow(
         calculate_player_changes()
       players_table <- players_table %>%
         unify_columns()
+
+      # Ensure market_inMarket column is always present
+      if (!"market_inMarket" %in% colnames(players_table)) {
+        players_table$market_inMarket <- FALSE
+      }
+      # Check which roster players are currently listed on the market
+      my_mkt_df <- tryCatch({
+        get_market_players(
+          login = login_token(),
+          championship_id = championship_id,
+          user_team_id = user_team_id
+        )
+      }, error = function(e) {
+        print(paste0("[Market check] Fetch warning: ", e$message))
+        NULL
+      })
+      if (!is.null(my_mkt_df) && nrow(my_mkt_df) > 0 && "id" %in% colnames(my_mkt_df)) {
+        mkt_ids <- as.character(my_mkt_df$id)
+        players_table$market_inMarket <- as.character(players_table$id) %in% mkt_ids
+      }
 
       # Background Sync Roster Snapshot to Supabase
       tryCatch({

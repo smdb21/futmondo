@@ -38,22 +38,22 @@ Horizontal bar chart rendering liquid cash balances across all user teams in the
 
 A `ggplot2` object suitable for rendering via `renderPlot()` in a Shiny UI.
 
-### B. Liquid Cash Summary Box
+### B. KPI Summary Boxes (2x2 Layout)
 
-A four-box summary row rendered at the top of the Players In Teams tab. Provides an at-a-glance financial overview for the selected team.
+A 2x2 grid of summary boxes rendered at the top of the Players In Teams tab. Provides an at-a-glance financial overview for the selected team. The layout uses two `fluidRow` containers (two boxes per row) to form a compact 2x2 grid.
 
-| Box | Label | Description |
-|-----|-------|-------------|
-| 1 | Classification Rank | The team's current position in the league classification. |
-| 2 | Liquid Cash Available Budget | The remaining liquid cash budget, computed as `Initial Budget - sum(buyPrice)`. |
-| 3 | Points | The team's accumulated league points. |
-| 4 | Squad Value | The aggregate market value of all players currently on the roster. |
+| Position | Label | Description |
+|----------|-------|-------------|
+| Top-Left | Classification Rank | The team's current position in the league classification. |
+| Top-Right | Points | The team's accumulated league points. |
+| Bottom-Left | Total Volume Earned | The cumulative inflow volume: `300,000,000` (initial budget) + total sales revenue + all bonuses (round bonuses, point bonuses, etc.). |
+| Bottom-Right | Total Volume Spent | The cumulative outflow volume: the sum of all player purchase costs (`sum(buyPrice)`) across the full transaction history. |
 
 #### Data Pipeline
 
 1. **Input**: Receives the authenticated `login` token, `championship_id`, and the selected team identifier.
-2. **Computation**: Derives each metric from the team's live data via the existing API pipeline shared with `league_finances_plot`.
-3. **Rendering**: Outputs four summary cards arranged in a single-row Bootstrap layout, rendered inside a single `fluidRow` container to ensure they appear on one line.
+2. **Computation**: Derives each metric from the team's live data via the existing API pipeline shared with `league_finances_plot`. Total Volume Earned aggregates the initial budget, all sales proceeds, and all bonus inflows. Total Volume Spent aggregates all purchase outflows.
+3. **Rendering**: Outputs four summary cards arranged in a 2x2 Bootstrap grid (two `fluidRow` containers, each with two columns), rendered inside the module UI.
 
 #### Parameters
 
@@ -78,7 +78,7 @@ Prompts a warning modal to confirm the user's intent. On confirmation, executes 
 
 The player roster table on the Your Team tab has been enhanced with additional columns and display refinements.
 
-### A. "In market" Column
+### A. "In Market" Status Badge Column
 
 A column inserted immediately after the `team` column in the player roster table. The header name is `"In market"`. Indicates whether a player is currently listed for sale on the marketplace.
 
@@ -86,14 +86,14 @@ A column inserted immediately after the `team` column in the player roster table
 
 | Condition | Cell Content |
 |-----------|-------------|
-| Player listed on market | `20.852.517 €` -- renders the formatted asking price alone inside an amber badge. |
+| Player listed on market | `20.852.517 EUR` -- renders the formatted asking price alone inside an amber status badge. |
 | Player not listed | `""` -- renders as an empty cell. |
 
 #### Data Pipeline
 
 1. **Input**: The player record from the roster API response.
 2. **Computation**: Checks the `market_listing` flag (or equivalent) on each player record. If set, formats the `asking_price` value with thousand separators and the Euro symbol.
-3. **Rendering**: Outputs the formatted asking price wrapped in an amber badge, or an empty string, rendered within the table cell.
+3. **Rendering**: Outputs the formatted asking price wrapped in an amber status badge, or an empty string, rendered within the table cell.
 
 ### B. Hidden "Your Bid" Column
 
@@ -168,7 +168,7 @@ reactable(
 
 ## 6. Shortened Cache Timeouts
 
-Roster and bid cache timeouts have been reduced to `timeout_sec = 15-30s` across the Players In Teams module. This ensures that live offers (such as a bid of 20.097.019 € on Borja Iglesias) render immediately without unnecessary delay.
+Roster and bid cache timeouts have been reduced to `timeout_sec = 15-30s` across the Players In Teams module. This ensures that live offers (such as a bid of 20.097.019 EUR on Borja Iglesias) render immediately without unnecessary delay.
 
 #### Rationale
 
@@ -206,3 +206,16 @@ get_cached_data(
 - Live offers appear within 15-30 seconds of being placed by other users.
 - Tab switches remain sub-millisecond for cached data within the timeout window.
 - API rate limits are respected since caching is still active; only the cache duration is shortened.
+
+---
+
+## 7. Standings Evolution Plot (Bottom Placement)
+
+The league standings evolution plot has been repositioned to the bottom of the Players In Teams tab, below the player roster table and all other interactive components. This placement ensures that the primary data table and KPI boxes are immediately visible without requiring the user to scroll past a large chart.
+
+#### Behavior
+
+- The plot renders as a time-series line chart tracking the standings position (rank) of each team across matchdays.
+- Each team is represented by a distinct colored line, with the user's own team highlighted for quick identification.
+- The plot is rendered via `plotlyOutput` for interactivity (hover tooltips, zoom, pan).
+- Positioned at the bottom of the tab, after the player table and any filter controls.

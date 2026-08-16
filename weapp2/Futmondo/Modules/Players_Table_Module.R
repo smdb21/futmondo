@@ -28,21 +28,21 @@ filter_by_players_with_bid = FALSE,
           column(width = 7,
                  fluidRow(
                    style = "background: #f8fafc; padding: 15px; border-radius: 8px; margin: 0 0 20px 0; border: 1px solid #e2e8f0;",
-                   if (filter_by_position) {
-                     column(width = 4, selectInput(inputId = ns("position_filter"), label = "Position", choices = c("All", "Goalkeeper", "Defender", "Midfielder", "Forward"), selected = "All", width = "100%"))
-                   },
-                   if (filter_by_team) {
-                     column(width = 4, selectInput(inputId = ns("team_filter"), label = "User Team Owner", choices = c("All"), width = "100%"))
-                   },
-                   if (filter_by_value) {
-                     tagList(
-                       column(width = 4, numericInput(inputId = ns("min_value_filter"), label = "Min Val (M)", min = 0, max = 1000, value = 0, step = 10, width = "100%")),
-                       column(width = 4, numericInput(inputId = ns("max_value_filter"), label = "Max Val (M)", min = 0, max = 1000, value = 1000, step = 10, width = "100%"))
-                     )
-                   },
-                   if (filter_by_change_value) {
-                     column(width = 4, numericInput(inputId = ns("change_value_filter"), label = "Min Trend (M)", min = 0, max = 1, value = default_minimum_change_value, step = 0.05, width = "100%"))
-                   }
+if (filter_by_position) {
+                      column(width = 4, div(title = "Filter players by primary or secondary position (Goalkeeper, Defender, Midfielder, Forward)", selectInput(inputId = ns("position_filter"), label = "Position", choices = c("All", "Goalkeeper", "Defender", "Midfielder", "Forward"), selected = "All", width = "100%")))
+                    },
+                    if (filter_by_team) {
+                      column(width = 4, div(title = "Filter players by current user team owner or free agents", selectInput(inputId = ns("team_filter"), label = "User Team Owner", choices = c("All"), width = "100%")))
+                    },
+                    if (filter_by_value) {
+                      tagList(
+                        column(width = 4, div(title = "Filter players by minimum market valuation in millions of EUR", numericInput(inputId = ns("min_value_filter"), label = "Min Val (M)", min = 0, max = 1000, value = 0, step = 10, width = "100%"))),
+                        column(width = 4, div(title = "Filter players by maximum market valuation in millions of EUR", numericInput(inputId = ns("max_value_filter"), label = "Max Val (M)", min = 0, max = 1000, value = 1000, step = 10, width = "100%")))
+                      )
+                    },
+                    if (filter_by_change_value) {
+                      column(width = 4, div(title = "Filter players by minimum 24-hour market trend in millions of EUR", numericInput(inputId = ns("change_value_filter"), label = "Min Trend (M)", min = 0, max = 1, value = default_minimum_change_value, step = 0.05, width = "100%")))
+                    }
                  )
           ),
           column(width = 5,
@@ -53,19 +53,19 @@ filter_by_players_with_bid = FALSE,
         fluidRow(
           style = "background: #f8fafc; padding: 15px; border-radius: 8px; margin: 0 0 20px 0; border: 1px solid #e2e8f0;",
           if (filter_by_position) {
-            column(width = 3, selectInput(inputId = ns("position_filter"), label = "Position", choices = c("All", "Goalkeeper", "Defender", "Midfielder", "Forward"), selected = "All", width = "100%"))
+            column(width = 3, div(title = "Filter players by primary or secondary position (Goalkeeper, Defender, Midfielder, Forward)", selectInput(inputId = ns("position_filter"), label = "Position", choices = c("All", "Goalkeeper", "Defender", "Midfielder", "Forward"), selected = "All", width = "100%")))
           },
           if (filter_by_team) {
-            column(width = 3, selectInput(inputId = ns("team_filter"), label = "User Team Owner", choices = c("All"), width = "100%"))
+            column(width = 3, div(title = "Filter players by current user team owner or free agents", selectInput(inputId = ns("team_filter"), label = "User Team Owner", choices = c("All"), width = "100%")))
           },
           if (filter_by_value) {
             tagList(
-              column(width = 2, numericInput(inputId = ns("min_value_filter"), label = "Min Val (M)", min = 0, max = 1000, value = 0, step = 10, width = "100%")),
-              column(width = 2, numericInput(inputId = ns("max_value_filter"), label = "Max Val (M)", min = 0, max = 1000, value = 1000, step = 10, width = "100%"))
+              column(width = 2, div(title = "Filter players by minimum market valuation in millions of EUR", numericInput(inputId = ns("min_value_filter"), label = "Min Val (M)", min = 0, max = 1000, value = 0, step = 10, width = "100%"))),
+              column(width = 2, div(title = "Filter players by maximum market valuation in millions of EUR", numericInput(inputId = ns("max_value_filter"), label = "Max Val (M)", min = 0, max = 1000, value = 1000, step = 10, width = "100%")))
             )
           },
           if (filter_by_change_value) {
-            column(width = 2, numericInput(inputId = ns("change_value_filter"), label = "Min Trend (M)", min = 0, max = 1, value = default_minimum_change_value, step = 0.05, width = "100%"))
+            column(width = 2, div(title = "Filter players by minimum 24-hour market trend in millions of EUR", numericInput(inputId = ns("change_value_filter"), label = "Min Trend (M)", min = 0, max = 1, value = default_minimum_change_value, step = 0.05, width = "100%")))
           }
         )
       },
@@ -75,20 +75,21 @@ filter_by_players_with_bid = FALSE,
         fluidRow(
           style = "padding: 0 15px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 20px; align-items: center;",
           if (filter_by_active_clause) {
-            div(checkboxInput(inputId = ns("active_clause_filter"), label = "Active Clause Only", value = FALSE), style = "font-weight: 500;")
+            div(checkboxInput(inputId = ns("active_clause_filter"), label = "Active Clause Only", value = FALSE), style = "font-weight: 500;", title = "Show only players whose buyout clause is currently payable (lock period has expired)")
           },
           if (filter_by_is_favorite) {
-            div(checkboxInput(inputId = ns("is_favorite_filter"), label = "Favorites Only", value = FALSE), style = "font-weight: 500;")
+            div(checkboxInput(inputId = ns("is_favorite_filter"), label = "Favorites Only", value = FALSE), style = "font-weight: 500;", title = "Show only players you have starred as favorite")
           },
           if (filter_by_is_from_futmondo) {
-            div(checkboxInput(inputId = ns("is_from_futmondo_filter"), label = "Free Agents Only", value = FALSE), style = "font-weight: 500;")
+            div(checkboxInput(inputId = ns("is_from_futmondo_filter"), label = "Free Agents Only", value = FALSE), style = "font-weight: 500;", title = "Show only unowned players without a user team (free agents / market)")
           },
           if (filter_by_players_with_bid) {
             tagList(
-              div(checkboxInput(inputId = ns("players_you_bid_filter"), label = "Your Bids Only", value = FALSE), style = "font-weight: 500;"),
-              div(checkboxInput(inputId = ns("players_with_bid_filter"), label = "Bidded Only", value = FALSE), style = "font-weight: 500;")
+              div(checkboxInput(inputId = ns("players_you_bid_filter"), label = "Your Bids Only", value = FALSE), style = "font-weight: 500;", title = "Show only players you have placed an active bid on"),
+              div(checkboxInput(inputId = ns("players_with_bid_filter"), label = "Bidded Only", value = FALSE), style = "font-weight: 500;", title = "Show only players with active bids from any league team")
             )
-          }
+          },
+          div(actionButton(ns("btn_clear_filters"), icon("eraser"), "Clear Filters", class = "btn btn-sm btn-outline-secondary"), style = "margin-left: 10px;", title = "Reset all table filters to default values")
         )
       },
 
@@ -124,6 +125,21 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       table_refresh_trigger(table_refresh_trigger() + 1)
     }
 
+    # Safe date parsing helper
+    parse_safe_datetime <- function(date_vec) {
+      if (is.null(date_vec) || length(date_vec) == 0) return(as.POSIXct(character(0)))
+      date_str <- as.character(date_vec)
+      clean_str <- gsub("T", " ", date_str)
+      clean_str <- gsub("Z", "", clean_str)
+      clean_str <- gsub("\\..*", "", clean_str)
+      parsed <- suppressWarnings(as.POSIXct(clean_str, format = "%Y-%m-%d %H:%M:%S"))
+      na_idx <- is.na(parsed)
+      if (any(na_idx)) {
+        parsed[na_idx] <- suppressWarnings(as.POSIXct(clean_str[na_idx], format = "%Y-%m-%d"))
+      }
+      return(parsed)
+    }
+
     # observers ----
     # observe user_teams_RV to update market_player_team_filter ----
     observeEvent(user_teams_RV(), {
@@ -137,6 +153,24 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
         team_choices <- c(team_choices, user_team_names)
       }
       updateSelectInput(session, inputId = "team_filter", choices = team_choices, selected = "All")
+    })
+
+    # observe clear filters button ----
+    observeEvent(input$btn_clear_filters, {
+      tryCatch({
+        updateSelectInput(session, inputId = "position_filter", selected = "All")
+        updateSelectInput(session, inputId = "team_filter", selected = "All")
+        updateNumericInput(session, inputId = "min_value_filter", value = 0)
+        updateNumericInput(session, inputId = "max_value_filter", value = 1000)
+        updateNumericInput(session, inputId = "change_value_filter", value = NA)
+        updateCheckboxInput(session, inputId = "active_clause_filter", value = FALSE)
+        updateCheckboxInput(session, inputId = "is_favorite_filter", value = FALSE)
+        updateCheckboxInput(session, inputId = "is_from_futmondo_filter", value = FALSE)
+        updateCheckboxInput(session, inputId = "players_you_bid_filter", value = FALSE)
+        updateCheckboxInput(session, inputId = "players_with_bid_filter", value = FALSE)
+      }, error = function(e) {
+        warning(paste0("[Players Table] Clear filters error: ", e$message))
+      })
     })
     
     # observe selected_player_RV() to open popup with           selected_player_UI(id = "selected_player")
@@ -271,8 +305,13 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       }
       if (!is.null(input$active_clause_filter)) {
         if (input$active_clause_filter) {
+          now_time <- Sys.time()
           players_table <- players_table %>%
-            dplyr::filter(isClause)
+            dplyr::filter(
+              isClause & (
+                is.na(clause_date) | clause_date == "" | parse_safe_datetime(clause_date) <= now_time
+              )
+            )
         }
       }
       # is_favorite_filter
@@ -359,10 +398,15 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       df <- players_table_RV()
       if (is.null(df) || nrow(df) == 0) return(NULL)
 
-      gk <- sum(df$role == "Goalkeeper" | df$role2 == "Goalkeeper" | df$role == "portero" | df$role2 == "portero", na.rm = TRUE)
-      df_cnt <- sum(df$role == "Defender" | df$role2 == "Defender" | df$role == "defensa" | df$role2 == "defensa", na.rm = TRUE)
-      md <- sum(df$role == "Midfielder" | df$role2 == "Midfielder" | df$role == "centrocampista" | df$role2 == "centrocampista", na.rm = TRUE)
-      fw <- sum(df$role == "Forward" | df$role2 == "Forward" | df$role == "delantero" | df$role2 == "delantero", na.rm = TRUE)
+      gkp_roles <- c("Goalkeeper", "portero", "POR", "GKP")
+      def_roles <- c("Defender", "defensa", "DEF", "DF")
+      mid_roles <- c("Midfielder", "centrocampista", "MED", "CEN", "MID", "MF")
+      fwd_roles <- c("Forward", "delantero", "DEL", "FWD", "FW", "ATT")
+
+      gk <- sum(df$role %in% gkp_roles | (!is.na(df$role2) & df$role2 %in% gkp_roles), na.rm = TRUE)
+      df_cnt <- sum(df$role %in% def_roles | (!is.na(df$role2) & df$role2 %in% def_roles), na.rm = TRUE)
+      md <- sum(df$role %in% mid_roles | (!is.na(df$role2) & df$role2 %in% mid_roles), na.rm = TRUE)
+      fw <- sum(df$role %in% fwd_roles | (!is.na(df$role2) & df$role2 %in% fwd_roles), na.rm = TRUE)
       total_squad <- nrow(df) # Exact actual player count (distinct players)
 
       div(

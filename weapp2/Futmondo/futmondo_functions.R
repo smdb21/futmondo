@@ -854,6 +854,48 @@ get_reactable_columns_for_players <- function(table) {
     columns[["bid_user"]] <- colDef(show = FALSE)
   }
 
+  # My Bid Price Column ----
+  if ("my_bid_price" %in% colnames(table)) {
+    columns[["my_bid_price"]] <- colDef(
+      name = "My Offer",
+      align = "right",
+      cell = function(value) {
+        if (is.na(value) || is.null(value) || value <= 0) return("")
+        shiny::tags$span(
+          class = "badge-my-bid",
+          style = "background: #dbeafe; color: #1d4ed8; font-weight: 600; padding: 3px 8px; border-radius: 12px;",
+          format_table_currency(value)
+        )
+      }
+    )
+  }
+
+  # Highest Other Bid Price Column ----
+  if ("highest_other_bid_price" %in% colnames(table) || "other_bid_price" %in% colnames(table)) {
+    bid_col_name <- if ("highest_other_bid_price" %in% colnames(table)) "highest_other_bid_price" else "other_bid_price"
+    columns[[bid_col_name]] <- colDef(
+      name = "Offers by Others",
+      align = "right",
+      cell = function(value, index) {
+        if (is.na(value) || is.null(value) || value <= 0) return("")
+        bidder <- if ("other_bid_user" %in% colnames(table) && !is.na(table$other_bid_user[index]) && nzchar(as.character(table$other_bid_user[index]))) {
+          as.character(table$other_bid_user[index])
+        } else {
+          "Futmondo"
+        }
+        shiny::tags$span(
+          class = "badge-active-bid",
+          title = paste0("Offer from ", bidder),
+          format_table_currency(value)
+        )
+      }
+    )
+  }
+
+  if ("other_bid_user" %in% colnames(table)) {
+    columns[["other_bid_user"]] <- colDef(show = FALSE)
+  }
+
   # Points Column ----
   if ("points" %in% colnames(table)) {
     columns[["points"]] <- colDef(

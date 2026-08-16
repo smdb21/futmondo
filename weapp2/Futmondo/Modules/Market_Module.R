@@ -7,7 +7,8 @@ market_UI <- function(id) {
       filter_by_position = TRUE,
       filter_by_team = TRUE,
       filter_by_is_favorite = FALSE,
-      filter_by_players_with_bid = TRUE
+      filter_by_players_with_bid = TRUE,
+      filter_by_active_clause = FALSE
     )
   )
 }
