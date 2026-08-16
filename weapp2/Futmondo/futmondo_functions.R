@@ -163,6 +163,148 @@ get_championships <- function(login, championship_name = NULL) {
 }
 
 
+get_finished_rounds <- function(login, championship_id) {
+  tryCatch({
+    if (is.null(login) || is.null(championship_id)) {
+      return(data.frame(
+        round_id = character(0), round_number = numeric(0),
+        begin_process = character(0), is_finished = logical(0),
+        stringsAsFactors = FALSE
+      ))
+    }
+
+    cache_key <- paste0("finished_rounds_", championship_id)
+    get_cached_data(cache_key, {
+      payload <- list(
+        header = list(
+          token = login[["token"]],
+          userid = login[["userid"]]
+        ),
+        query = list(
+          excludeGeneral = FALSE,
+          includeProphets = TRUE
+        ),
+        answer = list()
+      )
+
+      headers <- c("Content-Type" = "application/json; charset=utf-8")
+
+      print(paste0("[API] Fetching active championships for rounds (championship: ", championship_id, ")"))
+      response <- POST(ACTIVE_CHAMPIONSHIPS_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
+      ans <- httr::content(response)
+
+      if (is.null(ans) || !("answer" %in% names(ans)) || is.null(ans$answer) || !("championships" %in% names(ans$answer))) {
+        print("[Rounds] No championships data in response.")
+        return(data.frame(
+          round_id = character(0), round_number = numeric(0),
+          begin_process = character(0), is_finished = logical(0),
+          stringsAsFactors = FALSE
+        ))
+      }
+
+      championships <- ans$answer$championships
+      champ <- NULL
+      for (c_item in championships) {
+        if (is.list(c_item) && !is.null(c_item[["_id"]]) && as.character(c_item[["_id"]]) == as.character(championship_id)) {
+          champ <- c_item
+          break
+        }
+      }
+
+      if (is.null(champ)) {
+        print(paste0("[Rounds] Championship ", championship_id, " not found in active championships."))
+        return(data.frame(
+          round_id = character(0), round_number = numeric(0),
+          begin_process = character(0), is_finished = logical(0),
+          stringsAsFactors = FALSE
+        ))
+      }
+
+      # Extract rounds from ans$answer$rounds
+      rounds <- if (!is.null(ans$answer) && "rounds" %in% names(ans$answer)) ans$answer$rounds else NULL
+
+      # If ans$answer$rounds is empty, fallback to champ$rounds
+      if (is.null(rounds) || length(rounds) == 0) {
+        rounds <- if (!is.null(champ) && "rounds" %in% names(champ)) champ$rounds else NULL
+      }
+
+      # If championship has a league ID, filter rounds by matching round$championshipId to champ$league
+      if (!is.null(rounds) && length(rounds) > 0 && !is.null(champ) && !is.null(champ[["league"]])) {
+        league_id <- as.character(champ[["league"]])
+        rounds <- Filter(function(r) {
+          if (!is.null(r[["championshipId"]])) {
+            as.character(r[["championshipId"]]) == league_id
+          } else {
+            FALSE
+          }
+        }, rounds)
+      }
+
+      # Fallback: if rounds is empty but championship has started, return a single row for round 1
+      if (is.null(rounds) || length(rounds) == 0) {
+        champ_started <- FALSE
+        if (!is.null(champ) && !is.null(champ[["startDate"]])) {
+          start_time <- tryCatch({
+            as.POSIXct(as.character(champ[["startDate"]]), tz = "UTC")
+          }, error = function(e) NA)
+          champ_started <- !is.na(start_time) && start_time < Sys.time()
+        }
+        if (champ_started) {
+          print("[Rounds] No rounds data found, but championship has started. Returning fallback round 1.")
+          return(data.frame(
+            round_id = "",
+            round_number = 1,
+            begin_process = "",
+            is_finished = TRUE,
+            stringsAsFactors = FALSE
+          ))
+        }
+        print("[Rounds] No rounds data found for this championship.")
+        return(data.frame(
+          round_id = character(0), round_number = numeric(0),
+          begin_process = character(0), is_finished = logical(0),
+          stringsAsFactors = FALSE
+        ))
+      }
+
+      now <- Sys.time()
+      rounds_df <- lapply(rounds, FUN = function(r) {
+        r_id <- if (!is.null(r[["_id"]])) as.character(r[["_id"]]) else if (!is.null(r[["id"]])) as.character(r[["id"]]) else ""
+        r_num <- if (!is.null(r[["number"]])) as.numeric(r[["number"]]) else 1
+        begin_proc <- if (!is.null(r[["beginProcess"]])) as.character(r[["beginProcess"]]) else ""
+
+        is_fin <- if (begin_proc != "") {
+          begin_time <- tryCatch({
+            as.POSIXct(begin_proc, tz = "UTC")
+          }, error = function(e) NA)
+          !is.na(begin_time) && begin_time < now
+        } else {
+          TRUE
+        }
+
+        data.frame(
+          round_id = r_id,
+          round_number = r_num,
+          begin_process = begin_proc,
+          is_finished = is_fin,
+          stringsAsFactors = FALSE
+        )
+      }) %>% bind_rows()
+
+      print(paste0("[Rounds] Found ", nrow(rounds_df), " rounds, ", sum(rounds_df$is_finished), " finished."))
+      rounds_df
+    })
+  }, error = function(e) {
+    print(paste0("[Rounds] Error: ", e$message))
+    data.frame(
+      round_id = character(0), round_number = numeric(0),
+      begin_process = character(0), is_finished = logical(0),
+      stringsAsFactors = FALSE
+    )
+  })
+}
+
+
 get_players_from_team <- function(login, championship_id, user_team_id, teams = NULL) {
   cache_key <- paste0("roster_", championship_id, "_", user_team_id)
   get_cached_data(cache_key, {
@@ -1453,6 +1595,30 @@ calculate_league_finances <- function(login, championship_id, user_teams_df, ini
       print(paste0("[Finances] Supabase pressroom sync warning: ", e$message))
     })
 
+    # Determine finished rounds to decide whether to apply ranking prizes
+    finished_rounds_df <- tryCatch({
+      get_finished_rounds(login = login, championship_id = championship_id)
+    }, error = function(e) {
+      print(paste0("[Finances] Error fetching finished rounds: ", e$message))
+      data.frame(
+        round_id = character(0), round_number = numeric(0),
+        begin_process = character(0), is_finished = logical(0),
+        stringsAsFactors = FALSE
+      )
+    })
+    has_finished_rounds <- !is.null(finished_rounds_df) && nrow(finished_rounds_df) > 0 && any(finished_rounds_df$is_finished, na.rm = TRUE)
+
+    # Sort teams by points descending to determine ranking
+    teams_sorted <- user_teams_df[order(-as.numeric(user_teams_df$points)), ]
+    team_rank <- seq_len(nrow(teams_sorted))
+    team_rank_map <- setNames(team_rank, if ("teamid" %in% colnames(teams_sorted)) as.character(teams_sorted$teamid) else as.character(teams_sorted$id))
+
+    # Pre-calculate ranking prizes if applicable
+    ranking_prizes_df <- data.frame(rank = numeric(0), prize = numeric(0), stringsAsFactors = FALSE)
+    if (has_finished_rounds && nrow(user_teams_df) > 0) {
+      ranking_prizes_df <- calculate_futmondo_ranking_prizes(money = 30000000, members = nrow(user_teams_df))
+    }
+
     for (i in seq_len(nrow(user_teams_df))) {
       row <- user_teams_df[i, ]
       tid <- if ("teamid" %in% colnames(row)) row$teamid else row$id
@@ -1512,12 +1678,23 @@ calculate_league_finances <- function(login, championship_id, user_teams_df, ini
       total_spent_val <- if (pressroom_purchases > 0) pressroom_purchases else total_spent
       total_sales_val <- pressroom_sales
 
-      # No artificial point bonus or ranking prize -- budget is purely based on actual transactions
-      point_bonus <- 0
-      ranking_prize <- 0
+      # Point bonus: points earned * 70k EUR per point
+      point_bonus <- as.numeric(tpoints) * 70000
 
-      # Money Left = Initial Budget - Total Spent + Total Sales
-      calc_money_left <- initial_budget - total_spent_val + total_sales_val
+      # Ranking prize: based on team position if finished rounds exist
+      ranking_prize <- 0
+      if (has_finished_rounds && !is.null(team_rank_map[[as.character(tid)]])) {
+        team_position <- team_rank_map[[as.character(tid)]]
+        if (!is.null(ranking_prizes_df$prize[ranking_prizes_df$rank == team_position]) && length(ranking_prizes_df$prize[ranking_prizes_df$rank == team_position]) > 0) {
+          ranking_prize <- as.numeric(ranking_prizes_df$prize[ranking_prizes_df$rank == team_position])
+        }
+      }
+
+      # Total income = pressroom sales + point bonus + ranking prize
+      total_income <- total_sales_val + point_bonus + ranking_prize
+
+      # Money Left = Initial Budget - Total Spent + Total Income
+      calc_money_left <- initial_budget - total_spent_val + total_income
 
       # If get_user_team_info provides an explicit budget for this team, use it if valid
       actual_info <- tryCatch({
@@ -1544,8 +1721,8 @@ calculate_league_finances <- function(login, championship_id, user_teams_df, ini
         net_profit_loss = as.numeric(team_value - total_spent_val),
         squad_size = as.numeric(squad_size),
         points = as.numeric(tpoints),
-        point_bonus = 0,
-        ranking_prize = 0,
+        point_bonus = as.numeric(point_bonus),
+        ranking_prize = as.numeric(ranking_prize),
         stringsAsFactors = FALSE
       )
     }

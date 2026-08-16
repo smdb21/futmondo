@@ -195,7 +195,7 @@ The `running_balance` column is computed as follows:
 
 This ensures the "Money Left After Transaction" column reflects the cumulative cash position after each transaction in chronological order, regardless of the display sort order.
 
-### 4.3 Defensive Fallback Mode
+### 4.3 Defensive Fallback Mode with Reconstructed Transaction History
 
 If the API returns an empty data frame or throws an error (which can happen due to API restrictions on rival private transaction feeds), the module enters fallback mode:
 
@@ -207,7 +207,6 @@ If the API returns an empty data frame or throws an error (which can happen due 
    - `category`: `"market"`.
    - `money`: Negative of `price` for buys, positive `price` for sells.
    - `date`: The `created` timestamp from the pressroom entry.
-   - `running_balance`: Computed as `300000000 + cumsum(money)` (starting from the initial budget), sorted chronologically.
 3. **Second fallback -- Roster-based**: If the pressroom feed returns no matching entries for the rival, falls back to the current squad roster from `rival_players_table_RV()`. For each player with `buyPrice > 0`, constructs a synthetic purchase transaction:
    - `id`: `"fallback_buy_"` + sequential index.
    - `concept`: Player name.
@@ -221,6 +220,90 @@ If the API returns an empty data frame or throws an error (which can happen due 
 The callout text (in English):
 
 > Information restricted by Futmondo: The Futmondo API restricts direct access to private financial transactions for rival teams. The transactions shown below have been calculated from current squad purchases.
+
+### 4.3a Reconstructed Transaction History (Pressroom Fallback)
+
+When the pressroom feed is used as a fallback, the module builds a complete reconstructed transaction log by combining four distinct row types into a single data frame. This ensures the rival's financial picture is as accurate as possible despite API restrictions.
+
+**Row type (a): Initial Budget**
+
+A single synthetic row representing the starting budget allocation:
+
+| Field      | Value                    |
+|------------|--------------------------|
+| `id`       | `"recon_initial_budget"` |
+| `concept`  | `"Initial Budget"`       |
+| `type`     | `"budget"`               |
+| `category` | `"bonus"`                |
+| `money`    | `300000000`              |
+| `date`     | Season start date (derived from earliest pressroom transaction or budget-reset detection) |
+
+**Row type (b): Market Transfers**
+
+For each pressroom entry involving the rival team:
+- **Buys**: `money = -price` (negative outflow). Concept: `"Player Name (Purchased)"`.
+- **Sells**: `money = +price` (positive inflow). Concept: `"Player Name (Sold)"`.
+
+**Row type (c): Finished Round Bonuses**
+
+For each completed matchday, the module computes a per-round bonus based on the rival's average points:
+
+1. Retrieves the rival's total championship points from `user_teams_RV()`.
+2. Counts the number of finished rounds via `get_finished_rounds()`.
+3. Computes `avg_pts_per_round = rival_points / num_finished_rounds`.
+4. For each finished round, creates a bonus row with:
+   - `id`: `"recon_round_bonus_"` + round number.
+   - `concept`: `"Jornada N Bonus"` (where N is the round number).
+   - `type`: `"bonus"`.
+   - `category`: `"round"`.
+   - `money`: `avg_pts_per_round * 70000` (the standard Futmondo point bonus rate).
+   - `date`: The `begin_process` timestamp from the finished round data.
+
+This distributes the rival's total points across finished matchdays and applies the 70,000 EUR per-point bonus rate, matching the actual game mechanics.
+
+**Row type (d): Roster Fallback (when pressroom yields no data)**
+
+If the pressroom feed has no entries for the rival, the module falls back to constructing buy transactions from the current roster. Each player with `buyPrice > 0` generates a synthetic purchase row. No bonus rows are added in this mode since the pressroom feed is unavailable to determine finished round counts.
+
+**Running Balance Calculation**
+
+After assembling all rows:
+
+1. Parse `date` to `POSIXct` timestamps.
+2. Sort **ascending** by timestamp (chronological order).
+3. Compute `running_balance = cumsum(money)` on the sorted dataset.
+4. Re-sort **descending** by date for display (newest first).
+
+The running balance starts from `300,000,000 EUR` (the initial budget row) and accumulates all subsequent transactions. This fixes the previous roster-fallback bug where the running balance started from `0 EUR` because no initial budget row was included.
+
+### 4.3b Synchronization Between KPI Summary Cards and Transaction Log
+
+The four financial summary cards rendered above the transaction tab are synchronized with the reconstructed transaction log to ensure consistency across the page.
+
+**How it works:**
+
+1. The module fetches `rival_moneymovements_raw_RV()` which contains the full reconstructed transaction log (including the initial budget row, market transfers, round bonuses, and roster fallback buys).
+2. If transaction data is available:
+   - **Money Out**: Sum of `abs(money)` for all negative-money rows (purchases).
+   - **Money In**: Sum of positive `money` for all non-budget rows (sales and bonuses).
+   - **Budget (Money Left)**: The `running_balance` of the most recent transaction (first row in the descending-sorted dataset). This reflects the cumulative cash position after all known transactions.
+3. If transaction data is unavailable (fallback mode, no pressroom data):
+   - **Money Out**: Falls back to `total_spent` (sum of `buyPrice` from the roster).
+   - **Money In**: `0`.
+   - **Budget**: Falls back to `300000000 - total_spent`.
+4. The "Money Left (Budget)" card can be further overridden by the API-provided `info$budget` from `get_user_team_info()` if the value is available, numeric, and positive. This ensures the summary box matches the official API value when accessible.
+
+**Period Summary Cards (within Tab 2):**
+
+The three KPI cards inside the Transaction History tab (Total Inflow, Total Outflow, Net Cash Flow) are computed from the **filtered** dataset (`rival_moneymovements_filtered_RV()`), which respects the user's date range, type, and category filters. This allows the user to inspect cash flow for a specific period or transaction category.
+
+| Card         | Calculation                                     |
+|--------------|-------------------------------------------------|
+| Total Inflow | Sum of positive `money` values in filtered set. |
+| Total Outflow   | Sum of negative `money` values in filtered set. |
+| Net Cash Flow   | Net sum of all `money` values in filtered set.  |
+
+The summary cards outside the tab operate on the **unfiltered** raw dataset, providing a full-picture view of the rival's finances regardless of the active filters.
 
 ### 4.4 Filter Bar
 

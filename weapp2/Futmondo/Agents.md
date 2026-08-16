@@ -39,3 +39,10 @@ Every developer and AI agent making modifications or additions to the codebase *
 * **Futmondo System as Counterparty**: In Futmondo transactions (pressroom feed, market movements, transaction logs), if `buyer_team_id` / `_buyer` ID is missing, `NULL`, or empty (`""`), the buyer is the **Futmondo System / Market** (e.g., player was sold to the market/computer). Likewise, if `seller_team_id` / `_seller` ID is missing, `NULL`, or empty (`""`), the seller is the **Futmondo System / Market** (e.g., player was bought from the market/computer).
   - Agents and functions must treat missing/empty counterparty IDs as the Futmondo system, not as corrupted or missing data.
   - When displaying or reporting transactions, label an empty buyer/seller as `"Futmondo / Mercado"` or `"Futmondo (System)"`.
+
+---
+
+## 5. Project Scope & Legacy Isolation Rule
+
+* **Authoritative Root**: The ONLY authoritative codebase for this project is `/home/rstudio/workspace/futmondo/weapp2/Futmondo/`.
+* **Disregard Parent / Legacy Files**: Any file or directory outside `/home/rstudio/workspace/futmondo/weapp2/Futmondo/` (such as root workspace files, `../../src/`, `../../webapp/`, `../../jornada*.txt`, `../../saladeprensa*.txt`, etc.) belongs to deprecated legacy iterations, Java/R prototypes, or previous experiments. AI agents and developers must NEVER read, reference, edit, or rely on any files outside this project directory.

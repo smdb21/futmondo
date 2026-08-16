@@ -286,20 +286,52 @@ output$rival_financial_summary_box <- renderUI({
       info <- rival_financial_summary_box_RV()
       roster <- rival_players_table_RV()
 
-      # Compute total spent and squad value from roster
-      total_spent <- 0
+      # Compute squad value from roster
       squad_val <- 0
       if (!is.null(roster) && nrow(roster) > 0) {
-        if ("buyPrice" %in% colnames(roster)) {
-          total_spent <- sum(suppressWarnings(as.numeric(roster$buyPrice)), na.rm = TRUE)
-        }
         if ("value" %in% colnames(roster)) {
           squad_val <- sum(suppressWarnings(as.numeric(roster$value)), na.rm = TRUE)
         }
       }
 
-      # Determine budget (Money Left)
-      budget_val <- 300000000 - total_spent
+      # Retrieve transaction movements safely
+      tx_raw <- tryCatch({ rival_moneymovements_raw_RV() }, error = function(e) NULL)
+
+      # Derive money_out, money_in, total_spent, budget_val from reconstructed finances
+      money_out <- 0
+      money_in <- 0
+      total_spent <- 0
+      budget_val <- 300000000
+
+      if (!is.null(tx_raw) && nrow(tx_raw) > 0) {
+        # money_out = absolute value of all negative money (purchases)
+        money_out <- sum(abs(tx_raw$money[tx_raw$money < 0]), na.rm = TRUE)
+
+        # money_in = all positive money excluding initial budget row
+        non_budget_rows <- tx_raw[tx_raw$type != "budget", ]
+        if (nrow(non_budget_rows) > 0) {
+          money_in <- sum(non_budget_rows$money[non_budget_rows$money > 0], na.rm = TRUE)
+        }
+
+        # total_spent = money_out (purchases only)
+        total_spent <- money_out
+
+        # budget_val = running_balance of the most recent transaction (first row in descending order)
+        if ("running_balance" %in% colnames(tx_raw)) {
+          budget_val <- tx_raw$running_balance[1]
+        }
+      } else {
+        # No transaction data -- use roster-based calculation
+        if (!is.null(roster) && nrow(roster) > 0) {
+          if ("buyPrice" %in% colnames(roster)) {
+            total_spent <- sum(suppressWarnings(as.numeric(roster$buyPrice)), na.rm = TRUE)
+            money_out <- total_spent
+          }
+        }
+        budget_val <- 300000000 - total_spent
+      }
+
+      # Override budget and squad_val with API-provided values if available and valid
       if (!is.null(info) && !is.null(info$budget) && is.numeric(info$budget) && info$budget > 0) {
         budget_val <- info$budget
       }
@@ -307,45 +339,14 @@ output$rival_financial_summary_box <- renderUI({
         squad_val <- info$teamValue
       }
 
-      # Retrieve transaction movements safely
-      tx_raw <- tryCatch({ rival_moneymovements_raw_RV() }, error = function(e) NULL)
-
-      # Get pressroom-driven totals from league_finances_RV for the selected rival
-      money_out <- total_spent
-      money_in <- 0
-      rival_id <- selected_rival_team_id()
-      if (!is.null(rival_id)) {
-        finances_data <- tryCatch({ league_finances_RV() }, error = function(e) NULL)
-        if (!is.null(finances_data) && !is.null(finances_data$team_finances) && nrow(finances_data$team_finances) > 0) {
-          rival_row <- finances_data$team_finances[finances_data$team_finances$teamid == rival_id, ]
-          if (nrow(rival_row) > 0) {
-            money_out <- if ("total_spent" %in% colnames(rival_row)) as.numeric(rival_row$total_spent[1]) else money_out
-            money_in <- if ("total_sales" %in% colnames(rival_row)) as.numeric(rival_row$total_sales[1]) else 0
-            if ("budget" %in% colnames(rival_row) && is.numeric(rival_row$budget[1]) && !is.na(rival_row$budget[1])) {
-              budget_val <- as.numeric(rival_row$budget[1])
-            }
-          }
-        }
-      }
-
-      # Fallback: if league_finances did not provide pressroom data, use raw moneymovements
-      if (money_out == 0 || money_in == 0) {
-        if (!is.null(tx_raw) && nrow(tx_raw) > 0) {
-          if (money_out == 0) {
-            money_out <- sum(abs(tx_raw$money[tx_raw$money < 0 | tx_raw$type == "buy"]), na.rm = TRUE)
-          }
-          if (money_in == 0) {
-            money_in <- sum(tx_raw$money[tx_raw$type == "sell" | (tx_raw$money > 0 & tx_raw$type != "budget")], na.rm = TRUE)
-          }
-        }
-      }
+      # net_gain = squad_val - total_spent
+      net_gain <- squad_val - total_spent
 
       cash <- format_table_currency(budget_val)
       spent_fmt <- format_table_currency(total_spent)
       money_out_fmt <- format_table_currency(money_out)
       money_in_fmt <- format_table_currency(money_in)
       val_sum <- format_table_currency(squad_val)
-      net_gain <- squad_val - total_spent
       net_fmt <- format_table_currency(net_gain)
 
       pos <- if (!is.null(info) && !is.null(info$position) && !is.na(info$position)) get_ordinal_position(info$position) else "-"
@@ -567,7 +568,7 @@ output$rival_financial_summary_box <- renderUI({
 
     # ---- Transaction History Reactives ----
 
-    # Raw money movements: fetch via API, compute running balance, build fallback if empty
+    # Raw money movements: fetch via API, compute running balance, build full reconstructed fallback if empty
     is_fallback <- reactiveVal(FALSE)
 
     rival_moneymovements_raw_RV <- reactive({
@@ -587,101 +588,189 @@ output$rival_financial_summary_box <- renderUI({
         NULL
       })
 
-      # Check if API returned empty or errored
-      if (is.null(movements) || nrow(movements) == 0) {
-        is_fallback(TRUE)
+      # ---- PRIMARY PATH: API returned data ----
+      if (!is.null(movements) && nrow(movements) > 0) {
+        is_fallback(FALSE)
 
-        # Try pressroom feed as a first fallback
-        rival_id <- selected_rival_team_id()
-        pressroom_df <- tryCatch({
-          get_championship_pressroom(login = login_token(), championship_id = championship_id())
-        }, error = function(e) NULL)
+        # Parse ISO dates
+        movements$timestamp <- parse_safe_datetime(movements$date)
 
-        if (!is.null(pressroom_df) && nrow(pressroom_df) > 0 && !is.null(rival_id) && rival_id != "") {
-          rival_tx <- pressroom_df[pressroom_df$buyer_team_id == rival_id | pressroom_df$seller_team_id == rival_id, ]
-          if (nrow(rival_tx) > 0) {
-            fallback_df <- lapply(seq_len(nrow(rival_tx)), function(idx) {
-              row <- rival_tx[idx, ]
-              is_buy <- (as.character(row$buyer_team_id) == as.character(rival_id))
-              tx_type <- if (is_buy) "buy" else "sell"
-              tx_money <- if (is_buy) -as.numeric(row$price) else as.numeric(row$price)
-              p_name <- if (!is.null(row$player_name) && as.character(row$player_name) != "") as.character(row$player_name) else "Player"
-              data.frame(
-                id = paste0("pressroom_", row$id),
-                concept = paste0(p_name, if (is_buy) " (Purchased)" else " (Sold)"),
-                type = tx_type,
-                category = "market",
-                money = tx_money,
-                date = as.character(row$created),
-                stringsAsFactors = FALSE
-              )
-            }) %>% bind_rows()
+        # Sort ascending by timestamp (chronological) for running balance calculation
+        movements <- movements %>%
+          dplyr::arrange(timestamp)
 
-            fallback_df$timestamp <- parse_safe_datetime(fallback_df$date)
-            fallback_df <- fallback_df %>% dplyr::arrange(timestamp)
-            fallback_df$running_balance <- 300000000 + cumsum(fallback_df$money)
-            fallback_df$timestamp <- NULL
+        # Calculate running balance on the FULL chronological dataset
+        movements$running_balance <- cumsum(movements$money)
 
-            return(fallback_df)
-          }
-        }
+        # Drop the helper column before returning
+        movements$timestamp <- NULL
 
-        # Pressroom had no items for this rival -- fall back to current squad roster buyPrice
-        roster <- rival_players_table_RV()
-        if (is.null(roster) || nrow(roster) == 0) {
-          return(data.frame(
-            id = character(0), concept = character(0), type = character(0),
-            category = character(0), money = numeric(0), date = character(0),
-            running_balance = numeric(0), stringsAsFactors = FALSE
-          ))
-        }
+        # Return sorted descending for display (newest first)
+        movements <- movements %>%
+          dplyr::arrange(desc(date))
 
-        # Each player with buyPrice > 0 becomes a purchase transaction
-        fallback_df <- roster %>%
-          dplyr::filter(!is.na(buyPrice) & buyPrice > 0) %>%
-          dplyr::select(buyPrice, name) %>%
-          dplyr::mutate(
-            id = paste0("fallback_buy_", seq_len(n())),
-            concept = name,
-            type = "buy",
-            category = "market",
-            money = -buyPrice,
-            date = as.character(Sys.time())
-          ) %>%
-          dplyr::select(id, concept, type, category, money, date)
-
-        if (nrow(fallback_df) == 0) {
-          return(data.frame(
-            id = character(0), concept = character(0), type = character(0),
-            category = character(0), money = numeric(0), date = character(0),
-            running_balance = numeric(0), stringsAsFactors = FALSE
-          ))
-        }
-
-        # Sort ascending by timestamp (chronological) and compute running balance
-        fallback_df <- fallback_df %>%
-          dplyr::arrange(date) %>%
-          dplyr::mutate(running_balance = cumsum(money))
-
-        return(fallback_df)
+        return(movements)
       }
 
-      is_fallback(FALSE)
+      # ---- FALLBACK PATH: API restricted/empty -- build complete reconstructed financial log ----
+      is_fallback(TRUE)
 
-      # Parse ISO dates
-      movements$timestamp <- parse_safe_datetime(movements$date)
+      rival_id <- selected_rival_team_id()
+      champ_id <- championship_id()
+      login <- login_token()
 
-      # Sort ascending by timestamp (chronological) for running balance calculation
-      movements <- movements %>%
+      empty_df <- data.frame(
+        id = character(0), concept = character(0), type = character(0),
+        category = character(0), money = numeric(0), date = character(0),
+        running_balance = numeric(0), stringsAsFactors = FALSE
+      )
+
+      # (a) Determine season start date
+      season_start_date <- Sys.Date() - 180
+
+      # Fetch pressroom data (b)
+      pressroom_df <- tryCatch({
+        get_championship_pressroom(login = login, championship_id = champ_id)
+      }, error = function(e) NULL)
+
+      rival_tx <- data.frame()
+      has_pressroom <- FALSE
+      if (!is.null(pressroom_df) && nrow(pressroom_df) > 0 && !is.null(rival_id) && rival_id != "") {
+        rival_tx <- pressroom_df[pressroom_df$buyer_team_id == rival_id | pressroom_df$seller_team_id == rival_id, ]
+        if (nrow(rival_tx) > 0) {
+          has_pressroom <- TRUE
+          # Use earliest pressroom date as season start if available
+          if ("created" %in% colnames(rival_tx)) {
+            earliest <- min(parse_safe_datetime(rival_tx$created), na.rm = TRUE)
+            if (!is.na(earliest)) {
+              season_start_date <- as.Date(earliest)
+            }
+          }
+        }
+      }
+
+      # Fetch finished rounds (c)
+      finished_rounds_df <- tryCatch({
+        get_finished_rounds(login = login, championship_id = champ_id)
+      }, error = function(e) NULL)
+
+      if (!is.null(finished_rounds_df) && nrow(finished_rounds_df) > 0) {
+        finished_rounds_df <- finished_rounds_df[finished_rounds_df$is_finished == TRUE, ]
+      }
+
+      # Get rival's total points from user_teams_RV
+      rival_points <- 0
+      teams <- tryCatch({ user_teams_RV() }, error = function(e) NULL)
+      if (!is.null(teams) && nrow(teams) > 0) {
+        rival_row <- teams[teams$teamid == rival_id, ]
+        if (nrow(rival_row) > 0 && "points" %in% colnames(rival_row)) {
+          rival_points <- suppressWarnings(as.numeric(rival_row$points[1]))
+        }
+      }
+
+      # Build the reconstructed log as a list of data frames
+      all_rows <- list()
+
+      # (a) Initial Budget row
+      all_rows[[length(all_rows) + 1]] <- data.frame(
+        id = "recon_initial_budget",
+        concept = "Initial Budget",
+        type = "budget",
+        category = "bonus",
+        money = 300000000,
+        date = as.character(season_start_date),
+        stringsAsFactors = FALSE
+      )
+
+      # (b) Pressroom Transfers
+      if (has_pressroom && nrow(rival_tx) > 0) {
+        pressroom_rows <- lapply(seq_len(nrow(rival_tx)), function(idx) {
+          row <- rival_tx[idx, ]
+          is_buy <- (as.character(row$buyer_team_id) == as.character(rival_id))
+          tx_type <- if (is_buy) "buy" else "sell"
+          tx_money <- if (is_buy) -as.numeric(row$price) else as.numeric(row$price)
+          p_name <- if (!is.null(row$player_name) && as.character(row$player_name) != "") as.character(row$player_name) else "Player"
+          data.frame(
+            id = paste0("pressroom_", row$id),
+            concept = paste0(p_name, if (is_buy) " (Purchased)" else " (Sold)"),
+            type = tx_type,
+            category = "market",
+            money = tx_money,
+            date = as.character(row$created),
+            stringsAsFactors = FALSE
+          )
+        }) %>% bind_rows()
+
+        if (nrow(pressroom_rows) > 0) {
+          all_rows[[length(all_rows) + 1]] <- pressroom_rows
+        }
+      }
+
+      # (c) Finished Round Bonuses
+      if (!is.null(finished_rounds_df) && nrow(finished_rounds_df) > 0 && rival_points > 0) {
+        num_finished <- nrow(finished_rounds_df)
+        avg_pts_per_round <- rival_points / num_finished
+
+        bonus_rows <- lapply(seq_len(nrow(finished_rounds_df)), function(idx) {
+          r <- finished_rounds_df[idx, ]
+          round_pts <- avg_pts_per_round
+          bonus_money <- round_pts * 70000
+          data.frame(
+            id = paste0("recon_round_bonus_", r$round_number),
+            concept = paste0("Jornada ", r$round_number, " Bonus"),
+            type = "bonus",
+            category = "round",
+            money = bonus_money,
+            date = as.character(r$begin_process),
+            stringsAsFactors = FALSE
+          )
+        }) %>% bind_rows()
+
+        all_rows[[length(all_rows) + 1]] <- bonus_rows
+      }
+
+      # (d) Roster Fallback: if pressroom has no data, create roster buy rows
+      if (!has_pressroom) {
+        roster <- tryCatch({ rival_players_table_RV() }, error = function(e) NULL)
+        if (!is.null(roster) && nrow(roster) > 0) {
+          roster_buys <- roster %>%
+            dplyr::filter(!is.na(buyPrice) & buyPrice > 0) %>%
+            dplyr::select(buyPrice, name) %>%
+            dplyr::mutate(
+              id = paste0("fallback_buy_", seq_len(n())),
+              concept = name,
+              type = "buy",
+              category = "market",
+              money = -buyPrice,
+              date = as.character(Sys.time())
+            ) %>%
+            dplyr::select(id, concept, type, category, money, date)
+
+          if (nrow(roster_buys) > 0) {
+            all_rows[[length(all_rows) + 1]] <- roster_buys
+          }
+        }
+      }
+
+      # Combine all rows
+      if (length(all_rows) == 0) {
+        return(empty_df)
+      }
+
+      recon_df <- bind_rows(all_rows)
+
+      # (e) Running Balance: sort chronologically ascending -> cumsum -> return sorted descending
+      recon_df$timestamp <- parse_safe_datetime(recon_df$date)
+      recon_df <- recon_df %>%
         dplyr::arrange(timestamp)
+      recon_df$running_balance <- cumsum(recon_df$money)
+      recon_df$timestamp <- NULL
 
-      # Calculate running balance on the FULL chronological dataset
-      movements$running_balance <- cumsum(movements$money)
+      # Return sorted descending for display (newest first)
+      recon_df <- recon_df %>%
+        dplyr::arrange(desc(date))
 
-      # Drop the helper column before returning
-      movements$timestamp <- NULL
-
-      return(movements)
+      return(recon_df)
     })
 
     # Filtered money movements: apply date range, type, and category filters

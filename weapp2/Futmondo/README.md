@@ -45,6 +45,21 @@ shiny::runApp()
 
 ## Database
 
+### Database Tables
+
+The Supabase database contains 8 tables:
+
+| Table                  | Description                                              | Primary Key       |
+|------------------------|----------------------------------------------------------|-------------------|
+| `championships`        | Active championships and league metadata                | `id (text)`       |
+| `real_clubs`           | Real-world football clubs with logos                    | `id (text)`       |
+| `players`              | Full player catalog from the API                        | `id (text)`       |
+| `user_teams`           | User-managed teams within a championship                | `id (text)`       |
+| `user_team_history`    | Historical snapshot of user team standings              | `id (bigint)`     |
+| `player_history`       | Historical snapshot of player valuations                | `id (bigint)`     |
+| `market_transactions`  | Market transfer and clause transactions                 | `id (bigint)`     |
+| `round_dream_team`     | Best 11 (Dream Team) and MVP player accolades per round | `id (BIGSERIAL)`  |
+
 ### Initialization and Startup Verification
 
 On first launch, `global.R` calls `init_supabase_db()` to ensure the required tables and columns exist. The full initialization script lives in `scripts/init_db.R` and can be run standalone:
@@ -52,6 +67,26 @@ On first launch, `global.R` calls `init_supabase_db()` to ensure the required ta
 ```bash
 Rscript scripts/init_db.R
 ```
+
+### Database Population & Full Sync
+
+To populate all 8 Supabase tables from the Futmondo API, use either of the following methods:
+
+**Command line:**
+
+```bash
+Rscript scripts/populate_db.R
+```
+
+This reads credentials from `.Renviron`, logs in to the Futmondo API, retrieves the active championship ID, and sequentially syncs all tables (championships, real clubs, players, user teams, user team history, player history, market transactions, round dream teams). It prints per-table row counts and a grand total upon completion.
+
+**Admin Dashboard (in-app):**
+
+While logged in as the configured admin user, navigate to the **Admin** tab and click the **"Populate Entire Database"** button (`btn_populate_db`). The server calls `populate_entire_database()` with the current session token and championship ID, displays a progress notification, and automatically refreshes the telemetry counts once the operation completes.
+
+**Sync Round Dream Teams (in-app):**
+
+While logged in as the configured admin user, navigate to the **Admin** tab and click the **"Sync Round Dream Teams"** button (`btn_sync_dreamteams`). The server calls `sync_all_championship_dreamteams()` which iterates over all finished matchdays in the championship, fetches each round's Best 11 (Dream Team) and MVP player from the Futmondo API, and upserts the records into the `round_dream_team` Supabase table. Rounds with delayed matches (whose `beginProcess` timestamp has not yet passed) are automatically skipped and will be picked up on the next sync. The button displays a progress notification and refreshes the telemetry counts upon completion.
 
 ### Database Reset
 
@@ -78,4 +113,5 @@ This drops existing tables and re-applies the schema defined in `scripts/schema.
 - `scripts/`:
   - `init_db.R`: Standalone script to initialize the Supabase database schema.
   - `reset_db.R`: Drops all tables and re-creates the schema from `schema.sql`.
+  - `populate_db.R`: Populates all 8 tables from the Futmondo API (login, championship lookup, full sync, row-count summary).
   - `schema.sql`: Authoritative SQL definition of all database tables and columns.

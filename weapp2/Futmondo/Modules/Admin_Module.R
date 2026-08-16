@@ -14,7 +14,8 @@ get_table_definitions <- function() {
       "user_teams",
       "user_team_history",
       "player_history",
-      "market_transactions"
+      "market_transactions",
+      "round_dream_team"
     ),
     description = c(
       "Active championships and league metadata",
@@ -23,7 +24,8 @@ get_table_definitions <- function() {
       "User-managed teams within a championship",
       "Historical snapshot of user team standings",
       "Historical snapshot of player valuations",
-      "Market transfer and clause transactions"
+      "Market transfer and clause transactions",
+      "Best 11 (Dream Team) and MVP player accolades per round"
     ),
     primary_key = c(
       "id (text)",
@@ -32,7 +34,8 @@ get_table_definitions <- function() {
       "id (text)",
       "id (bigint)",
       "id (bigint)",
-      "id (bigint)"
+      "id (bigint)",
+      "id (BIGSERIAL)"
     ),
     stringsAsFactors = FALSE
   )
@@ -96,7 +99,7 @@ admin_UI <- function(id) {
                        icon("table", style = "color: #10b981;")
                    ),
                    div(style = "font-size: 13px; color: #64748b;",
-                       span("7 Tables", style = "font-weight: 600; color: #0f172a;")
+                       span("8 Tables", style = "font-weight: 600; color: #0f172a;")
                    ),
                    div(style = "font-size: 11px; color: #94a3b8;",
                        span("Schema verified")
@@ -187,23 +190,33 @@ admin_UI <- function(id) {
                             )
                         )
                  ),
-                 column(width = 3,
-                        div(style = "background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; text-align: center; margin-bottom: 8px;",
-                            div(style = "font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;", "Market Transactions"),
-                            div(style = "font-size: 22px; font-weight: 700; color: #ef4444;",
-                                textOutput(ns("kpi_market_transactions"))
-                            )
-                        )
-                 ),
-                 column(width = 3,
-                        div(style = "background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; text-align: center; margin-bottom: 8px;",
-                            div(style = "font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;", "Grand Total"),
-                            div(style = "font-size: 22px; font-weight: 700; color: #0f172a;",
-                                textOutput(ns("kpi_total_records"))
-                            )
-                        )
-                 )
-               )
+column(width = 3,
+                         div(style = "background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; text-align: center; margin-bottom: 8px;",
+                             div(style = "font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;", "Market Transactions"),
+                             div(style = "font-size: 22px; font-weight: 700; color: #ef4444;",
+                                 textOutput(ns("kpi_market_transactions"))
+                             )
+                         )
+                  ),
+                  column(width = 3,
+                         div(style = "background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; text-align: center; margin-bottom: 8px;",
+                             div(style = "font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;", "Round Dream Team"),
+                             div(style = "font-size: 22px; font-weight: 700; color: #d97706;",
+                                 textOutput(ns("kpi_round_dream_team"))
+                             )
+                         )
+                  )
+                ),
+                fluidRow(
+                  column(width = 6,
+                         div(style = "background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; text-align: center; margin-bottom: 8px;",
+                             div(style = "font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;", "Grand Total"),
+                             div(style = "font-size: 22px; font-weight: 700; color: #0f172a;",
+                                 textOutput(ns("kpi_total_records"))
+                             )
+                         )
+                  )
+                )
              )
       )
     ),
@@ -239,20 +252,46 @@ admin_UI <- function(id) {
                solidHeader = TRUE,
                collapsible = FALSE,
 
-               # Verify Schema button
-               div(style = "margin-bottom: 16px;",
-                   actionButton(
-                     inputId = ns("btn_verify_db"),
-                     label = "Verify Tables Schema",
-                     icon = icon("shield-halved"),
-                     class = "btn-default"
-                   ),
-                   p(style = "color: #64748b; font-size: 11px; margin-top: 6px;",
-                     "Checks that all 7 required tables exist and respond via the Supabase REST API."
-                   )
-               ),
+# Populate Entire Database button
+                div(style = "margin-bottom: 16px;",
+                    actionButton(
+                      inputId = ns("btn_populate_db"),
+                      label = "Populate Entire Database",
+                      icon = icon("cloud-arrow-down"),
+                      class = "btn-success"
+                    ),
+                    p(style = "color: #64748b; font-size: 11px; margin-top: 6px;",
+                      "Fetches and syncs all data from the Futmondo API into every Supabase table."
+                    )
+                ),
 
-               # Danger Zone
+                # Verify Schema button
+                div(style = "margin-bottom: 16px;",
+                    actionButton(
+                      inputId = ns("btn_verify_db"),
+                      label = "Verify Tables Schema",
+                      icon = icon("shield-halved"),
+                      class = "btn-default"
+                    ),
+                    p(style = "color: #64748b; font-size: 11px; margin-top: 6px;",
+                      "Checks that all 7 required tables exist and respond via the Supabase REST API."
+                    )
+                ),
+
+               # Sync Round Dream Teams button
+                div(style = "margin-bottom: 16px;",
+                    actionButton(
+                      inputId = ns("btn_sync_dreamteams"),
+                      label = "Sync Round Dream Teams",
+                      icon = icon("trophy"),
+                      class = "btn-info"
+                    ),
+                    p(style = "color: #64748b; font-size: 11px; margin-top: 6px;",
+                      "Verifies and syncs the Best 11 (Dream Team) and MVP accolades for all finished matchdays, reconciling delayed matches."
+                    )
+                ),
+
+                # Danger Zone
                div(style = "border: 2px solid #fecaca; border-radius: 8px; padding: 16px; background: #fef2f2;",
                    div(style = "display: flex; align-items: center; gap: 8px; margin-bottom: 12px;",
                        icon("triangle-exclamation", style = "color: #ef4444; font-size: 20px;"),
@@ -320,6 +359,7 @@ admin_Server <- function(id, is_module_active, login_token, championship_id, use
     output$kpi_user_team_history <- renderText({ get_count("user_team_history") })
     output$kpi_player_history <- renderText({ get_count("player_history") })
     output$kpi_market_transactions <- renderText({ get_count("market_transactions") })
+    output$kpi_round_dream_team <- renderText({ get_count("round_dream_team") })
     output$kpi_total_records <- renderText({
       df <- row_counts_df()
       if (is.null(df) || nrow(df) == 0) return("N/A")
@@ -443,6 +483,112 @@ admin_Server <- function(id, is_module_active, login_token, championship_id, use
           duration = 8
         )
         NULL
+      })
+    })
+
+    # ---- Populate Entire Database ----
+    observeEvent(input$btn_populate_db, {
+      # Check prerequisites
+      if (is.null(login_token()) || login_token() == "") {
+        showNotification(
+          "Cannot populate database: no login token available. Please log in first.",
+          type = "error",
+          duration = 8
+        )
+        return()
+      }
+      if (is.null(championship_id()) || championship_id() == "") {
+        showNotification(
+          "Cannot populate database: no championship ID available. Please select an active championship first.",
+          type = "error",
+          duration = 8
+        )
+        return()
+      }
+
+      showNotification(
+        "Populating database tables from Futmondo API...",
+        type = "message",
+        duration = 10
+      )
+
+      tryCatch({
+        populate_entire_database(
+          login = login_token(),
+          championship_id = championship_id(),
+          verbose = TRUE
+        )
+
+        showNotification(
+          "Database population complete. Refreshing stats...",
+          type = "message",
+          duration = 6
+        )
+
+        # Immediately refresh the row counts so the dashboard updates
+        load_row_counts()
+      }, error = function(e) {
+        showNotification(
+          paste0("Database population failed: ", e$message),
+          type = "error",
+          duration = 10
+        )
+      })
+    })
+
+    # ---- Sync Round Dream Teams ----
+    observeEvent(input$btn_sync_dreamteams, {
+      # Check prerequisites
+      if (is.null(login_token()) || login_token() == "") {
+        showNotification(
+          "Cannot sync dream teams: no login token available. Please log in first.",
+          type = "error",
+          duration = 8
+        )
+        return()
+      }
+      if (is.null(championship_id()) || championship_id() == "") {
+        showNotification(
+          "Cannot sync dream teams: no championship ID available. Please select an active championship first.",
+          type = "error",
+          duration = 8
+        )
+        return()
+      }
+
+      showNotification(
+        "Syncing round dream teams and MVP accolades...",
+        type = "message",
+        duration = 10
+      )
+
+      tryCatch({
+        result <- sync_all_championship_dreamteams(
+          login = login_token(),
+          championship_id = championship_id(),
+          verbose = TRUE
+        )
+
+        summary_msg <- if (!is.null(result) && length(result) > 0) {
+          paste0("Dream team sync complete. ", paste(names(result), result, sep = ": ", collapse = "; "))
+        } else {
+          "Dream team sync complete."
+        }
+
+        showNotification(
+          summary_msg,
+          type = "message",
+          duration = 8
+        )
+
+        # Refresh row counts so the dashboard updates
+        load_row_counts()
+      }, error = function(e) {
+        showNotification(
+          paste0("Dream team sync failed: ", e$message),
+          type = "error",
+          duration = 10
+        )
       })
     })
 

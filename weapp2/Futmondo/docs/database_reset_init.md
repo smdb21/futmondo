@@ -93,6 +93,43 @@ ok <- init_supabase_db(verbose = TRUE)
 
 ---
 
+### `populate_entire_database(login, championship_id, verbose = TRUE)`
+
+Executes a full database population in strict foreign-key order, syncing data from the Futmondo API into Supabase. Each step is wrapped defensively in `tryCatch()` so that a failure in one step does not prevent subsequent steps from running.
+
+**Parameters:**
+- `login` (list): A login object with at least `token` and `userid` fields, as returned by `login()` in `futmondo_functions.R`.
+- `championship_id` (character): The championship ID to populate. If `NULL` or `""`, all championships are synced.
+- `verbose` (logical, default `TRUE`): If `TRUE`, prints per-step progress and row counts to console.
+
+**Population Order (parent to child):**
+1. **Championships** -- `get_championships()` -> `sync_championship_to_supabase` (via `supabase_post`)
+2. **Real Clubs** -- `get_real_clubs()` -> `sync_real_clubs_to_supabase`
+3. **Players Catalog** -- `get_championship_players()` -> `sync_players_to_supabase`
+4. **User Teams** -- `get_teams()` -> `sync_user_teams_to_supabase`
+5. **Standings Snapshot** -- `get_teams()` -> `log_user_team_history`
+6. **Player History** -- `get_championship_players()` -> `log_player_history`
+7. **Pressroom Transactions** -- `get_championship_pressroom()` -> `sync_pressroom_transactions_to_supabase`
+
+**Return:** A named list with one entry per step. Each entry is a list with:
+- `status` (character): `"ok"` or `"error"`.
+- `count` (integer, present on success): Number of rows processed.
+- `message` (character, present on error): Error message from the failed step.
+
+On a fatal outer error, an additional `fatal_error` entry is added.
+
+**Usage:**
+```R
+result <- populate_entire_database(login = login_result, championship_id = "abc123", verbose = TRUE)
+print(result)
+```
+
+**Error Handling:**
+- Each individual step is independently wrapped in `tryCatch()`. A failure in one step does not abort the remaining steps.
+- The entire function body is also wrapped in an outer `tryCatch()` to catch catastrophic failures (e.g., missing API credentials).
+
+---
+
 ## Standalone Scripts
 
 ### `scripts/reset_db.R`
@@ -128,6 +165,25 @@ Rscript scripts/init_db.R
 2. Sources `supabase_connector.R`.
 3. Calls `init_supabase_db(verbose = TRUE)`.
 4. Displays table status list and instructions if any tables are missing.
+
+---
+
+### `scripts/populate_db.R`
+
+Standalone script to populate all Supabase tables from the Futmondo API.
+
+**Usage:**
+```bash
+Rscript scripts/populate_db.R
+```
+
+**Behavior:**
+1. Loads `.Renviron` if present (requires `user_name` and `password`).
+2. Sources `futmondo_functions.R` and `supabase_connector.R`.
+3. Logs in via `login()` using `.Renviron` credentials.
+4. Retrieves the active championship ID via `get_championships()`.
+5. Calls `populate_entire_database(login, championship_id, verbose = TRUE)`.
+6. Fetches and displays row counts for all 7 tables via `get_table_row_counts()`.
 
 ---
 

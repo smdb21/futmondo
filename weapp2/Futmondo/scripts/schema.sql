@@ -84,6 +84,22 @@ CREATE TABLE IF NOT EXISTS market_transactions (
     transaction_date TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 8. ROUND DREAM TEAM (Best 11 & MVP Accolades per Round)
+CREATE TABLE IF NOT EXISTS round_dream_team (
+    id BIGSERIAL PRIMARY KEY,
+    championship_id TEXT REFERENCES championships(id) ON DELETE CASCADE,
+    round_id TEXT NOT NULL,
+    round_number NUMERIC NOT NULL,
+    player_id TEXT REFERENCES players(id) ON DELETE CASCADE,
+    player_name TEXT,
+    player_role TEXT,
+    points INTEGER NOT NULL DEFAULT 0,
+    is_mvp BOOLEAN DEFAULT FALSE,
+    is_finished BOOLEAN DEFAULT TRUE,
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(championship_id, round_number, player_id)
+);
+
 -- ============================================================
 -- High-Performance Indices
 -- ============================================================
@@ -98,3 +114,7 @@ CREATE INDEX IF NOT EXISTS idx_team_history_team ON user_team_history(user_team_
 -- Fast transaction log queries
 CREATE INDEX IF NOT EXISTS idx_transactions_player ON market_transactions(player_id, transaction_date DESC);
 CREATE INDEX IF NOT EXISTS idx_transactions_championship ON market_transactions(championship_id, transaction_date DESC);
+
+-- Fast dream team lookups per round
+CREATE INDEX IF NOT EXISTS idx_dream_team_round ON round_dream_team(championship_id, round_number);
+CREATE INDEX IF NOT EXISTS idx_dream_team_player ON round_dream_team(player_id);

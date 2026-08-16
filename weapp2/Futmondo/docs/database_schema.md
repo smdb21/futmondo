@@ -88,6 +88,22 @@ CREATE TABLE IF NOT EXISTS market_transactions (
     is_clause BOOLEAN DEFAULT FALSE,
     transaction_date TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- 8. Round Dream Team (Best 11 & MVP Accolades per Round)
+CREATE TABLE IF NOT EXISTS round_dream_team (
+    id BIGSERIAL PRIMARY KEY,
+    championship_id TEXT REFERENCES championships(id) ON DELETE CASCADE,
+    round_id TEXT NOT NULL,
+    round_number NUMERIC NOT NULL,
+    player_id TEXT REFERENCES players(id) ON DELETE CASCADE,
+    player_name TEXT,
+    player_role TEXT,
+    points INTEGER NOT NULL DEFAULT 0,
+    is_mvp BOOLEAN DEFAULT FALSE,
+    is_finished BOOLEAN DEFAULT TRUE,
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(championship_id, round_number, player_id)
+);
 ```
 
 ---
@@ -107,6 +123,10 @@ CREATE INDEX IF NOT EXISTS idx_team_history_team ON user_team_history(user_team_
 -- Fast transaction log queries
 CREATE INDEX IF NOT EXISTS idx_transactions_player ON market_transactions(player_id, transaction_date DESC);
 CREATE INDEX IF NOT EXISTS idx_transactions_championship ON market_transactions(championship_id, transaction_date DESC);
+
+-- Fast dream team lookups per round
+CREATE INDEX IF NOT EXISTS idx_dream_team_round ON round_dream_team(championship_id, round_number);
+CREATE INDEX IF NOT EXISTS idx_dream_team_player ON round_dream_team(player_id);
 ```
 
 ---
@@ -118,8 +138,42 @@ CREATE INDEX IF NOT EXISTS idx_transactions_championship ON market_transactions(
 * **real_clubs** (1) -> (N) **players**: One real-world club has many registered players.
 * **players** (1) -> (N) **player_history**: One player logs daily valuation changes for historical curve trend plotting.
 * **players** (1) -> (N) **market_transactions**: One player receives multiple market offers/buyout clauses.
+* **championships** (1) -> (N) **round_dream_team**: One championship has dream team selections for each round.
+* **players** (1) -> (N) **round_dream_team**: One player can appear in multiple round dream teams across the season.
 
 ---
+
+## 5. Round Dream Team Table
+
+The `round_dream_team` table stores the official "Best 11" selections and MVP accolades for each round of a championship.
+
+### Column Descriptions
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | BIGSERIAL | Primary key, auto-incrementing unique identifier. |
+| `championship_id` | TEXT | Foreign key to `championships(id)`. Identifies which championship/league the selection belongs to. |
+| `round_id` | TEXT | The external API round identifier string. |
+| `round_number` | NUMERIC | The numeric round (jornada) number, e.g. 1, 2, 3, ... |
+| `player_id` | TEXT | Foreign key to `players(id)`. The selected player. |
+| `player_name` | TEXT | Denormalized player name for quick display without a join. |
+| `player_role` | TEXT | The player's role/position in the dream team formation (e.g. "Portero", "Defensa", "Mediocampista", "Delantero"). |
+| `points` | INTEGER | The points the player scored in that round. |
+| `is_mvp` | BOOLEAN | Whether this player was named MVP of the round. Exactly one player per round should have `is_mvp = TRUE`. |
+| `is_finished` | BOOLEAN | Whether the round's matches are fully completed. Set to FALSE for in-progress rounds where the dream team may still change. |
+| `updated_at` | TIMESTAMPTZ | Timestamp of the last update to this record. |
+
+### Constraints
+
+* **UNIQUE(championship_id, round_number, player_id)**: A player can appear at most once per round in a given championship. This prevents duplicate entries when the data is synced from the API.
+
+### Delayed Match Reconciliation
+
+In some championships, not all matches in a round finish at the same time. When a round is still in progress (`is_finished = FALSE`), the dream team selection may be incomplete or provisional. The synchronization process handles this by:
+
+1. **Initial sync**: When a round first has a dream team published (even if incomplete), records are inserted with `is_finished = FALSE`.
+2. **Update sync**: Once all matches in the round conclude, the API returns the final dream team. Existing records for that `(championship_id, round_number)` are updated (or upserted via the unique constraint) with the final player list, corrected points, and `is_finished = TRUE`.
+3. **Idempotency**: Because of the `UNIQUE(championship_id, round_number, player_id)` constraint, repeated syncs for the same round will not create duplicate rows. A player that drops out of the dream team between the provisional and final selection will have their row deleted during reconciliation.
 
 ## 4. Pressroom Market Log Usage
 
@@ -127,11 +181,12 @@ The `market_transactions` table serves dual purpose:
 
 1. **Manual transaction logging**: Individual `log_market_transaction()` calls record specific bid/clause events.
 2. **Pressroom feed sync**: `sync_pressroom_transactions_to_supabase()` bulk-inserts the full pressroom transfer feed, capturing every completed player sale across the championship. Each pressroom entry maps to:
-   - `player_id`: The transferred player.
-   - `championship_id`: The league the transfer occurred in.
-   - `buyer_team_id`: The user team that purchased the player.
-   - `seller_team_id`: The user team that sold the player.
-   - `price`: The sale price in EUR (integer scale).
-   - `created_at`: The timestamp from the pressroom feed.
+    - `player_id`: The transferred player.
+    - `championship_id`: The league the transfer occurred in.
+    - `buyer_team_id`: The user team that purchased the player. Empty or missing values are sanitized to `NULL` (Futmondo System / Market).
+    - `seller_team_id`: The user team that sold the player. Empty or missing values are sanitized to `NULL` (Futmondo System / Market).
+    - `price`: The sale price in EUR (integer scale).
+    - `created_at`: The timestamp from the pressroom feed.
+    - `transaction_date`: Duplicate of `created_at` for compatibility with consumers that expect this field name.
 
 The pressroom data is queried back via `get_pressroom_transactions_from_supabase(championship_id)` for historical analysis and is consumed by `calculate_league_finances()` to compute per-team purchase and sale volumes.

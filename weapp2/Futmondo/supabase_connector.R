@@ -41,7 +41,7 @@ supabase_post <- function(table_name, payload) {
   
   # Perform request defensively
   tryCatch({
-    response <- POST(url, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
+    response <- POST(url, body = toJSON(payload, auto_unbox = TRUE, na = "null"), add_headers(.headers = headers))
     code <- status_code(response)
     if (code >= 200 && code < 300) {
       print(paste0("[Supabase] Successfully synced data to table: ", table_name, " (HTTP ", code, ")"))
@@ -83,11 +83,22 @@ sync_real_clubs_to_supabase <- function(clubs_df) {
 
 sync_players_to_supabase <- function(players_df) {
   if (is.null(players_df) || nrow(players_df) == 0) return()
-  
+
   # Ensure minimum expected columns are present
   required <- c("id", "name", "slug")
   if (!all(required %in% colnames(players_df))) return()
-  
+
+  # Sanitize real_club_id: NA, NULL, or empty string become NA_character_
+  # so PostgreSQL FK real_clubs(id) accepts it as NULL
+  real_club_raw <- if ("teamId" %in% colnames(players_df)) as.character(players_df$teamId) else rep(NA_character_, nrow(players_df))
+  real_club_raw[is.na(real_club_raw) | real_club_raw == ""] <- NA_character_
+
+  # Clean up rating: coerce to integer, replacing NaN / string artefacts with NA
+  raw_rating <- if ("rating" %in% colnames(players_df)) players_df$rating else rep(NA_integer_, nrow(players_df))
+  rating_num <- suppressWarnings(as.numeric(raw_rating))
+  rating <- as.integer(rating_num)
+  rating[is.na(rating) | is.nan(rating_num)] <- NA_integer_
+
   payload <- data.frame(
     id = as.character(players_df$id),
     name = as.character(players_df$name),
@@ -95,16 +106,29 @@ sync_players_to_supabase <- function(players_df) {
     role = if ("role" %in% colnames(players_df)) as.character(players_df$role) else NA_character_,
     role2 = if ("role2" %in% colnames(players_df)) as.character(players_df$role2) else NA_character_,
     photo = if ("photo" %in% colnames(players_df)) as.character(players_df$photo) else NA_character_,
-    real_club_id = if ("teamId" %in% colnames(players_df)) as.character(players_df$teamId) else NA_character_,
+    real_club_id = real_club_raw,
     status = if ("status" %in% colnames(players_df)) as.character(players_df$status) else NA_character_,
-    rating = if ("rating" %in% colnames(players_df)) as.integer(players_df$rating) else NA_integer_,
+    rating = rating,
     stringsAsFactors = FALSE
   )
-  
+
   # Dedup
   payload <- payload %>% dplyr::distinct(id, .keep_all = TRUE)
-  
-  supabase_post("players", payload)
+
+  # Batch large payloads to avoid payload-size limits on the Supabase REST endpoint
+  batch_size <- 100
+  n <- nrow(payload)
+  print(paste0("[Supabase] Syncing ", n, " players to 'players' (batch size: ", batch_size, ")."))
+
+  tryCatch({
+    for (start_idx in seq(1, n, by = batch_size)) {
+      end_idx <- min(start_idx + batch_size - 1, n)
+      batch <- payload[start_idx:end_idx, , drop = FALSE]
+      supabase_post("players", batch)
+    }
+  }, error = function(e) {
+    print(paste0("[Supabase] Error during players sync: ", e$message))
+  })
 }
 
 sync_user_teams_to_supabase <- function(teams_df, championship_id) {
@@ -154,20 +178,49 @@ log_user_team_history <- function(teams_df, round_number = NULL) {
 log_player_history <- function(players_df, championship_id) {
   if (is.null(players_df) || nrow(players_df) == 0) return()
   if (!"id" %in% colnames(players_df)) return()
-  
+
+  # Helper: coerce to numeric, replacing "NaN", NaN, or non-numeric with NA_real_
+  safe_numeric <- function(x) {
+    if (is.null(x)) return(rep(NA_real_, nrow(players_df)))
+    vals <- suppressWarnings(as.numeric(as.character(x)))
+    vals[is.na(vals) | is.nan(vals)] <- NA_real_
+    vals
+  }
+
+  avg_points_val <- safe_numeric(
+    if ("average.average" %in% colnames(players_df)) players_df$average.average else NULL
+  )
+
+  avg_last_five_val <- safe_numeric(
+    if ("average.averageLastFive" %in% colnames(players_df)) players_df$average.averageLastFive else NULL
+  )
+
   payload <- data.frame(
     player_id = as.character(players_df$id),
     championship_id = as.character(championship_id),
-    value = if ("value" %in% colnames(players_df)) as.numeric(players_df$value) else 0,
-    change = if ("change" %in% colnames(players_df)) as.numeric(players_df$change) else 0,
+    value = if ("value" %in% colnames(players_df)) as.integer(players_df$value) else 0L,
+    change = if ("change" %in% colnames(players_df)) as.integer(players_df$change) else 0L,
     points = if ("points" %in% colnames(players_df)) as.integer(players_df$points) else 0,
-    avg_points = if ("average.average" %in% colnames(players_df)) as.numeric(players_df$average.average) else NA_real_,
-    avg_last_five = if ("average.averageLastFive" %in% colnames(players_df)) as.numeric(players_df$average.averageLastFive) else NA_real_,
+    avg_points = avg_points_val,
+    avg_last_five = avg_last_five_val,
     matches = if ("average.matches" %in% colnames(players_df)) as.integer(players_df$average.matches) else 0,
     stringsAsFactors = FALSE
   )
-  
-  supabase_post("player_history", payload)
+
+  # Batch large payloads to avoid payload-size limits on the Supabase REST endpoint
+  batch_size <- 100
+  n <- nrow(payload)
+  print(paste0("[Supabase] Syncing ", n, " player history records to 'player_history' (batch size: ", batch_size, ")."))
+
+  tryCatch({
+    for (start_idx in seq(1, n, by = batch_size)) {
+      end_idx <- min(start_idx + batch_size - 1, n)
+      batch <- payload[start_idx:end_idx, , drop = FALSE]
+      supabase_post("player_history", batch)
+    }
+  }, error = function(e) {
+    print(paste0("[Supabase] Error during player history sync: ", e$message))
+  })
 }
 
 log_market_transaction <- function(player_id, championship_id, buyer_team_id, seller_team_id = NULL, price, is_clause = FALSE) {
@@ -277,21 +330,29 @@ sync_pressroom_transactions_to_supabase <- function(pressroom_df, championship_i
   required_cols <- c("player_id", "buyer_team_id", "seller_team_id", "price", "created")
   if (!all(required_cols %in% colnames(pressroom_df))) return()
 
+  # Sanitize buyer_team_id and seller_team_id: empty strings or invalid values become NA_character_
+  # which serializes to null in JSON for PostgreSQL ON DELETE SET NULL FK compatibility
+  buyer_ids <- as.character(pressroom_df$buyer_team_id)
+  seller_ids <- as.character(pressroom_df$seller_team_id)
+  buyer_ids[buyer_ids == "" | is.na(buyer_ids)] <- NA_character_
+  seller_ids[seller_ids == "" | is.na(seller_ids)] <- NA_character_
+
   payload <- data.frame(
     player_id = as.character(pressroom_df$player_id),
     championship_id = as.character(championship_id),
-    buyer_team_id = as.character(pressroom_df$buyer_team_id),
-    seller_team_id = as.character(pressroom_df$seller_team_id),
+    buyer_team_id = buyer_ids,
+    seller_team_id = seller_ids,
     price = as.numeric(pressroom_df$price),
-    created_at = as.character(pressroom_df$created),
+    is_clause = FALSE,
+    transaction_date = as.character(pressroom_df$created),
     stringsAsFactors = FALSE
   )
 
-  # Deduplicate by player_id + championship_id + buyer_team_id + price to avoid duplicate syncs
-  payload <- payload %>% dplyr::distinct(player_id, championship_id, buyer_team_id, seller_team_id, price, created_at, .keep_all = TRUE)
+  # Deduplicate by player_id + championship_id + buyer_team_id + seller_team_id + price + transaction_date
+  payload <- payload %>% dplyr::distinct(player_id, championship_id, buyer_team_id, seller_team_id, price, transaction_date, .keep_all = TRUE)
 
   # Batch large payloads to avoid payload-size limits on the Supabase REST endpoint
-  batch_size <- 500
+  batch_size <- 200
   n <- nrow(payload)
   print(paste0("[Supabase] Syncing ", n, " pressroom transactions to market_transactions (batch size: ", batch_size, ")."))
 
@@ -361,7 +422,7 @@ supabase_delete <- function(table_name, filter = "id=neq.00000000-0000-0000-0000
 }
 
 supabase_delete_all <- function(table_name) {
-  bigint_pk_tables <- c("user_team_history", "player_history", "market_transactions")
+  bigint_pk_tables <- c("user_team_history", "player_history", "market_transactions", "round_dream_team")
   text_pk_tables <- c("championships", "real_clubs", "players", "user_teams")
 
   if (table_name %in% bigint_pk_tables) {
@@ -381,6 +442,7 @@ supabase_reset_database <- function(force = FALSE) {
   }
 
   reset_order <- c(
+    "round_dream_team",
     "market_transactions",
     "player_history",
     "user_team_history",
@@ -423,7 +485,8 @@ get_table_row_counts <- function() {
     "user_teams",
     "user_team_history",
     "player_history",
-    "market_transactions"
+    "market_transactions",
+    "round_dream_team"
   )
 
   results <- vector("list", length(tables))
@@ -490,7 +553,8 @@ init_supabase_db <- function(verbose = FALSE) {
     "user_teams",
     "user_team_history",
     "player_history",
-    "market_transactions"
+    "market_transactions",
+    "round_dream_team"
   )
 
   all_ok <- TRUE
@@ -522,4 +586,247 @@ init_supabase_db <- function(verbose = FALSE) {
   }
 
   return(all_ok)
+}
+
+# ============================================================
+# Round Dream Team Sync
+# ============================================================
+
+sync_round_dreamteam_to_supabase <- function(login, championship_id, round_id, round_number) {
+  if (is.null(login) || is.null(championship_id) || is.null(round_id) || is.null(round_number)) {
+    return(0L)
+  }
+
+  tryCatch({
+    ans <- get_round_dreamteam(login, championship_id, round_id)
+
+    if (is.null(ans) || !is.list(ans) || !("players" %in% names(ans)) || !("mvp" %in% names(ans))) {
+      print(paste0("[DreamTeam] No valid dream team data for round ", round_number, "."))
+      return(0L)
+    }
+
+    players_list <- ans$players
+    mvp_id <- as.character(ans$mvp)
+
+    if (is.null(players_list) || length(players_list) == 0) {
+      print(paste0("[DreamTeam] No players in dream team for round ", round_number, "."))
+      return(0L)
+    }
+
+    dreamteam_df <- do.call(rbind, lapply(players_list, function(p) {
+      data.frame(
+        championship_id = as.character(championship_id),
+        round_id = as.character(round_id),
+        round_number = as.numeric(round_number),
+        player_id = as.character(p$id),
+        player_name = as.character(p$name),
+        player_role = as.character(p$role),
+        points = as.integer(p$points),
+        is_mvp = (as.character(p$id) == mvp_id),
+        is_finished = TRUE,
+        stringsAsFactors = FALSE
+      )
+    }))
+
+    supabase_post("round_dream_team", dreamteam_df)
+
+    count <- nrow(dreamteam_df)
+    print(paste0("[DreamTeam] Synced ", count, " players for round ", round_number, "."))
+    return(count)
+  }, error = function(e) {
+    print(paste0("[DreamTeam] Error syncing round ", round_number, ": ", e$message))
+    return(0L)
+  })
+}
+
+sync_all_championship_dreamteams <- function(login, championship_id, verbose = TRUE) {
+  if (is.null(login) || is.null(championship_id)) {
+    if (verbose) print("[DreamTeam] Missing login or championship_id. Skipping.")
+    return(list(status = "skipped", total_rounds = 0L, total_players = 0L))
+  }
+
+  tryCatch({
+    finished_rounds <- get_finished_rounds(login, championship_id)
+
+    if (is.null(finished_rounds) || nrow(finished_rounds) == 0) {
+      if (verbose) print("[DreamTeam] No finished rounds found.")
+      return(list(status = "ok", total_rounds = 0L, total_players = 0L))
+    }
+
+    finished <- finished_rounds[finished_rounds$is_finished == TRUE, ]
+
+    if (nrow(finished) == 0) {
+      if (verbose) print("[DreamTeam] No finished rounds to sync.")
+      return(list(status = "ok", total_rounds = 0L, total_players = 0L))
+    }
+
+    if (verbose) print(paste0("[DreamTeam] Syncing dream teams for ", nrow(finished), " finished round(s)."))
+
+    total_players <- 0L
+    round_results <- list()
+
+    for (i in seq_len(nrow(finished))) {
+      r_id <- as.character(finished$round_id[i])
+      r_num <- as.numeric(finished$round_number[i])
+
+      if (verbose) cat(paste0("  [DreamTeam] Round ", r_num, "... "))
+
+      synced <- sync_round_dreamteam_to_supabase(login, championship_id, r_id, r_num)
+      total_players <- total_players + synced
+      round_results[[as.character(r_num)]] <- synced
+    }
+
+    if (verbose) print(paste0("[DreamTeam] Complete. Total players synced: ", total_players))
+    return(list(status = "ok", total_rounds = nrow(finished), total_players = total_players, per_round = round_results))
+  }, error = function(e) {
+    print(paste0("[DreamTeam] Error syncing all dream teams: ", e$message))
+    return(list(status = "error", message = e$message, total_rounds = 0L, total_players = 0L))
+  })
+}
+
+# ============================================================
+# Full Database Population
+# ============================================================
+
+populate_entire_database <- function(login, championship_id, verbose = TRUE) {
+  results <- list()
+
+  tryCatch({
+    # ---- Step 1: Sync Championship ----
+    if (verbose) cat("[Populate] Step 1: Syncing championship...\n")
+    tryCatch({
+      championships_data <- get_championships(login, championship_name = NULL)
+
+      if (!is.null(championships_data) && length(championships_data) > 0) {
+        # get_championships returns an unlisted vector; names encode structure as "index.field"
+        prefixes <- sub("\\..*", "", names(championships_data))
+        unique_prefixes <- unique(prefixes)
+
+        synced <- 0L
+        for (pfx in unique_prefixes) {
+          idx <- startsWith(names(championships_data), paste0(pfx, "."))
+          champ <- championships_data[idx]
+
+          # If championship_id is specified, only sync that championship
+          champ_id_val <- as.character(champ["id"])
+          if (!is.null(championship_id) && !is.na(championship_id) && championship_id != "" &&
+              !is.na(champ_id_val) && champ_id_val != as.character(championship_id)) {
+            next
+          }
+
+          payload <- list(
+            id = champ_id_val,
+            name = as.character(champ["name"]),
+            mode = as.character(champ["mode"]),
+            sport = as.character(champ["sport"])
+          )
+          supabase_post("championships", payload)
+          synced <- synced + 1L
+        }
+        if (verbose) print(paste0("[Populate] Synced ", synced, " championship(s)."))
+        results[["championships"]] <- list(status = "ok", count = synced)
+      } else {
+        if (verbose) print("[Populate] No championship data retrieved.")
+        results[["championships"]] <- list(status = "ok", count = 0L)
+      }
+    }, error = function(e) {
+      if (verbose) print(paste0("[Populate] Step 1 FAILED: ", e$message))
+      results[["championships"]] <- list(status = "error", message = e$message)
+    })
+
+    # ---- Step 2: Sync Real Clubs ----
+    if (verbose) cat("[Populate] Step 2: Syncing real clubs...\n")
+    tryCatch({
+      clubs <- get_real_clubs(login, championship_id)
+      if (verbose) print(paste0("[Populate] Retrieved ", if (!is.null(clubs) && nrow(clubs) > 0) nrow(clubs) else 0, " real clubs."))
+      sync_real_clubs_to_supabase(clubs)
+      results[["real_clubs"]] <- list(status = "ok", count = if (!is.null(clubs) && nrow(clubs) > 0) nrow(clubs) else 0L)
+    }, error = function(e) {
+      if (verbose) print(paste0("[Populate] Step 2 FAILED: ", e$message))
+      results[["real_clubs"]] <- list(status = "error", message = e$message)
+    })
+
+    # ---- Step 3: Sync Players Catalog ----
+    if (verbose) cat("[Populate] Step 3: Syncing players catalog...\n")
+    tryCatch({
+      players <- get_championship_players(login, championship_id)
+      if (verbose) print(paste0("[Populate] Retrieved ", if (!is.null(players) && nrow(players) > 0) nrow(players) else 0, " players."))
+      sync_players_to_supabase(players)
+      results[["players"]] <- list(status = "ok", count = if (!is.null(players) && nrow(players) > 0) nrow(players) else 0L)
+    }, error = function(e) {
+      if (verbose) print(paste0("[Populate] Step 3 FAILED: ", e$message))
+      results[["players"]] <- list(status = "error", message = e$message)
+    })
+
+    # ---- Step 4: Sync User Teams ----
+    if (verbose) cat("[Populate] Step 4: Syncing user teams...\n")
+    tryCatch({
+      teams <- get_teams(login, championship_id)
+      if (verbose) print(paste0("[Populate] Retrieved ", if (!is.null(teams) && nrow(teams) > 0) nrow(teams) else 0, " user teams."))
+      sync_user_teams_to_supabase(teams, championship_id)
+      results[["user_teams"]] <- list(status = "ok", count = if (!is.null(teams) && nrow(teams) > 0) nrow(teams) else 0L)
+    }, error = function(e) {
+      if (verbose) print(paste0("[Populate] Step 4 FAILED: ", e$message))
+      results[["user_teams"]] <- list(status = "error", message = e$message)
+    })
+
+    # ---- Step 5: Sync Standings Snapshot ----
+    if (verbose) cat("[Populate] Step 5: Syncing standings snapshot...\n")
+    tryCatch({
+      teams_for_history <- get_teams(login, championship_id)
+      log_user_team_history(teams_for_history)
+      count <- if (!is.null(teams_for_history) && nrow(teams_for_history) > 0) nrow(teams_for_history) else 0L
+      if (verbose) print(paste0("[Populate] Logged ", count, " standings snapshot(s)."))
+      results[["user_team_history"]] <- list(status = "ok", count = count)
+    }, error = function(e) {
+      if (verbose) print(paste0("[Populate] Step 5 FAILED: ", e$message))
+      results[["user_team_history"]] <- list(status = "error", message = e$message)
+    })
+
+    # ---- Step 6: Sync Player History ----
+    if (verbose) cat("[Populate] Step 6: Syncing player history...\n")
+    tryCatch({
+      players_for_history <- get_championship_players(login, championship_id)
+      log_player_history(players_for_history, championship_id)
+      count <- if (!is.null(players_for_history) && nrow(players_for_history) > 0) nrow(players_for_history) else 0L
+      if (verbose) print(paste0("[Populate] Logged ", count, " player history record(s)."))
+      results[["player_history"]] <- list(status = "ok", count = count)
+    }, error = function(e) {
+      if (verbose) print(paste0("[Populate] Step 6 FAILED: ", e$message))
+      results[["player_history"]] <- list(status = "error", message = e$message)
+    })
+
+    # ---- Step 7: Sync Pressroom Transactions ----
+    if (verbose) cat("[Populate] Step 7: Syncing pressroom transactions...\n")
+    tryCatch({
+      pressroom <- get_championship_pressroom(login, championship_id)
+      count <- if (!is.null(pressroom) && nrow(pressroom) > 0) nrow(pressroom) else 0L
+      if (verbose) print(paste0("[Populate] Retrieved ", count, " pressroom transactions."))
+      sync_pressroom_transactions_to_supabase(pressroom, championship_id)
+      results[["market_transactions"]] <- list(status = "ok", count = count)
+    }, error = function(e) {
+      if (verbose) print(paste0("[Populate] Step 7 FAILED: ", e$message))
+      results[["market_transactions"]] <- list(status = "error", message = e$message)
+    })
+
+    # ---- Step 8: Sync Round Dream Teams ----
+    if (verbose) cat("[Populate] Step 8: Syncing round dream teams...\n")
+    tryCatch({
+      dreamteam_result <- sync_all_championship_dreamteams(login, championship_id, verbose)
+      results[["round_dream_team"]] <- list(
+        status = dreamteam_result$status,
+        total_rounds = dreamteam_result$total_rounds,
+        total_players = dreamteam_result$total_players
+      )
+    }, error = function(e) {
+      if (verbose) print(paste0("[Populate] Step 8 FAILED: ", e$message))
+      results[["round_dream_team"]] <- list(status = "error", message = e$message)
+    })
+
+  }, error = function(e) {
+    print(paste0("[Populate] Fatal error during full database population: ", e$message))
+    results[["fatal_error"]] <- list(status = "error", message = e$message)
+  })
+
+  return(results)
 }
