@@ -92,30 +92,46 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       return(parsed)
     }
 
-    # Season start date helper
+    # Season start date helper -- programmatically detects the reset date
     get_season_start_date <- function(raw_movements = NULL) {
-      # If raw_movements has valid dates, return the earliest transaction date directly.
-      # This ensures that when the league admin resets the championship (whether on
-      # July 31 or in January for a mid-season reset), the filter dynamically starts
-      # exactly from the first transaction of that split.
-      if (!is.null(raw_movements) && nrow(raw_movements) > 0) {
-        parsed <- parse_safe_datetime(raw_movements$date)
-        min_tx_date <- as.Date(min(parsed, na.rm = TRUE))
-        if (!is.na(min_tx_date)) {
-          return(min_tx_date)
+      # --- Case 1: raw_movements is empty or NULL ---
+      if (is.null(raw_movements) || nrow(raw_movements) == 0) {
+        return(Sys.Date() - 180)
+      }
+
+      parsed_dates <- parse_safe_datetime(raw_movements$date)
+
+      # --- Case 2: look for explicit budget-reset rows ---
+      # A budget reset is signalled by type == "budget", or by category == "bonus"
+      # with money >= 100,000,000 (initial budget allocation).
+      budget_mask <- FALSE
+      if ("type" %in% colnames(raw_movements)) {
+        budget_mask <- as.character(raw_movements$type) == "budget"
+      }
+      bonus_large_mask <- FALSE
+      if ("category" %in% colnames(raw_movements) && "money" %in% colnames(raw_movements)) {
+        bonus_large_mask <- as.character(raw_movements$category) == "bonus" &
+                            suppressWarnings(as.numeric(raw_movements$money)) >= 100000000
+      }
+      reset_mask <- budget_mask | bonus_large_mask
+
+      if (any(reset_mask, na.rm = TRUE)) {
+        # Use the MOST RECENT budget-reset timestamp as the exact season start.
+        reset_dates <- parsed_dates[reset_mask]
+        reset_dates <- reset_dates[!is.na(reset_dates)]
+        if (length(reset_dates) > 0) {
+          return(as.Date(max(reset_dates)))
         }
       }
 
-      # Fallback: calendar-based season start
-      current_year <- as.integer(format(Sys.Date(), "%Y"))
-      current_month <- as.integer(format(Sys.Date(), "%m"))
-      if (current_month >= 7) {
-        # First split: July 31 of current year
-        return(as.Date(paste0(current_year, "-07-31")))
-      } else {
-        # Second split: January 1 of current year (mid-season reset)
-        return(as.Date(paste0(current_year, "-01-01")))
+      # --- Case 3: no explicit budget row -- use earliest transaction in the split ---
+      valid_dates <- parsed_dates[!is.na(parsed_dates)]
+      if (length(valid_dates) > 0) {
+        return(as.Date(min(valid_dates)))
       }
+
+      # --- Final fallback ---
+      return(Sys.Date() - 180)
     }
 
     # Selected rival team ID derived from table selection

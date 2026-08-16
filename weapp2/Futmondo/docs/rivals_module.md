@@ -168,6 +168,12 @@ When the API returns no data, Money Out falls back to `total_spent` (sum of `buy
 
 The module calls `get_user_team_moneymovements(login, championship_id, user_team_id)` to retrieve the rival's transaction log. The API endpoint is `POST https://api.futmondo.com/1/userteam/moneymovements`.
 
+**Response shape handling**: The Futmondo API may return the movements array in two different shapes:
+- `ans$answer` (direct array of movement objects)
+- `ans$answer$answer` (nested, where the outer `answer` wraps an inner `answer` containing the array)
+
+The `get_user_team_moneymovements()` function in `futmondo_functions.R` detects which shape is returned by checking whether `ans$answer` is a list that itself contains an `answer` key. If so, it extracts `ans$answer$answer`; otherwise it uses `ans$answer` directly. This ensures all movements (e.g., the full set of 19) are parsed regardless of API response nesting.
+
 The response is wrapped in `tryCatch()` to handle API errors defensively. On success, the data frame has columns:
 
 | Column     | Type     | Description                                      |
@@ -229,12 +235,11 @@ The tab provides three filter controls in a `fluidRow`:
 
 #### `get_season_start_date` Helper
 
-The date range filter defaults to a season-to-date range, computed by the `get_season_start_date(raw_movements = NULL)` helper:
+The date range filter defaults to a season-to-date range, computed by the `get_season_start_date(raw_movements = NULL)` helper. The function programmatically identifies the season/split reset date using a three-tier priority:
 
-1. **Priority -- Transaction-aware start**: If `raw_movements` is provided and has valid dates, the function computes `min_tx_date` via `parse_safe_datetime` (the earliest transaction date among active movements). This takes priority to handle custom league resets, such as a July 31 season start or mid-season resets in January. Returns `min_tx_date` when available.
-2. **Fallback -- Calendar split start**: If `raw_movements` is `NULL`, empty, or all dates parse to `NA`, the function falls back to a calendar-based split:
-   - **Split 1** (current month >= 7, i.e., July or later): season start is July 31 of the current year.
-   - **Split 2** (current month < 7, i.e., January through June): season start is January 1 of the current year.
+1. **Priority -- Budget-reset detection**: If `raw_movements` contains rows where `type == "budget"`, or where `category == "bonus"` AND `money >= 100,000,000` (initial budget allocation), the function finds the timestamp of the **most recent** such row. That timestamp is the exact moment the championship was reset by the admin. Returns `as.Date(max(reset_dates))`.
+2. **Secondary -- Earliest transaction**: If no explicit budget-reset row exists (e.g., when working with the pressroom feed fallback that lacks budget entries), the function falls back to `min(parse_safe_datetime(raw_movements$date))` -- the earliest transaction recorded in the active split.
+3. **Final fallback**: If `raw_movements` is `NULL`, empty, or all dates parse to `NA`, the function returns `Sys.Date() - 180` (180 days before today).
 
 The date range filter is auto-updated by an `observeEvent` watching `rival_moneymovements_raw_RV()`. Whenever the rival is switched or new transaction data loads, the date range resets to `[season_start, Sys.Date()]`.
 
