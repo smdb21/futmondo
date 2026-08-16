@@ -31,3 +31,11 @@ Every developer and AI agent making modifications or additions to the codebase *
   rsconnect::writeManifest()
   ```
   This is required to ensure that hosting services (such as shinyapps.io, RStudio Connect, or Posit Connect) correctly identify and install the required packages.
+
+---
+
+## 4. Domain & Transaction Rules
+
+* **Futmondo System as Counterparty**: In Futmondo transactions (pressroom feed, market movements, transaction logs), if `buyer_team_id` / `_buyer` ID is missing, `NULL`, or empty (`""`), the buyer is the **Futmondo System / Market** (e.g., player was sold to the market/computer). Likewise, if `seller_team_id` / `_seller` ID is missing, `NULL`, or empty (`""`), the seller is the **Futmondo System / Market** (e.g., player was bought from the market/computer).
+  - Agents and functions must treat missing/empty counterparty IDs as the Futmondo system, not as corrupted or missing data.
+  - When displaying or reporting transactions, label an empty buyer/seller as `"Futmondo / Mercado"` or `"Futmondo (System)"`.

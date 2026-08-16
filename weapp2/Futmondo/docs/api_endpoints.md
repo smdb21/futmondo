@@ -128,6 +128,7 @@ All requests to the Futmondo API (`api.futmondo.com`) are **stateless POST reque
   4. Repeat until the `news` array is empty or the last item's `_id` equals the current cursor (indicating no new data).
   5. The `get_championship_pressroom()` function implements this loop internally, with a safety cap of 25 pages maximum.
 * **Usage**: This endpoint provides the complete pressroom feed for a championship, listing all player transfers (market purchases and clause buyouts). It is used by `get_championship_pressroom()` to compute per-team purchase and sale volumes for league finance calculations.
+* **Counterparty Rule -- Futmondo System**: If `_buyer` ID is missing, `NULL`, or empty (`""`), the buyer is the **Futmondo System / Market** (e.g., the player was sold to the market/computer). If `_seller` ID is missing, `NULL`, or empty (`""`), the seller is the **Futmondo System / Market** (e.g., the player was bought from the market/computer). Missing or empty counterparty IDs must be treated as the Futmondo system, not as corrupted or missing data.
 
 ---
 
