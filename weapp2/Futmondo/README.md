@@ -6,6 +6,13 @@ Futmondo Insights is an R Shiny application that provides a comprehensive dashbo
 
 ## Features
 
+### Futmondo Intelligence Engine (v3.0 Phase 1)
+
+- **FIS Score (Futmondo Intelligence Score)**: Composite rating that evaluates each player across multiple dimensions including recent form, positional value, market liquidity, and transfer history. Used to surface high-potential targets and flag undervalued assets.
+- **Smart Bid Engine**: Automated bid calculation layer that generates data-driven offer suggestions based on a player's historical price trajectory, squad demand, and the manager's available budget. Reduces manual guesswork and minimizes overpayment risk.
+- **Manager DNA Profiler**: Behavioral analysis module that clusters managers into archetypes (e.g., aggressive buyer, cautious seller, balanced trader) based on their transaction history, average holding period, and risk tolerance. Powers personalized alerts and feed content.
+- **Manager Command Center Feed**: Personalized activity stream that aggregates market movements, rival transactions, Smart Bid notifications, and system alerts into a single feed tailored to the manager's DNA profile.
+
 ### Players In Teams Module
 
 - **2x2 KPI Boxes**: Compact grid showing Classification Rank, Points, Total Volume Earned (initial 300M budget plus sales and bonuses), and Total Volume Spent (aggregate purchase costs).
@@ -30,9 +37,19 @@ Futmondo Insights is an R Shiny application that provides a comprehensive dashbo
 The application follows a modular architecture with the following key components:
 
 - `app.R`: Main application entry point
+- `intelligence_engine.R`: Core logic for the Futmondo Intelligence Engine (FIS Score, Smart Bid Engine, Manager DNA Profiler, and Command Center feed). See `docs/intelligence_engine.md` for API reference and `docs/v3_roadmap.md` for the full v3.0 roadmap.
 - `Modules/`: Contains modular Shiny components for different features
 - `Utils/`: Utility functions for data processing, API integration, and formatting
 - `www/`: Static assets including custom CSS styles
+
+## Database
+
+The application uses a Supabase-backed PostgreSQL database. Phase 1 of the Intelligence Engine introduces four new tables, bringing the total monitored tables to 12:
+
+- `player_daily_snapshots`: Daily performance and valuation snapshots for every player, capturing matchday stats, FIS Score, and market price to enable trend analysis.
+- `manager_dna_profiles`: Computed profiles for each manager, storing archetype classification, behavioral metrics, and risk parameters derived from transaction history.
+- `decision_log`: Audit trail for all Intelligence Engine decisions, including Smart Bid outputs, alert triggers, and feed item generation, for transparency and debugging.
+- `user_smart_alerts`: Per-user notification queue for Smart Bid suggestions, market warnings, and personalized alerts routed through the Manager Command Center.
 
 ## Key Modules
 

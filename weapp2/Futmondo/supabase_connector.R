@@ -422,8 +422,9 @@ supabase_delete <- function(table_name, filter = "id=neq.00000000-0000-0000-0000
 }
 
 supabase_delete_all <- function(table_name) {
-  bigint_pk_tables <- c("user_team_history", "player_history", "market_transactions", "round_dream_team")
-  text_pk_tables <- c("championships", "real_clubs", "players", "user_teams")
+  bigint_pk_tables <- c("user_team_history", "player_history", "market_transactions", "round_dream_team",
+                      "player_daily_snapshots", "decision_log", "user_smart_alerts")
+  text_pk_tables <- c("championships", "real_clubs", "players", "user_teams", "manager_dna_profiles")
 
   if (table_name %in% bigint_pk_tables) {
     supabase_delete(table_name, filter = "id=gte.0")
@@ -442,6 +443,10 @@ supabase_reset_database <- function(force = FALSE) {
   }
 
   reset_order <- c(
+    "user_smart_alerts",
+    "decision_log",
+    "manager_dna_profiles",
+    "player_daily_snapshots",
     "round_dream_team",
     "market_transactions",
     "player_history",
@@ -486,7 +491,11 @@ get_table_row_counts <- function() {
     "user_team_history",
     "player_history",
     "market_transactions",
-    "round_dream_team"
+    "round_dream_team",
+    "player_daily_snapshots",
+    "manager_dna_profiles",
+    "decision_log",
+    "user_smart_alerts"
   )
 
   results <- vector("list", length(tables))
@@ -554,7 +563,11 @@ init_supabase_db <- function(verbose = FALSE) {
     "user_team_history",
     "player_history",
     "market_transactions",
-    "round_dream_team"
+    "round_dream_team",
+    "player_daily_snapshots",
+    "manager_dna_profiles",
+    "decision_log",
+    "user_smart_alerts"
   )
 
   all_ok <- TRUE
@@ -681,6 +694,149 @@ sync_all_championship_dreamteams <- function(login, championship_id, verbose = T
   }, error = function(e) {
     print(paste0("[DreamTeam] Error syncing all dream teams: ", e$message))
     return(list(status = "error", message = e$message, total_rounds = 0L, total_players = 0L))
+  })
+}
+
+# ============================================================
+# Intelligence Engine Sync Functions
+# ============================================================
+
+log_player_daily_snapshots <- function(players_df, championship_id) {
+  if (is.null(players_df) || nrow(players_df) == 0) return()
+  if (!"id" %in% colnames(players_df)) return()
+
+  # Helper: safe numeric coercion
+  safe_num <- function(x, default = NA_real_) {
+    if (is.null(x)) return(rep(default, nrow(players_df)))
+    vals <- suppressWarnings(as.numeric(as.character(x)))
+    vals[is.na(vals) | is.nan(vals)] <- default
+    vals
+  }
+
+  payload <- data.frame(
+    player_id = as.character(players_df$id),
+    championship_id = as.character(championship_id),
+    value = if ("value" %in% colnames(players_df)) as.integer(safe_num(players_df$value, 0)) else rep(0L, nrow(players_df)),
+    daily_change = if ("change" %in% colnames(players_df)) as.integer(safe_num(players_df$change, 0)) else rep(0L, nrow(players_df)),
+    points = if ("points" %in% colnames(players_df)) as.integer(safe_num(players_df$points, 0)) else rep(0L, nrow(players_df)),
+    fis_score = if ("fis_score" %in% colnames(players_df)) safe_num(players_df$fis_score, NA_real_) else rep(NA_real_, nrow(players_df)),
+    status = if ("status" %in% colnames(players_df)) as.character(players_df$status) else rep("ok", nrow(players_df)),
+    snapshot_date = as.character(Sys.Date()),
+    stringsAsFactors = FALSE
+  )
+
+  # Add optional columns if present
+  if ("user_team_id" %in% colnames(players_df)) {
+    owner_ids <- as.character(players_df$user_team_id)
+    owner_ids[is.na(owner_ids) | owner_ids == ""] <- NA_character_
+    payload$owner_team_id <- owner_ids
+  } else {
+    payload$owner_team_id <- rep(NA_character_, nrow(players_df))
+  }
+
+  if ("market_inMarket" %in% colnames(players_df)) {
+    payload$is_on_market <- as.logical(players_df$market_inMarket)
+  } else {
+    payload$is_on_market <- rep(FALSE, nrow(players_df))
+  }
+
+  if ("clause_price" %in% colnames(players_df)) {
+    payload$clause_price <- as.integer(safe_num(players_df$clause_price, NA_real_))
+  } else {
+    payload$clause_price <- rep(NA_integer_, nrow(players_df))
+  }
+
+  # Deduplicate by player_id + championship_id + snapshot_date
+  payload <- payload %>% dplyr::distinct(player_id, championship_id, snapshot_date, .keep_all = TRUE)
+
+  batch_size <- 100
+  n <- nrow(payload)
+  print(paste0("[Supabase] Syncing ", n, " player daily snapshots (batch size: ", batch_size, ")."))
+
+  tryCatch({
+    for (start_idx in seq(1, n, by = batch_size)) {
+      end_idx <- min(start_idx + batch_size - 1, n)
+      batch <- payload[start_idx:end_idx, , drop = FALSE]
+      supabase_post("player_daily_snapshots", batch)
+    }
+  }, error = function(e) {
+    print(paste0("[Supabase] Error during player_daily_snapshots sync: ", e$message))
+  })
+}
+
+sync_manager_dna_profiles <- function(dna_df, championship_id) {
+  if (is.null(dna_df) || nrow(dna_df) == 0) return()
+
+  # dna_df is expected to have columns: team_id, aggressiveness, avg_overpayment_pct,
+  # fav_position, trading_frequency, avg_holding_days, total_trades
+  required_cols <- c("team_id", "aggressiveness", "avg_overpayment_pct",
+                     "fav_position", "trading_frequency", "avg_holding_days", "total_trades")
+  missing <- setdiff(required_cols, colnames(dna_df))
+  if (length(missing) > 0) {
+    print(paste0("[Supabase] sync_manager_dna_profiles: missing columns: ", paste(missing, collapse = ", ")))
+    return()
+  }
+
+  payload <- data.frame(
+    team_id = as.character(dna_df$team_id),
+    championship_id = as.character(championship_id),
+    aggressiveness = suppressWarnings(as.numeric(dna_df$aggressiveness)),
+    avg_overpayment_pct = suppressWarnings(as.numeric(dna_df$avg_overpayment_pct)),
+    fav_position = as.character(dna_df$fav_position),
+    trading_frequency = suppressWarnings(as.numeric(dna_df$trading_frequency)),
+    avg_holding_days = suppressWarnings(as.numeric(dna_df$avg_holding_days)),
+    total_trades = as.integer(dna_df$total_trades),
+    stringsAsFactors = FALSE
+  )
+
+  payload <- payload %>% dplyr::distinct(team_id, .keep_all = TRUE)
+
+  print(paste0("[Supabase] Syncing ", nrow(payload), " manager DNA profiles."))
+
+  tryCatch({
+    supabase_post("manager_dna_profiles", payload)
+  }, error = function(e) {
+    print(paste0("[Supabase] Error during manager_dna_profiles sync: ", e$message))
+  })
+}
+
+log_decision <- function(championship_id, user_team_id, player_id, recommendation_type,
+                         recommended_value, actual_action, confidence, roi) {
+  payload <- list(
+    championship_id = as.character(championship_id),
+    user_team_id = as.character(user_team_id),
+    player_id = as.character(player_id),
+    recommendation_type = as.character(recommendation_type),
+    recommended_value = if (!is.null(recommended_value)) as.numeric(recommended_value) else NULL,
+    actual_action_taken = if (!is.null(actual_action)) as.character(actual_action) else NULL,
+    confidence_pct = if (!is.null(confidence)) as.numeric(confidence) else NULL,
+    outcome_roi = if (!is.null(roi)) as.numeric(roi) else NULL
+  )
+
+  tryCatch({
+    supabase_post("decision_log", payload)
+  }, error = function(e) {
+    print(paste0("[Supabase] Error during decision_log insert: ", e$message))
+  })
+}
+
+fetch_user_smart_alerts <- function(user_team_id, championship_id) {
+  if (is.null(user_team_id) || user_team_id == "") return(NULL)
+  if (is.null(championship_id) || championship_id == "") return(NULL)
+
+  query <- list(
+    user_team_id = paste0("eq.", user_team_id),
+    championship_id = paste0("eq.", championship_id),
+    select = "id,alert_type,title,message,severity,is_read,created_at",
+    order = "created_at.desc"
+  )
+
+  tryCatch({
+    df <- supabase_get("user_smart_alerts", query)
+    return(df)
+  }, error = function(e) {
+    print(paste0("[Supabase] Error fetching user_smart_alerts: ", e$message))
+    return(NULL)
   })
 }
 
@@ -821,6 +977,67 @@ populate_entire_database <- function(login, championship_id, verbose = TRUE) {
     }, error = function(e) {
       if (verbose) print(paste0("[Populate] Step 8 FAILED: ", e$message))
       results[["round_dream_team"]] <- list(status = "error", message = e$message)
+    })
+
+    # ---- Step 9: Log Player Daily Snapshots with FIS scores ----
+    if (verbose) cat("[Populate] Step 9: Logging player daily snapshots with FIS scores...\n")
+    tryCatch({
+      players_for_snapshot <- get_championship_players(login, championship_id)
+      if (!is.null(players_for_snapshot) && nrow(players_for_snapshot) > 0) {
+        # Compute FIS scores
+        players_for_snapshot <- calculate_fis_score(players_for_snapshot)
+        if (verbose) print(paste0("[Populate] Computed FIS scores for ", nrow(players_for_snapshot), " players."))
+        log_player_daily_snapshots(players_for_snapshot, championship_id)
+        results[["player_daily_snapshots"]] <- list(
+          status = "ok",
+          count = nrow(players_for_snapshot)
+        )
+      } else {
+        if (verbose) print("[Populate] No player data for snapshots.")
+        results[["player_daily_snapshots"]] <- list(status = "ok", count = 0L)
+      }
+    }, error = function(e) {
+      if (verbose) print(paste0("[Populate] Step 9 FAILED: ", e$message))
+      results[["player_daily_snapshots"]] <- list(status = "error", message = e$message)
+    })
+
+    # ---- Step 10: Calculate and sync Manager DNA profiles ----
+    if (verbose) cat("[Populate] Step 10: Calculating and syncing manager DNA profiles...\n")
+    tryCatch({
+      teams_for_dna <- get_teams(login, championship_id)
+      pressroom_for_dna <- get_championship_pressroom(login, championship_id)
+
+      if (!is.null(teams_for_dna) && nrow(teams_for_dna) > 0) {
+        team_ids <- if ("teamid" %in% colnames(teams_for_dna)) teams_for_dna$teamid else if ("id" %in% colnames(teams_for_dna)) teams_for_dna$id else character(0)
+
+        dna_results <- lapply(team_ids, function(tid) {
+          calculate_manager_dna(tid, pressroom_for_dna, teams_for_dna)
+        })
+
+        # Convert list of DNA results to data frame
+        dna_df <- do.call(rbind, lapply(dna_results, function(dna) {
+          data.frame(
+            team_id = as.character(dna$team_id),
+            aggressiveness = as.numeric(dna$aggressiveness),
+            avg_overpayment_pct = as.numeric(dna$avg_overpayment_pct),
+            fav_position = as.character(dna$fav_position),
+            trading_frequency = as.numeric(dna$trading_frequency),
+            avg_holding_days = as.numeric(dna$avg_holding_days),
+            total_trades = as.integer(dna$total_trades),
+            stringsAsFactors = FALSE
+          )
+        }))
+
+        sync_manager_dna_profiles(dna_df, championship_id)
+        if (verbose) print(paste0("[Populate] Synced DNA profiles for ", nrow(dna_df), " teams."))
+        results[["manager_dna_profiles"]] <- list(status = "ok", count = nrow(dna_df))
+      } else {
+        if (verbose) print("[Populate] No team data for DNA profiles.")
+        results[["manager_dna_profiles"]] <- list(status = "ok", count = 0L)
+      }
+    }, error = function(e) {
+      if (verbose) print(paste0("[Populate] Step 10 FAILED: ", e$message))
+      results[["manager_dna_profiles"]] <- list(status = "error", message = e$message)
     })
 
   }, error = function(e) {

@@ -4,6 +4,7 @@ if (file.exists(".Renviron")) {
 
 source("futmondo_functions.R")
 source("supabase_connector.R")
+source("intelligence_engine.R")
 source("Modules/Login_Module.R")
 source("Modules/Players_in_Teams_Module.R")
 source("Modules/Selected_Player_Module.R")
