@@ -46,3 +46,9 @@ Every developer and AI agent making modifications or additions to the codebase *
 
 * **Authoritative Root**: The ONLY authoritative codebase for this project is `/home/rstudio/workspace/futmondo/weapp2/Futmondo/`.
 * **Disregard Parent / Legacy Files**: Any file or directory outside `/home/rstudio/workspace/futmondo/weapp2/Futmondo/` (such as root workspace files, `../../src/`, `../../webapp/`, `../../jornada*.txt`, `../../saladeprensa*.txt`, etc.) belongs to deprecated legacy iterations, Java/R prototypes, or previous experiments. AI agents and developers must NEVER read, reference, edit, or rely on any files outside this project directory.
+
+---
+
+## 6. Roadmap Phase Tracking Rule
+
+* **Tag Completed Roadmap Phases**: Every time an AI agent, developer, or subagent finishes implementing a milestone or phase from the product roadmap (`docs/v3_roadmap.md`), the agent **MUST** update `docs/v3_roadmap.md` to tag that phase as `[COMPLETED]` / `[IMPLEMENTED]` with a status checkmark, completion date, and short summary of delivered components.

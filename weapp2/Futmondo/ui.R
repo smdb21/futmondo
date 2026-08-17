@@ -22,6 +22,10 @@ body <- shinydashboard::dashboardBody(
       )
     ),
     shinydashboard::tabItem(
+      tabName = "today",
+      today_UI(id = "today")
+    ),
+    shinydashboard::tabItem(
       tabName = "yourteam",
       fluidRow(
         column(

@@ -26,6 +26,14 @@ Futmondo Insights is an R Shiny application that provides a comprehensive dashbo
 - **Net Transfer Profit/Loss KPI Box**: Standalone summary box showing the rival's aggregate transfer profit or loss across all completed buy/sell pairs.
 - **Squad Value Evolution Plot**: Time-series line chart repositioned to the bottom of the page, tracking squad valuations across matchdays with interactive tooltips.
 
+### Manager Command Center ("Today" Tab - v3.1)
+
+- **Hero Banner**: Prominent header displaying the current matchday, date, and manager identity to orient the user immediately on landing.
+- **4 KPI Value Boxes**: Compact summary cards showing Budget Remaining, Squad Value, Squad Size, and Market Listings at a glance.
+- **Actionable Manager Feed**: Personalized activity stream with confidence badges (High/Medium/Low) that aggregates market movements, rival transactions, Smart Bid notifications, and system alerts tailored to the manager's DNA profile.
+- **Market Intelligence Radar**: Real-time market heat map widget tracking price velocity across positions, highlighting the hottest buy and sell targets.
+- **Recent League Deals**: Live feed of the latest transfers within the manager's league, displaying buyer, seller, player, and transaction price for competitive awareness.
+
 ### General
 
 - **Resized Columns**: All Reactable tables support click-and-drag column resizing.
@@ -39,6 +47,7 @@ The application follows a modular architecture with the following key components
 - `app.R`: Main application entry point
 - `intelligence_engine.R`: Core logic for the Futmondo Intelligence Engine (FIS Score, Smart Bid Engine, Manager DNA Profiler, and Command Center feed). See `docs/intelligence_engine.md` for API reference and `docs/v3_roadmap.md` for the full v3.0 roadmap.
 - `Modules/`: Contains modular Shiny components for different features
+- `Modules/Today_Module.R`: Manager Command Center (Today tab) module. Implements the hero banner, KPI value boxes, actionable feed with confidence badges, Market Intelligence Radar, and recent league deals. See `docs/today_module.md` for full API reference.
 - `Utils/`: Utility functions for data processing, API integration, and formatting
 - `www/`: Static assets including custom CSS styles
 

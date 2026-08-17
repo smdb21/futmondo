@@ -96,18 +96,27 @@ function(input, output, session) {
     })
   })
 
-  selected_player_RV <- players_in_teams_Server(id = "players_in_teams", 
-                                                is_module_active = reactive({
-                                                  input$tabs == "yourteam"
-                                                }),
-                                                login_token = login_token_RV, 
-                                                championship_id = championship_id_RV, 
-                                                user_team_id = user_team_id_RV, 
-                                                user_teams_RV = user_teams_RV,
-                                                refresh_trigger = refresh_trigger)
+selected_player_RV <- players_in_teams_Server(id = "players_in_teams",
+                                                 is_module_active = reactive({
+                                                   input$tabs == "yourteam"
+                                                 }),
+                                                 login_token = login_token_RV,
+                                                 championship_id = championship_id_RV,
+                                                 user_team_id = user_team_id_RV,
+                                                 user_teams_RV = user_teams_RV,
+                                                 refresh_trigger = refresh_trigger)
 
+  today_Server(id = "today",
+               is_module_active = reactive({
+                 input$tabs == "today"
+               }),
+               login_token = login_token_RV,
+               championship_id = championship_id_RV,
+               user_team_id = user_team_id_RV,
+               user_teams_RV = user_teams_RV,
+               refresh_trigger = refresh_trigger)
 
-  market_Server(id = "market", 
+  market_Server(id = "market",
                 is_module_active = reactive({
                   input$tabs == "market"
                 }),
@@ -154,13 +163,13 @@ players_in_championship_Server(id = "players_in_championship",
                user_teams_RV = user_teams_RV)
   # observers ----
   ## observe user_team_id_RV()
-  observeEvent(login_token_RV(),
-               {
-                 req(login_token_RV())
-                 updateTabsetPanel(inputId = "tabs", selected = "yourteam")
-               },
-               ignoreNULL = T
-  )
+observeEvent(login_token_RV(),
+                {
+                  req(login_token_RV())
+                  updateTabsetPanel(inputId = "tabs", selected = "today")
+                },
+                ignoreNULL = T
+   )
   
   # renders----
   ## render menu ----
@@ -176,6 +185,7 @@ players_in_championship_Server(id = "players_in_championship",
     # Standard menu items
     menu_items <- list(
       shinydashboard::menuItem("Login", tabName = "login", icon = icon("right-to-bracket")),
+      shinydashboard::menuItem("Today", tabName = "today", icon = icon("bolt")),
       shinydashboard::menuItem("Your team", tabName = "yourteam", icon = icon("users")),
       shinydashboard::menuItem("Market", tabName = "market", icon = icon("money-bill-trend-up")),
       shinydashboard::menuItem("Players", tabName = "players_in_championship", icon = icon("table")),
