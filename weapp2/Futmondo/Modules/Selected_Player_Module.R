@@ -38,6 +38,16 @@ selected_player_UI <- function(id) {
                  h4(style = "font-weight: 600; color: #0f172a; margin-bottom: 15px;", "Historical Valuation & Performance"),
                  plotly::plotlyOutput(ns("player_trend_plot"), height = "280px")
           )
+        ),
+        # FIS 5-Pillar Breakdown Panel
+        fluidRow(
+          style = "margin-top: 20px; padding-top: 15px; border-top: 1px solid #f1f5f9;",
+          column(12, uiOutput(ns("fis_panel")))
+        ),
+        # Smart Bid & Auction Intelligence Widget
+        fluidRow(
+          style = "margin-top: 20px; padding-top: 15px; border-top: 1px solid #f1f5f9;",
+          column(12, uiOutput(ns("smart_bid_widget")))
         )
       )
     )
@@ -50,6 +60,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     ns <- session$ns
 
     active_bid_info_RV <- reactiveVal(NULL)
+
+    # Store the latest smart bid result for the "Use Smart Bid" button
+    smart_bid_cache_RV <- reactiveVal(NULL)
 
     # ---- Safe reactive value extractor ----
     get_reactive_val <- function(x) {
@@ -573,6 +586,40 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           duration = 5
         )
       }
+    })
+
+    # ---- Use Smart Bid: pre-fill the market offer modal ----
+    observeEvent(input$btn_use_smart_bid, {
+      cached <- smart_bid_cache_RV()
+      if (is.null(cached) || is.null(cached$recommended_bid)) {
+        shiny::showNotification("Smart bid data not available. Please refresh.", type = "error")
+        return()
+      }
+
+      sp <- selected_player()
+      req(sp)
+      recommended_val <- cached$recommended_bid
+      market_price <- if ("effective_market_price" %in% colnames(sp) && !is.na(sp$effective_market_price)) suppressWarnings(as.numeric(sp$effective_market_price)) else if ("market_price" %in% colnames(sp) && !is.na(sp$market_price)) suppressWarnings(as.numeric(sp$market_price)) else if ("price" %in% colnames(sp) && !is.na(sp$price)) suppressWarnings(as.numeric(sp$price)) else recommended_val
+
+      showModal(modalDialog(
+        title = tagList(icon("chart-line"), " Place Market Offer (Smart Bid)"),
+        p(strong(sp$name)),
+        p("Current market price: ", strong(format_currency(market_price))),
+        p("Recommended Smart Bid: ", strong(format_currency(recommended_val))),
+        numericInput(
+          ns("bid_amount"),
+          label = "Your offer amount (EUR):",
+          value = recommended_val,
+          min = 1,
+          step = 10000
+        ),
+        uiOutput(ns("bid_amount_preview")),
+        footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
+                      modalButton("Cancel"),
+                      actionButton(ns("submit_bid"), "Submit Market Offer", class = "btn btn-buy-market")),
+        easyClose = TRUE,
+        size = "s"
+      ))
     })
 
     # ---- Option 1: Market Offer Modal ----
@@ -1351,6 +1398,270 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
               )
             }
           )
+        )
+      )
+    })
+
+    ## render FIS 5-Pillar Breakdown Panel ----
+    output$fis_panel <- renderUI({
+      sp <- selected_player()
+      req(sp)
+
+      # Wrap single row in a data.frame for calculate_fis_score
+      sp_df <- as.data.frame(t(unlist(as.list(sp))))
+      sp_df <- as.data.frame(t(sp_df))
+      # Ensure it is a proper data.frame with one row
+      if (is.null(dim(sp_df))) {
+        sp_df <- data.frame(sp, stringsAsFactors = FALSE)
+      }
+
+      fis_result <- tryCatch({
+        calculate_fis_score(sp_df)
+      }, error = function(e) {
+        print(paste0("[FIS Panel] Error computing FIS: ", e$message))
+        NULL
+      })
+
+      if (is.null(fis_result) || nrow(fis_result) == 0) {
+        return(div(style = "color: #94a3b8; font-size: 13px;", "FIS data unavailable."))
+      }
+
+      fis_score_val <- suppressWarnings(as.numeric(fis_result$fis_score[1]))
+      fis_tier_val <- if (!is.na(fis_result$fis_tier[1]) && nzchar(as.character(fis_result$fis_tier[1]))) as.character(fis_result$fis_tier[1]) else "N/A"
+      fis_summary_val <- if (!is.na(fis_result$fis_summary[1]) && nzchar(as.character(fis_result$fis_summary[1]))) as.character(fis_result$fis_summary[1]) else ""
+
+      # Pillar values (0-100)
+      perf_val <- suppressWarnings(as.numeric(fis_result$perf[1]))
+      form_val <- suppressWarnings(as.numeric(fis_result$form[1]))
+      eff_val <- suppressWarnings(as.numeric(fis_result$efficiency[1]))
+      mom_val <- suppressWarnings(as.numeric(fis_result$momentum[1]))
+      fix_val <- suppressWarnings(as.numeric(fis_result$fixture_risk[1]))
+
+      # Tier badge styling
+      badge_bg <- if (fis_tier_val == "Strong Buy") {
+        "#dcfce7"
+      } else if (fis_tier_val == "Buy") {
+        "#e0f2fe"
+      } else if (fis_tier_val == "Hold") {
+        "#fef3c7"
+      } else {
+        "#fee2e2"
+      }
+      badge_text <- if (fis_tier_val == "Strong Buy") {
+        "#166534"
+      } else if (fis_tier_val == "Buy") {
+        "#0369a1"
+      } else if (fis_tier_val == "Hold") {
+        "#92400e"
+      } else {
+        "#991b1b"
+      }
+
+      # Confidence pill color
+      conf_pct <- if (!is.na(fis_score_val)) round(fis_score_val, 1) else 0
+      conf_color <- if (conf_pct >= 80) "#16a34a" else if (conf_pct >= 65) "#2563eb" else if (conf_pct >= 45) "#d97706" else "#dc2626"
+
+      # Helper to render a single pillar bar
+      render_pillar <- function(label, value) {
+        v <- if (!is.na(value)) round(value, 1) else 0
+        bar_color <- if (v >= 70) "#16a34a" else if (v >= 50) "#2563eb" else if (v >= 30) "#d97706" else "#dc2626"
+        div(
+          style = "margin-bottom: 8px;",
+          div(
+            style = "display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; margin-bottom: 3px;",
+            span(label),
+            span(style = paste0("color: ", bar_color, ";"), paste0(v, "/100"))
+          ),
+          div(
+            style = "height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;",
+            div(
+              style = paste0("height: 100%; width: ", max(0, min(v, 100)), "%; background: ", bar_color, "; border-radius: 4px; transition: width 0.3s;")
+            )
+          )
+        )
+      }
+
+      div(
+        style = "background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;",
+        div(
+          style = "display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;",
+          div(
+            style = paste0("font-size: 22px; font-weight: 800; color: #0f172a;"),
+            "FIS ", if (!is.na(fis_score_val)) round(fis_score_val, 1) else "N/A"
+          ),
+          span(
+            style = paste0("display: inline-block; padding: 3px 10px; border-radius: 12px; font-weight: 700; font-size: 12px; background: ", badge_bg, "; color: ", badge_text, ";"),
+            fis_tier_val
+          ),
+          span(
+            style = paste0("display: inline-block; padding: 3px 10px; border-radius: 12px; font-weight: 600; font-size: 11px; background: ", conf_color, "; color: #fff;"),
+            paste0("Confidence: ", conf_pct, "%")
+          )
+        ),
+        if (nzchar(fis_summary_val)) {
+          p(
+            style = "margin: 0 0 14px 0; font-size: 13px; color: #475569; font-style: italic; line-height: 1.4;",
+            fis_summary_val
+          )
+        },
+        div(
+          style = "display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;",
+          render_pillar("Performance", perf_val),
+          render_pillar("Form", form_val),
+          render_pillar("Points/EUR Efficiency", eff_val),
+          render_pillar("Price Momentum", mom_val),
+          render_pillar("Availability & Fitness", fix_val)
+        )
+      )
+    })
+
+    ## render Smart Bid & Auction Intelligence Widget ----
+    output$smart_bid_widget <- renderUI({
+      sp <- selected_player()
+      req(sp)
+
+      login <- get_reactive_val(login_token)
+      champ_id <- get_reactive_val(championship_id)
+      team_id <- get_reactive_val(user_team_id)
+
+      current_user_team <- get_reactive_val(user_team_id)
+      player_owner_team <- if ("user_team_id" %in% colnames(sp)) sp$user_team_id else NULL
+      is_own_player <- (!is.null(current_user_team) && !is.null(player_owner_team) && current_user_team == player_owner_team)
+
+      # Only show for non-owned players
+      if (is_own_player) {
+        return(NULL)
+      }
+
+      # Compute smart bid
+      smart_bid_result <- tryCatch({
+        calculate_smart_bid(
+          player_row = sp,
+          championship_id = if (!is.null(champ_id)) as.character(champ_id) else "",
+          pressroom_df = NULL,
+          user_teams_df = NULL,
+          user_cash = 300000000
+        )
+      }, error = function(e) {
+        print(paste0("[Smart Bid Widget] Error computing smart bid: ", e$message))
+        list(error = e$message)
+      })
+
+      if (is.null(smart_bid_result) || !is.null(smart_bid_result$error)) {
+        return(div(style = "color: #94a3b8; font-size: 13px;", "Smart bid data unavailable."))
+      }
+
+      # Cache the smart bid result for the "Use Smart Bid" button
+      smart_bid_cache_RV(smart_bid_result)
+
+      fair_value <- smart_bid_result$fair_value
+      min_winning <- smart_bid_result$min_winning_bid
+      recommended <- smart_bid_result$recommended_bid
+      max_rational <- smart_bid_result$max_rational_bid
+      roi_pct <- smart_bid_result$expected_roi_pct
+      comp_level <- smart_bid_result$competition_level
+      competitors <- smart_bid_result$likely_competitors
+      conf_pct <- smart_bid_result$confidence_pct
+
+      # Competition level styling
+      comp_color <- if (comp_level == "High") {
+        "#dc2626"
+      } else if (comp_level == "Medium") {
+        "#d97706"
+      } else if (comp_level == "Low") {
+        "#16a34a"
+      } else {
+        "#64748b"
+      }
+
+      # ROI color
+      roi_color <- if (!is.na(roi_pct) && roi_pct > 0) "#16a34a" else if (!is.na(roi_pct) && roi_pct < 0) "#dc2626" else "#64748b"
+
+      # Competitors list
+      comp_list_html <- ""
+      if (!is.null(competitors) && length(competitors) > 0) {
+        comp_items <- vapply(competitors, function(c_name) {
+          c_str <- if (is.na(c_name) || c_name == "") "Futmondo / Mercado" else as.character(c_name)
+          paste0("<li style='margin-bottom: 4px;'>", shiny::HTML(c_str), "</li>")
+        }, character(1))
+        comp_list_html <- paste0("<ul style='margin: 0; padding-left: 18px; font-size: 13px; color: #475569;'>", paste(comp_items, collapse = ""), "</ul>")
+      } else {
+        comp_list_html <- "<p style='margin: 0; font-size: 13px; color: #94a3b8;'>No competitor data available.</p>"
+      }
+
+      div(
+        style = "background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;",
+        h4(
+          style = "font-weight: 700; color: #0f172a; margin-bottom: 12px; font-size: 15px;",
+          tagList(icon("chart-line"), " Smart Bid &amp; Auction Intelligence")
+        ),
+        div(
+          style = "display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 14px;",
+          # Estimated Fair Value
+          div(
+            style = "background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center;",
+            div(style = "font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;", "Estimated Fair Value"),
+            div(style = "font-size: 18px; font-weight: 800; color: #0f172a;", format_table_currency(fair_value))
+          ),
+          # Expected Winning Range
+          div(
+            style = "background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center;",
+            div(style = "font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;", "Expected Winning Range"),
+            div(style = "font-size: 14px; font-weight: 700; color: #2563eb;", paste0(format_table_currency(min_winning), " - ", format_table_currency(max_rational)))
+          ),
+          # Recommended Smart Bid
+          div(
+            style = "background: #e0f2fe; border: 2px solid #3b82f6; border-radius: 6px; padding: 10px; text-align: center;",
+            div(style = "font-size: 11px; color: #0369a1; font-weight: 600; text-transform: uppercase;", "Recommended Smart Bid"),
+            div(style = "font-size: 20px; font-weight: 800; color: #0369a1;", format_table_currency(recommended))
+          ),
+          # Expected ROI
+          div(
+            style = "background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center;",
+            div(style = "font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;", "Expected ROI"),
+            div(style = paste0("font-size: 18px; font-weight: 800; color: ", roi_color, ";"), paste0(roi_pct, "%"))
+          )
+        ),
+        # Competition Level and Confidence
+        div(
+          style = "display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; align-items: center;",
+          div(
+            style = "font-size: 13px; font-weight: 600;",
+            "Competition: ",
+            span(
+              style = paste0("display: inline-block; padding: 2px 8px; border-radius: 8px; background: ", comp_color, "; color: #fff; font-weight: 700; font-size: 11px;"),
+              comp_level
+            )
+          ),
+          div(
+            style = "font-size: 13px; font-weight: 600;",
+            "Max Rational Bid: ",
+            span(style = "color: #dc2626; font-weight: 800;", format_table_currency(max_rational))
+          ),
+          div(
+            style = "font-size: 13px; font-weight: 600;",
+            "Confidence: ",
+            span(style = paste0("color: ", if (conf_pct >= 70) "#16a34a" else if (conf_pct >= 50) "#d97706" else "#dc2626", "; font-weight: 800;"), paste0(conf_pct, "%"))
+          )
+        ),
+        # Use Smart Bid button
+        div(
+          style = "margin-bottom: 14px; text-align: center;",
+          actionButton(
+            ns("btn_use_smart_bid"),
+            label = tagList(icon("bolt"), " Use Smart Bid"),
+            class = "btn btn-primary",
+            onclick = paste0("document.getElementById('", ns("bid_amount"), "').value = ", recommended, ";")
+          )
+        ),
+        # Competitor Prediction Section
+        div(
+          style = "border-top: 1px solid #e2e8f0; padding-top: 12px;",
+          h5(
+            style = "font-weight: 700; color: #0f172a; margin-bottom: 8px; font-size: 13px;",
+            tagList(icon("users-gear"), " Who Else Will Bid? (Competitor Prediction)")
+          ),
+          shiny::HTML(comp_list_html)
         )
       )
     })

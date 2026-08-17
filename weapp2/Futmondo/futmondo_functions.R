@@ -1231,6 +1231,71 @@ get_reactable_columns_for_players <- function(table) {
     )
   }
 
+  # FIS Score Column ----
+  if ("fis_score" %in% colnames(table)) {
+    columns[["fis_score"]] <- colDef(
+      name = "FIS",
+      align = "center",
+      minWidth = 140,
+      cell = function(value, index) {
+        if (is.na(value) || is.null(value)) return("")
+
+        tier <- if ("fis_tier" %in% colnames(table) && !is.na(table$fis_tier[index])) {
+          as.character(table$fis_tier[index])
+        } else {
+          # Derive tier from score if fis_tier column is missing
+          if (value >= 80) "Strong Buy"
+          else if (value >= 65) "Buy"
+          else if (value >= 45) "Hold"
+          else "Sell"
+        }
+
+        # Color mapping per tier
+        bg_color <- if (tier == "Strong Buy") {
+          "#dcfce7"
+        } else if (tier == "Buy") {
+          "#e0f2fe"
+        } else if (tier == "Hold") {
+          "#fef3c7"
+        } else {
+          "#fee2e2"
+        }
+
+        text_color <- if (tier == "Strong Buy") {
+          "#166534"
+        } else if (tier == "Buy") {
+          "#0369a1"
+        } else if (tier == "Hold") {
+          "#92400e"
+        } else {
+          "#991b1b"
+        }
+
+        # Build tooltip from fis_summary if available
+        tooltip_text <- ""
+        if ("fis_summary" %in% colnames(table) && !is.na(table$fis_summary[index]) && nzchar(as.character(table$fis_summary[index]))) {
+          tooltip_text <- as.character(table$fis_summary[index])
+        }
+
+        shiny::tags$span(
+          class = "badge-fis-score",
+          title = tooltip_text,
+          style = paste0(
+            "background: ", bg_color, "; color: ", text_color, "; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 12px; white-space: nowrap; display: inline-block;"
+          ),
+          shiny::tags$span(
+            style = "margin-right: 4px;",
+            round(value, 1)
+          ),
+          shiny::tags$span(
+            style = "font-weight: 600;",
+            tier
+          )
+        )
+      }
+    )
+  }
+
   return(columns)
 }
 

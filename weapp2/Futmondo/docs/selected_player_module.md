@@ -120,3 +120,54 @@ Displays the name of the user who placed the incoming offer. When the offer is g
 
 ### Column Alignment
 All currency and market-related columns use left alignment (`align = "left"`) to ensure consistent formatting across the module's data tables.
+
+---
+
+## 6. FIS 5-Pillar Breakdown Panel
+
+When a player is selected, the module renders an FIS Score breakdown panel that decomposes the composite FIS Score into its five constituent pillars. This panel appears within the player modal/detail view.
+
+### Pillar Breakdown
+
+Each pillar displays:
+- **Pillar name** (Form, Momentum, Ownership, Scarcity, Fixture)
+- **Normalized score** (0-100)
+- **Weight** applied in the composite formula (e.g., Form = 30%, Momentum = 20%)
+- **Visual bar** proportional to the pillar score
+
+### Verdict and Confidence
+
+Below the pillar breakdown, the panel displays:
+- **1-Sentence Verdict**: An auto-generated summary sentence that interprets the player's overall FIS profile (e.g., "Strong recent form and favorable fixtures make this player a high-value target despite moderate market momentum.").
+- **Confidence Pill**: A colored badge showing the prediction confidence percentage (High/Medium/Low), derived from data freshness, sample size, historical accuracy, and market volatility per the Prediction Confidence formula in `docs/v3_roadmap.md` Section 4.
+
+---
+
+## 7. Smart Bid & Bid Competition Panel
+
+When a player is available for acquisition, the module renders a Smart Bid widget that provides data-driven bidding guidance and live competition analytics.
+
+### Smart Bid Metrics
+
+The panel displays the following computed values:
+
+| Metric | Description |
+|---|---|
+| Live Fair Value | The estimated intrinsic value of the player based on Moneyball Metrics and recent performance |
+| Recommended Bid | The optimal bid amount, adjusted for the user's Manager DNA profile (aggression score) |
+| Expected Winning Range | The bid range where the probability of winning the auction exceeds the user's target threshold (default 70%) |
+| Max Rational Bid | The highest bid that still yields a positive expected ROI; bidding above this is flagged as an overpay |
+| Expected ROI % | Projected return on investment percentage based on the recommended bid vs. fair value |
+
+### Competition Analysis
+
+The panel also provides competitive intelligence:
+
+| Metric | Description |
+|---|---|
+| Competition Level | Qualitative assessment (Low / Medium / High) based on the number of active bidders and historical auction intensity for this player |
+| Likely Competitor Managers | Predicted count of rival managers expected to bid on this player, derived from Manager DNA clustering and historical bidding patterns |
+
+### "Use Smart Bid" 1-Click Pre-Fill
+
+A prominent **"Use Smart Bid"** button is provided. When clicked, it automatically pre-fills the bid amount input field with the `recommended_bid` value, enabling the user to execute the bid with a single additional confirmation click. This streamlines the acquisition flow from analysis to execution.

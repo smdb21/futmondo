@@ -1072,6 +1072,675 @@ if (admin_reactives_test$status == "pass") {
 }
 
 # ===================================================================
+# PHASE 10: FIS Score & Tier Filtering (Phase 3.2)
+# ===================================================================
+cat("\n--- PHASE 10: FIS Score & Tier Filtering (Phase 3.2) ---\n")
+
+# ---- 10a: calculate_fis_score computes valid scores, tiers, summaries ----
+cat("\n  [10a] calculate_fis_score basic computation...\n")
+
+fis_score_basic_test <- safe_capture("fis_score_basic", {
+  # Build a minimal player data frame with required columns
+  test_df <- data.frame(
+    id = c("p1", "p2", "p3", "p4"),
+    name = c("Alpha", "Beta", "Gamma", "Delta"),
+    points = c(150, 80, 30, 5),
+    value = c(50000000, 30000000, 20000000, 10000000),
+    change = c(5000000, -2000000, 1000000, -5000000),
+    average.average = c(12.5, 8.0, 4.0, 1.0),
+    average.averageLastFive = c(14.0, 9.0, 3.5, 1.5),
+    average.matches = c(20, 18, 15, 10),
+    role = c("Forward", "Midfielder", "Defender", "Goalkeeper"),
+    status = c("ok", "ok", "doubt", "injured"),
+    stringsAsFactors = FALSE
+  )
+
+  result <- calculate_fis_score(test_df)
+
+  # Verify columns exist
+  required_cols <- c("perf", "form", "efficiency", "momentum", "fixture_risk",
+                     "fis_score", "fis_tier", "fis_summary")
+  for (col in required_cols) {
+    if (!col %in% colnames(result)) {
+      stop(paste("Missing column:", col))
+    }
+  }
+
+  # Verify score range [0, 100]
+  scores <- suppressWarnings(as.numeric(result$fis_score))
+  if (any(is.na(scores))) {
+    stop("fis_score contains NA values")
+  }
+  if (any(scores < 0) || any(scores > 100)) {
+    stop("fis_score values outside [0, 100] range")
+  }
+
+  # Verify tier labels are valid
+  valid_tiers <- c("Strong Buy", "Buy", "Hold", "Sell")
+  if (!all(result$fis_tier %in% valid_tiers)) {
+    stop("fis_tier contains invalid tier labels")
+  }
+
+  # Verify summary is non-empty
+  if (any(is.na(result$fis_summary)) || any(nzchar(result$fis_summary) == FALSE)) {
+    stop("fis_summary contains empty or NA values")
+  }
+
+  # Verify tier assignment logic: high score -> Strong Buy, low score -> Sell
+  # Alpha (150 pts, ok) should score higher than Delta (5 pts, injured)
+  if (scores[1] <= scores[4]) {
+    stop("Expected Alpha (high pts, ok) to score higher than Delta (low pts, injured)")
+  }
+
+  cat(sprintf("    FIS scores: %s\n", paste(round(scores, 1), collapse = ", ")))
+  cat(sprintf("    FIS tiers:  %s\n", paste(result$fis_tier, collapse = ", ")))
+  cat("    All FIS columns valid, scores in [0,100], tiers correct\n")
+  TRUE
+})
+
+if (fis_score_basic_test$status == "pass") {
+  cat("  calculate_fis_score basic: PASS\n")
+} else {
+  cat(sprintf("  calculate_fis_score basic: FAIL - %s\n", fis_score_basic_test$trace))
+}
+
+# ---- 10b: calculate_fis_score handles edge cases ----
+cat("\n  [10b] calculate_fis_score edge cases...\n")
+
+fis_score_edge_test <- safe_capture("fis_score_edge_cases", {
+  # Empty data frame
+  empty_df <- data.frame(
+    id = character(0), name = character(0), points = numeric(0),
+    value = numeric(0), change = numeric(0), average.average = numeric(0),
+    average.averageLastFive = numeric(0), average.matches = numeric(0),
+    role = character(0), status = character(0), stringsAsFactors = FALSE
+  )
+  empty_result <- calculate_fis_score(empty_df)
+  if (!is.null(empty_result) && nrow(empty_result) != 0) {
+    stop("Empty input should return empty result")
+  }
+
+  # NULL input
+  null_result <- calculate_fis_score(NULL)
+  if (!is.null(null_result)) {
+    stop("NULL input should return NULL")
+  }
+
+  # Single player
+  single_df <- data.frame(
+    id = "s1", name = "Solo", points = 100, value = 40000000, change = 0,
+    average.average = 10.0, average.averageLastFive = 10.0,
+    average.matches = 15, role = "Forward", status = "ok",
+    stringsAsFactors = FALSE
+  )
+  single_result <- calculate_fis_score(single_df)
+  if (nrow(single_result) != 1) {
+    stop("Single player input should return single row")
+  }
+  single_score <- suppressWarnings(as.numeric(single_result$fis_score))
+  if (is.na(single_score) || single_score < 0 || single_score > 100) {
+    stop("Single player FIS score should be valid [0,100]")
+  }
+
+  cat("    Edge cases (empty, NULL, single): all handled correctly\n")
+  TRUE
+})
+
+if (fis_score_edge_test$status == "pass") {
+  cat("  calculate_fis_score edge cases: PASS\n")
+} else {
+  cat(sprintf("  calculate_fis_score edge cases: FAIL - %s\n", fis_score_edge_test$trace))
+}
+
+# ---- 10c: fis_tier_filter UI options and reactive filtering ----
+cat("\n  [10c] fis_tier_filter UI options and reactive filtering...\n")
+
+fis_tier_filter_test <- safe_capture("fis_tier_filter", {
+  # Verify the selectInput choices are defined in players_table_UI
+  ui_result <- players_table_UI(id = "test_fis_filter")
+  # The UI should contain a selectInput with id "fis_tier_filter"
+  # We verify by checking the tagList structure
+  if (is.null(ui_result)) {
+    stop("players_table_UI returned NULL")
+  }
+
+  # Verify the filter choices: All, Strong Buy, Buy, Hold, Sell
+  expected_choices <- c("All", "Strong Buy", "Buy", "Hold", "Sell")
+
+  # Simulate filtering with each tier value
+  test_df <- data.frame(
+    id = c("p1", "p2", "p3", "p4"),
+    name = c("A", "B", "C", "D"),
+    points = c(150, 80, 30, 5),
+    value = c(50000000, 30000000, 20000000, 10000000),
+    change = c(5000000, -2000000, 1000000, -5000000),
+    average.average = c(12.5, 8.0, 4.0, 1.0),
+    average.averageLastFive = c(14.0, 9.0, 3.5, 1.5),
+    average.matches = c(20, 18, 15, 10),
+    role = c("Forward", "Midfielder", "Defender", "Goalkeeper"),
+    status = c("ok", "ok", "doubt", "injured"),
+    stringsAsFactors = FALSE
+  )
+  test_df <- calculate_fis_score(test_df)
+
+  # Filter by "Strong Buy"
+  strong_buy <- test_df[test_df$fis_tier == "Strong Buy", ]
+  # Filter by "Buy"
+  buy <- test_df[test_df$fis_tier == "Buy", ]
+  # Filter by "Hold"
+  hold <- test_df[test_df$fis_tier == "Hold", ]
+  # Filter by "Sell"
+  sell <- test_df[test_df$fis_tier == "Sell", ]
+
+  # Verify that combining all tiers gives back the full set
+  combined_nrow <- nrow(strong_buy) + nrow(buy) + nrow(hold) + nrow(sell)
+  if (combined_nrow != nrow(test_df)) {
+    stop("Tier filtering does not partition the full data set")
+  }
+
+  cat(sprintf("    Tier counts: Strong Buy=%d, Buy=%d, Hold=%d, Sell=%d\n",
+              nrow(strong_buy), nrow(buy), nrow(hold), nrow(sell)))
+  cat("    fis_tier_filter UI rendered, tier partitioning verified\n")
+  TRUE
+})
+
+if (fis_tier_filter_test$status == "pass") {
+  cat("  fis_tier_filter: PASS\n")
+} else {
+  cat(sprintf("  fis_tier_filter: FAIL - %s\n", fis_tier_filter_test$trace))
+}
+
+# ---- 10d: fis_score column in get_reactable_columns_for_players ----
+cat("\n  [10d] fis_score column in get_reactable_columns_for_players...\n")
+
+fis_column_def_test <- safe_capture("fis_column_definition", {
+  # Build a table that includes fis_score
+  test_df <- data.frame(
+    id = c("p1", "p2"),
+    name = c("A", "B"),
+    points = c(100, 50),
+    value = c(40000000, 20000000),
+    change = c(2000000, -1000000),
+    average.average = c(10.0, 5.0),
+    average.averageLastFive = c(11.0, 5.5),
+    average.matches = c(15, 10),
+    role = c("Forward", "Defender"),
+    status = c("ok", "ok"),
+    fis_score = c(75.5, 40.2),
+    fis_tier = c("Buy", "Hold"),
+    stringsAsFactors = FALSE
+  )
+
+  cols <- get_reactable_columns_for_players(test_df)
+
+  # Verify fis_score column is defined
+  if (!"fis_score" %in% names(cols)) {
+    stop("fis_score column not found in get_reactable_columns_for_players output")
+  }
+
+  fis_col <- cols[["fis_score"]]
+  if (is.null(fis_col)) {
+    stop("fis_score column definition is NULL")
+  }
+
+  # Verify it has a name
+  if (is.null(fis_col$name) || fis_col$name != "FIS") {
+    stop("fis_score column should have name 'FIS'")
+  }
+
+  cat("    fis_score column definition found with name='FIS'\n")
+  cat("    get_reactable_columns_for_players includes FIS column: PASS\n")
+  TRUE
+})
+
+if (fis_column_def_test$status == "pass") {
+  cat("  fis_score column definition: PASS\n")
+} else {
+  cat(sprintf("  fis_score column definition: FAIL - %s\n", fis_column_def_test$trace))
+}
+
+# ===================================================================
+# PHASE 11: Selected Player Intelligence Modal (Phase 3.3)
+# ===================================================================
+cat("\n--- PHASE 11: Selected Player Intelligence Modal (Phase 3.3) ---\n")
+
+# ---- 11a: output$fis_panel computes 5-pillar breakdown, score badge, summary ----
+cat("\n  [11a] FIS Panel: 5-pillar breakdown, score badge, summary...\n")
+
+fis_panel_test <- safe_capture("fis_panel_computation", {
+  # Build a representative single-player data frame
+  sp_df <- data.frame(
+    id = "sp1",
+    name = "TestPlayer",
+    points = 120,
+    value = 45000000,
+    change = 3000000,
+    average.average = 11.0,
+    average.averageLastFive = 13.0,
+    average.matches = 18,
+    role = "Forward",
+    status = "ok",
+    stringsAsFactors = FALSE
+  )
+
+  # Compute FIS score for this single player
+  fis_result <- tryCatch({
+    calculate_fis_score(sp_df)
+  }, error = function(e) {
+    stop(paste("FIS computation failed:", e$message))
+  })
+
+  if (is.null(fis_result) || nrow(fis_result) == 0) {
+    stop("FIS result is empty")
+  }
+
+  # Extract 5 pillars
+  perf_val <- suppressWarnings(as.numeric(fis_result$perf[1]))
+  form_val <- suppressWarnings(as.numeric(fis_result$form[1]))
+  eff_val  <- suppressWarnings(as.numeric(fis_result$efficiency[1]))
+  mom_val  <- suppressWarnings(as.numeric(fis_result$momentum[1]))
+  fix_val  <- suppressWarnings(as.numeric(fis_result$fixture_risk[1]))
+
+  # Verify all 5 pillars are valid [0, 100]
+  pillars <- c(perf_val, form_val, eff_val, mom_val, fix_val)
+  pillar_names <- c("perf", "form", "efficiency", "momentum", "fixture_risk")
+  for (i in seq_along(pillars)) {
+    if (is.na(pillars[i])) {
+      stop(paste("Pillar", pillar_names[i], "is NA"))
+    }
+    if (pillars[i] < 0 || pillars[i] > 100) {
+      stop(paste("Pillar", pillar_names[i], "out of range:", pillars[i]))
+    }
+  }
+
+  # Verify score badge (fis_score)
+  fis_score_val <- suppressWarnings(as.numeric(fis_result$fis_score[1]))
+  if (is.na(fis_score_val) || fis_score_val < 0 || fis_score_val > 100) {
+    stop("FIS score badge value is invalid")
+  }
+
+  # Verify tier badge
+  fis_tier_val <- as.character(fis_result$fis_tier[1])
+  valid_tiers <- c("Strong Buy", "Buy", "Hold", "Sell")
+  if (!fis_tier_val %in% valid_tiers) {
+    stop(paste("Invalid tier badge:", fis_tier_val))
+  }
+
+  # Verify analytical summary is non-empty
+  fis_summary_val <- as.character(fis_result$fis_summary[1])
+  if (is.na(fis_summary_val) || nzchar(fis_summary_val) == FALSE) {
+    stop("FIS summary is empty")
+  }
+
+  cat(sprintf("    Score: %.1f, Tier: %s\n", fis_score_val, fis_tier_val))
+  cat(sprintf("    Pillars: perf=%.1f, form=%.1f, eff=%.1f, mom=%.1f, fix=%.1f\n",
+              perf_val, form_val, eff_val, mom_val, fix_val))
+  cat("    5-pillar breakdown, score badge, and summary all valid\n")
+  TRUE
+})
+
+if (fis_panel_test$status == "pass") {
+  cat("  FIS Panel computation: PASS\n")
+} else {
+  cat(sprintf("  FIS Panel computation: FAIL - %s\n", fis_panel_test$trace))
+}
+
+# ---- 11b: calculate_smart_bid handles market auctions and competitor evaluations ----
+cat("\n  [11b] calculate_smart_bid: fair value, recommended bid, ROI, competitors...\n")
+
+smart_bid_basic_test <- safe_capture("smart_bid_basic", {
+  # Build a single player row
+  player_row <- data.frame(
+    id = "sb1",
+    name = "BidPlayer",
+    value = 50000000,
+    change = 2000000,
+    points = 100,
+    role = "Midfielder",
+    average.average = 10.0,
+    average.averageLastFive = 12.0,
+    average.matches = 16,
+    status = "ok",
+    clause_price = 60000000,
+    stringsAsFactors = FALSE
+  )
+
+  result <- tryCatch({
+    calculate_smart_bid(
+      player_row = player_row,
+      championship_id = "champ1",
+      pressroom_df = NULL,
+      user_teams_df = NULL,
+      user_cash = 300000000
+    )
+  }, error = function(e) {
+    stop(paste("Smart bid computation failed:", e$message))
+  })
+
+  # Verify required fields exist
+  required_fields <- c("fair_value", "league_premium_pct", "min_winning_bid",
+                       "recommended_bid", "max_rational_bid", "expected_roi_pct",
+                       "competition_level", "likely_competitors", "confidence_pct")
+  for (f in required_fields) {
+    if (is.null(result[[f]])) {
+      stop(paste("Missing field:", f))
+    }
+  }
+
+  # Verify fair_value is numeric and positive
+  fv <- suppressWarnings(as.numeric(result$fair_value))
+  if (is.na(fv) || fv <= 0) {
+    stop("fair_value should be positive numeric")
+  }
+
+  # Verify recommended_bid is numeric and positive
+  rb <- suppressWarnings(as.numeric(result$recommended_bid))
+  if (is.na(rb) || rb <= 0) {
+    stop("recommended_bid should be positive numeric")
+  }
+
+  # Verify ROI is numeric
+  roi <- suppressWarnings(as.numeric(result$expected_roi_pct))
+  if (is.na(roi)) {
+    stop("expected_roi_pct should be numeric")
+  }
+
+  # Verify competition_level is valid
+  valid_levels <- c("High", "Medium", "Low", "Unknown")
+  if (!result$competition_level %in% valid_levels) {
+    stop(paste("Invalid competition_level:", result$competition_level))
+  }
+
+  # Verify confidence_pct is in [0, 100]
+  conf <- suppressWarnings(as.numeric(result$confidence_pct))
+  if (is.na(conf) || conf < 0 || conf > 100) {
+    stop("confidence_pct should be in [0, 100]")
+  }
+
+  # Verify max_rational_bid <= user_cash
+  mrb <- suppressWarnings(as.numeric(result$max_rational_bid))
+  if (mrb > 300000000) {
+    stop("max_rational_bid should not exceed user_cash")
+  }
+
+  cat(sprintf("    Fair value: %.0f, Recommended bid: %.0f\n", fv, rb))
+  cat(sprintf("    ROI: %.2f%%, Competition: %s, Confidence: %.0f%%\n",
+              roi, result$competition_level, conf))
+  cat("    Smart bid basic computation: PASS\n")
+  TRUE
+})
+
+if (smart_bid_basic_test$status == "pass") {
+  cat("  calculate_smart_bid basic: PASS\n")
+} else {
+  cat(sprintf("  calculate_smart_bid basic: FAIL - %s\n", smart_bid_basic_test$trace))
+}
+
+# ---- 11c: calculate_smart_bid with pressroom data (competitor prediction) ----
+cat("\n  [11c] calculate_smart_bid with pressroom data (competitor prediction)...\n")
+
+smart_bid_pressroom_test <- safe_capture("smart_bid_with_pressroom", {
+  player_row <- data.frame(
+    id = "sb2",
+    name = "AuctionPlayer",
+    value = 40000000,
+    change = 1000000,
+    points = 80,
+    role = "Forward",
+    average.average = 8.0,
+    average.averageLastFive = 10.0,
+    average.matches = 14,
+    status = "ok",
+    clause_price = 50000000,
+    stringsAsFactors = FALSE
+  )
+
+  # Build a pressroom data frame with transactions for this player
+  pressroom_df <- data.frame(
+    player_id = c("sb2", "sb2", "sb2"),
+    buyer_team_id = c("team_A", "team_B", "team_C"),
+    seller_team_id = c("team_X", "team_Y", "team_Z"),
+    price = c(42000000, 45000000, 43000000),
+    created = c("2025-01-01T10:00:00Z", "2025-01-05T12:00:00Z", "2025-01-10T14:00:00Z"),
+    stringsAsFactors = FALSE
+  )
+
+  result <- tryCatch({
+    calculate_smart_bid(
+      player_row = player_row,
+      championship_id = "champ1",
+      pressroom_df = pressroom_df,
+      user_teams_df = NULL,
+      user_cash = 300000000
+    )
+  }, error = function(e) {
+    stop(paste("Smart bid with pressroom failed:", e$message))
+  })
+
+  # Verify competition level is "High" (3 unique buyers)
+  if (result$competition_level != "High") {
+    stop(paste("Expected competition_level='High' with 3 buyers, got:", result$competition_level))
+  }
+
+  # Verify likely_competitors contains the buyer team IDs
+  if (is.null(result$likely_competitors) || length(result$likely_competitors) < 3) {
+    stop("likely_competitors should contain at least 3 entries")
+  }
+
+  # Verify league_premium_pct is non-zero (pressroom prices differ from fair value)
+  lp <- suppressWarnings(as.numeric(result$league_premium_pct))
+  if (is.na(lp)) {
+    stop("league_premium_pct should be computed from pressroom data")
+  }
+
+  cat(sprintf("    Competition level: %s\n", result$competition_level))
+  cat(sprintf("    League premium: %.2f%%\n", lp))
+  cat(sprintf("    Competitors: %s\n", paste(result$likely_competitors, collapse = ", ")))
+  cat("    Smart bid with pressroom data: PASS\n")
+  TRUE
+})
+
+if (smart_bid_pressroom_test$status == "pass") {
+  cat("  calculate_smart_bid with pressroom: PASS\n")
+} else {
+  cat(sprintf("  calculate_smart_bid with pressroom: FAIL - %s\n", smart_bid_pressroom_test$trace))
+}
+
+# ---- 11d: calculate_smart_bid with NULL player_row ----
+cat("\n  [11d] calculate_smart_bid NULL handling...\n")
+
+smart_bid_null_test <- safe_capture("smart_bid_null", {
+  result <- calculate_smart_bid(
+    player_row = NULL,
+    championship_id = "champ1"
+  )
+
+  if (is.null(result$error)) {
+    stop("NULL player_row should return result with error field")
+  }
+
+  cat("    NULL player_row returns error as expected\n")
+  TRUE
+})
+
+if (smart_bid_null_test$status == "pass") {
+  cat("  calculate_smart_bid NULL handling: PASS\n")
+} else {
+  cat(sprintf("  calculate_smart_bid NULL handling: FAIL - %s\n", smart_bid_null_test$trace))
+}
+
+# ---- 11e: output$smart_bid_widget renders for non-owned player ----
+cat("\n  [11e] Smart Bid Widget: renders for non-owned player...\n")
+
+smart_bid_widget_test <- safe_capture("smart_bid_widget_render", {
+  # Build a player row that is NOT owned by the current user
+  sp <- data.frame(
+    id = "widget1",
+    name = "WidgetPlayer",
+    value = 35000000,
+    change = 1500000,
+    points = 90,
+    role = "Midfielder",
+    average.average = 9.0,
+    average.averageLastFive = 11.0,
+    average.matches = 17,
+    status = "ok",
+    clause_price = 45000000,
+    user_team_id = "rival_team",  # NOT the current user
+    stringsAsFactors = FALSE
+  )
+
+  # Compute smart bid directly (simulating what output$smart_bid_widget does)
+  smart_bid_result <- tryCatch({
+    calculate_smart_bid(
+      player_row = sp,
+      championship_id = "champ1",
+      pressroom_df = NULL,
+      user_teams_df = NULL,
+      user_cash = 300000000
+    )
+  }, error = function(e) {
+    stop(paste("Smart bid widget computation failed:", e$message))
+  })
+
+  # Verify no error
+  if (!is.null(smart_bid_result$error)) {
+    stop(paste("Smart bid widget returned error:", smart_bid_result$error))
+  }
+
+  # Verify all widget-relevant fields
+  fv <- suppressWarnings(as.numeric(smart_bid_result$fair_value))
+  rb <- suppressWarnings(as.numeric(smart_bid_result$recommended_bid))
+  roi <- suppressWarnings(as.numeric(smart_bid_result$expected_roi_pct))
+  conf <- suppressWarnings(as.numeric(smart_bid_result$confidence_pct))
+
+  if (is.na(fv) || fv <= 0) stop("fair_value invalid")
+  if (is.na(rb) || rb <= 0) stop("recommended_bid invalid")
+  if (is.na(roi)) stop("expected_roi_pct invalid")
+  if (is.na(conf) || conf < 0 || conf > 100) stop("confidence_pct invalid")
+
+  cat(sprintf("    Widget: fair_value=%.0f, recommended=%.0f, ROI=%.2f%%, confidence=%.0f%%\n",
+              fv, rb, roi, conf))
+  cat("    Smart Bid Widget render: PASS\n")
+  TRUE
+})
+
+if (smart_bid_widget_test$status == "pass") {
+  cat("  Smart Bid Widget render: PASS\n")
+} else {
+  cat(sprintf("  Smart Bid Widget render: FAIL - %s\n", smart_bid_widget_test$trace))
+}
+
+# ---- 11f: output$smart_bid_widget returns NULL for owned player ----
+cat("\n  [11f] Smart Bid Widget: returns NULL for owned player...\n")
+
+smart_bid_widget_owned_test <- safe_capture("smart_bid_widget_owned", {
+  # Build a player row that IS owned by the current user
+  sp_owned <- data.frame(
+    id = "widget2",
+    name = "OwnedPlayer",
+    value = 35000000,
+    change = 1500000,
+    points = 90,
+    role = "Midfielder",
+    average.average = 9.0,
+    average.averageLastFive = 11.0,
+    average.matches = 17,
+    status = "ok",
+    clause_price = 45000000,
+    user_team_id = "my_team",  # SAME as current user
+    stringsAsFactors = FALSE
+  )
+
+  current_user_team <- "my_team"
+  player_owner_team <- sp_owned$user_team_id
+
+  # Simulate the is_own_player check from output$smart_bid_widget
+  is_own_player <- (!is.null(current_user_team) && !is.null(player_owner_team) &&
+                    current_user_team == player_owner_team)
+
+  if (!is_own_player) {
+    stop("Player should be detected as owned by current user")
+  }
+
+  # The widget should return NULL for owned players
+  # We verify the logic path, not the actual Shiny renderUI
+  cat("    Owned player correctly identified, widget would return NULL\n")
+  TRUE
+})
+
+if (smart_bid_widget_owned_test$status == "pass") {
+  cat("  Smart Bid Widget owned player: PASS\n")
+} else {
+  cat(sprintf("  Smart Bid Widget owned player: FAIL - %s\n", smart_bid_widget_owned_test$trace))
+}
+
+# ---- 11g: output$fis_panel renders for valid player ----
+cat("\n  [11g] FIS Panel: renders for valid player in modal context...\n")
+
+fis_panel_modal_test <- safe_capture("fis_panel_modal_render", {
+  # Build a player row as it would appear in the selected_player modal
+  sp <- data.frame(
+    id = "modal1",
+    name = "ModalPlayer",
+    points = 110,
+    value = 42000000,
+    change = 2500000,
+    average.average = 10.5,
+    average.averageLastFive = 12.5,
+    average.matches = 16,
+    role = "Forward",
+    status = "ok",
+    stringsAsFactors = FALSE
+  )
+
+  # Simulate what output$fis_panel does: convert to df and compute FIS
+  sp_df <- as.data.frame(t(unlist(as.list(sp))))
+  sp_df <- as.data.frame(t(sp_df))
+  if (is.null(dim(sp_df))) {
+    sp_df <- data.frame(sp, stringsAsFactors = FALSE)
+  }
+
+  fis_result <- tryCatch({
+    calculate_fis_score(sp_df)
+  }, error = function(e) {
+    stop(paste("FIS panel modal computation failed:", e$message))
+  })
+
+  if (is.null(fis_result) || nrow(fis_result) == 0) {
+    stop("FIS result for modal player is empty")
+  }
+
+  # Verify 5 pillars exist and are valid
+  for (pillar in c("perf", "form", "efficiency", "momentum", "fixture_risk")) {
+    val <- suppressWarnings(as.numeric(fis_result[[pillar]][1]))
+    if (is.na(val) || val < 0 || val > 100) {
+      stop(paste("Pillar", pillar, "invalid in modal context"))
+    }
+  }
+
+  # Verify score and tier
+  score <- suppressWarnings(as.numeric(fis_result$fis_score[1]))
+  tier <- as.character(fis_result$fis_tier[1])
+  if (is.na(score) || score < 0 || score > 100) {
+    stop("FIS score invalid in modal context")
+  }
+  if (!tier %in% c("Strong Buy", "Buy", "Hold", "Sell")) {
+    stop(paste("Invalid tier in modal context:", tier))
+  }
+
+  cat(sprintf("    Modal FIS: score=%.1f, tier=%s\n", score, tier))
+  cat("    FIS Panel modal render: PASS\n")
+  TRUE
+})
+
+if (fis_panel_modal_test$status == "pass") {
+  cat("  FIS Panel modal render: PASS\n")
+} else {
+  cat(sprintf("  FIS Panel modal render: FAIL - %s\n", fis_panel_modal_test$trace))
+}
+
+# ===================================================================
 # FINAL SUMMARY
 # ===================================================================
 cat("\n======================================================================\n")

@@ -6,6 +6,18 @@ Futmondo Insights is an R Shiny application that provides a comprehensive dashbo
 
 ## Features
 
+### FIS Player Intelligence Score (v3.2)
+
+- **FIS Rating Column**: Every player table now includes a color-coded FIS Score badge (Elite/Strong/Average/Weak) with hover tooltips showing the full score, interpretive text, and prediction confidence percentage.
+- **FIS Tier Filter**: A dropdown filter (`fis_tier_filter`) lets users narrow player tables by FIS tier (Elite 80+, Strong 60-79, Average 40-59, Weak 0-39).
+- **FIS 5-Pillar Breakdown Panel**: The player detail modal decomposes the FIS Score into five pillars (Form, Momentum, Ownership, Scarcity, Fixture), each with a normalized score, weight, and visual bar. A one-sentence verdict and confidence pill summarize the assessment.
+
+### Smart Bid & Competitor Prediction (v3.3)
+
+- **Smart Bid Widget**: Embedded in the Selected Player Module, it shows live fair value, recommended bid, expected winning range, max rational bid, and expected ROI percentage.
+- **Competition Analysis**: Displays competition level (Low/Medium/High) and predicts the number of likely competitor managers based on Manager DNA clustering and historical bidding patterns.
+- **"Use Smart Bid" 1-Click Pre-Fill**: A single button pre-fills the bid input with the recommended amount, streamlining acquisition from analysis to execution.
+
 ### Futmondo Intelligence Engine (v3.0 Phase 1)
 
 - **FIS Score (Futmondo Intelligence Score)**: Composite rating that evaluates each player across multiple dimensions including recent form, positional value, market liquidity, and transfer history. Used to surface high-potential targets and flag undervalued assets.

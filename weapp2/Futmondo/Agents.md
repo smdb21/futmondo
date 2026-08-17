@@ -52,3 +52,11 @@ Every developer and AI agent making modifications or additions to the codebase *
 ## 6. Roadmap Phase Tracking Rule
 
 * **Tag Completed Roadmap Phases**: Every time an AI agent, developer, or subagent finishes implementing a milestone or phase from the product roadmap (`docs/v3_roadmap.md`), the agent **MUST** update `docs/v3_roadmap.md` to tag that phase as `[COMPLETED]` / `[IMPLEMENTED]` with a status checkmark, completion date, and short summary of delivered components.
+
+---
+
+## 7. Shiny Simulation Testing Rule
+
+* **Mandatory Test Updates for New Features**: Whenever a new module, UI component, major algorithm, or server handler is added or modified, developers and AI agents **MUST**:
+  1. Add corresponding automated simulation test cases into `test/test_shiny_simulation.R` (or a dedicated script in `test/`).
+  2. Verify that `Rscript test/test_shiny_simulation.R` runs cleanly with 100% passing tests before completing the task.

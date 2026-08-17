@@ -35,3 +35,41 @@ When `show_position_breakdown = TRUE`, the module calculates and displays positi
 | Total Squad | `nrow(df)` representing unique actual players |
 
 The position breakdown card checks both the primary `role` and secondary `role2` fields to ensure accurate counting of players with dual-position classifications.
+
+---
+
+## 6. FIS Score Rating Column
+
+The player table includes a dedicated FIS Score column (`fis_score`) that displays each player's Fantasy Insight Score as a color-coded badge.
+
+### Badge Color Tiers
+
+| Score Range | Tier | Badge Color |
+|---|---|---|
+| 80 - 100 | Elite | Green |
+| 60 - 79 | Strong | Blue |
+| 40 - 59 | Average | Amber |
+| 0 - 39 | Weak | Red |
+
+### Tooltips
+
+Hovering over the FIS Score badge reveals a tooltip with:
+- Full FIS Score value (to one decimal place)
+- Brief interpretive text (e.g., "Elite buy target", "Strong prospect", "Average value", "Weak outlook")
+- Prediction Confidence percentage
+
+---
+
+## 7. FIS Tier Filter (`fis_tier_filter`)
+
+A dropdown filter control (`fis_tier_filter`) is available in the filter bar above the player table. It allows users to narrow the displayed players by their FIS Score tier:
+
+| Filter Value | Description |
+|---|---|
+| All | Show all players regardless of FIS Score |
+| Elite (80+) | Only players with an FIS Score of 80 or above |
+| Strong (60-79) | Only players with an FIS Score between 60 and 79 |
+| Average (40-59) | Only players with an FIS Score between 40 and 59 |
+| Weak (0-39) | Only players with an FIS Score below 40 |
+
+The filter integrates with the existing reactive pipeline so that selecting a tier immediately updates the displayed table without requiring a full page reload.

@@ -66,7 +66,18 @@ if (filter_by_position) {
           },
           if (filter_by_change_value) {
             column(width = 2, div(title = "Filter players by minimum 24-hour market trend in millions of EUR", numericInput(inputId = ns("change_value_filter"), label = "Min Trend (M)", min = 0, max = 1, value = default_minimum_change_value, step = 0.05, width = "100%")))
-          }
+          },
+          div(
+            class = "col-sm-2 col-xs-6",
+            title = "Filter by Futmondo Intelligence Score rating tier",
+            selectInput(
+              inputId = ns("fis_tier_filter"),
+              label = "FIS Rating",
+              choices = c("All" = "All", "Strong Buy" = "Strong Buy", "Buy" = "Buy", "Hold" = "Hold", "Sell" = "Sell"),
+              selected = "All",
+              width = "100%"
+            )
+          )
         )
       },
 
@@ -168,6 +179,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
         updateCheckboxInput(session, inputId = "is_from_futmondo_filter", value = FALSE)
         updateCheckboxInput(session, inputId = "players_you_bid_filter", value = FALSE)
         updateCheckboxInput(session, inputId = "players_with_bid_filter", value = FALSE)
+        updateSelectInput(session, inputId = "fis_tier_filter", selected = "All")
       }, error = function(e) {
         warning(paste0("[Players Table] Clear filters error: ", e$message))
       })
@@ -212,6 +224,15 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       players_table <- players_table_RV()
       if (is.null(players_table) || nrow(players_table) == 0) {
         return(NULL)
+      }
+
+      # Ensure FIS scores are calculated if fis_score is not present
+      if (!"fis_score" %in% colnames(players_table)) {
+        tryCatch({
+          players_table <- calculate_fis_score(players_table)
+        }, error = function(e) {
+          warning(paste0("[Players Table] FIS score calculation failed: ", e$message))
+        })
       }
 
       # Apply local in-memory bid overrides if present
@@ -346,6 +367,13 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
           players_table <- players_table %>%
             # Number of Bids > 0
             dplyr::filter(numberOfBids > 0)
+        }
+      }
+      # FIS Tier filter
+      if (!is.null(input$fis_tier_filter) && input$fis_tier_filter != "All") {
+        if ("fis_tier" %in% colnames(players_table)) {
+          players_table <- players_table %>%
+            dplyr::filter(fis_tier == input$fis_tier_filter)
         }
       }
       return(players_table)

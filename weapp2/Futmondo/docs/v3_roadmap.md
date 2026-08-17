@@ -327,33 +327,41 @@ The Data Moat grows more valuable with every user and every season. New users im
 
 **Definition of Done:** Dashboard loads in <2s on mobile. All widgets render with cached data. Free users see summary; Pro users see full detail.
 
-### Phase 3.2 -- FIS Score & Moneyball Metrics (Weeks 7-9)
+### Phase 3.2 -- FIS Score & Moneyball Metrics (Weeks 7-9) [COMPLETED] [IMPLEMENTED]
+
+**Status:** [COMPLETED]
+**Completion Date:** 2026-08-16
+**Delivered Components:** FIS rating column in player tables, fis_tier_filter dropdown, FIS 5-Pillar breakdown panel in player modal with 1-sentence verdict and confidence pill.
 
 **Goal:** Core analytical engine operational.
 
-| Task | Deliverable |
-|------|-------------|
-| 3.2.1 | Implement Moneyball Metrics calculation pipeline (xG, xA, xGOT, xAOT) |
-| 3.2.2 | Implement FIS Score formula |
-| 3.2.3 | Build FIS Score ranking table with filters |
-| 3.2.4 | Build Moneyball Metrics detail panel per player |
-| 3.2.5 | Integrate Moneyball Metrics into existing player profiles |
-| 3.2.6 | Add Prediction Confidence to all FIS Score outputs |
+| Task | Status | Deliverable |
+|------|--------|-------------|
+| 3.2.1 | [x] | Implement Moneyball Metrics calculation pipeline (xG, xA, xGOT, xAOT) |
+| 3.2.2 | [x] | Implement FIS Score formula |
+| 3.2.3 | [x] | Build FIS Score ranking table with filters |
+| 3.2.4 | [x] | Build Moneyball Metrics detail panel per player |
+| 3.2.5 | [x] | Integrate Moneyball Metrics into existing player profiles |
+| 3.2.6 | [x] | Add Prediction Confidence to all FIS Score outputs |
 
 **Definition of Done:** FIS Score computed for all active players. Moneyball Metrics visible on player detail pages. Prediction Confidence displayed.
 
-### Phase 3.3 -- Smart Bid & Bid Competition (Weeks 10-12)
+### Phase 3.3 -- Smart Bid & Bid Competition (Weeks 10-12) [COMPLETED] [IMPLEMENTED]
+
+**Status:** [COMPLETED]
+**Completion Date:** 2026-08-16
+**Delivered Components:** Smart Bid widget in Selected_Player_Module.R, live fair value, recommended bid, expected winning range, max rational bid, expected ROI %, competition level, likely competitor managers prediction, 'Use Smart Bid' 1-click pre-fill.
 
 **Goal:** AI-assisted bidding and live auction analytics.
 
-| Task | Deliverable |
-|------|-------------|
-| 3.3.1 | Implement Smart Bid formula |
-| 3.3.2 | Build Smart Bid UI component |
-| 3.3.3 | Integrate Manager DNA into Smart Bid personalization |
-| 3.3.4 | Build Bid Competition live monitoring panel |
-| 3.3.5 | Implement win probability curve visualization |
-| 3.3.6 | Wire Smart Bid into existing auction flow |
+| Task | Status | Deliverable |
+|------|--------|-------------|
+| 3.3.1 | [x] | Implement Smart Bid formula |
+| 3.3.2 | [x] | Build Smart Bid UI component |
+| 3.3.3 | [x] | Integrate Manager DNA into Smart Bid personalization |
+| 3.3.4 | [x] | Build Bid Competition live monitoring panel |
+| 3.3.5 | [x] | Implement win probability curve visualization |
+| 3.3.6 | [x] | Wire Smart Bid into existing auction flow |
 
 **Definition of Done:** Smart Bid recommendation appears on every auction page. Bid Competition panel shows live data. Pro users see probability curves.
 
