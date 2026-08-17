@@ -213,7 +213,7 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
         if (!is.null(mkt) && is.null(sqd)) return(mkt)
 
         # Combine, deduplicate by id
-        combined <- bind_rows(mkt, sqd)
+        combined <- data.table::rbindlist(list(as.data.frame(mkt), as.data.frame(sqd)), fill = TRUE) %>% as.data.frame()
         if (nrow(combined) > 0 && "id" %in% colnames(combined)) {
           combined <- combined %>% dplyr::distinct(id, .keep_all = TRUE)
         }
@@ -520,15 +520,14 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
                 FIS = numeric(0),
                 Tier = character(0)
               ),
-              outlined = FALSE,
-              bordered = FALSE,
-              compact = TRUE,
-              showTitle = FALSE
-            )
-          )
-        }
+outlined = FALSE,
+               bordered = FALSE,
+               compact = TRUE
+             )
+           )
+         }
 
-        # Filter to high-FIS players and sort by FIS score descending
+         # Filter to high-FIS players and sort by FIS score descending
         radar_df <- mkt
         if ("fis_score" %in% colnames(radar_df)) {
           radar_df <- radar_df %>%
@@ -547,15 +546,14 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
                 FIS = numeric(0),
                 Tier = character(0)
               ),
-              outlined = FALSE,
-              bordered = FALSE,
-              compact = TRUE,
-              showTitle = FALSE
-            )
-          )
-        }
+outlined = FALSE,
+               bordered = FALSE,
+               compact = TRUE
+             )
+           )
+         }
 
-        display_df <- data.frame(
+         display_df <- data.frame(
           Player = if ("name" %in% colnames(radar_df)) as.character(radar_df$name) else rep("Unknown", nrow(radar_df)),
           Role = if ("role" %in% colnames(radar_df)) as.character(radar_df$role) else rep("-", nrow(radar_df)),
           Price = if ("value" %in% colnames(radar_df)) suppressWarnings(as.numeric(radar_df$value)) else rep(0, nrow(radar_df)),
@@ -567,13 +565,11 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
 
         reactable(
           display_df,
-          outlined = FALSE,
-          bordered = FALSE,
-          compact = TRUE,
-          showTitle = FALSE,
-          highlight = TRUE,
-          clickable = TRUE,
-          onClick = function(index) {
+outlined = FALSE,
+           bordered = FALSE,
+           compact = TRUE,
+           highlight = TRUE,
+           onClick = function(index) {
             pid <- display_df$PlayerID[index]
             if (!is.null(pid) && pid != "") {
               # Signal to the parent module to select this player

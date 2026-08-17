@@ -154,26 +154,29 @@ calculate_fis_score <- function(players_df, weights = NULL) {
     fis_score <- w_perf * perf + w_form * form + w_eff * efficiency +
                  w_mom * momentum + w_fix * fixture_risk
     fis_score <- safe_clamp(fis_score)
+    fis_score[is.na(fis_score) | is.nan(fis_score)] <- 50.0
 
     # ---- FIS tier ----
-    fis_tier <- ifelse(fis_score >= 80, "Strong Buy",
-                  ifelse(fis_score >= 65, "Buy",
-                  ifelse(fis_score >= 45, "Hold", "Sell")))
+fis_tier <- ifelse(fis_score >= 80, "Strong Buy",
+                   ifelse(fis_score >= 65, "Buy",
+                   ifelse(fis_score >= 45, "Hold", "Sell")))
+    fis_tier[is.na(fis_tier)] <- "Hold"
 
     # ---- FIS summary ----
     player_names <- if ("name" %in% colnames(players_df)) as.character(players_df$name) else rep("Player", n)
 
     fis_summary <- vapply(seq_len(n), function(i) {
-      tier_label <- fis_tier[i]
-      name_label <- player_names[i]
-      if (tier_label == "Strong Buy") {
-        paste0(name_label, ": Exceptional value with strong performance and positive market momentum (FIS=", round(fis_score[i], 1), ").")
-      } else if (tier_label == "Buy") {
-        paste0(name_label, ": Solid buy candidate with good form and efficiency metrics (FIS=", round(fis_score[i], 1), ").")
-      } else if (tier_label == "Hold") {
-        paste0(name_label, ": Neutral outlook; monitor for form changes before acting (FIS=", round(fis_score[i], 1), ").")
+      tier_label <- if (!is.na(fis_tier[i])) fis_tier[i] else "Hold"
+      name_label <- if (!is.na(player_names[i])) player_names[i] else "Player"
+      score_val  <- if (!is.na(fis_score[i])) round(fis_score[i], 1) else 50.0
+      if (identical(tier_label, "Strong Buy")) {
+        paste0(name_label, ": Exceptional value with strong performance and positive market momentum (FIS=", score_val, ").")
+      } else if (identical(tier_label, "Buy")) {
+        paste0(name_label, ": Solid buy candidate with good form and efficiency metrics (FIS=", score_val, ").")
+      } else if (identical(tier_label, "Hold")) {
+        paste0(name_label, ": Neutral outlook; monitor for form changes before acting (FIS=", score_val, ").")
       } else {
-        paste0(name_label, ": Weak metrics or negative trend; consider selling to free budget (FIS=", round(fis_score[i], 1), ").")
+        paste0(name_label, ": Weak metrics or negative trend; consider selling to free budget (FIS=", score_val, ").")
       }
     }, character(1))
 
