@@ -31,7 +31,8 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
     ns <- session$ns
     # renders ----
 output$team_value_box <- renderUI({
-       players_table <- players_table_RV()
+        req(is_module_active() == TRUE)
+        players_table <- players_table_RV()
        req(players_table)
 
        user_teams <- user_teams_RV()
