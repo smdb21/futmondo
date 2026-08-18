@@ -537,3 +537,422 @@ body, .wrapper {
     padding: 3px 8px !important;
     font-size: 11px !important;
 }
+
+/* ==================================================================
+   TACTICAL LINEUP SOCCER PITCH
+   ================================================================== */
+
+.soccer-pitch {
+    background: linear-gradient(180deg, #1e4620 0%, #153b17 50%, #1e4620 100%);
+    border-radius: 12px;
+    border: 2px solid #2e7d32;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), inset 0 0 60px rgba(0, 0, 0, 0.15);
+    min-height: 520px;
+    padding: 20px 10px;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Subtle turf stripe overlay */
+.soccer-pitch::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 48px,
+        rgba(255, 255, 255, 0.02) 48px,
+        rgba(255, 255, 255, 0.02) 96px
+    );
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Halfway line */
+.pitch-halfway-line {
+    position: absolute;
+    top: 50%;
+    left: 5%;
+    right: 5%;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.35);
+    transform: translateY(-1px);
+    z-index: 1;
+}
+
+/* Center circle */
+.pitch-center-circle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 80px;
+    height: 80px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1;
+}
+
+/* Center spot */
+.pitch-center-circle::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 6px;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+}
+
+/* Top penalty box */
+.pitch-penalty-box-top {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 50%;
+    height: 15%;
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    border-top: none;
+    z-index: 1;
+}
+
+/* Bottom penalty box */
+.pitch-penalty-box-bottom {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 50%;
+    height: 15%;
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    border-bottom: none;
+    z-index: 1;
+}
+
+/* ==================================================================
+   PITCH ROW (flex container for each line of players)
+   ================================================================== */
+
+.pitch-row {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    margin: 15px 0;
+    z-index: 2;
+    position: relative;
+}
+
+/* ==================================================================
+   PITCH PLAYER CARD (glassmorphic card for each player on the pitch)
+   ================================================================== */
+
+.pitch-player-card {
+    background: rgba(255, 255, 255, 0.92);
+    border-radius: 10px;
+    padding: 8px 10px;
+    text-align: center;
+    min-width: 95px;
+    max-width: 130px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    cursor: pointer;
+    position: relative;
+    z-index: 2;
+}
+
+.pitch-player-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+
+/* Player name (bold, truncated with ellipsis) */
+.pitch-player-name {
+    font-weight: 700;
+    font-size: 13px;
+    color: #0f172a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    line-height: 1.3;
+}
+
+/* Player role badge */
+.pitch-player-role {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 100px;
+    margin-top: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+/* Player value */
+.pitch-player-val {
+    font-size: 11px;
+    color: #555;
+    margin-top: 2px;
+    font-weight: 500;
+}
+
+/* Player FIS score pill */
+.pitch-player-fis {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 100px;
+    margin-top: 3px;
+    line-height: 1.5;
+}
+
+/* FIS color variants */
+.pitch-player-fis.fis-high {
+    background-color: #dcfce7;
+    color: #15803d;
+}
+.pitch-player-fis.fis-mid {
+    background-color: #fef9c3;
+    color: #a16207;
+}
+.pitch-player-fis.fis-low {
+    background-color: #fee2e2;
+    color: #b91c1c;
+}
+
+/* ==================================================================
+   TRANSFER CARD SWAP (comparison widget for transfer simulation)
+   ================================================================== */
+
+.transfer-card-swap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 16px 12px;
+    background: #f8fafc;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    overflow-x: auto;
+}
+
+.transfer-card-swap .swap-card {
+    flex: 1;
+    min-width: 140px;
+    max-width: 220px;
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Green buy card */
+.transfer-card-swap .swap-card-buy {
+    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+    border: 2px solid #6ee7b7;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.12);
+}
+
+.transfer-card-swap .swap-card-buy:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.2);
+}
+
+/* Red/gray sell card */
+.transfer-card-swap .swap-card-sell {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border: 2px solid #cbd5e1;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.transfer-card-swap .swap-card-sell:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+/* Swap arrow icon */
+.transfer-card-swap .swap-arrow {
+    font-size: 24px;
+    color: #64748b;
+    flex-shrink: 0;
+    animation: swap-pulse 2s ease-in-out infinite;
+}
+
+@keyframes swap-pulse {
+    0%, 100% { opacity: 0.6; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.1); }
+}
+
+/* Swap card inner text */
+.transfer-card-swap .swap-card-name {
+    font-weight: 700;
+    font-size: 13px;
+    color: #0f172a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.transfer-card-swap .swap-card-val {
+    font-size: 12px;
+    font-weight: 600;
+    margin-top: 4px;
+}
+
+.transfer-card-swap .swap-card-buy .swap-card-val {
+    color: #059669;
+}
+
+.transfer-card-swap .swap-card-sell .swap-card-val {
+    color: #64748b;
+}
+
+/* ==================================================================
+   SANDBOX KPI CARD (clean metric display with delta indicators)
+   ================================================================== */
+
+.sandbox-kpi-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    transition: box-shadow 0.2s ease;
+}
+
+.sandbox-kpi-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.sandbox-kpi-card .kpi-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+
+.sandbox-kpi-card .kpi-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.2;
+}
+
+.sandbox-kpi-card .kpi-delta {
+    font-size: 12px;
+    font-weight: 600;
+    margin-top: 4px;
+    display: inline-block;
+}
+
+/* Positive delta (green) */
+.sandbox-kpi-card .kpi-delta.delta-positive {
+    color: #10b981;
+}
+
+/* Negative delta (red) */
+.sandbox-kpi-card .kpi-delta.delta-negative {
+    color: #ef4444;
+}
+
+/* ==================================================================
+   MOBILE-FIRST RESPONSIVE RULES (max-width: 768px)
+   ================================================================== */
+
+@media (max-width: 768px) {
+    /* Pitch: reduce padding and min-height on mobile */
+    .soccer-pitch {
+        min-height: 420px;
+        padding: 12px 4px;
+        border-radius: 8px;
+    }
+
+    /* Pitch rows: tighter vertical spacing */
+    .pitch-row {
+        margin: 10px 0;
+    }
+
+    /* Player cards: narrower on mobile, smaller fonts */
+    .pitch-player-card {
+        min-width: 70px;
+        max-width: 100px;
+        padding: 6px 5px;
+        border-radius: 8px;
+    }
+
+    .pitch-player-name {
+        font-size: 11px;
+    }
+
+    .pitch-player-role {
+        font-size: 8px;
+        padding: 1px 4px;
+    }
+
+    .pitch-player-val {
+        font-size: 9px;
+    }
+
+    .pitch-player-fis {
+        font-size: 8px;
+        padding: 1px 4px;
+    }
+
+    /* Center circle smaller on mobile */
+    .pitch-center-circle {
+        width: 50px;
+        height: 50px;
+    }
+
+    /* Transfer swap: stack vertically on mobile */
+    .transfer-card-swap {
+        flex-direction: column;
+        gap: 8px;
+        padding: 12px 8px;
+    }
+
+    .transfer-card-swap .swap-card {
+        min-width: 100%;
+        max-width: 100%;
+        width: 100%;
+    }
+
+    .transfer-card-swap .swap-arrow {
+        transform: rotate(90deg);
+        font-size: 20px;
+    }
+
+    .transfer-card-swap .swap-card-name {
+        font-size: 12px;
+    }
+
+    .transfer-card-swap .swap-card-val {
+        font-size: 11px;
+    }
+
+    /* KPI cards: full-width, tighter padding */
+    .sandbox-kpi-card {
+        padding: 12px 8px;
+        width: 100%;
+    }
+
+    .sandbox-kpi-card .kpi-value {
+        font-size: 18px;
+    }
+
+    .sandbox-kpi-card .kpi-label {
+        font-size: 10px;
+    }
+}

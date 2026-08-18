@@ -209,6 +209,205 @@ fetch_user_smart_alerts(user_team_id, championship_id)
 
 ---
 
+## 5. optimize_starting_xi
+
+Runs a constraint satisfaction solver to select the optimal Starting 11 from the current squad, given a tactical formation and an optimization mode.
+
+### Parameters
+
+| Parameter | Type | Description |
+|---|---|---|
+| `squad_df` | data.frame | Current squad data with columns: `id`, `name`, `position`, `fis_score`, `perf`, `form`, `efficiency`, `momentum`, `fixture_risk`, `value`, `status`, `minutes_played` |
+| `formation` | character | One of: `"4-3-3"`, `"4-4-2"`, `"3-5-2"`, `"3-4-3"`, `"4-5-1"`, `"5-3-2"`, `"5-4-1"` |
+| `mode` | character | One of: `"Max FIS"`, `"Safe XI"`, `"Upside XI"`, `"Form XI"`, `"Fixture XI"` |
+
+### Formation Constraints
+
+Each formation dictates the minimum number of players per position:
+
+| Formation | GK | DEF | MID | FWD |
+|-----------|----|-----|-----|-----|
+| 4-3-3     | 1  | 4   | 3   | 3   |
+| 4-4-2     | 1  | 4   | 4   | 2   |
+| 3-5-2     | 1  | 3   | 5   | 2   |
+| 3-4-3     | 1  | 3   | 4   | 3   |
+| 4-5-1     | 1  | 4   | 5   | 1   |
+| 5-3-2     | 1  | 5   | 3   | 2   |
+| 5-4-1     | 1  | 5   | 4   | 1   |
+
+### Mode Scoring Formulas
+
+Each mode re-weights the FIS sub-scores to produce a mode-specific selection score:
+
+| Mode | Score Formula |
+|------|---------------|
+| Max FIS | `fis_score` (raw composite, no reweighting) |
+| Safe XI | `0.10 * perf + 0.10 * form + 0.10 * efficiency + 0.10 * momentum + 0.60 * fixture_risk` |
+| Upside XI | `0.10 * perf + 0.10 * form + 0.40 * efficiency + 0.40 * momentum + 0.00 * fixture_risk` |
+| Form XI | `0.10 * perf + 0.60 * form + 0.10 * efficiency + 0.10 * momentum + 0.10 * fixture_risk` |
+| Fixture XI | `0.10 * perf + 0.10 * form + 0.10 * efficiency + 0.10 * momentum + 0.60 * fixture_risk` |
+
+### Solver Approach
+
+1. **Pre-filter**: remove players with `status` = "Injured" or "Suspended".
+2. **Position assignment**: map each player to GK/DEF/MID/FWD based on `position` column.
+3. **Greedy initialization**: for each position bucket, pick the top-N players by mode score where N matches the formation constraint.
+4. **Local search**: iterate pairwise swaps across position boundaries to improve the total squad score while maintaining feasibility.
+5. **Tie-breaking**: if two lineups have equal total score, prefer the one with higher budget remaining (cheaper players).
+
+### Return Structure
+
+Returns a list with two elements:
+
+| Element | Type | Description |
+|---|---|---|
+| `starting_xi` | data.frame | 11 rows; columns: `id`, `name`, `position`, `fis_score`, `mode_score`, `perf`, `form`, `efficiency`, `momentum`, `fixture_risk` |
+| `bench` | data.frame | Remaining squad members; same columns as `starting_xi` |
+
+### Usage Example
+
+```R
+roster <- get_user_squad(login, user_team_id)
+roster <- calculate_fis_score(roster)
+
+result <- optimize_starting_xi(
+  squad_df = roster,
+  formation = "4-3-3",
+  mode = "Max FIS"
+)
+
+print(result$starting_xi[, c("name", "position", "fis_score", "mode_score")])
+cat("Bench size:", nrow(result$bench), "\n")
+```
+
+---
+
+## 6. recommend_transfers
+
+Generates a ranked list of recommended buy/sell transfer pairs that would improve the squad's overall FIS score while respecting budget constraints.
+
+### Parameters
+
+| Parameter | Type | Description |
+|---|---|---|
+| `squad_df` | data.frame | Current squad data with columns: `id`, `name`, `position`, `fis_score`, `value`, `status` |
+| `market_df` | data.frame | Available market data with columns: `id`, `name`, `position`, `fis_score`, `value`, `status` |
+| `current_budget` | numeric | Available cash in EUR |
+| `max_transfers` | integer | Maximum number of transfer recommendations to return (default 5) |
+
+### Algorithm
+
+1. **Sell candidates**: rank squad players by inverse FIS (lowest FIS first); exclude players with FIS >= squad median.
+2. **Buy candidates**: rank market players by FIS (highest first); filter to players whose FIS > squad median and whose `value` <= `current_budget`.
+3. **Pairing**: for each sell candidate, find the buy candidate at the same position (or adjacent position) with the highest FIS that fits within the budget after the sale.
+4. **Scoring**: compute `fis_impact = buy_fis - sell_fis` and `budget_impact = sell_value - buy_value`.
+5. **Ranking**: sort pairs by `fis_impact` descending, then by `budget_impact` descending (prefer pairs that improve FIS and leave budget intact).
+6. **Confidence**: compute `confidence_pct` based on data freshness, sample size of player stats, and market volatility (see Prediction Confidence formula in `v3_roadmap.md`).
+
+### Return Structure
+
+Returns a data.frame with one row per recommendation:
+
+| Column | Type | Description |
+|---|---|---|
+| `action` | character | `"Sell"` or `"Buy"` |
+| `player_id` | character | Player identifier |
+| `player_name` | character | Player name |
+| `position` | character | Player position |
+| `fis_impact` | numeric | Expected FIS change for the squad (+ for buys, - for sells) |
+| `budget_impact` | numeric | Expected budget change (sell_value - buy_value) |
+| `confidence` | numeric | Confidence score (0-100) |
+| `paired_with` | character | ID of the counter-transfer player (sell paired with buy and vice versa) |
+
+### Usage Example
+
+```R
+roster <- get_user_squad(login, user_team_id)
+roster <- calculate_fis_score(roster)
+market <- get_championship_players(login, championship_id)
+market <- calculate_fis_score(market)
+
+recs <- recommend_transfers(
+  squad_df = roster,
+  market_df = market,
+  current_budget = 50000000,
+  max_transfers = 5
+)
+
+print(recs[, c("action", "player_name", "fis_impact", "budget_impact", "confidence")])
+```
+
+---
+
+## 7. simulate_transfer_scenario
+
+Runs a what-if simulation of a specific set of sell and buy transfers, returning the projected squad composition, budget, and FIS metrics.
+
+### Parameters
+
+| Parameter | Type | Description |
+|---|---|---|
+| `squad_df` | data.frame | Current squad data with columns: `id`, `name`, `position`, `fis_score`, `value`, `status` |
+| `current_budget` | numeric | Available cash in EUR |
+| `sell_player_ids` | character vector | IDs of players to sell from the current squad |
+| `buy_player_ids` | character vector | IDs of players to buy from the market |
+| `market_df` | data.frame | Market data with columns: `id`, `name`, `position`, `fis_score`, `value`, `status` |
+
+### Computation Steps
+
+1. **Validate**: check that all `sell_player_ids` exist in `squad_df` and all `buy_player_ids` exist in `market_df`. Return error list if not.
+2. **Remove sells**: subset `squad_df` to exclude `sell_player_ids`. Sum their `value` to get `sell_proceeds`.
+3. **Add buys**: subset `market_df` to include only `buy_player_ids`. Sum their `value` to get `buy_costs`.
+4. **Budget delta**: `budget_delta = sell_proceeds - buy_costs`.
+5. **Projected budget**: `projected_budget = current_budget + budget_delta`. If `projected_budget < 0`, flag as invalid.
+6. **FIS delta**: `fis_delta = mean(buy_fis_scores) - mean(sell_fis_scores)`.
+7. **Projected squad**: union of remaining squad and bought players.
+8. **Projected avg FIS**: `mean(projected_squad$fis_score)`.
+
+### Return Structure
+
+Returns a list with the following elements:
+
+| Element | Type | Description |
+|---|---|---|
+| `budget_delta` | numeric | Net budget change (sell_proceeds - buy_costs) |
+| `projected_budget` | numeric | Budget after transfers |
+| `fis_delta` | numeric | Net FIS change (mean buy FIS - mean sell FIS) |
+| `projected_avg_fis` | numeric | Average FIS of the projected squad |
+| `sell_proceeds` | numeric | Total value from sold players |
+| `buy_costs` | numeric | Total cost of bought players |
+| `projected_squad` | data.frame | Full projected squad with columns: `id`, `name`, `position`, `fis_score`, `value`, `status`, `transfer_action` ("Sell", "Buy", or "Retained") |
+| `is_valid` | boolean | TRUE if `projected_budget >= 0` and all player IDs resolved |
+| `errors` | character vector | Empty if valid; contains error messages if validation failed |
+
+### Usage Example
+
+```R
+roster <- get_user_squad(login, user_team_id)
+roster <- calculate_fis_score(roster)
+market <- get_championship_players(login, championship_id)
+market <- calculate_fis_score(market)
+
+result <- simulate_transfer_scenario(
+  squad_df = roster,
+  current_budget = 50000000,
+  sell_player_ids = c("player-101", "player-202"),
+  buy_player_ids = c("player-303", "player-404"),
+  market_df = market
+)
+
+if (result$is_valid) {
+  cat("Budget delta:", result$budget_delta, "\n")
+  cat("FIS delta:", result$fis_delta, "\n")
+  cat("Projected avg FIS:", result$projected_avg_fis, "\n")
+  print(result$projected_squad[, c("name", "position", "fis_score", "transfer_action")])
+} else {
+  cat("Simulation errors:", paste(result$errors, collapse = ", "), "\n")
+}
+```
+
+---
+
 ## Defensive Programming
 
 All functions are wrapped in `tryCatch()` blocks to prevent user thread blocking or parent server crashes. Network failures, missing columns, and edge cases (empty data frames, NULL inputs) are handled gracefully with sensible defaults and error messages printed to the console.

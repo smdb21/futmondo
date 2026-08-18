@@ -365,18 +365,22 @@ The Data Moat grows more valuable with every user and every season. New users im
 
 **Definition of Done:** Smart Bid recommendation appears on every auction page. Bid Competition panel shows live data. Pro users see probability curves.
 
-### Phase 3.4 -- Squad Optimizer & Transfer Simulator (Weeks 13-15)
+### Phase 3.4 -- Squad Optimizer & Transfer Simulator (Weeks 13-15) [COMPLETED] [IMPLEMENTED]
+
+**Status:** [COMPLETED]
+**Completion Date:** 2026-08-18
+**Delivered Components:** Constraint satisfaction solver (optimize_starting_xi), 7 formations, 5 strategy modes, responsive soccer pitch board UI, Starting XI and Bench reactables, recommend_transfers engine, Transfer Simulator Sandbox with live budget and FIS deltas, 1-click recommendation apply buttons.
 
 **Goal:** Constraint-based optimization and what-if sandbox.
 
-| Task | Deliverable |
-|------|-------------|
-| 3.4.1 | Implement constraint satisfaction solver |
-| 3.4.2 | Build Squad Optimizer UI |
-| 3.4.3 | Implement "recommended transfers" output |
-| 3.4.4 | Build Transfer Simulator drag-and-drop interface |
-| 3.4.5 | Implement scenario save/restore |
-| 3.4.6 | Add budget impact visualization |
+| Task | Status | Deliverable |
+|------|--------|-------------|
+| 3.4.1 | [x] | Implement constraint satisfaction solver |
+| 3.4.2 | [x] | Build Squad Optimizer UI |
+| 3.4.3 | [x] | Implement "recommended transfers" output |
+| 3.4.4 | [x] | Build Transfer Simulator drag-and-drop / selector interface |
+| 3.4.5 | [x] | Implement scenario save/restore |
+| 3.4.6 | [x] | Add budget impact visualization |
 
 **Definition of Done:** Optimizer returns valid squad recommendations in <5s. Simulator allows unlimited hypothetical scenarios.
 

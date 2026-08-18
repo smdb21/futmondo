@@ -1741,6 +1741,321 @@ if (fis_panel_modal_test$status == "pass") {
 }
 
 # ===================================================================
+# PHASE 12: Lineup Optimizer & Transfer Sandbox (Players_in_Teams_Module)
+# ===================================================================
+
+# ---- 12a: optimize_starting_xi basic computation ----
+cat("\n  [12a] optimize_starting_xi basic computation...\n")
+
+optimizer_basic_test <- safe_capture("optimizer_basic", {
+  test_squad <- data.frame(
+    id = paste0("p", 1:15),
+    name = paste0("Player_", 1:15),
+    role = c(
+      "Goalkeeper", "Goalkeeper",
+      "Defender", "Defender", "Defender", "Defender", "Defender", "Defender",
+      "Midfielder", "Midfielder", "Midfielder", "Midfielder", "Midfielder",
+      "Forward", "Forward", "Forward"
+    ),
+    perf = c(70, 60, 80, 75, 72, 68, 65, 62, 85, 82, 78, 74, 70, 90, 88, 85),
+    form = c(65, 55, 78, 72, 70, 66, 63, 60, 80, 76, 74, 70, 68, 85, 82, 80),
+    momentum = c(70, 60, 80, 75, 72, 68, 65, 62, 85, 82, 78, 74, 70, 90, 88, 85),
+    fixture_risk = c(50, 50, 40, 45, 48, 52, 55, 58, 35, 38, 42, 46, 50, 30, 32, 35),
+    value = sample(10000000:100000000, 16),
+    stringsAsFactors = FALSE
+  )
+
+  result <- optimize_starting_xi(squad_df = test_squad, formation = "4-3-3", mode = "max_fis")
+
+  # Verify structure
+  if (is.null(result) || !is.list(result)) stop("optimize_starting_xi returned NULL or non-list")
+  if (!"starting_xi" %in% names(result)) stop("Missing 'starting_xi' in result")
+  if (!"bench" %in% names(result)) stop("Missing 'bench' in result")
+  if (!"formation" %in% names(result)) stop("Missing 'formation' in result")
+  if (!"mode" %in% names(result)) stop("Missing 'mode' in result")
+  if (!"total_score" %in% names(result)) stop("Missing 'total_score' in result")
+  if (!"avg_fis" %in% names(result)) stop("Missing 'avg_fis' in result")
+  if (!"feasible" %in% names(result)) stop("Missing 'feasible' in result")
+
+  # Verify starting XI has 11 players
+  if (nrow(result$starting_xi) != 11) stop(paste("Starting XI should have 11 players, got", nrow(result$starting_xi)))
+
+  # Verify bench has remaining players
+  expected_bench <- 16 - 11
+  if (nrow(result$bench) != expected_bench) stop(paste("Bench should have", expected_bench, "players, got", nrow(result$bench)))
+
+  # Verify total_score and avg_fis are numeric
+  if (is.na(result$total_score) || result$total_score <= 0) stop("total_score should be positive")
+  if (is.na(result$avg_fis) || result$avg_fis <= 0) stop("avg_fis should be positive")
+
+  cat(sprintf("    Formation: %s, XI size: %d, Bench: %d, Total Score: %.1f, Avg FIS: %.1f\n",
+              result$formation, nrow(result$starting_xi), nrow(result$bench), result$total_score, result$avg_fis))
+  TRUE
+})
+
+if (optimizer_basic_test$status == "pass") {
+  cat("  optimize_starting_xi basic: PASS\n")
+} else {
+  cat(sprintf("  optimize_starting_xi basic: FAIL - %s\n", optimizer_basic_test$trace))
+}
+
+# ---- 12b: optimize_starting_xi with different formations and modes ----
+cat("\n  [12b] optimize_starting_xi with different formations and modes...\n")
+
+optimizer_variants_test <- safe_capture("optimizer_variants", {
+  test_squad <- data.frame(
+    id = paste0("p", 1:15),
+    name = paste0("Player_", 1:15),
+    role = c(
+      "Goalkeeper", "Goalkeeper",
+      "Defender", "Defender", "Defender", "Defender", "Defender", "Defender",
+      "Midfielder", "Midfielder", "Midfielder", "Midfielder", "Midfielder",
+      "Forward", "Forward", "Forward"
+    ),
+    perf = runif(16, 50, 100),
+    form = runif(16, 50, 100),
+    momentum = runif(16, 50, 100),
+    fixture_risk = runif(16, 20, 80),
+    value = sample(10000000:100000000, 16),
+    stringsAsFactors = FALSE
+  )
+
+  formations <- c("4-3-3", "4-4-2", "3-5-2", "3-4-3", "4-5-1", "5-3-2", "5-4-1")
+  modes <- c("max_fis", "safe", "upside", "form", "fixture")
+
+  for (fmt in formations) {
+    for (mode in modes) {
+      result <- optimize_starting_xi(squad_df = test_squad, formation = fmt, mode = mode)
+      if (nrow(result$starting_xi) != 11) {
+        stop(paste("Formation", fmt, "mode", mode, "should produce 11 players"))
+      }
+      if (result$formation != fmt) {
+        stop(paste("Formation mismatch for", fmt))
+      }
+    }
+  }
+
+  cat(sprintf("    Tested %d formations x %d modes = %d combinations\n", length(formations), length(modes), length(formations) * length(modes)))
+  TRUE
+})
+
+if (optimizer_variants_test$status == "pass") {
+  cat("  optimize_starting_xi variants: PASS\n")
+} else {
+  cat(sprintf("  optimize_starting_xi variants: FAIL - %s\n", optimizer_variants_test$trace))
+}
+
+# ---- 12c: simulate_transfer_scenario basic computation ----
+cat("\n  [12c] simulate_transfer_scenario basic computation...\n")
+
+sandbox_basic_test <- safe_capture("sandbox_basic", {
+  test_squad <- data.frame(
+    id = c("s1", "s2", "s3", "s4", "s5"),
+    name = c("A", "B", "C", "D", "E"),
+    role = c("Forward", "Midfielder", "Defender", "Goalkeeper", "Forward"),
+    perf = c(80, 70, 60, 50, 90),
+    form = c(75, 65, 55, 45, 85),
+    momentum = c(78, 68, 58, 48, 88),
+    fixture_risk = c(40, 50, 60, 70, 35),
+    value = c(50000000, 40000000, 30000000, 20000000, 60000000),
+    stringsAsFactors = FALSE
+  )
+
+  test_market <- data.frame(
+    id = c("m1", "m2", "m3"),
+    name = c("X", "Y", "Z"),
+    role = c("Forward", "Midfielder", "Defender"),
+    perf = c(90, 85, 80),
+    form = c(88, 83, 78),
+    momentum = c(92, 87, 82),
+    fixture_risk = c(30, 35, 40),
+    value = c(70000000, 55000000, 45000000),
+    stringsAsFactors = FALSE
+  )
+
+  # Test: sell s1 (val=50M), buy m1 (val=70M), budget=100M
+  result <- simulate_transfer_scenario(
+    squad_df = test_squad,
+    current_budget = 100000000,
+    sell_player_ids = c("s1"),
+    buy_player_ids = c("m1"),
+    market_df = test_market
+  )
+
+  # Verify structure
+  if (is.null(result) || !is.list(result)) stop("simulate_transfer_scenario returned NULL")
+  if (!"projected_squad" %in% names(result)) stop("Missing 'projected_squad'")
+  if (!"total_sell_proceeds" %in% names(result)) stop("Missing 'total_sell_proceeds'")
+  if (!"total_buy_cost" %in% names(result)) stop("Missing 'total_buy_cost'")
+  if (!"projected_budget" %in% names(result)) stop("Missing 'projected_budget'")
+  if (!"delta_avg_fis" %in% names(result)) stop("Missing 'delta_avg_fis'")
+  if (!"is_budget_valid" %in% names(result)) stop("Missing 'is_budget_valid'")
+
+  # Verify projected squad: 5 - 1 + 1 = 5
+  if (nrow(result$projected_squad) != 5) stop(paste("Projected squad should have 5 players, got", nrow(result$projected_squad)))
+
+  # Verify budget: 100M + 50M - 70M = 80M
+  expected_budget <- 100000000 + 50000000 - 70000000
+  if (result$projected_budget != expected_budget) {
+    stop(paste("Projected budget should be", expected_budget, "got", result$projected_budget))
+  }
+
+  # Verify budget is valid
+  if (!result$is_budget_valid) stop("Budget should be valid")
+
+  cat(sprintf("    Sell proceeds: %d, Buy cost: %d, Budget: %d, Delta FIS: %.2f\n",
+              result$total_sell_proceeds, result$total_buy_cost, result$projected_budget, result$delta_avg_fis))
+  TRUE
+})
+
+if (sandbox_basic_test$status == "pass") {
+  cat("  simulate_transfer_scenario basic: PASS\n")
+} else {
+  cat(sprintf("  simulate_transfer_scenario basic: FAIL - %s\n", sandbox_basic_test$trace))
+}
+
+# ---- 12d: simulate_transfer_scenario with budget overflow ----
+cat("\n  [12d] simulate_transfer_scenario with budget overflow...\n")
+
+sandbox_overflow_test <- safe_capture("sandbox_overflow", {
+  test_squad <- data.frame(
+    id = c("s1", "s2"),
+    name = c("A", "B"),
+    role = c("Forward", "Midfielder"),
+    perf = c(80, 70),
+    form = c(75, 65),
+    momentum = c(78, 68),
+    fixture_risk = c(40, 50),
+    value = c(10000000, 20000000),
+    stringsAsFactors = FALSE
+  )
+
+  test_market <- data.frame(
+    id = c("m1"),
+    name = c("X"),
+    role = c("Forward"),
+    perf = c(95),
+    form = c(92),
+    momentum = c(96),
+    fixture_risk = c(20),
+    value = c(100000000),
+    stringsAsFactors = FALSE
+  )
+
+  # Budget of 5M, sell s1 (10M), buy m1 (100M) -> 5+10-100 = -85M (invalid)
+  result <- simulate_transfer_scenario(
+    squad_df = test_squad,
+    current_budget = 5000000,
+    sell_player_ids = c("s1"),
+    buy_player_ids = c("m1"),
+    market_df = test_market
+  )
+
+  if (result$is_budget_valid) stop("Budget should be invalid (negative)")
+  if (result$projected_budget >= 0) stop("Projected budget should be negative")
+
+  cat(sprintf("    Budget overflow detected correctly: projected_budget = %d, is_budget_valid = %s\n",
+              result$projected_budget, result$is_budget_valid))
+  TRUE
+})
+
+if (sandbox_overflow_test$status == "pass") {
+  cat("  simulate_transfer_scenario overflow: PASS\n")
+} else {
+  cat(sprintf("  simulate_transfer_scenario overflow: FAIL - %s\n", sandbox_overflow_test$trace))
+}
+
+# ---- 12e: recommend_transfers basic computation ----
+cat("\n  [12e] recommend_transfers basic computation...\n")
+
+rec_basic_test <- safe_capture("rec_basic", {
+  test_squad <- data.frame(
+    id = c("s1", "s2", "s3"),
+    name = c("Weak_F", "Med_M", "Strong_D"),
+    role = c("Forward", "Midfielder", "Defender"),
+    perf = c(40, 60, 80),
+    form = c(35, 55, 75),
+    momentum = c(38, 58, 78),
+    fixture_risk = c(70, 50, 30),
+    value = c(10000000, 30000000, 60000000),
+    stringsAsFactors = FALSE
+  )
+
+  test_market <- data.frame(
+    id = c("m1", "m2"),
+    name = c("Elite_F", "Pro_M"),
+    role = c("Forward", "Midfielder"),
+    perf = c(95, 85),
+    form = c(92, 82),
+    momentum = c(96, 86),
+    fixture_risk = c(15, 25),
+    value = c(50000000, 40000000),
+    stringsAsFactors = FALSE
+  )
+
+  result <- recommend_transfers(
+    squad_df = test_squad,
+    market_df = test_market,
+    current_budget = 50000000,
+    max_transfers = 5
+  )
+
+  if (is.null(result) || nrow(result) == 0) stop("recommend_transfers returned empty result")
+
+  # Verify columns
+  required_cols <- c("sell_id", "sell_name", "buy_id", "buy_name", "net_cost", "delta_fis", "roi_pct")
+  for (col in required_cols) {
+    if (!col %in% colnames(result)) stop(paste("Missing column:", col))
+  }
+
+  # All delta_fis should be positive
+  if (any(result$delta_fis <= 0, na.rm = TRUE)) stop("All delta_fis should be positive")
+
+  # Results should be sorted by delta_fis descending
+  if (!all(diff(result$delta_fis) <= 0)) stop("Results should be sorted by delta_fis descending")
+
+  cat(sprintf("    Recommendations: %d, Top delta_fis: %.2f\n", nrow(result), result$delta_fis[1]))
+  TRUE
+})
+
+if (rec_basic_test$status == "pass") {
+  cat("  recommend_transfers basic: PASS\n")
+} else {
+  cat(sprintf("  recommend_transfers basic: FAIL - %s\n", rec_basic_test$trace))
+}
+
+# ---- 12f: Players_in_Teams_Module UI structure with tabsetPanel ----
+cat("\n  [12f] Players_in_Teams_Module UI structure with tabsetPanel...\n")
+
+pit_ui_structure_test <- safe_capture("pit_ui_structure", {
+  ui_result <- players_in_teams_UI(id = "test_pit")
+
+  if (is.null(ui_result)) stop("players_in_teams_UI returned NULL")
+
+  # The UI should contain a tabsetPanel with 3 tabPanels
+  # We verify by checking the tagList structure for key components
+  ui_str <- capture.output(print(ui_result))
+  ui_text <- paste(ui_str, collapse = "\n")
+
+  # Check for tabsetPanel
+  if (!grepl("tabsetPanel", ui_text)) stop("UI should contain tabsetPanel")
+
+  # Check for tab labels
+  if (!grepl("Squad Roster", ui_text)) stop("UI should contain Squad Roster tab")
+  if (!grepl("Lineup Optimizer", ui_text)) stop("UI should contain Lineup Optimizer tab")
+  if (!grepl("Transfer Sandbox", ui_text)) stop("UI should contain Transfer Sandbox tab")
+
+  cat("    UI structure verified: tabsetPanel with 3 tabs (Squad Roster, Lineup Optimizer, Transfer Sandbox)\n")
+  TRUE
+})
+
+if (pit_ui_structure_test$status == "pass") {
+  cat("  Players_in_Teams_Module UI structure: PASS\n")
+} else {
+  cat(sprintf("  Players_in_Teams_Module UI structure: FAIL - %s\n", pit_ui_structure_test$trace))
+}
+
+# ===================================================================
 # FINAL SUMMARY
 # ===================================================================
 cat("\n======================================================================\n")
