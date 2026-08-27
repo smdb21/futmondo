@@ -100,7 +100,7 @@ if (filter_by_position) {
               div(checkboxInput(inputId = ns("players_with_bid_filter"), label = "Bidded Only", value = FALSE), style = "font-weight: 500;", title = "Show only players with active bids from any league team")
             )
           },
-          div(actionButton(ns("btn_clear_filters"), icon("eraser"), "Clear Filters", class = "btn btn-sm btn-outline-secondary"), style = "margin-left: 10px;", title = "Reset all table filters to default values")
+          div(actionButton(ns("btn_clear_filters"), label = "Clear Filters", icon = icon("eraser"), class = "btn btn-sm btn-outline-secondary"), style = "margin-left: 10px;", title = "Reset all table filters to default values")
         )
       },
 

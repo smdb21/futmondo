@@ -10,7 +10,7 @@ Sends a DELETE request to the Supabase REST API for a given table.
 
 **Parameters:**
 - `table_name` (character): The name of the Supabase table to delete from.
-- `filter` (character, default `"id=neq.00000000-0000-0000-0000-000000000000"`): A filter string in the format `"column=operator.value"`. For text PK tables, use a UUID-neq filter. For bigint PK tables, use `"id=gte.0"`.
+- `filter` (character, default `"id=neq.00000000-0000-0000-0000-0000-000000000000"`): A filter string in the format `"column=operator.value"`. The reset flow uses `<primary key>=not.is.null` (e.g. `"id=not.is.null"`, or `"team_id=not.is.null"` for `manager_dna_profiles`).
 
 **Return:** A named list with fields:
 - `status` (character): One of `"deleted"`, `"error"`, or `"skipped"`.
@@ -19,28 +19,26 @@ Sends a DELETE request to the Supabase REST API for a given table.
 
 **Usage:**
 ```R
-supabase_delete("championships", filter = "id=neq.00000000-0000-0000-0000-000000000000")
-supabase_delete("user_team_history", filter = "id=gte.0")
+supabase_delete("championships", filter = "id=not.is.null")
+supabase_delete("manager_dna_profiles", filter = "team_id=not.is.null")
 ```
 
 ---
 
 ### `supabase_delete_all(table_name)`
 
-Deletes all rows from a table, selecting the appropriate filter based on the primary key type.
+Deletes all rows from a known table using the filter `<primary key>=not.is.null`. The primary key is resolved by `supabase_primary_key()`: `manager_dna_profiles` uses `team_id`, and all other tables use `id`. Unknown tables are rejected with an error status.
 
 **Parameters:**
-- `table_name` (character): The name of the Supabase table.
+- `table_name` (character): The name of the Supabase table. Must be one of the 12 known tables handled by the connector.
 
 **Return:** A named list (same shape as `supabase_delete`).
 
-**PK Type Mapping:**
-| BigInt PK | Text PK |
+**Primary Key Mapping:**
+| Table | Primary key |
 |---|---|
-| `user_team_history` | `championships` |
-| `player_history` | `real_clubs` |
-| `market_transactions` | `players` |
-| | `user_teams` |
+| `manager_dna_profiles` | `team_id` |
+| all other tables | `id` |
 
 **Usage:**
 ```R
@@ -57,13 +55,20 @@ Resets all tables to an empty state in child-to-parent order to respect foreign 
 - `force` (logical, default `FALSE`): Must be `TRUE` to proceed.
 
 **Reset Order (child to parent):**
-1. `market_transactions`
-2. `player_history`
-3. `user_team_history`
-4. `user_teams`
-5. `players`
-6. `real_clubs`
-7. `championships`
+1. `user_smart_alerts`
+2. `decision_log`
+3. `manager_dna_profiles`
+4. `player_daily_snapshots`
+5. `round_dream_team`
+6. `market_transactions`
+7. `player_history`
+8. `user_team_history`
+9. `user_teams`
+10. `players`
+11. `real_clubs`
+12. `championships`
+
+The system handles all 12 existing `required_tables` from the connector.
 
 **Return:** A named list mapping table names to status strings.
 
@@ -81,10 +86,12 @@ Verifies that all required Supabase tables are accessible on startup. Does not h
 **Parameters:**
 - `verbose` (logical, default `FALSE`): If `TRUE`, prints per-table status to console.
 
-**Return:** `TRUE` if all tables respond with HTTP 200, otherwise `FALSE`.
+**Return:** `TRUE` if all tables respond with a 2xx HTTP status, otherwise `FALSE`.
 
-**Tables Verified:**
-- `championships`, `real_clubs`, `players`, `user_teams`, `user_team_history`, `player_history`, `market_transactions`
+**Tables Verified (all 12 `required_tables` from the connector):**
+- `championships`, `real_clubs`, `players`, `user_teams`, `user_team_history`, `player_history`, `market_transactions`, `round_dream_team`, `player_daily_snapshots`, `manager_dna_profiles`, `decision_log`, `user_smart_alerts`
+
+Each probe selects the table's primary key via `supabase_primary_key()` (`team_id` for `manager_dna_profiles`, `id` for all other tables).
 
 **Usage:**
 ```R
@@ -183,13 +190,13 @@ Rscript scripts/populate_db.R
 3. Logs in via `login()` using `.Renviron` credentials.
 4. Retrieves the active championship ID via `get_championships()`.
 5. Calls `populate_entire_database(login, championship_id, verbose = TRUE)`.
-6. Fetches and displays row counts for all 7 tables via `get_table_row_counts()`.
+6. Fetches and displays row counts for all 12 tables via `get_table_row_counts()`.
 
 ---
 
 ## `scripts/schema.sql`
 
-Complete DDL for all seven tables plus five high-performance indices. Includes `is_active` in `user_teams` and `round_number` / `active_teams_count` in `user_team_history`. Execute via the Supabase SQL Editor to create or update the schema.
+Canonical DDL for all 12 tables plus high-performance indices. It creates a fresh schema only: PostgreSQL `CREATE TABLE IF NOT EXISTS` does not add columns to tables that already exist. For an existing installation, see the "Existing-install upgrade" section in `docs/database_schema.md`.
 
 ## Integration with `global.R`
 

@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS user_teams (
     points INTEGER DEFAULT 0,
     position INTEGER,
     team_value BIGINT DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -60,6 +61,8 @@ CREATE TABLE IF NOT EXISTS user_team_history (
     budget BIGINT NOT NULL,
     position INTEGER,
     team_value BIGINT DEFAULT 0,
+    round_number INTEGER,
+    active_teams_count INTEGER,
     recorded_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -162,6 +165,16 @@ CREATE TABLE IF NOT EXISTS user_smart_alerts (
     is_read BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+```
+
+## Existing-install upgrade
+
+`scripts/schema.sql` is the canonical DDL for fresh installations. PostgreSQL `CREATE TABLE IF NOT EXISTS` does not add columns to tables that already exist. For an existing deployment created before these fields were added, run this idempotent upgrade in the Supabase SQL Editor:
+
+```sql
+ALTER TABLE user_teams ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+ALTER TABLE user_team_history ADD COLUMN IF NOT EXISTS round_number INTEGER;
+ALTER TABLE user_team_history ADD COLUMN IF NOT EXISTS active_teams_count INTEGER;
 ```
 
 ---

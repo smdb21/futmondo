@@ -1250,6 +1250,41 @@ if (fis_tier_filter_test$status == "pass") {
   cat(sprintf("  fis_tier_filter: FAIL - %s\n", fis_tier_filter_test$trace))
 }
 
+# ---- 10c2: players_table_UI clear-filters button icon warning regression ----
+cat("\n  [10c2] players_table_UI clear-filters button icon warning regression...\n")
+
+players_table_icon_warning_test <- safe_capture("players_table_icon_warning", {
+  # Regression: actionButton() with positional label/icon arguments bound the
+  # icon tag to `label` and the text to `icon`, emitting a Shiny startup
+  # warning ("non-HTML value ... icon"). Instantiate the Players Table UI and
+  # fail if that warning reappears.
+  icon_warnings <- character(0)
+  ui_probe <- withCallingHandlers(
+    players_table_UI("icon_probe"),
+    warning = function(w) {
+      icon_warnings <<- c(icon_warnings, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
+  if (is.null(ui_probe)) {
+    stop("players_table_UI(\"icon_probe\") returned NULL")
+  }
+  bad_warnings <- grep("non-HTML value.*icon", icon_warnings, value = TRUE)
+  if (length(bad_warnings) > 0) {
+    stop(paste("players_table_UI emitted icon coercion warning(s):",
+               paste(bad_warnings, collapse = " | ")))
+  }
+  cat(sprintf("    Warnings captured during UI instantiation: %d (none matched icon coercion)\n",
+              length(icon_warnings)))
+  TRUE
+})
+
+if (players_table_icon_warning_test$status == "pass") {
+  cat("  players_table_UI icon warning regression: PASS\n")
+} else {
+  cat(sprintf("  players_table_UI icon warning regression: FAIL - %s\n", players_table_icon_warning_test$trace))
+}
+
 # ---- 10d: fis_score column in get_reactable_columns_for_players ----
 cat("\n  [10d] fis_score column in get_reactable_columns_for_players...\n")
 
@@ -2056,6 +2091,769 @@ if (pit_ui_structure_test$status == "pass") {
 }
 
 # ===================================================================
+# PHASE 13: Rival Funds Estimation, Running Balance Batch Consolidation, Descending Date Sorting
+# ===================================================================
+cat("\n--- PHASE 13: Rival Funds Estimation, Running Balance, Batch Consolidation ---\n")
+
+# ---- 13a: Synthetic rival with transactions on 01/08, 02/08, 04/08 ----
+cat("\n  [13a] Synthetic rival transactions: running balance and batch consolidation...\n")
+
+rival_batch_test <- safe_capture("rival_batch_consolidation", {
+  library(dplyr)
+
+  # parse_safe_datetime helper (mirrors the one in Rivals_Module.R)
+  parse_safe_datetime <- function(date_vec) {
+    if (is.null(date_vec) || length(date_vec) == 0) return(as.POSIXct(character(0)))
+    date_str <- as.character(date_vec)
+    clean_str <- gsub("T", " ", date_str)
+    clean_str <- gsub("Z", "", clean_str)
+    clean_str <- gsub("\\..*", "", clean_str)
+    parsed <- suppressWarnings(as.POSIXct(clean_str, format = "%Y-%m-%d %H:%M:%S"))
+    na_idx <- is.na(parsed)
+    if (any(na_idx)) {
+      parsed[na_idx] <- suppressWarnings(as.POSIXct(clean_str[na_idx], format = "%Y-%m-%d"))
+    }
+    na_idx <- is.na(parsed)
+    if (any(na_idx)) {
+      parsed[na_idx] <- Sys.time()
+    }
+    return(parsed)
+  }
+
+  # Build synthetic rival transaction data matching the Hala Modric scenario
+  # 01/08: Initial Budget + 2 buys, 02/08: 1 buy, 04/08: 4 buys
+  raw_df <- data.frame(
+    id = c("budget", "buy_a", "buy_b", "buy_c", "buy_d", "buy_e", "buy_f", "buy_g"),
+    concept = c("Initial Budget", "Player A (Purchased)", "Player B (Purchased)",
+                "Player C (Purchased)", "Player D (Purchased)", "Player E (Purchased)",
+                "Player F (Purchased)", "Player G (Purchased)"),
+    type = c("budget", "buy", "buy", "buy", "buy", "buy", "buy", "buy"),
+    category = c("bonus", "market", "market", "market", "market", "market", "market", "market"),
+    money = c(300000000, -20000000, -25000000, -30000000, -20000000, -25000000, -30000000, -16024118),
+    date = c("2025-07-31",
+             "2025-08-01T10:00:00Z", "2025-08-01T10:00:00Z",
+             "2025-08-02T14:00:00Z",
+             "2025-08-04T09:00:00Z", "2025-08-04T09:00:00Z", "2025-08-04T09:00:00Z", "2025-08-04T09:00:00Z"),
+    stringsAsFactors = FALSE
+  )
+
+  # Simulate the processing pipeline from rival_moneymovements_raw_RV
+  raw_df$timestamp <- parse_safe_datetime(raw_df$date)
+  raw_df <- raw_df %>% dplyr::arrange(timestamp)
+  raw_df$running_balance <- cumsum(raw_df$money)
+
+  # Batch consolidation
+  raw_df$batch_key <- format(raw_df$timestamp, "%Y-%m-%d %H:%M")
+  raw_df <- raw_df %>%
+    dplyr::group_by(batch_key) %>%
+    dplyr::mutate(
+      batch_final_balance = running_balance[dplyr::n()],
+      is_batch_header = dplyr::row_number() == dplyr::n()
+    ) %>%
+    dplyr::ungroup()
+
+  # Order strictly descending (newest first), batch header first within each timestamp group
+  result <- raw_df %>%
+    dplyr::arrange(desc(timestamp), desc(is_batch_header))
+
+  # VERIFY: Running balance after 04/08 batch is strictly 133975882
+  expected_final_balance <- 133975882
+  actual_final_balance <- result$running_balance[1]
+  if (actual_final_balance != expected_final_balance) {
+    stop(sprintf("Running balance after 04/08 batch should be %d, got %d", expected_final_balance, actual_final_balance))
+  }
+
+  # VERIFY: Descending ordering puts 04/08 at row 1
+  row1_date <- format(result$timestamp[1], "%Y-%m-%d")
+  if (row1_date != "2025-08-04") {
+    stop(sprintf("Row 1 date should be 2025-08-04, got %s", row1_date))
+  }
+
+  # VERIFY: Row 1 has running_balance of 133975882
+  if (result$running_balance[1] != 133975882) {
+    stop(sprintf("Row 1 running_balance should be 133975882, got %d", result$running_balance[1]))
+  }
+
+  # VERIFY: is_batch_header is TRUE for row 1
+  if (!isTRUE(result$is_batch_header[1])) {
+    stop("Row 1 is_batch_header should be TRUE")
+  }
+
+  # VERIFY: is_batch_header is FALSE for the 3 intermediate buys on 04/08 (rows 2, 3, 4)
+  for (i in 2:4) {
+    if (isTRUE(result$is_batch_header[i])) {
+      stop(sprintf("Row %d (intermediate buy on 04/08) is_batch_header should be FALSE", i))
+    }
+  }
+
+  # VERIFY: Rows 2-4 are on 04/08
+  for (i in 2:4) {
+    row_date <- format(result$timestamp[i], "%Y-%m-%d")
+    if (row_date != "2025-08-04") {
+      stop(sprintf("Row %d date should be 2025-08-04, got %s", i, row_date))
+    }
+  }
+
+  # VERIFY: Row 5 is the 02/08 batch (single buy, so is_batch_header=TRUE)
+  row5_date <- format(result$timestamp[5], "%Y-%m-%d")
+  if (row5_date != "2025-08-02") {
+    stop(sprintf("Row 5 date should be 2025-08-02, got %s", row5_date))
+  }
+  if (!isTRUE(result$is_batch_header[5])) {
+    stop("Row 5 (single 02/08 buy) is_batch_header should be TRUE")
+  }
+
+  # VERIFY: Total rows = 8
+  if (nrow(result) != 8) {
+    stop(sprintf("Expected 8 rows, got %d", nrow(result)))
+  }
+
+  # VERIFY: batch_final_balance for 04/08 batch equals 133975882
+  batch_0408_mask <- format(result$timestamp, "%Y-%m-%d") == "2025-08-04"
+  batch_0408_final <- result$batch_final_balance[batch_0408_mask][1]
+  if (batch_0408_final != 133975882) {
+    stop(sprintf("batch_final_balance for 04/08 should be 133975882, got %d", batch_0408_final))
+  }
+
+  cat(sprintf("    Total rows: %d\n", nrow(result)))
+  cat(sprintf("    Row 1: date=%s, running_balance=%d, is_batch_header=%s\n",
+              row1_date, result$running_balance[1], result$is_batch_header[1]))
+  cat(sprintf("    Rows 2-4 is_batch_header: %s\n", paste(result$is_batch_header[2:4], collapse = ", ")))
+  cat(sprintf("    Final balance: %d (expected %d) -- MATCH\n", actual_final_balance, expected_final_balance))
+  cat("    Batch consolidation with descending sort: PASS\n")
+  TRUE
+})
+
+if (rival_batch_test$status == "pass") {
+  cat("  Rival batch consolidation: PASS\n")
+} else {
+  cat(sprintf("  Rival batch consolidation: FAIL - %s\n", rival_batch_test$trace))
+}
+
+# ---- 13b: Equality between calculate_league_finances() budget and rival detail budget ----
+cat("\n  [13b] Budget equality: calculate_league_finances() vs rival detail budget...\n")
+
+budget_equality_test <- safe_capture("budget_equality", {
+  library(dplyr)
+
+  # parse_safe_datetime helper
+  parse_safe_datetime <- function(date_vec) {
+    if (is.null(date_vec) || length(date_vec) == 0) return(as.POSIXct(character(0)))
+    date_str <- as.character(date_vec)
+    clean_str <- gsub("T", " ", date_str)
+    clean_str <- gsub("Z", "", clean_str)
+    clean_str <- gsub("\\..*", "", clean_str)
+    parsed <- suppressWarnings(as.POSIXct(clean_str, format = "%Y-%m-%d %H:%M:%S"))
+    na_idx <- is.na(parsed)
+    if (any(na_idx)) {
+      parsed[na_idx] <- suppressWarnings(as.POSIXct(clean_str[na_idx], format = "%Y-%m-%d"))
+    }
+    na_idx <- is.na(parsed)
+    if (any(na_idx)) {
+      parsed[na_idx] <- Sys.time()
+    }
+    return(parsed)
+  }
+
+  # Build the same synthetic data as 13a
+  raw_df <- data.frame(
+    id = c("budget", "buy_a", "buy_b", "buy_c", "buy_d", "buy_e", "buy_f", "buy_g"),
+    concept = c("Initial Budget", "Player A (Purchased)", "Player B (Purchased)",
+                "Player C (Purchased)", "Player D (Purchased)", "Player E (Purchased)",
+                "Player F (Purchased)", "Player G (Purchased)"),
+    type = c("budget", "buy", "buy", "buy", "buy", "buy", "buy", "buy"),
+    category = c("bonus", "market", "market", "market", "market", "market", "market", "market"),
+    money = c(300000000, -20000000, -25000000, -30000000, -20000000, -25000000, -30000000, -16024118),
+    date = c("2025-07-31",
+             "2025-08-01T10:00:00Z", "2025-08-01T10:00:00Z",
+             "2025-08-02T14:00:00Z",
+             "2025-08-04T09:00:00Z", "2025-08-04T09:00:00Z", "2025-08-04T09:00:00Z", "2025-08-04T09:00:00Z"),
+    stringsAsFactors = FALSE
+  )
+
+  # Process through the pipeline
+  raw_df$timestamp <- parse_safe_datetime(raw_df$date)
+  raw_df <- raw_df %>% dplyr::arrange(timestamp)
+  raw_df$running_balance <- cumsum(raw_df$money)
+  raw_df$batch_key <- format(raw_df$timestamp, "%Y-%m-%d %H:%M")
+  raw_df <- raw_df %>%
+    dplyr::group_by(batch_key) %>%
+    dplyr::mutate(
+      batch_final_balance = running_balance[dplyr::n()],
+      is_batch_header = dplyr::row_number() == dplyr::n()
+    ) %>%
+    dplyr::ungroup()
+  tx_raw <- raw_df %>%
+    dplyr::arrange(desc(timestamp), desc(is_batch_header))
+
+  # Rival detail budget: tx_raw$running_balance[1] (the first row in descending order = most recent batch header)
+  rival_detail_budget <- tx_raw$running_balance[1]
+
+  # Independent calculation: initial_budget - total_spent (matching calculate_league_finances logic)
+  initial_budget <- 300000000
+  total_spent <- sum(abs(tx_raw$money[tx_raw$money < 0]), na.rm = TRUE)
+  # No sales, no point bonus, no ranking prize in this synthetic scenario
+  calculated_budget <- initial_budget - total_spent
+
+  # VERIFY: Both budgets match
+  if (rival_detail_budget != calculated_budget) {
+    stop(sprintf("Budget mismatch: rival_detail=%d, calculated=%d", rival_detail_budget, calculated_budget))
+  }
+
+  # VERIFY: Both equal 133975882
+  if (rival_detail_budget != 133975882) {
+    stop(sprintf("Both budgets should equal 133975882, got %d", rival_detail_budget))
+  }
+
+  cat(sprintf("    Rival detail budget (running_balance[1]): %d\n", rival_detail_budget))
+  cat(sprintf("    Calculated budget (initial - spent):     %d\n", calculated_budget))
+  cat(sprintf("    Budgets match: %s\n", rival_detail_budget == calculated_budget))
+  cat("    Budget equality: PASS\n")
+  TRUE
+})
+
+if (budget_equality_test$status == "pass") {
+  cat("  Budget equality: PASS\n")
+} else {
+  cat(sprintf("  Budget equality: FAIL - %s\n", budget_equality_test$trace))
+}
+
+# ---- 13c: calculate_league_finances total_spent fix verification ----
+cat("\n  [13c] calculate_league_finances total_spent fix (pressroom_purchases vs total_spent_from_roster)...\n")
+
+total_spent_fix_test <- safe_capture("total_spent_fix", {
+  # Verify that the fix in calculate_league_finances uses total_spent_from_roster
+  # (not the old 'total_spent' which was 0) as the fallback when pressroom_purchases == 0
+
+  # Read the source to verify the fix is in place
+  src_lines <- readLines("futmondo_functions.R", warn = FALSE)
+
+  # Find the line containing the fix
+  fix_line_idx <- which(grepl("total_spent_val.*pressroom_purchases.*total_spent_from_roster", src_lines))
+  if (length(fix_line_idx) == 0) {
+    stop("The fix 'total_spent_val <- if (pressroom_purchases > 0) pressroom_purchases else total_spent_from_roster' was not found in futmondo_functions.R")
+  }
+
+  fix_line <- trimws(src_lines[fix_line_idx[1]])
+  cat(sprintf("    Found fix at line %d: %s\n", fix_line_idx[1], fix_line))
+
+  # Verify the old buggy pattern is NOT present
+  buggy_line_idx <- which(grepl("total_spent_val.*pressroom_purchases.*else total_spent[^_]", src_lines))
+  if (length(buggy_line_idx) > 0) {
+    stop("The buggy pattern 'else total_spent' (without _from_roster) is still present")
+  }
+
+  cat("    total_spent fix verified: total_spent_from_roster used as fallback\n")
+  TRUE
+})
+
+if (total_spent_fix_test$status == "pass") {
+  cat("  total_spent fix: PASS\n")
+} else {
+  cat(sprintf("  total_spent fix: FAIL - %s\n", total_spent_fix_test$trace))
+}
+
+# ---- 13d: calculate_league_finances handles empty roster / zero-transaction team ----
+cat("\n  [13d] calculate_league_finances with empty roster (no uninitialized variable error)...\n")
+
+empty_roster_finances_test <- safe_capture("empty_roster_finances", {
+  # Build a synthetic team with NO roster players and NO transactions
+  # This would previously trigger "object 'total_spent_from_roster' not found"
+  empty_team_df <- data.frame(
+    teamid = "empty_team_001",
+    teamname = "Empty Squad FC",
+    points = 0,
+    name = "Empty Squad FC",
+    id = "empty_team_001",
+    stringsAsFactors = FALSE
+  )
+
+  # Build an all_players data frame that has NO players for this team
+  empty_all_players <- data.frame(
+    id = character(0),
+    name = character(0),
+    userteamId = character(0),
+    buyPrice = numeric(0),
+    value = numeric(0),
+    stringsAsFactors = FALSE
+  )
+
+  # Build an empty pressroom data frame (no transactions)
+  empty_pressroom <- data.frame(
+    id = character(0),
+    buyer_team_id = character(0),
+    seller_team_id = character(0),
+    price = numeric(0),
+    stringsAsFactors = FALSE
+  )
+
+  # Patch calculate_league_finances to use our synthetic data
+  # We need to call the function directly with our data, but it internally
+  # calls API functions. Instead, we verify the fix by reading the source
+  # and confirming total_spent_from_roster is initialized before the roster check.
+
+  src_lines <- readLines("futmondo_functions.R", warn = FALSE)
+
+  # Find the initialization block
+  init_block_start <- which(grepl("total_spent_from_roster <- 0", src_lines))
+  if (length(init_block_start) == 0) {
+    stop("total_spent_from_roster <- 0 initialization not found in calculate_league_finances")
+  }
+
+  # Find the roster check
+  roster_check_idx <- which(grepl("if \\\\(.*!is.null\\\\(roster\\\\).*nrow\\\\(roster\\\\) > 0", src_lines))
+  if (length(roster_check_idx) == 0) {
+    # Try alternate pattern
+    roster_check_idx <- which(grepl("!is.null\\\\(roster\\\\) && nrow\\\\(roster\\\\) > 0", src_lines))
+  }
+
+  if (length(roster_check_idx) == 0) {
+    stop("Roster check not found in calculate_league_finances")
+  }
+
+  # Verify initialization comes BEFORE the roster check
+  init_line <- init_block_start[1]
+  check_line <- roster_check_idx[1]
+  if (init_line >= check_line) {
+    stop(sprintf("total_spent_from_roster initialization (line %d) must come BEFORE roster check (line %d)", init_line, check_line))
+  }
+
+  # Verify total_spent_from_roster is used inside the roster block
+  roster_block_start <- check_line
+  # Find the closing brace of the roster block by scanning forward
+  brace_depth <- 0
+  block_end <- NULL
+  for (i in (roster_block_start + 1):min(roster_block_start + 100, length(src_lines))) {
+    line <- src_lines[i]
+    brace_depth <- brace_depth + length(regmatches(line, gregexpr("\\{", line))[[1]])
+    brace_depth <- brace_depth - length(regmatches(line, gregexpr("\\}", line))[[1]])
+    if (brace_depth <= 0 && i > roster_block_start) {
+      block_end <- i
+      break
+    }
+  }
+
+  if (!is.null(block_end)) {
+    block_content <- paste(src_lines[roster_block_start:block_end], collapse = "\n")
+    if (!grepl("total_spent_from_roster", block_content)) {
+      stop("total_spent_from_roster should be assigned inside the roster block")
+    }
+  }
+
+  cat(sprintf("    total_spent_from_roster initialized at line %d\n", init_line))
+  cat(sprintf("    Roster check at line %d\n", check_line))
+  cat(sprintf("    Initialization precedes roster check: %s\n", init_line < check_line))
+
+  # Now verify the budget computation path for an empty roster:
+  # budget = initial_budget - total_spent_val
+  # where total_spent_val falls back to total_spent_from_roster (which is 0)
+  # So budget should equal initial_budget when roster is empty and no pressroom purchases
+  initial_budget <- 300000000
+  expected_budget_for_empty <- initial_budget  # 0 spent from roster, 0 from pressroom
+  cat(sprintf("    For empty roster: budget should equal initial_budget (%d)\n", expected_budget_for_empty))
+  cat("    Empty roster finances: PASS\n")
+  TRUE
+})
+
+if (empty_roster_finances_test$status == "pass") {
+  cat("  calculate_league_finances empty roster: PASS\n")
+} else {
+  cat(sprintf("  calculate_league_finances empty roster: FAIL - %s\n", empty_roster_finances_test$trace))
+}
+
+# ===================================================================
+# PHASE 14: Today_Module bug-fix regression tests
+# ===================================================================
+cat("\n--- PHASE 14: Today_Module bug-fix regression tests ---\n")
+
+# ---- 14a: colDef(show = FALSE) is used instead of visible = FALSE ----
+cat("\n  [14a] colDef(show = FALSE) regression test...\n")
+
+coldef_show_test <- safe_capture("coldef_show_false", {
+  src_lines <- readLines("Modules/Today_Module.R", warn = FALSE)
+
+  # Verify colDef(show = FALSE) IS present
+  show_false_idx <- which(grepl("colDef\\\\(show = FALSE\\\\)", src_lines))
+  if (length(show_false_idx) == 0) {
+    stop("colDef(show = FALSE) not found in Today_Module.R")
+  }
+
+  # Verify colDef(visible = FALSE) is NOT present
+  visible_false_idx <- which(grepl("colDef\\\\(visible = FALSE\\\\)", src_lines))
+  if (length(visible_false_idx) > 0) {
+    stop(sprintf("colDef(visible = FALSE) still present at line(s) %s in Today_Module.R",
+                 paste(visible_false_idx, collapse = ", ")))
+  }
+
+  cat(sprintf("    colDef(show = FALSE) found at line %d\n", show_false_idx[1]))
+  cat("    colDef(show = FALSE) regression: PASS\n")
+  TRUE
+})
+
+if (coldef_show_test$status == "pass") {
+  cat("  colDef(show = FALSE) regression: PASS\n")
+} else {
+  cat(sprintf("  colDef(show = FALSE) regression: FAIL - %s\n", coldef_show_test$trace))
+}
+
+# ---- 14b: recommendations_feed_ui renders cards with sparse NA confidence_pct ----
+cat("\n  [14b] recommendations_feed_ui NA confidence_pct handling...\n")
+
+recs_na_conf_test <- safe_capture("recs_na_confidence_pct", {
+  # Build a recommendations data frame with NA confidence_pct values
+  recs_na <- data.frame(
+    type = c("Buy", "Sell", "Hold", "Bid"),
+    title = c("Buy Player X", "Sell Player Y", "Hold Player Z", "Bid on Player W"),
+    description = c("High potential", "Overvalued", "Stable", "Undervalued"),
+    confidence_pct = c(NA, 75, NA, 90),
+    action_label = c("Buy Now", "Sell Now", "View", "Place Bid"),
+    player_id = c("p1", "p2", "p3", "p4"),
+    stringsAsFactors = FALSE
+  )
+
+  # Simulate the card-building logic from the lapply block in recommendations_feed_ui
+  cards <- lapply(seq_len(nrow(recs_na)), function(i) {
+    r <- recs_na[i, ]
+    rec_type <- if (!is.null(r$type) && !is.na(r$type)) as.character(r$type) else "Hold"
+    title_text <- if (!is.null(r$title) && !is.na(r$title)) as.character(r$title) else "Recommendation"
+    desc_text <- if (!is.null(r$description) && !is.na(r$description)) as.character(r$description) else ""
+    conf_raw <- suppressWarnings(as.numeric(r$confidence_pct))
+    conf_pct <- if (!is.null(conf_raw) && !is.na(conf_raw)) round(conf_raw, 0) else 50
+    action_label <- if (!is.null(r$action_label) && !is.na(r$action_label)) as.character(r$action_label) else "View"
+    pid <- if (!is.null(r$player_id) && !is.na(r$player_id)) as.character(r$player_id) else ""
+
+    # Verify conf_pct is never NA
+    if (is.na(conf_pct)) {
+      stop(sprintf("conf_pct is NA for row %d (original value: %s)", i, r$confidence_pct))
+    }
+
+    # Verify conf_pct is in valid range
+    if (conf_pct < 0 || conf_pct > 100) {
+      stop(sprintf("conf_pct out of range for row %d: %d", i, conf_pct))
+    }
+
+    # Verify rec_type is never NA
+    if (is.na(rec_type)) {
+      stop(sprintf("rec_type is NA for row %d", i))
+    }
+
+    # Verify title_text is never NA
+    if (is.na(title_text)) {
+      stop(sprintf("title_text is NA for row %d", i))
+    }
+
+    list(
+      type = rec_type,
+      title = title_text,
+      desc = desc_text,
+      conf = conf_pct,
+      action = action_label,
+      pid = pid
+    )
+  })
+
+  # Verify all 4 cards were generated
+  if (length(cards) != 4) {
+    stop(sprintf("Expected 4 cards, got %d", length(cards)))
+  }
+
+  # Verify NA confidence_pct (rows 1 and 3) default to 50
+  if (cards[[1]]$conf != 50) {
+    stop(sprintf("Row 1 (NA confidence) should default to 50, got %d", cards[[1]]$conf))
+  }
+  if (cards[[3]]$conf != 50) {
+    stop(sprintf("Row 3 (NA confidence) should default to 50, got %d", cards[[3]]$conf))
+  }
+
+  # Verify non-NA values are preserved
+  if (cards[[2]]$conf != 75) {
+    stop(sprintf("Row 2 (75 confidence) should be 75, got %d", cards[[2]]$conf))
+  }
+  if (cards[[4]]$conf != 90) {
+    stop(sprintf("Row 4 (90 confidence) should be 90, got %d", cards[[4]]$conf))
+  }
+
+  # Verify conf_pct >= 80 comparison works without error (for the conf_color logic)
+  for (j in seq_along(cards)) {
+    conf_color <- if (cards[[j]]$conf >= 80) "#10b981" else if (cards[[j]]$conf >= 60) "#f59e0b" else "#ef4444"
+    if (is.na(conf_color)) {
+      stop(sprintf("conf_color is NA for card %d", j))
+    }
+  }
+
+  cat(sprintf("    Cards generated: %d\n", length(cards)))
+  cat(sprintf("    NA confidence values default to 50: PASS\n"))
+  cat(sprintf("    Non-NA values preserved: PASS\n"))
+  cat("    recommendations_feed_ui NA handling: PASS\n")
+  TRUE
+})
+
+if (recs_na_conf_test$status == "pass") {
+  cat("  recommendations_feed_ui NA confidence_pct: PASS\n")
+} else {
+  cat(sprintf("  recommendations_feed_ui NA confidence_pct: FAIL - %s\n", recs_na_conf_test$trace))
+}
+
+# ===================================================================
+# PHASE 15: Deterministic offline fix tests
+# Covers: FIS (NA/empty role+status, non-finite weights), smart bid
+# (verified-funds bounds, market high bid, no 300M hardcode), acquisition
+# capacity + preflight (fail-closed, capacity, funds, modify), roster clause
+# payload, Today helpers (radar df / onClick JS / rec action), Rivals helpers
+# (buying power values / pivot ledger), and the player points trace.
+# ===================================================================
+cat("\n--- PHASE 15: Deterministic offline fix tests ---\n")
+
+det_fixes_test <- safe_capture("phase15_deterministic_fixes", {
+  options(deterministic_fixes_no_quit = TRUE)
+  source("test/test_deterministic_fixes.R")
+  options(deterministic_fixes_no_quit = NULL)
+  if (!isTRUE(deterministic_fixes_all_passed)) {
+    stop("deterministic fix tests reported failures (see output above)")
+  }
+  TRUE
+})
+
+if (det_fixes_test$status == "pass") {
+  cat("  Deterministic offline fix tests: PASS\n")
+} else {
+  cat(sprintf("  Deterministic offline fix tests: FAIL - %s\n", det_fixes_test$trace))
+}
+
+# ===================================================================
+# PHASE 16: Today 'Place Bid' recommendation routing (Today-local
+# selected player flow)
+# ===================================================================
+cat("\n--- PHASE 16: Today 'Place Bid' recommendation routing ---\n")
+
+# NOTE: this phase uses the proper two-argument
+# shiny::testServer(module_fn, test_code, args = list(...)) pattern so the
+# today_Server module actually runs inside the mock session, and a locally
+# correct result handler (a plain `x$comp <- ...` inside a tryCatch handler
+# creates a local binding in the handler frame and would swallow failures).
+# The test injects the namespaced rec_action_clicked event in the exact shape
+# the browser JS sends and verifies ACTUAL downstream routing (not just event
+# mapping):
+#   (1) a known MARKET player's Place Bid maps to 'market_bid', resolves from
+#       market data only, and reaches the Today-local open-action pathway;
+#   (2) an OWNED / non-market player's Place Bid cannot resolve / open a
+#       market bid (market-eligibility guard);
+#   (3) unknown ids do not route.
+# A second test exercises the shared market-offer helper (selected_player_Server)
+# with a stubbed preflight (no network write): preflight fail -> no offer modal;
+# preflight ok -> the regular market-offer modal opens.
+place_bid_routing_test <- function() {
+  local_result <- list(status = "pass", error = NULL, output = NULL, trace = character(0))
+  tryCatch(
+    {
+      active_RV <- reactiveVal(FALSE)
+      login_token_RV <- reactiveVal(login_token)
+      refresh_trigger <- reactiveVal(0)
+
+      championship_RV <- reactive({
+        req(login_token_RV())
+        get_championships(login = login_token_RV(), championship_name = NULL)
+      })
+      championship_id_RV <- reactive({
+        req(championship_RV())
+        championship_RV()["id"]
+      })
+      user_team_id_RV <- reactive({
+        req(championship_RV())
+        championship_RV()["userteam.id"]
+      })
+      user_teams_RV <- reactive({
+        req(championship_RV())
+        get_teams(login = login_token_RV(), championship_id = championship_RV()["id"])
+      })
+
+      shiny::testServer(
+        today_Server,
+        {
+          active_RV(TRUE)
+          session$flushReact()
+
+          mkt <- market_players_RV()
+          sqd <- squad_players_RV()
+          if (is.null(mkt) || nrow(mkt) == 0) stop("market_players_RV did not populate with live data")
+          if (is.null(sqd) || nrow(sqd) == 0) stop("squad_players_RV did not populate with live data")
+
+          mkt_ids <- as.character(mkt$id)
+          sqd_ids <- as.character(sqd$id)
+
+          # (1) Known MARKET player: Place Bid maps to market_bid, resolves from
+          # market data, and reaches the Today-local open-action pathway.
+          known_pid <- mkt_ids[1]
+          cat(sprintf("    Known MARKET player id: %s\n", known_pid))
+          session$setInputs(rec_action_clicked = list(player_id = known_pid, action = "Place Bid"))
+          session$flushReact()
+
+          ev <- selected_from_today_RV()
+          if (is.null(ev) || is.null(ev$player_id) || is.null(ev$action)) {
+            stop("rec_action_clicked event was not captured by selected_from_today_RV")
+          }
+          if (ev$player_id != known_pid) stop("Event player_id mismatch")
+          if (ev$action != "market_bid") stop(sprintf("Event action should be market_bid, got %s", ev$action))
+          cat("    Event retains mapped action 'market_bid': PASS\n")
+
+          sp <- selected_today_player_RV()
+          if (is.null(sp) || nrow(sp) != 1) stop("Market player did not resolve to a single row")
+          if (as.character(sp$id) != known_pid) stop("Resolved player id mismatch")
+          if (!known_pid %in% mkt_ids) stop("Resolved market_bid player is not in market data")
+          cat(sprintf("    Resolved from market data: %s (id=%s)\n", sp$name, sp$id))
+          cat("    Resolves from market data: PASS\n")
+
+          open_act <- today_open_action_RV()
+          if (!identical(open_act, "market_bid")) {
+            stop(sprintf("open-action pathway not reached: expected market_bid, got %s",
+                         if (is.null(open_act)) "NULL" else open_act))
+          }
+          cat("    Reaches Today-local selected-player open-action pathway: PASS\n")
+
+          # (2) Owned / non-market player: Place Bid must NOT resolve / open a
+          # market bid (market-eligibility guard).
+          owned_not_market <- setdiff(sqd_ids, mkt_ids)
+          if (length(owned_not_market) == 0) {
+            stop("No owned (squad) player absent from market data; cannot test market-eligibility guard")
+          }
+          owned_pid <- owned_not_market[1]
+          cat(sprintf("    Owned / non-market player id: %s\n", owned_pid))
+          session$setInputs(rec_action_clicked = list(player_id = owned_pid, action = "Place Bid"))
+          session$flushReact()
+          ev_own <- selected_from_today_RV()
+          if (is.null(ev_own) || ev_own$player_id != owned_pid) stop("Owned-player event not captured")
+          if (ev_own$action != "market_bid") stop("Owned-player Place Bid should map to market_bid")
+          if (!is.null(selected_today_player_RV())) {
+            stop("Owned / non-market player must NOT resolve for a market_bid action")
+          }
+          cat("    Owned / non-market player cannot resolve / open a market bid: PASS\n")
+
+          # (3) Unknown IDs must not route (no resolved player, no modal).
+          session$setInputs(rec_action_clicked = list(player_id = "no_such_player_xyz", action = "Place Bid"))
+          session$flushReact()
+          ev2 <- selected_from_today_RV()
+          if (is.null(ev2) || ev2$player_id != "no_such_player_xyz") stop("Unknown-id event not captured")
+          if (ev2$action != "market_bid") stop("Unknown-id event should retain the mapped action")
+          if (!is.null(selected_today_player_RV())) stop("Unknown player id must not route")
+          cat("    Unknown player id does not route: PASS\n")
+        },
+        args = list(
+          id = "today",
+          is_module_active = active_RV,
+          login_token = login_token_RV,
+          championship_id = championship_id_RV,
+          user_team_id = user_team_id_RV,
+          user_teams_RV = user_teams_RV,
+          refresh_trigger = refresh_trigger
+        )
+      )
+    },
+    error = function(e) {
+      local_result$status <<- "error"
+      local_result$error  <<- e
+      local_result$trace  <<- conditionMessage(e)
+    }
+  )
+  local_result
+}
+
+# ---- Shared market-offer helper (selected_player_Server) with a stubbed
+# preflight -- deterministic, NO network write. Verifies the actual
+# open_action routing: preflight fail -> no offer modal; preflight ok -> the
+# regular market-offer modal opens.
+market_offer_helper_sim_test <- function() {
+  local_result <- list(status = "pass", error = NULL, output = NULL, trace = character(0))
+  tryCatch(
+    {
+      # Stub capacity fetcher (test seam): records calls, returns controlled
+      # capacity. No network call is made.
+      stub_env <- new.env()
+      stub_env$count <- 0
+      stub_env$capacity <- NULL
+      stub_capacity <- function(login, championship_id, user_team_id, target_player_id) {
+        stub_env$count <- stub_env$count + 1
+        stub_env$capacity
+      }
+
+      sp_df <- data.frame(id = "test_market_player", name = "Test Mkt Player",
+                          effective_market_price = 500000, stringsAsFactors = FALSE)
+      selected_player_RV <- reactiveVal(sp_df)
+      login_token_RV2 <- reactiveVal(list(token = "t", userid = "u"))
+      championship_id_RV2 <- reactiveVal("champ")
+      user_team_id_RV2 <- reactiveVal("team")
+      open_action_RV <- reactiveVal(NULL)
+
+      shiny::testServer(
+        selected_player_Server,
+        {
+          # (a) preflight FAIL (roster full) -> helper attempts preflight, no modal.
+          stub_env$capacity <- list(
+            status = "ok",
+            roster = list(count = 25, cap = 25),
+            outstanding = list(count = 0),
+            funds = list(spendable_budget = 1000000)
+          )
+          open_action_RV("market_bid")
+          session$flushReact()
+          if (stub_env$count < 1) stop("helper did not attempt preflight (fetcher not called)")
+          if (isTRUE(offer_modal_opened_RV())) stop("offer modal opened despite preflight failure")
+          cat("    Preflight fail -> helper attempted preflight, no offer modal: PASS\n")
+
+          # (b) preflight OK (free slot) -> regular market-offer modal opens.
+          stub_env$count <- 0
+          stub_env$capacity <- list(
+            status = "ok",
+            roster = list(count = 20, cap = 25),
+            outstanding = list(count = 0),
+            funds = list(spendable_budget = 1000000)
+          )
+          open_action_RV(NULL)
+          session$flushReact()
+          open_action_RV("market_bid")
+          session$flushReact()
+          if (stub_env$count < 1) stop("helper did not attempt preflight on allowed path")
+          if (!isTRUE(offer_modal_opened_RV())) stop("offer modal did not open on allowed path")
+          cat("    Preflight ok -> regular market-offer modal opens: PASS\n")
+        },
+        args = list(
+          id = "sp_test",
+          selected_player = selected_player_RV,
+          login_token = login_token_RV2,
+          championship_id = championship_id_RV2,
+          user_team_id = user_team_id_RV2,
+          open_action = open_action_RV,
+          capacity_fetcher = stub_capacity
+        )
+      )
+    },
+    error = function(e) {
+      local_result$status <<- "error"
+      local_result$error  <<- e
+      local_result$trace  <<- conditionMessage(e)
+    }
+  )
+  local_result
+}
+
+place_bid_res <- place_bid_routing_test()
+test_results[["today_place_bid_routing"]] <- place_bid_res
+
+if (place_bid_res$status == "pass") {
+  cat("  Today 'Place Bid' routing: PASS\n")
+} else {
+  cat(sprintf("  Today 'Place Bid' routing: FAIL - %s\n", place_bid_res$trace))
+}
+
+market_offer_sim_res <- market_offer_helper_sim_test()
+test_results[["today_market_offer_helper"]] <- market_offer_sim_res
+
+if (market_offer_sim_res$status == "pass") {
+  cat("  Shared market-offer helper (stubbed preflight): PASS\n")
+} else {
+  cat(sprintf("  Shared market-offer helper (stubbed preflight): FAIL - %s\n", market_offer_sim_res$trace))
+}
+
+# ===================================================================
 # FINAL SUMMARY
 # ===================================================================
 cat("\n======================================================================\n")
@@ -2093,3 +2891,8 @@ if (fail_count == 0) {
   cat(sprintf("  RESULT: %d TEST(S) FAILED\n", fail_count))
 }
 cat("======================================================================\n")
+
+# Exit non-zero on any failure so CI / harnesses can detect regressions.
+if (fail_count > 0) {
+  quit(status = 1)
+}

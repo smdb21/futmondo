@@ -8,7 +8,12 @@ This document describes the `Selected_Player_Module.R` Shiny module, which rende
 
 The Selected Player Module provides two exported functions:
 * `selected_player_UI(id)` -- Renders the player detail box card, action button container, and valuation plot.
-* `selected_player_Server(id, selected_player, login_token, championship_id, user_team_id)` -- Drives dynamic content update, modal dialogs, and buy/offer execution.
+* `selected_player_Server(id, selected_player, login_token, championship_id, user_team_id, on_bid_updated = NULL, open_action = NULL, capacity_fetcher = NULL)` -- Drives dynamic content update, modal dialogs, and buy/offer execution.
+  * `on_bid_updated` (optional) -- callback invoked after successful bid/offer/listing writes so the caller can invalidate cached data.
+  * `open_action` (optional) -- reactive returning a stable action code. When a selected player is currently valid, the module routes exactly two codes (guarded against stale startup reactive values; all other codes, e.g. `"view"`, are ignored):
+    * **`"market_bid"`** (Today's "Place Bid" recommendation) -> opens the SAME market-offer modal as the "Make Market Offer" button (identical `run_acquisition_preflight` behavior).
+    * **`"clause_buyout"`** (Today's "Exercise Clause" recommendation) -> opens the SAME clause-buyout confirmation modal as the "Buy Release Clause" button via the shared `open_clause_buyout_modal(sp)` helper. It **rechecks the strict open-clause state before showing** (finite positive `clause_price`, explicitly `FALSE` `clause_transferred`, parseable `clause_date <= now` -- the same `today_is_clause_open()` policy helper used by the Today module), runs the clause preflight, and shows the confirmation modal. It **never opens the market bid modal**, and **only the recomputed `clause_price` is shown and executed** -- no comparison price (e.g. `max(market, clause)`) is ever sent to the clause endpoint.
+  * `capacity_fetcher` (optional) -- test seam: a function used in place of the network `get_acquisition_capacity()` call inside `run_acquisition_preflight`, so preflight behavior can be exercised deterministically (no network write).
 
 ---
 
@@ -47,8 +52,26 @@ If a clause exists (`clause_price > 0`) but is currently locked (`clause_transfe
 ### Option 3: Release Clause Buyout ("Buy Clause: [Price]")
 * **Condition**: Player is owned by a rival team and has an OPEN release clause (`is_clause_open == TRUE`).
 * **UI**: `btn_pay_clause` action button.
-* **Modal**: Confirmation dialog displaying fixed `clause_price`.
-* **API Handler**: Calls `buy_clause(..., price = clause_price, isClause = TRUE)`.
+* **Shared helper**: Both the button and the external `"clause_buyout"` action event (Today's "Exercise Clause" recommendation) go through the single shared helper `open_clause_buyout_modal(sp)`:
+  1. **Open-state recheck (fail closed)** -- the strict open-clause state is rechecked from the player row before showing (`today_is_clause_open()`: finite positive `clause_price`, **explicitly** `FALSE` `clause_transferred`, parseable `clause_date <= now`). A stale / locked / transferred clause shows a warning and opens **no modal**.
+  2. **Preflight** -- `run_acquisition_preflight(sp, "clause", amount = NULL)` (roster slot + verified spendable funds, fail closed).
+  3. **Modal** -- confirmation dialog displaying the fixed `clause_price` (recomputed locally from the player row, not from modal-scope state). The module's `clause_modal_opened_RV` records whether the modal opened (test seam mirroring `offer_modal_opened_RV`).
+* **API Handler**: On submit, the strict open state is **rechecked again before the write** (the clause may have locked/transferred between modal-open and submit), then `buy_roster_clause(..., price = clause_price)` is called against the dedicated `POST /1/market/rosterclause` endpoint (see `docs/api_endpoints.md` section 9). The clause price is recomputed locally in both the modal-open and submit handlers so a stale/undefined `clause_price` can never be sent. **Only the clause price is transmitted** -- a comparison price (e.g. `max(market price, clause price)` from a dual-route Today recommendation) is never sent to the clause endpoint. On success, `log_market_transaction()`, `clear_api_cache()`, and the `on_bid_updated()` callback are preserved.
+
+---
+
+## 2b. Acquisition Capacity Preflight
+
+Every acquisition path (market offer, direct owner offer, clause buyout, bid modification) runs a single internal preflight, `run_acquisition_preflight(sp, mode, amount, existing_bid_amount)`, which wraps `get_acquisition_capacity()` + `evaluate_acquisition_preflight()` (see `docs/bid_management.md`).
+
+* **When it runs**: at modal-open time (amount unknown) and again immediately before the write (amount known).
+* **Fail-closed**: if the capacity snapshot is unavailable/ambiguous (`status != "ok"`), the action is blocked with reason `unavailable` (distinct from `capacity` and `funds`).
+* **Rules**:
+  - New offers (`bid`/`offer`) are rejected when `roster_count + outstanding_count >= cap`.
+  - Clause buyout (`clause`) is rejected when `roster_count >= cap`.
+  - Bid modification (`modify`) does not consume another slot but requires a verifiable existing own bid.
+  - When the amount is known, the required spend (amount, or the positive delta for `modify`) must not exceed verified spendable funds.
+* **Notifications**: failures surface a toast that distinguishes unavailable verification from capacity and funds rejections. On success, `log_market_transaction()`, `clear_api_cache()`, and the `on_bid_updated()` callback are preserved.
 
 ---
 
@@ -171,3 +194,26 @@ The panel also provides competitive intelligence:
 ### "Use Smart Bid" 1-Click Pre-Fill
 
 A prominent **"Use Smart Bid"** button is provided. When clicked, it automatically pre-fills the bid amount input field with the `recommended_bid` value, enabling the user to execute the bid with a single additional confirmation click. This streamlines the acquisition flow from analysis to execution.
+
+### Contextual Data (no hardcoded budget)
+
+The widget no longer hardcodes a 300,000,000 budget. It computes the recommendation from live, verified context:
+
+* **Verified capacity** -- `get_acquisition_capacity(login, championship_id, user_team_id, target_player_id = <player>)` supplies the verified spendable funds (`max(0, budget - withheld)`) and the target's highest competing bid.
+* **Pressroom history** -- `get_championship_pressroom()` (cached) provides market/competition context.
+* **Market high bid** -- the target's `highest_bid` from the capacity snapshot is passed as `market_high_bid` so the minimum winning bid reflects the live auction.
+* **Unverified funds** -- `user_cash = NA` is passed so the engine treats `user_cash` as unverified; the verified figure comes from the capacity snapshot. When no capacity is available, the engine falls back to its default and marks `funds_verified = FALSE`.
+
+The resulting `recommended_bid` and `max_rational_bid` are always bounded by the verified spendable funds, so the widget never recommends a bid the team cannot afford.
+
+---
+
+## 8. Player Points Trend Trace
+
+The player valuation/points trend chart (`player_trend_plot`) renders two series:
+
+* **Market Valuation** -- a line+markers series from the player's historical `value` snapshots (with a pre-season simulated fallback when the DB is empty).
+* **Points** -- built by the pure helper `build_player_points_trace(history_df, sp)`:
+  - **One marker per completed round**: each historical snapshot carrying a valid recorded point value (finite, `>= 0`) becomes a marker; when a round has several snapshots, the latest is kept, so the trace has exactly one marker per round.
+  - **Markers only**: the points series uses `mode = "markers"` (no interpolated line) so it never implies points that were not recorded.
+  - **Graceful no-points state**: when there are no valid points (NULL/empty history, all-NA points, or all-negative), the points axis is hidden and a "No points recorded yet" annotation is shown instead of a fabricated zero line.

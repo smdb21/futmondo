@@ -15,6 +15,7 @@ CANCEL_SELL_URL <- "https://api.futmondo.com/1/market/cancelsell"
 PUT_ALL_ON_MARKET_URL <- "https://api.futmondo.com/5/market/putallonmarket"
 MY_PLAYERS_URL <- "https://api.futmondo.com/1/market/myplayers"
 ROSTER_BIDS_URL <- "https://api.futmondo.com/1/market/rosterbids"
+ROSTER_CLAUSE_URL <- "https://api.futmondo.com/1/market/rosterclause"
 ACCEPT_BID_URL <- "https://api.futmondo.com/1/market/acceptbid"
 REJECT_BID_URL <- "https://api.futmondo.com/1/market/rejectbid"
 API_CODE_OK <- "api.general.ok"
@@ -1407,6 +1408,446 @@ buy_clause <- function(login, championship_id, team_id, player_id, player_slug, 
   ))
 }
 
+# ============================================================
+# Roster Clause Buyout (dedicated endpoint)
+# ============================================================
+# Builds the exact JSON payload for the dedicated roster clause
+# buyout endpoint. The payload serializes exactly:
+#   header{token, userid},
+#   query{championshipId, userteamId, player_slug, player_id, price},
+#   answer{}
+# NOTE: isClause is intentionally NOT part of this payload (the
+# endpoint itself implies a clause purchase).
+build_roster_clause_payload <- function(login, championship_id, team_id, player_id, player_slug, price) {
+  list(
+    header = list(
+      token = login[["token"]],
+      userid = login[["userid"]]
+    ),
+    query = list(
+      championshipId = as.character(championship_id),
+      userteamId = as.character(team_id),
+      player_slug = as.character(player_slug),
+      player_id = as.character(player_id),
+      price = as.numeric(price)
+    ),
+    answer = list()
+  )
+}
+
+# Executes a release-clause buyout via POST /1/market/rosterclause.
+# The entire request is wrapped in tryCatch() so a network failure can
+# never block the user thread or crash the parent server.
+#
+# Parameters:
+#   login           -- login token vector (token, userid, user_name)
+#   championship_id -- character championship ID
+#   team_id         -- character, the buying (logged-in) team ID
+#   player_id       -- character player ID
+#   player_slug     -- character player slug
+#   price           -- numeric clause price in EUR
+#   url             -- endpoint URL (default ROSTER_CLAUSE_URL); overridable
+#                      for tests/mocks
+#
+# Returns:
+#   list(success = logical, code = character, message = character)
+buy_roster_clause <- function(login, championship_id, team_id, player_id, player_slug, price,
+                              url = ROSTER_CLAUSE_URL) {
+  tryCatch({
+    payload <- build_roster_clause_payload(
+      login = login,
+      championship_id = championship_id,
+      team_id = team_id,
+      player_id = player_id,
+      player_slug = player_slug,
+      price = price
+    )
+
+    headers <- c("Content-Type" = "application/json; charset=utf-8")
+
+    print(paste0("[API] Sending roster clause buyout for player: ", player_id,
+                 " price: ", price))
+    response <- POST(url, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
+    ans <- httr::content(response)
+
+    operation_code <- if (!is.null(ans) && "answer" %in% names(ans) && "code" %in% names(ans$answer)) ans$answer$code else ""
+    err_msg <- if (!is.null(ans) && "answer" %in% names(ans) && "msg" %in% names(ans$answer)) ans$answer$msg else if (!is.null(ans) && "answer" %in% names(ans) && "message" %in% names(ans$answer)) ans$answer$message else operation_code
+
+    is_success <- (operation_code == API_CODE_OK)
+
+    if (!is_success) {
+      print(paste0("[API] Roster clause request failed. Code: ", operation_code, " Msg: ", err_msg))
+    } else {
+      print("[API] Roster clause request succeeded (api.general.ok)")
+    }
+
+    list(success = is_success, code = operation_code, message = err_msg)
+  }, error = function(e) {
+    print(paste0("[API] Roster clause request error: ", e$message))
+    list(success = FALSE, code = "error", message = e$message)
+  })
+}
+
+# ============================================================
+# Acquisition Capacity (verified roster + funds + outstanding bids)
+# ============================================================
+# Extracts the immutable bidder team ID from a bid object. Used to
+# normalize "my own" active bids by team ID (never by name or list order).
+extract_bidder_team_id <- function(bid) {
+  if (!is.list(bid)) return(NA_character_)
+  ut <- bid[["userTeam"]]
+  if (is.list(ut)) {
+    if (!is.null(ut[["_id"]])) return(as.character(ut[["_id"]]))
+    if (!is.null(ut[["id"]])) return(as.character(ut[["id"]]))
+  }
+  for (k in c("userteamId", "userTeamId", "userteam_id", "userTeam_id", "bidder_team_id")) {
+    if (!is.null(bid[[k]])) return(as.character(bid[[k]]))
+  }
+  NA_character_
+}
+
+# Computes a verified acquisition-capacity snapshot for the logged-in team:
+# roster count/cap, verified spendable funds, and outstanding active bids.
+# Cached per (userid, championship, team, target player).
+#
+# Parameters:
+#   login             -- login token vector (token, userid, user_name)
+#   championship_id   -- character championship ID
+#   user_team_id      -- character, the logged-in team ID
+#   target_player_id  -- optional character player ID; when provided, the
+#                        target block reports that player's own bid, the
+#                        highest competing bid, and the bid count.
+#
+# Returns a structured list:
+#   status      -- "ok" | "partial" | "unavailable". Status is "ok" only when
+#                  roster cap, roster count, reported budget, outstanding bids,
+#                  AND a valid (finite, non-negative) withheld are all present.
+#                  A missing / non-finite / negative withheld makes funds
+#                  verification incomplete -> status "partial" (fail closed; we
+#                  never assume withheld = 0).
+#   roster      -- list(count, cap, remaining_slots)
+#   funds       -- list(reported_budget, withheld, spendable_budget).
+#                  spendable_budget is max(0, budget - withheld) and is NA when
+#                  withheld is not valid (funds verification incomplete).
+#   outstanding -- list(offers, count, total_amount, completeness)
+#   target      -- list(my_bid_id, my_bid_amount, highest_bid, bid_count)
+#   diagnostics -- character vector of data-availability notes
+get_acquisition_capacity <- function(login, championship_id, user_team_id, target_player_id = NULL) {
+  empty_target <- list(my_bid_id = NULL, my_bid_amount = NA_real_,
+                       highest_bid = NA_real_, bid_count = NA_integer_)
+
+  if (is.null(login) || is.null(championship_id) || is.null(user_team_id) ||
+      is.null(login[["userid"]])) {
+    return(list(
+      status = "unavailable",
+      roster = list(count = NA_integer_, cap = NA_integer_, remaining_slots = NA_integer_),
+      funds = list(reported_budget = NA_real_, withheld = NA_real_, spendable_budget = NA_real_),
+      outstanding = list(offers = NA_integer_, count = NA_integer_,
+                         total_amount = NA_real_, completeness = "unavailable"),
+      target = empty_target,
+      diagnostics = c("login, championship_id, or user_team_id is missing")
+    ))
+  }
+
+  target_key <- if (is.null(target_player_id) || !nzchar(as.character(target_player_id))) {
+    "all"
+  } else {
+    as.character(target_player_id)
+  }
+
+  cache_key <- paste0("acq_capacity_", login[["userid"]], "_", championship_id,
+                      "_", user_team_id, "_", target_key)
+
+  get_cached_data(cache_key, {
+    diagnostics <- character(0)
+
+    # ---- 1. Team info: roster cap, reported budget, withheld ----
+    cap_val <- NA_integer_
+    budget_val <- NA_real_
+    withheld_val <- NA_real_
+    withheld_valid <- FALSE
+    info <- tryCatch(
+      get_user_team_info(login = login, championship_id = championship_id, user_team_id = user_team_id),
+      error = function(e) NULL
+    )
+    if (is.null(info)) {
+      diagnostics <- c(diagnostics, "team info unavailable")
+    } else {
+      cfg <- if (is.list(info)) info[["configuration"]] else NULL
+      if (!is.null(cfg) && !is.null(cfg[["maxPlayersInRoster"]])) {
+        cap_val <- suppressWarnings(as.integer(cfg[["maxPlayersInRoster"]]))
+      }
+      if (!is.null(info[["budget"]])) budget_val <- suppressWarnings(as.numeric(info[["budget"]]))
+      if (!is.null(info[["withheld"]])) withheld_val <- suppressWarnings(as.numeric(info[["withheld"]]))
+      if (is.na(cap_val)) diagnostics <- c(diagnostics, "maxPlayersInRoster unavailable")
+      if (is.na(budget_val)) diagnostics <- c(diagnostics, "reported budget unavailable")
+      # withheld is only valid when it is a finite, non-negative number. A
+      # missing / non-finite / negative withheld makes funds verification
+      # INCOMPLETE (we fail closed rather than assuming 0).
+      withheld_valid <- !is.na(withheld_val) && is.finite(withheld_val) && withheld_val >= 0
+      if (!withheld_valid) {
+        if (is.null(info[["withheld"]])) {
+          diagnostics <- c(diagnostics, "withheld unavailable (funds verification incomplete)")
+        } else if (is.na(withheld_val) || !is.finite(withheld_val)) {
+          diagnostics <- c(diagnostics, "withheld non-finite (funds verification incomplete)")
+        } else {
+          diagnostics <- c(diagnostics, "withheld negative (funds verification incomplete)")
+        }
+      }
+    }
+
+    # ---- 2. Roster count ----
+    roster_count <- NA_integer_
+    roster_df <- tryCatch(
+      get_players_from_team(login = login, championship_id = championship_id,
+                            user_team_id = user_team_id, teams = NULL),
+      error = function(e) NULL
+    )
+    if (is.null(roster_df)) {
+      diagnostics <- c(diagnostics, "roster fetch failed")
+    } else {
+      roster_count <- as.integer(nrow(roster_df))
+    }
+
+    # ---- 3. Outstanding active bids (my own, normalized by immutable IDs) ----
+    bids_complete <- FALSE
+    bid_count <- NA_integer_
+    bid_total <- NA_real_
+    bids_df <- tryCatch(
+      get_roster_bids(login = login, championship_id = championship_id, user_team_id = user_team_id),
+      error = function(e) NULL
+    )
+    if (is.null(bids_df) || !is.data.frame(bids_df)) {
+      diagnostics <- c(diagnostics, "roster bids unavailable (partial)")
+    } else {
+      bids_complete <- TRUE
+      if (nrow(bids_df) == 0) {
+        bid_count <- 0L
+        bid_total <- 0
+      } else {
+        # Normalize by immutable player ID (dedupe); never by name or list order.
+        if ("id" %in% colnames(bids_df)) {
+          my_bids <- bids_df[!is.na(bids_df$id) & nzchar(as.character(bids_df$id)), , drop = FALSE]
+        } else {
+          my_bids <- bids_df
+        }
+        # When a bidder team ID is exposed, keep only bids placed by our team
+        # (immutable ID match; rows without an exposed ID are kept because the
+        # endpoint is already scoped to our userteamId).
+        if ("bidder_team_id" %in% colnames(my_bids) && nrow(my_bids) > 0) {
+          btid <- as.character(my_bids$bidder_team_id)
+          keep <- is.na(btid) | btid == "" | btid == as.character(user_team_id)
+          my_bids <- my_bids[keep, , drop = FALSE]
+        }
+        if (nrow(my_bids) > 0 && "id" %in% colnames(my_bids)) {
+          my_bids <- my_bids[!duplicated(as.character(my_bids$id)), , drop = FALSE]
+        }
+        bid_count <- as.integer(nrow(my_bids))
+        bid_total <- if ("bid_price" %in% colnames(my_bids)) {
+          sum(suppressWarnings(as.numeric(my_bids$bid_price)), na.rm = TRUE)
+        } else {
+          0
+        }
+      }
+    }
+
+    # ---- 4. Target player block (optional) ----
+    target <- empty_target
+    if (target_key != "all") {
+      summary_res <- tryCatch(
+        get_player_summary(login = login, championship_id = championship_id,
+                           user_team_id = user_team_id, player_id = target_key),
+        error = function(e) NULL
+      )
+      bids_arr <- if (!is.null(summary_res) && is.list(summary_res$bids)) summary_res$bids else NULL
+      if (is.null(bids_arr) || !is.list(bids_arr) || length(bids_arr) == 0) {
+        target$bid_count <- 0L
+        target$highest_bid <- 0
+        diagnostics <- c(diagnostics, "no active bids on target (none or unavailable)")
+      } else {
+        prices <- vapply(bids_arr, function(b) {
+          if (is.list(b) && !is.null(b[["price"]])) suppressWarnings(as.numeric(b[["price"]])) else NA_real_
+        }, numeric(1))
+        valid_prices <- prices[is.finite(prices) & prices > 0]
+        target$bid_count <- as.integer(length(bids_arr))
+        target$highest_bid <- if (length(valid_prices) > 0) max(valid_prices) else 0
+
+        # My own bid: immutable bidder team ID match (never by name/order).
+        # Only expose my_bid_id/my_bid_amount when a bid's immutable team ID
+        # matches user_team_id AND that bid carries a non-empty ID. We never
+        # fall back to summary-level my_bid_id/my_bid_price (which may be a
+        # rival's bid).
+        my_idx <- NULL
+        for (i in seq_along(bids_arr)) {
+          btid <- extract_bidder_team_id(bids_arr[[i]])
+          if (!is.na(btid) && btid == as.character(user_team_id)) {
+            my_idx <- i
+            break
+          }
+        }
+        if (!is.null(my_idx)) {
+          b <- bids_arr[[my_idx]]
+          bid_id <- if (is.list(b) && !is.null(b[["id"]])) as.character(b[["id"]])
+                    else if (is.list(b) && !is.null(b[["_id"]])) as.character(b[["_id"]])
+                    else NA_character_
+          if (!is.na(bid_id) && nzchar(bid_id)) {
+            target$my_bid_id <- bid_id
+            target$my_bid_amount <- if (is.finite(prices[my_idx]) && prices[my_idx] > 0) prices[my_idx] else NA_real_
+          }
+        }
+      }
+    }
+
+    # ---- 5. Status + spendable funds ----
+    # Conservative spendable: max(0, budget - withheld). It is only verifiable
+    # when BOTH the reported budget and withheld are valid. A missing /
+    # non-finite / negative withheld leaves spendable as NA (funds verification
+    # incomplete) -- we never assume withheld = 0.
+    spendable <- NA_real_
+    if (!is.na(budget_val) && withheld_valid) {
+      spendable <- max(0, budget_val - withheld_val)
+    }
+
+    required_available <- sum(
+      !is.na(cap_val),
+      !is.na(roster_count),
+      !is.na(budget_val),
+      bids_complete
+    )
+    if (required_available == 0) {
+      status <- "unavailable"
+    } else if (required_available < 4) {
+      status <- "partial"
+    } else if (!withheld_valid) {
+      # All structural data is present, but funds cannot be verified (withheld
+      # missing / non-finite / negative). Fail closed: do not assume withheld = 0.
+      status <- "partial"
+    } else {
+      status <- "ok"
+    }
+
+    remaining_slots <- if (!is.na(roster_count) && !is.na(cap_val)) as.integer(cap_val - roster_count) else NA_integer_
+
+    list(
+      status = status,
+      roster = list(
+        count = roster_count,
+        cap = cap_val,
+        remaining_slots = remaining_slots
+      ),
+      funds = list(
+        reported_budget = budget_val,
+        withheld = withheld_val,
+        spendable_budget = spendable
+      ),
+      outstanding = list(
+        offers = bid_count,
+        count = bid_count,
+        total_amount = bid_total,
+        completeness = if (bids_complete) "complete" else "partial"
+      ),
+      target = target,
+      diagnostics = diagnostics
+    )
+  }, timeout_sec = 60)
+}
+
+# ============================================================
+# Acquisition Preflight Decision (pure, deterministic)
+# ============================================================
+# Evaluates whether an acquisition action is allowed given a verified
+# capacity snapshot. Pure function (no I/O) so it is unit-testable.
+#
+# Parameters:
+#   capacity            -- list from get_acquisition_capacity()
+#   mode                -- "bid" | "offer" | "clause" | "modify"
+#   amount              -- numeric amount to spend (NULL when not yet known,
+#                          e.g. at modal-open time)
+#   existing_bid_amount -- numeric, the user's current bid amount on the
+#                          target (used by "modify" to compute the delta)
+#
+# Returns:
+#   list(ok = logical, reason = "ok"|"unavailable"|"capacity"|"funds",
+#        message = character)
+#
+# Rules:
+#   - Fail closed: if capacity is NULL or status != "ok" (partial/unavailable),
+#     reason is "unavailable" (verification could not be confirmed).
+#   - New offers ("bid"/"offer"): rejected when roster_count + outstanding_count
+#     >= cap (reason "capacity").
+#   - Clause buyout ("clause"): rejected when roster_count >= cap.
+#   - Bid modification ("modify"): does NOT consume another slot; requires a
+#     verifiable existing own bid, else "unavailable".
+#   - Funds: when amount is known, the required spend (amount, or the positive
+#     delta for "modify") must not exceed verified spendable funds, else
+#     "funds".
+evaluate_acquisition_preflight <- function(capacity, mode, amount = NULL, existing_bid_amount = NULL) {
+  unavailable <- function(msg) list(ok = FALSE, reason = "unavailable", message = msg)
+  capacity_fail <- function(msg) list(ok = FALSE, reason = "capacity", message = msg)
+  funds_fail <- function(msg) list(ok = FALSE, reason = "funds", message = msg)
+  ok_result <- list(ok = TRUE, reason = "ok", message = NULL)
+
+  if (is.null(capacity) || !is.list(capacity)) {
+    return(unavailable("Acquisition verification unavailable. Please refresh and try again."))
+  }
+  if (!identical(capacity$status, "ok")) {
+    return(unavailable(paste0(
+      "Acquisition verification unavailable (status: ", capacity$status,
+      "). Please refresh and try again."
+    )))
+  }
+
+  roster_count <- capacity$roster$count
+  cap_val <- capacity$roster$cap
+  outstanding_count <- capacity$outstanding$count
+  spendable <- capacity$funds$spendable_budget
+
+  # ---- Mode-specific capacity rules ----
+  if (identical(mode, "modify")) {
+    # Modification of an existing bid does not consume another slot, but we
+    # must be able to verify the existing own bid (fail closed otherwise).
+    if (is.null(existing_bid_amount) || is.na(existing_bid_amount) || !is.finite(existing_bid_amount) ||
+        existing_bid_amount <= 0) {
+      return(unavailable("Could not verify your existing bid on this player. Please refresh and try again."))
+    }
+  } else if (identical(mode, "clause")) {
+    if (!is.na(roster_count) && !is.na(cap_val) && roster_count >= cap_val) {
+      return(capacity_fail(paste0(
+        "Roster is full (", roster_count, " of ", cap_val,
+        " slots). Free a slot before buying a release clause."
+      )))
+    }
+  } else {
+    # New offers: "bid" and "offer"
+    if (!is.na(roster_count) && !is.na(cap_val) &&
+        !is.na(outstanding_count) && (roster_count + outstanding_count) >= cap_val) {
+      return(capacity_fail(paste0(
+        "Roster capacity reached (", roster_count, " players + ", outstanding_count,
+        " pending offer(s) = cap ", cap_val, "). Free a slot before placing a new offer."
+      )))
+    }
+  }
+
+  # ---- Funds check (only when the amount is known) ----
+  if (!is.null(amount) && is.numeric(amount) && length(amount) == 1 && is.finite(amount)) {
+    required_spend <- amount
+    if (identical(mode, "modify") && !is.null(existing_bid_amount) &&
+        is.numeric(existing_bid_amount) && is.finite(existing_bid_amount)) {
+      # Only the positive delta versus the existing bid consumes new funds.
+      required_spend <- max(0, amount - existing_bid_amount)
+    }
+    if (required_spend > 0 && !is.na(spendable) && is.finite(spendable) &&
+        required_spend > spendable) {
+      return(funds_fail(paste0(
+        "Amount exceeds verified spendable funds (", round(spendable),
+        " EUR available). Lower the amount or free up funds."
+      )))
+    }
+  }
+
+  ok_result
+}
+
 get_user_team_info <- function(login, championship_id, user_team_id) {
   cache_key <- paste0("team_info_", championship_id, "_", user_team_id)
   get_cached_data(cache_key, {
@@ -1864,11 +2305,12 @@ calculate_league_finances <- function(login, championship_id, user_teams_df, ini
         data.frame()
       }
 
-      total_spent <- 0
-      team_value <- 0
-      squad_size <- 0
+       total_spent_from_roster <- 0
+       total_spent <- 0
+       team_value <- 0
+       squad_size <- 0
 
-      if (!is.null(roster) && nrow(roster) > 0) {
+       if (!is.null(roster) && nrow(roster) > 0) {
         squad_size <- nrow(roster)
         total_spent_from_roster <- sum(suppressWarnings(as.numeric(roster$buyPrice)), na.rm = TRUE)
         team_value <- sum(suppressWarnings(as.numeric(roster$value)), na.rm = TRUE)
@@ -1901,8 +2343,8 @@ calculate_league_finances <- function(login, championship_id, user_teams_df, ini
         pressroom_sales <- sum(suppressWarnings(as.numeric(pressroom_df$price[pressroom_df$seller_team_id == tid])), na.rm = TRUE)
       }
 
-      # Use pressroom purchases as total_spent if available, otherwise fall back to roster buyPrice
-      total_spent_val <- if (pressroom_purchases > 0) pressroom_purchases else total_spent
+# Use pressroom purchases as total_spent if available, otherwise fall back to roster buyPrice
+       total_spent_val <- if (pressroom_purchases > 0) pressroom_purchases else total_spent_from_roster
       total_sales_val <- pressroom_sales
 
       # Point bonus: points earned * 70k EUR per point
@@ -1978,8 +2420,10 @@ calculate_league_finances <- function(login, championship_id, user_teams_df, ini
 
 get_player_summary <- function(login, championship_id, user_team_id = NULL, player_id = NULL) {
   if (is.null(login) || is.null(championship_id) || is.null(player_id)) return(NULL)
-  
-  cache_key <- paste0("player_summary_", championship_id, "_", player_id)
+
+  cache_user_id <- if (!is.null(login[["userid"]]) && nzchar(as.character(login[["userid"]]))) as.character(login[["userid"]]) else "anonymous"
+  cache_team_id <- if (!is.null(user_team_id) && nzchar(as.character(user_team_id))) as.character(user_team_id) else "none"
+  cache_key <- paste0("player_summary_", cache_user_id, "_", championship_id, "_", cache_team_id, "_", player_id)
   get_cached_data(cache_key, {
     payload <- list(
       header = list(
@@ -2004,7 +2448,7 @@ get_player_summary <- function(login, championship_id, user_team_id = NULL, play
       
       my_bid_id <- NULL
       my_bid_price <- NULL
-      
+
       # Extract bids array from market or top level
       bids_arr <- NULL
       if ("market" %in% names(ans_data) && is.list(ans_data$market) && "bids" %in% names(ans_data$market)) {
@@ -2012,12 +2456,21 @@ get_player_summary <- function(login, championship_id, user_team_id = NULL, play
       } else if ("bids" %in% names(ans_data)) {
         bids_arr <- ans_data$bids
       }
-      
-      if (!is.null(bids_arr) && is.list(bids_arr) && length(bids_arr) > 0) {
+
+      # Only expose my_bid_id/my_bid_price when a bid's immutable team ID
+      # matches user_team_id AND that bid carries a non-empty ID. We never take
+      # the "last bid" blindly -- it may be a rival's bid.
+      if (!is.null(bids_arr) && is.list(bids_arr) && length(bids_arr) > 0 &&
+          !is.null(user_team_id) && nzchar(as.character(user_team_id))) {
         for (b in bids_arr) {
           if (is.list(b) && !is.null(b[["id"]]) && !is.null(b[["price"]])) {
-            my_bid_id <- as.character(b[["id"]])
-            my_bid_price <- suppressWarnings(as.numeric(b[["price"]]))
+            bid_id <- as.character(b[["id"]])
+            btid <- extract_bidder_team_id(b)
+            if (!is.na(btid) && btid == as.character(user_team_id) && nzchar(bid_id)) {
+              my_bid_id <- bid_id
+              my_bid_price <- suppressWarnings(as.numeric(b[["price"]]))
+              break
+            }
           }
         }
       }
@@ -2253,12 +2706,13 @@ get_roster_bids <- function(login, championship_id, user_team_id) {
       ),
       query = list(
         championshipId = as.character(championship_id),
-        userteamId = as.character(user_team_id)
+        userteamId = as.character(user_team_id),
+        type = "roster"
       ),
       answer = list()
     )
     headers <- c("Content-Type" = "application/json; charset=utf-8")
-    print("[API] Fetching roster bids for team")
+    print("[API] Fetching roster bids for team (type=roster)")
     response <- POST(ROSTER_BIDS_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
     ans <- httr::content(response)
 
@@ -2301,7 +2755,9 @@ get_roster_bids <- function(login, championship_id, user_team_id) {
             b_price <- if (!is.null(b[["price"]])) suppressWarnings(as.numeric(b[["price"]])) else 0
             b_user <- if (!is.null(b[["userTeam"]]) && is.list(b[["userTeam"]]) && !is.null(b[["userTeam"]][["name"]]) && as.character(b[["userTeam"]][["name"]]) != "") as.character(b[["userTeam"]][["name"]]) else "Futmondo"
             b_id <- if (!is.null(b[["id"]])) as.character(b[["id"]]) else if (!is.null(b[["_id"]])) as.character(b[["_id"]]) else ""
-            data.frame(id = p_id, bid_price = b_price, bid_user = b_user, bid_id = b_id, stringsAsFactors = FALSE)
+            b_bidder <- extract_bidder_team_id(b)
+            data.frame(id = p_id, bid_price = b_price, bid_user = b_user, bid_id = b_id,
+                       bidder_team_id = b_bidder, stringsAsFactors = FALSE)
           }) %>% rbindlist(fill = TRUE) %>% as.data.frame()
 
           if (nrow(b_df) > 0) {
@@ -2313,7 +2769,9 @@ get_roster_bids <- function(login, championship_id, user_team_id) {
           b_price <- suppressWarnings(as.numeric(item[["price"]]))
           b_user <- if ("userTeam" %in% names(item) && is.list(item[["userTeam"]]) && !is.null(item[["userTeam"]][["name"]]) && as.character(item[["userTeam"]][["name"]]) != "") as.character(item[["userTeam"]][["name"]]) else "Futmondo"
           b_id <- if ("_id" %in% names(item)) as.character(item[["_id"]]) else if ("id" %in% names(item)) as.character(item[["id"]]) else ""
-          bids_list[[length(bids_list) + 1]] <- data.frame(id = p_id, bid_price = b_price, bid_user = b_user, bid_id = b_id, stringsAsFactors = FALSE)
+          b_bidder <- extract_bidder_team_id(item)
+          bids_list[[length(bids_list) + 1]] <- data.frame(id = p_id, bid_price = b_price, bid_user = b_user, bid_id = b_id,
+                                                            bidder_team_id = b_bidder, stringsAsFactors = FALSE)
         }
       }
 

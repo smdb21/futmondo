@@ -42,6 +42,13 @@ Computes a composite Futmondo Intelligence Score (FIS) for each player in a data
 | `fis_tier` | character | Tier: "Strong Buy" (>=80), "Buy" (65-79), "Hold" (45-64), "Sell" (<=44) |
 | `fis_summary` | character | One-sentence explanatory string |
 
+### Robustness (error-effect hardening)
+
+- **`default_if_null_na(x, default)`** is a local helper used to resolve weights. It returns `default` when `x` is `NULL` or a single `NA`, otherwise `x`. This replaces the previous `%||%` usage, which does NOT treat `NA` as missing (so an `NA` weight would previously leak into the math).
+- **Non-finite weight coercion**: after resolving defaults, each weight is coerced to a finite numeric; any `NA`/`Inf`/`-Inf`/non-numeric entry falls back to its default. This guarantees the composite is always a finite weighted average.
+- **NA/empty role & status sanitization**: `role` and `status` values that are `NA` or empty are replaced with `"Unknown"` / `"ok"` before `split()`/`tolower()`, so no rows are silently dropped and no `NA` tier/score is produced.
+- **Final score guard**: any residual `NA`/`NaN` in `fis_score` is replaced with `50.0` (neutral), and `fis_tier` `NA` is replaced with `"Hold"`.
+
 ### Usage Example
 
 ```R
@@ -64,7 +71,15 @@ Computes a structured smart-bid recommendation for a single player.
 | `championship_id` | character | Championship identifier |
 | `pressroom_df` | data.frame | Optional pressroom transactions for market context |
 | `user_teams_df` | data.frame | Optional user teams data |
-| `user_cash` | numeric | Available budget in EUR (default 300,000,000) |
+| `user_cash` | numeric | Available budget in EUR. Pass `NA`/`NULL` to mark funds as **unverified** (the engine then uses its own default and sets `funds_verified = FALSE`). Default 300,000,000. |
+| `market_high_bid` | numeric | Optional current highest competing bid on this player (from live market/summary data). When present and above the base minimum, it raises `min_winning_bid` so the recommendation actually wins the auction. |
+| `capacity` | list | Optional list returned by `get_acquisition_capacity()`. When `status == "ok"`, its verified `funds$spendable_budget` bounds the recommendation (see below). |
+
+### Verified-funds guardrail
+
+- `user_cash` alone is treated as **unverified**. A `capacity` object with `status == "ok"` supplies **verified** spendable funds (`max(0, budget - withheld)`), sets `funds_verified = TRUE`, and overrides the spendable figure.
+- `max_rational_bid` and `recommended_bid` are always bounded by the verified spendable funds, so the engine never recommends a bid the team cannot actually afford.
+- The widget in `Selected_Player_Module` passes `user_cash = NA` plus a live `capacity` snapshot (and the target's `market_high_bid`), so the recommendation is grounded in real available budget rather than a hardcoded 300M.
 
 ### Return Fields
 
@@ -72,20 +87,33 @@ Computes a structured smart-bid recommendation for a single player.
 |---|---|---|
 | `fair_value` | numeric | Base value adjusted by form and status factors |
 | `league_premium_pct` | numeric | Percentage above fair value the market pays (from pressroom history) |
-| `min_winning_bid` | numeric | Fair value + 2% premium |
-| `recommended_bid` | numeric | Balanced bid considering league premium |
-| `max_rational_bid` | numeric | Cap at 150% of fair value or user budget |
+| `min_winning_bid` | numeric | `max(fair_value * 1.02, market_high_bid * 1.01)` (the high-bid term only when `market_high_bid` is provided) |
+| `recommended_bid` | numeric | Balanced bid considering league premium, bounded by the rational guardrail and verified spendable funds |
+| `max_rational_bid` | numeric | `min(fair_value * 1.5, spendable_funds)` |
 | `expected_roi_pct` | numeric | Expected return on investment percentage |
 | `competition_level` | character | "High", "Medium", "Low", or "Unknown" |
 | `likely_competitors` | list | Team IDs that have previously bought this player |
-| `confidence_pct` | numeric | Confidence score (0-100) based on data availability |
+| `confidence_pct` | numeric | Confidence score (0-100); +5 when funds are verified, +5 when a live market high bid is present |
+| `spendable_funds` | numeric | The verified (or default) spendable budget used to bound the recommendation |
+| `funds_verified` | logical | `TRUE` only when a `capacity` with `status == "ok"` supplied the spendable figure |
+| `market_high_bid` | numeric / NULL | The live competing high bid that was used (NULL when none provided) |
 
 ### Usage Example
 
 ```R
 player_row <- players[players$name == "Lamine Yamal", ]
-bid_info <- calculate_smart_bid(player_row, championship_id, pressroom_df = pressroom)
+capacity <- get_acquisition_capacity(login, championship_id, user_team_id,
+                                     target_player_id = player_row$id)
+bid_info <- calculate_smart_bid(
+  player_row, championship_id,
+  pressroom_df = pressroom,
+  user_cash = NA,                 # unverified; capacity supplies verified funds
+  market_high_bid = capacity$target$highest_bid,
+  capacity = capacity
+)
 cat("Recommended bid:", bid_info$recommended_bid, "\n")
+cat("Verified spendable:", bid_info$spendable_funds,
+    "(verified:", bid_info$funds_verified, ")\n")
 cat("Expected ROI:", bid_info$expected_roi_pct, "%\n")
 ```
 
@@ -141,6 +169,12 @@ Generates top daily actionable manager recommendations.
 | `user_teams_df` | data.frame | All user teams data |
 | `players_df` | data.frame | Player data (FIS scores computed if missing) |
 | `pressroom_df` | data.frame | Optional pressroom transactions |
+| `market_candidates` | data.frame | **Optional.** Pre-filtered market buy candidates supplied by the Today module (system listings by default, rival listings when opted in; see `docs/today_module.md`). When supplied (even 0-row), the **BUY section is built EXCLUSIVELY from it** (top 3 Strong Buy / Buy tier by FIS, excluding dual-route players); when `NULL`, the legacy `players_df`-based behavior is kept. |
+| `clause_candidates` | data.frame | **Optional.** Pre-filtered strict open rival clause candidates supplied by the Today module. When supplied (even 0-row), the **CLAUSE section is built EXCLUSIVELY from it** (top 2 Strong Buy / Buy tier by FIS); when `NULL`, the legacy `players_df`-based behavior is kept. |
+
+### Dual-route rule (single clause recommendation)
+
+When a player appears in **both** candidate sets (a market listing AND an open rival clause), the feed emits a **SINGLE clause recommendation** for that player (no separate Buy card; the player is removed from the Buy pool). The value `max(market price, clause price)` is included in the description as **comparison metadata only** ("comparison max: X EUR"); the **executed price is always the clause price** (`clause_buyout` resolves to the clause candidate row, whose `clause_price` is what the clause endpoint receives -- never the comparison max).
 
 ### Return Columns
 
@@ -148,14 +182,16 @@ Generates top daily actionable manager recommendations.
 |---|---|---|
 | `type` | character | Recommendation type: "Buy", "Sell", "Bid", "Clause", "Hold" |
 | `title` | character | Short scannable title (e.g., "BUY: Player Name") |
-| `description` | character | Detailed explanation |
+| `description` | character | Detailed explanation (dual-route clause recs include the comparison max metadata) |
 | `confidence_pct` | numeric | Confidence score (0-100) |
 | `action_label` | character | Suggested action (e.g., "Place Bid", "List on Market", "Exercise Clause", "No Action") |
+| `action_code` | character | **Stable action code**: `"market_bid"` (Buy), `"clause_buyout"` (Clause), `"view"` (Sell / Bid / Hold). The Today module sends this code directly in the action-button JS. |
 | `player_id` | character | Player identifier |
 
 ### Usage Example
 
 ```R
+# Legacy call (NULL candidates): Buy/Clause derived from players_df.
 players <- get_championship_players(login, championship_id)
 players <- calculate_fis_score(players)
 feed <- generate_command_center_feed(
@@ -164,6 +200,17 @@ feed <- generate_command_center_feed(
   user_team_id = user_team_id,
   user_teams_df = teams_df,
   players_df = players
+)
+
+# Today call: Buy/Clause built exclusively from the candidate data frames.
+feed <- generate_command_center_feed(
+  login = login,
+  championship_id = championship_id,
+  user_team_id = user_team_id,
+  user_teams_df = teams_df,
+  players_df = all_players,
+  market_candidates = market_candidates_RV(),   # system-only by default
+  clause_candidates = clause_candidates_RV()    # strict open rival clauses
 )
 print(feed)
 ```

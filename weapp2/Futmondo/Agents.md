@@ -55,8 +55,10 @@ Every developer and AI agent making modifications or additions to the codebase *
 
 ---
 
-## 7. Shiny Simulation Testing Rule
+## 7. Scoped Verification & Testing Rule
 
-* **Mandatory Test Updates for New Features**: Whenever a new module, UI component, major algorithm, or server handler is added or modified, developers and AI agents **MUST**:
-  1. Add corresponding automated simulation test cases into `test/test_shiny_simulation.R` (or a dedicated script in `test/`).
-  2. Verify that `Rscript test/test_shiny_simulation.R` runs cleanly with 100% passing tests before completing the task.
+* **Focused Tests for Every Change**: Whenever a feature, module, UI component, algorithm, or server handler is added or modified, developers and AI agents **MUST** update or add an appropriate focused automated test covering the modified behavior (inside `test/`, e.g. `test/test_shiny_simulation.R` or a dedicated script for the affected component). No change may ship with zero test coverage.
+* **Smallest Relevant Test by Default**: For routine changes, run only the smallest directly relevant test script(s) that exercise the modified code. Do not run the full Shiny simulation suite by default.
+* **Full Suite Only When Warranted**: Running `Rscript test/test_shiny_simulation.R` (the full Shiny simulation suite) is required only for significant or cross-cutting changes, application-startup changes, shared infrastructure changes, or major UI/server flow changes, or when explicitly requested by the user.
+* **Report Test Selection & Results**: Developers and AI agents **MUST** report which test script(s) were selected and their actual results (pass/fail output) as part of the task report.
+* **Fix Failures Before Completion**: Any failed focused test must be fixed and re-run until it passes before the task is considered complete.

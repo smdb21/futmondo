@@ -20,6 +20,15 @@ safe_clamp <- function(x, lo = 0, hi = 100) {
   pmin(pmax(x, lo), hi)
 }
 
+# ---- Helper: NULL / scalar-NA safe default (local, no %||% dependency) ----
+# Returns `default` when x is NULL or a length-1 NA; otherwise returns x.
+# Defined locally so calculate_fis_score never relies on an undefined %||%.
+default_if_null_na <- function(x, default) {
+  if (is.null(x)) return(default)
+  if (length(x) == 1 && is.na(x)) return(default)
+  x
+}
+
 
 # ============================================================
 # 1. calculate_fis_score
@@ -61,11 +70,19 @@ calculate_fis_score <- function(players_df, weights = NULL) {
       )
     }
 
-    w_perf <- weights$perf %||% 0.30
-    w_form <- weights$form %||% 0.20
-    w_eff  <- weights$efficiency %||% 0.20
-    w_mom  <- weights$momentum %||% 0.15
-    w_fix  <- weights$fixture_risk %||% 0.15
+    # Use the local NULL/NA-safe default helper (no reliance on %||%).
+    w_perf <- default_if_null_na(weights$perf, 0.30)
+    w_form <- default_if_null_na(weights$form, 0.20)
+    w_eff  <- default_if_null_na(weights$efficiency, 0.20)
+    w_mom  <- default_if_null_na(weights$momentum, 0.15)
+    w_fix  <- default_if_null_na(weights$fixture_risk, 0.15)
+
+    # Coerce weights to finite numerics; fall back to defaults for bad entries.
+    w_perf <- if (is.numeric(w_perf) && is.finite(w_perf)) w_perf else 0.30
+    w_form <- if (is.numeric(w_form) && is.finite(w_form)) w_form else 0.20
+    w_eff  <- if (is.numeric(w_eff) && is.finite(w_eff)) w_eff else 0.20
+    w_mom  <- if (is.numeric(w_mom) && is.finite(w_mom)) w_mom else 0.15
+    w_fix  <- if (is.numeric(w_fix) && is.finite(w_fix)) w_fix else 0.15
 
     # ---- Extract raw columns with safe defaults ----
     points      <- safe_numeric(
@@ -88,6 +105,10 @@ calculate_fis_score <- function(players_df, weights = NULL) {
     )
     status_vec  <- if ("status" %in% colnames(players_df)) as.character(players_df$status) else rep("ok", n)
     role_vec    <- if ("role" %in% colnames(players_df)) as.character(players_df$role) else rep("Unknown", n)
+
+    # Sanitize NA/empty role and status so split() and tolower() never drop rows.
+    role_vec[is.na(role_vec) | trimws(role_vec) == ""] <- "Unknown"
+    status_vec[is.na(status_vec) | trimws(status_vec) == ""] <- "ok"
 
     # ---- perf (0-100): based on points, average, matches ----
     # Normalize: more points -> higher, capped at 100
@@ -222,18 +243,28 @@ fis_tier <- ifelse(fis_score >= 80, "Strong Buy",
 #   championship_id  -- character string
 #   pressroom_df     -- optional data frame of pressroom transactions
 #   user_teams_df    -- optional data frame of user teams
-#   user_cash        -- numeric, available budget (default 300M)
+#   user_cash        -- numeric, available budget (default 300M).
+#                       Pass NA/NULL to mark funds as unverified; the
+#                       function then falls back to its own default.
+#   market_high_bid  -- optional numeric, the current highest competing
+#                       bid on this player (from live market/summary data).
+#   capacity         -- optional list returned by get_acquisition_capacity().
+#                       When status == "ok", its verified spendable funds
+#                       bound the recommendation.
 #
 # Returns:
 #   List with: fair_value, league_premium_pct, min_winning_bid,
 #   recommended_bid, max_rational_bid, expected_roi_pct,
-#   competition_level, likely_competitors, confidence_pct
+#   competition_level, likely_competitors, confidence_pct,
+#   spendable_funds, funds_verified, market_high_bid
 # ============================================================
 
 calculate_smart_bid <- function(player_row, championship_id,
                                  pressroom_df = NULL,
                                  user_teams_df = NULL,
-                                 user_cash = 300000000) {
+                                 user_cash = 300000000,
+                                 market_high_bid = NULL,
+                                 capacity = NULL) {
   if (is.null(player_row)) {
     return(list(error = "player_row is NULL"))
   }
@@ -254,6 +285,34 @@ calculate_smart_bid <- function(player_row, championship_id,
     player_avg5 <- safe_numeric(p$average.averageLastFive, 0)
     player_matches <- safe_numeric(p$average.matches, 0)
     player_status <- if (!is.null(p$status)) as.character(p$status) else "ok"
+
+    # ---- Verified spendable funds ----
+    # user_cash alone is treated as unverified. A capacity object with
+    # status "ok" supplies verified spendable funds (max(0, budget - withheld)).
+    spendable <- 300000000
+    funds_verified <- FALSE
+    if (!is.null(user_cash) && length(user_cash) == 1 && is.numeric(user_cash) &&
+        is.finite(user_cash)) {
+      spendable <- max(0, user_cash)
+    } else {
+      # NA/NULL/non-finite user_cash -> unverified engine default
+      spendable <- 300000000
+    }
+    if (!is.null(capacity) && is.list(capacity) &&
+        identical(capacity$status, "ok") &&
+        is.list(capacity$funds) &&
+        is.numeric(capacity$funds$spendable_budget) &&
+        is.finite(capacity$funds$spendable_budget)) {
+      spendable <- max(0, capacity$funds$spendable_budget)
+      funds_verified <- TRUE
+    }
+
+    # ---- Market high bid (live competing bid) ----
+    mhb <- NULL
+    if (!is.null(market_high_bid) && length(market_high_bid) == 1 &&
+        is.numeric(market_high_bid) && is.finite(market_high_bid) && market_high_bid > 0) {
+      mhb <- market_high_bid
+    }
 
     # ---- fair_value: base value adjusted by form and momentum ----
     form_factor <- 1.0
@@ -284,14 +343,28 @@ calculate_smart_bid <- function(player_row, championship_id,
       league_premium_pct <- 0
     }
 
-    # ---- min_winning_bid: fair_value + small premium ----
-    min_winning_bid <- round(fair_value * 1.02)
+    # ---- min_winning_bid: fair_value + small premium, or just above the
+    #      current market high bid (to actually win the auction) ----
+    base_min <- round(fair_value * 1.02)
+    if (!is.null(mhb)) {
+      min_winning_bid <- max(base_min, round(mhb * 1.01))
+    } else {
+      min_winning_bid <- base_min
+    }
 
-    # ---- recommended_bid: balance between winning and value ----
-    recommended_bid <- round(fair_value * (1 + league_premium_pct / 200))
+    # ---- max_rational_bid: rational value guardrail (150% of fair value)
+    #      bounded by verified spendable funds ----
+    max_rational_bid <- min(round(fair_value * 1.5), spendable)
 
-    # ---- max_rational_bid: cap at 150% of fair value or user budget ----
-    max_rational_bid <- min(round(fair_value * 1.5), user_cash)
+    # ---- recommended_bid: balance between winning and value, bounded by
+    #      the rational guardrail and verified spendable funds ----
+    recommended_raw <- round(fair_value * (1 + league_premium_pct / 200))
+    recommended_bid <- min(recommended_raw, max_rational_bid)
+    # Never recommend below the minimum winning bid (when affordable)
+    if (min_winning_bid <= spendable) {
+      recommended_bid <- max(recommended_bid, min_winning_bid)
+    }
+    recommended_bid <- min(recommended_bid, spendable)
 
     # ---- expected_roi_pct ----
     if (recommended_bid > 0) {
@@ -337,6 +410,9 @@ calculate_smart_bid <- function(player_row, championship_id,
     if (!is.na(player_avg5) && player_avg > 0) base_confidence <- base_confidence + 5
     if (tolower(player_status) == "ok") base_confidence <- base_confidence + 5
     if (length(likely_competitors) > 0) base_confidence <- base_confidence + 5
+    # Verified spendable funds and live market high bid increase confidence
+    if (funds_verified) base_confidence <- base_confidence + 5
+    if (!is.null(mhb)) base_confidence <- base_confidence + 5
     confidence_pct <- safe_clamp(base_confidence)
 
     list(
@@ -348,7 +424,10 @@ calculate_smart_bid <- function(player_row, championship_id,
       expected_roi_pct = expected_roi_pct,
       competition_level = competition_level,
       likely_competitors = likely_competitors,
-      confidence_pct = confidence_pct
+      confidence_pct = confidence_pct,
+      spendable_funds = spendable,
+      funds_verified = funds_verified,
+      market_high_bid = mhb
     )
   }, error = function(e) {
     print(paste0("[SmartBid] Error computing smart bid: ", e$message))
@@ -514,63 +593,141 @@ calculate_manager_dna <- function(team_id, pressroom_df, user_teams_df = NULL) {
 # Generates top daily actionable manager recommendations.
 #
 # Parameters:
-#   login          -- login token vector
-#   championship_id -- character string
-#   user_team_id   -- character, the current user's team
-#   user_teams_df  -- data frame of all user teams
-#   players_df     -- data frame of players (should have FIS scores)
-#   pressroom_df   -- optional pressroom transactions
+#   login             -- login token vector
+#   championship_id   -- character string
+#   user_team_id      -- character, the current user's team
+#   user_teams_df     -- data frame of all user teams
+#   players_df        -- data frame of players (should have FIS scores)
+#   pressroom_df      -- optional pressroom transactions
+#   market_candidates -- optional data frame of pre-filtered market buy
+#                        candidates (supplied by the Today module: system
+#                        listings by default, rival listings when opted in).
+#                        When supplied (even 0-row), the BUY section is built
+#                        EXCLUSIVELY from it (action_code "market_bid"); when
+#                        NULL, the legacy players_df-based behavior is kept.
+#   clause_candidates -- optional data frame of pre-filtered strict open
+#                        rival clause candidates (supplied by the Today
+#                        module). When supplied (even 0-row), the CLAUSE
+#                        section is built EXCLUSIVELY from it (action_code
+#                        "clause_buyout"); when NULL, the legacy
+#                        players_df-based behavior is kept.
+#
+# Dual-route rule: when a player appears in BOTH candidate sets, a SINGLE
+# clause recommendation is emitted (no separate Buy card). The value
+# max(market price, clause price) is included in the description as comparison
+# metadata ONLY; the executed price is always the clause price.
 #
 # Returns:
 #   Data frame with: type, title, description, confidence_pct,
-#   action_label, player_id
+#   action_label, action_code, player_id
+#   (action_code is a stable code: "market_bid" / "clause_buyout" / "view")
 # ============================================================
 
 generate_command_center_feed <- function(login, championship_id,
                                           user_team_id, user_teams_df,
-                                          players_df, pressroom_df = NULL) {
-  if (is.null(players_df) || nrow(players_df) == 0) {
-    return(data.frame(
-      type = character(0), title = character(0), description = character(0),
-      confidence_pct = numeric(0), action_label = character(0),
-      player_id = character(0), stringsAsFactors = FALSE
-    ))
+                                          players_df, pressroom_df = NULL,
+                                          market_candidates = NULL,
+                                          clause_candidates = NULL) {
+  empty_feed <- data.frame(
+    type = character(0), title = character(0), description = character(0),
+    confidence_pct = numeric(0), action_label = character(0),
+    action_code = character(0), player_id = character(0), stringsAsFactors = FALSE
+  )
+
+  has_players <- !is.null(players_df) && is.data.frame(players_df) && nrow(players_df) > 0
+  has_market_cand <- is.data.frame(market_candidates)
+  has_clause_cand <- is.data.frame(clause_candidates)
+
+  if (!has_players && !has_market_cand && !has_clause_cand) {
+    return(empty_feed)
   }
+
+  # Ensures FIS columns exist on a candidate data frame (defensive: Today
+  # pre-computes them, but the feed must not assume it).
+  ensure_candidate_fis <- function(df) {
+    if (nrow(df) == 0) return(df)
+    if (!"fis_score" %in% colnames(df) || !"fis_tier" %in% colnames(df)) {
+      df <- calculate_fis_score(df)
+    }
+    df$fis_score <- safe_numeric(df$fis_score, 50)
+    df$fis_score[!is.finite(df$fis_score)] <- 50
+    df$fis_tier <- ifelse(is.na(df$fis_tier), "Hold", as.character(df$fis_tier))
+    df
+  }
+
+  # Formats a monetary amount as a plain (non-scientific) whole number for
+  # human-readable recommendation descriptions.
+  fmt_money <- function(x) format(round(x, 0), scientific = FALSE)
 
   tryCatch({
     recommendations <- list()
 
     # ---- Ensure FIS scores exist ----
-    if (!"fis_score" %in% colnames(players_df)) {
+    if (has_players && !"fis_score" %in% colnames(players_df)) {
       players_df <- calculate_fis_score(players_df)
     }
 
-    # ---- BUY recommendations: Strong Buy / Buy tier players on market ----
-    buy_candidates <- players_df[
-      players_df$fis_tier %in% c("Strong Buy", "Buy"),
-    ]
-    if (nrow(buy_candidates) > 0) {
-      # Sort by FIS score descending, take top 3
-      buy_candidates <- buy_candidates[order(-buy_candidates$fis_score), ]
-      top_buys <- head(buy_candidates, 3)
+    # ---- BUY recommendations ----
+    if (has_market_cand) {
+      # Policy path: Buy/Place Bid recommendations are built EXCLUSIVELY from
+      # the supplied market candidates (Today pre-filters them to explicit
+      # system listings by default, rival listings when opted in).
+      mc <- ensure_candidate_fis(market_candidates)
+      if (nrow(mc) > 0) {
+        # Dual-route dedupe: a player also covered by a clause candidate gets
+        # a SINGLE clause recommendation (clause price is executed).
+        clause_ids <- if (has_clause_cand && nrow(clause_candidates) > 0) as.character(clause_candidates$id) else character(0)
+        buy_pool <- mc[!as.character(mc$id) %in% clause_ids, ]
+        buy_pool <- buy_pool[buy_pool$fis_tier %in% c("Strong Buy", "Buy"), ]
+        if (nrow(buy_pool) > 0) {
+          buy_pool <- buy_pool[order(-buy_pool$fis_score), ]
+          top_buys <- head(buy_pool, 3)
 
-      for (i in seq_len(nrow(top_buys))) {
-        p <- top_buys[i, ]
-        recommendations[[length(recommendations) + 1]] <- data.frame(
-          type = "Buy",
-          title = paste0("BUY: ", p$name),
-          description = p$fis_summary,
-          confidence_pct = p$fis_score,
-          action_label = "Place Bid",
-          player_id = as.character(p$id),
-          stringsAsFactors = FALSE
-        )
+          for (i in seq_len(nrow(top_buys))) {
+            p <- top_buys[i, ]
+            recommendations[[length(recommendations) + 1]] <- data.frame(
+              type = "Buy",
+              title = paste0("BUY: ", p$name),
+              description = if (!is.na(p$fis_summary)) p$fis_summary else "",
+              confidence_pct = p$fis_score,
+              action_label = "Place Bid",
+              action_code = "market_bid",
+              player_id = as.character(p$id),
+              stringsAsFactors = FALSE
+            )
+          }
+        }
+      }
+    } else if (has_players) {
+      # Legacy path (NULL candidates): Strong Buy / Buy tier players in
+      # players_df.
+      buy_candidates <- players_df[
+        players_df$fis_tier %in% c("Strong Buy", "Buy"),
+      ]
+      if (nrow(buy_candidates) > 0) {
+        # Sort by FIS score descending, take top 3
+        buy_candidates <- buy_candidates[order(-buy_candidates$fis_score), ]
+        top_buys <- head(buy_candidates, 3)
+
+        for (i in seq_len(nrow(top_buys))) {
+          p <- top_buys[i, ]
+          recommendations[[length(recommendations) + 1]] <- data.frame(
+            type = "Buy",
+            title = paste0("BUY: ", p$name),
+            description = p$fis_summary,
+            confidence_pct = p$fis_score,
+            action_label = "Place Bid",
+            action_code = "market_bid",
+            player_id = as.character(p$id),
+            stringsAsFactors = FALSE
+          )
+        }
       }
     }
 
     # ---- SELL recommendations: Sell tier players owned by user ----
     # Check if players_df has user_team_id column (from roster)
-    if ("user_team_id" %in% colnames(players_df)) {
+    if (has_players && "user_team_id" %in% colnames(players_df)) {
       owned <- players_df[players_df$user_team_id == user_team_id, ]
       sell_candidates <- owned[owned$fis_tier == "Sell", ]
       if (nrow(sell_candidates) > 0) {
@@ -585,6 +742,7 @@ generate_command_center_feed <- function(login, championship_id,
             description = paste0("Weak metrics suggest listing on market. Current FIS: ", round(p$fis_score, 1)),
             confidence_pct = safe_clamp(100 - p$fis_score),
             action_label = "List on Market",
+            action_code = "view",
             player_id = as.character(p$id),
             stringsAsFactors = FALSE
           )
@@ -593,7 +751,7 @@ generate_command_center_feed <- function(login, championship_id,
     }
 
     # ---- BID recommendations: players with active bids ----
-    if ("bid_price" %in% colnames(players_df) && "user_team_id" %in% colnames(players_df)) {
+    if (has_players && "bid_price" %in% colnames(players_df) && "user_team_id" %in% colnames(players_df)) {
       bid_players <- players_df[
         players_df$user_team_id == user_team_id & !is.na(players_df$bid_price) & players_df$bid_price > 0,
       ]
@@ -609,6 +767,7 @@ generate_command_center_feed <- function(login, championship_id,
             description = paste0("Active bid of ", bid_val, " EUR on player valued at ", player_val, " EUR. ", accept, " recommended."),
             confidence_pct = ifelse(accept == "Accept", 85, 60),
             action_label = accept,
+            action_code = "view",
             player_id = as.character(p$id),
             stringsAsFactors = FALSE
           )
@@ -616,14 +775,75 @@ generate_command_center_feed <- function(login, championship_id,
       }
     }
 
-    # ---- CLAUSE recommendations: players with active clauses ----
-    if ("clause_price" %in% colnames(players_df)) {
-      clause_candidates <- players_df[
+    # ---- CLAUSE recommendations ----
+    if (has_clause_cand) {
+      # Policy path: clause recommendations are built EXCLUSIVELY from the
+      # supplied strict open rival clause candidates.
+      cc <- ensure_candidate_fis(clause_candidates)
+      if (nrow(cc) > 0) {
+        # Filter to those with good FIS scores
+        good_clause <- cc[cc$fis_tier %in% c("Strong Buy", "Buy"), ]
+        if (nrow(good_clause) > 0) {
+          good_clause <- good_clause[order(-good_clause$fis_score), ]
+          top_clauses <- head(good_clause, 2)
+          mkt_ids <- if (has_market_cand && nrow(market_candidates) > 0) as.character(market_candidates$id) else character(0)
+
+          for (i in seq_len(nrow(top_clauses))) {
+            p <- top_clauses[i, ]
+            pid <- as.character(p$id)
+            clause_price <- suppressWarnings(as.numeric(p$clause_price))
+
+            if (pid %in% mkt_ids) {
+              # Dual route: the player is BOTH a market listing and an open
+              # rival clause. Emit a SINGLE clause recommendation; the value
+              # max(market price, clause price) is comparison metadata only,
+              # and the executed price is always the clause price.
+              mkt_row <- market_candidates[which(as.character(market_candidates$id) == pid)[1], ]
+              mkt_price <- NA_real_
+              for (col in c("effective_market_price", "market_price", "price")) {
+                if (col %in% names(mkt_row)) {
+                  v <- suppressWarnings(as.numeric(mkt_row[[col]]))
+                  if (is.finite(v) && v > 0) {
+                    mkt_price <- v
+                    break
+                  }
+                }
+              }
+              if (!is.finite(mkt_price)) mkt_price <- clause_price
+              cmp <- max(mkt_price, clause_price)
+              description <- paste0(
+                "Buyout clause at ", fmt_money(clause_price), " EUR (dual route: also listed on market at ",
+                fmt_money(mkt_price), " EUR; comparison max: ", fmt_money(cmp),
+                " EUR). Executing clause price only."
+              )
+            } else {
+              player_val <- suppressWarnings(as.numeric(p$value))
+              discount <- ifelse(!is.na(clause_price) && !is.na(player_val) && player_val > 0,
+                          round((1 - clause_price / player_val) * 100, 1), 0)
+              description <- paste0("Buyout clause at ", clause_price, " EUR (", discount, "% discount to market value). Strong Buy candidate.")
+            }
+
+            recommendations[[length(recommendations) + 1]] <- data.frame(
+              type = "Clause",
+              title = paste0("CLAUSE: ", p$name),
+              description = description,
+              confidence_pct = safe_clamp(p$fis_score + 5),
+              action_label = "Exercise Clause",
+              action_code = "clause_buyout",
+              player_id = pid,
+              stringsAsFactors = FALSE
+            )
+          }
+        }
+      }
+    } else if (has_players && "clause_price" %in% colnames(players_df)) {
+      # Legacy path (NULL candidates): players in players_df with a clause.
+      clause_pool <- players_df[
         !is.na(players_df$clause_price) & players_df$clause_price > 0,
       ]
-      if (nrow(clause_candidates) > 0) {
+      if (nrow(clause_pool) > 0) {
         # Filter to those with good FIS scores
-        good_clause <- clause_candidates[clause_candidates$fis_tier %in% c("Strong Buy", "Buy"), ]
+        good_clause <- clause_pool[clause_pool$fis_tier %in% c("Strong Buy", "Buy"), ]
         if (nrow(good_clause) > 0) {
           for (i in seq_len(min(nrow(good_clause), 2))) {
             p <- good_clause[i, ]
@@ -637,6 +857,7 @@ generate_command_center_feed <- function(login, championship_id,
               description = paste0("Buyout clause at ", clause_price, " EUR (", discount, "% discount to market value). Strong Buy candidate."),
               confidence_pct = safe_clamp(p$fis_score + 5),
               action_label = "Exercise Clause",
+              action_code = "clause_buyout",
               player_id = as.character(p$id),
               stringsAsFactors = FALSE
             )
@@ -646,7 +867,7 @@ generate_command_center_feed <- function(login, championship_id,
     }
 
     # ---- HOLD recommendations: top Hold-tier owned players ----
-    if ("user_team_id" %in% colnames(players_df)) {
+    if (has_players && "user_team_id" %in% colnames(players_df)) {
       owned <- players_df[players_df$user_team_id == user_team_id, ]
       hold_candidates <- owned[owned$fis_tier == "Hold", ]
       if (nrow(hold_candidates) > 0) {
@@ -661,6 +882,7 @@ generate_command_center_feed <- function(login, championship_id,
             description = paste0("Stable asset; no immediate action needed. FIS: ", round(p$fis_score, 1)),
             confidence_pct = safe_clamp(p$fis_score),
             action_label = "No Action",
+            action_code = "view",
             player_id = as.character(p$id),
             stringsAsFactors = FALSE
           )
@@ -670,11 +892,7 @@ generate_command_center_feed <- function(login, championship_id,
 
     # ---- Combine and return ----
     if (length(recommendations) == 0) {
-      return(data.frame(
-        type = character(0), title = character(0), description = character(0),
-        confidence_pct = numeric(0), action_label = character(0),
-        player_id = character(0), stringsAsFactors = FALSE
-      ))
+      return(empty_feed)
     }
 
     result_df <- do.call(rbind, recommendations)
@@ -685,11 +903,7 @@ generate_command_center_feed <- function(login, championship_id,
     return(result_df)
   }, error = function(e) {
     print(paste0("[CommandCenter] Error generating feed: ", e$message))
-    data.frame(
-      type = character(0), title = character(0), description = character(0),
-      confidence_pct = numeric(0), action_label = character(0),
-      player_id = character(0), stringsAsFactors = FALSE
-    )
+    empty_feed
   })
 }
 

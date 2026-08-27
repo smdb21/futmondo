@@ -4,6 +4,248 @@ library(shinydashboard)
 library(shinydashboardPlus)
 library(dplyr)
 
+# ---- Pure helper: safe ISO datetime parser (top-level for testability) ----
+# Mirrors the module's internal parse_safe_datetime so the pure helpers below
+# can parse pressroom `created` timestamps deterministically.
+rivals_parse_datetime <- function(date_vec) {
+  if (is.null(date_vec) || length(date_vec) == 0) return(as.POSIXct(character(0)))
+  date_str <- as.character(date_vec)
+  clean_str <- gsub("T", " ", date_str)
+  clean_str <- gsub("Z", "", clean_str)
+  clean_str <- gsub("\\..*", "", clean_str)
+  parsed <- suppressWarnings(as.POSIXct(clean_str, format = "%Y-%m-%d %H:%M:%S"))
+  na_idx <- is.na(parsed)
+  if (any(na_idx)) {
+    parsed[na_idx] <- suppressWarnings(as.POSIXct(clean_str[na_idx], format = "%Y-%m-%d"))
+  }
+  # Invalid / unparseable timestamps stay NA (never substituted with Sys.time()).
+  parsed
+}
+
+# ---- Pure helper: per-team buying-power values for the league plot ----
+# Liquid Cash uses ALL transfers through the END date (the balance is not
+# reset at the slider start): 300M - (all purchases through end) + (all sales
+# through end). Investment and Transaction Volume stay within the [start, end]
+# range. Returns a data frame (team_id, team, value, range_label) where
+# range_label describes the window used (for labels/tooltips).
+rivals_buying_power_values <- function(pressroom_df, teams, metric = "cash",
+                                       start_date = NULL, end_date = NULL,
+                                       initial_budget = 300000000) {
+  team_ids <- if (!is.null(teams) && "teamid" %in% colnames(teams)) as.character(teams$teamid) else character(0)
+  team_names_map <- if (!is.null(teams) && "teamname" %in% colnames(teams)) setNames(as.character(teams$teamname), as.character(teams$teamid)) else character(0)
+
+  plot_df <- data.frame(
+    team_id = team_ids,
+    team = ifelse(team_ids %in% names(team_names_map), team_names_map[team_ids], team_ids),
+    stringsAsFactors = FALSE
+  )
+
+  if (is.null(pressroom_df) || !is.data.frame(pressroom_df) || nrow(pressroom_df) == 0) {
+    plot_df$value <- if (metric == "cash") initial_budget else 0
+    plot_df$range_label <- if (metric == "cash") "all transfers through end date" else "within selected range"
+    return(plot_df)
+  }
+
+  parsed <- suppressWarnings(as.POSIXct(as.character(pressroom_df$created), tz = "UTC"))
+
+  # Cash: no start filter (balance from all transfers through end).
+  # Investment / Volume: [start, end] range.
+  mask <- !is.na(parsed)
+  if (metric == "cash") {
+    if (!is.null(end_date)) mask <- mask & parsed <= end_date
+  } else {
+    if (!is.null(start_date)) mask <- mask & parsed >= start_date
+    if (!is.null(end_date)) mask <- mask & parsed <= end_date
+  }
+  sub <- pressroom_df[mask, , drop = FALSE]
+
+  purchases <- rep(0, nrow(plot_df))
+  sales <- rep(0, nrow(plot_df))
+
+  if (nrow(sub) > 0) {
+    if ("buyer_team_id" %in% colnames(sub) && "price" %in% colnames(sub)) {
+      buys_agg <- sub %>%
+        dplyr::filter(!is.na(buyer_team_id) & nzchar(as.character(buyer_team_id))) %>%
+        dplyr::group_by(buyer_team_id = as.character(buyer_team_id)) %>%
+        dplyr::summarise(total = sum(suppressWarnings(as.numeric(price)), na.rm = TRUE), .groups = "drop")
+      if (nrow(buys_agg) > 0) {
+        m <- match(plot_df$team_id, buys_agg$buyer_team_id)
+        purchases <- ifelse(!is.na(m), buys_agg$total[m], 0)
+      }
+    }
+    if ("seller_team_id" %in% colnames(sub) && "price" %in% colnames(sub)) {
+      sells_agg <- sub %>%
+        dplyr::filter(!is.na(seller_team_id) & nzchar(as.character(seller_team_id))) %>%
+        dplyr::group_by(seller_team_id = as.character(seller_team_id)) %>%
+        dplyr::summarise(total = sum(suppressWarnings(as.numeric(price)), na.rm = TRUE), .groups = "drop")
+      if (nrow(sells_agg) > 0) {
+        m <- match(plot_df$team_id, sells_agg$seller_team_id)
+        sales <- ifelse(!is.na(m), sells_agg$total[m], 0)
+      }
+    }
+  }
+
+  if (metric == "cash") {
+    plot_df$value <- initial_budget - purchases + sales
+    plot_df$range_label <- "all transfers through end date"
+  } else if (metric == "investment") {
+    plot_df$value <- purchases
+    plot_df$range_label <- "within selected range"
+  } else {
+    plot_df$value <- purchases + sales
+    plot_df$range_label <- "within selected range"
+  }
+
+  plot_df
+}
+
+# ---- Pure helper: build the "Pivot by Player" buy/sell ledger ----
+# Pairs buys to sells by player_id (falling back to player_name when no id is
+# exposed). Uses raw timestamps for matching/sorting (ISO 8601 sorts
+# chronologically as a string). Returns a data frame WITHOUT a "Sold" column;
+# a buy with no later sell has NA sell fields. Helper columns (PlayerID) are
+# present for pairing and should be hidden in the table.
+rivals_build_pivot_ledger <- function(pressroom_df, rival_id) {
+  empty <- data.frame(
+    Player = character(0), PlayerID = character(0),
+    Buy_Date = character(0), Buy_Type = character(0), Bought_Price = numeric(0),
+    Sell_Date = character(0), Sell_Type = character(0), Sold_Price = numeric(0), Net_PL = numeric(0),
+    stringsAsFactors = FALSE
+  )
+  if (is.null(pressroom_df) || !is.data.frame(pressroom_df) || nrow(pressroom_df) == 0) return(empty)
+  if (is.null(rival_id) || rival_id == "") return(empty)
+
+  # NA-safe team filtering (NA == rival_id yields NA, which would select an
+  # NA row when used as a row index).
+  buys <- pressroom_df[!is.na(pressroom_df$buyer_team_id) & pressroom_df$buyer_team_id == rival_id, , drop = FALSE]
+  sells <- pressroom_df[!is.na(pressroom_df$seller_team_id) & pressroom_df$seller_team_id == rival_id, , drop = FALSE]
+  if (nrow(buys) == 0) return(empty)
+
+  key_of <- function(df) {
+    if ("player_id" %in% colnames(df) && all(nzchar(as.character(df$player_id)))) {
+      as.character(df$player_id)
+    } else if ("player_name" %in% colnames(df)) {
+      as.character(df$player_name)
+    } else {
+      rep(NA_character_, nrow(df))
+    }
+  }
+  name_of <- function(df) {
+    if ("player_name" %in% colnames(df)) as.character(df$player_name) else rep("Unknown", nrow(df))
+  }
+
+  buys$key <- key_of(buys)
+  buys$display_name <- name_of(buys)
+  buys$buy_ts <- rivals_parse_datetime(buys$created)
+  # Skip buys with invalid (NA) timestamps rather than ordering on fabricated now.
+  buys <- buys[!is.na(buys$buy_ts), , drop = FALSE]
+  if (nrow(buys) == 0) return(empty)
+  buys <- buys[order(buys$buy_ts), , drop = FALSE]
+
+  sells$key <- key_of(sells)
+  sells$sell_ts <- rivals_parse_datetime(sells$created)
+  # Skip sells with invalid (NA) timestamps rather than matching on fabricated now.
+  sells <- sells[!is.na(sells$sell_ts), , drop = FALSE]
+  sells <- sells[order(sells$sell_ts), , drop = FALSE]
+
+  all_keys <- unique(buys$key)
+  all_keys <- all_keys[!is.na(all_keys) & nzchar(all_keys)]
+  if (length(all_keys) == 0) return(empty)
+
+  ledger_rows <- lapply(all_keys, function(pk) {
+    p_buys <- buys[buys$key == pk, , drop = FALSE]
+    p_sells <- sells[sells$key == pk, , drop = FALSE]
+    if (nrow(p_buys) == 0) return(NULL)
+
+    used_sells <- integer(0)
+    rows <- lapply(seq_len(nrow(p_buys)), function(bi) {
+      b <- p_buys[bi, ]
+      buy_price <- suppressWarnings(as.numeric(b$price))
+      buy_date_raw <- as.character(b$created)
+      buy_type <- if ("type" %in% colnames(b)) as.character(b$type) else "transfer"
+
+      # First unused sell (by raw timestamp) strictly after this buy.
+      sell_match_idx <- NA_integer_
+      if (nrow(p_sells) > 0) {
+        for (si in seq_len(nrow(p_sells))) {
+          if (si %in% used_sells) next
+          if (p_sells$sell_ts[si] > b$buy_ts) {
+            sell_match_idx <- si
+            break
+          }
+        }
+      }
+
+      if (!is.na(sell_match_idx)) {
+        used_sells <<- c(used_sells, sell_match_idx)
+        s <- p_sells[sell_match_idx, ]
+        sell_price <- suppressWarnings(as.numeric(s$price))
+        sell_date_raw <- as.character(s$created)
+        sell_type <- if ("type" %in% colnames(s)) as.character(s$type) else "transfer"
+        data.frame(
+          Player = b$display_name,
+          PlayerID = pk,
+          Buy_Date = buy_date_raw,
+          Buy_Type = buy_type,
+          Bought_Price = buy_price,
+          Sell_Date = sell_date_raw,
+          Sell_Type = sell_type,
+          Sold_Price = sell_price,
+          Net_PL = sell_price - buy_price,
+          stringsAsFactors = FALSE
+        )
+      } else {
+        data.frame(
+          Player = b$display_name,
+          PlayerID = pk,
+          Buy_Date = buy_date_raw,
+          Buy_Type = buy_type,
+          Bought_Price = buy_price,
+          Sell_Date = NA_character_,
+          Sell_Type = NA_character_,
+          Sold_Price = NA_real_,
+          Net_PL = NA_real_,
+          stringsAsFactors = FALSE
+        )
+      }
+    })
+
+    valid <- Filter(Negate(is.null), rows)
+    if (length(valid) == 0) return(NULL)
+    bind_rows(valid)
+  })
+
+  ledger <- Filter(Negate(is.null), ledger_rows)
+  if (length(ledger) == 0) return(empty)
+  ledger <- bind_rows(ledger)
+
+  # Sort by raw buy timestamp, newest first (ISO 8601 sorts chronologically).
+  # All ledger buys carry valid timestamps (invalid ones were skipped above),
+  # but keep NA handling explicit for safety.
+  ledger$buy_ts <- rivals_parse_datetime(ledger$Buy_Date)
+  ledger <- ledger[order(ledger$buy_ts, decreasing = TRUE, na.last = TRUE), , drop = FALSE]
+  ledger$buy_ts <- NULL
+  ledger
+}
+
+# ---- Pure helper: reorder the transaction log into display column order ----
+# Visible columns first (date, type, concept, money, running_balance), then the
+# hidden helper columns (id, category, timestamp, batch_*). All fields are
+# preserved and row order/values are unchanged; only the column order changes
+# so the reactable renders "Date" first.
+rivals_tx_display_df <- function(filtered) {
+  if (is.null(filtered) || !is.data.frame(filtered) || nrow(filtered) == 0) return(filtered)
+  visible_cols <- c("date", "type", "concept", "money", "running_balance")
+  helper_cols <- c("id", "category", "timestamp", "batch_key", "is_batch_header", "batch_final_balance")
+  present <- colnames(filtered)
+  ordered_cols <- c(
+    intersect(visible_cols, present),
+    intersect(helper_cols, present),
+    setdiff(present, c(visible_cols, helper_cols))
+  )
+  filtered[, ordered_cols, drop = FALSE]
+}
+
 rivals_UI <- function(id) {
   ns <- NS(id)
 tagList(
@@ -596,59 +838,25 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       start_date <- as.POSIXct(date_range[1], tz = "UTC")
       end_date <- as.POSIXct(date_range[2], tz = "UTC")
 
-      filtered_tx <- pressroom_df
-      if ("created" %in% colnames(filtered_tx)) {
-        parsed_dates <- suppressWarnings(as.POSIXct(as.character(filtered_tx$created), tz = "UTC"))
-        filtered_tx <- filtered_tx[!is.na(parsed_dates) & parsed_dates >= start_date & parsed_dates <= end_date, ]
-      }
-
-      team_ids <- if (!is.null(teams) && "teamid" %in% colnames(teams)) as.character(teams$teamid) else character(0)
-      team_names_map <- if (!is.null(teams) && "teamname" %in% colnames(teams)) setNames(as.character(teams$teamname), as.character(teams$teamid)) else character(0)
-
-      plot_df <- data.frame(
-        team_id = team_ids,
-        team = ifelse(team_ids %in% names(team_names_map), team_names_map[team_ids], team_ids),
-        purchases = 0,
-        sales = 0,
-        stringsAsFactors = FALSE
+      # Per-team values via the pure helper. Liquid Cash uses ALL transfers
+      # through the end date (balance not reset at slider start); investment
+      # and volume use the [start, end] range. range_label drives the tooltip.
+      plot_df <- rivals_buying_power_values(
+        pressroom_df = pressroom_df,
+        teams = teams,
+        metric = metric,
+        start_date = start_date,
+        end_date = end_date,
+        initial_budget = 300000000
       )
 
-      if (nrow(filtered_tx) > 0) {
-        if ("buyer_team_id" %in% colnames(filtered_tx) && "price" %in% colnames(filtered_tx)) {
-          buys_agg <- filtered_tx %>%
-            dplyr::filter(!is.na(buyer_team_id) & nzchar(as.character(buyer_team_id))) %>%
-            dplyr::group_by(buyer_team_id = as.character(buyer_team_id)) %>%
-            dplyr::summarise(total_purchases = sum(suppressWarnings(as.numeric(price)), na.rm = TRUE), .groups = "drop")
-
-          if (nrow(buys_agg) > 0) {
-            match_idx <- match(plot_df$team_id, buys_agg$buyer_team_id)
-            plot_df$purchases <- ifelse(!is.na(match_idx), buys_agg$total_purchases[match_idx], 0)
-          }
-        }
-
-        if ("seller_team_id" %in% colnames(filtered_tx) && "price" %in% colnames(filtered_tx)) {
-          sells_agg <- filtered_tx %>%
-            dplyr::filter(!is.na(seller_team_id) & nzchar(as.character(seller_team_id))) %>%
-            dplyr::group_by(seller_team_id = as.character(seller_team_id)) %>%
-            dplyr::summarise(total_sales = sum(suppressWarnings(as.numeric(price)), na.rm = TRUE), .groups = "drop")
-
-          if (nrow(sells_agg) > 0) {
-            match_idx <- match(plot_df$team_id, sells_agg$seller_team_id)
-            plot_df$sales <- ifelse(!is.na(match_idx), sells_agg$total_sales[match_idx], 0)
-          }
-        }
-      }
-
       if (metric == "cash") {
-        plot_df$value <- 300000000 - plot_df$purchases + plot_df$sales
         x_title <- "Liquid Cash (EUR)"
         tooltip_label <- "Liquid Cash"
       } else if (metric == "investment") {
-        plot_df$value <- plot_df$purchases
         x_title <- "Squad Purchases (EUR)"
         tooltip_label <- "Squad Purchases"
       } else {
-        plot_df$value <- plot_df$purchases + plot_df$sales
         x_title <- "Transaction Volume (EUR)"
         tooltip_label <- "Transaction Volume"
       }
@@ -666,7 +874,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
         orientation = "h",
         marker = list(color = colors, line = list(color = line_colors, width = 1)),
         hoverinfo = "text",
-        text = ~paste0("<b>", team, "</b><br>", tooltip_label, ": ", format_table_currency(value))
+        text = ~paste0("<b>", team, "</b><br>", tooltip_label, ": ", format_table_currency(value), "<br><i>", range_label, "</i>")
       ) %>%
         plotly::layout(
           paper_bgcolor = "rgba(0,0,0,0)",
@@ -758,12 +966,19 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
         # Calculate running balance on the FULL chronological dataset
         movements$running_balance <- cumsum(movements$money)
 
-        # Drop the helper column before returning
-        movements$timestamp <- NULL
-
-        # Return sorted descending for display (newest first)
+        # Batch consolidation: group by minute, compute batch_final_balance and is_batch_header
+        movements$batch_key <- format(movements$timestamp, "%Y-%m-%d %H:%M")
         movements <- movements %>%
-          dplyr::arrange(desc(date))
+          dplyr::group_by(batch_key) %>%
+          dplyr::mutate(
+            batch_final_balance = running_balance[dplyr::n()],
+            is_batch_header = dplyr::row_number() == dplyr::n()
+          ) %>%
+          dplyr::ungroup()
+
+        # Order strictly descending (newest first), batch header row first within each timestamp group
+        movements <- movements %>%
+          dplyr::arrange(desc(timestamp), desc(is_batch_header))
 
         return(movements)
       }
@@ -912,25 +1127,73 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
         }
       }
 
-      # Combine all rows
-      if (length(all_rows) == 0) {
+# Combine all rows
+       if (length(all_rows) == 0) {
         return(empty_df)
-      }
+       }
 
-      recon_df <- bind_rows(all_rows)
+       recon_df <- bind_rows(all_rows)
 
-      # (e) Running Balance: sort chronologically ascending -> cumsum -> return sorted descending
-      recon_df$timestamp <- parse_safe_datetime(recon_df$date)
-      recon_df <- recon_df %>%
-        dplyr::arrange(timestamp)
-      recon_df$running_balance <- cumsum(recon_df$money)
-      recon_df$timestamp <- NULL
+       # (d1) Add ranking prize bonus row if finished rounds exist with ranking prizes
+       if (!is.null(finished_rounds_df) && nrow(finished_rounds_df) > 0 && rival_points > 0) {
+         # Determine rival's rank among teams
+         rival_rank <- length(teams_sorted <- tryCatch({
+           user_teams_df <- user_teams_RV()
+           if (!is.null(user_teams_df) && nrow(user_teams_df) > 0) {
+             sorted <- user_teams_df[order(-as.numeric(user_teams_df$points)), ]
+             rank_val <- which(as.character(sorted$teamid) == as.character(rival_id))
+             if (length(rank_val) > 0 && rank_val[1] > 0) rank_val[1] else NA
+           } else {
+             NA
+           }
+         }, error = function(e) NA))
 
-      # Return sorted descending for display (newest first)
-      recon_df <- recon_df %>%
-        dplyr::arrange(desc(date))
+         if (!is.na(rival_rank) && rival_rank > 0) {
+           ranking_prizes_df <- tryCatch({
+             calculate_futmondo_ranking_prizes(money = 30000000, members = nrow(user_teams_RV()))
+           }, error = function(e) NULL)
 
-      return(recon_df)
+           if (!is.null(ranking_prizes_df) && nrow(ranking_prizes_df) > 0) {
+             prize_amount <- suppressWarnings(as.numeric(ranking_prizes_df$prize[ranking_prizes_df$rank == rival_rank]))
+             if (!is.na(prize_amount) && prize_amount > 0) {
+               # Use the latest date from existing rows, or Sys.time() if none
+               latest_date <- max(parse_safe_datetime(recon_df$date), na.rm = TRUE)
+               all_rows[[length(all_rows) + 1]] <- data.frame(
+                 id = "recon_ranking_prize",
+                 concept = "Ranking Prize",
+                 type = "bonus",
+                 category = "ranking",
+                 money = prize_amount,
+                 date = as.character(latest_date),
+                 stringsAsFactors = FALSE
+               )
+               recon_df <- bind_rows(all_rows)
+             }
+           }
+         }
+       }
+
+       # (e) Running Balance: sort chronologically ascending -> cumsum -> batch consolidation
+       recon_df$timestamp <- parse_safe_datetime(recon_df$date)
+       recon_df <- recon_df %>%
+         dplyr::arrange(timestamp)
+       recon_df$running_balance <- cumsum(recon_df$money)
+
+       # Batch consolidation: group by minute, compute batch_final_balance and is_batch_header
+       recon_df$batch_key <- format(recon_df$timestamp, "%Y-%m-%d %H:%M")
+       recon_df <- recon_df %>%
+         dplyr::group_by(batch_key) %>%
+         dplyr::mutate(
+           batch_final_balance = running_balance[dplyr::n()],
+           is_batch_header = dplyr::row_number() == dplyr::n()
+         ) %>%
+         dplyr::ungroup()
+
+       # Order strictly descending (newest first), batch header row first within each timestamp group
+       recon_df <- recon_df %>%
+         dplyr::arrange(desc(timestamp), desc(is_batch_header))
+
+       return(recon_df)
     })
 
     # Filtered money movements: passthrough to raw data (filters removed)
@@ -1030,162 +1293,78 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
 # Render Transaction Table
     output$rival_transactions_table <- reactable::renderReactable({
       if (isTRUE(input$tx_pivot_by_player)) {
-        # Pivot by player: build paired buy/sell ledger
+        # Pivot by player: build the paired buy/sell ledger via the pure
+        # helper (pairs by player_id, fallback name; raw dates; no Sold column).
         rival_id <- selected_rival_team_id()
         pressroom_df <- tryCatch({
           get_championship_pressroom(login = login_token(), championship_id = championship_id())
         }, error = function(e) NULL)
 
-        if (!is.null(pressroom_df) && nrow(pressroom_df) > 0 && !is.null(rival_id) && rival_id != "") {
-          buys <- pressroom_df[pressroom_df$buyer_team_id == rival_id, ]
-          sells <- pressroom_df[pressroom_df$seller_team_id == rival_id, ]
+        ledger <- rivals_build_pivot_ledger(pressroom_df, rival_id)
 
-          if (!is.null(buys) && nrow(buys) > 0) {
-            buys <- buys[order(parse_safe_datetime(buys$created)), ]
-          } else {
-            buys <- pressroom_df[0, ]
-          }
-          if (!is.null(sells) && nrow(sells) > 0) {
-            sells <- sells[order(parse_safe_datetime(sells$created)), ]
-          } else {
-            sells <- pressroom_df[0, ]
-          }
-
-          all_players <- unique(c(
-            if (nrow(buys) > 0 && "player_name" %in% colnames(buys)) as.character(buys$player_name),
-            if (nrow(sells) > 0 && "player_name" %in% colnames(sells)) as.character(sells$player_name)
-          ))
-          all_players <- all_players[nzchar(all_players)]
-
-          if (length(all_players) > 0) {
-            ledger_rows <- lapply(all_players, function(pname) {
-              p_buys <- if (nrow(buys) > 0 && "player_name" %in% colnames(buys)) buys[buys$player_name == pname, ] else buys[0, ]
-              p_sells <- if (nrow(sells) > 0 && "player_name" %in% colnames(sells)) sells[sells$player_name == pname, ] else sells[0, ]
-
-              if (nrow(p_buys) == 0) return(NULL)
-
-              rows <- lapply(seq_len(nrow(p_buys)), function(bi) {
-                b <- p_buys[bi, ]
-                buy_price <- suppressWarnings(as.numeric(b$price))
-                buy_date <- format(parse_safe_datetime(b$created), "%d/%m/%Y")
-                buy_type <- if ("type" %in% colnames(b)) as.character(b$type) else "transfer"
-
-                # Find the first unsold sell after this buy
-                sell_match <- NULL
-                for (si in seq_len(nrow(p_sells))) {
-                  s <- p_sells[si, ]
-                  if (parse_safe_datetime(s$created) > parse_safe_datetime(b$created)) {
-                    sell_match <- s
-                    # Remove this sell so it is not reused
-                    p_sells <<- p_sells[-si, ]
-                    break
+        if (!is.null(ledger) && nrow(ledger) > 0) {
+          return(reactable::reactable(
+            ledger,
+            compact = TRUE,
+            striped = TRUE,
+            highlight = TRUE,
+            bordered = FALSE,
+            defaultPageSize = 15,
+            columns = list(
+              Player = colDef(name = "Player", align = "left", style = list(fontWeight = "600")),
+              Bought_Price = colDef(
+                name = "Bought Price",
+                align = "right",
+                cell = function(val, Buy_Date, Buy_Type) {
+                  d <- format(rivals_parse_datetime(Buy_Date), "%d/%m/%Y")
+                  title_text <- paste0("Date: ", d, "\nType: ", Buy_Type)
+                  shiny::tags$span(
+                    style = "color: #ef4444; font-weight: 600;",
+                    title = title_text,
+                    format_table_currency(val)
+                  )
+                }
+              ),
+              Sold_Price = colDef(
+                name = "Sold Price",
+                align = "right",
+                cell = function(val, Sell_Date, Sell_Type) {
+                  if (is.na(val)) {
+                    shiny::tags$span(style = "color: #94a3b8;", "-")
+                  } else {
+                    d <- format(rivals_parse_datetime(Sell_Date), "%d/%m/%Y")
+                    title_text <- paste0("Date: ", d, "\nType: ", Sell_Type)
+                    shiny::tags$span(
+                      style = "color: #10b981; font-weight: 600;",
+                      title = title_text,
+                      format_table_currency(val)
+                    )
                   }
                 }
-
-                if (!is.null(sell_match)) {
-                  sell_price <- suppressWarnings(as.numeric(sell_match$price))
-                  sell_date <- format(parse_safe_datetime(sell_match$created), "%d/%m/%Y")
-                  sell_type <- if ("type" %in% colnames(sell_match)) as.character(sell_match$type) else "transfer"
-                  net_pl <- sell_price - buy_price
-                  data.frame(
-                    Player = pname,
-                    Buy_Date = buy_date,
-                    Buy_Type = buy_type,
-                    Bought_Price = buy_price,
-                    Sell_Date = sell_date,
-                    Sell_Type = sell_type,
-                    Sold_Price = sell_price,
-                    Net_PL = net_pl,
-                    Sold = TRUE,
-                    stringsAsFactors = FALSE
-                  )
-                } else {
-                  data.frame(
-                    Player = pname,
-                    Buy_Date = buy_date,
-                    Buy_Type = buy_type,
-                    Bought_Price = buy_price,
-                    Sell_Date = NA_character_,
-                    Sell_Type = NA_character_,
-                    Sold_Price = NA_real_,
-                    Net_PL = NA_real_,
-                    Sold = FALSE,
-                    stringsAsFactors = FALSE
-                  )
+              ),
+              Net_PL = colDef(
+                name = "Net P/L",
+                align = "right",
+                cell = function(val) {
+                  if (is.na(val)) {
+                    shiny::tags$span(style = "color: #94a3b8;", "-")
+                  } else if (val > 0) {
+                    shiny::tags$span(style = "color: #10b981; font-weight: 700;", paste0("+", format_table_currency(val)))
+                  } else if (val < 0) {
+                    shiny::tags$span(style = "color: #ef4444; font-weight: 700;", format_table_currency(val))
+                  } else {
+                    shiny::tags$span(style = "color: #64748b;", format_table_currency(val))
+                  }
                 }
-              })
-
-              valid <- Filter(Negate(is.null), rows)
-              if (length(valid) == 0) return(NULL)
-              bind_rows(valid)
-            })
-
-            ledger <- Filter(Negate(is.null), ledger_rows)
-            if (length(ledger) > 0) {
-              ledger <- bind_rows(ledger)
-            } else {
-              ledger <- NULL
-            }
-
-            if (!is.null(ledger) && nrow(ledger) > 0) {
-              ledger <- ledger %>% dplyr::arrange(desc(Buy_Date))
-
-              return(reactable::reactable(
-                ledger,
-                compact = TRUE,
-                striped = TRUE,
-                highlight = TRUE,
-                bordered = FALSE,
-                defaultPageSize = 15,
-                columns = list(
-                  Player = colDef(name = "Player", align = "left", style = list(fontWeight = "600")),
-                  Bought_Price = colDef(
-                    name = "Bought Price",
-                    align = "right",
-                    cell = function(val, Buy_Date, Buy_Type) {
-                      title_text <- paste0("Date: ", Buy_Date, "\nType: ", Buy_Type)
-                      shiny::tags$span(
-                        style = "color: #ef4444; font-weight: 600;",
-                        title = title_text,
-                        format_table_currency(val)
-                      )
-                    }
-                  ),
-                  Sold_Price = colDef(
-                    name = "Sold Price",
-                    align = "right",
-                    cell = function(val, Sold, Sell_Date, Sell_Type) {
-                      if (!Sold || is.na(val)) {
-                        shiny::tags$span(style = "color: #94a3b8;", "-")
-                      } else {
-                        title_text <- paste0("Date: ", Sell_Date, "\nType: ", Sell_Type)
-                        shiny::tags$span(
-                          style = "color: #10b981; font-weight: 600;",
-                          title = title_text,
-                          format_table_currency(val)
-                        )
-                      }
-                    }
-                  ),
-                  Net_PL = colDef(
-                    name = "Net P/L",
-                    align = "right",
-                    cell = function(val, Sold) {
-                      if (!Sold || is.na(val)) {
-                        shiny::tags$span(style = "color: #94a3b8;", "-")
-                      } else if (val > 0) {
-                        shiny::tags$span(style = "color: #10b981; font-weight: 700;", paste0("+", format_table_currency(val)))
-                      } else if (val < 0) {
-                        shiny::tags$span(style = "color: #ef4444; font-weight: 700;", format_table_currency(val))
-                      } else {
-                        shiny::tags$span(style = "color: #64748b;", format_table_currency(val))
-                      }
-                    }
-                  )
-                )
-              ))
-            }
-          }
+              ),
+              # Helper columns (pairing keys + raw dates/types) are hidden.
+              PlayerID = colDef(show = FALSE),
+              Buy_Date = colDef(show = FALSE),
+              Buy_Type = colDef(show = FALSE),
+              Sell_Date = colDef(show = FALSE),
+              Sell_Type = colDef(show = FALSE)
+            )
+          ))
         }
 
         # Fallback if no pressroom data
@@ -1208,13 +1387,20 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
         ))
       }
 
+      # Reorder columns so "Date" renders first (visible order), followed by
+      # the hidden helper columns. Values, filtering, and the timestamp-based
+      # default sort are all preserved.
+      display_df <- rivals_tx_display_df(filtered)
       reactable::reactable(
-        filtered,
+        display_df,
         compact = TRUE,
         striped = TRUE,
         highlight = TRUE,
         bordered = FALSE,
         defaultPageSize = 15,
+        # Timestamp-based default ordering (chronological, newest first) so
+        # sorting is correct across years (the raw `date` string is not used).
+        defaultSorted = list(timestamp = "desc"),
         columns = list(
           date = colDef(
             name = "Date",
@@ -1271,11 +1457,23 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
           running_balance = colDef(
             name = "Money Left After Transaction",
             align = "right",
-            cell = function(rb_val) {
-              formatted <- format_table_currency(rb_val)
-              shiny::tags$span(style = "font-weight: 700; color: #0f172a;", formatted)
+            cell = function(rb_val, rowInfo) {
+              is_hdr <- if (!is.null(rowInfo) && "is_batch_header" %in% names(rowInfo)) rowInfo$is_batch_header else TRUE
+              if (isTRUE(is_hdr)) {
+                formatted <- format_table_currency(rb_val)
+                shiny::tags$span(style = "font-weight: 700; color: #0f172a;", formatted)
+              } else {
+                shiny::tags$span(style = "color: #94a3b8;", "-")
+              }
             }
-          )
+          ),
+          # Helper / internal columns are hidden from the transaction log.
+          id = colDef(show = FALSE),
+          category = colDef(show = FALSE),
+          timestamp = colDef(show = FALSE),
+          batch_key = colDef(show = FALSE),
+          is_batch_header = colDef(show = FALSE),
+          batch_final_balance = colDef(show = FALSE)
         )
       )
     })

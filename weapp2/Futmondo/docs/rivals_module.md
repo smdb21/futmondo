@@ -144,12 +144,14 @@ The League Buying Power horizontal bar chart supports three display modes, selec
 
 #### Data Pipeline
 
-1. **Input**: Receives the authenticated `login` token, `championship_id`, and the selected mode from the dropdown.
-2. **Computation**: Depending on the selected mode, computes the metric for each team:
-   - Liquid Cash: `budget` column from `league_finances_RV()$team_finances`.
-   - Squad Purchases: `total_spent` column from `league_finances_RV()$team_finances`.
-   - Transaction Volume: Sum of `abs(money)` across all transactions for each team.
-3. **Rendering**: Produces a horizontal bar chart via `ggplot2` + `plotly` with interactive hover tooltips showing the exact value and team name.
+Per-team values are computed by the pure helper `rivals_buying_power_values(pressroom_df, teams, metric, start_date, end_date, initial_budget = 300000000)`, which returns a data frame with `team_id`, `team`, `value`, and `range_label`.
+
+1. **Input**: Receives the authenticated `login` token, `championship_id`, the selected mode, and the slider's `[start, end]` window.
+2. **Computation** (per mode):
+   - **Liquid Cash**: `300000000 - (all purchases through end) + (all sales through end)`. The balance is computed from **all transfers through the END date** and is **not reset at the slider start** -- moving the start handle does not change the cash balance, only the end handle does. `range_label = "all transfers through end date"`.
+   - **Squad Purchases (investment)**: total purchases **within the `[start, end]` range** only. `range_label = "within selected range"`.
+   - **Transaction Volume**: purchases + sales **within the `[start, end]` range** only. `range_label = "within selected range"`.
+3. **Rendering**: Produces a horizontal bar chart via `plotly` with interactive hover tooltips. The tooltip shows the metric value **and** the `range_label`, so the user can see whether the figure is an all-time-through-end balance (cash) or a within-range total (investment/volume).
 
 ### Clause Ratio Calculation
 
@@ -344,15 +346,17 @@ A toggle switch labeled "Pivot by Player" is available in the tab. When activate
 
 ### 4.5 Transaction Table
 
-The `reactable` table displays all transactions with the following columns:
+The `reactable` table displays all transactions. The **Date column is first**, and the default ordering is **timestamp-based** (`defaultSorted = list(timestamp = "desc")`) so rows are sorted chronologically (newest first) by the parsed `POSIXct` timestamp -- not by the raw `date` string, which would sort incorrectly across years.
 
 | Column                     | Formatting                                                        |
 |----------------------------|-------------------------------------------------------------------|
-| `date` (displayed as "Date") | Lowercase `date` column name matching the data frame column. Formatted as `dd/mm/YYYY HH:MM`. |
+| `date` (displayed as "Date") | Lowercase `date` column name matching the data frame column. Formatted as `dd/mm/YYYY HH:MM`. Shown first. |
 | Type / Category            | Status badge: Buy = Red (`#ef4444`), Sell = Green (`#10b981`), Bonus = Blue (`#3b82f6`), Budget = Slate (`#64748b`). |
 | Concept / Description      | Player name or concept string, medium font weight.               |
 | Amount                     | Formatted EUR via `format_table_currency()`. Green with `+` prefix if positive, red if negative. |
 | Money Left After Transaction | Formatted EUR via `format_table_currency()`, bold styled.      |
+
+**Hidden helper columns**: `id`, `category`, `timestamp`, `batch_key`, `is_batch_header`, and `batch_final_balance` are all hidden via `colDef(show = FALSE)`. In particular, the internal `id` column is never shown to the user.
 
 **Note**: The column definition uses lowercase `date = colDef(...)` to match the actual column name in the data frame produced by `get_user_team_moneymovements()`. Using uppercase `Date` would cause a `reactable` error because the column name does not exist in the data.
 
@@ -377,14 +381,22 @@ The Pivot Ledger is a dedicated view within the Rivals Module that presents a pa
 
 ### 5.1 Paired Buy/Sell Rows
 
-For each player the rival team has bought, the ledger displays two rows:
+The ledger is built by the pure helper `rivals_build_pivot_ledger(pressroom_df, rival_id)`. For each player the rival team has bought, the ledger displays **one row** with the buy and (if any) the matching sell side by side:
 
-| Row | Label | Content |
-|-----|-------|---------|
-| Buy Row | Player name + " (Buy)" | The purchase price, formatted as a negative value in red. |
-| Sell Row | Player name + " (Sell)" | The sale price, formatted as a positive value in green. If the player has not yet been sold, the cell is empty. |
+| Column | Content |
+|--------|---------|
+| `Player` | Player display name. |
+| `Bought Price` | Purchase price (red), with a two-line tooltip (date + type). |
+| `Sold Price` | Sale price (green) with a two-line tooltip, or `-` when the player has not yet been sold. |
+| `Net P/L` | `sell_price - buy_price` (green/red), or `-` when unsold. |
 
-The two rows are visually grouped (e.g., via alternating background shading or a shared border) so that the user can easily associate a buy with its corresponding sell.
+**Pairing key**: buys and sells are paired by **`player_id`**, falling back to `player_name` when no `player_id` is exposed. This avoids mis-pairing different players who share a name.
+
+**Raw dates**: matching and sorting use the **raw ISO 8601 timestamps** (which sort chronologically as strings), so a sell is matched to the first *unused* sell strictly after the buy. The raw date strings are kept in the data frame (hidden helper columns) and formatted for display in the cell renderers.
+
+**No `Sold` column**: there is no separate boolean `Sold` column; an unsold buy simply has `NA` sell fields, and the cell renderers display `-`.
+
+**Hidden helper columns**: `PlayerID`, `Buy_Date`, `Buy_Type`, `Sell_Date`, and `Sell_Type` are present for pairing/tooltips/sorting but are hidden from the table via `colDef(show = FALSE)`.
 
 ### 5.2 Two-Line Hover Tooltips
 
@@ -395,11 +407,11 @@ Hovering over a buy or sell cell reveals a two-line tooltip:
 
 ### 5.3 Handling of Re-Bought Players
 
-If the rival team sold a player and later re-bought the same player (or bought a different player with the same name), the ledger treats each transaction as a distinct entry:
+Because pairing is by `player_id` (fallback name), re-buys are handled correctly:
 
-- Each buy/sell pair is indexed by transaction ID, not by player name alone.
-- Multiple buy/sell pairs for the same player name appear as separate grouped rows.
-- The ledger appends a numeric suffix to disambiguate (e.g., `"Player Name (Buy #1)"`, `"Player Name (Sell #1)"`, `"Player Name (Buy #2)"`, etc.).
+- Each buy generates its own ledger row, in chronological order (newest first).
+- A sell is consumed by the earliest still-unmatched buy of the same player, so a sell-and-rebuy sequence produces distinct rows (the first buy matched to the first sell, the re-buy left unsold until a later sell).
+- A sell that has no earlier matching buy is ignored (it cannot be paired to a purchase the rival never made).
 
 ### 5.4 Net P/L Calculation
 

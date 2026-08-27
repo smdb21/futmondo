@@ -132,6 +132,39 @@ All requests to the Futmondo API (`api.futmondo.com`) are **stateless POST reque
 
 ---
 
+## 9. Roster Clause Buyout (dedicated endpoint)
+* **Endpoint**: `POST https://api.futmondo.com/1/market/rosterclause`
+* **Query Payload** (serialized exactly, **no** `isClause`):
+  ```json
+  {
+    "championshipId": "CHAMPIONSHIP_ID",
+    "userteamId": "USER_TEAM_ID",
+    "player_slug": "PLAYER_SLUG",
+    "player_id": "PLAYER_ID",
+    "price": 15000000
+  }
+  ```
+* **Response**: Returns the operation success code under `response$answer$code` (`"api.general.ok"` on success).
+* **Handler**: `buy_roster_clause()` (see `docs/bid_management.md`). This is the dedicated endpoint used by the Selected Player module for release-clause buyouts. Unlike the generic `/1/market/bid` endpoint (section 7), the payload carries no `isClause` flag because the endpoint itself implies a clause purchase.
+
+---
+
+## 10. Roster Bids (active market offers)
+* **Endpoint**: `POST https://api.futmondo.com/1/market/rosterbids`
+* **Query Payload**:
+  ```json
+  {
+    "championshipId": "CHAMPIONSHIP_ID",
+    "userteamId": "USER_TEAM_ID",
+    "type": "roster"
+  }
+  ```
+* **Note**: `type = "roster"` is **required** so only roster (market) bids are returned (as opposed to `type = "market"` used by other endpoints).
+* **Response**: A list of the team's active roster bids. Each bid exposes the bidder's immutable team ID (under `userTeam[["_id"]]` / `userTeam[["id"]]` or a flat `userteamId` key), which `extract_bidder_team_id()` normalizes so "my own" active bids can be identified reliably (never by name or list order).
+* **Handler**: `get_roster_bids()` (see `docs/bid_management.md`). Used by `get_acquisition_capacity()` to count outstanding offers and by the capacity preflight.
+
+---
+
 ## 🏷️ Transfer Market Bidding vs. Release Clause Purchases
 
 This section documents the underlying game mechanics and transaction rules that players encounter when trading in Futmondo championships:

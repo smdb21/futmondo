@@ -421,19 +421,20 @@ supabase_delete <- function(table_name, filter = "id=neq.00000000-0000-0000-0000
   })
 }
 
-supabase_delete_all <- function(table_name) {
-  bigint_pk_tables <- c("user_team_history", "player_history", "market_transactions", "round_dream_team",
-                      "player_daily_snapshots", "decision_log", "user_smart_alerts")
-  text_pk_tables <- c("championships", "real_clubs", "players", "user_teams", "manager_dna_profiles")
+supabase_primary_key <- function(table_name) {
+  if (identical(table_name, "manager_dna_profiles")) "team_id" else "id"
+}
 
-  if (table_name %in% bigint_pk_tables) {
-    supabase_delete(table_name, filter = "id=gte.0")
-  } else if (table_name %in% text_pk_tables) {
-    supabase_delete(table_name, filter = "id=neq.00000000-0000-0000-0000-000000000000")
-  } else {
-    print(paste0("[Supabase] Unknown PK type for table: ", table_name))
-    return(list(status = "error", reason = "unknown PK type"))
+supabase_known_tables <- function() {
+  c("championships", "real_clubs", "players", "user_teams", "user_team_history", "player_history", "market_transactions", "round_dream_team", "player_daily_snapshots", "manager_dna_profiles", "decision_log", "user_smart_alerts")
+}
+
+supabase_delete_all <- function(table_name) {
+  if (!(table_name %in% supabase_known_tables())) {
+    print(paste0("[Supabase] Unknown table: ", table_name))
+    return(list(status = "error", reason = "unknown table"))
   }
+  supabase_delete(table_name, filter = paste0(supabase_primary_key(table_name), "=not.is.null"))
 }
 
 supabase_reset_database <- function(force = FALSE) {
@@ -514,7 +515,7 @@ get_table_row_counts <- function() {
     )
 
     tryCatch({
-      response <- GET(url, query = list(select = "id", limit = "0"), add_headers(.headers = headers))
+      response <- GET(url, query = list(select = supabase_primary_key(tbl), limit = "0"), add_headers(.headers = headers))
       code <- status_code(response)
 
       if (code >= 200 && code < 300) {
@@ -582,13 +583,18 @@ init_supabase_db <- function(verbose = FALSE) {
     )
 
     tryCatch({
-      response <- GET(url, query = list(select = "id", limit = "1"), add_headers(.headers = headers))
+      response <- GET(url, query = list(select = supabase_primary_key(tbl), limit = "1"), add_headers(.headers = headers))
       code <- status_code(response)
-      if (code == 200) {
-        if (verbose) cat(paste0("[Init] Table OK: ", tbl, " (HTTP 200)\n"))
+      if (code >= 200 && code < 300) {
+        if (verbose) cat(paste0("[Init] Table OK: ", tbl, " (HTTP ", code, ")\n"))
       } else {
         all_ok <- FALSE
-        warning(paste0("[Init] Table check failed for '", tbl, "': HTTP ", code))
+        response_body <- tryCatch(
+          httr::content(response, as = "text", encoding = "UTF-8"),
+          error = function(e) ""
+        )
+        body_suffix <- if (is.character(response_body) && length(response_body) == 1L && nzchar(response_body)) paste0(": ", response_body) else ""
+        warning(paste0("[Init] Table check failed for '", tbl, "': HTTP ", code, body_suffix))
         if (verbose) cat(paste0("[Init] Table FAIL: ", tbl, " (HTTP ", code, ")\n"))
       }
     }, error = function(e) {

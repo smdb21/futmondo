@@ -109,6 +109,10 @@ Additionally, two helper functions are defined in the same file:
   player_history     Historical snapshot of player valuations  id (bigint)
   market_transactions Market transfer and clause transactions  id (bigint)
   round_dream_team   Best 11 (Dream Team) and MVP per round   id (BIGSERIAL)
+  player_daily_snapshots Daily valuation, stats, and ownership snapshots  id (BIGSERIAL)
+  manager_dna_profiles   Computed manager trading-behavior profiles       team_id (text)
+  decision_log           AI recommendation audit trail                    id (BIGSERIAL)
+  user_smart_alerts      Personalized smart alerts                        id (BIGSERIAL)
 ```
 
 ### `get_table_row_counts()` (in `supabase_connector.R`)
@@ -117,14 +121,14 @@ Additionally, two helper functions are defined in the same file:
 |-----------|------|-------------|
 | (none)    |      | No parameters. Reads credentials from `.Renviron` via `get_sb_url()` and `get_sb_key()`. |
 
-**Return type:** `data.frame` with 8 rows and 2 columns.
+**Return type:** `data.frame` with 12 rows and 2 columns.
 
 | Column       | Type    | Description                           |
 |--------------|---------|---------------------------------------|
 | `table_name` | char    | The Supabase table name.              |
 | `row_count`  | integer | The exact row count from the API.     |
 
-**Mechanism:** For each of the 8 tables, issues a `GET` request to `{sb_url}/rest/v1/{tbl}` with `Prefer: count=exact` and `Range: 0-0` headers. Extracts the total from the `Content-Range` response header (e.g., `"0-0/999"` yields `999`). If credentials are missing, returns an empty data frame with the correct column types and emits a warning.
+**Mechanism:** For each of the 12 tables, issues a `GET` request to `{sb_url}/rest/v1/{tbl}` with `Prefer: count=exact` and `Range: 0-0` headers. Extracts the total from the `Content-Range` response header (e.g., `"0-0/999"` yields `999`). If credentials are missing, returns an empty data frame with the correct column types and emits a warning.
 
 **Error handling:** Each table query is wrapped in `tryCatch`. On failure, `row_count` is set to `NA` for that table.
 

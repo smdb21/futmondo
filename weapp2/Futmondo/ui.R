@@ -3,9 +3,9 @@ header <- shinydashboardPlus::dashboardHeader(
 )
 body <- shinydashboard::dashboardBody(
   # Add custom CSS here
-  tags$head(
-    tags$link(rel = "stylesheet", type = "text/css", href = "custom_style.css"),
-    tags$style(HTML("
+  shiny::tags$head(
+    shiny::tags$link(rel = "stylesheet", type = "text/css", href = "custom_style.css"),
+    shiny::tags$style(shiny::HTML("
         .ReactTable .rt-thead {
           z-index: 1;
         }
