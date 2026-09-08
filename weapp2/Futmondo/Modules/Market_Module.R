@@ -31,9 +31,9 @@ market_Server <- function(id, is_module_active, login_token, championship_id, us
 
         # Background Sync Market Snapshot to Supabase
         tryCatch({
-          sync_real_clubs_to_supabase(players_table)
-          sync_players_to_supabase(players_table)
-          log_player_history(players_table, championship_id())
+          defer_persistence(sync_real_clubs_to_supabase, list(players_table))
+          defer_persistence(sync_players_to_supabase, list(players_table))
+          defer_persistence(log_player_history, list(players_table, championship_id()))
         }, error = function(e) {
           print(paste0("[Supabase] Market sync warning: ", e$message))
         })
@@ -49,7 +49,8 @@ market_Server <- function(id, is_module_active, login_token, championship_id, us
         user_teams_RV = user_teams_RV,
         login_token = login_token,
         championship_id = championship_id,
-        user_team_id = user_team_id
+        user_team_id = user_team_id,
+        refresh_trigger = refresh_trigger
       )
     }
   )

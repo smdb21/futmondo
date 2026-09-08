@@ -1,200 +1,119 @@
-# Futmondo Insights - R Shiny Application
+# Futmondo Insights
 
-## Overview
+An R Shiny companion for Futmondo: inspect rosters and transfers, compare players, forecast rival bids, plan trading scenarios and choose a legal XI. Predictions are advisory; observed data, model estimates and missing evidence are shown separately.
 
-Futmondo Insights is an R Shiny application that provides a comprehensive dashboard for managing and analyzing player data in the Futmondo fantasy football platform. The application integrates with the Futmondo API to fetch real-time data about players, teams, and market transactions.
+## Run locally
 
-## Features
+Open this directory as the project and run:
 
-### FIS Player Intelligence Score (v3.2)
-
-- **FIS Rating Column**: Every player table now includes a color-coded FIS Score badge (Elite/Strong/Average/Weak) with hover tooltips showing the full score, interpretive text, and prediction confidence percentage.
-- **FIS Tier Filter**: A dropdown filter (`fis_tier_filter`) lets users narrow player tables by FIS tier (Elite 80+, Strong 60-79, Average 40-59, Weak 0-39).
-- **FIS 5-Pillar Breakdown Panel**: The player detail modal decomposes the FIS Score into five pillars (Form, Momentum, Ownership, Scarcity, Fixture), each with a normalized score, weight, and visual bar. A one-sentence verdict and confidence pill summarize the assessment.
-
-### Smart Bid & Competitor Prediction (v3.3)
-
-- **Smart Bid Widget**: Embedded in the Selected Player Module, it shows live fair value, recommended bid, expected winning range, max rational bid, and expected ROI percentage.
-- **Competition Analysis**: Displays competition level (Low/Medium/High) and predicts the number of likely competitor managers based on Manager DNA clustering and historical bidding patterns.
-- **"Use Smart Bid" 1-Click Pre-Fill**: A single button pre-fills the bid input with the recommended amount, streamlining acquisition from analysis to execution.
-
-### Futmondo Intelligence Engine (v3.0 Phase 1)
-
-- **FIS Score (Futmondo Intelligence Score)**: Composite rating that evaluates each player across multiple dimensions including recent form, positional value, market liquidity, and transfer history. Used to surface high-potential targets and flag undervalued assets.
-- **Smart Bid Engine**: Automated bid calculation layer that generates data-driven offer suggestions based on a player's historical price trajectory, squad demand, and the manager's available budget. Reduces manual guesswork and minimizes overpayment risk.
-- **Manager DNA Profiler**: Behavioral analysis module that clusters managers into archetypes (e.g., aggressive buyer, cautious seller, balanced trader) based on their transaction history, average holding period, and risk tolerance. Powers personalized alerts and feed content.
-- **Manager Command Center Feed**: Personalized activity stream that aggregates market movements, rival transactions, Smart Bid notifications, and system alerts into a single feed tailored to the manager's DNA profile.
-
-### Players In Teams Module
-
-- **2x2 KPI Boxes**: Compact grid showing Classification Rank, Points, Total Volume Earned (initial 300M budget plus sales and bonuses), and Total Volume Spent (aggregate purchase costs).
-- **"In Market" Status Badge**: Amber badge column in the player roster table displaying the formatted asking price for players currently listed on the marketplace.
-- **Standings Evolution Plot**: Time-series line chart repositioned to the bottom of the tab, tracking team standings across matchdays with interactive tooltips.
-
-### Rivals Module
-
-- **League Buying Power Chart**: Horizontal bar chart with a mode selector (Liquid Cash, Squad Purchases, Transaction Volume) and a top date range slider for filtering by time window.
-- **Player Buy/Sell Pivot Ledger**: Paired buy/sell rows for each player the rival acquired, with two-line hover tooltips (transaction date and counterparty), handling of re-bought players via numeric suffixes, and per-player Net P/L calculation.
-- **Net Transfer Profit/Loss KPI Box**: Standalone summary box showing the rival's aggregate transfer profit or loss across all completed buy/sell pairs.
-- **Squad Value Evolution Plot**: Time-series line chart repositioned to the bottom of the page, tracking squad valuations across matchdays with interactive tooltips.
-
-### Manager Command Center ("Today" Tab - v3.1)
-
-- **Hero Banner**: Prominent header displaying the current matchday, date, and manager identity to orient the user immediately on landing.
-- **4 KPI Value Boxes**: Compact summary cards showing Budget Remaining, Squad Value, Squad Size, and Market Listings at a glance.
-- **Actionable Manager Feed**: Personalized activity stream with confidence badges (High/Medium/Low) that aggregates market movements, rival transactions, Smart Bid notifications, and system alerts tailored to the manager's DNA profile.
-- **Market Intelligence Radar**: Real-time market heat map widget tracking price velocity across positions, highlighting the hottest buy and sell targets.
-- **Recent League Deals**: Live feed of the latest transfers within the manager's league, displaying buyer, seller, player, and transaction price for competitive awareness.
-
-### General
-
-- **Resized Columns**: All Reactable tables support click-and-drag column resizing.
-- **Shortened Cache Timeouts**: Roster and bid caches reduced to 15-30 seconds for near-real-time offer visibility.
-- **Defensive Fallback Mode**: Rival transaction history falls back to pressroom feed reconstruction and roster-based synthesis when the private API is restricted.
-
-## Architecture
-
-The application follows a modular architecture with the following key components:
-
-- `app.R`: Main application entry point
-- `intelligence_engine.R`: Core logic for the Futmondo Intelligence Engine (FIS Score, Smart Bid Engine, Manager DNA Profiler, and Command Center feed). See `docs/intelligence_engine.md` for API reference and `docs/v3_roadmap.md` for the full v3.0 roadmap.
-- `Modules/`: Contains modular Shiny components for different features
-- `Modules/Today_Module.R`: Manager Command Center (Today tab) module. Implements the hero banner, KPI value boxes, actionable feed with confidence badges, Market Intelligence Radar, and recent league deals. See `docs/today_module.md` for full API reference.
-- `Utils/`: Utility functions for data processing, API integration, and formatting
-- `www/`: Static assets including custom CSS styles
-
-## Database
-
-The application uses a Supabase-backed PostgreSQL database. Phase 1 of the Intelligence Engine introduces four new tables, bringing the total monitored tables to 12:
-
-- `player_daily_snapshots`: Daily performance and valuation snapshots for every player, capturing matchday stats, FIS Score, and market price to enable trend analysis.
-- `manager_dna_profiles`: Computed profiles for each manager, storing archetype classification, behavioral metrics, and risk parameters derived from transaction history.
-- `decision_log`: Audit trail for all Intelligence Engine decisions, including Smart Bid outputs, alert triggers, and feed item generation, for transparency and debugging.
-- `user_smart_alerts`: Per-user notification queue for Smart Bid suggestions, market warnings, and personalized alerts routed through the Manager Command Center.
-
-## Key Modules
-
-### Rivals Module (`Modules/Rivals_Module.R`)
-Displays information about rival teams and their players. Provides comparative analysis between your team and competitors.
-
-### Selected Player Module (`Modules/Selected_Player_Module.R`)
-Detailed view of a selected player including:
-- Player statistics and performance metrics
-- Historical data visualization
-- Market information and valuation trends
-- Action buttons for market interactions (bidding, offers, clause buyouts)
-
-### Additional Modules
-- `Market_Module.R`: Transfer market functionality
-- `My_Squad_Module.R`: User's squad management
-- `Free_Agents_Module.R`: Available free agents
-- `Press_Room_Module.R`: News and press updates
-- `Player_Details_Module.R`: Comprehensive player information
-- `Player_Ratings_Module.R`: Player ratings and performance analysis
-- `Player_Ratings_History_Module.R`: Historical ratings data
-- `Player_Ratings_Comparison_Module.R`: Comparative player ratings
-- `Player_Ratings_Dashboard_Module.R`: Dashboard for player ratings
-- `Player_Ratings_Export_Module.R`: Export functionality for ratings data
-- `Player_Ratings_Filter_Module.R`: Filtering options for player ratings
-- `Player_Ratings_Search_Module.R`: Search functionality for player ratings
-- `Player_Ratings_Settings_Module.R`: Settings for player ratings display
-- `Player_Ratings_Share_Module.R`: Sharing options for player ratings
-- `Player_Ratings_Team_Module.R`: Team-based player ratings
-- `Player_Ratings_Week_Module.R`: Weekly player ratings
-- `Player_Ratings_Year_Module.R`: Yearly player ratings trends
-
-## Dependencies
-
-### R Packages
-- `shiny`: Web application framework
-- `shinydashboard`: Dashboard layout components
-- `shinyjs`: JavaScript integration for Shiny
-- `plotly`: Interactive plotting
-- `reactable`: Interactive tables
-- `dplyr`: Data manipulation
-- `tidyr`: Data tidying
-- `readr`: Data import
-- `httr`: HTTP tools for API communication
-- `jsonlite`: JSON parsing
-- `lubridate`: Date/time manipulation
-- `stringr`: String manipulation
-- `purrr`: Functional programming
-- `magrittr`: Pipe operator
-- `DescTools`: Statistical tools
-- `shinyWidgets`: Enhanced UI widgets
-- `shinyalert`: Alert dialogs
-- `shinycssloaders`: Loading animations
-- `shinybusy`: Busy indicators
-- `shinydashboardPlus`: Enhanced dashboard components
-- `shinydashboardPlus`: Enhanced dashboard components
-- `shinydashboardPlus`: Enhanced dashboard components
-
-### API Integration
-The application connects to the Futmondo API using the following base URLs:
-- Production: `https://api.futmondo.com`
-- Sandbox: `https://api-sandbox.futmondo.com`
-
-## Configuration
-
-### Environment Variables
-- `FUTMONDO_API_KEY`: API key for authentication
-- `FUTMONDO_ENV`: Environment (`production` or `sandbox`)
-- `FUTMONDO_BASE_URL`: Base URL for API requests
-- `FUTMONDO_PHOTO_URL`: Base URL for player photos
-
-### Local Development
-1. Install required R packages
-2. Set environment variables in `.Renviron` file
-3. Run the application using `shiny::runApp()`
-
-## Deployment
-
-### ShinyApps.io
-1. Install the `rsconnect` package
-2. Run `rsconnect::writeManifest()` to generate deployment manifest
-3. Deploy using `rsconnect::deployApp()`
-
-### RStudio Connect / Posit Connect
-1. Install the `rsconnect` package
-2. Run `rsconnect::writeManifest()` to generate deployment manifest
-3. Deploy using `rsconnect::deployApp()`
-
-## Customization
-
-### CSS Styling
-Custom styles are located in `www/custom_style.css`. The application uses Bootstrap for responsive design.
-
-### Color Scheme
-- Primary: `#f59e0b` (amber)
-- Secondary: `#10b981` (green)
-- Accent: `#3b82f6` (blue)
-- Background: `#f8fafc` (light gray)
-
-## Testing
-
-### Unit Tests
-Located in `tests/testthat/` directory. Run tests using:
-```R
-devtools::test()
+```r
+shiny::runApp(".")
 ```
 
-### Integration Tests
-Located in `tests/testthat/` directory with `_integration` suffix. Run tests using:
-```R
-devtools::test(filter = "integration")
+The application uses `global.R`, `ui.R` and `server.R`; there is no separate `app.R`. Install the dependencies recorded in `manifest.json` for your R environment. Core packages include Shiny, shinydashboardPlus, dplyr, data.table, httr, jsonlite, reactable, plotly, lpSolve, openssl, later and **callr**. `callr` is newly required for persistence in a separate R process. The regenerated manifest records the full dependency set.
+
+Login fields start empty. Users enter their own Futmondo credentials, select a league, and can switch leagues during the session. Logout clears the session and its API cache. Login passwords and tokens are not printed or deployed.
+
+## Multiple accounts and leagues
+
+A Futmondo **championship ID identifies a separate game**, with its own managers, roster ownership, cash, rules, scoring system and bonus configuration. API caches include account and league/team context. Switching leagues reloads these observations and resets action selections. Forecasts, saved scenarios, alerts and automation jobs retain their league and account identifiers; a worker also verifies current membership before acting.
+
+Global `players` and `real_clubs` contain shared identities. League-specific positions, ratings, ownership, prices and points live in championship-scoped observations. Team histories carry an explicit championship ID. Rule snapshots preserve configured media weights and bonuses; weights are not normalized to 100%.
+
+The API does not always expose a reliable season identifier. Unknown-season match records are retained for audit but excluded from historical point training. If the season is independently verified, configure an explicit **per-league** mapping, for example:
+
+```text
+FUTMONDO_SEASON_CONTEXTS='{"league-id-a":"2026-27","league-id-b":"2026"}'
 ```
 
-## Contributing
+Never use a global inferred season or another league's rules to fill missing data. See [data contracts](docs/data_contracts.md) and [multi-league storage](docs/multi_league.md).
 
-1. Follow the coding standards outlined in `AGENTS.md`
-2. Ensure all new features have corresponding documentation
-3. Write tests for new functionality
-4. Update the deployment manifest when adding dependencies
+## Database configuration and migrations
 
-## License
+Set server-side environment variables through your hosting secret store, or a local ignored `.Renviron`:
 
-This project is proprietary and confidential. All rights reserved.
+```text
+supabase_project_url=https://YOUR_PROJECT.supabase.co
+supabase_secret_key=YOUR_SERVER_SERVICE_ROLE_KEY
+admin=YOUR_ADMIN_LOGIN_EMAIL
+```
 
-## Contact
+`admin` is optional; every administrative handler checks the authenticated account. The service-role key stays on the server. Missing database configuration leaves live Futmondo inspection usable but persistence and historical analysis unavailable.
 
-For questions or support, contact the development team at [support@futmondo.com](mailto:support@futmondo.com).
+For a fresh database, apply `scripts/schema.sql`. For existing and fresh databases, review and apply these migrations in order:
+
+1. `scripts/migrations/20260905_reliable_insights.sql`
+2. `scripts/migrations/20260907_private_history.sql`
+3. `scripts/migrations/20260907_observation_lifecycle.sql`
+
+They create observation, forecast, scenario and worker tables; archive exact legacy transaction duplicates; add explicit league history context; and restrict private tables to the server role. Ambiguous legacy records are preserved. Back up the database and inspect the archive/reconciliation behavior before production application. **These migrations have not been applied to the connected production database.** PostgreSQL integration checks require a staging database; the offline tests do not substitute for them.
+
+Collection runs in a separate process after login/refresh. The app reports incomplete syncs rather than silently showing saved data. [Background persistence](docs/background_worker.md) describes lifecycle and failure handling.
+
+## Predictions and management
+
+- FIS is a descriptive snapshot rating, not a success probability. Missing appearances remain distinct from real zero points.
+- Rival bids use shrunk manager participation rates and pooled log bid/value distributions. Participation and win curves remain unavailable when auction visibility cannot support non-bid labels. Conditional amounts can still be shown where historical reference prices exist.
+- Resale forecasts compare no-change and regularized trends over one, three and seven days. Executable proceeds use an explicit offer assumption and fees; displayed value is not guaranteed sale proceeds.
+- The profit planner allows no bid and considers commitments, cash, roster capacity and the remaining XI. It imposes no minimum points preservation requirement.
+- Your Team includes a checked-by-default automatic coach preference for each league. Hiring is pending a verified endpoint; the current preference lasts only for the app session and sends no requests. See [coach integration status](docs/coach_hiring.md).
+- Point forecasts use recency and positional shrinkage. The optimizer assigns eleven distinct players to eligible positions and displays captain/bench guidance and transfer scenarios. Optional features require verified league settings.
+- Notifications provide a bell, unread/source/league/type filters and player links. Read state changes only after an explicit user interaction and successful acknowledgement.
+
+[Prediction interfaces and evaluation](docs/prediction_engine.md), [dashboard](docs/intelligence_module.md), [UI corrections](docs/ui_reliability.md), [notifications](docs/notifications_module.md).
+
+## Optional unattended worker
+
+In Automation, connect an encrypted session and enable observations separately for each league. Observation collection does not require a trading policy and runs every 15 minutes while enabled, rotating through 30 catalog players per pass. Deploy a single observation scheduler; distributed observation leases still require implementation. Pause observations independently of trading. Coach preferences persist per account/league/team after the third migration, but hiring remains unavailable pending a successful endpoint capture.
+
+The app now uses a shared black/green monospace theme without external fonts. The stylesheet is embedded in the UI to avoid stale browser CSS; restart the running Shiny app after stylesheet changes, then reload the page. See [theme](docs/terminal_theme.md), [observation/evaluation contracts](docs/insights_runtime.md) and [joint profit scenarios](docs/portfolio_planner.md). No new R package dependency was introduced by this follow-up. Source timestamps and revisions are retained; legacy unknown timestamps are excluded from predictive training rather than treated as fresh.
+
+Automation is off by default. Deploy the worker separately from Shiny on a host that supports a persistent process. It continues when the browser closes. Generate a random 32-byte base64 `AUTOMATION_SESSION_KEY` in your secret manager and give **the same key** to Shiny and the worker. It encrypts stored API sessions; losing/changing it requires reconnecting accounts. Do not commit or print it.
+
+From this project directory:
+
+```sh
+Rscript scripts/automation_worker.R --once
+Rscript scripts/automation_worker.R
+```
+
+Run the second command under a service manager with automatic restart. Configure the same Supabase secrets and season mapping in both processes. Users connect a session and create explicit per-league policies with allowed players, action types, expiry, acquisition ceilings and sale floors. Pause and reconciliation controls are in the app.
+
+Live execution is gated on fourteen verified observation days, current financial/eligibility checks and model validation when applicable. **Live rollout is not complete:** deadline/solvency and all formation/club restrictions still require contract verification. Lineup submission remains unavailable. Uncertain mutations hold the account lock until positively reconciled. See [automation contracts and recovery](docs/automation.md).
+
+## Deployment and verification
+
+`.rscignore` excludes `.Renviron`, HAR captures, tests and internal documentation from application bundles. Keep captures local: they may contain private sessions. `.gitignore` also excludes local credentials and captures; it does not erase previously tracked history.
+
+After a dependency change, regenerate and inspect:
+
+```r
+rsconnect::writeManifest()
+```
+
+This prepares dependencies; it does not deploy the app. Do not use old manifests that bundled local credentials.
+
+### Optional isolated browser and SQL checks
+
+These are development-only Node dependencies, not Shiny deployment packages:
+
+```bash
+npm install --prefix /tmp/futmondo-review-tools --no-audit --no-fund playwright @electric-sql/pglite
+/tmp/futmondo-review-tools/node_modules/.bin/playwright install chromium
+node test/test_observation_migration.cjs
+# Start the synthetic offline server in another terminal:
+Rscript test/test_browser_app.R
+node test/test_browser_theme.cjs
+```
+
+`FUTMONDO_TEST_NODE_MODULES` optionally selects another Node module directory. Browser fixtures listen only on `127.0.0.1:38765` and block external browser requests. Screenshots are written under `/tmp`. The SQL check executes migrations in isolated PostgreSQL (PGlite), covering repeat ingestion, historical replay, reapplication and access restrictions. It does not connect to Supabase or establish multi-process production concurrency. Production migrations and deployment have not been performed.
+
+Run focused tests for the affected behavior. For application or shared infrastructure changes, also run:
+
+```sh
+Rscript test/test_shiny_simulation.R
+```
+
+This is now an offline application lifecycle harness, with HTTP blocked, including login, league switching, module rendering, refresh/logout and authorization checks. Focused scripts and actual results are listed in [delivery status](docs/implementation_status.md). HAR replay tests require the local captures and never use their credentials or send captured requests.
+
+The [roadmap](docs/v3_roadmap.md) distinguishes implemented code from production rollout and validation still pending.

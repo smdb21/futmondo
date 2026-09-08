@@ -8,290 +8,156 @@ library(plotly)
 classification_UI <- function(id) {
   ns <- NS(id)
   tagList(
-    # Top Control Bar (Round Range Slider & Single Round Inspector)
-    fluidRow(
-      column(width = 12,
-             box(
-               title = "Matchday Round Selection & Window Filter",
-               width = 12,
-               status = "primary",
-               solidHeader = TRUE,
-               div(style = "background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;",
-                   fluidRow(
-                     column(width = 6,
-                            sliderInput(
-                              inputId = ns("round_range_slider"),
-                              label = "Filter Points Between Rounds (Window):",
-                              min = 1,
-                              max = 38,
-                              value = c(1, 38),
-                              step = 1,
-                              width = "100%"
-                            )
-                     ),
-                     column(width = 6,
-                            selectInput(
-                              inputId = ns("single_round_select"),
-                              label = "Inspect Specific Matchday Round:",
-                              choices = c("All Rounds" = "all"),
-                              selected = "all",
-                              width = "100%"
-                            )
-                     )
-                   )
-               )
-             )
-      )
-    ),
-
-    # Rank Position Evolution Chart across Rounds (Inverted Y-axis)
-    fluidRow(
-      column(width = 12,
-             box(
-               title = "Rank Position Evolution Across Rounds",
-               width = 12,
-               status = "primary",
-               solidHeader = TRUE,
-               plotly::plotlyOutput(ns("rank_evolution_plot"), height = "320px")
-             )
-      )
-    ),
-
-    # Standings Classification Table for Selected Round Range
-    fluidRow(
-      column(width = 12,
-             box(
-               title = "Standings Classification & Points Breakdown",
-               width = 12,
-               status = "primary",
-               solidHeader = TRUE,
-               reactable::reactableOutput(ns("classification_table"))
-             )
-      )
-    ),
-
-    # Dream Team & Round Rewards Box
-    fluidRow(
-      column(width = 12,
-             box(
-               title = "Matchday Best Players & Dream Team Rewards",
-               width = 12,
-               status = "info",
-               solidHeader = TRUE,
-               collapsible = TRUE,
-               collapsed = FALSE,
-               uiOutput(ns("dreamteam_box_ui"))
-             )
-      )
-    )
+    fluidRow(box(width = 12, title = "Matchday results", status = "primary", solidHeader = TRUE,
+      fluidRow(column(6, sliderInput(ns("round_range_slider"), "Points between rounds", min = 1, max = 38, value = c(1, 38))),
+               column(6, selectInput(ns("single_round_select"), "Inspect one round", choices = c("All rounds" = "all")))))),
+    fluidRow(box(width = 12, title = "Rank progression", plotlyOutput(ns("rank_evolution_plot"), height = "320px"))),
+    fluidRow(box(width = 12, title = "Standings", uiOutput(ns("classification_status")), reactableOutput(ns("classification_table")))),
+    fluidRow(box(width = 12, title = "Dream team and configured rewards", uiOutput(ns("dreamteam_box_ui"))))
   )
 }
 
-classification_Server <- function(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV) {
+# Normalize observed per-team round records. Missing points stay NA; opaque
+# round IDs are resolved using the championship round catalog, never guessed.
+classification_round_rows <- function(answer, team_id, team_name, rounds = data.frame()) {
+  empty <- data.frame(team_id = character(), team_name = character(), round = numeric(), points = numeric())
+  if (is.null(answer) || !length(answer) || isTRUE(answer$error)) return(empty)
+  records <- if (!is.null(answer$rounds)) answer$rounds else answer
+  if (is.data.frame(records)) records <- split(records, seq_len(nrow(records)))
+  if (!is.list(records)) return(empty)
+  pick <- function(x, keys) {
+    for (key in keys) if (!is.null(x[[key]]) && length(x[[key]]) == 1L && !is.list(x[[key]])) return(x[[key]])
+    NA
+  }
+  result <- bind_rows(lapply(records, function(record) {
+    if (!is.list(record)) return(NULL)
+    raw_round <- pick(record, c("round_number", "roundNumber", "number", "round", "id", "_id"))
+    n <- suppressWarnings(as.numeric(raw_round))
+    if (!is.finite(n) && nrow(rounds) && all(c("round_id", "round_number") %in% names(rounds))) {
+      n <- rounds$round_number[match(as.character(raw_round), as.character(rounds$round_id))]
+    }
+    if (length(n) != 1L || !is.finite(n)) return(NULL)
+    points <- suppressWarnings(as.numeric(pick(record, c("points", "score"))))
+    data.frame(team_id = as.character(team_id), team_name = as.character(team_name), round = n, points = points)
+  }))
+  if (!nrow(result)) return(empty)
+  result[!duplicated(paste(result$team_id, result$round), fromLast = TRUE), , drop = FALSE]
+}
+
+classification_window_table <- function(rows, window = NULL, single = "all") {
+  if (is.null(rows) || !nrow(rows)) return(data.frame())
+  teams <- unique(rows[, c("team_id", "team_name"), drop = FALSE])
+  if (!is.null(single) && length(single) == 1L && single != "all") {
+    rows <- rows[rows$round == suppressWarnings(as.numeric(single)), , drop = FALSE]
+  } else if (length(window) == 2L && all(is.finite(window))) {
+    rows <- rows[rows$round >= window[1] & rows$round <= window[2], , drop = FALSE]
+  }
+  if (!nrow(rows)) return(data.frame())
+  # Compare the same published rounds for every team. An absent record is
+  # missing evidence, not a zero-point round or permission to sum fewer rounds.
+  expected <- length(unique(rows$round))
+  totals <- rows %>% group_by(team_id, team_name) %>%
+    summarise(points = if (all(is.finite(points)) && n_distinct(round) == expected) sum(points) else NA_real_,
+              rounds = n_distinct(round), .groups = "drop")
+  teams %>% left_join(totals, by = c("team_id", "team_name")) %>%
+    mutate(rounds = ifelse(is.na(rounds), 0L, rounds),
+           rank = rank(-points, ties.method = "min", na.last = "keep")) %>% arrange(rank, team_name)
+}
+
+classification_dreamteam_rows <- function(answer) {
+  if (is.null(answer) || isTRUE(answer$error) || !length(answer$players)) return(data.frame())
+  players <- answer$players
+  if (is.data.frame(players)) players <- split(players, seq_len(nrow(players)))
+  scalar <- function(x, default = NA_character_) if (length(x) == 1L && !is.list(x)) as.character(x) else default
+  mvp <- answer$mvp
+  if (is.list(mvp)) mvp <- if (!is.null(mvp$id)) mvp$id else mvp[["_id"]]
+  bind_rows(lapply(players, function(p) {
+    id <- scalar(if (!is.null(p$id)) p$id else p[["_id"]])
+    data.frame(player_id = id, player = scalar(p$name), role = scalar(p$role),
+      points = suppressWarnings(as.numeric(scalar(p$points))),
+      mvp = !is.na(id) && id %in% as.character(mvp), stringsAsFactors = FALSE)
+  }))
+}
+
+classification_Server <- function(id, is_module_active, login_token, championship_id, user_team_id,
+                                  user_teams_RV, refresh_trigger = NULL) {
   moduleServer(id, function(input, output, session) {
-    ns <- session$ns
-
-    # Standings History Reactive
-    standings_history_RV <- reactive({
-      req(is_module_active() == TRUE)
-      req(championship_id())
-      champ_id <- championship_id()
-
-      df <- tryCatch({
-        get_league_standings_history(champ_id)
-      }, error = function(e) {
-        print(paste0("[Classification] Error fetching standings history: ", e$message))
-        NULL
-      })
-      return(df)
+    rounds_RV <- reactive({
+      req(is_module_active() == TRUE, login_token(), championship_id())
+      if (!is.null(refresh_trigger)) refresh_trigger()
+      tryCatch(get_finished_rounds(login_token(), championship_id()), error = function(e) data.frame())
     })
-
-    # Render Rank Position Evolution Chart
-    output$rank_evolution_plot <- plotly::renderPlotly({
+    round_rows_RV <- reactive({
+      req(is_module_active() == TRUE, login_token(), championship_id())
+      if (!is.null(refresh_trigger)) refresh_trigger()
+      teams <- user_teams_RV(); req(teams)
+      bind_rows(lapply(seq_len(nrow(teams)), function(i) {
+        ans <- tryCatch(get_user_team_rounds(login_token(), championship_id(), as.character(teams$teamid[i])), error = function(e) NULL)
+        classification_round_rows(ans, teams$teamid[i], teams$teamname[i], rounds_RV())
+      }))
+    })
+    observeEvent(list(rounds_RV(), round_rows_RV()), {
+      catalog <- rounds_RV(); history <- round_rows_RV()
+      numbers <- sort(unique(c(catalog$round_number, history$round)))
+      numbers <- numbers[is.finite(numbers)]
+      if (!length(numbers)) return()
+      updateSliderInput(session, "round_range_slider", min = min(numbers), max = max(c(numbers, min(numbers) + 1)), value = range(numbers))
+      updateSelectInput(session, "single_round_select", choices = c("All rounds" = "all", stats::setNames(as.character(numbers), paste("Round", numbers))))
+    })
+    filtered_rows_RV <- reactive({
+      classification_window_table(round_rows_RV(), input$round_range_slider, input$single_round_select)
+    })
+    output$classification_status <- renderUI({
+      rows <- round_rows_RV()
+      if (!nrow(rows)) return(p("Round history is unavailable. Current official cumulative totals are shown below; round filters require published results."))
+      if (!nrow(filtered_rows_RV())) return(p("No published results in this selection."))
+      p("Points are summed only from published round records. Missing scores remain unavailable.")
+    })
+    output$classification_table <- renderReactable({
       req(is_module_active() == TRUE)
-      history_df <- standings_history_RV()
-
-      has_data <- !is.null(history_df) && nrow(history_df) > 0 && "position" %in% colnames(history_df) && any(!is.na(history_df$position) & history_df$position > 0)
-
-      if (!has_data) {
-        return(
-          plotly::plot_ly() %>%
-            plotly::layout(
-              paper_bgcolor = "rgba(0,0,0,0)",
-              plot_bgcolor = "rgba(0,0,0,0)",
-              xaxis = list(visible = FALSE),
-              yaxis = list(visible = FALSE),
-              annotations = list(
-                list(
-                  x = 0.5,
-                  y = 0.5,
-                  xref = "paper",
-                  yref = "paper",
-                  text = "<b>No matchday round data available yet.</b><br><span style='font-size: 12px; color: #64748b;'>Rank position evolution across rounds will appear once matchday scores are recorded.</span>",
-                  showarrow = FALSE,
-                  font = list(size = 14, color = "#334155"),
-                  bgcolor = "#f8fafc",
-                  bordercolor = "#cbd5e1",
-                  borderwidth = 1,
-                  borderpad = 16
-                )
-              )
-            )
-        )
+      rows <- filtered_rows_RV()
+      if (!nrow(round_rows_RV())) {
+        teams <- user_teams_RV(); req(teams)
+        rows <- data.frame(team_name = teams$teamname,
+                           points = suppressWarnings(as.numeric(teams$points)),
+                           rank = suppressWarnings(as.numeric(teams$position)))
       }
-
-      # Format dates
-      history_df$date <- as.POSIXct(history_df$recorded_at, format = "%Y-%m-%dT%H:%M:%S")
-      if (any(is.na(history_df$date))) {
-        history_df$date <- as.POSIXct(history_df$recorded_at)
-      }
-      history_df <- history_df %>% dplyr::arrange(date)
-
-      # Inverted Y-axis rank position chart (1st place at top)
-      plotly::plot_ly(
-        data = history_df,
-        x = ~date,
-        y = ~position,
-        color = ~teamname,
-        type = "scatter",
-        mode = "lines+markers",
-        line = list(width = 2, shape = "spline"),
-        marker = list(size = 6),
-        hoverinfo = "text",
-        text = ~paste0("<b>", teamname, "</b><br>Rank Position: #", position, "<br>Points: ", points, "<br>Date: ", format(date, "%d-%m-%Y"))
-      ) %>%
-        plotly::layout(
-          paper_bgcolor = "rgba(0,0,0,0)",
-          plot_bgcolor = "rgba(0,0,0,0)",
-          xaxis = list(title = "Matchday Timeline", gridcolor = "#f1f5f9", zeroline = FALSE, tickformat = "%d-%m"),
-          yaxis = list(title = "Standings Position (Rank 1 at top)", gridcolor = "#f1f5f9", autorange = "reversed", dtick = 1),
-          legend = list(orientation = "h", x = 0.5, y = -0.25, xanchor = "center"),
-          margin = list(l = 60, r = 20, t = 10, b = 40)
-        )
+      if (!nrow(rows)) return(reactable(data.frame(Message = "No results available.")))
+      rows <- rows[, intersect(c("rank", "team_name", "points", "rounds"), names(rows)), drop = FALSE]
+      reactable(rows, compact = TRUE, striped = TRUE, defaultSorted = "rank", defaultColDef = colDef(na = "Unavailable"),
+                columns = list(rank = colDef(name = "Rank"), team_name = colDef(name = "Team"), points = colDef(name = "Points")))
     })
-
-    # Render Classification Table
-    output$classification_table <- reactable::renderReactable({
-      req(is_module_active() == TRUE)
-      teams_df <- user_teams_RV()
-      req(teams_df)
-
-      if (is.null(teams_df) || nrow(teams_df) == 0) return(NULL)
-
-      # Sort teams by rank position or total points
-      teams_df <- teams_df %>%
-        dplyr::mutate(
-          rank_num = if ("position" %in% colnames(teams_df)) suppressWarnings(as.numeric(position)) else seq_len(nrow(teams_df)),
-          pts_num = if ("points" %in% colnames(teams_df)) suppressWarnings(as.numeric(points)) else 0,
-          val_num = if ("teamValue" %in% colnames(teams_df)) suppressWarnings(as.numeric(teamValue)) else if ("team_value" %in% colnames(teams_df)) suppressWarnings(as.numeric(team_value)) else 0,
-          team_name_clean = if ("teamname" %in% colnames(teams_df)) teamname else name,
-          is_active_clean = if ("is_active" %in% colnames(teams_df)) isTRUE(as.logical(is_active)) else TRUE
-        ) %>%
-        dplyr::arrange(rank_num)
-
-      active_members <- nrow(teams_df)
-      ranking_prizes_df <- calculate_futmondo_ranking_prizes(money = 30000000, members = active_members)
-
-      teams_df$ranking_prize <- if (nrow(ranking_prizes_df) >= nrow(teams_df)) ranking_prizes_df$prize[seq_len(nrow(teams_df))] else 0
-      teams_df$point_earnings <- teams_df$pts_num * 70000
-      teams_df$total_earnings <- teams_df$point_earnings + teams_df$ranking_prize
-
-      df_display <- teams_df %>%
-        dplyr::transmute(
-          Rank = rank_num,
-          `User Team` = team_name_clean,
-          `Active` = is_active_clean,
-          `Total Points` = pts_num,
-          `Point Earnings` = point_earnings,
-          `Ranking Prize` = ranking_prize,
-          `Total Estimated Money` = total_earnings,
-          `Squad Value` = val_num
-        )
-
-      reactable::reactable(
-        df_display,
-        compact = TRUE,
-        striped = TRUE,
-        highlight = TRUE,
-        bordered = FALSE,
-        defaultPageSize = 10,
-        columns = list(
-          Rank = colDef(name = "Rank #", align = "center", width = 80, style = list(fontWeight = "700", color = "#0f172a")),
-          `User Team` = colDef(
-            align = "left",
-            cell = function(val, index) {
-              is_act <- df_display$Active[index]
-              if (!is_act) {
-                shiny::tags$span(
-                  style = "font-weight: 600; color: #64748b;",
-                  val,
-                  shiny::tags$span(style = "margin-left: 6px; font-size: 10px; background-color: #f1f5f9; color: #64748b; padding: 2px 6px; border-radius: 4px; font-weight: 600;", "Inactive")
-                )
-              } else {
-                shiny::tags$span(style = "font-weight: 600; color: #0f172a;", val)
-              }
-            }
-          ),
-          Active = colDef(show = FALSE),
-          `Total Points` = colDef(align = "center", style = list(fontWeight = "700", color = "#3b82f6")),
-          `Point Earnings` = colDef(name = "Point Earnings (€)", align = "right", cell = function(val) format_table_currency(val)),
-          `Ranking Prize` = colDef(name = "Ranking Prize (€)", align = "right", cell = function(val) format_table_currency(val)),
-          `Total Estimated Money` = colDef(
-            name = "Total Money Earned (€)",
-            align = "right",
-            cell = function(val) {
-              formatted <- format_table_currency(val)
-              shiny::tags$span(style = "color: #10b981; font-weight: 700;", formatted)
-            }
-          ),
-          `Squad Value` = colDef(name = "Squad Value (€)", align = "right", cell = function(val) format_table_currency(val))
-        )
-      )
+    output$rank_evolution_plot <- renderPlotly({
+      rows <- round_rows_RV()
+      if (!nrow(rows)) return(plot_ly() %>% fm_plot_layout(annotations = list(list(text = "No published round history", showarrow = FALSE))))
+      numbers <- sort(unique(rows$round))
+      history <- bind_rows(lapply(numbers, function(n) {
+        d <- classification_window_table(rows, c(min(numbers), n)); d$round <- n; d
+      }))
+      range <- input$round_range_slider
+      if (length(range) == 2L) history <- history[history$round >= range[1] & history$round <= range[2], , drop = FALSE]
+      if (!is.null(input$single_round_select) && input$single_round_select != "all") history <- history[history$round == as.numeric(input$single_round_select), , drop = FALSE]
+      plot_ly(history, x = ~round, y = ~rank, color = ~team_name, type = "scatter", mode = "lines+markers") %>%
+        fm_plot_layout(xaxis = list(title = "Round", dtick = 1), yaxis = list(title = "Cumulative rank", autorange = "reversed", dtick = 1))
     })
-
-    # Render Dream Team Box UI
     output$dreamteam_box_ui <- renderUI({
-      req(is_module_active() == TRUE)
-      teams_df <- user_teams_RV()
-      active_members <- if (!is.null(teams_df) && nrow(teams_df) > 0) nrow(teams_df) else 1
-      prizes_sample <- calculate_futmondo_ranking_prizes(money = 30000000, members = active_members)
-      first_prize <- if (nrow(prizes_sample) >= 1) format_table_currency(prizes_sample$prize[1]) else "10.000.000 €"
-      last_prize <- if (nrow(prizes_sample) >= 1) format_table_currency(prizes_sample$prize[nrow(prizes_sample)]) else "2.000.000 €"
-
-      div(
-        style = "padding: 18px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;",
-        div(
-          style = "display: flex; align-items: center; gap: 12px; margin-bottom: 12px;",
-          shiny::tags$i(class = "fa-solid fa-trophy", style = "font-size: 28px; color: #f59e0b;"),
-          div(
-            h4(style = "font-weight: 700; color: #0f172a; margin: 0; font-size: 16px;", "Official Futmondo Round Rewards & Ranking Distribution"),
-            p(style = "color: #64748b; margin: 2px 0 0 0; font-size: 12px;", paste0("Active League Size: ", active_members, " Teams | Mode: Flop Ranking"))
-          )
-        ),
-        div(
-          style = "display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 15px;",
-          div(
-            style = "background: #ffffff; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; text-align: center;",
-            span(style = "color: #64748b; font-size: 11px; font-weight: 600; text-transform: uppercase;", "Points Earnings"),
-            h4(style = "font-weight: 700; color: #3b82f6; margin: 4px 0 0 0;", "70.000 € / point")
-          ),
-          div(
-            style = "background: #ffffff; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; text-align: center;",
-            span(style = "color: #64748b; font-size: 11px; font-weight: 600; text-transform: uppercase;", "Ranking Pool Distribution"),
-            h4(style = "font-weight: 700; color: #10b981; margin: 4px 0 0 0;", paste0("30.000.000 € (1º: ", first_prize, " | ", active_members, "º: ", last_prize, ")"))
-          ),
-          div(
-            style = "background: #ffffff; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; text-align: center;",
-            span(style = "color: #64748b; font-size: 11px; font-weight: 600; text-transform: uppercase;", "Matchday MVP Bonus"),
-            h4(style = "font-weight: 700; color: #f59e0b; margin: 4px 0 0 0;", "1.000.000 €")
-          ),
-          div(
-            style = "background: #ffffff; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; text-align: center;",
-            span(style = "color: #64748b; font-size: 11px; font-weight: 600; text-transform: uppercase;", "Dream Team Player"),
-            h4(style = "font-weight: 700; color: #8b5cf6; margin: 4px 0 0 0;", "500.000 €")
-          )
-        )
-      )
+      req(is_module_active() == TRUE, login_token(), championship_id(), user_team_id())
+      if (!is.null(refresh_trigger)) refresh_trigger()
+      snapshot <- tryCatch(get_financial_snapshot(login_token(), championship_id(), user_team_id()), error = function(e) NULL)
+      rules <- normalize_league_rules(list(configuration = snapshot$configuration))
+      rewards <- p("Configured rewards — points: ", ui_financial_amount(rules$money_per_point),
+        "; ranking pool: ", ui_financial_amount(rules$ranking_pool),
+        "; ranking mode: ", if (length(rules$ranking_mode) && !is.na(rules$ranking_mode)) rules$ranking_mode else "Unavailable",
+        "; MVP: ", ui_financial_amount(rules$mvp_reward), "; dream-team player: ", ui_financial_amount(rules$dreamteam_reward))
+      if (is.null(input$single_round_select) || input$single_round_select == "all") return(tagList(rewards, p("Select one round to see its published dream team and MVP.")))
+      catalog <- rounds_RV(); index <- match(as.numeric(input$single_round_select), catalog$round_number)
+      if (is.na(index)) return(tagList(rewards, p("Round identity unavailable.")))
+      ans <- tryCatch(get_round_dreamteam(login_token(), championship_id(), catalog$round_id[index]), error = function(e) NULL)
+      players <- classification_dreamteam_rows(ans)
+      if (!nrow(players)) return(tagList(rewards, p("The dream team has not been published or is unavailable.")))
+      tagList(rewards, tags$ul(lapply(seq_len(nrow(players)), function(i) tags$li(
+        players$player[i], " — ", if (is.finite(players$points[i])) players$points[i] else "Unavailable", " points",
+        if (isTRUE(players$mvp[i])) strong(" · MVP")))))
     })
   })
 }

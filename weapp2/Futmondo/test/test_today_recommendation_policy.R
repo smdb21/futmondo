@@ -68,6 +68,11 @@ pol_record("source_futmondo_functions", { source("futmondo_functions.R") })
 pol_record("source_today_module", { source("Modules/Today_Module.R") })
 pol_record("source_selected_player_module", { source("Modules/Selected_Player_Module.R") })
 pol_record("source_utils", { source("utils.R") })
+pol_record("fis_badge_is_dark_classed_and_keeps_decimal_score", {
+  fis_badge_html <- as.character(today_fis_score_badge(73.3))
+  pol_expect(grepl("fis-score-badge fis-score-mid", fis_badge_html, fixed = TRUE), "FIS badge must use the mid-tier dark class")
+  pol_expect(grepl(">73.3<", fis_badge_html, fixed = TRUE), "FIS badge must preserve one decimal")
+})
 
 all_sourced <- !any(sapply(pol_results, function(r) r$status == "error"))
 

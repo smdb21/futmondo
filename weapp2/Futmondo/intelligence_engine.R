@@ -51,180 +51,59 @@ default_if_null_na <- function(x, default) {
 #   Enriched players_df with FIS columns appended.
 # ============================================================
 
+# Descriptive, cohort-independent indicators. These are not predictions.
+analytics_numeric_column <- function(df, column, default = NA_real_) {
+  if (!column %in% names(df)) return(rep(default, nrow(df)))
+  x <- suppressWarnings(as.numeric(as.character(df[[column]])))
+  x[!is.finite(x)] <- default
+  x
+}
+
 calculate_fis_score <- function(players_df, weights = NULL) {
-  if (is.null(players_df) || nrow(players_df) == 0) {
-    return(players_df)
+  if (is.null(players_df) || nrow(players_df) == 0) return(players_df)
+  defaults <- c(perf = .30, form = .20, efficiency = .20, momentum = .15, fixture_risk = .15)
+  w <- defaults
+  if (!is.null(weights)) for (key in names(defaults)) {
+    candidate <- weights[[key]]
+    if (is.numeric(candidate) && length(candidate) == 1L && is.finite(candidate) && candidate >= 0) w[key] <- candidate
   }
-
-  tryCatch({
-    n <- nrow(players_df)
-
-    # ---- Default weights ----
-    if (is.null(weights)) {
-      weights <- list(
-        perf = 0.30,
-        form = 0.20,
-        efficiency = 0.20,
-        momentum = 0.15,
-        fixture_risk = 0.15
-      )
-    }
-
-    # Use the local NULL/NA-safe default helper (no reliance on %||%).
-    w_perf <- default_if_null_na(weights$perf, 0.30)
-    w_form <- default_if_null_na(weights$form, 0.20)
-    w_eff  <- default_if_null_na(weights$efficiency, 0.20)
-    w_mom  <- default_if_null_na(weights$momentum, 0.15)
-    w_fix  <- default_if_null_na(weights$fixture_risk, 0.15)
-
-    # Coerce weights to finite numerics; fall back to defaults for bad entries.
-    w_perf <- if (is.numeric(w_perf) && is.finite(w_perf)) w_perf else 0.30
-    w_form <- if (is.numeric(w_form) && is.finite(w_form)) w_form else 0.20
-    w_eff  <- if (is.numeric(w_eff) && is.finite(w_eff)) w_eff else 0.20
-    w_mom  <- if (is.numeric(w_mom) && is.finite(w_mom)) w_mom else 0.15
-    w_fix  <- if (is.numeric(w_fix) && is.finite(w_fix)) w_fix else 0.15
-
-    # ---- Extract raw columns with safe defaults ----
-    points      <- safe_numeric(
-      if ("points" %in% colnames(players_df)) players_df$points else NULL, 0
-    )
-    value       <- safe_numeric(
-      if ("value" %in% colnames(players_df)) players_df$value else NULL, 0
-    )
-    change      <- safe_numeric(
-      if ("change" %in% colnames(players_df)) players_df$change else NULL, 0
-    )
-    avg_pts     <- safe_numeric(
-      if ("average.average" %in% colnames(players_df)) players_df$average.average else NULL, 0
-    )
-    avg_last5   <- safe_numeric(
-      if ("average.averageLastFive" %in% colnames(players_df)) players_df$average.averageLastFive else NULL, 0
-    )
-    matches     <- safe_numeric(
-      if ("average.matches" %in% colnames(players_df)) players_df$average.matches else NULL, 0
-    )
-    status_vec  <- if ("status" %in% colnames(players_df)) as.character(players_df$status) else rep("ok", n)
-    role_vec    <- if ("role" %in% colnames(players_df)) as.character(players_df$role) else rep("Unknown", n)
-
-    # Sanitize NA/empty role and status so split() and tolower() never drop rows.
-    role_vec[is.na(role_vec) | trimws(role_vec) == ""] <- "Unknown"
-    status_vec[is.na(status_vec) | trimws(status_vec) == ""] <- "ok"
-
-    # ---- perf (0-100): based on points, average, matches ----
-    # Normalize: more points -> higher, capped at 100
-    max_points <- max(points, na.rm = TRUE)
-    max_points <- ifelse(max_points == 0, 1, max_points)
-    perf_raw <- (points / max_points) * 60  # up to 60 pts from raw points
-
-    # Add average contribution (up to 25 pts)
-    avg_contribution <- pmin(avg_pts / 10, 1) * 25
-
-    # Add matches played contribution (up to 15 pts) -- rewards consistency
-    max_matches <- max(matches, na.rm = TRUE)
-    max_matches <- ifelse(max_matches == 0, 1, max_matches)
-    match_contribution <- (matches / max_matches) * 15
-
-    perf <- safe_clamp(perf_raw + avg_contribution + match_contribution)
-
-    # ---- form (0-100): form momentum from avg_last5 vs avg ----
-    # Where avg > 0, form_ratio = avg_last5 / avg
-    form_ratio <- ifelse(avg_pts > 0, avg_last5 / avg_pts, 1)
-    # Map ratio to 0-100: ratio=0.5 -> 0, ratio=1.0 -> 50, ratio=1.5 -> 100
-    form <- safe_clamp((form_ratio - 0.5) * 100)
-
-    # ---- efficiency (0-100): points per million EUR relative to position peers ----
-    # points per million = points / (value / 1e6)
-    value_safe <- ifelse(value > 0, value, 1)
-    pts_per_million <- points / (value_safe / 1e6)
-
-    # Group by position to compute peer-relative efficiency
-    position_groups <- split(seq_len(n), role_vec)
-    efficiency <- rep(50, n)  # default neutral
-
-    for (grp_name in names(position_groups)) {
-      idx <- position_groups[[grp_name]]
-      if (length(idx) < 2) next
-      grp_pts_m <- pts_per_million[idx]
-      grp_min <- min(grp_pts_m, na.rm = TRUE)
-      grp_max <- max(grp_pts_m, na.rm = TRUE)
-      grp_range <- grp_max - grp_min
-      grp_range <- ifelse(grp_range == 0, 1, grp_range)
-      efficiency[idx] <- safe_clamp((grp_pts_m - grp_min) / grp_range * 100)
-    }
-
-    # ---- momentum (0-100): 24h market value change normalized ----
-    abs_change <- abs(change)
-    max_abs_change <- max(abs_change, na.rm = TRUE)
-    max_abs_change <- ifelse(max_abs_change == 0, 1, max_abs_change)
-    # Normalize: sign matters, positive -> higher score
-    momentum_raw <- (change / max_abs_change) * 50 + 50  # maps [-1,1] -> [0,100]
-    momentum <- safe_clamp(momentum_raw)
-
-    # ---- fixture_risk (0-100): minutes played trend & status ----
-    # status penalty: 'ok' -> 0, 'doubt' -> -20, 'injured'/'injured2' -> -50, 'redcard' -> -40
-    status_penalty <- ifelse(tolower(status_vec) == "ok", 0,
-                       ifelse(tolower(status_vec) == "doubt", -20,
-                       ifelse(tolower(status_vec) %in% c("injured", "injured2"), -50,
-                       ifelse(tolower(status_vec) == "redcard", -40, 0))))
-
-    # Minutes played trend proxy via matches contribution
-    match_trend <- (matches / max_matches) * 30
-    fixture_risk <- safe_clamp(70 + status_penalty + match_trend)
-
-    # ---- Composite FIS score ----
-    fis_score <- w_perf * perf + w_form * form + w_eff * efficiency +
-                 w_mom * momentum + w_fix * fixture_risk
-    fis_score <- safe_clamp(fis_score)
-    fis_score[is.na(fis_score) | is.nan(fis_score)] <- 50.0
-
-    # ---- FIS tier ----
-fis_tier <- ifelse(fis_score >= 80, "Strong Buy",
-                   ifelse(fis_score >= 65, "Buy",
-                   ifelse(fis_score >= 45, "Hold", "Sell")))
-    fis_tier[is.na(fis_tier)] <- "Hold"
-
-    # ---- FIS summary ----
-    player_names <- if ("name" %in% colnames(players_df)) as.character(players_df$name) else rep("Player", n)
-
-    fis_summary <- vapply(seq_len(n), function(i) {
-      tier_label <- if (!is.na(fis_tier[i])) fis_tier[i] else "Hold"
-      name_label <- if (!is.na(player_names[i])) player_names[i] else "Player"
-      score_val  <- if (!is.na(fis_score[i])) round(fis_score[i], 1) else 50.0
-      if (identical(tier_label, "Strong Buy")) {
-        paste0(name_label, ": Exceptional value with strong performance and positive market momentum (FIS=", score_val, ").")
-      } else if (identical(tier_label, "Buy")) {
-        paste0(name_label, ": Solid buy candidate with good form and efficiency metrics (FIS=", score_val, ").")
-      } else if (identical(tier_label, "Hold")) {
-        paste0(name_label, ": Neutral outlook; monitor for form changes before acting (FIS=", score_val, ").")
-      } else {
-        paste0(name_label, ": Weak metrics or negative trend; consider selling to free budget (FIS=", score_val, ").")
-      }
-    }, character(1))
-
-    # ---- Assign back to data frame ----
-    players_df$perf            <- safe_clamp(perf)
-    players_df$form            <- safe_clamp(form)
-    players_df$efficiency      <- safe_clamp(efficiency)
-    players_df$momentum        <- safe_clamp(momentum)
-    players_df$fixture_risk    <- safe_clamp(fixture_risk)
-    players_df$fis_score       <- round(fis_score, 2)
-    players_df$fis_tier        <- fis_tier
-    players_df$fis_summary     <- fis_summary
-
-    return(players_df)
-  }, error = function(e) {
-    print(paste0("[FIS] Error computing FIS scores: ", e$message))
-    # Return original with NA columns
-    players_df$perf            <- NA_real_
-    players_df$form            <- NA_real_
-    players_df$efficiency      <- NA_real_
-    players_df$momentum        <- NA_real_
-    players_df$fixture_risk    <- NA_real_
-    players_df$fis_score       <- NA_real_
-    players_df$fis_tier        <- NA_character_
-    players_df$fis_summary     <- NA_character_
-    return(players_df)
-  })
+  if (sum(w) <= 0) w <- defaults
+  w <- w / sum(w)
+  avg <- analytics_numeric_column(players_df, 'average.average')
+  matches <- analytics_numeric_column(players_df, 'average.matches')
+  points <- analytics_numeric_column(players_df, 'points')
+  missing_avg <- !is.finite(avg) & is.finite(matches) & matches > 0 & is.finite(points)
+  avg[missing_avg] <- points[missing_avg] / matches[missing_avg]
+  avg[is.finite(matches) & matches == 0] <- NA_real_
+  last5 <- analytics_numeric_column(players_df, 'average.averageLastFive')
+  value <- analytics_numeric_column(players_df, 'value')
+  change <- analytics_numeric_column(players_df, 'change')
+  status <- if ('status' %in% names(players_df)) tolower(trimws(as.character(players_df$status))) else rep(NA_character_, nrow(players_df))
+  perf <- 100 * (1 - exp(-pmax(avg, 0) / 6))
+  form <- safe_clamp(50 + 50 * (last5 - avg) / pmax(abs(avg), 1))
+  efficiency <- ifelse(value > 0, 100 * pmax(avg, 0) / (pmax(avg, 0) + value / 1e6), NA_real_)
+  momentum <- ifelse(value > 0, 50 + 50 * tanh(20 * change / value), NA_real_)
+  availability <- rep(NA_real_, nrow(players_df))
+  availability[status %in% c('ok', 'available', 'healthy')] <- 100
+  availability[status %in% c('doubt', 'doubtful')] <- 60
+  availability[status %in% c('injured', 'injured2', 'redcard', 'suspended', 'unavailable')] <- 0
+  pillars <- cbind(perf, form, efficiency, momentum, fixture_risk = availability)
+  observed <- is.finite(pillars)
+  weighted <- sweep(pillars, 2, w, '*'); weighted[!observed] <- 0
+  denominator <- as.vector(observed %*% w)
+  score <- ifelse(denominator > 0, rowSums(weighted) / denominator, NA_real_)
+  score[!is.finite(avg)] <- NA_real_
+  coverage <- rowMeans(observed)
+  tier <- ifelse(!is.finite(score), 'Unavailable', ifelse(score >= 80, 'Strong Buy', ifelse(score >= 65, 'Buy', ifelse(score >= 45, 'Hold', 'Sell'))))
+  players_df$perf <- perf; players_df$form <- form; players_df$efficiency <- efficiency
+  players_df$momentum <- momentum; players_df$fixture_risk <- availability
+  players_df$fis_score <- round(score, 2); players_df$fis_tier <- tier
+  players_df$data_coverage <- coverage
+  players_df$fis_status <- ifelse(!is.finite(score), 'unavailable', ifelse(coverage < 1, 'partial', 'ok'))
+  players_df$fis_summary <- ifelse(is.finite(score),
+    paste0('Descriptive rating ', round(score, 1), '/100; ', round(coverage * 100), '% of indicators observed. Use forecasts, acquisition cost and your roster before acting.'),
+    'Insufficient observed match data for a rating.')
+  players_df
 }
 
 
@@ -243,9 +122,8 @@ fis_tier <- ifelse(fis_score >= 80, "Strong Buy",
 #   championship_id  -- character string
 #   pressroom_df     -- optional data frame of pressroom transactions
 #   user_teams_df    -- optional data frame of user teams
-#   user_cash        -- numeric, available budget (default 300M).
-#                       Pass NA/NULL to mark funds as unverified; the
-#                       function then falls back to its own default.
+#   user_cash        -- deprecated advisory input (default NA); never verifies funds.
+#                       An authoritative capacity snapshot is required.
 #   market_high_bid  -- optional numeric, the current highest competing
 #                       bid on this player (from live market/summary data).
 #   capacity         -- optional list returned by get_acquisition_capacity().
@@ -262,7 +140,7 @@ fis_tier <- ifelse(fis_score >= 80, "Strong Buy",
 calculate_smart_bid <- function(player_row, championship_id,
                                  pressroom_df = NULL,
                                  user_teams_df = NULL,
-                                 user_cash = 300000000,
+                                 user_cash = NA_real_,
                                  market_high_bid = NULL,
                                  capacity = NULL) {
   if (is.null(player_row)) {
@@ -286,25 +164,29 @@ calculate_smart_bid <- function(player_row, championship_id,
     player_matches <- safe_numeric(p$average.matches, 0)
     player_status <- if (!is.null(p$status)) as.character(p$status) else "ok"
 
-    # ---- Verified spendable funds ----
-    # user_cash alone is treated as unverified. A capacity object with
-    # status "ok" supplies verified spendable funds (max(0, budget - withheld)).
-    spendable <- 300000000
+    # A numeric user_cash argument cannot establish withheld funds or commitments.
+    spendable <- NA_real_
     funds_verified <- FALSE
-    if (!is.null(user_cash) && length(user_cash) == 1 && is.numeric(user_cash) &&
-        is.finite(user_cash)) {
-      spendable <- max(0, user_cash)
-    } else {
-      # NA/NULL/non-finite user_cash -> unverified engine default
-      spendable <- 300000000
+    if (is.list(capacity) && identical(capacity$status,"ok") && is.list(capacity$funds)) {
+      available <- capacity$funds$spendable_budget
+      if (is.numeric(available) && length(available)==1L && is.finite(available) && available>=0) {
+        spendable <- available
+        funds_verified <- TRUE
+      }
     }
-    if (!is.null(capacity) && is.list(capacity) &&
-        identical(capacity$status, "ok") &&
-        is.list(capacity$funds) &&
-        is.numeric(capacity$funds$spendable_budget) &&
-        is.finite(capacity$funds$spendable_budget)) {
-      spendable <- max(0, capacity$funds$spendable_budget)
-      funds_verified <- TRUE
+    if (!funds_verified) return(list(error="Verified available funds are required before recommending a bid.",
+      recommended_bid=0,max_rational_bid=NA_real_,spendable_funds=NA_real_,funds_verified=FALSE,
+      can_compete=FALSE,action="no_bid",confidence_pct=NA_real_,expected_roi_pct=NA_real_,
+      data_coverage_pct=NA_real_,method="unverified_funds",calibrated=FALSE))
+
+    api_bid_limit <- Inf
+    if ("api_bid_limit" %in% names(capacity$funds)) {
+      limit <- capacity$funds$api_bid_limit
+      if (!is.numeric(limit) || length(limit)!=1L || !is.finite(limit) || limit<0)
+        return(list(error="The API bidding limit is unavailable.",recommended_bid=0,max_rational_bid=NA_real_,
+          spendable_funds=spendable,funds_verified=TRUE,api_bid_limit=NA_real_,can_compete=FALSE,action="no_bid",
+          confidence_pct=NA_real_,expected_roi_pct=NA_real_,data_coverage_pct=NA_real_,calibrated=FALSE))
+      api_bid_limit <- limit
     }
 
     # ---- Market high bid (live competing bid) ----
@@ -354,24 +236,20 @@ calculate_smart_bid <- function(player_row, championship_id,
 
     # ---- max_rational_bid: rational value guardrail (150% of fair value)
     #      bounded by verified spendable funds ----
-    max_rational_bid <- min(round(fair_value * 1.5), spendable)
+    max_rational_bid <- min(round(fair_value * 1.5), spendable, api_bid_limit)
 
     # ---- recommended_bid: balance between winning and value, bounded by
     #      the rational guardrail and verified spendable funds ----
     recommended_raw <- round(fair_value * (1 + league_premium_pct / 200))
     recommended_bid <- min(recommended_raw, max_rational_bid)
     # Never recommend below the minimum winning bid (when affordable)
-    if (min_winning_bid <= spendable) {
+    if (min_winning_bid <= max_rational_bid) {
       recommended_bid <- max(recommended_bid, min_winning_bid)
     }
-    recommended_bid <- min(recommended_bid, spendable)
+    recommended_bid <- min(recommended_bid, spendable, max_rational_bid)
+    can_compete <- min_winning_bid <= max_rational_bid
 
-    # ---- expected_roi_pct ----
-    if (recommended_bid > 0) {
-      expected_roi_pct <- round((fair_value / recommended_bid - 1) * 100, 2)
-    } else {
-      expected_roi_pct <- 0
-    }
+    valuation_discount_pct <- if(recommended_bid>0) round((fair_value/recommended_bid-1)*100,2) else NA_real_
 
     # ---- competition_level ----
     if (!is.null(pressroom_df) && nrow(pressroom_df) > 0) {
@@ -403,31 +281,25 @@ calculate_smart_bid <- function(player_row, championship_id,
       likely_competitors <- list()
     }
 
-    # ---- confidence_pct ----
-    base_confidence <- 70
-    # Adjust based on data availability
-    if (player_matches > 0) base_confidence <- base_confidence + 5
-    if (!is.na(player_avg5) && player_avg > 0) base_confidence <- base_confidence + 5
-    if (tolower(player_status) == "ok") base_confidence <- base_confidence + 5
-    if (length(likely_competitors) > 0) base_confidence <- base_confidence + 5
-    # Verified spendable funds and live market high bid increase confidence
-    if (funds_verified) base_confidence <- base_confidence + 5
-    if (!is.null(mhb)) base_confidence <- base_confidence + 5
-    confidence_pct <- safe_clamp(base_confidence)
-
     list(
       fair_value = fair_value,
       league_premium_pct = league_premium_pct,
       min_winning_bid = min_winning_bid,
       recommended_bid = recommended_bid,
       max_rational_bid = max_rational_bid,
-      expected_roi_pct = expected_roi_pct,
+      expected_roi_pct = NA_real_,
+      valuation_discount_pct = valuation_discount_pct,
       competition_level = competition_level,
       likely_competitors = likely_competitors,
-      confidence_pct = confidence_pct,
+      confidence_pct = NA_real_,
+      data_coverage_pct = NA_real_,
       spendable_funds = spendable,
       funds_verified = funds_verified,
-      market_high_bid = mhb
+      api_bid_limit = if(is.finite(api_bid_limit)) api_bid_limit else NA_real_,
+      market_high_bid = mhb,
+      can_compete = can_compete,
+      method = "descriptive_heuristic",
+      calibrated = FALSE
     )
   }, error = function(e) {
     print(paste0("[SmartBid] Error computing smart bid: ", e$message))
@@ -453,137 +325,72 @@ calculate_smart_bid <- function(player_row, championship_id,
 #   total_trades, insights
 # ============================================================
 
+analytics_time <- function(x) {
+  x <- as.character(x)
+  result <- suppressWarnings(as.POSIXct(x, format = '%Y-%m-%dT%H:%M:%OS', tz = 'UTC'))
+  missing <- is.na(result)
+  if (any(missing)) result[missing] <- suppressWarnings(as.POSIXct(x[missing], format = '%Y-%m-%d %H:%M:%OS', tz = 'UTC'))
+  result
+}
+
 calculate_manager_dna <- function(team_id, pressroom_df, user_teams_df = NULL) {
-  if (is.null(team_id) || team_id == "") {
-    return(list(error = "team_id is empty"))
+  result <- list(team_id = team_id, aggressiveness = NA_real_, avg_overpayment_pct = NA_real_,
+    fav_position = 'Unknown', trading_frequency = 0, avg_holding_days = NA_real_, total_trades = 0,
+    insights = 'Insufficient observed transactions.', premium_observations = 0L, method = 'observed_transactions')
+  if (length(team_id) != 1L || is.na(team_id) || !nzchar(team_id)) return(result)
+  if (!is.data.frame(pressroom_df) || !nrow(pressroom_df) ||
+      !all(c('buyer_team_id', 'seller_team_id', 'player_id', 'price', 'created') %in% names(pressroom_df))) return(result)
+  tx <- pressroom_df
+  if ('id' %in% names(tx)) tx <- tx[!duplicated(tx$id), , drop = FALSE]
+  tx <- tx[tx$buyer_team_id %in% team_id | tx$seller_team_id %in% team_id, , drop = FALSE]
+  if (!nrow(tx)) return(result)
+  buy <- tx$buyer_team_id %in% team_id
+  result$total_trades <- nrow(tx)
+  prices <- analytics_numeric_column(tx, 'price')
+  reference <- rep(NA_real_, nrow(tx))
+  for (column in c('market_value_at_time', 'reference_value', 'value_at_transaction')) {
+    if (column %in% names(tx)) {
+      candidate <- analytics_numeric_column(tx, column)
+      use <- !is.finite(reference) & is.finite(candidate) & candidate > 0
+      reference[use] <- candidate[use]
+    }
   }
-
-  tryCatch({
-    # Default empty result
-    result <- list(
-      team_id = team_id,
-      aggressiveness = 50.0,
-      avg_overpayment_pct = 0.0,
-      fav_position = "Unknown",
-      trading_frequency = 0.0,
-      avg_holding_days = 0.0,
-      total_trades = 0,
-      insights = "Insufficient data to compute manager DNA profile."
-    )
-
-    if (is.null(pressroom_df) || nrow(pressroom_df) == 0) {
-      return(result)
-    }
-
-    # Filter transactions where this team is buyer or seller
-    team_tx <- pressroom_df[
-      pressroom_df$buyer_team_id == team_id | pressroom_df$seller_team_id == team_id,
-    ]
-
-    if (nrow(team_tx) == 0) {
-      return(result)
-    }
-
-    buys  <- team_tx[team_tx$buyer_team_id == team_id, ]
-    sells <- team_tx[team_tx$seller_team_id == team_id, ]
-
-    total_trades <- nrow(team_tx)
-    result$total_trades <- total_trades
-
-    # ---- aggressiveness (0-100) ----
-    # Based on trade volume and buy/sell ratio
-    buy_count <- nrow(buys)
-    sell_count <- nrow(sells)
-    turnover_ratio <- ifelse(total_trades > 0, (buy_count + sell_count) / total_trades, 0)
-    # Scale: more trades = more aggressive
-    aggressiveness <- safe_clamp(total_trades * 3 + turnover_ratio * 20)
-    result$aggressiveness <- round(aggressiveness, 2)
-
-    # ---- avg_overpayment_pct ----
-    if (nrow(buys) > 0) {
-      # We approximate overpayment by comparing buy price to a baseline
-      # (In a real system this would compare to fair_value from smart_bid)
-      # Use a heuristic: if price > 25M, assume 10% overpayment baseline
-      buy_prices <- suppressWarnings(as.numeric(buys$price))
-      avg_buy_price <- mean(buy_prices, na.rm = TRUE)
-      # Heuristic overpayment relative to typical market value
-      baseline_value <- 25000000  # typical baseline
-      avg_overpayment_pct <- round((avg_buy_price / baseline_value - 1) * 100, 2)
-      result$avg_overpayment_pct <- avg_overpayment_pct
-    }
-
-    # ---- fav_position ----
-    # Would require joining with players_df to get roles; use "Unknown" if unavailable
-    result$fav_position <- "Unknown"
-
-    # ---- trading_frequency ----
-    # Trades per approximate round (estimate from date range)
-    if (nrow(team_tx) > 1) {
-      dates <- team_tx$created
-      valid_dates <- dates[nzchar(dates)]
-      if (length(valid_dates) >= 2) {
-        parsed_dates <- suppressWarnings(as.POSIXct(valid_dates, tz = "UTC"))
-        valid_parsed <- parsed_dates[!is.na(parsed_dates)]
-        if (length(valid_parsed) >= 2) {
-          date_range_days <- as.numeric(difftime(max(valid_parsed), min(valid_parsed), units = "days"))
-          # Assume ~10 days per round
-          estimated_rounds <- ifelse(date_range_days > 0, date_range_days / 10, 1)
-          trading_frequency <- round(total_trades / estimated_rounds, 2)
-          result$trading_frequency <- trading_frequency
-        }
+  usable <- buy & is.finite(prices) & is.finite(reference) & reference > 0
+  if (any(usable)) {
+    premium <- prices[usable] / reference[usable] - 1
+    result$avg_overpayment_pct <- round(mean(premium) * 100, 2)
+    result$premium_observations <- sum(usable)
+    result$aggressiveness <- round(safe_clamp(50 + 100 * stats::median(premium)), 1)
+  }
+  if ('role' %in% names(tx) && any(buy)) {
+    roles <- as.character(tx$role[buy]); roles <- roles[!is.na(roles) & nzchar(roles)]
+    if (length(roles)) result$fav_position <- names(sort(table(roles), decreasing = TRUE))[1]
+  }
+  dates <- analytics_time(tx$created)
+  valid <- !is.na(dates)
+  if (any(valid)) {
+    span <- max(1, as.numeric(difftime(max(dates[valid]), min(dates[valid]), units = 'days')) + 1)
+    result$trading_frequency <- round(sum(valid) / span * 7, 2)
+  }
+  holdings <- numeric()
+  for (pid in unique(tx$player_id)) {
+    idx <- which(tx$player_id %in% pid & valid)
+    idx <- idx[order(dates[idx], seq_along(idx))]
+    acquired <- as.POSIXct(character(), tz = 'UTC')
+    for (i in idx) {
+      if (buy[i]) acquired <- c(acquired, dates[i])
+      else if (length(acquired)) {
+        holdings <- c(holdings, as.numeric(difftime(dates[i], acquired[1], units = 'days')))
+        acquired <- acquired[-1]
       }
     }
-
-    # ---- avg_holding_days ----
-    # For each player, compute time between buy and sell
-    holding_days_list <- c()
-    player_ids_bought <- unique(buys$player_id)
-    for (pid in player_ids_bought) {
-      buy_dates <- buys$created[buys$player_id == pid]
-      sell_dates <- sells$created[sells$player_id == pid]
-      valid_buy <- suppressWarnings(as.POSIXct(buy_dates[nzchar(buy_dates)], tz = "UTC"))
-      valid_sell <- suppressWarnings(as.POSIXct(sell_dates[nzchar(sell_dates)], tz = "UTC"))
-      valid_buy <- valid_buy[!is.na(valid_buy)]
-      valid_sell <- valid_sell[!is.na(valid_sell)]
-      if (length(valid_buy) > 0 && length(valid_sell) > 0) {
-        holding <- as.numeric(difftime(valid_sell, min(valid_buy), units = "days"))
-        holding_days_list <- c(holding_days_list, holding[!is.na(holding)])
-      }
-    }
-    if (length(holding_days_list) > 0) {
-      result$avg_holding_days <- round(mean(holding_days_list), 2)
-    }
-
-    # ---- insights ----
-    insights_parts <- c()
-    if (aggressiveness >= 70) {
-      insights_parts <- c(insights_parts, "Highly aggressive trader with rapid turnover.")
-    } else if (aggressiveness >= 40) {
-      insights_parts <- c(insights_parts, "Moderate trading activity with balanced approach.")
-    } else {
-      insights_parts <- c(insights_parts, "Conservative manager; prefers holding assets longer.")
-    }
-    if (avg_overpayment_pct > 20) {
-      insights_parts <- c(insights_parts, "Tends to overpay relative to market baseline.")
-    } else if (avg_overpayment_pct < -10) {
-      insights_parts <- c(insights_parts, "Strong value hunter; consistently buys below market.")
-    }
-    result$insights <- paste(insights_parts, collapse = " ")
-
-    return(result)
-  }, error = function(e) {
-    print(paste0("[ManagerDNA] Error computing DNA profile for team ", team_id, ": ", e$message))
-    list(
-      team_id = team_id,
-      aggressiveness = NA_real_,
-      avg_overpayment_pct = NA_real_,
-      fav_position = "Unknown",
-      trading_frequency = NA_real_,
-      avg_holding_days = NA_real_,
-      total_trades = 0,
-      insights = paste("Error computing profile:", e$message)
-    )
-  })
+  }
+  if (length(holdings)) result$avg_holding_days <- round(mean(holdings[holdings >= 0]), 2)
+  result$insights <- paste0(nrow(tx), ' observed transfers; ', result$trading_frequency,
+    ' per observed week. ', if (result$premium_observations > 0)
+      paste0('Average premium ', result$avg_overpayment_pct, '% from ', result$premium_observations, ' historical reference prices.')
+      else 'Historical reference prices unavailable; overpayment cannot be estimated.')
+  result
 }
 
 
@@ -897,7 +704,9 @@ generate_command_center_feed <- function(login, championship_id,
 
     result_df <- do.call(rbind, recommendations)
     # Sort by confidence descending
-    result_df <- result_df[order(-result_df$confidence_pct), ]
+    result_df$priority_score <- result_df$confidence_pct
+    result_df$confidence_pct <- NA_real_
+    result_df <- result_df[order(-result_df$priority_score), ]
     rownames(result_df) <- NULL
 
     return(result_df)
@@ -930,466 +739,314 @@ generate_command_center_feed <- function(login, championship_id,
 #   formation_counts (named numeric vector).
 # ============================================================
 
-optimize_starting_xi <- function(squad_df, formation = "4-3-3", mode = "max_fis") {
-  # ---- Default empty return on failure ----
-  empty_result <- list(
-    starting_xi = data.frame(),
-    bench = data.frame(),
-    formation = formation,
-    mode = mode,
-    total_score = 0,
-    avg_fis = 0,
-    feasible = FALSE,
-    formation_counts = c(GK = 1, DEF = 0, MID = 0, FWD = 0)
-  )
-
-  tryCatch({
-    # ---- Validate input ----
-    if (is.null(squad_df) || nrow(squad_df) == 0) {
-      return(empty_result)
+analytics_player_positions <- function(squad_df, multiposition = FALSE) {
+  aliases <- c(gk='GK', goalkeeper='GK', portero='GK', df='DEF', def='DEF', defender='DEF', defensa='DEF',
+    mf='MID', md='MID', mid='MID', midfielder='MID', centrocampista='MID', fw='FWD', fwd='FWD', forward='FWD', delantero='FWD')
+  lapply(seq_len(nrow(squad_df)), function(i) {
+    values <- character()
+    columns <- if (isTRUE(multiposition)) c('primary_role', 'role', 'role2', 'position', 'eligible_positions') else c('primary_role', 'role', 'position')
+    for (column in columns) {
+      if (column %in% names(squad_df)) {
+        candidate <- as.character(unlist(squad_df[[column]][i]))
+        candidate <- candidate[!is.na(candidate) & nzchar(trimws(candidate))]
+        values <- c(values, candidate)
+        if (!isTRUE(multiposition) && length(candidate)) break
+      }
     }
-
-    # ---- Parse formation ----
-    formation_map <- list(
-      "4-3-3" = c(DEF = 4, MID = 3, FWD = 3),
-      "4-4-2" = c(DEF = 4, MID = 4, FWD = 2),
-      "3-5-2" = c(DEF = 3, MID = 5, FWD = 2),
-      "3-4-3" = c(DEF = 3, MID = 4, FWD = 3),
-      "4-5-1" = c(DEF = 4, MID = 5, FWD = 1),
-      "5-3-2" = c(DEF = 5, MID = 3, FWD = 2),
-      "5-4-1" = c(DEF = 5, MID = 4, FWD = 1)
-    )
-
-    if (!formation %in% names(formation_map)) {
-      print(paste0("[StartingXI] Unknown formation '", formation, "'. Defaulting to 4-3-3."))
-      formation <- "4-3-3"
-    }
-
-    target <- formation_map[[formation]]
-    def_count <- as.integer(target["DEF"])
-    mid_count <- as.integer(target["MID"])
-    fwd_count <- as.integer(target["FWD"])
-
-    # ---- Normalize mode ----
-    mode_norm <- tolower(mode)
-    if (mode_norm %in% c("max_fis", "fis")) mode_norm <- "max_fis"
-
-    if (!mode_norm %in% c("max_fis", "safe", "upside", "form", "fixture")) {
-      print(paste0("[StartingXI] Unknown mode '", mode, "'. Defaulting to max_fis."))
-      mode_norm <- "max_fis"
-    }
-
-    # ---- Ensure FIS columns exist ----
-    if (!"fis_score" %in% colnames(squad_df)) {
-      squad_df <- calculate_fis_score(squad_df)
-    }
-
-    # ---- Ensure required numeric columns exist with safe defaults ----
-    squad_df$perf         <- safe_numeric(if ("perf" %in% colnames(squad_df)) squad_df$perf else NULL, 50)
-    squad_df$form         <- safe_numeric(if ("form" %in% colnames(squad_df)) squad_df$form else NULL, 50)
-    squad_df$momentum     <- safe_numeric(if ("momentum" %in% colnames(squad_df)) squad_df$momentum else NULL, 50)
-    squad_df$fixture_risk <- safe_numeric(if ("fixture_risk" %in% colnames(squad_df)) squad_df$fixture_risk else NULL, 50)
-    squad_df$fis_score    <- safe_numeric(if ("fis_score" %in% colnames(squad_df)) squad_df$fis_score else NULL, 50)
-
-    # ---- Compute avg_pts_scaled from perf (already 0-100) ----
-    avg_pts_scaled <- squad_df$perf
-
-    # ---- Compute opt_score per mode ----
-    if (mode_norm == "max_fis") {
-      squad_df$opt_score <- squad_df$fis_score
-    } else if (mode_norm == "safe") {
-      squad_df$opt_score <- 0.5 * avg_pts_scaled +
-                            0.3 * squad_df$form +
-                            0.2 * (100 - squad_df$fixture_risk)
-    } else if (mode_norm == "upside") {
-      squad_df$opt_score <- 0.4 * squad_df$perf +
-                            0.3 * squad_df$momentum +
-                            0.3 * squad_df$form
-    } else if (mode_norm == "form") {
-      squad_df$opt_score <- squad_df$form
-    } else if (mode_norm == "fixture") {
-      squad_df$opt_score <- 100 - squad_df$fixture_risk
-    }
-
-    squad_df$opt_score <- safe_numeric(squad_df$opt_score, 50)
-
-    # ---- Position mapping ----
-    # Map role / role2 to GK, DEF, MID, FWD
-    map_position <- function(role_val) {
-      if (is.na(role_val) || role_val == "" || role_val == "Unknown") return("Unknown")
-      r <- tolower(trimws(as.character(role_val)))
-      if (r %in% c("goalkeeper", "portero", "gk")) return("GK")
-      if (r %in% c("defender", "defensa", "df")) return("DEF")
-      if (r %in% c("midfielder", "centrocampista", "md")) return("MID")
-      if (r %in% c("forward", "delantero", "fw")) return("FWD")
-      return("Unknown")
-    }
-
-    # Try role first, fall back to role2
-    role_vec <- if ("role" %in% colnames(squad_df)) as.character(squad_df$role) else rep("Unknown", nrow(squad_df))
-    role2_vec <- if ("role2" %in% colnames(squad_df)) as.character(squad_df$role2) else rep("", nrow(squad_df))
-
-    squad_df$pos_group <- vapply(seq_len(nrow(squad_df)), function(i) {
-      primary <- map_position(role_vec[i])
-      if (primary != "Unknown") return(primary)
-      secondary <- map_position(role2_vec[i])
-      if (secondary != "Unknown") return(secondary)
-      "Unknown"
-    }, character(1))
-
-    # ---- Greedy selection by position ----
-    selected_idx <- integer(0)
-    feasible <- TRUE
-
-    # Helper: pick top N from a position group
-    pick_from_group <- function(group, count, current_selected) {
-      candidates <- squad_df$squad_pos_idx[
-        squad_df$pos_group == group & !(squad_df$squad_pos_idx %in% current_selected)
-      ]
-      if (length(candidates) == 0) return(integer(0))
-      # Sort by opt_score descending
-      scores <- squad_df$opt_score[candidates]
-      ord <- order(scores, decreasing = TRUE)
-      picked <- candidates[ord[seq_len(min(count, length(candidates)))]]
-      if (length(picked) < count) feasible <<- FALSE
-      return(picked)
-    }
-
-    # Assign a stable index for tracking
-    squad_df$squad_pos_idx <- seq_len(nrow(squad_df))
-
-    # Pick GK
-    selected_idx <- c(selected_idx, pick_from_group("GK", 1, selected_idx))
-
-    # Pick DEF
-    selected_idx <- c(selected_idx, pick_from_group("DEF", def_count, selected_idx))
-
-    # Pick MID
-    selected_idx <- c(selected_idx, pick_from_group("MID", mid_count, selected_idx))
-
-    # Pick FWD
-    selected_idx <- c(selected_idx, pick_from_group("FWD", fwd_count, selected_idx))
-
-    # ---- Backfill from remaining if needed ----
-    remaining <- squad_df$squad_pos_idx[!(squad_df$squad_pos_idx %in% selected_idx)]
-    target_total <- 1 + def_count + mid_count + fwd_count  # 11
-    if (length(selected_idx) < target_total && length(remaining) > 0) {
-      feasible <- FALSE
-      needed <- target_total - length(selected_idx)
-      # Sort remaining by opt_score descending
-      rem_scores <- squad_df$opt_score[remaining]
-      rem_ord <- order(rem_scores, decreasing = TRUE)
-      backfill <- remaining[rem_ord[seq_len(min(needed, length(remaining)))]]
-
-      selected_idx <- c(selected_idx, backfill)
-    }
-
-    # ---- Build starting_xi and bench ----
-    selected_idx <- unique(selected_idx)  # safety
-    bench_idx <- squad_df$squad_pos_idx[!(squad_df$squad_pos_idx %in% selected_idx)]
-
-    starting_xi <- squad_df[selected_idx, , drop = FALSE]
-    bench <- squad_df[bench_idx, , drop = FALSE]
-
-    # Clean internal tracking column
-    starting_xi$squad_pos_idx <- NULL
-    bench$squad_pos_idx <- NULL
-
-    # ---- Compute return values ----
-    total_score <- round(sum(starting_xi$opt_score, na.rm = TRUE), 1)
-    avg_fis <- round(mean(starting_xi$fis_score, na.rm = TRUE), 1)
-
-    list(
-      starting_xi = starting_xi,
-      bench = bench,
-      formation = formation,
-      mode = mode,
-      total_score = total_score,
-      avg_fis = avg_fis,
-      feasible = feasible,
-      formation_counts = c(GK = 1, DEF = def_count, MID = mid_count, FWD = fwd_count)
-    )
-  }, error = function(e) {
-    print(paste0("[StartingXI] Error optimizing starting XI: ", e$message))
-    empty_result
+    pieces <- trimws(tolower(unlist(strsplit(values[!is.na(values)], '[,;/|]+'))))
+    resolved <- unique(unname(aliases[pieces[pieces %in% names(aliases)]]))
+    if (isTRUE(multiposition)) resolved else head(resolved, 1L)
   })
 }
 
-
-# ============================================================
-# 6. recommend_transfers
-# ============================================================
-# Suggests optimal sell-then-buy transfer pairs to improve squad
-# quality within budget constraints.
-#
-# Parameters:
-#   squad_df       -- data frame of owned players (must be enrichable
-#                     with FIS scores).
-#   market_df      -- data frame of available market players (must be
-#                     enrichable with FIS scores).
-#   current_budget -- numeric, available budget in same units as value.
-#   max_transfers  -- integer, maximum number of recommendations.
-#
-# Returns:
-#   Data frame with columns: sell_id, sell_name, sell_role, sell_val,
-#   sell_fis, buy_id, buy_name, buy_role, buy_val, buy_fis,
-#   net_cost, delta_fis, roi_pct.  Sorted by delta_fis descending.
-# ============================================================
-
-recommend_transfers <- function(squad_df, market_df, current_budget = 0, max_transfers = 5) {
-  # ---- Default empty return ----
-  empty_df <- data.frame(
-    sell_id = character(0), sell_name = character(0), sell_role = character(0),
-    sell_val = numeric(0), sell_fis = numeric(0),
-    buy_id = character(0), buy_name = character(0), buy_role = character(0),
-    buy_val = numeric(0), buy_fis = numeric(0),
-    net_cost = numeric(0), delta_fis = numeric(0), roi_pct = numeric(0),
-    stringsAsFactors = FALSE
-  )
-
-  tryCatch({
-    # ---- Validate input ----
-    if (is.null(squad_df) || nrow(squad_df) == 0 ||
-        is.null(market_df) || nrow(market_df) == 0) {
-      return(empty_df)
-    }
-
-    # ---- Ensure FIS scores ----
-    if (!"fis_score" %in% colnames(squad_df)) {
-      squad_df <- calculate_fis_score(squad_df)
-    }
-    if (!"fis_score" %in% colnames(market_df)) {
-      market_df <- calculate_fis_score(market_df)
-    }
-
-    # ---- Safe numeric for value and fis_score ----
-    squad_df$value     <- safe_numeric(if ("value" %in% colnames(squad_df)) squad_df$value else NULL, 0)
-    squad_df$fis_score <- safe_numeric(squad_df$fis_score, 50)
-    market_df$value     <- safe_numeric(if ("value" %in% colnames(market_df)) market_df$value else NULL, 0)
-    market_df$fis_score <- safe_numeric(market_df$fis_score, 50)
-
-    # ---- Candidate sells: Sell tier, Hold tier, or lowest FIS ----
-    squad_df$fis_tier <- if ("fis_tier" %in% colnames(squad_df)) as.character(squad_df$fis_tier) else rep("Hold", nrow(squad_df))
-    squad_df$fis_tier[is.na(squad_df$fis_tier)] <- "Hold"
-
-    # Prioritize "Sell" tier, then "Hold" tier, then lowest FIS
-    sell_candidates <- squad_df[squad_df$fis_tier %in% c("Sell", "Hold"), ]
-    # If fewer than 5 candidates, include lowest FIS players
-    if (nrow(sell_candidates) < 5) {
-      squad_sorted <- squad_df[order(squad_df$fis_score), ]
-      extra <- squad_sorted[!squad_sorted$id %in% sell_candidates$id, ]
-      sell_candidates <- rbind(sell_candidates, head(extra, 5 - nrow(sell_candidates)))
-    }
-    # Sort by FIS ascending (worst first)
-    sell_candidates <- sell_candidates[order(sell_candidates$fis_score), ]
-    sell_candidates <- head(sell_candidates, 20)  # cap candidate pool
-
-    # ---- Candidate buys: Strong Buy / Buy tier or highest FIS ----
-    market_df$fis_tier <- if ("fis_tier" %in% colnames(market_df)) as.character(market_df$fis_tier) else rep("Hold", nrow(market_df))
-    market_df$fis_tier[is.na(market_df$fis_tier)] <- "Hold"
-
-    buy_candidates <- market_df[market_df$fis_tier %in% c("Strong Buy", "Buy"), ]
-    # If fewer than 5 candidates, include highest FIS players
-    if (nrow(buy_candidates) < 5) {
-      market_sorted <- market_df[order(-market_df$fis_score), ]
-      extra <- market_sorted[!market_sorted$id %in% buy_candidates$id, ]
-      buy_candidates <- rbind(buy_candidates, head(extra, 5 - nrow(buy_candidates)))
-    }
-    # Sort by FIS descending (best first)
-    buy_candidates <- buy_candidates[order(-buy_candidates$fis_score), ]
-    buy_candidates <- head(buy_candidates, 20)  # cap candidate pool
-
-    if (nrow(sell_candidates) == 0 || nrow(buy_candidates) == 0) {
-      return(empty_df)
-    }
-
-    # ---- Generate all candidate pairs ----
-    pairs_list <- list()
-    pair_count <- 0
-
-    for (si in seq_len(nrow(sell_candidates))) {
-      s <- sell_candidates[si, ]
-      for (bi in seq_len(nrow(buy_candidates))) {
-        b <- buy_candidates[bi, ]
-
-        # Skip if same player
-        if (!is.na(s$id) && !is.na(b$id) && as.character(s$id) == as.character(b$id)) {
-          next
-        }
-
-        sell_val <- safe_numeric(s$value, 0)
-        buy_val  <- safe_numeric(b$value, 0)
-        sell_fis <- safe_numeric(s$fis_score, 50)
-        buy_fis  <- safe_numeric(b$fis_score, 50)
-
-        net_cost <- buy_val - sell_val
-        delta_fis <- buy_fis - sell_fis
-
-        # Only positive improvement
-        if (delta_fis <= 0) next
-
-        # Budget feasibility: current_budget + sell_value >= buy_value
-        if (current_budget + sell_val < buy_val) next
-
-        # ROI: improvement relative to net cost
-        roi_pct <- if (net_cost > 0) round(delta_fis / net_cost * 100, 2) else if (delta_fis > 0) 100.0 else 0.0
-
-        pair_count <- pair_count + 1
-        pairs_list[[pair_count]] <- data.frame(
-          sell_id = as.character(s$id),
-          sell_name = as.character(s$name),
-          sell_role = as.character(s$role),
-          sell_val = sell_val,
-          sell_fis = sell_fis,
-          buy_id = as.character(b$id),
-          buy_name = as.character(b$name),
-          buy_role = as.character(b$role),
-          buy_val = buy_val,
-          buy_fis = buy_fis,
-          net_cost = net_cost,
-          delta_fis = delta_fis,
-          roi_pct = roi_pct,
-          stringsAsFactors = FALSE
-        )
-      }
-    }
-
-    if (length(pairs_list) == 0) {
-      return(empty_df)
-    }
-
-    result_df <- do.call(rbind, pairs_list)
-
-    # Sort by delta_fis descending
-    result_df <- result_df[order(-result_df$delta_fis), ]
-    rownames(result_df) <- NULL
-
-    # Return top max_transfers
-    result_df <- head(result_df, max_transfers)
-
-    return(result_df)
-  }, error = function(e) {
-    print(paste0("[TransferRec] Error recommending transfers: ", e$message))
-    empty_df
-  })
+analytics_known_unavailable <- function(squad_df) {
+  unavailable <- if ('status' %in% names(squad_df))
+    tolower(trimws(as.character(squad_df$status))) %in% c('injured', 'injured2', 'redcard', 'suspended', 'unavailable') else rep(FALSE,nrow(squad_df))
+  if ('available' %in% names(squad_df) && is.logical(squad_df$available)) unavailable <- unavailable | squad_df$available %in% FALSE
+  unavailable
 }
 
-
-# ============================================================
-# 7. simulate_transfer_scenario
-# ============================================================
-# Simulates a hypothetical transfer scenario: selling some players
-# and buying others, then computing projected squad metrics.
-#
-# Parameters:
-#   squad_df         -- data frame of current squad (must be enrichable
-#                       with FIS scores).
-#   current_budget   -- numeric, available budget.
-#   sell_player_ids  -- character vector of player IDs to sell.
-#   buy_player_ids   -- character vector of player IDs to buy.
-#   market_df        -- data frame of market players (required if
-#                       buy_player_ids is non-empty).
-#
-# Returns:
-#   List with: projected_squad, total_sell_proceeds, total_buy_cost,
-#   projected_budget, initial_total_val, projected_total_val,
-#   initial_avg_fis, projected_avg_fis, delta_avg_fis,
-#   is_budget_valid.
-# ============================================================
-
-simulate_transfer_scenario <- function(squad_df, current_budget = 0,
-                                         sell_player_ids = character(0),
-                                         buy_player_ids = character(0),
-                                         market_df = NULL) {
-  # ---- Default empty return ----
-  empty_result <- list(
-    projected_squad = data.frame(),
-    total_sell_proceeds = 0,
-    total_buy_cost = 0,
-    projected_budget = current_budget,
-    initial_total_val = 0,
-    projected_total_val = 0,
-    initial_avg_fis = 0,
-    projected_avg_fis = 0,
-    delta_avg_fis = 0,
-    is_budget_valid = TRUE
-  )
-
-  tryCatch({
-    # ---- Validate input ----
-    if (is.null(squad_df) || nrow(squad_df) == 0) {
-      return(empty_result)
+optimize_starting_xi <- function(squad_df, formation = '4-3-3', mode = 'max_fis', rules = NULL,
+                                 forecast_df = NULL, locked_ids = character(), excluded_ids = character()) {
+  if (is.null(rules)) rules <- list()
+  empty <- function(reason) list(starting_xi = data.frame(), bench = if (is.data.frame(squad_df)) squad_df else data.frame(),
+    formation = formation, mode = mode, total_score = NA_real_, avg_fis = NA_real_, feasible = FALSE,
+    formation_counts = c(GK=1, DEF=0, MID=0, FWD=0), expected_points = NA_real_, lower_points = NA_real_,
+    upper_points = NA_real_, captain_id = NA_character_, bench_order = character(), diagnostics = reason)
+  if (!is.data.frame(squad_df) || !nrow(squad_df)) return(empty('Roster is empty.'))
+  if (!'id' %in% names(squad_df) || anyNA(squad_df$id) || any(!nzchar(as.character(squad_df$id))) || anyDuplicated(squad_df$id)) return(empty('Unique player IDs are required.'))
+  for (context_column in c('championship_id','season','scoring_version')) {
+    context_values <- if(context_column%in%names(squad_df)) unique(as.character(squad_df[[context_column]][!is.na(squad_df[[context_column]])])) else character()
+    context_values <- context_values[nzchar(context_values)]
+    if(length(context_values)>1L) return(empty('Roster contains multiple league/scoring contexts.'))
+    if(is.data.frame(forecast_df)&&context_column%in%names(forecast_df)) {
+      forecast_values <- unique(as.character(forecast_df[[context_column]][!is.na(forecast_df[[context_column]])]))
+      forecast_values <- forecast_values[nzchar(forecast_values)]
+      if(!length(context_values)&&length(forecast_values)>1L) return(empty('Forecast context is ambiguous.'))
+      if(length(context_values)) forecast_df <- forecast_df[!is.na(forecast_df[[context_column]]) & as.character(forecast_df[[context_column]])==context_values,,drop=FALSE]
     }
-
-    # ---- Ensure FIS scores ----
-    if (!"fis_score" %in% colnames(squad_df)) {
-      squad_df <- calculate_fis_score(squad_df)
+  }
+  if (length(formation) != 1L || is.na(formation)) formation <- 'auto'
+  allowed <- rules$formations
+  if (is.null(allowed) || !length(allowed)) allowed <- c('4-3-3','4-4-2','3-5-2','3-4-3','4-5-1','5-3-2','5-4-1')
+  if (is.list(allowed)) allowed <- names(allowed)
+  allowed <- as.character(allowed)
+  valid_formation <- function(f) {
+    parts <- suppressWarnings(as.integer(strsplit(f, '-', fixed=TRUE)[[1]]))
+    length(parts) == 3L && all(is.finite(parts)) && all(parts >= 0) && sum(parts) == 10
+  }
+  allowed <- allowed[vapply(allowed, valid_formation, logical(1))]
+  choices <- if (identical(formation, 'auto')) allowed else intersect(formation, allowed)
+  if (!length(choices)) return(empty('Formation is not allowed by this league.'))
+  squad_df$id <- as.character(squad_df$id)
+  positions <- analytics_player_positions(squad_df, multiposition = isTRUE(rules$multiposition))
+  excluded <- squad_df$id %in% excluded_ids
+  if('acquisition_effective_at'%in%names(squad_df)) {
+    effective <- analytics_time(squad_df$acquisition_effective_at)
+    deadline <- analytics_time(rules$deadline %||% NA_character_)
+    if(length(deadline)!=1L||is.na(deadline)) deadline <- Sys.time()
+    excluded <- excluded | (!is.na(effective)&effective>deadline)
+  }
+  if (!identical(rules$exclude_unavailable, FALSE)) excluded <- excluded | analytics_known_unavailable(squad_df)
+  if (any(!locked_ids %in% squad_df$id) || any(locked_ids %in% squad_df$id[excluded])) return(empty('A locked player is unavailable or absent.'))
+  if (sum(!excluded & lengths(positions) > 0) < 11) return(empty('Fewer than eleven eligible available players.'))
+  if (!'fis_score' %in% names(squad_df)) squad_df <- calculate_fis_score(squad_df)
+  avg <- analytics_numeric_column(squad_df, 'average.average')
+  pts <- analytics_numeric_column(squad_df, 'points'); played <- analytics_numeric_column(squad_df, 'average.matches')
+  use <- !is.finite(avg) & is.finite(pts) & is.finite(played) & played > 0
+  avg[use] <- pts[use] / played[use]
+  lower <- upper <- rep(NA_real_,nrow(squad_df))
+  if (is.null(forecast_df) && exists('forecast_fantasy_points', mode='function')) {
+    forecast_df <- tryCatch(forecast_fantasy_points(squad_df, horizons=1), error=function(e) NULL)
+  }
+  if (is.data.frame(forecast_df) && nrow(forecast_df) && all(c('player_id','expected_points') %in% names(forecast_df))) {
+    if ('horizon' %in% names(forecast_df)) forecast_df <- forecast_df[forecast_df$horizon == 1, , drop=FALSE]
+    j <- match(squad_df$id, as.character(forecast_df$player_id))
+    if (nrow(forecast_df)) {
+      estimates <- suppressWarnings(as.numeric(forecast_df$expected_points[j])); replace <- is.finite(estimates)
+      avg[replace] <- estimates[replace]
+      if ('lower' %in% names(forecast_df)) lower[replace] <- forecast_df$lower[j[replace]]
+      if ('upper' %in% names(forecast_df)) upper[replace] <- forecast_df$upper[j[replace]]
     }
-
-    # ---- Safe numeric for value ----
-    squad_df$value     <- safe_numeric(if ("value" %in% colnames(squad_df)) squad_df$value else NULL, 0)
-    squad_df$fis_score <- safe_numeric(squad_df$fis_score, 50)
-
-    # ---- Compute initial metrics ----
-    initial_total_val <- sum(squad_df$value, na.rm = TRUE)
-    initial_avg_fis   <- mean(squad_df$fis_score, na.rm = TRUE)
-
-    # ---- Remove sold players ----
-    sell_player_ids <- sell_player_ids[nzchar(as.character(sell_player_ids))]
-    projected_squad <- squad_df[!as.character(squad_df$id) %in% as.character(sell_player_ids), , drop = FALSE]
-
-    # ---- Compute sell proceeds ----
-    sold_players <- squad_df[as.character(squad_df$id) %in% as.character(sell_player_ids), ]
-    total_sell_proceeds <- sum(safe_numeric(sold_players$value, 0), na.rm = TRUE)
-
-    # ---- Add bought players ----
-    buy_player_ids <- buy_player_ids[nzchar(as.character(buy_player_ids))]
-    total_buy_cost <- 0
-
-    if (length(buy_player_ids) > 0) {
-      if (is.null(market_df) || nrow(market_df) == 0) {
-        print("[SimTransfer] market_df is NULL or empty; cannot add buy candidates.")
-      } else {
-        # Ensure market FIS scores
-        if (!"fis_score" %in% colnames(market_df)) {
-          market_df <- calculate_fis_score(market_df)
+  }
+  unavailable <- analytics_known_unavailable(squad_df)
+  avg[unavailable] <- 0; lower[unavailable] <- 0; upper[unavailable] <- 0
+  fallback <- analytics_numeric_column(squad_df, 'fis_score')
+  score <- avg
+  mode <- if (length(mode) == 1L && !is.na(mode)) tolower(mode) else 'expected'
+  if (mode == 'safe') score <- lower
+  if (mode == 'upside') score <- upper
+  if (mode == 'form') score <- analytics_numeric_column(squad_df, 'average.averageLastFive')
+  if (mode == 'fis') score <- fallback
+  missing <- !is.finite(score); score[missing] <- avg[missing]
+  missing <- !is.finite(score)
+  # Unknown point estimates rank after observed estimates; descriptive ratings only
+  # order a wholly unobserved squad, and never become displayed point intervals.
+  if(any(!missing)) score[missing] <- min(score[!missing])-1 else score[missing] <- fallback[missing]
+  score[!is.finite(score)] <- 0
+  club <- rep('', nrow(squad_df))
+  for (column in c('club_id','real_club_id','teamId','team')) if (column %in% names(squad_df)) {
+    candidate <- as.character(squad_df[[column]])
+    use <- !nzchar(club) & !is.na(candidate) & nzchar(candidate); club[use] <- candidate[use]
+  }
+  cap <- if (is.null(rules$club_limit)) Inf else suppressWarnings(as.numeric(rules$club_limit)[1])
+  assumptions <- character()
+  if (identical(rules$club_limit_status, 'unknown')) {
+    cap <- Inf
+    assumptions <- c(assumptions, 'Club limit unknown; provisional XI assumes no club limit.')
+  }
+  if (identical(rules$club_limit_status, 'unrestricted')) cap <- Inf
+  if (!isTRUE(rules$verified)) assumptions <- c(assumptions, 'Full league rules and deadline eligibility are not verified.')
+  if (is.na(cap) || cap < 1) return(empty('Invalid club limit.'))
+  if (is.finite(cap) && any(!nzchar(club[!excluded]))) return(empty('Club identifiers are required to verify the club limit.'))
+  captain_enabled <- isTRUE(rules$captain_enabled)
+  multiplier <- if (captain_enabled) {
+    if (is.null(rules$captain_multiplier)) 2 else suppressWarnings(as.numeric(rules$captain_multiplier)[1])
+  } else 1
+  if (!is.finite(multiplier) || multiplier < 1) return(empty('Invalid captain multiplier.'))
+  best <- NULL; best_score <- -Inf
+  for (fmt in choices) {
+    counts <- c(GK=1L, setNames(as.integer(strsplit(fmt,'-',fixed=TRUE)[[1]]), c('DEF','MID','FWD')))
+    candidates <- lapply(names(counts), function(pos) {
+      idx <- which(!excluded & vapply(positions, function(x) pos %in% x, logical(1)))
+      idx[order(-score[idx], squad_df$id[idx])]
+    }); names(candidates) <- names(counts)
+    if (any(lengths(candidates) < counts)) next
+    group_order <- names(sort(lengths(candidates) / pmax(counts, 1)))
+    group_order <- group_order[counts[group_order] > 0]
+    slots <- rep(group_order, counts[group_order])
+    # Exact depth-first assignment with admissible score bounds; increasing candidate
+    # offsets within each position eliminate permutations of the same selection.
+    visit <- function(depth, selected, assigned, total, last_rank) {
+      if (depth > length(slots)) {
+        if (!all(locked_ids %in% squad_df$id[selected])) return(invisible(NULL))
+        objective <- total + (multiplier - 1) * max(score[selected])
+        if (objective > best_score + 1e-10) {
+          best_score <<- objective
+          best <<- list(idx=selected, assigned=assigned, formation=fmt, counts=counts)
         }
-        market_df$value     <- safe_numeric(if ("value" %in% colnames(market_df)) market_df$value else NULL, 0)
-        market_df$fis_score <- safe_numeric(market_df$fis_score, 50)
-
-        bought_players <- market_df[as.character(market_df$id) %in% as.character(buy_player_ids), ]
-        total_buy_cost <- sum(safe_numeric(bought_players$value, 0), na.rm = TRUE)
-
-        if (nrow(bought_players) > 0) {
-          projected_squad <- rbind(projected_squad, bought_players)
-        }
+        return(invisible(NULL))
       }
+      left <- length(slots) - depth + 1L
+      if (sum(!locked_ids %in% squad_df$id[selected]) > left) return(invisible(NULL))
+      available <- which(!excluded & !seq_len(nrow(squad_df)) %in% selected & lengths(positions) > 0)
+      if (length(available) < left) return(invisible(NULL))
+      # Position-specific relaxation is exact for single-position independent groups
+      # and remains an upper bound when flexible players appear in several groups.
+      remaining_counts <- table(slots[seq.int(depth,length(slots))])
+      bound <- total
+      for (remaining_pos in names(remaining_counts)) {
+        pool <- candidates[[remaining_pos]]
+        if (depth > 1L && remaining_pos == slots[depth] && slots[depth-1L] == remaining_pos) pool <- pool[seq_along(pool) > last_rank]
+        pool <- pool[!pool %in% selected]
+        needed <- as.integer(remaining_counts[remaining_pos])
+        if (length(pool) < needed) return(invisible(NULL))
+        bound <- bound + sum(head(score[pool],needed))
+      }
+      upper_bound <- bound + (multiplier - 1) * max(score[c(selected, available)])
+      if (upper_bound <= best_score + 1e-10) return(invisible(NULL))
+      pos <- slots[depth]; cand <- candidates[[pos]]
+      start <- if (depth > 1L && slots[depth-1L] == pos) last_rank + 1L else 1L
+      if (start > length(cand)) return(invisible(NULL))
+      for (rank in seq.int(start, length(cand))) {
+        idx <- cand[rank]
+        if (idx %in% selected) next
+        if (is.finite(cap) && sum(club[selected] == club[idx]) >= cap) next
+        visit(depth+1L, c(selected,idx), c(assigned,pos), total+score[idx], rank)
+      }
+      invisible(NULL)
+    }
+    visit(1L, integer(), character(), 0, 0L)
+  }
+  if (is.null(best)) return(empty('No legal XI satisfies positions, club limits and locked players.'))
+  idx <- best$idx; squad_df$opt_score <- score; squad_df$expected_points <- avg
+  squad_df$forecast_lower <- lower; squad_df$forecast_upper <- upper
+  squad_df$pos_group <- vapply(positions, function(x) if(length(x)) x[1] else 'Unknown', character(1))
+  starting <- squad_df[idx, , drop=FALSE]; starting$pos_group <- best$assigned
+  starting <- starting[order(match(starting$pos_group,c('GK','DEF','MID','FWD')),-starting$opt_score,starting$id),,drop=FALSE]
+  bench <- squad_df[!seq_len(nrow(squad_df)) %in% idx,,drop=FALSE]
+  bench <- bench[order(-bench$opt_score,bench$id),,drop=FALSE]
+  captain <- if (captain_enabled) idx[which.max(score[idx])] else integer()
+  aggregate <- function(v) {
+    if (any(!is.finite(v[idx]))) return(NA_real_)
+    sum(v[idx]) + if(length(captain)) (multiplier-1)*v[captain] else 0
+  }
+  bench_size <- if (is.null(rules$bench_size) || identical(rules$bench_enabled, FALSE)) 0L else suppressWarnings(as.integer(rules$bench_size)[1])
+  if (!is.finite(bench_size)) bench_size <- 0L
+  if (bench_size < 0) return(empty('Invalid bench size.'))
+  bench_eligible <- !bench$id %in% squad_df$id[excluded] & !analytics_known_unavailable(bench) & lengths(positions[match(bench$id, squad_df$id)]) > 0
+  # The complete reserve table remains visible, but only eligible reserves enter an enabled bench.
+  ordered_bench_ids <- head(bench$id[bench_eligible], bench_size)
+  list(starting_xi=starting, bench=bench, formation=best$formation, mode=mode,
+    total_score=round(best_score,3), avg_fis=if(any(is.finite(starting$fis_score))) mean(starting$fis_score,na.rm=TRUE) else NA_real_,
+    feasible=TRUE, legality_verified=isTRUE(rules$verified) && !length(assumptions),
+    legality_status=if(length(assumptions)) 'provisional' else 'verified', assumptions=assumptions,
+    formation_counts=best$counts, expected_points=aggregate(avg), lower_points=aggregate(lower),
+    upper_points=aggregate(upper), captain_id=if(length(captain)) squad_df$id[captain] else NA_character_,
+    bench_order=ordered_bench_ids, diagnostics=c(assumptions, if(any(!is.finite(avg[idx]))) 'Some players have no point forecast; descriptive ordering used.' else character()))
+}
+
+simulate_transfer_scenario <- function(squad_df, current_budget = 0, sell_player_ids = character(),
+                                        buy_player_ids = character(), market_df = NULL, rules = NULL,
+                                        buy_prices = NULL, sale_proceeds = NULL, forecast_df = NULL) {
+  fail <- function(message, status='invalid') list(projected_squad=data.frame(),total_sell_proceeds=NA_real_,
+    total_buy_cost=NA_real_,projected_budget=NA_real_,initial_total_val=NA_real_,projected_total_val=NA_real_,
+    initial_avg_fis=NA_real_,projected_avg_fis=NA_real_,delta_avg_fis=NA_real_,is_budget_valid=FALSE,
+    is_lineup_valid=FALSE,status=status,diagnostics=message,projected_lineup=NULL)
+  tryCatch({
+    if (!is.data.frame(squad_df) || !nrow(squad_df) || !'id' %in% names(squad_df)) return(fail('Roster data unavailable.'))
+    if (length(current_budget)!=1L || !is.finite(current_budget)) return(fail('Verified cash is required.'))
+    if (anyNA(squad_df$id) || anyDuplicated(squad_df$id)) return(fail('Roster IDs must be unique.'))
+    sells <- unique(as.character(sell_player_ids)); buys <- unique(as.character(buy_player_ids))
+    if (anyNA(c(sells,buys)) || any(!nzchar(c(sells,buys)))) return(fail('Invalid transfer player ID.'))
+    if (any(!sells %in% squad_df$id)) return(fail('A sale player is not owned.'))
+    if (length(intersect(sells,buys))) return(fail('A player cannot be bought and sold in the same scenario.'))
+    remaining <- squad_df[!squad_df$id %in% sells,,drop=FALSE]
+    if (any(buys %in% remaining$id)) return(fail('A purchase player is already owned.'))
+    if (length(buys) && (!is.data.frame(market_df) || !'id' %in% names(market_df) || any(!buys %in% market_df$id))) return(fail('Purchase data is missing.'))
+    if (length(buys) && anyDuplicated(market_df$id[market_df$id %in% buys])) return(fail('Purchase IDs are duplicated.'))
+    purchased <- if (length(buys)) market_df[match(buys,market_df$id),,drop=FALSE] else squad_df[FALSE,,drop=FALSE]
+    sold <- squad_df[match(sells,squad_df$id),,drop=FALSE]
+    for(column in c('championship_id','season','scoring_version')) {
+      values <- unique(unlist(lapply(list(squad_df,purchased),function(df) if(column%in%names(df)) as.character(df[[column]]) else character())))
+      values <- values[!is.na(values)&nzchar(values)]
+      if(length(values)>1L) return(fail('Transfers must remain within one league/scoring context.'))
     }
 
-    # ---- Compute projected metrics ----
-    projected_total_val <- sum(safe_numeric(projected_squad$value, 0), na.rm = TRUE)
-    projected_avg_fis   <- if (nrow(projected_squad) > 0) mean(safe_numeric(projected_squad$fis_score, 50), na.rm = TRUE) else 0
-    delta_avg_fis       <- round(projected_avg_fis - initial_avg_fis, 2)
-    projected_budget    <- current_budget + total_sell_proceeds - total_buy_cost
-    is_budget_valid     <- projected_budget >= 0
+    amount <- function(df, explicit, columns) {
+      if (!nrow(df)) return(numeric())
+      if (!is.null(explicit)) {
+        if (is.null(names(explicit))) return(rep(NA_real_,nrow(df)))
+        return(suppressWarnings(as.numeric(explicit[as.character(df$id)])))
+      }
+      result <- rep(NA_real_,nrow(df))
+      for (column in columns) if(column %in% names(df)) {
+        candidate <- analytics_numeric_column(df,column)
+        take <- !is.finite(result) & is.finite(candidate) & candidate >= 0; result[take] <- candidate[take]
+      }
+      result
+    }
+    sell_amounts <- amount(sold,sale_proceeds,c('executable_sale_price','sale_offer','value'))
+    buy_amounts <- amount(purchased,buy_prices,c('effective_market_price','price','value'))
+    if (any(!is.finite(c(sell_amounts,buy_amounts))) || any(c(sell_amounts,buy_amounts)<0)) return(fail('Transfer amounts are unavailable.'))
+    projected <- dplyr::bind_rows(remaining,purchased)
+    if (!'fis_score' %in% names(squad_df)) squad_df <- calculate_fis_score(squad_df)
+    projected <- calculate_fis_score(projected)
+    cash <- current_budget+sum(sell_amounts)-sum(buy_amounts)
+    cap <- if(is.null(rules$roster_cap)) Inf else suppressWarnings(as.numeric(rules$roster_cap)[1])
+    legal_rules <- if(is.null(rules)) list() else rules
+    legal_rules$exclude_unavailable <- FALSE
+    lineup <- optimize_starting_xi(projected,formation='auto',rules=legal_rules,forecast_df=forecast_df)
+    diagnostics <- character()
+    if (cash<0) diagnostics <- c(diagnostics,'Insufficient cash after transfers.')
+    if (is.na(cap)) diagnostics <- c(diagnostics,'Roster cap unavailable.')
+    else if (nrow(projected)>cap) diagnostics <- c(diagnostics,'Roster cap exceeded.')
+    if (!lineup$feasible) diagnostics <- c(diagnostics,lineup$diagnostics)
+    average <- function(x) if(length(x)&&any(is.finite(x))) mean(x,na.rm=TRUE) else NA_real_
+    initial_avg <- average(squad_df$fis_score); projected_avg <- average(projected$fis_score)
+    list(projected_squad=projected,total_sell_proceeds=sum(sell_amounts),total_buy_cost=sum(buy_amounts),
+      projected_budget=cash,initial_total_val=sum(analytics_numeric_column(squad_df,'value'),na.rm=TRUE),
+      projected_total_val=sum(analytics_numeric_column(projected,'value'),na.rm=TRUE),initial_avg_fis=initial_avg,
+      projected_avg_fis=projected_avg,delta_avg_fis=projected_avg-initial_avg,is_budget_valid=cash>=0,
+      is_lineup_valid=isTRUE(lineup$feasible)&&!is.na(cap)&&nrow(projected)<=cap,status=if(length(diagnostics)) 'invalid' else 'ok',
+      diagnostics=diagnostics,projected_lineup=lineup,prices_verified=all(c('executable_sale_price') %in% names(sold))&&all(c('effective_market_price') %in% names(purchased)))
+  },error=function(e) fail(conditionMessage(e),'error'))
+}
 
-    # Reset row names
-    rownames(projected_squad) <- NULL
-
-    list(
-      projected_squad = projected_squad,
-      total_sell_proceeds = total_sell_proceeds,
-      total_buy_cost = total_buy_cost,
-      projected_budget = projected_budget,
-      initial_total_val = initial_total_val,
-      projected_total_val = projected_total_val,
-      initial_avg_fis = round(initial_avg_fis, 2),
-      projected_avg_fis = round(projected_avg_fis, 2),
-      delta_avg_fis = delta_avg_fis,
-      is_budget_valid = is_budget_valid
-    )
-  }, error = function(e) {
-    print(paste0("[SimTransfer] Error simulating transfer scenario: ", e$message))
-    empty_result
-  })
+recommend_transfers <- function(squad_df, market_df, current_budget = 0, max_transfers = 5,
+                               rules = NULL, forecast_df = NULL) {
+  empty <- data.frame(sell_id=character(),sell_name=character(),sell_role=character(),sell_val=numeric(),sell_fis=numeric(),
+    buy_id=character(),buy_name=character(),buy_role=character(),buy_val=numeric(),buy_fis=numeric(),net_cost=numeric(),
+    delta_fis=numeric(),roi_pct=numeric(),delta_expected_points=numeric(),points_per_million=numeric(),expected_profit=numeric())
+  if (!is.data.frame(squad_df)||!nrow(squad_df)||!is.data.frame(market_df)||!nrow(market_df)||length(current_budget)!=1L||!is.finite(current_budget)) return(empty)
+  squad_df <- calculate_fis_score(squad_df); market_df <- calculate_fis_score(market_df)
+  legal_rules <- if(is.null(rules)) list() else rules
+  legal_rules$exclude_unavailable <- FALSE
+  before <- optimize_starting_xi(squad_df,formation='auto',rules=legal_rules,forecast_df=forecast_df)
+  if (!before$feasible) return(empty)
+  out <- list()
+  # Every legal pair is evaluated against the best resulting XI, not player rating differences.
+  for (si in seq_len(nrow(squad_df))) for (bi in seq_len(nrow(market_df))) {
+    s <- squad_df[si,,drop=FALSE]; b <- market_df[bi,,drop=FALSE]
+    if (as.character(b$id) %in% as.character(squad_df$id)) next
+    future_buy <- analytics_numeric_column(b,'expected_sale_proceeds')
+    future_hold <- analytics_numeric_column(s,'expected_sale_proceeds')
+    executable <- analytics_numeric_column(s,'executable_sale_price')
+    if(any(!is.finite(c(future_buy,future_hold,executable)))) next
+    scenario <- simulate_transfer_scenario(squad_df,current_budget,as.character(s$id),as.character(b$id),market_df,rules=rules,forecast_df=forecast_df)
+    if (!identical(scenario$status,'ok')) next
+    gain <- scenario$projected_lineup$expected_points-before$expected_points
+    cost <- scenario$total_buy_cost-scenario$total_sell_proceeds
+    profit <- future_buy-future_hold-cost
+    if(!is.finite(profit)||profit<=0) next
+    value <- function(df,key,default='') if(key %in% names(df)) as.character(df[[key]][1]) else default
+    out[[length(out)+1L]] <- data.frame(sell_id=as.character(s$id),sell_name=value(s,'name'),sell_role=value(s,'role'),
+      sell_val=scenario$total_sell_proceeds,sell_fis=s$fis_score,buy_id=as.character(b$id),buy_name=value(b,'name'),buy_role=value(b,'role'),
+      buy_val=scenario$total_buy_cost,buy_fis=b$fis_score,net_cost=cost,delta_fis=b$fis_score-s$fis_score,
+      roi_pct=NA_real_,delta_expected_points=gain,points_per_million=if(cost>0) gain/(cost/1e6) else NA_real_,expected_profit=profit)
+  }
+  if(!length(out)) return(empty)
+  result <- dplyr::bind_rows(out)
+  result <- result[order(-result$expected_profit,result$net_cost,result$buy_id,result$sell_id),,drop=FALSE]
+  head(result,max(0,as.integer(max_transfers)))
 }

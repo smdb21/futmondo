@@ -1,0 +1,5 @@
+.Renviron
+*.har
+.Rhistory
+.RData
+.runtime/

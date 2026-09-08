@@ -48,7 +48,8 @@ players_in_championship_Server <- function(id, is_module_active, login_token, ch
       players_table_RV = players_table_RV,
       user_teams_RV = user_teams_RV,
       login_token = login_token,
-      championship_id = championship_id
+      championship_id = championship_id,
+      refresh_trigger = refresh_trigger
     )
 
     return(selected_player_RV)

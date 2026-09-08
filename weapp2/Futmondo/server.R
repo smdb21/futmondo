@@ -1,100 +1,69 @@
 
 
 function(input, output, session) {
-  login_token_RV <- login_Server(id = "login") %>%
-    debounce(50)
-  
-  # Caching Refresh Trigger ----
+  login_token_RV <- login_Server(id = "login")
   refresh_trigger <- reactiveVal(0)
-  
   observeEvent(input$refresh_all, {
-    clear_api_cache()
+    req(valid_login(login_token_RV()))
+    clear_api_cache(login_token_RV()[["userid"]])
     refresh_trigger(refresh_trigger() + 1)
   })
-  
-  # reactives ----
-  ## championship_RV ----
-  championship_RV <- reactive({
-    req(login_token_RV())
-    refresh_trigger() # Dependency to trigger re-fetch on refresh
-    championship <- get_championships(login = login_token_RV(), championship_name = NULL)
-
-    # Defer Supabase sync so UI receives championship object instantly
-    on.exit({
-      tryCatch({
-        sync_championship_to_supabase(championship)
-      }, error = function(e) {
-        print(paste0("[Supabase] Championship sync warning: ", e$message))
-      })
-    }, add = TRUE)
-
-    return(championship)
+  championships_RV <- reactive({
+    req(valid_login(login_token_RV()))
+    refresh_trigger()
+    get_active_championships(login_token_RV())$championships
   })
-  ## user_teams_RV ----
-  user_teams_RV <- reactive({
-    req(championship_RV())
-    refresh_trigger() # Dependency to trigger re-fetch on refresh
-    teams <- get_teams(login = login_token_RV(), championship_id = championship_RV()["id"])
-
-    champ_id <- championship_RV()["id"]
-    # Defer Supabase sync so UI receives user teams instantly
-    on.exit({
-      tryCatch({
-        sync_user_teams_to_supabase(teams, champ_id)
-        log_user_team_history(teams)
-      }, error = function(e) {
-        print(paste0("[Supabase] Standings sync warning: ", e$message))
-      })
-    }, add = TRUE)
-
-    return(teams)
-  })
-  
-  ## championship_id_RV ----
-  championship_id_RV <- reactive({
-    req(championship_RV())
-    championship <- championship_RV()
-    championship_id <- championship["id"]
-    return(championship_id)
-  })
-  
-  ## user_team_id_RV ----
-  user_team_id_RV <- reactive({
-    req(championship_RV())
-    
-    championship <- championship_RV()
-    userteam_id <- championship["userteam.id"]
-    return(userteam_id)
-  })
-  
-  ## user_team_name_RV ----
-  user_team_name_RV <- reactive({
-    req(championship_RV())
-    championship <- championship_RV()
-    user_team_name <- championship["userteam.name"]
-    return(user_team_name)
-  })
-
-  # Background Sync: Full Player Catalog Snapshot (Zero Data Loss) ----
   observe({
-    req(login_token_RV())
-    req(championship_id_RV())
-
-    # Run defensively in the background
-    tryCatch({
-      print("[Supabase] Initiating background full-catalog snapshot to prevent data loss...")
-      all_players <- get_championship_players(login = login_token_RV(), championship_id = championship_id_RV())
-
-      if (!is.null(all_players) && nrow(all_players) > 0) {
-        sync_real_clubs_to_supabase(all_players)
-        sync_players_to_supabase(all_players)
-        log_player_history(all_players, championship_id_RV())
-        print("[Supabase] Success: Full player catalog snapshot successfully logged to history!")
-      }
-    }, error = function(e) {
-      print(paste0("[Supabase] Full-catalog sync warning: ", e$message))
-    })
+    ch <- championships_RV()
+    ids <- vapply(ch, function(c) fm_scalar(c$id %||% c$`_id`, ""), character(1))
+    labels <- vapply(ch, function(c) fm_scalar(c$name, "League"), character(1))
+    current <- isolate(input$selected_league)
+    selected <- if (!is.null(current) && current %in% ids) current else if (length(ids)) ids[1] else character()
+    updateSelectInput(session, "selected_league", choices = setNames(ids, labels), selected = selected)
   })
+  championship_RV <- reactive({
+    ch <- championships_RV(); req(length(ch))
+    ids <- vapply(ch, function(c) fm_scalar(c$id %||% c$`_id`, ""), character(1))
+    selected <- input$selected_league
+    if (is.null(selected) || !selected %in% ids) selected <- ids[1]
+    context <- ch[[match(selected,ids)]]
+    context$id <- context$id %||% context$`_id`
+    context$userteam$id <- context$userteam$id %||% context$userteam$`_id`
+    unlist(context)
+  })
+  championship_id_RV <- reactive({ req(championship_RV()); unname(championship_RV()["id"]) })
+  user_team_id_RV <- reactive({ req(championship_RV()); unname(championship_RV()["userteam.id"]) })
+  user_team_name_RV <- reactive({ req(championship_RV()); unname(championship_RV()["userteam.name"]) })
+  user_teams_RV <- reactive({
+    req(championship_id_RV()); refresh_trigger()
+    get_teams(login_token_RV(), championship_id_RV())
+  })
+  is_admin_RV <- reactive(is_authorized_admin(login_token_RV()))
+  # Collect/persist in an isolated process. No on.exit HTTP writes or startup DB checks.
+  observe({
+    req(valid_login(login_token_RV()), championship_id_RV(), user_team_id_RV())
+    refresh_trigger()
+    defer_persistence("collect_account_observations", list(login_token_RV(), championship_id_RV(), user_team_id_RV()))
+  })
+  output$background_sync <- renderUI({
+    req(valid_login(login_token_RV()))
+    invalidateLater(5000,session)
+    status <- background_sync_status(login_token_RV()[["userid"]])
+    if (!is.null(status$error)) return(tags$p(class="text-warning",status$error))
+    if (status$pending>0) tags$p(class="text-muted","Saving observations in the background…")
+  })
+  notifications <- notifications_Server("notifications", reactive(input$tabs == "notifications"),
+    login_token_RV, championship_id_RV, user_team_id_RV, user_teams_RV, refresh_trigger,
+    on_market_event=function(...)refresh_trigger(isolate(refresh_trigger())+1L))
+  output$notification_bell <- renderUI({
+    n <- notifications$unread()
+    actionLink("open_notifications", label = paste0("Notifications", if (is.finite(n)) paste0(" (",n,")") else ""), icon = icon("bell"))
+  })
+  observeEvent(input$open_notifications, updateTabItems(session, "tabs", "notifications"))
+  intelligence_Server("intelligence", reactive(input$tabs == "intelligence"), login_token_RV,
+    championship_id_RV, user_team_id_RV, refresh_trigger)
+  automation_Server("automation", reactive(input$tabs == "automation"), login_token_RV,
+    championship_id_RV, user_team_id_RV, refresh_trigger)
 
 selected_player_RV <- players_in_teams_Server(id = "players_in_teams",
                                                  is_module_active = reactive({
@@ -142,7 +111,7 @@ players_in_championship_Server(id = "players_in_championship",
                 login_token = login_token_RV,
                 championship_id = championship_id_RV,
                 user_team_id = user_team_id_RV,
-                user_teams_RV = user_teams_RV)
+                user_teams_RV = user_teams_RV, refresh_trigger = refresh_trigger)
 
   classification_Server(id = "classification",
                         is_module_active = reactive({
@@ -151,7 +120,7 @@ players_in_championship_Server(id = "players_in_championship",
                         login_token = login_token_RV,
                         championship_id = championship_id_RV,
                         user_team_id = user_team_id_RV,
-                        user_teams_RV = user_teams_RV)
+                        user_teams_RV = user_teams_RV, refresh_trigger = refresh_trigger)
 
   admin_Server(id = "admin",
                is_module_active = reactive({
@@ -160,15 +129,20 @@ players_in_championship_Server(id = "players_in_championship",
                login_token = login_token_RV,
                championship_id = championship_id_RV,
                user_team_id = user_team_id_RV,
-               user_teams_RV = user_teams_RV)
+               user_teams_RV = user_teams_RV, is_admin = is_admin_RV)
   # observers ----
   ## observe user_team_id_RV()
 observeEvent(login_token_RV(),
                 {
-                  req(login_token_RV())
+                  if (!valid_login(login_token_RV())) {
+                    session$userData$futmondo_user_id <- NULL
+                    updateTabItems(session, "tabs", "login")
+                    return()
+                  }
+                  session$userData$futmondo_user_id <- login_token_RV()[["userid"]]
                   updateTabsetPanel(inputId = "tabs", selected = "today")
                 },
-                ignoreNULL = T
+                ignoreNULL = FALSE
    )
   
   # renders----
@@ -185,6 +159,9 @@ observeEvent(login_token_RV(),
     # Standard menu items
     menu_items <- list(
       shinydashboard::menuItem("Login", tabName = "login", icon = icon("right-to-bracket")),
+      shinydashboard::menuItem("Predictions", tabName = "intelligence", icon = icon("chart-line")),
+      shinydashboard::menuItem("Notifications", tabName = "notifications", icon = icon("bell")),
+      shinydashboard::menuItem("Automation", tabName = "automation", icon = icon("robot")),
       shinydashboard::menuItem("Today", tabName = "today", icon = icon("bolt")),
       shinydashboard::menuItem("Your team", tabName = "yourteam", icon = icon("users")),
       shinydashboard::menuItem("Market", tabName = "market", icon = icon("money-bill-trend-up")),

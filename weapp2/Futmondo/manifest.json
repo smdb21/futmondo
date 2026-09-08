@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "locale": "en_US",
+  "locale": "C",
   "platform": "4.6.1",
   "metadata": {
     "appmode": "shiny",
@@ -228,6 +228,36 @@
         "Repository": "RSPM",
         "Date/Publication": "2024-05-16 09:50:11 UTC",
         "Built": "R 4.6.0; x86_64-pc-linux-gnu; 2026-04-24 01:49:23 UTC; unix"
+      }
+    },
+    "callr": {
+      "Source": "CRAN",
+      "Repository": "https://p3m.dev/cran/latest",
+      "description": {
+        "Package": "callr",
+        "Title": "Call R from R",
+        "Version": "3.8.0",
+        "Authors@R": "c(\n    person(\"Gábor\", \"Csárdi\", , \"csardi.gabor@gmail.com\", role = c(\"aut\", \"cre\", \"cph\"),\n           comment = c(ORCID = \"0000-0001-7098-9676\")),\n    person(\"Winston\", \"Chang\", role = \"aut\"),\n    person(\"Posit Software, PBC\", role = c(\"cph\", \"fnd\"),\n           comment = c(ROR = \"03wc8by49\")),\n    person(\"Ascent Digital Services\", role = c(\"cph\", \"fnd\"))\n  )",
+        "Description": "It is sometimes useful to perform a computation in a separate\n    R process, without affecting the current R process at all.  This\n    packages does exactly that.",
+        "License": "MIT + file LICENSE",
+        "URL": "https://callr.r-lib.org, https://github.com/r-lib/callr",
+        "BugReports": "https://github.com/r-lib/callr/issues",
+        "Depends": "R (>= 3.4)",
+        "Imports": "otel (>= 0.2.0), processx (>= 3.6.1), R6, utils",
+        "Suggests": "asciicast (>= 2.3.1), carrier, cli (>= 1.1.0), otelsdk (>=\n0.2.0), ps, rprojroot, spelling, testthat (>= 3.2.0), withr (>=\n2.3.0)",
+        "Config/Needs/website": "r-lib/asciicast, glue, htmlwidgets, igraph,\ntibble, tidyverse/tidytemplate",
+        "Config/testthat/edition": "3",
+        "Config/usethis/last-upkeep": "2025-04-28",
+        "Encoding": "UTF-8",
+        "Language": "en-US",
+        "Config/roxygen2/version": "8.0.0",
+        "NeedsCompilation": "no",
+        "Packaged": "2026-06-05 08:20:00 UTC; gaborcsardi",
+        "Author": "Gábor Csárdi [aut, cre, cph] (ORCID:\n    <https://orcid.org/0000-0001-7098-9676>),\n  Winston Chang [aut],\n  Posit Software, PBC [cph, fnd] (ROR: <https://ror.org/03wc8by49>),\n  Ascent Digital Services [cph, fnd]",
+        "Maintainer": "Gábor Csárdi <csardi.gabor@gmail.com>",
+        "Repository": "RSPM",
+        "Date/Publication": "2026-06-05 11:40:13 UTC",
+        "Built": "R 4.6.0; ; 2026-06-05 14:25:04 UTC; unix"
       }
     },
     "cli": {
@@ -1334,6 +1364,35 @@
         "Built": "R 4.6.0; ; 2026-04-24 03:50:41 UTC; unix"
       }
     },
+    "processx": {
+      "Source": "CRAN",
+      "Repository": "https://p3m.dev/cran/latest",
+      "description": {
+        "Package": "processx",
+        "Title": "Execute and Control System Processes",
+        "Version": "3.9.0",
+        "Authors@R": "c(\n    person(\"Gábor\", \"Csárdi\", , \"csardi.gabor@gmail.com\", role = c(\"aut\", \"cre\", \"cph\"),\n           comment = c(ORCID = \"0000-0001-7098-9676\")),\n    person(\"Winston\", \"Chang\", role = \"aut\"),\n    person(\"Posit Software, PBC\", role = c(\"cph\", \"fnd\"),\n           comment = c(ROR = \"03wc8by49\")),\n    person(\"Ascent Digital Services\", role = c(\"cph\", \"fnd\"))\n  )",
+        "Description": "Tools to run system processes in the background.  It can\n    check if a background process is running; wait on a background process\n    to finish; get the exit status of finished processes; kill background\n    processes. It can read the standard output and error of the processes,\n    using non-blocking connections. 'processx' can poll a process for\n    standard output or error, with a timeout. It can also poll several\n    processes at once.",
+        "License": "MIT + file LICENSE",
+        "URL": "https://processx.r-lib.org, https://github.com/r-lib/processx",
+        "BugReports": "https://github.com/r-lib/processx/issues",
+        "Depends": "R (>= 3.4.0)",
+        "Imports": "ps (>= 1.9.3), R6, utils",
+        "Suggests": "callr (>= 3.7.3), cli (>= 3.3.0), codetools, covr, curl,\ndebugme, parallel, rlang (>= 1.0.2), testthat (>= 3.0.0),\nwebfakes, withr",
+        "Config/Needs/website": "tidyverse/tidytemplate",
+        "Config/testthat/edition": "3",
+        "Config/usethis/last-upkeep": "2025-04-25",
+        "Encoding": "UTF-8",
+        "RoxygenNote": "7.3.3",
+        "NeedsCompilation": "yes",
+        "Packaged": "2026-04-22 10:56:15 UTC; gaborcsardi",
+        "Author": "Gábor Csárdi [aut, cre, cph] (ORCID:\n    <https://orcid.org/0000-0001-7098-9676>),\n  Winston Chang [aut],\n  Posit Software, PBC [cph, fnd] (ROR: <https://ror.org/03wc8by49>),\n  Ascent Digital Services [cph, fnd]",
+        "Maintainer": "Gábor Csárdi <csardi.gabor@gmail.com>",
+        "Repository": "RSPM",
+        "Date/Publication": "2026-04-22 12:00:02 UTC",
+        "Built": "R 4.6.0; x86_64-pc-linux-gnu; 2026-04-24 02:14:48 UTC; unix"
+      }
+    },
     "promises": {
       "Source": "CRAN",
       "Repository": "https://p3m.dev/cran/latest",
@@ -1364,6 +1423,36 @@
         "Repository": "RSPM",
         "Date/Publication": "2025-11-01 06:30:02 UTC",
         "Built": "R 4.6.0; ; 2026-04-24 02:01:43 UTC; unix"
+      }
+    },
+    "ps": {
+      "Source": "CRAN",
+      "Repository": "https://p3m.dev/cran/latest",
+      "description": {
+        "Package": "ps",
+        "Title": "List, Query, Manipulate System Processes",
+        "Version": "1.9.3",
+        "Authors@R": "c(\n    person(\"Jay\", \"Loden\", role = \"aut\"),\n    person(\"Dave\", \"Daeschler\", role = \"aut\"),\n    person(\"Giampaolo\", \"Rodola'\", role = \"aut\"),\n    person(\"Gábor\", \"Csárdi\", , \"csardi.gabor@gmail.com\", role = c(\"aut\", \"cre\")),\n    person(\"Posit Software, PBC\", role = c(\"cph\", \"fnd\"),\n           comment = c(ROR = \"03wc8by49\"))\n  )",
+        "Description": "List, query and manipulate all system processes, on\n    'Windows', 'Linux' and 'macOS'.",
+        "License": "MIT + file LICENSE",
+        "URL": "https://github.com/r-lib/ps, https://ps.r-lib.org/",
+        "BugReports": "https://github.com/r-lib/ps/issues",
+        "Depends": "R (>= 3.4)",
+        "Imports": "utils",
+        "Suggests": "callr, covr, curl, pillar, pingr, processx (>= 3.1.0), R6,\nrlang, testthat (>= 3.0.0), webfakes, withr",
+        "Biarch": "true",
+        "Config/Needs/website": "tidyverse/tidytemplate",
+        "Config/testthat/edition": "3",
+        "Config/usethis/last-upkeep": "2025-04-28",
+        "Encoding": "UTF-8",
+        "RoxygenNote": "7.3.3",
+        "NeedsCompilation": "yes",
+        "Packaged": "2026-04-20 12:53:07 UTC; gaborcsardi",
+        "Author": "Jay Loden [aut],\n  Dave Daeschler [aut],\n  Giampaolo Rodola' [aut],\n  Gábor Csárdi [aut, cre],\n  Posit Software, PBC [cph, fnd] (ROR: <https://ror.org/03wc8by49>)",
+        "Maintainer": "Gábor Csárdi <csardi.gabor@gmail.com>",
+        "Repository": "RSPM",
+        "Date/Publication": "2026-04-20 13:40:03 UTC",
+        "Built": "R 4.6.0; x86_64-pc-linux-gnu; 2026-04-24 01:59:38 UTC; unix"
       }
     },
     "purrr": {
@@ -2180,65 +2269,122 @@
     }
   },
   "files": {
-    ".Renviron": {
-      "checksum": "fc5549150dd5c7a7c6649eaeb64e9e89"
+    "automation_runtime.R": {
+      "checksum": "9e8795ae75df320ea887d9e5053928f3"
     },
-    "Agents.md": {
-      "checksum": "a8838888364db3e6af39cb4d18924b68"
+    "background_runtime.R": {
+      "checksum": "d2afbd3b269d7ab1b4ab8041c51fa15a"
     },
-    "app.futmondo.com.har": {
-      "checksum": "5bfce43cdd06e05caf5b9b1cd1c52e8c"
-    },
-    "docs/api_endpoints.md": {
-      "checksum": "df1052f8bbb6c925e71f3664f02027d1"
-    },
-    "docs/database_schema.md": {
-      "checksum": "7a35ae7ed637c755241ec79ff710e58f"
+    "data_contracts.R": {
+      "checksum": "0b0a65b0c5fa4c62fe99fac4c2ca33da"
     },
     "futmondo_functions.R": {
-      "checksum": "8f14192531d739578b2801f447eb5a68"
+      "checksum": "23f9d3ba123025c8df83d04b7338bdd8"
     },
     "global.R": {
-      "checksum": "022826f988dccd63f7b17198b1b1134f"
+      "checksum": "c14461e3b186c2b9d31adb34da259c9f"
+    },
+    "insights_runtime.R": {
+      "checksum": "1f9f91875692f94199f4be46e7b5d91f"
+    },
+    "intelligence_engine.R": {
+      "checksum": "dce4df3fbeedcd2c5ed40d09dd8ea304"
+    },
+    "Modules/Admin_Module.R": {
+      "checksum": "2e292a278d965cff50c8bd298ed946d3"
+    },
+    "Modules/Automation_Module.R": {
+      "checksum": "9785773713a2d884292d40b2bb11c443"
+    },
+    "Modules/Classification_Module.R": {
+      "checksum": "1d68075469e3bbdc203f792fc5376d0d"
+    },
+    "Modules/Intelligence_Module.R": {
+      "checksum": "935926f660a16a22a627fc218ace17eb"
     },
     "Modules/Login_Module.R": {
-      "checksum": "5de1cf62a6757d91041112caef39cc40"
+      "checksum": "acc55135d4d7449d06177d0dc8aeed78"
     },
     "Modules/Market_Module.R": {
-      "checksum": "d2db4884cc252f23cd3231698451f587"
+      "checksum": "7e5ecd554a54025fbe281fe941750eb0"
+    },
+    "Modules/Notifications_Module.R": {
+      "checksum": "5dd54e8c3a2babb8caac45188dbc397b"
     },
     "Modules/Players_in_Championship_Module.R": {
-      "checksum": "73319c1c170071d8ecfc82be3707e5d4"
+      "checksum": "2b0762be42d248085147a1cde3998f83"
     },
     "Modules/Players_in_Teams_Module.R": {
-      "checksum": "0548e83f411fc0882f92b659033a24e4"
+      "checksum": "2fcac446aa8a0ba72405055dfec1c13f"
     },
     "Modules/Players_Table_Module.R": {
-      "checksum": "a4bb30e214a8836ea53fd10ae98505d8"
+      "checksum": "4adf7a30cd4782862e4ddf17bd0df020"
+    },
+    "Modules/Rivals_Module.R": {
+      "checksum": "5c2f89c96540e25cf8a2e68f5b53d7ef"
     },
     "Modules/Selected_Player_Module.R": {
-      "checksum": "10d427a99249627cebf8739c7b9f3f4d"
+      "checksum": "bd09fc2cb9c47bfd2f5b6a713e74f0fb"
+    },
+    "Modules/Today_Module.R": {
+      "checksum": "845702d8c60ccabde79d6327340e1775"
     },
     "player_columns_to_hide.txt": {
-      "checksum": "7072474780f11345f2823820403c10f7"
+      "checksum": "d17576ee36ef8538f45c08b179c991f3"
+    },
+    "portfolio_engine.R": {
+      "checksum": "af513103a898afe95ca330fc8aae2714"
+    },
+    "prediction_engine.R": {
+      "checksum": "b8172aa12e282866d4b3f309fbf9b6a4"
     },
     "README.md": {
-      "checksum": "c6262ef108155b31451e8a0ad411a164"
+      "checksum": "01c58a644cbfd7769df336c5752ef8d8"
+    },
+    "scripts/automation_worker.R": {
+      "checksum": "127fd63a56bb57892d2e78d10fc3e27a"
+    },
+    "scripts/init_db.R": {
+      "checksum": "f2d59d7df2a2ef8ec3a87f4632185751"
+    },
+    "scripts/migrations/20260905_reliable_insights.sql": {
+      "checksum": "5e94652f8faef2acd3bb4f769ec92adf"
+    },
+    "scripts/migrations/20260907_observation_lifecycle.sql": {
+      "checksum": "583d0493929165fd4db2f45b6ed5d8cd"
+    },
+    "scripts/migrations/20260907_private_history.sql": {
+      "checksum": "320d88e82b7aad0401b55358c586a1db"
+    },
+    "scripts/populate_db.R": {
+      "checksum": "ad211615d6bd3dfa910997eb9994c4f1"
+    },
+    "scripts/reset_db.R": {
+      "checksum": "5cf1f522bcda802f1471cbb5ea6297ec"
+    },
+    "scripts/schema_v3.sql": {
+      "checksum": "7604063500e177d26bec6ee486221c13"
+    },
+    "scripts/schema.sql": {
+      "checksum": "8e897bc94a89b75662b7b8d7149f159d"
     },
     "server.R": {
-      "checksum": "f78a3b13a571e450ad8b872789febeb7"
+      "checksum": "cbc2daf2249f4ba79d9d544d1d13244f"
     },
     "supabase_connector.R": {
-      "checksum": "442b4e190f526f7c5ffa1416b22ad267"
+      "checksum": "8717fc3484314ad5e03f9de0c20c00e5"
+    },
+    "theme.R": {
+      "checksum": "4787615df03516c7ab4673aa883799f4"
     },
     "ui.R": {
-      "checksum": "8be6985c50bebea68eb1e72d9c3c8e33"
+      "checksum": "6a5e2905570b87189c96d6c3e07af8c2"
     },
     "utils.R": {
       "checksum": "6253d5e12d91ddef162c7e9e7624680a"
     },
     "www/custom_style.css": {
-      "checksum": "c1e652a061bb99a5033746a41ac10253"
+      "checksum": "01276ce93a2948512dec4f7000d939b5"
     }
   },
   "users": null

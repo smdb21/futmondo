@@ -56,12 +56,12 @@ admin_UI <- function(id) {
                collapsible = FALSE,
                div(style = "text-align: center; padding: 10px 0;",
                    div(style = "font-size: 32px; margin-bottom: 4px;",
-                       icon("server", style = "color: #3b82f6;")
+                       icon("server", style = "color: var(--fm-text);")
                    ),
-                   div(style = "font-size: 13px; color: #64748b;",
-                       span("Supabase", style = "font-weight: 600; color: #0f172a;")
+                   div(style = "font-size: 13px; color: var(--fm-text);",
+                       span("Supabase", style = "font-weight: 600; color: var(--fm-text);")
                    ),
-                   div(style = "font-size: 11px; color: #94a3b8;",
+                   div(style = "font-size: 11px; color: var(--fm-text);",
                        span("Live API endpoint")
                    )
                )
@@ -76,12 +76,12 @@ admin_UI <- function(id) {
                collapsible = FALSE,
                div(style = "text-align: center; padding: 10px 0;",
                    div(style = "font-size: 32px; margin-bottom: 4px;",
-                       icon("user-shield", style = "color: #8b5cf6;")
+                       icon("user-shield", style = "color: var(--fm-text);")
                    ),
-                   div(style = "font-size: 13px; color: #64748b;",
-                       span("Authorized Operator", style = "font-weight: 600; color: #0f172a;")
+                   div(style = "font-size: 13px; color: var(--fm-text);",
+                       span("Authorized Operator", style = "font-weight: 600; color: var(--fm-text);")
                    ),
-                   div(style = "font-size: 11px; color: #94a3b8;",
+                   div(style = "font-size: 11px; color: var(--fm-text);",
                        span("From .Renviron")
                    )
                )
@@ -96,12 +96,12 @@ admin_UI <- function(id) {
                collapsible = FALSE,
                div(style = "text-align: center; padding: 10px 0;",
                    div(style = "font-size: 32px; margin-bottom: 4px;",
-                       icon("table", style = "color: #10b981;")
+                       icon("table", style = "color: var(--fm-text);")
                    ),
-                   div(style = "font-size: 13px; color: #64748b;",
-                       span("8 Tables", style = "font-weight: 600; color: #0f172a;")
+                   div(style = "font-size: 13px; color: var(--fm-text);",
+                       span("8 Tables", style = "font-weight: 600; color: var(--fm-text);")
                    ),
-                   div(style = "font-size: 11px; color: #94a3b8;",
+                   div(style = "font-size: 11px; color: var(--fm-text);",
                        span("Schema verified")
                    )
                )
@@ -116,12 +116,12 @@ admin_UI <- function(id) {
                collapsible = FALSE,
                div(style = "text-align: center; padding: 10px 0;",
                    div(style = "font-size: 32px; margin-bottom: 4px;",
-                       icon("database", style = "color: #f59e0b;")
+                       icon("database", style = "color: var(--fm-warning);")
                    ),
-                   div(style = "font-size: 13px; color: #64748b;",
-                       span("Dynamic Count", style = "font-weight: 600; color: #0f172a;")
+                   div(style = "font-size: 13px; color: var(--fm-text);",
+                       span("Dynamic Count", style = "font-weight: 600; color: var(--fm-text);")
                    ),
-                   div(style = "font-size: 11px; color: #94a3b8;",
+                   div(style = "font-size: 11px; color: var(--fm-text);",
                        span("Refresh to update")
                    )
                )
@@ -141,33 +141,33 @@ admin_UI <- function(id) {
                collapsed = FALSE,
                fluidRow(
                  column(width = 3,
-                        div(style = "background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; text-align: center; margin-bottom: 8px;",
-                            div(style = "font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;", "Championships"),
-                            div(style = "font-size: 22px; font-weight: 700; color: #3b82f6;",
+                        div(style = "background: var(--fm-surface); padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; text-align: center; margin-bottom: 8px;",
+                            div(style = "font-size: 11px; color: var(--fm-text); font-weight: 600; text-transform: uppercase;", "Championships"),
+                            div(style = "font-size: 22px; font-weight: 700; color: var(--fm-text);",
                                 textOutput(ns("kpi_championships"))
                             )
                         )
                  ),
                  column(width = 3,
-                        div(style = "background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; text-align: center; margin-bottom: 8px;",
-                            div(style = "font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;", "Real Clubs"),
-                            div(style = "font-size: 22px; font-weight: 700; color: #10b981;",
+                        div(style = "background: var(--fm-surface); padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; text-align: center; margin-bottom: 8px;",
+                            div(style = "font-size: 11px; color: var(--fm-text); font-weight: 600; text-transform: uppercase;", "Real Clubs"),
+                            div(style = "font-size: 22px; font-weight: 700; color: var(--fm-text);",
                                 textOutput(ns("kpi_real_clubs"))
                             )
                         )
                  ),
                  column(width = 3,
-                        div(style = "background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; text-align: center; margin-bottom: 8px;",
-                            div(style = "font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;", "Players"),
-                            div(style = "font-size: 22px; font-weight: 700; color: #8b5cf6;",
+                        div(style = "background: var(--fm-surface); padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; text-align: center; margin-bottom: 8px;",
+                            div(style = "font-size: 11px; color: var(--fm-text); font-weight: 600; text-transform: uppercase;", "Players"),
+                            div(style = "font-size: 22px; font-weight: 700; color: var(--fm-text);",
                                 textOutput(ns("kpi_players"))
                             )
                         )
                  ),
                  column(width = 3,
-                        div(style = "background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; text-align: center; margin-bottom: 8px;",
-                            div(style = "font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;", "User Teams"),
-                            div(style = "font-size: 22px; font-weight: 700; color: #f59e0b;",
+                        div(style = "background: var(--fm-surface); padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; text-align: center; margin-bottom: 8px;",
+                            div(style = "font-size: 11px; color: var(--fm-text); font-weight: 600; text-transform: uppercase;", "User Teams"),
+                            div(style = "font-size: 22px; font-weight: 700; color: var(--fm-warning);",
                                 textOutput(ns("kpi_user_teams"))
                             )
                         )
@@ -175,33 +175,33 @@ admin_UI <- function(id) {
                ),
                fluidRow(
                  column(width = 3,
-                        div(style = "background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; text-align: center; margin-bottom: 8px;",
-                            div(style = "font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;", "Team History"),
-                            div(style = "font-size: 22px; font-weight: 700; color: #06b6d4;",
+                        div(style = "background: var(--fm-surface); padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; text-align: center; margin-bottom: 8px;",
+                            div(style = "font-size: 11px; color: var(--fm-text); font-weight: 600; text-transform: uppercase;", "Team History"),
+                            div(style = "font-size: 22px; font-weight: 700; color: var(--fm-text);",
                                 textOutput(ns("kpi_user_team_history"))
                             )
                         )
                  ),
                  column(width = 3,
-                        div(style = "background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; text-align: center; margin-bottom: 8px;",
-                            div(style = "font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;", "Player History"),
-                            div(style = "font-size: 22px; font-weight: 700; color: #ec4899;",
+                        div(style = "background: var(--fm-surface); padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; text-align: center; margin-bottom: 8px;",
+                            div(style = "font-size: 11px; color: var(--fm-text); font-weight: 600; text-transform: uppercase;", "Player History"),
+                            div(style = "font-size: 22px; font-weight: 700; color: var(--fm-text);",
                                 textOutput(ns("kpi_player_history"))
                             )
                         )
                  ),
 column(width = 3,
-                         div(style = "background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; text-align: center; margin-bottom: 8px;",
-                             div(style = "font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;", "Market Transactions"),
-                             div(style = "font-size: 22px; font-weight: 700; color: #ef4444;",
+                         div(style = "background: var(--fm-surface); padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; text-align: center; margin-bottom: 8px;",
+                             div(style = "font-size: 11px; color: var(--fm-text); font-weight: 600; text-transform: uppercase;", "Market Transactions"),
+                             div(style = "font-size: 22px; font-weight: 700; color: var(--fm-danger);",
                                  textOutput(ns("kpi_market_transactions"))
                              )
                          )
                   ),
                   column(width = 3,
-                         div(style = "background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; text-align: center; margin-bottom: 8px;",
-                             div(style = "font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;", "Round Dream Team"),
-                             div(style = "font-size: 22px; font-weight: 700; color: #d97706;",
+                         div(style = "background: var(--fm-surface); padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; text-align: center; margin-bottom: 8px;",
+                             div(style = "font-size: 11px; color: var(--fm-text); font-weight: 600; text-transform: uppercase;", "Round Dream Team"),
+                             div(style = "font-size: 22px; font-weight: 700; color: var(--fm-warning);",
                                  textOutput(ns("kpi_round_dream_team"))
                              )
                          )
@@ -209,9 +209,9 @@ column(width = 3,
                 ),
                 fluidRow(
                   column(width = 6,
-                         div(style = "background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; text-align: center; margin-bottom: 8px;",
-                             div(style = "font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;", "Grand Total"),
-                             div(style = "font-size: 22px; font-weight: 700; color: #0f172a;",
+                         div(style = "background: var(--fm-surface); padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; text-align: center; margin-bottom: 8px;",
+                             div(style = "font-size: 11px; color: var(--fm-text); font-weight: 600; text-transform: uppercase;", "Grand Total"),
+                             div(style = "font-size: 22px; font-weight: 700; color: var(--fm-text);",
                                  textOutput(ns("kpi_total_records"))
                              )
                          )
@@ -260,7 +260,7 @@ column(width = 3,
                       icon = icon("cloud-arrow-down"),
                       class = "btn-success"
                     ),
-                    p(style = "color: #64748b; font-size: 11px; margin-top: 6px;",
+                    p(style = "color: var(--fm-text); font-size: 11px; margin-top: 6px;",
                       "Fetches and syncs all data from the Futmondo API into every Supabase table."
                     )
                 ),
@@ -273,7 +273,7 @@ column(width = 3,
                       icon = icon("shield-halved"),
                       class = "btn-default"
                     ),
-                    p(style = "color: #64748b; font-size: 11px; margin-top: 6px;",
+                    p(style = "color: var(--fm-text); font-size: 11px; margin-top: 6px;",
                       "Checks that all 7 required tables exist and respond via the Supabase REST API."
                     )
                 ),
@@ -286,18 +286,18 @@ column(width = 3,
                       icon = icon("trophy"),
                       class = "btn-info"
                     ),
-                    p(style = "color: #64748b; font-size: 11px; margin-top: 6px;",
+                    p(style = "color: var(--fm-text); font-size: 11px; margin-top: 6px;",
                       "Verifies and syncs the Best 11 (Dream Team) and MVP accolades for all finished matchdays, reconciling delayed matches."
                     )
                 ),
 
                 # Danger Zone
-               div(style = "border: 2px solid #fecaca; border-radius: 8px; padding: 16px; background: #fef2f2;",
+               div(style = "border: 2px solid #fecaca; border-radius: 8px; padding: 16px; background: var(--fm-surface);",
                    div(style = "display: flex; align-items: center; gap: 8px; margin-bottom: 12px;",
-                       icon("triangle-exclamation", style = "color: #ef4444; font-size: 20px;"),
-                       span(style = "font-weight: 700; color: #991b1b; font-size: 14px;", "Danger Zone")
+                       icon("triangle-exclamation", style = "color: var(--fm-danger); font-size: 20px;"),
+                       span(style = "font-weight: 700; color: var(--fm-text); font-size: 14px;", "Danger Zone")
                    ),
-                   p(style = "color: #991b1b; font-size: 12px; margin-bottom: 12px;",
+                   p(style = "color: var(--fm-text); font-size: 12px; margin-bottom: 12px;",
                      "Resetting the database will permanently delete all records across every table. This action cannot be undone."
                    ),
                    actionButton(
@@ -313,8 +313,12 @@ column(width = 3,
   )
 }
 
-admin_Server <- function(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV) {
+admin_Server <- function(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, is_admin = NULL) {
   moduleServer(id, function(input, output, session) {
+    authorized <- reactive({
+      if (!is.null(is_admin)) isTRUE(is_admin()) else is_authorized_admin(login_token())
+    })
+
     ns <- session$ns
 
     # ---- Reactive: table row counts ----
@@ -332,13 +336,14 @@ admin_Server <- function(id, is_module_active, login_token, championship_id, use
 
     # Load counts when the module becomes active
     observe({
-      if (isTRUE(is_module_active())) {
+      if (isTRUE(is_module_active()) && isTRUE(authorized())) {
         load_row_counts()
       }
     })
 
     # Load counts on manual refresh
     observeEvent(input$btn_refresh_stats, {
+      req(authorized())
       load_row_counts()
     })
 
@@ -404,7 +409,7 @@ admin_Server <- function(id, is_module_active, login_token, championship_id, use
             name = "Table Name",
             align = "left",
             cell = function(val) {
-              shiny::tags$span(style = "font-weight: 600; color: #0f172a;", val)
+              shiny::tags$span(style = "font-weight: 600; color: var(--fm-text);", val)
             }
           ),
           row_count = colDef(
@@ -412,11 +417,11 @@ admin_Server <- function(id, is_module_active, login_token, championship_id, use
             align = "center",
             cell = function(val) {
               if (is.na(val)) {
-                shiny::tags$span(style = "color: #94a3b8;", "N/A")
+                shiny::tags$span(style = "color: var(--fm-text);", "N/A")
               } else {
                 formatted <- formatC(val, format = "f", big.mark = ",", digits = 0)
                 shiny::tags$span(
-                  style = "background: #eff6ff; color: #1d4ed8; padding: 2px 10px; border-radius: 12px; font-weight: 600; font-size: 13px;",
+                  style = "background: var(--fm-surface); color: var(--fm-text); padding: 2px 10px; border-radius: 12px; font-weight: 600; font-size: 13px;",
                   formatted
                 )
               }
@@ -426,14 +431,14 @@ admin_Server <- function(id, is_module_active, login_token, championship_id, use
             name = "Primary Key",
             align = "center",
             cell = function(val) {
-              shiny::tags$span(style = "color: #64748b; font-size: 12px;", val)
+              shiny::tags$span(style = "color: var(--fm-text); font-size: 12px;", val)
             }
           ),
           description = colDef(
             name = "Description",
             align = "left",
             cell = function(val) {
-              shiny::tags$span(style = "color: #334155; font-size: 12px;", val)
+              shiny::tags$span(style = "color: var(--fm-text); font-size: 12px;", val)
             }
           ),
           live_status = colDef(
@@ -442,13 +447,13 @@ admin_Server <- function(id, is_module_active, login_token, championship_id, use
             cell = function(val) {
               if (val == "Active") {
                 shiny::tags$span(
-                  style = "color: #10b981; font-weight: 600; font-size: 12px;",
+                  style = "color: var(--fm-text); font-weight: 600; font-size: 12px;",
                   icon("circle-check", style = "margin-right: 4px;"),
                   val
                 )
               } else {
                 shiny::tags$span(
-                  style = "color: #f59e0b; font-weight: 600; font-size: 12px;",
+                  style = "color: var(--fm-warning); font-weight: 600; font-size: 12px;",
                   icon("circle-exclamation", style = "margin-right: 4px;"),
                   val
                 )
@@ -461,6 +466,7 @@ admin_Server <- function(id, is_module_active, login_token, championship_id, use
 
     # ---- Verify Schema ----
     observeEvent(input$btn_verify_db, {
+      req(authorized())
       result <- tryCatch({
         ok <- init_supabase_db(verbose = TRUE)
         if (ok) {
@@ -488,6 +494,7 @@ admin_Server <- function(id, is_module_active, login_token, championship_id, use
 
     # ---- Populate Entire Database ----
     observeEvent(input$btn_populate_db, {
+      req(authorized())
       # Check prerequisites (safe scalar checks to avoid vector coercion bug)
       tok <- login_token()
       has_valid_token <- !is.null(tok) && length(tok) >= 1 && (
@@ -546,6 +553,7 @@ admin_Server <- function(id, is_module_active, login_token, championship_id, use
 
     # ---- Sync Round Dream Teams ----
     observeEvent(input$btn_sync_dreamteams, {
+      req(authorized())
       # Check prerequisites (safe scalar checks to avoid vector coercion bug)
       tok <- login_token()
       has_valid_token <- !is.null(tok) && length(tok) >= 1 && (
@@ -612,29 +620,30 @@ admin_Server <- function(id, is_module_active, login_token, championship_id, use
 
     # ---- Reset Database: confirmation modal ----
     observeEvent(input$btn_reset_db, {
+      req(authorized())
       showModal(
         modalDialog(
           title = div(
             style = "display: flex; align-items: center; gap: 8px;",
-            icon("triangle-exclamation", style = "color: #ef4444;"),
+            icon("triangle-exclamation", style = "color: var(--fm-danger);"),
             "Confirm Database Reset"
           ),
-          p(style = "color: #334155; font-size: 14px;",
+          p(style = "color: var(--fm-text); font-size: 14px;",
             "This will permanently delete ALL records from every table in the Supabase database."
           ),
-          p(style = "color: #991b1b; font-weight: 700; font-size: 13px;",
+          p(style = "color: var(--fm-text); font-weight: 700; font-size: 13px;",
             "This action cannot be undone."
           ),
           div(
-            style = "background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 12px; margin-top: 12px;",
-            p(style = "color: #991b1b; font-size: 12px; margin: 0;",
+            style = "background: var(--fm-surface); border: 1px solid #fecaca; border-radius: 6px; padding: 12px; margin-top: 12px;",
+            p(style = "color: var(--fm-text); font-size: 12px; margin: 0;",
               "Affected tables: championships, real_clubs, players, user_teams, user_team_history, player_history, market_transactions"
             )
           ),
           footer = tagList(
             modalButton("Cancel"),
             actionButton(
-              inputId = "btn_confirm_reset",
+              inputId = ns("btn_confirm_reset"),
               label = "Yes, Reset Everything",
               icon = icon("trash-can"),
               class = "btn-danger"
@@ -648,6 +657,7 @@ admin_Server <- function(id, is_module_active, login_token, championship_id, use
 
     # ---- Reset Database: execute ----
     observeEvent(input$btn_confirm_reset, {
+      req(authorized())
       tryCatch({
         results <- supabase_reset_database(force = TRUE)
 

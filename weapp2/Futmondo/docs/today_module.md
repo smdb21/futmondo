@@ -39,7 +39,7 @@ The Today Module provides two exported functions:
   - Renders actionable recommendation cards via `generate_command_center_feed()`
   - Each card shows: type icon, title, detailed description, confidence pill badge (e.g., "Confidence: 85%"), type badge, and action button
 - **Right Column (width=4)**:
-  - "Today's Market Intelligence Radar" box -- reactable table of top 10 FIS bargains on the market with player name, role, price, FIS score badge, and tier. Rows are prepared by the pure helper `today_prepare_radar_df()`, which coerces FIS to numeric, **drops non-finite (NA/Inf/-Inf) rows**, sorts by FIS descending, and keeps the top 10 -- so non-finite FIS values can never reach the rendered table (fixes the FIS "error effect"). Clicking a row selects that player (see section 4).
+  - "Today's Market Intelligence Radar" box -- reactable table of top 10 FIS bargains on the market with player name, role, price, FIS score badge, and tier. Rows are prepared by the pure helper `today_prepare_radar_df()`, which coerces FIS to numeric, **drops non-finite (NA/Inf/-Inf) rows**, sorts by FIS descending, and keeps the top 10 -- so non-finite FIS values can never reach the rendered table. `today_fis_score_badge()` renders each value as a compact dark, square-cornered, tabular-numeric badge; amber is 65–79.9, green is 80+, and muted green is below 65. Clicking a row selects that player (see section 4).
   - "Recent League Transfers" box -- list of the 6 most recent pressroom transactions with player name, buyer/seller, price, and date
 
 ---
@@ -115,6 +115,7 @@ When a selection event becomes valid, Today resolves and opens the player **loca
 
 ### Pure helpers (testable, top-level)
 * `today_prepare_radar_df(mkt, top_n = 10)` -- coerce/filter non-finite FIS, sort desc, top-N, build display columns.
+* `today_fis_score_badge(value)` -- returns an HTML score badge with one decimal and a threshold class. Non-finite input renders as `0.0` in the low tier.
 * `today_radar_onclick_js(ns)` -- returns the `htmlwidgets::JS()` row-click handler.
 * `today_escape_js_string(x)` -- escapes a value for embedding in a single-quoted JS string literal: **backslashes first** (`\` -> `\\`), then single quotes (`'` -> `\'`).
 * `today_rec_action_onclick_js(ns, player_id, action_label)` -- returns the action-button `onclick` attribute string; values are escaped via `today_escape_js_string` (backslash + single quote).

@@ -1,0 +1,344 @@
+# Full application lifecycle with synthetic fixtures and blocked network I/O.
+options(futmondo.offline = TRUE, warn = 1)
+offline_http_attempts <- 0L
+for (method in c('GET','POST','PUT','PATCH','DELETE')) {
+  suppressMessages(trace(method, where=asNamespace('httr'), print=FALSE,
+    tracer=quote({offline_http_attempts <<- offline_http_attempts + 1L; stop('Unexpected HTTP in offline lifecycle test')})))
+}
+app_checks <- 0L
+app_check <- function(name, code) {
+  force(code); app_checks <<- app_checks + 1L; cat('[PASS]', name, '\n')
+}
+app_check('actual application startup', {
+  source('global.R',local=.GlobalEnv)
+  source('ui.R',local=.GlobalEnv)
+  app_server <- source('server.R',local=.GlobalEnv)$value
+  stopifnot(is.function(app_server),offline_http_attempts==0L)
+})
+# Every ID/name here is synthetic. Fixtures include zero scores, a multiposition
+# player, valid seventeen-player squad, published rounds and an unread event.
+app_auth <- c(token='offline-token',userid='offline-user',user_name='offline@example.invalid')
+app_teams <- data.frame(teamid=c('team1','team2'),id=c('team1','team2'),teamname=c('Your Team','Rival Team'),
+  name=c('Your Team','Rival Team'),points=c(30,25),position=1:2,teamValue=c(34e6,32e6),is_active=TRUE)
+app_roster <- data.frame(id=paste0('p',1:17),name=paste('Player',1:17),
+  role=c(rep('portero',2),rep('defensa',5),rep('centrocampista',6),rep('delantero',4)),
+  role2=NA_character_,team=rep(c('Club A','Club B','Club C'),length.out=17),teamId=rep(1:3,length.out=17),
+  points=seq(0,80,length.out=17),value=2e6,change=10000,buyPrice=1.8e6,
+  average.average=seq(2,6,length.out=17),average.matches=10,average.averageLastFive=seq(2,6,length.out=17),
+  status='ok',photo='fixture',slug=paste0('player-',1:17),userteamId='team1',user_team_id='team1',userTeam='Your Team',
+  isClause=FALSE,clause_price=4e6,clause_date=NA_character_,clause_transferred=FALSE,
+  market_inMarket=FALSE,effective_market_price=NA_real_,price=NA_real_,bid_price=NA_real_,numberOfBids=0,
+  computer=FALSE,fav=FALSE,observed_at=format(Sys.time(),'%Y-%m-%dT%H:%M:%OSZ',tz='UTC'))
+app_roster$role2[7] <- 'centrocampista'
+app_market <- app_roster[15:17,,drop=FALSE]
+app_market$id <- paste0('m',1:3);app_market$name<-paste('Market Player',1:3)
+app_market$userteamId<-NA_character_;app_market$user_team_id<-NA_character_;app_market$userTeam<-NA_character_
+app_market$computer<-TRUE;app_market$market_inMarket<-TRUE;app_market$price<-2e6;app_market$effective_market_price<-2e6
+app_cfg <- list(budget=30e6,moneyPerPoint=123,moneyPerRanking=456,rankingMode='flop',
+                mvpPlayer=789,dreamTeamPlayer=321,maxPlayersInRoster=20)
+app_financial <- list(status='ok',cash=0,withheld=0,spendable_budget=0,legal_bid_limit=10e6,
+  roster_count=17,roster_cap=20,observed_at=Sys.time(),configuration=app_cfg,commitments=list(),
+  lineup_rules=list(roster_cap=20))
+app_champ <- list(id='champ',name='Offline League',userteam=list(id='team1',name='Your Team'))
+app_rounds <- data.frame(round_id=c('r1','r2'),round_number=1:2,begin_process=c('2026-08-15T00:00:00Z','2026-08-22T00:00:00Z'),is_finished=TRUE)
+login <- function(...) app_auth
+get_championships <- function(...) unlist(app_champ)
+get_active_championships <- function(...) list(championships=list(app_champ))
+get_teams <- function(...) app_teams
+get_players_from_team <- function(login,championship_id,user_team_id,...) {
+  d<-app_roster
+  if(as.character(user_team_id)!='team1') {d$id<-paste0('r',1:17);d$userteamId<-'team2';d$user_team_id<-'team2';d$userTeam<-'Rival Team'}
+  d
+}
+get_market_players <- function(...) app_market
+get_roster_bids <- function(...) data.frame()
+get_my_market_players <- function(...) app_roster[FALSE,,drop=FALSE]
+get_championship_players <- function(...) dplyr::bind_rows(app_roster,app_market)
+get_financial_snapshot <- function(...) app_financial
+get_user_team_info <- function(...) list(budget=0,withheld=0,maxBid=10e6,teamValue=34e6,configuration=app_cfg)
+get_lineup_from_team <- function(...) list(players=app_roster[c(1,3:6,8:10,14:16),,drop=FALSE],bench=list(players=app_roster[c(2,7,11:13,17),,drop=FALSE]),lineup_config=list(),budget=0)
+get_finished_rounds <- function(...) app_rounds
+get_user_team_rounds <- function(login,championship_id,user_team_id,...) {
+  if(as.character(user_team_id)=='team1') list(list(round='r1',points=10),list(round='r2',points=20)) else list(list(round='r1',points=20),list(round='r2',points=5))
+}
+get_round_dreamteam <- function(...) list(mvp='p1',players=list(list(id='p1',name='Player 1',role=1,points=9)))
+get_championship_pressroom <- function(...) data.frame(id=character(),created=character(),player_id=character(),player_name=character(),buyer_team_id=character(),seller_team_id=character(),price=numeric())
+get_user_team_moneymovements <- function(...) data.frame()
+get_league_standings_history <- function(...) data.frame()
+get_player_historical_data <- function(...) data.frame()
+get_player_summary <- function(...) list(my_bid_id=NULL,my_bid_price=NULL,points=list(),match=list())
+read_player_price_history <- function(...) data.frame()
+read_player_match_history <- function(...) data.frame()
+read_auction_observations <- function(...) data.frame()
+read_bid_observations <- function(...) data.frame()
+read_transfer_scenarios <- function(...) data.frame()
+read_automation_rows <- function(...) list()
+supabase_get <- function(...) data.frame()
+fetch_user_smart_alerts <- function(...) data.frame()
+get_notification_unread <- function(...) 1L
+get_notifications <- function(...) normalize_notifications(list(list(`_id`='notice1',created='2026-08-22T00:00:00Z',updated='2026-08-22T00:00:00Z',type='market',action='acceptBid',readed=FALSE,directObject=list(id='p1',name='Player 1'),subject=list(name='Futmondo'),context=list(id='champ',name='Offline League'))))
+get_table_row_counts <- function(...) data.frame(table='players',rows=0)
+calculate_league_finances <- function(...) list(team_finances=data.frame(teamid=app_teams$teamid,teamname=app_teams$teamname,
+  initial_budget=30e6,total_spent=30e6,total_sales=0,budget=c(0,2e6),team_value=app_teams$teamValue,
+  net_profit_loss=0,squad_size=17,points=app_teams$points,point_bonus=0,ranking_prize=0),all_purchases=data.frame())
+# Infrastructure already respects offline mode; make all persistence boundaries
+# deterministic too, so the fixture test never launches a background process.
+defer_persistence <- function(...) invisible(TRUE)
+for (name in c('sync_championship_to_supabase','sync_user_teams_to_supabase','log_user_team_history',
+ 'sync_real_clubs_to_supabase','sync_players_to_supabase','log_player_history','sync_pressroom_transactions_to_supabase',
+ 'save_smart_alerts','upsert_smart_alerts')) assign(name,function(...) invisible(TRUE),envir=.GlobalEnv)
+
+app_check('full server login, navigation, refresh and logout', {
+  shiny::testServer(app_server, {
+    session$setInputs(tabs='login',`login-user_name`='offline@example.invalid',`login-password`='fixture',`login-login_button`=1)
+    session$elapse(100)
+    session$flushReact()
+    stopifnot(valid_login(login_token_RV()))
+    tabs <- list(
+      today=c('today-kpi_cash_box','today-kpi_valuation_box','today-recommendations_feed_ui','today-market_radar_table'),
+      yourteam=c('players_in_teams-team_value_box','players_in_teams-optimizer_kpi_row','players_in_teams-soccer_pitch_ui','players_in_teams-submitted_lineup_comparison','players_in_teams-lineup_notes','players_in_teams-starting_xi_table','players_in_teams-bench_table','players_in_teams-sandbox_kpi_row','players_in_teams-sandbox_projected_table','players_in_teams-sandbox_lineup_status','players_in_teams-sandbox_lineup_table'),
+      market='market-market_players_table-players_table',
+      players_in_championship='players_in_championship-championship_players_table-players_table',
+      rivals=c('rivals-league_finances_table','rivals-league_finances_plot','rivals-team_valuation_history_plot'),
+      classification=c('classification-classification_table','classification-rank_evolution_plot','classification-dreamteam_box_ui'),
+      notifications=c('notifications-status','notifications-items'),
+      intelligence=c('intelligence-coverage','intelligence-lineup_summary','intelligence-lineup','intelligence-profit_summary'),
+      automation=c('automation-connection_status','automation-policy_status','automation-history'))
+    for(tab in names(tabs)) {
+      session$setInputs(tabs=tab)
+      session$flushReact()
+      for(key in tabs[[tab]]) {
+        value<-output[[key]]
+        stopifnot(!is.null(value))
+      }
+      if (tab=='rivals') {
+        session$setInputs(`rivals-league_finances_table__reactable__selected`=2L)
+        session$flushReact()
+        stopifnot(!is.null(output[['rivals-rival_financial_summary_box']]),
+                  !is.null(output[['rivals-rival_transactions_tab_ui']]),
+                  !is.null(output[['rivals-rival_transactions_table']]))
+      }
+      cat('[PASS] rendered tab:',tab,'\n')
+    }
+    session$setInputs(tabs='classification',`classification-single_round_select`='1',`classification-round_range_slider`=c(1,2))
+    first<-output[['classification-classification_table']]
+    session$setInputs(`classification-single_round_select`='2')
+    second<-output[['classification-classification_table']]
+    stopifnot(!identical(first,second))
+    stopifnot(grepl('Player 1',output[['classification-dreamteam_box_ui']]$html,fixed=TRUE))
+    session$setInputs(tabs='today',refresh_all=1)
+    stopifnot(!is.null(output[['today-kpi_cash_box']]))
+    session$setInputs(`login-logout_button`=1)
+    session$elapse(100);session$flushReact()
+    stopifnot(is.null(login_token_RV()))
+  })
+})
+app_check('rendered login never embeds server credentials', {
+  previous <- Sys.getenv(c('user_name','password'))
+  Sys.setenv(user_name='SENTINEL-UI-USER',password='SENTINEL-UI-PASSWORD')
+  html <- as.character(login_UI('login'))
+  stopifnot(!grepl('SENTINEL-UI-',html,fixed=TRUE))
+  do.call(Sys.setenv,as.list(previous))
+})
+app_check('actual admin handlers reject forged non-admin inputs', {
+  reset_calls <- 0L;verify_calls <- 0L
+  supabase_reset_database <- function(...) {reset_calls <<- reset_calls + 1L;list(players=0)}
+  init_supabase_db <- function(...) {verify_calls <<- verify_calls + 1L;TRUE}
+  testServer(admin_Server,args=list(is_module_active=reactive(FALSE),login_token=reactive(app_auth),
+    championship_id=reactive('champ'),user_team_id=reactive('team1'),user_teams_RV=reactive(app_teams),is_admin=reactive(FALSE)),{
+    session$setInputs(btn_confirm_reset=1,btn_verify_db=1,btn_populate_db=1,btn_sync_dreamteams=1)
+    stopifnot(reset_calls==0L,verify_calls==0L)
+  })
+  testServer(admin_Server,args=list(is_module_active=reactive(TRUE),login_token=reactive(app_auth),
+    championship_id=reactive('champ'),user_team_id=reactive('team1'),user_teams_RV=reactive(app_teams),is_admin=reactive(TRUE)),{
+    session$setInputs(btn_confirm_reset=1)
+    stopifnot(reset_calls==1L)
+  })
+})
+app_check('notifications escape text, preserve unread on failed ack, and retain stale results', {
+  notification_read <- FALSE;allow_ack<-FALSE;fail_fetch<-FALSE
+  get_notifications <- function(...) {
+    if(fail_fetch) return(NULL)
+    normalize_notifications(list(list(`_id`='notice1',created='2026-08-22T00:00:00Z',updated='2026-08-22T00:00:00Z',
+      type='market',action='acceptBid',readed=notification_read,directObject=list(id='p1',name='<script>alert(1)</script>'),
+      subject=list(name='Futmondo'),context=list(id='champ',name='Offline League'))))
+  }
+  get_notification_unread <- function(...) if(notification_read) 0L else 1L
+  mark_notification_read <- function(...) {if(!allow_ack) return(FALSE);notification_read<<-TRUE;TRUE}
+  testServer(notifications_Server,args=list(is_module_active=reactive(TRUE),login_token=reactive(app_auth),
+    championship_id=reactive('champ'),user_team_id=reactive('team1'),user_teams_RV=reactive(app_teams),refresh_trigger=reactiveVal(0L)),{
+    session$setInputs(read_filter='all',source_filter='All',event_filter='All',current_league=TRUE)
+    session$flushReact()
+    html<-output$items$html
+    stopifnot(grepl('&lt;script&gt;',html,fixed=TRUE),!grepl('<script>alert',html,fixed=TRUE))
+    session$setInputs(mark_read='notice1');stopifnot(!notification_read,!official()$is_read[1])
+    allow_ack<<-TRUE
+    session$setInputs(mark_read='');session$setInputs(mark_read='notice1')
+    stopifnot(notification_read,official()$is_read[1])
+    fail_fetch<<-TRUE;session$setInputs(refresh=1)
+    stopifnot(stale(),nrow(official())==1L)
+  })
+})
+app_check('same account switches A to B and back without carrying private selections or actions', {
+  # Shared p1 and m1 represent the same real player with different ownership,
+  # values and scoring in two leagues. Unique IDs would hide stale-modal bugs.
+  overrides <- c('get_active_championships','get_teams','get_players_from_team','get_market_players',
+    'get_my_market_players','get_championship_players','get_financial_snapshot','get_user_team_info',
+    'get_lineup_from_team','get_player_summary','calculate_league_finances','get_notifications',
+    'get_notification_unread','fetch_user_smart_alerts','read_automation_rows','supabase_patch','put_player_on_market')
+  originals <- mget(overrides,envir=.GlobalEnv,inherits=TRUE)
+  b_roster<-app_roster;b_roster$id<-c('p1',paste0('b',2:17));b_roster$name<-paste('B Player',1:17)
+  b_roster$value<-3e6;b_roster$points<-b_roster$points+100;b_roster$average.average<-b_roster$average.average+5
+  b_roster$average.averageLastFive<-b_roster$average.average
+  b_roster$userteamId<-'b-team';b_roster$user_team_id<-'b-team';b_roster$userTeam<-'B Own Team'
+  b_market<-app_market;b_market$id<-c('m1','bm2','bm3');b_market$name<-paste('B Market',1:3);b_market$value<-4e6;b_market$price<-4e6
+  b_teams<-data.frame(teamid=c('b-team','b-rival','b-third'),id=c('b-team','b-rival','b-third'),
+    teamname=c('B Own Team','B Rival','B Third'),name=c('B Own Team','B Rival','B Third'),points=c(90,85,60),
+    position=1:3,teamValue=c(51e6,45e6,40e6),is_active=TRUE)
+  a_rules<-list(formations='4-3-3',multiposition=FALSE,captain_enabled=FALSE,club_limit=Inf,
+    scoring=list(media_a=60,media_b=40),scoring_version='a-100',bench_enabled=FALSE)
+  b_rules<-list(formations='4-4-2',multiposition=TRUE,captain_enabled=TRUE,captain_multiplier=2,club_limit=Inf,
+    scoring=list(media_a=100,media_b=100),scoring_version='b-200',bench_enabled=TRUE,bench_size=4)
+  a_fin<-app_financial;a_fin$lineup_rules<-a_rules
+  b_fin<-app_financial;b_fin$cash<-9500000;b_fin$spendable_budget<-9500000;b_fin$lineup_rules<-b_rules
+  b_fin$configuration$moneyPerPoint<-300;b_fin$configuration$maxPlayersInRoster<-25;b_fin$roster_cap<-25
+  fixtures<-list(champ=list(roster=app_roster,market=app_market,teams=app_teams,finance=a_fin),
+    `champ-b`=list(roster=b_roster,market=b_market,teams=b_teams,finance=b_fin))
+  multi_champs<-list(app_champ,list(id='champ-b',name='B League',userteam=list(id='b-team',name='B Own Team')))
+  fixture<-function(championship_id) {stopifnot(as.character(championship_id)%in%names(fixtures));fixtures[[as.character(championship_id)]]}
+  get_active_championships<-function(...)list(championships=multi_champs)
+  get_teams<-function(login,championship_id,...)fixture(championship_id)$teams
+  get_players_from_team<-function(login,championship_id,user_team_id,...) {
+    f<-fixture(championship_id);stopifnot(user_team_id%in%f$teams$teamid)
+    d<-f$roster
+    if(user_team_id!=f$teams$teamid[1]) {d$id<-paste0(user_team_id,'-',d$id);d$userteamId<-user_team_id;d$user_team_id<-user_team_id}
+    d
+  }
+  get_market_players<-function(login,championship_id,...)fixture(championship_id)$market
+  get_my_market_players<-function(login,championship_id,...)fixture(championship_id)$roster[1,,drop=FALSE]
+  get_championship_players<-function(login,championship_id,...) {f<-fixture(championship_id);dplyr::bind_rows(f$roster,f$market)}
+  get_financial_snapshot<-function(login,championship_id,user_team_id,...) {
+    f<-fixture(championship_id);stopifnot(user_team_id%in%f$teams$teamid)
+    result<-f$finance;result$observed_at<-Sys.time();result
+  }
+  get_user_team_info<-function(login,championship_id,user_team_id,...) {
+    f<-fixture(championship_id);stopifnot(user_team_id%in%f$teams$teamid)
+    list(budget=f$finance$cash,withheld=0,maxBid=10e6,teamValue=sum(f$roster$value),configuration=f$finance$configuration)
+  }
+  get_lineup_from_team<-function(login,championship_id,user_team_id,...) {
+    f<-fixture(championship_id)
+    list(players=f$roster[c(1,3:6,8:10,14:16),,drop=FALSE],bench=list(players=f$roster[c(2,7,11:13,17),,drop=FALSE]),
+      lineup_config=f$finance$lineup_rules,budget=f$finance$cash)
+  }
+  get_player_summary<-function(login,championship_id,user_team_id,player_id,...) {
+    f<-fixture(championship_id);list(data=list(id=player_id),my_bid_id=NULL,my_bid_price=NULL,points=list(),match=list())
+  }
+  calculate_league_finances<-function(login,championship_id,...) {
+    f<-fixture(championship_id);list(team_finances=data.frame(teamid=f$teams$teamid,teamname=f$teams$teamname,
+      initial_budget=30e6,total_spent=30e6,total_sales=0,budget=f$finance$cash,team_value=f$teams$teamValue,
+      net_profit_loss=0,squad_size=17,points=f$teams$points,point_bonus=0,ranking_prize=0),all_purchases=data.frame())
+  }
+  get_notifications<-function(...)normalize_notifications(lapply(names(fixtures),function(id)list(`_id`=paste0('notice-',id),
+    created='2026-08-22T00:00:00Z',updated='2026-08-22T00:00:00Z',type='market',action='acceptBid',readed=FALSE,
+    directObject=list(id='p1',name=paste(id,'player')),subject=list(name='Futmondo'),context=list(id=id,name=id))))
+  get_notification_unread<-function(...)2L
+  fetch_user_smart_alerts<-function(user_team_id,championship_id,user_id=NULL,...) {
+    stopifnot(identical(user_id,'offline-user'),user_team_id==fixture(championship_id)$teams$teamid[1])
+    data.frame(id=paste0('private-',championship_id),created_at='2026-08-22T00:00:00Z',alert_type='solvency',
+      is_read=FALSE,player_id='p1',championship_id=championship_id,title=paste('Private',championship_id),message='Scoped alert')
+  }
+  policy_rows<-lapply(names(fixtures),function(id)list(id=paste0('policy-',id),user_id='offline-user',championship_id=id,
+    user_team_id=fixture(id)$teams$teamid[1],enabled=TRUE,mode='shadow',expires_at='2099-01-01T00:00:00Z',
+    policy=list(name=paste('Policy',id),actions=list('list'),allowed_player_ids=list('p1'),amount=2e6,
+      max_per_action=2e6,total_spending_limit=2e6,minimum_sale_price=2e6,expires_at='2099-01-01T00:00:00Z')))
+  read_automation_rows<-function(table,filters) {
+    if(table!='automation_policies')return(list())
+    Filter(function(x)identical(paste0('eq.',x$championship_id),filters$championship_id),policy_rows)
+  }
+  mutation_calls<-list()
+  supabase_patch<-function(...) {mutation_calls[[length(mutation_calls)+1L]]<<-list(...);TRUE}
+  put_player_on_market<-function(...) {mutation_calls[[length(mutation_calls)+1L]]<<-list(...);list(success=TRUE)}
+  # Capture the actual nested module environments without replacing modules.
+  # This permits assertions on state behind rendered UI in the real root server.
+  app_multi_envs<-new.env(parent=emptyenv())
+  suppressMessages(trace('moduleServer',where=asNamespace('shiny'),print=FALSE,tracer=quote({
+    body(module)<-substitute({assign(session$ns(''),environment(),envir=app_multi_envs);BODY},list(BODY=body(module)))
+  })))
+  had_module_override<-exists('moduleServer',envir=.GlobalEnv,inherits=FALSE)
+  if(had_module_override)old_module_override<-get('moduleServer',envir=.GlobalEnv)
+  moduleServer<-function(...)shiny::moduleServer(...)
+  shiny::testServer(app_server, {
+    session$setInputs(tabs='login',`login-user_name`='offline@example.invalid',`login-password`='fixture',`login-login_button`=1)
+    session$elapse(100);session$flushReact()
+    session$setInputs(selected_league='champ',tabs='yourteam')
+    team_env<-get('players_in_teams-',app_multi_envs)
+    table_env<-get('players_in_teams-players_table_in_teams-',app_multi_envs)
+    action_env<-get('players_in_teams-players_table_in_teams-selected_player-',app_multi_envs)
+    verify_team<-function(id) {
+      f<-fixture(id);session$flushReact()
+      stopifnot(championship_id_RV()==id,user_team_id_RV()==f$teams$teamid[1],
+        setequal(team_env$players_table_RV()$id,f$roster$id),team_env$liquid_cash_RV()==f$finance$cash,
+        identical(as.character(team_env$players_table_RV()$id[team_env$players_table_RV()$market_inMarket]),as.character(f$roster$id[1])),
+        nrow(f$market)>0L,!f$roster$id[1]%in%f$market$id,
+        identical(team_env$league_rules_RV()$scoring,f$finance$lineup_rules$scoring),
+        identical(team_env$league_rules_RV()$formations,f$finance$lineup_rules$formations),
+        identical(team_env$league_rules_RV()$multiposition,f$finance$lineup_rules$multiposition))
+      points<-team_env$point_forecasts_RV();stopifnot(any(points$player_id=='p1'))
+      points$expected_points[match('p1',points$player_id)]
+    }
+    a_points<-verify_team('champ')
+    idx<-match('p1',table_env$players_table_filtered_RV()$id)
+    session$setInputs(`players_in_teams-players_table_in_teams-players_table__reactable__selected`=idx,
+      `players_in_teams-players_table_in_teams-selected_player-btn_put_on_market`=1)
+    stopifnot(table_env$selected_player_id_RV()=='p1',length(action_env$modal_context_RV())==1L)
+    session$setInputs(selected_league='champ-b')
+    b_points<-verify_team('champ-b')
+    stopifnot(b_points!=a_points,is.null(table_env$selected_player_id_RV()),length(action_env$modal_context_RV())==0L,
+      is.null(action_env$active_bid_info_RV()),is.null(action_env$smart_bid_cache_RV()))
+    session$setInputs(`players_in_teams-players_table_in_teams-selected_player-sale_price_input`=2e6,
+      `players_in_teams-players_table_in_teams-selected_player-submit_put_on_market`=1)
+    stopifnot(length(mutation_calls)==0L)
+    session$setInputs(`players_in_teams-players_table_in_teams-players_table__reactable__selected`=NA_integer_)
+    idx<-match('p1',table_env$players_table_filtered_RV()$id)
+    session$setInputs(`players_in_teams-players_table_in_teams-players_table__reactable__selected`=idx,
+      `players_in_teams-players_table_in_teams-selected_player-btn_put_on_market`=2)
+    session$setInputs(selected_league='champ')
+    stopifnot(verify_team('champ')==a_points,is.null(table_env$selected_player_id_RV()),length(action_env$modal_context_RV())==0L)
+    session$setInputs(`players_in_teams-players_table_in_teams-selected_player-submit_put_on_market`=2)
+    stopifnot(length(mutation_calls)==0L)
+    for(id in c('champ','champ-b','champ')) {
+      session$setInputs(tabs='intelligence',selected_league=id,`intelligence-player_id`='m1')
+      d<-get('intelligence-',app_multi_envs)$loaded();f<-fixture(id)
+      stopifnot(d$championship_id==id,d$finance$cash==f$finance$cash,
+        setequal(d$teams$teamid,f$teams$teamid),setequal(d$model$managers$manager_id,f$teams$teamid),
+        d$market$value[match('m1',d$market$id)]==f$market$value[1])
+    }
+    session$setInputs(tabs='rivals',selected_league='champ',`rivals-league_finances_table__reactable__selected`=2L)
+    rival_env<-get('rivals-',app_multi_envs);stopifnot(rival_env$selected_rival_team_id()=='team2')
+    session$setInputs(selected_league='champ-b')
+    stopifnot(is.null(rival_env$selected_rival_team_id()),setequal(rival_env$league_finances_RV()$team_finances$teamid,b_teams$teamid))
+    session$setInputs(selected_league='champ');stopifnot(is.null(rival_env$selected_rival_team_id()))
+    session$setInputs(tabs='notifications',`notifications-current_league`=TRUE,`notifications-read_filter`='all',
+      `notifications-source_filter`='All',`notifications-event_filter`='All',`notifications-open_player`='notice-champ')
+    notice_env<-get('notifications-',app_multi_envs)
+    stopifnot(notice_env$detail_context()$championship_id=='champ',all(notice_env$filtered()$championship_id=='champ'))
+    session$setInputs(selected_league='champ-b')
+    stopifnot(is.null(notice_env$selected()),is.null(notice_env$detail_context()),
+      all(notice_env$filtered()$championship_id=='champ-b'),setequal(notice_env$local()$championship_id,c('champ','champ-b')))
+    session$setInputs(`notifications-mark_read`='insights:private-champ')
+    stopifnot(length(mutation_calls)==0L)
+    session$setInputs(selected_league='champ')
+    stopifnot(setequal(notice_env$local()$championship_id,c('champ','champ-b')),is.null(notice_env$selected()))
+    session$setInputs(tabs='automation',`automation-policy_id`='policy-champ')
+    automation_env<-get('automation-',app_multi_envs);stopifnot(automation_env$own_policy()$championship_id=='champ')
+    session$setInputs(selected_league='champ-b',`automation-pause`=1)
+    stopifnot(is.null(automation_env$own_policy()),length(mutation_calls)==0L,
+      all(vapply(automation_env$policies(),function(x)x$championship_id=='champ-b',logical(1))))
+  })
+  suppressMessages(untrace('moduleServer',where=asNamespace('shiny')))
+  if(had_module_override)moduleServer<-old_module_override else rm(moduleServer,envir=.GlobalEnv)
+  for(name in names(originals))assign(name,originals[[name]],envir=.GlobalEnv)
+})
+app_check('no HTTP or live database mutation attempts', stopifnot(offline_http_attempts==0L))
+cat('Offline application lifecycle:',app_checks,'checks plus 9 rendered tabs passed.\n')
+for(method in c('GET','POST','PUT','PATCH','DELETE')) suppressMessages(untrace(method,where=asNamespace('httr')))

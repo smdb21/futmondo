@@ -1,5 +1,7 @@
 # Players In Teams Module Documentation
 
+The Your Team page now includes a checked-by-default automatic coach preference. Hiring is explicitly pending a verified endpoint; preferences are isolated per account/league/team for the current app session. See [coach preference contracts and tests](coach_hiring.md).
+
 This document describes the player roster visualization components rendered within the Shiny application, including the Liquid Cash Plot.
 
 ---

@@ -1,0 +1,495 @@
+# Unattended, opt-in automation. All imports and APIs remain in the project.
+# See docs/automation.md for policy, lease, encryption and recovery contracts.
+automation_actions <- function() c("bid", "modify_bid", "cancel_bid", "list", "delist", "accept_bid", "reject_bid", "clause")
+
+automation_key <- function(value = Sys.getenv("AUTOMATION_SESSION_KEY")) {
+  key <- tryCatch(openssl::base64_decode(value), error = function(e) raw())
+  if (length(key) != 32L) stop("AUTOMATION_SESSION_KEY must contain 32 random bytes encoded as base64.")
+  key
+}
+
+encrypt_automation_session <- function(login, expires_at, key = automation_key()) {
+  stopifnot(valid_login(login))
+  raw <- charToRaw(jsonlite::toJSON(list(login = as.list(login), expires_at = expires_at), auto_unbox = TRUE))
+  enc <- openssl::sha256(c(key, charToRaw("session-encryption-v1")))
+  mac <- openssl::sha256(c(key, charToRaw("session-authentication-v1")))
+  cipher <- openssl::aes_gcm_encrypt(raw, key = unclass(enc))
+  iv <- attr(cipher, "iv")
+  signature <- openssl::sha256(c(iv, unclass(cipher)), key = unclass(mac))
+  list(version = 1L, iv = openssl::base64_encode(iv),
+    ciphertext = openssl::base64_encode(unclass(cipher)), mac = openssl::base64_encode(unclass(signature)))
+}
+
+decrypt_automation_session <- function(envelope, key = automation_key(), now = Sys.time()) {
+  if (!identical(as.integer(envelope$version), 1L)) stop("Unsupported session format")
+  iv <- openssl::base64_decode(envelope$iv)
+  cipher <- openssl::base64_decode(envelope$ciphertext)
+  supplied <- openssl::base64_decode(envelope$mac)
+  mac_key <- openssl::sha256(c(key, charToRaw("session-authentication-v1")))
+  expected <- unclass(openssl::sha256(c(iv,cipher),key=unclass(mac_key)))
+  if (length(supplied)!=length(expected) ||
+      sum(bitwXor(as.integer(supplied),as.integer(expected)))!=0L) stop("Session authentication failed")
+  enc <- openssl::sha256(c(key,charToRaw("session-encryption-v1")))
+  value <- jsonlite::fromJSON(rawToChar(openssl::aes_gcm_decrypt(cipher,key=unclass(enc),iv=iv)))
+  if (is.na(fm_time(value$expires_at)) || fm_time(value$expires_at)<=now) stop("Session expired; reconnect your account")
+  token <- unlist(value$login)
+  if (!valid_login(token)) stop("Invalid session")
+  token
+}
+
+validate_automation_policy <- function(policy, now = Sys.time()) {
+  errors <- character()
+  actions <- as.character(unlist(policy$actions))
+  if (!length(actions) || any(!actions %in% automation_actions())) errors <- c(errors,"Choose supported actions")
+  targets <- as.character(unlist(policy$allowed_player_ids))
+  if (!length(targets) || anyNA(targets) || any(!nzchar(targets))) errors <- c(errors,"Select approved player IDs")
+  for (field in c("max_per_action","total_spending_limit","minimum_sale_price")) {
+    value <- fm_number(policy[[field]])
+    if (!is.finite(value) || value<0) errors <- c(errors,paste(field,"must be nonnegative"))
+  }
+  expiry <- fm_time(policy$expires_at)
+  if (length(expiry)!=1L || is.na(expiry) || expiry<=now) errors <- c(errors,"Policy must have a future expiry")
+  if (isTRUE(policy$model_driven)) {
+    if (any(actions!="bid")) errors <- c(errors,"Model amounts are supported only for normal-market bids")
+    ratio <- fm_number(policy$execution_ratio)
+    if (!is.finite(ratio) || ratio<=0 || ratio>1) errors <- c(errors,"Executable resale ratio must be greater than zero and at most one")
+  }
+  list(ok=!length(errors),errors=errors)
+}
+
+# Only fully checked, completed observation days count toward the live gate.
+automation_shadow_days <- function(history, policy, now=Sys.time()) {
+  days <- vapply(Filter(function(x) identical(x$status,"shadow") &&
+    identical(as.character(x$policy_id),as.character(policy$id)) &&
+    identical(as.character(x$user_id),as.character(policy$user_id)) &&
+    isTRUE(x$result$preflight_verified),history),function(x) fm_scalar(x$finished_at,""),character(1))
+  times <- fm_time(days)
+  started <- fm_time(policy$shadow_started_at)
+  if (length(started)!=1L || is.na(started) || as.numeric(difftime(now,started,units="days"))<14) return(0L)
+  keep <- !is.na(times) & times>=started & times<now
+  length(unique(format(times[keep],"%Y-%m-%d",tz="UTC")))
+}
+
+validate_automation_action <- function(job, policy_row, financial, roster,
+                                       now=Sys.time(), shadow_days=0L, target=NULL) {
+  deny <- function(reason) list(ok=FALSE,reason=reason)
+  p <- policy_row$policy
+  if (!isTRUE(policy_row$enabled)) return(deny("Policy paused"))
+  valid <- validate_automation_policy(p,now)
+  if (!valid$ok) return(deny(paste(valid$errors,collapse="; ")))
+  if (!fm_scalar(policy_row$mode,"") %in% c("shadow","live")) return(deny("Unknown policy mode"))
+  for (key in c("user_id","championship_id","user_team_id"))
+    if (!identical(fm_scalar(job[[key]],""),fm_scalar(policy_row[[key]],""))) return(deny("Account or league mismatch"))
+  if (!fm_scalar(job$action_type,"") %in% unlist(p$actions)) return(deny("Action is not authorized"))
+  player <- fm_scalar(job$payload$player_id,"")
+  if (!player %in% unlist(p$allowed_player_ids)) return(deny("Player is not authorized"))
+  if (!is.list(financial) || !identical(financial$status,"ok")) return(deny("Financial state unavailable"))
+  age <- as.numeric(difftime(now,financial$observed_at,units="secs"))
+  if (length(age)!=1L || !is.finite(age) || age>30 || age< -5) return(deny("Financial state is stale"))
+  if (!is.data.frame(roster) || !"id" %in% names(roster) || anyNA(roster$id) || anyDuplicated(roster$id))
+    return(deny("Roster ownership could not be verified"))
+  if (!is.null(target$verified_at)) {
+    target_age <- as.numeric(difftime(now,fm_time(target$verified_at),units="secs"))
+    if (length(target_age)!=1L || !is.finite(target_age) || target_age>30 || target_age< -5)
+      return(deny("Target verification is stale"))
+  }
+  if (job$action_type %in% c("bid","modify_bid","cancel_bid") && !is.null(target$listing_expires_at)) {
+    expiry <- fm_time(target$listing_expires_at)
+    if (length(expiry)!=1L || is.na(expiry) || expiry<=now+30) return(deny("Auction deadline changed during preflight"))
+  }
+  amount <- fm_number(job$payload$amount)
+  buys <- job$action_type %in% c("bid","modify_bid","clause")
+  old_bid <- if (job$action_type=="modify_bid" && isTRUE(target$ok)) fm_number(target$previous_amount,0) else 0
+  charge <- max(0,amount-old_bid)
+  if (buys) {
+    if (!is.finite(amount) || amount<=0 || amount>fm_number(p$max_per_action)) return(deny("Per-action spending limit"))
+    limit <- fm_number(financial$legal_bid_limit)
+    if (!is.finite(limit) || amount>limit) return(deny("API bidding limit is unavailable or exceeded"))
+    used <- fm_number(policy_row$spent); pending <- fm_number(policy_row$reserved)
+    if (!is.finite(used) || used<0 || !is.finite(pending) || pending<0) return(deny("Policy spending could not be verified"))
+    if (charge+used+pending>fm_number(p$total_spending_limit)) return(deny("Total spending limit"))
+    # A verified modification replaces its previous commitment. All other
+    # acquisitions require positive cash after already withheld commitments.
+    if (!is.finite(fm_number(financial$spendable_budget)) || charge>=financial$spendable_budget)
+      return(deny("Insufficient cash after commitments"))
+    if (!is.finite(fm_number(financial$cash)) || financial$cash<=0 || financial$spendable_budget>financial$cash)
+      return(deny("Cash balance is not verified positive"))
+    count <- fm_number(financial$roster_count); cap <- fm_number(financial$roster_cap)
+    if (!is.finite(count) || count<0 || count!=floor(count) || !is.finite(cap) || cap<11 || cap!=floor(cap))
+      return(deny("Roster capacity is invalid"))
+    slots <- cap-count
+    outstanding <- fm_number(financial$commitments$count)
+    if (!identical(financial$commitments$completeness,"complete") ||
+        !is.finite(slots) || !is.finite(outstanding) ||
+        (job$action_type!="modify_bid" && slots<=outstanding)) return(deny("No verified roster capacity"))
+    if (player %in% as.character(roster$id)) return(deny("Player is already owned"))
+  }
+  own <- player %in% as.character(roster$id)
+  if (job$action_type %in% c("list","delist","accept_bid","reject_bid") && !own)
+    return(deny("Player is no longer owned"))
+  if (job$action_type %in% c("list","accept_bid") &&
+      (!is.finite(amount) || amount<fm_number(p$minimum_sale_price))) return(deny("Sale-price floor"))
+  if (job$action_type=="accept_bid") {
+    rules <- financial$lineup_rules
+    if (is.null(rules) || !isTRUE(rules$verified)) return(deny("League lineup rules are not verified"))
+    rules$exclude_unavailable <- FALSE
+    after <- roster[as.character(roster$id)!=player,,drop=FALSE]
+    xi <- tryCatch(optimize_starting_xi(after,formation="auto",rules=rules),error=function(e)NULL)
+    if (!isTRUE(xi$feasible)) return(deny("Sale would remove the legal XI"))
+  }
+  if (identical(policy_row$mode,"live")) {
+    if(!isTRUE(financial$lineup_rules$verified) || identical(financial$lineup_rules$club_limit_status,'unknown'))
+      return(deny('Full league rules are not verified'))
+    deadline <- fm_time(financial$rules$deadline)
+    if (!isTRUE(financial$rules$solvency_verified) || length(deadline)!=1L || is.na(deadline) || deadline<=now+30)
+      return(deny("Round deadline and solvency rules are not verified"))
+    if (!is.finite(shadow_days) || shadow_days<14L) return(deny("Fourteen verified observation days are required"))
+    if ((isTRUE(job$payload$model_driven) || isTRUE(p$model_driven)) && !isTRUE(policy_row$model_validated))
+      return(deny("Model has not passed chronological validation"))
+  }
+  list(ok=TRUE,reason="ok",spending_charge=if(buys)charge else 0)
+}
+
+execute_automation_action <- function(job, login) {
+  p <- job$payload; championship <- job$championship_id; team <- job$user_team_id
+  tryCatch({
+    result <- switch(job$action_type,
+      bid=buy_clause(login,championship,team,p$player_id,p$player_slug,p$amount,isClause=FALSE),
+      modify_bid=modify_bid(login,championship,team,p$player_id,p$bid_id,p$amount),
+      cancel_bid=cancel_bid(login,championship,team,p$bid_id),
+      list=put_player_on_market(login,championship,team,p$player_id,p$amount),
+      delist=cancel_player_sell(login,championship,team,p$player_id),
+      accept_bid=accept_bid(login,championship,team,p$player_id,p$bid_id),
+      reject_bid=reject_bid(login,championship,team,p$player_id,p$bid_id),
+      clause=buy_roster_clause(login,championship,team,p$player_id,p$player_slug,p$amount),
+      stop("Unsupported action"))
+    if (isTRUE(result)) return(list(status="succeeded",code="api.general.ok"))
+    # Legacy logical FALSE discards the API code; absence of a known response is
+    # not proof of rejection. The clause adapter also catches network errors.
+    if (!is.list(result)) return(list(status="uncertain",code="reconcile_before_retry"))
+    code <- fm_scalar(result$code,"")
+    if (isTRUE(result$success) && identical(code,"api.general.ok")) list(status="succeeded",code=code) else
+      if (identical(result$success,FALSE) && startsWith(code,"api.") && code!="api.general.ok")
+        list(status="failed",code=code) else list(status="uncertain",code="reconcile_before_retry")
+  },error=function(e)list(status="uncertain",code="reconcile_before_retry"))
+}
+
+read_automation_rows <- function(table, filters) {
+  d <- supabase_get(table,filters)
+  if (is.null(d)) return(structure(list(),status="unavailable"))
+  lapply(seq_len(nrow(d)), function(i) {
+    r <- lapply(d,function(col) if (is.list(col) && !is.data.frame(col)) col[[i]] else col[i])
+    for (name in names(d)) if (is.data.frame(d[[name]])) r[[name]] <- as.list(d[[name]][i,,drop=FALSE])
+    r
+  })
+}
+
+automation_services <- function() list(
+  policies=function(id)read_automation_rows("automation_policies",list(id=paste0("eq.",id))),
+  sessions=function(id)read_automation_rows("automation_sessions",list(user_id=paste0("eq.",id))),
+  jobs=function(id)read_automation_rows("automation_jobs",list(policy_id=paste0("eq.",id))),
+  financial=get_financial_snapshot, roster=get_players_from_team,
+  summary=get_player_summary, market=get_market_players, listings=get_my_market_players,
+  offers=get_roster_bids, memberships=get_active_championships,
+  execute=execute_automation_action, begin=begin_automation_execution,
+  clear_cache=clear_api_cache, now=Sys.time)
+
+# Query actual account-scoped targets, not stale catalog rows. Every action
+# category has a verified read contract; unrecognised responses fail closed.
+verify_automation_target <- function(job,login,services=automation_services(),now=Sys.time()) {
+  deny <- function(reason) list(ok=FALSE,reason=reason)
+  p <- job$payload; c <- job$championship_id; t <- job$user_team_id
+  summary <- tryCatch(services$summary(login,c,t,p$player_id),error=function(e)NULL)
+  if (is.null(summary) || !identical(fm_scalar(summary$data$id,""),fm_scalar(p$player_id,"")))
+    return(deny("Target identity could not be verified"))
+  owner <- fm_scalar(summary$championship$owner$`_id` %||% summary$championship$owner$id,"")
+  if (job$action_type %in% c("bid","modify_bid","cancel_bid")) {
+    market <- tryCatch(services$market(login,c,t),error=function(e)NULL)
+    if (!is.data.frame(market) || !all(c("id","expirationDate","price","computer","type","isClause") %in% names(market)))
+      return(deny("Market availability could not be verified"))
+    target <- market[!is.na(market$id) & as.character(market$id)==p$player_id,,drop=FALSE]
+    if (nrow(target)!=1L) return(deny("Target is no longer listed"))
+    deadline <- fm_time(target$expirationDate)
+    if (length(deadline)!=1L || is.na(deadline) || deadline<=now+30) return(deny("Auction deadline is too close or unavailable"))
+    if (nzchar(owner) || !isTRUE(as.logical(target$computer)) || !identical(fm_scalar(target$type),"normal") ||
+        !identical(as.logical(target$isClause),FALSE)) return(deny("Only verified normal system auctions are supported"))
+    if (!is.null(p$listing_expires_at) && !identical(fm_scalar(p$listing_expires_at),fm_scalar(target$expirationDate)))
+      return(deny("Auction was relisted after this job was planned"))
+    bid_id <- fm_scalar(target$bid_id,"")
+    previous <- fm_number(target$bid_price)
+    if (job$action_type=="bid" && nzchar(bid_id)) return(deny("An own bid already exists; authorize modification instead"))
+    if (job$action_type %in% c("modify_bid","cancel_bid") &&
+        (!nzchar(bid_id) || !identical(bid_id,fm_scalar(p$bid_id,"")) || !is.finite(previous)))
+      return(deny("Own bid changed or disappeared"))
+    if (job$action_type %in% c("bid","modify_bid") &&
+        (!is.finite(fm_number(target$price)) || fm_number(p$amount)<fm_number(target$price)))
+      return(deny("Bid is below the current asking price"))
+    return(list(ok=TRUE,reason="ok",previous_amount=if(is.finite(previous))previous else 0,
+      listing_expires_at=fm_scalar(target$expirationDate)))
+  }
+  if (job$action_type=="clause") {
+    clause <- summary$championship$clause
+    unlock <- fm_time(clause$date)
+    if (!nzchar(owner) || owner==t || !identical(clause$transferred,FALSE) ||
+        length(unlock)!=1L || is.na(unlock) || unlock>now ||
+        !is.finite(fm_number(clause$price)) || fm_number(clause$price)!=fm_number(p$amount))
+      return(deny("Clause ownership, availability or price changed"))
+    return(list(ok=TRUE,reason="ok",owner_id=owner))
+  }
+  if (!identical(owner,as.character(t))) return(deny("Target ownership could not be verified"))
+  if (job$action_type %in% c("accept_bid","reject_bid")) {
+    offers <- tryCatch(services$offers(login,c,t),error=function(e)NULL)
+    if (!is.data.frame(offers) || !all(c("id","bid_id","bid_price") %in% names(offers)))
+      return(deny("Offers unavailable"))
+    matches <- offers[!is.na(offers$bid_id) & !is.na(offers$id) &
+      offers$bid_id==fm_scalar(p$bid_id,"") & offers$id==p$player_id,,drop=FALSE]
+    if (nrow(matches)!=1L || !is.finite(fm_number(matches$bid_price)) ||
+        fm_number(matches$bid_price)!=fm_number(p$amount)) return(deny("Offer changed or disappeared"))
+    if (isTRUE(summary$championship$clause$transferred)) return(deny("A delayed transfer is already in progress"))
+    return(list(ok=TRUE,reason="ok",offer_id=fm_scalar(matches$bid_id)))
+  }
+  if (job$action_type %in% c("list","delist")) {
+    listings <- tryCatch(services$listings(login,c,t),error=function(e)NULL)
+    if (!is.data.frame(listings) || (nrow(listings)>0 && !"id" %in% names(listings)))
+      return(deny("Own listings unavailable"))
+    listed <- nrow(listings)>0 && p$player_id %in% as.character(listings$id)
+    if (job$action_type=="list" && listed) return(deny("Player is already listed"))
+    if (job$action_type=="delist" && !listed) return(deny("Player is no longer listed"))
+    if (isTRUE(summary$championship$clause$transferred)) return(deny("A delayed transfer is already in progress"))
+    return(list(ok=TRUE,reason="ok"))
+  }
+  deny("Unsupported action")
+}
+
+run_automation_job <- function(job, now=Sys.time(), services=NULL) {
+  if (is.null(services)) services <- automation_services()
+  policies <- services$policies(job$policy_id)
+  if(length(policies)!=1L) return(list(status="blocked",reason="Policy unavailable"))
+  policy <- policies[[1]]
+  sessions <- services$sessions(job$user_id)
+  if(length(sessions)!=1L) return(list(status="blocked",reason="Reconnect background session"))
+  login <- tryCatch(decrypt_automation_session(sessions[[1]]$encrypted_session,now=now),error=function(e)NULL)
+  if(is.null(login) || !identical(as.character(login[["userid"]]),as.character(job$user_id)))
+    return(list(status="blocked",reason="Session expired or account mismatch"))
+  services$clear_cache(login[["userid"]])
+  active <- tryCatch(services$memberships(login)$championships,error=function(e)list())
+  member <- any(vapply(active,function(c)identical(fm_scalar(c$id %||% c$`_id`),as.character(job$championship_id)) &&
+    identical(fm_scalar(c$userteam$id %||% c$userteam$`_id`),as.character(job$user_team_id)),logical(1)))
+  if(!member) return(list(status="blocked",reason="League membership could not be verified"))
+  target_started_at <- services$now()
+  target <- verify_automation_target(job,login,services,target_started_at)
+  target$verified_at <- format(target_started_at,"%Y-%m-%dT%H:%M:%OSZ",tz="UTC")
+  if(!target$ok) return(list(status="blocked",reason=target$reason))
+  fin <- tryCatch(services$financial(login,job$championship_id,job$user_team_id),error=function(e)NULL)
+  roster <- tryCatch(services$roster(login,job$championship_id,job$user_team_id),error=function(e)NULL)
+  history <- services$jobs(job$policy_id)
+  if(identical(attr(history,"status"),"unavailable")) return(list(status="blocked",reason="Spending history unavailable"))
+  spending_actions <- c("bid","modify_bid","clause")
+  policy$spent <- sum(vapply(history,function(x) if(identical(x$status,"succeeded") && x$action_type %in% spending_actions)
+    fm_number(x$result$spending_charge,fm_number(x$payload$amount,Inf)) else 0,numeric(1)))
+  policy$reserved <- sum(vapply(history,function(x) if(!identical(x$id,job$id) &&
+    x$status %in% c("pending","running","uncertain") && x$action_type %in% spending_actions)
+      fm_number(x$payload$amount,Inf) else 0,numeric(1)))
+  days <- automation_shadow_days(history,policy,now)
+  valid <- validate_automation_action(job,policy,fin,roster,services$now(),days,target)
+  if(!valid$ok) return(list(status="blocked",reason=valid$reason))
+  observation <- list(preflight_verified=TRUE,spending_charge=valid$spending_charge,
+    cash=fin$cash,spendable_budget=fin$spendable_budget,legal_bid_limit=fin$legal_bid_limit,
+    target=target,observed_at=format(now,"%Y-%m-%dT%H:%M:%OSZ",tz="UTC"))
+  if(policy$mode=="shadow") return(c(list(status="shadow",reason="Observation only; no account action"),observation))
+  # Atomic fence renews only our lease, checks the policy has not been paused,
+  # and pins the account lock before the external request can start. A crashed
+  # worker or timeout retains this lock until conclusive reconciliation.
+  if(!isTRUE(services$begin(job,observation))) return(list(status="blocked",reason="Execution lease or policy changed"))
+  result <- services$execute(job,login)
+  c(result,observation)
+}
+
+automation_rpc <- function(name,payload=list()) {
+  tryCatch({
+    if(!nzchar(get_sb_url()) || !nzchar(get_sb_key())) return(NULL)
+    r <- httr::POST(paste0(get_sb_url(),"/rest/v1/rpc/",name),
+      body=jsonlite::toJSON(payload,auto_unbox=TRUE,null="null",na="null"),
+      httr::add_headers(apikey=get_sb_key(),Authorization=paste("Bearer",get_sb_key()),
+        `Content-Type`="application/json"),httr::timeout(15),httr::config(connecttimeout=5))
+    if(!httr::status_code(r) %in% 200:299) return(NULL)
+    jsonlite::fromJSON(httr::content(r,as="text",encoding="UTF-8"),simplifyVector=FALSE)
+  },error=function(e)NULL)
+}
+
+claim_automation_job <- function() {
+  result <- automation_rpc("claim_automation_job",structure(list(),names=character()))
+  if(is.list(result) && length(result)) result[[1]] else NULL
+}
+
+begin_automation_execution <- function(job,observation) {
+  isTRUE(automation_rpc("begin_automation_execution",list(p_job_id=job$id,
+    p_lease_token=job$lease_token,p_observation=observation)))
+}
+
+finish_automation_job <- function(job,result) {
+  isTRUE(automation_rpc("finish_automation_job",list(p_job_id=job$id,
+    p_lease_token=job$lease_token,p_result=result)))
+}
+
+# An INSERT with ignore-duplicates is atomic. Never merge a freshly planned
+# 'pending' row over a job another worker has already claimed or completed.
+insert_automation_job <- function(job) {
+  tryCatch({
+    if(!nzchar(get_sb_url()) || !nzchar(get_sb_key())) return(FALSE)
+    r <- httr::POST(paste0(get_sb_url(),"/rest/v1/automation_jobs"),query=list(on_conflict="idempotency_key"),
+      body=jsonlite::toJSON(job,auto_unbox=TRUE,na="null"),httr::add_headers(apikey=get_sb_key(),
+        Authorization=paste("Bearer",get_sb_key()),`Content-Type`="application/json",
+        Prefer="resolution=ignore-duplicates,return=minimal"),httr::timeout(15),httr::config(connecttimeout=5))
+    httr::status_code(r) %in% 200:299
+  },error=function(e)FALSE)
+}
+
+plan_automation_jobs <- function(policy, login, now=Sys.time()) {
+  p <- policy$policy
+  if(!isTRUE(policy$enabled) || !validate_automation_policy(p,now)$ok) return(list())
+  catalog <- get_championship_players(login,policy$championship_id)
+  fin <- get_financial_snapshot(login,policy$championship_id,policy$user_team_id)
+  market <- get_market_players(login,policy$championship_id,policy$user_team_id)
+  if(!is.data.frame(catalog) || !"id" %in% names(catalog)) return(list())
+  jobs <- list()
+  for(player_id in unlist(p$allowed_player_ids)) {
+    player <- catalog[as.character(catalog$id)==player_id,,drop=FALSE]
+    if(nrow(player)!=1L) next
+    for(action in unlist(p$actions)) {
+      amount <- fm_number(p$amount,0)
+      payload <- list(player_id=player_id,player_slug=fm_scalar(player$slug,""),amount=amount,
+        model_driven=isTRUE(p$model_driven),horizon=7L)
+      if(action %in% c("bid","modify_bid","cancel_bid")) {
+        target <- if(is.data.frame(market) && "id" %in% names(market))
+          market[as.character(market$id)==player_id,,drop=FALSE] else NULL
+        if(is.null(target) || nrow(target)!=1L) next
+        payload$listing_expires_at <- fm_scalar(target$expirationDate,"")
+        if(action %in% c("modify_bid","cancel_bid")) {
+          payload$bid_id <- fm_scalar(target$bid_id,"")
+          if(!nzchar(payload$bid_id)) next
+        }
+      }
+      if(action=="bid" && isTRUE(p$model_driven)) {
+        auctions <- read_model_auctions(policy$championship_id)
+        bids <- read_bid_observations(policy$championship_id)
+        model <- fit_rival_bid_model(auctions,bids,as_of=now)
+        maximum <- min(fm_number(p$max_per_action,0),fm_number(fin$spendable_budget,0),fm_number(fin$legal_bid_limit,0))
+        curve <- predict_auction_win_curve(model,seq(0,maximum,length.out=101),
+          reference_value=fm_number(player$value),user_id=policy$user_team_id)
+        player <- preserve_observation_time(player)
+        resale <- forecast_resale_values(player,read_player_price_history(policy$championship_id,player_id),
+          as_of=now,horizons=7,execution_ratio=fm_number(p$execution_ratio))
+        choice <- select_profit_bid(curve,if(nrow(resale))resale$conservative_proceeds[1] else NA_real_,
+          spendable_cash=maximum,max_bid=maximum)
+        payload$amount <- fm_number(choice$recommended_bid,0)
+        payload$forecast <- choice[c("action","reason","expected_profit","win_probability")]
+      }
+      if(action %in% c("accept_bid","reject_bid")) {
+        offers <- get_roster_bids(login,policy$championship_id,policy$user_team_id)
+        candidates <- if(is.data.frame(offers) && all(c("id","bid_id","bid_price") %in% names(offers)))
+          offers[offers$id==player_id & is.finite(offers$bid_price),,drop=FALSE] else NULL
+        if(is.null(candidates)||!nrow(candidates)) next
+        if(action=="accept_bid") candidates <- candidates[candidates$bid_price>=fm_number(p$minimum_sale_price),,drop=FALSE]
+        if(action=="reject_bid") candidates <- candidates[candidates$bid_price<fm_number(p$minimum_sale_price),,drop=FALSE]
+        if(!nrow(candidates)) next
+        candidate <- candidates[which.max(candidates$bid_price),,drop=FALSE]
+        payload$bid_id <- as.character(candidate$bid_id);payload$amount <- fm_number(candidate$bid_price)
+      }
+      if(action=="clause") {
+        detail <- get_player_summary(login,policy$championship_id,policy$user_team_id,player_id)
+        payload$amount <- fm_number(detail$championship$clause$price)
+      }
+      identity <- automation_opportunity_key(policy,player_id,action,payload)
+      jobs[[length(jobs)+1L]] <- list(id=paste0("job_",as.character(openssl::md5(charToRaw(identity)))),
+        user_id=policy$user_id,policy_id=policy$id,championship_id=policy$championship_id,
+        user_team_id=policy$user_team_id,action_type=action,payload=payload,
+        idempotency_key=identity,status="pending")
+    }
+  }
+  jobs
+}
+
+automation_opportunity_key <- function(policy,player_id,action,payload) {
+  version <- as.character(openssl::sha256(charToRaw(jsonlite::toJSON(policy$policy,auto_unbox=TRUE))))
+  opportunity <- list(listing=payload$listing_expires_at,bid=payload$bid_id,
+    amount=payload$amount,clause_effective_at=payload$effective_at)
+  paste(policy$id,version,player_id,action,
+    as.character(openssl::sha256(charToRaw(jsonlite::toJSON(opportunity,auto_unbox=TRUE)))),sep=':')
+}
+
+schedule_automation_policies <- function(now=Sys.time()) {
+  stamp <- format(now,"%Y-%m-%dT%H:%M:%OSZ",tz="UTC")
+  policies <- read_automation_rows("automation_policies",list(enabled="eq.true",expires_at=paste0("gt.",stamp),
+    next_run_at=paste0("lte.",stamp),limit=100))
+  for(policy in policies) {
+    sessions <- read_automation_rows("automation_sessions",list(user_id=paste0("eq.",policy$user_id)))
+    login <- if(length(sessions)==1L) tryCatch(decrypt_automation_session(sessions[[1]]$encrypted_session,now=now),error=function(e)NULL) else NULL
+    if(is.null(login) || !identical(fm_scalar(login[["userid"]]),fm_scalar(policy$user_id))) {
+      supabase_patch("automation_policies",list(enabled=FALSE,pause_reason="Background session expired; reconnect and resume observation"),
+        list(id=paste0("eq.",policy$id)))
+      next
+    }
+    planning_error <- ""
+    jobs <- tryCatch(plan_automation_jobs(policy,login,now),error=function(e) {
+      planning_error <<- "Planning data or model output unavailable; collection will retry"
+      list()
+    })
+    inserted <- vapply(jobs,insert_automation_job,logical(1))
+    if(any(!inserted)) planning_error <- "Job storage unavailable; scheduling will retry"
+    supabase_patch("automation_policies",list(last_error=planning_error),list(id=paste0("eq.",policy$id)))
+    supabase_patch("automation_policies",list(next_run_at=format(now+300,"%Y-%m-%dT%H:%M:%OSZ",tz="UTC")),
+      list(id=paste0("eq.",policy$id)))
+  }
+  invisible(length(policies))
+}
+
+reconcile_automation_job <- function(job,login,services=NULL) {
+  # Reconciliation never replays an action or infers execution from an absent
+  # bid/offer. A positive current-state match is sufficient for bid/listing
+  # acknowledgements, while settled transfers require a matching ledger event.
+  if(!valid_login(login) || !identical(fm_scalar(login[["userid"]]),fm_scalar(job$user_id)))
+    return(list(status="uncertain",reason="Account mismatch"))
+  if(is.null(services)) services <- automation_services()
+  services$clear_cache(login[["userid"]])
+  p <- job$payload
+  summary <- tryCatch(services$summary(login,job$championship_id,job$user_team_id,p$player_id),error=function(e)NULL)
+  if(is.null(summary) || !identical(fm_scalar(summary$data$id),fm_scalar(p$player_id)))
+    return(list(status="uncertain",reason="Target unavailable"))
+  if(job$action_type %in% c("bid","modify_bid")) {
+    listings <- tryCatch(services$market(login,job$championship_id,job$user_team_id),error=function(e)NULL)
+    if(is.data.frame(listings) && all(c("id","bid_id","bid_price","expirationDate") %in% names(listings))) {
+      match <- listings[!is.na(listings$id) & listings$id==p$player_id,,drop=FALSE]
+      if(nrow(match)==1L && nzchar(fm_scalar(match$bid_id,"")) &&
+         identical(fm_number(match$bid_price),fm_number(p$amount)) &&
+         identical(fm_scalar(match$expirationDate),fm_scalar(p$listing_expires_at)))
+        return(list(status="succeeded",reason="Own bid and auction verified by API",
+          spending_charge=fm_number(job$result$spending_charge,fm_number(p$amount))))
+    }
+  }
+  if(job$action_type=="list") {
+    listings <- tryCatch(services$listings(login,job$championship_id,job$user_team_id),error=function(e)NULL)
+    if(is.data.frame(listings) && all(c("id","price") %in% names(listings))) {
+      match <- listings[!is.na(listings$id) & listings$id==p$player_id,,drop=FALSE]
+      owner <- fm_scalar(summary$championship$owner$`_id` %||% summary$championship$owner$id,"")
+      if(nrow(match)==1L && owner==job$user_team_id && identical(fm_number(match$price),fm_number(p$amount)))
+        return(list(status="succeeded",reason="Own listing and price verified by API",spending_charge=0))
+    }
+  }
+  list(status="uncertain",reason="No conclusive API confirmation. Account remains paused; review the event in Futmondo before reconciling again.")
+}
+
+
+record_automation_alert <- function(job,result) {
+  if(!fm_scalar(result$status,"") %in% c("failed","blocked","uncertain")) return(invisible(FALSE))
+  tryCatch({
+    code <- supabase_post_direct("user_smart_alerts",list(user_id=job$user_id,
+      user_team_id=job$user_team_id,championship_id=job$championship_id,
+      player_id=job$payload$player_id,event_key=paste("automation",job$id,result$status,sep=":"),
+      alert_type="automation",title=paste("Automation",result$status),
+      message=paste(job$action_type,":",fm_scalar(result$reason,result$code %||% "Review execution history")),
+      severity=if(result$status=="uncertain")"danger" else "warning",is_read=FALSE),
+      "user_id,championship_id,event_key")
+    invisible(is.numeric(code) && code %in% 200:299)
+  },error=function(e)invisible(FALSE))
+}

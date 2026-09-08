@@ -1606,7 +1606,7 @@ Returns all active championships for the authenticated user, including champions
 
 **Purpose & Functional Description:**
 
-Returns the Dream Team configuration for a user team, including the last update date and PRO status.
+Reads a user-team configuration response containing `date` and `pro`. The date semantics are not verified. This is not a coach-hiring endpoint and does not confirm an active coach contract. See [coach capture requirements](coach_hiring.md).
 
 **Request Headers:**
 
@@ -1633,7 +1633,7 @@ Returns the Dream Team configuration for a user team, including the last update 
 ```json
 {
   "answer": {
-    "date": "<string: ISO 8601 last update>",
+    "date": "<string: observed ISO 8601 date; semantics unverified>",
     "pro": "<boolean>"
   },
   "query": {

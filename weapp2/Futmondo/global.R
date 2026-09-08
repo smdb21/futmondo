@@ -5,6 +5,11 @@ if (file.exists(".Renviron")) {
 source("futmondo_functions.R")
 source("supabase_connector.R")
 source("intelligence_engine.R")
+source("prediction_engine.R")
+source("background_runtime.R")
+source("automation_runtime.R")
+source("insights_runtime.R")
+source("portfolio_engine.R")
 source("Modules/Login_Module.R")
 source("Modules/Players_in_Teams_Module.R")
 source("Modules/Selected_Player_Module.R")
@@ -15,12 +20,14 @@ source("Modules/Classification_Module.R")
 source("Modules/Players_Table_Module.R")
 source("Modules/Admin_Module.R")
 source("Modules/Today_Module.R")
+source("Modules/Notifications_Module.R")
+source("Modules/Intelligence_Module.R")
+source("Modules/Automation_Module.R")
 source("utils.R")
 library(shiny)
 library(shinydashboardPlus)
 library(dplyr)
 
-init_supabase_db(verbose = FALSE)
+
 
 cfg_player_columns_to_hide <- fread(file = "player_columns_to_hide.txt", header = FALSE)[[1]]
-

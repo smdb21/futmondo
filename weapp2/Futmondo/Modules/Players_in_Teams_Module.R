@@ -4,6 +4,7 @@ players_in_teams_UI <- function(id) {
   ns <- NS(id)
   tagList(
     uiOutput(ns("team_value_box")),
+    squad_coach_UI(ns("coach")),
     tabsetPanel(
       id = ns("squad_sub_tabs"),
       type = "pills",
@@ -45,8 +46,8 @@ players_in_teams_UI <- function(id) {
             selectInput(
               ns("opt_formation"),
               "Tactical Formation",
-              choices = c("4-3-3", "4-4-2", "3-5-2", "3-4-3", "4-5-1", "5-3-2", "5-4-1"),
-              selected = "4-3-3"
+              choices = c("Best available formation" = "auto", "4-3-3", "4-4-2", "3-5-2", "3-4-3", "4-5-1", "5-3-2", "5-4-1"),
+              selected = "auto"
             )
           ),
           column(
@@ -55,11 +56,10 @@ players_in_teams_UI <- function(id) {
               ns("opt_mode"),
               "Strategy Mode",
               choices = c(
-                "Max FIS (Balanced)" = "max_fis",
-                "Safe XI (Floor & Consistency)" = "safe",
-                "Upside XI (Ceiling & xG)" = "upside",
-                "Form XI (Hot Streak)" = "form",
-                "Fixture XI (Easy Matchups)" = "fixture"
+                "Expected points (Baseline)" = "max_fis",
+                "Lower forecast range (when available)" = "safe",
+                "Upper forecast range (when available)" = "upside",
+                "Recent average points" = "form"
               ),
               selected = "max_fis"
             )
@@ -67,6 +67,8 @@ players_in_teams_UI <- function(id) {
         ),
         # Optimizer KPI summary row
         uiOutput(ns("optimizer_kpi_row")),
+        uiOutput(ns("submitted_lineup_comparison")),
+        uiOutput(ns("lineup_notes")),
         # Soccer Pitch container
         uiOutput(ns("soccer_pitch_ui")),
         # Starting XI and Bench tables in collapsible panels
@@ -95,6 +97,7 @@ players_in_teams_UI <- function(id) {
         icon = icon("calculator"),
         # Top Scenario KPI summary
         uiOutput(ns("sandbox_kpi_row")),
+        uiOutput(ns("sandbox_price_status")),
         fluidRow(
           # Left column
           column(
@@ -121,7 +124,11 @@ players_in_teams_UI <- function(id) {
               ),
               div(
                 style = "margin-top: 10px;",
-                actionButton(ns("sandbox_reset"), "Reset Sandbox", class = "btn btn-default")
+                actionButton(ns("sandbox_reset"), "Reset Sandbox", class = "btn btn-default"),
+                textInput(ns("scenario_name"), "Scenario name", placeholder = "Next round options"),
+                actionButton(ns("scenario_save"), "Save scenario"),
+                selectInput(ns("scenario_saved"), "Saved scenarios", choices = character()),
+                actionButton(ns("scenario_load"), "Load scenario")
               ),
               # Recommended Swaps feed
               uiOutput(ns("sandbox_recommendations_ui"))
@@ -136,7 +143,10 @@ players_in_teams_UI <- function(id) {
               status = "success",
               solidHeader = TRUE,
               collapsible = FALSE,
-              reactableOutput(ns("sandbox_projected_table"))
+              reactableOutput(ns("sandbox_projected_table")),
+              h4("Resulting starting XI"),
+              uiOutput(ns("sandbox_lineup_status")),
+              reactableOutput(ns("sandbox_lineup_table"))
             )
           )
         )
@@ -149,6 +159,7 @@ players_in_teams_UI <- function(id) {
 players_in_teams_Server <- function(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+    squad_coach_Server("coach", login_token, championship_id, user_team_id)
 
     # ---- helpers ----
     get_reactive_val <- function(x) {
@@ -176,6 +187,7 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
         user_team_id = user_team_id,
         teams = NULL
       )
+      players_table <- preserve_observation_time(players_table)
       players_table <- players_table %>%
         translate_player_positions()
       players_table <- players_table %>%
@@ -187,9 +199,9 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       if (!"market_inMarket" %in% colnames(players_table)) {
         players_table$market_inMarket <- FALSE
       }
-      # Check which roster players are currently listed on the market
+      # Reconcile only against the authenticated manager's own listings.
       my_mkt_df <- tryCatch({
-        get_market_players(
+        get_my_market_players(
           login = login_token(),
           championship_id = championship_id,
           user_team_id = user_team_id
@@ -198,16 +210,18 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
         print(paste0("[Market check] Fetch warning: ", e$message))
         NULL
       })
-      if (!is.null(my_mkt_df) && nrow(my_mkt_df) > 0 && "id" %in% colnames(my_mkt_df)) {
+      if (!is.null(my_mkt_df) && "id" %in% colnames(my_mkt_df)) {
         mkt_ids <- as.character(my_mkt_df$id)
         players_table$market_inMarket <- as.character(players_table$id) %in% mkt_ids
       }
 
-      # Background Sync Roster Snapshot to Supabase
+      players_table <- preserve_observation_time(players_table)
+
+      # Queue persistence after the fetched snapshot is available
       tryCatch({
-        sync_real_clubs_to_supabase(players_table)
-        sync_players_to_supabase(players_table)
-        log_player_history(players_table, championship_id)
+        defer_persistence(sync_real_clubs_to_supabase, list(players_table))
+        defer_persistence(sync_players_to_supabase, list(players_table))
+        defer_persistence(log_player_history, list(players_table, championship_id))
       }, error = function(e) {
         print(paste0("[Supabase] Roster sync warning: ", e$message))
       })
@@ -228,12 +242,14 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
           championship_id = championship_id(),
           user_team_id = user_team_id()
         )
+        mkt_df <- preserve_observation_time(mkt_df)
         if (!is.null(mkt_df) && nrow(mkt_df) > 0) {
           mkt_df <- mkt_df %>%
             translate_player_positions() %>%
             calculate_player_changes() %>%
             unify_columns()
         }
+        mkt_df <- preserve_observation_time(mkt_df)
         mkt_df
       }, error = function(e) {
         print(paste0("[Market Players RV] Fetch warning: ", e$message))
@@ -241,32 +257,48 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       })
     })
 
-    ## Liquid Cash Value (shared across tabs) ----
-    liquid_cash_RV <- reactive({
-      players_table <- players_table_RV()
-      req(players_table)
-      user_login <- get_reactive_val(login_token)
-      user_champ_id <- get_reactive_val(championship_id)
-      user_tid <- get_reactive_val(user_team_id)
+    financial_snapshot_RV <- reactive({
+      req(login_token(), championship_id(), user_team_id())
+      if (!is.null(refresh_trigger)) refresh_trigger()
+      tryCatch(get_financial_snapshot(login_token(), championship_id(), user_team_id()),
+               error = function(e) list(status = "unavailable", cash = NA_real_,
+                                        spendable_budget = NA_real_, configuration = list()))
+    })
+    liquid_cash_RV <- reactive({ financial_snapshot_RV()$cash })
+    transfer_budget_RV <- reactive({ financial_snapshot_RV()$spendable_budget })
+    submitted_lineup_RV <- reactive({
+      req(is_module_active() == TRUE, login_token(), championship_id(), user_team_id())
+      if (!is.null(refresh_trigger)) refresh_trigger()
+      tryCatch(get_lineup_from_team(login_token(), championship_id(), user_team_id()), error = function(e) NULL)
+    })
+    league_rules_RV <- reactive({
+      snapshot <- financial_snapshot_RV()
+      if (is.list(snapshot$lineup_rules)) return(snapshot$lineup_rules)
+      normalize_league_rules(list(configuration = snapshot$configuration), submitted_lineup_RV())
+    })
 
-      user_finances <- tryCatch({
-        if (!is.null(user_login) && !is.null(user_champ_id) && !is.null(user_tid)) {
-          get_user_team_info(login = user_login, championship_id = user_champ_id, user_team_id = user_tid)
-        } else {
-          NULL
-        }
-      }, error = function(e) NULL)
-
-      total_spent <- 0
-      if (!is.null(players_table) && nrow(players_table) > 0 && "buyPrice" %in% colnames(players_table)) {
-        total_spent <- sum(suppressWarnings(as.numeric(players_table$buyPrice)), na.rm = TRUE)
+    point_history_RV <- reactive({
+      req(is_module_active() == TRUE, championship_id())
+      if (!is.null(refresh_trigger)) refresh_trigger()
+      rules <- league_rules_RV()
+      history <- tryCatch(read_player_match_history(championship_id(), final_only = TRUE,
+        season=rules$season, scoring_version=rules$scoring_version), error = function(e) data.frame())
+      if (is.data.frame(history) && nrow(history) && "round" %in% names(history)) {
+        # A round number alone is reused across seasons and scoring variants.
+        season <- if ("season" %in% names(history)) history$season else "unknown"
+        scoring <- if ("scoring_version" %in% names(history)) history$scoring_version else "unknown"
+        history$round_id <- paste(season, scoring, history$round, sep = ":")
       }
-
-      liquid_cash_val <- 300000000 - total_spent
-      if (!is.null(user_finances) && !is.null(user_finances$budget) && is.numeric(user_finances$budget) && user_finances$budget > 0) {
-        liquid_cash_val <- user_finances$budget
-      }
-      liquid_cash_val
+      history
+    })
+    point_forecasts_RV <- reactive({
+      req(is_module_active() == TRUE)
+      players <- dplyr::bind_rows(players_table_RV(), market_players_RV())
+      players <- players[!duplicated(as.character(players$id)), , drop = FALSE]
+      rules <- league_rules_RV()
+      context <- list(championship_id=championship_id(),season=rules$season,scoring_version=rules$scoring_version)
+      for (key in names(context)) players[[key]] <- context[[key]]
+      forecast_fantasy_points(players, history = point_history_RV(), horizons = 1, context=context)
     })
 
     # renders ----
@@ -416,35 +448,12 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
         next_team_block <- NULL
       }
 
-      # ---- Financials: Liquid Cash, Total Spent, Total Earned ----
-      user_login <- get_reactive_val(login_token)
-      user_champ_id <- get_reactive_val(championship_id)
-      user_tid <- get_reactive_val(user_team_id)
-
-      user_finances <- tryCatch({
-        if (!is.null(user_login) && !is.null(user_champ_id) && !is.null(user_tid)) {
-          get_user_team_info(login = user_login, championship_id = user_champ_id, user_team_id = user_tid)
-        } else {
-          NULL
-        }
-      }, error = function(e) NULL)
-
+      # A real zero/negative balance is meaningful; unavailable stays unavailable.
+      financial <- financial_snapshot_RV()
+      liquid_cash_val <- financial$cash
       roster_players <- players_table_RV()
-      total_spent <- 0
-      if (!is.null(roster_players) && nrow(roster_players) > 0 && "buyPrice" %in% colnames(roster_players)) {
-        total_spent <- sum(suppressWarnings(as.numeric(roster_players$buyPrice)), na.rm = TRUE)
-      }
-
-      liquid_cash_val <- 300000000 - total_spent
-      if (!is.null(user_finances) && !is.null(user_finances$budget) && is.numeric(user_finances$budget) && user_finances$budget > 0) {
-        liquid_cash_val <- user_finances$budget
-      }
-
-      # total_volume_earned = liquid_cash_val + total_spent
-      total_volume_earned <- liquid_cash_val + total_spent
-
-      # total_volume_spent = total purchases from pressroom (or total_spent from roster)
-      total_volume_spent <- total_spent
+      costs <- if ("buyPrice" %in% names(roster_players)) suppressWarnings(as.numeric(roster_players$buyPrice)) else NA_real_
+      total_spent <- if (length(costs) && all(is.finite(costs))) sum(costs) else NA_real_
 
       # ---- Build 2x2 Grid Layout ----
 
@@ -479,44 +488,44 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
 
       # Row 2, Col 1: Available Liquid Cash & Total Volume Earned
       liquid_cash_box <- box(
-        title = "Available Liquid Cash & Total Volume Earned",
+        title = "Cash & Spending Capacity",
         width = 6,
         status = "success",
         solidHeader = TRUE,
         collapsible = FALSE,
         descriptionBlock(
-          header = format_table_currency(liquid_cash_val),
+          header = ui_financial_amount(liquid_cash_val),
           number = NULL,
           numberColor = "green",
-          text = "Available Budget"
+          text = "Cash balance"
         ),
         div(
-          style = "margin-top: 8px; font-size: 13px; color: #047857; text-align: center;",
+          style = "margin-top: 8px; font-size: 13px; color: var(--fm-text); text-align: center;",
           tagList(
             icon("sack-dollar"),
-            paste0(" Total Volume Earned: ", format_table_currency(total_volume_earned))
+            paste0(" Spendable: ", ui_financial_amount(financial$spendable_budget), " | Legal bid limit: ", ui_financial_amount(financial$legal_bid_limit))
           )
         )
       )
 
       # Row 2, Col 2: Squad Investment & Total Volume Spent
       squad_investment_box <- box(
-        title = "Squad Investment & Total Volume Spent",
+        title = "Current Squad Investment",
         width = 6,
         status = "warning",
         solidHeader = TRUE,
         collapsible = FALSE,
         descriptionBlock(
-          header = format_table_currency(total_spent),
+          header = ui_financial_amount(total_spent),
           number = NULL,
           numberColor = "orange",
           text = "Current Squad Cost"
         ),
         div(
-          style = "margin-top: 8px; font-size: 13px; color: #b45309; text-align: center;",
+          style = "margin-top: 8px; font-size: 13px; color: var(--fm-text); text-align: center;",
           tagList(
             icon("money-bill-transfer"),
-            paste0(" Total Volume Spent: ", format_table_currency(total_volume_spent))
+            "Purchase cost of players currently in the squad; excludes players already sold."
           )
         )
       )
@@ -575,7 +584,7 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       if (!has_points) {
         return(
           plotly::plot_ly() %>%
-            plotly::layout(
+            fm_plot_layout(
               paper_bgcolor = "rgba(0,0,0,0)",
               plot_bgcolor = "rgba(0,0,0,0)",
               xaxis = list(visible = FALSE),
@@ -586,7 +595,7 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
                   y = 0.5,
                   xref = "paper",
                   yref = "paper",
-                  text = "<b>No matchday points recorded yet.</b><br><span style='font-size: 12px; color: #64748b;'>The points evolution timeline will display automatically once matchday scores are logged.</span>",
+                  text = "<b>No matchday points recorded yet.</b><br><span style='font-size: 12px; color: var(--fm-muted);'>The points evolution timeline will display automatically once matchday scores are logged.</span>",
                   showarrow = FALSE,
                   font = list(size = 14, color = "#334155"),
                   align = "center",
@@ -614,7 +623,7 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
                       marker = list(size = 5),
                       hoverinfo = "text",
                       text = ~paste0("Team: ", teamname, "<br>Date: ", format(date, "%d-%m-%y"), "<br>Points: ", points)) %>%
-        plotly::layout(
+        fm_plot_layout(
           paper_bgcolor = "rgba(0,0,0,0)",
           plot_bgcolor = "rgba(0,0,0,0)",
           xaxis = list(title = "", gridcolor = "#f1f5f9", zeroline = FALSE, tickformat = "%d-%m"),
@@ -633,11 +642,13 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       req(is_module_active() == TRUE)
       squad_df <- players_table_RV()
       req(squad_df)
-      formation <- input$opt_formation
-      mode <- input$opt_mode
+      formation <- if (is.null(input$opt_formation)) "auto" else input$opt_formation
+      mode <- if (is.null(input$opt_mode)) "max_fis" else input$opt_mode
 
       tryCatch({
-        optimize_starting_xi(squad_df = squad_df, formation = formation, mode = mode)
+        optimize_starting_xi(squad_df = squad_df, formation = formation, mode = mode,
+                            rules = league_rules_RV(),
+                            forecast_df = point_forecasts_RV())
       }, error = function(e) {
         print(paste0("[Optimizer] Error: ", e$message))
         list(
@@ -645,8 +656,10 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
           bench = data.frame(),
           formation = formation,
           mode = mode,
-          total_score = 0,
-          avg_fis = 0,
+          total_score = NA_real_,
+          expected_points = NA_real_,
+          avg_fis = NA_real_,
+          diagnostics = "The lineup could not be verified.",
           feasible = FALSE,
           formation_counts = c(GK = 1, DEF = 0, MID = 0, FWD = 0)
         )
@@ -672,16 +685,16 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
         column(
           width = 3,
           descriptionBlock(
-            header = round(opt$total_score, 1),
+            header = if (length(opt$expected_points) == 1L && is.finite(opt$expected_points)) round(opt$expected_points, 1) else "Unavailable",
             number = NULL,
             numberColor = "blue",
-            text = "Total Opt Score"
+            text = "Expected points (baseline)"
           )
         ),
         column(
           width = 3,
           descriptionBlock(
-            header = round(opt$avg_fis, 1),
+            header = if (length(opt$avg_fis) == 1L && is.finite(opt$avg_fis)) round(opt$avg_fis, 1) else "Unavailable",
             number = NULL,
             numberColor = "green",
             text = "Avg FIS"
@@ -690,13 +703,46 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
         column(
           width = 3,
           descriptionBlock(
-            header = if (opt$feasible) "Yes" else "Partial",
+            header = if (isTRUE(opt$legality_verified)) "Verified" else if (isTRUE(opt$feasible)) "Provisional" else "Invalid",
             number = NULL,
-            numberColor = if (opt$feasible) "green" else "orange",
+            numberColor = if (isTRUE(opt$feasible)) "green" else "orange",
             text = "Feasible"
           )
         )
       )
+    })
+
+    output$submitted_lineup_comparison <- renderUI({
+      comparison <- squad_lineup_comparison(submitted_lineup_RV(), optimizer_result_RV())
+      if (comparison$status != "ok") return(div(class = "alert alert-info", comparison$message))
+      roster <- players_table_RV()
+      names_for <- function(ids) paste(roster$name[match(ids, as.character(roster$id))], collapse = ", ")
+      div(class = "alert alert-info",
+          strong("Compared with your submitted XI: "),
+          paste0(length(comparison$add), " player changes. "),
+          if (length(comparison$add)) span("Add: ", names_for(comparison$add), ". Remove: ", names_for(comparison$remove), "."),
+          lapply(comparison$changes,function(change) p(change)),
+          p("Recommendation only. Check the official round deadline and submit your team in Futmondo."))
+    })
+
+    output$lineup_notes <- renderUI({
+      req(is_module_active() == TRUE)
+      opt <- optimizer_result_RV()
+      roster <- players_table_RV()
+      label <- function(ids) {
+        if (!length(ids)) return("None")
+        names <- as.character(roster$name[match(ids, as.character(roster$id))])
+        missing <- is.na(names) | !nzchar(names)
+        names[missing] <- as.character(ids)[missing]
+        paste(names, collapse = ", ")
+      }
+      captain <- opt$captain_id
+      tagList(
+        if (length(opt$diagnostics)) div(class = "alert alert-warning", paste(opt$diagnostics, collapse = " ")),
+        if (isTRUE(opt$feasible)) p(
+          if (length(captain) == 1L && !is.na(captain)) span(strong("Captain: "), label(captain), ". "),
+          if (length(opt$bench_order)) span(strong("Bench order: "), label(opt$bench_order), ". Substitutions follow this order within each position. "),
+          "Point forecasts are advisory. Availability and league settings are checked against the current snapshot."))
     })
 
     # Soccer Pitch UI
@@ -712,16 +758,16 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
         return(
           div(
             class = "soccer-pitch",
-            style = "position: relative; width: 100%; max-width: 600px; margin: 0 auto; padding: 20px; background: #166534; border-radius: 8px; min-height: 400px;",
+            style = "position: relative; width: 100%; max-width: 600px; margin: 0 auto; padding: 20px; background: var(--fm-surface); border-radius: 8px; min-height: 400px;",
             div(
               class = "pitch-halfway-line",
-              style = "position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: rgba(255,255,255,0.4);"
+              style = "position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: var(--fm-surface);"
             ),
             div(
               class = "pitch-center-circle",
               style = "position: absolute; top: 50%; left: 50%; width: 80px; height: 80px; border: 2px solid rgba(255,255,255,0.4); border-radius: 50%; transform: translate(-50%, -50%);"
             ),
-            div(style = "text-align: center; color: white; margin-top: 180px; font-size: 14px;", "No players available for lineup optimization.")
+            div(style = "text-align: center; color: var(--fm-text); margin-top: 180px; font-size: 14px;", "No players available for lineup optimization.")
           )
         )
       }
@@ -752,13 +798,13 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
 
         tags$div(
           class = "pitch-player-card",
-          style = paste0("position: absolute; left: ", left_pct, "%; transform: translateX(-50%); text-align: center; width: 90px; z-index: 2;"),
+          style = paste0("position: absolute; left: ", left_pct, "%; transform: translateX(-50%); text-align: center; width: calc(100% / ", total_in_row + 1, " - 4px); max-width: 90px; z-index: 2;"),
           tags$div(
-            style = "background: rgba(255,255,255,0.92); border-radius: 6px; padding: 4px 6px; font-size: 11px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);",
-            tags$span(class = "pitch-player-name", style = "display: block; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px;", name),
-            tags$span(class = "pitch-player-role", style = "display: block; font-size: 9px; color: #64748b;", paste0(row_label, " #", col_index)),
-            tags$span(class = "pitch-player-val", style = "display: block; font-size: 9px; color: #047857;", val),
-            tags$span(class = "pitch-player-fis", style = "display: block; font-size: 9px; font-weight: 600; color: #2563eb;", paste0("FIS: ", fis))
+            style = "background: var(--fm-surface); border-radius: 6px; padding: 4px 6px; font-size: 11px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);",
+            tags$span(class = "pitch-player-name", style = "display: block; font-weight: 700; color: var(--fm-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px;", name),
+            tags$span(class = "pitch-player-role", style = "display: block; font-size: 9px; color: var(--fm-muted);", paste0(row_label, " #", col_index)),
+            tags$span(class = "pitch-player-val", style = "display: block; font-size: 9px; color: var(--fm-text);", val),
+            tags$span(class = "pitch-player-fis", style = "display: block; font-size: 9px; font-weight: 600; color: var(--fm-text);", paste0("FIS: ", fis))
           )
         )
       }
@@ -809,10 +855,10 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
 
       div(
         class = "soccer-pitch",
-        style = "position: relative; width: 100%; max-width: 600px; margin: 0 auto; padding: 20px; background: #166534; border-radius: 8px; min-height: 450px; overflow: hidden;",
+        style = "position: relative; width: 100%; max-width: 600px; margin: 0 auto; padding: 20px; background: var(--fm-surface); border-radius: 8px; min-height: 450px; overflow: hidden;",
         div(
           class = "pitch-halfway-line",
-          style = "position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: rgba(255,255,255,0.4);"
+          style = "position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: var(--fm-surface);"
         ),
         div(
           class = "pitch-center-circle",
@@ -833,47 +879,30 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
         return(reactable(data.frame(), defaultColDef = colDef(cell = function() "No data")))
       }
 
-      reactable(
-        xi,
-        columns = list(
-          name = colDef(name = "Player", minWidth = 120),
-          role = colDef(name = "Position", minWidth = 100),
-          fis_score = colDef(name = "FIS", format = colFormat(digits = 1), minWidth = 60),
-          opt_score = colDef(name = "Opt Score", format = colFormat(digits = 1), minWidth = 80),
-          value = colDef(name = "Value", format = colFormat(separator = ",", digitGroupSeparator = "."), minWidth = 100),
-          pos_group = colDef(name = "Group", minWidth = 60)
-        ),
-        highlight = TRUE,
-        compact = TRUE,
-        bordered = TRUE
-      )
+      rows <- squad_lineup_display_rows(xi, opt$captain_id, opt$bench_order, starting = TRUE)
+      reactable(rows, defaultColDef = colDef(na = "Unavailable"),
+        columns = list(player = colDef(name = "Player"), position = colDef(name = "Assigned position"),
+          expected_points = colDef(name = "Expected points", format = colFormat(digits = 1)),
+          lower = colDef(name = "Lower estimate", format = colFormat(digits = 1)),
+          upper = colDef(name = "Upper estimate", format = colFormat(digits = 1)),
+          value = colDef(name = "Market value", cell = ui_financial_amount),
+          selection = colDef(name = "Selection")), highlight = TRUE, compact = TRUE, bordered = TRUE)
     })
 
-    # Bench table
+    # The full reserve roster remains visible; only configured, eligible bench
+    # selections receive an explicit substitution order.
     output$bench_table <- renderReactable({
       req(is_module_active() == TRUE)
-      opt <- optimizer_result_RV()
-      req(opt)
-      bench <- opt$bench
-
-      if (is.null(bench) || nrow(bench) == 0) {
-        return(reactable(data.frame(), defaultColDef = colDef(cell = function() "No bench players")))
-      }
-
-      reactable(
-        bench,
-        columns = list(
-          name = colDef(name = "Player", minWidth = 120),
-          role = colDef(name = "Position", minWidth = 100),
-          fis_score = colDef(name = "FIS", format = colFormat(digits = 1), minWidth = 60),
-          opt_score = colDef(name = "Opt Score", format = colFormat(digits = 1), minWidth = 80),
-          value = colDef(name = "Value", format = colFormat(separator = ",", digitGroupSeparator = "."), minWidth = 100),
-          pos_group = colDef(name = "Group", minWidth = 60)
-        ),
-        highlight = TRUE,
-        compact = TRUE,
-        bordered = TRUE
-      )
+      opt <- optimizer_result_RV(); req(opt)
+      rows <- squad_lineup_display_rows(opt$bench, opt$captain_id, opt$bench_order)
+      if (!nrow(rows)) return(reactable(data.frame(Message = "No reserve players.")))
+      reactable(rows, defaultColDef = colDef(na = "Unavailable"),
+        columns = list(player = colDef(name = "Player"), position = colDef(name = "Position"),
+          expected_points = colDef(name = "Expected points", format = colFormat(digits = 1)),
+          lower = colDef(name = "Lower estimate", format = colFormat(digits = 1)),
+          upper = colDef(name = "Upper estimate", format = colFormat(digits = 1)),
+          value = colDef(name = "Market value", cell = ui_financial_amount),
+          selection = colDef(name = "Bench order")), highlight = TRUE, compact = TRUE, bordered = TRUE)
     })
 
     # ================================================================
@@ -919,13 +948,54 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       })
     })
 
+    scenario_version <- reactiveVal(0L)
+    saved_scenarios_RV <- reactive({
+      req(login_token(), championship_id(), user_team_id())
+      scenario_version()
+      tryCatch(read_transfer_scenarios(login_token()[["userid"]], championship_id(), user_team_id()),
+               error = function(e) data.frame())
+    })
+    observeEvent(saved_scenarios_RV(), {
+      d <- saved_scenarios_RV()
+      choices <- if (is.data.frame(d) && nrow(d)) stats::setNames(as.character(d$id), d$name) else character()
+      updateSelectInput(session, "scenario_saved", choices = choices)
+    })
+    observeEvent(input$scenario_save, {
+      name <- trimws(input$scenario_name)
+      if (!length(name) || !nzchar(name)) {
+        showNotification("Enter a scenario name.", type = "warning"); return()
+      }
+      payload <- list(sell_ids = as.character(input$sandbox_sells), buy_ids = as.character(input$sandbox_buys),
+                      formation = input$opt_formation, mode = input$opt_mode)
+      ok <- tryCatch(save_transfer_scenario(login_token()[["userid"]], championship_id(), user_team_id(), name, payload), error = function(e) FALSE)
+      showNotification(if (isTRUE(ok)) "Scenario saved." else "Scenario could not be saved.", type = if (isTRUE(ok)) "message" else "error")
+      if (isTRUE(ok)) scenario_version(isolate(scenario_version()) + 1L)
+    })
+    observeEvent(input$scenario_load, {
+      d <- saved_scenarios_RV(); req(is.data.frame(d), nrow(d), input$scenario_saved)
+      idx <- match(input$scenario_saved, as.character(d$id)); req(!is.na(idx))
+      item <- d$scenario[[idx]]
+      if (is.character(item)) item <- tryCatch(jsonlite::fromJSON(item), error = function(e) NULL)
+      req(is.list(item))
+      # Keep selections: fresh validation reports players who are no longer available.
+      restore_choices <- function(players, ids) {
+        choices <- if (is.data.frame(players) && nrow(players)) stats::setNames(as.character(players$id), players$name) else character()
+        missing <- setdiff(as.character(ids), unname(choices))
+        c(choices, stats::setNames(missing, paste("Unavailable player", missing)))
+      }
+      updateSelectizeInput(session, "sandbox_sells", choices = restore_choices(players_table_RV(), item$sell_ids), selected = as.character(item$sell_ids))
+      updateSelectizeInput(session, "sandbox_buys", choices = restore_choices(market_players_RV(), item$buy_ids), selected = as.character(item$buy_ids))
+      updateSelectInput(session, "opt_formation", selected = item$formation)
+      updateSelectInput(session, "opt_mode", selected = item$mode)
+      showNotification("Scenario loaded and recalculated using current data.", type = "message")
+    })
+
     # Sandbox scenario reactive
     sandbox_scenario_RV <- reactive({
       req(is_module_active() == TRUE)
       squad_df <- players_table_RV()
       req(squad_df)
-      current_budget <- liquid_cash_RV()
-      req(current_budget)
+      current_budget <- transfer_budget_RV()
 
       sell_ids <- input$sandbox_sells
       buy_ids <- input$sandbox_buys
@@ -942,7 +1012,9 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
           current_budget = current_budget,
           sell_player_ids = sell_ids,
           buy_player_ids = buy_ids,
-          market_df = mkt_df
+          market_df = mkt_df,
+          rules = league_rules_RV(),
+          forecast_df = point_forecasts_RV()
         )
       }, error = function(e) {
         print(paste0("[Sandbox Scenario] Error: ", e$message))
@@ -956,9 +1028,18 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
           initial_avg_fis = 0,
           projected_avg_fis = 0,
           delta_avg_fis = 0,
-          is_budget_valid = TRUE
+          is_budget_valid = FALSE,
+          is_lineup_valid = FALSE,
+          status = "error",
+          diagnostics = "Scenario could not be verified."
         )
       })
+    })
+
+    output$sandbox_price_status <- renderUI({
+      scenario <- sandbox_scenario_RV()
+      if (!is.null(scenario$status) && scenario$status == "ok" && !isTRUE(scenario$prices_verified))
+        p(class = "text-muted", "Transfer prices are estimates. Actual offers, auction outcomes and retained funds can change the result.")
     })
 
     # Sandbox KPI row
@@ -967,8 +1048,14 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       scenario <- sandbox_scenario_RV()
       req(scenario)
 
-      delta_icon <- if (scenario$delta_avg_fis > 0) icon("caret-up") else if (scenario$delta_avg_fis < 0) icon("caret-down") else NULL
-      budget_color <- if (scenario$is_budget_valid) "green" else "red"
+      if (!is.null(scenario$status) && scenario$status != "ok") {
+        return(div(class = "alert alert-warning", strong("Scenario is not valid. "),
+                   paste(unlist(scenario$diagnostics), collapse = " ")))
+      }
+      delta <- scenario$delta_avg_fis
+      if (length(delta) != 1L || !is.finite(delta)) delta <- 0
+      delta_icon <- if (delta > 0) icon("caret-up") else if (delta < 0) icon("caret-down") else NULL
+      budget_color <- if (isTRUE(scenario$is_budget_valid)) "green" else "red"
 
       fluidRow(
         column(
@@ -1001,9 +1088,9 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
         column(
           width = 3,
           descriptionBlock(
-            header = paste0(scenario$delta_avg_fis, " pts"),
+            header = paste0(scenario$delta_avg_fis, " FIS"),
             number = NULL,
-            numberColor = if (scenario$delta_avg_fis >= 0) "green" else "red",
+            numberColor = if (delta >= 0) "green" else "red",
             numberIcon = delta_icon,
             text = "Delta Avg FIS"
           )
@@ -1023,12 +1110,12 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       }
 
       reactable(
-        proj,
+        proj[, intersect(c("name", "role", "fis_score", "value"), names(proj)), drop = FALSE],
         columns = list(
           name = colDef(name = "Player", minWidth = 120),
           role = colDef(name = "Position", minWidth = 100),
           fis_score = colDef(name = "FIS", format = colFormat(digits = 1), minWidth = 60),
-          value = colDef(name = "Value", format = colFormat(separator = ",", digitGroupSeparator = "."), minWidth = 100)
+          value = colDef(name = "Market value", cell = ui_financial_amount, minWidth = 100)
         ),
         highlight = TRUE,
         compact = TRUE,
@@ -1037,31 +1124,69 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       )
     })
 
-    # Transfer recommendations
-    output$sandbox_recommendations_ui <- renderUI({
+    output$sandbox_lineup_status <- renderUI({
+      req(is_module_active() == TRUE)
+      scenario <- sandbox_scenario_RV()
+      lineup <- scenario$projected_lineup
+      if (is.null(lineup) || !isTRUE(lineup$feasible))
+        return(p("A legal starting XI could not be verified for this scenario."))
+      p("Formation: ", lineup$formation, ". Expected points: ",
+        if (length(lineup$expected_points) == 1L && is.finite(lineup$expected_points)) round(lineup$expected_points, 1) else "Unavailable",
+        ". This scenario uses estimated transfer prices.")
+    })
+    output$sandbox_lineup_table <- renderReactable({
+      req(is_module_active() == TRUE)
+      lineup <- sandbox_scenario_RV()$projected_lineup
+      if (is.null(lineup) || !isTRUE(lineup$feasible)) return(reactable(data.frame(Message = "No verified XI.")))
+      rows <- squad_lineup_display_rows(lineup$starting_xi, lineup$captain_id, lineup$bench_order, starting = TRUE)
+      reactable(rows[, c("player", "position", "expected_points", "selection"), drop = FALSE],
+        defaultColDef = colDef(na = "Unavailable"), compact = TRUE,
+        columns = list(expected_points = colDef(name = "Expected points", format = colFormat(digits = 1))))
+    })
+
+    # Shared snapshot keeps displayed and applied recommendations identical.
+    transfer_recommendations_RV <- reactive({
       req(is_module_active() == TRUE)
       squad_df <- players_table_RV()
       req(squad_df)
       mkt_df <- tryCatch({ market_players_RV() }, error = function(e) NULL)
-      current_budget <- tryCatch({ liquid_cash_RV() }, error = function(e) 0)
+      current_budget <- tryCatch({ transfer_budget_RV() }, error = function(e) NA_real_)
+
+      if(exists('profit_portfolio_inputs',mode='function')) {
+        prepared <- tryCatch({
+          execution<-fit_sale_execution(read_sale_observations(login_token()[['userid']],championship_id()))
+          rules<-league_rules_RV()
+          profit_portfolio_inputs(squad_df,mkt_df,read_player_price_history(championship_id()),
+            get_roster_bids(login_token(),championship_id(),user_team_id()),execution,
+            context=list(championship_id=championship_id(),season=rules$season,scoring_version=rules$scoring_version))
+        },error=function(e)NULL)
+        if(!is.null(prepared)){squad_df<-prepared$roster;mkt_df<-prepared$market}
+      }
 
       recs <- tryCatch({
         recommend_transfers(
           squad_df = squad_df,
           market_df = mkt_df,
           current_budget = current_budget,
-          max_transfers = 5
+          max_transfers = 5,
+          rules = league_rules_RV(),
+          forecast_df = point_forecasts_RV()
         )
       }, error = function(e) {
         print(paste0("[Transfer Recs] Error: ", e$message))
         data.frame()
       })
 
+      recs
+    })
+    output$sandbox_recommendations_ui <- renderUI({
+      req(is_module_active() == TRUE)
+      recs <- transfer_recommendations_RV()
       if (is.null(recs) || nrow(recs) == 0) {
         return(
           div(
-            style = "margin-top: 15px; padding: 10px; background: #f8fafc; border-radius: 6px; text-align: center; color: #64748b; font-size: 13px;",
-            "No transfer recommendations available. Add players to sell or buy to see suggestions."
+            style = "margin-top: 15px; padding: 10px; background: var(--fm-surface); border-radius: 6px; text-align: center; color: var(--fm-muted); font-size: 13px;",
+            "No supported profitable transfer yet. Recommendations need observed sale offers and resale evidence."
           )
         )
       }
@@ -1074,82 +1199,46 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
         delta_fis_str <- if (r$delta_fis > 0) paste0("+", round(r$delta_fis, 1)) else as.character(round(r$delta_fis, 1))
 
         cards_list[[i]] <- div(
-          style = "margin-top: 10px; padding: 10px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;",
+          style = "margin-top: 10px; padding: 10px; background: var(--fm-surface); border: 1px solid #bbf7d0; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;",
           div(
             style = "flex: 1;",
-            tags$strong(style = "font-size: 13px; color: #0f172a;",
+            tags$strong(style = "font-size: 13px; color: var(--fm-text);",
               paste0("Sell: ", r$sell_name, " -> Buy: ", r$buy_name)
             ),
             tags$br(),
-            tags$span(style = "font-size: 11px; color: #64748b;",
-              paste0("Net: ", net_cost_str, " | FIS Delta: ", delta_fis_str, " | ROI: ", r$roi_pct, "%")
+            tags$span(style = "font-size: 11px; color: var(--fm-muted);",
+              paste0("Net cost: ", net_cost_str, " | Expected profit: ", format_table_currency(r$expected_profit),
+                " | XI change: ", round(r$delta_expected_points, 1), " points")
             )
           ),
-          actionButton(
-            ns(paste0("rec_apply_", i)),
-            "Apply",
-            class = "btn btn-sm btn-success",
-            style = "margin-left: 10px; white-space: nowrap;"
-          )
+          tags$button(type="button",class="btn btn-sm btn-success", "Preview",
+            onclick=paste0("Shiny.setInputValue(",jsonlite::toJSON(ns("apply_recommendation"),auto_unbox=TRUE),",",
+              jsonlite::toJSON(list(account=login_token()[['userid']],league=championship_id(),team=user_team_id(),
+                sell_id=as.character(r$sell_id),buy_id=as.character(r$buy_id)),auto_unbox=TRUE),",{priority:'event'});"))
+
         )
       }
 
       div(
         style = "margin-top: 15px;",
-        tags$h5(style = "margin-bottom: 5px; color: #0f172a;", "Top Transfer Recommendations"),
+        tags$h5(style = "margin-bottom: 5px; color: var(--fm-text);", "Top Transfer Recommendations"),
         do.call(tagList, cards_list)
       )
     })
 
-    # Recommendation apply observers
-    observeEvent(input[["rec_apply_1"]], {
-      tryCatch({
-        apply_recommendation(session, 1)
-      }, error = function(e) print(paste0("[Rec Apply 1] Error: ", e$message)))
-    })
-    observeEvent(input[["rec_apply_2"]], {
-      tryCatch({
-        apply_recommendation(session, 2)
-      }, error = function(e) print(paste0("[Rec Apply 2] Error: ", e$message)))
-    })
-    observeEvent(input[["rec_apply_3"]], {
-      tryCatch({
-        apply_recommendation(session, 3)
-      }, error = function(e) print(paste0("[Rec Apply 3] Error: ", e$message)))
-    })
-    observeEvent(input[["rec_apply_4"]], {
-      tryCatch({
-        apply_recommendation(session, 4)
-      }, error = function(e) print(paste0("[Rec Apply 4] Error: ", e$message)))
-    })
-    observeEvent(input[["rec_apply_5"]], {
-      tryCatch({
-        apply_recommendation(session, 5)
-      }, error = function(e) print(paste0("[Rec Apply 5] Error: ", e$message)))
+    observeEvent(input$apply_recommendation, {
+      event <- input$apply_recommendation
+      req(is.list(event),identical(event$account,as.character(login_token()[['userid']])),
+        identical(event$league,as.character(championship_id())),identical(event$team,as.character(user_team_id())))
+      apply_recommendation(session,event$sell_id,event$buy_id)
     })
 
-    # Helper: apply a recommendation to sandbox selectors
-    apply_recommendation <- function(session, idx) {
+    apply_recommendation <- function(session, sell_id, buy_id) {
       req(is_module_active() == TRUE)
-      squad_df <- players_table_RV()
-      req(squad_df)
-      mkt_df <- tryCatch({ market_players_RV() }, error = function(e) NULL)
-      current_budget <- tryCatch({ liquid_cash_RV() }, error = function(e) 0)
-
-      recs <- tryCatch({
-        recommend_transfers(
-          squad_df = squad_df,
-          market_df = mkt_df,
-          current_budget = current_budget,
-          max_transfers = 5
-        )
-      }, error = function(e) data.frame())
-
-      if (is.null(recs) || nrow(recs) < idx) return()
-
-      r <- recs[idx, ]
-      sell_id <- as.character(r$sell_id)
-      buy_id <- as.character(r$buy_id)
+      recs <- transfer_recommendations_RV()
+      req(is.data.frame(recs),nrow(recs)>0,length(sell_id)==1L,length(buy_id)==1L)
+      r <- recs[recs$sell_id==sell_id & recs$buy_id==buy_id,,drop=FALSE]
+      req(nrow(r)==1L)
 
       # Get current selections
       current_sells <- input$sandbox_sells
@@ -1181,7 +1270,7 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       showModal(modalDialog(
         title = tagList(icon("tags"), " Put All Players on Market"),
         p("Are you sure you want to list ALL your squad players on the transfer market simultaneously?"),
-        p(style = "color: #64748b; font-size: 12px;", "Other users and the computer will be able to place bids on all your players."),
+        p(style = "color: var(--fm-muted); font-size: 12px;", "Other users and the computer will be able to place bids on all your players."),
         footer = tagList(
           modalButton("Cancel"),
           actionButton(ns("submit_put_all_on_market"), "Confirm Market Listing", class = "btn btn-offer-money")
@@ -1198,11 +1287,11 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       team_id <- get_reactive_val(user_team_id)
       req(login, champ_id, team_id)
 
-      res <- put_all_on_market(
+      res <- tryCatch(put_all_on_market(
         login = login,
         championship_id = champ_id,
         team_id = team_id
-      )
+      ), error = function(e) list(success = FALSE, message = "The listing request could not be verified. Refresh before retrying."))
 
       is_success <- if (is.list(res)) isTRUE(res$success) else isTRUE(res)
 
@@ -1215,13 +1304,6 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
           duration = 5
         )
         clear_api_cache()
-
-        # Optimistically mark all squad players as on market for instant UI update
-        curr_table <- tryCatch({ players_table_RV() }, error = function(e) NULL)
-        if (!is.null(curr_table) && nrow(curr_table) > 0) {
-          curr_table$market_inMarket <- TRUE
-          tryCatch({ players_table_RV(curr_table) }, error = function(e) NULL)
-        }
 
         # Trigger reactive refresh with cache-cleared fresh API data
         if (!is.null(refresh_trigger) && is.function(refresh_trigger)) {
@@ -1246,7 +1328,8 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       login_token = login_token,
       championship_id = championship_id,
       user_team_id = user_team_id,
-      hide_bid_column = FALSE
+      hide_bid_column = FALSE,
+      refresh_trigger = refresh_trigger
     )
 
     return(selected_player_RV)
@@ -1261,4 +1344,155 @@ get_ordinal_position <- function(position) {
     TRUE ~ paste0(position, "th")
   )
   return(position)
+}
+# Compare immutable player IDs; unavailable lineups never imply an empty XI.
+squad_lineup_comparison <- function(submitted, optimized) {
+  if (is.null(submitted) || !is.data.frame(submitted$players))
+    return(list(status = "unavailable", message = "Submitted lineup is unavailable."))
+  if (!isTRUE(optimized$feasible))
+    return(list(status = "invalid", message = "The suggested lineup does not meet all constraints."))
+  key <- intersect(c("id", "player_id", "_player", "_id", "player.id"), names(submitted$players))
+  if (!length(key)) return(list(status = "unavailable", message = "Submitted player identities are unavailable."))
+  current <- as.character(submitted$players[[key[1]]])
+  target <- as.character(optimized$starting_xi$id)
+  changes <- list()
+  cfg <- submitted$lineup_config %||% submitted
+  old_formation <- fm_scalar(cfg$formation,'')
+  if(nzchar(old_formation)&&!identical(old_formation,optimized$formation))
+    changes<-c(changes,list(paste('Formation:',old_formation,'→',optimized$formation)))
+  captain <- cfg$captain_id %||% cfg$captain
+  if(is.list(captain))captain<-captain$id %||% captain$`_id`
+  captain <- fm_scalar(captain,'')
+  recommended <- fm_scalar(optimized$captain_id,'')
+  if(nzchar(captain)&&nzchar(recommended)&&captain!=recommended)
+    changes<-c(changes,list(paste('Captain:',captain,'→',recommended,'; highest projected captain contribution.')))
+  bench <- submitted$bench$players
+  if(is.data.frame(bench)&&'id'%in%names(bench)&&length(optimized$bench_order) &&
+     !identical(as.character(bench$id),as.character(optimized$bench_order)))
+    changes<-c(changes,list(paste('Bench order:',paste(optimized$bench_order,collapse=', '),'; ordered by projected points among eligible reserves.')))
+  position <- intersect(c('pos_group','assigned_position','position'),names(submitted$players))
+  if(length(position)&&'pos_group'%in%names(optimized$starting_xi)) {
+    old<-as.character(submitted$players[[position[1]]]);new<-optimized$starting_xi$pos_group[match(current,target)]
+    known<-old%in%c('GK','DEF','MID','FWD') & !is.na(new)&old!=new
+    for(i in which(known))changes<-c(changes,list(paste(current[i],'position:',old[i],'→',new[i])))
+  }
+  all<-dplyr::bind_rows(optimized$starting_xi,optimized[['bench']])
+  for(id in setdiff(target,current)) {
+    row<-all[all$id==id,,drop=FALSE]
+    label<-if('name'%in%names(row))as.character(row$name[1]) else id
+    points<-if('expected_points'%in%names(row))fm_number(row$expected_points[1]) else NA_real_
+    changes<-c(changes,list(paste('Add',label,'· projected points:',if(is.finite(points))round(points,1) else 'unavailable','· improves the chosen feasible assignment.')))
+  }
+  for(id in setdiff(current,target)) {
+    row<-all[all$id==id,,drop=FALSE]
+    reason<-if(nrow(row)&&any(analytics_known_unavailable(row)))'reported unavailable' else 'lower contribution in the selected formation'
+    changes<-c(changes,list(paste('Remove',id,'·',reason)))
+  }
+  list(status = "ok", add = setdiff(target, current), remove = setdiff(current, target),changes=changes)
+}
+
+# Keep user-facing lineup tables limited to selection evidence, never raw API
+# records. Missing forecasts remain missing rather than becoming zero points.
+squad_lineup_display_rows <- function(players, captain_id = NA_character_, bench_order = character(), starting = FALSE) {
+  if (!is.data.frame(players) || !nrow(players)) return(data.frame())
+  text <- function(key, default = NA_character_) if (key %in% names(players)) as.character(players[[key]]) else rep(default, nrow(players))
+  number <- function(key) suppressWarnings(as.numeric(text(key)))
+  ids <- text("id")
+  positions <- text("pos_group")
+  missing <- is.na(positions) | !nzchar(positions)
+  positions[missing] <- text("role")[missing]
+  selection <- rep(if (starting) "Starting XI" else "Reserve", nrow(players))
+  if (starting) {
+    selection[!is.na(ids) & ids %in% captain_id[!is.na(captain_id)]] <- "Captain"
+  } else {
+    order <- match(ids, bench_order)
+    selection[!is.na(order)] <- paste("Bench", order[!is.na(order)])
+  }
+  data.frame(player = text("name"), position = positions, expected_points = number("expected_points"),
+    lower = number("forecast_lower"), upper = number("forecast_upper"), value = number("value"),
+    selection = selection, stringsAsFactors = FALSE)
+}
+
+
+# Preference only until a successful per-round hiring contract is captured.
+# See docs/coach_hiring.md. No network call or automation job is dispatched.
+squad_coach_UI <- function(id) {
+  ns <- shiny::NS(id)
+  shiny::div(class="well well-sm",
+    shiny::h4("Automatic coach"),
+    shiny::uiOutput(ns("preference")),
+    shiny::uiOutput(ns("status")))
+}
+
+squad_coach_Server <- function(id, login_token, championship_id, user_team_id) {
+  shiny::moduleServer(id, function(input, output, session) {
+    preferences <- shiny::reactiveVal(list())
+    saved <- shiny::reactiveVal(list())
+    context <- shiny::reactive({
+      auth <- login_token()
+      if(!valid_login(auth)) return(NULL)
+      league <- fm_scalar(championship_id(), "")
+      team <- fm_scalar(user_team_id(), "")
+      if(!nzchar(league) || !nzchar(team)) return(NULL)
+      account <- as.character(auth[["userid"]])
+      key <- as.character(openssl::sha256(charToRaw(jsonlite::toJSON(
+        list(account,league,team),auto_unbox=TRUE))))
+      list(account_id=account, championship_id=league, user_team_id=team,
+        input_id=paste0("auto_hire_",key), key=key)
+    })
+    shiny::observeEvent(context(), {
+      ctx <- context(); if(is.null(ctx)) return()
+      current <- shiny::isolate(preferences())
+      if(is.null(current[[ctx$key]]) && exists('read_league_preference',mode='function')) {
+        stored <- read_league_preference(ctx$account_id,ctx$championship_id,ctx$user_team_id)
+        if(is.logical(stored)&&length(stored)==1L&&!is.na(stored)) {
+          current[[ctx$key]] <- stored;preferences(current)
+          state<-shiny::isolate(saved());state[[ctx$key]]<-TRUE;saved(state)
+        }
+      }
+    },priority=100)
+    preference <- shiny::reactive({
+      ctx <- context()
+      if(is.null(ctx)) return(NULL)
+      enabled <- preferences()[[ctx$key]]
+      list(account_id=ctx$account_id,championship_id=ctx$championship_id,
+        user_team_id=ctx$user_team_id,enabled=if(is.null(enabled)) TRUE else enabled,
+        execution_available=FALSE,reason="hiring_endpoint_unverified")
+    })
+    output$preference <- shiny::renderUI({
+      ctx <- context()
+      if(is.null(ctx)) return(shiny::p("Log in and select a league to set this preference."))
+      enabled <- shiny::isolate(preference()$enabled)
+      shiny::checkboxInput(session$ns(ctx$input_id),
+        "Automatically hire the coach each round",value=enabled)
+    })
+    shiny::observe({
+      ctx <- context()
+      if(is.null(ctx)) return()
+      # A different input identity per account/league/team prevents delayed
+      # events from the previous league from changing the current preference.
+      value <- input[[ctx$input_id]]
+      if(!is.logical(value) || length(value)!=1L || is.na(value)) return()
+      current <- shiny::isolate(preferences())
+      if(!identical(current[[ctx$key]],value)) {
+        current[[ctx$key]] <- value
+        preferences(current)
+        ok <- if(exists('save_league_preference',mode='function'))
+          save_league_preference(ctx$account_id,ctx$championship_id,ctx$user_team_id,value) else FALSE
+        state <- shiny::isolate(saved());state[[ctx$key]] <- isTRUE(ok);saved(state)
+      }
+    })
+    output$status <- shiny::renderUI({
+      current <- preference()
+      if(is.null(current)) return(NULL)
+      shiny::tagList(
+        shiny::p(class=if(current$enabled) "text-warning" else "text-muted",
+          if(current$enabled) "Pending: automatic hiring is not connected yet. Hire the coach in Futmondo for now."
+          else "Automatic coach hiring is off for this league."),
+        shiny::tags$small(class="text-muted", if(isTRUE(saved()[[context()$key]]))
+          "Preference saved for this account and league." else
+          "Preference is active in this session; database saving is unavailable."))
+    })
+    preference
+  })
 }

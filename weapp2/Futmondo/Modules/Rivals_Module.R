@@ -23,14 +23,14 @@ rivals_parse_datetime <- function(date_vec) {
 }
 
 # ---- Pure helper: per-team buying-power values for the league plot ----
-# Liquid Cash uses ALL transfers through the END date (the balance is not
-# reset at the slider start): 300M - (all purchases through end) + (all sales
-# through end). Investment and Transaction Volume stay within the [start, end]
+# Transfer-only balance estimates use ALL transfers through the END date
+# (not reset at slider start), starting from an explicitly supplied budget.
+# Rewards and other account adjustments are not inferred from transfers. Investment and Transaction Volume stay within the [start, end]
 # range. Returns a data frame (team_id, team, value, range_label) where
 # range_label describes the window used (for labels/tooltips).
 rivals_buying_power_values <- function(pressroom_df, teams, metric = "cash",
                                        start_date = NULL, end_date = NULL,
-                                       initial_budget = 300000000) {
+                                       initial_budget = NA_real_) {
   team_ids <- if (!is.null(teams) && "teamid" %in% colnames(teams)) as.character(teams$teamid) else character(0)
   team_names_map <- if (!is.null(teams) && "teamname" %in% colnames(teams)) setNames(as.character(teams$teamname), as.character(teams$teamid)) else character(0)
 
@@ -40,6 +40,10 @@ rivals_buying_power_values <- function(pressroom_df, teams, metric = "cash",
     stringsAsFactors = FALSE
   )
 
+  if (!nrow(plot_df)) {
+    plot_df$value <- numeric(); plot_df$range_label <- character()
+    return(plot_df)
+  }
   if (is.null(pressroom_df) || !is.data.frame(pressroom_df) || nrow(pressroom_df) == 0) {
     plot_df$value <- if (metric == "cash") initial_budget else 0
     plot_df$range_label <- if (metric == "cash") "all transfers through end date" else "within selected range"
@@ -259,7 +263,7 @@ tagList(
                solidHeader = TRUE,
                collapsible = TRUE,
                collapsed = FALSE,
-               p(style = "color: #64748b; font-size: 13px; font-weight: 500; margin-bottom: 12px;",
+               p(style = "color: var(--fm-muted); font-size: 13px; font-weight: 500; margin-bottom: 12px;",
                  icon("hand-pointer"), " Select a user team from the table below to scout their squad and financial details."),
                reactable::reactableOutput(ns("league_finances_table"))
              )
@@ -270,7 +274,7 @@ tagList(
     fluidRow(
       column(width = 12,
              box(
-               title = "League Buying Power (Liquid Cash Standings)",
+               title = "League Cash and Observed Transfers",
                width = 12,
                status = "primary",
                solidHeader = TRUE,
@@ -293,7 +297,7 @@ collapsible = TRUE,
                       radioButtons(
                         inputId = ns("buying_power_metric"),
                         label = "Display Metric:",
-                        choices = c("Liquid Cash" = "cash", "Squad Purchases" = "investment", "Transaction Volume" = "volume"),
+                        choices = c("Transfer-only balance estimate" = "cash", "Squad Purchases" = "investment", "Transaction Volume" = "volume"),
                         selected = "cash",
                         inline = TRUE
                       )
@@ -323,7 +327,7 @@ collapsible = TRUE,
   )
 }
 
-rivals_Server <- function(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV) {
+rivals_Server <- function(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     
@@ -400,26 +404,32 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       return(Sys.Date() - 180)
     }
 
-    # Selected rival team ID derived from table selection
+    rival_context_RV <- reactive(list(user=fm_scalar(login_token()[["userid"]]),
+      championship=fm_scalar(championship_id()),team=fm_scalar(user_team_id())))
+    selected_rival_id_RV <- reactiveVal(NULL)
+    selected_rival_context_RV <- reactiveVal(NULL)
+    observeEvent(rival_context_RV(), {
+      selected_rival_id_RV(NULL);selected_rival_context_RV(NULL)
+      tryCatch(updateReactable("league_finances_table",selected=NA_integer_,session=session),error=function(e)NULL)
+    },ignoreNULL=FALSE,priority=100)
+    observeEvent(getReactableState("league_finances_table","selected",session=session), {
+      idx<-getReactableState("league_finances_table","selected",session=session)
+      df<-league_finances_RV()$team_finances
+      req(length(idx)==1L,is.numeric(idx),is.data.frame(df),idx>=1,idx<=nrow(df))
+      selected_rival_context_RV(rival_context_RV());selected_rival_id_RV(as.character(df$teamid[idx]))
+    },ignoreNULL=TRUE)
     selected_rival_team_id <- reactive({
-      finances_data <- league_finances_RV()
-      req(finances_data, finances_data$team_finances)
-      df <- finances_data$team_finances
-      if (is.null(df) || nrow(df) == 0) return(NULL)
-
-      # Read selected row index from reactable state
-      selected_idx <- getReactableState("league_finances_table", "selected", session = session)
-
-      if (!is.null(selected_idx) && is.numeric(selected_idx) && selected_idx >= 1 && selected_idx <= nrow(df)) {
-        return(as.character(df$teamid[selected_idx]))
-      } else {
-        return(NULL)
-      }
+      if(!identical(selected_rival_context_RV(),rival_context_RV())) return(NULL)
+      id<-selected_rival_id_RV()
+      df<-league_finances_RV()$team_finances
+      if(is.null(id) || !is.data.frame(df) || !id %in% df$teamid) return(NULL)
+      id
     })
-    
+
     # Detailed financial statistics of selected rival
     rival_financial_summary_box_RV <- reactive({
       req(is_module_active() == TRUE)
+      if (!is.null(refresh_trigger)) refresh_trigger()
       req(login_token())
       req(championship_id())
       req(selected_rival_team_id())
@@ -435,6 +445,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
     # Scouted Player list of the rival
     rival_players_table_RV <- reactive({
       req(is_module_active() == TRUE)
+      if (!is.null(refresh_trigger)) refresh_trigger()
       req(selected_rival_team_id())
       
       players_table <- get_players_from_team(
@@ -473,16 +484,19 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
     # League Finances reactive
     league_finances_RV <- reactive({
       req(is_module_active() == TRUE)
+      if (!is.null(refresh_trigger)) refresh_trigger()
       req(login_token())
       req(championship_id())
       teams <- user_teams_RV()
       req(teams)
 
+      snapshot <- tryCatch(get_financial_snapshot(login_token(), championship_id(), user_team_id()), error = function(e) NULL)
+      initial <- normalize_league_rules(list(configuration = snapshot$configuration))$initial_budget
       finances <- calculate_league_finances(
         login = login_token(),
         championship_id = championship_id(),
         user_teams_df = teams,
-        initial_budget = 300000000
+        initial_budget = initial
       )
       return(finances)
     })
@@ -490,6 +504,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
     # Render League Financial Standings Table
     output$league_finances_table <- reactable::renderReactable({
       req(is_module_active() == TRUE)
+      if (!is.null(refresh_trigger)) refresh_trigger()
       finances_data <- league_finances_RV()
       req(finances_data)
       df <- finances_data$team_finances
@@ -524,8 +539,9 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
           `Money Left` = colDef(
             align = "right",
             cell = function(val) {
+              if (length(val) != 1L || !is.finite(val)) return("Unavailable")
               formatted <- format_table_currency(val)
-              color_style <- if (val >= 0) "color: #10b981; font-weight: 700;" else "color: #ef4444; font-weight: 700;"
+              color_style <- if (val >= 0) "color: var(--fm-text); font-weight: 700;" else "color: var(--fm-danger); font-weight: 700;"
               shiny::tags$span(style = color_style, formatted)
             }
           ),
@@ -535,7 +551,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
             cell = function(val) {
               if (is.na(val) || !is.numeric(val)) return("")
               sign_pfx <- if (val > 0) "+" else ""
-              color_style <- if (val > 0) "color: #10b981; font-weight: 600;" else if (val < 0) "color: #ef4444; font-weight: 600;" else "color: #64748b;"
+              color_style <- if (val > 0) "color: var(--fm-text); font-weight: 600;" else if (val < 0) "color: var(--fm-danger); font-weight: 600;" else "color: var(--fm-muted);"
               formatted <- paste0(sign_pfx, format_table_currency(val))
               shiny::tags$span(style = color_style, formatted)
             }
@@ -549,6 +565,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
 # Render Financial Details Summary card rows for selected rival
  output$rival_financial_summary_box <- renderUI({
       req(is_module_active() == TRUE)
+      if (!is.null(refresh_trigger)) refresh_trigger()
       info <- rival_financial_summary_box_RV()
       roster <- rival_players_table_RV()
       rival_id <- selected_rival_team_id()
@@ -568,7 +585,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       money_out <- 0
       money_in <- 0
       total_spent <- 0
-      budget_val <- 300000000
+      budget_val <- NA_real_
 
       if (!is.null(tx_raw) && nrow(tx_raw) > 0) {
         # money_out = absolute value of all negative money (purchases)
@@ -583,10 +600,6 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
         # total_spent = money_out (purchases only)
         total_spent <- money_out
 
-        # budget_val = running_balance of the most recent transaction (first row in descending order)
-        if ("running_balance" %in% colnames(tx_raw)) {
-          budget_val <- tx_raw$running_balance[1]
-        }
       } else {
         # No transaction data -- use roster-based calculation
         if (!is.null(roster) && nrow(roster) > 0) {
@@ -595,11 +608,11 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
             money_out <- total_spent
           }
         }
-        budget_val <- 300000000 - total_spent
+        budget_val <- NA_real_
       }
 
       # Override budget and squad_val with API-provided values if available and valid
-      if (!is.null(info) && !is.null(info$budget) && is.numeric(info$budget) && info$budget > 0) {
+      if (!is.null(info) && length(info$budget) == 1L && is.numeric(info$budget) && is.finite(info$budget)) {
         budget_val <- info$budget
       }
       if (!is.null(info) && !is.null(info$teamValue) && is.numeric(info$teamValue) && info$teamValue > 0) {
@@ -634,7 +647,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       pnl_color <- if (net_transfer_pnl > 0) "#10b981" else if (net_transfer_pnl < 0) "#ef4444" else "#64748b"
       pnl_sign <- if (net_transfer_pnl > 0) "+" else ""
 
-      cash <- format_table_currency(budget_val)
+      cash <- ui_financial_amount(budget_val)
       spent_fmt <- format_table_currency(total_spent)
       money_out_fmt <- format_table_currency(money_out)
       money_in_fmt <- format_table_currency(money_in)
@@ -656,8 +669,8 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                    status = "primary",
                    solidHeader = TRUE,
                    div(style = "text-align: center; padding: 10px;",
-                       h3(style = "font-weight: 700; color: #0f172a; margin: 0; font-size: 20px;", rank_text),
-                       p(style = "color: #64748b; font-size: 11px; text-transform: uppercase; margin-top: 5px;", "Rank Position"))
+                       h3(style = "font-weight: 700; color: var(--fm-text); margin: 0; font-size: 20px;", rank_text),
+                       p(style = "color: var(--fm-muted); font-size: 11px; text-transform: uppercase; margin-top: 5px;", "Rank Position"))
                  )
           ),
           column(width = 3,
@@ -667,19 +680,19 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                    status = "success",
                    solidHeader = TRUE,
                    div(style = "text-align: center; padding: 10px;",
-                       h3(style = "font-weight: 700; color: #10b981; margin: 0; font-size: 20px;", cash),
-                       p(style = "color: #64748b; font-size: 11px; text-transform: uppercase; margin-top: 5px;", "Calculated Funds Left"))
+                       h3(style = "font-weight: 700; color: var(--fm-text); margin: 0; font-size: 20px;", cash),
+                       p(style = "color: var(--fm-muted); font-size: 11px; text-transform: uppercase; margin-top: 5px;", "Official Cash Balance"))
                  )
           ),
           column(width = 3,
                  box(
-                   title = "Net Transfer P/L",
+                   title = "Observed Transfer Cash Flow",
                    width = 12,
                    status = if (net_transfer_pnl > 0) "success" else "warning",
                    solidHeader = TRUE,
                    div(style = "text-align: center; padding: 10px;",
                        h3(style = paste0("font-weight: 700; color: ", pnl_color, "; margin: 0; font-size: 20px;"), pnl_fmt),
-                       p(style = "color: #64748b; font-size: 11px; text-transform: uppercase; margin-top: 5px;", "Transfer Profit/Loss"))
+                       p(style = "color: var(--fm-muted); font-size: 11px; text-transform: uppercase; margin-top: 5px;", "Sales minus purchases"))
                  )
           ),
           column(width = 3,
@@ -689,11 +702,11 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                    status = "warning",
                    solidHeader = TRUE,
                    div(style = "text-align: center; padding: 10px;",
-                       h3(style = "font-weight: 700; color: #f59e0b; margin: 0; font-size: 20px;", money_out_fmt),
-                       p(style = "color: #64748b; font-size: 11px; text-transform: uppercase; margin-top: 5px;",
-                         tags$span(style = "color: #ef4444; font-weight: 600;", paste0("Spent: ", money_out_fmt)),
-                         tags$span(style = "color: #94a3b8;", " . "),
-                         tags$span(style = "color: #10b981; font-weight: 600;", paste0("Inflow: ", money_in_fmt)))
+                       h3(style = "font-weight: 700; color: var(--fm-warning); margin: 0; font-size: 20px;", money_out_fmt),
+                       p(style = "color: var(--fm-muted); font-size: 11px; text-transform: uppercase; margin-top: 5px;",
+                         tags$span(style = "color: var(--fm-danger); font-weight: 600;", paste0("Spent: ", money_out_fmt)),
+                         tags$span(style = "color: var(--fm-muted);", " . "),
+                         tags$span(style = "color: var(--fm-text); font-weight: 600;", paste0("Inflow: ", money_in_fmt)))
                        )
                  )
           )
@@ -707,8 +720,8 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                    status = "danger",
                    solidHeader = TRUE,
                    div(style = "text-align: center; padding: 10px;",
-                       h3(style = "font-weight: 700; color: #ef4444; margin: 0; font-size: 20px;", val_sum),
-                       p(style = "color: #64748b; font-size: 11px; text-transform: uppercase; margin-top: 5px;", paste0("Net Gain: ", net_fmt)))
+                       h3(style = "font-weight: 700; color: var(--fm-danger); margin: 0; font-size: 20px;", val_sum),
+                       p(style = "color: var(--fm-muted); font-size: 11px; text-transform: uppercase; margin-top: 5px;", paste0("Net Gain: ", net_fmt)))
                  )
           )
         )
@@ -718,6 +731,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
     # Plot D: League Squad Value Evolution (Historical valuations of all teams)
     output$team_valuation_history_plot <- plotly::renderPlotly({
       req(is_module_active() == TRUE)
+      if (!is.null(refresh_trigger)) refresh_trigger()
 
       champ_id <- if (!is.null(championship_id)) championship_id() else NULL
       history_df <- NULL
@@ -729,24 +743,16 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
         })
       }
 
-      # Fallback baseline timeline if DB is empty or unconfigured (pre-season)
-      if (is.null(history_df) || nrow(history_df) == 0 || !"team_value" %in% colnames(history_df)) {
+      # A current valuation is one observation, never an invented price history.
+      if (is.null(history_df) || nrow(history_df) == 0 || !"team_value" %in% names(history_df)) {
         teams <- user_teams_RV()
-        if (is.null(teams) || nrow(teams) == 0) {
-          teams <- data.frame(teamname = c("Team Alpha", "Team Beta"), teamValue = c(10000000, 8000000), stringsAsFactors = FALSE)
+        if (is.null(teams) || !nrow(teams) || !"teamValue" %in% names(teams)) {
+          return(plotly::plot_ly() %>% fm_plot_layout(annotations = list(list(
+            text = "Valuation history unavailable", showarrow = FALSE))))
         }
-
-        today <- Sys.time()
-        dates <- seq(today - as.difftime(6, units="days"), today, by="1 day")
-
-        history_df <- lapply(1:nrow(teams), function(i) {
-          data.frame(
-            teamname = teams$teamname[i],
-            team_value = rep(as.numeric(if ("teamValue" %in% colnames(teams)) teams$teamValue[i] else 10000000), length(dates)),
-            recorded_at = as.character(dates),
-            stringsAsFactors = FALSE
-          )
-        }) %>% bind_rows()
+        history_df <- data.frame(teamname = teams$teamname,
+          team_value = suppressWarnings(as.numeric(teams$teamValue)),
+          recorded_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%S", tz = "UTC"), stringsAsFactors = FALSE)
       }
 
       # Format dates
@@ -763,7 +769,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                       marker = list(size = 5),
                       hoverinfo = "text",
                       text = ~paste0("Team: ", teamname, "<br>Date: ", format(date, "%d-%m-%y"), "<br>Valuation: ", format_table_currency(team_value))) %>%
-        plotly::layout(
+        fm_plot_layout(
           paper_bgcolor = "rgba(0,0,0,0)",
           plot_bgcolor = "rgba(0,0,0,0)",
           xaxis = list(title = "", gridcolor = "#f1f5f9", zeroline = FALSE, tickformat = "%d-%m"),
@@ -776,11 +782,14 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
     # Plot E: League Buying Power horizontal bar chart
     output$league_finances_plot <- plotly::renderPlotly({
       req(is_module_active() == TRUE)
+      if (!is.null(refresh_trigger)) refresh_trigger()
       req(login_token(), championship_id(), user_teams_RV())
 
       champ_id <- championship_id()
       login <- login_token()
       teams <- user_teams_RV()
+      snapshot <- tryCatch(get_financial_snapshot(login, champ_id, user_team_id()), error = function(e) NULL)
+      initial <- normalize_league_rules(list(configuration = snapshot$configuration))$initial_budget
 
       pressroom_df <- tryCatch({
         get_championship_pressroom(login = login, championship_id = champ_id)
@@ -788,6 +797,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
 
       date_range <- input$buying_power_date_slider
       metric <- input$buying_power_metric
+      if (is.null(metric)) metric <- "cash"
 
       if (is.null(pressroom_df) || nrow(pressroom_df) == 0 || is.null(date_range) || length(date_range) != 2) {
         # Fallback: show liquid cash from finances
@@ -796,7 +806,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
             login = login,
             championship_id = champ_id,
             user_teams_df = teams,
-            initial_budget = 300000000
+            initial_budget = initial
           )
         }, error = function(e) NULL)
 
@@ -804,7 +814,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
         if (is.null(teams_df) || nrow(teams_df) == 0) return(NULL)
 
         team_names <- if ("teamname" %in% colnames(teams_df)) teams_df$teamname else if ("name" %in% colnames(teams_df)) teams_df$name else "Unknown"
-        team_budgets <- if ("budget" %in% colnames(teams_df)) as.numeric(teams_df$budget) else 300000000
+        team_budgets <- if ("budget" %in% colnames(teams_df)) as.numeric(teams_df$budget) else rep(NA_real_, nrow(teams_df))
 
         plot_df <- data.frame(
           team = as.character(team_names),
@@ -825,7 +835,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
           hoverinfo = "text",
           text = ~paste0("<b>", team, "</b><br>Liquid Cash: ", format_table_currency(value))
         ) %>%
-          plotly::layout(
+          fm_plot_layout(
             paper_bgcolor = "rgba(0,0,0,0)",
             plot_bgcolor = "rgba(0,0,0,0)",
             xaxis = list(title = "Liquid Cash (EUR)", gridcolor = "#f1f5f9", zeroline = TRUE, zerolinecolor = "#cbd5e1"),
@@ -847,12 +857,12 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
         metric = metric,
         start_date = start_date,
         end_date = end_date,
-        initial_budget = 300000000
+        initial_budget = initial
       )
 
       if (metric == "cash") {
-        x_title <- "Liquid Cash (EUR)"
-        tooltip_label <- "Liquid Cash"
+        x_title <- "Transfer-only balance estimate (EUR)"
+        tooltip_label <- "Transfer-only estimate; excludes rewards and adjustments"
       } else if (metric == "investment") {
         x_title <- "Squad Purchases (EUR)"
         tooltip_label <- "Squad Purchases"
@@ -876,7 +886,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
         hoverinfo = "text",
         text = ~paste0("<b>", team, "</b><br>", tooltip_label, ": ", format_table_currency(value), "<br><i>", range_label, "</i>")
       ) %>%
-        plotly::layout(
+        fm_plot_layout(
           paper_bgcolor = "rgba(0,0,0,0)",
           plot_bgcolor = "rgba(0,0,0,0)",
           xaxis = list(title = x_title, gridcolor = "#f1f5f9", zeroline = metric == "cash", zerolinecolor = "#cbd5e1"),
@@ -888,15 +898,16 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
     # Render Scouted Rival Details (or empty state prompt if no selection)
     output$scouted_rival_details_ui <- renderUI({
       req(is_module_active() == TRUE)
+      if (!is.null(refresh_trigger)) refresh_trigger()
       rival_id <- selected_rival_team_id()
 
       if (is.null(rival_id) || rival_id == "") {
         div(
-          style = "text-align: center; padding: 40px 20px; background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px; margin-top: 20px; margin-bottom: 25px;",
-          shiny::tags$i(class = "fa-solid fa-user-ninja", style = "font-size: 36px; color: #94a3b8; margin-bottom: 12px;"),
-          h4(style = "font-weight: 700; color: #334155; margin: 0 0 6px 0;", "No User Team Selected"),
-          p(style = "color: #64748b; font-size: 14px; margin: 0;",
-            icon("hand-pointer", style = "color: #3b82f6; margin-right: 4px;"),
+          style = "text-align: center; padding: 40px 20px; background: var(--fm-surface); border: 2px dashed #cbd5e1; border-radius: 12px; margin-top: 20px; margin-bottom: 25px;",
+          shiny::tags$i(class = "fa-solid fa-user-ninja", style = "font-size: 36px; color: var(--fm-muted); margin-bottom: 12px;"),
+          h4(style = "font-weight: 700; color: var(--fm-text); margin: 0 0 6px 0;", "No User Team Selected"),
+          p(style = "color: var(--fm-muted); font-size: 14px; margin: 0;",
+            icon("hand-pointer", style = "color: var(--fm-text); margin-right: 4px;"),
             "Click on any user row in the table above to scout their squad roster and financial details."
           )
         )
@@ -932,6 +943,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
 
     rival_moneymovements_raw_RV <- reactive({
       req(is_module_active() == TRUE)
+      if (!is.null(refresh_trigger)) refresh_trigger()
       req(login_token())
       req(championship_id())
       req(selected_rival_team_id())
@@ -964,7 +976,9 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
           dplyr::arrange(timestamp)
 
         # Calculate running balance on the FULL chronological dataset
-        movements$running_balance <- cumsum(movements$money)
+        # A visible movement page does not prove a complete account ledger.
+        # Keep historical balances unavailable without a verified opening balance.
+        movements$running_balance <- rep(NA_real_, nrow(movements))
 
         # Batch consolidation: group by minute, compute batch_final_balance and is_batch_header
         movements$batch_key <- format(movements$timestamp, "%Y-%m-%d %H:%M")
@@ -983,217 +997,12 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
         return(movements)
       }
 
-      # ---- FALLBACK PATH: API restricted/empty -- build complete reconstructed financial log ----
+      # Restricted money movements do not authorize inventing rewards, budgets,
+      # dates or account balances. Show only settled transfers visible in feed.
       is_fallback(TRUE)
+      pressroom <- tryCatch(get_championship_pressroom(login_token(), championship_id()), error = function(e) NULL)
+      rivals_observed_transfers(pressroom, selected_rival_team_id())
 
-      rival_id <- selected_rival_team_id()
-      champ_id <- championship_id()
-      login <- login_token()
-
-      empty_df <- data.frame(
-        id = character(0), concept = character(0), type = character(0),
-        category = character(0), money = numeric(0), date = character(0),
-        running_balance = numeric(0), stringsAsFactors = FALSE
-      )
-
-      # (a) Determine season start date
-      season_start_date <- Sys.Date() - 180
-
-      # Fetch pressroom data (b)
-      pressroom_df <- tryCatch({
-        get_championship_pressroom(login = login, championship_id = champ_id)
-      }, error = function(e) NULL)
-
-      rival_tx <- data.frame()
-      has_pressroom <- FALSE
-      if (!is.null(pressroom_df) && nrow(pressroom_df) > 0 && !is.null(rival_id) && rival_id != "") {
-        rival_tx <- pressroom_df[pressroom_df$buyer_team_id == rival_id | pressroom_df$seller_team_id == rival_id, ]
-        # Deduplicate across cursor page boundaries
-        if (nrow(rival_tx) > 0 && "id" %in% colnames(rival_tx)) {
-          rival_tx <- rival_tx %>% dplyr::distinct(id, .keep_all = TRUE)
-        }
-        if (nrow(rival_tx) > 0) {
-          has_pressroom <- TRUE
-          # Use earliest pressroom date as season start if available
-          if ("created" %in% colnames(rival_tx)) {
-            earliest <- min(parse_safe_datetime(rival_tx$created), na.rm = TRUE)
-            if (!is.na(earliest)) {
-              season_start_date <- as.Date(earliest)
-            }
-          }
-        }
-      }
-
-      # Fetch finished rounds (c)
-      finished_rounds_df <- tryCatch({
-        get_finished_rounds(login = login, championship_id = champ_id)
-      }, error = function(e) NULL)
-
-      if (!is.null(finished_rounds_df) && nrow(finished_rounds_df) > 0) {
-        finished_rounds_df <- finished_rounds_df[finished_rounds_df$is_finished == TRUE, ]
-      }
-
-      # Get rival's total points from user_teams_RV
-      rival_points <- 0
-      teams <- tryCatch({ user_teams_RV() }, error = function(e) NULL)
-      if (!is.null(teams) && nrow(teams) > 0) {
-        rival_row <- teams[teams$teamid == rival_id, ]
-        if (nrow(rival_row) > 0 && "points" %in% colnames(rival_row)) {
-          rival_points <- suppressWarnings(as.numeric(rival_row$points[1]))
-        }
-      }
-
-      # Build the reconstructed log as a list of data frames
-      all_rows <- list()
-
-      # (a) Initial Budget row
-      all_rows[[length(all_rows) + 1]] <- data.frame(
-        id = "recon_initial_budget",
-        concept = "Initial Budget",
-        type = "budget",
-        category = "bonus",
-        money = 300000000,
-        date = as.character(season_start_date),
-        stringsAsFactors = FALSE
-      )
-
-      # (b) Pressroom Transfers
-      if (has_pressroom && nrow(rival_tx) > 0) {
-        pressroom_rows <- lapply(seq_len(nrow(rival_tx)), function(idx) {
-          row <- rival_tx[idx, ]
-          is_buy <- (as.character(row$buyer_team_id) == as.character(rival_id))
-          tx_type <- if (is_buy) "buy" else "sell"
-          tx_money <- if (is_buy) -as.numeric(row$price) else as.numeric(row$price)
-          p_name <- if (!is.null(row$player_name) && as.character(row$player_name) != "") as.character(row$player_name) else "Player"
-          data.frame(
-            id = paste0("pressroom_", row$id),
-            concept = paste0(p_name, if (is_buy) " (Purchased)" else " (Sold)"),
-            type = tx_type,
-            category = "market",
-            money = tx_money,
-            date = as.character(row$created),
-            stringsAsFactors = FALSE
-          )
-        }) %>% bind_rows()
-
-        if (nrow(pressroom_rows) > 0) {
-          all_rows[[length(all_rows) + 1]] <- pressroom_rows
-        }
-      }
-
-      # (c) Finished Round Bonuses
-      if (!is.null(finished_rounds_df) && nrow(finished_rounds_df) > 0 && rival_points > 0) {
-        num_finished <- nrow(finished_rounds_df)
-        avg_pts_per_round <- rival_points / num_finished
-
-        bonus_rows <- lapply(seq_len(nrow(finished_rounds_df)), function(idx) {
-          r <- finished_rounds_df[idx, ]
-          round_pts <- avg_pts_per_round
-          bonus_money <- round_pts * 70000
-          data.frame(
-            id = paste0("recon_round_bonus_", r$round_number),
-            concept = paste0("Jornada ", r$round_number, " Bonus"),
-            type = "bonus",
-            category = "round",
-            money = bonus_money,
-            date = as.character(r$begin_process),
-            stringsAsFactors = FALSE
-          )
-        }) %>% bind_rows()
-
-        all_rows[[length(all_rows) + 1]] <- bonus_rows
-      }
-
-      # (d) Roster Fallback: if pressroom has no data, create roster buy rows
-      if (!has_pressroom) {
-        roster <- tryCatch({ rival_players_table_RV() }, error = function(e) NULL)
-        if (!is.null(roster) && nrow(roster) > 0) {
-          roster_buys <- roster %>%
-            dplyr::filter(!is.na(buyPrice) & buyPrice > 0) %>%
-            dplyr::select(buyPrice, name) %>%
-            dplyr::mutate(
-              id = paste0("fallback_buy_", seq_len(n())),
-              concept = name,
-              type = "buy",
-              category = "market",
-              money = -buyPrice,
-              date = as.character(Sys.time())
-            ) %>%
-            dplyr::select(id, concept, type, category, money, date)
-
-          if (nrow(roster_buys) > 0) {
-            all_rows[[length(all_rows) + 1]] <- roster_buys
-          }
-        }
-      }
-
-# Combine all rows
-       if (length(all_rows) == 0) {
-        return(empty_df)
-       }
-
-       recon_df <- bind_rows(all_rows)
-
-       # (d1) Add ranking prize bonus row if finished rounds exist with ranking prizes
-       if (!is.null(finished_rounds_df) && nrow(finished_rounds_df) > 0 && rival_points > 0) {
-         # Determine rival's rank among teams
-         rival_rank <- length(teams_sorted <- tryCatch({
-           user_teams_df <- user_teams_RV()
-           if (!is.null(user_teams_df) && nrow(user_teams_df) > 0) {
-             sorted <- user_teams_df[order(-as.numeric(user_teams_df$points)), ]
-             rank_val <- which(as.character(sorted$teamid) == as.character(rival_id))
-             if (length(rank_val) > 0 && rank_val[1] > 0) rank_val[1] else NA
-           } else {
-             NA
-           }
-         }, error = function(e) NA))
-
-         if (!is.na(rival_rank) && rival_rank > 0) {
-           ranking_prizes_df <- tryCatch({
-             calculate_futmondo_ranking_prizes(money = 30000000, members = nrow(user_teams_RV()))
-           }, error = function(e) NULL)
-
-           if (!is.null(ranking_prizes_df) && nrow(ranking_prizes_df) > 0) {
-             prize_amount <- suppressWarnings(as.numeric(ranking_prizes_df$prize[ranking_prizes_df$rank == rival_rank]))
-             if (!is.na(prize_amount) && prize_amount > 0) {
-               # Use the latest date from existing rows, or Sys.time() if none
-               latest_date <- max(parse_safe_datetime(recon_df$date), na.rm = TRUE)
-               all_rows[[length(all_rows) + 1]] <- data.frame(
-                 id = "recon_ranking_prize",
-                 concept = "Ranking Prize",
-                 type = "bonus",
-                 category = "ranking",
-                 money = prize_amount,
-                 date = as.character(latest_date),
-                 stringsAsFactors = FALSE
-               )
-               recon_df <- bind_rows(all_rows)
-             }
-           }
-         }
-       }
-
-       # (e) Running Balance: sort chronologically ascending -> cumsum -> batch consolidation
-       recon_df$timestamp <- parse_safe_datetime(recon_df$date)
-       recon_df <- recon_df %>%
-         dplyr::arrange(timestamp)
-       recon_df$running_balance <- cumsum(recon_df$money)
-
-       # Batch consolidation: group by minute, compute batch_final_balance and is_batch_header
-       recon_df$batch_key <- format(recon_df$timestamp, "%Y-%m-%d %H:%M")
-       recon_df <- recon_df %>%
-         dplyr::group_by(batch_key) %>%
-         dplyr::mutate(
-           batch_final_balance = running_balance[dplyr::n()],
-           is_batch_header = dplyr::row_number() == dplyr::n()
-         ) %>%
-         dplyr::ungroup()
-
-       # Order strictly descending (newest first), batch header row first within each timestamp group
-       recon_df <- recon_df %>%
-         dplyr::arrange(desc(timestamp), desc(is_batch_header))
-
-       return(recon_df)
     })
 
     # Filtered money movements: passthrough to raw data (filters removed)
@@ -1232,10 +1041,10 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
             status = "success",
             solidHeader = TRUE,
             div(style = "text-align: center; padding: 10px;",
-              h3(style = "font-weight: 700; color: #10b981; margin: 0; font-size: 18px;",
+              h3(style = "font-weight: 700; color: var(--fm-text); margin: 0; font-size: 18px;",
                 format_table_currency(total_inflow)
               ),
-              p(style = "color: #64748b; font-size: 11px; text-transform: uppercase; margin-top: 5px;", "Inflow in Period")
+              p(style = "color: var(--fm-muted); font-size: 11px; text-transform: uppercase; margin-top: 5px;", "Inflow in Period")
             )
           )
         ),
@@ -1246,10 +1055,10 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
             status = "danger",
             solidHeader = TRUE,
             div(style = "text-align: center; padding: 10px;",
-              h3(style = "font-weight: 700; color: #ef4444; margin: 0; font-size: 18px;",
+              h3(style = "font-weight: 700; color: var(--fm-danger); margin: 0; font-size: 18px;",
                 format_table_currency(total_outflow)
               ),
-              p(style = "color: #64748b; font-size: 11px; text-transform: uppercase; margin-top: 5px;", "Outflow in Period")
+              p(style = "color: var(--fm-muted); font-size: 11px; text-transform: uppercase; margin-top: 5px;", "Outflow in Period")
             )
           )
         ),
@@ -1263,7 +1072,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
               h3(style = paste0("font-weight: 700; color: ", net_flow_color, "; margin: 0; font-size: 18px;"),
                 format_table_currency(net_flow)
               ),
-              p(style = "color: #64748b; font-size: 11px; text-transform: uppercase; margin-top: 5px;", "Net Cash Flow")
+              p(style = "color: var(--fm-muted); font-size: 11px; text-transform: uppercase; margin-top: 5px;", "Net Cash Flow")
             )
           )
         )
@@ -1282,6 +1091,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
           )
         ),
 
+        if (is_fallback()) p(class = "alert alert-info", "Only observed transfers are available. Rewards, account adjustments and historical balances are unavailable."),
         # Period Summary Cards
         period_summary_cards,
 
@@ -1319,7 +1129,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                   d <- format(rivals_parse_datetime(Buy_Date), "%d/%m/%Y")
                   title_text <- paste0("Date: ", d, "\nType: ", Buy_Type)
                   shiny::tags$span(
-                    style = "color: #ef4444; font-weight: 600;",
+                    style = "color: var(--fm-danger); font-weight: 600;",
                     title = title_text,
                     format_table_currency(val)
                   )
@@ -1330,12 +1140,12 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                 align = "right",
                 cell = function(val, Sell_Date, Sell_Type) {
                   if (is.na(val)) {
-                    shiny::tags$span(style = "color: #94a3b8;", "-")
+                    shiny::tags$span(style = "color: var(--fm-muted);", "-")
                   } else {
                     d <- format(rivals_parse_datetime(Sell_Date), "%d/%m/%Y")
                     title_text <- paste0("Date: ", d, "\nType: ", Sell_Type)
                     shiny::tags$span(
-                      style = "color: #10b981; font-weight: 600;",
+                      style = "color: var(--fm-text); font-weight: 600;",
                       title = title_text,
                       format_table_currency(val)
                     )
@@ -1347,13 +1157,13 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                 align = "right",
                 cell = function(val) {
                   if (is.na(val)) {
-                    shiny::tags$span(style = "color: #94a3b8;", "-")
+                    shiny::tags$span(style = "color: var(--fm-muted);", "-")
                   } else if (val > 0) {
-                    shiny::tags$span(style = "color: #10b981; font-weight: 700;", paste0("+", format_table_currency(val)))
+                    shiny::tags$span(style = "color: var(--fm-text); font-weight: 700;", paste0("+", format_table_currency(val)))
                   } else if (val < 0) {
-                    shiny::tags$span(style = "color: #ef4444; font-weight: 700;", format_table_currency(val))
+                    shiny::tags$span(style = "color: var(--fm-danger); font-weight: 700;", format_table_currency(val))
                   } else {
-                    shiny::tags$span(style = "color: #64748b;", format_table_currency(val))
+                    shiny::tags$span(style = "color: var(--fm-muted);", format_table_currency(val))
                   }
                 }
               ),
@@ -1430,7 +1240,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                 badge_label <- "Budget"
               }
               shiny::tags$span(
-                style = paste0("background: ", badge_color, "; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;"),
+                style = paste0("background: ", badge_color, "; color: var(--fm-text); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;"),
                 badge_label
               )
             }
@@ -1446,11 +1256,11 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
             cell = function(money_val) {
               formatted <- format_table_currency(money_val)
               if (money_val > 0) {
-                shiny::tags$span(style = "color: #10b981; font-weight: 600;", paste0("+", formatted))
+                shiny::tags$span(style = "color: var(--fm-text); font-weight: 600;", paste0("+", formatted))
               } else if (money_val < 0) {
-                shiny::tags$span(style = "color: #ef4444; font-weight: 600;", formatted)
+                shiny::tags$span(style = "color: var(--fm-danger); font-weight: 600;", formatted)
               } else {
-                shiny::tags$span(style = "color: #64748b;", formatted)
+                shiny::tags$span(style = "color: var(--fm-muted);", formatted)
               }
             }
           ),
@@ -1460,10 +1270,10 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
             cell = function(rb_val, rowInfo) {
               is_hdr <- if (!is.null(rowInfo) && "is_batch_header" %in% names(rowInfo)) rowInfo$is_batch_header else TRUE
               if (isTRUE(is_hdr)) {
-                formatted <- format_table_currency(rb_val)
-                shiny::tags$span(style = "font-weight: 700; color: #0f172a;", formatted)
+                formatted <- ui_financial_amount(rb_val)
+                shiny::tags$span(style = "font-weight: 700; color: var(--fm-text);", formatted)
               } else {
-                shiny::tags$span(style = "color: #94a3b8;", "-")
+                shiny::tags$span(style = "color: var(--fm-muted);", "-")
               }
             }
           ),
@@ -1485,9 +1295,44 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       user_teams_RV = user_teams_RV,
       login_token = login_token,
       championship_id = championship_id,
-      user_team_id = user_team_id # Passed logged-in team ID so buying executes on your behalf
+      user_team_id = user_team_id, # Actions execute on the logged-in team only.
+      refresh_trigger = refresh_trigger
     )
     
     return(selected_player_RV)
   })
+}
+# Restricted account histories can be supplemented with observed pressroom
+# transfers, but never with fabricated budget, reward, date or balance records.
+rivals_observed_transfers <- function(pressroom_df, rival_id) {
+  empty <- data.frame(id=character(),concept=character(),type=character(),category=character(),
+                      money=numeric(),date=character(),running_balance=numeric(),
+                      timestamp=as.POSIXct(character()),batch_key=character(),is_batch_header=logical(),batch_final_balance=numeric())
+  if (!is.data.frame(pressroom_df) || !nrow(pressroom_df) || length(rival_id)!=1L || is.na(rival_id) || !nzchar(rival_id)) return(empty)
+  required <- c("buyer_team_id","seller_team_id","created","price")
+  if (!all(required %in% names(pressroom_df))) return(empty)
+  buyer <- as.character(pressroom_df$buyer_team_id)
+  seller <- as.character(pressroom_df$seller_team_id)
+  involved <- (!is.na(buyer) & buyer == rival_id) | (!is.na(seller) & seller == rival_id)
+  rows <- pressroom_df[involved,,drop=FALSE]
+  if (!nrow(rows)) return(empty)
+  if ("id" %in% names(rows)) {
+    ids <- as.character(rows$id)
+    known <- !is.na(ids) & nzchar(ids)
+    rows <- rows[!(known & duplicated(ids)),,drop=FALSE]
+  }
+  timestamps <- rivals_parse_datetime(rows$created)
+  amounts <- suppressWarnings(as.numeric(rows$price))
+  usable <- !is.na(timestamps) & is.finite(amounts) & amounts >= 0
+  rows <- rows[usable,,drop=FALSE]; timestamps <- timestamps[usable]; amounts <- amounts[usable]
+  if (!nrow(rows)) return(empty)
+  buying <- !is.na(rows$buyer_team_id) & as.character(rows$buyer_team_id)==rival_id
+  names <- if ("player_name"%in%names(rows)) as.character(rows$player_name) else rep("Player",nrow(rows))
+  names[is.na(names) | !nzchar(names)] <- "Player"
+  ids <- if ("id"%in%names(rows)) as.character(rows$id) else rep(NA_character_,nrow(rows))
+  result <- data.frame(id=ids,concept=paste0(names,ifelse(buying," (Purchased)"," (Sold)")),
+    type=ifelse(buying,"buy","sell"),category="market",money=ifelse(buying,-amounts,amounts),
+    date=as.character(rows$created),running_balance=NA_real_,timestamp=timestamps,
+    batch_key=format(timestamps,"%Y-%m-%d %H:%M"),is_batch_header=TRUE,batch_final_balance=NA_real_,stringsAsFactors=FALSE)
+  result[order(result$timestamp,decreasing=TRUE),,drop=FALSE]
 }

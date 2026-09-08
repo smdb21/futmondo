@@ -1,17 +1,25 @@
 header <- shinydashboardPlus::dashboardHeader(
-  title = "Futmondo"
+  title = "Futmondo",
+  tags$li(class = "dropdown", uiOutput("notification_bell"))
 )
 body <- shinydashboard::dashboardBody(
   # Add custom CSS here
   shiny::tags$head(
-    shiny::tags$link(rel = "stylesheet", type = "text/css", href = "custom_style.css"),
+    shiny::tags$style(shiny::HTML(fm_theme_css())),
+    # Embed the current stylesheet: cached legacy CSS must not restore white surfaces.
+    shiny::includeCSS("www/custom_style.css"),
     shiny::tags$style(shiny::HTML("
         .ReactTable .rt-thead {
           z-index: 1;
         }
       "))
   ),
+  selectInput("selected_league", "League", choices = character()),
+  uiOutput("background_sync"),
   shinydashboard::tabItems(
+    shinydashboard::tabItem(tabName="intelligence", intelligence_UI("intelligence")),
+    shinydashboard::tabItem(tabName="notifications", notifications_UI("notifications")),
+    shinydashboard::tabItem(tabName="automation", automation_UI("automation")),
     shinydashboard::tabItem(
       tabName = "login",
       fluidRow(
@@ -68,7 +76,7 @@ body <- shinydashboard::dashboardBody(
 )
 
 shinydashboardPlus::dashboardPage(
-  preloader = list(html = tagList(waiter::spin_1(), "Loading ..."), color = "#3c8dbc"),
+  preloader = list(html = tagList(waiter::spin_1(), "Loading ..."), color = fm_theme_tokens()$bg),
   header,
   shinydashboardPlus::dashboardSidebar(
     width = 135, # pixels

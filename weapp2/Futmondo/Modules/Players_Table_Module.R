@@ -27,7 +27,7 @@ filter_by_players_with_bid = FALSE,
         fluidRow(
           column(width = 7,
                  fluidRow(
-                   style = "background: #f8fafc; padding: 15px; border-radius: 8px; margin: 0 0 20px 0; border: 1px solid #e2e8f0;",
+                   style = "background: var(--fm-surface); padding: 15px; border-radius: 8px; margin: 0 0 20px 0; border: 1px solid #e2e8f0;",
 if (filter_by_position) {
                       column(width = 4, div(title = "Filter players by primary or secondary position (Goalkeeper, Defender, Midfielder, Forward)", selectInput(inputId = ns("position_filter"), label = "Position", choices = c("All", "Goalkeeper", "Defender", "Midfielder", "Forward"), selected = "All", width = "100%")))
                     },
@@ -51,7 +51,7 @@ if (filter_by_position) {
         )
       } else {
         fluidRow(
-          style = "background: #f8fafc; padding: 15px; border-radius: 8px; margin: 0 0 20px 0; border: 1px solid #e2e8f0;",
+          style = "background: var(--fm-surface); padding: 15px; border-radius: 8px; margin: 0 0 20px 0; border: 1px solid #e2e8f0;",
           if (filter_by_position) {
             column(width = 3, div(title = "Filter players by primary or secondary position (Goalkeeper, Defender, Midfielder, Forward)", selectInput(inputId = ns("position_filter"), label = "Position", choices = c("All", "Goalkeeper", "Defender", "Midfielder", "Forward"), selected = "All", width = "100%")))
           },
@@ -114,26 +114,32 @@ if (filter_by_position) {
 }
 
 
-players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL, hide_bid_column = FALSE) {
+players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL, hide_bid_column = FALSE, refresh_trigger = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     table_refresh_trigger <- reactiveVal(0)
+    selected_player_id_RV <- reactiveVal(NULL)
+    selected_player_context_RV <- reactiveVal(NULL)
+    table_context_RV <- reactive({
+      value <- function(x) if(is.function(x)) x() else x
+      auth <- value(login_token)
+      list(user=if(valid_login(auth))fm_scalar(auth[["userid"]],"") else "",
+        championship=fm_scalar(value(championship_id),""),team=fm_scalar(value(user_team_id),""))
+    })
+    observeEvent(table_context_RV(), {
+      selected_player_id_RV(NULL);selected_player_context_RV(NULL)
+      tryCatch(updateReactable("players_table",selected=NA_integer_,session=session),error=function(e)NULL)
+      removeModal()
+    },ignoreNULL=FALSE,priority=100)
 
-    local_bids_override <- reactiveVal(list())
-    bulk_market_override <- reactiveVal(FALSE)
-
-    handle_bid_updated <- function(player_id = NULL, new_bid_price = NULL, is_cancel = FALSE) {
-      if (!is.null(player_id) && player_id == "ALL") {
-        bulk_market_override(TRUE)
-      } else if (!is.null(player_id) && player_id != "") {
-        current_overrides <- local_bids_override()
-        current_overrides[[as.character(player_id)]] <- list(
-          price = if (isTRUE(is_cancel)) NA_real_ else suppressWarnings(as.numeric(new_bid_price)),
-          is_cancel = isTRUE(is_cancel)
-        )
-        local_bids_override(current_overrides)
+    # All market mutations invalidate the authoritative snapshot. Listing a
+    # player, cancelling our bid, and rejecting another team's bid are distinct.
+    handle_bid_updated <- function(player_id = NULL, new_bid_price = NULL,
+                                   is_cancel = FALSE, action_type = "refresh") {
+      table_refresh_trigger(table_refresh_trigger() + 1L)
+      if (!is.null(refresh_trigger) && is.function(refresh_trigger)) {
+        refresh_trigger(isolate(refresh_trigger()) + 1L)
       }
-      table_refresh_trigger(table_refresh_trigger() + 1)
     }
 
     # Safe date parsing helper
@@ -211,11 +217,21 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       on_bid_updated = handle_bid_updated
     )
     # reactives ----
-    ## selected_player_RV
-    selected_player_RV <- reactive({
+    # Capture identity when the user selects a row. A refresh can reorder rows;
+    # the same numeric index must never silently switch the action target.
+    observeEvent(getReactableState(outputId = "players_table", name = "selected", session = session), {
       selected_idx <- getReactableState(outputId = "players_table", name = "selected", session = session)
-      req(selected_idx)
-      selected_player <- players_table_filtered_RV()[selected_idx, ]
+      rows <- players_table_filtered_RV()
+      req(length(selected_idx) == 1L, is.data.frame(rows), selected_idx >= 1L, selected_idx <= nrow(rows))
+      selected_player_context_RV(table_context_RV())
+      selected_player_id_RV(as.character(rows$id[selected_idx]))
+    }, ignoreNULL = TRUE)
+    selected_player_RV <- reactive({
+      req(identical(selected_player_context_RV(),table_context_RV()))
+      player_id <- selected_player_id_RV(); req(player_id)
+      rows <- players_table_filtered_RV(); req(rows)
+      index <- match(player_id, as.character(rows$id)); req(!is.na(index))
+      rows[index, , drop = FALSE]
     })
     
     ## players_table_filtered_RV ----
@@ -235,70 +251,6 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
         })
       }
 
-      # Apply local in-memory bid overrides if present
-      overrides <- local_bids_override()
-      if (length(overrides) > 0 && "id" %in% colnames(players_table)) {
-        for (pid in names(overrides)) {
-          ov <- overrides[[pid]]
-          match_idx <- which(as.character(players_table$id) == pid)
-          if (length(match_idx) > 0) {
-            if (isTRUE(ov$is_cancel)) {
-              if ("bid_price" %in% colnames(players_table)) {
-                players_table$bid_price[match_idx] <- NA_real_
-              }
-              if ("market_inMarket" %in% colnames(players_table)) {
-                players_table$market_inMarket[match_idx] <- FALSE
-              }
-              if ("effective_market_price" %in% colnames(players_table)) {
-                players_table$effective_market_price[match_idx] <- NA_real_
-              }
-              if ("numberOfBids" %in% colnames(players_table) && !is.na(players_table$numberOfBids[match_idx])) {
-                current_bids <- suppressWarnings(as.numeric(players_table$numberOfBids[match_idx]))
-                if (!is.na(current_bids)) {
-                  players_table$numberOfBids[match_idx] <- max(0, current_bids - 1)
-                }
-              }
-            } else {
-              old_bid <- if ("bid_price" %in% colnames(players_table)) players_table$bid_price[match_idx] else NA_real_
-              if (!"bid_price" %in% colnames(players_table)) {
-                players_table$bid_price <- NA_real_
-              }
-              players_table$bid_price[match_idx] <- ov$price
-
-              if ("numberOfBids" %in% colnames(players_table)) {
-                old_bid_val <- suppressWarnings(as.numeric(old_bid))
-                if (is.na(old_bid_val) || is.null(old_bid_val) || old_bid_val == 0) {
-                  current_bids <- suppressWarnings(as.numeric(players_table$numberOfBids[match_idx]))
-                  current_bids <- if (is.na(current_bids)) 0 else current_bids
-                  players_table$numberOfBids[match_idx] <- current_bids + 1
-                }
-              }
-            }
-          }
-        }
-      }
-
-      # Apply bulk market listed override if active
-      if (isTRUE(bulk_market_override()) && !is.null(players_table) && nrow(players_table) > 0) {
-        players_table$market_inMarket <- TRUE
-        if (!"effective_market_price" %in% colnames(players_table)) {
-          players_table$effective_market_price <- NA_real_
-        }
-        if ("value" %in% colnames(players_table)) {
-          players_table$effective_market_price <- ifelse(
-            is.na(players_table$effective_market_price) | players_table$effective_market_price <= 0,
-            players_table$value,
-            players_table$effective_market_price
-          )
-        }
-      }
-
-      # players_table <- players_table %>%
-      #   translate_player_positions()
-      # players_table <- players_table %>%
-      #   calculate_player_changes()
-      # players_table <- players_table %>%
-      #   unify_columns()
       if (!is.null(input$position_filter)) {
         if (input$position_filter != "All") {
           players_table <- players_table %>%
@@ -383,7 +335,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
     ## render players_table ----
     output$players_table <- renderReactable({
       req(players_table_filtered_RV())
-      cols_to_hide <- cfg_player_columns_to_hide
+      cols_to_hide <- c(cfg_player_columns_to_hide, "data_coverage", "fis_status", "priority_score", "observed_at")
       if (isTRUE(hide_bid_column)) {
         cols_to_hide <- c(cols_to_hide, "bid_price")
       }
@@ -415,7 +367,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
                 selection = "single",
                 borderless = TRUE,
                 onClick = "select",
-                theme = reactableTheme(
+                theme = fm_reactable_theme(
                   rowSelectedStyle = list(backgroundColor = "#eee", boxShadow = "inset 2px 0 0 0 #ffa62d")
                 )
       )
@@ -442,7 +394,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
         class = "squad-breakdown-card",
         div(class = "squad-breakdown-title",
             span(icon("users"), " Squad Position Breakdown"),
-            span(class = "badge", style = "background-color: #334155; color: #fff; font-size: 11px; padding: 3px 8px;", paste0("Total: ", total_squad, " Players"))
+            span(class = "badge", style = "background-color: var(--fm-surface); color: var(--fm-text); font-size: 11px; padding: 3px 8px;", paste0("Total: ", total_squad, " Players"))
         ),
         div(style = "display: flex; gap: 8px; flex-wrap: wrap; justify-content: space-between; margin-top: 8px;",
             span(class = "badge-gk squad-pos-badge", paste0("Goalkeepers: ", gk)),
@@ -455,4 +407,11 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
 
     return(selected_player_RV)
   })
+}
+
+# Shared display contract: preserve signed balances and distinguish missing data.
+ui_financial_amount <- function(value) {
+  amount <- suppressWarnings(as.numeric(value))
+  if (length(amount) != 1L || !is.finite(amount)) return("Unavailable")
+  format_table_currency(amount)
 }

@@ -35,7 +35,7 @@ selected_player_UI <- function(id) {
         fluidRow(
           style = "margin-top: 25px; padding-top: 20px; border-top: 1px solid #f1f5f9;",
           column(12,
-                 h4(style = "font-weight: 600; color: #0f172a; margin-bottom: 15px;", "Historical Valuation & Performance"),
+                 h4(style = "font-weight: 600; color: var(--fm-text); margin-bottom: 15px;", "Historical Valuation & Performance"),
                  plotly::plotlyOutput(ns("player_trend_plot"), height = "280px")
           )
         ),
@@ -106,6 +106,33 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       }
     }
 
+    # A confirmation belongs to the exact account, league, team and player
+    # that opened it. Switching context invalidates even an already queued click.
+    modal_context_RV <- reactiveVal(list())
+    player_action_context_RV <- reactive({
+      auth <- get_reactive_val(login_token)
+      sp <- tryCatch(selected_player(),error=function(e)NULL)
+      if(!valid_login(auth) || is.null(sp) || !nzchar(fm_scalar(sp$id,""))) return(NULL)
+      list(user=fm_scalar(auth[["userid"]]),championship=fm_scalar(get_reactive_val(championship_id)),
+        team=fm_scalar(get_reactive_val(user_team_id)),player=fm_scalar(sp$id))
+    })
+    observeEvent(player_action_context_RV(), {
+      active_bid_info_RV(NULL);smart_bid_cache_RV(NULL);modal_context_RV(list())
+      offer_modal_opened_RV(FALSE);clause_modal_opened_RV(FALSE)
+      removeModal()
+    },ignoreNULL=FALSE,priority=110)
+    remember_action_context <- function(action) {
+      context <- player_action_context_RV();req(!is.null(context))
+      values <- modal_context_RV();values[[action]]<-context;modal_context_RV(values)
+      invisible(TRUE)
+    }
+    consume_action_context <- function(action) {
+      context <- player_action_context_RV();values<-modal_context_RV()
+      if(is.null(context) || !identical(values[[action]],context)) return(FALSE)
+      values[[action]]<-NULL;modal_context_RV(values)
+      TRUE
+    }
+
     # ---- Acquisition capacity preflight (shared by all acquisition paths) ----
     # Single internal preflight used by market bid, direct-owner offer, clause
     # buyout, and bid modification. It verifies roster capacity, verified
@@ -160,13 +187,13 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     render_input_price_preview <- function(val) {
       if (is.null(val) || is.na(val) || !is.numeric(val) || val <= 0) {
         div(
-          style = "margin-top: 6px; color: #ef4444; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;",
+          style = "margin-top: 6px; color: var(--fm-danger); font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;",
           shiny::tags$i(class = "fa-solid fa-circle-exclamation"),
           "Please enter a valid numerical price greater than 0 €."
         )
       } else {
         div(
-          style = "margin-top: 6px; color: #10b981; font-size: 14px; font-weight: 700;",
+          style = "margin-top: 6px; color: var(--fm-text); font-size: 14px; font-weight: 700;",
           format_table_currency(val)
         )
       }
@@ -185,6 +212,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       {
         sp <- selected_player()
         req(sp)
+        smart_bid_cache_RV(NULL)
 
         login <- get_reactive_val(login_token)
         champ_id <- get_reactive_val(championship_id)
@@ -238,14 +266,14 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           }
           
           team_logo <- shiny::tags$div(
-            style = "margin-top: 6px; display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 13px; color: #cbd5e1;",
+            style = "margin-top: 6px; display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 13px; color: var(--fm-text);",
             logo_tag,
             sp$team
           )
         }
 
         sub_title_markup <- tagList(
-          shiny::tags$span(style = "display: block; font-weight: 600; font-size: 13px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;", role_text),
+          shiny::tags$span(style = "display: block; font-weight: 600; font-size: 13px; color: var(--fm-muted); text-transform: uppercase; letter-spacing: 0.5px;", role_text),
           team_logo
         )
 
@@ -309,14 +337,14 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           }
 
           own_badge <- div(
-            style = "display: inline-block; padding: 8px 16px; background-color: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; border-radius: 8px; font-weight: 600; font-size: 12px; margin: 5px;",
+            style = "display: inline-block; padding: 8px 16px; background-color: var(--fm-surface); color: var(--fm-text); border: 1px solid #bae6fd; border-radius: 8px; font-weight: 600; font-size: 12px; margin: 5px;",
             tagList(icon("shield-halved"), " Player in Your Squad")
           )
 
           if (is_listed_on_market) {
             price_text <- if (!is.na(current_asking_price) && current_asking_price > 0) paste0(" (Asking: ", format_currency(current_asking_price), ")") else ""
             listed_badge <- div(
-              style = "display: inline-block; padding: 8px 16px; background-color: #fef3c7; color: #b45309; border: 1px solid #fde68a; border-radius: 8px; font-weight: 600; font-size: 12px; margin: 5px;",
+              style = "display: inline-block; padding: 8px 16px; background-color: var(--fm-surface); color: var(--fm-text); border: 1px solid #fde68a; border-radius: 8px; font-weight: 600; font-size: 12px; margin: 5px;",
               tagList(icon("tags"), paste0(" Listed on Market", price_text))
             )
             btn_update_sale <- actionButton(
@@ -354,7 +382,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
           if (has_received_offer) {
             offer_banner <- div(
-              style = "width: 100%; text-align: center; margin-bottom: 10px; padding: 10px 16px; background-color: #d1fae5; color: #047857; border: 1px solid #a7f3d0; border-radius: 8px; font-weight: 700; font-size: 14px;",
+              style = "width: 100%; text-align: center; margin-bottom: 10px; padding: 10px 16px; background-color: var(--fm-surface); color: var(--fm-text); border: 1px solid #a7f3d0; border-radius: 8px; font-weight: 700; font-size: 14px;",
               tagList(icon("hand-holding-dollar"), paste0(" Received Offer: ", format_currency(rec_offer_price), " from ", rec_offer_bidder))
             )
             btn_accept_offer <- actionButton(
@@ -373,7 +401,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           # ---- Player belongs to rival/market AND current user has an active BUY bid ----
           bid_info <- active_bid_info_RV()
           banner <- div(
-            style = "width: 100%; text-align: center; margin-bottom: 10px; padding: 10px 16px; background-color: #d1fae5; color: #047857; border: 1px solid #a7f3d0; border-radius: 8px; font-weight: 700; font-size: 14px;",
+            style = "width: 100%; text-align: center; margin-bottom: 10px; padding: 10px 16px; background-color: var(--fm-surface); color: var(--fm-text); border: 1px solid #a7f3d0; border-radius: 8px; font-weight: 700; font-size: 14px;",
             tagList(icon("hand-holding-dollar"), paste0(" Your Active Bid: ", format_currency(bid_info$price)))
           )
           btn_modify <- actionButton(
@@ -429,28 +457,28 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           if (!is_computer && !is.null(owner_name) && is_on_market) {
             # Rival player on Market: "{username} / Market"
             badge_tag <- div(
-              style = "display: inline-block; padding: 8px 16px; background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a; border-radius: 8px; font-weight: 600; font-size: 13px; margin: 5px;",
+              style = "display: inline-block; padding: 8px 16px; background-color: var(--fm-surface); color: var(--fm-text); border: 1px solid #fde68a; border-radius: 8px; font-weight: 600; font-size: 13px; margin: 5px;",
               tagList(icon("tags"), paste0(" ", owner_name, " / Market"))
             )
             action_buttons <- tagList(badge_tag, action_buttons)
           } else if (is_computer && is_on_market) {
             # Computer / Free Agent on Market: "Free Agent / Market"
             badge_tag <- div(
-              style = "display: inline-block; padding: 8px 16px; background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; font-size: 13px; margin: 5px;",
+              style = "display: inline-block; padding: 8px 16px; background-color: var(--fm-surface); color: var(--fm-muted); border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; font-size: 13px; margin: 5px;",
               tagList(icon("building-columns"), " Free Agent / Market")
             )
             action_buttons <- tagList(badge_tag, action_buttons)
           } else if (!is_computer && !is.null(owner_name)) {
             # Rival player off Market: "Owner: {owner_name}"
             badge_tag <- div(
-              style = "display: inline-block; padding: 8px 16px; background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a; border-radius: 8px; font-weight: 600; font-size: 13px; margin: 5px;",
+              style = "display: inline-block; padding: 8px 16px; background-color: var(--fm-surface); color: var(--fm-text); border: 1px solid #fde68a; border-radius: 8px; font-weight: 600; font-size: 13px; margin: 5px;",
               tagList(icon("users"), paste0(" Owner: ", owner_name))
             )
             action_buttons <- tagList(badge_tag, action_buttons)
           } else {
             # Generic free agent fallback
             badge_tag <- div(
-              style = "display: inline-block; padding: 8px 16px; background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; font-size: 13px; margin: 5px;",
+              style = "display: inline-block; padding: 8px 16px; background-color: var(--fm-surface); color: var(--fm-muted); border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; font-size: 13px; margin: 5px;",
               tagList(icon("building-columns"), " Free Agent / Market")
             )
             action_buttons <- tagList(badge_tag, action_buttons)
@@ -519,7 +547,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
             # Release clause exists but is currently LOCKED
             lock_reason <- if (clause_date_formatted != "") paste0("until ", clause_date_formatted) else "transferred/cooldown"
             locked_badge <- div(
-              style = "display: inline-block; padding: 8px 16px; background-color: #fef3c7; color: #b45309; border: 1px solid #fde68a; border-radius: 8px; font-weight: 600; font-size: 12px; margin: 5px;",
+              style = "display: inline-block; padding: 8px 16px; background-color: var(--fm-surface); color: var(--fm-text); border: 1px solid #fde68a; border-radius: 8px; font-weight: 600; font-size: 12px; margin: 5px;",
               tagList(icon("lock"), paste0(" Release Clause Locked ", lock_reason, " (", format_currency(clause_price_val), ")"))
             )
             action_buttons <- tagList(action_buttons, locked_badge)
@@ -532,6 +560,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
     # ---- Modify Active Bid Modal ----
     observeEvent(input$btn_modify_bid, {
+      remember_action_context("modify")
       sp <- selected_player()
       req(sp)
       bid_info <- active_bid_info_RV()
@@ -566,6 +595,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
     # ---- Submit Modify Active Bid ----
     observeEvent(input$submit_modify_bid, {
+      req(consume_action_context("modify"))
       sp <- selected_player()
       login <- get_reactive_val(login_token)
       champ_id <- get_reactive_val(championship_id)
@@ -617,7 +647,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           duration = 5
         )
         if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
-          tryCatch(on_bid_updated(player_id = player_id, new_bid_price = new_price, is_cancel = FALSE), error = function(e) NULL)
+          tryCatch(on_bid_updated(action_type = "bid_modified", player_id = player_id, new_bid_price = new_price, is_cancel = FALSE), error = function(e) NULL)
         }
         clear_api_cache()
       } else {
@@ -631,6 +661,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
     # ---- Cancel Active Bid Modal ----
     observeEvent(input$btn_cancel_bid, {
+      remember_action_context("cancel")
       sp <- selected_player()
       req(sp)
       bid_info <- active_bid_info_RV()
@@ -640,7 +671,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         title = tagList(icon("trash-can"), " Cancel Active Bid"),
         p(strong(sp$name)),
         p("Are you sure you want to cancel your active bid of ", strong(format_currency(bid_info$price)), "?"),
-        p(style = "color: #ef4444; font-size: 13px;", "This will withdraw your offer from the transfer market."),
+        p(style = "color: var(--fm-danger); font-size: 13px;", "This will withdraw your offer from the transfer market."),
         footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
                      modalButton("Keep Bid"),
                      actionButton(ns("submit_cancel_bid"), "Confirm Cancel Bid", class = "btn btn-cancel-bid")),
@@ -651,6 +682,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
     # ---- Submit Cancel Active Bid ----
     observeEvent(input$submit_cancel_bid, {
+      req(consume_action_context("cancel"))
       sp <- selected_player()
       login <- get_reactive_val(login_token)
       champ_id <- get_reactive_val(championship_id)
@@ -658,6 +690,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       bid_info <- active_bid_info_RV()
       req(sp, login, champ_id, team_id, bid_info)
 
+      player_id <- sp$id
       bid_id <- bid_info$id
 
       success <- cancel_bid(
@@ -676,7 +709,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           duration = 5
         )
         if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
-          tryCatch(on_bid_updated(player_id = player_id, new_bid_price = NA_real_, is_cancel = TRUE), error = function(e) NULL)
+          tryCatch(on_bid_updated(action_type = "bid_cancelled", player_id = player_id, new_bid_price = NA_real_, is_cancel = TRUE), error = function(e) NULL)
         }
         clear_api_cache()
       } else {
@@ -690,8 +723,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
     # ---- Use Smart Bid: pre-fill the market offer modal ----
     observeEvent(input$btn_use_smart_bid, {
+      remember_action_context("bid")
       cached <- smart_bid_cache_RV()
-      if (is.null(cached) || is.null(cached$recommended_bid)) {
+      if (is.null(cached) || !isTRUE(cached$can_compete) || !isTRUE(cached$funds_verified) || length(cached$recommended_bid) != 1L || !is.finite(cached$recommended_bid) || cached$recommended_bid <= 0) {
         shiny::showNotification("Smart bid data not available. Please refresh.", type = "error")
         return()
       }
@@ -753,6 +787,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
       market_price <- if ("effective_market_price" %in% colnames(sp) && !is.na(sp$effective_market_price)) suppressWarnings(as.numeric(sp$effective_market_price)) else if ("market_price" %in% colnames(sp) && !is.na(sp$market_price)) suppressWarnings(as.numeric(sp$market_price)) else if ("price" %in% colnames(sp) && !is.na(sp$price)) suppressWarnings(as.numeric(sp$price)) else 1000000
 
+      remember_action_context("bid")
       offer_modal_opened_RV(TRUE)
       showModal(modalDialog(
         title = tagList(icon("hand-holding-dollar"), " Place Market Offer"),
@@ -808,6 +843,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
     # ---- Submit Market Offer ----
     observeEvent(input$submit_bid, {
+      req(consume_action_context("bid"))
       sp <- selected_player()
       login <- get_reactive_val(login_token)
       champ_id <- get_reactive_val(championship_id)
@@ -864,7 +900,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         )
         clear_api_cache()
         if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
-          tryCatch(on_bid_updated(player_id = player_id, new_bid_price = bid_amount, is_cancel = FALSE), error = function(e) NULL)
+          tryCatch(on_bid_updated(action_type = "bid_placed", player_id = player_id, new_bid_price = bid_amount, is_cancel = FALSE), error = function(e) NULL)
         }
       } else {
         err_msg <- if (is.list(res) && !is.null(res$message) && res$message != "") res$message else "Please verify your funds and try again."
@@ -878,6 +914,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
     # ---- Option 2: Direct Offer to Owner Modal ----
     observeEvent(input$btn_offer_owner, {
+      remember_action_context("owner_offer")
       sp <- selected_player()
       req(sp)
 
@@ -904,7 +941,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           step = 10000
         ),
         uiOutput(ns("owner_offer_amount_preview")),
-        p(style = "color: #64748b; font-size: 12px;", "This offer will be submitted to the player owner and tracked in market transaction history."),
+        p(style = "color: var(--fm-muted); font-size: 12px;", "This offer will be submitted to the player owner and tracked in market transaction history."),
         footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
                      modalButton("Cancel"),
                      actionButton(ns("submit_owner_offer"), "Submit Offer", class = "btn btn-offer-money")),
@@ -915,6 +952,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
     # ---- Submit Direct Offer to Owner ----
     observeEvent(input$submit_owner_offer, {
+      req(consume_action_context("owner_offer"))
       sp <- selected_player()
       login <- get_reactive_val(login_token)
       champ_id <- get_reactive_val(championship_id)
@@ -971,7 +1009,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         )
         clear_api_cache()
         if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
-          tryCatch(on_bid_updated(player_id = player_id, new_bid_price = offer_amount, is_cancel = FALSE), error = function(e) NULL)
+          tryCatch(on_bid_updated(action_type = "owner_offer_placed", player_id = player_id, new_bid_price = offer_amount, is_cancel = FALSE), error = function(e) NULL)
         }
       } else {
         err_msg <- if (is.list(res) && !is.null(res$message) && res$message != "") res$message else "Please verify your funds and try again."
@@ -1019,13 +1057,14 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         return(invisible(FALSE))
       }
 
+      remember_action_context("clause")
       clause_modal_opened_RV(TRUE)
       showModal(modalDialog(
         title = tagList(icon("bolt"), " Confirm Release Clause Buyout"),
         p(strong(sp$name)),
         p("This will instantly purchase the player for their official release clause."),
         p("Clause price: ", strong(format_currency(clause_price))),
-        p(style = "color: #ef4444; font-size: 13px; font-weight: 600;", "Are you sure you want to trigger this clause buyout?"),
+        p(style = "color: var(--fm-danger); font-size: 13px; font-weight: 600;", "Are you sure you want to trigger this clause buyout?"),
         footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
                      modalButton("Cancel"),
                      actionButton(ns("submit_clause"), "Confirm Clause Buyout", class = "btn btn-buy-clause")),
@@ -1044,6 +1083,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
     # ---- Submit Clause Purchase ----
     observeEvent(input$submit_clause, {
+      req(consume_action_context("clause"))
       sp <- selected_player()
       login <- get_reactive_val(login_token)
       champ_id <- get_reactive_val(championship_id)
@@ -1114,7 +1154,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         )
         clear_api_cache()
         if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
-          tryCatch(on_bid_updated(), error = function(e) NULL)
+          tryCatch(on_bid_updated(action_type = "clause_paid"), error = function(e) NULL)
         }
       } else {
         err_msg <- if (is.list(res) && !is.null(res$message) && res$message != "") res$message else "Please verify your funds and try again."
@@ -1128,6 +1168,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
     # ---- Put Single Player on Market Modal ----
     observeEvent(input$btn_put_on_market, {
+      remember_action_context("list")
       sp <- selected_player()
       req(sp)
       default_price <- if ("value" %in% colnames(sp) && !is.na(sp$value) && sp$value > 0) sp$value else 1000000
@@ -1144,7 +1185,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           step = 10000
         ),
         uiOutput(ns("sale_price_input_preview")),
-        p(style = "color: #64748b; font-size: 12px;", "This player will be listed on the transfer market for other users and computer to place bids."),
+        p(style = "color: var(--fm-muted); font-size: 12px;", "This player will be listed on the transfer market for other users and computer to place bids."),
         footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
                      modalButton("Cancel"),
                      actionButton(ns("submit_put_on_market"), "Confirm Market Listing", class = "btn btn-offer-money")),
@@ -1155,6 +1196,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
     # ---- Submit Put Player on Market ----
     observeEvent(input$submit_put_on_market, {
+      req(consume_action_context("list"))
       sp <- selected_player()
       login <- get_reactive_val(login_token)
       champ_id <- get_reactive_val(championship_id)
@@ -1189,7 +1231,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         )
         clear_api_cache()
         if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
-          tryCatch(on_bid_updated(player_id = player_id, new_bid_price = sale_price, is_cancel = FALSE), error = function(e) NULL)
+          tryCatch(on_bid_updated(action_type = "player_listed", player_id = player_id, new_bid_price = sale_price, is_cancel = FALSE), error = function(e) NULL)
         }
       } else {
         err_msg <- if (is.list(res) && !is.null(res$message) && res$message != "") res$message else "Listing failed. Please try again."
@@ -1203,6 +1245,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
     # ---- Remove Player from Market Modal ----
     observeEvent(input$btn_cancel_sell, {
+      remember_action_context("delist")
       sp <- selected_player()
       req(sp)
 
@@ -1220,6 +1263,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
     # ---- Submit Remove Player from Market ----
     observeEvent(input$submit_cancel_sell, {
+      req(consume_action_context("delist"))
       sp <- selected_player()
       login <- get_reactive_val(login_token)
       champ_id <- get_reactive_val(championship_id)
@@ -1247,7 +1291,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         )
         clear_api_cache()
         if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
-          tryCatch(on_bid_updated(player_id = player_id, new_bid_price = NA_real_, is_cancel = TRUE), error = function(e) NULL)
+          tryCatch(on_bid_updated(action_type = "listing_cancelled", player_id = player_id, new_bid_price = NA_real_, is_cancel = TRUE), error = function(e) NULL)
         }
       } else {
         err_msg <- if (is.list(res) && !is.null(res$message) && res$message != "") res$message else "Withdrawal failed. Please try again."
@@ -1261,6 +1305,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
     # ---- Accept Received Offer Modal ----
     observeEvent(input$btn_accept_offer, {
+      remember_action_context("accept")
       sp <- selected_player()
       req(sp)
       rec_offer_price <- suppressWarnings(as.numeric(sp$bid_price))
@@ -1270,7 +1315,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         title = tagList(icon("circle-check"), paste0(" Accept Offer for ", sp$name)),
         p(strong(sp$name)),
         p("Are you sure you want to ACCEPT the received offer of ", strong(format_currency(rec_offer_price)), " from ", strong(rec_offer_bidder), "?"),
-        p(style = "color: #10b981; font-size: 13px; font-weight: 600;", "The player will be sold and funds added to your budget immediately."),
+        p(style = "color: var(--fm-text); font-size: 13px; font-weight: 600;", "The player will be sold and funds added to your budget immediately."),
         footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
                      modalButton("Cancel"),
                      actionButton(ns("submit_accept_offer"), "Confirm Accept Offer", class = "btn btn-offer-money")),
@@ -1281,6 +1326,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
     # ---- Submit Accept Received Offer ----
     observeEvent(input$submit_accept_offer, {
+      req(consume_action_context("accept"))
       sp <- selected_player()
       login <- get_reactive_val(login_token)
       champ_id <- get_reactive_val(championship_id)
@@ -1331,7 +1377,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         )
         clear_api_cache()
         if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
-          tryCatch(on_bid_updated(player_id = player_id, new_bid_price = NA_real_, is_cancel = TRUE), error = function(e) NULL)
+          tryCatch(on_bid_updated(action_type = "offer_accepted", player_id = player_id, new_bid_price = NA_real_, is_cancel = TRUE), error = function(e) NULL)
         }
       } else {
         err_msg <- if (is.list(res) && !is.null(res$message) && res$message != "") res$message else "Accept failed. Please try again."
@@ -1345,6 +1391,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
     # ---- Reject Received Offer Modal ----
     observeEvent(input$btn_reject_offer, {
+      remember_action_context("reject")
       sp <- selected_player()
       req(sp)
       rec_offer_price <- suppressWarnings(as.numeric(sp$bid_price))
@@ -1364,6 +1411,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
     # ---- Submit Reject Received Offer ----
     observeEvent(input$submit_reject_offer, {
+      req(consume_action_context("reject"))
       sp <- selected_player()
       login <- get_reactive_val(login_token)
       champ_id <- get_reactive_val(championship_id)
@@ -1414,7 +1462,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         )
         clear_api_cache()
         if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
-          tryCatch(on_bid_updated(player_id = player_id, new_bid_price = NA_real_, is_cancel = TRUE), error = function(e) NULL)
+          tryCatch(on_bid_updated(action_type = "offer_rejected", player_id = player_id, new_bid_price = NA_real_, is_cancel = TRUE), error = function(e) NULL)
         }
       } else {
         err_msg <- if (is.list(res) && !is.null(res$message) && res$message != "") res$message else "Reject failed. Please try again."
@@ -1546,7 +1594,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       }
 
       chart %>%
-        plotly::layout(
+        fm_plot_layout(
           hovermode = "x unified",
           paper_bgcolor = "rgba(0,0,0,0)",
           plot_bgcolor = "rgba(0,0,0,0)",
@@ -1576,7 +1624,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       points <- sp$points
 
       clean_points <- if (is.null(points) || is.na(points) || points == "NaN" || points == "") {
-        "0"
+        "Unavailable"
       } else {
         as.character(points)
       }
@@ -1603,7 +1651,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       avg_last_points <- sp$average.averageLastFive
 
       clean_total <- if (is.null(total_last_points) || is.na(total_last_points) || total_last_points == "NaN" || total_last_points == "") {
-        "0"
+        "Unavailable"
       } else {
         as.character(total_last_points)
       }
@@ -1635,10 +1683,10 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       value <- sp$value
       change <- sp$change
       change_pct <- sp$change_by_value * 100
-      if (change > 0) {
+      if (length(change) == 1L && is.finite(change) && change > 0) {
         icon <- icon("caret-up")
         number_color = "green"
-      } else if (change < 0) {
+      } else if (length(change) == 1L && is.finite(change) && change < 0) {
         icon <- icon("caret-down")
         number_color = "red"
       } else {
@@ -1692,23 +1740,12 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       sp <- selected_player()
       req(sp)
 
-      # Wrap single row in a data.frame for calculate_fis_score
-      sp_df <- as.data.frame(t(unlist(as.list(sp))))
-      sp_df <- as.data.frame(t(sp_df))
-      # Ensure it is a proper data.frame with one row
-      if (is.null(dim(sp_df))) {
-        sp_df <- data.frame(sp, stringsAsFactors = FALSE)
-      }
-
-      fis_result <- tryCatch({
-        calculate_fis_score(sp_df)
-      }, error = function(e) {
-        print(paste0("[FIS Panel] Error computing FIS: ", e$message))
-        NULL
-      })
+      # Reuse the exact cohort-independent score already displayed in the table.
+      # Preserve a row as a row: double transposition previously destroyed columns.
+      fis_result <- selected_player_fis_row(sp)
 
       if (is.null(fis_result) || nrow(fis_result) == 0) {
-        return(div(style = "color: #94a3b8; font-size: 13px;", "FIS data unavailable."))
+        return(div(style = "color: var(--fm-muted); font-size: 13px;", "FIS data unavailable."))
       }
 
       fis_score_val <- suppressWarnings(as.numeric(fis_result$fis_score[1]))
@@ -1743,22 +1780,24 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       }
 
       # Confidence pill color
-      conf_pct <- if (!is.na(fis_score_val)) round(fis_score_val, 1) else 0
-      conf_color <- if (conf_pct >= 80) "#16a34a" else if (conf_pct >= 65) "#2563eb" else if (conf_pct >= 45) "#d97706" else "#dc2626"
+      coverage <- suppressWarnings(as.numeric(fis_result$data_coverage[1]))
+      conf_pct <- if (length(coverage) == 1L && is.finite(coverage)) round(100 * coverage) else NA_real_
+      conf_color <- if (!is.finite(conf_pct)) "#64748b" else if (conf_pct >= 80) "#16a34a" else if (conf_pct >= 65) "#2563eb" else if (conf_pct >= 45) "#d97706" else "#dc2626"
 
       # Helper to render a single pillar bar
       render_pillar <- function(label, value) {
-        v <- if (!is.na(value)) round(value, 1) else 0
+        available <- length(value) == 1L && is.finite(value)
+        v <- if (available) round(value, 1) else 0
         bar_color <- if (v >= 70) "#16a34a" else if (v >= 50) "#2563eb" else if (v >= 30) "#d97706" else "#dc2626"
         div(
           style = "margin-bottom: 8px;",
           div(
             style = "display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; margin-bottom: 3px;",
             span(label),
-            span(style = paste0("color: ", bar_color, ";"), paste0(v, "/100"))
+            span(style = paste0("color: ", bar_color, ";"), if (available) paste0(v, "/100") else "Unavailable")
           ),
           div(
-            style = "height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;",
+            style = "height: 8px; background: var(--fm-surface); border-radius: 4px; overflow: hidden;",
             div(
               style = paste0("height: 100%; width: ", max(0, min(v, 100)), "%; background: ", bar_color, "; border-radius: 4px; transition: width 0.3s;")
             )
@@ -1767,25 +1806,25 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       }
 
       div(
-        style = "background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;",
+        style = "background: var(--fm-surface); border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;",
         div(
           style = "display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;",
           div(
-            style = paste0("font-size: 22px; font-weight: 800; color: #0f172a;"),
-            "FIS ", if (!is.na(fis_score_val)) round(fis_score_val, 1) else "N/A"
+            style = paste0("font-size: 22px; font-weight: 800; color: var(--fm-text);"),
+            "Descriptive rating ", if (!is.na(fis_score_val)) round(fis_score_val, 1) else "N/A"
           ),
           span(
             style = paste0("display: inline-block; padding: 3px 10px; border-radius: 12px; font-weight: 700; font-size: 12px; background: ", badge_bg, "; color: ", badge_text, ";"),
             fis_tier_val
           ),
           span(
-            style = paste0("display: inline-block; padding: 3px 10px; border-radius: 12px; font-weight: 600; font-size: 11px; background: ", conf_color, "; color: #fff;"),
-            paste0("Confidence: ", conf_pct, "%")
+            style = paste0("display: inline-block; padding: 3px 10px; border-radius: 12px; font-weight: 600; font-size: 11px; background: ", conf_color, "; color: var(--fm-text);"),
+            if (is.finite(conf_pct)) paste0("Data coverage: ", conf_pct, "%") else "Data coverage unavailable"
           )
         ),
         if (nzchar(fis_summary_val)) {
           p(
-            style = "margin: 0 0 14px 0; font-size: 13px; color: #475569; font-style: italic; line-height: 1.4;",
+            style = "margin: 0 0 14px 0; font-size: 13px; color: var(--fm-muted); font-style: italic; line-height: 1.4;",
             fis_summary_val
           )
         },
@@ -1811,7 +1850,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
       current_user_team <- get_reactive_val(user_team_id)
       player_owner_team <- if ("user_team_id" %in% colnames(sp)) sp$user_team_id else NULL
-      is_own_player <- (!is.null(current_user_team) && !is.null(player_owner_team) && current_user_team == player_owner_team)
+      is_own_player <- (length(current_user_team) == 1L && !is.na(current_user_team) &&
+                        length(player_owner_team) == 1L && !is.na(player_owner_team) &&
+                        identical(as.character(current_user_team), as.character(player_owner_team)))
 
       # Only show for non-owned players
       if (is_own_player) {
@@ -1870,7 +1911,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       })
 
       if (is.null(smart_bid_result) || !is.null(smart_bid_result$error)) {
-        return(div(style = "color: #94a3b8; font-size: 13px;", "Smart bid data unavailable."))
+        return(div(style = "color: var(--fm-muted); font-size: 13px;", "Smart bid data unavailable."))
       }
 
       # Cache the smart bid result for the "Use Smart Bid" button
@@ -1881,9 +1922,11 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       recommended <- smart_bid_result$recommended_bid
       max_rational <- smart_bid_result$max_rational_bid
       roi_pct <- smart_bid_result$expected_roi_pct
+      if (length(roi_pct) != 1L || !is.finite(roi_pct)) roi_pct <- NA_real_
       comp_level <- smart_bid_result$competition_level
       competitors <- smart_bid_result$likely_competitors
       conf_pct <- smart_bid_result$confidence_pct
+      if (length(conf_pct) != 1L || !is.finite(conf_pct)) conf_pct <- NA_real_
 
       # Competition level styling
       comp_color <- if (comp_level == "High") {
@@ -1904,44 +1947,44 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       if (!is.null(competitors) && length(competitors) > 0) {
         comp_items <- vapply(competitors, function(c_name) {
           c_str <- if (is.na(c_name) || c_name == "") "Futmondo / Mercado" else as.character(c_name)
-          paste0("<li style='margin-bottom: 4px;'>", shiny::HTML(c_str), "</li>")
+          paste0("<li style='margin-bottom: 4px;'>", htmltools::htmlEscape(c_str), "</li>")
         }, character(1))
-        comp_list_html <- paste0("<ul style='margin: 0; padding-left: 18px; font-size: 13px; color: #475569;'>", paste(comp_items, collapse = ""), "</ul>")
+        comp_list_html <- paste0("<ul style='margin: 0; padding-left: 18px; font-size: 13px; color: var(--fm-muted);'>", paste(comp_items, collapse = ""), "</ul>")
       } else {
-        comp_list_html <- "<p style='margin: 0; font-size: 13px; color: #94a3b8;'>No competitor data available.</p>"
+        comp_list_html <- "<p style='margin: 0; font-size: 13px; color: var(--fm-muted);'>No competitor data available.</p>"
       }
 
       div(
-        style = "background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;",
+        style = "background: var(--fm-surface); border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;",
         h4(
-          style = "font-weight: 700; color: #0f172a; margin-bottom: 12px; font-size: 15px;",
+          style = "font-weight: 700; color: var(--fm-text); margin-bottom: 12px; font-size: 15px;",
           tagList(icon("chart-line"), " Smart Bid &amp; Auction Intelligence")
         ),
         div(
           style = "display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 14px;",
           # Estimated Fair Value
           div(
-            style = "background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center;",
-            div(style = "font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;", "Estimated Fair Value"),
-            div(style = "font-size: 18px; font-weight: 800; color: #0f172a;", format_table_currency(fair_value))
+            style = "background: var(--fm-surface); border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center;",
+            div(style = "font-size: 11px; color: var(--fm-muted); font-weight: 600; text-transform: uppercase;", "Estimated Fair Value"),
+            div(style = "font-size: 18px; font-weight: 800; color: var(--fm-text);", format_table_currency(fair_value))
           ),
           # Expected Winning Range
           div(
-            style = "background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center;",
-            div(style = "font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;", "Expected Winning Range"),
-            div(style = "font-size: 14px; font-weight: 700; color: #2563eb;", paste0(format_table_currency(min_winning), " - ", format_table_currency(max_rational)))
+            style = "background: var(--fm-surface); border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center;",
+            div(style = "font-size: 11px; color: var(--fm-muted); font-weight: 600; text-transform: uppercase;", "Heuristic bid bounds"),
+            div(style = "font-size: 14px; font-weight: 700; color: var(--fm-text);", paste0(format_table_currency(min_winning), " - ", format_table_currency(max_rational)))
           ),
           # Recommended Smart Bid
           div(
-            style = "background: #e0f2fe; border: 2px solid #3b82f6; border-radius: 6px; padding: 10px; text-align: center;",
-            div(style = "font-size: 11px; color: #0369a1; font-weight: 600; text-transform: uppercase;", "Recommended Smart Bid"),
-            div(style = "font-size: 20px; font-weight: 800; color: #0369a1;", format_table_currency(recommended))
+            style = "background: var(--fm-surface); border: 2px solid #3b82f6; border-radius: 6px; padding: 10px; text-align: center;",
+            div(style = "font-size: 11px; color: var(--fm-text); font-weight: 600; text-transform: uppercase;", "Recommended Smart Bid"),
+            div(style = "font-size: 20px; font-weight: 800; color: var(--fm-text);", format_table_currency(recommended))
           ),
           # Expected ROI
           div(
-            style = "background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center;",
-            div(style = "font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;", "Expected ROI"),
-            div(style = paste0("font-size: 18px; font-weight: 800; color: ", roi_color, ";"), paste0(roi_pct, "%"))
+            style = "background: var(--fm-surface); border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center;",
+            div(style = "font-size: 11px; color: var(--fm-muted); font-weight: 600; text-transform: uppercase;", "Model-implied value gap"),
+            div(style = paste0("font-size: 18px; font-weight: 800; color: ", roi_color, ";"), if (is.finite(roi_pct)) paste0(roi_pct, "%") else "Unavailable")
           )
         ),
         # Competition Level and Confidence
@@ -1951,19 +1994,19 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
             style = "font-size: 13px; font-weight: 600;",
             "Competition: ",
             span(
-              style = paste0("display: inline-block; padding: 2px 8px; border-radius: 8px; background: ", comp_color, "; color: #fff; font-weight: 700; font-size: 11px;"),
+              style = paste0("display: inline-block; padding: 2px 8px; border-radius: 8px; background: ", comp_color, "; color: var(--fm-text); font-weight: 700; font-size: 11px;"),
               comp_level
             )
           ),
           div(
             style = "font-size: 13px; font-weight: 600;",
             "Max Rational Bid: ",
-            span(style = "color: #dc2626; font-weight: 800;", format_table_currency(max_rational))
+            span(style = "color: var(--fm-danger); font-weight: 800;", format_table_currency(max_rational))
           ),
           div(
             style = "font-size: 13px; font-weight: 600;",
-            "Confidence: ",
-            span(style = paste0("color: ", if (conf_pct >= 70) "#16a34a" else if (conf_pct >= 50) "#d97706" else "#dc2626", "; font-weight: 800;"), paste0(conf_pct, "%"))
+            "Method: ",
+            span("Heuristic; winning probability not calibrated")
           )
         ),
         # Use Smart Bid button
@@ -1973,15 +2016,15 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
             ns("btn_use_smart_bid"),
             label = tagList(icon("bolt"), " Use Smart Bid"),
             class = "btn btn-primary",
-            onclick = paste0("document.getElementById('", ns("bid_amount"), "').value = ", recommended, ";")
+            disabled = if (!isTRUE(smart_bid_result$can_compete) || !isTRUE(smart_bid_result$funds_verified)) "disabled" else NULL
           )
         ),
         # Competitor Prediction Section
         div(
           style = "border-top: 1px solid #e2e8f0; padding-top: 12px;",
           h5(
-            style = "font-weight: 700; color: #0f172a; margin-bottom: 8px; font-size: 13px;",
-            tagList(icon("users-gear"), " Who Else Will Bid? (Competitor Prediction)")
+            style = "font-weight: 700; color: var(--fm-text); margin-bottom: 8px; font-size: 13px;",
+            tagList(icon("users-gear"), " Historical manager interest")
           ),
           shiny::HTML(comp_list_html)
         )
@@ -2134,4 +2177,14 @@ add_sign <- function(x) {
   } else {
     return(as.character(x))
   }
+}
+# Preserve the selected player's score and shape; calculate only when absent.
+selected_player_fis_row <- function(player) {
+  if (is.null(player)) return(NULL)
+  row <- if (is.data.frame(player)) player[1, , drop = FALSE] else as.data.frame(player, stringsAsFactors = FALSE)
+  if (nrow(row) == 0L) return(NULL)
+  if (!"fis_score" %in% names(row)) row <- calculate_fis_score(row)
+  for (field in c("perf", "form", "efficiency", "momentum", "fixture_risk", "data_coverage")) if (!field %in% names(row)) row[[field]] <- NA_real_
+  for (field in c("fis_tier", "fis_summary")) if (!field %in% names(row)) row[[field]] <- ""
+  row
 }

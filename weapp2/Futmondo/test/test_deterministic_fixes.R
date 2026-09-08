@@ -162,26 +162,33 @@ det_record("smart_bid_capacity_bounds_by_verified_funds", {
   stopifnot(res$recommended_bid <= 10000000)
 })
 
-det_record("smart_bid_no_300m_hardcode_unverified", {
-  # user_cash = NA and no capacity -> unverified engine default (300M) but
-  # funds_verified must be FALSE (i.e. NOT treated as verified funds).
-  res <- calculate_smart_bid(
-    player_row = player_row, championship_id = "champ",
-    pressroom_df = NULL, user_teams_df = NULL,
-    user_cash = NA, market_high_bid = NULL, capacity = NULL
-  )
-  stopifnot(isFALSE(res$funds_verified))
-  stopifnot(res$spendable_funds == 300000000)
+det_record("smart_bid_respects_api_limit_and_abstains_when_it_is_unknown", {
+  cap<-list(status="ok",funds=list(spendable_budget=20000000,api_bid_limit=1000000))
+  x<-calculate_smart_bid(player_row,"champ",capacity=cap)
+  stopifnot(x$recommended_bid<=1000000,x$max_rational_bid<=1000000,x$spendable_funds==20000000,!x$can_compete)
+  cap$funds$api_bid_limit<-NA_real_
+  x<-calculate_smart_bid(player_row,"champ",capacity=cap)
+  stopifnot(x$action=="no_bid",x$recommended_bid==0,is.na(x$max_rational_bid),!is.null(x$error))
+})
+
+det_record("smart_bid_unknown_funds_never_manufactures_spending_capacity", {
+  for(cash in list(NULL,NA_real_,Inf,300000000)) {
+    res<-calculate_smart_bid(player_row,"champ",user_cash=cash)
+    stopifnot(isFALSE(res$funds_verified),is.na(res$spendable_funds),res$recommended_bid==0,
+      is.na(res$max_rational_bid),!res$can_compete,res$action=="no_bid",is.character(res$error))
+  }
+  invalid<-list(status="ok",funds=list(spendable_budget=-1))
+  stopifnot(calculate_smart_bid(player_row,"champ",capacity=invalid)$action=="no_bid")
 })
 
 det_record("smart_bid_market_high_bid_raises_min_winning", {
   base <- calculate_smart_bid(player_row = player_row, championship_id = "champ",
                               pressroom_df = NULL, user_teams_df = NULL,
-                              user_cash = NA, market_high_bid = NULL, capacity = NULL)
+                              user_cash = NA, market_high_bid = NULL, capacity = list(status="ok",funds=list(spendable_budget=30000000)))
   # A competing bid ABOVE the base minimum (fair_value*1.02) must raise it.
   with_mhb <- calculate_smart_bid(player_row = player_row, championship_id = "champ",
                                   pressroom_df = NULL, user_teams_df = NULL,
-                                  user_cash = NA, market_high_bid = 25000000, capacity = NULL)
+                                  user_cash = NA, market_high_bid = 25000000, capacity = list(status="ok",funds=list(spendable_budget=30000000)))
   stopifnot(with_mhb$min_winning_bid > base$min_winning_bid)
   stopifnot(with_mhb$market_high_bid == 25000000)
   stopifnot(with_mhb$min_winning_bid >= round(25000000 * 1.01))
@@ -211,37 +218,27 @@ cat("\n--- Acquisition capacity + preflight ---\n")
 # Seed the cache to simulate a verified snapshot (offline).
 login <- c(token = "fake_token", userid = "fake_userid", user_name = "test")
 champ <- "champX"; team <- "teamY"; pid <- "playerZ"
+# Cache fixtures use the production account partition and only outgoing market bids.
+det_seed_capacity <- function(info, market, incoming = data.frame()) {
+  clear_api_cache()
+  fixtures <- list(info, data.frame(id=paste0("r",1:24),name=paste0("P",1:24)),market,incoming)
+  keys <- c(paste0("team_info_",champ,"_",team),paste0("roster_",champ,"_",team),
+    paste0("market_",champ,"_",team),paste0("roster_bids_",champ,"_",team))
+  for(i in seq_along(keys)) api_cache_env[[api_cache_key(keys[i],login)]] <- list(data=fixtures[[i]],time=Sys.time())
+}
+det_empty_market <- function() data.frame(id=pid,bid_id=NA_character_,bid_price=NA_real_,numberOfBids=2)
+det_original_post <- futmondo_post
+futmondo_post <- function(...) stop("Unexpected external API request in offline deterministic test")
+
 
 det_record("capacity_ok_snapshot", {
-  clear_api_cache()
-  api_cache_env[[paste0("team_info_", champ, "_", team)]] <- list(
-    data = list(budget = 50000000, withheld = 10000000,
-                configuration = list(maxPlayersInRoster = 25)),
-    time = Sys.time())
-  api_cache_env[[paste0("roster_", champ, "_", team)]] <- list(
-    data = data.frame(id = paste0("r", 1:24), name = paste0("P", 1:24), stringsAsFactors = FALSE),
-    time = Sys.time())
-  api_cache_env[[paste0("roster_bids_", champ, "_", team)]] <- list(
-    data = data.frame(id = c("b1", "b2"), bid_price = c(5000000, 7000000),
-                      bid_user = c("Futmondo", "Futmondo"), bid_id = c("bid1", "bid2"),
-                      bidder_team_id = c(team, team), stringsAsFactors = FALSE),
-    time = Sys.time())
-  api_cache_env[[paste0("player_summary_", "fake_userid", "_", champ, "_", team, "_", pid)]] <- list(
-    data = list(data = NULL, prices = list(),
-                bids = list(
-                  list(id = "bid1", price = 5000000, userTeam = list("_id" = team, name = "Me")),
-                  list(id = "bid2", price = 7000000, userTeam = list("_id" = "other", name = "Rival"))
-                ),
-                my_bid_id = "bid1", my_bid_price = 5000000),
-    time = Sys.time())
-
-  cap <- get_acquisition_capacity(login, champ, team, target_player_id = pid)
-  stopifnot(cap$status == "ok")
-  stopifnot(cap$roster$count == 24L, cap$roster$cap == 25L, cap$roster$remaining_slots == 1L)
-  stopifnot(cap$funds$spendable_budget == 40000000)
-  stopifnot(cap$outstanding$count == 2L, cap$outstanding$completeness == "complete")
-  stopifnot(cap$target$my_bid_id == "bid1", cap$target$my_bid_amount == 5000000)
-  stopifnot(cap$target$highest_bid == 7000000, cap$target$bid_count == 2L)
+  det_seed_capacity(list(budget=50000000,withheld=10000000,configuration=list(maxPlayersInRoster=25)),
+    data.frame(id=c(pid,"other_player"),bid_id=c("bid1","bid2"),bid_price=c(5000000,7000000),numberOfBids=c(2,1)))
+  cap <- get_acquisition_capacity(login, champ, team, target_player_id=pid)
+  stopifnot(cap$status=="ok",cap$roster$count==24L,cap$roster$cap==25L,cap$roster$remaining_slots==1L,
+    cap$funds$spendable_budget==28000000,cap$outstanding$count==2L,cap$outstanding$completeness=="complete",
+    cap$target$my_bid_id=="bid1",cap$target$my_bid_amount==5000000,
+    is.na(cap$target$highest_bid),cap$target$bid_count==2L)
 })
 
 det_record("preflight_at_cap_bid_rejected", {
@@ -329,135 +326,45 @@ det_record("preflight_funds_over_spendable_rejected_modify_delta", {
 })
 
 det_record("capacity_missing_withheld_partial_preflight_blocks", {
-  clear_api_cache()
-  # Team info WITHOUT a withheld field -> funds verification is incomplete.
-  api_cache_env[[paste0("team_info_", champ, "_", team)]] <- list(
-    data = list(budget = 50000000,
-                configuration = list(maxPlayersInRoster = 25)),
-    time = Sys.time())
-  api_cache_env[[paste0("roster_", champ, "_", team)]] <- list(
-    data = data.frame(id = paste0("r", 1:24), name = paste0("P", 1:24), stringsAsFactors = FALSE),
-    time = Sys.time())
-  api_cache_env[[paste0("roster_bids_", champ, "_", team)]] <- list(
-    data = data.frame(id = c("b1"), bid_price = c(5000000),
-                      bid_user = c("Futmondo"), bid_id = c("bid1"),
-                      bidder_team_id = c(team), stringsAsFactors = FALSE),
-    time = Sys.time())
-
-  cap <- get_acquisition_capacity(login, champ, team, target_player_id = NULL)
-  # Missing withheld -> NOT ok (funds verification incomplete); spendable is NA.
-  stopifnot(cap$status == "partial")
-  stopifnot(is.na(cap$funds$spendable_budget))
-  # Preflight must block bid and clause (unavailable).
-  r_bid <- evaluate_acquisition_preflight(cap, "bid", amount = 1000000)
-  stopifnot(!r_bid$ok, r_bid$reason == "unavailable")
-  r_clause <- evaluate_acquisition_preflight(cap, "clause", amount = 1000000)
-  stopifnot(!r_clause$ok, r_clause$reason == "unavailable")
+  det_seed_capacity(list(budget=50000000,configuration=list(maxPlayersInRoster=25)),det_empty_market())
+  cap <- get_acquisition_capacity(login,champ,team)
+  stopifnot(cap$status=="partial",is.na(cap$funds$spendable_budget))
+  for(action in c("bid","clause")) {
+    r<-evaluate_acquisition_preflight(cap,action,amount=1000000)
+    stopifnot(!r$ok,r$reason=="unavailable")
+  }
 })
 
 det_record("capacity_negative_withheld_partial", {
-  clear_api_cache()
-  # A negative withheld is invalid -> funds verification incomplete (fail closed).
-  api_cache_env[[paste0("team_info_", champ, "_", team)]] <- list(
-    data = list(budget = 50000000, withheld = -5000000,
-                configuration = list(maxPlayersInRoster = 25)),
-    time = Sys.time())
-  api_cache_env[[paste0("roster_", champ, "_", team)]] <- list(
-    data = data.frame(id = paste0("r", 1:24), name = paste0("P", 1:24), stringsAsFactors = FALSE),
-    time = Sys.time())
-  api_cache_env[[paste0("roster_bids_", champ, "_", team)]] <- list(
-    data = data.frame(id = character(0), bid_price = numeric(0),
-                      bid_user = character(0), bid_id = character(0),
-                      bidder_team_id = character(0), stringsAsFactors = FALSE),
-    time = Sys.time())
-  cap <- get_acquisition_capacity(login, champ, team, target_player_id = NULL)
-  stopifnot(cap$status == "partial")
-  stopifnot(is.na(cap$funds$spendable_budget))
-  stopifnot(!evaluate_acquisition_preflight(cap, "bid", amount = 1000000)$ok)
+  det_seed_capacity(list(budget=50000000,withheld=-5000000,configuration=list(maxPlayersInRoster=25)),det_empty_market())
+  cap<-get_acquisition_capacity(login,champ,team)
+  stopifnot(cap$status=="partial",is.na(cap$funds$spendable_budget),!evaluate_acquisition_preflight(cap,"bid",1000000)$ok)
 })
 
 det_record("capacity_valid_zero_withheld_ok", {
-  clear_api_cache()
-  # withheld = 0 is valid -> status ok, spendable = budget.
-  api_cache_env[[paste0("team_info_", champ, "_", team)]] <- list(
-    data = list(budget = 50000000, withheld = 0,
-                configuration = list(maxPlayersInRoster = 25)),
-    time = Sys.time())
-  api_cache_env[[paste0("roster_", champ, "_", team)]] <- list(
-    data = data.frame(id = paste0("r", 1:24), name = paste0("P", 1:24), stringsAsFactors = FALSE),
-    time = Sys.time())
-  api_cache_env[[paste0("roster_bids_", champ, "_", team)]] <- list(
-    data = data.frame(id = character(0), bid_price = numeric(0),
-                      bid_user = character(0), bid_id = character(0),
-                      bidder_team_id = character(0), stringsAsFactors = FALSE),
-    time = Sys.time())
-  cap <- get_acquisition_capacity(login, champ, team, target_player_id = NULL)
-  stopifnot(cap$status == "ok")
-  stopifnot(cap$funds$spendable_budget == 50000000)
-  stopifnot(evaluate_acquisition_preflight(cap, "bid", amount = 1000000)$ok)
+  det_seed_capacity(list(budget=0,withheld=0,configuration=list(maxPlayersInRoster=25)),det_empty_market())
+  cap<-get_acquisition_capacity(login,champ,team)
+  stopifnot(cap$status=="ok",cap$funds$reported_budget==0,cap$funds$spendable_budget==0,
+    !evaluate_acquisition_preflight(cap,"bid",1000000)$ok)
 })
 
-det_record("capacity_mixed_bid_rival_not_mine", {
-  clear_api_cache()
-  api_cache_env[[paste0("team_info_", champ, "_", team)]] <- list(
-    data = list(budget = 50000000, withheld = 0,
-                configuration = list(maxPlayersInRoster = 25)),
-    time = Sys.time())
-  api_cache_env[[paste0("roster_", champ, "_", team)]] <- list(
-    data = data.frame(id = paste0("r", 1:24), name = paste0("P", 1:24), stringsAsFactors = FALSE),
-    time = Sys.time())
-  api_cache_env[[paste0("roster_bids_", champ, "_", team)]] <- list(
-    data = data.frame(id = character(0), bid_price = numeric(0),
-                      bid_user = character(0), bid_id = character(0),
-                      bidder_team_id = character(0), stringsAsFactors = FALSE),
-    time = Sys.time())
-  # The target player has only a RIVAL's bid (last). The summary-level
-  # my_bid_id/my_bid_price points at that rival bid. We must NOT expose it as
-  # ours (no immutable team-ID match, no unsafe fallback).
-  api_cache_env[[paste0("player_summary_", "fake_userid", "_", champ, "_", team, "_", pid)]] <- list(
-    data = list(data = NULL, prices = list(),
-                bids = list(
-                  list(id = "rival_bid", price = 9000000, userTeam = list("_id" = "other", name = "Rival"))
-                ),
-                my_bid_id = "rival_bid", my_bid_price = 9000000),
-    time = Sys.time())
-
-  cap <- get_acquisition_capacity(login, champ, team, target_player_id = pid)
-  stopifnot(is.null(cap$target$my_bid_id))
-  stopifnot(is.na(cap$target$my_bid_amount))
-  # The rival's bid is still counted in the market (highest_bid / bid_count).
-  stopifnot(cap$target$highest_bid == 9000000, cap$target$bid_count == 1L)
+det_record("capacity_incoming_offers_are_not_outgoing_bids", {
+  incoming<-data.frame(id=pid,bid_id="incoming",bid_price=9000000,bidder_team_id="rival")
+  det_seed_capacity(list(budget=50000000,withheld=10000000,configuration=list(maxPlayersInRoster=25)),det_empty_market(),incoming)
+  cap<-get_acquisition_capacity(login,champ,team,target_player_id=pid)
+  stopifnot(cap$status=="ok",cap$outstanding$count==0,cap$outstanding$total_amount==0,
+    cap$funds$spendable_budget==40000000,is.null(cap$target$my_bid_id),is.na(cap$target$my_bid_amount),
+    is.na(cap$target$highest_bid),cap$target$bid_count==2)
 })
 
-det_record("capacity_mixed_bid_own_preferred_over_rival", {
-  clear_api_cache()
-  api_cache_env[[paste0("team_info_", champ, "_", team)]] <- list(
-    data = list(budget = 50000000, withheld = 0,
-                configuration = list(maxPlayersInRoster = 25)),
-    time = Sys.time())
-  api_cache_env[[paste0("roster_", champ, "_", team)]] <- list(
-    data = data.frame(id = paste0("r", 1:24), name = paste0("P", 1:24), stringsAsFactors = FALSE),
-    time = Sys.time())
-  api_cache_env[[paste0("roster_bids_", champ, "_", team)]] <- list(
-    data = data.frame(id = character(0), bid_price = numeric(0),
-                      bid_user = character(0), bid_id = character(0),
-                      bidder_team_id = character(0), stringsAsFactors = FALSE),
-    time = Sys.time())
-  # Rival's bid is LAST (higher price); ours is first. We must expose OURS,
-  # never the rival's "last bid".
-  api_cache_env[[paste0("player_summary_", "fake_userid", "_", champ, "_", team, "_", pid)]] <- list(
-    data = list(data = NULL, prices = list(),
-                bids = list(
-                  list(id = "my_bid", price = 5000000, userTeam = list("_id" = team, name = "Me")),
-                  list(id = "rival_bid", price = 9000000, userTeam = list("_id" = "other", name = "Rival"))
-                ),
-                my_bid_id = "rival_bid", my_bid_price = 9000000),
-    time = Sys.time())
-
-  cap <- get_acquisition_capacity(login, champ, team, target_player_id = pid)
-  stopifnot(cap$target$my_bid_id == "my_bid")
-  stopifnot(cap$target$my_bid_amount == 5000000)
-  stopifnot(cap$target$highest_bid == 9000000)
+det_record("capacity_own_market_bid_is_counted_once_and_sealed_amounts_remain_unknown", {
+  market<-data.frame(id=c(pid,pid),bid_id="own",bid_price=5000000,numberOfBids=2)
+  incoming<-data.frame(id=pid,bid_id="incoming",bid_price=9000000,bidder_team_id="rival")
+  det_seed_capacity(list(budget=50000000,withheld=10000000,configuration=list(maxPlayersInRoster=25)),market,incoming)
+  cap<-get_acquisition_capacity(login,champ,team,target_player_id=pid)
+  stopifnot(cap$status=="ok",cap$outstanding$count==1,cap$outstanding$total_amount==5000000,
+    cap$funds$spendable_budget==35000000,cap$target$my_bid_id=="own",cap$target$my_bid_amount==5000000,
+    is.na(cap$target$highest_bid))
 })
 
 det_record("player_summary_cache_key_no_collision", {
@@ -466,8 +373,8 @@ det_record("player_summary_cache_key_no_collision", {
   # cache keys must NOT collide (no shared player_summary_<champ>_<pid> key).
   login_a <- c(token = "tokenA", userid = "userA", user_name = "A")
   login_b <- c(token = "tokenB", userid = "userB", user_name = "B")
-  key_a <- paste0("player_summary_", "userA", "_", champ, "_", team, "_", pid)
-  key_b <- paste0("player_summary_", "userB", "_", champ, "_", team, "_", pid)
+  key_a <- api_cache_key(paste0("player_summary_", "userA", "_", champ, "_", team, "_", pid), login_a)
+  key_b <- api_cache_key(paste0("player_summary_", "userB", "_", champ, "_", team, "_", pid), login_b)
   stopifnot(key_a != key_b)
   api_cache_env[[key_a]] <- list(
     data = list(data = NULL, prices = list(),
@@ -482,12 +389,12 @@ det_record("player_summary_cache_key_no_collision", {
   # Each viewer gets its own cached data (no cross-contamination).
   res_a <- get_player_summary(login_a, champ, team, pid)
   res_b <- get_player_summary(login_b, champ, team, pid)
-  stopifnot(res_a$my_bid_id == "bidA", res_a$my_bid_price == 1000000)
-  stopifnot(res_b$my_bid_id == "bidB", res_b$my_bid_price == 2000000)
+  stopifnot(!is.null(res_a), identical(res_a$my_bid_id, "bidA"), res_a$my_bid_id == "bidA", res_a$my_bid_price == 1000000)
+  stopifnot(!is.null(res_b), identical(res_b$my_bid_id, "bidB"), res_b$my_bid_id == "bidB", res_b$my_bid_price == 2000000)
 
   # A different team for the SAME user is also a distinct key.
   team2 <- "teamZ"
-  key_c <- paste0("player_summary_", "userA", "_", champ, "_", team2, "_", pid)
+  key_c <- api_cache_key(paste0("player_summary_", "userA", "_", champ, "_", team2, "_", pid), login_a)
   stopifnot(key_a != key_c)
   api_cache_env[[key_c]] <- list(
     data = list(data = NULL, prices = list(),
@@ -495,7 +402,7 @@ det_record("player_summary_cache_key_no_collision", {
                 my_bid_id = "bidC", my_bid_price = 3000000),
     time = Sys.time())
   res_c <- get_player_summary(login_a, champ, team2, pid)
-  stopifnot(res_c$my_bid_id == "bidC", res_c$my_bid_price == 3000000)
+  stopifnot(!is.null(res_c), identical(res_c$my_bid_id, "bidC"), res_c$my_bid_id == "bidC", res_c$my_bid_price == 3000000)
   # userA/team still returns its own data (not overwritten by team2).
   res_a2 <- get_player_summary(login_a, champ, team, pid)
   stopifnot(res_a2$my_bid_id == "bidA", res_a2$my_bid_price == 1000000)
@@ -505,6 +412,8 @@ det_record("player_summary_cache_key_no_collision", {
 # 4. Roster clause payload
 # =============================================================================
 cat("\n--- Roster clause payload ---\n")
+
+futmondo_post <- det_original_post
 
 det_record("roster_clause_payload_exact_shape_no_isclause", {
   p <- build_roster_clause_payload(login, champ, team, pid, "slugZ", 12345678)
@@ -717,11 +626,12 @@ pr <- data.frame(
 start_dt <- as.POSIXct("2026-08-05", tz = "UTC")
 end_dt <- as.POSIXct("2026-08-25", tz = "UTC")
 
-det_record("rivals_cash_uses_all_transfers_through_end", {
-  cash <- rivals_buying_power_values(pr, teams, metric = "cash", start_date = start_dt, end_date = end_dt)
-  stopifnot(cash$value[cash$team_id == "T1"] == 295000000)  # 300 - 10 + 5
-  stopifnot(cash$value[cash$team_id == "T2"] == 287000000)  # 300 - (5+8)
-  stopifnot(all(cash$range_label == "all transfers through end date"))
+det_record("rivals_cash_uses_all_transfers_through_end_and_observed_initial_budget", {
+  cash <- rivals_buying_power_values(pr, teams, metric="cash", start_date=start_dt,end_date=end_dt,initial_budget=100000000)
+  stopifnot(cash$value[cash$team_id=="T1"]==95000000,cash$value[cash$team_id=="T2"]==87000000,
+    all(cash$range_label=="all transfers through end date"))
+  unknown <- rivals_buying_power_values(pr,teams,metric="cash",start_date=start_dt,end_date=end_dt,initial_budget=NA_real_)
+  stopifnot(all(is.na(unknown$value)))
 })
 
 det_record("rivals_investment_volume_use_range", {

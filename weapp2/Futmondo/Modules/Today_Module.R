@@ -53,6 +53,14 @@ today_prepare_radar_df <- function(mkt, top_n = 10) {
   )
 }
 
+# ---- Pure helper: render a readable descriptive FIS score badge ----
+today_fis_score_badge <- function(value) {
+  score <- suppressWarnings(as.numeric(value))
+  if (is.na(score) || !is.finite(score)) score <- 0
+  score_class <- if (score >= 80) "fis-score-high" else if (score >= 65) "fis-score-mid" else "fis-score-low"
+  div(class = paste("fis-score-badge", score_class), formatC(score, format = "f", digits = 1))
+}
+
 # ---- Pure helper: build the reactable onClick JS for the market radar ----
 # Returns an htmlwidgets::JS() function that, on row click, sends the clicked
 # row's PlayerID to the namespaced input 'radar_selected_player'.
@@ -341,13 +349,13 @@ today_UI <- function(id) {
   tagList(
     # ---- Hero Banner ----
     div(
-      style = "background: linear-gradient(135deg, #1e3a5f 0%, #0f2027 100%); color: #fff; padding: 28px 24px; border-radius: 10px; margin-bottom: 20px;",
+      style = "background: var(--fm-surface); color: var(--fm-text); padding: 28px 24px; border-radius: 10px; margin-bottom: 20px;",
       fluidRow(
         column(
           width = 12,
           div(
             style = "display: flex; align-items: center; gap: 14px; flex-wrap: wrap;",
-            icon("bolt", style = "font-size: 28px; color: #fbbf24;"),
+            icon("bolt", style = "font-size: 28px; color: var(--fm-warning);"),
             div(
               style = "flex: 1;",
               h2(
@@ -356,7 +364,7 @@ today_UI <- function(id) {
               ),
               p(
                 id = ns("today_date_subtitle"),
-                style = "margin: 4px 0 0 0; font-size: 13px; color: #94a3b8;",
+                style = "margin: 4px 0 0 0; font-size: 13px; color: var(--fm-muted);",
                 "Your daily intelligence briefing"
               )
             )
@@ -518,7 +526,7 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
         if (!is.null(refresh_trigger)) refresh_trigger()
 
         tryCatch({
-          info <- get_user_team_info(
+          info <- get_financial_snapshot(
             login = login_token(),
             championship_id = championship_id(),
             user_team_id = user_team_id()
@@ -688,27 +696,20 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
         fin <- user_finances_RV()
         sqd <- squad_players_RV()
 
-        liquid_cash_val <- 300000000
-        if (!is.null(fin) && !is.null(fin$budget) && is.numeric(fin$budget) && fin$budget > 0) {
-          liquid_cash_val <- fin$budget
-        } else if (!is.null(sqd) && nrow(sqd) > 0 && "buyPrice" %in% colnames(sqd)) {
-          total_spent <- sum(suppressWarnings(as.numeric(sqd$buyPrice)), na.rm = TRUE)
-          liquid_cash_val <- 300000000 - total_spent
-        }
-
-        value_text <- format_table_currency(liquid_cash_val)
+        liquid_cash_val <- if (!is.null(fin)) fin$cash else NA_real_
+        value_text <- ui_financial_amount(liquid_cash_val)
 
         div(
-          style = "background: linear-gradient(135deg, #059669 0%, #047857 100%); color: #fff; padding: 18px 16px; border-radius: 10px; margin-bottom: 10px;",
-          icon("sack-dollar", style = "font-size: 20px; margin-bottom: 8px; color: #a7f3d0;"),
+          style = "background: var(--fm-surface); color: var(--fm-text); padding: 18px 16px; border-radius: 10px; margin-bottom: 10px;",
+          icon("sack-dollar", style = "font-size: 20px; margin-bottom: 8px; color: var(--fm-text);"),
           br(),
           div(
             style = "font-size: 20px; font-weight: 700;",
             value_text
           ),
           div(
-            style = "font-size: 11px; color: #a7f3d0; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px;",
-            "Available Liquid Cash"
+            style = "font-size: 11px; color: var(--fm-text); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px;",
+            "Cash balance"
           )
         )
       })
@@ -721,21 +722,21 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
         val_sum <- if (!is.null(sqd) && nrow(sqd) > 0 && "value" %in% colnames(sqd)) {
           sum(suppressWarnings(as.numeric(sqd$value)), na.rm = TRUE)
         } else {
-          0
+          NA_real_
         }
 
-        value_text <- format_table_currency(val_sum)
+        value_text <- ui_financial_amount(val_sum)
 
         div(
-          style = "background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: #fff; padding: 18px 16px; border-radius: 10px; margin-bottom: 10px;",
-          icon("chart-line", style = "font-size: 20px; margin-bottom: 8px; color: #bfdbfe;"),
+          style = "background: var(--fm-surface); color: var(--fm-text); padding: 18px 16px; border-radius: 10px; margin-bottom: 10px;",
+          icon("chart-line", style = "font-size: 20px; margin-bottom: 8px; color: var(--fm-text);"),
           br(),
           div(
             style = "font-size: 20px; font-weight: 700;",
             value_text
           ),
           div(
-            style = "font-size: 11px; color: #bfdbfe; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px;",
+            style = "font-size: 11px; color: var(--fm-text); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px;",
             "Squad Market Valuation"
           )
         )
@@ -752,15 +753,15 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
         }
 
         div(
-          style = "background: linear-gradient(135deg, #d97706 0%, #b45309 100%); color: #fff; padding: 18px 16px; border-radius: 10px; margin-bottom: 10px;",
-          icon("magnifying-glass-chart", style = "font-size: 20px; margin-bottom: 8px; color: #fde68a;"),
+          style = "background: var(--fm-surface); color: var(--fm-text); padding: 18px 16px; border-radius: 10px; margin-bottom: 10px;",
+          icon("magnifying-glass-chart", style = "font-size: 20px; margin-bottom: 8px; color: var(--fm-text);"),
           br(),
           div(
             style = "font-size: 20px; font-weight: 700;",
             high_fis_count
           ),
           div(
-            style = "font-size: 11px; color: #fde68a; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px;",
+            style = "font-size: 11px; color: var(--fm-text); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px;",
             "Active Market Opportunities"
           )
         )
@@ -791,15 +792,15 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
         status_color <- if (threats_count > 2) "#ef4444" else if (threats_count > 0) "#f59e0b" else "#10b981"
 
         div(
-          style = paste0("background: linear-gradient(135deg, ", status_color, " 0%, ", status_color, " 100%); color: #fff; padding: 18px 16px; border-radius: 10px; margin-bottom: 10px;"),
-          icon("shield-halved", style = "font-size: 20px; margin-bottom: 8px; color: rgba(255,255,255,0.7);"),
+          style = paste0("background: linear-gradient(135deg, ", status_color, " 0%, ", status_color, " 100%); color: var(--fm-text); padding: 18px 16px; border-radius: 10px; margin-bottom: 10px;"),
+          icon("shield-halved", style = "font-size: 20px; margin-bottom: 8px; color: var(--fm-text);"),
           br(),
           div(
             style = "font-size: 20px; font-weight: 700;",
             threats_count
           ),
           div(
-            style = "font-size: 11px; color: rgba(255,255,255,0.8); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px;",
+            style = "font-size: 11px; color: var(--fm-text); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px;",
             "Clause Threat Radar"
           )
         )
@@ -813,7 +814,7 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
         if (is.null(recs) || nrow(recs) == 0) {
           return(
             div(
-              style = "padding: 24px; text-align: center; color: #64748b;",
+              style = "padding: 24px; text-align: center; color: var(--fm-muted);",
               icon("circle-info", style = "font-size: 24px; margin-bottom: 8px;"),
               br(),
               p("No actionable recommendations at this time. Check back later or refresh data.")
@@ -827,7 +828,7 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
           title_text <- if (!is.null(r$title) && !is.na(r$title)) as.character(r$title) else "Recommendation"
           desc_text <- if (!is.null(r$description) && !is.na(r$description)) as.character(r$description) else ""
           conf_raw <- suppressWarnings(as.numeric(r$confidence_pct))
-          conf_pct <- if (!is.null(conf_raw) && !is.na(conf_raw)) round(conf_raw, 0) else 50
+          conf_pct <- if (length(conf_raw) == 1L && is.finite(conf_raw)) round(conf_raw, 0) else NA_real_
           action_label <- if (!is.null(r$action_label) && !is.na(r$action_label)) as.character(r$action_label) else "View"
           pid <- if (!is.null(r$player_id) && !is.na(r$player_id)) as.character(r$player_id) else ""
           # The feed emits a stable action_code ("market_bid" / "clause_buyout"
@@ -840,59 +841,57 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
           # Color coding by type
           type_icon <- switch(
             rec_type,
-            "Buy"    = icon("arrow-down", style = "color: #10b981;"),
-            "Sell"   = icon("arrow-up", style = "color: #ef4444;"),
-            "Bid"    = icon("hand-holding-dollar", style = "color: #f59e0b;"),
-            "Clause" = icon("bolt", style = "color: #8b5cf6;"),
-            "Hold"   = icon("hand", style = "color: #6b7280;"),
-            icon("circle-info", style = "color: #6b7280;")
+            "Buy"    = icon("arrow-down", style = "color: var(--fm-text);"),
+            "Sell"   = icon("arrow-up", style = "color: var(--fm-danger);"),
+            "Bid"    = icon("hand-holding-dollar", style = "color: var(--fm-warning);"),
+            "Clause" = icon("bolt", style = "color: var(--fm-text);"),
+            "Hold"   = icon("hand", style = "color: var(--fm-muted);"),
+            icon("circle-info", style = "color: var(--fm-muted);")
           )
 
           type_badge_color <- switch(
             rec_type,
-            "Buy"    = "background-color: #d1fae5; color: #065f46; border-color: #a7f3d0;",
-            "Sell"   = "background-color: #fee2e2; color: #991b1b; border-color: #fca5a5;",
-            "Bid"    = "background-color: #fef3c7; color: #92400e; border-color: #fde68a;",
-            "Clause" = "background-color: #ede9fe; color: #5b21b6; border-color: #c4b5fd;",
-            "Hold"   = "background-color: #f3f4f6; color: #374151; border-color: #d1d5db;",
-            "background-color: #f3f4f6; color: #374151; border-color: #d1d5db;"
+            "Buy"    = "background-color: var(--fm-surface); color: var(--fm-text); border-color: var(--fm-border);",
+            "Sell"   = "background-color: var(--fm-surface); color: var(--fm-text); border-color: var(--fm-border);",
+            "Bid"    = "background-color: var(--fm-surface); color: var(--fm-text); border-color: var(--fm-border);",
+            "Clause" = "background-color: var(--fm-surface); color: var(--fm-text); border-color: var(--fm-border);",
+            "Hold"   = "background-color: var(--fm-surface); color: var(--fm-text); border-color: var(--fm-border);",
+            "background-color: var(--fm-surface); color: var(--fm-text); border-color: var(--fm-border);"
           )
-
-          conf_color <- if (conf_pct >= 80) "#10b981" else if (conf_pct >= 60) "#f59e0b" else "#ef4444"
 
           # Determine if action button should be shown
           show_action_btn <- rec_type %in% c("Buy", "Bid", "Clause")
 
           div(
-            style = "border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; margin-bottom: 12px; background: #fff;",
+            class = "today-recommendation-card",
             fluidRow(
               # Icon + Title
               column(
-                width = 10,
+                width = 9,
                 div(
                   style = "display: flex; align-items: center; gap: 10px;",
                   div(style = "font-size: 18px;", type_icon),
                   div(
                     style = "flex: 1;",
                     div(
-                      style = "font-weight: 700; font-size: 14px; color: #0f172a;",
+                      style = "font-weight: 700; font-size: 14px; color: var(--fm-text);",
                       title_text
                     ),
                     div(
-                      style = "font-size: 12px; color: #64748b; margin-top: 4px;",
+                      style = "font-size: 12px; color: var(--fm-muted); margin-top: 4px;",
                       desc_text
                     )
                   )
                 )
               ),
-              # Confidence badge
+              # Descriptive label, not a prediction-confidence claim.
               column(
-                width = 2,
+                width = 3,
                 div(
-                  style = paste0("text-align: right; display: flex; align-items: center; justify-content: flex-end;"),
+                  class = "today-recommendation-label",
                   div(
-                    style = paste0("display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; background-color: ", if (conf_pct >= 80) "#d1fae5" else if (conf_pct >= 60) "#fef3c7" else "#fee2e2", "; color: ", conf_color, ";"),
-                    paste0("Confidence: ", conf_pct, "%")
+                    class = "today-heuristic-label",
+                    "Heuristic suggestion"
                   )
                 )
               )
@@ -911,8 +910,7 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
                       actionButton(
                         inputId = ns(paste0("rec_action_", pid)),
                         label = tagList(icon("arrow-right"), action_label),
-                        class = "btn btn-sm btn-primary",
-                        style = "font-size: 11px; padding: 4px 12px;",
+                        class = "btn btn-primary today-recommendation-action",
                         onclick = today_rec_action_onclick_js(ns, pid, action_code)
                       )
                     } else {
@@ -965,7 +963,7 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
               minWidth = 100,
               cell = function(value) {
                 div(
-                  style = "font-weight: 600; font-size: 12px; color: #0f172a;",
+                  style = "font-weight: 600; font-size: 12px; color: var(--fm-text);",
                   value
                 )
               }
@@ -975,7 +973,7 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
               minWidth = 60,
               cell = function(value) {
                 div(
-                  style = "font-size: 11px; color: #64748b;",
+                  style = "font-size: 11px; color: var(--fm-muted);",
                   value
                 )
               }
@@ -986,7 +984,7 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
               minWidth = 90,
               cell = function(value) {
                 div(
-                  style = "font-size: 12px; font-weight: 600; color: #059669;",
+                  style = "font-size: 12px; font-weight: 600; color: var(--fm-text);",
                   format_table_currency(value)
                 )
               }
@@ -994,15 +992,9 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
             FIS = colDef(
               name = "FIS",
               align = "center",
-              minWidth = 55,
+              minWidth = 64,
               cell = function(value) {
-                v <- suppressWarnings(as.numeric(value))
-                if (is.na(v) || !is.finite(v)) v <- 0
-                badge_color <- if (v >= 80) "#10b981" else if (v >= 65) "#f59e0b" else "#6b7280"
-                div(
-                  style = paste0("display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; background-color: ", if (v >= 80) "#d1fae5" else if (v >= 65) "#fef3c7" else "#f3f4f6", "; color: ", badge_color, ";"),
-                  v
-                )
+                today_fis_score_badge(value)
               }
             ),
             Tier = colDef(
@@ -1036,7 +1028,7 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
         if (is.null(prs) || nrow(prs) == 0) {
           return(
             div(
-              style = "padding: 16px; text-align: center; color: #64748b; font-size: 12px;",
+              style = "padding: 16px; text-align: center; color: var(--fm-muted); font-size: 12px;",
               icon("newspaper", style = "font-size: 16px; margin-bottom: 4px;"),
               br(),
               "No recent transfer data available."
@@ -1073,26 +1065,26 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
             style = "border-bottom: 1px solid #f1f5f9; padding: 10px 0;",
             div(
               style = "display: flex; align-items: center; gap: 8px;",
-              icon("exchange-alt", style = "font-size: 12px; color: #6b7280;"),
+              icon("exchange-alt", style = "font-size: 12px; color: var(--fm-muted);"),
               div(
                 style = "flex: 1; font-size: 12px;",
                 div(
-                  style = "font-weight: 600; color: #0f172a;",
+                  style = "font-weight: 600; color: var(--fm-text);",
                   player_name
                 ),
                 div(
-                  style = "font-size: 11px; color: #64748b;",
+                  style = "font-size: 11px; color: var(--fm-muted);",
                   paste0(buyer_name, " <- ", seller_name)
                 )
               ),
               div(
                 style = "text-align: right;",
                 div(
-                  style = "font-weight: 700; font-size: 12px; color: #059669;",
+                  style = "font-weight: 700; font-size: 12px; color: var(--fm-text);",
                   price_display
                 ),
                 div(
-                  style = "font-size: 10px; color: #94a3b8;",
+                  style = "font-size: 10px; color: var(--fm-muted);",
                   display_date
                 )
               )

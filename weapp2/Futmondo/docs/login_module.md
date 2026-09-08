@@ -1,28 +1,11 @@
-# Login Module Documentation
+# Login and account isolation
 
-This document describes the `Login_Module.R` Shiny module, which handles user authentication with the Futmondo API and presents the connection status.
+`login_UI(id)` returns an empty email/password form, login button, logout button and connection status. `login_Server(id,user=NULL,password=NULL)` returns a reactive authentication value: NULL when logged out, otherwise a named token/user-ID/login-name vector. UI inputs are not populated from server credentials. The submitted password input is cleared after authentication and never logged. Every failed attempt renders a generic accessible error below the form, including a first failure when the token was already NULL; transport details are not exposed.
 
----
+`login(user_name=NULL,password=NULL)` calls the official authentication endpoint only with explicitly supplied values. Authenticated tokens are used in server-side requests; no token is printed or rendered. Optional unattended sessions are stored encrypted only after the user connects the worker, as documented in [automation](automation.md).
 
-## 1. Overview
+Pressing Enter while the password input is focused triggers the same namespaced Login button click as a mouse or touch click. The handler prevents a browser form submission and ignores IME composition events; it does not create another authentication route.
 
-The Login Module provides two exported functions:
-* `login_UI(id)` -- Renders the login input form box and the authentication result box.
-* `login_Server(id, user, password)` -- Drives user authentication via `login()`, updates connection state reactively, and displays status.
+On login, root server loads the account's memberships and offers a league selector. Switching a league binds roster, financial rules, rivals, forecasts and action context to its championship/team IDs. Logout clears the authentication value and account cache. Selected-player confirmations cannot survive account/league/team changes.
 
----
-
-## 2. Authentication UI & Status
-
-Upon successful login with Futmondo API (`POST https://api.futmondo.com/5/login/with_mail`):
-1. **Security Clean-Up**: Raw API tokens are hidden from the user interface.
-2. **Welcome Card**: Renders a clean success card featuring a green checkmark icon (`fa-circle-check`), personalized greeting (`"Welcome back, [user_name]!"`), and active connection indicator.
-3. **Status Update**: Updates the result box status to `"success"`.
-
----
-
-## 3. Security & Privacy Notice
-
-The login interface includes an explicit privacy notice informing users:
-1. **Official Server Authentication**: Logs in directly using your Futmondo account to authenticate with the official Futmondo authentication server (`POST https://api.futmondo.com/5/login/with_mail`).
-2. **Zero Credential Persistence**: Passwords are used strictly in-memory during authentication and are never saved or stored anywhere on disk or in the database.
+Every administrative handler checks `is_authorized_admin()` against authenticated identity and the configured server administrator. Menu visibility alone is not authorization. See [multi-league design](multi_league.md) and the offline lifecycle tests.

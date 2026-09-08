@@ -1,3 +1,5 @@
+> Financial reliability update (2026-09-07): the implementation no longer reconstructs account balances, artificial reward entries or roster purchase dates. Restricted account history displays observed transfers with unknown balances. Current official cash preserves zero and negative values. The transfer-only chart requires the configured initial budget and excludes rewards/adjustments. See [current contracts and examples](ui_reliability.md#rival-financial-evidence); historical reconstruction descriptions below are superseded.
+
 # Rivals Module - Rivals Scouting Page
 
 This document describes the `Rivals_Module.R` Shiny module that implements the "Rivals" scouting page. It allows the logged-in user to select any team in the championship, view their financial overview, and inspect their full player roster with clause-to-value ratio indicators.
