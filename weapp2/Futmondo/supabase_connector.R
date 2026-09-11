@@ -17,20 +17,38 @@ get_sb_key <- function() {
   if (is.null(key) || key == "") SB_KEY else key
 }
 
+# Keep only safe diagnostic codes; response text can contain private row data.
+record_persistence_failure <- function(table_name, http_status = NULL, error_code = NULL, category = NULL) {
+  table_name <- if (length(table_name) == 1L && !is.na(table_name) &&
+    grepl("^[a-z_]+$", table_name)) table_name else "unknown"
+  code <- if (is.character(error_code) && length(error_code) == 1L &&
+    !is.na(error_code) && grepl("^[A-Z0-9]{4,12}$", error_code)) error_code else ""
+  status <- if (length(http_status) == 1L && is.numeric(http_status) &&
+    is.finite(http_status)) http_status else NA_real_
+  if (is.null(category)) category <- if (status %in% c(401, 403)) "authorization" else
+    if (code %in% c("PGRST204", "PGRST205", "42P01", "42703", "42P10")) "schema" else
+    if (is.na(status) || status == 429 || status >= 500) "connection" else "write"
+  issue <- list(table = table_name, category = category, http_status = status, code = code)
+  options(futmondo.persistence_failures = getOption("futmondo.persistence_failures", 0L) + 1L,
+    futmondo.persistence_issues = c(getOption("futmondo.persistence_issues", list()), list(issue)))
+  message("[Persistence] table=", table_name, " category=", category,
+    if (!is.na(status)) paste0(" HTTP=", status), if (nzchar(code)) paste0(" code=", code))
+  invisible(issue)
+}
+
 supabase_post_direct <- function(table_name, payload, conflict = NULL) {
   if (isTRUE(getOption("futmondo.offline", FALSE))) return(NULL)
+  if (is.null(payload) || (is.data.frame(payload) && nrow(payload) == 0) || (is.list(payload) && length(payload) == 0)) {
+    return(NULL)
+  }
   # Defensive check for loaded credentials
   sb_url <- get_sb_url()
   sb_key <- get_sb_key()
   if (is.null(sb_url) || sb_url == "" || is.null(sb_key) || sb_key == "") {
-    options(futmondo.persistence_failures=getOption("futmondo.persistence_failures",0L)+1L)
-    print("[Supabase] Database credentials unavailable.")
+    record_persistence_failure(table_name, category = "configuration")
     return(NULL)
   }
   
-  if (is.null(payload) || (is.data.frame(payload) && nrow(payload) == 0) || (is.list(payload) && length(payload) == 0)) {
-    return(NULL)
-  }
   
   url <- paste0(sb_url, "/rest/v1/", table_name)
   
@@ -48,13 +66,13 @@ supabase_post_direct <- function(table_name, payload, conflict = NULL) {
     if (code >= 200 && code < 300) {
       print(paste0("[Supabase] Successfully synced data to table: ", table_name, " (HTTP ", code, ")"))
     } else {
-      options(futmondo.persistence_failures=getOption("futmondo.persistence_failures",0L)+1L)
-      print(paste0("[Supabase] Warning: Received HTTP code ", code, " from table: ", table_name))
+      details <- tryCatch(jsonlite::fromJSON(httr::content(response, as = "text", encoding = "UTF-8")),
+        error = function(e) NULL)
+      record_persistence_failure(table_name, code, if (is.list(details)) details$code else NULL)
     }
     return(code)
   }, error = function(e) {
-    options(futmondo.persistence_failures=getOption("futmondo.persistence_failures",0L)+1L)
-    print(paste0("[Supabase] Connection error during post to table ", table_name))
+    record_persistence_failure(table_name, category = "connection")
     return(NULL)
   })
 }
@@ -73,16 +91,26 @@ sync_championship_to_supabase <- function(championship) {
 }
 
 sync_real_clubs_to_supabase <- function(clubs_df) {
-  if (is.null(clubs_df) || nrow(clubs_df) == 0) return()
-  
-  # Expected columns: teamId, team, logo
-  if (!"teamId" %in% colnames(clubs_df)) return()
-  
-  payload <- clubs_df %>%
-    dplyr::select(id = teamId, name = team, logo) %>%
-    dplyr::distinct(id, .keep_all = TRUE)
-  
-  supabase_post("real_clubs", payload)
+  if (!is.data.frame(clubs_df) || nrow(clubs_df) == 0 ||
+      !"teamId" %in% names(clubs_df)) return(invisible(TRUE))
+
+  ids <- trimws(as.character(clubs_df$teamId))
+  club_names <- if ("team" %in% names(clubs_df)) trimws(as.character(clubs_df$team)) else rep(NA_character_, nrow(clubs_df))
+  logos <- if ("logo" %in% names(clubs_df)) as.character(clubs_df$logo) else rep(NA_character_, nrow(clubs_df))
+  known_name <- !is.na(club_names) & nzchar(club_names)
+  # Unassigned players have no catalog identity. A nonempty ID with missing
+  # enrichment still needs a row so the following player write has a valid FK.
+  club_names[!known_name] <- ids[!known_name]
+  payload <- data.frame(id = ids, name = club_names, logo = logos, stringsAsFactors = FALSE)
+  payload <- payload[order(!known_name), , drop = FALSE]
+  payload <- payload[!is.na(payload$id) & nzchar(payload$id), , drop = FALSE]
+  payload <- dplyr::distinct(payload, id, .keep_all = TRUE)
+  if (!nrow(payload)) return(invisible(TRUE))
+
+  tryCatch(supabase_post("real_clubs", payload), error = function(e) {
+    record_persistence_failure("real_clubs", category = "write")
+    invisible(FALSE)
+  })
 }
 
 sync_players_to_supabase <- function(players_df) {
@@ -92,10 +120,10 @@ sync_players_to_supabase <- function(players_df) {
   required <- c("id", "name", "slug")
   if (!all(required %in% colnames(players_df))) return()
 
-  # Sanitize real_club_id: NA, NULL, or empty string become NA_character_
-  # so PostgreSQL FK real_clubs(id) accepts it as NULL
-  real_club_raw <- if ("teamId" %in% colnames(players_df)) as.character(players_df$teamId) else rep(NA_character_, nrow(players_df))
-  real_club_raw[is.na(real_club_raw) | real_club_raw == ""] <- NA_character_
+  # Match the club seed's normalized IDs. Missing/blank IDs represent an
+  # unassigned player and become SQL NULL instead of an invalid foreign key.
+  real_club_raw <- if ("teamId" %in% colnames(players_df)) trimws(as.character(players_df$teamId)) else rep(NA_character_, nrow(players_df))
+  real_club_raw[is.na(real_club_raw) | !nzchar(real_club_raw)] <- NA_character_
 
   payload <- data.frame(
     id = as.character(players_df$id),

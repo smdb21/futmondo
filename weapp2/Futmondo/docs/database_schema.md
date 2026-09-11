@@ -4,6 +4,24 @@ This document details the relational database schema used by the Futmondo Insigh
 
 ---
 
+
+## Catalog synchronization with incomplete club data
+
+`sync_real_clubs_to_supabase(clubs_df)` accepts a data frame with `teamId` and optional `team`/`logo` columns. The input may be the clubs endpoint result or player rows enriched by the club join. It writes one `{id, name, logo}` row per nonempty, trimmed club ID; absent names use the ID as an explicit placeholder, and absent logos become SQL `NULL`. If duplicate rows include a known club name, that name wins. A later enriched sync replaces the placeholder. Players with missing/blank club IDs produce no club row.
+
+`sync_players_to_supabase(players_df)` requires `id`, `name`, and `slug`; optional `teamId` and `photo` populate `real_club_id` and `photo`. Its catalog payload contains only those identity fields. It trims club IDs using the same rule, and missing/blank club IDs become SQL `NULL`. Call the club sync before the player sync, as the collection, market, and roster workflows already do. A nonempty club ID with unavailable enrichment therefore retains a valid reference instead of rejecting the entire club batch or causing the following player foreign key write to fail.
+
+The club helper returns the underlying HTTP status when it writes, invisible `TRUE` when there are no valid IDs, and invisible `FALSE` plus a recorded persistence issue for a thrown write error. The player helper batches up to 100 rows per write and returns invisibly after the batch loop; HTTP errors are recorded by the connector. Neither helper fetches additional API data.
+
+```r
+players <- data.frame(id = c("p1", "p2"), name = c("Player 1", "Player 2"),
+                      slug = c("player-1", "player-2"), teamId = c("club-1", NA))
+sync_real_clubs_to_supabase(players) # Seeds club-1 with its ID as placeholder name.
+sync_players_to_supabase(players)   # p1 references club-1; p2 has no club reference.
+```
+
+Focused offline regression: `Rscript test/test_catalog_sync.R` covers missing joins, unassigned players, duplicate enrichment, and matching club foreign keys.
+
 ## 1. Table Definitions (DDL SQL)
 
 Execute the following DDL query inside your **Supabase SQL Editor** to create the tables, define foreign key relations, and configure primary keys.

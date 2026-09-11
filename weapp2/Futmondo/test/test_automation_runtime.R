@@ -21,6 +21,7 @@ policy<-list(id="policy",user_id="u",championship_id="c",user_team_id="t",enable
 job<-list(id="j",policy_id="policy",lease_token="lease",user_id="u",championship_id="c",user_team_id="t",
   action_type="bid",payload=list(player_id="p",amount=300,listing_expires_at="2026-09-05T13:00:00Z"))
 fin<-list(status="ok",cash=1000,spendable_budget=1000,legal_bid_limit=600,observed_at=now,
+  debt_limit=500,minimum_balance=-500,
   roster_count=15,roster_cap=20,commitments=list(count=0,completeness="complete"),
   rules=list(solvency_verified=TRUE,deadline="2026-09-06T12:00:00Z"),
   lineup_rules=list(verified=TRUE,formations="4-3-3",multiposition=FALSE,club_limit=Inf))
@@ -40,18 +41,19 @@ check("shadow policy permits approved identities and rejects foreign accounts an
   bad<-job;bad$payload$player_id<-"unapproved"
   stopifnot(!validate_automation_action(bad,policy,fin,roster,now)$ok)
 })
-check("collective spending, positive cash, API limit, freshness and roster capacity",{
+check("collective spending, temporary debt, API limit, freshness and roster capacity",{
   po<-policy;po$reserved<-800
   stopifnot(!validate_automation_action(job,po,fin,roster,now)$ok)
   po$reserved<-Inf
   stopifnot(!validate_automation_action(job,po,fin,roster,now)$ok)
   for(field in c("spendable_budget","legal_bid_limit")) {
-    f<-fin;f[[field]]<-if(field=="spendable_budget")300 else 299
+    f<-fin;f[[field]]<-if(field=="spendable_budget")299 else 299
     stopifnot(!validate_automation_action(job,policy,f,roster,now)$ok)
     f[[field]]<-NA_real_;stopifnot(!validate_automation_action(job,policy,f,roster,now)$ok)
   }
   f<-fin;f$cash<- -1
-  stopifnot(!validate_automation_action(job,policy,f,roster,now)$ok)
+  stopifnot(validate_automation_action(job,policy,f,roster,now)$ok)
+  f$debt_limit<-NA_real_;stopifnot(!validate_automation_action(job,policy,f,roster,now)$ok)
   stopifnot(!validate_automation_action(job,policy,fin,roster,now,target=list(ok=TRUE,
     verified_at="2026-09-05T11:59:00Z"))$ok)
   f<-fin;f$observed_at<-now-31

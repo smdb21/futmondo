@@ -8,6 +8,8 @@ The functions in `intelligence_engine.R` are pure local computations. They do no
 
 The indicators use fixed mappings, so a player's result is identical in a catalog, filtered table, roster, or detail view. Performance maps observed average `a` to `100*(1-exp(-max(a,0)/6))`; form maps the recent-average difference relative to `max(abs(a),1)` around 50; efficiency is `100*max(a,0)/(max(a,0)+value/1e6)`; momentum is `50+50*tanh(20*change/value)`. The legacy `fixture_risk` name now consistently means **availability quality**: healthy 100, doubtful 60, known injury/suspension 0, unknown NA. It does not measure an opponent's difficulty.
 
+Roster, market, and catalog responses normalize nested API match statistics to the same `average.*` columns before scoring. Data coverage of 20% means **one of five** indicators is available, usually price momentum when no usable match average or availability status is supplied. With reported match averages, recent form, price/value data, and an unknown availability status, coverage is 80%; the rating uses those four observed indicators. The availability component says **Not reported** when the source status is blank/unknown. It does not imply injury. Missing match data and zero appearances still produce an unavailable overall rating.
+
 Default weights are performance .30, form .20, efficiency .20, momentum .15 and availability .15. Named custom weights must be finite nonnegative scalar numerics; invalid entries use their default and weights are normalized. The weighted average includes observed indicators only. `data_coverage` is the proportion observed, not accuracy. No observed match average means `fis_score=NA`, `fis_tier="Unavailable"` and `fis_status="unavailable"`; incomplete inputs otherwise receive `fis_status="partial"`.
 
 Historical tier names remain for existing table compatibility (`Strong Buy`, `Buy`, `Hold`, `Sell`). They are descriptive labels, not an economic recommendation or prediction. No confidence probability is derived from the rating.
@@ -63,7 +65,7 @@ if (scenario$status != "ok") print(scenario$diagnostics)
 
 ## Legacy smart-bid compatibility
 
-`calculate_smart_bid(player_row, championship_id, pressroom_df=NULL, user_teams_df=NULL, user_cash=NA_real_, market_high_bid=NULL, capacity=NULL)` remains a **descriptive heuristic**, not the rival-bid model. Its return includes `fair_value`, `league_premium_pct`, `min_winning_bid`, `recommended_bid`, `max_rational_bid`, `expected_roi_pct`, `competition_level`, `likely_competitors`, `spendable_funds`, `funds_verified`, `market_high_bid`, `can_compete`, `method`, `calibrated`, `confidence_pct`, and `data_coverage_pct`.
+`calculate_smart_bid(player_row, championship_id, pressroom_df=NULL, user_teams_df=NULL, user_cash=NA_real_, market_high_bid=NULL, capacity=NULL)` remains a **descriptive heuristic**, not the rival-bid model. Its return includes `fair_value`, `league_premium_pct`, `min_winning_bid`, `recommended_bid`, `max_rational_bid`, `expected_roi_pct`, `competition_level`, `likely_competitors`, `spendable_funds`, `funds_verified`, `market_high_bid`, `minimum_bid`, `can_compete`, `action`, `reason`, `message`, `method`, `calibrated`, `confidence_pct`, and `data_coverage_pct`.
 
 The recommendation never exceeds its rational ceiling or supplied spendable ceiling; `can_compete=FALSE` when the estimated required bid is above the ceiling. Only `capacity$status=="ok"` verifies funds. When supplied, `capacity$funds$api_bid_limit` also caps the rational/recommended amounts; an explicit unavailable/invalid API limit returns no bid. Legacy synthetic capacity objects may omit this field, while production capacity always supplies it. Missing, invalid or partial capacity returns a no-bid error with zero recommendation and unknown spending/rational limits, even if `user_cash` contains a number. Zero verified available funds remains a valid zero ceiling. `expected_roi_pct`, `confidence_pct` and `data_coverage_pct` are NA; `calibrated=FALSE`. The separate `valuation_discount_pct` is a descriptive valuation discount, never a profit forecast. New economic decisions use `fit_rival_bid_model()`, `forecast_resale_values()` and `select_profit_bid()`.
 
@@ -71,6 +73,22 @@ The recommendation never exceeds its rational ceiling or supplied spendable ceil
 advisory <- calculate_smart_bid(player, "league-id", capacity=verified_capacity)
 if (isTRUE(advisory$funds_verified) && isTRUE(advisory$can_compete)) print(advisory$recommended_bid)
 ```
+
+### Executable market minimum
+
+`market_bid_minimum(player_row)` accepts a one-row player data frame or named list. It returns the whole-euro minimum as a numeric scalar: the greater of current `value` and the first positive finite listing price among `effective_market_price`, `market_price`, and `price`. Missing, empty, zero, negative, and non-finite prices are skipped; an entirely unknown minimum returns `NA_real_`. Numeric strings are supported.
+
+`calculate_smart_bid()` preserves its independent form/injury valuation and enforces this market minimum before recommending an executable amount. `min_winning_bid` also covers the heuristic competition premium and any observed higher bid. If the minimum winning bid exceeds verified funds, the API bid limit, or the rational valuation ceiling, the result is `action="no_bid"`, `recommended_bid=0`, `can_compete=FALSE`, with an explanatory `reason` and `message`. The player card displays **No bid** and disables its Smart Bid button. It never presents a below-minimum amount as an actionable recommendation.
+
+```r
+market_bid_minimum(list(value=10000000, price=12000000)) # 12000000
+advisory <- calculate_smart_bid(player, "league-id", capacity=verified_capacity)
+if (identical(advisory$action, "bid")) {
+  stopifnot(advisory$recommended_bid >= advisory$minimum_bid)
+}
+```
+
+Offline regression coverage: `Rscript test/test_smart_bid_minimum.R`.
 
 ## Manager history and command-center feed
 
@@ -94,3 +112,7 @@ values <- analytics_numeric_column(roster, "value")
 ```
 
 Run `Rscript --vanilla test/test_intelligence_correctness.R`. It tests contextual score identity, missing data, exact assignment, availability, positions, club/captain/lock constraints, cash and scenario validation, economically bounded heuristics, meaningful transfer deltas and observed manager history.
+
+Rating input regression: `Rscript test/test_player_rating_inputs.R` verifies real parser output shapes through the selected-player panel without external requests.
+
+When no executable bid exists, the result identifies the binding ceiling in `binding_constraint` and uses a specific `reason`: `no_spendable_capacity`, `api_bid_limit_zero`, or a `<constraint>_below_minimum` value. This distinguishes a zero balance/debt headroom from a zero limit reported by Futmondo and from the model valuation ceiling.

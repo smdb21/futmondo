@@ -10,11 +10,36 @@ login_UI <- function(id) {
       passwordInput(inputId = ns("password"), label = "Password:", placeholder = "password", value = ""),
       actionButton(inputId = ns("login_button"), label = "Login"),
       actionButton(inputId = ns("logout_button"), label = "Logout"),
+      div(
+        id = ns("login_progress"), class = "login-feedback", style = "display: none;",
+        role = "status", `aria-live` = "polite",
+        icon("spinner", class = "fa-spin"), span("Connecting to Futmondo…")
+      ),
       uiOutput(ns("login_feedback")),
-      tags$script(HTML(paste0(
-        "$(function(){var password=$('#", ns("password"), "');var login=$('#", ns("login_button"),
-        "');password.off('keydown.futmondoLogin').on('keydown.futmondoLogin',function(event){",
-        "if(event.key==='Enter'&&!event.isComposing){event.preventDefault();login.trigger('click');}});});"
+      tags$script(id = ns("login_feedback_script"), HTML(paste0(
+        "(function(){function bindLogin(){",
+        "var login=document.getElementById('", ns("login_button"), "');",
+        "if(!login||login.dataset.futmondoLoginBound)return;",
+        "login.dataset.futmondoLoginBound='true';",
+        "var progress=document.getElementById('", ns("login_progress"), "');",
+        "var feedback=document.getElementById('", ns("login_feedback"), "');",
+        "var logout=document.getElementById('", ns("logout_button"), "');",
+        "var pending=false;var label=login.textContent;",
+        "function setBusy(busy){pending=!!busy;login.disabled=pending;logout.disabled=pending;",
+        "login.setAttribute('aria-busy',String(pending));",
+        "login.textContent=pending?'Logging in…':label;",
+        "progress.style.display=pending?'flex':'none';feedback.style.display=pending?'none':'';}",
+        # Capture runs before Shiny's action-button handler, so feedback is immediate.
+        "login.addEventListener('click',function(event){",
+        "if(pending){event.preventDefault();event.stopImmediatePropagation();return;}",
+        "setBusy(true);},true);",
+        "['", ns("user_name"), "','", ns("password"), "'].forEach(function(id){",
+        "document.getElementById(id).addEventListener('keydown',function(event){",
+        "if(event.key==='Enter'&&!event.isComposing){event.preventDefault();",
+        "if(!pending)login.click();}});});",
+        "Shiny.addCustomMessageHandler('", ns("login_state"), "',function(message){setBusy(message.busy);});",
+        "}if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',bindLogin,{once:true});}",
+        "else{bindLogin();}})();"
       ))),
       div(style = "color: var(--fm-text); font-size: 11px; margin-top: 15px; display: flex; flex-direction: column; gap: 6px;",
         div(style = "display: flex; align-items: flex-start; gap: 6px;",
@@ -66,29 +91,38 @@ login_Server <- function(id, user = NULL, password = NULL) {
         input$login_button
       },
       {
-        user_name <- input$user_name
-        password <- input$password
-        login_token <- NULL
-        failure_message <- NULL
         tryCatch(
           {
-            login_token <- login(user_name, password)
+            user_name <- trimws(input$user_name %||% "")
+            password <- input$password %||% ""
+            if (!nzchar(user_name) || !nzchar(password)) {
+              login_feedback_RV(list(kind = "error", message = "Enter your username and password to log in."))
+              return()
+            }
+            login_token <- NULL
+            failure_message <- NULL
+            tryCatch(
+              { login_token <- login(user_name, password) },
+              error = function(e) {
+                # Do not expose transport or server details in the UI or logs.
+                failure_message <<- "Could not authenticate with Futmondo. Check your username and password, then try again."
+                NULL
+              }
+            )
+            if (valid_login(login_token)) {
+              session$userData$futmondo_user_id <- login_token[["userid"]]
+              login_feedback_RV(list(kind = "success", message = "Connected to Futmondo."))
+            } else {
+              session$userData$futmondo_user_id <- NULL
+              login_feedback_RV(list(kind = "error", message = failure_message %||% "Could not authenticate with Futmondo. Check your username and password, then try again."))
+            }
+            login_token_RV(login_token)
           },
-          error = function(e) {
-            # Do not expose transport or server details in the UI or logs.
-            failure_message <<- "Could not authenticate with Futmondo. Check your username and password, then try again."
-            NULL
+          finally = {
+            updateTextInput(session, "password", value = "")
+            session$sendCustomMessage(session$ns("login_state"), list(busy = FALSE))
           }
         )
-        updateTextInput(session, "password", value = "")
-        if (valid_login(login_token)) {
-          session$userData$futmondo_user_id <- login_token[["userid"]]
-          login_feedback_RV(list(kind = "success", message = "Connected to Futmondo."))
-        } else {
-          session$userData$futmondo_user_id <- NULL
-          login_feedback_RV(list(kind = "error", message = failure_message %||% "Could not authenticate with Futmondo. Check your username and password, then try again."))
-        }
-        login_token_RV(login_token)
       }
     )
 

@@ -35,6 +35,48 @@ fm_time <- function(x) {
   as.POSIXct(values, origin="1970-01-01", tz="UTC")
 }
 
+# Futmondo permits a temporary negative balance down to half the team value.
+# This is acquisition headroom only: cash must be positive when a round begins.
+acquisition_headroom <- function(cash, team_value, withheld = 0,
+                                 commitments = 0, debt_fraction = 0.5) {
+  values <- vapply(list(cash, team_value, withheld, commitments, debt_fraction),
+    fm_number, numeric(1))
+  names(values) <- c("cash", "team_value", "withheld", "commitments", "debt_fraction")
+  if (any(!is.finite(values)) || values["team_value"] < 0 ||
+      values["withheld"] < 0 || values["commitments"] < 0 ||
+      values["debt_fraction"] < 0) {
+    return(list(spendable_budget = NA_real_, debt_limit = NA_real_,
+      minimum_balance = NA_real_, projected_committed_balance = NA_real_))
+  }
+  debt_limit <- values["team_value"] * values["debt_fraction"]
+  committed_balance <- values["cash"] - values["withheld"] - values["commitments"]
+  list(spendable_budget = max(0, committed_balance + debt_limit),
+    debt_limit = debt_limit, minimum_balance = -debt_limit,
+    projected_committed_balance = committed_balance)
+}
+
+next_round_context <- function(rounds, now = Sys.time()) {
+  unavailable <- list(available = FALSE, round_number = NA_real_, starts_at = as.POSIXct(NA))
+  if (!is.data.frame(rounds) || !nrow(rounds) ||
+      !all(c("round_number", "begin_process") %in% names(rounds))) return(unavailable)
+  starts <- fm_time(rounds$begin_process)
+  current <- fm_time(now)
+  candidates <- which(!is.na(starts) & starts > current)
+  if (!length(candidates)) return(unavailable)
+  index <- candidates[which.min(starts[candidates])]
+  list(available = TRUE, round_number = fm_number(rounds$round_number[index]),
+    starts_at = starts[index])
+}
+
+format_round_countdown <- function(starts_at, now = Sys.time()) {
+  seconds <- floor(as.numeric(difftime(fm_time(starts_at), fm_time(now), units = "secs")))
+  if (length(seconds) != 1L || !is.finite(seconds)) return("Start time unavailable")
+  seconds <- max(0, seconds)
+  days <- seconds %/% 86400; seconds <- seconds %% 86400
+  hours <- seconds %/% 3600; seconds <- seconds %% 3600
+  minutes <- seconds %/% 60; seconds <- seconds %% 60
+  sprintf("%dd %02dh %02dm %02ds", days, hours, minutes, seconds)
+}
 fetch_result <- function(data = NULL, status = "ok", source = "futmondo",
                          observed_at = Sys.time(), error = NULL) {
   stopifnot(status %in% c("ok", "empty", "stale", "partial", "unavailable"))

@@ -143,7 +143,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     # amount: numeric amount to spend (NULL at modal-open time)
     # existing_bid_amount: the user's current bid on the target (for "modify")
     #
-    # Returns list(ok, reason = "ok"|"unavailable"|"capacity"|"funds", message).
+    # Returns list(ok, reason = "ok"|"unavailable"|"capacity"|"funds"|"minimum_bid", message).
     run_acquisition_preflight <- function(sp, mode, amount = NULL, existing_bid_amount = NULL) {
       login <- get_reactive_val(login_token)
       champ_id <- get_reactive_val(championship_id)
@@ -172,7 +172,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         capacity = capacity,
         mode = mode,
         amount = amount,
-        existing_bid_amount = existing_bid_amount
+        existing_bid_amount = existing_bid_amount,
+        minimum_bid = if (mode %in% c("bid", "modify")) market_bid_minimum(sp) else NULL
       )
     }
 
@@ -577,11 +578,12 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         title = tagList(icon("pen-to-square"), " Update Your Active Bid"),
         p(strong(sp$name)),
         p("Current Active Bid: ", strong(format_currency(bid_info$price))),
+        p("Minimum market bid: ", strong(format_currency(market_bid_minimum(sp)))),
         numericInput(
           ns("new_bid_amount"),
           label = "New Bid Amount (EUR):",
-          value = bid_info$price,
-          min = 1,
+          value = max(bid_info$price, market_bid_minimum(sp)),
+          min = market_bid_minimum(sp),
           step = 10000
         ),
         uiOutput(ns("new_bid_amount_preview")),
@@ -733,26 +735,26 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       sp <- selected_player()
       req(sp)
 
-      # Preflight: a new market offer must have roster capacity available.
-      pf <- run_acquisition_preflight(sp, "bid", amount = NULL)
+      # Recheck the cached recommendation against current minimum and funds.
+      pf <- run_acquisition_preflight(sp, "bid", amount = cached$recommended_bid)
       if (!isTRUE(pf$ok)) {
         show_preflight_failure(pf)
         return()
       }
 
       recommended_val <- cached$recommended_bid
-      market_price <- if ("effective_market_price" %in% colnames(sp) && !is.na(sp$effective_market_price)) suppressWarnings(as.numeric(sp$effective_market_price)) else if ("market_price" %in% colnames(sp) && !is.na(sp$market_price)) suppressWarnings(as.numeric(sp$market_price)) else if ("price" %in% colnames(sp) && !is.na(sp$price)) suppressWarnings(as.numeric(sp$price)) else recommended_val
+      market_price <- market_bid_minimum(sp)
 
       showModal(modalDialog(
         title = tagList(icon("chart-line"), " Place Market Offer (Smart Bid)"),
         p(strong(sp$name)),
-        p("Current market price: ", strong(format_currency(market_price))),
+        p("Minimum market bid: ", strong(format_currency(market_price))),
         p("Recommended Smart Bid: ", strong(format_currency(recommended_val))),
         numericInput(
           ns("bid_amount"),
           label = "Your offer amount (EUR):",
           value = recommended_val,
-          min = 1,
+          min = market_price,
           step = 10000
         ),
         uiOutput(ns("bid_amount_preview")),
@@ -785,19 +787,19 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         return(invisible(FALSE))
       }
 
-      market_price <- if ("effective_market_price" %in% colnames(sp) && !is.na(sp$effective_market_price)) suppressWarnings(as.numeric(sp$effective_market_price)) else if ("market_price" %in% colnames(sp) && !is.na(sp$market_price)) suppressWarnings(as.numeric(sp$market_price)) else if ("price" %in% colnames(sp) && !is.na(sp$price)) suppressWarnings(as.numeric(sp$price)) else 1000000
+      market_price <- market_bid_minimum(sp)
 
       remember_action_context("bid")
       offer_modal_opened_RV(TRUE)
       showModal(modalDialog(
         title = tagList(icon("hand-holding-dollar"), " Place Market Offer"),
         p(strong(sp$name)),
-        p("Current market price: ", strong(format_currency(market_price))),
+        p("Minimum market bid: ", strong(format_currency(market_price))),
         numericInput(
           ns("bid_amount"),
           label = "Your offer amount (EUR):",
           value = market_price,
-          min = 1,
+          min = market_price,
           step = 10000
         ),
         uiOutput(ns("bid_amount_preview")),
@@ -1527,7 +1529,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       }
 
       val_df$date <- as.POSIXct(parse_safe_datetime(val_df$recorded_at))
-      val_df <- val_df %>% dplyr::filter(!is.na(date)) %>% dplyr::arrange(date)
+      val_df$value <- suppressWarnings(as.numeric(as.character(val_df$value)))
+      val_df <- val_df %>% dplyr::filter(!is.na(date), is.finite(value)) %>% dplyr::arrange(date)
 
       # ---- Points series: one marker per completed round; graceful no-points ----
       # Fetch finished rounds defensively; points are only rendered when round
@@ -1566,6 +1569,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
             mode = "markers",
             x = ~date, y = ~points,
             name = "Points",
+            inherit = FALSE,
             marker = list(size = 8, color = "#10b981", symbol = "circle"),
             yaxis = "y2",
             hoverinfo = "text",
@@ -1576,12 +1580,13 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           overlaying = "y",
           side = "right",
           showgrid = FALSE,
-          rangemode = "tozero"
+          autorange = FALSE,
+          range = player_trend_axis_range(points_trace$points_df$points)
         )
         annotations_cfg <- NULL
       } else {
         # Graceful no-points state: hide the points axis, show a note.
-        yaxis2_cfg <- list(showaxis = FALSE)
+        yaxis2_cfg <- list(visible = FALSE)
         annotations_cfg <- list(list(
           text = "No points recorded yet",
           x = 0.98, y = 0.98, xref = "paper", yref = "paper",
@@ -1607,6 +1612,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           yaxis = list(
             title = "Valuation (\u20ac)",
             tickformat = "s",
+            autorange = FALSE,
+            range = player_trend_axis_range(val_df$value),
             gridcolor = "#f1f5f9"
           ),
           yaxis2 = yaxis2_cfg,
@@ -1785,7 +1792,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       conf_color <- if (!is.finite(conf_pct)) "#64748b" else if (conf_pct >= 80) "#16a34a" else if (conf_pct >= 65) "#2563eb" else if (conf_pct >= 45) "#d97706" else "#dc2626"
 
       # Helper to render a single pillar bar
-      render_pillar <- function(label, value) {
+      render_pillar <- function(label, value, missing_label = "Unavailable") {
         available <- length(value) == 1L && is.finite(value)
         v <- if (available) round(value, 1) else 0
         bar_color <- if (v >= 70) "#16a34a" else if (v >= 50) "#2563eb" else if (v >= 30) "#d97706" else "#dc2626"
@@ -1794,7 +1801,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           div(
             style = "display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; margin-bottom: 3px;",
             span(label),
-            span(style = paste0("color: ", bar_color, ";"), if (available) paste0(v, "/100") else "Unavailable")
+            span(style = paste0("color: ", bar_color, ";"), if (available) paste0(v, "/100") else missing_label)
           ),
           div(
             style = "height: 8px; background: var(--fm-surface); border-radius: 4px; overflow: hidden;",
@@ -1834,8 +1841,12 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           render_pillar("Form", form_val),
           render_pillar("Points/EUR Efficiency", eff_val),
           render_pillar("Price Momentum", mom_val),
-          render_pillar("Availability & Fitness", fix_val)
-        )
+          render_pillar("Availability & Fitness", fix_val, "Not reported")
+        ),
+        if (!is.finite(fix_val)) {
+          p(style = "font-size: 12px; color: var(--fm-muted); margin-top: 10px;",
+            "Futmondo has not reported an availability status for this player.")
+        }
       )
     })
 
@@ -1972,13 +1983,14 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           div(
             style = "background: var(--fm-surface); border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center;",
             div(style = "font-size: 11px; color: var(--fm-muted); font-weight: 600; text-transform: uppercase;", "Heuristic bid bounds"),
-            div(style = "font-size: 14px; font-weight: 700; color: var(--fm-text);", paste0(format_table_currency(min_winning), " - ", format_table_currency(max_rational)))
+            div(style = "font-size: 14px; font-weight: 700; color: var(--fm-text);", paste0("Minimum ", format_table_currency(min_winning), " · Ceiling ", format_table_currency(max_rational)))
           ),
           # Recommended Smart Bid
           div(
             style = "background: var(--fm-surface); border: 2px solid #3b82f6; border-radius: 6px; padding: 10px; text-align: center;",
             div(style = "font-size: 11px; color: var(--fm-text); font-weight: 600; text-transform: uppercase;", "Recommended Smart Bid"),
-            div(style = "font-size: 20px; font-weight: 800; color: var(--fm-text);", format_table_currency(recommended))
+            div(style = "font-size: 20px; font-weight: 800; color: var(--fm-text);",
+                if (isTRUE(smart_bid_result$can_compete)) format_table_currency(recommended) else "No bid")
           ),
           # Expected ROI
           div(
@@ -2009,14 +2021,27 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
             span("Heuristic; winning probability not calibrated")
           )
         ),
+        if (!isTRUE(smart_bid_result$can_compete)) {
+          p(style = "font-size: 13px; color: var(--fm-muted);", smart_bid_result$message)
+        },
         # Use Smart Bid button
+          div(
+            style = "font-size: 13px; font-weight: 600;",
+            "Verified Spendable: ",
+            span(style = "font-weight: 800;", format_table_currency(smart_bid_result$spendable_funds))
+          ),
+          if (is.finite(smart_bid_result$api_bid_limit)) div(
+            style = "font-size: 13px; font-weight: 600;",
+            "Futmondo Bid Limit: ",
+            span(style = "font-weight: 800;", format_table_currency(smart_bid_result$api_bid_limit))
+          ),
         div(
           style = "margin-bottom: 14px; text-align: center;",
           actionButton(
             ns("btn_use_smart_bid"),
             label = tagList(icon("bolt"), " Use Smart Bid"),
             class = "btn btn-primary",
-            disabled = if (!isTRUE(smart_bid_result$can_compete) || !isTRUE(smart_bid_result$funds_verified)) "disabled" else NULL
+            disabled = !isTRUE(smart_bid_result$can_compete) || !isTRUE(smart_bid_result$funds_verified)
           )
         ),
         # Competitor Prediction Section
@@ -2031,6 +2056,18 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       )
     })
   })
+}
+
+# Keep every marker inside its axis, including constant or zero-only series.
+# Explicit bounds prevent the valuation fill's zero baseline from compressing
+# expensive players against the top of the chart.
+player_trend_axis_range <- function(values) {
+  values <- suppressWarnings(as.numeric(as.character(values)))
+  values <- values[is.finite(values)]
+  if (!length(values)) return(c(0, 1))
+  bounds <- range(values)
+  padding <- max(diff(bounds) * 0.12, abs(bounds) * 0.02, 1)
+  bounds + c(-padding, padding)
 }
 
 # Pure helper: build the points trace for the player trend chart.

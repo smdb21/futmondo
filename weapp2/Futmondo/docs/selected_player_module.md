@@ -212,8 +212,23 @@ The resulting `recommended_bid` and `max_rational_bid` are always bounded by the
 
 The player valuation/points trend chart (`player_trend_plot`) renders two series:
 
-* **Market Valuation** -- a line+markers series from the player's historical `value` snapshots (with a pre-season simulated fallback when the DB is empty).
-* **Points** -- built by the pure helper `build_player_points_trace(history_df, sp)`:
-  - **One marker per completed round**: each historical snapshot carrying a valid recorded point value (finite, `>= 0`) becomes a marker; when a round has several snapshots, the latest is kept, so the trace has exactly one marker per round.
+* **Market Valuation** -- a line+markers series from the player's historical `value` snapshots (with a pre-season simulated fallback when the DB is empty). Values are converted to numeric, and rows without finite values or valid dates are omitted.
+* **Points** -- built by the pure helper `build_player_points_trace(history_df, finished_rounds_df, sp)`:
+  - **One marker per completed round**: a snapshot must have a finite nonnegative `points` value and a valid `recorded_at`. The latest snapshot within each finished-round boundary window is selected. No marker is drawn without finished-round boundaries.
   - **Markers only**: the points series uses `mode = "markers"` (no interpolated line) so it never implies points that were not recorded.
-  - **Graceful no-points state**: when there are no valid points (NULL/empty history, all-NA points, or all-negative), the points axis is hidden and a "No points recorded yet" annotation is shown instead of a fabricated zero line.
+  - **Graceful no-points state**: when there are no eligible points, the points axis is hidden and a "No points recorded yet" annotation is shown instead of a fabricated zero line.
+* **Independent padded axes** -- both axes fit their own plotted values with space above and below every marker. The valuation fill no longer forces the axis down to zero, which previously crowded high or nearly constant valuations against the top edge. Constant and zero-only series also receive nonzero ranges.
+
+### `player_trend_axis_range(values)`
+
+This pure helper accepts a numeric vector or numeric strings and returns a numeric vector `c(lower, upper)` for Plotly's `range`. It ignores missing, nonnumeric, and infinite inputs. The padding is the largest of 12% of the data span, 2% of the largest absolute value, or one unit. No finite values returns `c(0, 1)`. There are no network calls or payloads.
+
+```r
+player_trend_axis_range(c(99000000, 100000000)) # c(97000000, 102000000)
+player_trend_axis_range(c(8, 8))              # c(7, 9)
+player_trend_axis_range(c(0, 0))              # c(-1, 1)
+```
+
+Focused offline verification: `Rscript test/test_player_trend_plot.R` checks axis headroom, flat/zero/missing data, numeric strings, and the actual chart render with independent valuation and points axes.
+
+The Smart Bid card displays verified spendable capacity and Futmondo's reported bid limit. A blocked recommendation is rendered as **No bid** with the exact binding constraint, rather than presenting zero as a recommended bid or an unexplained rational ceiling.

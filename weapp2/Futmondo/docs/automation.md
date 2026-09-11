@@ -8,6 +8,8 @@ Automation is optional and starts in observation (`shadow`) mode. The applicatio
 
 `automation_actions()` returns supported action strings: `bid`, `modify_bid`, `cancel_bid`, `list`, `delist`, `accept_bid`, `reject_bid`, `clause`. Normal-market bid actions require a verified system listing (`computer=true`, `type=normal`, `isClause=false`). Offer acceptance targets the best available offer at or above the floor; rejection targets an offer below it. Clause prices are refreshed and constrained by the acquisition ceiling.
 
+Verified automated acquisitions may use the league's temporary credit down to half the team value. The exact debt boundary is permitted, while an unverified limit or an amount beyond it is denied. Policy and API bid ceilings still apply. Automation does not guarantee recovery before kickoff; the persistent next-round bar warns the user that cash must be positive to score points.
+
 `validate_automation_policy(policy, now=Sys.time())` returns `list(ok, errors)`. A policy requires:
 
 ```r

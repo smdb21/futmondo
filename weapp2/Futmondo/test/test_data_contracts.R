@@ -76,11 +76,14 @@ check("natural conflict targets cover observations and scenarios",{
 })
 check("financial snapshot preserves zero and debt",{
   saved_info<-get_user_team_info;saved_capacity<-get_acquisition_capacity
-  get_acquisition_capacity<-function(...)list(status="ok",roster=list(count=17,cap=20),outstanding=list(count=0,total_amount=0,completeness="complete"))
+  get_acquisition_capacity<-function(...)list(status="ok",roster=list(count=17,cap=20),
+    funds=list(api_bid_limit=1000,team_value=10000,debt_limit=5000,minimum_balance=-5000,
+      projected_committed_balance=-100,spendable_budget=4900),
+    outstanding=list(count=0,total_amount=0,completeness="complete"))
   get_user_team_info<-function(...)list(budget=-100,withheld=0,maxBid=1000,teamValue=10000,configuration=list())
   clear_api_cache()
   fin<-get_financial_snapshot(c(token="t",userid="negative"),"c","t")
-  stopifnot(fin$cash== -100,fin$spendable_budget==0,fin$legal_bid_limit==1000)
+  stopifnot(fin$cash== -100,fin$spendable_budget==4900,fin$legal_bid_limit==1000)
   get_user_team_info<-function(...)list(budget=0,withheld=0,maxBid=0,configuration=list())
   clear_api_cache()
   stopifnot(get_financial_snapshot(c(token="t",userid="zero"),"c","t")$cash==0)

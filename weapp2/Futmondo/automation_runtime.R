@@ -109,11 +109,12 @@ validate_automation_action <- function(job, policy_row, financial, roster,
     if (!is.finite(used) || used<0 || !is.finite(pending) || pending<0) return(deny("Policy spending could not be verified"))
     if (charge+used+pending>fm_number(p$total_spending_limit)) return(deny("Total spending limit"))
     # A verified modification replaces its previous commitment. All other
-    # acquisitions require positive cash after already withheld commitments.
-    if (!is.finite(fm_number(financial$spendable_budget)) || charge>=financial$spendable_budget)
+    # Acquisitions may use verified temporary credit down to half team value.
+    if (!is.finite(fm_number(financial$spendable_budget)) || charge>financial$spendable_budget)
       return(deny("Insufficient cash after commitments"))
-    if (!is.finite(fm_number(financial$cash)) || financial$cash<=0 || financial$spendable_budget>financial$cash)
-      return(deny("Cash balance is not verified positive"))
+    if (!is.finite(fm_number(financial$debt_limit)) || financial$debt_limit < 0 ||
+        !is.finite(fm_number(financial$minimum_balance)))
+      return(deny("Temporary debt limit is unverified"))
     count <- fm_number(financial$roster_count); cap <- fm_number(financial$roster_cap)
     if (!is.finite(count) || count<0 || count!=floor(count) || !is.finite(cap) || cap<11 || cap!=floor(cap))
       return(deny("Roster capacity is invalid"))

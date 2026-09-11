@@ -51,14 +51,15 @@ Computes a **verified** acquisition-capacity snapshot for the logged-in team. Ca
   - `target`: `list(my_bid_id, my_bid_amount, highest_bid, bid_count)` (empty when no target).
   - `diagnostics`: character vector of data-availability notes.
 
-### G. `evaluate_acquisition_preflight(capacity, mode, amount = NULL, existing_bid_amount = NULL)`
+### G. `evaluate_acquisition_preflight(capacity, mode, amount = NULL, existing_bid_amount = NULL, minimum_bid = NULL)`
 Pure decision function that gates every acquisition path. **Fails closed**: if `capacity` is `NULL` or `status != "ok"`, it returns `reason = "unavailable"` (verification could not be confirmed).
 * **Modes**:
   - `"bid"` / `"offer"` (new offers): rejected with `reason = "capacity"` when `roster_count + outstanding_count >= cap`.
   - `"clause"` (release-clause buyout): rejected with `reason = "capacity"` when `roster_count >= cap`.
   - `"modify"` (bid update): does **not** consume another slot; requires a verifiable existing own bid (`existing_bid_amount > 0`), else `reason = "unavailable"`.
+* **Minimum market bid**: optional numeric `minimum_bid` applies to `"bid"` and `"modify"` modes. A supplied unknown/nonpositive minimum fails with `reason="unavailable"`; an amount below the minimum fails with `reason="minimum_bid"` before any API write. Omitting the argument preserves the existing pure preflight contract. Direct owner offers and clause purchases retain their respective rules.
 * **Funds**: when `amount` is known, the required spend (the amount, or the positive delta for `"modify"`) must not exceed verified spendable funds, else `reason = "funds"`.
-* **Returns**: `list(ok = logical, reason = "ok"|"unavailable"|"capacity"|"funds", message = character)`.
+* **Returns**: `list(ok = logical, reason = "ok"|"unavailable"|"capacity"|"funds"|"minimum_bid", message = character)`.
 
 ### H. `build_roster_clause_payload(login, championship_id, team_id, player_id, player_slug, price)`
 Builds the exact JSON payload for the dedicated roster-clause buyout endpoint. Serializes exactly:
@@ -83,9 +84,21 @@ Executes a release-clause buyout via `POST https://api.futmondo.com/1/market/ros
 | Release-clause buyout (`submit_clause`) | `clause` | clause price (recomputed locally) | requires a free roster slot; uses `buy_roster_clause` |
 | Bid modification (`submit_modify_bid`) | `modify` | new price | delta vs existing bid; no new slot consumed |
 
-Failures are surfaced as notifications that distinguish **unavailable verification** from **capacity** and **funds** rejections. On success, logging (`log_market_transaction`), cache invalidation (`clear_api_cache`), and the `on_bid_updated` callback are preserved.
+For market bids and bid modifications, the module supplies `market_bid_minimum(selected_player)` on modal opening and immediately before submission. Market and modify inputs show that minimum and start at or above it; the Smart Bid modal additionally rechecks the cached recommendation amount before opening. The shared minimum uses the greater of market valuation and the current listing asking price (see [intelligence_engine.md](intelligence_engine.md)).
+
+```r
+preflight <- evaluate_acquisition_preflight(
+  capacity, "bid", amount=12000000,
+  minimum_bid=market_bid_minimum(list(value=10000000, price=12000000))
+)
+stopifnot(preflight$ok) # with sufficient verified funds and a free roster slot
+```
+
+Failures are surfaced as notifications that distinguish **unavailable verification**, **minimum bid**, **capacity**, and **funds** rejections. On success, logging (`log_market_transaction`), cache invalidation (`clear_api_cache`), and the `on_bid_updated` callback are preserved.
 
 ---
 
 ## 3. Table Column Display
 In player tables (`get_reactable_columns_for_players`), active bids are displayed in the `"Your Bid"` column formatted with an emerald badge (`.badge-active-bid`), making active bids clearly visible across market and player tables.
+
+Focused offline regression test: `Rscript test/test_smart_bid_minimum.R` exercises floor selection, no-bid cases, rendered modal bounds, and actual submission handlers with stubbed API writes.

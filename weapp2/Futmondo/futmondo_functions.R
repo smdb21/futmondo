@@ -364,28 +364,11 @@ get_players_from_team <- function(login, championship_id, user_team_id, teams = 
     }
     roster <- lapply(roster, FUN = function(player) {
       print(player$name)
-      average <- player$average
-      fitness <- average$fitness %>% unlist()
-      if (length(fitness) > 0) { # because before starting the season this is empty
-        fitness <- fitness %>% paste0(collapse = ",")
-        names(fitness) <- "average.fitness"
-        # split in numbers
-        last_points <- fitness %>%
-          strsplit(",") %>%
-          unlist() %>%
-          as.numeric()
-        total_last_points <- sum(last_points)
-        average_last_points <- mean(last_points)
-        fitness <- c(fitness, total_last_points, average_last_points)
-        names(fitness) <- c("average.fitness", "average.total", "average.averageLastFive")
-      }
-      average <- average[-which(names(average) == "fitness")]
+      average <- normalize_player_average(player$average)
       clause <- player$clause
-      names(clause) <- paste0("clause_", names(clause))
-      # remove average element from player list
-      player <- player[-which(names(player) == "average")]
-      # remove clause element from player list
-      player <- player[-which(names(player) == "clause")]
+      if (length(clause)) names(clause) <- paste0("clause_", names(clause))
+      player$average <- NULL
+      player$clause <- NULL
       ## market ----
       market <- player$market
       ### bids ----
@@ -417,8 +400,8 @@ get_players_from_team <- function(login, championship_id, user_team_id, teams = 
         names(market) <- paste0("market_", names(market))
       }
       # remove market element from player list
-      player <- player[-which(names(player) == "market")]
-      player <- c(player, average, fitness, clause, market)
+      player$market <- NULL
+      player <- c(player, average, clause, market)
 
       if (!is.null(bids)) {
         player <- c(player, bids)
@@ -586,30 +569,32 @@ get_championship_players <- function(login, championship_id) {
 }
 
 
-parse_player_json <- function(player) {
-  # player <- assign_names_recursive(lst = player, parent_name = "")
-  if (player$name == "Lucas Beltrán") {
-    # browser()
+# Flatten observed point statistics into the same columns for every endpoint.
+normalize_player_average <- function(average) {
+  if (!is.list(average) || !length(average)) return(list())
+  fitness <- average$fitness
+  average$fitness <- NULL
+  if (!is.null(fitness)) {
+    scores <- vapply(as.list(fitness), fm_number, numeric(1))
+    average$fitness <- paste(scores, collapse = ",")
+    if (length(scores) && all(is.finite(scores))) {
+      average$total <- sum(scores)
+      if (!is.finite(fm_number(average$averageLastFive))) average$averageLastFive <- mean(scores)
+    }
   }
-  average <- player$average
-  average <- remove_json_children(json = average, element_name = "fitness", collapse_children = TRUE)
-  # remove total because it is already in player as player$points
-  # instead, add the points in average.fitness
-  average$total <- average$fitness %>%
-    strsplit(",") %>%
-    unlist() %>%
-    as.numeric() %>%
-    sum()
   names(average) <- paste0("average.", names(average))
-  # remove average element from player list
-  player <- player[-which(names(player) == "average")]
+  average
+}
+
+parse_player_json <- function(player) {
+  average <- normalize_player_average(player$average)
+  player$average <- NULL
   player <- c(player, average)
   # clause
   if ("clause" %in% names(player)) {
     clause <- player$clause
-    names(clause) <- paste0("clause_", names(clause))
-    # remove clause element from player list
-    player <- player[-which(names(player) == "clause")]
+    if (length(clause)) names(clause) <- paste0("clause_", names(clause))
+    player$clause <- NULL
     player <- c(player, clause)
   }
   if ("total" %in% names(player)) {
@@ -618,9 +603,8 @@ parse_player_json <- function(player) {
   }
   if ("bid" %in% names(player)) {
     bid <- player$bid
-    names(bid) <- paste0("bid_", names(bid))
-    # remove bid element from player list
-    player <- player[-which(names(player) == "bid")]
+    if (length(bid)) names(bid) <- paste0("bid_", names(bid))
+    player$bid <- NULL
     player <- c(player, bid)
   }
   player <- player[!is.na(names(player)) & names(player) != ""]
@@ -1512,8 +1496,9 @@ extract_bidder_team_id <- function(bid) {
 #                  verification incomplete -> status "partial" (fail closed; we
 #                  never assume withheld = 0).
 #   roster      -- list(count, cap, remaining_slots)
-#   funds       -- list(reported_budget, withheld, spendable_budget).
-#                  spendable_budget is max(0, budget - withheld) and is NA when
+#   funds       -- list(reported_budget, withheld, team_value, debt_limit,
+#                  minimum_balance, spendable_budget). Spendable funds include
+#                  temporary borrowing down to -50% of verified team value.
 #                  withheld is not valid (funds verification incomplete).
 #   outstanding -- list(offers, count, total_amount, completeness)
 #   target      -- list(my_bid_id, my_bid_amount, highest_bid, bid_count)
@@ -1527,7 +1512,9 @@ get_acquisition_capacity <- function(login, championship_id, user_team_id, targe
     return(list(
       status = "unavailable",
       roster = list(count = NA_integer_, cap = NA_integer_, remaining_slots = NA_integer_),
-      funds = list(reported_budget = NA_real_, withheld = NA_real_, spendable_budget = NA_real_),
+      funds = list(reported_budget = NA_real_, withheld = NA_real_, team_value = NA_real_,
+        debt_limit = NA_real_, minimum_balance = NA_real_, projected_committed_balance = NA_real_,
+        api_bid_limit = NA_real_, spendable_budget = NA_real_),
       outstanding = list(offers = NA_integer_, count = NA_integer_,
                          total_amount = NA_real_, completeness = "unavailable"),
       target = empty_target,
@@ -1550,6 +1537,7 @@ get_acquisition_capacity <- function(login, championship_id, user_team_id, targe
     # ---- 1. Team info: roster cap, reported budget, withheld ----
     cap_val <- NA_integer_
     budget_val <- NA_real_
+    team_value_val <- NA_real_
     withheld_val <- NA_real_
     withheld_valid <- FALSE
     info <- tryCatch(
@@ -1564,6 +1552,7 @@ get_acquisition_capacity <- function(login, championship_id, user_team_id, targe
         cap_val <- suppressWarnings(as.integer(cfg[["maxPlayersInRoster"]]))
       }
       if (!is.null(info[["budget"]])) budget_val <- suppressWarnings(as.numeric(info[["budget"]]))
+      if (!is.null(info[["teamValue"]])) team_value_val <- suppressWarnings(as.numeric(info[["teamValue"]]))
       if (!is.null(info[["withheld"]])) withheld_val <- suppressWarnings(as.numeric(info[["withheld"]]))
       if (is.na(cap_val)) diagnostics <- c(diagnostics, "maxPlayersInRoster unavailable")
       if (is.na(budget_val)) diagnostics <- c(diagnostics, "reported budget unavailable")
@@ -1593,8 +1582,17 @@ get_acquisition_capacity <- function(login, championship_id, user_team_id, targe
       diagnostics <- c(diagnostics, "roster fetch failed")
     } else {
       roster_count <- as.integer(nrow(roster_df))
+      if (!is.finite(team_value_val) || team_value_val < 0) {
+        if (nrow(roster_df) && "value" %in% names(roster_df)) {
+          roster_values <- suppressWarnings(as.numeric(roster_df$value))
+          if (length(roster_values) == nrow(roster_df) && all(is.finite(roster_values) & roster_values >= 0))
+            team_value_val <- sum(roster_values)
+        }
+      }
     }
 
+    if (!is.finite(team_value_val) || team_value_val < 0)
+      diagnostics <- c(diagnostics, "team value unavailable (debt limit unverified)")
     # Own bids come from market listings. Roster bids are incoming offers.
     bids_complete <- FALSE; bid_count <- NA_integer_; bid_total <- NA_real_
     market <- tryCatch(get_market_players(login, championship_id, user_team_id), error=function(e) NULL)
@@ -1626,24 +1624,20 @@ get_acquisition_capacity <- function(login, championship_id, user_team_id, targe
       bids_complete <- FALSE
 
     # ---- 5. Status + spendable funds ----
-    # Conservative spendable: max(0, budget - withheld). It is only verifiable
-    # when BOTH the reported budget and withheld are valid. A missing /
-    # non-finite / negative withheld leaves spendable as NA (funds verification
-    # incomplete) -- we never assume withheld = 0.
-    spendable <- NA_real_
-    if (!is.na(budget_val) && withheld_valid) {
-      spendable <- if (bids_complete) max(0, budget_val - withheld_val - bid_total) else NA_real_
-    }
+    # Bids may temporarily use credit down to half the verified team value.
+    borrowing <- acquisition_headroom(budget_val, team_value_val, withheld_val, bid_total)
+    spendable <- if (bids_complete && withheld_valid) borrowing$spendable_budget else NA_real_
 
     required_available <- sum(
       !is.na(cap_val),
       !is.na(roster_count),
       !is.na(budget_val),
+      is.finite(team_value_val) && team_value_val >= 0,
       bids_complete
     )
     if (required_available == 0) {
       status <- "unavailable"
-    } else if (required_available < 4) {
+    } else if (required_available < 5) {
       status <- "partial"
     } else if (!withheld_valid) {
       # All structural data is present, but funds cannot be verified (withheld
@@ -1665,6 +1659,10 @@ get_acquisition_capacity <- function(login, championship_id, user_team_id, targe
       funds = list(
         reported_budget = budget_val,
         withheld = withheld_val,
+        team_value = team_value_val,
+        debt_limit = borrowing$debt_limit,
+        minimum_balance = borrowing$minimum_balance,
+        projected_committed_balance = borrowing$projected_committed_balance,
         api_bid_limit = fm_number(info$maxBid),
         spendable_budget = spendable
       ),
@@ -1693,9 +1691,10 @@ get_acquisition_capacity <- function(login, championship_id, user_team_id, targe
 #                          e.g. at modal-open time)
 #   existing_bid_amount -- numeric, the user's current bid amount on the
 #                          target (used by "modify" to compute the delta)
+#   minimum_bid         -- optional current market/listing minimum for bid/modify
 #
 # Returns:
-#   list(ok = logical, reason = "ok"|"unavailable"|"capacity"|"funds",
+#   list(ok = logical, reason = "ok"|"unavailable"|"capacity"|"funds"|"minimum_bid",
 #        message = character)
 #
 # Rules:
@@ -1709,7 +1708,7 @@ get_acquisition_capacity <- function(login, championship_id, user_team_id, targe
 #   - Funds: when amount is known, the required spend (amount, or the positive
 #     delta for "modify") must not exceed verified spendable funds, else
 #     "funds".
-evaluate_acquisition_preflight <- function(capacity, mode, amount = NULL, existing_bid_amount = NULL) {
+evaluate_acquisition_preflight <- function(capacity, mode, amount = NULL, existing_bid_amount = NULL, minimum_bid = NULL) {
   unavailable <- function(msg) list(ok = FALSE, reason = "unavailable", message = msg)
   capacity_fail <- function(msg) list(ok = FALSE, reason = "capacity", message = msg)
   funds_fail <- function(msg) list(ok = FALSE, reason = "funds", message = msg)
@@ -1731,6 +1730,18 @@ evaluate_acquisition_preflight <- function(capacity, mode, amount = NULL, existi
   spendable <- capacity$funds$spendable_budget
 
   if(length(spendable)!=1L || !is.finite(spendable)) return(unavailable("Spendable funds are unverified."))
+  if (mode %in% c("bid", "modify") && !is.null(minimum_bid)) {
+    if (!is.numeric(minimum_bid) || length(minimum_bid) != 1L ||
+        !is.finite(minimum_bid) || minimum_bid <= 0) {
+      return(unavailable("The current minimum market bid is unavailable. Please refresh the player."))
+    }
+    if (!is.null(amount) && (!is.numeric(amount) || length(amount) != 1L ||
+        !is.finite(amount) || amount < minimum_bid)) {
+      return(list(ok = FALSE, reason = "minimum_bid",
+        message = paste0("Your bid must be at least ", format(minimum_bid, scientific = FALSE, trim = TRUE),
+                         " EUR (the current market/listing minimum).")))
+    }
+  }
   # ---- Mode-specific capacity rules ----
   if (identical(mode, "modify")) {
     # Modification of an existing bid does not consume another slot, but we
@@ -2810,20 +2821,26 @@ get_financial_snapshot <- function(login, championship_id, user_team_id) {
     status <- if (!is.null(info)) capacity$status else "unavailable"
     stale <- identical(attr(info,"fetch_status"),"stale") || identical(attr(capacity,"fetch_status"),"stale")
     if (stale) status <- "partial"
-    cash <- fm_number(info$budget); withheld <- fm_number(info$withheld); limit <- fm_number(info$maxBid)
+    cash <- fm_number(info$budget); withheld <- fm_number(info$withheld)
+    limit <- fm_number(capacity$funds$api_bid_limit)
     pending <- fm_number(capacity$outstanding$total_amount)
     complete <- identical(capacity$outstanding$completeness,"complete")
-    spendable <- if (identical(status,"ok") && complete && is.finite(pending) && pending>=0 &&
-      is.finite(cash) && is.finite(withheld) && withheld>=0) max(0,cash-withheld-pending) else NA_real_
+    team_value <- fm_number(capacity$funds$team_value)
+    spendable <- if (identical(status,"ok") && complete) fm_number(capacity$funds$spendable_budget) else NA_real_
+    debt_limit <- fm_number(capacity$funds$debt_limit)
+    minimum_balance <- fm_number(capacity$funds$minimum_balance)
+    projected_balance <- fm_number(capacity$funds$projected_committed_balance)
     lineup <- tryCatch(get_lineup_from_team(login,championship_id,user_team_id),error=function(e)NULL)
     rules <- normalize_league_rules(info,lineup,championship_id)
     observed_at <- min(attr(info,"observed_at") %||% Sys.time(), attr(capacity,"observed_at") %||% Sys.time())
     list(status = status, cash = cash, withheld = withheld,
       spendable_budget = spendable, legal_bid_limit = limit,
+      debt_limit = debt_limit, minimum_balance = minimum_balance,
+      projected_committed_balance = projected_balance,
       roster_count = capacity$roster$count, roster_cap = capacity$roster$cap,
       commitments = capacity$outstanding, observed_at = observed_at,
       configuration = info$configuration %||% list(),
-      team_value = fm_number(info$teamValue), rules = rules, lineup_rules = rules)
+      team_value = team_value, rules = rules, lineup_rules = rules)
   }, timeout_sec = 15)
 }
 

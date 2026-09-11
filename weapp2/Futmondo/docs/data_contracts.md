@@ -12,11 +12,25 @@
 
 `get_acquisition_capacity(login,championship_id,user_team_id,target_player_id=NULL)` returns `status`, roster count/cap/slots, funds, outgoing commitments, optional own target bid and diagnostics. Commitments come from `market/players` own `bid_id`/`bid_price`, not incoming roster offers. Sealed rival amounts remain unknown. `get_financial_snapshot(login,championship_id,user_team_id)` is the common model/UI snapshot: signed `cash`, `withheld`, `legal_bid_limit`, `spendable_budget`, `commitments`, roster constraints, rules and observation time. Recommended spending conservatively subtracts withheld funds and outgoing commitments; unknown commitments produce NA. Borrowing permission never replaces cash. Capacity snapshots expire after fifteen seconds. Read failure/staleness blocks execution.
 
+Temporary acquisition credit is verified from the current team value. `acquisition_headroom(cash,team_value,withheld=0,commitments=0,debt_fraction=0.5)` permits spending down to `minimum_balance = -0.5 * team_value`, while subtracting held funds and outgoing bids. It returns `spendable_budget`, `debt_limit`, `minimum_balance`, and `projected_committed_balance`; unknown inputs remain unavailable. `get_acquisition_capacity()` and `get_financial_snapshot()` expose these fields. Positive cash is still required at the next round start to score points.
+
 ```r
 fin <- get_financial_snapshot(auth, league_id, own_team_id)
 if (identical(fin$status, "ok")) print(fin$spendable_budget)
 # Do not turn missing cash into an estimated starting budget.
 ```
+
+`normalize_player_average(average)` accepts the API's nested point-statistics list, for example `list(average=11, matches=2, averageLastFive="11.00", fitness=list(11,11), total="22.0")`. It returns a flat named list with the `average.` prefix (`average.average`, `average.matches`, `average.averageLastFive`, `average.fitness`, `average.total`, and supplied venue averages). Roster, market, and catalog parsing all use this same shape. A missing or empty `average` returns an empty list and preserves the player's identity, valuation, and other fields. Missing optional `clause`/`market` fields also preserve roster rows.
+
+The fitness array contains recent **point scores**, not physical-health measurements. Its observed values are retained as a comma-separated string; a nonempty complete numeric array supplies the recent total and a recent mean only when the API has not supplied a usable mean. Missing/empty/incomplete scores do not manufacture recent form. Blank `status` remains unknown availability; the card says **Not reported** rather than declaring a player injured or healthy.
+
+```r
+stats <- normalize_player_average(list(average=11, matches=2, fitness=list(11,11)))
+stopifnot(stats$average.average == 11, stats$average.averageLastFive == 11)
+# get_players_from_team() attaches the same canonical statistics to roster rows.
+```
+
+Focused regression: `Rscript test/test_player_rating_inputs.R` exercises actual response parsing into roster/card ratings, endpoint consistency, absent optional data, and caching.
 
 `normalize_bid_observations(pressroom_df,championship_id,observed_at)` reconstructs a system-auction winner from settlement price, combines nested losing bids and removes repeated manager/auction bids. It returns league/auction/player/bidder IDs, amount, winner flag, source bid ID and settlement/observation times. `normalize_auction_observations(...)` returns sold outcomes and unknown visibility. Missing buyer/seller IDs mean Futmondo, not missing counterparties. Open/relisted opportunities use distinct listing identifiers in market observations; absence from a later snapshot is not proof of an unsold auction.
 

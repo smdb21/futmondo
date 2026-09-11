@@ -182,3 +182,7 @@ After login, the default tab is set to `"today"`:
 ```R
 updateTabsetPanel(inputId = "tabs", selected = "today")
 ```
+
+### Missing bid and valuation data
+
+The command-center feed creates a Bid recommendation only when the current user's player has a finite, positive `bid_price`. Missing bid values are excluded before row selection so R cannot turn an `NA` predicate into a synthetic empty recommendation. When the bid is valid but the player valuation is unavailable, the card shows the bid amount and asks for manual evaluation without rendering `NA` as an amount.

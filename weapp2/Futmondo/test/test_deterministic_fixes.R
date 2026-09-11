@@ -220,6 +220,7 @@ login <- c(token = "fake_token", userid = "fake_userid", user_name = "test")
 champ <- "champX"; team <- "teamY"; pid <- "playerZ"
 # Cache fixtures use the production account partition and only outgoing market bids.
 det_seed_capacity <- function(info, market, incoming = data.frame()) {
+  if (is.null(info$teamValue)) info$teamValue <- 0
   clear_api_cache()
   fixtures <- list(info, data.frame(id=paste0("r",1:24),name=paste0("P",1:24)),market,incoming)
   keys <- c(paste0("team_info_",champ,"_",team),paste0("roster_",champ,"_",team),

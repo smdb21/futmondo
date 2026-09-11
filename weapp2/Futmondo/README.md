@@ -48,9 +48,11 @@ For a fresh database, apply `scripts/schema.sql`. For existing and fresh databas
 
 They create observation, forecast, scenario and worker tables; archive exact legacy transaction duplicates; add explicit league history context; and restrict private tables to the server role. Ambiguous legacy records are preserved. Back up the database and inspect the archive/reconciliation behavior before production application. **These migrations have not been applied to the connected production database.** PostgreSQL integration checks require a staging database; the offline tests do not substitute for them.
 
-Collection runs in a separate process after login/refresh. The app reports incomplete syncs rather than silently showing saved data. [Background persistence](docs/background_worker.md) describes lifecycle and failure handling.
+Collection runs in a separate process after login/refresh. Failed saves distinguish missing configuration, denied access, missing schema, and connection problems. Use Refresh to retry; a successful refresh clears the warning for the same operation and league/team. Failures for other operations or leagues remain visible. Server diagnostics include only the affected table and HTTP/database error codes, never response payloads or credentials. [Background persistence](docs/background_worker.md) describes lifecycle and failure handling.
 
 ## Predictions and management
+
+A team may temporarily borrow down to half its current value. Bids subtract held funds and existing commitments and still respect the API ceiling. Cash must be strictly positive when a round begins to score points, so a persistent top bar shows the next-round countdown and a live solvency warning.
 
 - FIS is a descriptive snapshot rating, not a success probability. Missing appearances remain distinct from real zero points.
 - Rival bids use shrunk manager participation rates and pooled log bid/value distributions. Participation and win curves remain unavailable when auction visibility cannot support non-bid labels. Conditional amounts can still be shown where historical reference prices exist.

@@ -107,6 +107,33 @@ calculate_fis_score <- function(players_df, weights = NULL) {
 }
 
 
+# Market bids must cover the current valuation and the listing's asking price.
+# Accept a player row/list; an unknown minimum stays unavailable.
+market_bid_minimum <- function(player_row) {
+  if (is.data.frame(player_row)) {
+    if (nrow(player_row) == 0L) return(NA_real_)
+    player_row <- as.list(player_row[1, , drop = FALSE])
+  }
+  if (!is.list(player_row)) return(NA_real_)
+  positive_amount <- function(x) {
+    if (length(x) != 1L) return(NA_real_)
+    value <- suppressWarnings(as.numeric(as.character(x)))
+    if (is.finite(value) && value > 0) value else NA_real_
+  }
+  value <- positive_amount(player_row$value)
+  asking <- NA_real_
+  for (field in c("effective_market_price", "market_price", "price")) {
+    candidate <- positive_amount(player_row[[field]])
+    if (is.finite(candidate)) {
+      asking <- candidate
+      break
+    }
+  }
+  amounts <- c(value, asking)
+  if (!any(is.finite(amounts))) return(NA_real_)
+  ceiling(max(amounts, na.rm = TRUE))
+}
+
 # ============================================================
 # 2. calculate_smart_bid
 # ============================================================
@@ -118,7 +145,8 @@ calculate_fis_score <- function(players_df, weights = NULL) {
 #   player_row       -- single-row data frame or list with:
 #                       id, name, value, change, points, role,
 #                       average.average, average.averageLastFive,
-#                       average.matches, status, clause_price
+#                       average.matches, status, clause_price, and optional
+#                       effective_market_price / market_price / price
 #   championship_id  -- character string
 #   pressroom_df     -- optional data frame of pressroom transactions
 #   user_teams_df    -- optional data frame of user teams
@@ -134,7 +162,8 @@ calculate_fis_score <- function(players_df, weights = NULL) {
 #   List with: fair_value, league_premium_pct, min_winning_bid,
 #   recommended_bid, max_rational_bid, expected_roi_pct,
 #   competition_level, likely_competitors, confidence_pct,
-#   spendable_funds, funds_verified, market_high_bid
+#   spendable_funds, funds_verified, market_high_bid, minimum_bid,
+#   action ("bid" / "no_bid"), reason, message
 # ============================================================
 
 calculate_smart_bid <- function(player_row, championship_id,
@@ -225,11 +254,12 @@ calculate_smart_bid <- function(player_row, championship_id,
       league_premium_pct <- 0
     }
 
-    # ---- min_winning_bid: fair_value + small premium, or just above the
-    #      current market high bid (to actually win the auction) ----
-    base_min <- round(fair_value * 1.02)
+    # Fair value can be discounted by form/injury; it cannot lower the
+    # market's executable minimum. Preserve the listing floor separately.
+    minimum_bid <- market_bid_minimum(p)
+    base_min <- max(minimum_bid, ceiling(fair_value * 1.02))
     if (!is.null(mhb)) {
-      min_winning_bid <- max(base_min, round(mhb * 1.01))
+      min_winning_bid <- max(base_min, ceiling(mhb * 1.01), floor(mhb) + 1)
     } else {
       min_winning_bid <- base_min
     }
@@ -241,13 +271,40 @@ calculate_smart_bid <- function(player_row, championship_id,
     # ---- recommended_bid: balance between winning and value, bounded by
     #      the rational guardrail and verified spendable funds ----
     recommended_raw <- round(fair_value * (1 + league_premium_pct / 200))
-    recommended_bid <- min(recommended_raw, max_rational_bid)
-    # Never recommend below the minimum winning bid (when affordable)
-    if (min_winning_bid <= max_rational_bid) {
-      recommended_bid <- max(recommended_bid, min_winning_bid)
+    can_compete <- is.finite(min_winning_bid) && min_winning_bid > 0 &&
+      is.finite(max_rational_bid) && min_winning_bid <= floor(max_rational_bid)
+    recommended_bid <- if (can_compete) {
+      min(max(recommended_raw, min_winning_bid), floor(max_rational_bid))
+    } else 0
+    ceiling_values <- c(valuation = round(fair_value * 1.5),
+      spendable = spendable, api_limit = api_bid_limit)
+    binding_constraint <- names(which.min(ceiling_values))[1]
+    reason <- if (can_compete) "ok" else if (!is.finite(minimum_bid)) {
+      "minimum_unavailable"
+    } else if (binding_constraint == "spendable" && spendable <= 0) {
+      "no_spendable_capacity"
+    } else if (binding_constraint == "api_limit" && api_bid_limit <= 0) {
+      "api_bid_limit_zero"
+    } else {
+      paste0(binding_constraint, "_below_minimum")
     }
-    recommended_bid <- min(recommended_bid, spendable, max_rational_bid)
-    can_compete <- min_winning_bid <= max_rational_bid
+    format_bid_amount <- function(x) format(round(x, 0), scientific = FALSE, trim = TRUE)
+    message <- if (can_compete) NULL else if (reason == "minimum_unavailable") {
+      "The current minimum market bid is unavailable. Refresh the player before bidding."
+    } else if (reason == "no_spendable_capacity") {
+      "No bid: verified spendable capacity is 0 EUR after cash, temporary debt, withheld funds, and existing bids."
+    } else if (reason == "api_bid_limit_zero") {
+      "No bid: Futmondo currently reports a maximum allowed bid of 0 EUR for this team. Refresh finances before trying again."
+    } else if (binding_constraint == "spendable") {
+      paste0("No bid: the required minimum is ", format_bid_amount(min_winning_bid),
+        " EUR, but verified spendable capacity is ", format_bid_amount(spendable), " EUR.")
+    } else if (binding_constraint == "api_limit") {
+      paste0("No bid: the required minimum is ", format_bid_amount(min_winning_bid),
+        " EUR, but Futmondo's maximum allowed bid is ", format_bid_amount(api_bid_limit), " EUR.")
+    } else {
+      paste0("No bid: the required minimum is ", format_bid_amount(min_winning_bid),
+        " EUR, above the valuation ceiling of ", format_bid_amount(max_rational_bid), " EUR.")
+    }
 
     valuation_discount_pct <- if(recommended_bid>0) round((fair_value/recommended_bid-1)*100,2) else NA_real_
 
@@ -297,7 +354,12 @@ calculate_smart_bid <- function(player_row, championship_id,
       funds_verified = funds_verified,
       api_bid_limit = if(is.finite(api_bid_limit)) api_bid_limit else NA_real_,
       market_high_bid = mhb,
+      minimum_bid = minimum_bid,
       can_compete = can_compete,
+      action = if (can_compete) "bid" else "no_bid",
+      reason = reason,
+      binding_constraint = binding_constraint,
+      message = message,
       method = "descriptive_heuristic",
       calibrated = FALSE
     )
@@ -559,19 +621,28 @@ generate_command_center_feed <- function(login, championship_id,
 
     # ---- BID recommendations: players with active bids ----
     if (has_players && "bid_price" %in% colnames(players_df) && "user_team_id" %in% colnames(players_df)) {
-      bid_players <- players_df[
-        players_df$user_team_id == user_team_id & !is.na(players_df$bid_price) & players_df$bid_price > 0,
-      ]
+      owned_mask <- as.character(players_df$user_team_id) == as.character(user_team_id)
+      bid_values <- suppressWarnings(as.numeric(as.character(players_df$bid_price)))
+      eligible_bid <- !is.na(owned_mask) & owned_mask & is.finite(bid_values) & bid_values > 0
+      bid_players <- players_df[which(eligible_bid), , drop = FALSE]
       if (nrow(bid_players) > 0) {
         for (i in seq_len(nrow(bid_players))) {
           p <- bid_players[i, ]
           bid_val <- suppressWarnings(as.numeric(p$bid_price))
           player_val <- suppressWarnings(as.numeric(p$value))
-          accept <- ifelse(!is.na(bid_val) && !is.na(player_val) && bid_val >= player_val * 0.9, "Accept", "Evaluate")
+          valuation_available <- length(player_val) == 1L && is.finite(player_val) && player_val >= 0
+          accept <- if (valuation_available && bid_val >= player_val * 0.9) "Accept" else "Evaluate"
+          bid_description <- if (valuation_available) {
+            paste0("Active bid of ", fmt_money(bid_val), " EUR on player valued at ",
+              fmt_money(player_val), " EUR. ", accept, " recommended.")
+          } else {
+            paste0("Active bid of ", fmt_money(bid_val),
+              " EUR. Player valuation is unavailable; evaluate the offer manually.")
+          }
           recommendations[[length(recommendations) + 1]] <- data.frame(
             type = "Bid",
             title = paste0("BID OFFER: ", p$name),
-            description = paste0("Active bid of ", bid_val, " EUR on player valued at ", player_val, " EUR. ", accept, " recommended."),
+            description = bid_description,
             confidence_pct = ifelse(accept == "Accept", 85, 60),
             action_label = accept,
             action_code = "view",
