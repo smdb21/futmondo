@@ -186,3 +186,23 @@ updateTabsetPanel(inputId = "tabs", selected = "today")
 ### Missing bid and valuation data
 
 The command-center feed creates a Bid recommendation only when the current user's player has a finite, positive `bid_price`. Missing bid values are excluded before row selection so R cannot turn an `NA` predicate into a synthetic empty recommendation. When the bid is valid but the player valuation is unavailable, the card shows the bid amount and asks for manual evaluation without rendering `NA` as an amount.
+
+### Action filters and money display
+
+The actionable feed places compact icon checkboxes above the cards for `Buy`, `Sell`, `Bid`, `Clause`, and `Hold`. All types are selected initially. `today_filter_recommendations(recommendations, selected_types)` returns matching rows in their original priority order; clearing every type displays the existing empty-feed state. Bid and clause amounts use Spanish thousands separators and the euro symbol, for example `1.234.567 €`.
+
+### Net result on accepted sale offers
+
+For a Bid recommendation whose action is `Accept`, the card displays the full sale proceeds, the player's current acquisition cost, and the resulting net gain or loss. `current_player_acquisition_cost(player_row, pressroom_df, user_team_id)` first accepts a finite positive roster `buyPrice`/`buy_price`/`acquisition_cost`; otherwise it replays the player's chronological pressroom ownership cycles and uses the latest purchase that has not subsequently been sold. Re-buys replace the earlier cost basis. If no acquisition cost is observed, the proceeds remain visible and the acquisition cost and net result are labeled unavailable.
+
+### Clause price comparison wording
+
+`clause_value_comparison(clause_price, market_value)` returns `available`, absolute `percent`, display `text`, and `favorable`. A cheaper clause is described as `N% below market value`; a more expensive clause is `N% above market value`; equal prices are `at market value`. Missing comparisons remain unavailable. Clause cards with a premium explicitly advise review before buying and never present a negative percentage as a discount or call the price a Strong Buy.
+
+### Player-card shortcut on suggestions
+
+Every recommendation card includes a compact address-card icon button with the tooltip and accessible label `Show player card`. It sends the stable `view` action through `today_rec_action_onclick_js()` and the existing `rec_action_clicked` observer, independently of the recommendation's primary action. Button IDs include the rendered row index and player ID so multiple suggestions for one player remain valid.
+
+### Clause distribution and deadline funding
+
+`recommendations_RV` passes `user_finances_RV()`, `squad_players_RV()`, and the cached `get_finished_rounds()` result through `next_round_context()` to `generate_command_center_feed()`. Clause suggestions rank the lowest observed clause-to-player-value ratios. A suggestion appears only when its clause can leave the manager with a positive projected balance at the next-round deadline, either immediately or after accepting enough currently observed positive squad offers. The funding plan retains at least 11 players after adding the clause target; speculative listing proceeds are excluded. If finance or the next-round deadline cannot be verified, Today does not expose an executable clause suggestion.

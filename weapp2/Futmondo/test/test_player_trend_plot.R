@@ -60,7 +60,7 @@ check('single, constant and zero-only series receive usable centered ranges', {
   }
 })
 check('invalid observations cannot poison the axis range', {
-  stopifnot(identical(player_trend_axis_range(c('8', 'NA', 'bad', 'Inf')), c(7, 9)),
+  stopifnot(identical(player_trend_axis_range(c('8', 'NA', 'bad', 'Inf')), c(6, 10)),
             identical(player_trend_axis_range(c(NA, Inf, -Inf)), c(0, 1)),
             identical(player_trend_axis_range(NULL), c(0, 1)))
 })
@@ -97,4 +97,16 @@ check('empty history fallback has a usable valuation range', {
   stopifnot(length(chart$data) == 1L, length(chart$data[[1]]$y) == 7L)
   assert_visible(chart$data[[1]]$y, chart$layout$yaxis$range)
 })
+
+check('latest round points are limited and returned newest first', {
+  history_recent <- data.frame(
+    recorded_at=sprintf('2026-08-%02dT10:00:00Z',seq(1,8)),
+    value=1000000,points=seq(1,8))
+  rounds_recent <- data.frame(round_number=seq(1,8),begin_process=history_recent$recorded_at,is_finished=TRUE)
+  recent <- latest_player_round_points(history_recent,rounds_recent,limit=5)
+  stopifnot(identical(recent$round_number,c(8,7,6,5,4)),identical(recent$points,c(8,7,6,5,4)))
+  unavailable <- latest_player_round_points(history_recent,NULL,limit=5)
+  stopifnot(nrow(unavailable)==0L)
+})
+
 cat(sprintf('Player trend plot: %d checks passed.\n', checks))

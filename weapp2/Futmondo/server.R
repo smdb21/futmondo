@@ -44,8 +44,15 @@ function(input, output, session) {
       error = function(e) data.frame())
     next_round <- next_round_context(rounds)
     if (!isTRUE(next_round$available)) {
+      current_round <- current_round_context(rounds)
+      if (isTRUE(current_round$available)) {
+        return(tags$div(class = "round-countdown-bar round-countdown-in-progress",
+          tags$div(class = "round-countdown-main", icon("futbol"),
+            tags$strong(paste0("Round ", current_round$round_number)),
+            tags$span("In progress"))))
+      }
       return(tags$div(class = "round-countdown-bar round-countdown-unavailable",
-        icon("clock"), tags$span("Next round start time unavailable")))
+        icon("clock"), tags$span("Round schedule unavailable")))
     }
     finance <- tryCatch(get_financial_snapshot(login_token_RV(), championship_id_RV(), user_team_id_RV()),
       error = function(e) NULL)

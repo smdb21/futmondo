@@ -19,6 +19,19 @@ fetch_account_insights_alerts <- function(login) {
   dplyr::bind_rows(rows)
 }
 
+# Only player-specific notifications may open the player details panel.
+notification_has_player_details <- function(notification_row) {
+  if (!is.data.frame(notification_row) || nrow(notification_row)!=1L ||
+      !"player_id" %in% names(notification_row)) return(FALSE)
+  player_id <- as.character(notification_row$player_id[1])
+  if (is.na(player_id) || !nzchar(trimws(player_id))) return(FALSE)
+  fields <- intersect(c("type","action","message"),names(notification_row))
+  event <- tolower(paste(vapply(fields,function(x)as.character(notification_row[[x]][1]),character(1)),collapse=" "))
+  is_round_close <- grepl("round[[:space:]_-]*(close|closed|closure)",event) ||
+    grepl("(close|closed|closure)[[:space:]_-]*round",event)
+  !is_round_close
+}
+
 notifications_UI <- function(id) {
   ns <- shiny::NS(id)
   shiny::tagList(
@@ -172,7 +185,7 @@ notifications_Server <- function(id, is_module_active, login_token, championship
           shiny::div(class="fm-notification-meta",r$source," · ",r$league_name," · ",
             shiny::tags$time(datetime=r$created_at,r$created_at)),
           shiny::strong(r$message), shiny::p(r$player_name),
-          if(nzchar(r$player_id) && !is.na(r$player_id)) shiny::tags$button(class="btn btn-default",type="button",
+          if(notification_has_player_details(r)) shiny::tags$button(class="btn btn-default",type="button",
             onclick=event_js("open_player",r$id),"Player details"),
           if(!r$is_read) shiny::tags$button(class="btn btn-default",type="button",
             onclick=event_js("mark_read",r$id),"Mark read"))
@@ -186,7 +199,7 @@ notifications_Server <- function(id, is_module_active, login_token, championship
       if(isTRUE(ok)) { clear_api_cache(login_token()[["userid"]]); tick(tick()+1L) } else shiny::showNotification("Could not mark this notification read. Retry.",type="error")
     })
     shiny::observeEvent(input$open_player, {
-      d <- filtered(); r <- d[d$id==input$open_player,,drop=FALSE]; shiny::req(nrow(r)==1)
+      d <- filtered(); r <- d[d$id==input$open_player,,drop=FALSE]; shiny::req(nrow(r)==1,notification_has_player_details(r))
       # Membership is checked against the authenticated user's leagues.
       active <- get_active_championships(login_token())$championships
       allowed <- vapply(active,function(x)fm_scalar(x$id,""),character(1))

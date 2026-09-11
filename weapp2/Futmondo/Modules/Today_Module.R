@@ -341,6 +341,15 @@ today_filter_clause_candidates <- function(rival_roster_df, current_team_id, now
 }
 
 
+# Filter recommendation rows by their stable display type.
+today_filter_recommendations <- function(recommendations, selected_types) {
+  if (!is.data.frame(recommendations) || !nrow(recommendations) ||
+      !"type" %in% names(recommendations)) return(recommendations)
+  allowed <- intersect(as.character(selected_types), c("Buy", "Sell", "Bid", "Clause", "Hold"))
+  if (!length(allowed)) return(recommendations[0, , drop = FALSE])
+  recommendations[which(!is.na(recommendations$type) & as.character(recommendations$type) %in% allowed), , drop = FALSE]
+}
+
 # ============================================================
 # today_UI
 # ============================================================
@@ -403,6 +412,20 @@ today_UI <- function(id) {
               inputId = ns("include_rival_listings"),
               label = "Include rival-owned market listings",
               value = FALSE
+            )
+          ),
+          div(class = "today-action-filters",
+            checkboxGroupInput(
+              inputId = ns("recommendation_types"), label = NULL,
+              choiceNames = list(
+                tagList(icon("cart-shopping"), " Buy"),
+                tagList(icon("arrow-up"), " Sell"),
+                tagList(icon("hand-holding-dollar"), " Bid"),
+                tagList(icon("bolt"), " Clause"),
+                tagList(icon("hand"), " Hold")
+              ),
+              choiceValues = c("Buy", "Sell", "Bid", "Clause", "Hold"),
+              selected = c("Buy", "Sell", "Bid", "Clause", "Hold"), inline = TRUE
             )
           ),
           uiOutput(ns("recommendations_feed_ui"))
@@ -649,6 +672,11 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
         ut <- user_teams_RV()
         mkt_cand <- market_candidates_RV()
         clause_cand <- clause_candidates_RV()
+        fin <- user_finances_RV()
+        sqd <- squad_players_RV()
+        rounds <- tryCatch(get_finished_rounds(login_token(),championship_id()),
+          error=function(e)data.frame())
+        deadline <- next_round_context(rounds)
 
         if ((is.null(all_p) || nrow(all_p) == 0) && nrow(mkt_cand) == 0 && nrow(clause_cand) == 0) {
           return(data.frame(
@@ -667,7 +695,10 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
             players_df = all_p,
             pressroom_df = prs,
             market_candidates = mkt_cand,
-            clause_candidates = clause_cand
+            clause_candidates = clause_cand,
+            financial = fin,
+            roster_df = sqd,
+            next_round = deadline
           )
         }, error = function(e) {
           print(paste0("[Today] Error generating recommendations: ", e$message))
@@ -810,6 +841,9 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
       output$recommendations_feed_ui <- renderUI({
         req(is_module_active() == TRUE)
         recs <- recommendations_RV()
+        selected_types <- input$recommendation_types
+        if (is.null(selected_types)) selected_types <- c("Buy", "Sell", "Bid", "Clause", "Hold")
+        recs <- today_filter_recommendations(recs, selected_types)
 
         if (is.null(recs) || nrow(recs) == 0) {
           return(
@@ -906,16 +940,22 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
                     style = paste0("display: inline-block; padding: 4px 12px; border-radius: 6px; font-size: 11px; font-weight: 600; border: 1px solid; ", type_badge_color),
                     rec_type
                   ),
-                    if (show_action_btn) {
-                      actionButton(
-                        inputId = ns(paste0("rec_action_", pid)),
-                        label = tagList(icon("arrow-right"), action_label),
-                        class = "btn btn-primary today-recommendation-action",
-                        onclick = today_rec_action_onclick_js(ns, pid, action_code)
-                      )
-                    } else {
-                      NULL
-                    }
+                  div(class = "today-recommendation-controls",
+                    if (nzchar(pid)) actionButton(
+                      inputId = ns(paste0("rec_view_", i, "_", pid)),
+                      label = icon("address-card"),
+                      class = "btn btn-default today-player-card-button",
+                      title = "Show player card",
+                      `aria-label` = paste0("Show player card for ", title_text),
+                      onclick = today_rec_action_onclick_js(ns, pid, "view")
+                    ),
+                    if (show_action_btn) actionButton(
+                      inputId = ns(paste0("rec_action_", i, "_", pid)),
+                      label = tagList(icon("arrow-right"), action_label),
+                      class = "btn btn-primary today-recommendation-action",
+                      onclick = today_rec_action_onclick_js(ns, pid, action_code)
+                    )
+                  )
                 )
               )
             )

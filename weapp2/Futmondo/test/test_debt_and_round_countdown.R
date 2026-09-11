@@ -59,6 +59,16 @@ check("countdown is stable at boundary and handles unavailable dates", {
     format_round_countdown(NA,now)=="Start time unavailable",
     !next_round_context(data.frame(),now)$available)
 })
+check("current round selects latest started unfinished round", {
+  rounds <- data.frame(round_number=c(4,5,6),
+    begin_process=c("2026-09-01T12:00:00Z","2026-09-08T12:00:00Z","2026-09-15T12:00:00Z"),
+    is_finished=c(TRUE,FALSE,FALSE))
+  now <- as.POSIXct("2026-09-11T12:00:00Z",tz="UTC")
+  current <- current_round_context(rounds,now)
+  all_finished <- transform(rounds,is_finished=TRUE)
+  no_current <- current_round_context(all_finished,now)
+  stopifnot(current$available,current$round_number==5,isFALSE(no_current$available))
+})
 check("global UI exposes countdown and deadline solvency warning", {
   ui <- paste(readLines("ui.R",warn=FALSE),collapse="\n")
   server <- paste(readLines("server.R",warn=FALSE),collapse="\n")
@@ -66,6 +76,7 @@ check("global UI exposes countdown and deadline solvency warning", {
   stopifnot(grepl('uiOutput("round_countdown")',ui,fixed=TRUE),
     grepl('output$round_countdown <- renderUI',server,fixed=TRUE),
     grepl("before kickoff to score points",server,fixed=TRUE),
+    grepl('tags$span("In progress")',server,fixed=TRUE),
     grepl("position: sticky",css,fixed=TRUE),grepl("@media (max-width: 767px)",css,fixed=TRUE))
 })
 cat(sprintf("DEBT AND ROUND COUNTDOWN: %d passed / 0 failed\n",passed))

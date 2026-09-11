@@ -116,3 +116,20 @@ Run `Rscript --vanilla test/test_intelligence_correctness.R`. It tests contextua
 Rating input regression: `Rscript test/test_player_rating_inputs.R` verifies real parser output shapes through the selected-player panel without external requests.
 
 When no executable bid exists, the result identifies the binding ceiling in `binding_constraint` and uses a specific `reason`: `no_spendable_capacity`, `api_bid_limit_zero`, or a `<constraint>_below_minimum` value. This distinguishes a zero balance/debt headroom from a zero limit reported by Futmondo and from the model valuation ceiling.
+
+### Clause distribution and deadline affordability
+
+Clause recommendations compare `clause_price / value` across every currently observed, valid rival clause. Eligible Buy/Strong Buy players are ordered from the lowest ratio upward; the feed flags the lowest quartile, with at least two candidates when available and a maximum of three. The card reports the candidate's empirical percentile and the clause premium as `N% above market value` when applicable.
+
+`clause_deadline_affordability(clause_price, financial, roster_df, next_round)` returns `status`, `affordable`, `required_sales`, `sale_proceeds`, `sell_player_ids`, and `deadline`. `financial` must have `status="ok"` and a finite `projected_committed_balance`; `next_round` must have `available=TRUE` and `starts_at`. The helper first checks whether the clause leaves at least €1 at the deadline. If it does not, it selects the fewest highest current positive `bid_price` offers needed to restore a positive balance, while retaining at least 11 players after the incoming player joins. It never counts hypothetical future market sales. Results are `affordable_now`, `affordable_after_sales`, `unaffordable`, or `unverified`.
+
+In the live Today feed, `generate_command_center_feed(..., financial, roster_df, next_round)` suppresses unaffordable and unverified clause actions. Calls omitting `financial` keep compatibility behavior for non-live consumers.
+
+```r
+plan <- clause_deadline_affordability(5000000, financial, squad, next_round)
+feed <- generate_command_center_feed(NULL, league_id, team_id, teams, rated,
+  market_candidates=market, clause_candidates=clauses,
+  financial=financial, roster_df=squad, next_round=next_round)
+```
+
+Offline regression coverage: `Rscript test/test_clause_affordability.R` and `Rscript test/test_clause_value_wording.R`.

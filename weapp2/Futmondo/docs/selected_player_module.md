@@ -221,14 +221,25 @@ The player valuation/points trend chart (`player_trend_plot`) renders two series
 
 ### `player_trend_axis_range(values)`
 
-This pure helper accepts a numeric vector or numeric strings and returns a numeric vector `c(lower, upper)` for Plotly's `range`. It ignores missing, nonnumeric, and infinite inputs. The padding is the largest of 12% of the data span, 2% of the largest absolute value, or one unit. No finite values returns `c(0, 1)`. There are no network calls or payloads.
+This pure helper accepts a numeric vector or numeric strings and returns a numeric vector `c(lower, upper)` for Plotly's `range`. It ignores missing, nonnumeric, and infinite inputs. The padding is the largest of 20% of the data span, 4% of the largest absolute value, or two units. No finite values returns `c(0, 1)`. There are no network calls or payloads.
 
 ```r
-player_trend_axis_range(c(99000000, 100000000)) # c(97000000, 102000000)
-player_trend_axis_range(c(8, 8))              # c(7, 9)
-player_trend_axis_range(c(0, 0))              # c(-1, 1)
+player_trend_axis_range(c(99000000, 100000000)) # c(95000000, 104000000)
+player_trend_axis_range(c(8, 8))              # c(6, 10)
+player_trend_axis_range(c(0, 0))              # c(-2, 2)
 ```
 
 Focused offline verification: `Rscript test/test_player_trend_plot.R` checks axis headroom, flat/zero/missing data, numeric strings, and the actual chart render with independent valuation and points axes.
 
 The Smart Bid card displays verified spendable capacity and Futmondo's reported bid limit. A blocked recommendation is rendered as **No bid** with the exact binding constraint, rather than presenting zero as a recommended bid or an unexplained rational ceiling.
+
+
+## 9. Latest Round Points
+
+The player card displays up to five completed-round point observations below its summary metrics. `latest_player_round_points(history_df, finished_rounds_df, limit=5L)` reuses `build_player_points_trace()`, returns `date`, `points`, and `round_number`, and orders the selected rows by newest round first. Missing history or verified finished-round boundaries produces an empty data frame and the card displays `No completed-round points recorded yet`.
+
+```r
+latest_player_round_points(player_history, finished_rounds, limit=5L)
+```
+
+The renderer reads player history and finished rounds through the existing cached connectors. The responsive `.player-recent-rounds-list` wraps point chips on narrow screens without fixed widths. Focused regression coverage is included in `Rscript test/test_player_trend_plot.R`.

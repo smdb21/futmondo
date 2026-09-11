@@ -68,6 +68,21 @@ next_round_context <- function(rounds, now = Sys.time()) {
     starts_at = starts[index])
 }
 
+# Return the latest started round that the source still marks unfinished.
+current_round_context <- function(rounds, now = Sys.time()) {
+  unavailable <- list(available = FALSE, round_number = NA_real_, starts_at = as.POSIXct(NA))
+  if (!is.data.frame(rounds) || !nrow(rounds) ||
+      !all(c("round_number", "begin_process", "is_finished") %in% names(rounds))) return(unavailable)
+  starts <- fm_time(rounds$begin_process)
+  current <- fm_time(now)
+  unfinished <- !is.na(rounds$is_finished) & !as.logical(rounds$is_finished)
+  candidates <- which(!is.na(starts) & starts <= current & unfinished)
+  if (!length(candidates)) return(unavailable)
+  index <- candidates[which.max(starts[candidates])]
+  list(available = TRUE, round_number = fm_number(rounds$round_number[index]),
+    starts_at = starts[index])
+}
+
 format_round_countdown <- function(starts_at, now = Sys.time()) {
   seconds <- floor(as.numeric(difftime(fm_time(starts_at), fm_time(now), units = "secs")))
   if (length(seconds) != 1L || !is.finite(seconds)) return("Start time unavailable")

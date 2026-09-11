@@ -456,6 +456,60 @@ calculate_manager_dna <- function(team_id, pressroom_df, user_teams_df = NULL) {
 }
 
 
+# Resolve the current ownership cycle's acquisition cost for an owned player.
+# Returns a positive numeric cost or NA when neither roster nor history proves it.
+current_player_acquisition_cost <- function(player_row, pressroom_df, user_team_id) {
+  p <- if (is.data.frame(player_row) && nrow(player_row)) as.list(player_row[1, , drop=FALSE]) else player_row
+  if (is.list(p)) for (field in c("buyPrice", "buy_price", "acquisition_cost")) {
+    cost <- suppressWarnings(as.numeric(as.character(p[[field]])))
+    if (length(cost)==1L && is.finite(cost) && cost>0) return(cost)
+  }
+  required <- c("player_id","buyer_team_id","seller_team_id","price","created")
+  if (!is.list(p) || is.null(p$id) || !is.data.frame(pressroom_df) || !nrow(pressroom_df) ||
+      !all(required %in% names(pressroom_df)) || length(user_team_id)!=1L || is.na(user_team_id)) return(NA_real_)
+  tx <- pressroom_df[as.character(pressroom_df$player_id)==as.character(p$id),,drop=FALSE]
+  if (!nrow(tx)) return(NA_real_)
+  if ("id" %in% names(tx)) tx <- tx[!duplicated(tx$id),,drop=FALSE]
+  tx <- tx[order(analytics_time(tx$created),seq_len(nrow(tx))),,drop=FALSE]
+  cost <- NA_real_
+  for (i in seq_len(nrow(tx))) {
+    price <- suppressWarnings(as.numeric(as.character(tx$price[i])))
+    if (as.character(tx$buyer_team_id[i])==as.character(user_team_id) && is.finite(price) && price>0) cost <- price
+    if (as.character(tx$seller_team_id[i])==as.character(user_team_id)) cost <- NA_real_
+  }
+  cost
+}
+
+# Check positive deadline cash using only current balance and executable observed sale offers.
+clause_deadline_affordability <- function(clause_price, financial, roster_df, next_round) {
+  unavailable <- list(status="unverified",affordable=NA,required_sales=NA_real_,
+    sale_proceeds=NA_real_,sell_player_ids=character(),deadline=as.POSIXct(NA))
+  price <- suppressWarnings(as.numeric(as.character(clause_price)))
+  if (length(price)!=1L || !is.finite(price) || price<=0 || !is.list(financial) || !identical(financial$status,"ok") ||
+      !is.list(next_round) || !isTRUE(next_round$available)) return(unavailable)
+  balance <- suppressWarnings(as.numeric(financial$projected_committed_balance))
+  if (length(balance)!=1L || !is.finite(balance)) return(unavailable)
+  required <- max(0, 1 - (balance-price))
+  if (required==0) return(list(status="affordable_now",affordable=TRUE,required_sales=0,
+    sale_proceeds=0,sell_player_ids=character(),deadline=next_round$starts_at))
+  if (!is.data.frame(roster_df) || !nrow(roster_df) || !all(c("id","bid_price") %in% names(roster_df)))
+    return(list(status="unaffordable",affordable=FALSE,required_sales=required,
+      sale_proceeds=0,sell_player_ids=character(),deadline=next_round$starts_at))
+  offers <- suppressWarnings(as.numeric(as.character(roster_df$bid_price)))
+  eligible <- which(is.finite(offers) & offers>0)
+  max_sales <- max(0,nrow(roster_df)+1L-11L)
+  if (!length(eligible) || max_sales==0) return(list(status="unaffordable",affordable=FALSE,
+    required_sales=required,sale_proceeds=0,sell_player_ids=character(),deadline=next_round$starts_at))
+  eligible <- eligible[order(-offers[eligible],as.character(roster_df$id[eligible]))]
+  eligible <- head(eligible,max_sales)
+  count <- which(cumsum(offers[eligible])>=required)[1]
+  if (is.na(count)) return(list(status="unaffordable",affordable=FALSE,required_sales=required,
+    sale_proceeds=sum(offers[eligible]),sell_player_ids=as.character(roster_df$id[eligible]),deadline=next_round$starts_at))
+  chosen <- head(eligible,count)
+  list(status="affordable_after_sales",affordable=TRUE,required_sales=required,
+    sale_proceeds=sum(offers[chosen]),sell_player_ids=as.character(roster_df$id[chosen]),deadline=next_round$starts_at)
+}
+
 # ============================================================
 # 4. generate_command_center_feed
 # ============================================================
@@ -463,6 +517,21 @@ calculate_manager_dna <- function(team_id, pressroom_df, user_teams_df = NULL) {
 #
 # Parameters:
 #   login             -- login token vector
+
+# Describe a clause price relative to observed market value without calling a premium a discount.
+clause_value_comparison <- function(clause_price, market_value) {
+  clause <- suppressWarnings(as.numeric(as.character(clause_price)))
+  market <- suppressWarnings(as.numeric(as.character(market_value)))
+  if (length(clause)!=1L || length(market)!=1L || !is.finite(clause) || clause<=0 ||
+      !is.finite(market) || market<=0) return(list(available=FALSE,percent=NA_real_,text="market-value comparison unavailable",favorable=NA))
+  percent <- round(abs(clause / market - 1) * 100, 1)
+  if (clause < market) return(list(available=TRUE,percent=percent,
+    text=paste0(percent,"% below market value"),favorable=TRUE))
+  if (clause > market) return(list(available=TRUE,percent=percent,
+    text=paste0(percent,"% above market value"),favorable=FALSE))
+  list(available=TRUE,percent=0,text="at market value",favorable=TRUE)
+}
+
 #   championship_id   -- character string
 #   user_team_id      -- character, the current user's team
 #   user_teams_df     -- data frame of all user teams
@@ -496,7 +565,8 @@ generate_command_center_feed <- function(login, championship_id,
                                           user_team_id, user_teams_df,
                                           players_df, pressroom_df = NULL,
                                           market_candidates = NULL,
-                                          clause_candidates = NULL) {
+                                          clause_candidates = NULL, financial = NULL,
+                                          roster_df = NULL, next_round = NULL) {
   empty_feed <- data.frame(
     type = character(0), title = character(0), description = character(0),
     confidence_pct = numeric(0), action_label = character(0),
@@ -526,7 +596,8 @@ generate_command_center_feed <- function(login, championship_id,
 
   # Formats a monetary amount as a plain (non-scientific) whole number for
   # human-readable recommendation descriptions.
-  fmt_money <- function(x) format(round(x, 0), scientific = FALSE)
+  fmt_money <- function(x) paste0(format(round(x, 0), big.mark = ".", decimal.mark = ",",
+    scientific = FALSE, trim = TRUE), " €")
 
   tryCatch({
     recommendations <- list()
@@ -632,12 +703,25 @@ generate_command_center_feed <- function(login, championship_id,
           player_val <- suppressWarnings(as.numeric(p$value))
           valuation_available <- length(player_val) == 1L && is.finite(player_val) && player_val >= 0
           accept <- if (valuation_available && bid_val >= player_val * 0.9) "Accept" else "Evaluate"
+          acquisition_cost <- current_player_acquisition_cost(p, pressroom_df, user_team_id)
+          sale_result <- if (is.finite(acquisition_cost)) bid_val - acquisition_cost else NA_real_
           bid_description <- if (valuation_available) {
-            paste0("Active bid of ", fmt_money(bid_val), " EUR on player valued at ",
-              fmt_money(player_val), " EUR. ", accept, " recommended.")
+            paste0("Active bid of ", fmt_money(bid_val), " on player valued at ",
+              fmt_money(player_val), ". ", accept, " recommended.")
           } else {
             paste0("Active bid of ", fmt_money(bid_val),
-              " EUR. Player valuation is unavailable; evaluate the offer manually.")
+              ". Player valuation is unavailable; evaluate the offer manually.")
+          }
+          if (accept == "Accept") {
+            bid_description <- if (is.finite(acquisition_cost)) {
+              result_label <- if (sale_result >= 0) "Net gain" else "Net loss"
+              paste0(bid_description, " Sale proceeds: ", fmt_money(bid_val),
+                "; acquisition cost: ", fmt_money(acquisition_cost), "; ", result_label, ": ",
+                fmt_money(abs(sale_result)), ".")
+            } else {
+              paste0(bid_description, " Sale proceeds: ", fmt_money(bid_val),
+                "; acquisition cost and net result unavailable.")
+            }
           }
           recommendations[[length(recommendations) + 1]] <- data.frame(
             type = "Bid",
@@ -659,58 +743,69 @@ generate_command_center_feed <- function(login, championship_id,
       # supplied strict open rival clause candidates.
       cc <- ensure_candidate_fis(clause_candidates)
       if (nrow(cc) > 0) {
-        # Filter to those with good FIS scores
-        good_clause <- cc[cc$fis_tier %in% c("Strong Buy", "Buy"), ]
-        if (nrow(good_clause) > 0) {
-          good_clause <- good_clause[order(-good_clause$fis_score), ]
-          top_clauses <- head(good_clause, 2)
-          mkt_ids <- if (has_market_cand && nrow(market_candidates) > 0) as.character(market_candidates$id) else character(0)
-
-          for (i in seq_len(nrow(top_clauses))) {
-            p <- top_clauses[i, ]
-            pid <- as.character(p$id)
-            clause_price <- suppressWarnings(as.numeric(p$clause_price))
-
-            if (pid %in% mkt_ids) {
-              # Dual route: the player is BOTH a market listing and an open
-              # rival clause. Emit a SINGLE clause recommendation; the value
-              # max(market price, clause price) is comparison metadata only,
-              # and the executed price is always the clause price.
-              mkt_row <- market_candidates[which(as.character(market_candidates$id) == pid)[1], ]
-              mkt_price <- NA_real_
-              for (col in c("effective_market_price", "market_price", "price")) {
-                if (col %in% names(mkt_row)) {
-                  v <- suppressWarnings(as.numeric(mkt_row[[col]]))
-                  if (is.finite(v) && v > 0) {
-                    mkt_price <- v
-                    break
+        # Compare every observable clause before applying player-quality and
+        # affordability gates, so "low premium" means low in the league's
+        # current clause/value distribution rather than a fixed threshold.
+        clause_amounts <- suppressWarnings(as.numeric(as.character(cc$clause_price)))
+        market_values <- suppressWarnings(as.numeric(as.character(cc$value)))
+        valid_comparison <- is.finite(clause_amounts) & clause_amounts>0 & is.finite(market_values) & market_values>0
+        cc <- cc[which(valid_comparison), , drop=FALSE]
+        premium_ratio <- clause_amounts[valid_comparison] / market_values[valid_comparison]
+        if (nrow(cc)>0) {
+          cc$clause_percentile <- 100 * rank(premium_ratio,ties.method="max") / length(premium_ratio)
+          cc$premium_ratio <- premium_ratio
+          good_clause <- cc[cc$fis_tier %in% c("Strong Buy","Buy"),,drop=FALSE]
+          if (!is.null(financial) && nrow(good_clause)>0) {
+            plans <- lapply(good_clause$clause_price,clause_deadline_affordability,
+              financial=financial,roster_df=roster_df,next_round=next_round)
+            good_clause$affordability_plan <- I(plans)
+            good_clause <- good_clause[vapply(plans,function(x)isTRUE(x$affordable),logical(1)),,drop=FALSE]
+          }
+          if (nrow(good_clause)>0) {
+            good_clause <- good_clause[order(good_clause$premium_ratio,-good_clause$fis_score),,drop=FALSE]
+            flag_count <- min(3L,nrow(good_clause),max(2L,ceiling(nrow(good_clause)*0.25)))
+            top_clauses <- head(good_clause,flag_count)
+            mkt_ids <- if (has_market_cand && nrow(market_candidates)>0) as.character(market_candidates$id) else character(0)
+            for (i in seq_len(nrow(top_clauses))) {
+              p <- top_clauses[i,,drop=FALSE]
+              pid <- as.character(p$id)
+              clause_price <- suppressWarnings(as.numeric(p$clause_price))
+              player_val <- suppressWarnings(as.numeric(p$value))
+              comparison <- clause_value_comparison(clause_price,player_val)
+              clause_priority <- 100-safe_numeric(p$clause_percentile,100)+safe_numeric(p$fis_score,0)/1000
+              guidance <- paste0("In the lowest ",round(safe_numeric(p$clause_percentile,100)),
+                "% of observed clause-to-value ratios.")
+              funding <- ""
+              if ("affordability_plan" %in% names(p)) {
+                plan <- p$affordability_plan[[1]]
+                funding <- if (identical(plan$status,"affordable_now")) {
+                  " Affordable now with a positive projected balance at the next-round deadline."
+                } else if (identical(plan$status,"affordable_after_sales")) {
+                  paste0(" Affordable by accepting observed offers worth ",fmt_money(plan$sale_proceeds),
+                    " for ",length(plan$sell_player_ids)," player(s), while retaining at least 11 players and a positive deadline balance.")
+                } else ""
+              }
+              if (pid %in% mkt_ids) {
+                mkt_row <- market_candidates[which(as.character(market_candidates$id)==pid)[1],]
+                mkt_price <- NA_real_
+                for (col in c("effective_market_price","market_price","price")) {
+                  if (col %in% names(mkt_row)) {
+                    v <- suppressWarnings(as.numeric(mkt_row[[col]]))
+                    if (is.finite(v) && v>0) { mkt_price <- v; break }
                   }
                 }
+                if (!is.finite(mkt_price)) mkt_price <- clause_price
+                cmp <- max(mkt_price,clause_price)
+                description <- paste0("Buyout clause at ",fmt_money(clause_price)," (",comparison$text,
+                  "; dual route: also listed on market at ",fmt_money(mkt_price),
+                  "; comparison max: ",fmt_money(cmp),"). ",guidance,funding," Executing clause price only.")
+              } else {
+                description <- paste0("Buyout clause at ",fmt_money(clause_price)," (",comparison$text,"). ",guidance,funding)
               }
-              if (!is.finite(mkt_price)) mkt_price <- clause_price
-              cmp <- max(mkt_price, clause_price)
-              description <- paste0(
-                "Buyout clause at ", fmt_money(clause_price), " EUR (dual route: also listed on market at ",
-                fmt_money(mkt_price), " EUR; comparison max: ", fmt_money(cmp),
-                " EUR). Executing clause price only."
-              )
-            } else {
-              player_val <- suppressWarnings(as.numeric(p$value))
-              discount <- ifelse(!is.na(clause_price) && !is.na(player_val) && player_val > 0,
-                          round((1 - clause_price / player_val) * 100, 1), 0)
-              description <- paste0("Buyout clause at ", clause_price, " EUR (", discount, "% discount to market value). Strong Buy candidate.")
+              recommendations[[length(recommendations)+1]] <- data.frame(type="Clause",
+                title=paste0("CLAUSE: ",p$name),description=description,confidence_pct=clause_priority,
+                action_label="Exercise Clause",action_code="clause_buyout",player_id=pid,stringsAsFactors=FALSE)
             }
-
-            recommendations[[length(recommendations) + 1]] <- data.frame(
-              type = "Clause",
-              title = paste0("CLAUSE: ", p$name),
-              description = description,
-              confidence_pct = safe_clamp(p$fis_score + 5),
-              action_label = "Exercise Clause",
-              action_code = "clause_buyout",
-              player_id = pid,
-              stringsAsFactors = FALSE
-            )
           }
         }
       }
@@ -720,20 +815,30 @@ generate_command_center_feed <- function(login, championship_id,
         !is.na(players_df$clause_price) & players_df$clause_price > 0,
       ]
       if (nrow(clause_pool) > 0) {
-        # Filter to those with good FIS scores
-        good_clause <- clause_pool[clause_pool$fis_tier %in% c("Strong Buy", "Buy"), ]
+        # Compatibility path uses the same lowest-premium ordering.
+        good_clause <- clause_pool[clause_pool$fis_tier %in% c("Strong Buy", "Buy"), , drop=FALSE]
+        clause_amounts <- suppressWarnings(as.numeric(as.character(good_clause$clause_price)))
+        market_values <- suppressWarnings(as.numeric(as.character(good_clause$value)))
+        valid_comparison <- is.finite(clause_amounts) & clause_amounts>0 & is.finite(market_values) & market_values>0
+        good_clause <- good_clause[which(valid_comparison), , drop=FALSE]
         if (nrow(good_clause) > 0) {
+          premium_ratio <- clause_amounts[valid_comparison] / market_values[valid_comparison]
+          good_clause <- good_clause[order(premium_ratio, -good_clause$fis_score), , drop=FALSE]
           for (i in seq_len(min(nrow(good_clause), 2))) {
             p <- good_clause[i, ]
             clause_price <- suppressWarnings(as.numeric(p$clause_price))
             player_val <- suppressWarnings(as.numeric(p$value))
-            discount <- ifelse(!is.na(clause_price) && !is.na(player_val) && player_val > 0,
-                        round((1 - clause_price / player_val) * 100, 1), 0)
+            comparison <- clause_value_comparison(clause_price, player_val)
+            clause_priority <- 100 - if (isFALSE(comparison$favorable)) comparison$percent else 0
+            clause_priority <- clause_priority + safe_numeric(p$fis_score,0)/1000
+            guidance <- if (isFALSE(comparison$favorable))
+              "Costs more than market value; review before buying." else "Potential value opportunity."
             recommendations[[length(recommendations) + 1]] <- data.frame(
               type = "Clause",
               title = paste0("CLAUSE: ", p$name),
-              description = paste0("Buyout clause at ", clause_price, " EUR (", discount, "% discount to market value). Strong Buy candidate."),
-              confidence_pct = safe_clamp(p$fis_score + 5),
+              description = paste0("Buyout clause at ", fmt_money(clause_price), " (",
+                comparison$text, "). ", guidance),
+              confidence_pct = clause_priority,
               action_label = "Exercise Clause",
               action_code = "clause_buyout",
               player_id = as.character(p$id),

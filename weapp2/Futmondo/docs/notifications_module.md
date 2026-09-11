@@ -14,3 +14,16 @@ ok <- mark_notification_read(auth, selected_notification_id) # explicit interact
 ```
 
 Focused coverage: `test_data_contracts.R`, `test_history_persistence.R`, `test_har_contracts.R`; Shiny lifecycle checks escaping, failed acknowledgements, navigation and account changes.
+
+## Player-details eligibility
+
+`notification_has_player_details(notification_row)` returns one logical value for a normalized, single-row notification. It requires a non-empty `player_id` and rejects round-closure events detected from the normalized `type`, `action`, and `message` fields, including values such as `roundClose`, `round close 4`, and `Round closed: 4`. The items renderer uses this result to omit the **Player details** button, and the `open_player` observer repeats the same check so a synthetic client event cannot open a player panel for a round closure.
+
+```r
+notification_has_player_details(data.frame(
+  type="round", action="roundClose", message="round close 4", player_id="4"
+))
+# FALSE
+```
+
+Focused regression coverage: `Rscript test/test_notification_player_details.R`.

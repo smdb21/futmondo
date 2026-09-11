@@ -73,3 +73,19 @@ A dropdown filter control (`fis_tier_filter`) is available in the filter bar abo
 | Weak (0-39) | Only players with an FIS Score below 40 |
 
 The filter integrates with the existing reactive pipeline so that selecting a tier immediately updates the displayed table without requiring a full page reload.
+---
+
+## 8. Configurable Recent-Points Average
+
+Every shared players table includes the numeric control **Average points: latest games**, initially set to 5 and constrained to 1–20. This applies to Your Team, Market, and All Players in Championship because all three use `players_table_UI()` and `players_table_Server()`. Changing the value recalculates the column heading and values immediately as `Avg Last N`.
+
+`add_recent_points_average(players_df, history_df, n=5L)` returns `players_df` with numeric `recent_points_avg`. `players_df` requires `id`; finalized `history_df` uses `player_id`, `points`, and preferably `round`. For each player, the helper sorts rounds newest first, selects at most N finite observed scores, and calculates their arithmetic mean. Players with fewer than N recorded games use every available game. Missing observations remain `NA`. When N is exactly 5, the normalized API field `average.averageLastFive` is used only for players without stored finalized-round history.
+
+```r
+players <- add_recent_points_average(players, finalized_match_history, n=3L)
+# players$recent_points_avg contains each player's observed last-three mean
+```
+
+The server obtains the league-wide finalized observations with one cached `read_player_match_history()` call rather than issuing per-player requests. The control uses a fluid Bootstrap row and moves to the left on narrow screens. It does not add a package or environment variable.
+
+Focused verification: `Rscript test/test_recent_points_average.R`. Cross-page rendering is covered by `Rscript test/test_application_offline.R` and the full Shiny simulation.

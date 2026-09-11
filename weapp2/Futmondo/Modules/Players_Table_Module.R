@@ -104,6 +104,14 @@ if (filter_by_position) {
         )
       },
 
+      fluidRow(
+        class = "player-average-control",
+        column(width=12,
+          numericInput(ns("recent_games_n"),"Average points: latest games",
+            min=1,max=20,value=5,step=1,width="180px")
+        )
+      ),
+
       # Table Container
       div(
         reactableOutput(ns("players_table")),
@@ -186,6 +194,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
         updateCheckboxInput(session, inputId = "players_you_bid_filter", value = FALSE)
         updateCheckboxInput(session, inputId = "players_with_bid_filter", value = FALSE)
         updateSelectInput(session, inputId = "fis_tier_filter", selected = "All")
+        updateNumericInput(session, inputId = "recent_games_n", value = 5)
       }, error = function(e) {
         warning(paste0("[Players Table] Clear filters error: ", e$message))
       })
@@ -241,6 +250,16 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       if (is.null(players_table) || nrow(players_table) == 0) {
         return(NULL)
       }
+
+      recent_n <- suppressWarnings(as.integer(input$recent_games_n)[1])
+      if (!is.finite(recent_n)) recent_n <- 5L
+      recent_n <- max(1L,min(20L,recent_n))
+      champ <- if (is.function(championship_id)) championship_id() else championship_id
+      history <- if (!is.null(champ) && length(champ)==1L && !is.na(champ) && nzchar(as.character(champ))) tryCatch(
+        get_cached_data(paste0("players_table_match_history_",as.character(champ)),
+          read_player_match_history(as.character(champ),final_only=TRUE)),
+        error=function(e)data.frame()) else data.frame()
+      players_table <- add_recent_points_average(players_table,history,recent_n)
 
       # Ensure FIS scores are calculated if fis_score is not present
       if (!"fis_score" %in% colnames(players_table)) {
@@ -349,6 +368,11 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       #     any_of(starts_with("change")), any_of(starts_with("market_")), any_of(starts_with("bid_price")), any_of(starts_with("clause_")), any_of(c("name", "role", "role2", "points", "value", "status", "team", "rating", "change", "average", "total")))
       #
       table_columns <- get_reactable_columns_for_players(players_table)
+      recent_n <- suppressWarnings(as.integer(input$recent_games_n)[1])
+      if (!is.finite(recent_n)) recent_n <- 5L
+      table_columns[["recent_points_avg"]] <- colDef(
+        name=paste0("Avg Last ",max(1L,min(20L,recent_n))),align="center",
+        cell=function(value) if (length(value)!=1L || !is.finite(value)) "-" else round(value,1))
       reactable(players_table,
                 columns = table_columns,
                 searchable = TRUE,
@@ -407,6 +431,39 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
 
     return(selected_player_RV)
   })
+}
+
+# Add an observed average over each player's latest N finalized rounds.
+add_recent_points_average <- function(players_df,history_df,n=5L) {
+  if (!is.data.frame(players_df)) return(players_df)
+  n <- suppressWarnings(as.integer(n)[1]); if (!is.finite(n)) n <- 5L
+  n <- max(1L,min(20L,n))
+  players_df$recent_points_avg <- NA_real_
+  if (nrow(players_df) && "id" %in% names(players_df) && is.data.frame(history_df) && nrow(history_df) &&
+      all(c("player_id","points") %in% names(history_df))) {
+    points <- suppressWarnings(as.numeric(as.character(history_df$points)))
+    keep <- is.finite(points)
+    history_df <- history_df[keep,,drop=FALSE]; history_df$points <- points[keep]
+    if (nrow(history_df)) {
+      order_value <- if ("round" %in% names(history_df)) suppressWarnings(as.numeric(history_df$round)) else seq_len(nrow(history_df))
+      order_value[!is.finite(order_value)] <- seq_len(nrow(history_df))[!is.finite(order_value)]
+      history_df$.recent_order <- order_value
+      averages <- vapply(as.character(players_df$id),function(id) {
+        rows <- history_df[as.character(history_df$player_id)==id,,drop=FALSE]
+        if (!nrow(rows)) return(NA_real_)
+        rows <- rows[order(rows$.recent_order,decreasing=TRUE),,drop=FALSE]
+        mean(head(rows$points,n))
+      },numeric(1))
+      players_df$recent_points_avg <- averages
+    }
+  }
+  # The API-reported last-five average is a valid fallback only for N=5.
+  if (n==5L && "average.averageLastFive" %in% names(players_df)) {
+    fallback <- suppressWarnings(as.numeric(as.character(players_df$average.averageLastFive)))
+    use <- !is.finite(players_df$recent_points_avg) & is.finite(fallback)
+    players_df$recent_points_avg[use] <- fallback[use]
+  }
+  players_df
 }
 
 # Shared display contract: preserve signed balances and distinguish missing data.

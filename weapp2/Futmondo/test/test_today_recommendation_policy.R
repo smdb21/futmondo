@@ -457,9 +457,9 @@ pol_record("feed_dual_route_comparison_max_metadata", {
   )
   dual_desc <- feed$description[feed$player_id == "dual1"]
   # max(market price 10M, clause price 8M) = 10M appears as comparison metadata.
-  stopifnot(grepl("comparison max: 10000000", dual_desc, fixed = TRUE))
+  stopifnot(grepl("comparison max: 10.000.000 €", dual_desc, fixed = TRUE))
   # The clause price is stated as the executed price.
-  stopifnot(grepl("Buyout clause at 8000000", dual_desc, fixed = TRUE))
+  stopifnot(grepl("Buyout clause at 8.000.000 €", dual_desc, fixed = TRUE))
   stopifnot(grepl("Executing clause price only", dual_desc, fixed = TRUE))
 })
 
@@ -497,7 +497,7 @@ pol_record("feed_dual_route_max_when_clause_higher", {
   )
   stopifnot(nrow(feed[feed$player_id == "dual2", ]) == 1)
   stopifnot(feed$type[feed$player_id == "dual2"] == "Clause")
-  stopifnot(grepl("comparison max: 8000000",
+  stopifnot(grepl("comparison max: 8.000.000 €",
                   feed$description[feed$player_id == "dual2"], fixed = TRUE))
 })
 

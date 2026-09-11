@@ -1,0 +1,10 @@
+#!/usr/bin/env Rscript
+source("Modules/Notifications_Module.R")
+notice <- function(action="acceptBid",type="market",message="Offer accepted",player_id="p1")
+  data.frame(action=action,type=type,message=message,player_id=player_id,stringsAsFactors=FALSE)
+stopifnot(notification_has_player_details(notice()))
+stopifnot(!notification_has_player_details(notice(action="roundClose",type="round",message="round close 4")))
+stopifnot(!notification_has_player_details(notice(action="closed",type="round",message="Round closed: 4")))
+stopifnot(!notification_has_player_details(notice(player_id="")))
+stopifnot(!notification_has_player_details(notice(player_id=NA_character_)))
+cat("NOTIFICATION PLAYER DETAILS: 5 passed / 0 failed\n")

@@ -26,6 +26,9 @@ selected_player_UI <- function(id) {
           column(4, uiOutput(ns("player_last_points_description_box"))),
           column(4, uiOutput(ns("player_value_description_box")))
         ),
+        fluidRow(
+          column(12, uiOutput(ns("recent_round_points")))
+        ),
         # Interactive Purchase Row
         fluidRow(
           column(12, align = "center", style = "margin-top: 15px; display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;",
@@ -1623,6 +1626,26 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         )
     })
 
+    ## render recent completed-round points ----
+    output$recent_round_points <- renderUI({
+      sp <- selected_player(); req(sp)
+      login <- get_reactive_val(login_token)
+      champ_id <- get_reactive_val(championship_id)
+      history <- if (!is.null(champ_id) && !is.null(sp$id)) tryCatch(
+        get_player_historical_data(sp$id,champ_id),error=function(e)NULL) else NULL
+      rounds <- if (!is.null(login) && !is.null(champ_id)) tryCatch(
+        get_finished_rounds(login,champ_id),error=function(e)NULL) else NULL
+      recent <- latest_player_round_points(history,rounds,limit=5L)
+      div(class="player-recent-rounds",
+        h4(icon("futbol")," Latest round points"),
+        if (!nrow(recent)) span(class="player-recent-rounds-empty","No completed-round points recorded yet") else
+          div(class="player-recent-rounds-list",lapply(seq_len(nrow(recent)),function(i)
+            div(class="player-recent-round-chip",
+              span(class="player-recent-round-label",paste("Round",recent$round_number[i])),
+              strong(paste0(format(recent$points[i],trim=TRUE,scientific=FALSE)," pts")))))
+      )
+    })
+
     ## render player_points_description_box ----
     output$player_points_description_box <- renderUI({
       sp <- selected_player()
@@ -2066,7 +2089,7 @@ player_trend_axis_range <- function(values) {
   values <- values[is.finite(values)]
   if (!length(values)) return(c(0, 1))
   bounds <- range(values)
-  padding <- max(diff(bounds) * 0.12, abs(bounds) * 0.02, 1)
+  padding <- max(diff(bounds) * 0.20, abs(bounds) * 0.04, 2)
   bounds + c(-padding, padding)
 }
 
@@ -2196,6 +2219,16 @@ build_player_points_trace <- function(history_df, finished_rounds_df = NULL, sp 
   rownames(points_df) <- NULL
 
   list(points_df = points_df, has_points = TRUE)
+}
+
+# Return the latest completed-round point observations, newest first.
+latest_player_round_points <- function(history_df,finished_rounds_df,limit=5L) {
+  trace <- build_player_points_trace(history_df,finished_rounds_df)
+  limit <- suppressWarnings(as.integer(limit)[1])
+  if (!isTRUE(trace$has_points) || !is.finite(limit) || limit<1L)
+    return(trace$points_df[0,,drop=FALSE])
+  points <- tail(trace$points_df,limit)
+  points[order(points$round_number,decreasing=TRUE,na.last=TRUE),,drop=FALSE]
 }
 
 add_sign <- function(x) {

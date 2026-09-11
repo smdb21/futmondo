@@ -1024,3 +1024,36 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
   .pitch-player-name { max-width: 100% !important; white-space: normal !important; overflow-wrap: anywhere; }
   .btn { min-height: 40px; }
 }
+.round-countdown-in-progress { border-color: var(--fm-warning); color: var(--fm-text); }
+.today-action-filters { margin: 0 0 12px; }
+.today-action-filters .shiny-options-group { display: flex; flex-wrap: wrap; gap: 6px; }
+.today-action-filters .checkbox-inline { display: inline-flex; align-items: center; gap: 3px; margin: 0; padding: 5px 9px; border: 1px solid var(--fm-border); border-radius: 999px; background: var(--fm-surface); font-size: 12px; }
+.today-action-filters .checkbox-inline input { margin: 0 3px 0 0; }
+.today-recommendation-controls { display: inline-flex; align-items: center; gap: 6px; }
+.today-player-card-button { width: 34px; min-width: 34px; min-height: 34px !important; height: 34px; padding: 5px; border-color: var(--fm-border); color: var(--fm-text); }
+
+.player-recent-rounds {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--fm-border, #e2e8f0);
+}
+.player-recent-rounds h4 { margin: 0 0 10px; font-size: 14px; font-weight: 700; }
+.player-recent-rounds-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.player-recent-round-chip {
+  flex: 1 1 100px;
+  min-width: 0;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: var(--fm-surface);
+  border: 1px solid var(--fm-border, #e2e8f0);
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.player-recent-round-label, .player-recent-rounds-empty { color: var(--fm-muted); }
+
+.player-average-control { margin: 0 0 8px; }
+.player-average-control .col-sm-12 { display: flex; justify-content: flex-end; }
+@media (max-width: 767px) {
+  .player-average-control .col-sm-12 { justify-content: flex-start; }
+}

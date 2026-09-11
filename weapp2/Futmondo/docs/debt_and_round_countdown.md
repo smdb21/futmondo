@@ -13,3 +13,5 @@ stopifnot(headroom$minimum_balance == -10000000,
 ```
 
 Run `Rscript test/test_debt_and_round_countdown.R`. The focused test covers the exact debt boundary, commitments, missing inputs, roster-value fallback, future-round selection, countdown formatting and responsive global UI contract.
+
+When no future round start exists, `current_round_context(rounds, now)` selects the latest round whose `begin_process` has passed and whose normalized `is_finished` flag is false. The top bar then displays `Round N — In progress`. If no future or active round can be verified, it displays `Round schedule unavailable`.
