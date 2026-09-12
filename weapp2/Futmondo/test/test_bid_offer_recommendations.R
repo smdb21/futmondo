@@ -37,9 +37,18 @@ stopifnot(nrow(sell_card)==1L,sell_card$action_label=="Accept Offer",
   sell_card$description=="Received offer of 11.234.778 €. Current FIS: 42.8.",
   nrow(sell_feed[sell_feed$type=="Bid",,drop=FALSE])==0L)
 
+
+# NA owner/FIS rows can appear while an accepted offer refreshes the roster.
+# They must never become synthetic Sell or Hold cards.
+transient <- rbind(sell_offer, data.frame(id=NA_character_,name=NA_character_,user_team_id=NA_character_,
+  bid_price=NA_real_,value=NA_real_,fis_score=NA_real_,fis_tier=NA_character_,fis_summary=NA_character_))
+transient_feed <- feed_for(transient)
+stopifnot(!any(is.na(transient_feed$player_id)),
+  !any(grepl("SELL: NA|HOLD: NA", transient_feed$title)))
+
 pressroom <- data.frame(id=c("buy1","sell1","buy2"),player_id="valid",
   buyer_team_id=c("mine","other","mine"),seller_team_id=c("other","mine","other"),
   price=c(500,650,750),created=c("2026-01-01","2026-02-01","2026-03-01"))
 stopifnot(current_player_acquisition_cost(list(id="valid"),pressroom,"mine")==750,
   is.na(current_player_acquisition_cost(list(id="unknown"),pressroom,"mine")))
-cat("BID OFFER RECOMMENDATIONS: 3 passed / 0 failed\n")
+cat("BID OFFER RECOMMENDATIONS: 4 passed / 0 failed\n")

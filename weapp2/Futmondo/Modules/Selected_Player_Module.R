@@ -1661,9 +1661,10 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       rounds <- if (!is.null(login) && !is.null(champ_id)) tryCatch(
         get_finished_rounds(login,champ_id),error=function(e)NULL) else NULL
       recent <- latest_player_round_points(history,rounds,limit=5L)
+      empty_text <- recent_round_points_empty_text(sp$points)
       div(class="player-recent-rounds",
         h4(icon("futbol")," Latest round points"),
-        if (!nrow(recent)) span(class="player-recent-rounds-empty","No completed-round points recorded yet") else
+        if (!nrow(recent)) span(class="player-recent-rounds-empty",empty_text) else
           div(class="player-recent-rounds-list",lapply(seq_len(nrow(recent)),function(i)
             div(class="player-recent-round-chip",
               span(class="player-recent-round-label",paste("Round",recent$round_number[i])),
@@ -2259,6 +2260,17 @@ latest_player_round_points <- function(history_df,finished_rounds_df,limit=5L) {
     return(trace$points_df[0,,drop=FALSE])
   points <- tail(trace$points_df,limit)
   points[order(points$round_number,decreasing=TRUE,na.last=TRUE),,drop=FALSE]
+}
+
+# Explain an empty completed-round breakdown without hiding a known aggregate total.
+recent_round_points_empty_text <- function(aggregate_points) {
+  total <- suppressWarnings(as.numeric(as.character(aggregate_points)[1]))
+  if (is.finite(total) && total > 0) {
+    paste0("Total points: ", format(total, trim=TRUE, scientific=FALSE),
+      ". Completed-round breakdown is unavailable.")
+  } else {
+    "No completed-round points recorded yet"
+  }
 }
 
 add_sign <- function(x) {

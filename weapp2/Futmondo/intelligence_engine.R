@@ -668,8 +668,15 @@ generate_command_center_feed <- function(login, championship_id,
     # ---- SELL recommendations: Sell tier players owned by user ----
     # Check if players_df has user_team_id column (from roster)
     if (has_players && "user_team_id" %in% colnames(players_df)) {
-      owned <- players_df[players_df$user_team_id == user_team_id, ]
-      sell_candidates <- owned[owned$fis_tier == "Sell", ]
+      owner_ids <- as.character(players_df$user_team_id)
+      current_team <- as.character(user_team_id)[1]
+      valid_owned <- !is.na(owner_ids) & nzchar(trimws(owner_ids)) & !is.na(current_team) &
+        nzchar(trimws(current_team)) & owner_ids == current_team
+      owned <- players_df[which(valid_owned), , drop = FALSE]
+      sell_fis <- suppressWarnings(as.numeric(as.character(owned$fis_score)))
+      sell_identity <- !is.na(owned$id) & nzchar(trimws(as.character(owned$id))) &
+        !is.na(owned$name) & nzchar(trimws(as.character(owned$name)))
+      sell_candidates <- owned[which(sell_identity & is.finite(sell_fis) & as.character(owned$fis_tier) == "Sell"), , drop = FALSE]
       if (nrow(sell_candidates) > 0) {
         sell_candidates <- sell_candidates[order(-sell_candidates$fis_score), ]
         top_sells <- head(sell_candidates, 2)
@@ -860,8 +867,15 @@ generate_command_center_feed <- function(login, championship_id,
 
     # ---- HOLD recommendations: top Hold-tier owned players ----
     if (has_players && "user_team_id" %in% colnames(players_df)) {
-      owned <- players_df[players_df$user_team_id == user_team_id, ]
-      hold_candidates <- owned[owned$fis_tier == "Hold", ]
+      owner_ids <- as.character(players_df$user_team_id)
+      current_team <- as.character(user_team_id)[1]
+      valid_owned <- !is.na(owner_ids) & nzchar(trimws(owner_ids)) & !is.na(current_team) &
+        nzchar(trimws(current_team)) & owner_ids == current_team
+      owned <- players_df[which(valid_owned), , drop = FALSE]
+      hold_fis <- suppressWarnings(as.numeric(as.character(owned$fis_score)))
+      hold_identity <- !is.na(owned$id) & nzchar(trimws(as.character(owned$id))) &
+        !is.na(owned$name) & nzchar(trimws(as.character(owned$name)))
+      hold_candidates <- owned[which(hold_identity & is.finite(hold_fis) & as.character(owned$fis_tier) == "Hold"), , drop = FALSE]
       if (nrow(hold_candidates) > 0) {
         hold_candidates <- hold_candidates[order(-hold_candidates$fis_score), ]
         top_holds <- head(hold_candidates, 2)

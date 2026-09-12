@@ -114,4 +114,13 @@ check('latest round points are limited and returned newest first', {
   stopifnot(nrow(unavailable)==0L)
 })
 
+check('empty latest-round panel keeps a known aggregate score visible', {
+  stopifnot(
+    recent_round_points_empty_text(10) == 'Total points: 10. Completed-round breakdown is unavailable.',
+    recent_round_points_empty_text(0) == 'No completed-round points recorded yet',
+    recent_round_points_empty_text(NA_real_) == 'No completed-round points recorded yet'
+  )
+})
+
+
 cat(sprintf('Player trend plot: %d checks passed.\n', checks))

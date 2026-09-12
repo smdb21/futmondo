@@ -236,7 +236,7 @@ The Smart Bid card displays verified spendable capacity and Futmondo's reported 
 
 ## 9. Latest Round Points
 
-The player card displays up to five completed-round point observations below its summary metrics. `latest_player_round_points(history_df, finished_rounds_df, limit=5L)` reuses `build_player_points_trace()`, returns `date`, `points`, and `round_number`, and orders the selected rows by newest round first. Missing history or verified finished-round boundaries produces an empty data frame and the card displays `No completed-round points recorded yet`.
+The player card displays up to five completed-round point observations below its summary metrics. `latest_player_round_points(history_df, finished_rounds_df, limit=5L)` reuses `build_player_points_trace()`, returns `date`, `points`, and `round_number`, and orders the selected rows by newest round first. Missing history or verified finished-round boundaries produces an empty data frame. `recent_round_points_empty_text(aggregate_points)` then preserves a positive aggregate score (for example, `Total points: 10. Completed-round breakdown is unavailable.`), so the card does not claim the player has no points while the breakdown cannot yet be verified.
 
 ```r
 latest_player_round_points(player_history, finished_rounds, limit=5L)

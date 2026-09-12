@@ -143,3 +143,5 @@ Focused regression coverage: `Rscript test/test_command_center_conflicts.R`.
 ### Sell recommendations with received offers
 
 For an owned Sell-tier player with a finite positive `bid_price`, the command center creates one Sell card with `Accept Offer` and stable action code `accept_offer`. Its description includes the received amount. The generic Bid card is suppressed for that player, avoiding duplicate acceptance advice. A Sell-tier player without an offer remains `List on Market` with action code `view`.
+
+Owned-player Sell and Hold candidates require a non-empty matching owner ID, player ID and name, plus a finite FIS score. This discards incomplete rows that can briefly appear while the roster refreshes, so the feed never emits fabricated `SELL: NA` or `HOLD: NA` cards.
