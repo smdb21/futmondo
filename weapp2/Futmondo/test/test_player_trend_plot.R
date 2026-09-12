@@ -30,9 +30,9 @@ find_plot_body <- function(node) {
 }
 plot_body <- find_plot_body(parse('Modules/Selected_Player_Module.R'))
 stopifnot(!is.null(plot_body))
-render_fixture <- function(history, rounds = NULL) {
+render_fixture <- function(history, rounds = NULL, aggregate_points = NA_real_) {
   env <- new.env(parent = globalenv())
-  env$selected_player <- function() data.frame(id = 'player', value = 100000000, change = 0)
+  env$selected_player <- function() data.frame(id = 'player', value = 100000000, change = 0, points = aggregate_points)
   env$login_token <- 'fixture'; env$championship_id <- 'league'
   env$get_reactive_val <- identity
   env$get_player_historical_data <- function(...) history
@@ -90,7 +90,12 @@ check('zero-point markers remain visible and an unavailable points series stays 
   assert_visible(chart$data[[2]]$y, chart$layout$yaxis2$range)
   unavailable <- render_fixture(history)
   stopifnot(length(unavailable$data) == 1L, !unavailable$layout$yaxis2$visible,
-            unavailable$layout$annotations[[1]]$text == 'No points recorded yet')
+            unavailable$layout$annotations[[1]]$text == 'No round-by-round points recorded yet')
+})
+check('aggregate points do not produce a misleading no-points annotation', {
+  chart <- render_fixture(NULL, NULL, aggregate_points = 37)
+  stopifnot(length(chart$data) == 1L,
+    chart$layout$annotations[[1]]$text == 'Total points: 37. Round-by-round history is unavailable.')
 })
 check('empty history fallback has a usable valuation range', {
   chart <- render_fixture(NULL)

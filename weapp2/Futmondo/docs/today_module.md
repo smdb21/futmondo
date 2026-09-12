@@ -206,3 +206,7 @@ Every recommendation card includes a compact address-card icon button with the t
 ### Clause distribution and deadline funding
 
 `recommendations_RV` passes `user_finances_RV()`, `squad_players_RV()`, and the cached `get_finished_rounds()` result through `next_round_context()` to `generate_command_center_feed()`. Clause suggestions rank the lowest observed clause-to-player-value ratios. A suggestion appears only when its clause can leave the manager with a positive projected balance at the next-round deadline, either immediately or after accepting enough currently observed positive squad offers. The funding plan retains at least 11 players after adding the clause target; speculative listing proceeds are excluded. If finance or the next-round deadline cannot be verified, Today does not expose an executable clause suggestion.
+
+### Accept Offer actions
+
+Today recognizes the stable `accept_offer` action from a Sell recommendation, resolves the owned player from current player data, and opens the existing received-offer confirmation in the player card. The card verifies the offer remains finite and positive before displaying confirmation.

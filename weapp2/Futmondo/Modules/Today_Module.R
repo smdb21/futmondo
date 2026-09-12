@@ -105,7 +105,8 @@ today_rec_action_onclick_js <- function(ns, player_id, action_label) {
 # Single source of truth for mapping feed action labels to stable codes:
 #   - "Place Bid" (case-insensitive, trimmed) -> "market_bid"
 #   - "Exercise Clause" (case-insensitive, trimmed) -> "clause_buyout"
-#   - already-stable codes ("market_bid", "clause_buyout", "view") pass through unchanged
+#   - "Accept Offer" -> "accept_offer"
+#   - already-stable codes ("market_bid", "clause_buyout", "accept_offer", "view") pass through unchanged
 #   - anything else -> "view"
 # No other code may infer action intent from raw labels.
 today_normalize_action <- function(action_label) {
@@ -113,7 +114,8 @@ today_normalize_action <- function(action_label) {
   if (is.na(a)) a <- ""
   if (a == "place bid") return("market_bid")
   if (a == "exercise clause") return("clause_buyout")
-  if (a %in% c("market_bid", "clause_buyout", "view")) return(a)
+  if (a == "accept offer") return("accept_offer")
+  if (a %in% c("market_bid", "clause_buyout", "accept_offer", "view")) return(a)
   "view"
 }
 
@@ -894,7 +896,7 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
           )
 
           # Determine if action button should be shown
-          show_action_btn <- rec_type %in% c("Buy", "Bid", "Clause")
+          show_action_btn <- rec_type %in% c("Buy", "Bid", "Clause", "Sell")
 
           div(
             class = "today-recommendation-card",

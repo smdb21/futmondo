@@ -508,7 +508,7 @@ pol_record("feed_action_codes_for_all_types", {
     market_candidates = mkt_cand, clause_candidates = clause_cand
   )
   stopifnot("action_code" %in% colnames(feed))
-  stopifnot(all(feed$action_code %in% c("market_bid", "clause_buyout", "view")))
+  stopifnot(all(feed$action_code %in% c("market_bid", "clause_buyout", "accept_offer", "view")))
   # Sell recs (own2) carry the "view" code.
   sells <- feed[feed$type == "Sell", ]
   stopifnot(nrow(sells) >= 1)
@@ -593,6 +593,8 @@ pol_record("normalize_action_clause_and_market_codes", {
   stopifnot(today_normalize_action("Place Bid") == "market_bid")
   stopifnot(today_normalize_action("market_bid") == "market_bid")
   stopifnot(today_normalize_action("view") == "view")
+  stopifnot(today_normalize_action("Accept Offer") == "accept_offer")
+  stopifnot(today_normalize_action("accept_offer") == "accept_offer")
   stopifnot(today_normalize_action("List on Market") == "view")
   stopifnot(today_normalize_action(NULL) == "view")
 })

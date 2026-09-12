@@ -27,9 +27,19 @@ stopifnot(nrow(bids) == 1L,
     "Sale proceeds: 900 €; acquisition cost: 700 €; Net gain: 200 €."),
   bids$action_label == "Accept")
 
+
+sell_offer <- data.frame(id="sell",name="Konaté",user_team_id="mine",bid_price=11234778,
+  value=15000000,fis_score=42.8,fis_tier="Sell",fis_summary="",stringsAsFactors=FALSE)
+sell_feed <- feed_for(sell_offer)
+sell_card <- sell_feed[sell_feed$type=="Sell",,drop=FALSE]
+stopifnot(nrow(sell_card)==1L,sell_card$action_label=="Accept Offer",
+  sell_card$action_code=="accept_offer",
+  sell_card$description=="Received offer of 11.234.778 €. Current FIS: 42.8.",
+  nrow(sell_feed[sell_feed$type=="Bid",,drop=FALSE])==0L)
+
 pressroom <- data.frame(id=c("buy1","sell1","buy2"),player_id="valid",
   buyer_team_id=c("mine","other","mine"),seller_team_id=c("other","mine","other"),
   price=c(500,650,750),created=c("2026-01-01","2026-02-01","2026-03-01"))
 stopifnot(current_player_acquisition_cost(list(id="valid"),pressroom,"mine")==750,
   is.na(current_player_acquisition_cost(list(id="unknown"),pressroom,"mine")))
-cat("BID OFFER RECOMMENDATIONS: 2 passed / 0 failed\n")
+cat("BID OFFER RECOMMENDATIONS: 3 passed / 0 failed\n")

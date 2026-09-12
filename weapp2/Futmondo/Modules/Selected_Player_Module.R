@@ -3,6 +3,14 @@ library(reactable)
 # Transparent 1x1 GIF to prevent broken-image alt-text rendering on pre-load
 SPACER_GIF <- "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
 
+# Stable human-readable euro amounts for player-card banners.
+player_card_money <- function(value) {
+  amount <- suppressWarnings(as.numeric(value))
+  if (length(amount) != 1L || !is.finite(amount)) return("Unavailable")
+  paste0(format(round(amount), big.mark = ".", decimal.mark = ",",
+    scientific = FALSE, trim = TRUE), " €")
+}
+
 selected_player_UI <- function(id) {
   ns <- NS(id)
   tagList(
@@ -198,7 +206,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       } else {
         div(
           style = "margin-top: 6px; color: var(--fm-text); font-size: 14px; font-weight: 700;",
-          format_table_currency(val)
+          player_card_money(val)
         )
       }
     }
@@ -346,7 +354,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           )
 
           if (is_listed_on_market) {
-            price_text <- if (!is.na(current_asking_price) && current_asking_price > 0) paste0(" (Asking: ", format_currency(current_asking_price), ")") else ""
+            price_text <- if (!is.na(current_asking_price) && current_asking_price > 0) paste0(" (Asking: ", player_card_money(current_asking_price), ")") else ""
             listed_badge <- div(
               style = "display: inline-block; padding: 8px 16px; background-color: var(--fm-surface); color: var(--fm-text); border: 1px solid #fde68a; border-radius: 8px; font-weight: 600; font-size: 12px; margin: 5px;",
               tagList(icon("tags"), paste0(" Listed on Market", price_text))
@@ -387,7 +395,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           if (has_received_offer) {
             offer_banner <- div(
               style = "width: 100%; text-align: center; margin-bottom: 10px; padding: 10px 16px; background-color: var(--fm-surface); color: var(--fm-text); border: 1px solid #a7f3d0; border-radius: 8px; font-weight: 700; font-size: 14px;",
-              tagList(icon("hand-holding-dollar"), paste0(" Received Offer: ", format_currency(rec_offer_price), " from ", rec_offer_bidder))
+              tagList(icon("hand-holding-dollar"), paste0(" Received Offer: ", player_card_money(rec_offer_price), " from ", rec_offer_bidder))
             )
             btn_accept_offer <- actionButton(
               ns("btn_accept_offer"),
@@ -406,7 +414,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           bid_info <- active_bid_info_RV()
           banner <- div(
             style = "width: 100%; text-align: center; margin-bottom: 10px; padding: 10px 16px; background-color: var(--fm-surface); color: var(--fm-text); border: 1px solid #a7f3d0; border-radius: 8px; font-weight: 700; font-size: 14px;",
-            tagList(icon("hand-holding-dollar"), paste0(" Your Active Bid: ", format_currency(bid_info$price)))
+            tagList(icon("hand-holding-dollar"), paste0(" Your Active Bid: ", player_card_money(bid_info$price)))
           )
           btn_modify <- actionButton(
             ns("btn_modify_bid"),
@@ -538,7 +546,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
           # Option 3: "Buy Release Clause" button when clause is OPEN
           if (is_clause_open) {
-            clause_label <- paste0(" Buy Clause: ", format_currency(clause_price_val))
+            clause_label <- paste0(" Buy Clause: ", player_card_money(clause_price_val))
             action_buttons <- tagList(
               action_buttons,
               actionButton(
@@ -552,7 +560,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
             lock_reason <- if (clause_date_formatted != "") paste0("until ", clause_date_formatted) else "transferred/cooldown"
             locked_badge <- div(
               style = "display: inline-block; padding: 8px 16px; background-color: var(--fm-surface); color: var(--fm-text); border: 1px solid #fde68a; border-radius: 8px; font-weight: 600; font-size: 12px; margin: 5px;",
-              tagList(icon("lock"), paste0(" Release Clause Locked ", lock_reason, " (", format_currency(clause_price_val), ")"))
+              tagList(icon("lock"), paste0(" Release Clause Locked ", lock_reason, " (", player_card_money(clause_price_val), ")"))
             )
             action_buttons <- tagList(action_buttons, locked_badge)
           }
@@ -580,8 +588,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       showModal(modalDialog(
         title = tagList(icon("pen-to-square"), " Update Your Active Bid"),
         p(strong(sp$name)),
-        p("Current Active Bid: ", strong(format_currency(bid_info$price))),
-        p("Minimum market bid: ", strong(format_currency(market_bid_minimum(sp)))),
+        p("Current Active Bid: ", strong(player_card_money(bid_info$price))),
+        p("Minimum market bid: ", strong(player_card_money(market_bid_minimum(sp)))),
         numericInput(
           ns("new_bid_amount"),
           label = "New Bid Amount (EUR):",
@@ -647,7 +655,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           )
         }, error = function(e) NULL)
         shiny::showNotification(
-          paste0("Active bid updated to ", format_currency(new_price), " for ", sp$name, "!"),
+          paste0("Active bid updated to ", player_card_money(new_price), " for ", sp$name, "!"),
           type = "message",
           duration = 5
         )
@@ -675,7 +683,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       showModal(modalDialog(
         title = tagList(icon("trash-can"), " Cancel Active Bid"),
         p(strong(sp$name)),
-        p("Are you sure you want to cancel your active bid of ", strong(format_currency(bid_info$price)), "?"),
+        p("Are you sure you want to cancel your active bid of ", strong(player_card_money(bid_info$price)), "?"),
         p(style = "color: var(--fm-danger); font-size: 13px;", "This will withdraw your offer from the transfer market."),
         footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
                      modalButton("Keep Bid"),
@@ -751,8 +759,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       showModal(modalDialog(
         title = tagList(icon("chart-line"), " Place Market Offer (Smart Bid)"),
         p(strong(sp$name)),
-        p("Minimum market bid: ", strong(format_currency(market_price))),
-        p("Recommended Smart Bid: ", strong(format_currency(recommended_val))),
+        p("Minimum market bid: ", strong(player_card_money(market_price))),
+        p("Recommended Smart Bid: ", strong(player_card_money(recommended_val))),
         numericInput(
           ns("bid_amount"),
           label = "Your offer amount (EUR):",
@@ -797,7 +805,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       showModal(modalDialog(
         title = tagList(icon("hand-holding-dollar"), " Place Market Offer"),
         p(strong(sp$name)),
-        p("Minimum market bid: ", strong(format_currency(market_price))),
+        p("Minimum market bid: ", strong(player_card_money(market_price))),
         numericInput(
           ns("bid_amount"),
           label = "Your offer amount (EUR):",
@@ -820,6 +828,31 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       open_market_offer_modal()
     })
 
+    # ---- Shared received-offer confirmation modal ----
+    open_accept_offer_modal <- function() {
+      sp <- selected_player()
+      req(sp)
+      rec_offer_price <- if ("bid_price" %in% names(sp)) suppressWarnings(as.numeric(sp$bid_price)) else NA_real_
+      if (length(rec_offer_price) != 1L || !is.finite(rec_offer_price) || rec_offer_price <= 0) {
+        shiny::showNotification("This received offer is no longer available. Please refresh and try again.", type = "warning")
+        return(invisible(FALSE))
+      }
+      rec_offer_bidder <- if ("bid_user" %in% colnames(sp) && !is.na(sp$bid_user) && sp$bid_user != "") as.character(sp$bid_user) else "Futmondo"
+      remember_action_context("accept")
+      showModal(modalDialog(
+        title = tagList(icon("circle-check"), paste0(" Accept Offer for ", sp$name)),
+        p(strong(sp$name)),
+        p("Are you sure you want to ACCEPT the received offer of ", strong(player_card_money(rec_offer_price)), " from ", strong(rec_offer_bidder), "?"),
+        p(style = "color: var(--fm-text); font-size: 13px; font-weight: 600;", "The player will be sold and funds added to your budget immediately."),
+        footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
+                     modalButton("Cancel"),
+                     actionButton(ns("submit_accept_offer"), "Confirm Accept Offer", class = "btn btn-offer-money")),
+        easyClose = TRUE,
+        size = "s"
+      ))
+      invisible(TRUE)
+    }
+
     # ---- Open acquisition modals from an external stable action event ----
     # `open_action` is an optional reactive returning a stable action code:
     #   - "market_bid"   (Today's "Place Bid" recommendation) -> the SAME
@@ -830,18 +863,19 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     #     ever shown/executed (never a comparison price). It NEVER opens the
     #     market bid modal.
     # Guarded against stale startup reactive values: only fires when the
-    # action is exactly one of the two codes AND a selected player is
-    # currently valid.
+    # action is an executable stable code and a selected player is valid.
     if (!is.null(open_action) && is.reactive(open_action)) {
       observeEvent(open_action(), {
         act <- open_action()
-        if (!act %in% c("market_bid", "clause_buyout")) return()
+        if (!act %in% c("market_bid", "clause_buyout", "accept_offer")) return()
         sp <- selected_player()
         req(sp)
         if (identical(act, "market_bid")) {
           open_market_offer_modal()
-        } else {
+        } else if (identical(act, "clause_buyout")) {
           open_clause_buyout_modal(sp)
+        } else {
+          open_accept_offer_modal()
         }
       }, ignoreNULL = TRUE)
     }
@@ -899,7 +933,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           print(paste0("[Supabase] Bid log warning: ", e$message))
         })
         shiny::showNotification(
-          paste0("Market offer of ", format_currency(bid_amount), " submitted successfully for ", sp$name, "!"),
+          paste0("Market offer of ", player_card_money(bid_amount), " submitted successfully for ", sp$name, "!"),
           type = "message",
           duration = 5
         )
@@ -932,12 +966,12 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
       default_offer <- if ("value" %in% colnames(sp) && !is.na(sp$value) && sp$value > 0) sp$value else 1000000
       owner_name <- if ("userTeam" %in% colnames(sp) && !is.na(sp$userTeam)) sp$userTeam else if ("teamname" %in% colnames(sp) && !is.na(sp$teamname)) sp$teamname else "Owner"
-      clause_info <- if ("clause_price" %in% colnames(sp) && !is.na(sp$clause_price) && sp$clause_price > 0) paste0(" (Release Clause: ", format_currency(sp$clause_price), ")") else ""
+      clause_info <- if ("clause_price" %in% colnames(sp) && !is.na(sp$clause_price) && sp$clause_price > 0) paste0(" (Release Clause: ", player_card_money(sp$clause_price), ")") else ""
 
       showModal(modalDialog(
         title = tagList(icon("hand-holding-dollar"), paste0(" Offer Money to ", owner_name)),
         p(strong(sp$name), clause_info),
-        p("Current Market Valuation: ", strong(format_currency(default_offer))),
+        p("Current Market Valuation: ", strong(player_card_money(default_offer))),
         numericInput(
           ns("owner_offer_amount"),
           label = "Your purchase offer amount (EUR):",
@@ -1008,7 +1042,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           print(paste0("[Supabase] Direct offer log warning: ", e$message))
         })
         shiny::showNotification(
-          paste0("Direct offer of ", format_currency(offer_amount), " submitted successfully for ", sp$name, "!"),
+          paste0("Direct offer of ", player_card_money(offer_amount), " submitted successfully for ", sp$name, "!"),
           type = "message",
           duration = 5
         )
@@ -1068,7 +1102,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         title = tagList(icon("bolt"), " Confirm Release Clause Buyout"),
         p(strong(sp$name)),
         p("This will instantly purchase the player for their official release clause."),
-        p("Clause price: ", strong(format_currency(clause_price))),
+        p("Clause price: ", strong(player_card_money(clause_price))),
         p(style = "color: var(--fm-danger); font-size: 13px; font-weight: 600;", "Are you sure you want to trigger this clause buyout?"),
         footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
                      modalButton("Cancel"),
@@ -1153,7 +1187,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           print(paste0("[Supabase] Clause log warning: ", e$message))
         })
         shiny::showNotification(
-          paste0("Release clause buyout of ", format_currency(clause_price), " executed successfully for ", sp$name, "!"),
+          paste0("Release clause buyout of ", player_card_money(clause_price), " executed successfully for ", sp$name, "!"),
           type = "message",
           duration = 5
         )
@@ -1181,7 +1215,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       showModal(modalDialog(
         title = tagList(icon("tags"), paste0(" List ", sp$name, " on Market")),
         p(strong(sp$name)),
-        p("Current Market Valuation: ", strong(format_currency(default_price))),
+        p("Current Market Valuation: ", strong(player_card_money(default_price))),
         numericInput(
           ns("sale_price_input"),
           label = "Asking Listing Price (EUR):",
@@ -1230,7 +1264,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
       if (is_success) {
         shiny::showNotification(
-          paste0(sp$name, " listed on the transfer market for ", format_currency(sale_price), "!"),
+          paste0(sp$name, " listed on the transfer market for ", player_card_money(sale_price), "!"),
           type = "message",
           duration = 5
         )
@@ -1309,25 +1343,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     })
 
     # ---- Accept Received Offer Modal ----
-    observeEvent(input$btn_accept_offer, {
-      remember_action_context("accept")
-      sp <- selected_player()
-      req(sp)
-      rec_offer_price <- suppressWarnings(as.numeric(sp$bid_price))
-      rec_offer_bidder <- if ("bid_user" %in% colnames(sp) && !is.na(sp$bid_user) && sp$bid_user != "") as.character(sp$bid_user) else "Futmondo"
-
-      showModal(modalDialog(
-        title = tagList(icon("circle-check"), paste0(" Accept Offer for ", sp$name)),
-        p(strong(sp$name)),
-        p("Are you sure you want to ACCEPT the received offer of ", strong(format_currency(rec_offer_price)), " from ", strong(rec_offer_bidder), "?"),
-        p(style = "color: var(--fm-text); font-size: 13px; font-weight: 600;", "The player will be sold and funds added to your budget immediately."),
-        footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
-                     modalButton("Cancel"),
-                     actionButton(ns("submit_accept_offer"), "Confirm Accept Offer", class = "btn btn-offer-money")),
-        easyClose = TRUE,
-        size = "s"
-      ))
-    })
+    observeEvent(input$btn_accept_offer, open_accept_offer_modal())
 
     # ---- Submit Accept Received Offer ----
     observeEvent(input$submit_accept_offer, {
@@ -1405,7 +1421,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       showModal(modalDialog(
         title = tagList(icon("circle-xmark"), paste0(" Reject Offer for ", sp$name)),
         p(strong(sp$name)),
-        p("Are you sure you want to REJECT the received offer of ", strong(format_currency(rec_offer_price)), " from ", strong(rec_offer_bidder), "?"),
+        p("Are you sure you want to REJECT the received offer of ", strong(player_card_money(rec_offer_price)), " from ", strong(rec_offer_bidder), "?"),
         footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
                      modalButton("Cancel"),
                      actionButton(ns("submit_reject_offer"), "Confirm Reject Offer", class = "btn btn-cancel-bid")),
@@ -1560,7 +1576,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           line = list(color = "#3b82f6", width = 2.5),
           yaxis = "y",
           hoverinfo = "text",
-          text = ~paste0("Date: ", format(date, "%d-%m-%y"), "<br>Valuation: ", format_table_currency(value))
+          text = ~paste0("Date: ", format(date, "%d-%m-%y"), "<br>Valuation: ", player_card_money(value))
         )
 
       if (points_trace$has_points) {
@@ -1588,10 +1604,19 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         )
         annotations_cfg <- NULL
       } else {
-        # Graceful no-points state: hide the points axis, show a note.
+        # Keep aggregate points and round-by-round observations distinct. A
+        # player can have a current total while finalized per-round data has
+        # not yet been collected.
         yaxis2_cfg <- list(visible = FALSE)
+        aggregate_points <- suppressWarnings(as.numeric(as.character(sp$points)))
+        no_points_text <- if (length(aggregate_points) == 1L && is.finite(aggregate_points) && aggregate_points > 0) {
+          paste0("Total points: ", format(aggregate_points, trim = TRUE, scientific = FALSE),
+            ". Round-by-round history is unavailable.")
+        } else {
+          "No round-by-round points recorded yet"
+        }
         annotations_cfg <- list(list(
-          text = "No points recorded yet",
+          text = no_points_text,
           x = 0.98, y = 0.98, xref = "paper", yref = "paper",
           showarrow = FALSE, align = "right",
           font = list(color = "#94a3b8", size = 12),
@@ -1723,9 +1748,14 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         icon <- NULL
         number_color = "black"
       }
+      change_text <- if (length(change) == 1L && is.finite(change)) {
+        add_sign(player_card_money(change))
+      } else {
+        "Unavailable"
+      }
       descriptionBlock(
-        header = format_currency(value),
-        number = paste0(add_sign(format_currency(change)), " (", round(change_pct, 2), "%)"),
+        header = player_card_money(value),
+        number = paste0(change_text, " (", round(change_pct, 2), "%)"),
         numberColor = number_color,
         numberIcon = icon,
         text = "Value"
@@ -2000,20 +2030,20 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           div(
             style = "background: var(--fm-surface); border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center;",
             div(style = "font-size: 11px; color: var(--fm-muted); font-weight: 600; text-transform: uppercase;", "Estimated Fair Value"),
-            div(style = "font-size: 18px; font-weight: 800; color: var(--fm-text);", format_table_currency(fair_value))
+            div(style = "font-size: 18px; font-weight: 800; color: var(--fm-text);", player_card_money(fair_value))
           ),
           # Expected Winning Range
           div(
             style = "background: var(--fm-surface); border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center;",
             div(style = "font-size: 11px; color: var(--fm-muted); font-weight: 600; text-transform: uppercase;", "Heuristic bid bounds"),
-            div(style = "font-size: 14px; font-weight: 700; color: var(--fm-text);", paste0("Minimum ", format_table_currency(min_winning), " · Ceiling ", format_table_currency(max_rational)))
+            div(style = "font-size: 14px; font-weight: 700; color: var(--fm-text);", paste0("Minimum ", player_card_money(min_winning), " · Ceiling ", player_card_money(max_rational)))
           ),
           # Recommended Smart Bid
           div(
             style = "background: var(--fm-surface); border: 2px solid #3b82f6; border-radius: 6px; padding: 10px; text-align: center;",
             div(style = "font-size: 11px; color: var(--fm-text); font-weight: 600; text-transform: uppercase;", "Recommended Smart Bid"),
             div(style = "font-size: 20px; font-weight: 800; color: var(--fm-text);",
-                if (isTRUE(smart_bid_result$can_compete)) format_table_currency(recommended) else "No bid")
+                if (isTRUE(smart_bid_result$can_compete)) player_card_money(recommended) else "No bid")
           ),
           # Expected ROI
           div(
@@ -2036,7 +2066,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           div(
             style = "font-size: 13px; font-weight: 600;",
             "Max Rational Bid: ",
-            span(style = "color: var(--fm-danger); font-weight: 800;", format_table_currency(max_rational))
+            span(style = "color: var(--fm-danger); font-weight: 800;", player_card_money(max_rational))
           ),
           div(
             style = "font-size: 13px; font-weight: 600;",
@@ -2051,12 +2081,12 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           div(
             style = "font-size: 13px; font-weight: 600;",
             "Verified Spendable: ",
-            span(style = "font-weight: 800;", format_table_currency(smart_bid_result$spendable_funds))
+            span(style = "font-weight: 800;", player_card_money(smart_bid_result$spendable_funds))
           ),
           if (is.finite(smart_bid_result$api_bid_limit)) div(
             style = "font-size: 13px; font-weight: 600;",
             "Futmondo Bid Limit: ",
-            span(style = "font-weight: 800;", format_table_currency(smart_bid_result$api_bid_limit))
+            span(style = "font-weight: 800;", player_card_money(smart_bid_result$api_bid_limit))
           ),
         div(
           style = "margin-bottom: 14px; text-align: center;",

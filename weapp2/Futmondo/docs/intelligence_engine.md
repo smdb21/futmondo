@@ -133,3 +133,13 @@ feed <- generate_command_center_feed(NULL, league_id, team_id, teams, rated,
 ```
 
 Offline regression coverage: `Rscript test/test_clause_affordability.R` and `Rscript test/test_clause_value_wording.R`.
+
+### Recommendation conflict resolution
+
+A player cannot appear as both `Hold` and `Sell` in one command-center feed. If an asynchronous refresh or duplicate source record temporarily produces both actions for the same immutable `player_id`, `Sell` is retained because it is actionable and the conflicting `Hold` card is removed. Buy, Bid, and Clause cards retain their separate transaction semantics.
+
+Focused regression coverage: `Rscript test/test_command_center_conflicts.R`.
+
+### Sell recommendations with received offers
+
+For an owned Sell-tier player with a finite positive `bid_price`, the command center creates one Sell card with `Accept Offer` and stable action code `accept_offer`. Its description includes the received amount. The generic Bid card is suppressed for that player, avoiding duplicate acceptance advice. A Sell-tier player without an offer remains `List on Market` with action code `view`.

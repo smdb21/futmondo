@@ -9,6 +9,17 @@ suppressPackageStartupMessages(source('Modules/Classification_Module.R'))
 suppressPackageStartupMessages(source('Modules/Rivals_Module.R'))
 format_table_currency <- function(x) paste0(format(x, scientific=FALSE, trim=TRUE), ' EUR')
 record <- function(name, expr) {force(expr); cat('[PASS]', name, '\n')}
+record('all player-card money displays use the shared formatter', {
+  source_text <- paste(readLines('Modules/Selected_Player_Module.R', warn=FALSE), collapse='\n')
+  stopifnot(!grepl('format_currency\\(', source_text),
+            !grepl('format_table_currency\\(', source_text),
+            length(gregexpr('player_card_money\\(', source_text)[[1]]) > 20L)
+})
+record('player card offer money uses stable Spanish euro formatting', {
+  stopifnot(player_card_money(11234778) == '11.234.778 €',
+            player_card_money(-5000.5) == '-5.000 €',
+            player_card_money(NA_real_) == 'Unavailable')
+})
 record('signed and missing financial values', {
   stopifnot(ui_financial_amount(0)=='0 EUR', ui_financial_amount(-50)=='-50 EUR',
             ui_financial_amount(NA_real_)=='Unavailable',ui_financial_amount(NULL)=='Unavailable')

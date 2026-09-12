@@ -216,7 +216,7 @@ The player valuation/points trend chart (`player_trend_plot`) renders two series
 * **Points** -- built by the pure helper `build_player_points_trace(history_df, finished_rounds_df, sp)`:
   - **One marker per completed round**: a snapshot must have a finite nonnegative `points` value and a valid `recorded_at`. The latest snapshot within each finished-round boundary window is selected. No marker is drawn without finished-round boundaries.
   - **Markers only**: the points series uses `mode = "markers"` (no interpolated line) so it never implies points that were not recorded.
-  - **Graceful no-points state**: when there are no eligible points, the points axis is hidden and a "No points recorded yet" annotation is shown instead of a fabricated zero line.
+  - **Graceful unavailable state**: when there are no eligible per-round observations, the points axis is hidden. If Futmondo reports a positive aggregate total, the chart shows that total and explains that round-by-round history is unavailable; otherwise it says that no round-by-round points have been recorded. It never fabricates a zero line.
 * **Independent padded axes** -- both axes fit their own plotted values with space above and below every marker. The valuation fill no longer forces the axis down to zero, which previously crowded high or nearly constant valuations against the top edge. Constant and zero-only series also receive nonzero ranges.
 
 ### `player_trend_axis_range(values)`
@@ -243,3 +243,14 @@ latest_player_round_points(player_history, finished_rounds, limit=5L)
 ```
 
 The renderer reads player history and finished rounds through the existing cached connectors. The responsive `.player-recent-rounds-list` wraps point chips on narrow screens without fixed widths. Focused regression coverage is included in `Rscript test/test_player_trend_plot.R`.
+
+## 10. Received Offer Currency
+
+`player_card_money(value)` returns a whole-euro string with Spanish thousands separators and the euro symbol, for example `11.234.778 €`. It returns `Unavailable` for missing or non-finite values. Every monetary display in the player card uses this helper: valuation, trend hover text, asking prices, offers, bids, clauses, confirmation dialogs, success notices, previews, and Smart Bid values. A received offer from Futmondo is displayed as `Received Offer: 11.234.778 € from Futmondo`.
+
+```r
+player_card_money(11234778)
+# "11.234.778 €"
+```
+
+Focused verification: `Rscript test/test_ui_reliability.R`.

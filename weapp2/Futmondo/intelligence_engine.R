@@ -676,13 +676,20 @@ generate_command_center_feed <- function(login, championship_id,
 
         for (i in seq_len(nrow(top_sells))) {
           p <- top_sells[i, ]
+          offer_amount <- if ("bid_price" %in% names(p)) suppressWarnings(as.numeric(p$bid_price)) else NA_real_
+          has_offer <- length(offer_amount) == 1L && is.finite(offer_amount) && offer_amount > 0
+          sell_description <- if (has_offer) {
+            paste0("Received offer of ", fmt_money(offer_amount), ". Current FIS: ", round(p$fis_score, 1), ".")
+          } else {
+            paste0("Weak metrics suggest listing on market. Current FIS: ", round(p$fis_score, 1))
+          }
           recommendations[[length(recommendations) + 1]] <- data.frame(
             type = "Sell",
             title = paste0("SELL: ", p$name),
-            description = paste0("Weak metrics suggest listing on market. Current FIS: ", round(p$fis_score, 1)),
+            description = sell_description,
             confidence_pct = safe_clamp(100 - p$fis_score),
-            action_label = "List on Market",
-            action_code = "view",
+            action_label = if (has_offer) "Accept Offer" else "List on Market",
+            action_code = if (has_offer) "accept_offer" else "view",
             player_id = as.character(p$id),
             stringsAsFactors = FALSE
           )
@@ -694,7 +701,9 @@ generate_command_center_feed <- function(login, championship_id,
     if (has_players && "bid_price" %in% colnames(players_df) && "user_team_id" %in% colnames(players_df)) {
       owned_mask <- as.character(players_df$user_team_id) == as.character(user_team_id)
       bid_values <- suppressWarnings(as.numeric(as.character(players_df$bid_price)))
-      eligible_bid <- !is.na(owned_mask) & owned_mask & is.finite(bid_values) & bid_values > 0
+      sell_tier <- if ("fis_tier" %in% names(players_df)) as.character(players_df$fis_tier) == "Sell" else rep(FALSE, nrow(players_df))
+      # Sell cards with a received offer already provide the Accept Offer action.
+      eligible_bid <- !is.na(owned_mask) & owned_mask & is.finite(bid_values) & bid_values > 0 & !sell_tier
       bid_players <- players_df[which(eligible_bid), , drop = FALSE]
       if (nrow(bid_players) > 0) {
         for (i in seq_len(nrow(bid_players))) {
@@ -879,6 +888,14 @@ generate_command_center_feed <- function(login, championship_id,
     }
 
     result_df <- do.call(rbind, recommendations)
+    # A player cannot be both a Hold and a Sell recommendation. Duplicate or
+    # asynchronously refreshed source rows can temporarily carry different
+    # FIS tiers for the same player ID; the actionable Sell takes precedence.
+    sell_ids <- as.character(result_df$player_id[result_df$type == "Sell"])
+    if (length(sell_ids)) {
+      result_df <- result_df[!(result_df$type == "Hold" &
+        as.character(result_df$player_id) %in% sell_ids), , drop = FALSE]
+    }
     # Sort by confidence descending
     result_df$priority_score <- result_df$confidence_pct
     result_df$confidence_pct <- NA_real_
