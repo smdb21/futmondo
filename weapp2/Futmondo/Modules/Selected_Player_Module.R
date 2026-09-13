@@ -14,6 +14,14 @@ player_card_money <- function(value) {
 selected_player_UI <- function(id) {
   ns <- NS(id)
   tagList(
+    # The modal footer is below a long card. Keep a large, keyboard-accessible
+    # dismissal control at the top of the scrollable player-card content.
+    div(
+      class = "player-card-close-shortcut",
+      tags$button(type = "button", class = "btn btn-default",
+        `data-dismiss` = "modal", `aria-label` = "Close player card",
+        icon("times"), span("Close player card"))
+    ),
     userBox(
       id = ns("selected_player_box"),
       width = 12,
@@ -1250,13 +1258,13 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
       player_id <- sp$id
 
-      res <- put_player_on_market(
-        login = login,
-        championship_id = champ_id,
-        team_id = team_id,
-        player_id = player_id,
-        price = sale_price
-      )
+      already_listed <- ("market_inMarket" %in% names(sp) && isTRUE(as.logical(sp$market_inMarket))) ||
+        ("effective_market_price" %in% names(sp) && is.finite(suppressWarnings(as.numeric(sp$effective_market_price))) && suppressWarnings(as.numeric(sp$effective_market_price)) > 0)
+      res <- if (already_listed) {
+        update_player_market_listing(login, champ_id, team_id, player_id, sale_price)
+      } else {
+        put_player_on_market(login, champ_id, team_id, player_id, sale_price)
+      }
 
       is_success <- if (is.list(res)) isTRUE(res$success) else isTRUE(res)
 
@@ -1563,6 +1571,11 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         })
       }
       points_trace <- build_player_points_trace(history_df, finished_rounds_df, sp)
+      if (!points_trace$has_points && !is.null(login) && !is.null(champ_id) && !is.null(player_id)) {
+        summary <- tryCatch(get_player_summary(login, champ_id, get_reactive_val(user_team_id), player_id), error = function(e) NULL)
+        summary_trace <- player_summary_points_trace(summary, finished_rounds_df)
+        if (summary_trace$has_points) points_trace <- summary_trace
+      }
 
       # Build clean dual y-axis Plotly chart (valuation always present).
       chart <- plotly::plot_ly(data = val_df) %>%
@@ -1661,6 +1674,11 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       rounds <- if (!is.null(login) && !is.null(champ_id)) tryCatch(
         get_finished_rounds(login,champ_id),error=function(e)NULL) else NULL
       recent <- latest_player_round_points(history,rounds,limit=5L)
+      if (!nrow(recent) && !is.null(login) && !is.null(champ_id) && !is.null(sp$id)) {
+        summary <- tryCatch(get_player_summary(login, champ_id, get_reactive_val(user_team_id), sp$id), error = function(e) NULL)
+        summary_trace <- player_summary_points_trace(summary, rounds)
+        if (summary_trace$has_points) recent <- tail(summary_trace$points_df, 5L)[order(tail(summary_trace$points_df, 5L)$round_number, decreasing=TRUE), , drop=FALSE]
+      }
       empty_text <- recent_round_points_empty_text(sp$points)
       div(class="player-recent-rounds",
         h4(icon("futbol")," Latest round points"),
@@ -2250,6 +2268,31 @@ build_player_points_trace <- function(history_df, finished_rounds_df = NULL, sp 
   rownames(points_df) <- NULL
 
   list(points_df = points_df, has_points = TRUE)
+}
+
+# Extract final round scores directly from the cached player-summary response.
+# This fallback is used when daily snapshots have not yet been persisted.
+player_summary_points_trace <- function(summary, finished_rounds_df = NULL) {
+  empty <- list(points_df = data.frame(date=as.POSIXct(character(0)), points=numeric(), round_number=numeric(), stringsAsFactors=FALSE), has_points=FALSE)
+  points <- if (is.list(summary)) summary$points else NULL
+  if (is.null(points) || !length(points) || !is.data.frame(finished_rounds_df) || !nrow(finished_rounds_df) ||
+      !all(c("round_number", "begin_process") %in% names(finished_rounds_df))) return(empty)
+  if (is.data.frame(points)) points <- split(points, seq_len(nrow(points)))
+  finished <- if ("is_finished" %in% names(finished_rounds_df)) !is.na(as.logical(finished_rounds_df$is_finished)) & as.logical(finished_rounds_df$is_finished) else rep(FALSE, nrow(finished_rounds_df))
+  rounds <- finished_rounds_df[finished, , drop=FALSE]
+  if (!nrow(rounds)) return(empty)
+  dates <- suppressWarnings(as.POSIXct(gsub("Z$", "", gsub("T", " ", as.character(rounds$begin_process))), tz="UTC"))
+  out <- lapply(as.list(points), function(point) {
+    round <- suppressWarnings(as.numeric(point$round)); score <- suppressWarnings(as.numeric(point$points))
+    idx <- which(rounds$round_number == round)
+    if (length(idx) != 1L || !is.finite(score)) return(NULL)
+    data.frame(date=dates[idx], points=score, round_number=round, stringsAsFactors=FALSE)
+  })
+  out <- Filter(Negate(is.null), out)
+  if (!length(out)) return(empty)
+  frame <- do.call(rbind, out)
+  frame <- frame[order(frame$round_number), , drop=FALSE]
+  list(points_df=frame, has_points=TRUE)
 }
 
 # Return the latest completed-round point observations, newest first.

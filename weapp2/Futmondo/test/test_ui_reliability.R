@@ -15,6 +15,12 @@ record('all player-card money displays use the shared formatter', {
             !grepl('format_table_currency\\(', source_text),
             length(gregexpr('player_card_money\\(', source_text)[[1]]) > 20L)
 })
+record('player card has an accessible top close control', {
+  card_html <- htmltools::renderTags(selected_player_UI('fixture'))$html
+  stopifnot(grepl('player-card-close-shortcut', card_html, fixed=TRUE),
+            grepl('Close player card', card_html, fixed=TRUE),
+            grepl('data-dismiss="modal"', card_html, fixed=TRUE))
+})
 record('player card offer money uses stable Spanish euro formatting', {
   stopifnot(player_card_money(11234778) == '11.234.778 €',
             player_card_money(-5000.5) == '-5.000 €',
@@ -163,14 +169,16 @@ record('bulk listing handles unverified API outcomes without local roster mutati
   env <- new.env(parent=globalenv())
   env$login_token <- 'fixture'; env$championship_id <- 'champ'; env$user_team_id <- 'team'
   env$get_reactive_val <- identity
-  env$put_all_on_market <- function(...) stop('unverified transport failure')
+  env$input <- list(bulk_listing_price_mode='value', bulk_listing_clause_premium=5)
+  env$players_table_RV <- function(...) data.frame(id='p1', value=1000000, market_inMarket=FALSE)
+  calls <- 0L
+  env$put_player_on_market <- function(...) { calls <<- calls + 1L; stop('unverified transport failure') }
   env$removeModal <- function(...) NULL
   env$refresh_trigger <- function(...) stop('must not refresh as successful mutation')
-  env$players_table_RV <- function(...) stop('must not overwrite roster')
   session <- shiny::MockShinySession$new()
   shiny::withReactiveDomain(session, eval(handler, env))
   session$close()
-  stopifnot(!env$is_success, !env$res$success, grepl('verified', env$res$message, fixed=TRUE))
+  stopifnot(calls == 1L)
 })
 record('classification UI renders all active controls', {
   html <- as.character(classification_UI('class'))

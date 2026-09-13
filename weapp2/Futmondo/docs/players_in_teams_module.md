@@ -73,12 +73,12 @@ A Shiny `tagList` containing four summary boxes, suitable for rendering via `ren
 
 ### "Put All Players on Market" (`btn_put_all_on_market`)
 
-Prompts a warning modal to confirm the user's intent. On confirmation, executes a bulk listing of all squad players via `put_all_on_market()`, which calls `POST https://api.futmondo.com/5/market/putallonmarket`.
+Prompts for a pricing method and confirms the user's intent. Every listing uses the verified single-player market endpoint. Users can list at current value or, for players with a valid closed clause, at clause price plus a configurable premium (default 5%).
 
 #### Workflow
 
 1. **Modal Confirmation**: The user clicks the "Put All on Market" button, triggering a confirmation modal. If the user cancels, no further action occurs.
-2. **API Call**: On confirmation, `put_all_on_market(login, championship_id, team_id)` is invoked, sending a POST request to the bulk listing endpoint.
+2. **API Calls**: On confirmation, each eligible player is listed through `put_player_on_market()`. Existing listings use `update_player_market_listing()` so Futmondo receives a withdrawal followed by the replacement price.
 3. **Success Path**:
    - A success notification is displayed to the user.
    - **Cache Invalidation**: `clear_api_cache()` is called to purge all cached API responses, ensuring the next data fetch retrieves fresh data from the server.

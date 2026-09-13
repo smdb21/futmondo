@@ -2565,6 +2565,27 @@ put_player_on_market <- function(login, championship_id, team_id, player_id, pri
   ))
 }
 
+# Updates an existing listing by withdrawing it first, then creating the
+# replacement at the requested price. Each API write is contained so callers
+# receive a verified outcome instead of an unhandled transport error.
+update_player_market_listing <- function(login, championship_id, team_id, player_id, price) {
+  tryCatch({
+    withdrawn <- cancel_player_sell(login, championship_id, team_id, player_id)
+    withdrawn_ok <- if (is.list(withdrawn)) isTRUE(withdrawn$success) else isTRUE(withdrawn)
+    if (!withdrawn_ok) {
+      message <- if (is.list(withdrawn) && !is.null(withdrawn$message) && nzchar(as.character(withdrawn$message))) withdrawn$message else "Could not remove the existing listing."
+      return(list(success = FALSE, code = if (is.list(withdrawn)) withdrawn$code %||% "" else "", message = message))
+    }
+    listed <- put_player_on_market(login, championship_id, team_id, player_id, price)
+    listed_ok <- if (is.list(listed)) isTRUE(listed$success) else isTRUE(listed)
+    if (!listed_ok) {
+      message <- if (is.list(listed) && !is.null(listed$message) && nzchar(as.character(listed$message))) listed$message else "The old listing was removed but the new price could not be listed."
+      return(list(success = FALSE, code = if (is.list(listed)) listed$code %||% "" else "", message = message))
+    }
+    if (is.list(listed)) listed else list(success = TRUE, code = "", message = "")
+  }, error = function(e) list(success = FALSE, code = "error", message = conditionMessage(e)))
+}
+
 cancel_player_sell <- function(login, championship_id, team_id, player_id) {
   payload <- list(
     header = list(

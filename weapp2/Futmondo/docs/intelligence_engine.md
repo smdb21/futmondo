@@ -96,6 +96,8 @@ Offline regression coverage: `Rscript test/test_smart_bid_minimum.R`.
 
 `generate_command_center_feed(login, championship_id, user_team_id, user_teams_df, players_df, pressroom_df=NULL, market_candidates=NULL, clause_candidates=NULL)` preserves the existing explicit market/clause route policy and dataframe fields `type`, `title`, `description`, `confidence_pct`, `action_label`, `action_code`, `player_id`. `priority_score` orders descriptive suggestions; `confidence_pct` is unavailable. Empty supplied candidate tables are authoritative; NULL retains compatibility behavior. Neither this feed nor any tier performs an account action.
 
+Buy ordering also uses `player_value_growth_ratio(players_df)`, which returns the daily `change / value` ratio for valid positive values. For market suggestions, the ratio is compared with every player in the league input, never merely with the current market list. With at least four observed league ratios, a positive upper-quartile player receives a bounded 10-point ordering boost; a Hold-tier player can be surfaced only through that upper-quartile signal, while Sell and unavailable players remain excluded. The card states the percentage increase and league-relative rank. This is a descriptive momentum signal, not a price forecast.
+
 ```r
 profile <- calculate_manager_dna("team-id", pressroom)
 feed <- generate_command_center_feed(NULL, "league-id", "team-id", teams, rated,

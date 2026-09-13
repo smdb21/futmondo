@@ -59,6 +59,17 @@ analytics_numeric_column <- function(df, column, default = NA_real_) {
   x
 }
 
+# Relative daily value movement. This ratio avoids treating the same euro
+# increase as equally meaningful for inexpensive and expensive players.
+player_value_growth_ratio <- function(players_df) {
+  if (is.null(players_df) || !is.data.frame(players_df)) return(numeric(0))
+  value <- analytics_numeric_column(players_df, "value")
+  change <- analytics_numeric_column(players_df, "change")
+  ratio <- ifelse(value > 0 & is.finite(change), change / value, NA_real_)
+  ratio[!is.finite(ratio)] <- NA_real_
+  ratio
+}
+
 calculate_fis_score <- function(players_df, weights = NULL) {
   if (is.null(players_df) || nrow(players_df) == 0) return(players_df)
   defaults <- c(perf = .30, form = .20, efficiency = .20, momentum = .15, fixture_risk = .15)
@@ -82,7 +93,8 @@ calculate_fis_score <- function(players_df, weights = NULL) {
   perf <- 100 * (1 - exp(-pmax(avg, 0) / 6))
   form <- safe_clamp(50 + 50 * (last5 - avg) / pmax(abs(avg), 1))
   efficiency <- ifelse(value > 0, 100 * pmax(avg, 0) / (pmax(avg, 0) + value / 1e6), NA_real_)
-  momentum <- ifelse(value > 0, 50 + 50 * tanh(20 * change / value), NA_real_)
+  value_growth <- player_value_growth_ratio(players_df)
+  momentum <- ifelse(is.finite(value_growth), 50 + 50 * tanh(20 * value_growth), NA_real_)
   availability <- rep(NA_real_, nrow(players_df))
   availability[status %in% c('ok', 'available', 'healthy')] <- 100
   availability[status %in% c('doubt', 'doubtful')] <- 60
@@ -599,6 +611,44 @@ generate_command_center_feed <- function(login, championship_id,
   fmt_money <- function(x) paste0(format(round(x, 0), big.mark = ".", decimal.mark = ",",
     scientific = FALSE, trim = TRUE), " €")
 
+  # A price rise is useful only in context. Rank each market candidate against
+  # every observed league player by change/value, and reserve the signal for
+  # the upper quartile of a sufficiently sized observed population.
+  add_value_growth_context <- function(pool, league_players) {
+    if (!is.data.frame(pool) || nrow(pool) == 0) return(pool)
+    pool$value_growth_ratio <- player_value_growth_ratio(pool)
+    pool$value_growth_percentile <- NA_real_
+    pool$high_value_growth <- FALSE
+    reference <- player_value_growth_ratio(league_players)
+    reference <- reference[is.finite(reference)]
+    if (length(reference) >= 4L) {
+      valid <- is.finite(pool$value_growth_ratio)
+      if (any(valid)) {
+        pool$value_growth_percentile[valid] <- vapply(pool$value_growth_ratio[valid], function(x) {
+          100 * mean(reference <= x)
+        }, numeric(1))
+      }
+      pool$high_value_growth <- is.finite(pool$value_growth_ratio) & pool$value_growth_ratio > 0 &
+        is.finite(pool$value_growth_percentile) & pool$value_growth_percentile >= 75
+    }
+    pool$buy_priority <- safe_numeric(pool$fis_score, -Inf) + ifelse(
+      pool$high_value_growth, 10 * pool$value_growth_percentile / 100, 0
+    )
+    pool
+  }
+
+  buy_description <- function(p) {
+    description <- if ("fis_summary" %in% names(p) && !is.na(p$fis_summary)) as.character(p$fis_summary) else ""
+    if (isTRUE(p$high_value_growth)) {
+      increase <- round(100 * safe_numeric(p$value_growth_ratio, 0), 1)
+      percentile <- round(safe_numeric(p$value_growth_percentile, 75))
+      description <- paste0(description, if (nzchar(description)) " " else "",
+        "Value is up ", increase, "% today, in the top ", 100 - percentile + 1,
+        "% of observed league players by relative value growth.")
+    }
+    description
+  }
+
   tryCatch({
     recommendations <- list()
 
@@ -618,9 +668,12 @@ generate_command_center_feed <- function(login, championship_id,
         # a SINGLE clause recommendation (clause price is executed).
         clause_ids <- if (has_clause_cand && nrow(clause_candidates) > 0) as.character(clause_candidates$id) else character(0)
         buy_pool <- mc[!as.character(mc$id) %in% clause_ids, ]
-        buy_pool <- buy_pool[buy_pool$fis_tier %in% c("Strong Buy", "Buy"), ]
+        league_reference <- if (has_players) players_df else mc
+        buy_pool <- add_value_growth_context(buy_pool, league_reference)
+        growth_eligible <- buy_pool$high_value_growth & !buy_pool$fis_tier %in% c("Sell", "Unavailable")
+        buy_pool <- buy_pool[buy_pool$fis_tier %in% c("Strong Buy", "Buy") | growth_eligible, , drop = FALSE]
         if (nrow(buy_pool) > 0) {
-          buy_pool <- buy_pool[order(-buy_pool$fis_score), ]
+          buy_pool <- buy_pool[order(-buy_pool$buy_priority, -buy_pool$fis_score), ]
           top_buys <- head(buy_pool, 3)
 
           for (i in seq_len(nrow(top_buys))) {
@@ -628,8 +681,8 @@ generate_command_center_feed <- function(login, championship_id,
             recommendations[[length(recommendations) + 1]] <- data.frame(
               type = "Buy",
               title = paste0("BUY: ", p$name),
-              description = if (!is.na(p$fis_summary)) p$fis_summary else "",
-              confidence_pct = p$fis_score,
+              description = buy_description(p),
+              confidence_pct = p$buy_priority,
               action_label = "Place Bid",
               action_code = "market_bid",
               player_id = as.character(p$id),
@@ -641,12 +694,16 @@ generate_command_center_feed <- function(login, championship_id,
     } else if (has_players) {
       # Legacy path (NULL candidates): Strong Buy / Buy tier players in
       # players_df.
-      buy_candidates <- players_df[
-        players_df$fis_tier %in% c("Strong Buy", "Buy"),
+      buy_candidates <- add_value_growth_context(players_df, players_df)
+      growth_eligible <- buy_candidates$high_value_growth & !buy_candidates$fis_tier %in% c("Sell", "Unavailable")
+      buy_candidates <- buy_candidates[
+        buy_candidates$fis_tier %in% c("Strong Buy", "Buy") | growth_eligible,
+        , drop = FALSE
       ]
       if (nrow(buy_candidates) > 0) {
-        # Sort by FIS score descending, take top 3
-        buy_candidates <- buy_candidates[order(-buy_candidates$fis_score), ]
+        # Relative value growth can improve priority, but cannot outweigh a
+        # materially stronger descriptive player rating by itself.
+        buy_candidates <- buy_candidates[order(-buy_candidates$buy_priority, -buy_candidates$fis_score), ]
         top_buys <- head(buy_candidates, 3)
 
         for (i in seq_len(nrow(top_buys))) {
@@ -654,8 +711,8 @@ generate_command_center_feed <- function(login, championship_id,
           recommendations[[length(recommendations) + 1]] <- data.frame(
             type = "Buy",
             title = paste0("BUY: ", p$name),
-            description = p$fis_summary,
-            confidence_pct = p$fis_score,
+            description = buy_description(p),
+            confidence_pct = p$buy_priority,
             action_label = "Place Bid",
             action_code = "market_bid",
             player_id = as.character(p$id),

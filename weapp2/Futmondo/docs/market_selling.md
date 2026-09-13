@@ -1,6 +1,6 @@
 # Market Selling & Withdrawal Documentation
 
-This document describes the API integration handlers and user workflows for selling squad players on the transfer market individually (`put_player_on_market`), in bulk (`put_all_on_market`), and withdrawing listed players (`cancel_player_sell`).
+This document describes the API integration handlers and user workflows for selling squad players on the transfer market individually (`put_player_on_market`), in bulk through verified per-player requests, updating a listing (`update_player_market_listing`), and withdrawing listed players (`cancel_player_sell`).
 
 ---
 
@@ -25,12 +25,9 @@ Withdraws a currently listed player from the transfer market via `POST https://a
   - `player_id`: Player ID string.
 * **Returns**: `list(success, code, message)`.
 
-### C. `put_all_on_market(login, championship_id, team_id)`
-Lists all squad players on the transfer market simultaneously via `POST https://api.futmondo.com/5/market/putallonmarket`.
-* **Parameters**:
-  - `login`: Auth token list (`token`, `userid`).
-  - `championship_id`: Active championship ID string.
-  - `team_id`: User team ID string.
+### C. `update_player_market_listing(login, championship_id, team_id, player_id, price)`
+Updates a listed player by calling the verified single-player endpoints in order: withdraw the existing listing, then create the replacement listing at `price`. If withdrawal succeeds but re-listing fails, the result explicitly reports that partial state so the user can refresh and act on it.
+* **Parameters**: `login`, `championship_id`, `team_id`, `player_id`, and positive numeric `price`.
 * **Returns**: `list(success, code, message)`.
 
 ### D. `get_my_market_players(login, championship_id, user_team_id)`

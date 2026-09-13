@@ -75,6 +75,10 @@ check("global UI exposes countdown and deadline solvency warning", {
   css <- paste(readLines("www/custom_style.css",warn=FALSE),collapse="\n")
   stopifnot(grepl('uiOutput("round_countdown")',ui,fixed=TRUE),
     grepl('output$round_countdown <- renderUI',server,fixed=TRUE),
+    grepl('Active offers:',server,fixed=TRUE),
+    grepl('After offers:',server,fixed=TRUE),
+    grepl('Can spend:',server,fixed=TRUE),
+    grepl('projected_committed_balance',server,fixed=TRUE),
     grepl("before kickoff to score points",server,fixed=TRUE),
     grepl('tags$span("In progress")',server,fixed=TRUE),
     grepl("position: sticky",css,fixed=TRUE),grepl("@media (max-width: 767px)",css,fixed=TRUE))

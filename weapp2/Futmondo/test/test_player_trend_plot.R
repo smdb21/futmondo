@@ -103,6 +103,13 @@ check('empty history fallback has a usable valuation range', {
   assert_visible(chart$data[[1]]$y, chart$layout$yaxis$range)
 })
 
+check('player-summary fallback returns only explicitly finished rounds', {
+  summary <- list(points=list(list(round=1,points=4),list(round=2,points=8)))
+  rounds <- data.frame(round_number=1:2,begin_process=c('2026-08-01T10:00:00Z','2026-08-08T10:00:00Z'),is_finished=c(TRUE,FALSE))
+  trace <- player_summary_points_trace(summary, rounds)
+  stopifnot(trace$has_points, identical(trace$points_df$round_number, 1), identical(trace$points_df$points, 4))
+})
+
 check('latest round points are limited and returned newest first', {
   history_recent <- data.frame(
     recorded_at=sprintf('2026-08-%02dT10:00:00Z',seq(1,8)),

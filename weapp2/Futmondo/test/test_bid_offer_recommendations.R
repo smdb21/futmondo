@@ -52,3 +52,23 @@ pressroom <- data.frame(id=c("buy1","sell1","buy2"),player_id="valid",
 stopifnot(current_player_acquisition_cost(list(id="valid"),pressroom,"mine")==750,
   is.na(current_player_acquisition_cost(list(id="unknown"),pressroom,"mine")))
 cat("BID OFFER RECOMMENDATIONS: 4 passed / 0 failed\n")
+
+# Buy candidates also consider change/value relative to the whole league. A
+# high-growth Hold player is eligible only when its rise is in the upper league
+# quartile; an otherwise identical player with an ordinary rise is not.
+league <- data.frame(
+  id = paste0("p", 1:5), name = paste0("Player ", 1:5),
+  value = rep(1000000, 5), change = c(10000, 20000, 30000, 40000, 100000),
+  fis_score = c(60, 60, 60, 60, 60), fis_tier = rep("Hold", 5),
+  fis_summary = rep("Stable rating.", 5), stringsAsFactors = FALSE
+)
+growth_feed <- generate_command_center_feed(
+  login = NULL, championship_id = "c", user_team_id = "mine", user_teams_df = data.frame(),
+  players_df = league, market_candidates = league, clause_candidates = data.frame()
+)
+growth_buy <- growth_feed[growth_feed$type == "Buy", , drop = FALSE]
+stopifnot(identical(growth_buy$player_id[1], "p5"),
+  setequal(growth_buy$player_id, c("p4", "p5")),
+  grepl("Value is up 10% today", growth_buy$description[1], fixed = TRUE),
+  identical(player_value_growth_ratio(league)[5], 0.1))
+cat("BUY VALUE GROWTH: 1 passed / 0 failed\n")

@@ -2,6 +2,8 @@
 
 This document describes the `Selected_Player_Module.R` Shiny module, which renders detailed player profile cards, performance history plots, and interactive player acquisition features.
 
+The card includes a prominent **Close player card** control before its content. It dismisses the hosting Shiny modal and uses sticky positioning, with a 48px mobile touch target, so users do not need to scroll to the footer to close a long card.
+
 ---
 
 ## 1. Module Overview
@@ -229,7 +231,7 @@ player_trend_axis_range(c(8, 8))              # c(6, 10)
 player_trend_axis_range(c(0, 0))              # c(-2, 2)
 ```
 
-Focused offline verification: `Rscript test/test_player_trend_plot.R` checks axis headroom, flat/zero/missing data, numeric strings, and the actual chart render with independent valuation and points axes.
+Focused offline verification: `Rscript test/test_player_trend_plot.R` checks axis headroom, flat/zero/missing data, numeric strings, and the actual chart render with independent valuation and points axes. When persisted snapshots do not yet contain round scores, `player_summary_points_trace(summary, finished_rounds_df)` reads the cached player-summary points only for explicitly finished rounds; it returns the same `points_df`/`has_points` shape and never labels an in-progress score as final.
 
 The Smart Bid card displays verified spendable capacity and Futmondo's reported bid limit. A blocked recommendation is rendered as **No bid** with the exact binding constraint, rather than presenting zero as a recommended bid or an unexplained rational ceiling.
 

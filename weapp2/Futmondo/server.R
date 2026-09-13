@@ -57,20 +57,29 @@ function(input, output, session) {
     finance <- tryCatch(get_financial_snapshot(login_token_RV(), championship_id_RV(), user_team_id_RV()),
       error = function(e) NULL)
     cash <- if (is.list(finance)) fm_number(finance$cash) else NA_real_
-    solvency_class <- if (is.finite(cash) && cash > 0) "round-countdown-solvent" else "round-countdown-warning"
-    solvency_text <- if (!is.finite(cash)) {
+    commitments <- if (is.list(finance)) fm_number(finance$commitments) else NA_real_
+    final_balance <- if (is.list(finance)) fm_number(finance$projected_committed_balance) else NA_real_
+    spendable <- if (is.list(finance)) fm_number(finance$spendable_budget) else NA_real_
+    money_text <- function(x) if (is.finite(x)) paste0(format(round(x), big.mark = ".", scientific = FALSE), " EUR") else "Unavailable"
+    solvency_class <- if (is.finite(final_balance) && final_balance > 0) "round-countdown-solvent" else "round-countdown-warning"
+    solvency_text <- if (!is.finite(final_balance)) {
       "Balance unavailable — verify it before the round"
-    } else if (cash > 0) {
-      paste0("Balance positive: ", format(round(cash), big.mark = ".", scientific = FALSE), " EUR")
+    } else if (final_balance > 0) {
+      paste0("Final balance positive: ", money_text(final_balance))
     } else {
-      paste0("Restore at least ", format(round(abs(cash) + 1), big.mark = ".", scientific = FALSE),
+      paste0("Restore at least ", format(round(abs(final_balance) + 1), big.mark = ".", scientific = FALSE),
         " EUR before kickoff to score points")
     }
     tags$div(class = paste("round-countdown-bar", solvency_class),
       tags$div(class = "round-countdown-main", icon("clock"),
         tags$strong(paste0("Round ", next_round$round_number)),
         tags$span(format_round_countdown(next_round$starts_at))),
-      tags$span(class = "round-countdown-finance", solvency_text))
+      tags$div(class = "round-countdown-finance",
+        tags$span(class = "round-countdown-finance-item", paste0("Balance: ", money_text(cash))),
+        tags$span(class = "round-countdown-finance-item", paste0("Active offers: ", money_text(commitments))),
+        tags$span(class = "round-countdown-finance-item", paste0("After offers: ", money_text(if (is.finite(cash) && is.finite(commitments)) cash - commitments else NA_real_))),
+        tags$span(class = "round-countdown-finance-item", paste0("Can spend: ", money_text(spendable))),
+        tags$span(class = "round-countdown-solvency", solvency_text)))
   })
   user_teams_RV <- reactive({
     req(championship_id_RV()); refresh_trigger()
