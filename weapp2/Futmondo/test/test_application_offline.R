@@ -101,6 +101,7 @@ app_check('full server login, navigation, refresh and logout', {
       players_in_championship='players_in_championship-championship_players_table-players_table',
       rivals=c('rivals-league_finances_table','rivals-league_finances_plot','rivals-team_valuation_history_plot'),
       classification=c('classification-classification_table','classification-rank_evolution_plot','classification-dreamteam_box_ui'),
+      round_mvps='round_mvps-mvp_cards',
       notifications=c('notifications-status','notifications-items'),
       intelligence=c('intelligence-coverage','intelligence-lineup_summary','intelligence-lineup','intelligence-profit_summary'),
       automation=c('automation-connection_status','automation-policy_status','automation-history'))

@@ -302,6 +302,30 @@ supabase_get <- function(table_name, query_params = list()) {
   })
 }
 
+# Retrieve saved MVP selections for a league. The query is cached because the
+# data changes only when the dream-team synchronisation writes a completed round.
+get_round_mvps <- function(championship_id) {
+  empty <- data.frame(
+    championship_id = character(), round_id = character(), round_number = numeric(),
+    player_id = character(), player_name = character(), player_role = character(),
+    points = numeric(), is_mvp = logical(), is_finished = logical(), stringsAsFactors = FALSE
+  )
+  if (is.null(championship_id) || !length(championship_id) ||
+      is.na(championship_id[1]) || !nzchar(as.character(championship_id[1]))) return(empty)
+  cache_key <- paste0("round_mvps_", as.character(championship_id[1]))
+  get_cached_data(cache_key, {
+    rows <- supabase_get("round_dream_team", list(
+      championship_id = paste0("eq.", as.character(championship_id[1])),
+      is_mvp = "is.true",
+      is_finished = "is.true",
+      select = "championship_id,round_id,round_number,player_id,player_name,player_role,points,is_mvp,is_finished",
+      order = "round_number.desc"
+    ))
+    if (is.null(rows)) stop("Round MVP data is unavailable.")
+    rows
+  })
+}
+
 get_player_historical_data <- function(player_id, championship_id) {
   query <- list(
     player_id = paste0("eq.", player_id),

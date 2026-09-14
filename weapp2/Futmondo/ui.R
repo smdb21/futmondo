@@ -63,6 +63,10 @@ body <- shinydashboard::dashboardBody(
       classification_UI(id = "classification")
     ),
     shinydashboard::tabItem(
+      tabName = "round_mvps",
+      round_mvps_UI(id = "round_mvps")
+    ),
+    shinydashboard::tabItem(
       tabName = "admin",
       admin_UI(id = "admin")
     )

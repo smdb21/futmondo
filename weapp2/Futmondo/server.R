@@ -178,6 +178,14 @@ players_in_championship_Server(id = "players_in_championship",
                         user_team_id = user_team_id_RV,
                         user_teams_RV = user_teams_RV, refresh_trigger = refresh_trigger)
 
+  round_mvps_Server(id = "round_mvps",
+                    is_module_active = reactive({
+                      input$tabs == "round_mvps"
+                    }),
+                    login_token = login_token_RV,
+                    championship_id = championship_id_RV,
+                    refresh_trigger = refresh_trigger)
+
   admin_Server(id = "admin",
                is_module_active = reactive({
                  req(input$tabs); input$tabs == "admin"
@@ -223,7 +231,8 @@ observeEvent(login_token_RV(),
       shinydashboard::menuItem("Market", tabName = "market", icon = icon("money-bill-trend-up")),
       shinydashboard::menuItem("Players", tabName = "players_in_championship", icon = icon("table")),
       shinydashboard::menuItem("Rivals", tabName = "rivals", icon = icon("users-viewfinder")),
-      shinydashboard::menuItem("Classification", tabName = "classification", icon = icon("trophy"))
+      shinydashboard::menuItem("Classification", tabName = "classification", icon = icon("trophy")),
+      shinydashboard::menuItem("Round MVPs", tabName = "round_mvps", icon = icon("medal"))
     )
 
     # Append Admin menu item as the last item if user is admin

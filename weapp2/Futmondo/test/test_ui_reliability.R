@@ -6,6 +6,7 @@ source('Modules/Players_Table_Module.R')
 source('Modules/Selected_Player_Module.R')
 source('Modules/Players_in_Teams_Module.R')
 suppressPackageStartupMessages(source('Modules/Classification_Module.R'))
+suppressPackageStartupMessages(source('Modules/Round_MVPs_Module.R'))
 suppressPackageStartupMessages(source('Modules/Rivals_Module.R'))
 format_table_currency <- function(x) paste0(format(x, scientific=FALSE, trim=TRUE), ' EUR')
 record <- function(name, expr) {force(expr); cat('[PASS]', name, '\n')}
@@ -76,6 +77,22 @@ record('round filters change standings without replacing unavailable scores', {
             missing_round$points[missing_round$team_id=='b']==22)
   missing_team <- classification_window_table(all[-2, ], c(2, 2), 'all')
   stopifnot(nrow(missing_team)==2L,is.na(missing_team$rank[missing_team$team_id=='a']))
+})
+record('round MVP records keep completed MVPs in newest-first order', {
+  rows <- data.frame(championship_id=c('league','league','league','other'), round_number=c(2,1,2,9),
+    player_id=c('p2','p1','not-mvp','other'), player_name=c('Latest','Earlier','Other','Wrong league'),
+    player_role=c('MID','GK','DEF','FWD'), points=c(12,8,99,30),
+    is_mvp=c(TRUE,'true',FALSE,TRUE), is_finished=c(TRUE,'1',TRUE,TRUE))
+  out <- round_mvp_rows(rows, 'league')
+  stopifnot(identical(out$player_id,c('p2','p1')), identical(out$round_number,c(2,1)),
+            nrow(round_mvp_rows(rows[rows$is_finished %in% FALSE,,drop=FALSE], 'league')) == 0L)
+})
+record('round MVP UI has dedicated responsive card output', {
+  html <- htmltools::renderTags(round_mvps_UI('mvp'))$html
+  stopifnot(grepl('mvp-mvp_cards', html, fixed=TRUE), grepl('Round MVPs', html, fixed=TRUE))
+  server_source <- paste(readLines('server.R', warn=FALSE), collapse='\n')
+  stopifnot(grepl('tabName = "round_mvps"', server_source, fixed=TRUE),
+            grepl('menuItem("Round MVPs"', server_source, fixed=TRUE))
 })
 record('dream team preserves actual MVP and missing scores', {
   d <- classification_dreamteam_rows(list(mvp='p1',players=list(list(id='p1',name='A',role=1,points=0),list(id='p2',name='B',role=2))))
