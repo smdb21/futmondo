@@ -64,7 +64,7 @@ function(input, output, session) {
     active_offer_count <- if (is.list(commitment_snapshot)) fm_number(commitment_snapshot$count) else NA_real_
     final_balance <- if (is.list(finance)) fm_number(finance$projected_committed_balance) else NA_real_
     spendable <- if (is.list(finance)) fm_number(finance$spendable_budget) else NA_real_
-    money_text <- function(x) if (is.finite(x)) paste0(format(round(x), big.mark = ".", scientific = FALSE), " EUR") else "Unavailable"
+    money_text <- function(x) if (is.finite(x)) paste0(format(round(x), big.mark = ".", decimal.mark = ",", scientific = FALSE), " EUR") else "Unavailable"
     offers_text <- if (is.finite(commitments)) {
       suffix <- if (is.finite(active_offer_count)) paste0(" (", as.integer(active_offer_count), ")") else ""
       paste0(money_text(commitments), suffix)
@@ -75,7 +75,7 @@ function(input, output, session) {
     } else if (final_balance > 0) {
       paste0("Final balance positive: ", money_text(final_balance))
     } else {
-      paste0("Restore at least ", format(round(abs(final_balance) + 1), big.mark = ".", scientific = FALSE),
+      paste0("Restore at least ", format(round(abs(final_balance) + 1), big.mark = ".", decimal.mark = ",", scientific = FALSE),
         " EUR before kickoff to score points")
     }
     tags$div(class = paste("round-countdown-bar", solvency_class),

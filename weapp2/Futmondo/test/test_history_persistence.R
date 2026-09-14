@@ -3,6 +3,14 @@ options(futmondo.offline=TRUE)
 suppressPackageStartupMessages({source('futmondo_functions.R');source('supabase_connector.R');source('background_runtime.R');source('intelligence_engine.R');source('Modules/Notifications_Module.R')})
 n<-0L
 check<-function(name,code){force(code);n<<-n+1L;cat('PASS',name,'\n')}
+check('collection logs avoid conflicting number separators and player-name debug output',{
+  server_source<-paste(readLines('server.R',warn=FALSE),collapse='\n')
+  roster_source<-paste(readLines('futmondo_functions.R',warn=FALSE),collapse='\n')
+  connector_source<-paste(readLines('supabase_connector.R',warn=FALSE),collapse='\n')
+  stopifnot(grepl('decimal.mark = ","',server_source,fixed=TRUE),
+    !grepl('print(player$name)',roster_source,fixed=TRUE),
+    grepl('Insight alerts skipped for this collection',connector_source,fixed=TRUE))
+})
 check('UTC, SQL and millisecond timestamps agree',{
   t<-fm_time(c('2026-09-01T12:00:00Z','2026-09-01 12:00:00+00:00','2026-09-01T14:00:00+02:00'))
   stopifnot(length(unique(as.numeric(t)))==1L,as.numeric(fm_time(as.numeric(t[1])*1000))==as.numeric(t[1]))

@@ -363,7 +363,6 @@ get_players_from_team <- function(login, championship_id, user_team_id, teams = 
       return(empty_df)
     }
     roster <- lapply(roster, FUN = function(player) {
-      print(player$name)
       average <- normalize_player_average(player$average)
       clause <- player$clause
       if (length(clause)) names(clause) <- paste0("clause_", names(clause))

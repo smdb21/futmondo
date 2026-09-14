@@ -1313,14 +1313,16 @@ collect_account_observations <- function(login, championship_id, user_team_id) {
   }
   if(length(completed_id)==1L && !is.na(completed_id)) supabase_post('observation_subscriptions',
     list(user_id=login[['userid']],championship_id=championship_id,user_team_id=user_team_id,last_player_id=completed_id))
-  if(exists("build_insight_alerts",mode="function")) {
+  # Alerts are supplementary. A transient alert/offer failure must not mark the
+  # completed history collection as failed or stop the next collection cycle.
+  if(exists("build_insight_alerts",mode="function")) tryCatch({
     fin <- get_financial_snapshot(login,championship_id,user_team_id)
     offers <- tryCatch(get_roster_bids(login,championship_id,user_team_id),error=function(e)NULL)
     sale_rows <- normalize_sale_observations(offers,roster,login[['userid']],championship_id,user_team_id)
     if(nrow(sale_rows)) supabase_post('sale_observations',sale_rows)
     alerts <- build_insight_alerts(login[["userid"]],championship_id,user_team_id,fin,roster,offers,market=market)
     if(nrow(alerts)) supabase_post("user_smart_alerts",alerts)
-  }
+  }, error=function(e) message("[Observations] Insight alerts skipped for this collection."))
   TRUE
 }
 
