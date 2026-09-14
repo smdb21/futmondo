@@ -10,7 +10,7 @@ Open this directory as the project and run:
 shiny::runApp(".")
 ```
 
-The application uses `global.R`, `ui.R` and `server.R`; there is no separate `app.R`. Install the dependencies recorded in `manifest.json` for your R environment. Core packages include Shiny, shinydashboardPlus, dplyr, data.table, httr, jsonlite, reactable, plotly, lpSolve, openssl, later and **callr**. `callr` is newly required for persistence in a separate R process. The regenerated manifest records the full dependency set.
+The application uses `global.R`, `ui.R` and `server.R`; there is no separate `app.R`. Install the dependencies recorded in `manifest.json` for your R environment. Core packages include Shiny, shinydashboardPlus, dplyr, data.table, httr, jsonlite, reactable, plotly, lpSolve, openssl and later. The observation queue runs cooperatively in the active Shiny session; no separate R child process is required. The regenerated manifest records the full dependency set.
 
 Login fields start empty. Users enter their own Futmondo credentials, select a league, and can switch leagues during the session. Logout clears the session and its API cache. Login passwords and tokens are not printed or deployed.
 The desktop navigation sidebar is 180px wide so full menu labels remain readable; the existing responsive mobile navigation is unchanged.
@@ -49,7 +49,7 @@ For a fresh database, apply `scripts/schema.sql`. For existing and fresh databas
 
 They create observation, forecast, scenario and worker tables; archive exact legacy transaction duplicates; add explicit league history context; and restrict private tables to the server role. Ambiguous legacy records are preserved. Back up the database and inspect the archive/reconciliation behavior before production application. **These migrations have not been applied to the connected production database.** PostgreSQL integration checks require a staging database; the offline tests do not substitute for them.
 
-Collection runs in a separate process after login/refresh. Failed saves distinguish missing configuration, denied access, missing schema, and connection problems. Use Refresh to retry; a successful refresh clears the warning for the same operation and league/team. Failures for other operations or leagues remain visible. Server diagnostics include only the affected table and HTTP/database error codes, never response payloads or credentials. [Background persistence](docs/background_worker.md) describes lifecycle and failure handling.
+Collection runs as a cooperative in-session queue after login/refresh. Failed saves distinguish missing configuration, denied access, missing schema, and connection problems. Use Refresh to retry; a successful refresh clears the warning for the same operation and league/team. Failures for other operations or leagues remain visible. Server diagnostics include only the affected table and HTTP/database error codes, never response payloads or credentials. [Background persistence](docs/background_worker.md) describes lifecycle and failure handling.
 
 ## Predictions and management
 

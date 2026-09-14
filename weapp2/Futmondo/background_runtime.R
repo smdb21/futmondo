@@ -1,8 +1,8 @@
-# Process-isolated persistence; see docs/background_worker.md.
+# In-session cooperative persistence; see docs/background_worker.md.
 .persistence_state <- new.env(parent=emptyenv())
 .persistence_state$queue <- list()
-.persistence_state$batch <- list()
-.persistence_state$process <- NULL
+.persistence_state$active <- NULL
+.persistence_state$progress <- list()
 .persistence_state$scheduled <- FALSE
 .persistence_state$errors <- list()
 
@@ -50,15 +50,21 @@ persistence_job_scope <- function(name, args) {
 
 persistence_failure_message <- function(issues = list()) {
   categories <- vapply(issues, function(issue) fm_scalar(issue$category, "write"), character(1))
-  if ("configuration" %in% categories)
-    return("History saving is unavailable because the database is not configured. Live Futmondo data is still available.")
-  if ("authorization" %in% categories)
-    return("History could not be saved because database access was denied. Contact the app administrator.")
-  if ("schema" %in% categories)
-    return("History could not be saved because the database needs an update. Contact the app administrator.")
-  if ("connection" %in% categories)
-    return("History could not be saved because the database connection failed. Use Refresh to retry.")
+  if ("configuration" %in% categories) return("History saving is unavailable because the database is not configured. Live Futmondo data is still available.")
+  if ("authorization" %in% categories) return("History could not be saved because database access was denied. Contact the app administrator.")
+  if ("schema" %in% categories) return("History could not be saved because the database needs an update. Contact the app administrator.")
+  if ("connection" %in% categories) return("History could not be saved because the database connection failed. Use Refresh to retry.")
+  if ("runtime" %in% categories) return("Observation saving stopped unexpectedly. Use Refresh to resume from the last saved player.")
   "Some history could not be saved. Use Refresh to retry; if this continues, contact the app administrator."
+}
+
+persistence_record_result <- function(job, ok, issues = list()) {
+  owner <- job$owner; key <- job$error_key %||% job$key
+  failures <- .persistence_state$errors[[owner]]
+  if (!is.list(failures)) failures <- list()
+  failures[[key]] <- if (isTRUE(ok)) NULL else persistence_failure_message(issues)
+  .persistence_state$errors[[owner]] <- failures
+  if (!isTRUE(ok)) message("[Persistence] Incomplete job: ", job$fn %||% "unknown")
 }
 
 defer_persistence <- function(fn, args=list()) {
@@ -71,88 +77,58 @@ defer_persistence <- function(fn, args=list()) {
   owner <- fm_scalar(owner,"system")
   key <- as.character(openssl::sha256(serialize(list(owner,name,args),NULL)))
   error_key <- persistence_job_scope(name,args)
-  existing <- c(.persistence_state$queue,.persistence_state$batch)
+  active <- .persistence_state$active
+  existing <- c(.persistence_state$queue, if (!is.null(active)) list(active) else list())
   if (any(vapply(existing,function(x)identical(x$key,key),logical(1)))) return(invisible(TRUE))
   if (length(.persistence_state$queue)>=200L) {
-    failures <- .persistence_state$errors[[owner]]
-    if (!is.list(failures)) failures <- list()
-    failures[[error_key]] <- "Background queue full. Use Refresh to retry."
-    .persistence_state$errors[[owner]] <- failures
+    failures <- .persistence_state$errors[[owner]]; if (!is.list(failures)) failures <- list()
+    failures[[error_key]] <- "Background queue full. Use Refresh to retry."; .persistence_state$errors[[owner]] <- failures
     return(FALSE)
   }
-  .persistence_state$queue[[length(.persistence_state$queue)+1L]] <- list(fn=name,args=args,owner=owner,key=key,
-    error_key=error_key)
-  if (!isTRUE(.persistence_state$scheduled)) {
-    .persistence_state$scheduled <- TRUE
-    later::later(persistence_tick,0)
-  }
+  .persistence_state$queue[[length(.persistence_state$queue)+1L]] <- list(fn=name,args=args,owner=owner,key=key,error_key=error_key)
+  if (!isTRUE(.persistence_state$scheduled)) { .persistence_state$scheduled <- TRUE; later::later(persistence_tick,0) }
   invisible(TRUE)
 }
 
 background_sync_status <- function(user_id) {
   owner <- fm_scalar(user_id,"")
-  jobs <- c(.persistence_state$queue,.persistence_state$batch)
+  active <- .persistence_state$active
+  jobs <- c(.persistence_state$queue, if (!is.null(active)) list(active) else list())
   pending <- sum(vapply(jobs,function(x)identical(x$owner,owner),logical(1)))
   errors <- unlist(.persistence_state$errors[[owner]],use.names=FALSE)
-  list(pending=pending,error=if(length(errors)) paste(unique(errors),collapse=' ') else NULL)
+  progress <- .persistence_state$progress[[owner]]
+  list(pending=pending,error=if(length(errors)) paste(unique(errors),collapse=" ") else NULL,
+       progress=if (is.character(progress) && length(progress)==1L) progress else NULL)
 }
 
 persistence_tick <- function() {
-  p <- .persistence_state$process
-  if (!is.null(p) && !p$is_alive()) {
-    result <- tryCatch(p$get_result(),error=function(e)NULL)
-    for (i in seq_along(.persistence_state$batch)) {
-      owner <- .persistence_state$batch[[i]]$owner
-      item <- if (length(result) >= i) result[[i]] else NULL
-      good <- isTRUE(item) || (is.list(item) && isTRUE(item$ok))
-      failures <- .persistence_state$errors[[owner]]
-      if (!is.list(failures)) failures <- list()
-      key <- .persistence_state$batch[[i]]$error_key %||% .persistence_state$batch[[i]]$key
-      issues <- if (is.list(item)) item$issues else list()
-      failures[[key]] <- if (good) NULL else persistence_failure_message(issues)
-      if (!good) {
-        message("[Persistence] Incomplete job: ", .persistence_state$batch[[i]]$fn %||% "unknown")
-        for (issue in issues) message("[Persistence] table=", issue$table, " category=", issue$category,
-          if (length(issue$http_status) == 1L && is.finite(issue$http_status)) paste0(" HTTP=", issue$http_status),
-          if (length(issue$code) == 1L && !is.na(issue$code) && nzchar(issue$code)) paste0(" code=", issue$code))
-      }
-      .persistence_state$errors[[owner]] <- failures
-    }
-    .persistence_state$batch <- list(); .persistence_state$process <- NULL
+  if (is.null(.persistence_state$active) && length(.persistence_state$queue)) {
+    .persistence_state$active <- .persistence_state$queue[[1]]
+    .persistence_state$queue <- .persistence_state$queue[-1]
   }
-  if (is.null(.persistence_state$process) && length(.persistence_state$queue)) {
-    batch <- head(.persistence_state$queue,10L)
-    .persistence_state$queue <- tail(.persistence_state$queue,-length(batch))
-    .persistence_state$batch <- batch
-    .persistence_state$process <- tryCatch(callr::r_bg(function(root,batch) {
-      setwd(root)
-      if (file.exists(".Renviron")) readRenviron(".Renviron")
-      source("futmondo_functions.R"); source("supabase_connector.R")
-      source("Modules/Notifications_Module.R"); source("intelligence_engine.R"); source("prediction_engine.R")
-      source("insights_runtime.R")
-      source("portfolio_engine.R")
-      lapply(batch,function(job) {
-        options(futmondo.persistence_failures=0L, futmondo.persistence_issues=list())
-        value <- tryCatch(do.call(job$fn,job$args),error=function(e) {
-          # Never put raw exception messages, tokens or payloads in process results.
-          message("[Persistence] Job failed: ",job$fn)
-          FALSE
-        })
-        list(ok=!identical(value,FALSE) && getOption("futmondo.persistence_failures",0L)==0L,
-          issues=getOption("futmondo.persistence_issues",list()))
-      })
-    },args=list(root=normalizePath("."),batch=batch),supervise=TRUE),error=function(e)NULL)
-    if (is.null(.persistence_state$process)) {
-      for (job in batch) {
-        failures <- .persistence_state$errors[[job$owner]]
-        if (!is.list(failures)) failures <- list()
-        failures[[job$error_key %||% job$key]] <- "Background process could not start. Use Refresh to retry."
-        .persistence_state$errors[[job$owner]] <- failures
-      }
-      .persistence_state$batch <- list()
-    }
+  job <- .persistence_state$active
+  if (is.null(job)) { .persistence_state$scheduled <- FALSE; return(invisible(TRUE)) }
+  options(futmondo.persistence_failures=0L, futmondo.persistence_issues=list())
+  if (identical(job$fn,"collect_account_observations")) {
+    if (is.null(job$collection_state)) job$collection_state <- new_account_observation_collection(job$args[[1]],job$args[[2]],job$args[[3]])
+    old_in_session <- getOption("futmondo.in_session_persistence", FALSE)
+    options(futmondo.in_session_persistence=TRUE)
+    on.exit(options(futmondo.in_session_persistence=old_in_session), add=TRUE)
+    state <- collect_account_observation_step(job$collection_state)
+    options(futmondo.in_session_persistence=old_in_session)
+    job$collection_state <- state
+    .persistence_state$progress[[job$owner]] <- state$message
+    if (isTRUE(state$complete)) {
+      issues <- getOption("futmondo.persistence_issues",list())
+      if (!isTRUE(state$ok)) issues <- c(issues,list(list(table="collector",category="runtime",http_status=NA_real_,code="")))
+      persistence_record_result(job,isTRUE(state$ok) && getOption("futmondo.persistence_failures",0L)==0L,issues)
+      .persistence_state$progress[[job$owner]] <- NULL; .persistence_state$active <- NULL
+    } else .persistence_state$active <- job
+  } else {
+    value <- tryCatch(do.call(job$fn,job$args),error=function(e) FALSE)
+    persistence_record_result(job,!identical(value,FALSE) && getOption("futmondo.persistence_failures",0L)==0L,getOption("futmondo.persistence_issues",list()))
+    .persistence_state$active <- NULL
   }
-  if (!is.null(.persistence_state$process) || length(.persistence_state$queue)) later::later(persistence_tick,0.5)
-  else .persistence_state$scheduled <- FALSE
+  if (!is.null(.persistence_state$active) || length(.persistence_state$queue)) later::later(persistence_tick,0.05) else .persistence_state$scheduled <- FALSE
   invisible(TRUE)
 }

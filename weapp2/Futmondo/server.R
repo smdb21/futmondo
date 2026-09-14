@@ -105,7 +105,7 @@ function(input, output, session) {
     invalidateLater(5000,session)
     status <- background_sync_status(login_token_RV()[["userid"]])
     if (!is.null(status$error)) return(tags$p(class="text-warning",status$error))
-    if (status$pending>0) tags$p(class="text-muted","Saving observations in the background…")
+    if (status$pending>0) tags$p(class="text-muted",paste0("Saving observations…", if (!is.null(status$progress)) paste0(" ", status$progress) else ""))
   })
   notifications <- notifications_Server("notifications", reactive(input$tabs == "notifications"),
     login_token_RV, championship_id_RV, user_team_id_RV, user_teams_RV, refresh_trigger,

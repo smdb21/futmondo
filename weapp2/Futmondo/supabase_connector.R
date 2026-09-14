@@ -1155,7 +1155,8 @@ supabase_conflict_key <- function(table_name) {
 supabase_post <- function(table_name, payload, conflict = supabase_conflict_key(table_name)) {
   if (isTRUE(getOption("futmondo.offline", FALSE))) return(invisible(204L))
   domain <- if (requireNamespace("shiny", quietly = TRUE)) shiny::getDefaultReactiveDomain() else NULL
-  if (!is.null(domain) && exists("defer_persistence", mode = "function")) {
+  if (!isTRUE(getOption("futmondo.in_session_persistence", FALSE)) &&
+      !is.null(domain) && exists("defer_persistence", mode = "function")) {
     return(defer_persistence("supabase_post_direct", list(table_name, payload, conflict)))
   }
   supabase_post_direct(table_name, payload, conflict)
@@ -1325,6 +1326,94 @@ collect_account_observations <- function(login, championship_id, user_team_id) {
   }, error=function(e) message("[Observations] Insight alerts skipped for this collection."))
   TRUE
 }
+
+
+# Cooperative, session-safe collection used by the Shiny persistence queue.
+# Each call performs one bounded stage and returns state for the next tick.
+new_account_observation_collection <- function(login, championship_id, user_team_id) {
+  list(login=login, championship_id=championship_id, user_team_id=user_team_id,
+       stage="catalog", player_index=1L, complete=FALSE, ok=TRUE, message="Preparing league data")
+}
+
+collect_account_observation_step <- function(state) {
+  fail <- function(message) { state$ok <- FALSE; state$complete <- TRUE; state$message <- message; state }
+  if (!isTRUE(state$ok) || isTRUE(state$complete)) return(state)
+  login <- state$login; championship_id <- state$championship_id; user_team_id <- state$user_team_id
+  if (!valid_login(login)) return(fail("Login expired before observations could be saved."))
+  tryCatch({
+    if (identical(state$stage, "catalog")) {
+      active <- get_active_championships(login)
+      selected <- Filter(function(x) identical(fm_scalar(x$id), as.character(championship_id)) &&
+        identical(fm_scalar(x$userteam$id), as.character(user_team_id)), active$championships)
+      if (length(selected) != 1L) return(fail("Selected league is no longer available."))
+      state$champ <- selected[[1]]
+      sync_championship_to_supabase(unlist(state$champ))
+      state$players <- get_championship_players(login, championship_id)
+      state$teams <- get_teams(login, championship_id)
+      sync_real_clubs_to_supabase(state$players); sync_players_to_supabase(state$players)
+      sync_user_teams_to_supabase(state$teams, championship_id)
+      log_user_team_history(state$teams, championship_id=championship_id); log_player_history(state$players, championship_id)
+      log_player_daily_snapshots(calculate_fis_score(state$players), championship_id)
+      state$stage <- "pressroom"; state$message <- "Saving market history"; return(state)
+    }
+    if (identical(state$stage, "pressroom")) {
+      persist_auction_history(get_championship_pressroom(login, championship_id), championship_id)
+      state$stage <- "market"; state$message <- "Saving roster and market observations"; return(state)
+    }
+    if (identical(state$stage, "market")) {
+      state$info <- get_user_team_info(login,championship_id,user_team_id)
+      state$lineup <- tryCatch(get_lineup_from_team(login,championship_id,user_team_id),error=function(e)NULL)
+      rules <- normalize_league_rules(state$info,state$lineup,championship_id)
+      state$version <- rules$scoring_version
+      state$season <- league_season_context(championship_id,state$champ$season %||% state$champ$seasonId)
+      stamp <- format(fm_time(attr(state$info,'observed_at') %||% NA_character_),"%Y-%m-%dT%H:%M:%OSZ",tz="UTC")
+      if(!is.na(stamp) && !identical(attr(state$info,'fetch_status'),'stale')) supabase_post("league_rule_snapshots",list(championship_id=championship_id,scoring_version=state$version,season=state$season,observed_at=stamp,configuration=list(scoring=state$lineup$custom,point_system=state$lineup$pointSystem,settings=state$info$configuration,capabilities=rules)))
+      state$roster <- get_players_from_team(login,championship_id,user_team_id)
+      state$market <- tryCatch(get_market_players(login,championship_id,user_team_id),error=function(e)NULL)
+      opportunities <- normalize_listing_opportunities(state$market,championship_id)
+      if(nrow(opportunities)) supabase_post('auction_opportunities',opportunities)
+      state$ids <- unique(as.character(state$players$id))
+      subscription <- tryCatch(supabase_read_all('observation_subscriptions',list(user_id=paste0('eq.',login[['userid']]),championship_id=paste0('eq.',championship_id),user_team_id=paste0('eq.',user_team_id))),error=function(e)NULL)
+      after <- if(is.data.frame(subscription)&&nrow(subscription)==1L) subscription$last_player_id else NULL
+      state$ids <- collection_player_batch(state$ids,after,30L)
+      state$completed <- tryCatch(get_finished_rounds(login,championship_id),error=function(e)NULL)
+      state$finished_numbers <- if(is.data.frame(state$completed)) state$completed$round_number[state$completed$is_finished %in% TRUE] else numeric()
+      state$player_index <- 1L; state$stage <- "players"; state$message <- "Saving player round observations"; return(state)
+    }
+    if (identical(state$stage, "players")) {
+      if (state$player_index > length(state$ids)) { state$stage <- "finish"; state$message <- "Finishing observation save"; return(state) }
+      id <- state$ids[state$player_index]
+      summary <- tryCatch(get_player_summary(login,championship_id,user_team_id,id),error=function(e)NULL)
+      if(!is.null(summary)&&!is.null(attr(summary,'observed_at'))&&!identical(attr(summary,'fetch_status'),'stale')) {
+        fixture <- normalize_fixture_observation(summary,id,championship_id,state$season,state$version)
+        if(nrow(fixture)) supabase_post('fixture_observations',fixture)
+        obs <- normalize_player_match_observations(summary,id,championship_id,state$version,state$season,observed_at=fm_time(attr(summary,'observed_at')),rounds=state$completed)
+        if(nrow(fixture)&&nrow(obs)) obs$occurred_at[obs$round==fixture$round] <- fixture$occurred_at
+        if(nrow(obs)) obs$score_status[obs$round %in% state$finished_numbers & is.finite(obs$points)] <- "final"
+        if(nrow(obs)) supabase_post("player_match_observations",obs)
+      }
+      state$completed_id <- id
+      # Persist after every player: a closed session resumes at the next ID.
+      supabase_post('observation_subscriptions',list(user_id=login[['userid']],championship_id=championship_id,user_team_id=user_team_id,last_player_id=id))
+      state$player_index <- state$player_index + 1L
+      state$message <- paste0("Saving player observations (", min(state$player_index-1L,length(state$ids)), "/", length(state$ids), ")")
+      return(state)
+    }
+    if (identical(state$stage, "finish")) {
+      if(exists("build_insight_alerts",mode="function")) tryCatch({
+        fin <- get_financial_snapshot(login,championship_id,user_team_id)
+        offers <- tryCatch(get_roster_bids(login,championship_id,user_team_id),error=function(e)NULL)
+        sale_rows <- normalize_sale_observations(offers,state$roster,login[['userid']],championship_id,user_team_id)
+        if(nrow(sale_rows)) supabase_post('sale_observations',sale_rows)
+        alerts <- build_insight_alerts(login[["userid"]],championship_id,user_team_id,fin,state$roster,offers,market=state$market)
+        if(nrow(alerts)) supabase_post("user_smart_alerts",alerts)
+      },error=function(e) message("[Observations] Insight alerts skipped for this collection."))
+      state$complete <- TRUE; state$message <- "Observations saved"; return(state)
+    }
+    fail("Observation state is invalid.")
+  }, error=function(e) fail("Observation collection stopped unexpectedly."))
+}
+
 
 read_model_auctions <- function(championship_id, auctions=NULL) {
   d <- if(is.null(auctions))read_auction_observations(championship_id) else auctions

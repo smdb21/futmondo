@@ -60,7 +60,7 @@ The focused scripts contain **268 passing checks**. The broad lifecycle check wa
 
 HAR tests replay response bodies only. No captured request is sent; no live trade, lineup, production migration or notification acknowledgement is part of testing. A separate authorized read-only API inspection confirmed current lineup/bench and league configuration shapes.
 
-The deployment manifest includes `callr`, `openssl`, `later` and the new runtime/modules; it excludes `.Renviron` and every local HAR capture. Code whitespace checks pass; the pre-existing user change in `player_columns_to_hide.txt` was preserved.
+The deployment manifest includes `openssl`, `later` and the new runtime/modules; it excludes `.Renviron` and every local HAR capture. Code whitespace checks pass; the pre-existing user change in `player_columns_to_hide.txt` was preserved.
 
 Production requirements remain: staging PostgreSQL migration/locking validation, reviewed backfill, worker/secret deployment, complete league deadline and advanced eligibility contracts, chronological model acceptance and fourteen verified observation days. Unknown data remains visible and blocks dependent mutations. Realized-profit validation requires actual settled purchases and executable sales; a price-model backtest does not establish that result.
 
