@@ -13,6 +13,7 @@ shiny::runApp(".")
 The application uses `global.R`, `ui.R` and `server.R`; there is no separate `app.R`. Install the dependencies recorded in `manifest.json` for your R environment. Core packages include Shiny, shinydashboardPlus, dplyr, data.table, httr, jsonlite, reactable, plotly, lpSolve, openssl, later and **callr**. `callr` is newly required for persistence in a separate R process. The regenerated manifest records the full dependency set.
 
 Login fields start empty. Users enter their own Futmondo credentials, select a league, and can switch leagues during the session. Logout clears the session and its API cache. Login passwords and tokens are not printed or deployed.
+The desktop navigation sidebar is 180px wide so full menu labels remain readable; the existing responsive mobile navigation is unchanged.
 
 ## Multiple accounts and leagues
 
@@ -53,6 +54,7 @@ Collection runs in a separate process after login/refresh. Failed saves distingu
 ## Predictions and management
 
 A team may temporarily borrow down to half its current value. Bids subtract held funds and existing commitments and still respect the API ceiling. Cash must be strictly positive when a round begins to score points, so a persistent top bar shows the next-round countdown and a live solvency warning.
+The All Players release-clause affordability filter uses this same verified spending capacity; when it cannot be verified, it does not infer that a clause is affordable.
 
 - FIS is a descriptive snapshot rating, not a success probability. Missing appearances remain distinct from real zero points.
 - Rival bids use shrunk manager participation rates and pooled log bid/value distributions. Participation and win curves remain unavailable when auction visibility cannot support non-bid labels. Conditional amounts can still be shown where historical reference prices exist.

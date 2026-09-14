@@ -30,10 +30,10 @@ find_plot_body <- function(node) {
 }
 plot_body <- find_plot_body(parse('Modules/Selected_Player_Module.R'))
 stopifnot(!is.null(plot_body))
-render_fixture <- function(history, rounds = NULL, aggregate_points = NA_real_) {
+render_fixture <- function(history, rounds = NULL, aggregate_points = NA_real_, chart_metric = "valuation") {
   env <- new.env(parent = globalenv())
   env$selected_player <- function() data.frame(id = 'player', value = 100000000, change = 0, points = aggregate_points)
-  env$login_token <- 'fixture'; env$championship_id <- 'league'
+  env$login_token <- 'fixture'; env$championship_id <- 'league'; env$input <- list(player_chart_metric = chart_metric)
   env$get_reactive_val <- identity
   env$get_player_historical_data <- function(...) history
   env$get_finished_rounds <- function(...) rounds
@@ -68,14 +68,13 @@ check('invalid observations cannot poison the axis range', {
 history <- data.frame(recorded_at = c('2026-08-01T10:00:00Z', '2026-08-08T10:00:00Z'),
                       value = c(99000000, 100000000), points = c(98, 99))
 rounds <- data.frame(round_number = 1:2, begin_process = history$recorded_at, is_finished = TRUE)
-check('rendered valuation and points traces use independently padded numeric axes', {
-  chart <- render_fixture(history, rounds)
-  stopifnot(length(chart$data) == 2L, chart$data[[1]]$yaxis == 'y', chart$data[[2]]$yaxis == 'y2',
-            chart$data[[2]]$mode == 'markers', chart$layout$yaxis2$overlaying == 'y',
-            chart$layout$yaxis2$side == 'right', !chart$layout$yaxis$autorange,
-            !chart$layout$yaxis2$autorange)
-  assert_visible(chart$data[[1]]$y, chart$layout$yaxis$range)
-  assert_visible(chart$data[[2]]$y, chart$layout$yaxis2$range)
+check('valuation and points chart modes use independently padded numeric axes', {
+  valuation <- render_fixture(history, rounds)
+  points <- render_fixture(history, rounds, chart_metric = 'points')
+  stopifnot(length(valuation$data) == 1L, valuation$data[[1]]$yaxis == 'y', !valuation$layout$yaxis$autorange,
+            length(points$data) == 1L, points$data[[1]]$mode == 'lines+markers', !points$layout$yaxis$autorange)
+  assert_visible(valuation$data[[1]]$y, valuation$layout$yaxis$range)
+  assert_visible(points$data[[1]]$y, points$layout$yaxis$range)
 })
 check('render handles numeric strings and excludes nonfinite valuation rows', {
   strings <- rbind(history, transform(history[1, ], recorded_at = '2026-08-03T10:00:00Z'))
@@ -86,16 +85,14 @@ check('render handles numeric strings and excludes nonfinite valuation rows', {
 })
 check('zero-point markers remain visible and an unavailable points series stays hidden', {
   zero <- history; zero$points <- 0
-  chart <- render_fixture(zero, rounds)
-  assert_visible(chart$data[[2]]$y, chart$layout$yaxis2$range)
-  unavailable <- render_fixture(history)
-  stopifnot(length(unavailable$data) == 1L, !unavailable$layout$yaxis2$visible,
-            unavailable$layout$annotations[[1]]$text == 'No round-by-round points recorded yet')
+  chart <- render_fixture(zero, rounds, chart_metric = 'points')
+  assert_visible(chart$data[[1]]$y, chart$layout$yaxis$range)
+  unavailable <- render_fixture(history, chart_metric = 'points')
+  stopifnot(unavailable$layout$annotations[[1]]$text == 'No round-by-round points recorded yet')
 })
 check('aggregate points do not produce a misleading no-points annotation', {
-  chart <- render_fixture(NULL, NULL, aggregate_points = 37)
-  stopifnot(length(chart$data) == 1L,
-    chart$layout$annotations[[1]]$text == 'Total points: 37. Round-by-round history is unavailable.')
+  chart <- render_fixture(NULL, NULL, aggregate_points = 37, chart_metric = 'points')
+  stopifnot(chart$layout$annotations[[1]]$text == 'Total points: 37. Round-by-round history is unavailable.')
 })
 check('empty history fallback has a usable valuation range', {
   chart <- render_fixture(NULL)

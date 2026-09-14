@@ -5,3 +5,4 @@ weapp2/Futmondo/.Renviron
 target/**
 **/rsconnect/**
 *.har
+/weapp2/Futmondo/muxu

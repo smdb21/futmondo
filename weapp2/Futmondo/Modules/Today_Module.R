@@ -151,7 +151,14 @@ today_resolve_player_for_action <- function(player_id, action, market_df, all_df
   if (act == "clause_buyout") {
     return(today_resolve_player(player_id, clause_df))
   }
-  return(today_resolve_player(player_id, all_df))
+  # Viewing a card never starts a transaction. Clause and market candidates
+  # may originate from data sources outside all_players_RV(), so allow a
+  # view-only fallback to those current candidate rows.
+  resolved <- today_resolve_player(player_id, all_df)
+  if (!is.null(resolved)) return(resolved)
+  resolved <- today_resolve_player(player_id, clause_df)
+  if (!is.null(resolved)) return(resolved)
+  today_resolve_player(player_id, market_df)
 }
 
 # ---- Pure helper: classify a player row's owner class (immutable IDs only) ----
@@ -343,6 +350,20 @@ today_filter_clause_candidates <- function(rival_roster_df, current_team_id, now
 }
 
 
+# Determines whether rival-owned listings are relevant to the currently
+# selected action types. A Clause-only view includes them automatically so the
+# related player cards can be resolved; Sell/Hold-only views never fetch them.
+today_rival_listing_mode <- function(selected_types, manual_opt_in = FALSE) {
+  types <- unique(intersect(as.character(selected_types), c("Buy", "Sell", "Bid", "Clause", "Hold")))
+  acquisition_types <- types[types %in% c("Buy", "Clause")]
+  clause_only <- identical(types, "Clause")
+  list(
+    relevant = length(acquisition_types) > 0L,
+    automatic = clause_only,
+    include_rival = clause_only || ("Buy" %in% acquisition_types && isTRUE(manual_opt_in))
+  )
+}
+
 # Filter recommendation rows by their stable display type.
 today_filter_recommendations <- function(recommendations, selected_types) {
   if (!is.data.frame(recommendations) || !nrow(recommendations) ||
@@ -408,21 +429,14 @@ today_UI <- function(id) {
            # Buy/Place Bid recommendations; checking this also includes
            # rival-owned market listings (unknown-owner listings are always
            # hidden).
-          div(
-            style = "margin: 0 0 10px 0;",
-            checkboxInput(
-              inputId = ns("include_rival_listings"),
-              label = "Include rival-owned market listings",
-              value = FALSE
-            )
-          ),
+          div(style = "margin: 0 0 10px 0;", uiOutput(ns("rival_listing_control"))),
           div(class = "today-action-filters",
             checkboxGroupInput(
               inputId = ns("recommendation_types"), label = NULL,
               choiceNames = list(
-                tagList(icon("cart-shopping"), " Buy"),
+                tagList(icon("cart-shopping"), " Buy players"),
                 tagList(icon("arrow-up"), " Sell"),
-                tagList(icon("hand-holding-dollar"), " Bid"),
+                tagList(icon("hand-holding-dollar"), " Offers received"),
                 tagList(icon("bolt"), " Clause"),
                 tagList(icon("hand"), " Hold")
               ),
@@ -584,13 +598,42 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
         combined
       })
 
-      # ---- Reactive: include rival-owned market listings (opt-in toggle) ----
-      # Unchecked by default: Buy/Place Bid recommendations include only
-      # explicit Futmondo/system market listings (computer is an explicit
-      # scalar logical TRUE).
+      selected_recommendation_types_RV <- reactive({
+        types <- input$recommendation_types
+        if (is.null(types)) types <- c("Buy", "Sell", "Bid", "Clause", "Hold")
+        as.character(types)
+      })
+
+      # ---- Reactive: include rival-owned market listings ----
+      # This option is relevant only for acquisition views. Clause-only
+      # filtering includes rival listings automatically; Sell/Hold-only
+      # filtering explicitly excludes them.
       include_rival_RV <- reactive({
         req(is_module_active() == TRUE)
-        isTRUE(input$include_rival_listings)
+        mode <- today_rival_listing_mode(
+          selected_recommendation_types_RV(), input$include_rival_listings
+        )
+        isTRUE(mode$include_rival)
+      })
+
+      output$rival_listing_control <- renderUI({
+        req(is_module_active() == TRUE)
+        mode <- today_rival_listing_mode(
+          selected_recommendation_types_RV(), input$include_rival_listings
+        )
+        if (isTRUE(mode$automatic)) {
+          return(div(class = "today-rival-listings-disabled",
+            icon("check-circle"), " Rival-owned market listings included for clause opportunities."))
+        }
+        if (!isTRUE(mode$relevant)) {
+          return(div(class = "today-rival-listings-disabled",
+            icon("circle-info"), " Rival-owned market listings apply only to Buy or Clause actions."))
+        }
+        checkboxInput(
+          inputId = ns("include_rival_listings"),
+          label = "Include rival-owned market listings for Buy actions",
+          value = isTRUE(input$include_rival_listings)
+        )
       })
 
       # ---- Reactive: filtered market candidates (default: system only) ----
@@ -843,8 +886,7 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
       output$recommendations_feed_ui <- renderUI({
         req(is_module_active() == TRUE)
         recs <- recommendations_RV()
-        selected_types <- input$recommendation_types
-        if (is.null(selected_types)) selected_types <- c("Buy", "Sell", "Bid", "Clause", "Hold")
+        selected_types <- selected_recommendation_types_RV()
         recs <- today_filter_recommendations(recs, selected_types)
 
         if (is.null(recs) || nrow(recs) == 0) {

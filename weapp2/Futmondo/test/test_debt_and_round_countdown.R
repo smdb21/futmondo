@@ -27,6 +27,8 @@ check("verified acquisition capacity includes debt and existing bids", {
   stopifnot(cap$status=="ok",cap$funds$spendable_budget==4400,
     cap$funds$debt_limit==5000,cap$funds$minimum_balance== -5000,
     cap$funds$projected_committed_balance== -600)
+  finance <- get_financial_snapshot(c(token="t",userid="u"),"c","team")
+  stopifnot(finance$commitments$total_amount == 300, finance$commitments$count == 1)
   stopifnot(evaluate_acquisition_preflight(cap,"modify",4700,300)$ok,
     !evaluate_acquisition_preflight(cap,"modify",4701,300)$ok)
   list2env(saved,envir=.GlobalEnv);clear_api_cache()
@@ -76,6 +78,7 @@ check("global UI exposes countdown and deadline solvency warning", {
   stopifnot(grepl('uiOutput("round_countdown")',ui,fixed=TRUE),
     grepl('output$round_countdown <- renderUI',server,fixed=TRUE),
     grepl('Active offers:',server,fixed=TRUE),
+    grepl('commitment_snapshot$total_amount',server,fixed=TRUE),
     grepl('After offers:',server,fixed=TRUE),
     grepl('Can spend:',server,fixed=TRUE),
     grepl('projected_committed_balance',server,fixed=TRUE),

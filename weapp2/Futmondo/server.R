@@ -57,10 +57,18 @@ function(input, output, session) {
     finance <- tryCatch(get_financial_snapshot(login_token_RV(), championship_id_RV(), user_team_id_RV()),
       error = function(e) NULL)
     cash <- if (is.list(finance)) fm_number(finance$cash) else NA_real_
-    commitments <- if (is.list(finance)) fm_number(finance$commitments) else NA_real_
+    # commitments is a structured snapshot, not a scalar: retain both the
+    # held amount and the number of active outgoing offers for the top bar.
+    commitment_snapshot <- if (is.list(finance)) finance$commitments else NULL
+    commitments <- if (is.list(commitment_snapshot)) fm_number(commitment_snapshot$total_amount) else fm_number(commitment_snapshot)
+    active_offer_count <- if (is.list(commitment_snapshot)) fm_number(commitment_snapshot$count) else NA_real_
     final_balance <- if (is.list(finance)) fm_number(finance$projected_committed_balance) else NA_real_
     spendable <- if (is.list(finance)) fm_number(finance$spendable_budget) else NA_real_
     money_text <- function(x) if (is.finite(x)) paste0(format(round(x), big.mark = ".", scientific = FALSE), " EUR") else "Unavailable"
+    offers_text <- if (is.finite(commitments)) {
+      suffix <- if (is.finite(active_offer_count)) paste0(" (", as.integer(active_offer_count), ")") else ""
+      paste0(money_text(commitments), suffix)
+    } else "Unavailable"
     solvency_class <- if (is.finite(final_balance) && final_balance > 0) "round-countdown-solvent" else "round-countdown-warning"
     solvency_text <- if (!is.finite(final_balance)) {
       "Balance unavailable — verify it before the round"
@@ -76,7 +84,7 @@ function(input, output, session) {
         tags$span(format_round_countdown(next_round$starts_at))),
       tags$div(class = "round-countdown-finance",
         tags$span(class = "round-countdown-finance-item", paste0("Balance: ", money_text(cash))),
-        tags$span(class = "round-countdown-finance-item", paste0("Active offers: ", money_text(commitments))),
+        tags$span(class = "round-countdown-finance-item", paste0("Active offers: ", offers_text)),
         tags$span(class = "round-countdown-finance-item", paste0("After offers: ", money_text(if (is.finite(cash) && is.finite(commitments)) cash - commitments else NA_real_))),
         tags$span(class = "round-countdown-finance-item", paste0("Can spend: ", money_text(spendable))),
         tags$span(class = "round-countdown-solvency", solvency_text)))
@@ -147,7 +155,8 @@ players_in_championship_Server(id = "players_in_championship",
                                     input$tabs == "players_in_championship"  
                                   }),
                                   login_token = login_token_RV, 
-                                  championship_id = championship_id_RV, 
+                                  championship_id = championship_id_RV,
+                                  user_team_id = user_team_id_RV,
                                   user_teams_RV = user_teams_RV,
                                   refresh_trigger = refresh_trigger)
 

@@ -1028,6 +1028,7 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 }
 .round-countdown-in-progress { border-color: var(--fm-warning); color: var(--fm-text); }
 .today-action-filters { margin: 0 0 12px; }
+.today-rival-listings-disabled { color: var(--fm-muted); font-size: 12px; padding: 7px 0; }
 .today-action-filters .shiny-options-group { display: flex; flex-wrap: wrap; gap: 6px; }
 .today-action-filters .checkbox-inline { display: inline-flex; align-items: center; gap: 3px; margin: 0; padding: 5px 9px; border: 1px solid var(--fm-border); border-radius: 999px; background: var(--fm-surface); font-size: 12px; }
 .today-action-filters .checkbox-inline input { margin: 0 3px 0 0; }
@@ -1064,6 +1065,21 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
     font-size: 15px;
   }
 }
+
+[id$='selected_player_box'] .box-header { display: none; }
+.player-card-identity { display: flex; align-items: center; gap: 12px; padding: 0 0 14px; margin-bottom: 14px; border-bottom: 1px solid var(--fm-border); }
+.player-card-identity-photo { width: 58px; height: 58px; flex: 0 0 58px; object-fit: cover; border-radius: 50%; border: 2px solid var(--fm-border); background: var(--fm-bg); }
+.player-card-identity-details { min-width: 0; }
+.player-card-identity-name { font-size: 20px; font-weight: 800; color: var(--fm-text); overflow-wrap: anywhere; }
+.player-card-identity-meta { margin-top: 2px; font-size: 13px; color: var(--fm-muted); overflow-wrap: anywhere; }
+.player-card-identity-location { margin-top: 6px; font-size: 12px; font-weight: 700; color: var(--fm-text); overflow-wrap: anywhere; }
+@media (max-width: 768px) { .player-card-identity { gap: 10px; } .player-card-identity-photo { width: 52px; height: 52px; flex-basis: 52px; } .player-card-identity-name { font-size: 18px; } }
+
+.player-chart-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 15px; flex-wrap: wrap; }
+.player-chart-heading .shiny-options-group { display: inline-flex; gap: 6px; }
+.player-chart-heading .radio-inline { margin: 0; padding: 6px 10px; border: 1px solid var(--fm-border); border-radius: 3px; font-size: 12px; }
+.player-chart-heading .radio-inline input { margin-right: 4px; }
+@media (max-width: 768px) { .player-chart-heading { align-items: flex-start; } }
 
 .player-recent-rounds {
   margin-top: 14px;

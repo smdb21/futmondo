@@ -11,6 +11,31 @@ player_card_money <- function(value) {
     scientific = FALSE, trim = TRUE), " €")
 }
 
+# Compact ownership/market wording for the player-card header. A free agent is
+# not assumed to be listed: market status requires an explicit flag or asking price.
+player_card_location_label <- function(player, current_team_id = NULL) {
+  row <- if (is.data.frame(player) && nrow(player)) player[1, , drop = FALSE] else data.frame()
+  text_at <- function(name) {
+    value <- if (name %in% names(row)) as.character(row[[name]][1]) else ""
+    if (length(value) != 1L || is.na(value)) "" else trimws(value)
+  }
+  owner_id <- text_at("user_team_id")
+  current_id <- if (is.null(current_team_id) || length(current_team_id) != 1L || is.na(current_team_id)) "" else trimws(as.character(current_team_id))
+  owner_name <- text_at("userTeam")
+  if (!nzchar(owner_name)) owner_name <- text_at("user_team_name")
+  listed_flag <- "market_inMarket" %in% names(row) && isTRUE(row$market_inMarket[1])
+  asking <- NA_real_
+  for (field in c("effective_market_price", "market_price", "price")) {
+    amount <- if (field %in% names(row)) suppressWarnings(as.numeric(row[[field]][1])) else NA_real_
+    if (length(amount) == 1L && is.finite(amount) && amount > 0) { asking <- amount; break }
+  }
+  on_market <- listed_flag || is.finite(asking)
+  owner_label <- if (!nzchar(owner_id)) "Free Agent" else if (nzchar(current_id) && identical(owner_id, current_id)) {
+    "Your Squad"
+  } else paste0("Rival Owned", if (nzchar(owner_name)) paste0(": ", owner_name) else "")
+  paste0(owner_label, if (on_market) " / On Market" else "")
+}
+
 selected_player_UI <- function(id) {
   ns <- NS(id)
   tagList(
@@ -25,18 +50,14 @@ selected_player_UI <- function(id) {
     userBox(
       id = ns("selected_player_box"),
       width = 12,
-      title = userDescription(
-        title = "Player Name",
-        subtitle = "Position & Team",
-        type = 1,
-        image = SPACER_GIF
-      ),
+      title = userDescription(title = "Player", subtitle = "", type = 1, image = SPACER_GIF),
       status = "primary",
       gradient = TRUE,
       background = "light-blue",
       boxToolSize = "xl",
       collapsible = FALSE,
       footer = tagList(
+        uiOutput(ns("player_identity_summary")),
         fluidRow(
           column(4, uiOutput(ns("player_points_description_box"))),
           column(4, uiOutput(ns("player_last_points_description_box"))),
@@ -54,7 +75,12 @@ selected_player_UI <- function(id) {
         fluidRow(
           style = "margin-top: 25px; padding-top: 20px; border-top: 1px solid #f1f5f9;",
           column(12,
-                 h4(style = "font-weight: 600; color: var(--fm-text); margin-bottom: 15px;", "Historical Valuation & Performance"),
+                 div(class = "player-chart-heading",
+                   h4(style = "font-weight: 600; color: var(--fm-text); margin: 0;", "Historical Valuation & Performance"),
+                   radioButtons(ns("player_chart_metric"), label = NULL,
+                     choices = c("Valuation" = "valuation", "Round points" = "points"),
+                     selected = "valuation", inline = TRUE)
+                 ),
                  plotly::plotlyOutput(ns("player_trend_plot"), height = "280px")
           )
         ),
@@ -224,6 +250,25 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     output$owner_offer_amount_preview <- renderUI({ render_input_price_preview(input$owner_offer_amount) })
     output$sale_price_input_preview <- renderUI({ render_input_price_preview(input$sale_price_input) })
 
+    output$player_identity_summary <- renderUI({
+      sp <- selected_player()
+      req(sp)
+      player_name <- if ("name" %in% names(sp) && !is.na(sp$name)) as.character(sp$name) else "Player"
+      role <- if ("role" %in% names(sp) && !is.na(sp$role)) as.character(sp$role) else "Position unavailable"
+      team <- if ("team" %in% names(sp) && !is.na(sp$team) && nzchar(as.character(sp$team))) as.character(sp$team) else "Team unavailable"
+      photo <- if ("photo" %in% names(sp) && !is.na(sp$photo) && nzchar(as.character(sp$photo))) paste0(PHOTO_URL, "/", sp$photo) else SPACER_GIF
+      location <- player_card_location_label(sp, get_reactive_val(user_team_id))
+      div(class = "player-card-identity",
+        img(src = photo, class = "player-card-identity-photo", alt = player_name,
+          onerror = paste0("this.src='", SPACER_GIF, "';")),
+        div(class = "player-card-identity-details",
+          div(class = "player-card-identity-name", player_name),
+          div(class = "player-card-identity-meta", paste(role, "·", team)),
+          div(class = "player-card-identity-location", icon("location-dot"), " ", location)
+        )
+      )
+    })
+
     # ---- Main observer: populate box + action buttons ----
     observeEvent(
       {
@@ -302,9 +347,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           action = "update",
           options = list(
             title = shinydashboardPlus::userDescription(
-              title = player_name,
-              subtitle = sub_title_markup,
-              type = 1,
+              title = player_name, subtitle = sub_title_markup, type = 1,
               image = paste0(PHOTO_URL, "/", sp$photo)
             ),
             status = "red",
@@ -1577,7 +1620,33 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         if (summary_trace$has_points) points_trace <- summary_trace
       }
 
-      # Build clean dual y-axis Plotly chart (valuation always present).
+      chart_metric <- if (!is.null(input$player_chart_metric) && identical(as.character(input$player_chart_metric), "points")) "points" else "valuation"
+      if (identical(chart_metric, "points")) {
+        if (isTRUE(points_trace$has_points)) {
+          return(plotly::plot_ly(data = points_trace$points_df) %>%
+            plotly::add_trace(type = "scatter", mode = "lines+markers", x = ~date, y = ~points,
+              name = "Round points", line = list(color = "#10b981", width = 2.5),
+              marker = list(size = 8, color = "#10b981"), hoverinfo = "text",
+              text = ~paste0("Jornada ", round_number, "<br>Points: ", points)) %>%
+            fm_plot_layout(hovermode = "x unified", paper_bgcolor = "rgba(0,0,0,0)",
+              plot_bgcolor = "rgba(0,0,0,0)", xaxis = list(title = "", tickformat = "%d-%m", gridcolor = "#f1f5f9"),
+              yaxis = list(title = "Points", autorange = FALSE, range = player_trend_axis_range(points_trace$points_df$points), gridcolor = "#f1f5f9"),
+              showlegend = FALSE, margin = list(l = 50, r = 20, t = 10, b = 40)))
+        }
+        aggregate_points <- suppressWarnings(as.numeric(as.character(sp$points)))
+        no_points_text <- if (length(aggregate_points) == 1L && is.finite(aggregate_points) && aggregate_points > 0) {
+          paste0("Total points: ", format(aggregate_points, trim = TRUE, scientific = FALSE),
+            ". Round-by-round history is unavailable.")
+        } else "No round-by-round points recorded yet"
+        return(plotly::plot_ly() %>% fm_plot_layout(paper_bgcolor = "rgba(0,0,0,0)",
+          plot_bgcolor = "rgba(0,0,0,0)", xaxis = list(visible = FALSE), yaxis = list(visible = FALSE),
+          annotations = list(list(text = no_points_text, x = 0.5, y = 0.5, xref = "paper", yref = "paper",
+            showarrow = FALSE, align = "center", font = list(color = "#94a3b8", size = 13))),
+          margin = list(l = 20, r = 20, t = 10, b = 20)))
+      }
+
+      # Valuation mode keeps its own readable scale. Points have a dedicated
+      # chart selected through the switch above rather than a competing axis.
       chart <- plotly::plot_ly(data = val_df) %>%
         plotly::add_trace(
           type = "scatter",
@@ -1592,7 +1661,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           text = ~paste0("Date: ", format(date, "%d-%m-%y"), "<br>Valuation: ", player_card_money(value))
         )
 
-      if (points_trace$has_points) {
+      if (identical(chart_metric, "points") && points_trace$has_points) {
         # One marker per completed round (no interpolated line).
         chart <- chart %>%
           plotly::add_trace(
@@ -1617,6 +1686,12 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         )
         annotations_cfg <- NULL
       } else {
+        # Valuation mode does not need a second points axis or an unavailable
+        # annotation; the Points chart displays that state when selected.
+        if (identical(chart_metric, "valuation")) {
+          yaxis2_cfg <- list(visible = FALSE)
+          annotations_cfg <- NULL
+        } else {
         # Keep aggregate points and round-by-round observations distinct. A
         # player can have a current total while finalized per-round data has
         # not yet been collected.
@@ -1637,6 +1712,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           bordercolor = "#e2e8f0",
           borderpad = 4
         ))
+        }
       }
 
       chart %>%

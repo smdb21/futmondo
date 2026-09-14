@@ -64,3 +64,8 @@ The lineup summary shows expected points separately from descriptive FIS, and re
 ```r
 rivals_buying_power_values(data.frame(), data.frame(teamid = "t1", teamname = "Team"), initial_budget = 0)
 ```
+
+
+## All Players release-clause filters
+
+The All Players table adds **Max Clause (M)**, which keeps only positive release clauses at or below the selected euro amount, and **Clause within available funds**. The latter uses the current verified debt-aware `spendable_budget`, including active-offer commitments; if that snapshot is unavailable, it returns no rows rather than guessing affordability.

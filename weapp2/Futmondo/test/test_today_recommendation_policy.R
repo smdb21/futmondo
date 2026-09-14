@@ -561,6 +561,24 @@ pol_record("resolve_market_bid_from_market_candidates_only", {
   stopifnot(is.null(today_resolve_player_for_action("sys1", "market_bid", data.frame(), all_df)))
 })
 
+pol_record("action_filter_labels_explain_buy_and_received_offers", {
+  ui_html <- htmltools::renderTags(today_UI("today_filter_labels"))$html
+  stopifnot(grepl("Buy players", ui_html, fixed = TRUE),
+            grepl("Offers received", ui_html, fixed = TRUE),
+            grepl("rival_listing_control", ui_html, fixed = TRUE))
+})
+
+pol_record("rival_listing_mode_tracks_action_filters", {
+  clause_only <- today_rival_listing_mode("Clause", manual_opt_in = FALSE)
+  stopifnot(clause_only$relevant, clause_only$automatic, clause_only$include_rival)
+  buy_only <- today_rival_listing_mode("Buy", manual_opt_in = FALSE)
+  stopifnot(buy_only$relevant, !buy_only$automatic, !buy_only$include_rival)
+  buy_opted_in <- today_rival_listing_mode("Buy", manual_opt_in = TRUE)
+  stopifnot(buy_opted_in$include_rival)
+  sell_hold <- today_rival_listing_mode(c("Sell", "Hold"), manual_opt_in = TRUE)
+  stopifnot(!sell_hold$relevant, !sell_hold$include_rival)
+})
+
 pol_record("resolve_clause_buyout_from_clause_candidates_only", {
   # An open clause candidate resolves.
   r1 <- today_resolve_player_for_action("rcl1", "clause_buyout", mkt_cand, all_df,
@@ -574,6 +592,11 @@ pol_record("resolve_clause_buyout_from_clause_candidates_only", {
                                                     clause_df = clause_cand)))
   # NULL clause candidates fail closed.
   stopifnot(is.null(today_resolve_player_for_action("rcl1", "clause_buyout", mkt_cand, all_df)))
+  # The player-card control uses a view route. Rival-roster clause rows may
+  # be absent from all_players_RV(), but still need to open as read-only cards.
+  view_row <- today_resolve_player_for_action("rcl1", "view", mkt_cand, data.frame(),
+                                               clause_df = clause_cand)
+  stopifnot(is.data.frame(view_row), as.character(view_row$id) == "rcl1")
   # Raw label "Exercise Clause" maps to the clause_buyout route.
   r2 <- today_resolve_player_for_action("rcl1", "Exercise Clause", mkt_cand, all_df,
                                         clause_df = clause_cand)

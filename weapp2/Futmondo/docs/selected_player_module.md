@@ -2,6 +2,8 @@
 
 This document describes the `Selected_Player_Module.R` Shiny module, which renders detailed player profile cards, performance history plots, and interactive player acquisition features.
 
+The historical chart has a **Valuation / Round points** switch. Valuation uses the price series alone; Round points shows one finalized score per round, sourced first from stored `player_match_observations` and then from the current player-summary response. The database schema for those observations already exists in the 20260905 and 20260907 migrations; they must be applied to the connected database for persistent full-round history.
+
 The card includes a prominent **Close player card** control before its content. It dismisses the hosting Shiny modal and uses sticky positioning, with a 48px mobile touch target, so users do not need to scroll to the footer to close a long card.
 
 ---

@@ -9,6 +9,8 @@ players_table_UI <- function(id, box_title = NULL,
                              filter_by_change_value = TRUE,
                              default_minimum_change_value = NA,
                              filter_by_active_clause = TRUE,
+                             filter_by_max_clause_value = FALSE,
+                             filter_by_clause_under_available_funds = FALSE,
                              filter_by_is_favorite = TRUE,
                              filter_by_is_from_futmondo = TRUE,
 filter_by_players_with_bid = FALSE,
@@ -82,11 +84,21 @@ if (filter_by_position) {
       },
 
       # Checkboxes Inline Grid
-      if (filter_by_active_clause || filter_by_is_favorite || filter_by_is_from_futmondo || filter_by_players_with_bid) {
+      if (filter_by_active_clause || filter_by_max_clause_value || filter_by_clause_under_available_funds || filter_by_is_favorite || filter_by_is_from_futmondo || filter_by_players_with_bid) {
         fluidRow(
           style = "padding: 0 15px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 20px; align-items: center;",
           if (filter_by_active_clause) {
             div(checkboxInput(inputId = ns("active_clause_filter"), label = "Active Clause Only", value = FALSE), style = "font-weight: 500;", title = "Show only players whose buyout clause is currently payable (lock period has expired)")
+          },
+          if (filter_by_max_clause_value) {
+            div(numericInput(inputId = ns("max_clause_value_filter"), label = "Max Clause (M)", min = 0,
+              max = 1000, value = 1000, step = 0.5, width = "160px"), style = "font-weight: 500;",
+              title = "Show only players with a positive release clause at or below this amount")
+          },
+          if (filter_by_clause_under_available_funds) {
+            div(checkboxInput(inputId = ns("clause_under_available_funds_filter"),
+              label = "Clause within available funds", value = FALSE), style = "font-weight: 500;",
+              title = "Show only release clauses at or below your verified debt-aware spending capacity")
           },
           if (filter_by_is_favorite) {
             div(checkboxInput(inputId = ns("is_favorite_filter"), label = "Favorites Only", value = FALSE), style = "font-weight: 500;", title = "Show only players you have starred as favorite")
@@ -122,7 +134,7 @@ if (filter_by_position) {
 }
 
 
-players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL, hide_bid_column = FALSE, refresh_trigger = NULL) {
+players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL, available_funds_RV = NULL, hide_bid_column = FALSE, refresh_trigger = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     table_refresh_trigger <- reactiveVal(0)
@@ -189,6 +201,8 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
         updateNumericInput(session, inputId = "max_value_filter", value = 1000)
         updateNumericInput(session, inputId = "change_value_filter", value = NA)
         updateCheckboxInput(session, inputId = "active_clause_filter", value = FALSE)
+        updateNumericInput(session, inputId = "max_clause_value_filter", value = 1000)
+        updateCheckboxInput(session, inputId = "clause_under_available_funds_filter", value = FALSE)
         updateCheckboxInput(session, inputId = "is_favorite_filter", value = FALSE)
         updateCheckboxInput(session, inputId = "is_from_futmondo_filter", value = FALSE)
         updateCheckboxInput(session, inputId = "players_you_bid_filter", value = FALSE)
@@ -294,6 +308,27 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       if (!is.null(input$max_value_filter)) {
         players_table <- players_table %>%
           dplyr::filter(value <= input$max_value_filter * 1000000)
+      }
+      clause_values <- if ("clause_price" %in% names(players_table)) {
+        suppressWarnings(as.numeric(as.character(players_table$clause_price)))
+      } else rep(NA_real_, nrow(players_table))
+      if (!is.null(input$max_clause_value_filter) && is.finite(input$max_clause_value_filter)) {
+        maximum_clause <- as.numeric(input$max_clause_value_filter) * 1000000
+        players_table <- players_table[is.finite(clause_values) & clause_values > 0 & clause_values <= maximum_clause, , drop = FALSE]
+        clause_values <- clause_values[is.finite(clause_values) & clause_values > 0 & clause_values <= maximum_clause]
+      }
+      if (!is.null(input$clause_under_available_funds_filter) && isTRUE(input$clause_under_available_funds_filter)) {
+        funds <- tryCatch({
+          if (is.null(available_funds_RV)) NA_real_ else if (is.reactive(available_funds_RV) || is.function(available_funds_RV)) available_funds_RV() else available_funds_RV
+        }, error = function(e) NA_real_)
+        funds <- suppressWarnings(as.numeric(funds)[1])
+        if (!is.finite(funds) || funds < 0) {
+          # Do not guess affordability when the verified financial snapshot is unavailable.
+          players_table <- players_table[0, , drop = FALSE]
+        } else {
+          clause_values <- if ("clause_price" %in% names(players_table)) suppressWarnings(as.numeric(as.character(players_table$clause_price))) else rep(NA_real_, nrow(players_table))
+          players_table <- players_table[is.finite(clause_values) & clause_values > 0 & clause_values <= funds, , drop = FALSE]
+        }
       }
       if (!is.null(input$active_clause_filter)) {
         if (input$active_clause_filter) {

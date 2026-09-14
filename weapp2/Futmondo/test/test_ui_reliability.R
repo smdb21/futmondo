@@ -9,6 +9,10 @@ suppressPackageStartupMessages(source('Modules/Classification_Module.R'))
 suppressPackageStartupMessages(source('Modules/Rivals_Module.R'))
 format_table_currency <- function(x) paste0(format(x, scientific=FALSE, trim=TRUE), ' EUR')
 record <- function(name, expr) {force(expr); cat('[PASS]', name, '\n')}
+record('desktop sidebar reserves room for full navigation labels', {
+  ui_source <- paste(readLines('ui.R', warn=FALSE), collapse='\n')
+  stopifnot(grepl('width = 180', ui_source, fixed=TRUE))
+})
 record('all player-card money displays use the shared formatter', {
   source_text <- paste(readLines('Modules/Selected_Player_Module.R', warn=FALSE), collapse='\n')
   stopifnot(!grepl('format_currency\\(', source_text),
@@ -20,6 +24,12 @@ record('player card has an accessible top close control', {
   stopifnot(grepl('player-card-close-shortcut', card_html, fixed=TRUE),
             grepl('Close player card', card_html, fixed=TRUE),
             grepl('data-dismiss="modal"', card_html, fixed=TRUE))
+})
+record('player card location distinguishes ownership from market listing', {
+  stopifnot(player_card_location_label(data.frame(), 'mine') == 'Free Agent',
+    player_card_location_label(data.frame(market_inMarket=TRUE), 'mine') == 'Free Agent / On Market',
+    player_card_location_label(data.frame(user_team_id='rival', userTeam='Rivals FC'), 'mine') == 'Rival Owned: Rivals FC',
+    player_card_location_label(data.frame(user_team_id='rival', userTeam='Rivals FC', market_inMarket=TRUE), 'mine') == 'Rival Owned: Rivals FC / On Market')
 })
 record('player card offer money uses stable Spanish euro formatting', {
   stopifnot(player_card_money(11234778) == '11.234.778 €',
@@ -96,6 +106,21 @@ selected_player_UI <- function(...) NULL
 cfg_player_columns_to_hide <- character()
 reorder_player_table_columns <- function(x) x
 get_reactable_columns_for_players <- function(x) list()
+record('all players clause filters respect maximum and verified funds', {
+  players <- reactive(data.frame(
+    id=c('low','equal','high'), name=c('Low','Equal','High'), role='MID', role2=NA_character_,
+    value=1000000, clause_price=c(1000000,2000000,3000000), isClause=TRUE,
+    clause_date='', fis_score=60, stringsAsFactors=FALSE
+  ))
+  testServer(players_table_Server, args=list(
+    players_table_RV=players, user_teams_RV=reactive(NULL), available_funds_RV=reactive(2000000)
+  ), {
+    session$setInputs(max_clause_value_filter=2, clause_under_available_funds_filter=FALSE)
+    stopifnot(identical(players_table_filtered_RV()$id, c('low','equal')))
+    session$setInputs(max_clause_value_filter=1000, clause_under_available_funds_filter=TRUE)
+    stopifnot(identical(players_table_filtered_RV()$id, c('low','equal')))
+  })
+})
 record('listing and rejected offers refresh authoritative data', {
   trigger <- reactiveVal(0L)
   authoritative <- reactive({

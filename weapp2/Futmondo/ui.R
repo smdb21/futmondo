@@ -80,7 +80,7 @@ shinydashboardPlus::dashboardPage(
   preloader = list(html = tagList(waiter::spin_1(), "Loading ..."), color = fm_theme_tokens()$bg),
   header,
   shinydashboardPlus::dashboardSidebar(
-    width = 135, # pixels
+    width = 180, # pixels; keeps navigation labels readable without changing mobile navigation
     shinydashboard::sidebarMenuOutput(outputId = "menu")
   ),
   body
