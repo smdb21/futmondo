@@ -1118,3 +1118,14 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 .round-mvp-round { color: var(--fm-warning); font-size: 12px; font-weight: 800; text-transform: uppercase; }
 .round-mvp-player { margin-top: 5px; color: var(--fm-text); font-size: 17px; font-weight: 800; overflow-wrap: anywhere; }
 .round-mvp-meta { margin-top: 4px; color: var(--fm-muted); font-size: 13px; overflow-wrap: anywhere; }
+
+/* Player profile and match history use responsive wrapping cards. */
+.player-external-details { color: var(--fm-text); }
+.player-external-details h4 { margin: 0 0 10px; font-size: 15px; font-weight: 700; }
+.player-external-details h5 { margin: 14px 0 8px; font-size: 13px; font-weight: 700; }
+.player-profile-summary { display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: 13px; color: var(--fm-muted); }
+.player-profile-price { font-weight: 700; color: var(--fm-text); }
+.player-match-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; }
+.player-match-card { min-width: 0; padding: 9px 10px; border: 1px solid var(--fm-border); border-radius: 4px; display: grid; gap: 3px; font-size: 12px; overflow-wrap: anywhere; }
+.player-match-round { font-weight: 700; color: var(--fm-text); }
+.player-match-date, .player-external-unavailable { color: var(--fm-muted); font-size: 12px; }

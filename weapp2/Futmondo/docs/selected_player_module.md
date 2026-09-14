@@ -263,3 +263,9 @@ Focused verification: `Rscript test/test_ui_reliability.R`.
 ## Stored round points
 
 `get_player_round_points_history(player_id, championship_id)` supplies finalized rows from `player_match_observations` to the chart and latest-round panel. `player_match_points_trace(rows)` maps `round`, `points`, and the best available event timestamp into chart data. Daily valuation snapshots and live player-summary data remain fallbacks when no stored final rows are available.
+
+## 10. Player Profile and Match Context
+
+The player card makes two cached authenticated reads for its profile section: `get_player_full_profile(login, player_id)` calls `/1/player/fullprofile`, while `get_player_matches(login, player_id)` calls `/2/player/matches`. Both submit `{header: {token, userid}, query: {playerId}, answer: {}}` and return Futmondo's `answer` object. `normalize_player_full_profile(answer)` returns `list(profile, price_history)`, where `price_history` has `recorded_at`, `social`, and `classic`. `normalize_player_matches(answer)` returns a data frame with `round`, `occurred_at`, teams, scores, and status.
+
+These endpoints describe real-competition profile and match data. Their scoring modes are never used for the league-specific points graph; that graph continues to use `get_player_summary(login, championship_id, user_team_id, player_id)`. Each profile or match section has its own unavailable state if an individual read fails.

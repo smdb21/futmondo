@@ -8,6 +8,8 @@ ROUNDS_URL <- "https://api.futmondo.com/1/userteam/rounds"
 BID_URL <- "https://api.futmondo.com/1/market/bid"
 MARKET_URL <- "https://api.futmondo.com/1/market/players"
 PLAYER_SUMMARY_URL <- "https://api.futmondo.com/1/player/summary"
+PLAYER_FULL_PROFILE_URL <- "https://api.futmondo.com/1/player/fullprofile"
+PLAYER_MATCHES_URL <- "https://api.futmondo.com/2/player/matches"
 MODIFY_BID_URL <- "https://api.futmondo.com/5/market/modifybid"
 PRESSROOM_URL <- "https://api.futmondo.com/1/locker/pressroom"
 CANCEL_BID_URL <- "https://api.futmondo.com/1/market/cancelbid"
@@ -89,7 +91,7 @@ futmondo_post <- function(url, ...) {
   if (isTRUE(getOption("futmondo.offline", FALSE))) stop("Network disabled in offline mode")
   read_routes <- c("information", "activechampionships", "teams", "roster", "rounds",
     "dreamteam", "nightmareteam", "lineup", "championshipplayers", "championshipteams",
-    "players", "summary", "pressroom", "moneymovements", "rosterbids", "myplayers",
+    "players", "summary", "fullprofile", "matches", "pressroom", "moneymovements", "rosterbids", "myplayers",
     "list", "unread", "getdtconfig")
   route <- tail(strsplit(url, "/", fixed = TRUE)[[1]], 1)
   attempts <- if (route %in% read_routes) 2L else 1L
@@ -2412,6 +2414,85 @@ get_player_summary <- function(login, championship_id, user_team_id = NULL, play
     }
     return(NULL)
   }, timeout_sec = 60)
+}
+
+# Read a player endpoint that is scoped only by player ID.  These endpoints
+# contain real-competition profile/match data and must not replace the selected
+# championship's points from get_player_summary().
+get_player_profile_endpoint <- function(login, player_id, endpoint, cache_prefix) {
+  if (!valid_login(login) || is.null(player_id) || !length(player_id) ||
+      !nzchar(as.character(player_id)[1])) return(NULL)
+  cache_key <- paste0(cache_prefix, "_", as.character(player_id)[1])
+  get_cached_data(cache_key, {
+    payload <- list(
+      header = list(token = login[["token"]], userid = login[["userid"]]),
+      query = list(playerId = as.character(player_id)[1]), answer = list()
+    )
+    response <- futmondo_post(endpoint,
+      body = toJSON(payload, auto_unbox = TRUE),
+      add_headers(.headers = c("Content-Type" = "application/json; charset=utf-8")))
+    raw_body <- httr::content(response, as = "text", encoding = "UTF-8")
+    decoded <- tryCatch(jsonlite::fromJSON(raw_body, simplifyVector = FALSE), error = function(e) NULL)
+    answer <- if (is.list(decoded)) decoded$answer else NULL
+    if (is.null(answer) || !is.list(answer)) stop("Player profile data is unavailable.")
+    answer
+  }, timeout_sec = 300)
+}
+
+# Fetch Futmondo's real-competition player profile, including independent
+# social/classic valuation history. Returns the raw answer payload for
+# normalize_player_full_profile().
+get_player_full_profile <- function(login, player_id) {
+  get_player_profile_endpoint(login, player_id, PLAYER_FULL_PROFILE_URL, "player_full_profile")
+}
+
+# Fetch Futmondo's completed match metadata for a player. Returns the raw
+# answer payload for normalize_player_matches().
+get_player_matches <- function(login, player_id) {
+  get_player_profile_endpoint(login, player_id, PLAYER_MATCHES_URL, "player_matches")
+}
+
+normalize_player_full_profile <- function(answer) {
+  empty_prices <- data.frame(recorded_at=character(), social=numeric(), classic=numeric(), stringsAsFactors=FALSE)
+  if (!is.list(answer)) return(list(profile=list(), price_history=empty_prices))
+  profile <- answer$profile %||% list()
+  nationality <- if (is.list(profile$nationality)) profile$nationality$main %||% "" else profile$nationality %||% ""
+  normalized_profile <- list(
+    date_of_birth = fm_scalar(profile$dob, ""), nationality = fm_scalar(nationality, ""),
+    height_cm = fm_number(profile$height), weight_kg = fm_number(profile$weight),
+    preferred_foot = fm_scalar(profile$foot, ""), shirt_number = fm_number(profile$number)
+  )
+  prices <- answer$prices
+  if (is.null(prices) || !length(prices)) return(list(profile=normalized_profile, price_history=empty_prices))
+  if (!is.data.frame(prices)) prices <- dplyr::bind_rows(prices)
+  if (!nrow(prices)) return(list(profile=normalized_profile, price_history=empty_prices))
+  out <- data.frame(
+    recorded_at=if ("date" %in% names(prices)) as.character(prices$date) else NA_character_,
+    social=if ("social" %in% names(prices)) suppressWarnings(as.numeric(prices$social)) else NA_real_,
+    classic=if ("classic" %in% names(prices)) suppressWarnings(as.numeric(prices$classic)) else NA_real_,
+    stringsAsFactors=FALSE
+  )
+  out <- out[!is.na(out$recorded_at) & nzchar(out$recorded_at),,drop=FALSE]
+  list(profile=normalized_profile, price_history=out)
+}
+
+normalize_player_matches <- function(answer) {
+  empty <- data.frame(round=numeric(), occurred_at=character(), home=character(), away=character(), home_score=numeric(), away_score=numeric(), status=character(), stringsAsFactors=FALSE)
+  matches <- if (is.list(answer)) answer$matches else NULL
+  if (is.null(matches) || !length(matches)) return(empty)
+  if (is.data.frame(matches)) matches <- split(matches, seq_len(nrow(matches)))
+  out <- lapply(matches, function(match) {
+    if (!is.list(match)) return(NULL)
+    home <- match$h %||% list(); away <- match$a %||% list(); info <- match$info %||% list()
+    data.frame(round=fm_number(match$r), occurred_at=fm_scalar(info$date, ""),
+      home=fm_scalar(home$name, "Home team"), away=fm_scalar(away$name, "Away team"),
+      home_score=fm_number(home$score), away_score=fm_number(away$score),
+      status=fm_scalar(match$st, ""), stringsAsFactors=FALSE)
+  })
+  out <- Filter(Negate(is.null), out)
+  if (!length(out)) return(empty)
+  frame <- dplyr::bind_rows(out)
+  frame[order(frame$round, decreasing=TRUE, na.last=TRUE),,drop=FALSE]
 }
 
 modify_bid <- function(login, championship_id, team_id, player_id, bid_id, new_price) {

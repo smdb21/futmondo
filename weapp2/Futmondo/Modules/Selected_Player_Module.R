@@ -84,6 +84,11 @@ selected_player_UI <- function(id) {
                  plotly::plotlyOutput(ns("player_trend_plot"), height = "280px")
           )
         ),
+        # Real-competition profile, price history, and completed match metadata.
+        fluidRow(
+          style = "margin-top: 20px; padding-top: 15px; border-top: 1px solid #f1f5f9;",
+          column(12, uiOutput(ns("player_external_details")))
+        ),
         # FIS 5-Pillar Breakdown Panel
         fluidRow(
           style = "margin-top: 20px; padding-top: 15px; border-top: 1px solid #f1f5f9;",
@@ -1771,6 +1776,52 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
             div(class="player-recent-round-chip",
               span(class="player-recent-round-label",paste("Round",recent$round_number[i])),
               strong(paste0(format(recent$points[i],trim=TRUE,scientific=FALSE)," pts")))))
+      )
+    })
+
+    ## render profile and match context from captured player endpoints ----
+    output$player_external_details <- renderUI({
+      sp <- selected_player(); req(sp)
+      login <- get_reactive_val(login_token)
+      if (!valid_login(login) || is.null(sp$id) || !nzchar(as.character(sp$id))) {
+        return(div(class="player-external-details", h4(icon("address-card"), " Player profile & matches"),
+          span(class="player-external-unavailable", "Player profile is unavailable until a valid session is available.")))
+      }
+      profile_answer <- tryCatch(get_player_full_profile(login, sp$id), error=function(e) NULL)
+      matches_answer <- tryCatch(get_player_matches(login, sp$id), error=function(e) NULL)
+      profile_data <- normalize_player_full_profile(profile_answer)
+      matches <- normalize_player_matches(matches_answer)
+      profile <- profile_data$profile
+      profile_bits <- c()
+      if (nzchar(profile$nationality)) profile_bits <- c(profile_bits, profile$nationality)
+      if (is.finite(profile$height_cm)) profile_bits <- c(profile_bits, paste0(format(profile$height_cm, trim=TRUE), " cm"))
+      if (is.finite(profile$weight_kg)) profile_bits <- c(profile_bits, paste0(format(profile$weight_kg, trim=TRUE), " kg"))
+      if (nzchar(profile$preferred_foot)) profile_bits <- c(profile_bits, profile$preferred_foot)
+      prices <- profile_data$price_history
+      latest_price <- if (nrow(prices)) prices[nrow(prices),,drop=FALSE] else NULL
+      price_text <- if (!is.null(latest_price) && is.finite(latest_price$social[1])) {
+        paste0("Profile valuation: ", player_card_money(latest_price$social[1]), " · ", nrow(prices), " saved values")
+      } else "Profile valuation history is unavailable."
+      div(class="player-external-details",
+        h4(icon("address-card"), " Player profile & matches"),
+        if (is.null(profile_answer)) div(class="player-external-unavailable", "Player profile is unavailable. Please refresh to retry.") else
+          div(class="player-profile-summary",
+            if (length(profile_bits)) span(paste(profile_bits, collapse=" · ")) else span("Profile details are unavailable."),
+            span(class="player-profile-price", price_text)
+          ),
+        h5("Recent matches"),
+        if (is.null(matches_answer)) div(class="player-external-unavailable", "Match history is unavailable. Please refresh to retry.") else if (!nrow(matches))
+          div(class="player-external-unavailable", "No completed matches are available.") else
+          div(class="player-match-list", lapply(seq_len(min(5L,nrow(matches))), function(i) {
+            match <- matches[i,,drop=FALSE]
+            score <- if (is.finite(match$home_score) && is.finite(match$away_score)) paste0(format(match$home_score,trim=TRUE), "–", format(match$away_score,trim=TRUE)) else "Score unavailable"
+            date <- if (nzchar(match$occurred_at)) sub("T.*", "", match$occurred_at) else "Date unavailable"
+            div(class="player-match-card",
+              span(class="player-match-round", paste("Round", format(match$round,trim=TRUE))),
+              strong(paste(match$home, score, match$away)),
+              span(class="player-match-date", date)
+            )
+          }))
       )
     })
 
