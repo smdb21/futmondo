@@ -1066,7 +1066,10 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
   }
 }
 
-[id$='selected_player_box'] .box-header { display: none; }
+/* The compact identity row replaces userBox's legacy title/image header. */
+[id$='selected_player_box'] .box-header,
+[id$='selected_player_box'] .widget-user-header,
+[id$='selected_player_box'] .widget-user-image { display: none !important; }
 .player-card-identity { display: flex; align-items: center; gap: 12px; padding: 0 0 14px; margin-bottom: 14px; border-bottom: 1px solid var(--fm-border); }
 .player-card-identity-photo { width: 58px; height: 58px; flex: 0 0 58px; object-fit: cover; border-radius: 50%; border: 2px solid var(--fm-border); background: var(--fm-bg); }
 .player-card-identity-details { min-width: 0; }

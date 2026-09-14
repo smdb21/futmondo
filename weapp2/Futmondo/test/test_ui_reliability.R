@@ -26,6 +26,11 @@ record('player card has an accessible top close control', {
             grepl('Close player card', card_html, fixed=TRUE),
             grepl('data-dismiss="modal"', card_html, fixed=TRUE))
 })
+record('player card hides the legacy userBox header', {
+  css <- paste(readLines('www/custom_style.css', warn=FALSE), collapse='\n')
+  stopifnot(grepl("[id$='selected_player_box'] .widget-user-header", css, fixed=TRUE),
+            grepl("[id$='selected_player_box'] .widget-user-image", css, fixed=TRUE))
+})
 record('player card location distinguishes ownership from market listing', {
   stopifnot(player_card_location_label(data.frame(), 'mine') == 'Free Agent',
     player_card_location_label(data.frame(market_inMarket=TRUE), 'mine') == 'Free Agent / On Market',
