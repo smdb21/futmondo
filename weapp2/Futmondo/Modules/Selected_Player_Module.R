@@ -1627,12 +1627,12 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       if (identical(chart_metric, "points")) {
         if (isTRUE(points_trace$has_points)) {
           return(plotly::plot_ly(data = points_trace$points_df) %>%
-            plotly::add_trace(type = "scatter", mode = "lines+markers", x = ~date, y = ~points,
+            plotly::add_trace(type = "scatter", mode = "lines+markers", x = ~round_number, y = ~points,
               name = "Round points", line = list(color = "#10b981", width = 2.5),
               marker = list(size = 8, color = "#10b981"), hoverinfo = "text",
               text = ~paste0("Jornada ", round_number, "<br>Points: ", points)) %>%
             fm_plot_layout(hovermode = "x unified", paper_bgcolor = "rgba(0,0,0,0)",
-              plot_bgcolor = "rgba(0,0,0,0)", xaxis = list(title = "", tickformat = "%d-%m", gridcolor = "#f1f5f9"),
+              plot_bgcolor = "rgba(0,0,0,0)", xaxis = list(title = "Round", dtick = 1, gridcolor = "#f1f5f9"),
               yaxis = list(title = "Points", autorange = FALSE, range = player_trend_axis_range(points_trace$points_df$points), gridcolor = "#f1f5f9"),
               showlegend = FALSE, margin = list(l = 50, r = 20, t = 10, b = 40)))
         }
@@ -2379,18 +2379,26 @@ player_match_points_trace <- function(rows) {
 player_summary_points_trace <- function(summary, finished_rounds_df = NULL) {
   empty <- list(points_df = data.frame(date=as.POSIXct(character(0)), points=numeric(), round_number=numeric(), stringsAsFactors=FALSE), has_points=FALSE)
   points <- if (is.list(summary)) summary$points else NULL
-  if (is.null(points) || !length(points) || !is.data.frame(finished_rounds_df) || !nrow(finished_rounds_df) ||
-      !all(c("round_number", "begin_process") %in% names(finished_rounds_df))) return(empty)
+  if (is.null(points) || !length(points)) return(empty)
   if (is.data.frame(points)) points <- split(points, seq_len(nrow(points)))
-  finished <- if ("is_finished" %in% names(finished_rounds_df)) !is.na(as.logical(finished_rounds_df$is_finished)) & as.logical(finished_rounds_df$is_finished) else rep(FALSE, nrow(finished_rounds_df))
-  rounds <- finished_rounds_df[finished, , drop=FALSE]
-  if (!nrow(rounds)) return(empty)
-  dates <- suppressWarnings(as.POSIXct(gsub("Z$", "", gsub("T", " ", as.character(rounds$begin_process))), tz="UTC"))
+  has_round_boundaries <- is.data.frame(finished_rounds_df) && nrow(finished_rounds_df) &&
+    all(c("round_number", "begin_process") %in% names(finished_rounds_df))
+  rounds <- if (has_round_boundaries) {
+    finished <- if ("is_finished" %in% names(finished_rounds_df)) !is.na(as.logical(finished_rounds_df$is_finished)) & as.logical(finished_rounds_df$is_finished) else rep(FALSE, nrow(finished_rounds_df))
+    finished_rounds_df[finished, , drop=FALSE]
+  } else data.frame()
+  current_round <- suppressWarnings(as.numeric(summary$match$r$number %||% NA_real_))
+  dates <- if (nrow(rounds)) suppressWarnings(as.POSIXct(gsub("Z$", "", gsub("T", " ", as.character(rounds$begin_process))), tz="UTC")) else as.POSIXct(character(0))
   out <- lapply(as.list(points), function(point) {
     round <- suppressWarnings(as.numeric(point$round)); score <- suppressWarnings(as.numeric(point$points))
-    idx <- which(rounds$round_number == round)
-    if (length(idx) != 1L || !is.finite(score)) return(NULL)
-    data.frame(date=dates[idx], points=score, round_number=round, stringsAsFactors=FALSE)
+    if (!is.finite(round) || !is.finite(score)) return(NULL)
+    idx <- if (nrow(rounds)) which(rounds$round_number == round) else integer()
+    if (nrow(rounds) && length(idx) != 1L) return(NULL)
+    if (!nrow(rounds) && is.finite(current_round) && round >= current_round) return(NULL)
+    # The points plot is indexed by round. Keep a deterministic timestamp for
+    # trace consumers that still expect a date column.
+    date <- if (length(idx) == 1L) dates[idx] else as.POSIXct("1970-01-01", tz="UTC") + round * 86400
+    data.frame(date=date, points=score, round_number=round, stringsAsFactors=FALSE)
   })
   out <- Filter(Negate(is.null), out)
   if (!length(out)) return(empty)

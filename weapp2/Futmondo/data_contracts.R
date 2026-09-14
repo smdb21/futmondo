@@ -195,6 +195,10 @@ normalize_player_match_observations <- function(summary, player_id, championship
   points <- summary$points
   if (is.null(points) || !length(points)) return(data.frame())
   if (is.data.frame(points)) points <- split(points, seq_len(nrow(points)))
+  # Player summaries expose prior round scores even when the round endpoint
+  # only returns the current round. A score before the current match round is
+  # final; a score for that round remains provisional unless explicitly final.
+  current_round <- suppressWarnings(as.numeric(summary$match$r$number %||% NA_real_))
   dplyr::bind_rows(lapply(points, function(p) {
     round <- fm_number(p$round)
     if (!is.finite(round)) return(NULL)
@@ -207,7 +211,7 @@ normalize_player_match_observations <- function(summary, player_id, championship
     data.frame(player_id = as.character(player_id), championship_id = as.character(championship_id),
       season = season, scoring_version = scoring_version, round = round, points = pts,
       score_status = if (!is.finite(pts)) "unavailable" else if (isTRUE(p$isFinished) ||
-        isTRUE(p$finished)) "final" else "provisional",
+        isTRUE(p$finished) || (is.finite(current_round) && round < current_round)) "final" else "provisional",
       is_home = if (is.logical(p$isHomeTeam)) p$isHomeTeam else NA,
       minutes_raw = fm_number(p$minutesPlayed),
       start_raw = if (is.logical(p$initialLineUp)) p$initialLineUp else NA,

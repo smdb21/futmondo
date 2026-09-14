@@ -37,6 +37,11 @@ check("missing points and actual zero stay distinct; ambiguous minutes untrusted
   stopifnot(d$points[1]==0,is.na(d$points[2]),d$score_status[2]=="unavailable",
     d$score_status[3]=="final",all(is.na(d$participation)))
 })
+check("summary scores before the current match round are finalized",{
+  s<-list(match=list(r=list(number=3)),points=list(list(round=1,points=4),list(round=2,points=8),list(round=3,points=1)))
+  d<-normalize_player_match_observations(s,"p","c")
+  stopifnot(identical(d$score_status,c("final","final","provisional")))
+})
 check("configured scoring weights are not normalized",{
   rules<-normalize_league_rules(list(configuration=list(moneyPerPoint=123,cpt=TRUE)),
     list(custom=list(media=list(list(pct=20),list(pct=20))),multiposition=FALSE))

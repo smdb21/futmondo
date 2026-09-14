@@ -233,7 +233,7 @@ player_trend_axis_range(c(8, 8))              # c(6, 10)
 player_trend_axis_range(c(0, 0))              # c(-2, 2)
 ```
 
-Focused offline verification: `Rscript test/test_player_trend_plot.R` checks axis headroom, flat/zero/missing data, numeric strings, and the actual chart render with independent valuation and points axes. When persisted snapshots do not yet contain round scores, `player_summary_points_trace(summary, finished_rounds_df)` reads the cached player-summary points only for explicitly finished rounds; it returns the same `points_df`/`has_points` shape and never labels an in-progress score as final.
+Focused offline verification: `Rscript test/test_player_trend_plot.R` checks axis headroom, flat/zero/missing data, numeric strings, and the actual chart render with independent valuation and points axes. When persisted snapshots do not yet contain round scores, `player_summary_points_trace(summary, finished_rounds_df)` reads cached player-summary points. It uses verified finished-round boundaries when available; otherwise it includes only scores before the summary's current match round, so an in-progress score is never shown as final. The points plot is indexed by round number, which keeps it useful when the rounds endpoint omits historic dates.
 
 The Smart Bid card displays verified spendable capacity and Futmondo's reported bid limit. A blocked recommendation is rendered as **No bid** with the exact binding constraint, rather than presenting zero as a recommended bid or an unexplained rational ceiling.
 

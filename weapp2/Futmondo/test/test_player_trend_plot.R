@@ -30,13 +30,15 @@ find_plot_body <- function(node) {
 }
 plot_body <- find_plot_body(parse('Modules/Selected_Player_Module.R'))
 stopifnot(!is.null(plot_body))
-render_fixture <- function(history, rounds = NULL, aggregate_points = NA_real_, chart_metric = "valuation") {
+render_fixture <- function(history, rounds = NULL, aggregate_points = NA_real_, chart_metric = "valuation", summary = NULL) {
   env <- new.env(parent = globalenv())
   env$selected_player <- function() data.frame(id = 'player', value = 100000000, change = 0, points = aggregate_points)
   env$login_token <- 'fixture'; env$championship_id <- 'league'; env$input <- list(player_chart_metric = chart_metric)
   env$get_reactive_val <- identity
   env$get_player_historical_data <- function(...) history
   env$get_finished_rounds <- function(...) rounds
+  env$get_player_round_points_history <- function(...) data.frame()
+  env$get_player_summary <- function(...) summary
   plotly::plotly_build(eval(plot_body, env))$x
 }
 assert_visible <- function(values, bounds) {
@@ -112,6 +114,18 @@ check('player-summary fallback returns only explicitly finished rounds', {
   rounds <- data.frame(round_number=1:2,begin_process=c('2026-08-01T10:00:00Z','2026-08-08T10:00:00Z'),is_finished=c(TRUE,FALSE))
   trace <- player_summary_points_trace(summary, rounds)
   stopifnot(trace$has_points, identical(trace$points_df$round_number, 1), identical(trace$points_df$points, 4))
+})
+
+check('player-summary fallback uses prior scores when historic round boundaries are absent', {
+  summary <- list(match=list(r=list(number=3)), points=list(list(round=1,points=4),list(round=2,points=8),list(round=3,points=2)))
+  trace <- player_summary_points_trace(summary, NULL)
+  stopifnot(trace$has_points, identical(trace$points_df$round_number, c(1,2)), identical(trace$points_df$points, c(4,8)))
+})
+
+check('points chart renders the summary fallback without historic round boundaries', {
+  summary <- list(match=list(r=list(number=3)), points=list(list(round=1,points=4),list(round=2,points=8),list(round=3,points=2)))
+  chart <- render_fixture(NULL, NULL, aggregate_points=14, chart_metric='points', summary=summary)
+  stopifnot(length(chart$data)==1L, identical(as.numeric(unlist(chart$data[[1]]$x)),c(1,2)), identical(as.numeric(unlist(chart$data[[1]]$y)),c(4,8)))
 })
 
 check('latest round points are limited and returned newest first', {
