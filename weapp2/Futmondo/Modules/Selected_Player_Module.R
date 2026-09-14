@@ -1613,7 +1613,10 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           print(paste0("[Plot A] Error loading finished rounds: ", e$message))
         })
       }
-      points_trace <- build_player_points_trace(history_df, finished_rounds_df, sp)
+      stored_round_history <- if (!is.null(champ_id) && !is.null(player_id)) tryCatch(
+        get_player_round_points_history(player_id, champ_id), error=function(e) NULL) else NULL
+      points_trace <- player_match_points_trace(stored_round_history)
+      if (!points_trace$has_points) points_trace <- build_player_points_trace(history_df, finished_rounds_df, sp)
       if (!points_trace$has_points && !is.null(login) && !is.null(champ_id) && !is.null(player_id)) {
         summary <- tryCatch(get_player_summary(login, champ_id, get_reactive_val(user_team_id), player_id), error = function(e) NULL)
         summary_trace <- player_summary_points_trace(summary, finished_rounds_df)
@@ -1749,7 +1752,12 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         get_player_historical_data(sp$id,champ_id),error=function(e)NULL) else NULL
       rounds <- if (!is.null(login) && !is.null(champ_id)) tryCatch(
         get_finished_rounds(login,champ_id),error=function(e)NULL) else NULL
-      recent <- latest_player_round_points(history,rounds,limit=5L)
+      stored_round_history <- if (!is.null(champ_id) && !is.null(sp$id)) tryCatch(
+        get_player_round_points_history(sp$id, champ_id), error=function(e) NULL) else NULL
+      stored_trace <- player_match_points_trace(stored_round_history)
+      recent <- if (stored_trace$has_points) {
+        tail(stored_trace$points_df, 5L)[order(tail(stored_trace$points_df, 5L)$round_number, decreasing=TRUE), , drop=FALSE]
+      } else latest_player_round_points(history,rounds,limit=5L)
       if (!nrow(recent) && !is.null(login) && !is.null(champ_id) && !is.null(sp$id)) {
         summary <- tryCatch(get_player_summary(login, champ_id, get_reactive_val(user_team_id), sp$id), error = function(e) NULL)
         summary_trace <- player_summary_points_trace(summary, rounds)
@@ -2344,6 +2352,26 @@ build_player_points_trace <- function(history_df, finished_rounds_df = NULL, sp 
   rownames(points_df) <- NULL
 
   list(points_df = points_df, has_points = TRUE)
+}
+
+# Convert stored final per-round observations into the card chart series.
+player_match_points_trace <- function(rows) {
+  empty <- list(points_df=data.frame(date=as.POSIXct(character(0)), points=numeric(), round_number=numeric(), stringsAsFactors=FALSE), has_points=FALSE)
+  required <- c("round", "points")
+  if (!is.data.frame(rows) || !nrow(rows) || !all(required %in% names(rows))) return(empty)
+  final <- if ("score_status" %in% names(rows)) as.character(rows$score_status) == "final" else rep(TRUE, nrow(rows))
+  points <- suppressWarnings(as.numeric(rows$points)); rounds <- suppressWarnings(as.numeric(rows$round))
+  stamps <- if ("occurred_at" %in% names(rows)) as.character(rows$occurred_at) else rep(NA_character_,nrow(rows))
+  if ("round_start_at" %in% names(rows)) stamps[is.na(stamps) | !nzchar(stamps)] <- as.character(rows$round_start_at[is.na(stamps) | !nzchar(stamps)])
+  if ("observed_at" %in% names(rows)) stamps[is.na(stamps) | !nzchar(stamps)] <- as.character(rows$observed_at[is.na(stamps) | !nzchar(stamps)])
+  stamp_clean <- gsub("Z$", "", gsub("T", " ", stamps))
+  dates <- suppressWarnings(as.POSIXct(stamp_clean, tz="UTC"))
+  keep <- final & is.finite(points) & is.finite(rounds) & !is.na(dates)
+  if (!any(keep)) return(empty)
+  out <- data.frame(date=dates[keep], points=points[keep], round_number=rounds[keep], stringsAsFactors=FALSE)
+  out <- out[order(out$round_number,out$date),,drop=FALSE]
+  out <- out[!duplicated(out$round_number,fromLast=TRUE),,drop=FALSE]
+  list(points_df=out, has_points=nrow(out)>0L)
 }
 
 # Extract final round scores directly from the cached player-summary response.

@@ -100,6 +100,13 @@ check('empty history fallback has a usable valuation range', {
   assert_visible(chart$data[[1]]$y, chart$layout$yaxis$range)
 })
 
+check('stored finalized match observations are the primary round-points source', {
+  rows <- data.frame(round=c(1,2,2,3),points=c(4,8,9,NA),score_status=c('final','final','final','provisional'),
+    occurred_at=c('2026-08-01T10:00:00Z',NA,'2026-08-09T10:00:00Z','2026-08-15T10:00:00Z'),
+    round_start_at=c(NA,'2026-08-08T10:00:00Z',NA,NA),observed_at=c('2026-08-01T11:00:00Z','2026-08-08T11:00:00Z','2026-08-09T11:00:00Z','2026-08-15T11:00:00Z'))
+  trace <- player_match_points_trace(rows)
+  stopifnot(trace$has_points, identical(trace$points_df$round_number,c(1,2)), identical(trace$points_df$points,c(4,9)))
+})
 check('player-summary fallback returns only explicitly finished rounds', {
   summary <- list(points=list(list(round=1,points=4),list(round=2,points=8)))
   rounds <- data.frame(round_number=1:2,begin_process=c('2026-08-01T10:00:00Z','2026-08-08T10:00:00Z'),is_finished=c(TRUE,FALSE))

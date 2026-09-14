@@ -326,6 +326,24 @@ get_round_mvps <- function(championship_id) {
   })
 }
 
+# Read finalized per-round points for one player. This is separate from daily
+# valuation history, which only holds aggregate point totals.
+get_player_round_points_history <- function(player_id, championship_id) {
+  if (is.null(player_id) || is.null(championship_id) || !nzchar(as.character(player_id)[1]) || !nzchar(as.character(championship_id)[1])) return(data.frame())
+  key <- paste0("player_round_points_", as.character(championship_id)[1], "_", as.character(player_id)[1])
+  get_cached_data(key, {
+    rows <- supabase_get("player_match_observations", list(
+      player_id = paste0("eq.", as.character(player_id)[1]),
+      championship_id = paste0("eq.", as.character(championship_id)[1]),
+      score_status = "eq.final",
+      select = "player_id,round,points,score_status,round_start_at,occurred_at,observed_at",
+      order = "round.asc,observed_at.asc"
+    ))
+    if (is.null(rows)) stop("Player round history is unavailable.")
+    rows
+  })
+}
+
 get_player_historical_data <- function(player_id, championship_id) {
   query <- list(
     player_id = paste0("eq.", player_id),

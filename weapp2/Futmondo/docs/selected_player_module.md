@@ -258,3 +258,8 @@ player_card_money(11234778)
 ```
 
 Focused verification: `Rscript test/test_ui_reliability.R`.
+
+
+## Stored round points
+
+`get_player_round_points_history(player_id, championship_id)` supplies finalized rows from `player_match_observations` to the chart and latest-round panel. `player_match_points_trace(rows)` maps `round`, `points`, and the best available event timestamp into chart data. Daily valuation snapshots and live player-summary data remain fallbacks when no stored final rows are available.
