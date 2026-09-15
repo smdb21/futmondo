@@ -7,9 +7,12 @@ check <- function(name, code) { force(code); passed <<- passed + 1L; cat("PASS",
 check("temporary debt headroom reaches exactly half team value", {
   x <- acquisition_headroom(cash=-100, team_value=10000, withheld=200, commitments=300)
   stopifnot(x$debt_limit==5000, x$minimum_balance== -5000,
-    x$projected_committed_balance== -600, x$spendable_budget==4400)
+    x$projected_committed_balance== -400, x$spendable_budget==4600,
+    x$reserved_amount==300)
   boundary <- acquisition_headroom(-5000,10000)
   stopifnot(boundary$spendable_budget==0, boundary$minimum_balance== -5000)
+  same_reservation <- acquisition_headroom(cash=1000, team_value=10000, withheld=300, commitments=300)
+  stopifnot(same_reservation$projected_committed_balance==700, same_reservation$spendable_budget==5700)
 })
 check("unknown or invalid finance fails closed", {
   for (x in list(acquisition_headroom(1,NA), acquisition_headroom(1,-1),
@@ -24,13 +27,13 @@ check("verified acquisition capacity includes debt and existing bids", {
   get_market_players <- function(...) data.frame(id="target",bid_id="mine",bid_price=300)
   clear_api_cache()
   cap <- get_acquisition_capacity(c(token="t",userid="u"),"c","team","target")
-  stopifnot(cap$status=="ok",cap$funds$spendable_budget==4400,
+  stopifnot(cap$status=="ok",cap$funds$spendable_budget==4600,
     cap$funds$debt_limit==5000,cap$funds$minimum_balance== -5000,
-    cap$funds$projected_committed_balance== -600)
+    cap$funds$projected_committed_balance== -400, cap$funds$reserved_amount==300)
   finance <- get_financial_snapshot(c(token="t",userid="u"),"c","team")
   stopifnot(finance$commitments$total_amount == 300, finance$commitments$count == 1)
-  stopifnot(evaluate_acquisition_preflight(cap,"modify",4700,300)$ok,
-    !evaluate_acquisition_preflight(cap,"modify",4701,300)$ok)
+  stopifnot(evaluate_acquisition_preflight(cap,"modify",4900,300)$ok,
+    !evaluate_acquisition_preflight(cap,"modify",4901,300)$ok)
   list2env(saved,envir=.GlobalEnv);clear_api_cache()
 })
 check("roster value verifies debt limit when team summary omits it", {

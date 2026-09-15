@@ -73,7 +73,7 @@ function(input, output, session) {
     solvency_text <- if (!is.finite(final_balance)) {
       "Balance unavailable — verify it before the round"
     } else if (final_balance > 0) {
-      paste0("Final balance positive: ", money_text(final_balance))
+      NULL
     } else {
       paste0("Restore at least ", format(round(abs(final_balance) + 1), big.mark = ".", decimal.mark = ",", scientific = FALSE),
         " EUR before kickoff to score points")
@@ -87,7 +87,7 @@ function(input, output, session) {
         tags$span(class = "round-countdown-finance-item", paste0("Active offers: ", offers_text)),
         tags$span(class = "round-countdown-finance-item", paste0("After offers: ", money_text(if (is.finite(cash) && is.finite(commitments)) cash - commitments else NA_real_))),
         tags$span(class = "round-countdown-finance-item", paste0("Can spend: ", money_text(spendable))),
-        tags$span(class = "round-countdown-solvency", solvency_text)))
+        if (!is.null(solvency_text)) tags$span(class = "round-countdown-solvency", solvency_text)))
   })
   user_teams_RV <- reactive({
     req(championship_id_RV()); refresh_trigger()

@@ -1664,6 +1664,7 @@ get_acquisition_capacity <- function(login, championship_id, user_team_id, targe
         debt_limit = borrowing$debt_limit,
         minimum_balance = borrowing$minimum_balance,
         projected_committed_balance = borrowing$projected_committed_balance,
+        reserved_amount = borrowing$reserved_amount,
         api_bid_limit = fm_number(info$maxBid),
         spendable_budget = spendable
       ),
@@ -2931,13 +2932,14 @@ get_financial_snapshot <- function(login, championship_id, user_team_id) {
     debt_limit <- fm_number(capacity$funds$debt_limit)
     minimum_balance <- fm_number(capacity$funds$minimum_balance)
     projected_balance <- fm_number(capacity$funds$projected_committed_balance)
+    reserved_amount <- fm_number(capacity$funds$reserved_amount)
     lineup <- tryCatch(get_lineup_from_team(login,championship_id,user_team_id),error=function(e)NULL)
     rules <- normalize_league_rules(info,lineup,championship_id)
     observed_at <- min(attr(info,"observed_at") %||% Sys.time(), attr(capacity,"observed_at") %||% Sys.time())
     list(status = status, cash = cash, withheld = withheld,
       spendable_budget = spendable, legal_bid_limit = limit,
       debt_limit = debt_limit, minimum_balance = minimum_balance,
-      projected_committed_balance = projected_balance,
+      projected_committed_balance = projected_balance, reserved_amount = reserved_amount,
       roster_count = capacity$roster$count, roster_cap = capacity$roster$cap,
       commitments = capacity$outstanding, observed_at = observed_at,
       configuration = info$configuration %||% list(),

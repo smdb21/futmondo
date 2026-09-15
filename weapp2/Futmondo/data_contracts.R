@@ -36,7 +36,10 @@ fm_time <- function(x) {
 }
 
 # Futmondo permits a temporary negative balance down to half the team value.
-# This is acquisition headroom only: cash must be positive when a round begins.
+# `withheld` is the API's reservation for active outgoing offers. When the
+# market endpoint reports the same offers, both fields describe the same held
+# money and must not be subtracted twice. This is acquisition headroom only:
+# cash must be positive when a round begins.
 acquisition_headroom <- function(cash, team_value, withheld = 0,
                                  commitments = 0, debt_fraction = 0.5) {
   values <- vapply(list(cash, team_value, withheld, commitments, debt_fraction),
@@ -46,13 +49,14 @@ acquisition_headroom <- function(cash, team_value, withheld = 0,
       values["withheld"] < 0 || values["commitments"] < 0 ||
       values["debt_fraction"] < 0) {
     return(list(spendable_budget = NA_real_, debt_limit = NA_real_,
-      minimum_balance = NA_real_, projected_committed_balance = NA_real_))
+      minimum_balance = NA_real_, projected_committed_balance = NA_real_, reserved_amount = NA_real_))
   }
   debt_limit <- values["team_value"] * values["debt_fraction"]
-  committed_balance <- values["cash"] - values["withheld"] - values["commitments"]
+  reserved_amount <- max(values["withheld"], values["commitments"])
+  committed_balance <- values["cash"] - reserved_amount
   list(spendable_budget = max(0, committed_balance + debt_limit),
     debt_limit = debt_limit, minimum_balance = -debt_limit,
-    projected_committed_balance = committed_balance)
+    projected_committed_balance = committed_balance, reserved_amount = reserved_amount)
 }
 
 next_round_context <- function(rounds, now = Sys.time()) {
