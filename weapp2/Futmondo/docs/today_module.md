@@ -199,9 +199,19 @@ The actionable feed places compact icon checkboxes above the cards for **Buy pla
 
 ### Net result on accepted sale offers
 
-For a Bid recommendation whose action is `Accept`, the card displays the full sale proceeds, the player's current acquisition cost, and the resulting net gain or loss. `current_player_acquisition_cost(player_row, pressroom_df, user_team_id)` first accepts a finite positive roster `buyPrice`/`buy_price`/`acquisition_cost`; otherwise it replays the player's chronological pressroom ownership cycles and uses the latest purchase that has not subsequently been sold. Re-buys replace the earlier cost basis. If no acquisition cost is observed, the proceeds remain visible and the acquisition cost and net result are labeled unavailable.
+For every Bid recommendation with a known acquisition cost, the card displays the full sale proceeds, the player's current acquisition cost, and the resulting net gain or loss. `current_player_acquisition_cost(player_row, pressroom_df, user_team_id)` first accepts a finite positive roster `buyPrice`/`buy_price`/`acquisition_cost`; otherwise it replays the player's chronological pressroom ownership cycles and uses the latest purchase that has not subsequently been sold. Re-buys replace the earlier cost basis. If no acquisition cost is observed, the proceeds remain visible and the acquisition cost and net result are labeled unavailable.
+
+Automatic `Accept` guidance is conservative: the offer must reach at least 110% of current value, avoid a realized loss, and the player must be neither Buy/Strong Buy nor rising in value. Otherwise the card says **Hold or negotiate**, labels the action `Evaluate`, and lists each observed reason. Available scoring average is shown as context. This prevents a near-market offer from being recommended merely because it exceeds the former 90% shortcut while ignoring a large acquisition loss or strong player momentum.
+
+The intentional exception is an owned player already rated `Sell` by the current FIS evidence. If that player has an offer, Today may recommend accepting even at a loss, but the card must say **Accept despite a net loss**, quantify the loss and acquisition cost, and cite the Sell rating together with any available low scoring average or falling-value evidence. This presents the action as cutting a deteriorating position, not as a profitable sale.
 
 ### Clause price comparison wording
+
+### Position depth on recommendations
+
+Every recommendation includes `position_context` and displays it after the decision rationale. BUY and Clause cards show the current number of squad players covering each of the target's primary and secondary positions before purchase. Sell and received-offer Bid cards show how many would remain in each position after removing that player. Hold cards show current coverage. Counts use distinct immutable player IDs and the live `squad_players_RV()` snapshot; missing squad or position evidence is displayed as **Squad position depth unavailable**.
+
+Example for a DEF/MID target: `Current squad depth before purchase: Defenders: 4; Midfielders: 5.`
 
 `clause_value_comparison(clause_price, market_value)` returns `available`, absolute `percent`, display `text`, and `favorable`. A cheaper clause is described as `N% below market value`; a more expensive clause is `N% above market value`; equal prices are `at market value`. Missing comparisons remain unavailable. Clause cards with a premium explicitly advise review before buying and never present a negative percentage as a discount or call the price a Strong Buy.
 

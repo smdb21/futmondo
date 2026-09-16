@@ -553,13 +553,48 @@ pol_record("feed_empty_candidates_supplied_yields_no_buy_clause", {
   stopifnot(nrow(feed[feed$type == "Clause", ]) == 0)
 })
 
-pol_record("market_countdown_formats_and_closes_safely", {
+pol_record("recommendations_show_multi_position_squad_depth", {
+  roster <- data.frame(
+    id=c("sell1","def2","mid2","gk1"),name=c("Seller","Defender","Midfielder","Keeper"),
+    role=c("DEF","DEF","MID","GK"),role2=c("MID",NA,NA,NA),user_team_id="me",
+    value=1000,fis_score=c(30,55,55,55),fis_tier=c("Sell","Hold","Hold","Hold"),
+    fis_summary="",stringsAsFactors=FALSE)
+  candidates <- data.frame(
+    id="buy1",name="Flexible Buy",role="defensa",role2="centrocampista",
+    value=2000,price=2000,fis_score=85,fis_tier="Buy",fis_summary="",
+    stringsAsFactors=FALSE)
+  feed <- generate_command_center_feed(
+    login=NULL,championship_id="champ",user_team_id="me",user_teams_df=teams_df,
+    players_df=roster,market_candidates=candidates,clause_candidates=data.frame(),
+    roster_df=roster)
+  buy <- feed[feed$type=="Buy" & feed$player_id=="buy1",,drop=FALSE]
+  sell <- feed[feed$type=="Sell" & feed$player_id=="sell1",,drop=FALSE]
+  stopifnot(nrow(buy)==1L,nrow(sell)==1L,
+    buy$position_context=="Current squad depth before purchase: Defenders: 2; Midfielders: 2.",
+    grepl(buy$position_context,buy$description,fixed=TRUE),
+    sell$position_context=="Squad depth after sale: Defenders: 1; Midfielders: 1.",
+    grepl(sell$position_context,sell$description,fixed=TRUE))
+})
+
+pol_record("position_depth_handles_numeric_roles_and_unavailable_data", {
+  numeric_roster <- data.frame(id=c("g","d","m","f"),role=1:4,stringsAsFactors=FALSE)
+  goalkeeper <- data.frame(id="new-g",role="portero",stringsAsFactors=FALSE)
+  stopifnot(
+    recommendation_position_context(goalkeeper,numeric_roster,"buy")==
+      "Current squad depth before purchase: Goalkeepers: 1.",
+    recommendation_position_context(data.frame(),numeric_roster,"buy")==
+      "Squad position depth unavailable.",
+    recommendation_position_context(goalkeeper,data.frame(),"buy")==
+      "Squad position depth unavailable.")
+})
   now <- as.POSIXct("2026-09-16 10:00:00", tz = "UTC")
   hours <- today_market_countdown(now + 3661, now)
   days <- today_market_countdown(now + 90061, now)
   zero <- today_market_countdown(now, now)
   expired <- today_market_countdown(now - 1, now)
   invalid <- today_market_countdown("not-a-date", now)
+
+pol_record("market_countdown_formats_and_closes_safely", {
   stopifnot(hours$label == "01:01:01", !hours$closed, hours$available)
   stopifnot(days$label == "1d 01:01:01", !days$closed)
   stopifnot(zero$label == "Market closed", zero$closed)

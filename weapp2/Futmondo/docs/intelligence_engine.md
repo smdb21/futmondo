@@ -146,6 +146,46 @@ Focused regression coverage: `Rscript test/test_command_center_conflicts.R`.
 
 ### Sell recommendations with received offers
 
-For an owned Sell-tier player with a finite positive `bid_price`, the command center creates one Sell card with `Accept Offer` and stable action code `accept_offer`. Its description includes the received amount. The generic Bid card is suppressed for that player, avoiding duplicate acceptance advice. A Sell-tier player without an offer remains `List on Market` with action code `view`.
+For an owned Sell-tier player with a finite positive `bid_price`, the command center creates one Sell card with `Accept Offer` and stable action code `accept_offer`. Its description includes the received amount and explains that weak current performance supports selling. When accepting realizes a loss, the card explicitly says **Accept despite a net loss**, gives the loss and acquisition cost, and supports the exception with the Sell rating plus available scoring-average and falling-value evidence. The generic Bid card is suppressed for that player, avoiding duplicate acceptance advice. A Sell-tier player without an offer remains `List on Market` with action code `view`.
 
 Owned-player Sell and Hold candidates require a non-empty matching owner ID, player ID and name, plus a finite FIS score. This discards incomplete rows that can briefly appear while the roster refreshes, so the feed never emits fabricated `SELL: NA` or `HOLD: NA` cards.
+
+### Conservative received-offer decisions
+
+`evaluate_received_offer(player_row, offer, market_value, acquisition_cost = NA_real_, acceptance_ratio = 1.10)` returns a structured sale decision containing `action_label`, `confidence_pct`, valuation and cost availability, offer ratio, sale result, FIS tier, scoring average, value movement, and the individual decision flags.
+
+An offer is labeled `Accept` only when all verifiable conditions hold:
+
+- it is at least 110% of current market value;
+- its proceeds do not realize a loss against the current ownership cycle's acquisition cost, unless the separate Sell-tier path clearly identifies weak current performance and explains why cutting the loss is recommended;
+- the player is not rated `Buy` or `Strong Buy`; and
+- the player's observed value is not rising.
+
+Every other valid offer is labeled `Evaluate`, with **Hold or negotiate** guidance and explicit reasons such as a sub-threshold offer, realized loss, Buy rating, or rising value. The card always shows the observed proceeds and cost result when acquisition cost is known, and includes the scoring average as decision context when available. Missing valuation still requires manual evaluation; missing acquisition cost prevents automatic acceptance because profit cannot be verified.
+
+```r
+decision <- evaluate_received_offer(player, offer=13077175,
+  market_value=13274287, acquisition_cost=21661732)
+stopifnot(decision$action_label == "Evaluate")
+```
+
+### Recommendation position depth
+
+`recommendation_position_context(player_row, roster_df, direction = c("current", "buy", "sell"))` accepts a one-row recommendation target, the current squad snapshot, and the transaction direction. It returns one display string covering every normalized primary or secondary position:
+
+- `buy`: current squad counts before the purchase;
+- `sell`: remaining squad counts after removing the target's immutable player ID;
+- `current`: current counts without a hypothetical transaction.
+
+Each roster player is counted once per eligible position, so a DEF/MID player contributes to both depth figures but duplicate player IDs do not inflate them. Supported inputs include API numeric roles `1`–`4`, English/Spanish position names, common abbreviations, `role2`, and delimited multi-position values. Missing roster or target-position evidence returns `Squad position depth unavailable.`
+
+```r
+recommendation_position_context(
+  data.frame(id="target",role="DEF",role2="MID"),
+  data.frame(id=c("d","m"),role=c("DEF","MID")),
+  direction="buy"
+)
+# "Current squad depth before purchase: Defenders: 1; Midfielders: 1."
+```
+
+`recommendation_player_row(player_id, sources)` resolves the first position-bearing row for an immutable player ID across current market, clause, catalog, and roster sources. The command-center feed exposes the resulting text in `position_context` and appends it to every recommendation description.

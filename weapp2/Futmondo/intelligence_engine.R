@@ -492,6 +492,95 @@ current_player_acquisition_cost <- function(player_row, pressroom_df, user_team_
   cost
 }
 
+# Make a conservative received-offer decision from facts the feed can verify.
+# Accept is reserved for a meaningful premium that does not realize a loss and
+# is not contradicted by a Buy rating or positive value momentum.
+evaluate_received_offer <- function(player_row, offer, market_value,
+                                    acquisition_cost = NA_real_,
+                                    acceptance_ratio = 1.10) {
+  p <- if (is.data.frame(player_row) && nrow(player_row)) as.list(player_row[1, , drop=FALSE]) else player_row
+  scalar_number <- function(x) {
+    value <- suppressWarnings(as.numeric(as.character(x)))
+    if (length(value)==1L && is.finite(value)) value else NA_real_
+  }
+  offer <- scalar_number(offer)
+  market_value <- scalar_number(market_value)
+  acquisition_cost <- scalar_number(acquisition_cost)
+  acceptance_ratio <- scalar_number(acceptance_ratio)
+  if (!is.finite(acceptance_ratio) || acceptance_ratio<=1) acceptance_ratio <- 1.10
+  tier <- if (is.list(p) && length(p$fis_tier)==1L) as.character(p$fis_tier) else NA_character_
+  value_change <- if (is.list(p)) scalar_number(p$change) else NA_real_
+  scoring_average <- if (is.list(p)) scalar_number(p$average.average) else NA_real_
+  valuation_available <- is.finite(market_value) && market_value>0
+  cost_available <- is.finite(acquisition_cost) && acquisition_cost>0
+  offer_ratio <- if (is.finite(offer) && offer>0 && valuation_available) offer/market_value else NA_real_
+  sale_result <- if (is.finite(offer) && offer>0 && cost_available) offer-acquisition_cost else NA_real_
+  high_quality <- !is.na(tier) && tier %in% c("Strong Buy","Buy")
+  rising <- is.finite(value_change) && value_change>0
+  clears_premium <- is.finite(offer_ratio) && offer_ratio>=acceptance_ratio
+  avoids_loss <- is.finite(sale_result) && sale_result>=0
+  accept <- valuation_available && clears_premium && cost_available && avoids_loss && !high_quality && !rising
+  list(
+    action_label=if (accept) "Accept" else "Evaluate",
+    confidence_pct=if (accept) 85 else 60,
+    valuation_available=valuation_available,
+    acquisition_cost_available=cost_available,
+    offer_ratio=offer_ratio,
+    sale_result=sale_result,
+    tier=tier,
+    high_quality=high_quality,
+    value_change=value_change,
+    rising=rising,
+    scoring_average=scoring_average,
+    acceptance_ratio=acceptance_ratio,
+    clears_premium=clears_premium,
+    avoids_loss=avoids_loss
+  )
+}
+
+# Summarize current squad coverage for every position a recommendation target
+# can play. Selling removes that immutable player ID before counting.
+recommendation_position_context <- function(player_row, roster_df,
+                                            direction=c("current","buy","sell")) {
+  direction <- match.arg(direction)
+  unavailable <- "Squad position depth unavailable."
+  if (!is.data.frame(player_row) || !nrow(player_row) || !is.data.frame(roster_df) || !nrow(roster_df)) return(unavailable)
+  target <- analytics_player_positions(player_row[1,,drop=FALSE],multiposition=TRUE)[[1]]
+  if (!length(target)) return(unavailable)
+  squad <- roster_df
+  if (direction=="sell") {
+    if (!"id" %in% names(squad) || !"id" %in% names(player_row)) return(unavailable)
+    target_id <- as.character(player_row$id[1])
+    if (is.na(target_id) || !nzchar(target_id)) return(unavailable)
+    squad <- squad[as.character(squad$id)!=target_id,,drop=FALSE]
+  }
+  if ("id" %in% names(squad)) {
+    valid_id <- !is.na(squad$id) & nzchar(trimws(as.character(squad$id)))
+    squad <- squad[valid_id & !duplicated(as.character(squad$id)),,drop=FALSE]
+  }
+  squad_positions <- analytics_player_positions(squad,multiposition=TRUE)
+  labels <- c(GK="Goalkeepers",DEF="Defenders",MID="Midfielders",FWD="Forwards")
+  counts <- vapply(target,function(position)
+    sum(vapply(squad_positions,function(eligible) position %in% eligible,logical(1))),integer(1))
+  detail <- paste0(unname(labels[target]),": ",counts,collapse="; ")
+  prefix <- switch(direction,
+    buy="Current squad depth before purchase: ",
+    sell="Squad depth after sale: ",
+    current="Current squad depth: ")
+  paste0(prefix,detail,".")
+}
+
+recommendation_player_row <- function(player_id, sources) {
+  for (source in sources) if (is.data.frame(source) && nrow(source) && "id" %in% names(source)) {
+    matches <- which(as.character(source$id)==as.character(player_id))
+    if (length(matches)) {
+      candidate <- source[matches[1],,drop=FALSE]
+      if (length(analytics_player_positions(candidate,multiposition=TRUE)[[1]])) return(candidate)
+    }
+  }
+  data.frame()
+}
+
 # Check positive deadline cash using only current balance and executable observed sale offers.
 clause_deadline_affordability <- function(clause_price, financial, roster_df, next_round) {
   unavailable <- list(status="unverified",affordable=NA,required_sales=NA_real_,
@@ -752,7 +841,26 @@ generate_command_center_feed <- function(login, championship_id,
           offer_amount <- if ("bid_price" %in% names(p)) suppressWarnings(as.numeric(p$bid_price)) else NA_real_
           has_offer <- length(offer_amount) == 1L && is.finite(offer_amount) && offer_amount > 0
           sell_description <- if (has_offer) {
-            paste0("Received offer of ", fmt_money(offer_amount), ". Current FIS: ", round(p$fis_score, 1), ".")
+            acquisition_cost <- current_player_acquisition_cost(p, pressroom_df, user_team_id)
+            sale_result <- if (is.finite(acquisition_cost)) offer_amount-acquisition_cost else NA_real_
+            performance_average <- if ("average.average" %in% names(p)) suppressWarnings(as.numeric(p$average.average)) else NA_real_
+            value_change <- if ("change" %in% names(p)) suppressWarnings(as.numeric(p$change)) else NA_real_
+            rationale <- if (is.finite(sale_result) && sale_result<0) {
+              paste0("Accept despite a net loss of ",fmt_money(abs(sale_result)),
+                ": the player is rated Sell (FIS ",round(p$fis_score,1),
+                "/100), indicating weak current performance")
+            } else paste0("Accept recommended because the player is rated Sell (FIS ",
+              round(p$fis_score,1),"/100), indicating weak current performance")
+            if (is.finite(performance_average)) rationale <- paste0(rationale,
+              "; scoring average is ",format(round(performance_average,1),trim=TRUE,scientific=FALSE)," points per match")
+            if (is.finite(value_change) && value_change<0) rationale <- paste0(rationale,
+              "; market value is falling by ",fmt_money(abs(value_change)))
+            financial_result <- if (is.finite(acquisition_cost)) {
+              result_label <- if (sale_result>=0) "Net gain" else "Net loss"
+              paste0(" Sale proceeds: ",fmt_money(offer_amount),"; acquisition cost: ",
+                fmt_money(acquisition_cost),"; ",result_label,": ",fmt_money(abs(sale_result)),".")
+            } else " Acquisition cost and net result are unavailable."
+            paste0("Received offer of ",fmt_money(offer_amount),". ",rationale,".",financial_result)
           } else {
             paste0("Weak metrics suggest listing on market. Current FIS: ", round(p$fis_score, 1))
           }
@@ -783,34 +891,48 @@ generate_command_center_feed <- function(login, championship_id,
           p <- bid_players[i, ]
           bid_val <- suppressWarnings(as.numeric(p$bid_price))
           player_val <- suppressWarnings(as.numeric(p$value))
-          valuation_available <- length(player_val) == 1L && is.finite(player_val) && player_val >= 0
-          accept <- if (valuation_available && bid_val >= player_val * 0.9) "Accept" else "Evaluate"
           acquisition_cost <- current_player_acquisition_cost(p, pressroom_df, user_team_id)
-          sale_result <- if (is.finite(acquisition_cost)) bid_val - acquisition_cost else NA_real_
-          bid_description <- if (valuation_available) {
-            paste0("Active bid of ", fmt_money(bid_val), " on player valued at ",
-              fmt_money(player_val), ". ", accept, " recommended.")
+          decision <- evaluate_received_offer(p, bid_val, player_val, acquisition_cost)
+          bid_description <- if (decision$valuation_available) {
+            ratio_pct <- round(decision$offer_ratio*100,1)
+            threshold_pct <- round(decision$acceptance_ratio*100)
+            if (decision$action_label=="Accept") {
+              paste0("Active bid of ",fmt_money(bid_val)," (",ratio_pct,
+                "% of current value ",fmt_money(player_val),"). Accept recommended: the offer clears the ",
+                threshold_pct,"% premium threshold, does not realize a loss, and the player is neither rated Buy nor rising in value.")
+            } else {
+              reasons <- character()
+              if (!decision$clears_premium) reasons <- c(reasons,paste0("the offer is ",ratio_pct,
+                "% of current value, below the ",threshold_pct,"% acceptance threshold"))
+              if (!decision$acquisition_cost_available) reasons <- c(reasons,"the acquisition cost is unavailable, so profit cannot be verified")
+              else if (!decision$avoids_loss) reasons <- c(reasons,paste0("accepting would realize a net loss of ",fmt_money(abs(decision$sale_result))))
+              if (decision$high_quality) reasons <- c(reasons,paste0("the player is rated ",decision$tier))
+              if (decision$rising) reasons <- c(reasons,paste0("market value is rising by ",fmt_money(decision$value_change)))
+              paste0("Active bid of ",fmt_money(bid_val)," (",ratio_pct,
+                "% of current value ",fmt_money(player_val),"). Hold or negotiate; evaluate the offer because ",
+                paste(reasons,collapse=", "),".")
+            }
           } else {
             paste0("Active bid of ", fmt_money(bid_val),
               ". Player valuation is unavailable; evaluate the offer manually.")
           }
-          if (accept == "Accept") {
-            bid_description <- if (is.finite(acquisition_cost)) {
-              result_label <- if (sale_result >= 0) "Net gain" else "Net loss"
-              paste0(bid_description, " Sale proceeds: ", fmt_money(bid_val),
-                "; acquisition cost: ", fmt_money(acquisition_cost), "; ", result_label, ": ",
-                fmt_money(abs(sale_result)), ".")
-            } else {
-              paste0(bid_description, " Sale proceeds: ", fmt_money(bid_val),
-                "; acquisition cost and net result unavailable.")
-            }
+          if (decision$valuation_available) {
+            bid_description <- if (decision$acquisition_cost_available) {
+              result_label <- if (decision$sale_result>=0) "Net gain" else "Net loss"
+              paste0(bid_description," Sale proceeds: ",fmt_money(bid_val),
+                "; acquisition cost: ",fmt_money(acquisition_cost),"; ",result_label,": ",
+                fmt_money(abs(decision$sale_result)),".")
+            } else paste0(bid_description," Sale proceeds: ",fmt_money(bid_val),
+              "; acquisition cost and net result unavailable.")
+            if (is.finite(decision$scoring_average)) bid_description <- paste0(bid_description,
+              " Scoring average: ",format(round(decision$scoring_average,1),trim=TRUE,scientific=FALSE)," points per match.")
           }
           recommendations[[length(recommendations) + 1]] <- data.frame(
             type = "Bid",
             title = paste0("BID OFFER: ", p$name),
             description = bid_description,
-            confidence_pct = ifelse(accept == "Accept", 85, 60),
-            action_label = accept,
+            confidence_pct = decision$confidence_pct,
+            action_label = decision$action_label,
             action_code = "view",
             player_id = as.character(p$id),
             stringsAsFactors = FALSE
@@ -976,6 +1098,23 @@ generate_command_center_feed <- function(login, championship_id,
       result_df <- result_df[!(result_df$type == "Hold" &
         as.character(result_df$player_id) %in% sell_ids), , drop = FALSE]
     }
+    depth_roster <- roster_df
+    if (!is.data.frame(depth_roster) || !nrow(depth_roster)) {
+      depth_roster <- data.frame()
+      if (has_players && "user_team_id" %in% names(players_df)) {
+        owner <- as.character(players_df$user_team_id)
+        current_team <- as.character(user_team_id)[1]
+        depth_roster <- players_df[!is.na(owner) & owner==current_team,,drop=FALSE]
+      }
+    }
+    sources <- list(market_candidates,clause_candidates,players_df,depth_roster)
+    result_df$position_context <- vapply(seq_len(nrow(result_df)),function(i) {
+      player <- recommendation_player_row(result_df$player_id[i],sources)
+      direction <- if (result_df$type[i] %in% c("Buy","Clause")) "buy" else
+        if (result_df$type[i] %in% c("Sell","Bid")) "sell" else "current"
+      recommendation_position_context(player,depth_roster,direction)
+    },character(1))
+    result_df$description <- paste(trimws(as.character(result_df$description)),result_df$position_context)
     # Sort by confidence descending
     result_df$priority_score <- result_df$confidence_pct
     result_df$confidence_pct <- NA_real_
@@ -1013,8 +1152,8 @@ generate_command_center_feed <- function(login, championship_id,
 # ============================================================
 
 analytics_player_positions <- function(squad_df, multiposition = FALSE) {
-  aliases <- c(gk='GK', goalkeeper='GK', portero='GK', df='DEF', def='DEF', defender='DEF', defensa='DEF',
-    mf='MID', md='MID', mid='MID', midfielder='MID', centrocampista='MID', fw='FWD', fwd='FWD', forward='FWD', delantero='FWD')
+  aliases <- c('1'='GK', gk='GK', goalkeeper='GK', portero='GK', '2'='DEF', df='DEF', def='DEF', defender='DEF', defensa='DEF',
+    '3'='MID', mf='MID', md='MID', mid='MID', midfielder='MID', mediocampista='MID', centrocampista='MID', '4'='FWD', fw='FWD', fwd='FWD', forward='FWD', delantero='FWD')
   lapply(seq_len(nrow(squad_df)), function(i) {
     values <- character()
     columns <- if (isTRUE(multiposition)) c('primary_role', 'role', 'role2', 'position', 'eligible_positions') else c('primary_role', 'role', 'position')
