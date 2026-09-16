@@ -200,9 +200,13 @@ today_test_result <- safe_test("today_server_full", {
       # preflight path).
       cat("\n  [3g] Testing 'Place Bid' recommendation routing (no network write)...\n")
 
-      # Pick a player that is actually listed on the market (market data only).
+      # Pick from the CURRENT FILTERED market candidates, the exact action-
+      # eligibility source used by selected_today_player_RV. Raw market rows
+      # hidden by owner policy must not be used by this routing assertion.
       mkt_ids <- as.character(mkt$id)
-      known_pid <- mkt_ids[1]
+      eligible_market <- market_candidates_RV()
+      if (!is.data.frame(eligible_market) || !nrow(eligible_market)) stop("No eligible filtered market candidate available for routing test")
+      known_pid <- as.character(eligible_market$id[1])
       cat(sprintf("    Known MARKET player id: %s\n", known_pid))
 
       session$setInputs(rec_action_clicked = list(player_id = known_pid, action = "Place Bid"))

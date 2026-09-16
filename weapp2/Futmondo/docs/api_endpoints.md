@@ -134,16 +134,22 @@ All requests to the Futmondo API (`api.futmondo.com`) are **stateless POST reque
 
 ## 9. Roster Clause Buyout (dedicated endpoint)
 * **Endpoint**: `POST https://api.futmondo.com/1/market/rosterclause`
-* **Query Payload** (serialized exactly, **no** `isClause`):
+* **Request Payload** (serialized exactly, **no** `isClause`):
   ```json
   {
-    "championshipId": "CHAMPIONSHIP_ID",
-    "userteamId": "USER_TEAM_ID",
-    "player_slug": "PLAYER_SLUG",
-    "player_id": "PLAYER_ID",
-    "price": 15000000
+    "header": {"token": "TOKEN", "userid": "USER_ID"},
+    "query": {
+      "championshipId": "CHAMPIONSHIP_ID",
+      "userteamId": "USER_TEAM_ID",
+      "player_slug": "PLAYER_SLUG",
+      "player_id": "PLAYER_ID",
+      "price": 15000000
+    },
+    "answer": {}
   }
   ```
+  `answer` must be an empty JSON object (`{}`), not an empty array (`[]`). In R,
+  the payload builder uses a named empty list so `jsonlite` preserves this wire shape.
 * **Response**: Returns the operation success code under `response$answer$code` (`"api.general.ok"` on success).
 * **Handler**: `buy_roster_clause()` (see `docs/bid_management.md`). This is the dedicated endpoint used by the Selected Player module for release-clause buyouts. Unlike the generic `/1/market/bid` endpoint (section 7), the payload carries no `isClause` flag because the endpoint itself implies a clause purchase.
 

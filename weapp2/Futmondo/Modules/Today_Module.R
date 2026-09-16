@@ -61,6 +61,24 @@ today_fis_score_badge <- function(value) {
   div(class = paste("fis-score-badge", score_class), formatC(score, format = "f", digits = 1))
 }
 
+# ---- Pure helper: compact market-listing countdown ----
+today_market_countdown <- function(expires_at, now = Sys.time()) {
+  expiry <- fm_time(expires_at)
+  current <- fm_time(now)
+  if (length(expiry) != 1L || is.na(expiry) || length(current) != 1L || is.na(current)) {
+    return(list(label = "Expiry unavailable", closed = FALSE, available = FALSE))
+  }
+  remaining <- max(0, floor(as.numeric(difftime(expiry, current, units = "secs"))))
+  if (remaining <= 0) return(list(label = "Market closed", closed = TRUE, available = TRUE))
+  days <- remaining %/% 86400
+  hours <- (remaining %% 86400) %/% 3600
+  minutes <- (remaining %% 3600) %/% 60
+  seconds <- remaining %% 60
+  clock <- sprintf("%02d:%02d:%02d", hours, minutes, seconds)
+  list(label = if (days > 0) paste0(days, "d ", clock) else clock,
+       closed = FALSE, available = TRUE)
+}
+
 # ---- Pure helper: build the reactable onClick JS for the market radar ----
 # Returns an htmlwidgets::JS() function that, on row click, sends the clicked
 # row's PlayerID to the namespaced input 'radar_selected_player'.
@@ -113,9 +131,10 @@ today_normalize_action <- function(action_label) {
   a <- if (is.null(action_label)) "" else trimws(tolower(as.character(action_label)))
   if (is.na(a)) a <- ""
   if (a == "place bid") return("market_bid")
+  if (a == "update bid") return("modify_bid")
   if (a == "exercise clause") return("clause_buyout")
   if (a == "accept offer") return("accept_offer")
-  if (a %in% c("market_bid", "clause_buyout", "accept_offer", "view")) return(a)
+  if (a %in% c("market_bid", "modify_bid", "clause_buyout", "accept_offer", "view")) return(a)
   "view"
 }
 
@@ -145,7 +164,7 @@ today_resolve_player <- function(player_id, players_df) {
 # visual/heuristic market fields.
 today_resolve_player_for_action <- function(player_id, action, market_df, all_df, clause_df = NULL) {
   act <- today_normalize_action(action)
-  if (act == "market_bid") {
+  if (act %in% c("market_bid", "modify_bid")) {
     return(today_resolve_player(player_id, market_df))
   }
   if (act == "clause_buyout") {
@@ -900,6 +919,7 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
           )
         }
 
+        if (any(recs$type == "Buy", na.rm = TRUE)) shiny::invalidateLater(1000, session)
         cards <- lapply(seq_len(nrow(recs)), function(i) {
           r <- recs[i, ]
           rec_type <- if (!is.null(r$type) && !is.na(r$type)) as.character(r$type) else "Hold"
@@ -915,6 +935,18 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
           # to label normalization only when the column is absent.
           action_code_raw <- if (!is.null(r$action_code) && !is.na(r$action_code)) as.character(r$action_code) else ""
           action_code <- if (nzchar(action_code_raw)) action_code_raw else today_normalize_action(action_label)
+          bid_price <- if ("my_bid_price" %in% names(r)) suppressWarnings(as.numeric(r$my_bid_price)) else NA_real_
+          bid_count <- if ("market_bid_count" %in% names(r)) suppressWarnings(as.numeric(r$market_bid_count)) else NA_real_
+          expiry_raw <- if ("market_expires_at" %in% names(r) && !is.na(r$market_expires_at)) as.character(r$market_expires_at) else NA_character_
+          countdown <- if (rec_type == "Buy") today_market_countdown(expiry_raw) else list(label = "", closed = FALSE, available = FALSE)
+          bid_status <- if (rec_type == "Buy" && is.finite(bid_price) && bid_price > 0) {
+            count_text <- if (is.finite(bid_count) && bid_count >= 0) paste0(" · ", as.integer(bid_count), if (as.integer(bid_count) == 1L) " bid" else " bids") else ""
+            paste0("Your bid: ", player_card_money(bid_price), count_text)
+          } else if (rec_type == "Buy" && is.finite(bid_count) && bid_count >= 0) {
+            paste0(as.integer(bid_count), if (as.integer(bid_count) == 1L) " bid" else " bids")
+          } else {
+            ""
+          }
 
           # Color coding by type
           type_icon <- switch(
@@ -958,6 +990,13 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
                     div(
                       style = "font-size: 12px; color: var(--fm-muted); margin-top: 4px;",
                       desc_text
+                    ),
+                    if (rec_type == "Buy") div(
+                      class = "today-market-meta",
+                      if (nzchar(bid_status)) span(class = "today-own-bid", icon("hand-holding-dollar"), " ", bid_status),
+                      span(class = if (isTRUE(countdown$closed)) "today-market-expiry is-closed" else "today-market-expiry",
+                           icon(if (isTRUE(countdown$closed)) "lock" else "hourglass-half"),
+                           " ", countdown$label)
                     )
                   )
                 )
@@ -997,7 +1036,8 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
                       inputId = ns(paste0("rec_action_", i, "_", pid)),
                       label = tagList(icon("arrow-right"), action_label),
                       class = "btn btn-primary today-recommendation-action",
-                      onclick = today_rec_action_onclick_js(ns, pid, action_code)
+                      onclick = if (!isTRUE(countdown$closed)) today_rec_action_onclick_js(ns, pid, action_code) else NULL,
+                      disabled = if (isTRUE(countdown$closed)) "disabled" else NULL
                     )
                   )
                 )
@@ -1269,7 +1309,7 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
           # Stale / unknown input is rejected: no modal (player or
           # market-offer or clause-buyout) is opened.
           act <- today_normalize_action(ev$action)
-          if (act == "market_bid") {
+          if (act %in% c("market_bid", "modify_bid")) {
             shiny::showNotification(
               "This player is not currently listed on the market (the market data may be stale or still loading). Please refresh and try again.",
               type = "warning", duration = 5

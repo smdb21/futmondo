@@ -23,6 +23,13 @@
 .btn.today-recommendation-action { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 8px 14px; font-size: 13px; line-height: 1.4; white-space: normal; }
 .btn.today-recommendation-action:hover { background: var(--fm-border) !important; color: var(--fm-text); }
 .btn.today-recommendation-action:focus-visible { outline: 2px solid var(--fm-text); outline-offset: 3px; }
+.today-market-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 7px; color: var(--fm-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.today-own-bid { color: var(--fm-text); font-weight: 600; }
+.today-market-expiry { white-space: nowrap; }
+.today-market-expiry.is-closed { color: var(--fm-danger); font-weight: 600; }
+.today-recommendation-action[disabled] { cursor: not-allowed; opacity: .55; }
+@media (max-width: 767px) { .today-market-meta { align-items: flex-start; flex-direction: column; gap: 4px; } }
+
 @media (max-width: 767px) { .today-recommendation-label { justify-content: flex-start; margin-top: 12px; } }
 
 /* Shared system monospace typography throughout the application. */

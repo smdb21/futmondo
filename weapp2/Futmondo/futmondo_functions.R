@@ -1402,7 +1402,8 @@ build_roster_clause_payload <- function(login, championship_id, team_id, player_
       player_id = as.character(player_id),
       price = as.numeric(price)
     ),
-    answer = list()
+    # A named empty list encodes as the required JSON object {}; list() becomes [].
+    answer = setNames(list(), character())
   )
 }
 

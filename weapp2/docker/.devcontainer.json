@@ -1,0 +1,60 @@
+{
+    "image": "yatiribio/proteobrowser:bioc_3.23",
+    "workspaceFolder": "/home/rstudio/workspace",
+    "runArgs": [
+        "--name",
+        "futmondo",
+        "--pull",
+        "always",
+        "-p",
+        "2220:22",
+        "-p",
+        "8081:80",
+        "--security-opt",
+        "seccomp=unconfined"
+    ],
+    "mounts": [
+        "source=C:/github,target=/home/rstudio/workspace,type=bind,consistency=cached",
+        // "source=D:/Yatiribio Inc/Yatiri Bio - Documents,target=/home/rstudio/sharepoint,type=bind,consistency=cached",
+        "source=C:/Users/SalvadorMartinez/Yatiribio Inc/Yatiri Bio - Documents,target=/home/rstudio/sharepoint,type=bind,consistency=cached",
+        "source=C:/Users/SalvadorMartinez/Yatiribio Inc/Lab files - Documents,target=/home/rstudio/lab_files,type=bind,consistency=cached",
+        // "source=D:/OneDrive - Yatiribio Inc/proteobrowser_files,target=/home/rstudio/proteobrowser_files,type=bind,consistency=cached",
+        "source=C:/Users/SalvadorMartinez/OneDrive - Yatiribio Inc/proteobrowser_files,target=/home/rstudio/proteobrowser_files,type=bind,consistency=cached"
+    ],
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "REditorSupport.r",
+                "ms-python.python",
+                "ms-toolsai.jupyter",
+                "redhat.vscode-yaml",
+                "mhutchie.git-graph",
+                "sst-dev.opencode"
+            ],
+            "settings": {
+                "terminal.integrated.profiles.linux": {
+                    "fish": {
+                        "path": "/usr/bin/fish"
+                    }
+                },
+                "terminal.integrated.defaultProfile.linux": "fish",
+                "r.alwaysUseActiveTerminal": true,
+                "r.bracketedPaste": true,
+                "r.sessionWatcher": true,
+                "r.rterm.linux": "/usr/local/bin/radian",
+                "r.rterm.option": [
+                    ""
+                ],
+                "r.autoDetect": "false",
+                "r.terminalPath": "/usr/local/bin/radian",
+                "r.interpreterPath": "/usr/local/bin/R"
+            }
+        }
+    },
+    "remoteEnv": {
+        "PROTEOBROWSER_SERVER_TYPE": "docker",
+        "GOOGLE_APPLICATION_CREDENTIALS": "/home/rstudio/workspace/vertex_ai_credentials.json",
+        "GOOGLE_CLOUD_PROJECT": "aml-sensitivity-landscape",
+        "VERTEX_LOCATION": "global"
+    }
+}

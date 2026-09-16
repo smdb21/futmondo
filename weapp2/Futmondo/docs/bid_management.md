@@ -64,6 +64,9 @@ Pure decision function that gates every acquisition path. **Fails closed**: if `
 ### H. `build_roster_clause_payload(login, championship_id, team_id, player_id, player_slug, price)`
 Builds the exact JSON payload for the dedicated roster-clause buyout endpoint. Serializes exactly:
 `header{token, userid}`, `query{championshipId, userteamId, player_slug, player_id, price}`, `answer{}`.
+The empty `answer` value is deliberately represented as a named empty R list so
+`jsonlite::toJSON(..., auto_unbox=TRUE)` emits the required JSON object `{}`;
+an unnamed `list()` would incorrectly emit `[]`.
 * **Note**: `isClause` is intentionally **not** part of this payload (the endpoint itself implies a clause purchase).
 
 ### I. `buy_roster_clause(login, championship_id, team_id, player_id, player_slug, price, url = ROSTER_CLAUSE_URL)`

@@ -145,6 +145,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     # preflight / missing player (FALSE). Exposed so the "clause_buyout"
     # open_action routing can be asserted in tests without a live UI.
     clause_modal_opened_RV <- reactiveVal(FALSE)
+    # Test seam for direct and external active-bid update routing.
+    modify_modal_opened_RV <- reactiveVal(FALSE)
+
 
     # ---- Safe reactive value extractor ----
     get_reactive_val <- function(x) {
@@ -168,7 +171,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     })
     observeEvent(player_action_context_RV(), {
       active_bid_info_RV(NULL);smart_bid_cache_RV(NULL);modal_context_RV(list())
-      offer_modal_opened_RV(FALSE);clause_modal_opened_RV(FALSE)
+      offer_modal_opened_RV(FALSE);clause_modal_opened_RV(FALSE);modify_modal_opened_RV(FALSE)
       removeModal()
     },ignoreNULL=FALSE,priority=110)
     remember_action_context <- function(action) {
@@ -626,21 +629,45 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       }
     )
 
-    # ---- Modify Active Bid Modal ----
-    observeEvent(input$btn_modify_bid, {
-      remember_action_context("modify")
+    # ---- Shared helper: verify and open the active-bid update modal ----
+    open_modify_bid_modal <- function() {
       sp <- selected_player()
-      req(sp)
-      bid_info <- active_bid_info_RV()
-      req(bid_info)
+      login <- get_reactive_val(login_token)
+      champ_id <- get_reactive_val(championship_id)
+      team_id <- get_reactive_val(user_team_id)
+      req(sp, login, champ_id, team_id)
 
-      # Preflight: modification must be able to verify the existing own bid.
-      pf <- run_acquisition_preflight(sp, "modify", amount = NULL, existing_bid_amount = bid_info$price)
+      # Reverify immutable own-team bid evidence immediately before opening.
+      summary_res <- tryCatch(
+        get_player_summary(login = login, championship_id = champ_id,
+                           user_team_id = team_id, player_id = sp$id),
+        error = function(e) NULL
+      )
+      bid_id <- if (!is.null(summary_res)) summary_res$my_bid_id else NULL
+      bid_price <- if (!is.null(summary_res)) suppressWarnings(as.numeric(summary_res$my_bid_price)) else NA_real_
+      if (is.null(bid_id) || !nzchar(as.character(bid_id)) ||
+          length(bid_price) != 1L || !is.finite(bid_price) || bid_price <= 0) {
+        active_bid_info_RV(NULL)
+        modify_modal_opened_RV(FALSE)
+        shiny::showNotification(
+          "Your active bid could not be verified and may no longer exist. Please refresh and try again.",
+          type = "warning", duration = 5
+        )
+        return(invisible(FALSE))
+      }
+      active_bid_info_RV(list(id = as.character(bid_id), price = bid_price))
+      bid_info <- active_bid_info_RV()
+
+      pf <- run_acquisition_preflight(sp, "modify", amount = NULL,
+                                      existing_bid_amount = bid_info$price)
       if (!isTRUE(pf$ok)) {
         show_preflight_failure(pf)
-        return()
+        modify_modal_opened_RV(FALSE)
+        return(invisible(FALSE))
       }
 
+      remember_action_context("modify")
+      modify_modal_opened_RV(TRUE)
       showModal(modalDialog(
         title = tagList(icon("pen-to-square"), " Update Your Active Bid"),
         p(strong(sp$name)),
@@ -660,6 +687,11 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         easyClose = TRUE,
         size = "s"
       ))
+      invisible(TRUE)
+    }
+
+    observeEvent(input$btn_modify_bid, {
+      open_modify_bid_modal()
     })
 
     # ---- Submit Modify Active Bid ----
@@ -910,6 +942,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     }
 
     # ---- Open acquisition modals from an external stable action event ----
+    #   - "modify_bid"  (Today's "Update Bid" recommendation) -> re-verifies
+    #     immutable own-bid evidence and opens the existing update modal.
     # `open_action` is an optional reactive returning a stable action code:
     #   - "market_bid"   (Today's "Place Bid" recommendation) -> the SAME
     #     market-offer helper as the button path (identical preflight).
@@ -923,10 +957,12 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     if (!is.null(open_action) && is.reactive(open_action)) {
       observeEvent(open_action(), {
         act <- open_action()
-        if (!act %in% c("market_bid", "clause_buyout", "accept_offer")) return()
+        if (!act %in% c("market_bid", "modify_bid", "clause_buyout", "accept_offer")) return()
         sp <- selected_player()
         req(sp)
-        if (identical(act, "market_bid")) {
+        if (identical(act, "modify_bid")) {
+          open_modify_bid_modal()
+        } else if (identical(act, "market_bid")) {
           open_market_offer_modal()
         } else if (identical(act, "clause_buyout")) {
           open_clause_buyout_modal(sp)

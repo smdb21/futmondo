@@ -387,6 +387,10 @@ mkt_cand <- data.frame(
   fis_score = c(90, 85, 88),
   fis_tier = c("Strong Buy", "Buy", "Strong Buy"),
   fis_summary = c("s1", "s2", "s3"),
+  bid_id = c("own-bid-1", NA, NA),
+  bid_price = c(11000000, 8500000, NA),
+  numberOfBids = c(2, 1, 0),
+  expirationDate = c("2099-01-01T01:01:01Z", "2099-01-02T01:01:01Z", NA),
   stringsAsFactors = FALSE
 )
 
@@ -415,8 +419,15 @@ pol_record("feed_buy_exclusive_from_market_candidates", {
   # sys1 + sys2; the players_df Strong Buy player (own1) must NOT appear.
   stopifnot(setequal(buys$player_id, c("sys1", "sys2")))
   stopifnot(!"own1" %in% buys$player_id)
-  stopifnot(all(buys$action_code == "market_bid"))
-  stopifnot(all(buys$action_label == "Place Bid"))
+  own <- buys[buys$player_id == "sys1", ]
+  rival_only <- buys[buys$player_id == "sys2", ]
+  stopifnot(own$action_code == "modify_bid", own$action_label == "Update Bid")
+  stopifnot(own$my_bid_id == "own-bid-1", own$my_bid_price == 11000000,
+            own$market_bid_count == 2,
+            own$market_expires_at == "2099-01-01T01:01:01Z")
+  # A visible/highest bid without a verified own bid ID is never treated as ours.
+  stopifnot(rival_only$action_code == "market_bid", rival_only$action_label == "Place Bid",
+            is.na(rival_only$my_bid_id), is.na(rival_only$my_bid_price))
 })
 
 pol_record("feed_clause_exclusive_from_clause_candidates", {
@@ -508,7 +519,7 @@ pol_record("feed_action_codes_for_all_types", {
     market_candidates = mkt_cand, clause_candidates = clause_cand
   )
   stopifnot("action_code" %in% colnames(feed))
-  stopifnot(all(feed$action_code %in% c("market_bid", "clause_buyout", "accept_offer", "view")))
+  stopifnot(all(feed$action_code %in% c("market_bid", "modify_bid", "clause_buyout", "accept_offer", "view")))
   # Sell recs (own2) carry the "view" code.
   sells <- feed[feed$type == "Sell", ]
   stopifnot(nrow(sells) >= 1)
@@ -542,6 +553,20 @@ pol_record("feed_empty_candidates_supplied_yields_no_buy_clause", {
   stopifnot(nrow(feed[feed$type == "Clause", ]) == 0)
 })
 
+pol_record("market_countdown_formats_and_closes_safely", {
+  now <- as.POSIXct("2026-09-16 10:00:00", tz = "UTC")
+  hours <- today_market_countdown(now + 3661, now)
+  days <- today_market_countdown(now + 90061, now)
+  zero <- today_market_countdown(now, now)
+  expired <- today_market_countdown(now - 1, now)
+  invalid <- today_market_countdown("not-a-date", now)
+  stopifnot(hours$label == "01:01:01", !hours$closed, hours$available)
+  stopifnot(days$label == "1d 01:01:01", !days$closed)
+  stopifnot(zero$label == "Market closed", zero$closed)
+  stopifnot(expired$label == "Market closed", expired$closed)
+  stopifnot(invalid$label == "Expiry unavailable", !invalid$closed, !invalid$available)
+})
+
 # =============================================================================
 # 6. Action validation (market_bid / clause_buyout / view)
 # =============================================================================
@@ -555,6 +580,10 @@ pol_record("resolve_market_bid_from_market_candidates_only", {
   stopifnot(is.data.frame(r1), nrow(r1) == 1, as.character(r1$id) == "sys1")
   # A clause-only player (absent from market candidates) must NOT resolve.
   stopifnot(is.null(today_resolve_player_for_action("rcl1", "market_bid", mkt_cand, all_df)))
+  # Updating an existing bid has the same strict current-market resolution.
+  r2 <- today_resolve_player_for_action("sys1", "modify_bid", mkt_cand, all_df)
+  stopifnot(is.data.frame(r2), as.character(r2$id) == "sys1")
+  stopifnot(is.null(today_resolve_player_for_action("rcl1", "modify_bid", mkt_cand, all_df)))
   # Stale / unknown ids are rejected.
   stopifnot(is.null(today_resolve_player_for_action("gone", "market_bid", mkt_cand, all_df)))
   # Empty market candidates fail closed even if the id exists elsewhere.
@@ -615,6 +644,8 @@ pol_record("normalize_action_clause_and_market_codes", {
   stopifnot(today_normalize_action("clause_buyout") == "clause_buyout")
   stopifnot(today_normalize_action("Place Bid") == "market_bid")
   stopifnot(today_normalize_action("market_bid") == "market_bid")
+  stopifnot(today_normalize_action("Update Bid") == "modify_bid")
+  stopifnot(today_normalize_action("modify_bid") == "modify_bid")
   stopifnot(today_normalize_action("view") == "view")
   stopifnot(today_normalize_action("Accept Offer") == "accept_offer")
   stopifnot(today_normalize_action("accept_offer") == "accept_offer")
@@ -650,7 +681,8 @@ cat("\n--- selected_player clause_buyout routing ---\n")
 
 # Stub every network-touching function the module may call at runtime so the
 # test is fully OFFLINE (main observer, trend plot, smart-bid widget).
-get_player_summary <- function(login, championship_id, user_team_id, player_id) NULL
+summary_stub <- NULL
+get_player_summary <- function(login, championship_id, user_team_id, player_id) summary_stub
 get_player_historical_data <- function(player_id, championship_id) NULL
 get_finished_rounds <- function(login, championship_id) data.frame(
   round_id = character(0), round_number = numeric(0),
@@ -781,6 +813,30 @@ pol_record("clause_buyout_opens_clause_modal_not_market_modal", {
       pol_expect(isTRUE(offer_modal_opened_RV()), "market_bid must still open the market-offer modal")
       pol_expect(isFALSE(clause_modal_opened_RV()), "market_bid must not open the clause modal")
       cat("    PASS: market_bid regression -> market-offer modal opens (clause modal untouched)\n")
+
+      # ---- (e) modify_bid re-verifies and opens the update modal ----
+      summary_stub <<- list(my_bid_id = "verified-own-bid", my_bid_price = 600000)
+      offer_modal_opened_RV(FALSE)
+      open_action_RV(NULL)
+      session$flushReact()
+      open_action_RV("modify_bid")
+      session$flushReact()
+      pol_expect(isTRUE(modify_modal_opened_RV()), "verified modify_bid must open the update modal")
+      pol_expect(isFALSE(offer_modal_opened_RV()), "modify_bid must not open the new-offer modal")
+      pol_expect(identical(active_bid_info_RV()$id, "verified-own-bid"),
+                 "modify_bid did not retain the verified bid id")
+      cat("    PASS: modify_bid + verified own bid -> update modal\n")
+
+      # ---- (f) stale modify_bid evidence fails closed ----
+      summary_stub <<- NULL
+      modify_modal_opened_RV(FALSE)
+      open_action_RV(NULL)
+      session$flushReact()
+      open_action_RV("modify_bid")
+      session$flushReact()
+      pol_expect(isFALSE(modify_modal_opened_RV()), "stale modify_bid must open no update modal")
+      pol_expect(is.null(active_bid_info_RV()), "stale modify_bid must clear active bid state")
+      cat("    PASS: modify_bid + stale evidence -> no mutation modal\n")
 
       # ---- (e) unknown action codes are ignored ----
       # Reset the modal flags (they retain the state from step d) so we can

@@ -678,14 +678,21 @@ generate_command_center_feed <- function(login, championship_id,
 
           for (i in seq_len(nrow(top_buys))) {
             p <- top_buys[i, ]
+            own_bid_id <- if ("bid_id" %in% names(p) && !is.na(p$bid_id) && nzchar(trimws(as.character(p$bid_id)))) as.character(p$bid_id) else NA_character_
+            own_bid_price <- if ("bid_price" %in% names(p)) suppressWarnings(as.numeric(p$bid_price)) else NA_real_
+            has_own_bid <- !is.na(own_bid_id) && is.finite(own_bid_price) && own_bid_price > 0
             recommendations[[length(recommendations) + 1]] <- data.frame(
               type = "Buy",
               title = paste0("BUY: ", p$name),
               description = buy_description(p),
               confidence_pct = p$buy_priority,
-              action_label = "Place Bid",
-              action_code = "market_bid",
+              action_label = if (has_own_bid) "Update Bid" else "Place Bid",
+              action_code = if (has_own_bid) "modify_bid" else "market_bid",
               player_id = as.character(p$id),
+              my_bid_id = own_bid_id,
+              my_bid_price = if (has_own_bid) own_bid_price else NA_real_,
+              market_bid_count = if ("numberOfBids" %in% names(p)) suppressWarnings(as.numeric(p$numberOfBids)) else NA_real_,
+              market_expires_at = if ("expirationDate" %in% names(p) && !is.na(p$expirationDate)) as.character(p$expirationDate) else NA_character_,
               stringsAsFactors = FALSE
             )
           }
@@ -716,6 +723,8 @@ generate_command_center_feed <- function(login, championship_id,
             action_label = "Place Bid",
             action_code = "market_bid",
             player_id = as.character(p$id),
+              my_bid_id = NA_character_, my_bid_price = NA_real_,
+              market_bid_count = NA_real_, market_expires_at = NA_character_,
             stringsAsFactors = FALSE
           )
         }
@@ -958,7 +967,7 @@ generate_command_center_feed <- function(login, championship_id,
       return(empty_feed)
     }
 
-    result_df <- do.call(rbind, recommendations)
+    result_df <- data.table::rbindlist(recommendations, fill = TRUE) %>% as.data.frame()
     # A player cannot be both a Hold and a Sell recommendation. Duplicate or
     # asynchronously refreshed source rows can temporarily carry different
     # FIS tiers for the same player ID; the actionable Sell takes precedence.
