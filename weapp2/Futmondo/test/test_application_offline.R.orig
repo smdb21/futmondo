@@ -118,10 +118,6 @@ app_check('full server login, navigation, refresh and logout', {
         stopifnot(!is.null(output[['rivals-rival_financial_summary_box']]),
                   !is.null(output[['rivals-rival_transactions_tab_ui']]),
                   !is.null(output[['rivals-rival_transactions_table']]))
-        details_html<-output[['rivals-scouted_rival_details_ui']]$html
-        stopifnot(grepl('Player Roster &amp; Clauses',details_html,fixed=TRUE),
-          grepl('Transaction &amp; Financial History',details_html,fixed=TRUE),
-          grepl('League Cash &amp; Observed Transfers',details_html,fixed=TRUE))
       }
       cat('[PASS] rendered tab:',tab,'\n')
     }

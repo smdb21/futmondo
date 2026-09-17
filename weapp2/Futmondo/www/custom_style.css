@@ -1138,6 +1138,14 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 .player-match-date, .player-external-unavailable { color: var(--fm-muted); font-size: 12px; }
 .sell-ranking-card {
   margin-top: 10px;
+.today-sell-ranking-launcher {
+  display: flex;
+  justify-content: flex-start;
+  margin: 4px 0 12px;
+}
+.today-sell-ranking-launcher .btn {
+  font-weight: 700;
+}
   padding: 12px;
   border: 1px solid var(--fm-border);
   border-radius: 8px;

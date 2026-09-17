@@ -28,14 +28,14 @@ The Rivals Module provides two exported functions:
 Returns a `tagList` containing:
 1. A Net Transfer Profit/Loss KPI box (standalone summary box in the top summary row).
 2. A League Financial Standings & Budget Left table (`reactableOutput`) displaying per-team finances.
-3. A League Buying Power chart (`plotlyOutput`) showing liquid cash standings. Includes a mode selector dropdown (Liquid Cash, Squad Purchases, Transaction Volume) and a date range slider at the top.
-4. A `uiOutput` placeholder (`scouted_rival_details_ui`) for the selected rival details, which renders:
+3. A `uiOutput` placeholder (`scouted_rival_details_ui`) for the selected rival details, which renders:
     - Financial summary cards (Standings Position, Money Left, Squad Investment, Squad Valuation & Net Gain).
 - A `tabsetPanel` (type = "pills") with tabs including:
       - **Tab 1: "Player Roster & Clauses"** -- Contains the `players_table_UI` call for the scouted player roster and purchase breakdown.
       - **Tab 2: "Transaction & Financial History"** -- Displays all transactions directly (no filter bar). Includes a "Pivot by Player" toggle that switches the view between the full chronological transaction log and a per-player pivot summary.
+      - **Tab 3: "League Cash & Observed Transfers"** -- Contains the league-wide cash/transfer chart, date-range slider, and metric selector for transfer-only balance, squad purchases, or transaction volume.
       - **Player Buy/Sell Pivot Ledger** -- A paired buy/sell comparison view for each player the rival team has ever acquired, with two-line hover tooltips, re-bought player handling, and Net P/L calculation.
-5. A League Squad Value Evolution chart (`plotlyOutput`) showing historical valuations of all teams, positioned at the bottom of the page below all interactive components.
+4. A League Squad Value Evolution chart (`plotlyOutput`) showing historical valuations of all teams, positioned at the bottom of the page below all interactive components.
 
 ### Usage Example
 

@@ -270,44 +270,6 @@ tagList(
       )
     ),
 
-    # Plot E: League Buying Power (Liquid Cash Standings)
-    fluidRow(
-      column(width = 12,
-             box(
-               title = "League Cash and Observed Transfers",
-               width = 12,
-               status = "primary",
-               solidHeader = TRUE,
-collapsible = TRUE,
-                collapsed = FALSE,
-                fluidRow(
-                  column(width = 7,
-                    sliderInput(
-                      inputId = ns("buying_power_date_slider"),
-                      label = "Date Range Window:",
-                      min = as.Date(paste0(format(Sys.Date(), "%Y"), "-07-31")),
-                      max = Sys.Date(),
-                      value = c(as.Date(paste0(format(Sys.Date(), "%Y"), "-07-31")), Sys.Date()),
-                      timeFormat = "%d/%m/%Y",
-                      width = "100%"
-                    )
-                  ),
-                  column(width = 5,
-                    div(style = "margin-top: 5px;",
-                      radioButtons(
-                        inputId = ns("buying_power_metric"),
-                        label = "Display Metric:",
-                        choices = c("Transfer-only balance estimate" = "cash", "Squad Purchases" = "investment", "Transaction Volume" = "volume"),
-                        selected = "cash",
-                        inline = TRUE
-                      )
-                    )
-                  )
-                ),
-                plotly::plotlyOutput(ns("league_finances_plot"), height = "300px")
-              )
-       )
-     ),
 
     # Scouted Rival Details (Summary cards + Player Roster Table)
     uiOutput(ns("scouted_rival_details_ui")),
@@ -930,6 +892,43 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
             ),
             tabPanel(title = "Transaction & Financial History", icon = icon("receipt"),
               uiOutput(ns("rival_transactions_tab_ui"))
+            ),
+            tabPanel(title = "League Cash & Observed Transfers", icon = icon("chart-column"),
+              box(
+                title = "League Cash and Observed Transfers",
+                width = 12,
+                status = "primary",
+                solidHeader = TRUE,
+                collapsible = TRUE,
+                collapsed = FALSE,
+                fluidRow(
+                  column(width = 7,
+                    sliderInput(
+                      inputId = ns("buying_power_date_slider"),
+                      label = "Date Range Window:",
+                      min = as.Date(paste0(format(Sys.Date(), "%Y"), "-07-31")),
+                      max = Sys.Date(),
+                      value = c(as.Date(paste0(format(Sys.Date(), "%Y"), "-07-31")), Sys.Date()),
+                      timeFormat = "%d/%m/%Y",
+                      width = "100%"
+                    )
+                  ),
+                  column(width = 5,
+                    div(style = "margin-top: 5px;",
+                      radioButtons(
+                        inputId = ns("buying_power_metric"),
+                        label = "Display Metric:",
+                        choices = c("Transfer-only balance estimate" = "cash",
+                          "Squad Purchases" = "investment",
+                          "Transaction Volume" = "volume"),
+                        selected = "cash",
+                        inline = TRUE
+                      )
+                    )
+                  )
+                ),
+                plotly::plotlyOutput(ns("league_finances_plot"), height = "300px")
+              )
             )
           )
         )
