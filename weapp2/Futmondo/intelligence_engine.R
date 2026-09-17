@@ -1447,6 +1447,130 @@ simulate_transfer_scenario <- function(squad_df, current_budget = 0, sell_player
   },error=function(e) fail(conditionMessage(e),'error'))
 }
 
+# Rank owned players to sell for a selected position or a concrete purchase target.
+# This is advisory only: observed offers are executable evidence; market value is
+# always labelled as an estimate.
+rank_sale_candidates <- function(squad_df, selected_positions=NULL, target_player=NULL,
+                                 rules=NULL, forecast_df=NULL, pressroom_df=NULL,
+                                 pending_outbound_ids=character(), max_results=5L,
+                                 include_all=FALSE) {
+  empty <- data.frame(rank=integer(),player_id=character(),player_name=character(),
+    eligible_positions=character(),recommendation_score=numeric(),xi_points_change=numeric(),
+    remaining_position_counts=character(),depth_risk=integer(),fis_score=numeric(),
+    performance=numeric(),form=numeric(),value_trend=numeric(),clause_ratio=numeric(),
+    proceeds=numeric(),proceeds_type=character(),acquisition_cost=numeric(),
+    sale_result=numeric(),evidence_pct=numeric(),rationale=character(),
+    stringsAsFactors=FALSE)
+  if(!is.data.frame(squad_df)||!nrow(squad_df)||!"id"%in%names(squad_df)) return(empty)
+  squad<-squad_df[!duplicated(as.character(squad_df$id)),,drop=FALSE]
+  ids<-trimws(as.character(squad$id)); valid<-!is.na(ids)&nzchar(ids)
+  squad<-squad[valid,,drop=FALSE]; ids<-ids[valid]
+  pending<-unique(trimws(as.character(pending_outbound_ids)))
+  squad<-squad[!ids%in%pending,,drop=FALSE]
+  if(!nrow(squad)) return(empty)
+  target<-if(is.data.frame(target_player)&&nrow(target_player)) target_player[1,,drop=FALSE] else NULL
+  positions<-unique(trimws(as.character(selected_positions)))
+  positions<-positions[!is.na(positions)&nzchar(positions)]
+  if(!is.null(target)) positions<-analytics_player_positions(target,multiposition=TRUE)[[1]]
+  if(!length(positions)) return(empty)
+  pos<-analytics_player_positions(squad,multiposition=TRUE)
+  eligible<-vapply(pos,function(x) any(x%in%positions),logical(1))
+  candidates<-which(eligible)
+  if(!length(candidates)) return(empty)
+  squad<-calculate_fis_score(squad)
+  legal<-if(is.list(rules)) rules else list()
+  legal$exclude_unavailable<-FALSE
+  before<-optimize_starting_xi(squad,formation="auto",rules=legal,forecast_df=forecast_df)
+  if(!isTRUE(before$feasible)) return(empty)
+  before_points<-suppressWarnings(as.numeric(before$expected_points))
+  if(length(before_points)!=1L||!is.finite(before_points)) before_points<-suppressWarnings(as.numeric(before$total_score))
+  number<-function(row,names,default=NA_real_) {
+    key<-names[names%in%colnames(row)][1]
+    if(is.na(key)) return(default)
+    value<-suppressWarnings(as.numeric(row[[key]][1]))
+    if(length(value)==1L&&is.finite(value)) value else default
+  }
+  label<-function(x) if(length(x)==1L&&!is.na(x)&&nzchar(trimws(as.character(x)))) as.character(x) else "Unknown player"
+  rows<-list()
+  for(idx in candidates) {
+    player<-squad[idx,,drop=FALSE]; pid<-as.character(player$id[1])
+    projected<-squad[-idx,,drop=FALSE]
+    if(!is.null(target)&&!as.character(target$id[1])%in%as.character(projected$id))
+      projected<-data.table::rbindlist(list(projected,target),fill=TRUE)%>%as.data.frame()
+    after<-optimize_starting_xi(projected,formation="auto",rules=legal,forecast_df=forecast_df)
+    if(!isTRUE(after$feasible)) next
+    after_points<-suppressWarnings(as.numeric(after$expected_points))
+    if(length(after_points)!=1L||!is.finite(after_points)) after_points<-suppressWarnings(as.numeric(after$total_score))
+    delta<-if(is.finite(before_points)&&is.finite(after_points)) after_points-before_points else NA_real_
+    projected_pos<-analytics_player_positions(projected,multiposition=TRUE)
+    counts<-vapply(positions,function(p)sum(vapply(projected_pos,function(x)p%in%x,logical(1))),integer(1))
+    depth_risk<-if(length(counts)) max(0L,2L-min(counts)) else 2L
+    offer<-number(player,c("bid_price","sale_offer","executable_sale_price"))
+    value<-number(player,c("value"))
+    proceeds<-if(is.finite(offer)&&offer>0) offer else value
+    proceeds_type<-if(is.finite(offer)&&offer>0) "Verified active offer" else if(is.finite(value)&&value>0) "Estimated market value" else "Unavailable"
+    cost<-tryCatch(current_player_acquisition_cost(player,pressroom_df,
+      if("user_team_id"%in%names(player)) as.character(player$user_team_id[1]) else NULL),error=function(e)NA_real_)
+    result<-if(is.finite(proceeds)&&is.finite(cost)) proceeds-cost else NA_real_
+    trend<-number(player,c("change"))
+    clause<-number(player,c("clause_price"))
+    clause_ratio<-if(is.finite(clause)&&is.finite(value)&&value>0) clause/value else NA_real_
+    avg<-number(player,c("average.average","recent_points_avg"))
+    form<-number(player,c("average.averageLastFive","recent_points_avg"))
+    fis<-number(player,c("fis_score"))
+    evidence<-mean(c(is.finite(delta),is.finite(avg),is.finite(form),is.finite(trend),
+      is.finite(clause_ratio),is.finite(proceeds),is.finite(cost)))*100
+    depth_text<-paste(paste0(positions,": ",counts),collapse=" · ")
+    reasons<-c(
+      if(is.finite(delta)) paste0("Projected XI change: ",format(round(delta,1),nsmall=1)," points.") else "Projected XI change unavailable.",
+      if(depth_risk>0) paste0("Warning: sale leaves ",min(counts)," eligible player",if(min(counts)==1)"":"s"," in a required position.") else paste0("Position depth after sale: ",depth_text,"."),
+      if(is.finite(trend)&&trend>0) "The player is increasing in value, so selling sacrifices momentum." else if(is.finite(trend)&&trend<0) "Market value is declining." else "Value trend unavailable.",
+      if(identical(proceeds_type,"Verified active offer")) "Proceeds use a verified active offer." else if(identical(proceeds_type,"Estimated market value")) "Proceeds are estimated; there is no active offer." else "Sale proceeds are unavailable.",
+      if(is.finite(result)&&result<0&&is.finite(fis)&&fis<45) paste0("A loss of ",format(round(abs(result)),big.mark=".",scientific=FALSE)," EUR may still be reasonable because current performance is weak.") else NULL)
+    rows[[length(rows)+1L]]<-data.frame(player_id=pid,player_name=label(player$name),
+      eligible_positions=paste(pos[[idx]],collapse=", "),xi_points_change=delta,
+      remaining_position_counts=depth_text,depth_risk=depth_risk,fis_score=fis,
+      performance=avg,form=form,value_trend=trend,clause_ratio=clause_ratio,
+      proceeds=proceeds,proceeds_type=proceeds_type,acquisition_cost=cost,
+      sale_result=result,evidence_pct=round(evidence),rationale=paste(reasons,collapse=" "),
+      stringsAsFactors=FALSE)
+  }
+  if(!length(rows)) return(empty)
+  out<-data.table::rbindlist(rows,fill=TRUE)%>%as.data.frame()
+  order_delta<-ifelse(is.finite(out$xi_points_change),-out$xi_points_change,Inf)
+  order_fis<-ifelse(is.finite(out$fis_score),out$fis_score,Inf)
+  order_trend<-ifelse(is.finite(out$value_trend),out$value_trend,Inf)
+  order_proceeds<-ifelse(is.finite(out$proceeds),-out$proceeds,Inf)
+  out<-out[order(order_delta,out$depth_risk,order_fis,order_trend,order_proceeds,out$player_id),,drop=FALSE]
+  out$rank<-seq_len(nrow(out))
+  out$recommendation_score<-round(100*(nrow(out)-out$rank+1)/nrow(out),1)
+  out<-out[,names(empty),drop=FALSE]
+  if(!isTRUE(include_all)) out<-head(out,max(0L,as.integer(max_results)))
+  rownames(out)<-NULL
+  out
+}
+
+# Resolve ranking actions only against the current owned roster and current
+# server-generated ranking. This prevents stale or forged browser events.
+resolve_sell_ranking_player <- function(player_id, roster_df, rankings_df) {
+  id<-if(length(player_id)==1L&&!is.na(player_id)) trimws(as.character(player_id)) else ""
+  if(!nzchar(id)||!is.data.frame(roster_df)||!nrow(roster_df)||!"id"%in%names(roster_df)||
+      !is.data.frame(rankings_df)||!nrow(rankings_df)||!"player_id"%in%names(rankings_df)) return(NULL)
+  if(sum(as.character(rankings_df$player_id)==id)!=1L) return(NULL)
+  row<-roster_df[as.character(roster_df$id)==id,,drop=FALSE]
+  if(nrow(row)==1L) row else NULL
+}
+
+validate_sell_ranking_sandbox_event <- function(event, rankings_df, target_pool_df) {
+  if(!is.list(event)||!is.data.frame(rankings_df)||!nrow(rankings_df)||
+      !is.data.frame(target_pool_df)||!nrow(target_pool_df)) return(NULL)
+  sell<-if(length(event$player_id)==1L) as.character(event$player_id) else ""
+  buy<-if(length(event$target_id)==1L) as.character(event$target_id) else ""
+  if(!nzchar(sell)||!nzchar(buy)||sum(as.character(rankings_df$player_id)==sell)!=1L||
+      sum(as.character(target_pool_df$id)==buy)!=1L) return(NULL)
+  list(sell_id=sell,buy_id=buy)
+}
+
 recommend_transfers <- function(squad_df, market_df, current_budget = 0, max_transfers = 5,
                                rules = NULL, forecast_df = NULL) {
   empty <- data.frame(sell_id=character(),sell_name=character(),sell_role=character(),sell_val=numeric(),sell_fis=numeric(),

@@ -261,3 +261,6 @@ The league standings evolution plot has been repositioned to the bottom of the P
 - Each team is represented by a distinct colored line, with the user's own team highlighted for quick identification.
 - The plot is rendered via `plotlyOutput` for interactivity (hover tooltips, zoom, pan).
 - Positioned at the bottom of the tab, after the player table and any filter controls.
+## On-demand sale ranking in Transfer Sandbox
+
+The Scenario Builder includes the same position/target `rank_sale_candidates()` analysis used by Today, using the current roster, forecasts, league rules, cached pressroom evidence, effective-capacity pending departures, market listings, and open rival clauses. Results are advisory and responsive. **Open Player Card** validates the player against both the current roster and current ranking. In target mode, **Apply to Sandbox** validates both immutable IDs and populates the existing sell/buy selectors; it never lists, sells, bids, or purchases a player.

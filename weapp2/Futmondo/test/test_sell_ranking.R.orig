@@ -1,0 +1,63 @@
+source("intelligence_engine.R")
+
+passed<-0L
+check<-function(name,expr) {
+  tryCatch({force(expr);passed<<-passed+1L;cat("[PASS]",name,"\n")},
+    error=function(e){cat("[FAIL]",name,"--",conditionMessage(e),"\n");quit(status=1L)})
+}
+roles<-c("GK","GK",rep("DEF",5),rep("MID",5),rep("FWD",4))
+squad<-data.frame(id=paste0("p",seq_along(roles)),name=paste("Player",seq_along(roles)),
+  role=roles,role2=NA_character_,value=seq_along(roles)*1e6,
+  change=c(rep(0,12),-2e5,1e5,0,-1e5),points=10,
+  average.average=c(rep(6,12),2,8,5,4),
+  average.averageLastFive=c(rep(6,12),1,9,5,3),
+  clause_price=seq_along(roles)*1.2e6,status="ok",user_team_id="me",
+  bid_price=c(rep(NA_real_,12),9e6,rep(NA_real_,3)),stringsAsFactors=FALSE)
+forecasts<-data.frame(player_id=squad$id,expected_points=c(rep(6,12),2,9,5,4),
+  lower=1,upper=10,horizon=1)
+target<-data.frame(id="target",name="Target",role="MID",role2="FWD",value=8e6,
+  change=1e5,points=10,average.average=7,average.averageLastFive=8,
+  clause_price=9e6,status="ok",stringsAsFactors=FALSE)
+
+check("position_mode_and_verified_vs_estimated",{
+  rows<-rank_sale_candidates(squad,"FWD",forecast_df=forecasts,include_all=TRUE)
+  stopifnot(nrow(rows)==4L,setequal(rows$player_id,squad$id[roles=="FWD"]),
+    rows$proceeds_type[rows$player_id=="p13"]=="Verified active offer",
+    all(rows$proceeds_type[rows$player_id!="p13"]=="Estimated market value"))
+})
+check("target_mode_uses_all_positions_and_excludes_pending",{
+  rows<-rank_sale_candidates(squad,target_player=target,forecast_df=forecasts,
+    pending_outbound_ids="p13",include_all=TRUE)
+  allowed<-squad$id[roles%in%c("MID","FWD")]
+  stopifnot(nrow(rows)>0L,all(rows$player_id%in%allowed),!any(rows$player_id=="p13"))
+})
+check("stable_squad_impact_first_order",{
+  first<-rank_sale_candidates(squad,"FWD",forecast_df=forecasts,include_all=TRUE)
+  second<-rank_sale_candidates(squad[sample(seq_len(nrow(squad))),],"FWD",
+    forecast_df=forecasts,include_all=TRUE)
+  stopifnot(identical(first$player_id,second$player_id),
+    first$player_id[1]=="p13",all(diff(first$rank)==1L))
+})
+check("missing_optional_evidence_is_explicit",{
+  reduced<-squad
+  reduced$change<-NA_real_;reduced$clause_price<-NA_real_;reduced$bid_price<-NA_real_
+  rows<-rank_sale_candidates(reduced,"FWD",forecast_df=forecasts)
+  stopifnot(nrow(rows)>0L,all(rows$proceeds_type=="Estimated market value"),
+    all(rows$evidence_pct<100),all(grepl("Value trend unavailable",rows$rationale,fixed=TRUE)))
+})
+cat("SELL RANKING:",passed,"passed / 0 failed\n")
+check("stale_or_forged_actions_are_rejected",{
+  rows<-rank_sale_candidates(squad,"FWD",forecast_df=forecasts)
+  stopifnot(!is.null(resolve_sell_ranking_player(rows$player_id[1],squad,rows)),
+    is.null(resolve_sell_ranking_player("forged",squad,rows)),
+    is.null(resolve_sell_ranking_player(rows$player_id[1],squad[0,],rows)))
+})
+check("sandbox_apply_requires_current_sell_and_target",{
+  rows<-rank_sale_candidates(squad,target_player=target,forecast_df=forecasts)
+  pool<-target
+  good<-validate_sell_ranking_sandbox_event(
+    list(player_id=rows$player_id[1],target_id="target"),rows,pool)
+  stopifnot(identical(good$buy_id,"target"),
+    is.null(validate_sell_ranking_sandbox_event(list(player_id="forged",target_id="target"),rows,pool)),
+    is.null(validate_sell_ranking_sandbox_event(list(player_id=rows$player_id[1],target_id="stale"),rows,pool)))
+})

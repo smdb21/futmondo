@@ -463,6 +463,10 @@ today_UI <- function(id) {
               selected = c("Buy", "Sell", "Bid", "Clause", "Hold"), inline = TRUE
             )
           ),
+          checkboxInput(ns("show_sell_ranking"),
+            label=tagList(icon("ranking-star")," Who should I sell?"),value=FALSE),
+          uiOutput(ns("sell_ranking_controls")),
+          uiOutput(ns("sell_ranking_results")),
           uiOutput(ns("recommendations_feed_ui"))
         )
       ),
@@ -899,6 +903,79 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
             "Clause Threat Radar"
           )
         )
+      # ---- On-demand sell ranking (position or concrete purchase target) ----
+      sell_target_pool_RV <- reactive({
+        pool<-data.table::rbindlist(list(market_candidates_RV(),clause_candidates_RV()),fill=TRUE)%>%as.data.frame()
+        if(!nrow(pool)||!"id"%in%names(pool)) return(data.frame())
+        pool[!duplicated(as.character(pool$id)),,drop=FALSE]
+      })
+      output$sell_ranking_controls <- renderUI({
+        req(is_module_active()==TRUE)
+        if(!isTRUE(input$show_sell_ranking)) return(NULL)
+        tagList(
+          radioButtons(ns("sell_rank_mode"),"Analyze by",
+            choices=c("Position"="position","Purchase target"="target"),selected="position",inline=TRUE),
+          if(identical(input$sell_rank_mode,"target"))
+            selectizeInput(ns("sell_rank_target"),"Player you want to buy",choices=NULL,width="100%")
+          else selectInput(ns("sell_rank_position"),"Position",
+            choices=c("Goalkeeper"="GK","Defender"="DEF","Midfielder"="MID","Forward"="FWD"),
+            selected="DEF"),
+          checkboxInput(ns("sell_rank_show_all"),"Show full ranking",value=FALSE)
+        )
+      })
+      observe({
+        req(is_module_active()==TRUE,isTRUE(input$show_sell_ranking))
+        pool<-sell_target_pool_RV()
+        choices<-if(nrow(pool)&&all(c("id","name")%in%names(pool)))
+          stats::setNames(as.character(pool$id),paste0(pool$name," (",if("role"%in%names(pool)) pool$role else "position unavailable",")")) else character()
+        updateSelectizeInput(session,"sell_rank_target",choices=choices,server=TRUE)
+      })
+      sell_rankings_RV <- reactive({
+        req(is_module_active()==TRUE,isTRUE(input$show_sell_ranking))
+        squad<-squad_players_RV(); req(is.data.frame(squad),nrow(squad))
+        mode<-input$sell_rank_mode
+        target<-NULL; positions<-NULL
+        if(identical(mode,"target")) {
+          pool<-sell_target_pool_RV()
+          id<-as.character(input$sell_rank_target)
+          target<-pool[as.character(pool$id)==id,,drop=FALSE]
+          if(nrow(target)!=1L) return(data.frame())
+        } else {
+          positions<-input$sell_rank_position
+          if(is.null(positions)||!nzchar(as.character(positions))) return(data.frame())
+        }
+        financial<-user_finances_RV()
+        pending<-if(is.list(financial)&&is.list(financial$roster_capacity))
+          financial$roster_capacity$pending_outbound_ids else character()
+        rank_sale_candidates(squad,positions,target,rules=if(is.list(financial)) financial$rules else NULL,
+          forecast_df=NULL,pressroom_df=pressroom_RV(),pending_outbound_ids=pending,max_results=5L,
+          include_all=isTRUE(input$sell_rank_show_all))
+      })
+      output$sell_ranking_results <- renderUI({
+        req(is_module_active()==TRUE)
+        if(!isTRUE(input$show_sell_ranking)) return(NULL)
+        rows<-sell_rankings_RV()
+        if(!is.data.frame(rows)||!nrow(rows))
+          return(div(class="sell-ranking-empty","No legal sale candidate could be verified for this selection."))
+        cards<-lapply(seq_len(nrow(rows)),function(i) {
+          r<-rows[i,,drop=FALSE]
+          div(class="sell-ranking-card",
+            div(class="sell-ranking-heading",
+              strong(paste0("#",r$rank," ",r$player_name)),
+              span(class="sell-ranking-evidence",paste0(r$evidence_pct,"% evidence"))),
+            div(class="sell-ranking-meta",
+              span(icon("users")," ",r$remaining_position_counts),
+              span(icon("chart-line")," XI ",if(is.finite(r$xi_points_change)) paste0(if(r$xi_points_change>0) "+" else "",round(r$xi_points_change,1)) else "unavailable"),
+              span(icon("coins")," ",r$proceeds_type)),
+            p(r$rationale),
+            tags$button(type="button",class="btn btn-default",
+              onclick=paste0("Shiny.setInputValue(",jsonlite::toJSON(ns("sell_rank_open"),auto_unbox=TRUE),",",jsonlite::toJSON(as.character(r$player_id),auto_unbox=TRUE),",{priority:'event'});"),
+              icon("address-card")," Open Player Card"))
+        })
+        tagList(div(class="sell-ranking-note",
+          "Advisory ranking. Estimated market value is not a guaranteed sale price."),do.call(tagList,cards))
+      })
+
       })
 
       # ---- Recommendations Feed ----
@@ -1228,6 +1305,16 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
       # mapped intent (e.g. "market_bid" for a "Place Bid" click) is preserved
       # end-to-end.
       selected_from_today_RV <- reactiveVal(NULL)
+      observeEvent(input$sell_rank_open,{
+        player<-resolve_sell_ranking_player(input$sell_rank_open,squad_players_RV(),sell_rankings_RV())
+        if(is.null(player)) {
+          shiny::showNotification(
+            "This sell recommendation is stale or the player is no longer in your squad. Refresh and try again.",
+            type="warning",duration=5)
+          return()
+        }
+        selected_from_today_RV(list(player_id=as.character(player$id[1]),action="view"))
+      },ignoreNULL=TRUE)
 
       # ---- Market Radar row selection (browser JS -> namespaced input) ----
       # The reactable onClick (today_radar_onclick_js) sends the clicked row's

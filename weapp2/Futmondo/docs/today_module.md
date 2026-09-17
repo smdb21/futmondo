@@ -228,3 +228,6 @@ Every recommendation card includes a compact address-card icon button with the t
 ### Accept Offer actions
 
 Today recognizes the stable `accept_offer` action from a Sell recommendation, resolves the owned player from current player data, and opens the existing received-offer confirmation in the player card. The card verifies the offer remains finite and positive before displaying confirmation.
+### On-demand “Who should I sell?” analysis
+
+Today exposes an optional position/target analysis above the normal feed. Position mode accepts the four canonical positions; purchase-target mode combines current filtered market candidates and currently open rival clauses, then uses all target positions. The top five legal sale candidates are produced by `rank_sale_candidates()` and remain independent of whether the normal feed emits a Sell recommendation. Cards distinguish verified offers from estimated proceeds, show projected XI/depth impact and evidence coverage, and route **Open Player Card** through a dedicated current-roster validator before using the existing read/action modal.

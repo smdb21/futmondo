@@ -189,3 +189,16 @@ recommendation_position_context(
 ```
 
 `recommendation_player_row(player_id, sources)` resolves the first position-bearing row for an immutable player ID across current market, clause, catalog, and roster sources. The command-center feed exposes the resulting text in `position_context` and appends it to every recommendation description.
+## On-demand sale ranking
+
+`rank_sale_candidates(squad_df, selected_positions=NULL, target_player=NULL, rules=NULL, forecast_df=NULL, pressroom_df=NULL, pending_outbound_ids=character(), max_results=5L, include_all=FALSE)` returns an advisory ranking of owned players whose primary or secondary positions match the selected canonical positions (`GK`, `DEF`, `MID`, `FWD`) or every eligible position of a concrete purchase target. Duplicate immutable IDs and pending clause departures are excluded. Each candidate is simulated as a sale; target mode also adds the proposed replacement. Candidates that cannot produce a verified legal XI are omitted.
+
+Rows contain `rank`, player identity and positions, `recommendation_score`, projected XI-points change, post-sale position counts and depth risk, FIS/performance/form, value trend, clause/value ratio, proceeds and proceeds type, acquisition cost/result, evidence percentage, and a plain-language rationale. Ordering preserves squad impact first, then depth risk, weaker performance, declining value, higher proceeds, and immutable player ID. A positive active offer is labelled **Verified active offer**; otherwise player value is labelled **Estimated market value** and is never represented as guaranteed proceeds. Missing optional evidence remains unavailable and lowers `evidence_pct`.
+
+`resolve_sell_ranking_player()` and `validate_sell_ranking_sandbox_event()` accept only immutable IDs present in the current server-generated ranking and current roster/target pool, rejecting stale or forged browser events.
+
+```r
+rank_sale_candidates(squad_df, selected_positions="DEF",
+  rules=league_rules, forecast_df=next_round_forecasts,
+  pressroom_df=pressroom, pending_outbound_ids=c("player-already-leaving"))
+```
