@@ -414,26 +414,6 @@ det_record("player_summary_cache_key_no_collision", {
 })
 
 # =============================================================================
-det_record("pending_clause_transfers_are_deduplicated_and_effective", {
-  now<-as.POSIXct("2026-09-17 12:00:00",tz="UTC")
-  roster<-data.frame(id=c("out","stay"))
-  press<-data.frame(player_id=c("out","in","in"),buyer_team_id=c("rival",team,team),
-    seller_team_id=c(team,"rival","rival"),created=c("2026-09-17 09:00:00","2026-09-17 08:00:00","2026-09-17 10:00:00"))
-  summaries<-list(
-    out=list(championship=list(owner=list(`_id`=team),clause=list(transferred=TRUE,transferDate="2026-09-18 12:00:00"))),
-    `in`=list(championship=list(owner=list(`_id`="rival"),clause=list(transferred=TRUE,transferDate="2026-09-18 12:00:00"))))
-  state<-reconcile_pending_clause_transfers(roster,press,summaries,team,now)
-  stopifnot(state$status=="ok",identical(state$pending_outbound_ids,"out"),
-    identical(state$pending_inbound_ids,"in"),state$pending_outbound_count==1L,state$pending_inbound_count==1L)
-  effective<-nrow(roster)-state$pending_outbound_count+state$pending_inbound_count
-  cap<-list(status="ok",
-    roster=list(status="ok",count=2L,effective_count=effective,cap=effective,pending_outbound_count=1L,pending_inbound_count=1L),
-    funds=list(spendable_budget=1e9),outstanding=list(count=0L))
-  stopifnot(!evaluate_acquisition_preflight(cap,"clause")$ok,
-    !evaluate_acquisition_preflight(cap,"bid")$ok,
-    evaluate_acquisition_preflight(cap,"modify",existing_bid_amount=1)$ok)
-})
-
 # 4. Roster clause payload
 # =============================================================================
 cat("\n--- Roster clause payload ---\n")

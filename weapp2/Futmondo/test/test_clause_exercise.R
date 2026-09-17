@@ -60,6 +60,17 @@ failure <- buy_roster_clause(login, query$championshipId, query$userteamId,
                              query$player_id, query$player_slug, query$price)
 stopifnot(isFALSE(failure$success), identical(failure$code, "error"),
           identical(failure$message, "synthetic transport failure"))
+# The roster-limit code stays machine-readable while the message is actionable.
+futmondo_post <- function(url, ...) {
+  body <- jsonlite::toJSON(list(answer=list(code="api.market.max_number_players_in_roster",
+    msg="api.market.max_number_players_in_roster")),auto_unbox=TRUE)
+  structure(list(status_code=200L,headers=list("Content-Type"="application/json"),
+    content=charToRaw(body),url=url),class="response")
+}
+capacity_failure <- buy_roster_clause(login,query$championshipId,query$userteamId,
+  query$player_id,query$player_slug,query$price)
+stopifnot(!capacity_failure$success,identical(capacity_failure$code,"api.market.max_number_players_in_roster"),
+  grepl("Sell a player first",capacity_failure$message,fixed=TRUE))
 futmondo_post <- original_post
 
-cat("CLAUSE EXERCISE: 5 passed / 0 failed\n")
+cat("CLAUSE EXERCISE: 6 passed / 0 failed\n")

@@ -76,8 +76,6 @@ If a clause exists (`clause_price > 0`) but is currently locked (`clause_transfe
 
 Every acquisition path (market offer, direct owner offer, clause buyout, bid modification) runs a single internal preflight, `run_acquisition_preflight(sp, mode, amount, existing_bid_amount)`, which wraps `get_acquisition_capacity()` + `evaluate_acquisition_preflight()` (see `docs/bid_management.md`).
 
-Player cards render Place Bid, owner-offer, and Buy Clause controls disabled when effective capacity is exhausted or unavailable, with the same current/outbound/inbound/effective/cap explanation used by server preflight. Verified Update Bid and Cancel Bid controls remain enabled. This is not CSS-only: modal-open and submit handlers recheck capacity to reject forged or stale client events.
-
 * **When it runs**: at modal-open time (amount unknown) and again immediately before the write (amount known).
 * **Fail-closed**: if the capacity snapshot is unavailable/ambiguous (`status != "ok"`), the action is blocked with reason `unavailable` (distinct from `capacity` and `funds`).
 * **Rules**:

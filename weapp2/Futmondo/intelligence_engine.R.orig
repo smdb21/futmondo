@@ -1108,26 +1108,6 @@ generate_command_center_feed <- function(login, championship_id,
         current_team <- as.character(user_team_id)[1]
         depth_roster <- players_df[!is.na(owner) & owner==current_team,,drop=FALSE]
       }
-    result_df$action_disabled <- FALSE
-    result_df$action_disabled_reason <- NA_character_
-    roster_capacity <- if (is.list(financial)) financial$roster_capacity else NULL
-    for (i in seq_len(nrow(result_df))) {
-      is_new_acquisition <- result_df$type[i] %in% c("Buy","Clause") &&
-        !identical(as.character(result_df$action_code[i]),"modify_bid")
-      if (!is_new_acquisition) next
-      mode <- if (result_df$type[i]=="Clause") "clause" else "bid"
-      offers <- if (is.list(financial)&&is.list(financial$commitments))
-        suppressWarnings(as.numeric(financial$commitments$count)) else NA_real_
-      synthetic <- list(status=if(is.list(roster_capacity)) "ok" else "unavailable",
-        roster=roster_capacity, funds=list(spendable_budget=.Machine$double.xmax),
-        outstanding=list(count=if(length(offers)==1L&&is.finite(offers)) as.integer(offers) else 0L))
-      gate <- evaluate_acquisition_preflight(synthetic,mode)
-      if (!isTRUE(gate$ok)) {
-        result_df$action_disabled[i] <- TRUE
-        result_df$action_disabled_reason[i] <- gate$message
-        result_df$description[i] <- paste(result_df$description[i],gate$message)
-      }
-    }
     }
     sources <- list(market_candidates,clause_candidates,players_df,depth_roster)
     result_df$position_context <- vapply(seq_len(nrow(result_df)),function(i) {

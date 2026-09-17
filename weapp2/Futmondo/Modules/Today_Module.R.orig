@@ -1037,9 +1037,8 @@ today_Server <- function(id, is_module_active, login_token, championship_id,
                       inputId = ns(paste0("rec_action_", i, "_", pid)),
                       label = tagList(icon("arrow-right"), action_label),
                       class = "btn btn-primary today-recommendation-action",
-                      onclick = if (!isTRUE(countdown$closed) && !capacity_disabled) today_rec_action_onclick_js(ns, pid, action_code) else NULL,
-                      disabled = if (isTRUE(countdown$closed) || capacity_disabled) "disabled" else NULL,
-                      title = if (capacity_disabled && "action_disabled_reason" %in% names(r)) as.character(r$action_disabled_reason) else NULL
+                      onclick = if (!isTRUE(countdown$closed)) today_rec_action_onclick_js(ns, pid, action_code) else NULL,
+                      disabled = if (isTRUE(countdown$closed)) "disabled" else NULL
                     )
                   )
                 )

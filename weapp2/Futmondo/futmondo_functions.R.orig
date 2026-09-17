@@ -1822,9 +1822,8 @@ evaluate_acquisition_preflight <- function(capacity, mode, amount = NULL, existi
     )))
   }
 
-  has_effective_contract <- "effective_count" %in% names(capacity$roster)
-  roster_count <- if (has_effective_contract) capacity$roster$effective_count else capacity$roster$count
-  roster_status <- if ("status" %in% names(capacity$roster)) capacity$roster$status else "ok"
+  roster_count <- capacity$roster$effective_count
+  roster_status <- capacity$roster$status
   cap_val <- capacity$roster$cap
   outstanding_count <- capacity$outstanding$count
   spendable <- capacity$funds$spendable_budget

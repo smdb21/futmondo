@@ -1289,11 +1289,11 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           tryCatch(on_bid_updated(action_type = "clause_paid"), error = function(e) NULL)
         }
       } else {
-        if(is.list(res)&&identical(res$code,"api.market.max_number_players_in_roster")) clear_api_cache()
         err_msg <- if (is.list(res) && !is.null(res$message) && res$message != "") res$message else "Please verify your funds and try again."
         shiny::showNotification(
           paste0("Clause buyout failed: ", err_msg),
           type = "error",
+        if(is.list(res)&&identical(res$code,"api.market.max_number_players_in_roster")) clear_api_cache()
           duration = 6
         )
       }

@@ -430,6 +430,21 @@ pol_record("feed_buy_exclusive_from_market_candidates", {
             is.na(rival_only$my_bid_id), is.na(rival_only$my_bid_price))
 })
 
+pol_record("feed_keeps_acquisitions_visible_but_disabled_at_effective_cap", {
+  capacity <- list(status="ok",count=24L,raw_count=24L,effective_count=25L,cap=25L,
+    pending_outbound_count=1L,pending_inbound_count=2L)
+  feed <- generate_command_center_feed(
+    login=NULL,championship_id="champ",user_team_id="me",user_teams_df=teams_df,
+    players_df=players_df,market_candidates=mkt_cand,clause_candidates=clause_cand,
+    financial=list(roster_capacity=capacity,commitments=list(count=0L)))
+  new_actions <- feed$type %in% c("Buy","Clause") & feed$action_code!="modify_bid"
+  update_actions <- feed$action_code=="modify_bid"
+  stopifnot(any(new_actions),all(feed$action_disabled[new_actions]),
+    all(grepl("24 current",feed$action_disabled_reason[new_actions],fixed=TRUE)),
+    all(grepl("1 pending departure",feed$action_disabled_reason[new_actions],fixed=TRUE)),
+    any(update_actions),all(!feed$action_disabled[update_actions]))
+})
+
 pol_record("feed_clause_exclusive_from_clause_candidates", {
   feed <- generate_command_center_feed(
     login = NULL, championship_id = "champ", user_team_id = "me",
@@ -768,6 +783,8 @@ pol_record("clause_buyout_opens_clause_modal_not_market_modal", {
     effective_market_price = 10000000,
     stringsAsFactors = FALSE
   )
+  sp_own_clause <- sp_open
+  sp_own_clause$id <- "cl-own"; sp_own_clause$name <- "Own Clause"; sp_own_clause$user_team_id <- "team"
   # Plain market row (no clause) for the market_bid regression check.
   sp_market <- data.frame(
     id = "mk1", name = "Market Guy", role = "FW",
@@ -801,6 +818,19 @@ pol_record("clause_buyout_opens_clause_modal_not_market_modal", {
       pol_expect(isTRUE(clause_modal_opened_RV()), "clause confirmation modal did not open")
       pol_expect(isFALSE(offer_modal_opened_RV()), "market bid modal must never open for clause_buyout")
       cat("    PASS: clause_buyout + open clause -> clause confirmation modal (not market modal)\n")
+
+      # ---- own-player clause event -> blocked before preflight ----
+      selected_player_RV(sp_own_clause)
+      session$flushReact()
+      preflight_count <- stub_env$count
+      open_action_RV(NULL)
+      session$flushReact()
+      open_action_RV("clause_buyout")
+      session$flushReact()
+      pol_expect(isFALSE(clause_modal_opened_RV()),"own player must not open the clause modal")
+      pol_expect(stub_env$count==preflight_count,"own-player clause must be blocked before acquisition preflight")
+      cat("    PASS: clause_buyout + own player -> blocked before preflight\n")
+
 
       # ---- (b) clause_buyout + LOCKED clause -> recheck blocks the modal ----
       selected_player_RV(sp_locked)

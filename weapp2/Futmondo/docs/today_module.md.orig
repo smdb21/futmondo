@@ -116,8 +116,6 @@ When a selection event becomes valid, Today resolves and opens the player **loca
    * `open_action` is the optional reactive carrying the stable action code (`today_open_action_RV`). Inside `selected_player_Server`, an observer routes the three acquisition codes when a selected player is currently valid (guarded against stale startup reactive values):
      * **`"modify_bid"`** -> re-verifies the own bid from the player summary and opens the existing update-bid modal; stale evidence fails closed.
      * **`"market_bid"`** -> the SAME `open_market_offer_modal()` helper as the "Make Market Offer" button (identical `run_acquisition_preflight` behavior, fail closed).
-
-BUY and Clause rows include stable `action_disabled` and `action_disabled_reason` fields. Capacity-blocked recommendations stay visible with the effective-roster explanation, but their buttons have a real disabled attribute and emit no client action. `modify_bid`, Sell, and Hold actions remain available.
      * **`"clause_buyout"`** -> the SAME `open_clause_buyout_modal()` helper as the "Buy Release Clause" button. It **rechecks the strict open-clause state before showing** (finite positive price, explicitly `FALSE` transferred, parseable `clause_date <= now`), runs the clause preflight, and shows the clause confirmation modal. It **never opens the market bid modal**, and **only the recomputed `clause_price` is shown/executed** (no comparison price is ever sent to the clause endpoint). See `docs/selected_player_module.md`.
    * `on_bid_updated` only invalidates/recomputes Today data (it bumps the `refresh_trigger` reactiveVal so cached API data is refetched); **Today itself never performs writes** -- all bid/clause submission logic stays in `selected_player_Server`.
 

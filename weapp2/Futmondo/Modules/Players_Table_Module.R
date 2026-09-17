@@ -140,6 +140,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
     table_refresh_trigger <- reactiveVal(0)
     selected_player_id_RV <- reactiveVal(NULL)
     selected_player_context_RV <- reactiveVal(NULL)
+    player_selection_event_RV <- reactiveVal(0L)
     table_context_RV <- reactive({
       value <- function(x) if(is.function(x)) x() else x
       auth <- value(login_token)
@@ -214,9 +215,11 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       })
     })
     
-    # observe selected_player_RV() to open popup with           selected_player_UI(id = "selected_player")
+    # Open from an explicit click event, not from identity changes. The table
+    # selection is cleared after opening so the same row can emit another
+    # selection event after the modal is closed.
     observeEvent(
-      selected_player_RV(),
+      player_selection_event_RV(),
       {
         req(selected_player_RV())
         showModal(modalDialog(
@@ -227,8 +230,9 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
           easyClose = TRUE,
           size = "l"
         ))
+        tryCatch(updateReactable("players_table",selected=NA_integer_,session=session),error=function(e)NULL)
       },
-      ignoreNULL = TRUE
+      ignoreInit = TRUE
     )
     # Modules ----
     selected_player_Server(
@@ -248,6 +252,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       req(length(selected_idx) == 1L, is.data.frame(rows), selected_idx >= 1L, selected_idx <= nrow(rows))
       selected_player_context_RV(table_context_RV())
       selected_player_id_RV(as.character(rows$id[selected_idx]))
+      player_selection_event_RV(isolate(player_selection_event_RV())+1L)
     }, ignoreNULL = TRUE)
     selected_player_RV <- reactive({
       req(identical(selected_player_context_RV(),table_context_RV()))

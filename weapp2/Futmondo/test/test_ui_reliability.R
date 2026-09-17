@@ -32,10 +32,25 @@ record('player card hides the legacy userBox header', {
             grepl("[id$='selected_player_box'] .widget-user-image", css, fixed=TRUE))
 })
 record('player card location distinguishes ownership from market listing', {
-  stopifnot(player_card_location_label(data.frame(), 'mine') == 'Free Agent',
-    player_card_location_label(data.frame(market_inMarket=TRUE), 'mine') == 'Free Agent / On Market',
-    player_card_location_label(data.frame(user_team_id='rival', userTeam='Rivals FC'), 'mine') == 'Rival Owned: Rivals FC',
-    player_card_location_label(data.frame(user_team_id='rival', userTeam='Rivals FC', market_inMarket=TRUE), 'mine') == 'Rival Owned: Rivals FC / On Market')
+  stopifnot(player_card_location_label(data.frame(), 'mine') ==
+      'Ownership: Free Agent · Market: Not listed on Market',
+    player_card_location_label(data.frame(market_inMarket=TRUE), 'mine') ==
+      'Ownership: Free Agent · Market: Listed on Market',
+    player_card_location_label(data.frame(user_team_id='rival', userTeam='Rivals FC'), 'mine') ==
+      'Ownership: Rival Owned: Rivals FC · Market: Not listed on Market',
+    player_card_location_label(data.frame(user_team_id='rival',userTeam='Rivals FC',market_inMarket=TRUE),'mine') ==
+      'Ownership: Rival Owned: Rivals FC · Market: Listed on Market',
+    player_card_location_label(data.frame(user_team_id='mine',market_inMarket=FALSE,price=999),'mine') ==
+      'Ownership: Your Squad · Market: Not listed on Market',
+    !player_card_location_status(data.frame(computer=FALSE,market_inMarket=FALSE),'mine')$on_market)
+})
+record('own player never exposes clause purchase eligibility', {
+  own <- data.frame(id='p1',user_team_id=' mine ',clause_price=1000000)
+  rival <- data.frame(id='p2',user_team_id='rival',clause_price=1000000)
+  stopifnot(player_card_is_own_player(own,'mine'),
+    !player_card_can_buy_clause(own,'mine',TRUE),
+    player_card_can_buy_clause(rival,'mine',TRUE),
+    !player_card_can_buy_clause(rival,'mine',FALSE))
 })
 record('player card offer money uses stable Spanish euro formatting', {
   stopifnot(player_card_money(11234778) == '11.234.778 €',
@@ -171,7 +186,12 @@ record('selected player identity survives authoritative table reordering', {
   })
   testServer(players_table_Server,args=list(players_table_RV=authoritative,user_teams_RV=reactive(NULL),refresh_trigger=trigger), {
     session$setInputs(fixture_selection=1L)
-    stopifnot(selected_player_RV()$id=='p1')
+    session$flushReact()
+    stopifnot(selected_player_RV()$id=='p1',player_selection_event_RV()==1L)
+    session$setInputs(fixture_selection=NA_integer_)
+    session$setInputs(fixture_selection=1L)
+    session$flushReact()
+    stopifnot(selected_player_RV()$id=='p1',player_selection_event_RV()==2L)
     handle_bid_updated(player_id='p1',action_type='bid_modified')
     session$flushReact()
     stopifnot(players_table_filtered_RV()$id[1]=='p2',selected_player_RV()$id=='p1')

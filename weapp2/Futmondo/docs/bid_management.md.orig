@@ -85,12 +85,6 @@ Executes a release-clause buyout via `POST https://api.futmondo.com/1/market/ros
 | Market offer (`submit_bid`) | `bid` | offer amount | new offer must have a free slot + funds |
 | Direct owner offer (`submit_owner_offer`) | `offer` | offer amount | new offer must have a free slot + funds |
 | Release-clause buyout (`submit_clause`) | `clause` | clause price (recomputed locally) | requires a free roster slot; uses `buy_roster_clause` |
-
-Capacity uses Futmondo's delayed-transfer rule: `effective_count = raw_count - pending_outbound_count + pending_inbound_count`. Pending transfers are reconciled by immutable player/team IDs from the latest pressroom transaction and a future `championship.clause.transferDate`; ambiguous, stale, or missing evidence fails closed. The roster payload exposes raw/effective counts, the cap, remaining slots, and inbound/outbound ID vectors and counts.
-
-New market bids and owner offers also include existing outbound acquisition commitments. Clause purchases use the effective count directly. Verified existing bids may still be updated or cancelled at the cap because they do not reserve another slot. Every mutation repeats preflight immediately before submission.
-
-`api.market.max_number_players_in_roster` is preserved in `code` for diagnostics and mapped to a friendly message explaining that pending arrivals consume capacity and recommending that the user sell a player first. Its receipt invalidates cached roster/capacity data.
 | Bid modification (`submit_modify_bid`) | `modify` | new price | delta vs existing bid; no new slot consumed |
 
 For market bids and bid modifications, the module supplies `market_bid_minimum(selected_player)` on modal opening and immediately before submission. Market and modify inputs show that minimum and start at or above it; the Smart Bid modal additionally rechecks the cached recommendation amount before opening. The shared minimum uses the greater of market valuation and the current listing asking price (see [intelligence_engine.md](intelligence_engine.md)).
