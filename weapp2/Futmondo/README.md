@@ -4,6 +4,8 @@ An R Shiny companion for Futmondo: inspect rosters and transfers, compare player
 
 ## Run locally
 
+Round MVPs and Rivals share a session-scoped official-result loader (`mvp_runtime.R`). It uses the existing cache and cooperative Shiny timers, requires no additional packages or always-on worker, and keeps live results available when history saving fails. Rival funds display attributable MVP income separately from verified cash and explain incomplete historical evidence. See [MVP loading](docs/round_mvps_module.md) and [finance attribution](docs/league_finances.md).
+
 Open this directory as the project and run:
 
 ```r

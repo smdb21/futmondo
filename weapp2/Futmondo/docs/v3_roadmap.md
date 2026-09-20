@@ -4,6 +4,8 @@ Updated 2026-09-08. Milestone tags below identify delivered code, not completion
 
 ## Specification-audit follow-up
 
+**[IMPLEMENTED] ✅ 2026-09-20 — MVP availability and fund-attribution corrections.** Shared cooperative official-MVP discovery/display, explicit unknown/error states, evidence-based MVP bonus breakdowns without altering verified cash, truthful queued/saved sync counts, and persistence errors retained across collection stages. Historical eligibility/payment contracts remain explicitly unresolved where upstream evidence is absent; no inferred award is recorded as a payment.
+
 **[IMPLEMENTED] ✅ 2026-09-08 — critical integration corrections and terminal theme.** Real adapter output can yield an explicitly provisional XI; automation requires verified rules. Your Team reconciles own listings, preserves source freshness and allows profitable points-reducing transfer previews. Shared black/green monospace tokens cover Shiny, Reactable and Plotly. Desktop/mobile browser fixtures exercise nine tabs.
 
 **[IMPLEMENTED] ✅ 2026-09-08 — observation and advisory planning integrations.** Revision-preserving SQL/history replay, rotating independent observation subscriptions, saved-outcome matching and production worker callers for chronological evaluators. Added listing/fixture evidence storage, observed executable-offer estimates, bounded joint purchase/sale scenarios, cost-basis realized-profit ledger, detailed XI comparison, authorized all-league Insights unread counts and durable coach preferences. Per-job failures persist; action identities include listing/offer and policy content.

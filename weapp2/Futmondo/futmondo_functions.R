@@ -15,6 +15,7 @@ PRESSROOM_URL <- "https://api.futmondo.com/1/locker/pressroom"
 CANCEL_BID_URL <- "https://api.futmondo.com/1/market/cancelbid"
 PUT_ON_MARKET_URL <- "https://api.futmondo.com/1/market/putonmarket"
 CANCEL_SELL_URL <- "https://api.futmondo.com/1/market/cancelsell"
+DIRECT_SELL_URL <- "https://api.futmondo.com/1/market/directsell"
 PUT_ALL_ON_MARKET_URL <- "https://api.futmondo.com/5/market/putallonmarket"
 MY_PLAYERS_URL <- "https://api.futmondo.com/1/market/myplayers"
 ROSTER_BIDS_URL <- "https://api.futmondo.com/1/market/rosterbids"
@@ -30,6 +31,7 @@ library(httr)
 library(dplyr)
 library(jsonlite)
 library(data.table)
+source("mvp_runtime.R")
 
 # Global Cache Environment and Utilities
 api_cache_env <- new.env(parent = emptyenv())
@@ -201,118 +203,25 @@ get_championships <- function(login, championship_name = NULL) {
 }
 
 
-get_finished_rounds <- function(login, championship_id) {
-  tryCatch({
-    if (is.null(login) || is.null(championship_id)) {
-      return(data.frame(
-        round_id = character(0), round_number = numeric(0),
-        begin_process = character(0), is_finished = logical(0),
-        stringsAsFactors = FALSE
-      ))
-    }
+empty_finished_rounds <- function() data.frame(round_id=character(), round_number=numeric(), begin_process=character(), is_finished=logical(), stringsAsFactors=FALSE)
 
-    cache_key <- paste0("finished_rounds_", championship_id)
-    get_cached_data(cache_key, {
-      payload <- list(
-        header = list(
-          token = login[["token"]],
-          userid = login[["userid"]]
-        ),
-        query = list(
-          excludeGeneral = FALSE,
-          includeProphets = TRUE
-        ),
-        answer = list()
-      )
-
-      headers <- c("Content-Type" = "application/json; charset=utf-8")
-
-      print(paste0("[API] Fetching active championships for rounds (championship: ", championship_id, ")"))
-      response <- futmondo_post(ACTIVE_CHAMPIONSHIPS_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
-      ans <- httr::content(response)
-
-      if (is.null(ans) || !("answer" %in% names(ans)) || is.null(ans$answer) || !("championships" %in% names(ans$answer))) {
-        print("[Rounds] No championships data in response.")
-        return(data.frame(
-          round_id = character(0), round_number = numeric(0),
-          begin_process = character(0), is_finished = logical(0),
-          stringsAsFactors = FALSE
-        ))
-      }
-
-      championships <- ans$answer$championships
-      champ <- NULL
-      for (c_item in championships) {
-        if (is.list(c_item) && !is.null(c_item[["id"]] %||% c_item[["_id"]]) && as.character(c_item[["id"]] %||% c_item[["_id"]]) == as.character(championship_id)) {
-          champ <- c_item
-          break
-        }
-      }
-
-      if (is.null(champ)) {
-        print(paste0("[Rounds] Championship ", championship_id, " not found in active championships."))
-        return(data.frame(
-          round_id = character(0), round_number = numeric(0),
-          begin_process = character(0), is_finished = logical(0),
-          stringsAsFactors = FALSE
-        ))
-      }
-
-      # Extract rounds from ans$answer$rounds
-      rounds <- if (!is.null(ans$answer) && "rounds" %in% names(ans$answer)) ans$answer$rounds else NULL
-
-      # If ans$answer$rounds is empty, fallback to champ$rounds
-      if (is.null(rounds) || length(rounds) == 0) {
-        rounds <- if (!is.null(champ) && "rounds" %in% names(champ)) champ$rounds else NULL
-      }
-
-      # If championship has a league ID, filter rounds by matching round$championshipId to champ$league
-      if (!is.null(rounds) && length(rounds) > 0 && !is.null(champ) && !is.null(champ[["league"]])) {
-        league_id <- as.character(champ[["league"]])
-        rounds <- Filter(function(r) {
-          if (!is.null(r[["championshipId"]])) {
-            as.character(r[["championshipId"]]) == league_id
-          } else {
-            FALSE
-          }
-        }, rounds)
-      }
-
-      if (is.null(rounds) || length(rounds) == 0) return(data.frame(
-        round_id = character(), round_number = numeric(), begin_process = character(),
-        is_finished = logical(), stringsAsFactors = FALSE))
-
-      now <- Sys.time()
-      rounds_df <- lapply(rounds, FUN = function(r) {
-        r_id <- if (!is.null(r[["_id"]])) as.character(r[["_id"]]) else if (!is.null(r[["id"]])) as.character(r[["id"]]) else ""
-        r_num <- if (!is.null(r[["number"]])) as.numeric(r[["number"]]) else 1
-        begin_proc <- if (!is.null(r[["beginProcess"]])) as.character(r[["beginProcess"]]) else ""
-
-        is_fin <- isTRUE(r$isFinished) || isTRUE(r$finished) ||
-          (!is.null(r$status) && r$status %in% c("finished", "closed", "final"))
-
-        data.frame(
-          round_id = r_id,
-          round_number = r_num,
-          begin_process = begin_proc,
-          is_finished = is_fin,
-          stringsAsFactors = FALSE
-        )
-      }) %>% bind_rows()
-
-      print(paste0("[Rounds] Found ", nrow(rounds_df), " rounds, ", sum(rounds_df$is_finished), " finished."))
-      rounds_df
-    })
-  }, error = function(e) {
-    print(paste0("[Rounds] Error: ", e$message))
-    data.frame(
-      round_id = character(0), round_number = numeric(0),
-      begin_process = character(0), is_finished = logical(0),
-      stringsAsFactors = FALSE
-    )
-  })
+fm_round_flag <- function(x) {
+  if (is.logical(x)) return(length(x) == 1L && isTRUE(x))
+  if (is.numeric(x)) return(length(x) == 1L && is.finite(x) && x != 0)
+  length(x) == 1L && tolower(trimws(as.character(x))) %in% c("true", "t", "1", "yes", "y")
 }
+round_is_finished <- function(r) {
+  flags <- c("isFinished","finished","isClosed","closed","isCompleted","completed","finalized")
+  if (is.list(r) && any(vapply(flags, function(n) !is.null(r[[n]]) && fm_round_flag(r[[n]]), logical(1)))) return(TRUE)
+  is.list(r) && tolower(trimws(as.character(r[["status"]] %||% ""))) %in% c("done","finished","closed","final","completed","complete","ended")
+}
+round_reference <- function(round_id, round_number=NA_real_) {
+  id <- as.character(round_id %||% "")[1]; if (is.na(id) || !nzchar(id)) return(NULL)
+  list(round_id=id, round_number=suppressWarnings(as.numeric(round_number)[1]))
+}
+empty_round_catalog <- function(status="unavailable") list(status=status, rounds=empty_finished_rounds())
 
+get_finished_rounds <- function(login, championship_id) get_finished_round_catalog(login, championship_id)$rounds
 
 get_players_from_team <- function(login, championship_id, user_team_id, teams = NULL) {
   cache_key <- paste0("roster_", championship_id, "_", user_team_id)
@@ -2099,6 +2008,10 @@ get_user_team_moneymovements <- function(login, championship_id, user_team_id) {
           concept = get_val(m, "concept", ""),
           type = get_val(m, "type", ""),
           category = get_val(m, "category", ""),
+          # Explicit bonus attribution is optional; never infer it from concept text.
+          bonus_type = get_val(m, "bonus_type", ""),
+          round_id = get_val(m, "round_id", ""),
+          player_id = get_val(m, "player_id", ""),
           money = if (is.null(get_val(m, "money", NULL))) 0 else as.numeric(get_val(m, "money")),
           date = get_val(m, "date", ""),
           stringsAsFactors = FALSE
@@ -2663,32 +2576,20 @@ get_user_team_rounds <- function(login, championship_id, user_team_id) {
   })
 }
 
-get_round_dreamteam <- function(login, championship_id, round_number) {
-  if (is.null(login) || is.null(championship_id) || is.null(round_number)) return(NULL)
-  
-  cache_key <- paste0("dreamteam_", championship_id, "_", round_number)
-  get_cached_data(cache_key, {
-    payload <- list(
-      header = list(
-        token = login[["token"]],
-        userid = login[["userid"]]
-      ),
-      query = list(
-        championshipId = championship_id,
-        type = "dreamteam",
-        round = round_number
-      ),
-      answer = list()
-    )
-    headers <- c("Content-Type" = "application/json; charset=utf-8")
-    print(paste0("[API] Fetching dreamteam for round: ", round_number))
-    response <- futmondo_post(DREAMTEAM_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
-    ans <- httr::content(response)
-    if (!is.null(ans) && "answer" %in% names(ans) && is.list(ans$answer)) {
-      return(ans$answer)
-    }
-    return(list())
-  })
+build_round_dreamteam_payload <- function(login, championship_id, reference) list(header=list(token=login[["token"]], userid=login[["userid"]]), query=list(championshipId=championship_id,type="dreamteam",round=reference$round_id),answer=list())
+get_round_dreamteam <- function(login, championship_id, reference) { ref<-if(is.list(reference)) round_reference(reference$round_id,reference$round_number) else round_reference(reference); if(is.null(ref)) return(NULL); get_cached_data(paste0("dreamteam_",championship_id,"_",ref$round_id), { ans<-httr::content(futmondo_post(DREAMTEAM_URL,body=toJSON(build_round_dreamteam_payload(login,championship_id,ref),auto_unbox=TRUE),add_headers(.headers=c("Content-Type"="application/json; charset=utf-8")))); if(is.list(ans$answer)) ans$answer else list() }) }
+official_round_mvp_row <- function(answer, championship_id, reference) {
+  result <- normalize_official_dreamteam(answer,championship_id,reference)
+  if(result$status!="ok") return(data.frame())
+  result$rows[result$rows$is_mvp %in% TRUE,,drop=FALSE]
+}
+get_official_round_mvps <- function(login, championship_id, rounds) {
+  done <- rounds[rounds$is_finished %in% TRUE,,drop=FALSE]
+  if(!nrow(done)) return(mvp_result("unsupported",reason="No verified completed rounds were supplied; historical coverage is unknown."))
+  results <- lapply(seq_len(nrow(done)),function(i) get_official_dreamteam_result(login,championship_id,round_reference(done$round_id[i],done$round_number[i])))
+  rows <- dplyr::bind_rows(lapply(results,function(x) if(x$status=="ok") x$rows[x$rows$is_mvp %in% TRUE,,drop=FALSE] else NULL))
+  ok <- all(vapply(results,function(x)identical(x$status,"ok"),logical(1)))
+  mvp_result(if(ok) "ok" else "partial",rows,paste(unique(vapply(results,function(x)x$reason,character(1))),collapse=" "),complete=ok)
 }
 
 calculate_futmondo_ranking_prizes <- function(money = 30000000, members = 1) {
@@ -2706,6 +2607,56 @@ calculate_futmondo_ranking_prizes <- function(money = 30000000, members = 1) {
     prize = prizes,
     stringsAsFactors = FALSE
   )
+}
+
+build_direct_sell_payload <- function(login, championship_id, team_id, player_id) {
+  list(header=list(token=login[["token"]],userid=login[["userid"]]),
+    query=list(championshipId=as.character(championship_id),userteamId=as.character(team_id),
+      player_id=as.character(player_id)), answer=setNames(list(),character()))
+}
+
+direct_sale_preflight <- function(login, championship_id, team_id, player_id) {
+  denied <- function(code,message) list(ok=FALSE,code=code,message=message)
+  ids <- list(championship_id,team_id,player_id)
+  if(!valid_login(login) || any(!vapply(ids,function(x) is.atomic(x) && length(x)==1L && !is.na(x) && nzchar(trimws(as.character(x))),logical(1))))
+    return(denied("invalid_context","Log in and select an owned player before selling."))
+  # A sale must recheck live ownership; a cached card cannot authorize a write.
+  key <- api_cache_key(paste0("player_summary_",login[["userid"]],"_",championship_id,"_",team_id,"_",player_id),login)
+  if(exists(key,api_cache_env,inherits=FALSE)) rm(list=key,envir=api_cache_env)
+  summary <- tryCatch(get_player_summary(login,championship_id,team_id,player_id),error=function(e)NULL)
+  if(!is.list(summary) || !is.list(summary$data) || !is.list(summary$championship) || identical(attr(summary,"fetch_status"),"stale") ||
+     !identical(fm_scalar(summary$data$id %||% summary$data$`_id`,""),as.character(player_id)))
+    return(denied("unavailable","Current player ownership could not be verified. Refresh before selling."))
+  owner <- summary$championship$owner
+  owner_id <- if(is.list(owner)) fm_scalar(owner$`_id` %||% owner$id,"") else ""
+  if(!identical(owner_id,as.character(team_id))) return(denied("not_owner","This player no longer belongs to your team."))
+  if(!is.list(summary$market)) return(denied("unavailable","Current market status could not be verified."))
+  # The captured direct-sale flow first cancels an existing listing. Never
+  # withdraw a listing implicitly as part of this action.
+  if(any(c("pr","p","vom","pom") %in% names(summary$market)))
+    return(denied("listed","Remove this player's market listing before selling directly to Futmondo."))
+  if(!all(c("bids","direct") %in% names(summary$market)))
+    return(denied("unavailable","The returned market status does not establish that direct selling is available. Refresh before selling."))
+  list(ok=TRUE,code="ok",message="",value=fm_number(summary$data$value))
+}
+
+direct_sell_player <- function(login, championship_id, team_id, player_id) {
+  tryCatch({
+    check <- direct_sale_preflight(login,championship_id,team_id,player_id)
+    if(!isTRUE(check$ok)) return(list(success=FALSE,uncertain=FALSE,code=check$code,message=check$message))
+    response <- futmondo_post(DIRECT_SELL_URL,
+      body=toJSON(build_direct_sell_payload(login,championship_id,team_id,player_id),auto_unbox=TRUE),
+      add_headers(.headers=c("Content-Type"="application/json; charset=utf-8")))
+    answer <- httr::content(response)$answer
+    code <- if(is.list(answer)) fm_scalar(answer$code,"") else ""
+    if(!grepl("^[A-Za-z0-9_.-]{0,100}$",code)) code <- ""
+    http_ok <- httr::status_code(response) %in% 200:299
+    ok <- http_ok && identical(code,API_CODE_OK) && !isTRUE(answer$error)
+    rejected <- http_ok && nzchar(code) && !identical(code,API_CODE_OK)
+    list(success=ok,uncertain=!ok && !rejected,code=code,
+      message=if(ok) "Player sold to Futmondo / Mercado." else if(rejected) paste0("Futmondo rejected the sale (",code,").") else "The sale could not be confirmed. Refresh your roster and funds before trying again.")
+  },error=function(e) list(success=FALSE,uncertain=TRUE,code="unconfirmed",
+    message="The sale could not be confirmed. Refresh your roster and funds before trying again."))
 }
 
 put_player_on_market <- function(login, championship_id, team_id, player_id, price) {

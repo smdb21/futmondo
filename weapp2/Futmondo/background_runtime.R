@@ -56,14 +56,19 @@ persistence_failure_message <- function(issues = list()) {
   if ("schema" %in% categories) return("History could not be saved because the database needs an update. Contact the app administrator.")
   if ("connection" %in% categories) return("History could not be saved because the database connection failed. Use Refresh to retry.")
   if ("runtime" %in% categories) return("Observation saving stopped unexpectedly. Use Refresh to start collection again.")
-  "Some history could not be saved. Use Refresh to retry; if this continues, contact the app administrator."
+  "Some history could not be saved because a write was rejected or its result could not be confirmed. Use Refresh to retry; if this continues, contact the app administrator."
 }
 
 persistence_record_result <- function(job, ok, issues = list()) {
   owner <- job$owner; key <- job$error_key %||% job$key
   failures <- .persistence_state$errors[[owner]]
   if (!is.list(failures)) failures <- list()
-  failures[[key]] <- if (isTRUE(ok)) NULL else persistence_failure_message(issues)
+  details <- vapply(issues,function(issue) paste0(issue$table %||% "unknown",
+    if(!is.null(issue$stage) && nzchar(issue$stage)) paste0("/",issue$stage) else "",
+    if(is.finite(issue$http_status %||% NA_real_)) paste0(" HTTP ",issue$http_status) else "",
+    if(nzchar(issue$code %||% "")) paste0(" ",issue$code) else ""),character(1))
+  failures[[key]] <- if (isTRUE(ok)) NULL else paste(persistence_failure_message(issues),
+    if(length(details)) paste0("Details: ",paste(unique(details),collapse="; ")) else "")
   .persistence_state$errors[[owner]] <- failures
   if (!isTRUE(ok)) message("[Persistence] Incomplete job: ", job$fn %||% "unknown")
 }
@@ -132,15 +137,21 @@ persistence_tick <- function() {
   }
   job <- .persistence_state$active
   if (is.null(job)) { .persistence_state$scheduled <- FALSE; return(invisible(TRUE)) }
-  options(futmondo.persistence_failures=0L, futmondo.persistence_issues=list())
+  options(futmondo.persistence_failures=job$failure_count %||% 0L,
+    futmondo.persistence_issues=job$issues %||% list())
   if (identical(job$fn,"collect_account_observations")) {
     if (is.null(job$collection_state)) job$collection_state <- new_account_observation_collection(job$args[[1]],job$args[[2]],job$args[[3]])
     old_in_session <- getOption("futmondo.in_session_persistence", FALSE)
+    old_stage <- getOption("futmondo.persistence_stage", "")
+    options(futmondo.persistence_stage=job$collection_state$stage)
+    on.exit(options(futmondo.persistence_stage=old_stage),add=TRUE)
     options(futmondo.in_session_persistence=TRUE)
     on.exit(options(futmondo.in_session_persistence=old_in_session), add=TRUE)
     state <- collect_account_observation_step(job$collection_state)
     options(futmondo.in_session_persistence=old_in_session)
     job$collection_state <- state
+    job$failure_count <- getOption("futmondo.persistence_failures",0L)
+    job$issues <- getOption("futmondo.persistence_issues",list())
     .persistence_state$progress[[job$owner]] <- state$message
     if (isTRUE(state$complete)) {
       issues <- getOption("futmondo.persistence_issues",list())
@@ -150,7 +161,9 @@ persistence_tick <- function() {
     } else .persistence_state$active <- job
   } else {
     value <- tryCatch(do.call(job$fn,job$args),error=function(e) FALSE)
-    persistence_record_result(job,!identical(value,FALSE) && getOption("futmondo.persistence_failures",0L)==0L,getOption("futmondo.persistence_issues",list()))
+    http_failed <- identical(job$fn,"supabase_post_direct") &&
+      !(is.numeric(value) && length(value)==1L && is.finite(value) && value>=200 && value<300)
+    persistence_record_result(job,!http_failed && !identical(value,FALSE) && getOption("futmondo.persistence_failures",0L)==0L,getOption("futmondo.persistence_issues",list()))
     .persistence_state$active <- NULL
   }
   if (!is.null(.persistence_state$active) || length(.persistence_state$queue)) later::later(persistence_tick,0.05) else .persistence_state$scheduled <- FALSE

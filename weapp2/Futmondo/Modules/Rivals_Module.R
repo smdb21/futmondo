@@ -280,6 +280,7 @@ tagList(
 rivals_Server <- function(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+    mvp_snapshot <- shared_mvp_source(session,login_token,championship_id,is_module_active,refresh_trigger)
     
     # Observers ----
 
@@ -448,6 +449,11 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
         user_teams_df = teams,
         initial_budget = initial
       )
+      official <- mvp_snapshot()
+      payments <- get_mvp_payment_evidence(login_token(),championship_id(),teams$teamid)
+      attribution <- calculate_mvp_bonuses(official$rows,championship_id(),payments=payments,coverage_complete=official$complete)
+      finances$team_finances <- add_mvp_finance_estimates(finances$team_finances,attribution)
+      finances$mvp_attribution <- attribution
       return(finances)
     })
 
@@ -467,6 +473,10 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
           `Initial Budget` = initial_budget,
           `Squad Investment` = total_spent,
           `Money Left` = budget,
+          `Recorded MVP Income` = mvp_recorded,
+          `Estimated MVP Income` = mvp_estimated,
+          `Known Funds Subtotal` = known_funds_subtotal,
+          `Estimate Coverage` = mvp_status,
           `Squad Value` = team_value,
           `Net Profit/Loss` = net_profit_loss,
           `Squad Size` = squad_size,

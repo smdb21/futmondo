@@ -100,9 +100,12 @@ submitted values use the stable `team:<team_id>` form.
 
 `players_table_normalize_owner(players_df, teams_df = NULL)` accepts a player
 data frame plus the league-team data frame. It reads common normalized owner-ID
-fields (`owner_team_id`, `user_team_id`, and Futmondo aliases), resolves an
-empty player owner name from the league-team ID/name mapping, and returns
-`owner_team_id` and `userTeam` columns. Empty owner IDs remain free agents.
+fields (`owner_team_id`, `user_team_id`, and Futmondo aliases), coalescing them
+row by row when an earlier alias is empty. It resolves an empty player owner
+name from the league-team ID/name mapping, and returns
+`owner_team_id`, `user_team_id` (the same resolved ID), and `userTeam` columns.
+Keeping both ID columns consistent lets selected-player cards and action handlers
+recognize the same owner as the filter. Empty owner IDs remain free agents.
 
 `players_table_owner_choices(teams_df)` returns named select-input choices for
 `All`, `Free agents`, and every named league team. New selections filter by

@@ -140,10 +140,17 @@ players_table_normalize_owner <- function(players_df, teams_df = NULL) {
   if (!is.data.frame(players_df)) return(players_df)
   n <- nrow(players_df)
   text_col <- function(candidates) {
-    key <- candidates[candidates %in% names(players_df)][1]
-    if (is.na(key)) return(rep("",n))
-    value <- trimws(as.character(players_df[[key]]))
-    value[is.na(value)] <- ""
+    # Full-catalog and market rows can carry both a normalized field and its
+    # Futmondo alias. Prefer the first populated value per row: an empty
+    # normalized field must not hide a populated alias such as userteamId.
+    keys <- candidates[candidates %in% names(players_df)]
+    value <- rep("", n)
+    for (key in keys) {
+      candidate <- trimws(as.character(players_df[[key]]))
+      candidate[is.na(candidate)] <- ""
+      use_candidate <- !nzchar(value) & nzchar(candidate)
+      value[use_candidate] <- candidate[use_candidate]
+    }
     value
   }
   owner_id <- text_col(c("owner_team_id","user_team_id","userteamId","userTeamId",
@@ -163,6 +170,7 @@ players_table_normalize_owner <- function(players_df, teams_df = NULL) {
     }
   }
   players_df$owner_team_id <- owner_id
+  players_df$user_team_id <- owner_id
   players_df$userTeam <- owner_name
   players_df
 }

@@ -198,8 +198,11 @@ app_check('same account switches A to B and back without carrying private select
   overrides <- c('get_active_championships','get_teams','get_players_from_team','get_market_players',
     'get_my_market_players','get_championship_players','get_financial_snapshot','get_user_team_info',
     'get_lineup_from_team','get_player_summary','calculate_league_finances','get_notifications',
-    'get_notification_unread','fetch_user_smart_alerts','read_automation_rows','supabase_patch','put_player_on_market')
+    'get_notification_unread','fetch_user_smart_alerts','read_automation_rows','supabase_patch','put_player_on_market',
+    'automation_external_worker_available')
   originals <- mget(overrides,envir=.GlobalEnv,inherits=TRUE)
+  # This fixture exercises worker-only controls using mocked services.
+  automation_external_worker_available <- function(...) TRUE
   b_roster<-app_roster;b_roster$id<-c('p1',paste0('b',2:17));b_roster$name<-paste('B Player',1:17)
   b_roster$value<-3e6;b_roster$points<-b_roster$points+100;b_roster$average.average<-b_roster$average.average+5
   b_roster$average.averageLastFive<-b_roster$average.average

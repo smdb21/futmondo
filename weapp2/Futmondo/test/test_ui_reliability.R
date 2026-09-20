@@ -52,6 +52,17 @@ record('own player never exposes clause purchase eligibility', {
     player_card_can_buy_clause(rival,'mine',TRUE),
     !player_card_can_buy_clause(rival,'mine',FALSE))
 })
+record('rival card resolves owner aliases and preserves own-player protection', {
+  for (field in c('owner_team_id','userteamId','userTeamId','userTeam.id','userteam._id')) {
+    player <- data.frame(id='p',user_team_id=NA_character_,userTeam='Rivals FC')
+    player[[field]] <- ' rival '
+    stopifnot(player_card_location_status(player,'mine')$ownership=='Rival Owned: Rivals FC')
+    player[[field]] <- 'mine'
+    stopifnot(player_card_is_own_player(player,'mine'),
+              !player_card_can_buy_clause(player,'mine',TRUE))
+  }
+  stopifnot(player_card_owner_id(data.frame(user_team_id='',userteamId=NA_character_))=='')
+})
 record('player card offer money uses stable Spanish euro formatting', {
   stopifnot(player_card_money(11234778) == '11.234.778 €',
             player_card_money(-5000.5) == '-5.000 €',
@@ -77,6 +88,18 @@ record('league owner filter uses immutable team IDs and fills blank labels', {
       session$setInputs(team_filter='Free')
       stopifnot(identical(players_table_filtered_RV()$id,'free'))
   })
+})
+record('league owner filter falls back past empty normalized owner aliases', {
+  teams <- data.frame(teamid = 't2', teamname = 'Beta', stringsAsFactors = FALSE)
+  players <- data.frame(
+    owner_team_id = '', user_team_id = '', userteamId = 't2',
+    userTeam = '', `userTeam.name` = 'Beta', stringsAsFactors = FALSE
+  )
+  normalized <- players_table_normalize_owner(players, teams)
+  stopifnot(identical(normalized$owner_team_id, 't2'),
+            identical(normalized$user_team_id, 't2'),
+            player_card_location_status(normalized,'mine')$ownership=='Rival Owned: Beta',
+            identical(normalized$userTeam, 'Beta'))
 })
 record('rival balance estimates require an explicit league budget', {
   teams <- data.frame(teamid='t1',teamname='Team')

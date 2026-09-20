@@ -28,7 +28,8 @@ record_persistence_failure <- function(table_name, http_status = NULL, error_cod
   if (is.null(category)) category <- if (status %in% c(401, 403)) "authorization" else
     if (code %in% c("PGRST204", "PGRST205", "42P01", "42703", "42P10")) "schema" else
     if (is.na(status) || status == 429 || status >= 500) "connection" else "write"
-  issue <- list(table = table_name, category = category, http_status = status, code = code)
+  issue <- list(table = table_name, category = category, http_status = status, code = code,
+    stage=getOption("futmondo.persistence_stage",""))
   options(futmondo.persistence_failures = getOption("futmondo.persistence_failures", 0L) + 1L,
     futmondo.persistence_issues = c(getOption("futmondo.persistence_issues", list()), list(issue)))
   message("[Persistence] table=", table_name, " category=", category,
@@ -64,6 +65,7 @@ supabase_post_direct <- function(table_name, payload, conflict = NULL) {
     response <- POST(url, query = if (!is.null(conflict)) list(on_conflict = conflict) else NULL, body = toJSON(payload, auto_unbox = TRUE, na = "null"), add_headers(.headers = headers), httr::timeout(15), httr::config(connecttimeout = 5))
     code <- status_code(response)
     if (code >= 200 && code < 300) {
+      if(identical(table_name,"round_dream_team")) invalidate_mvp_saved_cache()
       print(paste0("[Supabase] Successfully synced data to table: ", table_name, " (HTTP ", code, ")"))
     } else {
       details <- tryCatch(jsonlite::fromJSON(httr::content(response, as = "text", encoding = "UTF-8")),
@@ -691,98 +693,6 @@ init_supabase_db <- function(verbose = FALSE) {
 # Round Dream Team Sync
 # ============================================================
 
-sync_round_dreamteam_to_supabase <- function(login, championship_id, round_id, round_number) {
-  if (is.null(login) || is.null(championship_id) || is.null(round_id) || is.null(round_number)) {
-    return(0L)
-  }
-
-  tryCatch({
-    ans <- get_round_dreamteam(login, championship_id, round_id)
-
-    if (is.null(ans) || !is.list(ans) || !("players" %in% names(ans)) || !("mvp" %in% names(ans))) {
-      print(paste0("[DreamTeam] No valid dream team data for round ", round_number, "."))
-      return(0L)
-    }
-
-    players_list <- ans$players
-    mvp_id <- as.character(ans$mvp)
-
-    if (is.null(players_list) || length(players_list) == 0) {
-      print(paste0("[DreamTeam] No players in dream team for round ", round_number, "."))
-      return(0L)
-    }
-
-    dreamteam_df <- do.call(rbind, lapply(players_list, function(p) {
-      data.frame(
-        championship_id = as.character(championship_id),
-        round_id = as.character(round_id),
-        round_number = as.numeric(round_number),
-        player_id = as.character(p$id),
-        player_name = as.character(p$name),
-        player_role = as.character(p$role),
-        points = as.integer(p$points),
-        is_mvp = (as.character(p$id) == mvp_id),
-        is_finished = TRUE,
-        stringsAsFactors = FALSE
-      )
-    }))
-
-    supabase_post("round_dream_team", dreamteam_df)
-
-    count <- nrow(dreamteam_df)
-    print(paste0("[DreamTeam] Synced ", count, " players for round ", round_number, "."))
-    return(count)
-  }, error = function(e) {
-    print(paste0("[DreamTeam] Error syncing round ", round_number, ": ", e$message))
-    return(0L)
-  })
-}
-
-sync_all_championship_dreamteams <- function(login, championship_id, verbose = TRUE) {
-  if (is.null(login) || is.null(championship_id)) {
-    if (verbose) print("[DreamTeam] Missing login or championship_id. Skipping.")
-    return(list(status = "skipped", total_rounds = 0L, total_players = 0L))
-  }
-
-  tryCatch({
-    finished_rounds <- get_finished_rounds(login, championship_id)
-
-    if (is.null(finished_rounds) || nrow(finished_rounds) == 0) {
-      if (verbose) print("[DreamTeam] No finished rounds found.")
-      return(list(status = "ok", total_rounds = 0L, total_players = 0L))
-    }
-
-    finished <- finished_rounds[finished_rounds$is_finished == TRUE, ]
-
-    if (nrow(finished) == 0) {
-      if (verbose) print("[DreamTeam] No finished rounds to sync.")
-      return(list(status = "ok", total_rounds = 0L, total_players = 0L))
-    }
-
-    if (verbose) print(paste0("[DreamTeam] Syncing dream teams for ", nrow(finished), " finished round(s)."))
-
-    total_players <- 0L
-    round_results <- list()
-
-    for (i in seq_len(nrow(finished))) {
-      r_id <- as.character(finished$round_id[i])
-      r_num <- as.numeric(finished$round_number[i])
-
-      if (verbose) cat(paste0("  [DreamTeam] Round ", r_num, "... "))
-
-      synced <- sync_round_dreamteam_to_supabase(login, championship_id, r_id, r_num)
-      total_players <- total_players + synced
-      round_results[[as.character(r_num)]] <- synced
-    }
-
-    if (verbose) print(paste0("[DreamTeam] Complete. Total players synced: ", total_players))
-    return(list(status = "ok", total_rounds = nrow(finished), total_players = total_players, per_round = round_results))
-  }, error = function(e) {
-    print(paste0("[DreamTeam] Error syncing all dream teams: ", e$message))
-    return(list(status = "error", message = e$message, total_rounds = 0L, total_players = 0L))
-  })
-}
-
 # ============================================================
 # Intelligence Engine Sync Functions
 # ============================================================
@@ -1069,11 +979,7 @@ populate_entire_database <- function(login, championship_id, verbose = TRUE) {
     if (verbose) cat("[Populate] Step 8: Syncing round dream teams...\n")
     tryCatch({
       dreamteam_result <- sync_all_championship_dreamteams(login, championship_id, verbose)
-      results[["round_dream_team"]] <- list(
-        status = dreamteam_result$status,
-        total_rounds = dreamteam_result$total_rounds,
-        total_players = dreamteam_result$total_players
-      )
+      results[["round_dream_team"]] <- dreamteam_result
     }, error = function(e) {
       if (verbose) print(paste0("[Populate] Step 8 FAILED: ", e$message))
       results[["round_dream_team"]] <- list(status = "error", message = e$message)

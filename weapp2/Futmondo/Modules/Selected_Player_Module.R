@@ -11,9 +11,22 @@ player_card_money <- function(value) {
     scientific = FALSE, trim = TRUE), " €")
 }
 
+player_card_owner_id <- function(player) {
+  if (!is.data.frame(player) || !nrow(player)) return("")
+  for (field in c("owner_team_id", "user_team_id", "userteamId", "userTeamId",
+                  "userTeam._id", "userTeam.id", "userteam._id", "userteam.id")) {
+    if (!field %in% names(player)) next
+    value <- player[[field]][1]
+    if (!is.atomic(value) || length(value) != 1L || is.na(value)) next
+    value <- trimws(as.character(value))
+    if (nzchar(value)) return(value)
+  }
+  ""
+}
+
 player_card_is_own_player <- function(player, current_team_id = NULL) {
   row <- if (is.data.frame(player) && nrow(player)) player[1,,drop=FALSE] else data.frame()
-  owner <- if ("user_team_id" %in% names(row)) trimws(as.character(row$user_team_id[1])) else ""
+  owner <- player_card_owner_id(row)
   current <- if (is.null(current_team_id) || length(current_team_id)!=1L || is.na(current_team_id)) "" else trimws(as.character(current_team_id))
   !is.na(owner) && nzchar(owner) && nzchar(current) && identical(owner,current)
 }
@@ -30,7 +43,7 @@ player_card_location_status <- function(player, current_team_id = NULL) {
     value <- if (name %in% names(row)) as.character(row[[name]][1]) else ""
     if (length(value) != 1L || is.na(value)) "" else trimws(value)
   }
-  owner_id <- text_at("user_team_id")
+  owner_id <- player_card_owner_id(row)
   current_id <- if (is.null(current_team_id) || length(current_team_id) != 1L || is.na(current_team_id)) "" else trimws(as.character(current_team_id))
   owner_name <- text_at("userTeam")
   if (!nzchar(owner_name)) owner_name <- text_at("user_team_name")
@@ -147,8 +160,18 @@ market_offer_decision <- function(sp, preflight) {
 
 
 selected_player_Server <- function(id, selected_player, login_token = NULL, championship_id = NULL, user_team_id = NULL, on_bid_updated = NULL, open_action = NULL, capacity_fetcher = NULL) {
+  # Keep the caller's reactive lazy: parent tables define it after this module.
+  player_source <- function() selected_player()
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+    raw_selected_player <- player_source
+    selected_player <- reactive({
+      row <- raw_selected_player()
+      if (is.data.frame(row) && nrow(row) == 1L) {
+        row$user_team_id <- player_card_owner_id(row)
+      }
+      row
+    })
 
     active_bid_info_RV <- reactiveVal(NULL)
 
@@ -453,6 +476,11 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
             )
             action_buttons <- tagList(own_badge, btn_put_on_market)
           }
+
+          action_buttons <- tagList(action_buttons, actionButton(ns("btn_direct_sell"),
+            label=tagList(icon("money-bill-transfer")," Sell directly to Futmondo"),
+            class="btn btn-danger", disabled=if(is_listed_on_market) "disabled" else NULL,
+            title=if(is_listed_on_market) "Remove the existing listing first." else "Sell to Futmondo without waiting for an offer."))
 
           # Check for received offer on squad player
           has_received_offer <- FALSE
@@ -1373,6 +1401,44 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           type = "error",
           duration = 6
         )
+      }
+    })
+
+    # ---- Direct sale to Futmondo: no received offer is required ----
+    observeEvent(input$btn_direct_sell, {
+      sp <- selected_player()
+      login <- get_reactive_val(login_token)
+      champ_id <- get_reactive_val(championship_id)
+      team_id <- get_reactive_val(user_team_id)
+      req(sp,login,champ_id,team_id,player_card_is_own_player(sp,team_id))
+      check <- direct_sale_preflight(login,champ_id,team_id,sp$id)
+      if(!isTRUE(check$ok)) {
+        showNotification(check$message,type="error");return()
+      }
+      remember_action_context("direct_sell")
+      showModal(modalDialog(title=paste0("Sell ",sp$name," directly to Futmondo?"),
+        p("This immediately sells the player to Futmondo / Mercado without waiting for an offer."),
+        if(is.finite(check$value)) p(paste0("Current market value (reference only): ",player_card_money(check$value))),
+        p("Futmondo determines the sale proceeds. A guaranteed sale price is not available. The player will leave your squad, which may affect your lineup."),
+        footer=tagList(modalButton("Cancel"),actionButton(ns("submit_direct_sell"),"Confirm direct sale",class="btn btn-danger")),
+        easyClose=FALSE,size="s"))
+    })
+
+    observeEvent(input$submit_direct_sell, {
+      req(consume_action_context("direct_sell"))
+      sp <- selected_player()
+      login <- get_reactive_val(login_token)
+      champ_id <- get_reactive_val(championship_id)
+      team_id <- get_reactive_val(user_team_id)
+      req(sp,login,champ_id,team_id,player_card_is_own_player(sp,team_id))
+      result <- direct_sell_player(login,champ_id,team_id,sp$id)
+      removeModal()
+      showNotification(result$message,type=if(isTRUE(result$success)) "message" else "error",duration=8)
+      if(isTRUE(result$success) || isTRUE(result$uncertain)) {
+        clear_api_cache(login[["userid"]])
+        if(is.function(on_bid_updated)) tryCatch(on_bid_updated(
+          action_type=if(isTRUE(result$success)) "player_sold_direct" else "refresh",
+          player_id=sp$id,new_bid_price=NA_real_,is_cancel=FALSE),error=function(e)NULL)
       }
     })
 

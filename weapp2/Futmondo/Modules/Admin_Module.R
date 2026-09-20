@@ -593,17 +593,11 @@ admin_Server <- function(id, is_module_active, login_token, championship_id, use
           verbose = TRUE
         )
 
-        summary_msg <- if (!is.null(result) && result$total_rounds == 0) {
-          "Dream team check complete: No finished rounds to sync yet (the active round is currently in progress). Best 11 and MVP accolades will be stored once the round completes."
-        } else if (!is.null(result) && length(result) > 0) {
-          paste0("Dream team sync complete: ", result$total_rounds, " finished round(s) verified, ", result$total_players, " players and MVPs synced.")
-        } else {
-          "Dream team sync complete."
-        }
+        summary_msg <- mvp_sync_message(result)
 
         showNotification(
           summary_msg,
-          type = "message",
+          type = if(result$status %in% c("ok","queued")) "message" else "warning",
           duration = 8
         )
 

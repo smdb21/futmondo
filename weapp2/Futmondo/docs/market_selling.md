@@ -6,6 +6,16 @@ This document describes the API integration handlers and user workflows for sell
 
 ## 1. API Functions
 
+### Direct sale without an offer
+
+Verified by `app.futmondo.com.direct_sel.har`: `POST /1/market/directsell` accepts `{header:{token,userid}, query:{championshipId,userteamId,player_id}, answer:{}}` and returns `{answer:{code:"api.general.ok"}}` on success. No price or bid ID is submitted. The captured flow withdraws an existing listing before the direct sale; the UI therefore requires users to remove existing listings themselves first.
+
+`build_direct_sell_payload(login, championship_id, team_id, player_id)` returns that payload, preserving the empty JSON object. `direct_sale_preflight(...)` evicts only the selected player's summary cache and fetches fresh data through `get_player_summary()`/`get_cached_data()`. It requires matching player/owner IDs, a non-stale summary and an unlisted market shape; returns `{ok,code,message,value}` (`value` only on success). Summary listing fields `pr`, `p`, `vom` or `pom` block the direct sale. `direct_sell_player(...)` repeats preflight, contains request errors, never retries a trade and returns `{success,uncertain,code,message}`.
+
+Example: `result <- direct_sell_player(login, championship_id, team_id, player_id)` **executes a sale** and is called only after user confirmation. The card shows current market value as a reference, not a guaranteed quote: this capture supplies no guaranteed direct-sale amount. Success emits `player_sold_direct` and refreshes authoritative roster/funds; uncertain responses emit only `refresh` and tell the user to check the outcome. Cash is never adjusted locally. Verified free-agent/rival rows and stale confirmation contexts cannot execute the action.
+
+Focused offline verification: `Rscript test/test_direct_sell.R`. Captured credentials are never replayed.
+
 ### A. `put_player_on_market(login, championship_id, team_id, player_id, price)`
 Lists an individual squad player on the transfer market via `POST https://api.futmondo.com/1/market/putonmarket`.
 * **Parameters**:

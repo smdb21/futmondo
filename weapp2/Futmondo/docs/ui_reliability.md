@@ -2,6 +2,8 @@
 
 ## Market action events
 
+Direct sale to Futmondo emits `player_sold_direct` only after API-confirmed success. An unconfirmed direct-sale response emits `refresh` to reconcile roster and funds without inventing a completed transaction. Both use the shared invalidation callback; no local cash or ownership mutation is applied. See `test/test_direct_sell.R`.
+
 `players_table_Server(..., refresh_trigger = NULL)` accepts the shared Shiny reactive value used to invalidate authenticated data. Its child player module emits `on_bid_updated(action_type, player_id, new_bid_price, is_cancel)` after success. The explicit action is one of `bid_modified`, `bid_cancelled`, `bid_placed`, `owner_offer_placed`, `clause_paid`, `player_listed`, `listing_cancelled`, `offer_accepted`, or `offer_rejected`. Legacy amount/cancellation arguments remain accepted, but they no longer overwrite unrelated bid/listing fields. The table increments its render trigger and the shared snapshot trigger; callers retrieve authoritative roster, market and financial data. Row selection captures the immutable player ID, so refreshed ordering cannot silently change a player action’s target.
 
 Player-card opening uses a separate `player_selection_event_RV` counter. Every valid row-selection event records the immutable player ID, increments the event, opens the card, and clears only the reactable's visual selection with `updateReactable(..., selected = NA_integer_)`. The player identity remains available to the nested action handlers while the modal is open. Because the browser row is no longer left selected, clicking the same row after closing the modal emits a fresh event and reopens the card; table refreshes alone do not reopen it.

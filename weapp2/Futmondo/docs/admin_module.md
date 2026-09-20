@@ -1,5 +1,9 @@
 # Admin Module Documentation
 
+## MVP synchronization result contract (2026-09-20)
+
+`sync_round_dreamteam_to_supabase(login, championship_id, round_id, round_number)` now delegates to `mvp_sync_round()` and returns `{status, fetched, queued, saved, skipped, failed, reason}` rather than an integer. `sync_all_championship_dreamteams(login, championship_id, verbose=TRUE)` delegates to `mvp_sync_all()`, adds `total_rounds` and `per_round`, and retains `total_players` as the **confirmed saved** count. Unverified round catalogs return partial results, never successful zero-history claims. Queued writes are not confirmed saves. `mvp_sync_message(result)` formats these counts for Admin; population retains the full result. `invalidate_mvp_saved_cache()` removes saved-MVP read caches only after a confirmed write. Example: `result <- sync_all_championship_dreamteams(login, championship_id); mvp_sync_message(result)`. These contracts supersede the older sync workflow description below.
+
 This document describes the `Admin_Module.R` Shiny module, which provides database telemetry, schema verification, and a controlled database reset workflow for authorized administrators.
 
 ---
