@@ -1,5 +1,7 @@
 # Background automation
 
+Automation is unavailable in the Posit Connect Cloud free-plan deployment. The app does not store background sessions, create policies, or schedule jobs unless `FUTMONDO_EXTERNAL_AUTOMATION_WORKER=true` is explicitly configured for a separately provisioned external worker. That worker is outside this app deployment; without it, all automation controls remain disabled.
+
 Automation is optional and starts in observation (`shadow`) mode. The application stores an encrypted API session and explicit trading policies. A separate process schedules and validates jobs while Shiny is closed. No live action is enabled merely by creating a policy.
 
 **Current limitation:** the shared league adapter does not yet verify the complete round deadline/solvency contract or all legal formation/club restrictions. Live execution therefore remains unavailable for these leagues, including after fourteen observation days. Lineup submission is not exposed because its write contract is unverified. Models are advisory until chronological validation has been reviewed; the UI cannot mark a model validated.
@@ -94,3 +96,7 @@ Rscript --vanilla test/test_automation_runtime.R
 ```
 
 Tests cover encryption/tampering/expiry; account isolation; cash and API limits; complete commitments; modification deltas; legal XI preservation; target identity/expiry/ownership/offer changes; logical and uncertain API responses; the fourteen-day gate; shadow isolation; the final lease fence; and read-only reconciliation. Migration assertions verify lease retention, token fencing and atomic insertion contracts. Tests do not call live APIs, create background policies, write to Supabase, or apply migrations. PostgreSQL concurrency behavior still requires a staging database migration/integration check before deployment.
+
+## Connected-session run
+
+On Posit Connect Cloud, **Run automation now** performs one explicitly confirmed pass for the authenticated account's currently selected league and team. It re-plans at confirmation, processes at most ten actions, and uses the current browser login rather than storing an encrypted background session. The pass stops with the Shiny session and never schedules a future run. Every action is freshly verified; live actions retain the existing database lease, final execution fence, and uncertain-result lock. A session interruption leaves a claimed action for read-only reconciliation, never automatic replay.

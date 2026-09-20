@@ -1198,7 +1198,8 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       pending<-if(is.list(financial$roster_capacity)) financial$roster_capacity$pending_outbound_ids else character()
       press<-tryCatch(get_championship_pressroom(login_token(),championship_id()),error=function(e)data.frame())
       rank_sale_candidates(squad,positions,target,rules=league_rules_RV(),
-        forecast_df=point_forecasts_RV(),pressroom_df=press,pending_outbound_ids=pending,max_results=5L)
+        forecast_df=point_forecasts_RV(),pressroom_df=press,pending_outbound_ids=pending,max_results=5L,
+        include_all=isTRUE(input$sell_rank_show_all))
     })
     ranking_selected_RV <- reactiveVal(NULL)
     output$sell_ranking_results <- renderUI({

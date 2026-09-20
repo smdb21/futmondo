@@ -13,6 +13,10 @@ shiny::runApp(".")
 The application uses `global.R`, `ui.R` and `server.R`; there is no separate `app.R`. Install the dependencies recorded in `manifest.json` for your R environment. Core packages include Shiny, shinydashboardPlus, dplyr, data.table, httr, jsonlite, reactable, plotly, lpSolve, openssl and later. The observation queue runs cooperatively in the active Shiny session; no separate R child process is required. The regenerated manifest records the full dependency set.
 
 Login fields start empty. Users enter their own Futmondo credentials, select a league, and can switch leagues during the session. Logout clears the session and its API cache. Login passwords and tokens are not printed or deployed.
+## Posit Connect Cloud deployment limits
+
+The app runs on the **Posit Connect Cloud free plan**. Application code has no control over server settings, process lifecycle, background/child processes, cron scheduling, or an always-on worker. Work that runs while the app is open must be cooperative and non-blocking within the active Shiny session; it can be interrupted when that session is suspended or stopped. Use an explicitly configured external service for persistent scheduled or background work.
+
 The desktop navigation sidebar is 180px wide so full menu labels remain readable; the existing responsive mobile navigation is unchanged.
 
 ## Multiple accounts and leagues
@@ -66,24 +70,11 @@ The All Players release-clause affordability filter uses this same verified spen
 
 [Prediction interfaces and evaluation](docs/prediction_engine.md), [dashboard](docs/intelligence_module.md), [UI corrections](docs/ui_reliability.md), [notifications](docs/notifications_module.md).
 
-## Optional unattended worker
+## Automation availability
 
-In Automation, connect an encrypted session and enable observations separately for each league. Observation collection does not require a trading policy and runs every 15 minutes while enabled, rotating through 30 catalog players per pass. Deploy a single observation scheduler; distributed observation leases still require implementation. Pause observations independently of trading. Coach preferences persist per account/league/team after the third migration, but hiring remains unavailable pending a successful endpoint capture.
+Unattended observation and trading automation are **not available** in this Posit Connect Cloud free-plan deployment. The platform cannot host the required persistent worker, scheduler, or service manager. The Automation page therefore disables policy creation, encrypted background sessions, and automatic actions. Manual analysis and transactions remain available.
 
-The app now uses a shared black/green monospace theme without external fonts. The stylesheet is embedded in the UI to avoid stale browser CSS; restart the running Shiny app after stylesheet changes, then reload the page. See [theme](docs/terminal_theme.md), [observation/evaluation contracts](docs/insights_runtime.md) and [joint profit scenarios](docs/portfolio_planner.md). No new R package dependency was introduced by this follow-up. Source timestamps and revisions are retained; legacy unknown timestamps are excluded from predictive training rather than treated as fresh.
-
-Automation is off by default. Deploy the worker separately from Shiny on a host that supports a persistent process. It continues when the browser closes. Generate a random 32-byte base64 `AUTOMATION_SESSION_KEY` in your secret manager and give **the same key** to Shiny and the worker. It encrypts stored API sessions; losing/changing it requires reconnecting accounts. Do not commit or print it.
-
-From this project directory:
-
-```sh
-Rscript scripts/automation_worker.R --once
-Rscript scripts/automation_worker.R
-```
-
-Run the second command under a service manager with automatic restart. Configure the same Supabase secrets and season mapping in both processes. Users connect a session and create explicit per-league policies with allowed players, action types, expiry, acquisition ceilings and sale floors. Pause and reconciliation controls are in the app.
-
-Live execution is gated on fourteen verified observation days, current financial/eligibility checks and model validation when applicable. **Live rollout is not complete:** deadline/solvency and all formation/club restrictions still require contract verification. Lineup submission remains unavailable. Uncertain mutations hold the account lock until positively reconciled. See [automation contracts and recovery](docs/automation.md).
+The worker scripts remain developer-only infrastructure for a separately provisioned external service. They are not a supported deployment path for this application.
 
 ## Deployment and verification
 
@@ -121,3 +112,7 @@ Rscript test/test_shiny_simulation.R
 This is now an offline application lifecycle harness, with HTTP blocked, including login, league switching, module rendering, refresh/logout and authorization checks. Focused scripts and actual results are listed in [delivery status](docs/implementation_status.md). HAR replay tests require the local captures and never use their credentials or send captured requests.
 
 The [roadmap](docs/v3_roadmap.md) distinguishes implemented code from production rollout and validation still pending.
+
+### Connected-session automation
+
+When a user is logged in, **Run automation now** can execute one confirmed pass of enabled policies for the selected league/team. It uses the current login only, processes at most ten actions, and stops if the browser session ends. It does not need a worker, does not schedule later work, and an interrupted claimed action remains locked for reconciliation rather than retrying automatically.

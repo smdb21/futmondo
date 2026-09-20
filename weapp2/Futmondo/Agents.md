@@ -62,3 +62,11 @@ Every developer and AI agent making modifications or additions to the codebase *
 * **Full Suite Only When Warranted**: Running `Rscript test/test_shiny_simulation.R` (the full Shiny simulation suite) is required only for significant or cross-cutting changes, application-startup changes, shared infrastructure changes, or major UI/server flow changes, or when explicitly requested by the user.
 * **Report Test Selection & Results**: Developers and AI agents **MUST** report which test script(s) were selected and their actual results (pass/fail output) as part of the task report.
 * **Fix Failures Before Completion**: Any failed focused test must be fixed and re-run until it passes before the task is considered complete.
+---
+
+## Posit Connect Cloud Free Plan Constraint
+
+* This application is deployed on **Posit Connect Cloud’s free plan**.
+* Do not assume control of the hosting server, R process lifecycle, background/child processes, cron jobs, service configuration, or deployment-wide settings.
+* Implement periodic or deferred work cooperatively inside the active Shiny session, keep it non-blocking, and tolerate session suspension or termination.
+* Features requiring an always-on worker, scheduled execution, custom server configuration, or a process manager must remain optional and use an external service explicitly configured by the user.

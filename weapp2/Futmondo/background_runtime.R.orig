@@ -93,25 +93,9 @@ defer_persistence <- function(fn, args=list()) {
     failures[[error_key]] <- "Background queue full. Use Refresh to retry."; .persistence_state$errors[[owner]] <- failures
     return(FALSE)
   }
-  .persistence_state$queue[[length(.persistence_state$queue)+1L]] <- list(fn=name,args=args,owner=owner,session_id=session_id,key=key,error_key=error_key)
+  .persistence_state$queue[[length(.persistence_state$queue)+1L]] <- list(fn=name,args=args,owner=owner,key=key,error_key=error_key)
   if (!isTRUE(.persistence_state$scheduled)) { .persistence_state$scheduled <- TRUE; later::later(persistence_tick,0) }
   invisible(TRUE)
-}
-
-# Logout prevents queued work from continuing with that browser session's token.
-cancel_persistence_jobs <- function(owner, session_id = NULL) {
-  owner <- fm_scalar(owner, "")
-  if (!nzchar(owner)) return(invisible(0L))
-  matches <- function(job) identical(job$owner, owner) &&
-    (is.null(session_id) || identical(job$session_id, session_id))
-  queued <- .persistence_state$queue
-  dropped <- sum(vapply(queued, matches, logical(1)))
-  .persistence_state$queue <- Filter(function(job) !matches(job), queued)
-  if (!is.null(.persistence_state$active) && matches(.persistence_state$active)) {
-    .persistence_state$active <- NULL; dropped <- dropped + 1L
-  }
-  .persistence_state$progress[[owner]] <- NULL
-  invisible(dropped)
 }
 
 background_sync_status <- function(user_id) {

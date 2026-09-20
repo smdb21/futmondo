@@ -229,8 +229,14 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
     observeEvent(user_teams_RV(), {
       teams <- user_teams_RV()
       req(teams)
-      updateSelectInput(session, inputId = "team_filter",
-        choices = players_table_owner_choices(teams), selected = "All")
+      user_team_names <- teams$teamname %>% sort()
+      # remove the ones that are not in players_table_RV
+      user_team_names <- user_team_names[user_team_names %in% players_table_RV()$userTeam]
+      team_choices <- c("All", "Free")
+      if (length(user_team_names)) {
+        team_choices <- c(team_choices, user_team_names)
+      }
+      updateSelectInput(session, inputId = "team_filter", choices = team_choices, selected = "All")
     })
 
     # observe clear filters button ----

@@ -89,3 +89,28 @@ players <- add_recent_points_average(players, finalized_match_history, n=3L)
 The server obtains the league-wide finalized observations with one cached `read_player_match_history()` call rather than issuing per-player requests. The control uses a fluid Bootstrap row and moves to the left on narrow screens. It does not add a package or environment variable.
 
 Focused verification: `Rscript test/test_recent_points_average.R`. Cross-page rendering is covered by `Rscript test/test_application_offline.R` and the full Shiny simulation.
+
+---
+
+## 9. User Team Owner Filter
+
+The **User Team Owner** selector is built from every league team, even when the
+player feed omits the team display name. Its labels are team names, but its
+submitted values use the stable `team:<team_id>` form.
+
+`players_table_normalize_owner(players_df, teams_df = NULL)` accepts a player
+data frame plus the league-team data frame. It reads common normalized owner-ID
+fields (`owner_team_id`, `user_team_id`, and Futmondo aliases), resolves an
+empty player owner name from the league-team ID/name mapping, and returns
+`owner_team_id` and `userTeam` columns. Empty owner IDs remain free agents.
+
+`players_table_owner_choices(teams_df)` returns named select-input choices for
+`All`, `Free agents`, and every named league team. New selections filter by
+immutable ID; saved name-only selections retain a display-name fallback.
+
+```r
+teams <- data.frame(teamid = "team-7", teamname = "Aurora")
+players <- data.frame(user_team_id = "team-7", userTeam = "")
+players_table_normalize_owner(players, teams)$userTeam
+# [1] "Aurora"
+players_table_owner_choices(teams)["Aurora"]

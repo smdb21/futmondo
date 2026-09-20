@@ -210,3 +210,24 @@ CREATE INDEX IF NOT EXISTS bids_champ_date ON bid_observations(championship_id,s
 CREATE INDEX IF NOT EXISTS jobs_pending ON automation_jobs(status,run_after);
 CREATE INDEX IF NOT EXISTS matches_champ_cutoff ON player_match_observations(championship_id,observed_at);
 COMMIT;
+
+-- Connected-session claim: never scans or claims another account's pending work.
+CREATE OR REPLACE FUNCTION claim_connected_automation_job(p_job_id TEXT,p_user_id TEXT,p_championship_id TEXT,p_user_team_id TEXT)
+RETURNS SETOF automation_jobs LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE candidate automation_jobs; acquired TEXT; token TEXT;
+BEGIN
+  UPDATE automation_jobs j SET status='uncertain', finished_at=NOW(),
+    result=COALESCE(j.result,'{}'::jsonb)||'{"reason":"connected session interrupted; reconciliation required"}'::jsonb
+    FROM automation_account_locks l WHERE j.id=l.job_id AND j.status='running' AND
+      ((j.execution_started_at IS NULL AND l.expires_at<NOW()) OR j.execution_started_at<NOW()-INTERVAL '2 minutes');
+  UPDATE automation_account_locks l SET expires_at='infinity'::timestamptz FROM automation_jobs j WHERE l.job_id=j.id AND j.status='uncertain';
+  SELECT * INTO candidate FROM automation_jobs WHERE id=p_job_id AND user_id=p_user_id AND
+    championship_id=p_championship_id AND user_team_id=p_user_team_id AND status='pending' AND run_after<=NOW() FOR UPDATE;
+  IF NOT FOUND OR EXISTS(SELECT 1 FROM automation_jobs WHERE user_id=p_user_id AND status='uncertain') THEN RETURN; END IF;
+  token := md5(random()::text||clock_timestamp()::text||candidate.id);
+  INSERT INTO automation_account_locks(user_id,job_id,expires_at,lease_token) VALUES(candidate.user_id,candidate.id,NOW()+INTERVAL '2 minutes',token)
+    ON CONFLICT DO NOTHING RETURNING user_id INTO acquired;
+  IF acquired IS NOT NULL THEN RETURN QUERY UPDATE automation_jobs SET status='running',claimed_at=NOW(),lease_token=token WHERE id=candidate.id RETURNING *; END IF;
+END $$;
+REVOKE ALL ON FUNCTION claim_connected_automation_job(TEXT,TEXT,TEXT,TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION claim_connected_automation_job(TEXT,TEXT,TEXT,TEXT) TO service_role;

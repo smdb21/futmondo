@@ -78,7 +78,6 @@ record('league owner filter uses immutable team IDs and fills blank labels', {
       stopifnot(identical(players_table_filtered_RV()$id,'free'))
   })
 })
-record('rival balance estimates require an explicit league budget', {
   teams <- data.frame(teamid='t1',teamname='Team')
   no_budget <- rivals_buying_power_values(data.frame(), teams)
   stopifnot(is.na(no_budget$value), nrow(rivals_buying_power_values(data.frame(),NULL))==0L)

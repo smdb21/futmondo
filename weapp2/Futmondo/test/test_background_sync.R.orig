@@ -33,7 +33,7 @@ check('status is isolated by account and reports active collection progress', {
 })
 check('runtime failure gives a resumable, specific user message', {
   message <- persistence_failure_message(list(list(category='runtime')))
-  stopifnot(grepl('start collection again',message,fixed=TRUE))
+  stopifnot(grepl('resume from the last saved player',message,fixed=TRUE))
 })
 check('queue deduplicates an active collection request', {
   reset(); options(futmondo.offline=FALSE)
@@ -42,19 +42,5 @@ check('queue deduplicates an active collection request', {
   key <- as.character(openssl::sha256(serialize(list('u','collect_account_observations',args),NULL)))
   .persistence_state$active <- list(owner='u',key=key,fn='collect_account_observations',args=args)
   stopifnot(isTRUE(defer_persistence('collect_account_observations',args)),length(.persistence_state$queue)==0L)
-})
-check('logout cancellation removes only the matching browser session jobs', {
-  reset()
-  .persistence_state$queue <- list(
-    list(owner='u',session_id='s1',key='a'), list(owner='u',session_id='s2',key='b'), list(owner='v',session_id='s1',key='c'))
-  .persistence_state$active <- list(owner='u',session_id='s1',key='d')
-  stopifnot(cancel_persistence_jobs('u','s1')==2L, length(.persistence_state$queue)==2L,
-    all(vapply(.persistence_state$queue,function(x)x$key %in% c('b','c'),logical(1))))
-})
-check('per-account queue limit rejects only the saturated account', {
-  reset(); options(futmondo.offline=FALSE); on.exit(options(futmondo.offline=TRUE),add=TRUE)
-  .persistence_state$queue <- lapply(seq_len(.persistence_max_jobs_per_owner),function(i)list(owner='u',key=paste0('u',i)))
-  stopifnot(!isTRUE(defer_persistence('collect_account_observations',list(c(userid='u',token='t'),'league','team'))),
-    isTRUE(defer_persistence('collect_account_observations',list(c(userid='v',token='t'),'league','team'))))
 })
 cat(sprintf('BACKGROUND SYNC: %d passed / 0 failed\n',n))

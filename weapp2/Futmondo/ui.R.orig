@@ -59,10 +59,6 @@ body <- shinydashboard::dashboardBody(
       rivals_UI(id = "rivals")
     ),
     shinydashboard::tabItem(
-      tabName = "plots",
-      plots_UI(id = "plots")
-    ),
-    shinydashboard::tabItem(
       tabName = "classification",
       classification_UI(id = "classification")
     ),

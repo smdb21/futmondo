@@ -1,5 +1,10 @@
 automation_UI <- function(id) {
   ns <- shiny::NS(id)
+  if (FALSE) return(shiny::tagList(
+    shiny::h2("Background automation"),
+    shiny::div(class = "alert alert-warning", automation_unavailable_message()),
+    shiny::p("Observations, policies, encrypted background sessions, and automatic trades are disabled. Manual app features remain available.")))
+
   shiny::tagList(shiny::h2("Background automation"),
     shiny::p("Policies start in observation mode. Live actions require 14 verified observation days, current league rules, and your declared limits."),
     shiny::uiOutput(ns("connection_status")),
@@ -42,6 +47,10 @@ automation_Server <- function(id,is_module_active,login_token,championship_id,us
     policies<-shiny::reactiveVal(list())
     account_jobs<-shiny::reactiveVal(list())
     session_rows<-shiny::reactiveVal(list())
+    if (!automation_external_worker_available()) {
+      output$connection_status <- shiny::renderUI(shiny::div(class = "alert alert-warning", automation_unavailable_message()))
+      return(invisible(NULL))
+    }
     reconciliation_message<-shiny::reactiveVal("")
     shiny::observeEvent(list(login_token(),championship_id()),{
       policies(list());account_jobs(list());session_rows(list());reconciliation_message("")
@@ -106,6 +115,16 @@ automation_Server <- function(id,is_module_active,login_token,championship_id,us
       if(!isTRUE(paused) || !isTRUE(deleted)) shiny::showNotification("Background disconnect could not be fully confirmed. Refresh and retry.",type="error")
       tick(tick()+1L)
     })
+    run_result <- shiny::reactiveVal(NULL)
+    shiny::observeEvent(input$run_now, {
+      auth <- login_token(); shiny::req(valid_login(auth), championship_id(), user_team_id())
+      showModal(modalDialog(title="Run automation now?","This one-time pass rechecks current-league policies, may execute eligible live actions, and stops when the session ends.",footer=tagList(modalButton("Cancel"),actionButton(ns("confirm_run_now"),"Confirm run",class="btn-danger"))))
+    })
+    shiny::observeEvent(input$confirm_run_now, {
+      removeModal(); auth <- login_token(); shiny::req(valid_login(auth),championship_id(),user_team_id())
+      run_result(list(status="running")); run_result(tryCatch(run_connected_automation_pass(auth,championship_id(),user_team_id(),10L),error=function(e)list(error="Automation pass could not complete."))); tick(tick()+1L)
+    })
+    output$run_status <- shiny::renderUI({ r<-run_result(); if(is.null(r)) return(NULL); if(identical(r$status,"running")) return(p("Automation pass is running…")); if(!is.null(r$error)) return(div(class="alert alert-warning",r$error)); p("Automation pass complete. Refresh history for details.") })
     shiny::observeEvent(input$save_policy,{
       shiny::req(valid_login(login_token()),championship_id(),user_team_id(),length(input$targets)>0)
       expiry<-paste0(as.character(input$expiry),"T23:59:59Z")

@@ -204,8 +204,6 @@ players_in_championship_Server(id = "players_in_championship",
 observeEvent(login_token_RV(),
                 {
                   if (!valid_login(login_token_RV())) {
-                    cancel_persistence_jobs(session$userData$futmondo_user_id,
-                      session$token)
                     session$userData$futmondo_user_id <- NULL
                     updateTabItems(session, "tabs", "login")
                     return()

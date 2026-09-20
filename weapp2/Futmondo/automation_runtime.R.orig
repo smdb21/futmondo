@@ -203,8 +203,7 @@ automation_services <- function() list(
   financial=get_financial_snapshot, roster=get_players_from_team,
   summary=get_player_summary, market=get_market_players, listings=get_my_market_players,
   offers=get_roster_bids, memberships=get_active_championships,
-  execute=execute_automation_action, begin=begin_automation_execution, finish=finish_automation_job,
-  insert=insert_automation_job, claim=claim_connected_automation_job,
+  execute=execute_automation_action, begin=begin_automation_execution,
   clear_cache=clear_api_cache, now=Sys.time)
 
 # Query actual account-scoped targets, not stale catalog rows. Every action

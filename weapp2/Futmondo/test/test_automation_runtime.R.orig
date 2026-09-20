@@ -1,6 +1,5 @@
 #!/usr/bin/env Rscript
 options(futmondo.offline=TRUE)
-Sys.setenv(FUTMONDO_EXTERNAL_AUTOMATION_WORKER='true')
 suppressPackageStartupMessages({source("futmondo_functions.R");source("supabase_connector.R");source("intelligence_engine.R");source("automation_runtime.R")})
 passed<-0L
 check<-function(name,expr){force(expr);passed<<-passed+1L;cat("PASS",name,"\n")}

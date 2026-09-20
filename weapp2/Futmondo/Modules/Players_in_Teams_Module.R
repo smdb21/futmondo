@@ -30,8 +30,7 @@ players_in_teams_UI <- function(id) {
           filter_by_is_from_futmondo = FALSE,
           show_position_breakdown = TRUE,
           hide_bid_column = FALSE
-        ),
-        uiOutput(ns("charts_row")) # Dynamic Plot B & Plot C Container
+        )
       ),
       # ================================================================
       # TAB 2: Lineup Optimizer

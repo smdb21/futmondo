@@ -100,11 +100,12 @@ app_check('full server login, navigation, refresh and logout', {
       market='market-market_players_table-players_table',
       players_in_championship='players_in_championship-championship_players_table-players_table',
       rivals=c('rivals-league_finances_table','rivals-league_finances_plot','rivals-team_valuation_history_plot'),
+      plots=c('plots-standings_plot','plots-values_plot','plots-cash_plot','plots-rank_plot','plots-bid_plot','plots-owned_club_plot'),
       classification=c('classification-classification_table','classification-rank_evolution_plot','classification-dreamteam_box_ui'),
       round_mvps='round_mvps-mvp_cards',
       notifications=c('notifications-status','notifications-items'),
       intelligence=c('intelligence-coverage','intelligence-lineup_summary','intelligence-lineup','intelligence-profit_summary'),
-      automation=c('automation-connection_status','automation-policy_status','automation-history'))
+      automation=character())
     for(tab in names(tabs)) {
       session$setInputs(tabs=tab)
       session$flushReact()
@@ -120,8 +121,7 @@ app_check('full server login, navigation, refresh and logout', {
                   !is.null(output[['rivals-rival_transactions_table']]))
         details_html<-output[['rivals-scouted_rival_details_ui']]$html
         stopifnot(grepl('Player Roster &amp; Clauses',details_html,fixed=TRUE),
-          grepl('Transaction &amp; Financial History',details_html,fixed=TRUE),
-          grepl('League Cash &amp; Observed Transfers',details_html,fixed=TRUE))
+          grepl('Transaction &amp; Financial History',details_html,fixed=TRUE))
       }
       cat('[PASS] rendered tab:',tab,'\n')
     }

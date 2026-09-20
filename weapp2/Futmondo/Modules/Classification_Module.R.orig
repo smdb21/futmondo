@@ -11,6 +11,7 @@ classification_UI <- function(id) {
     fluidRow(box(width = 12, title = "Matchday results", status = "primary", solidHeader = TRUE,
       fluidRow(column(6, sliderInput(ns("round_range_slider"), "Points between rounds", min = 1, max = 38, value = c(1, 38))),
                column(6, selectInput(ns("single_round_select"), "Inspect one round", choices = c("All rounds" = "all")))))),
+    fluidRow(box(width = 12, title = "Rank progression", plotlyOutput(ns("rank_evolution_plot"), height = "320px"))),
     fluidRow(box(width = 12, title = "Standings", uiOutput(ns("classification_status")), reactableOutput(ns("classification_table")))),
     fluidRow(box(width = 12, title = "Dream team and configured rewards", uiOutput(ns("dreamteam_box_ui"))))
   )
