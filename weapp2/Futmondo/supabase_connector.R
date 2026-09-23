@@ -37,7 +37,7 @@ record_persistence_failure <- function(table_name, http_status = NULL, error_cod
   invisible(issue)
 }
 
-supabase_post_direct <- function(table_name, payload, conflict = NULL) {
+supabase_post_direct <- function(table_name, payload, conflict = NULL, ignore_duplicates = FALSE) {
   if (isTRUE(getOption("futmondo.offline", FALSE))) return(NULL)
   if (is.null(payload) || (is.data.frame(payload) && nrow(payload) == 0) || (is.list(payload) && length(payload) == 0)) {
     return(NULL)
@@ -57,7 +57,7 @@ supabase_post_direct <- function(table_name, payload, conflict = NULL) {
     "apikey" = sb_key,
     "Authorization" = paste("Bearer", sb_key),
     "Content-Type" = "application/json",
-    "Prefer" = "resolution=merge-duplicates" # Upsert on PK matching
+    "Prefer" = if (isTRUE(ignore_duplicates)) "resolution=ignore-duplicates" else "resolution=merge-duplicates"
   )
   
   # Perform request defensively
@@ -404,11 +404,45 @@ get_league_finances_history <- function(championship_id) {
   return(df)
 }
 
-sync_pressroom_transactions_to_supabase <- function(pressroom_df, championship_id) {
+sync_pressroom_transactions_to_supabase <- function(pressroom_df, championship_id, deferred = FALSE) {
   if (is.null(pressroom_df) || nrow(pressroom_df) == 0) return()
 
   required_cols <- c("player_id", "buyer_team_id", "seller_team_id", "price", "created")
   if (!all(required_cols %in% colnames(pressroom_df))) return()
+
+  if (isTRUE(deferred)) {
+    previous <- getOption("futmondo.in_session_persistence", FALSE)
+    options(futmondo.in_session_persistence = TRUE)
+    on.exit(options(futmondo.in_session_persistence = previous), add = TRUE)
+  }
+
+  # Keep dependent writes together when called from an interactive session.
+  domain <- if (requireNamespace("shiny", quietly = TRUE)) shiny::getDefaultReactiveDomain() else NULL
+  if (!isTRUE(getOption("futmondo.in_session_persistence", FALSE)) &&
+      !is.null(domain) && exists("defer_persistence", mode = "function")) {
+    return(defer_persistence("sync_pressroom_transactions_to_supabase", list(pressroom_df, championship_id, TRUE)))
+  }
+  if (isTRUE(getOption("futmondo.offline", FALSE))) return(invisible(FALSE))
+  ids <- as.character(pressroom_df$player_id)
+  if (anyNA(ids) || any(!nzchar(trimws(ids)))) {
+    record_persistence_failure("players", category = "write")
+    return(invisible(FALSE))
+  }
+  player_names <- if ("player_name" %in% names(pressroom_df)) as.character(pressroom_df$player_name) else ids
+  unknown <- is.na(player_names) | !nzchar(trimws(player_names))
+  player_names[unknown] <- ids[unknown]
+  # A historical feed has no slug: empty means unknown, not an invented URL.
+  parents <- data.frame(id = ids, name = player_names, slug = "", stringsAsFactors = FALSE)
+  parents <- parents[order(unknown), , drop = FALSE]
+  parents <- parents[!duplicated(parents$id), , drop = FALSE]
+  for (start in seq.int(1L, nrow(parents), by = 200L)) {
+    batch <- parents[start:min(start + 199L, nrow(parents)), , drop = FALSE]
+    status <- supabase_post_direct("players", batch, conflict = "id", ignore_duplicates = TRUE)
+    if (!is.numeric(status) || length(status) != 1L || is.na(status) || status < 200 || status >= 300) {
+      record_persistence_failure("players", category = "write")
+      return(invisible(FALSE))
+    }
+  }
 
   # Sanitize buyer_team_id and seller_team_id: empty strings or invalid values become NA_character_
   # which serializes to null in JSON for PostgreSQL ON DELETE SET NULL FK compatibility
