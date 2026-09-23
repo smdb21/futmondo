@@ -80,6 +80,9 @@ check("global UI exposes countdown and deadline solvency warning", {
   css <- paste(readLines("www/custom_style.css",warn=FALSE),collapse="\n")
   stopifnot(grepl('uiOutput("round_countdown")',ui,fixed=TRUE),
     grepl('output$round_countdown <- renderUI',server,fixed=TRUE),
+    grepl('round_finance_RV <- reactive',server,fixed=TRUE),
+    grepl('invalidateLater(60000, session)',server,fixed=TRUE),
+    grepl('finance <- round_finance_RV()',server,fixed=TRUE),
     grepl('Active offers:',server,fixed=TRUE),
     grepl('commitment_snapshot$total_amount',server,fixed=TRUE),
     grepl('After offers:',server,fixed=TRUE),
@@ -88,5 +91,13 @@ check("global UI exposes countdown and deadline solvency warning", {
     grepl("before kickoff to score points",server,fixed=TRUE),
     grepl('tags$span("In progress")',server,fixed=TRUE),
     grepl("position: sticky",css,fixed=TRUE),grepl("@media (max-width: 767px)",css,fixed=TRUE))
+})
+check("countdown clock and financial refresh use separate intervals", {
+  server <- paste(readLines("server.R",warn=FALSE),collapse="\n")
+  finance_start <- regexpr("round_finance_RV <- reactive",server,fixed=TRUE)[1]
+  countdown_start <- regexpr("output$round_countdown <- renderUI",server,fixed=TRUE)[1]
+  stopifnot(finance_start > 0, countdown_start > finance_start,
+    grepl("invalidateLater(60000, session)",substr(server,finance_start,countdown_start-1),fixed=TRUE),
+    grepl("invalidateLater(1000, session)",substr(server,countdown_start,nchar(server)),fixed=TRUE))
 })
 cat(sprintf("DEBT AND ROUND COUNTDOWN: %d passed / 0 failed\n",passed))

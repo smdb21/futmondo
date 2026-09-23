@@ -34,6 +34,16 @@ function(input, output, session) {
   championship_id_RV <- reactive({ req(championship_RV()); unname(championship_RV()["id"]) })
   user_team_id_RV <- reactive({ req(championship_RV()); unname(championship_RV()["userteam.id"]) })
   user_team_name_RV <- reactive({ req(championship_RV()); unname(championship_RV()["userteam.name"]) })
+  # Keep the clock smooth without rebuilding the expensive acquisition and
+  # pressroom-backed financial snapshot every second. Explicit refreshes and
+  # market events still invalidate this reactive immediately.
+  round_finance_RV <- reactive({
+    req(valid_login(login_token_RV()), championship_id_RV(), user_team_id_RV())
+    refresh_trigger()
+    invalidateLater(60000, session)
+    tryCatch(get_financial_snapshot(login_token_RV(), championship_id_RV(), user_team_id_RV()),
+      error = function(e) NULL)
+  })
   output$round_countdown <- renderUI({
     invalidateLater(1000, session)
     if (!valid_login(login_token_RV())) {
@@ -54,8 +64,7 @@ function(input, output, session) {
       return(tags$div(class = "round-countdown-bar round-countdown-unavailable",
         icon("clock"), tags$span("Round schedule unavailable")))
     }
-    finance <- tryCatch(get_financial_snapshot(login_token_RV(), championship_id_RV(), user_team_id_RV()),
-      error = function(e) NULL)
+    finance <- round_finance_RV()
     cash <- if (is.list(finance)) fm_number(finance$cash) else NA_real_
     # commitments is a structured snapshot, not a scalar: retain both the
     # held amount and the number of active outgoing offers for the top bar.

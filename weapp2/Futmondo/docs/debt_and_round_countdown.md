@@ -6,6 +6,8 @@ This temporary borrowing rule does not make a negative balance safe at kickoff. 
 
 `acquisition_headroom(cash,team_value,withheld=0,commitments=0,debt_fraction=0.5)` returns `spendable_budget`, `debt_limit`, `minimum_balance`, `projected_committed_balance`, and `reserved_amount`. Invalid or missing values return `NA` fields. `next_round_context(rounds,now=Sys.time())` accepts normalized `round_number` and `begin_process` columns and returns the earliest future round. `format_round_countdown(starts_at,now=Sys.time())` returns a fixed `Dd HHh MMm SSs` string.
 
+The countdown text updates every second. Its financial snapshot is held in a separate session reactive and refreshes every 60 seconds, or immediately after the global refresh trigger changes (including confirmed market events). This prevents the top bar from repeatedly rebuilding acquisition capacity and scanning the paginated pressroom feed while preserving a live clock.
+
 ```r
 headroom <- acquisition_headroom(cash=-1000000,team_value=20000000)
 stopifnot(headroom$minimum_balance == -10000000,
