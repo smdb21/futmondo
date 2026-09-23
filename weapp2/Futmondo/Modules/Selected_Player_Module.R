@@ -308,13 +308,22 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       role <- if ("role" %in% names(sp) && !is.na(sp$role)) as.character(sp$role) else "Position unavailable"
       team <- if ("team" %in% names(sp) && !is.na(sp$team) && nzchar(as.character(sp$team))) as.character(sp$team) else "Team unavailable"
       photo <- if ("photo" %in% names(sp) && !is.na(sp$photo) && nzchar(as.character(sp$photo))) paste0(PHOTO_URL, "/", sp$photo) else SPACER_GIF
+      team_logo_field <- if ("logo" %in% names(sp) && !is.na(sp$logo) && nzchar(as.character(sp$logo))) as.character(sp$logo) else NULL
+      team_image_name <- if (identical(team, "Team unavailable")) "" else get_team_image_name(team, logo = team_logo_field)
+      team_logo <- if (nzchar(team_image_name)) {
+        img(src = paste0(TEAM_LOGO_URL, team_image_name, ".png"),
+          class = "player-card-identity-team-logo", alt = paste0(team, " logo"),
+          onerror = "this.style.display=\"none\";")
+      } else NULL
       location <- player_card_location_label(sp, get_reactive_val(user_team_id))
       div(class = "player-card-identity",
         img(src = photo, class = "player-card-identity-photo", alt = player_name,
           onerror = paste0("this.src='", SPACER_GIF, "';")),
         div(class = "player-card-identity-details",
           div(class = "player-card-identity-name", player_name),
-          div(class = "player-card-identity-meta", paste(role, "·", team)),
+          div(class = "player-card-identity-meta",
+            team_logo,
+            span(paste(role, "·", team))),
           div(class = "player-card-identity-location", icon("location-dot"), " ", location)
         )
       )

@@ -31,6 +31,14 @@ record('player card hides the legacy userBox header', {
   stopifnot(grepl("[id$='selected_player_box'] .widget-user-header", css, fixed=TRUE),
             grepl("[id$='selected_player_box'] .widget-user-image", css, fixed=TRUE))
 })
+record('player card keeps the team logo in the visible identity row', {
+  source_text <- paste(readLines('Modules/Selected_Player_Module.R', warn=FALSE), collapse='\n')
+  css <- paste(readLines('www/custom_style.css', warn=FALSE), collapse='\n')
+  stopifnot(grepl('player-card-identity-team-logo', source_text, fixed=TRUE),
+            grepl('get_team_image_name(team, logo = team_logo_field)', source_text, fixed=TRUE),
+            grepl('TEAM_LOGO_URL, team_image_name', source_text, fixed=TRUE),
+            grepl('.player-card-identity-team-logo', css, fixed=TRUE))
+})
 record('player card location distinguishes ownership from market listing', {
   stopifnot(player_card_location_label(data.frame(), 'mine') ==
       'Ownership: Free Agent · Market: Not listed on Market',
@@ -318,4 +326,4 @@ record('scenario save scopes data and restore retains stale IDs for validation',
   stopifnot('old-player'%in%updates$sandbox_sells$choices,updates$sandbox_sells$selected=='old-player',
             'new-target'%in%updates$sandbox_buys$choices,updates$sandbox_buys$selected=='new-target')
 })
-cat('UI reliability: 14 checks passed.\n')
+cat('UI reliability: 15 checks passed.\n')

@@ -1082,6 +1082,7 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 .player-card-identity-details { min-width: 0; }
 .player-card-identity-name { font-size: 20px; font-weight: 800; color: var(--fm-text); overflow-wrap: anywhere; }
 .player-card-identity-meta { margin-top: 2px; font-size: 13px; color: var(--fm-muted); overflow-wrap: anywhere; }
+.player-card-identity-team-logo { width: 20px; height: 20px; margin-right: 6px; vertical-align: middle; object-fit: contain; background: transparent; }
 .player-card-identity-location { margin-top: 6px; font-size: 12px; font-weight: 700; color: var(--fm-text); overflow-wrap: anywhere; }
 @media (max-width: 768px) { .player-card-identity { gap: 10px; } .player-card-identity-photo { width: 52px; height: 52px; flex-basis: 52px; } .player-card-identity-name { font-size: 18px; } }
 
