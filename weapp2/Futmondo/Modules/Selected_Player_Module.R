@@ -2538,8 +2538,7 @@ player_match_points_trace <- function(rows) {
   stamps <- if ("occurred_at" %in% names(rows)) as.character(rows$occurred_at) else rep(NA_character_,nrow(rows))
   if ("round_start_at" %in% names(rows)) stamps[is.na(stamps) | !nzchar(stamps)] <- as.character(rows$round_start_at[is.na(stamps) | !nzchar(stamps)])
   if ("observed_at" %in% names(rows)) stamps[is.na(stamps) | !nzchar(stamps)] <- as.character(rows$observed_at[is.na(stamps) | !nzchar(stamps)])
-  stamp_clean <- gsub("Z$", "", gsub("T", " ", stamps))
-  dates <- suppressWarnings(as.POSIXct(stamp_clean, tz="UTC"))
+  dates <- fm_time(stamps)
   keep <- final & is.finite(points) & is.finite(rounds) & !is.na(dates)
   if (!any(keep)) return(empty)
   out <- data.frame(date=dates[keep], points=points[keep], round_number=rounds[keep], stringsAsFactors=FALSE)
@@ -2562,7 +2561,7 @@ player_summary_points_trace <- function(summary, finished_rounds_df = NULL) {
     finished_rounds_df[finished, , drop=FALSE]
   } else data.frame()
   current_round <- suppressWarnings(as.numeric(summary$match$r$number %||% NA_real_))
-  dates <- if (nrow(rounds)) suppressWarnings(as.POSIXct(gsub("Z$", "", gsub("T", " ", as.character(rounds$begin_process))), tz="UTC")) else as.POSIXct(character(0))
+  dates <- if (nrow(rounds)) fm_time(rounds$begin_process) else as.POSIXct(character(0))
   out <- lapply(as.list(points), function(point) {
     round <- suppressWarnings(as.numeric(point$round)); score <- suppressWarnings(as.numeric(point$points))
     if (!is.finite(round) || !is.finite(score)) return(NULL)
@@ -2571,7 +2570,7 @@ player_summary_points_trace <- function(summary, finished_rounds_df = NULL) {
     if (!nrow(rounds) && is.finite(current_round) && round >= current_round) return(NULL)
     # The points plot is indexed by round. Keep a deterministic timestamp for
     # trace consumers that still expect a date column.
-    date <- if (length(idx) == 1L) dates[idx] else as.POSIXct("1970-01-01", tz="UTC") + round * 86400
+    date <- if (length(idx) == 1L && !is.na(dates[idx])) dates[idx] else as.POSIXct("1970-01-01", tz="UTC") + round * 86400
     data.frame(date=date, points=score, round_number=round, stringsAsFactors=FALSE)
   })
   out <- Filter(Negate(is.null), out)

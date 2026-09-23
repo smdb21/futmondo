@@ -2,6 +2,8 @@
 
 Player-card history outputs treat malformed, unavailable, and all-invalid persistence rows as empty evidence. The valuation chart falls back to the current finite value (or a neutral placeholder when unavailable), while the recent-round panel validates its round/points columns and shows an explanatory empty state. These fallbacks prevent Shiny's generic render error from replacing the card when historical persistence is incomplete.
 
+Round timestamps use the shared tolerant UTC parser. Invalid stored timestamps are excluded; an explicitly finalized summary score with an invalid boundary timestamp receives a deterministic internal fallback date because the visible chart is indexed by round number.
+
 This document describes the `Selected_Player_Module.R` Shiny module, which renders detailed player profile cards, performance history plots, and interactive player acquisition features.
 
 The historical chart has a **Valuation / Round points** switch. Valuation uses the price series alone; Round points shows one finalized score per round, sourced first from stored `player_match_observations` and then from the current player-summary response. The database schema for those observations already exists in the 20260905 and 20260907 migrations; they must be applied to the connected database for persistent full-round history.

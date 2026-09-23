@@ -123,6 +123,16 @@ check('player-summary fallback returns only explicitly finished rounds', {
   trace <- player_summary_points_trace(summary, rounds)
   stopifnot(trace$has_points, identical(trace$points_df$round_number, 1), identical(trace$points_df$points, 4))
 })
+check('malformed Futmondo timestamps cannot crash points traces', {
+  stored <- data.frame(round=1,points=4,score_status='final',
+    occurred_at='not-a-date',round_start_at=NA_character_,observed_at=NA_character_)
+  stopifnot(!player_match_points_trace(stored)$has_points)
+  summary <- list(points=list(list(round=1,points=4)))
+  rounds <- data.frame(round_number=1,begin_process='not-a-date',is_finished=TRUE)
+  trace <- player_summary_points_trace(summary,rounds)
+  stopifnot(trace$has_points,trace$points_df$points==4,
+    is.finite(as.numeric(trace$points_df$date)))
+})
 
 check('player-summary fallback uses prior scores when historic round boundaries are absent', {
   summary <- list(match=list(r=list(number=3)), points=list(list(round=1,points=4),list(round=2,points=8),list(round=3,points=2)))
