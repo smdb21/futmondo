@@ -1699,15 +1699,17 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
       # ---- Valuation series (with pre-season simulated fallback) ----
       val_df <- NULL
-      if (!is.null(history_df) && nrow(history_df) > 0 && "value" %in% colnames(history_df)) {
+      if (is.data.frame(history_df) && nrow(history_df) > 0 && "value" %in% colnames(history_df)) {
         val_df <- history_df
       } else {
         # Fallback simulated valuation only when DB is empty/unconfigured.
         # NOTE: no points are fabricated here (points trace is built separately).
         today <- Sys.time()
         dates <- seq(today - as.difftime(6, units="days"), today, by="1 day")
-        val_today <- if ("value" %in% colnames(sp)) as.numeric(sp$value) else 1000000
-        val_change <- if ("change" %in% colnames(sp)) as.numeric(sp$change) else 0
+        val_today <- if ("value" %in% colnames(sp)) suppressWarnings(as.numeric(sp$value[1])) else NA_real_
+        val_change <- if ("change" %in% colnames(sp)) suppressWarnings(as.numeric(sp$change[1])) else NA_real_
+        if (!is.finite(val_today)) val_today <- 1000000
+        if (!is.finite(val_change)) val_change <- 0
 
         val_df <- data.frame(
           recorded_at = as.character(dates),
@@ -1719,6 +1721,11 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       val_df$date <- as.POSIXct(parse_safe_datetime(val_df$recorded_at))
       val_df$value <- suppressWarnings(as.numeric(as.character(val_df$value)))
       val_df <- val_df %>% dplyr::filter(!is.na(date), is.finite(value)) %>% dplyr::arrange(date)
+      if (!nrow(val_df)) {
+        current_value <- if ("value" %in% colnames(sp)) suppressWarnings(as.numeric(sp$value[1])) else NA_real_
+        if (!is.finite(current_value)) current_value <- 1000000
+        val_df <- data.frame(date = Sys.time(), value = current_value)
+      }
 
       # ---- Points series: one marker per completed round; graceful no-points ----
       # Fetch finished rounds defensively; points are only rendered when round
@@ -1873,9 +1880,12 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       stored_round_history <- if (!is.null(champ_id) && !is.null(sp$id)) tryCatch(
         get_player_round_points_history(sp$id, champ_id), error=function(e) NULL) else NULL
       stored_trace <- player_match_points_trace(stored_round_history)
-      recent <- if (stored_trace$has_points) {
+      recent <- if (is.list(stored_trace) && isTRUE(stored_trace$has_points) && is.data.frame(stored_trace$points_df)) {
         tail(stored_trace$points_df, 5L)[order(tail(stored_trace$points_df, 5L)$round_number, decreasing=TRUE), , drop=FALSE]
       } else latest_player_round_points(history,rounds,limit=5L)
+      if (!is.data.frame(recent) || !all(c("round_number", "points") %in% names(recent))) {
+        recent <- data.frame(round_number=numeric(), points=numeric())
+      }
       if (!nrow(recent) && !is.null(login) && !is.null(champ_id) && !is.null(sp$id)) {
         summary <- tryCatch(get_player_summary(login, champ_id, get_reactive_val(user_team_id), sp$id), error = function(e) NULL)
         summary_trace <- player_summary_points_trace(summary, rounds)
@@ -2584,7 +2594,7 @@ latest_player_round_points <- function(history_df,finished_rounds_df,limit=5L) {
 # Explain an empty completed-round breakdown without hiding a known aggregate total.
 recent_round_points_empty_text <- function(aggregate_points) {
   total <- suppressWarnings(as.numeric(as.character(aggregate_points)[1]))
-  if (is.finite(total) && total > 0) {
+  if (length(total) == 1L && is.finite(total) && total > 0) {
     paste0("Total points: ", format(total, trim=TRUE, scientific=FALSE),
       ". Completed-round breakdown is unavailable.")
   } else {

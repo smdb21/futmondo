@@ -101,6 +101,14 @@ check('empty history fallback has a usable valuation range', {
   stopifnot(length(chart$data) == 1L, length(chart$data[[1]]$y) == 7L)
   assert_visible(chart$data[[1]]$y, chart$layout$yaxis$range)
 })
+check('malformed and unusable history fall back to a valid valuation point', {
+  malformed <- render_fixture(list(value=100))
+  invalid <- render_fixture(data.frame(recorded_at=c('bad',NA),value=c('bad',Inf)))
+  for (chart in list(malformed,invalid)) {
+    stopifnot(length(chart$data)==1L, length(chart$data[[1]]$y)>=1L,
+      all(is.finite(as.numeric(chart$data[[1]]$y))))
+  }
+})
 
 check('stored finalized match observations are the primary round-points source', {
   rows <- data.frame(round=c(1,2,2,3),points=c(4,8,9,NA),score_status=c('final','final','final','provisional'),
@@ -143,7 +151,8 @@ check('empty latest-round panel keeps a known aggregate score visible', {
   stopifnot(
     recent_round_points_empty_text(10) == 'Total points: 10. Completed-round breakdown is unavailable.',
     recent_round_points_empty_text(0) == 'No completed-round points recorded yet',
-    recent_round_points_empty_text(NA_real_) == 'No completed-round points recorded yet'
+    recent_round_points_empty_text(NA_real_) == 'No completed-round points recorded yet',
+    recent_round_points_empty_text(NULL) == 'No completed-round points recorded yet'
   )
 })
 
