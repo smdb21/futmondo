@@ -35,6 +35,12 @@ player_card_can_buy_clause <- function(player,current_team_id,clause_open) {
   isTRUE(clause_open) && !player_card_is_own_player(player,current_team_id)
 }
 
+# The first valid player context follows the loading shell and must not dismiss
+# it. Once a player context has existed, any later change invalidates its modal.
+player_card_context_changed <- function(previous_context, current_context) {
+  !is.null(previous_context) && !identical(previous_context, current_context)
+}
+
 # Compact ownership/market wording for the player-card header. A free agent is
 # not assumed to be listed: market status requires an explicit flag or asking price.
 player_card_location_status <- function(player, current_team_id = NULL) {
@@ -212,10 +218,14 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       list(user=fm_scalar(auth[["userid"]]),championship=fm_scalar(get_reactive_val(championship_id)),
         team=fm_scalar(get_reactive_val(user_team_id)),player=fm_scalar(sp$id))
     })
+    previous_player_action_context_RV <- reactiveVal(NULL)
     observeEvent(player_action_context_RV(), {
+      current_context <- player_action_context_RV()
+      previous_context <- isolate(previous_player_action_context_RV())
       active_bid_info_RV(NULL);smart_bid_cache_RV(NULL);modal_context_RV(list())
       offer_modal_opened_RV(FALSE);clause_modal_opened_RV(FALSE);modify_modal_opened_RV(FALSE)
-      removeModal()
+      if (player_card_context_changed(previous_context, current_context)) removeModal()
+      previous_player_action_context_RV(current_context)
     },ignoreNULL=FALSE,priority=110)
     remember_action_context <- function(action) {
       context <- player_action_context_RV();req(!is.null(context))

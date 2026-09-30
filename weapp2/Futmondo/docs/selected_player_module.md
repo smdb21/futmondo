@@ -1,5 +1,10 @@
 # Selected Player Module Documentation
 
+The player-card modal stays open when its selected player first becomes
+available after the modal shell is sent to the browser. Later changes to an
+established account, championship, team, or player context clear stale action
+state and dismiss any modal bound to the previous context.
+
 Player-card history outputs treat malformed, unavailable, and all-invalid persistence rows as empty evidence. The valuation chart falls back to the current finite value (or a neutral placeholder when unavailable), while the recent-round panel validates its round/points columns and shows an explanatory empty state. These fallbacks prevent Shiny's generic render error from replacing the card when historical persistence is incomplete.
 
 Round timestamps use the shared tolerant UTC parser. Invalid stored timestamps are excluded; an explicitly finalized summary score with an invalid boundary timestamp receives a deterministic internal fallback date because the visible chart is indexed by round number.
