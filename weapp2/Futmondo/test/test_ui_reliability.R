@@ -26,6 +26,14 @@ record('player card has an accessible top close control', {
             grepl('Close player card', card_html, fixed=TRUE),
             grepl('data-dismiss="modal"', card_html, fixed=TRUE))
 })
+record('player card opens before expensive selected-player outputs are enabled', {
+  source_text <- paste(readLines('Modules/Players_Table_Module.R', warn=FALSE), collapse='\n')
+  show_at <- regexpr('showModal(modalDialog(', source_text, fixed=TRUE)[1]
+  flush_at <- regexpr('session$onFlushed(function()', source_text, fixed=TRUE)[1]
+  ready_at <- regexpr('selected_player_ready_RV(TRUE)', source_text, fixed=TRUE)[1]
+  stopifnot(show_at > 0L, flush_at > show_at, ready_at > flush_at,
+            grepl('if (!isTRUE(selected_player_ready_RV())) return(NULL)', source_text, fixed=TRUE))
+})
 record('player card hides the legacy userBox header', {
   css <- paste(readLines('www/custom_style.css', warn=FALSE), collapse='\n')
   stopifnot(grepl("[id$='selected_player_box'] .widget-user-header", css, fixed=TRUE),
@@ -235,7 +243,7 @@ record('selected player identity survives authoritative table reordering', {
   testServer(players_table_Server,args=list(players_table_RV=authoritative,user_teams_RV=reactive(NULL),refresh_trigger=trigger), {
     session$setInputs(fixture_selection=1L)
     session$flushReact()
-    stopifnot(selected_player_RV()$id=='p1',player_selection_event_RV()==1L)
+    stopifnot(isTRUE(selected_player_ready_RV()),selected_player_RV()$id=='p1',player_selection_event_RV()==1L)
     session$setInputs(fixture_selection=NA_integer_)
     session$setInputs(fixture_selection=1L)
     session$flushReact()

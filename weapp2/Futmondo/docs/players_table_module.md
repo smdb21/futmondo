@@ -92,7 +92,16 @@ Focused verification: `Rscript test/test_recent_points_average.R`. Cross-page re
 
 ---
 
-## 9. User Team Owner Filter
+## 9. Immediate Player-Card Opening
+
+Selecting a player sends the modal shell to the browser before enabling the
+selected-player reactive. The module uses `session$onFlushed(..., once=TRUE)`
+to start summary, history, and intelligence requests in the following reactive
+cycle. Until then, the card displays a loading message. This keeps API latency
+from delaying click feedback while retaining the selected player ID and table
+context checks.
+
+## 10. User Team Owner Filter
 
 The **User Team Owner** selector is built from every league team, even when the
 player feed omits the team display name. Its labels are team names, but its

@@ -194,6 +194,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
     table_refresh_trigger <- reactiveVal(0)
     selected_player_id_RV <- reactiveVal(NULL)
     selected_player_context_RV <- reactiveVal(NULL)
+    selected_player_ready_RV <- reactiveVal(FALSE)
     player_selection_event_RV <- reactiveVal(0L)
     table_context_RV <- reactive({
       value <- function(x) if(is.function(x)) x() else x
@@ -202,6 +203,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
         championship=fm_scalar(value(championship_id),""),team=fm_scalar(value(user_team_id),""))
     })
     observeEvent(table_context_RV(), {
+      selected_player_ready_RV(FALSE)
       selected_player_id_RV(NULL);selected_player_context_RV(NULL)
       tryCatch(updateReactable("players_table",selected=NA_integer_,session=session),error=function(e)NULL)
       removeModal()
@@ -269,7 +271,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
     observeEvent(
       player_selection_event_RV(),
       {
-        req(selected_player_RV())
+        selection_event <- isolate(player_selection_event_RV())
         showModal(modalDialog(
           # title = "Selected player",
           selected_player_UI(id = ns("selected_player")),
@@ -278,6 +280,14 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
           easyClose = TRUE,
           size = "l"
         ))
+        # Send the modal shell before enabling the selected-player reactive.
+        # This lets the browser paint the card before synchronous API/history
+        # work in the child module begins.
+        session$onFlushed(function() {
+          if (identical(isolate(player_selection_event_RV()), selection_event)) {
+            selected_player_ready_RV(TRUE)
+          }
+        }, once = TRUE)
         tryCatch(updateReactable("players_table",selected=NA_integer_,session=session),error=function(e)NULL)
       },
       ignoreInit = TRUE
@@ -298,15 +308,20 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       selected_idx <- getReactableState(outputId = "players_table", name = "selected", session = session)
       rows <- players_table_filtered_RV()
       req(length(selected_idx) == 1L, is.data.frame(rows), selected_idx >= 1L, selected_idx <= nrow(rows))
+      selected_player_ready_RV(FALSE)
       selected_player_context_RV(table_context_RV())
       selected_player_id_RV(as.character(rows$id[selected_idx]))
       player_selection_event_RV(isolate(player_selection_event_RV())+1L)
     }, ignoreNULL = TRUE)
     selected_player_RV <- reactive({
-      req(identical(selected_player_context_RV(),table_context_RV()))
-      player_id <- selected_player_id_RV(); req(player_id)
-      rows <- players_table_filtered_RV(); req(rows)
-      index <- match(player_id, as.character(rows$id)); req(!is.na(index))
+      if (!isTRUE(selected_player_ready_RV())) return(NULL)
+      if (!identical(selected_player_context_RV(),table_context_RV())) return(NULL)
+      player_id <- selected_player_id_RV()
+      if (is.null(player_id)) return(NULL)
+      rows <- players_table_filtered_RV()
+      if (is.null(rows)) return(NULL)
+      index <- match(player_id, as.character(rows$id))
+      if (is.na(index)) return(NULL)
       rows[index, , drop = FALSE]
     })
     

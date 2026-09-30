@@ -303,7 +303,10 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
     output$player_identity_summary <- renderUI({
       sp <- selected_player()
-      req(sp)
+      if (is.null(sp)) {
+        return(div(class = "player-card-loading",
+          icon("spinner", class = "fa-spin"), span("Loading player details…")))
+      }
       player_name <- if ("name" %in% names(sp) && !is.na(sp$name)) as.character(sp$name) else "Player"
       role <- if ("role" %in% names(sp) && !is.na(sp$role)) as.character(sp$role) else "Position unavailable"
       team <- if ("team" %in% names(sp) && !is.na(sp$team) && nzchar(as.character(sp$team))) as.character(sp$team) else "Team unavailable"
