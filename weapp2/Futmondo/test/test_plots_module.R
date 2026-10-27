@@ -1,4 +1,5 @@
 #!/usr/bin/env Rscript
+options(futmondo.offline=TRUE)
 source('global.R')
 checks <- 0L
 check <- function(label, expr) { force(expr); checks <<- checks + 1L; cat('[PASS]', label, '\n') }
@@ -12,8 +13,8 @@ check('owned real-team aggregation is descending with stable name tie-break', {
   d <- plots_owned_by_real_team(p)
   stopifnot(identical(d$real_team, c('Alpha','Beta')), identical(d$owned_players, c(2L,1L)))
 })
-check('plots UI exposes six chart tabs', {
+check('plots UI exposes five factual chart tabs', {
   html <- as.character(plots_UI('plots'))
-  for (id in c('standings_plot','values_plot','cash_plot','rank_plot','bid_plot','owned_club_plot')) stopifnot(grepl(id, html, fixed=TRUE))
+  for (id in c('standings_plot','values_plot','cash_plot','rank_plot','owned_club_plot')) stopifnot(grepl(id, html, fixed=TRUE))
 })
 cat('Plots module:', checks, 'checks passed.\n')

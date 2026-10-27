@@ -1,60 +1,26 @@
 #!/usr/bin/env Rscript
-# In-session queue tests: no HTTP requests or database writes.
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages({source('futmondo_functions.R');source('supabase_connector.R');source('background_runtime.R')})
-n <- 0L
-check <- function(name, code) { force(code); n <<- n + 1L; cat('PASS', name, '\n') }
-reset <- function() {
-  .persistence_state$queue <- list(); .persistence_state$active <- NULL
-  .persistence_state$progress <- list(); .persistence_state$errors <- list(); .persistence_state$scheduled <- FALSE
-  options(futmondo.persistence_failures=0L, futmondo.persistence_issues=list())
-}
-
-check('retry identity ignores refreshed token and isolates league/team', {
-  a <- list(c(userid='u',token='old'),'league-a','team-a')
-  b <- a; b[[1]][['token']] <- 'fresh'
-  c <- b; c[[2]] <- 'league-b'
-  stopifnot(identical(persistence_job_scope('collect_account_observations',a),persistence_job_scope('collect_account_observations',b)),
-    !identical(persistence_job_scope('collect_account_observations',a),persistence_job_scope('collect_account_observations',c)))
+n<-0L;check<-function(name,expr){force(expr);n<<-n+1L;cat('PASS',name,'\n')}
+reset<-function(){.persistence_state$queue<-list();.persistence_state$active<-NULL;.persistence_state$errors<-list();.persistence_state$acknowledged<-list();.persistence_state$scheduled<-FALSE}
+ctx<-resource_context(account_id='u',session_id='s',championship_id='league')
+args<-list('player_history',list(player_id='p',championship_id='league',value=100,observed_at='2026-10-01'),supabase_conflict_key('player_history'))
+check('duplicate observation queues once and correction stays distinct',{
+ reset();options(futmondo.offline=FALSE);stopifnot(isTRUE(defer_persistence('supabase_post_direct',args,ctx)),isTRUE(defer_persistence('supabase_post_direct',args,ctx)),length(.persistence_state$queue)==1L)
+ corrected<-args;corrected[[2]]$value<-101;stopifnot(isTRUE(defer_persistence('supabase_post_direct',corrected,ctx)),length(.persistence_state$queue)==2L)
 })
-check('direct-write scopes retain stable entity identities', {
-  a <- list('auction_observations',list(championship_id='league',auction_id='a',observed_at='old'))
-  b <- list('auction_observations',list(championship_id='league',auction_id='b',observed_at='new'))
-  stopifnot(!identical(persistence_job_scope('supabase_post_direct',a),persistence_job_scope('supabase_post_direct',b)))
+check('acknowledged content does not queue again',{
+ job<-.persistence_state$queue[[1]];persistence_record_result(job,TRUE);.persistence_state$queue<-list();stopifnot(isTRUE(defer_persistence('supabase_post_direct',args,ctx)),length(.persistence_state$queue)==0L)
 })
-check('status is isolated by account and reports active collection progress', {
-  reset()
-  .persistence_state$active <- list(owner='u',key='k',fn='collect_account_observations')
-  .persistence_state$progress$u <- 'Saving player observations (1/30)'
-  .persistence_state$errors$v <- list(x='other account failure')
-  status <- background_sync_status('u')
-  stopifnot(status$pending==1L, grepl('1/30',status$progress,fixed=TRUE), is.null(status$error),
-    is.null(background_sync_status('v')$progress))
+check('only factual writes enter queue',stopifnot(!defer_persistence('get_teams',list('token','league'),ctx)))
+check('account bound preserves another account capacity',{
+ reset();.persistence_state$queue<-lapply(seq_len(.persistence_max_jobs_per_owner),function(i)list(owner='u',session_id='s',key=paste0('u',i)))
+ other<-ctx;other$account_id<-'v';stopifnot(!defer_persistence('supabase_post_direct',args,ctx),isTRUE(defer_persistence('supabase_post_direct',args,other)),!is.null(background_sync_status('u')$error),is.null(background_sync_status('v')$error))
 })
-check('runtime failure gives a resumable, specific user message', {
-  message <- persistence_failure_message(list(list(category='runtime')))
-  stopifnot(grepl('start collection again',message,fixed=TRUE))
+check('logout removes matching session jobs only',{
+ reset();.persistence_state$queue<-list(list(owner='u',session_id='s1',key='a'),list(owner='u',session_id='s2',key='b'),list(owner='v',session_id='s1',key='c'));stopifnot(cancel_persistence_jobs('u','s1')==1L,length(.persistence_state$queue)==2L)
 })
-check('queue deduplicates an active collection request', {
-  reset(); options(futmondo.offline=FALSE)
-  on.exit(options(futmondo.offline=TRUE),add=TRUE)
-  args <- list(c(userid='u',token='t'),'league','team')
-  key <- as.character(openssl::sha256(serialize(list('u','collect_account_observations',args),NULL)))
-  .persistence_state$active <- list(owner='u',key=key,fn='collect_account_observations',args=args)
-  stopifnot(isTRUE(defer_persistence('collect_account_observations',args)),length(.persistence_state$queue)==0L)
+check('configuration failure is scoped and distinct',{
+ reset();persistence_record_result(list(owner='u',key='x'),FALSE,list(list(category='configuration')));stopifnot(grepl('not configured',background_sync_status('u')$error,fixed=TRUE),is.null(background_sync_status('v')$error))
 })
-check('logout cancellation removes only the matching browser session jobs', {
-  reset()
-  .persistence_state$queue <- list(
-    list(owner='u',session_id='s1',key='a'), list(owner='u',session_id='s2',key='b'), list(owner='v',session_id='s1',key='c'))
-  .persistence_state$active <- list(owner='u',session_id='s1',key='d')
-  stopifnot(cancel_persistence_jobs('u','s1')==2L, length(.persistence_state$queue)==2L,
-    all(vapply(.persistence_state$queue,function(x)x$key %in% c('b','c'),logical(1))))
-})
-check('per-account queue limit rejects only the saturated account', {
-  reset(); options(futmondo.offline=FALSE); on.exit(options(futmondo.offline=TRUE),add=TRUE)
-  .persistence_state$queue <- lapply(seq_len(.persistence_max_jobs_per_owner),function(i)list(owner='u',key=paste0('u',i)))
-  stopifnot(!isTRUE(defer_persistence('collect_account_observations',list(c(userid='u',token='t'),'league','team'))),
-    isTRUE(defer_persistence('collect_account_observations',list(c(userid='v',token='t'),'league','team'))))
-})
-cat(sprintf('BACKGROUND SYNC: %d passed / 0 failed\n',n))
+options(futmondo.offline=TRUE);reset();cat(sprintf('BACKGROUND SYNC: %d passed / 0 failed\n',n))

@@ -1,0 +1,861 @@
+{
+  "project_id": "ozhnextrcxxksswpnglt",
+  "schema_before": {
+    "captured_at": "2026-10-27T07:08:06.498318+00:00",
+    "database_version": "PostgreSQL 17.6 on aarch64-unknown-linux-gnu, compiled by gcc (GCC) 13.2.0, 64-bit",
+    "objects": [
+      {
+        "acl": "{postgres=rwU/postgres,anon=rwU/postgres,authenticated=rwU/postgres,service_role=rwU/postgres}",
+        "rls": false,
+        "kind": "S",
+        "name": "futmondo_players_id_seq",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "futmondo_players",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": false,
+        "kind": "v",
+        "name": "auction_observation_history",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": false,
+        "kind": "v",
+        "name": "bid_observation_history",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "observation_revisions",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "league_preferences",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "real_clubs",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "players",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "user_teams",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "championships",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=rwU/postgres,service_role=rwU/postgres}",
+        "rls": false,
+        "kind": "S",
+        "name": "user_team_history_id_seq",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "observation_subscriptions",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "sale_observations",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "model_evaluations",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "player_history",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "fixture_observations",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "auction_opportunities",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "market_transactions",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "user_smart_alerts",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=rwU/postgres,service_role=rwU/postgres}",
+        "rls": false,
+        "kind": "S",
+        "name": "transfer_scenarios_id_seq",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "player_match_observations",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "auction_observations",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "bid_observations",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "market_observations",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "league_rule_snapshots",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "forecast_records",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "transfer_scenarios",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "user_team_history",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "automation_sessions",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "manager_dna_profiles",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "automation_policies",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "automation_jobs",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "player_daily_snapshots",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "automation_account_locks",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "decision_log",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "market_transactions_archive",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "rls": true,
+        "kind": "r",
+        "name": "round_dream_team",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=rwU/postgres,service_role=rwU/postgres}",
+        "rls": false,
+        "kind": "S",
+        "name": "player_history_id_seq",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=rwU/postgres,service_role=rwU/postgres}",
+        "rls": false,
+        "kind": "S",
+        "name": "market_transactions_id_seq",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=rwU/postgres,service_role=rwU/postgres}",
+        "rls": false,
+        "kind": "S",
+        "name": "round_dream_team_id_seq",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=rwU/postgres,service_role=rwU/postgres}",
+        "rls": false,
+        "kind": "S",
+        "name": "player_daily_snapshots_id_seq",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=rwU/postgres,service_role=rwU/postgres}",
+        "rls": false,
+        "kind": "S",
+        "name": "decision_log_id_seq",
+        "owner": "postgres",
+        "schema": "public"
+      },
+      {
+        "acl": "{postgres=rwU/postgres,service_role=rwU/postgres}",
+        "rls": false,
+        "kind": "S",
+        "name": "user_smart_alerts_id_seq",
+        "owner": "postgres",
+        "schema": "public"
+      }
+    ],
+    "indexes": [
+      {
+        "indexdef": "CREATE UNIQUE INDEX futmondo_players_id_key ON public.futmondo_players USING btree (id)",
+        "indexname": "futmondo_players_id_key",
+        "tablename": "futmondo_players"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX futmondo_players_pkey ON public.futmondo_players USING btree (id)",
+        "indexname": "futmondo_players_pkey",
+        "tablename": "futmondo_players"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX observation_revisions_pkey ON public.observation_revisions USING btree (kind, championship_id, event_key, observed_at)",
+        "indexname": "observation_revisions_pkey",
+        "tablename": "observation_revisions"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX league_preferences_pkey ON public.league_preferences USING btree (user_id, championship_id, user_team_id)",
+        "indexname": "league_preferences_pkey",
+        "tablename": "league_preferences"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX real_clubs_pkey ON public.real_clubs USING btree (id)",
+        "indexname": "real_clubs_pkey",
+        "tablename": "real_clubs"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX players_pkey ON public.players USING btree (id)",
+        "indexname": "players_pkey",
+        "tablename": "players"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX user_teams_pkey ON public.user_teams USING btree (id)",
+        "indexname": "user_teams_pkey",
+        "tablename": "user_teams"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX championships_pkey ON public.championships USING btree (id)",
+        "indexname": "championships_pkey",
+        "tablename": "championships"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX observation_subscriptions_pkey ON public.observation_subscriptions USING btree (user_id, championship_id, user_team_id)",
+        "indexname": "observation_subscriptions_pkey",
+        "tablename": "observation_subscriptions"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX sale_observations_pkey ON public.sale_observations USING btree (user_id, championship_id, offer_id, observed_at)",
+        "indexname": "sale_observations_pkey",
+        "tablename": "sale_observations"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX model_evaluations_pkey ON public.model_evaluations USING btree (id)",
+        "indexname": "model_evaluations_pkey",
+        "tablename": "model_evaluations"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX player_history_pkey ON public.player_history USING btree (id)",
+        "indexname": "player_history_pkey",
+        "tablename": "player_history"
+      },
+      {
+        "indexdef": "CREATE INDEX idx_player_history_player ON public.player_history USING btree (player_id, recorded_at DESC)",
+        "indexname": "idx_player_history_player",
+        "tablename": "player_history"
+      },
+      {
+        "indexdef": "CREATE INDEX idx_player_history_championship ON public.player_history USING btree (championship_id, recorded_at DESC)",
+        "indexname": "idx_player_history_championship",
+        "tablename": "player_history"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX player_history_source_time ON public.player_history USING btree (player_id, championship_id, observed_at)",
+        "indexname": "player_history_source_time",
+        "tablename": "player_history"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX fixture_observations_pkey ON public.fixture_observations USING btree (championship_id, season, scoring_version, player_id, round, observed_at)",
+        "indexname": "fixture_observations_pkey",
+        "tablename": "fixture_observations"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX auction_opportunities_pkey ON public.auction_opportunities USING btree (championship_id, listing_id, observed_at)",
+        "indexname": "auction_opportunities_pkey",
+        "tablename": "auction_opportunities"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX market_transactions_pkey ON public.market_transactions USING btree (id)",
+        "indexname": "market_transactions_pkey",
+        "tablename": "market_transactions"
+      },
+      {
+        "indexdef": "CREATE INDEX idx_transactions_player ON public.market_transactions USING btree (player_id, transaction_date DESC)",
+        "indexname": "idx_transactions_player",
+        "tablename": "market_transactions"
+      },
+      {
+        "indexdef": "CREATE INDEX idx_transactions_championship ON public.market_transactions USING btree (championship_id, transaction_date DESC)",
+        "indexname": "idx_transactions_championship",
+        "tablename": "market_transactions"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX transactions_source_event ON public.market_transactions USING btree (championship_id, source_event_id)",
+        "indexname": "transactions_source_event",
+        "tablename": "market_transactions"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX user_smart_alerts_pkey ON public.user_smart_alerts USING btree (id)",
+        "indexname": "user_smart_alerts_pkey",
+        "tablename": "user_smart_alerts"
+      },
+      {
+        "indexdef": "CREATE INDEX idx_alerts_team ON public.user_smart_alerts USING btree (user_team_id, created_at DESC)",
+        "indexname": "idx_alerts_team",
+        "tablename": "user_smart_alerts"
+      },
+      {
+        "indexdef": "CREATE INDEX idx_alerts_unread ON public.user_smart_alerts USING btree (user_team_id, is_read, created_at DESC)",
+        "indexname": "idx_alerts_unread",
+        "tablename": "user_smart_alerts"
+      },
+      {
+        "indexdef": "CREATE INDEX idx_alerts_championship ON public.user_smart_alerts USING btree (championship_id, created_at DESC)",
+        "indexname": "idx_alerts_championship",
+        "tablename": "user_smart_alerts"
+      },
+      {
+        "indexdef": "CREATE INDEX idx_alerts_type ON public.user_smart_alerts USING btree (alert_type)",
+        "indexname": "idx_alerts_type",
+        "tablename": "user_smart_alerts"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX alerts_event ON public.user_smart_alerts USING btree (user_id, championship_id, event_key)",
+        "indexname": "alerts_event",
+        "tablename": "user_smart_alerts"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX player_match_observations_pkey ON public.player_match_observations USING btree (player_id, championship_id, season, scoring_version, round, observed_at)",
+        "indexname": "player_match_observations_pkey",
+        "tablename": "player_match_observations"
+      },
+      {
+        "indexdef": "CREATE INDEX matches_champ_cutoff ON public.player_match_observations USING btree (championship_id, observed_at)",
+        "indexname": "matches_champ_cutoff",
+        "tablename": "player_match_observations"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX auction_observations_pkey ON public.auction_observations USING btree (championship_id, auction_id)",
+        "indexname": "auction_observations_pkey",
+        "tablename": "auction_observations"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX bid_observations_pkey ON public.bid_observations USING btree (championship_id, auction_id, bidder_id)",
+        "indexname": "bid_observations_pkey",
+        "tablename": "bid_observations"
+      },
+      {
+        "indexdef": "CREATE INDEX bids_champ_date ON public.bid_observations USING btree (championship_id, settled_at)",
+        "indexname": "bids_champ_date",
+        "tablename": "bid_observations"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX market_observations_pkey ON public.market_observations USING btree (championship_id, listing_id, observed_at)",
+        "indexname": "market_observations_pkey",
+        "tablename": "market_observations"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX league_rule_snapshots_pkey ON public.league_rule_snapshots USING btree (championship_id, scoring_version, observed_at)",
+        "indexname": "league_rule_snapshots_pkey",
+        "tablename": "league_rule_snapshots"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX forecast_records_pkey ON public.forecast_records USING btree (id)",
+        "indexname": "forecast_records_pkey",
+        "tablename": "forecast_records"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX transfer_scenarios_pkey ON public.transfer_scenarios USING btree (id)",
+        "indexname": "transfer_scenarios_pkey",
+        "tablename": "transfer_scenarios"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX transfer_scenarios_user_id_championship_id_user_team_id_nam_key ON public.transfer_scenarios USING btree (user_id, championship_id, user_team_id, name)",
+        "indexname": "transfer_scenarios_user_id_championship_id_user_team_id_nam_key",
+        "tablename": "transfer_scenarios"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX user_team_history_pkey ON public.user_team_history USING btree (id)",
+        "indexname": "user_team_history_pkey",
+        "tablename": "user_team_history"
+      },
+      {
+        "indexdef": "CREATE INDEX idx_team_history_team ON public.user_team_history USING btree (user_team_id, recorded_at DESC)",
+        "indexname": "idx_team_history_team",
+        "tablename": "user_team_history"
+      },
+      {
+        "indexdef": "CREATE INDEX team_history_championship_recorded ON public.user_team_history USING btree (championship_id, recorded_at DESC)",
+        "indexname": "team_history_championship_recorded",
+        "tablename": "user_team_history"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX user_team_history_source_time ON public.user_team_history USING btree (user_team_id, championship_id, observed_at)",
+        "indexname": "user_team_history_source_time",
+        "tablename": "user_team_history"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX automation_sessions_pkey ON public.automation_sessions USING btree (user_id)",
+        "indexname": "automation_sessions_pkey",
+        "tablename": "automation_sessions"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX manager_dna_profiles_pkey ON public.manager_dna_profiles USING btree (team_id)",
+        "indexname": "manager_dna_profiles_pkey",
+        "tablename": "manager_dna_profiles"
+      },
+      {
+        "indexdef": "CREATE INDEX idx_manager_dna_championship ON public.manager_dna_profiles USING btree (championship_id)",
+        "indexname": "idx_manager_dna_championship",
+        "tablename": "manager_dna_profiles"
+      },
+      {
+        "indexdef": "CREATE INDEX idx_manager_dna_aggressiveness ON public.manager_dna_profiles USING btree (aggressiveness)",
+        "indexname": "idx_manager_dna_aggressiveness",
+        "tablename": "manager_dna_profiles"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX automation_policies_pkey ON public.automation_policies USING btree (id)",
+        "indexname": "automation_policies_pkey",
+        "tablename": "automation_policies"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX automation_jobs_pkey ON public.automation_jobs USING btree (id)",
+        "indexname": "automation_jobs_pkey",
+        "tablename": "automation_jobs"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX automation_jobs_idempotency_key_key ON public.automation_jobs USING btree (idempotency_key)",
+        "indexname": "automation_jobs_idempotency_key_key",
+        "tablename": "automation_jobs"
+      },
+      {
+        "indexdef": "CREATE INDEX jobs_pending ON public.automation_jobs USING btree (status, run_after)",
+        "indexname": "jobs_pending",
+        "tablename": "automation_jobs"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX player_daily_snapshots_pkey ON public.player_daily_snapshots USING btree (id)",
+        "indexname": "player_daily_snapshots_pkey",
+        "tablename": "player_daily_snapshots"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX player_daily_snapshots_player_id_championship_id_snapshot_d_key ON public.player_daily_snapshots USING btree (player_id, championship_id, snapshot_date)",
+        "indexname": "player_daily_snapshots_player_id_championship_id_snapshot_d_key",
+        "tablename": "player_daily_snapshots"
+      },
+      {
+        "indexdef": "CREATE INDEX idx_snapshots_player ON public.player_daily_snapshots USING btree (player_id, snapshot_date DESC)",
+        "indexname": "idx_snapshots_player",
+        "tablename": "player_daily_snapshots"
+      },
+      {
+        "indexdef": "CREATE INDEX idx_snapshots_championship ON public.player_daily_snapshots USING btree (championship_id, snapshot_date DESC)",
+        "indexname": "idx_snapshots_championship",
+        "tablename": "player_daily_snapshots"
+      },
+      {
+        "indexdef": "CREATE INDEX idx_snapshots_owner ON public.player_daily_snapshots USING btree (owner_team_id, snapshot_date DESC)",
+        "indexname": "idx_snapshots_owner",
+        "tablename": "player_daily_snapshots"
+      },
+      {
+        "indexdef": "CREATE INDEX idx_snapshots_market ON public.player_daily_snapshots USING btree (is_on_market, snapshot_date DESC)",
+        "indexname": "idx_snapshots_market",
+        "tablename": "player_daily_snapshots"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX automation_account_locks_pkey ON public.automation_account_locks USING btree (user_id)",
+        "indexname": "automation_account_locks_pkey",
+        "tablename": "automation_account_locks"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX decision_log_pkey ON public.decision_log USING btree (id)",
+        "indexname": "decision_log_pkey",
+        "tablename": "decision_log"
+      },
+      {
+        "indexdef": "CREATE INDEX idx_decision_log_team ON public.decision_log USING btree (user_team_id, created_at DESC)",
+        "indexname": "idx_decision_log_team",
+        "tablename": "decision_log"
+      },
+      {
+        "indexdef": "CREATE INDEX idx_decision_log_championship ON public.decision_log USING btree (championship_id, created_at DESC)",
+        "indexname": "idx_decision_log_championship",
+        "tablename": "decision_log"
+      },
+      {
+        "indexdef": "CREATE INDEX idx_decision_log_player ON public.decision_log USING btree (player_id, created_at DESC)",
+        "indexname": "idx_decision_log_player",
+        "tablename": "decision_log"
+      },
+      {
+        "indexdef": "CREATE INDEX idx_decision_log_type ON public.decision_log USING btree (recommendation_type)",
+        "indexname": "idx_decision_log_type",
+        "tablename": "decision_log"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX round_dream_team_pkey ON public.round_dream_team USING btree (id)",
+        "indexname": "round_dream_team_pkey",
+        "tablename": "round_dream_team"
+      },
+      {
+        "indexdef": "CREATE UNIQUE INDEX round_dream_team_championship_id_round_number_player_id_key ON public.round_dream_team USING btree (championship_id, round_number, player_id)",
+        "indexname": "round_dream_team_championship_id_round_number_player_id_key",
+        "tablename": "round_dream_team"
+      },
+      {
+        "indexdef": "CREATE INDEX idx_dream_team_round ON public.round_dream_team USING btree (championship_id, round_number)",
+        "indexname": "idx_dream_team_round",
+        "tablename": "round_dream_team"
+      },
+      {
+        "indexdef": "CREATE INDEX idx_dream_team_player ON public.round_dream_team USING btree (player_id)",
+        "indexname": "idx_dream_team_player",
+        "tablename": "round_dream_team"
+      }
+    ],
+    "automation_functions": [
+      {
+        "acl": "{postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+        "identity": "begin_automation_execution(text,text,jsonb)",
+        "definition": "CREATE OR REPLACE FUNCTION public.begin_automation_execution(p_job_id text, p_lease_token text, p_observation jsonb)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\r\nDECLARE j automation_jobs; l automation_account_locks; p automation_policies;\r\nBEGIN\r\n  SELECT * INTO j FROM automation_jobs WHERE id=p_job_id FOR UPDATE;\r\n  IF NOT FOUND OR j.status<>'running' OR j.lease_token IS DISTINCT FROM p_lease_token OR\r\n      j.execution_started_at IS NOT NULL THEN RETURN FALSE; END IF;\r\n  SELECT * INTO l FROM automation_account_locks WHERE user_id=j.user_id FOR UPDATE;\r\n  IF NOT FOUND OR l.job_id<>j.id OR l.lease_token IS DISTINCT FROM p_lease_token OR l.expires_at<=NOW()\r\n    THEN RETURN FALSE; END IF;\r\n  SELECT * INTO p FROM automation_policies WHERE id=j.policy_id FOR UPDATE;\r\n  IF NOT FOUND OR NOT p.enabled OR p.mode<>'live' OR p.expires_at<=NOW() OR\r\n      p.user_id<>j.user_id OR p.championship_id<>j.championship_id OR p.user_team_id<>j.user_team_id\r\n    THEN RETURN FALSE; END IF;\r\n  -- Pin the lease before sending the external request. No worker can acquire\r\n  -- this account until acknowledgement or positive read-only reconciliation.\r\n  UPDATE automation_account_locks SET expires_at='infinity'::timestamptz WHERE user_id=j.user_id;\r\n  UPDATE automation_jobs SET execution_started_at=NOW(),result=p_observation WHERE id=j.id;\r\n  RETURN TRUE;\r\nEND $function$\n"
+      },
+      {
+        "acl": "{postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+        "identity": "claim_automation_job()",
+        "definition": "CREATE OR REPLACE FUNCTION public.claim_automation_job()\n RETURNS SETOF automation_jobs\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\r\nDECLARE candidate automation_jobs; acquired TEXT; token TEXT;\r\nBEGIN\r\n  -- Preflight leases can expire. Execution fences never expire into permission\r\n  -- for another trade: uncertain outcomes keep the entire account locked.\r\n  UPDATE automation_jobs j SET status='uncertain', finished_at=NOW(),\r\n    result=COALESCE(j.result,'{}'::jsonb)||'{\"reason\":\"worker interrupted; reconciliation required\"}'::jsonb\r\n    FROM automation_account_locks l\r\n    WHERE j.id=l.job_id AND j.status='running' AND\r\n      ((j.execution_started_at IS NULL AND l.expires_at<NOW()) OR\r\n       j.execution_started_at<NOW()-INTERVAL '2 minutes');\r\n  UPDATE automation_account_locks l SET expires_at='infinity'::timestamptz\r\n    FROM automation_jobs j WHERE l.job_id=j.id AND j.status='uncertain';\r\n  UPDATE automation_policies p SET enabled=FALSE,\r\n    pause_reason='An account action has an uncertain outcome; reconcile it before resuming',updated_at=NOW()\r\n    WHERE p.enabled AND EXISTS(SELECT 1 FROM automation_jobs j WHERE j.user_id=p.user_id AND j.status='uncertain');\r\n  DELETE FROM automation_account_locks l USING automation_jobs j\r\n    WHERE l.job_id=j.id AND j.status IN ('succeeded','failed','shadow','blocked','cancelled');\r\n  FOR candidate IN SELECT j.* FROM automation_jobs j\r\n      WHERE j.status='pending' AND j.run_after<=NOW()\r\n        AND NOT EXISTS(SELECT 1 FROM automation_jobs u WHERE u.user_id=j.user_id AND u.status='uncertain')\r\n      ORDER BY j.created_at FOR UPDATE SKIP LOCKED LIMIT 20 LOOP\r\n    acquired := NULL;\r\n    token := md5(random()::text||clock_timestamp()::text||candidate.id);\r\n    INSERT INTO automation_account_locks(user_id,job_id,expires_at,lease_token)\r\n      VALUES(candidate.user_id,candidate.id,NOW()+INTERVAL '2 minutes',token)\r\n      ON CONFLICT DO NOTHING RETURNING user_id INTO acquired;\r\n    IF acquired IS NOT NULL THEN\r\n      RETURN QUERY UPDATE automation_jobs SET status='running',claimed_at=NOW(),lease_token=token\r\n        WHERE id=candidate.id RETURNING *;\r\n      RETURN;\r\n    END IF;\r\n  END LOOP;\r\nEND $function$\n"
+      },
+      {
+        "acl": "{postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+        "identity": "finish_automation_job(text,text,jsonb)",
+        "definition": "CREATE OR REPLACE FUNCTION public.finish_automation_job(p_job_id text, p_lease_token text, p_result jsonb)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\r\nDECLARE j automation_jobs; l automation_account_locks; next_status TEXT;\r\nBEGIN\r\n  SELECT * INTO j FROM automation_jobs WHERE id=p_job_id FOR UPDATE;\r\n  IF NOT FOUND OR j.status NOT IN ('running','uncertain') OR j.lease_token IS DISTINCT FROM p_lease_token\r\n    THEN RETURN FALSE; END IF;\r\n  SELECT * INTO l FROM automation_account_locks WHERE user_id=j.user_id FOR UPDATE;\r\n  IF NOT FOUND OR l.job_id<>j.id OR l.lease_token IS DISTINCT FROM p_lease_token THEN RETURN FALSE; END IF;\r\n  next_status := p_result->>'status';\r\n  IF next_status IS NULL OR next_status NOT IN ('shadow','succeeded','failed','uncertain','blocked','cancelled')\r\n    THEN RETURN FALSE; END IF;\r\n  IF j.execution_started_at IS NOT NULL AND next_status IN ('shadow','blocked','cancelled') THEN RETURN FALSE; END IF;\r\n  UPDATE automation_jobs SET status=next_status,finished_at=NOW(),\r\n    result=COALESCE(j.result,'{}'::jsonb)||p_result WHERE id=j.id;\r\n  IF next_status='uncertain' THEN\r\n    UPDATE automation_account_locks SET expires_at='infinity'::timestamptz WHERE user_id=j.user_id;\r\n    UPDATE automation_policies SET enabled=FALSE,\r\n      pause_reason='An account action has an uncertain outcome; reconcile it before resuming',updated_at=NOW()\r\n      WHERE user_id=j.user_id;\r\n  ELSE\r\n    DELETE FROM automation_account_locks WHERE user_id=j.user_id AND job_id=j.id AND lease_token=p_lease_token;\r\n  END IF;\r\n  RETURN TRUE;\r\nEND $function$\n"
+      }
+    ],
+    "cross_dependencies": null,
+    "cron_exists": false
+  },
+  "checksums_before": [
+    {
+      "table_name": "auction_observations",
+      "row_count": 540,
+      "content_digest": "b36d1eab92fc454fbb432d82d2738eef"
+    },
+    {
+      "table_name": "auction_opportunities",
+      "row_count": 18182,
+      "content_digest": "d77441559fe49e797daf4d7c319897b7"
+    },
+    {
+      "table_name": "automation_account_locks",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "automation_jobs",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "automation_policies",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "automation_sessions",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "bid_observations",
+      "row_count": 933,
+      "content_digest": "9a6a4bb4300004565deb3a753f4249c7"
+    },
+    {
+      "table_name": "championships",
+      "row_count": 1,
+      "content_digest": "84f74fad12c3613e7bab414594732b8f"
+    },
+    {
+      "table_name": "decision_log",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "fixture_observations",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "forecast_records",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "futmondo_players",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "league_preferences",
+      "row_count": 1,
+      "content_digest": "78ccd74bf4911a10b8728a642cd247cf"
+    },
+    {
+      "table_name": "league_rule_snapshots",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "manager_dna_profiles",
+      "row_count": 10,
+      "content_digest": "5f2a1866a37a7c1b89083f1e6a01cfdf"
+    },
+    {
+      "table_name": "market_observations",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "market_transactions",
+      "row_count": 1054,
+      "content_digest": "d3d3c35e9bb25a2b13d4685780dfa9b4"
+    },
+    {
+      "table_name": "market_transactions_archive",
+      "row_count": 1683,
+      "content_digest": "c7eca5cd994480791649e76eba31f049"
+    },
+    {
+      "table_name": "model_evaluations",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "observation_revisions",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "observation_subscriptions",
+      "row_count": 1,
+      "content_digest": "fad13167b493e8fb19ec620c4c8b7e21"
+    },
+    {
+      "table_name": "player_daily_snapshots",
+      "row_count": 12952,
+      "content_digest": "78ffa63e7cd1562029b5b10aedb81395"
+    },
+    {
+      "table_name": "player_history",
+      "row_count": 113367,
+      "content_digest": "6de0e09812eb5958b937fc6917156a3b"
+    },
+    {
+      "table_name": "player_match_observations",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "players",
+      "row_count": 575,
+      "content_digest": "8b4021a6dca788b0d4e451d0327fece2"
+    },
+    {
+      "table_name": "real_clubs",
+      "row_count": 21,
+      "content_digest": "33089ea2fa1aa4eefdaf83850cea8b71"
+    },
+    {
+      "table_name": "round_dream_team",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "sale_observations",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "transfer_scenarios",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "user_smart_alerts",
+      "row_count": 32,
+      "content_digest": "8303f33bbdc31456319f8c06e8d07cbc"
+    },
+    {
+      "table_name": "user_team_history",
+      "row_count": 2570,
+      "content_digest": "7a3f9efbba34da5df13dfb83bd58bb65"
+    },
+    {
+      "table_name": "user_teams",
+      "row_count": 10,
+      "content_digest": "ca76607bbe006734339552d96fd6cf91"
+    }
+  ]
+}

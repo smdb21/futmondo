@@ -47,7 +47,7 @@ cat("  DETERMINISTIC FIX TESTS (offline)\n")
 cat("======================================================================\n")
 
 # ---- Source the code under test (order matters for dependencies) ----
-det_record("source_intelligence_engine", { source("intelligence_engine.R") })
+det_record("source_factual_helpers", { source("factual_helpers.R") })
 det_record("source_futmondo_functions", { source("futmondo_functions.R") })
 det_record("source_today_module", { source("Modules/Today_Module.R") })
 det_record("source_rivals_module", { source("Modules/Rivals_Module.R") })
@@ -68,65 +68,11 @@ if (all_sourced) {
 # =============================================================================
 cat("\n--- FIS score ---\n")
 
-det_record("fis_na_empty_role_status_no_rows_dropped", {
-  df <- data.frame(
-    id = c("a", "b", "c"),
-    name = c("A", "B", "C"),
-    points = c(10, 20, 30),
-    value = c(1000000, 2000000, 3000000),
-    change = c(0, 100000, -50000),
-    `average.average` = c(5, 8, 10),
-    `average.averageLastFive` = c(6, 9, 11),
-    `average.matches` = c(10, 12, 14),
-    role = c(NA, "", "MF"),
-    status = c(NA, "", "ok"),
-    stringsAsFactors = FALSE
-  )
-  out <- calculate_fis_score(df)
-  stopifnot(nrow(out) == 3)
-  stopifnot(all(is.finite(out$fis_score)))
-  stopifnot(all(out$fis_tier %in% c("Strong Buy", "Buy", "Hold", "Sell")))
-  stopifnot(all(!is.na(out$fis_score)))
-})
 
-det_record("fis_non_finite_weights_fallback", {
-  df <- data.frame(
-    id = c("a", "b"),
-    name = c("A", "B"),
-    points = c(10, 20),
-    value = c(1000000, 2000000),
-    change = c(0, 100000),
-    `average.average` = c(5, 8),
-    `average.averageLastFive` = c(6, 9),
-    `average.matches` = c(10, 12),
-    role = c("MF", "MF"),
-    status = c("ok", "ok"),
-    stringsAsFactors = FALSE
-  )
-  # Non-finite / NA weights must fall back to defaults without error.
-  out <- calculate_fis_score(df, weights = list(perf = NA, form = Inf, efficiency = -Inf, momentum = "x", fixture_risk = NULL))
-  stopifnot(nrow(out) == 2)
-  stopifnot(all(is.finite(out$fis_score)))
-})
 
-det_record("fis_default_weights_sum_to_one", {
-  # With default weights the score is a weighted average in [0,100].
-  df <- data.frame(
-    id = c("a", "b", "c"),
-    name = c("A", "B", "C"),
-    points = c(10, 20, 30),
-    value = c(1000000, 2000000, 3000000),
-    change = c(0, 100000, -50000),
-    `average.average` = c(5, 8, 10),
-    `average.averageLastFive` = c(6, 9, 11),
-    `average.matches` = c(10, 12, 14),
-    role = c("GK", "DF", "MF"),
-    status = c("ok", "ok", "ok"),
-    stringsAsFactors = FALSE
-  )
-  out <- calculate_fis_score(df)
-  stopifnot(all(out$fis_score >= 0 & out$fis_score <= 100))
-})
+
+
+
 
 # =============================================================================
 # 2. Smart bid
@@ -141,74 +87,15 @@ player_row <- data.frame(
   stringsAsFactors = FALSE
 )
 
-det_record("smart_bid_capacity_bounds_by_verified_funds", {
-  # Verified spendable funds of 10M must bound max_rational and recommended.
-  capacity <- list(
-    status = "ok",
-    roster = list(count = 5L, cap = 25L, remaining_slots = 20L),
-    funds = list(reported_budget = 10000000, withheld = 0, spendable_budget = 10000000),
-    outstanding = list(offers = list(), count = 0L, total_amount = 0, completeness = "complete"),
-    target = list(my_bid_id = NULL, my_bid_amount = NA_real_, highest_bid = 0, bid_count = 0L),
-    diagnostics = character(0)
-  )
-  res <- calculate_smart_bid(
-    player_row = player_row, championship_id = "champ",
-    pressroom_df = NULL, user_teams_df = NULL,
-    user_cash = NA, market_high_bid = NULL, capacity = capacity
-  )
-  stopifnot(isTRUE(res$funds_verified))
-  stopifnot(res$spendable_funds == 10000000)
-  stopifnot(res$max_rational_bid <= 10000000)
-  stopifnot(res$recommended_bid <= 10000000)
-})
 
-det_record("smart_bid_respects_api_limit_and_abstains_when_it_is_unknown", {
-  cap<-list(status="ok",funds=list(spendable_budget=20000000,api_bid_limit=1000000))
-  x<-calculate_smart_bid(player_row,"champ",capacity=cap)
-  stopifnot(x$recommended_bid<=1000000,x$max_rational_bid<=1000000,x$spendable_funds==20000000,!x$can_compete)
-  cap$funds$api_bid_limit<-NA_real_
-  x<-calculate_smart_bid(player_row,"champ",capacity=cap)
-  stopifnot(x$action=="no_bid",x$recommended_bid==0,is.na(x$max_rational_bid),!is.null(x$error))
-})
 
-det_record("smart_bid_unknown_funds_never_manufactures_spending_capacity", {
-  for(cash in list(NULL,NA_real_,Inf,300000000)) {
-    res<-calculate_smart_bid(player_row,"champ",user_cash=cash)
-    stopifnot(isFALSE(res$funds_verified),is.na(res$spendable_funds),res$recommended_bid==0,
-      is.na(res$max_rational_bid),!res$can_compete,res$action=="no_bid",is.character(res$error))
-  }
-  invalid<-list(status="ok",funds=list(spendable_budget=-1))
-  stopifnot(calculate_smart_bid(player_row,"champ",capacity=invalid)$action=="no_bid")
-})
 
-det_record("smart_bid_market_high_bid_raises_min_winning", {
-  base <- calculate_smart_bid(player_row = player_row, championship_id = "champ",
-                              pressroom_df = NULL, user_teams_df = NULL,
-                              user_cash = NA, market_high_bid = NULL, capacity = list(status="ok",funds=list(spendable_budget=30000000)))
-  # A competing bid ABOVE the base minimum (fair_value*1.02) must raise it.
-  with_mhb <- calculate_smart_bid(player_row = player_row, championship_id = "champ",
-                                  pressroom_df = NULL, user_teams_df = NULL,
-                                  user_cash = NA, market_high_bid = 25000000, capacity = list(status="ok",funds=list(spendable_budget=30000000)))
-  stopifnot(with_mhb$min_winning_bid > base$min_winning_bid)
-  stopifnot(with_mhb$market_high_bid == 25000000)
-  stopifnot(with_mhb$min_winning_bid >= round(25000000 * 1.01))
-})
 
-det_record("smart_bid_recommended_never_exceeds_spendable", {
-  capacity <- list(
-    status = "ok",
-    funds = list(reported_budget = 5000000, withheld = 0, spendable_budget = 5000000),
-    roster = list(count = 5L, cap = 25L, remaining_slots = 20L),
-    outstanding = list(offers = list(), count = 0L, total_amount = 0, completeness = "complete"),
-    target = list(my_bid_id = NULL, my_bid_amount = NA_real_, highest_bid = 0, bid_count = 0L),
-    diagnostics = character(0)
-  )
-  res <- calculate_smart_bid(player_row = player_row, championship_id = "champ",
-                             pressroom_df = NULL, user_teams_df = NULL,
-                             user_cash = NA, market_high_bid = NULL, capacity = capacity)
-  stopifnot(res$recommended_bid <= 5000000)
-  stopifnot(res$max_rational_bid <= 5000000)
-})
+
+
+
+
+
 
 # =============================================================================
 # 3. Acquisition capacity + preflight
@@ -225,10 +112,10 @@ det_seed_capacity <- function(info, market, incoming = data.frame()) {
   fixtures <- list(info, data.frame(id=paste0("r",1:24),name=paste0("P",1:24)),market,incoming)
   keys <- c(paste0("team_info_",champ,"_",team),paste0("roster_",champ,"_",team),
     paste0("market_",champ,"_",team),paste0("roster_bids_",champ,"_",team))
-  for(i in seq_along(keys)) api_cache_env[[api_cache_key(keys[i],login)]] <- list(data=fixtures[[i]],time=Sys.time())
+  for(i in seq_along(keys)) api_cache_env[[api_cache_key(keys[i],context=resource_context(login,champ,team))]] <- list(data=fixtures[[i]],time=Sys.time())
   empty_pressroom <- data.frame(player_id=character(),buyer_team_id=character(),
     seller_team_id=character(),created=character(),stringsAsFactors=FALSE)
-  api_cache_env[[api_cache_key(paste0("pressroom_",champ),login)]] <-
+  api_cache_env[[api_cache_key(paste0("pressroom_",champ),context=resource_context(login,champ))]] <-
     list(data=empty_pressroom,time=Sys.time())
 }
 det_empty_market <- function() data.frame(id=pid,bid_id=NA_character_,bid_price=NA_real_,numberOfBids=2)
@@ -241,7 +128,7 @@ det_record("capacity_ok_snapshot", {
     data.frame(id=c(pid,"other_player"),bid_id=c("bid1","bid2"),bid_price=c(5000000,7000000),numberOfBids=c(2,1)))
   cap <- get_acquisition_capacity(login, champ, team, target_player_id=pid)
   stopifnot(cap$status=="ok",cap$roster$count==24L,cap$roster$cap==25L,cap$roster$remaining_slots==1L,
-    cap$funds$spendable_budget==28000000,cap$outstanding$count==2L,cap$outstanding$completeness=="complete",
+    cap$funds$spendable_budget==38000000,cap$outstanding$count==2L,cap$outstanding$completeness=="complete",
     cap$target$my_bid_id=="bid1",cap$target$my_bid_amount==5000000,
     is.na(cap$target$highest_bid),cap$target$bid_count==2L)
 })
@@ -368,7 +255,7 @@ det_record("capacity_own_market_bid_is_counted_once_and_sealed_amounts_remain_un
   det_seed_capacity(list(budget=50000000,withheld=10000000,configuration=list(maxPlayersInRoster=25)),market,incoming)
   cap<-get_acquisition_capacity(login,champ,team,target_player_id=pid)
   stopifnot(cap$status=="ok",cap$outstanding$count==1,cap$outstanding$total_amount==5000000,
-    cap$funds$spendable_budget==35000000,cap$target$my_bid_id=="own",cap$target$my_bid_amount==5000000,
+    cap$funds$spendable_budget==40000000,cap$target$my_bid_id=="own",cap$target$my_bid_amount==5000000,
     is.na(cap$target$highest_bid))
 })
 
@@ -378,8 +265,8 @@ det_record("player_summary_cache_key_no_collision", {
   # cache keys must NOT collide (no shared player_summary_<champ>_<pid> key).
   login_a <- c(token = "tokenA", userid = "userA", user_name = "A")
   login_b <- c(token = "tokenB", userid = "userB", user_name = "B")
-  key_a <- api_cache_key(paste0("player_summary_", "userA", "_", champ, "_", team, "_", pid), login_a)
-  key_b <- api_cache_key(paste0("player_summary_", "userB", "_", champ, "_", team, "_", pid), login_b)
+  key_a <- api_cache_key(paste0("player_summary_", "userA", "_", champ, "_", team, "_", pid), context=resource_context(login_a,champ,team,pid))
+  key_b <- api_cache_key(paste0("player_summary_", "userB", "_", champ, "_", team, "_", pid), context=resource_context(login_b,champ,team,pid))
   stopifnot(key_a != key_b)
   api_cache_env[[key_a]] <- list(
     data = list(data = NULL, prices = list(),
@@ -399,7 +286,7 @@ det_record("player_summary_cache_key_no_collision", {
 
   # A different team for the SAME user is also a distinct key.
   team2 <- "teamZ"
-  key_c <- api_cache_key(paste0("player_summary_", "userA", "_", champ, "_", team2, "_", pid), login_a)
+  key_c <- api_cache_key(paste0("player_summary_", "userA", "_", champ, "_", team2, "_", pid), context=resource_context(login_a,champ,team2,pid))
   stopifnot(key_a != key_c)
   api_cache_env[[key_c]] <- list(
     data = list(data = NULL, prices = list(),
@@ -457,146 +344,33 @@ det_record("roster_clause_payload_exact_shape_no_isclause", {
 # =============================================================================
 cat("\n--- Today helpers ---\n")
 
-det_record("today_prepare_radar_df_filters_non_finite_fis", {
-  df <- data.frame(
-    id = c("a", "b", "c", "d", "e"),
-    name = c("A", "B", "C", "D", "E"),
-    role = c("GK", "DF", "MF", "FW", "MF"),
-    value = c(100, 200, 300, 400, 500),
-    fis_score = c(NA, Inf, -Inf, 85, 70),
-    fis_tier = c("Hold", "Strong Buy", "Hold", "Buy", "Hold"),
-    stringsAsFactors = FALSE
-  )
-  out <- today_prepare_radar_df(df, top_n = 10)
-  stopifnot(nrow(out) == 2)
-  stopifnot(all(out$PlayerID %in% c("d", "e")))
-  stopifnot(out$PlayerID[1] == "d", out$PlayerID[2] == "e")  # sorted desc
-  stopifnot(all(is.finite(out$FIS)))
-})
 
-det_record("today_prepare_radar_df_top_n_cap", {
-  df <- data.frame(
-    id = paste0("p", 1:15), name = paste0("P", 1:15),
-    fis_score = seq(95, 81, length.out = 15),
-    stringsAsFactors = FALSE
-  )
-  out <- today_prepare_radar_df(df, top_n = 10)
-  stopifnot(nrow(out) == 10)
-  stopifnot(out$FIS[1] == 95)
-})
 
-det_record("today_radar_onclick_js_namespaced", {
-  ns <- NS("today_test")
-  js <- today_radar_onclick_js(ns)
-  stopifnot(reactable:::is.JS(js))
-  s <- as.character(js)
-  stopifnot(grepl("function(rowInfo, column, state)", s, fixed = TRUE))
-  stopifnot(grepl("rowInfo.values.PlayerID", s, fixed = TRUE))
-  stopifnot(grepl("Shiny.setInputValue('today_test-radar_selected_player'", s, fixed = TRUE))
-  stopifnot(grepl("{priority: 'event'}", s, fixed = TRUE))
-  # reactable accepts it
-  rt <- reactable(data.frame(Player = "A", PlayerID = "p1", stringsAsFactors = FALSE),
-                  onClick = js, columns = list(PlayerID = colDef(show = FALSE)))
-  stopifnot(inherits(rt, "reactable"))
-})
 
-det_record("today_rec_action_onclick_js_escaping", {
-  ns <- NS("today_test")
-  oc <- today_rec_action_onclick_js(ns, "player123", "Buy Now")
-  stopifnot(grepl("Shiny.setInputValue('today_test-rec_action_clicked'", oc, fixed = TRUE))
-  stopifnot(grepl("player_id: 'player123'", oc, fixed = TRUE))
-  stopifnot(grepl("action: 'Buy Now'", oc, fixed = TRUE))
-  oc2 <- today_rec_action_onclick_js(ns, "o'brien", "Buy 'X'")
-  stopifnot(grepl("player_id: 'o\\'brien'", oc2, fixed = TRUE))
-  stopifnot(grepl("action: 'Buy \\'X\\''", oc2, fixed = TRUE))
-})
 
-det_record("today_normalize_action_place_bid_maps_to_market_bid", {
-  stopifnot(today_normalize_action("Place Bid") == "market_bid")
-  stopifnot(today_normalize_action("place bid") == "market_bid")
-  stopifnot(today_normalize_action("PLACE BID") == "market_bid")
-  stopifnot(today_normalize_action("  Place Bid  ") == "market_bid")
-})
 
-det_record("today_normalize_action_stable_codes_passthrough", {
-  stopifnot(today_normalize_action("market_bid") == "market_bid")
-  stopifnot(today_normalize_action("view") == "view")
-  stopifnot(today_normalize_action("VIEW") == "view")
-})
 
-det_record("today_normalize_action_unsupported_maps_to_view", {
-  stopifnot(today_normalize_action("Buy Now") == "view")
-  stopifnot(today_normalize_action("Sell Now") == "view")
-  stopifnot(today_normalize_action("View") == "view")
-  stopifnot(today_normalize_action("") == "view")
-  stopifnot(today_normalize_action(NULL) == "view")
-  stopifnot(today_normalize_action(NA) == "view")
-})
 
-det_record("today_resolve_player_known_id_returns_single_row", {
-  df <- data.frame(id = c("p1", "p2", "p3"), name = c("A", "B", "C"),
-                   value = c(100, 200, 300), stringsAsFactors = FALSE)
-  row <- today_resolve_player("p2", df)
-  stopifnot(is.data.frame(row), nrow(row) == 1)
-  stopifnot(as.character(row$id) == "p2", row$name == "B")
-  # Numeric ids resolve against character ids (immutable id comparison).
-  df2 <- data.frame(id = c(101, 102), name = c("X", "Y"), stringsAsFactors = FALSE)
-  row2 <- today_resolve_player("102", df2)
-  stopifnot(is.data.frame(row2), nrow(row2) == 1, row2$name == "Y")
-})
 
-det_record("today_resolve_player_unknown_or_missing_returns_null", {
-  df <- data.frame(id = c("p1", "p2"), name = c("A", "B"), stringsAsFactors = FALSE)
-  stopifnot(is.null(today_resolve_player("nope", df)))
-  stopifnot(is.null(today_resolve_player("", df)))
-  stopifnot(is.null(today_resolve_player(NULL, df)))
-  stopifnot(is.null(today_resolve_player("p1", data.frame())))
-  stopifnot(is.null(today_resolve_player("p1", NULL)))
-  stopifnot(is.null(today_resolve_player("p1", data.frame(name = "A", stringsAsFactors = FALSE))))
-})
+
+
+
+
+
+
+
+
+
 
 # ---- Action-aware resolver: market_bid resolves from market data ONLY ----
 # An owned / non-listed player (present in all-players but absent from market
 # data) must NOT resolve for a market_bid action; it resolves for view.
-det_record("today_resolve_for_action_market_bid_resolves_from_market_only", {
-  market_df <- data.frame(id = c("m1", "m2"), name = c("MktA", "MktB"),
-                          stringsAsFactors = FALSE)
-  all_df <- data.frame(id = c("m1", "m2", "owned1"), name = c("MktA", "MktB", "Owned"),
-                       stringsAsFactors = FALSE)
-  # market_bid: resolves a market-listed player from market data.
-  r1 <- today_resolve_player_for_action("m1", "market_bid", market_df, all_df)
-  stopifnot(is.data.frame(r1), nrow(r1) == 1, as.character(r1$id) == "m1")
-  # market_bid: an owned / non-listed player (only in all_df) must NOT resolve.
-  r2 <- today_resolve_player_for_action("owned1", "market_bid", market_df, all_df)
-  stopifnot(is.null(r2))
-  # market_bid: a market player is resolved even though it also appears in all_df.
-  r3 <- today_resolve_player_for_action("m2", "Place Bid", market_df, all_df)
-  stopifnot(is.data.frame(r3), nrow(r3) == 1, as.character(r3$id) == "m2")
-})
 
-det_record("today_resolve_for_action_view_resolves_from_all_players", {
-  market_df <- data.frame(id = c("m1"), name = c("MktA"), stringsAsFactors = FALSE)
-  all_df <- data.frame(id = c("m1", "owned1"), name = c("MktA", "Owned"),
-                       stringsAsFactors = FALSE)
-  # view: an owned / non-market player resolves from all data.
-  r1 <- today_resolve_player_for_action("owned1", "view", market_df, all_df)
-  stopifnot(is.data.frame(r1), nrow(r1) == 1, r1$name == "Owned")
-  # view: a market player also resolves from all data.
-  r2 <- today_resolve_player_for_action("m1", "view", market_df, all_df)
-  stopifnot(is.data.frame(r2), nrow(r2) == 1, as.character(r2$id) == "m1")
-  # unknown id for view does not resolve.
-  stopifnot(is.null(today_resolve_player_for_action("nope", "view", market_df, all_df)))
-})
 
-det_record("today_resolve_for_action_market_bid_unknown_or_empty_market_null", {
-  market_df <- data.frame(id = character(0), name = character(0), stringsAsFactors = FALSE)
-  all_df <- data.frame(id = c("m1"), name = c("MktA"), stringsAsFactors = FALSE)
-  # Empty market data: a market_bid cannot resolve (fail closed), even if the
-  # player is present in all data.
-  stopifnot(is.null(today_resolve_player_for_action("m1", "market_bid", market_df, all_df)))
-  # NULL market data also fails closed for market_bid.
-  stopifnot(is.null(today_resolve_player_for_action("m1", "market_bid", NULL, all_df)))
-})
+
+
+
+
 
 # ---- Pure market-offer open decision ----
 # The shared decision point: preflight fail -> no open; preflight ok -> open;
@@ -773,110 +547,17 @@ fr3 <- data.frame(
   stringsAsFactors = FALSE
 )
 
-det_record("points_trace_one_marker_per_round", {
-  # Multiple snapshots in one round -> the latest eligible is kept.
-  # Round 1 window (-Inf, 08-01]: 07-30 (5) and 08-01 (6) -> keep 6.
-  # Round 2 window (08-01, 08-08]: 08-05 (7) and 08-07 (8) -> keep 8.
-  # Round 3 window (08-08, 08-15]: 08-12 (9) -> keep 9.
-  df <- data.frame(
-    recorded_at = c("2026-07-30T10:00:00Z", "2026-08-01T10:00:00Z",
-                    "2026-08-05T10:00:00Z", "2026-08-07T10:00:00Z",
-                    "2026-08-12T10:00:00Z"),
-    points = c(5, 6, 7, 8, 9),
-    stringsAsFactors = FALSE
-  )
-  r <- build_player_points_trace(df, fr3)
-  stopifnot(r$has_points, nrow(r$points_df) == 3)
-  stopifnot(all(r$points_df$round_number == c(1, 2, 3)))
-  stopifnot(all(r$points_df$points == c(6, 8, 9)))
-})
 
-det_record("points_trace_missing_round_skipped", {
-  # Only a snapshot in Round 1's window; Rounds 2 and 3 have no eligible
-  # snapshot and must be skipped (no fabricated markers).
-  df <- data.frame(
-    recorded_at = "2026-07-30T10:00:00Z",
-    points = 5,
-    stringsAsFactors = FALSE
-  )
-  r <- build_player_points_trace(df, fr3)
-  stopifnot(r$has_points, nrow(r$points_df) == 1)
-  stopifnot(r$points_df$round_number == 1, r$points_df$points == 5)
-})
 
-det_record("points_trace_boundary_behavior", {
-  # A snapshot exactly at a round boundary belongs to that round (at/before);
-  # a snapshot one second after the prior boundary belongs to the next round.
-  fr2 <- data.frame(
-    round_number = c(1, 2),
-    begin_process = c("2026-08-01T10:00:00Z", "2026-08-08T10:00:00Z"),
-    stringsAsFactors = FALSE
-  )
-  df <- data.frame(
-    recorded_at = c("2026-08-01T10:00:00Z", "2026-08-01T10:00:01Z"),
-    points = c(5, 6),
-    stringsAsFactors = FALSE
-  )
-  r <- build_player_points_trace(df, fr2)
-  stopifnot(r$has_points, nrow(r$points_df) == 2)
-  r1 <- r$points_df[r$points_df$round_number == 1, ]
-  r2 <- r$points_df[r$points_df$round_number == 2, ]
-  stopifnot(nrow(r1) == 1, nrow(r2) == 1, r1$points == 5, r2$points == 6)
-})
 
-det_record("points_trace_no_round_data", {
-  # No finished-round data -> never render points from daily snapshots.
-  df <- data.frame(
-    recorded_at = c("2026-08-01T10:00:00Z", "2026-08-08T10:00:00Z"),
-    points = c(5, 8),
-    stringsAsFactors = FALSE
-  )
-  stopifnot(!build_player_points_trace(df, NULL)$has_points)
-  stopifnot(!build_player_points_trace(df, data.frame())$has_points)
-  # Finished rounds with no parseable begin_process -> no points.
-  fr_bad <- data.frame(round_number = c(1, 2), begin_process = c("", ""), stringsAsFactors = FALSE)
-  stopifnot(!build_player_points_trace(df, fr_bad)$has_points)
-})
 
-det_record("points_trace_graceful_no_points", {
-  stopifnot(!build_player_points_trace(NULL, fr3)$has_points)
-  stopifnot(!build_player_points_trace(data.frame(), fr3)$has_points)
-  df_na <- data.frame(recorded_at = c("2026-08-01T10:00:00Z", "2026-08-08T10:00:00Z"),
-                      points = c(NA, NA), stringsAsFactors = FALSE)
-  stopifnot(!build_player_points_trace(df_na, fr3)$has_points)
-  df_neg <- data.frame(recorded_at = c("2026-07-30T10:00:00Z", "2026-08-05T10:00:00Z"),
-                       points = c(-1, 8), stringsAsFactors = FALSE)
-  r_neg <- build_player_points_trace(df_neg, fr3)
-  stopifnot(r_neg$has_points, nrow(r_neg$points_df) == 1, r_neg$points_df$points == 8)
-})
 
-det_record("points_trace_ignores_unfinished_round", {
-  # An otherwise eligible snapshot under an UNFINISHED round must not produce a
-  # marker; only the finished round does.
-  fr <- data.frame(
-    round_number = c(1, 2),
-    begin_process = c("2026-08-01T10:00:00Z", "2026-08-08T10:00:00Z"),
-    is_finished = c(TRUE, FALSE),
-    stringsAsFactors = FALSE
-  )
-  # Round 1 (finished) has a snapshot; Round 2 (unfinished) also has one.
-  df <- data.frame(
-    recorded_at = c("2026-07-30T10:00:00Z", "2026-08-05T10:00:00Z"),
-    points = c(5, 7),
-    stringsAsFactors = FALSE
-  )
-  r <- build_player_points_trace(df, fr)
-  stopifnot(r$has_points, nrow(r$points_df) == 1)
-  stopifnot(r$points_df$round_number == 1, r$points_df$points == 5)
-  # If every round is unfinished, no points are rendered at all.
-  fr_none <- data.frame(
-    round_number = c(1, 2),
-    begin_process = c("2026-08-01T10:00:00Z", "2026-08-08T10:00:00Z"),
-    is_finished = c(FALSE, FALSE),
-    stringsAsFactors = FALSE
-  )
-  stopifnot(!build_player_points_trace(df, fr_none)$has_points)
-})
+
+
+
+
+
+
 
 }  # end if (all_sourced)
 

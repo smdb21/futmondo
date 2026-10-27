@@ -279,6 +279,8 @@ tagList(
 
 rivals_Server <- function(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger = NULL) {
   moduleServer(id, function(input, output, session) {
+    bind_factual_reads(c("get_user_team_info","get_players_from_team","get_financial_snapshot","calculate_league_finances","get_mvp_payment_evidence","get_championship_pressroom","get_league_standings_history","get_user_team_moneymovements"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
+
     ns <- session$ns
     mvp_snapshot <- shared_mvp_source(session,login_token,championship_id,is_module_active,refresh_trigger)
     

@@ -81,6 +81,8 @@ classification_dreamteam_rows <- function(answer) {
 classification_Server <- function(id, is_module_active, login_token, championship_id, user_team_id,
                                   user_teams_RV, refresh_trigger = NULL) {
   moduleServer(id, function(input, output, session) {
+    bind_factual_reads(c("get_finished_rounds","get_user_team_rounds","get_financial_snapshot","get_round_dreamteam"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
+
     rounds_RV <- reactive({
       req(is_module_active() == TRUE, login_token(), championship_id())
       if (!is.null(refresh_trigger)) refresh_trigger()

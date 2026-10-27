@@ -1,72 +1,43 @@
-# AI Agent Development Rules - Futmondo Insights
+# Futmondo development rules
 
-This document establishes critical guidelines and guardrails for all AI subagents, sidekicks, and developers making additions to the Futmondo Insights R Shiny project.
+## Scope and product boundary
 
----
+The authoritative application is `/home/rstudio/workspace/futmondo/weapp2/Futmondo`. Work inside this directory; parent Java/R prototypes are unrelated legacy projects. Preserve existing user changes and review scoped diffs.
 
-## 📋 1. Mandatory Documentation Rule
+Futmondo provides observed player/team/market data, historical records, official notifications, descriptive statistics, and explicit manual transactions. Prediction models, forecast-based recommendations/optimizers, Smart Bid, trading automation, coach automation, scheduled observation workers, and stored background sessions have been removed from the product scope. Do not reintroduce them or list them as future milestones without a new explicit user request.
 
-Every developer and AI agent making modifications or additions to the codebase **MUST** adhere to the following documentation constraints:
+Normal active-session loading, caching, and recording of already-fetched observations are data infrastructure. They must not perform autonomous trading or unattended harvesting.
 
-### A. Feature & Code Additions
-* Any new R function, module, API connector, or database integration **must** be documented in a corresponding `.md` file inside the `docs/` directory.
-* The documentation must outline the functional parameters, payload shapes, return types, and code usage examples.
+## Data architecture
 
-### B. General & Configuration Additions
-* Any global changes, new R package dependencies, environment variable additions, or system-level setup guides **must** be documented directly inside the root `README.md` file under appropriate sections.
+Follow `docs/data_architecture_redesign_plan.md` and the implemented contracts in the data-layer documentation. UI modules consume shared resource state. Pass account and league/team context explicitly, preserve source timestamps, bound caches and queues, and invalidate only affected resources.
 
----
+A timer or `tryCatch()` does not make synchronous HTTP non-blocking. Verify responsiveness with delayed-request checks. Do not assume control of hosting processes, child processes, cron, or services: the app uses Posit Connect Cloud's free plan.
 
-## 🛠️ 2. Architectural Guardrails
-* **No Blocking Syncs**: Always wrap Supabase or external API network writes defensively in `tryCatch()` blocks to prevent user thread blocking or parent server crashes.
-* **Caching Respect**: All new API fetching handlers must hook into `get_cached_data()` to ensure sub-millisecond tab switches and protect accounts from API rate-limiting.
-* **Mobile-First CSS**: Avoid adding fixed-width elements. Ensure all columns, modals, and container paddings leverage standard Bootstrap fluid structures or responsive media queries in `www/custom_style.css`.
+Do not manufacture historical values, scores, dates, balances, or season identity. Keep unavailable values distinct from true zero; preserve negative points. Keep different leagues, seasons, and scoring versions separate. Retried persistence must not duplicate source observations.
 
----
+In transaction records a missing or empty buyer/seller ID means the Futmondo System/Market, not a corrupt counterparty. Preserve this domain rule.
 
-## 📦 3. Package Dependencies & Deployment
+Keep explicit manual-action preflights. An uncertain transaction response must be reconciled, never automatically retried.
 
-* **Manifest Creation**: Whenever a new R library dependency is added to the project, you **MUST** regenerate the deployment manifest file in the project root by running:
-  ```R
-  rsconnect::writeManifest()
-  ```
-  This is required to ensure that hosting services (such as shinyapps.io, RStudio Connect, or Posit Connect) correctly identify and install the required packages.
+## Documentation and delivery tracking
 
----
+Document new or changed functions, modules, interfaces, payload shapes, and data behavior in `docs/`. Document environment variables, dependencies, and setup in `README.md`.
 
-## 4. Domain & Transaction Rules
+Track work in `docs/data_architecture_redesign_plan.md`; record actual checks and limitations in `docs/data_review_results.md`. Mark milestones complete only when their stated exit criteria are met. Distinguish local implementation and isolated validation from production migration and deployment.
 
-* **Futmondo System as Counterparty**: In Futmondo transactions (pressroom feed, market movements, transaction logs), if `buyer_team_id` / `_buyer` ID is missing, `NULL`, or empty (`""`), the buyer is the **Futmondo System / Market** (e.g., player was sold to the market/computer). Likewise, if `seller_team_id` / `_seller` ID is missing, `NULL`, or empty (`""`), the seller is the **Futmondo System / Market** (e.g., player was bought from the market/computer).
-  - Agents and functions must treat missing/empty counterparty IDs as the Futmondo system, not as corrupted or missing data.
-  - When displaying or reporting transactions, label an empty buyer/seller as `"Futmondo / Mercado"` or `"Futmondo (System)"`.
+The former prediction/automation roadmap is superseded. Keep `docs/v3_roadmap.md` as a short pointer to the current scope.
 
----
+## Verification
 
-## 5. Project Scope & Legacy Isolation Rule
+Use the smallest meaningful existing tests for each changed behavior. Add focused coverage for uncovered data, cache, isolation, or manual-action risks. Independently verify changed point/history transformations with known-answer fixtures.
 
-* **Authoritative Root**: The ONLY authoritative codebase for this project is `/home/rstudio/workspace/futmondo/weapp2/Futmondo/`.
-* **Disregard Parent / Legacy Files**: Any file or directory outside `/home/rstudio/workspace/futmondo/weapp2/Futmondo/` (such as root workspace files, `../../src/`, `../../webapp/`, `../../jornada*.txt`, `../../saladeprensa*.txt`, etc.) belongs to deprecated legacy iterations, Java/R prototypes, or previous experiments. AI agents and developers must NEVER read, reference, edit, or rely on any files outside this project directory.
+For shared infrastructure, startup, or cross-cutting UI changes, run `Rscript test/test_shiny_simulation.R`, the offline lifecycle harness. Never use real accounts or transactions in tests. Report executed results honestly; repair failures before claiming the affected behavior is complete.
 
----
+Regenerate and inspect `rsconnect::writeManifest()` after dependency changes. Exclude credentials, HAR captures, tests, internal documentation, obsolete source backups, and development scripts from the application bundle.
 
-## 6. Roadmap Phase Tracking Rule
+## Security and presentation
 
-* **Tag Completed Roadmap Phases**: Every time an AI agent, developer, or subagent finishes implementing a milestone or phase from the product roadmap (`docs/v3_roadmap.md`), the agent **MUST** update `docs/v3_roadmap.md` to tag that phase as `[COMPLETED]` / `[IMPLEMENTED]` with a status checkmark, completion date, and short summary of delivered components.
+Keep database credentials on the R server. Maintain context isolation, restricted database access, and safe diagnostic logging. Do not print tokens, passwords, or raw private response bodies.
 
----
-
-## 7. Scoped Verification & Testing Rule
-
-* **Focused Tests for Every Change**: Whenever a feature, module, UI component, algorithm, or server handler is added or modified, developers and AI agents **MUST** update or add an appropriate focused automated test covering the modified behavior (inside `test/`, e.g. `test/test_shiny_simulation.R` or a dedicated script for the affected component). No change may ship with zero test coverage.
-* **Smallest Relevant Test by Default**: For routine changes, run only the smallest directly relevant test script(s) that exercise the modified code. Do not run the full Shiny simulation suite by default.
-* **Full Suite Only When Warranted**: Running `Rscript test/test_shiny_simulation.R` (the full Shiny simulation suite) is required only for significant or cross-cutting changes, application-startup changes, shared infrastructure changes, or major UI/server flow changes, or when explicitly requested by the user.
-* **Report Test Selection & Results**: Developers and AI agents **MUST** report which test script(s) were selected and their actual results (pass/fail output) as part of the task report.
-* **Fix Failures Before Completion**: Any failed focused test must be fixed and re-run until it passes before the task is considered complete.
----
-
-## Posit Connect Cloud Free Plan Constraint
-
-* This application is deployed on **Posit Connect Cloud’s free plan**.
-* Do not assume control of the hosting server, R process lifecycle, background/child processes, cron jobs, service configuration, or deployment-wide settings.
-* Implement periodic or deferred work cooperatively inside the active Shiny session, keep it non-blocking, and tolerate session suspension or termination.
-* Features requiring an always-on worker, scheduled execution, custom server configuration, or a process manager must remain optional and use an external service explicitly configured by the user.
+Use responsive Bootstrap structures and mobile-safe CSS; avoid fixed-width controls that overflow narrow screens.

@@ -1,12 +1,5 @@
-# Team Load Speed Acceleration
+# Data loading and responsiveness
 
-## Summary
-Removed blocking Supabase HTTP syncs from the reactive computation path and reduced the login debounce delay to accelerate team load speed.
+The current work is defined by the [data redesign plan](data_architecture_redesign_plan.md). The previous use of `on.exit()` or timer callbacks did not establish non-blocking network behavior: synchronous HTTP still occupies the Shiny process while it executes.
 
-## Changes
-- **Debounce reduction**: `debounce(1000)` -> `debounce(50)` on `login_token_RV` (line 5).
-- **Deferred championship sync**: `championship_RV` now returns the championship object immediately; `sync_championship_to_supabase()` runs via `on.exit(add = TRUE)` after the reactive value is returned.
-- **Deferred user teams sync**: `user_teams_RV` now returns the teams object immediately; `sync_user_teams_to_supabase()` and `log_user_team_history()` run via `on.exit(add = TRUE)` after the reactive value is returned.
-
-## Verification
-`Rscript -e "parse('server.R')"` parses successfully with no syntax errors.
+Measure data reuse, request counts, memory bounds, and delayed-request responsiveness through the shared resource layer. Cache hits do not prove that cold requests or persistence callbacks remain responsive. Executed results belong in [review results](data_review_results.md).

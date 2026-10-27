@@ -33,59 +33,8 @@ library(jsonlite)
 library(data.table)
 source("mvp_runtime.R")
 
-# Global Cache Environment and Utilities
-api_cache_env <- new.env(parent = emptyenv())
-
-api_cache_key <- function(key, login = NULL, scope = NULL) {
-  if (is.null(scope) && valid_login(login)) scope <- as.character(login[["userid"]])
-  if (is.null(scope) && requireNamespace("shiny", quietly = TRUE)) {
-    domain <- shiny::getDefaultReactiveDomain()
-    if (!is.null(domain)) scope <- domain$userData$futmondo_user_id
-  }
-  if (is.null(scope) || !nzchar(scope)) key else paste0("account:", scope, ":", key)
-}
-
-get_cached_data <- function(key, expr, timeout_sec = 300) {
-  caller <- parent.frame()
-  auth <- get0("login", envir = caller, inherits = FALSE)
-  key <- api_cache_key(key, auth)
-  now <- Sys.time()
-  cached <- api_cache_env[[key]]
-  if (!is.null(cached) && as.numeric(difftime(now, cached$time, units = "secs")) < timeout_sec)
-    return(cached$data)
-  tryCatch({
-    data <- force(expr)
-    if (is.null(data)) stop("Data unavailable")
-    data <- observed_data(data, status=attr(data,"fetch_status"),
-      observed_at=attr(data,"observed_at") %||% now)
-    api_cache_env[[key]] <- list(data = data, time = now)
-    data
-  }, error = function(e) {
-    if (!is.null(cached)) {
-      fallback <- observed_data(cached$data,status="stale",
-        observed_at=attr(cached$data,"observed_at") %||% cached$time)
-      if(is.list(fallback) && !is.data.frame(fallback) && identical(fallback$status,"ok")) {
-        fallback$status <- "partial"
-        if("spendable_budget" %in% names(fallback)) fallback$spendable_budget <- NA_real_
-        if(is.list(fallback$funds)) fallback$funds$spendable_budget <- NA_real_
-      }
-      return(fallback)
-    }
-    stop(structure(list(message = "Requested data is unavailable. Please retry.", call = NULL),
-                   class = c("futmondo_unavailable", "error", "condition")))
-  })
-}
-
-clear_api_cache <- function(user_id = NULL) {
-  if (is.null(user_id) && requireNamespace("shiny", quietly = TRUE)) {
-    domain <- shiny::getDefaultReactiveDomain()
-    if (!is.null(domain)) user_id <- domain$userData$futmondo_user_id
-  }
-  keys <- ls(envir = api_cache_env)
-  if (!is.null(user_id)) keys <- keys[startsWith(keys, paste0("account:", user_id, ":"))]
-  if (length(keys)) rm(list = keys, envir = api_cache_env)
-  invisible(TRUE)
-}
+source("data_service.R")
+source("async_transport.R")
 
 # Only read endpoints may retry. Mutations require reconciliation after an
 # uncertain response, so a network timeout must never replay a trade.
@@ -148,7 +97,7 @@ get_real_clubs <- function(login, championship_id) {
         stringsAsFactors = FALSE
       )
     }) %>% bind_rows()
-  })
+  }, context=resource_context(login=login,championship_id=championship_id))
 }
 
 login <- function(user_name = NULL, password = NULL) {
@@ -199,7 +148,7 @@ get_championships <- function(login, championship_name = NULL) {
     }
     ret <- ret %>% unlist()
     ret
-  })
+  }, context=resource_context(login=login))
 }
 
 
@@ -367,7 +316,7 @@ get_players_from_team <- function(login, championship_id, user_team_id, teams = 
     }
 
     roster
-  }, timeout_sec = 30)
+  }, timeout_sec = 30, context=resource_context(login=login,championship_id=championship_id,user_team_id=user_team_id))
 }
 
 # Function to check if a column is character and convert to numeric
@@ -425,7 +374,7 @@ get_market_players <- function(login, championship_id, user_team_id) {
     }
     ret <- ret %>% dplyr::arrange(desc(change))
     ret
-  })
+  }, context=resource_context(login=login,championship_id=championship_id,user_team_id=user_team_id))
 }
 
 get_championship_players <- function(login, championship_id) {
@@ -475,7 +424,7 @@ get_championship_players <- function(login, championship_id) {
     
     ret <- ret %>% dplyr::arrange(name)
     ret
-  })
+  }, context=resource_context(login=login,championship_id=championship_id))
 }
 
 
@@ -639,7 +588,7 @@ get_lineup_from_team <- function(login, championship_id, user_team_id) {
     pointSystem=lineup$pointSystem,players=parse_slots(lineup$players),budget=lineup$budget,
     bench=list(config=bench_config,players=bench_players))
   return(lineup)
-  }, timeout_sec = 30)
+  }, timeout_sec = 30, context=resource_context(login=login,championship_id=championship_id,user_team_id=user_team_id))
 }
 
 # Vectorized Date Formatter to DD-MM-YY HH:MM
@@ -1095,87 +1044,7 @@ get_reactable_columns_for_players <- function(table) {
     )
   }
 
-  if ("clause_ratio" %in% colnames(table)) {
-    columns[["clause_ratio"]] <- colDef(
-      name = "Scout Indicator",
-      align = "center",
-      cell = function(value) {
-        if (is.na(value) || !is.numeric(value)) return("")
-        if (value < 1.1) {
-          shiny::tags$span(class = "badge-md", style = "font-weight: 700; font-size: 11px; padding: 2px 8px;", "STEAL")
-        } else if (value < 1.3) {
-          shiny::tags$span(style = "color: var(--fm-warning); font-weight: 600;", "GOOD VALUE")
-        } else {
-          shiny::tags$span(style = "color: var(--fm-text);", "OVERPRICED")
-        }
-      }
-    )
-  }
-
-  # FIS Score Column ----
-  if ("fis_score" %in% colnames(table)) {
-    columns[["fis_score"]] <- colDef(
-      name = "FIS",
-      align = "center",
-      minWidth = 140,
-      cell = function(value, index) {
-        if (is.na(value) || is.null(value)) return("")
-
-        tier <- if ("fis_tier" %in% colnames(table) && !is.na(table$fis_tier[index])) {
-          as.character(table$fis_tier[index])
-        } else {
-          # Derive tier from score if fis_tier column is missing
-          if (value >= 80) "Strong Buy"
-          else if (value >= 65) "Buy"
-          else if (value >= 45) "Hold"
-          else "Sell"
-        }
-
-        # Color mapping per tier
-        bg_color <- if (tier == "Strong Buy") {
-          "#dcfce7"
-        } else if (tier == "Buy") {
-          "#e0f2fe"
-        } else if (tier == "Hold") {
-          "#fef3c7"
-        } else {
-          "#fee2e2"
-        }
-
-        text_color <- if (tier == "Strong Buy") {
-          "#166534"
-        } else if (tier == "Buy") {
-          "#0369a1"
-        } else if (tier == "Hold") {
-          "#92400e"
-        } else {
-          "#991b1b"
-        }
-
-        # Build tooltip from fis_summary if available
-        tooltip_text <- ""
-        if ("fis_summary" %in% colnames(table) && !is.na(table$fis_summary[index]) && nzchar(as.character(table$fis_summary[index]))) {
-          tooltip_text <- as.character(table$fis_summary[index])
-        }
-
-        shiny::tags$span(
-          class = "badge-fis-score",
-          title = tooltip_text,
-          style = paste0(
-            "background: ", bg_color, "; color: ", text_color, "; font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 12px; white-space: nowrap; display: inline-block;"
-          ),
-          shiny::tags$span(
-            style = "margin-right: 4px;",
-            round(value, 1)
-          ),
-          shiny::tags$span(
-            style = "font-weight: 600;",
-            tier
-          )
-        )
-      }
-    )
-  }
+  if("clause_ratio"%in%colnames(table))columns[["clause_ratio"]]<-colDef(name="Clause / market value",align="center",cell=function(value){number<-suppressWarnings(as.numeric(value));if(length(number)!=1L||!is.finite(number))"Unavailable"else sprintf("%.2fx",number)})
 
   return(columns)
 }
@@ -1235,13 +1104,13 @@ get_teams <- function(login, championship_id) {
         ret$teamname <- ret$name
       }
       if (!"points" %in% colnames(ret)) {
-        ret$points <- 0
+        ret$points <- NA_real_
       }
     }
     
     print(paste0(nrow(ret), " teams retrieved"))
     ret
-  })
+  }, context=resource_context(login=login,championship_id=championship_id))
 }
 
 
@@ -1682,7 +1551,7 @@ get_acquisition_capacity <- function(login, championship_id, user_team_id, targe
       target = target,
       diagnostics = diagnostics
     )
-  }, timeout_sec = 15)
+  }, timeout_sec = 15, context=resource_context(login=login,championship_id=championship_id,user_team_id=user_team_id))
 }
 
 # ============================================================
@@ -1827,7 +1696,7 @@ get_user_team_info <- function(login, championship_id, user_team_id) {
     } else {
       return(NULL)
     }
-  }, timeout_sec = 15)
+  }, timeout_sec = 15, context=resource_context(login=login,championship_id=championship_id,user_team_id=user_team_id))
 }
 
 get_team_image_name <- function(team, logo = NULL) {
@@ -2024,7 +1893,7 @@ get_user_team_moneymovements <- function(login, championship_id, user_team_id) {
       category = character(0), money = numeric(0), date = character(0),
       stringsAsFactors = FALSE
     ))
-  })
+  }, context=resource_context(login=login,championship_id=championship_id,user_team_id=user_team_id))
 }
 
 get_championship_pressroom <- function(login, championship_id) {
@@ -2172,7 +2041,7 @@ get_championship_pressroom <- function(login, championship_id) {
     }, error = function(e) {
       stop("Pressroom data unavailable")
     })
-  }, timeout_sec = 300)
+  }, timeout_sec = 300, context=resource_context(login=login,championship_id=championship_id))
 }
 
 calculate_league_finances <- function(login, championship_id, user_teams_df, initial_budget = NA_real_) {
@@ -2210,7 +2079,7 @@ calculate_league_finances <- function(login, championship_id, user_teams_df, ini
 
     # Sync pressroom transactions to Supabase
     tryCatch({
-      sync_pressroom_transactions_to_supabase(pressroom_df, championship_id)
+
     }, error = function(e) {
       print(paste0("[Finances] Supabase pressroom sync warning: ", e$message))
     })
@@ -2337,8 +2206,8 @@ calculate_league_finances <- function(login, championship_id, user_teams_df, ini
 
     # Sync calculated financial standings to Supabase
     tryCatch({
-      sync_user_teams_to_supabase(finances_df, championship_id)
-      log_user_team_history(finances_df,championship_id=championship_id)
+
+
     }, error = function(e) {
       print(paste0("[Finances] Supabase sync warning: ", e$message))
     })
@@ -2347,7 +2216,7 @@ calculate_league_finances <- function(login, championship_id, user_teams_df, ini
       team_finances = finances_df,
       all_purchases = purchases_df
     ))
-  }, timeout_sec = 60)
+  }, timeout_sec = 60, context=resource_context(login=login,championship_id=championship_id))
 }
 
 get_player_summary <- function(login, championship_id, user_team_id = NULL, player_id = NULL) {
@@ -2413,6 +2282,7 @@ get_player_summary <- function(login, championship_id, user_team_id = NULL, play
         points = ans_data$points %||% list(),
         match = ans_data$match %||% NULL,
         championship = ans_data$championship %||% list(),
+        history_complete = isTRUE(ans_data$historyComplete),
         owners = ans_data$owners %||% list(),
         market = ans_data$market %||% list(),
         numberOfBids = ans_data$numberOfBids %||% NA_integer_,
@@ -2422,7 +2292,7 @@ get_player_summary <- function(login, championship_id, user_team_id = NULL, play
       ))
     }
     return(NULL)
-  }, timeout_sec = 60)
+  }, timeout_sec = 60, context=resource_context(login=login,championship_id=championship_id,user_team_id=user_team_id,player_id=player_id))
 }
 
 # Read a player endpoint that is scoped only by player ID.  These endpoints
@@ -2445,7 +2315,7 @@ get_player_profile_endpoint <- function(login, player_id, endpoint, cache_prefix
     answer <- if (is.list(decoded)) decoded$answer else NULL
     if (is.null(answer) || !is.list(answer)) stop("Player profile data is unavailable.")
     answer
-  }, timeout_sec = 300)
+  }, timeout_sec = 300, context=resource_context(login=login,player_id=player_id))
 }
 
 # Fetch Futmondo's real-competition player profile, including independent
@@ -2463,7 +2333,7 @@ get_player_matches <- function(login, player_id) {
 
 normalize_player_full_profile <- function(answer) {
   empty_prices <- data.frame(recorded_at=character(), social=numeric(), classic=numeric(), stringsAsFactors=FALSE)
-  if (!is.list(answer)) return(list(profile=list(), price_history=empty_prices))
+  if (!is.list(answer)) answer <- list()
   profile <- answer$profile %||% list()
   nationality <- if (is.list(profile$nationality)) profile$nationality$main %||% "" else profile$nationality %||% ""
   normalized_profile <- list(
@@ -2573,11 +2443,11 @@ get_user_team_rounds <- function(login, championship_id, user_team_id) {
       return(ans$answer)
     }
     return(list())
-  })
+  }, context=resource_context(login=login,championship_id=championship_id,user_team_id=user_team_id))
 }
 
 build_round_dreamteam_payload <- function(login, championship_id, reference) list(header=list(token=login[["token"]], userid=login[["userid"]]), query=list(championshipId=championship_id,type="dreamteam",round=reference$round_id),answer=list())
-get_round_dreamteam <- function(login, championship_id, reference) { ref<-if(is.list(reference)) round_reference(reference$round_id,reference$round_number) else round_reference(reference); if(is.null(ref)) return(NULL); get_cached_data(paste0("dreamteam_",championship_id,"_",ref$round_id), { ans<-httr::content(futmondo_post(DREAMTEAM_URL,body=toJSON(build_round_dreamteam_payload(login,championship_id,ref),auto_unbox=TRUE),add_headers(.headers=c("Content-Type"="application/json; charset=utf-8")))); if(is.list(ans$answer)) ans$answer else list() }) }
+get_round_dreamteam <- function(login, championship_id, reference) { ref<-if(is.list(reference)) round_reference(reference$round_id,reference$round_number) else round_reference(reference); if(is.null(ref)) return(NULL); get_cached_data(paste0("dreamteam_",championship_id,"_",ref$round_id), { ans<-httr::content(futmondo_post(DREAMTEAM_URL,body=toJSON(build_round_dreamteam_payload(login,championship_id,ref),auto_unbox=TRUE),add_headers(.headers=c("Content-Type"="application/json; charset=utf-8")))); if(is.list(ans$answer)) ans$answer else list() }, context=resource_context(login=login,championship_id=championship_id)) }
 official_round_mvp_row <- function(answer, championship_id, reference) {
   result <- normalize_official_dreamteam(answer,championship_id,reference)
   if(result$status!="ok") return(data.frame())
@@ -2621,8 +2491,7 @@ direct_sale_preflight <- function(login, championship_id, team_id, player_id) {
   if(!valid_login(login) || any(!vapply(ids,function(x) is.atomic(x) && length(x)==1L && !is.na(x) && nzchar(trimws(as.character(x))),logical(1))))
     return(denied("invalid_context","Log in and select an owned player before selling."))
   # A sale must recheck live ownership; a cached card cannot authorize a write.
-  key <- api_cache_key(paste0("player_summary_",login[["userid"]],"_",championship_id,"_",team_id,"_",player_id),login)
-  if(exists(key,api_cache_env,inherits=FALSE)) rm(list=key,envir=api_cache_env)
+  invalidate_resources(resource_context(login,championship_id,team_id,player_id),pattern="^player_summary_")
   summary <- tryCatch(get_player_summary(login,championship_id,team_id,player_id),error=function(e)NULL)
   if(!is.list(summary) || !is.list(summary$data) || !is.list(summary$championship) || identical(attr(summary,"fetch_status"),"stale") ||
      !identical(fm_scalar(summary$data$id %||% summary$data$`_id`,""),as.character(player_id)))
@@ -2864,7 +2733,7 @@ dplyr::slice_max(order_by = bid_price, n = 1, with_ties = FALSE) %>%
        }
      }
      return(data.frame())
-  }, timeout_sec = 15)
+  }, timeout_sec = 15, context=resource_context(login=login,championship_id=championship_id,user_team_id=user_team_id))
 }
 
 get_my_market_players <- function(login, championship_id, user_team_id) {
@@ -2898,7 +2767,7 @@ get_my_market_players <- function(login, championship_id, user_team_id) {
       return(ret)
     }
     return(data.frame())
-  }, timeout_sec = 60)
+  }, timeout_sec = 60, context=resource_context(login=login,championship_id=championship_id,user_team_id=user_team_id))
 }
 
 accept_bid <- function(login, championship_id, team_id, player_id, bid_id) {
@@ -2993,7 +2862,7 @@ get_financial_snapshot <- function(login, championship_id, user_team_id) {
       commitments = capacity$outstanding, observed_at = observed_at,
       configuration = info$configuration %||% list(),
       team_value = team_value, rules = rules, lineup_rules = rules)
-  }, timeout_sec = 15)
+  }, timeout_sec = 15, context=resource_context(login=login,championship_id=championship_id,user_team_id=user_team_id))
 }
 
 get_active_championships <- function(login) {
@@ -3011,7 +2880,7 @@ get_active_championships <- function(login) {
       champ
     })
     answer
-  }, timeout_sec = 60)
+  }, timeout_sec = 60, context=resource_context(login=login))
 }
 
 notification_request <- function(login, action, query = "") {
@@ -3052,7 +2921,7 @@ get_notifications <- function(login) {
     if (result$status != "ok") stop("Unavailable")
     if(!is.list(result$data$items)) stop("Notification list unavailable")
     normalize_notifications(result$data$items)
-  }, timeout_sec = 30), error = function(e) NULL)
+  }, timeout_sec = 30, context=resource_context(login=login)), error = function(e) NULL)
 }
 
 get_notification_unread <- function(login) {
@@ -3061,7 +2930,7 @@ get_notification_unread <- function(login) {
     count <- fm_number(result$data)
     if (result$status != "ok" || !is.finite(count) || count < 0) stop("Unavailable")
     as.integer(count)
-  }, timeout_sec = 55), error = function(e) NA_integer_)
+  }, timeout_sec = 55, context=resource_context(login=login)), error = function(e) NA_integer_)
 }
 
 mark_notification_read <- function(login, id) {

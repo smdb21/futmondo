@@ -118,7 +118,8 @@ selected_player_UI <- function(id) {
                    h4(style = "font-weight: 600; color: var(--fm-text); margin: 0;", "Historical Valuation & Performance"),
                    radioButtons(ns("player_chart_metric"), label = NULL,
                      choices = c("Valuation" = "valuation", "Round points" = "points"),
-                     selected = "valuation", inline = TRUE)
+                     selected = "valuation", inline = TRUE),
+                   actionButton(ns("refresh_history"), "Refresh history", icon=icon("rotate"))
                  ),
                  plotly::plotlyOutput(ns("player_trend_plot"), height = "280px")
           )
@@ -127,16 +128,6 @@ selected_player_UI <- function(id) {
         fluidRow(
           style = "margin-top: 20px; padding-top: 15px; border-top: 1px solid #f1f5f9;",
           column(12, uiOutput(ns("player_external_details")))
-        ),
-        # FIS 5-Pillar Breakdown Panel
-        fluidRow(
-          style = "margin-top: 20px; padding-top: 15px; border-top: 1px solid #f1f5f9;",
-          column(12, uiOutput(ns("fis_panel")))
-        ),
-        # Smart Bid & Auction Intelligence Widget
-        fluidRow(
-          style = "margin-top: 20px; padding-top: 15px; border-top: 1px solid #f1f5f9;",
-          column(12, uiOutput(ns("smart_bid_widget")))
         )
       )
     )
@@ -146,7 +137,7 @@ selected_player_UI <- function(id) {
 
 # ---- Pure helper: market-offer open decision ----
 # Single decision point shared by the "Make Market Offer" button and the
-# external "market_bid" action event (e.g. Today's "Place Bid" recommendation).
+# external "market_bid" action event from another player view.
 # Given a selected player row and a preflight result, decide whether the
 # regular market-offer modal should open.
 #   - no valid player            -> open = FALSE, reason = "no_player"
@@ -165,11 +156,15 @@ market_offer_decision <- function(sp, preflight) {
 }
 
 
-selected_player_Server <- function(id, selected_player, login_token = NULL, championship_id = NULL, user_team_id = NULL, on_bid_updated = NULL, open_action = NULL, capacity_fetcher = NULL) {
+selected_player_Server <- function(id, selected_player, login_token = NULL, championship_id = NULL, user_team_id = NULL, on_bid_updated = NULL, open_action = NULL, capacity_fetcher = NULL, refresh_trigger = NULL) {
   # Keep the caller's reactive lazy: parent tables define it after this module.
   player_source <- function() selected_player()
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+    bind_factual_reads(c("get_player_full_profile","get_player_matches"),session,
+      function()get_reactive_val(login_token),function()get_reactive_val(championship_id),function()get_reactive_val(user_team_id),
+      is_active=function()!is.null(selected_player()) && valid_login(get_reactive_val(login_token)),refresh_trigger=refresh_trigger)
+
     raw_selected_player <- player_source
     selected_player <- reactive({
       row <- raw_selected_player()
@@ -181,8 +176,6 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
     active_bid_info_RV <- reactiveVal(NULL)
 
-    # Store the latest smart bid result for the "Use Smart Bid" button
-    smart_bid_cache_RV <- reactiveVal(NULL)
 
     # Records whether the regular market-offer modal was opened by the shared
     # helper (TRUE) or blocked by preflight / missing player (FALSE). Exposed
@@ -222,7 +215,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     observeEvent(player_action_context_RV(), {
       current_context <- player_action_context_RV()
       previous_context <- isolate(previous_player_action_context_RV())
-      active_bid_info_RV(NULL);smart_bid_cache_RV(NULL);modal_context_RV(list())
+      active_bid_info_RV(NULL);modal_context_RV(list())
       offer_modal_opened_RV(FALSE);clause_modal_opened_RV(FALSE);modify_modal_opened_RV(FALSE)
       if (player_card_context_changed(previous_context, current_context)) removeModal()
       previous_player_action_context_RV(current_context)
@@ -345,12 +338,11 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     # ---- Main observer: populate box + action buttons ----
     observeEvent(
       {
-        selected_player()
+        list(selected_player(),card_history())
       },
       {
         sp <- selected_player()
         req(sp)
-        smart_bid_cache_RV(NULL)
 
         login <- get_reactive_val(login_token)
         champ_id <- get_reactive_val(championship_id)
@@ -360,9 +352,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         my_bid_price <- NULL
 
         if (!is.null(login) && !is.null(champ_id) && !is.null(team_id) && !is.null(sp$id)) {
-          summary_res <- tryCatch({
-            get_player_summary(login = login, championship_id = champ_id, user_team_id = team_id, player_id = sp$id)
-          }, error = function(e) NULL)
+          summary_res <- card_history()$summary
 
           # Only trust summary-level my_bid_id/my_bid_price: get_player_summary
           # now returns them ONLY when a bid's immutable team ID matches our
@@ -791,7 +781,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
           tryCatch(on_bid_updated(action_type = "bid_modified", player_id = player_id, new_bid_price = new_price, is_cancel = FALSE), error = function(e) NULL)
         }
-        clear_api_cache()
+        invalidate_manual_resources(login,champ_id,team_id,sp$id)
       } else {
         shiny::showNotification(
           "Failed to update bid. Please try again.",
@@ -853,7 +843,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
           tryCatch(on_bid_updated(action_type = "bid_cancelled", player_id = player_id, new_bid_price = NA_real_, is_cancel = TRUE), error = function(e) NULL)
         }
-        clear_api_cache()
+        invalidate_manual_resources(login,champ_id,team_id,sp$id)
       } else {
         shiny::showNotification(
           "Failed to cancel bid. Please try again.",
@@ -863,52 +853,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       }
     })
 
-    # ---- Use Smart Bid: pre-fill the market offer modal ----
-    observeEvent(input$btn_use_smart_bid, {
-      remember_action_context("bid")
-      cached <- smart_bid_cache_RV()
-      if (is.null(cached) || !isTRUE(cached$can_compete) || !isTRUE(cached$funds_verified) || length(cached$recommended_bid) != 1L || !is.finite(cached$recommended_bid) || cached$recommended_bid <= 0) {
-        shiny::showNotification("Smart bid data not available. Please refresh.", type = "error")
-        return()
-      }
-
-      sp <- selected_player()
-      req(sp)
-
-      # Recheck the cached recommendation against current minimum and funds.
-      pf <- run_acquisition_preflight(sp, "bid", amount = cached$recommended_bid)
-      if (!isTRUE(pf$ok)) {
-        show_preflight_failure(pf)
-        return()
-      }
-
-      recommended_val <- cached$recommended_bid
-      market_price <- market_bid_minimum(sp)
-
-      showModal(modalDialog(
-        title = tagList(icon("chart-line"), " Place Market Offer (Smart Bid)"),
-        p(strong(sp$name)),
-        p("Minimum market bid: ", strong(player_card_money(market_price))),
-        p("Recommended Smart Bid: ", strong(player_card_money(recommended_val))),
-        numericInput(
-          ns("bid_amount"),
-          label = "Your offer amount (EUR):",
-          value = recommended_val,
-          min = market_price,
-          step = 10000
-        ),
-        uiOutput(ns("bid_amount_preview")),
-        footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
-                      modalButton("Cancel"),
-                      actionButton(ns("submit_bid"), "Submit Market Offer", class = "btn btn-buy-market")),
-        easyClose = TRUE,
-        size = "s"
-      ))
-    })
-
     # ---- Shared helper: open the regular market-offer modal ----
     # Single code path for the "Make Market Offer" button and for external
-    # "market_bid" action events (e.g. Today's "Place Bid" recommendation).
+    # "market_bid" action events from another player view.
     # Honors the same run_acquisition_preflight behavior as the button path.
     open_market_offer_modal <- function() {
       sp <- selected_player()
@@ -1070,7 +1017,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           type = "message",
           duration = 5
         )
-        clear_api_cache()
+        invalidate_manual_resources(login,champ_id,team_id,sp$id)
         if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
           tryCatch(on_bid_updated(action_type = "bid_placed", player_id = player_id, new_bid_price = bid_amount, is_cancel = FALSE), error = function(e) NULL)
         }
@@ -1097,7 +1044,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         return()
       }
 
-      default_offer <- if ("value" %in% colnames(sp) && !is.na(sp$value) && sp$value > 0) sp$value else 1000000
+      default_offer <- if ("value" %in% colnames(sp) && !is.na(sp$value) && sp$value > 0) sp$value else NA_real_
       owner_name <- if ("userTeam" %in% colnames(sp) && !is.na(sp$userTeam)) sp$userTeam else if ("teamname" %in% colnames(sp) && !is.na(sp$teamname)) sp$teamname else "Owner"
       clause_info <- if ("clause_price" %in% colnames(sp) && !is.na(sp$clause_price) && sp$clause_price > 0) paste0(" (Release Clause: ", player_card_money(sp$clause_price), ")") else ""
 
@@ -1179,7 +1126,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           type = "message",
           duration = 5
         )
-        clear_api_cache()
+        invalidate_manual_resources(login,champ_id,team_id,sp$id)
         if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
           tryCatch(on_bid_updated(action_type = "owner_offer_placed", player_id = player_id, new_bid_price = offer_amount, is_cancel = FALSE), error = function(e) NULL)
         }
@@ -1334,12 +1281,12 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           type = "message",
           duration = 5
         )
-        clear_api_cache()
+        invalidate_manual_resources(login,champ_id,team_id,sp$id)
         if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
           tryCatch(on_bid_updated(action_type = "clause_paid"), error = function(e) NULL)
         }
       } else {
-        if(is.list(res)&&identical(res$code,"api.market.max_number_players_in_roster")) clear_api_cache()
+        if(is.list(res)&&identical(res$code,"api.market.max_number_players_in_roster")) invalidate_manual_resources(login,champ_id,team_id,sp$id)
         err_msg <- if (is.list(res) && !is.null(res$message) && res$message != "") res$message else "Please verify your funds and try again."
         shiny::showNotification(
           paste0("Clause buyout failed: ", err_msg),
@@ -1354,7 +1301,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       remember_action_context("list")
       sp <- selected_player()
       req(sp)
-      default_price <- if ("value" %in% colnames(sp) && !is.na(sp$value) && sp$value > 0) sp$value else 1000000
+      default_price <- if ("value" %in% colnames(sp) && !is.na(sp$value) && sp$value > 0) sp$value else NA_real_
 
       showModal(modalDialog(
         title = tagList(icon("tags"), paste0(" List ", sp$name, " on Market")),
@@ -1412,7 +1359,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           type = "message",
           duration = 5
         )
-        clear_api_cache()
+        invalidate_manual_resources(login,champ_id,team_id,sp$id)
         if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
           tryCatch(on_bid_updated(action_type = "player_listed", player_id = player_id, new_bid_price = sale_price, is_cancel = FALSE), error = function(e) NULL)
         }
@@ -1457,7 +1404,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       removeModal()
       showNotification(result$message,type=if(isTRUE(result$success)) "message" else "error",duration=8)
       if(isTRUE(result$success) || isTRUE(result$uncertain)) {
-        clear_api_cache(login[["userid"]])
+        invalidate_manual_resources(login,champ_id,team_id,sp$id)
         if(is.function(on_bid_updated)) tryCatch(on_bid_updated(
           action_type=if(isTRUE(result$success)) "player_sold_direct" else "refresh",
           player_id=sp$id,new_bid_price=NA_real_,is_cancel=FALSE),error=function(e)NULL)
@@ -1510,7 +1457,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           type = "message",
           duration = 5
         )
-        clear_api_cache()
+        invalidate_manual_resources(login,champ_id,team_id,sp$id)
         if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
           tryCatch(on_bid_updated(action_type = "listing_cancelled", player_id = player_id, new_bid_price = NA_real_, is_cancel = TRUE), error = function(e) NULL)
         }
@@ -1578,7 +1525,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           type = "message",
           duration = 5
         )
-        clear_api_cache()
+        invalidate_manual_resources(login,champ_id,team_id,sp$id)
         if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
           tryCatch(on_bid_updated(action_type = "offer_accepted", player_id = player_id, new_bid_price = NA_real_, is_cancel = TRUE), error = function(e) NULL)
         }
@@ -1663,7 +1610,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           type = "message",
           duration = 5
         )
-        clear_api_cache()
+        invalidate_manual_resources(login,champ_id,team_id,sp$id)
         if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
           tryCatch(on_bid_updated(action_type = "offer_rejected", player_id = player_id, new_bid_price = NA_real_, is_cancel = TRUE), error = function(e) NULL)
         }
@@ -1677,242 +1624,80 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       }
     })
 
-    ## render player_trend_plot (Plot A) ----
-    output$player_trend_plot <- plotly::renderPlotly({
-      sp <- selected_player()
-      req(sp)
-
-      login <- get_reactive_val(login_token)
-      champ_id <- get_reactive_val(championship_id)
-      player_id <- sp$id
-
-      # Safe date parsing helper
-      parse_safe_datetime <- function(date_vec) {
-        if (is.null(date_vec) || length(date_vec) == 0) return(as.POSIXct(character(0)))
-        date_str <- as.character(date_vec)
-        clean_str <- gsub("T", " ", date_str)
-        clean_str <- gsub("Z", "", clean_str)
-        clean_str <- gsub("\\..*", "", clean_str)
-        parsed <- suppressWarnings(as.POSIXct(clean_str, format = "%Y-%m-%d %H:%M:%S"))
-        na_idx <- is.na(parsed)
-        if (any(na_idx)) {
-          parsed[na_idx] <- suppressWarnings(as.POSIXct(clean_str[na_idx], format = "%Y-%m-%d"))
-        }
-        return(parsed)
-      }
-
-      history_df <- NULL
-      if (!is.null(champ_id) && !is.null(player_id)) {
-        tryCatch({
-          history_df <- get_player_historical_data(player_id, champ_id)
-        }, error = function(e) {
-          print(paste0("[Plot A] Error loading history: ", e$message))
-        })
-      }
-
-      # ---- Valuation series (with pre-season simulated fallback) ----
-      val_df <- NULL
-      if (is.data.frame(history_df) && nrow(history_df) > 0 && "value" %in% colnames(history_df)) {
-        val_df <- history_df
-      } else {
-        # Fallback simulated valuation only when DB is empty/unconfigured.
-        # NOTE: no points are fabricated here (points trace is built separately).
-        today <- Sys.time()
-        dates <- seq(today - as.difftime(6, units="days"), today, by="1 day")
-        val_today <- if ("value" %in% colnames(sp)) suppressWarnings(as.numeric(sp$value[1])) else NA_real_
-        val_change <- if ("change" %in% colnames(sp)) suppressWarnings(as.numeric(sp$change[1])) else NA_real_
-        if (!is.finite(val_today)) val_today <- 1000000
-        if (!is.finite(val_change)) val_change <- 0
-
-        val_df <- data.frame(
-          recorded_at = as.character(dates),
-          value = seq(val_today - val_change, val_today, length.out = length(dates)),
-          stringsAsFactors = FALSE
-        )
-      }
-
-      val_df$date <- as.POSIXct(parse_safe_datetime(val_df$recorded_at))
-      val_df$value <- suppressWarnings(as.numeric(as.character(val_df$value)))
-      val_df <- val_df %>% dplyr::filter(!is.na(date), is.finite(value)) %>% dplyr::arrange(date)
-      if (!nrow(val_df)) {
-        current_value <- if ("value" %in% colnames(sp)) suppressWarnings(as.numeric(sp$value[1])) else NA_real_
-        if (!is.finite(current_value)) current_value <- 1000000
-        val_df <- data.frame(date = Sys.time(), value = current_value)
-      }
-
-      # ---- Points series: one marker per completed round; graceful no-points ----
-      # Fetch finished rounds defensively; points are only rendered when round
-      # boundary data is available (never from daily snapshots alone).
-      finished_rounds_df <- NULL
-      if (!is.null(login) && !is.null(champ_id)) {
-        tryCatch({
-          finished_rounds_df <- get_finished_rounds(login, champ_id)
-        }, error = function(e) {
-          print(paste0("[Plot A] Error loading finished rounds: ", e$message))
-        })
-      }
-      stored_round_history <- if (!is.null(champ_id) && !is.null(player_id)) tryCatch(
-        get_player_round_points_history(player_id, champ_id), error=function(e) NULL) else NULL
-      points_trace <- player_match_points_trace(stored_round_history)
-      if (!points_trace$has_points) points_trace <- build_player_points_trace(history_df, finished_rounds_df, sp)
-      if (!points_trace$has_points && !is.null(login) && !is.null(champ_id) && !is.null(player_id)) {
-        summary <- tryCatch(get_player_summary(login, champ_id, get_reactive_val(user_team_id), player_id), error = function(e) NULL)
-        summary_trace <- player_summary_points_trace(summary, finished_rounds_df)
-        if (summary_trace$has_points) points_trace <- summary_trace
-      }
-
-      chart_metric <- if (!is.null(input$player_chart_metric) && identical(as.character(input$player_chart_metric), "points")) "points" else "valuation"
-      if (identical(chart_metric, "points")) {
-        if (isTRUE(points_trace$has_points)) {
-          return(plotly::plot_ly(data = points_trace$points_df) %>%
-            plotly::add_trace(type = "scatter", mode = "lines+markers", x = ~round_number, y = ~points,
-              name = "Round points", line = list(color = "#10b981", width = 2.5),
-              marker = list(size = 8, color = "#10b981"), hoverinfo = "text",
-              text = ~paste0("Jornada ", round_number, "<br>Points: ", points)) %>%
-            fm_plot_layout(hovermode = "x unified", paper_bgcolor = "rgba(0,0,0,0)",
-              plot_bgcolor = "rgba(0,0,0,0)", xaxis = list(title = "Round", dtick = 1, gridcolor = "#f1f5f9"),
-              yaxis = list(title = "Points", autorange = FALSE, range = player_trend_axis_range(points_trace$points_df$points), gridcolor = "#f1f5f9"),
-              showlegend = FALSE, margin = list(l = 50, r = 20, t = 10, b = 40)))
-        }
-        aggregate_points <- suppressWarnings(as.numeric(as.character(sp$points)))
-        no_points_text <- if (length(aggregate_points) == 1L && is.finite(aggregate_points) && aggregate_points > 0) {
-          paste0("Total points: ", format(aggregate_points, trim = TRUE, scientific = FALSE),
-            ". Round-by-round history is unavailable.")
-        } else "No round-by-round points recorded yet"
-        return(plotly::plot_ly() %>% fm_plot_layout(paper_bgcolor = "rgba(0,0,0,0)",
-          plot_bgcolor = "rgba(0,0,0,0)", xaxis = list(visible = FALSE), yaxis = list(visible = FALSE),
-          annotations = list(list(text = no_points_text, x = 0.5, y = 0.5, xref = "paper", yref = "paper",
-            showarrow = FALSE, align = "center", font = list(color = "#94a3b8", size = 13))),
-          margin = list(l = 20, r = 20, t = 10, b = 20)))
-      }
-
-      # Valuation mode keeps its own readable scale. Points have a dedicated
-      # chart selected through the switch above rather than a competing axis.
-      chart <- plotly::plot_ly(data = val_df) %>%
-        plotly::add_trace(
-          type = "scatter",
-          mode = "lines+markers",
-          x = ~date, y = ~value,
-          name = "Market Valuation (\u20ac)",
-          fill = "tozeroy",
-          fillcolor = "rgba(59, 130, 246, 0.08)",
-          line = list(color = "#3b82f6", width = 2.5),
-          yaxis = "y",
-          hoverinfo = "text",
-          text = ~paste0("Date: ", format(date, "%d-%m-%y"), "<br>Valuation: ", player_card_money(value))
-        )
-
-      if (identical(chart_metric, "points") && points_trace$has_points) {
-        # One marker per completed round (no interpolated line).
-        chart <- chart %>%
-          plotly::add_trace(
-            data = points_trace$points_df,
-            type = "scatter",
-            mode = "markers",
-            x = ~date, y = ~points,
-            name = "Points",
-            inherit = FALSE,
-            marker = list(size = 8, color = "#10b981", symbol = "circle"),
-            yaxis = "y2",
-            hoverinfo = "text",
-            text = ~paste0("Jornada ", round_number, " (", format(date, "%d-%m-%y"), ")<br>Points: ", points)
-          )
-        yaxis2_cfg <- list(
-          title = "Points",
-          overlaying = "y",
-          side = "right",
-          showgrid = FALSE,
-          autorange = FALSE,
-          range = player_trend_axis_range(points_trace$points_df$points)
-        )
-        annotations_cfg <- NULL
-      } else {
-        # Valuation mode does not need a second points axis or an unavailable
-        # annotation; the Points chart displays that state when selected.
-        if (identical(chart_metric, "valuation")) {
-          yaxis2_cfg <- list(visible = FALSE)
-          annotations_cfg <- NULL
-        } else {
-        # Keep aggregate points and round-by-round observations distinct. A
-        # player can have a current total while finalized per-round data has
-        # not yet been collected.
-        yaxis2_cfg <- list(visible = FALSE)
-        aggregate_points <- suppressWarnings(as.numeric(as.character(sp$points)))
-        no_points_text <- if (length(aggregate_points) == 1L && is.finite(aggregate_points) && aggregate_points > 0) {
-          paste0("Total points: ", format(aggregate_points, trim = TRUE, scientific = FALSE),
-            ". Round-by-round history is unavailable.")
-        } else {
-          "No round-by-round points recorded yet"
-        }
-        annotations_cfg <- list(list(
-          text = no_points_text,
-          x = 0.98, y = 0.98, xref = "paper", yref = "paper",
-          showarrow = FALSE, align = "right",
-          font = list(color = "#94a3b8", size = 12),
-          bgcolor = "rgba(248,250,252,0.85)",
-          bordercolor = "#e2e8f0",
-          borderpad = 4
-        ))
-        }
-      }
-
-      chart %>%
-        fm_plot_layout(
-          hovermode = "x unified",
-          paper_bgcolor = "rgba(0,0,0,0)",
-          plot_bgcolor = "rgba(0,0,0,0)",
-          xaxis = list(
-            title = "",
-            gridcolor = "#f1f5f9",
-            zeroline = FALSE,
-            tickformat = "%d-%m"
-          ),
-          yaxis = list(
-            title = "Valuation (\u20ac)",
-            tickformat = "s",
-            autorange = FALSE,
-            range = player_trend_axis_range(val_df$value),
-            gridcolor = "#f1f5f9"
-          ),
-          yaxis2 = yaxis2_cfg,
-          annotations = annotations_cfg,
-          legend = list(orientation = "h", x = 0.5, y = -0.25, xanchor = "center"),
-          margin = list(l = 50, r = 50, t = 10, b = 40)
-        )
+    history_refresh <- reactive(paste(if (is.function(refresh_trigger)) refresh_trigger() else 0L,
+      input$refresh_history %||% 0L, sep=":"))
+    card_resource <- shared_resource(session,"player_card",
+      context=function() {
+        sp <- selected_player(); req(sp,sp$id)
+        auth <- get_reactive_val(login_token);champ <- get_reactive_val(championship_id)
+        req(valid_login(auth),champ)
+        resource_context(auth,champ,get_reactive_val(user_team_id),sp$id,session_id=session$token)
+      },
+      fetch=function(ctx) async_adapter_fetch("get_player_card_history",list(
+        login=get_reactive_val(login_token),championship_id=ctx$championship_id,
+        user_team_id=ctx$user_team_id,player_id=ctx$player_id,refresh=TRUE),context=ctx),
+      refresh=history_refresh)
+    card_history <- reactive({
+      state <- card_resource();result <- state$data
+      if (!is.list(result)) result <- list(valuation=data.frame(),points=data.frame(),status=state$status,freshness=state$freshness,source=state$source)
+      if (identical(state$status,"loading")) result$status <- "loading"
+      if (identical(state$freshness,"stale")) result$freshness <- "stale"
+      result
     })
-
-    ## render recent completed-round points ----
+    output$player_trend_plot <- plotly::renderPlotly({
+      sp <- selected_player(); req(sp); history <- card_history()
+      metric <- if (identical(input$player_chart_metric,"points")) "points" else "valuation"
+      empty_chart <- function(message) plotly::plot_ly() %>% fm_plot_layout(
+        paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",
+        xaxis=list(visible=FALSE),yaxis=list(visible=FALSE),
+        annotations=list(list(text=message,x=.5,y=.5,xref="paper",yref="paper",showarrow=FALSE)))
+      if (identical(history$status,"loading") && !nrow(history$points) && !nrow(history$valuation)) return(empty_chart("Loading player history…"))
+      if (metric=="points") {
+        points <- history$points
+        if (!is.data.frame(points) || !all(c("round_number","points") %in% names(points))) points <- data.frame()
+        if (nrow(points)) {
+          points$round_number <- suppressWarnings(as.numeric(points$round_number));points$points <- suppressWarnings(as.numeric(points$points))
+          points <- points[is.finite(points$round_number)&is.finite(points$points),,drop=FALSE]
+        }
+        if (!nrow(points)) return(empty_chart(recent_round_points_empty_text(sp$points)))
+        points <- points[order(points$round_number),,drop=FALSE]
+        points$label <- paste0("Round ",points$round_number,"<br>Points: ",points$points,
+          if ("score_status" %in% names(points)) paste0("<br>",points$score_status) else "")
+        return(plotly::plot_ly(points) %>% plotly::add_trace(type="scatter",mode="lines+markers",
+          x=~round_number,y=~points,text=~label,hoverinfo="text",name="Round points",
+          line=list(color="#10b981",width=2.5),marker=list(size=8)) %>%
+          fm_plot_layout(paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",
+            xaxis=list(title="Round",dtick=1),yaxis=list(title="Points",autorange=FALSE,
+              range=player_trend_axis_range(points$points)),showlegend=FALSE))
+      }
+      values <- history$valuation
+      if (!is.data.frame(values) || !all(c("recorded_at","value") %in% names(values))) values <- data.frame()
+      if (nrow(values)) {
+        values$date <- fm_time(values$recorded_at);values$value <- suppressWarnings(as.numeric(values$value))
+        values <- values[!is.na(values$date)&is.finite(values$value),,drop=FALSE]
+      }
+      if (!nrow(values)) return(empty_chart(paste0("Valuation history unavailable. Current value: ",player_card_money(sp$value))))
+      values <- values[order(values$date),,drop=FALSE]
+      plotly::plot_ly(values) %>% plotly::add_trace(type="scatter",mode="lines+markers",x=~date,y=~value,
+        name="Observed value",line=list(color="#00ff88",width=2.5)) %>%
+        fm_plot_layout(paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",
+          xaxis=list(title="Date"),yaxis=list(title="Value (EUR)",autorange=FALSE,
+            range=player_trend_axis_range(values$value)),showlegend=FALSE)
+    })
     output$recent_round_points <- renderUI({
-      sp <- selected_player(); req(sp)
-      login <- get_reactive_val(login_token)
-      champ_id <- get_reactive_val(championship_id)
-      history <- if (!is.null(champ_id) && !is.null(sp$id)) tryCatch(
-        get_player_historical_data(sp$id,champ_id),error=function(e)NULL) else NULL
-      rounds <- if (!is.null(login) && !is.null(champ_id)) tryCatch(
-        get_finished_rounds(login,champ_id),error=function(e)NULL) else NULL
-      stored_round_history <- if (!is.null(champ_id) && !is.null(sp$id)) tryCatch(
-        get_player_round_points_history(sp$id, champ_id), error=function(e) NULL) else NULL
-      stored_trace <- player_match_points_trace(stored_round_history)
-      recent <- if (is.list(stored_trace) && isTRUE(stored_trace$has_points) && is.data.frame(stored_trace$points_df)) {
-        tail(stored_trace$points_df, 5L)[order(tail(stored_trace$points_df, 5L)$round_number, decreasing=TRUE), , drop=FALSE]
-      } else latest_player_round_points(history,rounds,limit=5L)
-      if (!is.data.frame(recent) || !all(c("round_number", "points") %in% names(recent))) {
-        recent <- data.frame(round_number=numeric(), points=numeric())
+      sp <- selected_player(); req(sp);history <- card_history(); points <- history$points
+      if (!is.data.frame(points) || !all(c("round_number","points") %in% names(points))) points <- data.frame()
+      if (nrow(points)) {
+        points <- points[is.finite(suppressWarnings(as.numeric(points$round_number))) & is.finite(suppressWarnings(as.numeric(points$points))),,drop=FALSE]
+        points <- head(points[order(points$round_number,decreasing=TRUE),,drop=FALSE],5L)
       }
-      if (!nrow(recent) && !is.null(login) && !is.null(champ_id) && !is.null(sp$id)) {
-        summary <- tryCatch(get_player_summary(login, champ_id, get_reactive_val(user_team_id), sp$id), error = function(e) NULL)
-        summary_trace <- player_summary_points_trace(summary, rounds)
-        if (summary_trace$has_points) recent <- tail(summary_trace$points_df, 5L)[order(tail(summary_trace$points_df, 5L)$round_number, decreasing=TRUE), , drop=FALSE]
-      }
-      empty_text <- recent_round_points_empty_text(sp$points)
-      div(class="player-recent-rounds",
-        h4(icon("futbol")," Latest round points"),
-        if (!nrow(recent)) span(class="player-recent-rounds-empty",empty_text) else
-          div(class="player-recent-rounds-list",lapply(seq_len(nrow(recent)),function(i)
-            div(class="player-recent-round-chip",
-              span(class="player-recent-round-label",paste("Round",recent$round_number[i])),
-              strong(paste0(format(recent$points[i],trim=TRUE,scientific=FALSE)," pts")))))
-      )
+      div(class="player-recent-rounds",h4(icon("futbol")," Latest round points"),
+        if (!nrow(points)) span(class="player-recent-rounds-empty",recent_round_points_empty_text(sp$points)) else
+          div(class="player-recent-rounds-list",lapply(seq_len(nrow(points)),function(i)
+            div(class="player-recent-round-chip",span(class="player-recent-round-label",paste("Round",points$round_number[i])),strong(paste0(points$points[i]," pts")),
+              if ("score_status" %in% names(points) && !is.na(points$score_status[i]) && points$score_status[i]!="final")span(class="player-round-status",as.character(points$score_status[i]))))),
+        if (!is.null(history$status) && history$status %in% c("loading","partial","unavailable","error"))span(class="player-history-status",paste("History",history$status)),
+        if (identical(history$freshness,"stale")) span(class="player-history-status","Showing saved history; refresh failed."))
     })
 
     ## render profile and match context from captured player endpoints ----
@@ -2085,319 +1870,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       )
     })
 
-    ## render FIS 5-Pillar Breakdown Panel ----
-    output$fis_panel <- renderUI({
-      sp <- selected_player()
-      req(sp)
 
-      # Reuse the exact cohort-independent score already displayed in the table.
-      # Preserve a row as a row: double transposition previously destroyed columns.
-      fis_result <- selected_player_fis_row(sp)
-
-      if (is.null(fis_result) || nrow(fis_result) == 0) {
-        return(div(style = "color: var(--fm-muted); font-size: 13px;", "FIS data unavailable."))
-      }
-
-      fis_score_val <- suppressWarnings(as.numeric(fis_result$fis_score[1]))
-      fis_tier_val <- if (!is.na(fis_result$fis_tier[1]) && nzchar(as.character(fis_result$fis_tier[1]))) as.character(fis_result$fis_tier[1]) else "N/A"
-      fis_summary_val <- if (!is.na(fis_result$fis_summary[1]) && nzchar(as.character(fis_result$fis_summary[1]))) as.character(fis_result$fis_summary[1]) else ""
-
-      # Pillar values (0-100)
-      perf_val <- suppressWarnings(as.numeric(fis_result$perf[1]))
-      form_val <- suppressWarnings(as.numeric(fis_result$form[1]))
-      eff_val <- suppressWarnings(as.numeric(fis_result$efficiency[1]))
-      mom_val <- suppressWarnings(as.numeric(fis_result$momentum[1]))
-      fix_val <- suppressWarnings(as.numeric(fis_result$fixture_risk[1]))
-
-      # Tier badge styling
-      badge_bg <- if (fis_tier_val == "Strong Buy") {
-        "#dcfce7"
-      } else if (fis_tier_val == "Buy") {
-        "#e0f2fe"
-      } else if (fis_tier_val == "Hold") {
-        "#fef3c7"
-      } else {
-        "#fee2e2"
-      }
-      badge_text <- if (fis_tier_val == "Strong Buy") {
-        "#166534"
-      } else if (fis_tier_val == "Buy") {
-        "#0369a1"
-      } else if (fis_tier_val == "Hold") {
-        "#92400e"
-      } else {
-        "#991b1b"
-      }
-
-      # Confidence pill color
-      coverage <- suppressWarnings(as.numeric(fis_result$data_coverage[1]))
-      conf_pct <- if (length(coverage) == 1L && is.finite(coverage)) round(100 * coverage) else NA_real_
-      conf_color <- if (!is.finite(conf_pct)) "#64748b" else if (conf_pct >= 80) "#16a34a" else if (conf_pct >= 65) "#2563eb" else if (conf_pct >= 45) "#d97706" else "#dc2626"
-
-      # Helper to render a single pillar bar
-      render_pillar <- function(label, value, missing_label = "Unavailable") {
-        available <- length(value) == 1L && is.finite(value)
-        v <- if (available) round(value, 1) else 0
-        bar_color <- if (v >= 70) "#16a34a" else if (v >= 50) "#2563eb" else if (v >= 30) "#d97706" else "#dc2626"
-        div(
-          style = "margin-bottom: 8px;",
-          div(
-            style = "display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; margin-bottom: 3px;",
-            span(label),
-            span(style = paste0("color: ", bar_color, ";"), if (available) paste0(v, "/100") else missing_label)
-          ),
-          div(
-            style = "height: 8px; background: var(--fm-surface); border-radius: 4px; overflow: hidden;",
-            div(
-              style = paste0("height: 100%; width: ", max(0, min(v, 100)), "%; background: ", bar_color, "; border-radius: 4px; transition: width 0.3s;")
-            )
-          )
-        )
-      }
-
-      div(
-        style = "background: var(--fm-surface); border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;",
-        div(
-          style = "display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;",
-          div(
-            style = paste0("font-size: 22px; font-weight: 800; color: var(--fm-text);"),
-            "Descriptive rating ", if (!is.na(fis_score_val)) round(fis_score_val, 1) else "N/A"
-          ),
-          span(
-            style = paste0("display: inline-block; padding: 3px 10px; border-radius: 12px; font-weight: 700; font-size: 12px; background: ", badge_bg, "; color: ", badge_text, ";"),
-            fis_tier_val
-          ),
-          span(
-            style = paste0("display: inline-block; padding: 3px 10px; border-radius: 12px; font-weight: 600; font-size: 11px; background: ", conf_color, "; color: var(--fm-text);"),
-            if (is.finite(conf_pct)) paste0("Data coverage: ", conf_pct, "%") else "Data coverage unavailable"
-          )
-        ),
-        if (nzchar(fis_summary_val)) {
-          p(
-            style = "margin: 0 0 14px 0; font-size: 13px; color: var(--fm-muted); font-style: italic; line-height: 1.4;",
-            fis_summary_val
-          )
-        },
-        div(
-          style = "display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;",
-          render_pillar("Performance", perf_val),
-          render_pillar("Form", form_val),
-          render_pillar("Points/EUR Efficiency", eff_val),
-          render_pillar("Price Momentum", mom_val),
-          render_pillar("Availability & Fitness", fix_val, "Not reported")
-        ),
-        if (!is.finite(fix_val)) {
-          p(style = "font-size: 12px; color: var(--fm-muted); margin-top: 10px;",
-            "Futmondo has not reported an availability status for this player.")
-        }
-      )
-    })
-
-    ## render Smart Bid & Auction Intelligence Widget ----
-    output$smart_bid_widget <- renderUI({
-      sp <- selected_player()
-      req(sp)
-
-      login <- get_reactive_val(login_token)
-      champ_id <- get_reactive_val(championship_id)
-      team_id <- get_reactive_val(user_team_id)
-
-      current_user_team <- get_reactive_val(user_team_id)
-      player_owner_team <- if ("user_team_id" %in% colnames(sp)) sp$user_team_id else NULL
-      is_own_player <- (length(current_user_team) == 1L && !is.na(current_user_team) &&
-                        length(player_owner_team) == 1L && !is.na(player_owner_team) &&
-                        identical(as.character(current_user_team), as.character(player_owner_team)))
-
-      # Only show for non-owned players
-      if (is_own_player) {
-        return(NULL)
-      }
-
-      # Verified acquisition capacity (roster + verified spendable funds +
-      # target's competing bids). Cached per (userid, championship, team, target).
-      capacity <- tryCatch({
-        if (!is.null(login) && !is.null(champ_id) && !is.null(team_id)) {
-          get_acquisition_capacity(
-            login = login,
-            championship_id = champ_id,
-            user_team_id = team_id,
-            target_player_id = as.character(sp$id)
-          )
-        } else {
-          NULL
-        }
-      }, error = function(e) NULL)
-
-      # Pressroom transaction history (cached) for value/competition context.
-      pressroom_df <- tryCatch({
-        if (!is.null(login) && !is.null(champ_id)) {
-          get_championship_pressroom(login = login, championship_id = champ_id)
-        } else {
-          NULL
-        }
-      }, error = function(e) NULL)
-
-      # Market high bid = highest competing bid on the target (from capacity).
-      mhb <- if (!is.null(capacity) && is.list(capacity$target) &&
-                 is.numeric(capacity$target$highest_bid) && is.finite(capacity$target$highest_bid) &&
-                 capacity$target$highest_bid > 0) {
-        capacity$target$highest_bid
-      } else {
-        NULL
-      }
-
-      # Compute smart bid. user_cash is intentionally NA (unverified); the
-      # verified spendable funds come from the capacity snapshot, so the
-      # recommendation is bounded by real available budget (no 300M hardcode).
-      smart_bid_result <- tryCatch({
-        calculate_smart_bid(
-          player_row = sp,
-          championship_id = if (!is.null(champ_id)) as.character(champ_id) else "",
-          pressroom_df = pressroom_df,
-          user_teams_df = NULL,
-          user_cash = NA,
-          market_high_bid = mhb,
-          capacity = capacity
-        )
-      }, error = function(e) {
-        print(paste0("[Smart Bid Widget] Error computing smart bid: ", e$message))
-        list(error = e$message)
-      })
-
-      if (is.null(smart_bid_result) || !is.null(smart_bid_result$error)) {
-        return(div(style = "color: var(--fm-muted); font-size: 13px;", "Smart bid data unavailable."))
-      }
-
-      # Cache the smart bid result for the "Use Smart Bid" button
-      smart_bid_cache_RV(smart_bid_result)
-
-      fair_value <- smart_bid_result$fair_value
-      min_winning <- smart_bid_result$min_winning_bid
-      recommended <- smart_bid_result$recommended_bid
-      max_rational <- smart_bid_result$max_rational_bid
-      roi_pct <- smart_bid_result$expected_roi_pct
-      if (length(roi_pct) != 1L || !is.finite(roi_pct)) roi_pct <- NA_real_
-      comp_level <- smart_bid_result$competition_level
-      competitors <- smart_bid_result$likely_competitors
-      conf_pct <- smart_bid_result$confidence_pct
-      if (length(conf_pct) != 1L || !is.finite(conf_pct)) conf_pct <- NA_real_
-
-      # Competition level styling
-      comp_color <- if (comp_level == "High") {
-        "#dc2626"
-      } else if (comp_level == "Medium") {
-        "#d97706"
-      } else if (comp_level == "Low") {
-        "#16a34a"
-      } else {
-        "#64748b"
-      }
-
-      # ROI color
-      roi_color <- if (!is.na(roi_pct) && roi_pct > 0) "#16a34a" else if (!is.na(roi_pct) && roi_pct < 0) "#dc2626" else "#64748b"
-
-      # Competitors list
-      comp_list_html <- ""
-      if (!is.null(competitors) && length(competitors) > 0) {
-        comp_items <- vapply(competitors, function(c_name) {
-          c_str <- if (is.na(c_name) || c_name == "") "Futmondo / Mercado" else as.character(c_name)
-          paste0("<li style='margin-bottom: 4px;'>", htmltools::htmlEscape(c_str), "</li>")
-        }, character(1))
-        comp_list_html <- paste0("<ul style='margin: 0; padding-left: 18px; font-size: 13px; color: var(--fm-muted);'>", paste(comp_items, collapse = ""), "</ul>")
-      } else {
-        comp_list_html <- "<p style='margin: 0; font-size: 13px; color: var(--fm-muted);'>No competitor data available.</p>"
-      }
-
-      div(
-        style = "background: var(--fm-surface); border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;",
-        h4(
-          style = "font-weight: 700; color: var(--fm-text); margin-bottom: 12px; font-size: 15px;",
-          tagList(icon("chart-line"), " Smart Bid &amp; Auction Intelligence")
-        ),
-        div(
-          style = "display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 14px;",
-          # Estimated Fair Value
-          div(
-            style = "background: var(--fm-surface); border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center;",
-            div(style = "font-size: 11px; color: var(--fm-muted); font-weight: 600; text-transform: uppercase;", "Estimated Fair Value"),
-            div(style = "font-size: 18px; font-weight: 800; color: var(--fm-text);", player_card_money(fair_value))
-          ),
-          # Expected Winning Range
-          div(
-            style = "background: var(--fm-surface); border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center;",
-            div(style = "font-size: 11px; color: var(--fm-muted); font-weight: 600; text-transform: uppercase;", "Heuristic bid bounds"),
-            div(style = "font-size: 14px; font-weight: 700; color: var(--fm-text);", paste0("Minimum ", player_card_money(min_winning), " · Ceiling ", player_card_money(max_rational)))
-          ),
-          # Recommended Smart Bid
-          div(
-            style = "background: var(--fm-surface); border: 2px solid #3b82f6; border-radius: 6px; padding: 10px; text-align: center;",
-            div(style = "font-size: 11px; color: var(--fm-text); font-weight: 600; text-transform: uppercase;", "Recommended Smart Bid"),
-            div(style = "font-size: 20px; font-weight: 800; color: var(--fm-text);",
-                if (isTRUE(smart_bid_result$can_compete)) player_card_money(recommended) else "No bid")
-          ),
-          # Expected ROI
-          div(
-            style = "background: var(--fm-surface); border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center;",
-            div(style = "font-size: 11px; color: var(--fm-muted); font-weight: 600; text-transform: uppercase;", "Model-implied value gap"),
-            div(style = paste0("font-size: 18px; font-weight: 800; color: ", roi_color, ";"), if (is.finite(roi_pct)) paste0(roi_pct, "%") else "Unavailable")
-          )
-        ),
-        # Competition Level and Confidence
-        div(
-          style = "display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; align-items: center;",
-          div(
-            style = "font-size: 13px; font-weight: 600;",
-            "Competition: ",
-            span(
-              style = paste0("display: inline-block; padding: 2px 8px; border-radius: 8px; background: ", comp_color, "; color: var(--fm-text); font-weight: 700; font-size: 11px;"),
-              comp_level
-            )
-          ),
-          div(
-            style = "font-size: 13px; font-weight: 600;",
-            "Max Rational Bid: ",
-            span(style = "color: var(--fm-danger); font-weight: 800;", player_card_money(max_rational))
-          ),
-          div(
-            style = "font-size: 13px; font-weight: 600;",
-            "Method: ",
-            span("Heuristic; winning probability not calibrated")
-          )
-        ),
-        if (!isTRUE(smart_bid_result$can_compete)) {
-          p(style = "font-size: 13px; color: var(--fm-muted);", smart_bid_result$message)
-        },
-        # Use Smart Bid button
-          div(
-            style = "font-size: 13px; font-weight: 600;",
-            "Verified Spendable: ",
-            span(style = "font-weight: 800;", player_card_money(smart_bid_result$spendable_funds))
-          ),
-          if (is.finite(smart_bid_result$api_bid_limit)) div(
-            style = "font-size: 13px; font-weight: 600;",
-            "Futmondo Bid Limit: ",
-            span(style = "font-weight: 800;", player_card_money(smart_bid_result$api_bid_limit))
-          ),
-        div(
-          style = "margin-bottom: 14px; text-align: center;",
-          actionButton(
-            ns("btn_use_smart_bid"),
-            label = tagList(icon("bolt"), " Use Smart Bid"),
-            class = "btn btn-primary",
-            disabled = !isTRUE(smart_bid_result$can_compete) || !isTRUE(smart_bid_result$funds_verified)
-          )
-        ),
-        # Competitor Prediction Section
-        div(
-          style = "border-top: 1px solid #e2e8f0; padding-top: 12px;",
-          h5(
-            style = "font-weight: 700; color: var(--fm-text); margin-bottom: 8px; font-size: 13px;",
-            tagList(icon("users-gear"), " Historical manager interest")
-          ),
-          shiny::HTML(comp_list_html)
-        )
-      )
-    })
   })
 }
 
@@ -2413,134 +1886,6 @@ player_trend_axis_range <- function(values) {
   bounds + c(-padding, padding)
 }
 
-# Pure helper: build the points trace for the player trend chart.
-#
-# Points are bucketed by FINISHED ROUND, not by calendar day. Each historical
-# snapshot is mapped to the first completed round whose boundary window it
-# falls within (with no reuse). Bucketing rule:
-#   - Parse/sort the valid round `begin_process` boundaries ascending.
-#   - For round i, the eligible window is (prior_boundary, boundary_i]
-#     (prior_boundary is -Inf for the first round).
-#   - The latest eligible snapshot is chosen for that round; a round with no
-#     eligible snapshot is skipped.
-#
-# Returns a graceful no-points state (has_points = FALSE) when there is no
-# history, no finished-round data, or no valid points -- it never fabricates a
-# zero line, and it never renders points from daily snapshots when no
-# finished-round data is available.
-#
-# Parameters:
-#   history_df          -- data frame from get_player_historical_data() with
-#                          `recorded_at` and `points` columns (may be NULL/empty)
-#   finished_rounds_df  -- data frame from get_finished_rounds() with
-#                          `round_number` and `begin_process` columns
-#                          (may be NULL/empty)
-#   sp                  -- selected player row (reserved for signature symmetry)
-#
-# Returns:
-#   list(points_df = data.frame(date = POSIXct, points = numeric,
-#                               round_number = numeric),
-#        has_points = logical)
-build_player_points_trace <- function(history_df, finished_rounds_df = NULL, sp = NULL) {
-  empty <- list(
-    points_df = data.frame(
-      date = as.POSIXct(character(0)), points = numeric(0),
-      round_number = numeric(0), stringsAsFactors = FALSE
-    ),
-    has_points = FALSE
-  )
-
-  if (is.null(history_df) || !is.data.frame(history_df) || nrow(history_df) == 0) {
-    return(empty)
-  }
-  if (!("recorded_at" %in% colnames(history_df)) || !("points" %in% colnames(history_df))) {
-    return(empty)
-  }
-
-  # No finished-round data -> do NOT render points from daily snapshots.
-  if (is.null(finished_rounds_df) || !is.data.frame(finished_rounds_df) || nrow(finished_rounds_df) == 0) {
-    return(empty)
-  }
-  if (!("round_number" %in% colnames(finished_rounds_df)) || !("begin_process" %in% colnames(finished_rounds_df))) {
-    return(empty)
-  }
-
-  # Finished-only: when is_finished is present, keep strictly the finished
-  # rounds (is_finished == TRUE). An unfinished round must never produce a
-  # marker, even if a snapshot falls within its boundary window. NA is treated
-  # as not-finished (fail closed).
-  if ("is_finished" %in% colnames(finished_rounds_df)) {
-    fin <- as.logical(finished_rounds_df$is_finished)
-    finished_rounds_df <- finished_rounds_df[!is.na(fin) & fin, , drop = FALSE]
-    if (nrow(finished_rounds_df) == 0) {
-      return(empty)
-    }
-  }
-
-  # Parse/sort valid round boundaries ascending.
-  bp_str <- as.character(finished_rounds_df$begin_process)
-  bp_clean <- gsub("T", " ", gsub("Z", "", gsub("\\..*", "", bp_str)))
-  round_bp <- suppressWarnings(as.POSIXct(bp_clean, format = "%Y-%m-%d %H:%M:%S"))
-  round_num <- as.numeric(finished_rounds_df$round_number)
-  valid_round <- !is.na(round_bp)
-  if (!any(valid_round)) {
-    return(empty)
-  }
-  rounds <- data.frame(bp = round_bp[valid_round], round_number = round_num[valid_round], stringsAsFactors = FALSE)
-  rounds <- rounds[order(rounds$bp, rounds$round_number), , drop = FALSE]
-
-  # Parse snapshot dates and points.
-  date_str <- as.character(history_df$recorded_at)
-  clean_str <- gsub("T", " ", date_str)
-  clean_str <- gsub("Z", "", clean_str)
-  clean_str <- gsub("\\..*", "", clean_str)
-  parsed <- suppressWarnings(as.POSIXct(clean_str, format = "%Y-%m-%d %H:%M:%S"))
-  na_idx <- is.na(parsed)
-  if (any(na_idx)) {
-    parsed[na_idx] <- suppressWarnings(as.POSIXct(clean_str[na_idx], format = "%Y-%m-%d"))
-  }
-  pts <- suppressWarnings(as.numeric(history_df$points))
-
-  # Valid snapshots: parseable date, finite points >= 0.
-  valid_snap <- !is.na(parsed) & !is.na(pts) & is.finite(pts) & (pts >= 0)
-  if (!any(valid_snap)) {
-    return(empty)
-  }
-  snap_date <- parsed[valid_snap]
-  snap_pts <- pts[valid_snap]
-  n_snap <- length(snap_date)
-
-  # Bucket each snapshot into the first completed round whose boundary window
-  # it falls within: window for round i is (prior_boundary, boundary_i]. The
-  # windows are disjoint, so a snapshot is used at most once (no reuse).
-  used <- rep(FALSE, n_snap)
-  trace_rows <- list()
-  prev_bp <- -Inf
-  for (i in seq_len(nrow(rounds))) {
-    cur_bp <- rounds$bp[i]
-    eligible <- which(!used & snap_date > prev_bp & snap_date <= cur_bp)
-    prev_bp <- cur_bp
-    if (length(eligible) == 0) next
-    latest <- eligible[which.max(snap_date[eligible])]
-    used[latest] <- TRUE
-    trace_rows[[length(trace_rows) + 1]] <- data.frame(
-      date = snap_date[latest],
-      points = snap_pts[latest],
-      round_number = rounds$round_number[i],
-      stringsAsFactors = FALSE
-    )
-  }
-
-  if (length(trace_rows) == 0) {
-    return(empty)
-  }
-  points_df <- do.call(rbind, trace_rows)
-  points_df <- points_df[order(points_df$date), , drop = FALSE]
-  rownames(points_df) <- NULL
-
-  list(points_df = points_df, has_points = TRUE)
-}
-
 # Convert stored final per-round observations into the card chart series.
 player_match_points_trace <- function(rows) {
   empty <- list(points_df=data.frame(date=as.POSIXct(character(0)), points=numeric(), round_number=numeric(), stringsAsFactors=FALSE), has_points=FALSE)
@@ -2552,7 +1897,7 @@ player_match_points_trace <- function(rows) {
   if ("round_start_at" %in% names(rows)) stamps[is.na(stamps) | !nzchar(stamps)] <- as.character(rows$round_start_at[is.na(stamps) | !nzchar(stamps)])
   if ("observed_at" %in% names(rows)) stamps[is.na(stamps) | !nzchar(stamps)] <- as.character(rows$observed_at[is.na(stamps) | !nzchar(stamps)])
   dates <- fm_time(stamps)
-  keep <- final & is.finite(points) & is.finite(rounds) & !is.na(dates)
+  keep <- !is.na(final) & final & is.finite(points) & is.finite(rounds)
   if (!any(keep)) return(empty)
   out <- data.frame(date=dates[keep], points=points[keep], round_number=rounds[keep], stringsAsFactors=FALSE)
   out <- out[order(out$round_number,out$date),,drop=FALSE]
@@ -2583,7 +1928,7 @@ player_summary_points_trace <- function(summary, finished_rounds_df = NULL) {
     if (!nrow(rounds) && is.finite(current_round) && round >= current_round) return(NULL)
     # The points plot is indexed by round. Keep a deterministic timestamp for
     # trace consumers that still expect a date column.
-    date <- if (length(idx) == 1L && !is.na(dates[idx])) dates[idx] else as.POSIXct("1970-01-01", tz="UTC") + round * 86400
+    date <- if (length(idx) == 1L && !is.na(dates[idx])) dates[idx] else as.POSIXct(NA_character_, tz="UTC")
     data.frame(date=date, points=score, round_number=round, stringsAsFactors=FALSE)
   })
   out <- Filter(Negate(is.null), out)
@@ -2594,19 +1939,11 @@ player_summary_points_trace <- function(summary, finished_rounds_df = NULL) {
 }
 
 # Return the latest completed-round point observations, newest first.
-latest_player_round_points <- function(history_df,finished_rounds_df,limit=5L) {
-  trace <- build_player_points_trace(history_df,finished_rounds_df)
-  limit <- suppressWarnings(as.integer(limit)[1])
-  if (!isTRUE(trace$has_points) || !is.finite(limit) || limit<1L)
-    return(trace$points_df[0,,drop=FALSE])
-  points <- tail(trace$points_df,limit)
-  points[order(points$round_number,decreasing=TRUE,na.last=TRUE),,drop=FALSE]
-}
 
 # Explain an empty completed-round breakdown without hiding a known aggregate total.
 recent_round_points_empty_text <- function(aggregate_points) {
   total <- suppressWarnings(as.numeric(as.character(aggregate_points)[1]))
-  if (length(total) == 1L && is.finite(total) && total > 0) {
+  if (length(total) == 1L && is.finite(total)) {
     paste0("Total points: ", format(total, trim=TRUE, scientific=FALSE),
       ". Completed-round breakdown is unavailable.")
   } else {
@@ -2632,12 +1969,3 @@ add_sign <- function(x) {
   }
 }
 # Preserve the selected player's score and shape; calculate only when absent.
-selected_player_fis_row <- function(player) {
-  if (is.null(player)) return(NULL)
-  row <- if (is.data.frame(player)) player[1, , drop = FALSE] else as.data.frame(player, stringsAsFactors = FALSE)
-  if (nrow(row) == 0L) return(NULL)
-  if (!"fis_score" %in% names(row)) row <- calculate_fis_score(row)
-  for (field in c("perf", "form", "efficiency", "momentum", "fixture_risk", "data_coverage")) if (!field %in% names(row)) row[[field]] <- NA_real_
-  for (field in c("fis_tier", "fis_summary")) if (!field %in% names(row)) row[[field]] <- ""
-  row
-}

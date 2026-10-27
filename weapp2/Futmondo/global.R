@@ -1,15 +1,11 @@
-if (file.exists(".Renviron")) {
+if (!isTRUE(getOption("futmondo.offline", FALSE)) && file.exists(".Renviron")) {
   readRenviron(".Renviron")
 }
 
 source("futmondo_functions.R")
+source("factual_helpers.R")
 source("supabase_connector.R")
-source("intelligence_engine.R")
-source("prediction_engine.R")
 source("background_runtime.R")
-source("automation_runtime.R")
-source("insights_runtime.R")
-source("portfolio_engine.R")
 source("Modules/Login_Module.R")
 source("Modules/Players_in_Teams_Module.R")
 source("Modules/Selected_Player_Module.R")
@@ -22,8 +18,6 @@ source("Modules/Players_Table_Module.R")
 source("Modules/Admin_Module.R")
 source("Modules/Today_Module.R")
 source("Modules/Notifications_Module.R")
-source("Modules/Intelligence_Module.R")
-source("Modules/Automation_Module.R")
 source("Modules/Plots_Module.R")
 source("utils.R")
 library(shiny)

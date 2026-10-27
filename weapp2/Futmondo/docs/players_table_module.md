@@ -38,43 +38,6 @@ The position breakdown card checks both the primary `role` and secondary `role2`
 
 ---
 
-## 6. FIS Score Rating Column
-
-The player table includes a dedicated FIS Score column (`fis_score`) that displays each player's Fantasy Insight Score as a color-coded badge.
-
-### Badge Color Tiers
-
-| Score Range | Tier | Badge Color |
-|---|---|---|
-| 80 - 100 | Elite | Green |
-| 60 - 79 | Strong | Blue |
-| 40 - 59 | Average | Amber |
-| 0 - 39 | Weak | Red |
-
-### Tooltips
-
-Hovering over the FIS Score badge reveals a tooltip with:
-- Full FIS Score value (to one decimal place)
-- Brief interpretive text (e.g., "Elite buy target", "Strong prospect", "Average value", "Weak outlook")
-- Prediction Confidence percentage
-
----
-
-## 7. FIS Tier Filter (`fis_tier_filter`)
-
-A dropdown filter control (`fis_tier_filter`) is available in the filter bar above the player table. It allows users to narrow the displayed players by their FIS Score tier:
-
-| Filter Value | Description |
-|---|---|
-| All | Show all players regardless of FIS Score |
-| Elite (80+) | Only players with an FIS Score of 80 or above |
-| Strong (60-79) | Only players with an FIS Score between 60 and 79 |
-| Average (40-59) | Only players with an FIS Score between 40 and 59 |
-| Weak (0-39) | Only players with an FIS Score below 40 |
-
-The filter integrates with the existing reactive pipeline so that selecting a tier immediately updates the displayed table without requiring a full page reload.
----
-
 ## 8. Configurable Recent-Points Average
 
 Every shared players table includes the numeric control **Average points: latest games**, initially set to 5 and constrained to 1–20. This applies to Your Team, Market, and All Players in Championship because all three use `players_table_UI()` and `players_table_Server()`. Changing the value recalculates the column heading and values immediately as `Avg Last N`.
@@ -96,7 +59,7 @@ Focused verification: `Rscript test/test_recent_points_average.R`. Cross-page re
 
 Selecting a player sends the modal shell to the browser before enabling the
 selected-player reactive. The module uses `session$onFlushed(..., once=TRUE)`
-to start summary, history, and intelligence requests in the following reactive
+to start summary and history requests in the following reactive
 cycle. Until then, the card displays a loading message. This keeps API latency
 from delaying click feedback while retaining the selected player ID and table
 context checks.

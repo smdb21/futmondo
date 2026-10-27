@@ -40,13 +40,14 @@ plots_UI <- function(id) {
       shiny::tabPanel("Squad values", plotly::plotlyOutput(ns("values_plot"), height="420px")),
       shiny::tabPanel("Cash & transfers", shiny::fluidRow(shiny::column(7, shiny::dateRangeInput(ns("cash_dates"),"Date range")), shiny::column(5, shiny::radioButtons(ns("cash_metric"),"Metric",choices=c("Transfer-only balance estimate"="cash","Squad Purchases"="investment","Transaction Volume"="volume"),inline=TRUE))), plotly::plotlyOutput(ns("cash_plot"), height="420px")),
       shiny::tabPanel("Rank progression", shiny::fluidRow(shiny::column(7, shiny::sliderInput(ns("rank_range"),"Rounds",min=1,max=38,value=c(1,38))), shiny::column(5, shiny::selectInput(ns("rank_round"),"Inspect one round",choices=c("All rounds"="all")))), plotly::plotlyOutput(ns("rank_plot"), height="420px")),
-      shiny::tabPanel("Bid probability", shiny::fluidRow(shiny::column(8, shiny::selectizeInput(ns("bid_player"),"Market player",choices=NULL)),shiny::column(4, shiny::actionButton(ns("bid_reload"),"Refresh analysis",icon=shiny::icon("rotate")))), plotly::plotlyOutput(ns("bid_plot"), height="420px"), shiny::p("The curve combines observed rival bidding patterns. It is advisory and may be unavailable when history is incomplete.")),
       shiny::tabPanel("Owned by real team", shiny::p("Currently fantasy-owned players, grouped by their real football club."), plotly::plotlyOutput(ns("owned_club_plot"), height="520px"))
     ))
 }
 
 plots_Server <- function(id,is_module_active,login_token,championship_id,user_team_id,user_teams_RV,refresh_trigger=NULL) {
   shiny::moduleServer(id,function(input,output,session) {
+    bind_factual_reads(c("get_league_standings_history","get_financial_snapshot","get_championship_pressroom","get_user_team_rounds","get_championship_players"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
+
     active <- function() isTRUE(is_module_active())
     history <- shiny::reactive({ shiny::req(active(), championship_id()); if(is.function(refresh_trigger)) refresh_trigger(); tryCatch(get_league_standings_history(championship_id()),error=function(e)data.frame()) })
     output$standings_plot <- plotly::renderPlotly({ plots_history(history(),"points","Cumulative points") })
@@ -69,9 +70,6 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
     })
     shiny::observe({ r<-rank_rows(); if(nrow(r)){n<-sort(unique(r$round)); shiny::updateSliderInput(session,"rank_range",min=min(n),max=max(n),value=c(min(n),max(n))); shiny::updateSelectInput(session,"rank_round",choices=c("All rounds"="all",stats::setNames(n,n))) } })
     output$rank_plot <- plotly::renderPlotly({ r<-rank_rows(); if(!nrow(r)) return(plots_empty("No published round history")); n<-sort(unique(r$round)); h<-dplyr::bind_rows(lapply(n,function(x){d<-classification_window_table(r,c(min(n),x));d$round<-x;d})); z<-input$rank_range;if(length(z)==2)h<-h[h$round>=z[1]&h$round<=z[2],,drop=FALSE]; if(!is.null(input$rank_round)&&input$rank_round!="all")h<-h[h$round==as.numeric(input$rank_round),,drop=FALSE]; plotly::plot_ly(h,x=~round,y=~rank,color=~team_name,type="scatter",mode="lines+markers") %>% fm_plot_layout(xaxis=list(title="Round",dtick=1),yaxis=list(title="Cumulative rank",autorange="reversed",dtick=1),margin=list(l=55,r=15,t=10,b=45)) })
-    market <- shiny::reactive({ shiny::req(active(),login_token(),championship_id(),user_team_id()); input$bid_reload; tryCatch(get_market_players(login_token(),championship_id(),user_team_id()),error=function(e)data.frame()) })
-    shiny::observe({m<-market(); if(is.data.frame(m)&&nrow(m)&&all(c("id","name")%in%names(m))) shiny::updateSelectizeInput(session,"bid_player",choices=stats::setNames(as.character(m$id),as.character(m$name)),selected=as.character(m$id[1]),server=TRUE)})
-    output$bid_plot <- plotly::renderPlotly({ m<-market(); p<-if(is.data.frame(m)&&"id"%in%names(m))m[as.character(m$id)==as.character(input$bid_player),,drop=FALSE]else data.frame(); if(!nrow(p)||!"value"%in%names(p)||!is.finite(as.numeric(p$value[1])))return(plots_empty("Select a market player with a verified value")); plots_empty("Bid probability requires observed auction history. Open Predictions to view the full advisory analysis.") })
     output$owned_club_plot <- plotly::renderPlotly({ shiny::req(active(),login_token(),championship_id()); if(is.function(refresh_trigger))refresh_trigger(); d<-plots_owned_by_real_team(tryCatch(get_championship_players(login_token(),championship_id()),error=function(e)data.frame())); if(!nrow(d))return(plots_empty("Owned-player and real-club data unavailable")); plotly::plot_ly(d,x=~owned_players,y=~reorder(real_team,owned_players),type="bar",orientation="h",hovertemplate=~paste0("<b>",real_team,"</b><br>",owned_players," owned players<extra></extra>")) %>% fm_plot_layout(xaxis=list(title="Players owned"),yaxis=list(title=""),margin=list(l=115,r=15,t=10,b=45)) })
   })
 }

@@ -167,9 +167,9 @@ sync_user_teams_to_supabase <- function(teams_df, championship_id) {
     championship_id = as.character(championship_id),
     name = as.character(team_names),
     budget = if ("budget" %in% colnames(teams_df)) as.numeric(teams_df$budget) else NA_real_,
-    points = if ("points" %in% colnames(teams_df)) as.integer(teams_df$points) else 0,
+    points = if ("points" %in% colnames(teams_df)) as.integer(teams_df$points) else NA_real_,
     position = if ("position" %in% colnames(teams_df)) as.integer(teams_df$position) else NA_integer_,
-    team_value = if ("team_value" %in% colnames(teams_df)) as.numeric(teams_df$team_value) else if ("teamValue" %in% colnames(teams_df)) as.numeric(teams_df$teamValue) else 0,
+    team_value = if ("team_value" %in% colnames(teams_df)) as.numeric(teams_df$team_value) else if ("teamValue" %in% colnames(teams_df)) as.numeric(teams_df$teamValue) else NA_real_,
     is_active = if ("is_active" %in% colnames(teams_df)) as.logical(teams_df$is_active) else TRUE,
     stringsAsFactors = FALSE
   )
@@ -193,10 +193,10 @@ log_user_team_history <- function(teams_df, round_number = NULL, championship_id
     user_team_id = as.character(team_ids),
     observed_at = as.character(teams_df$observed_at),
     championship_id = if(!is.null(championship_id)) as.character(championship_id) else if("championship_id" %in% names(teams_df)) as.character(teams_df$championship_id) else NA_character_,
-    points = if ("points" %in% colnames(teams_df)) as.integer(teams_df$points) else 0,
+    points = if ("points" %in% colnames(teams_df)) as.integer(teams_df$points) else NA_real_,
     budget = if ("budget" %in% colnames(teams_df)) as.numeric(teams_df$budget) else NA_real_,
     position = if ("position" %in% colnames(teams_df)) as.integer(teams_df$position) else NA_integer_,
-    team_value = if ("team_value" %in% colnames(teams_df)) as.numeric(teams_df$team_value) else if ("teamValue" %in% colnames(teams_df)) as.numeric(teams_df$teamValue) else 0,
+    team_value = if ("team_value" %in% colnames(teams_df)) as.numeric(teams_df$team_value) else if ("teamValue" %in% colnames(teams_df)) as.numeric(teams_df$teamValue) else NA_real_,
     round_number = if (!is.null(round_number)) as.integer(round_number) else if ("round_number" %in% colnames(teams_df)) as.integer(teams_df$round_number) else NA_integer_,
     active_teams_count = as.integer(active_cnt),
     stringsAsFactors = FALSE
@@ -233,12 +233,12 @@ log_player_history <- function(players_df, championship_id) {
     player_id = as.character(players_df$id),
     championship_id = as.character(championship_id),
     observed_at = as.character(players_df$observed_at),
-    value = if ("value" %in% colnames(players_df)) as.integer(players_df$value) else 0L,
-    change = if ("change" %in% colnames(players_df)) as.integer(players_df$change) else 0L,
-    points = if ("points" %in% colnames(players_df)) as.integer(players_df$points) else 0,
+    value = if ("value" %in% colnames(players_df)) as.integer(players_df$value) else NA_integer_,
+    change = if ("change" %in% colnames(players_df)) as.integer(players_df$change) else NA_integer_,
+    points = if ("points" %in% colnames(players_df)) as.integer(players_df$points) else NA_real_,
     avg_points = avg_points_val,
     avg_last_five = avg_last_five_val,
-    matches = if ("average.matches" %in% colnames(players_df)) as.integer(players_df$average.matches) else 0,
+    matches = if ("average.matches" %in% colnames(players_df)) as.integer(players_df$average.matches) else NA_real_,
     stringsAsFactors = FALSE
   )
 
@@ -316,55 +316,37 @@ get_round_mvps <- function(championship_id) {
       is.na(championship_id[1]) || !nzchar(as.character(championship_id[1]))) return(empty)
   cache_key <- paste0("round_mvps_", as.character(championship_id[1]))
   get_cached_data(cache_key, {
-    rows <- supabase_get("round_dream_team", list(
+    rows <- supabase_read_all("round_dream_team", list(
       championship_id = paste0("eq.", as.character(championship_id[1])),
       is_mvp = "is.true",
       is_finished = "is.true",
       select = "championship_id,round_id,round_number,player_id,player_name,player_role,points,is_mvp,is_finished",
-      order = "round_number.desc"
+      order = "round_number.desc,player_id.asc"
     ))
     if (is.null(rows)) stop("Round MVP data is unavailable.")
     rows
-  })
+  }, context=resource_context(account_id="database",championship_id=championship_id))
 }
 
 # Read finalized per-round points for one player. This is separate from daily
 # valuation history, which only holds aggregate point totals.
-get_player_round_points_history <- function(player_id, championship_id) {
-  if (is.null(player_id) || is.null(championship_id) || !nzchar(as.character(player_id)[1]) || !nzchar(as.character(championship_id)[1])) return(data.frame())
-  key <- paste0("player_round_points_", as.character(championship_id)[1], "_", as.character(player_id)[1])
-  get_cached_data(key, {
-    rows <- supabase_get("player_match_observations", list(
-      player_id = paste0("eq.", as.character(player_id)[1]),
-      championship_id = paste0("eq.", as.character(championship_id)[1]),
-      score_status = "eq.final",
-      select = "player_id,round,points,score_status,round_start_at,occurred_at,observed_at",
-      order = "round.asc,observed_at.asc"
-    ))
-    if (is.null(rows)) stop("Player round history is unavailable.")
-    rows
-  })
+get_player_round_points_history<-function(player_id,championship_id,season="unknown",scoring_version="unknown"){
+ ctx<-resource_context(account_id="database",championship_id=championship_id,player_id=player_id,season=season,scoring_version=scoring_version)
+ rows<-read_card_round_history(ctx);if(!is.data.frame(rows))return(rows)
+ rows<-history_context_filter(rows,ctx);if(nrow(rows))rows<-rows[!duplicated(rows$round,fromLast=TRUE),,drop=FALSE];rows
 }
 
-get_player_historical_data <- function(player_id, championship_id) {
-  query <- list(
-    player_id = paste0("eq.", player_id),
-    championship_id = paste0("eq.", championship_id),
-    select = "value,change,points,recorded_at",
-    order = "recorded_at.asc"
-  )
-  supabase_get("player_history", query)
-}
+get_player_historical_data<-function(player_id,championship_id){read_card_price_history(resource_context(account_id="database",championship_id=championship_id,player_id=player_id))}
 
 get_league_standings_history <- function(championship_id) {
   query <- list(
     select = "points,budget,position,team_value,recorded_at,user_teams!inner(name,championship_id)",
     championship_id = paste0("eq.", championship_id),
     "user_teams.championship_id" = paste0("eq.", championship_id),
-    order = "recorded_at.asc"
+    order = "recorded_at.asc,id.asc"
   )
   
-  df <- supabase_get("user_team_history", query)
+  df <- supabase_read_all("user_team_history", query)
   if (!is.null(df) && nrow(df) > 0 && "user_teams" %in% colnames(df)) {
     if (is.list(df$user_teams) || is.data.frame(df$user_teams)) {
       df$teamname <- df$user_teams$name
@@ -389,10 +371,10 @@ get_league_finances_history <- function(championship_id) {
     select = "budget,team_value,points,position,recorded_at,user_teams!inner(name,championship_id)",
     championship_id = paste0("eq.", championship_id),
     "user_teams.championship_id" = paste0("eq.", championship_id),
-    order = "recorded_at.asc"
+    order = "recorded_at.asc,id.asc"
   )
 
-  df <- supabase_get("user_team_history", query)
+  df <- supabase_read_all("user_team_history", query)
   if (!is.null(df) && nrow(df) > 0 && "user_teams" %in% colnames(df)) {
     if (is.list(df$user_teams) || is.data.frame(df$user_teams)) {
       df$teamname <- df$user_teams$name
@@ -404,83 +386,33 @@ get_league_finances_history <- function(championship_id) {
   return(df)
 }
 
-sync_pressroom_transactions_to_supabase <- function(pressroom_df, championship_id, deferred = FALSE) {
-  if (is.null(pressroom_df) || nrow(pressroom_df) == 0) return()
-
-  required_cols <- c("player_id", "buyer_team_id", "seller_team_id", "price", "created")
-  if (!all(required_cols %in% colnames(pressroom_df))) return()
-
-  if (isTRUE(deferred)) {
-    previous <- getOption("futmondo.in_session_persistence", FALSE)
-    options(futmondo.in_session_persistence = TRUE)
-    on.exit(options(futmondo.in_session_persistence = previous), add = TRUE)
-  }
-
-  # Keep dependent writes together when called from an interactive session.
-  domain <- if (requireNamespace("shiny", quietly = TRUE)) shiny::getDefaultReactiveDomain() else NULL
-  if (!isTRUE(getOption("futmondo.in_session_persistence", FALSE)) &&
-      !is.null(domain) && exists("defer_persistence", mode = "function")) {
-    return(defer_persistence("sync_pressroom_transactions_to_supabase", list(pressroom_df, championship_id, TRUE)))
-  }
-  if (isTRUE(getOption("futmondo.offline", FALSE))) return(invisible(FALSE))
-  ids <- as.character(pressroom_df$player_id)
-  if (anyNA(ids) || any(!nzchar(trimws(ids)))) {
-    record_persistence_failure("players", category = "write")
-    return(invisible(FALSE))
-  }
-  player_names <- if ("player_name" %in% names(pressroom_df)) as.character(pressroom_df$player_name) else ids
-  unknown <- is.na(player_names) | !nzchar(trimws(player_names))
-  player_names[unknown] <- ids[unknown]
-  # A historical feed has no slug: empty means unknown, not an invented URL.
-  parents <- data.frame(id = ids, name = player_names, slug = "", stringsAsFactors = FALSE)
-  parents <- parents[order(unknown), , drop = FALSE]
-  parents <- parents[!duplicated(parents$id), , drop = FALSE]
-  for (start in seq.int(1L, nrow(parents), by = 200L)) {
-    batch <- parents[start:min(start + 199L, nrow(parents)), , drop = FALSE]
-    status <- supabase_post_direct("players", batch, conflict = "id", ignore_duplicates = TRUE)
-    if (!is.numeric(status) || length(status) != 1L || is.na(status) || status < 200 || status >= 300) {
-      record_persistence_failure("players", category = "write")
-      return(invisible(FALSE))
-    }
-  }
-
-  # Sanitize buyer_team_id and seller_team_id: empty strings or invalid values become NA_character_
-  # which serializes to null in JSON for PostgreSQL ON DELETE SET NULL FK compatibility
-  buyer_ids <- as.character(pressroom_df$buyer_team_id)
-  seller_ids <- as.character(pressroom_df$seller_team_id)
-  buyer_ids[buyer_ids == "" | is.na(buyer_ids)] <- NA_character_
-  seller_ids[seller_ids == "" | is.na(seller_ids)] <- NA_character_
-
-  payload <- data.frame(
-    player_id = as.character(pressroom_df$player_id),
-    championship_id = as.character(championship_id),
-    buyer_team_id = buyer_ids,
-    seller_team_id = seller_ids,
-    price = as.numeric(pressroom_df$price),
-    is_clause = FALSE,
-    source_event_id = as.character(pressroom_df$id),
-    provenance = "futmondo_pressroom",
-    transaction_date = as.character(pressroom_df$created),
-    stringsAsFactors = FALSE
-  )
-
-  # Deduplicate by player_id + championship_id + buyer_team_id + seller_team_id + price + transaction_date
-  payload <- payload %>% dplyr::distinct(player_id, championship_id, buyer_team_id, seller_team_id, price, transaction_date, .keep_all = TRUE)
-
-  # Batch large payloads to avoid payload-size limits on the Supabase REST endpoint
-  batch_size <- 200
-  n <- nrow(payload)
-  print(paste0("[Supabase] Syncing ", n, " pressroom transactions to market_transactions (batch size: ", batch_size, ")."))
-
-  tryCatch({
-    for (start_idx in seq(1, n, by = batch_size)) {
-      end_idx <- min(start_idx + batch_size - 1, n)
-      batch <- payload[start_idx:end_idx, , drop = FALSE]
-      supabase_post("market_transactions", batch)
-    }
-  }, error = function(e) {
-    print(paste0("[Supabase] Error during pressroom transaction sync: ", e$message))
-  })
+supabase_fact_batch_valid<-function(operations){
+ is.list(operations)&&length(operations)>0L&&length(operations)<=2L&&all(vapply(operations,function(op)is.list(op)&&length(op)==4L&&is.character(op[[1]])&&length(op[[1]])==1L&&op[[1]]%in%c("players","market_transactions")&&is.data.frame(op[[2]])&&nrow(op[[2]])>0L&&nrow(op[[2]])<=100L,logical(1)))
+}
+supabase_fact_batch_direct<-function(operations){
+ if(!supabase_fact_batch_valid(operations))return(FALSE)
+ for(op in operations){code<-tryCatch(do.call(supabase_post_direct,op),error=function(e)NULL);if(!is.numeric(code)||length(code)!=1L||is.na(code)||code<200||code>=300)return(FALSE)}
+ invisible(TRUE)
+}
+sync_pressroom_transactions_to_supabase<-function(pressroom_df,championship_id,deferred=FALSE){
+ if(!is.data.frame(pressroom_df)||!nrow(pressroom_df))return(invisible(TRUE))
+ required<-c("id","player_id","buyer_team_id","seller_team_id","price","created")
+ if(!all(required%in%names(pressroom_df)))return(invisible(FALSE))
+ ids<-as.character(pressroom_df$player_id)
+ if(anyNA(ids)||any(!nzchar(trimws(ids)))){record_persistence_failure("players",category="write");return(FALSE)}
+ d<-pressroom_df;labels<-as.character(d$player_name %||% d$player_id);unknown<-is.na(labels)|!nzchar(trimws(labels));labels[unknown]<-ids[unknown]
+ parents<-data.frame(id=ids,name=labels,slug="",stringsAsFactors=FALSE);parents<-parents[order(unknown),,drop=FALSE];parents<-parents[!duplicated(parents$id),,drop=FALSE]
+ buyer<-as.character(d$buyer_team_id);seller<-as.character(d$seller_team_id);buyer[is.na(buyer)|!nzchar(buyer)]<-NA_character_;seller[is.na(seller)|!nzchar(seller)]<-NA_character_
+ payload<-data.frame(player_id=ids,championship_id=as.character(championship_id),buyer_team_id=buyer,seller_team_id=seller,price=suppressWarnings(as.numeric(d$price)),is_clause=FALSE,source_event_id=as.character(d$id),provenance="futmondo_pressroom",transaction_date=as.character(d$created))
+ payload<-payload[!duplicated(payload$source_event_id),,drop=FALSE]
+ domain<-if(requireNamespace("shiny",quietly=TRUE))shiny::getDefaultReactiveDomain()else NULL
+ queued<-(!is.null(domain)||!is.null(getOption("futmondo.persistence_context")))&&exists("defer_persistence",mode="function")
+ for(i in seq.int(1L,nrow(payload),by=100L)){
+  batch<-payload[i:min(i+99L,nrow(payload)),,drop=FALSE];parent_batch<-parents[parents$id%in%batch$player_id,,drop=FALSE]
+  operations<-list(list("players",parent_batch,"id",TRUE),list("market_transactions",batch,supabase_conflict_key("market_transactions"),FALSE))
+  ok<-if(queued)defer_persistence("supabase_fact_batch_direct",list(operations))else supabase_fact_batch_direct(operations)
+  if(!isTRUE(ok))return(FALSE)
+ };invisible(TRUE)
 }
 
 get_pressroom_transactions_from_supabase <- function(championship_id) {
@@ -488,11 +420,11 @@ get_pressroom_transactions_from_supabase <- function(championship_id) {
 
   query <- list(
     championship_id = paste0("eq.", championship_id),
-    select = "player_id,buyer_team_id,seller_team_id,price,created_at"
+    select = "player_id,buyer_team_id,seller_team_id,price,created_at",order="created_at.asc,id.asc"
   )
 
   tryCatch({
-    df <- supabase_get("market_transactions", query)
+    df <- supabase_read_all("market_transactions", query)
     return(df)
   }, error = function(e) {
     print(paste0("[Supabase] Error fetching pressroom transactions: ", e$message))
@@ -538,11 +470,12 @@ supabase_delete <- function(table_name, filter = "id=neq.00000000-0000-0000-0000
 }
 
 supabase_primary_key <- function(table_name) {
-  if (identical(table_name, "manager_dna_profiles")) "team_id" else "id"
+  # A nonnullable identity component for count and delete filters.
+  if(table_name %in% c("auction_observations","bid_observations","market_observations","league_rule_snapshots","observation_revisions")) "championship_id" else if(identical(table_name,"player_match_observations")) "player_id" else "id"
 }
 
 supabase_known_tables <- function() {
-  c("championships", "real_clubs", "players", "user_teams", "user_team_history", "player_history", "market_transactions", "round_dream_team", "player_daily_snapshots", "manager_dna_profiles", "decision_log", "user_smart_alerts")
+  c("championships", "real_clubs", "players", "user_teams", "user_team_history", "player_history", "market_transactions", "round_dream_team", "player_daily_snapshots", "auction_observations", "bid_observations", "market_observations", "player_match_observations", "league_rule_snapshots", "observation_revisions")
 }
 
 supabase_delete_all <- function(table_name) {
@@ -560,9 +493,7 @@ supabase_reset_database <- function(force = FALSE) {
   }
 
   reset_order <- c(
-    "user_smart_alerts",
-    "decision_log",
-    "manager_dna_profiles",
+    "observation_revisions", "bid_observations", "auction_observations", "market_observations", "player_match_observations", "league_rule_snapshots",
     "player_daily_snapshots",
     "round_dream_team",
     "market_transactions",
@@ -600,20 +531,7 @@ get_table_row_counts <- function() {
     return(data.frame(table_name = character(), row_count = integer(), stringsAsFactors = FALSE))
   }
 
-  tables <- c(
-    "championships",
-    "real_clubs",
-    "players",
-    "user_teams",
-    "user_team_history",
-    "player_history",
-    "market_transactions",
-    "round_dream_team",
-    "player_daily_snapshots",
-    "manager_dna_profiles",
-    "decision_log",
-    "user_smart_alerts"
-  )
+  tables <- supabase_known_tables()
 
   results <- vector("list", length(tables))
   names(results) <- tables
@@ -641,9 +559,8 @@ get_table_row_counts <- function() {
           parts <- strsplit(content_range, "/")[[1]]
           total <- as.integer(trimws(parts[length(parts)]))
         } else {
-          # Fallback: if no content-range, try counting via a minimal select
-          body_text <- httr::content(response, as = "text", encoding = "UTF-8")
-          total <- 0L
+          # An absent count header cannot establish an empty table.
+          total <- NA_integer_
         }
         results[[tbl]] <- total
       } else {
@@ -672,20 +589,7 @@ init_supabase_db <- function(verbose = FALSE) {
     return(FALSE)
   }
 
-  required_tables <- c(
-    "championships",
-    "real_clubs",
-    "players",
-    "user_teams",
-    "user_team_history",
-    "player_history",
-    "market_transactions",
-    "round_dream_team",
-    "player_daily_snapshots",
-    "manager_dna_profiles",
-    "decision_log",
-    "user_smart_alerts"
-  )
+  required_tables <- supabase_known_tables()
 
   all_ok <- TRUE
 
@@ -728,7 +632,7 @@ init_supabase_db <- function(verbose = FALSE) {
 # ============================================================
 
 # ============================================================
-# Intelligence Engine Sync Functions
+# Observed daily snapshots
 # ============================================================
 
 log_player_daily_snapshots <- function(players_df, championship_id) {
@@ -750,10 +654,9 @@ log_player_daily_snapshots <- function(players_df, championship_id) {
   payload <- data.frame(
     player_id = as.character(players_df$id),
     championship_id = as.character(championship_id),
-    value = if ("value" %in% colnames(players_df)) as.integer(safe_num(players_df$value, 0)) else rep(0L, nrow(players_df)),
-    daily_change = if ("change" %in% colnames(players_df)) as.integer(safe_num(players_df$change, 0)) else rep(0L, nrow(players_df)),
-    points = if ("points" %in% colnames(players_df)) as.integer(safe_num(players_df$points, 0)) else rep(0L, nrow(players_df)),
-    fis_score = if ("fis_score" %in% colnames(players_df)) safe_num(players_df$fis_score, NA_real_) else rep(NA_real_, nrow(players_df)),
+    value = if ("value" %in% colnames(players_df)) as.integer(safe_num(players_df$value)) else rep(NA_integer_, nrow(players_df)),
+    daily_change = if ("change" %in% colnames(players_df)) as.integer(safe_num(players_df$change)) else rep(NA_integer_, nrow(players_df)),
+    points = if ("points" %in% colnames(players_df)) as.integer(safe_num(players_df$points)) else rep(NA_integer_, nrow(players_df)),
     status = if ("status" %in% colnames(players_df)) as.character(players_df$status) else rep("ok", nrow(players_df)),
     snapshot_date = format(fm_time(players_df$observed_at),'%Y-%m-%d',tz='UTC'),
     observed_at = as.character(players_df$observed_at),
@@ -802,292 +705,6 @@ log_player_daily_snapshots <- function(players_df, championship_id) {
   })
 }
 
-sync_manager_dna_profiles <- function(dna_df, championship_id) {
-  if (is.null(dna_df) || nrow(dna_df) == 0) return()
-
-  # dna_df is expected to have columns: team_id, aggressiveness, avg_overpayment_pct,
-  # fav_position, trading_frequency, avg_holding_days, total_trades
-  required_cols <- c("team_id", "aggressiveness", "avg_overpayment_pct",
-                     "fav_position", "trading_frequency", "avg_holding_days", "total_trades")
-  missing <- setdiff(required_cols, colnames(dna_df))
-  if (length(missing) > 0) {
-    print(paste0("[Supabase] sync_manager_dna_profiles: missing columns: ", paste(missing, collapse = ", ")))
-    return()
-  }
-
-  payload <- data.frame(
-    team_id = as.character(dna_df$team_id),
-    championship_id = as.character(championship_id),
-    aggressiveness = suppressWarnings(as.numeric(dna_df$aggressiveness)),
-    avg_overpayment_pct = suppressWarnings(as.numeric(dna_df$avg_overpayment_pct)),
-    fav_position = as.character(dna_df$fav_position),
-    trading_frequency = suppressWarnings(as.numeric(dna_df$trading_frequency)),
-    avg_holding_days = suppressWarnings(as.numeric(dna_df$avg_holding_days)),
-    total_trades = as.integer(dna_df$total_trades),
-    stringsAsFactors = FALSE
-  )
-
-  payload <- payload %>% dplyr::distinct(team_id, .keep_all = TRUE)
-
-  print(paste0("[Supabase] Syncing ", nrow(payload), " manager DNA profiles."))
-
-  tryCatch({
-    supabase_post("manager_dna_profiles", payload)
-  }, error = function(e) {
-    print(paste0("[Supabase] Error during manager_dna_profiles sync: ", e$message))
-  })
-}
-
-log_decision <- function(championship_id, user_team_id, player_id, recommendation_type,
-                         recommended_value, actual_action, confidence, roi) {
-  payload <- list(
-    championship_id = as.character(championship_id),
-    user_team_id = as.character(user_team_id),
-    player_id = as.character(player_id),
-    recommendation_type = as.character(recommendation_type),
-    recommended_value = if (!is.null(recommended_value)) as.numeric(recommended_value) else NULL,
-    actual_action_taken = if (!is.null(actual_action)) as.character(actual_action) else NULL,
-    confidence_pct = if (!is.null(confidence)) as.numeric(confidence) else NULL,
-    outcome_roi = if (!is.null(roi)) as.numeric(roi) else NULL
-  )
-
-  tryCatch({
-    supabase_post("decision_log", payload)
-  }, error = function(e) {
-    print(paste0("[Supabase] Error during decision_log insert: ", e$message))
-  })
-}
-
-fetch_user_smart_alerts <- function(user_team_id, championship_id, user_id = NULL) {
-  if (is.null(user_id)) {
-    domain <- shiny::getDefaultReactiveDomain()
-    user_id <- if (!is.null(domain)) domain$userData$futmondo_user_id else NULL
-  }
-  if (is.null(user_id) || !nzchar(user_id)) return(NULL)
-  if (is.null(user_team_id) || user_team_id == "") return(NULL)
-  if (is.null(championship_id) || championship_id == "") return(NULL)
-
-  query <- list(
-    user_team_id = paste0("eq.", user_team_id),
-    championship_id = paste0("eq.", championship_id),
-    select = "id,alert_type,title,message,severity,is_read,created_at,championship_id,player_id",
-    user_id = paste0("eq.", user_id),
-    order = "created_at.desc"
-  )
-
-  tryCatch({
-    df <- supabase_read_all("user_smart_alerts", query)
-    return(df)
-  }, error = function(e) {
-    print(paste0("[Supabase] Error fetching user_smart_alerts: ", e$message))
-    return(NULL)
-  })
-}
-
-# ============================================================
-# Full Database Population
-# ============================================================
-
-populate_entire_database <- function(login, championship_id, verbose = TRUE) {
-  results <- list()
-
-  tryCatch({
-    # ---- Step 1: Sync Championship ----
-    if (verbose) cat("[Populate] Step 1: Syncing championship...\n")
-    tryCatch({
-      championships_data <- get_championships(login, championship_name = NULL)
-
-      if (!is.null(championships_data) && length(championships_data) > 0) {
-        # get_championships returns an unlisted vector; names encode structure as "index.field"
-        prefixes <- sub("\\..*", "", names(championships_data))
-        unique_prefixes <- unique(prefixes)
-
-        synced <- 0L
-        for (pfx in unique_prefixes) {
-          idx <- startsWith(names(championships_data), paste0(pfx, "."))
-          champ <- championships_data[idx]
-
-          # If championship_id is specified, only sync that championship
-          champ_id_val <- as.character(champ["id"])
-          if (!is.null(championship_id) && !is.na(championship_id) && championship_id != "" &&
-              !is.na(champ_id_val) && champ_id_val != as.character(championship_id)) {
-            next
-          }
-
-          payload <- list(
-            id = champ_id_val,
-            name = as.character(champ["name"]),
-            mode = as.character(champ["mode"]),
-            sport = as.character(champ["sport"])
-          )
-          supabase_post("championships", payload)
-          synced <- synced + 1L
-        }
-        if (verbose) print(paste0("[Populate] Synced ", synced, " championship(s)."))
-        results[["championships"]] <- list(status = "ok", count = synced)
-      } else {
-        if (verbose) print("[Populate] No championship data retrieved.")
-        results[["championships"]] <- list(status = "ok", count = 0L)
-      }
-    }, error = function(e) {
-      if (verbose) print(paste0("[Populate] Step 1 FAILED: ", e$message))
-      results[["championships"]] <- list(status = "error", message = e$message)
-    })
-
-    # ---- Step 2: Sync Real Clubs ----
-    if (verbose) cat("[Populate] Step 2: Syncing real clubs...\n")
-    tryCatch({
-      clubs <- get_real_clubs(login, championship_id)
-      if (verbose) print(paste0("[Populate] Retrieved ", if (!is.null(clubs) && nrow(clubs) > 0) nrow(clubs) else 0, " real clubs."))
-      sync_real_clubs_to_supabase(clubs)
-      results[["real_clubs"]] <- list(status = "ok", count = if (!is.null(clubs) && nrow(clubs) > 0) nrow(clubs) else 0L)
-    }, error = function(e) {
-      if (verbose) print(paste0("[Populate] Step 2 FAILED: ", e$message))
-      results[["real_clubs"]] <- list(status = "error", message = e$message)
-    })
-
-    # ---- Step 3: Sync Players Catalog ----
-    if (verbose) cat("[Populate] Step 3: Syncing players catalog...\n")
-    tryCatch({
-      players <- get_championship_players(login, championship_id)
-      if (verbose) print(paste0("[Populate] Retrieved ", if (!is.null(players) && nrow(players) > 0) nrow(players) else 0, " players."))
-      sync_players_to_supabase(players)
-      results[["players"]] <- list(status = "ok", count = if (!is.null(players) && nrow(players) > 0) nrow(players) else 0L)
-    }, error = function(e) {
-      if (verbose) print(paste0("[Populate] Step 3 FAILED: ", e$message))
-      results[["players"]] <- list(status = "error", message = e$message)
-    })
-
-    # ---- Step 4: Sync User Teams ----
-    if (verbose) cat("[Populate] Step 4: Syncing user teams...\n")
-    tryCatch({
-      teams <- get_teams(login, championship_id)
-      if (verbose) print(paste0("[Populate] Retrieved ", if (!is.null(teams) && nrow(teams) > 0) nrow(teams) else 0, " user teams."))
-      sync_user_teams_to_supabase(teams, championship_id)
-      results[["user_teams"]] <- list(status = "ok", count = if (!is.null(teams) && nrow(teams) > 0) nrow(teams) else 0L)
-    }, error = function(e) {
-      if (verbose) print(paste0("[Populate] Step 4 FAILED: ", e$message))
-      results[["user_teams"]] <- list(status = "error", message = e$message)
-    })
-
-    # ---- Step 5: Sync Standings Snapshot ----
-    if (verbose) cat("[Populate] Step 5: Syncing standings snapshot...\n")
-    tryCatch({
-      teams_for_history <- get_teams(login, championship_id)
-      log_user_team_history(teams_for_history,championship_id=championship_id)
-      count <- if (!is.null(teams_for_history) && nrow(teams_for_history) > 0) nrow(teams_for_history) else 0L
-      if (verbose) print(paste0("[Populate] Logged ", count, " standings snapshot(s)."))
-      results[["user_team_history"]] <- list(status = "ok", count = count)
-    }, error = function(e) {
-      if (verbose) print(paste0("[Populate] Step 5 FAILED: ", e$message))
-      results[["user_team_history"]] <- list(status = "error", message = e$message)
-    })
-
-    # ---- Step 6: Sync Player History ----
-    if (verbose) cat("[Populate] Step 6: Syncing player history...\n")
-    tryCatch({
-      players_for_history <- get_championship_players(login, championship_id)
-      log_player_history(players_for_history, championship_id)
-      count <- if (!is.null(players_for_history) && nrow(players_for_history) > 0) nrow(players_for_history) else 0L
-      if (verbose) print(paste0("[Populate] Logged ", count, " player history record(s)."))
-      results[["player_history"]] <- list(status = "ok", count = count)
-    }, error = function(e) {
-      if (verbose) print(paste0("[Populate] Step 6 FAILED: ", e$message))
-      results[["player_history"]] <- list(status = "error", message = e$message)
-    })
-
-    # ---- Step 7: Sync Pressroom Transactions ----
-    if (verbose) cat("[Populate] Step 7: Syncing pressroom transactions...\n")
-    tryCatch({
-      pressroom <- get_championship_pressroom(login, championship_id)
-      count <- if (!is.null(pressroom) && nrow(pressroom) > 0) nrow(pressroom) else 0L
-      if (verbose) print(paste0("[Populate] Retrieved ", count, " pressroom transactions."))
-      sync_pressroom_transactions_to_supabase(pressroom, championship_id)
-      results[["market_transactions"]] <- list(status = "ok", count = count)
-    }, error = function(e) {
-      if (verbose) print(paste0("[Populate] Step 7 FAILED: ", e$message))
-      results[["market_transactions"]] <- list(status = "error", message = e$message)
-    })
-
-    # ---- Step 8: Sync Round Dream Teams ----
-    if (verbose) cat("[Populate] Step 8: Syncing round dream teams...\n")
-    tryCatch({
-      dreamteam_result <- sync_all_championship_dreamteams(login, championship_id, verbose)
-      results[["round_dream_team"]] <- dreamteam_result
-    }, error = function(e) {
-      if (verbose) print(paste0("[Populate] Step 8 FAILED: ", e$message))
-      results[["round_dream_team"]] <- list(status = "error", message = e$message)
-    })
-
-    # ---- Step 9: Log Player Daily Snapshots with FIS scores ----
-    if (verbose) cat("[Populate] Step 9: Logging player daily snapshots with FIS scores...\n")
-    tryCatch({
-      players_for_snapshot <- get_championship_players(login, championship_id)
-      if (!is.null(players_for_snapshot) && nrow(players_for_snapshot) > 0) {
-        # Compute FIS scores
-        players_for_snapshot <- calculate_fis_score(players_for_snapshot)
-        if (verbose) print(paste0("[Populate] Computed FIS scores for ", nrow(players_for_snapshot), " players."))
-        log_player_daily_snapshots(players_for_snapshot, championship_id)
-        results[["player_daily_snapshots"]] <- list(
-          status = "ok",
-          count = nrow(players_for_snapshot)
-        )
-      } else {
-        if (verbose) print("[Populate] No player data for snapshots.")
-        results[["player_daily_snapshots"]] <- list(status = "ok", count = 0L)
-      }
-    }, error = function(e) {
-      if (verbose) print(paste0("[Populate] Step 9 FAILED: ", e$message))
-      results[["player_daily_snapshots"]] <- list(status = "error", message = e$message)
-    })
-
-    # ---- Step 10: Calculate and sync Manager DNA profiles ----
-    if (verbose) cat("[Populate] Step 10: Calculating and syncing manager DNA profiles...\n")
-    tryCatch({
-      teams_for_dna <- get_teams(login, championship_id)
-      pressroom_for_dna <- get_championship_pressroom(login, championship_id)
-
-      if (!is.null(teams_for_dna) && nrow(teams_for_dna) > 0) {
-        team_ids <- if ("teamid" %in% colnames(teams_for_dna)) teams_for_dna$teamid else if ("id" %in% colnames(teams_for_dna)) teams_for_dna$id else character(0)
-
-        dna_results <- lapply(team_ids, function(tid) {
-          calculate_manager_dna(tid, pressroom_for_dna, teams_for_dna)
-        })
-
-        # Convert list of DNA results to data frame
-        dna_df <- do.call(rbind, lapply(dna_results, function(dna) {
-          data.frame(
-            team_id = as.character(dna$team_id),
-            aggressiveness = as.numeric(dna$aggressiveness),
-            avg_overpayment_pct = as.numeric(dna$avg_overpayment_pct),
-            fav_position = as.character(dna$fav_position),
-            trading_frequency = as.numeric(dna$trading_frequency),
-            avg_holding_days = as.numeric(dna$avg_holding_days),
-            total_trades = as.integer(dna$total_trades),
-            stringsAsFactors = FALSE
-          )
-        }))
-
-        sync_manager_dna_profiles(dna_df, championship_id)
-        if (verbose) print(paste0("[Populate] Synced DNA profiles for ", nrow(dna_df), " teams."))
-        results[["manager_dna_profiles"]] <- list(status = "ok", count = nrow(dna_df))
-      } else {
-        if (verbose) print("[Populate] No team data for DNA profiles.")
-        results[["manager_dna_profiles"]] <- list(status = "ok", count = 0L)
-      }
-    }, error = function(e) {
-      if (verbose) print(paste0("[Populate] Step 10 FAILED: ", e$message))
-      results[["manager_dna_profiles"]] <- list(status = "error", message = e$message)
-    })
-
-  }, error = function(e) {
-    print(paste0("[Populate] Fatal error during full database population: ", e$message))
-    results[["fatal_error"]] <- list(status = "error", message = e$message)
-  })
-
-  return(results)
-}
-# Explicit conflict targets for natural-key observations, not generated IDs.
 supabase_conflict_key <- function(table_name) {
   keys <- c(user_team_history="user_team_id,championship_id,observed_at",
     player_history = "player_id,championship_id,observed_at",
@@ -1097,43 +714,29 @@ supabase_conflict_key <- function(table_name) {
     auction_observations = "championship_id,auction_id",
     bid_observations = "championship_id,auction_id,bidder_id",
     market_observations = "championship_id,listing_id,observed_at",
-    forecast_records = "id",
     player_match_observations = "player_id,championship_id,season,scoring_version,round,observed_at",
     league_rule_snapshots = "championship_id,scoring_version,observed_at",
-    transfer_scenarios = "user_id,championship_id,user_team_id,name",
-    user_smart_alerts = "user_id,championship_id,event_key",
-    observation_subscriptions="user_id,championship_id,user_team_id",
     sale_observations="user_id,championship_id,offer_id,observed_at",
-    model_evaluations="id",
     fixture_observations="championship_id,season,scoring_version,player_id,round,observed_at",
     auction_opportunities="championship_id,listing_id,observed_at")
   if (table_name %in% names(keys)) unname(keys[[table_name]]) else NULL
 }
 
-supabase_post <- function(table_name, payload, conflict = supabase_conflict_key(table_name)) {
-  if (isTRUE(getOption("futmondo.offline", FALSE))) return(invisible(204L))
-  domain <- if (requireNamespace("shiny", quietly = TRUE)) shiny::getDefaultReactiveDomain() else NULL
-  if (!isTRUE(getOption("futmondo.in_session_persistence", FALSE)) &&
-      !is.null(domain) && exists("defer_persistence", mode = "function")) {
-    return(defer_persistence("supabase_post_direct", list(table_name, payload, conflict)))
-  }
-  supabase_post_direct(table_name, payload, conflict)
+supabase_post<-function(table_name,payload,conflict=supabase_conflict_key(table_name),ignore_duplicates=FALSE){
+ if(is.null(payload)||(is.data.frame(payload)&&!nrow(payload)))return(invisible(204L))
+ if(isTRUE(getOption("futmondo.offline",FALSE)))return(invisible(204L))
+ if(is.data.frame(payload)&&nrow(payload)>100L){
+  results<-lapply(seq.int(1L,nrow(payload),by=100L),function(i)supabase_post(table_name,payload[i:min(i+99L,nrow(payload)),,drop=FALSE],conflict,ignore_duplicates))
+  return(invisible(if(all(vapply(results,function(x)isTRUE(x)||(is.numeric(x)&&length(x)==1L&&x>=200&&x<300),logical(1))))TRUE else FALSE))
+ }
+ domain<-if(requireNamespace("shiny",quietly=TRUE))shiny::getDefaultReactiveDomain()else NULL
+ if((!is.null(domain)||!is.null(getOption("futmondo.persistence_context")))&&exists("defer_persistence",mode="function"))return(defer_persistence("supabase_post_direct",list(table_name,payload,conflict,ignore_duplicates)))
+ supabase_post_direct(table_name,payload,conflict,ignore_duplicates)
 }
 
-supabase_read_all <- function(table_name, query = list(), max_rows = 100000L) {
-  key <- paste0("db_", table_name, "_", jsonlite::toJSON(query, auto_unbox = TRUE))
-  get_cached_data(key, {
-    rows <- list()
-    for (offset in seq.int(0L, max_rows - 1L, by = 1000L)) {
-      q <- query; q$limit <- 1000L; q$offset <- offset
-      batch <- supabase_get(table_name, q)
-      if (is.null(batch)) stop("Database unavailable")
-      if (!nrow(batch)) break
-      rows[[length(rows) + 1L]] <- batch
-      if (nrow(batch) < 1000L) break
-    }
-    dplyr::bind_rows(rows)
-  }, timeout_sec = 60)
+supabase_read_all<-function(table_name,query=list(),max_rows=20000L){
+ if(is.null(query$order))query$order<-switch(table_name,player_match_observations="season.asc,scoring_version.asc,player_id.asc,round.asc,observed_at.asc",auction_observation_history="observed_at.asc,id.asc",bid_observation_history="observed_at.asc,id.asc","recorded_at.asc,id.asc")
+ history_read_pages(table_name,query,max_rows=max_rows)
 }
 
 read_player_price_history <- function(championship_id, player_ids = NULL) {
@@ -1162,25 +765,6 @@ read_observation_revisions <- function(table, championship_id, cutoff, keys) {
   d[!duplicated(d[keys],fromLast=TRUE),,drop=FALSE]
 }
 
-save_transfer_scenario <- function(user_id, championship_id, user_team_id, name, scenario) {
-  if (!nzchar(trimws(name)) || !nzchar(user_id)) return(FALSE)
-  payload <- list(user_id = user_id, championship_id = championship_id, user_team_id = user_team_id,
-    name = trimws(name), scenario = scenario,
-    updated_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%OSZ", tz = "UTC"))
-  # User needs acknowledgement before seeing 'Saved'. Bounded request; unlike
-  # background telemetry this user-initiated persistence must return its status.
-  code <- supabase_post_direct("transfer_scenarios", payload,
-    supabase_conflict_key("transfer_scenarios"))
-  success <- is.numeric(code) && code >= 200 && code < 300
-  if (isTRUE(success)) clear_api_cache(user_id)
-  isTRUE(success)
-}
-read_transfer_scenarios <- function(user_id, championship_id, user_team_id) {
-  tryCatch(supabase_read_all("transfer_scenarios", list(user_id = paste0("eq.", user_id),
-    championship_id = paste0("eq.", championship_id), user_team_id = paste0("eq.", user_team_id),
-    order = "updated_at.desc")), error = function(e) NULL)
-}
-
 supabase_patch <- function(table_name, payload, filters) {
   if (isTRUE(getOption("futmondo.offline", FALSE))) return(FALSE)
   tryCatch({
@@ -1201,259 +785,18 @@ persist_auction_history <- function(pressroom_df, championship_id) {
   invisible(TRUE)
 }
 
-collect_account_observations <- function(login, championship_id, user_team_id) {
-  if (!valid_login(login)) return(FALSE)
-  active <- get_active_championships(login)
-  selected <- Filter(function(x) identical(fm_scalar(x$id), as.character(championship_id)) &&
-    identical(fm_scalar(x$userteam$id), as.character(user_team_id)), active$championships)
-  if (length(selected)!=1L) return(FALSE)
-  champ <- selected[[1]]
-  sync_championship_to_supabase(unlist(champ))
-  players <- get_championship_players(login, championship_id)
-  teams <- get_teams(login, championship_id)
-  sync_real_clubs_to_supabase(players); sync_players_to_supabase(players)
-  sync_user_teams_to_supabase(teams, championship_id)
-  log_user_team_history(teams,championship_id=championship_id); log_player_history(players, championship_id)
-  # Full-catalog ownership comes from userteamId; unknown market visibility is NA.
-  log_player_daily_snapshots(calculate_fis_score(players), championship_id)
-  pressroom <- get_championship_pressroom(login, championship_id)
-  persist_auction_history(pressroom, championship_id)
-  info <- get_user_team_info(login,championship_id,user_team_id)
-  lineup <- tryCatch(get_lineup_from_team(login,championship_id,user_team_id),error=function(e)NULL)
-  rules <- normalize_league_rules(info,lineup,championship_id)
-  version <- rules$scoring_version
-  stamp <- format(fm_time(attr(info,'observed_at') %||% NA_character_),"%Y-%m-%dT%H:%M:%OSZ",tz="UTC")
-  season <- league_season_context(championship_id,champ$season %||% champ$seasonId)
-  if(!is.na(stamp) && !identical(attr(info,'fetch_status'),'stale')) supabase_post("league_rule_snapshots",list(championship_id=championship_id,scoring_version=version,
-    season=season,observed_at=stamp,configuration=list(scoring=lineup$custom,point_system=lineup$pointSystem,settings=info$configuration,capabilities=rules)))
-  roster <- get_players_from_team(login,championship_id,user_team_id)
-  market <- tryCatch(get_market_players(login,championship_id,user_team_id),error=function(e)NULL)
-  opportunities<-normalize_listing_opportunities(market,championship_id)
-  if(nrow(opportunities)) {
-    previous<-tryCatch(supabase_read_all('auction_opportunities',list(championship_id=paste0('eq.',championship_id),order='observed_at.asc')),error=function(e)NULL)
-    if(is.data.frame(previous)&&nrow(previous))for(i in seq_len(nrow(opportunities))) {
-      known<-previous$first_observed_at[previous$listing_id==opportunities$listing_id[i]]
-      if(length(known))opportunities$first_observed_at[i]<-as.character(known[1])
-    }
-    supabase_post('auction_opportunities',opportunities)
-  }
-  market_stamp <- attr(market,'observed_at')
-  if(!is.null(market) && nrow(market) && !is.null(market_stamp) && !identical(attr(market,'fetch_status'),'stale')) {
-    stamp <- format(market_stamp,'%Y-%m-%dT%H:%M:%OSZ',tz='UTC')
-    expiry_col <- intersect(c("date","expires","expirationDate","expiration"),names(market))
-    for(i in seq_len(nrow(market))) {
-      expires <- if(length(expiry_col)) fm_scalar(market[[expiry_col[1]]][i]) else NA_character_
-      # An unknown listing cycle cannot be joined to a past auction by player alone.
-      listing <- if(!is.na(expires)) paste(market$id[i],expires,sep=":") else paste(market$id[i],stamp,sep=":unknown:")
-      supabase_post("market_observations",list(championship_id=championship_id,player_id=as.character(market$id[i]),
-        listing_id=listing,observed_at=stamp,expires_at=expires,value=fm_number(market$value[i]),
-        asking_price=fm_number(market$price[i]),bidder_count=fm_number(market$numberOfBids[i])))
-    }
-  }
-  ids <- unique(as.character(players$id))
-  subscription <- tryCatch(supabase_read_all('observation_subscriptions',list(user_id=paste0('eq.',login[['userid']]),
-    championship_id=paste0('eq.',championship_id),user_team_id=paste0('eq.',user_team_id))),error=function(e)NULL)
-  after <- if(is.data.frame(subscription)&&nrow(subscription)==1L) subscription$last_player_id else NULL
-  batch <- collection_player_batch(ids,after,30L)
-  completed <- tryCatch(get_finished_rounds(login,championship_id),error=function(e)NULL)
-  finished_numbers <- if(is.data.frame(completed)) completed$round_number[completed$is_finished %in% TRUE] else numeric()
-  completed_id <- after
-  for(id in batch) {
-    summary <- tryCatch(get_player_summary(login,championship_id,user_team_id,id),error=function(e)NULL)
-    if(is.null(summary)||is.null(attr(summary,'observed_at'))||identical(attr(summary,'fetch_status'),'stale')) next
-    fixture<-normalize_fixture_observation(summary,id,championship_id,season,version)
-    if(nrow(fixture))supabase_post('fixture_observations',fixture)
-    obs <- normalize_player_match_observations(summary,id,championship_id,version,season,
-      observed_at=fm_time(attr(summary,'observed_at')),rounds=completed)
-    if(nrow(fixture)&&nrow(obs))obs$occurred_at[obs$round==fixture$round]<-fixture$occurred_at
-    if(nrow(obs)) obs$score_status[obs$round %in% finished_numbers & is.finite(obs$points)] <- "final"
-    if(nrow(obs)) supabase_post("player_match_observations",obs)
-    completed_id <- id
-  }
-  if(length(completed_id)==1L && !is.na(completed_id)) supabase_post('observation_subscriptions',
-    list(user_id=login[['userid']],championship_id=championship_id,user_team_id=user_team_id,last_player_id=completed_id))
-  # Alerts are supplementary. A transient alert/offer failure must not mark the
-  # completed history collection as failed or stop the next collection cycle.
-  if(exists("build_insight_alerts",mode="function")) tryCatch({
-    fin <- get_financial_snapshot(login,championship_id,user_team_id)
-    offers <- tryCatch(get_roster_bids(login,championship_id,user_team_id),error=function(e)NULL)
-    sale_rows <- normalize_sale_observations(offers,roster,login[['userid']],championship_id,user_team_id)
-    if(nrow(sale_rows)) supabase_post('sale_observations',sale_rows)
-    alerts <- build_insight_alerts(login[["userid"]],championship_id,user_team_id,fin,roster,offers,market=market)
-    if(nrow(alerts)) supabase_post("user_smart_alerts",alerts)
-  }, error=function(e) message("[Observations] Insight alerts skipped for this collection."))
-  TRUE
+read_player_match_history<-function(championship_id,cutoff=Sys.time(),final_only=TRUE,season="unknown",scoring_version="unknown",player_ids=NULL,round_min=NULL,round_max=NULL,max_rows=5000L){
+ q<-list(championship_id=paste0("eq.",championship_id),season=paste0("eq.",season),scoring_version=paste0("eq.",scoring_version),observed_at=paste0("lte.",format(fm_time(cutoff),"%Y-%m-%dT%H:%M:%OSZ",tz="UTC")),order="player_id.asc,round.asc,observed_at.asc")
+ q$select<-"player_id,championship_id,season,scoring_version,round,points,score_status,observed_at"
+ if(!is.null(round_min))q$round<-paste0("gte.",round_min)
+ if(!is.null(round_max))q$and<-paste0("(round.lte.",round_max,")")
+ if(length(player_ids))q$player_id<-paste0("in.(",paste(unique(player_ids),collapse=","),")")
+ if(final_only)q$score_status<-"eq.final"
+ d<-supabase_read_all("player_match_observations",q,max_rows=max_rows);if(!is.data.frame(d)||!nrow(d))return(d)
+ keep<-d$championship_id==championship_id & d$season==season & d$scoring_version==scoring_version & !is.na(fm_time(d$observed_at)) & fm_time(d$observed_at)<=fm_time(cutoff)
+ if(final_only)keep<-keep & d$score_status=="final"
+ d<-d[keep%in%TRUE,,drop=FALSE];d<-d[order(d$player_id,d$round,fm_time(d$observed_at)),,drop=FALSE]
+ d$is_final<-d$score_status=="final";d$round_id<-paste(d$season,d$scoring_version,d$round,sep=":")
+ d[!duplicated(d[c("player_id","season","scoring_version","round")],fromLast=TRUE),,drop=FALSE]
 }
-
-
-# Cooperative, session-safe collection used by the Shiny persistence queue.
-# Each call performs one bounded stage and returns state for the next tick.
-new_account_observation_collection <- function(login, championship_id, user_team_id) {
-  list(login=login, championship_id=championship_id, user_team_id=user_team_id,
-       stage="catalog", player_index=1L, complete=FALSE, ok=TRUE, message="Preparing league data")
-}
-
-collect_account_observation_step <- function(state) {
-  fail <- function(message) { state$ok <- FALSE; state$complete <- TRUE; state$message <- message; state }
-  if (!isTRUE(state$ok) || isTRUE(state$complete)) return(state)
-  login <- state$login; championship_id <- state$championship_id; user_team_id <- state$user_team_id
-  if (!valid_login(login)) return(fail("Login expired before observations could be saved."))
-  tryCatch({
-    if (identical(state$stage, "catalog")) {
-      active <- get_active_championships(login)
-      selected <- Filter(function(x) identical(fm_scalar(x$id), as.character(championship_id)) &&
-        identical(fm_scalar(x$userteam$id), as.character(user_team_id)), active$championships)
-      if (length(selected) != 1L) return(fail("Selected league is no longer available."))
-      state$champ <- selected[[1]]
-      sync_championship_to_supabase(unlist(state$champ))
-      state$players <- get_championship_players(login, championship_id)
-      state$teams <- get_teams(login, championship_id)
-      sync_real_clubs_to_supabase(state$players); sync_players_to_supabase(state$players)
-      sync_user_teams_to_supabase(state$teams, championship_id)
-      log_user_team_history(state$teams, championship_id=championship_id); log_player_history(state$players, championship_id)
-      log_player_daily_snapshots(calculate_fis_score(state$players), championship_id)
-      state$stage <- "pressroom"; state$message <- "Saving market history"; return(state)
-    }
-    if (identical(state$stage, "pressroom")) {
-      persist_auction_history(get_championship_pressroom(login, championship_id), championship_id)
-      state$stage <- "market"; state$message <- "Saving roster and market observations"; return(state)
-    }
-    if (identical(state$stage, "market")) {
-      state$info <- get_user_team_info(login,championship_id,user_team_id)
-      state$lineup <- tryCatch(get_lineup_from_team(login,championship_id,user_team_id),error=function(e)NULL)
-      rules <- normalize_league_rules(state$info,state$lineup,championship_id)
-      state$version <- rules$scoring_version
-      state$season <- league_season_context(championship_id,state$champ$season %||% state$champ$seasonId)
-      stamp <- format(fm_time(attr(state$info,'observed_at') %||% NA_character_),"%Y-%m-%dT%H:%M:%OSZ",tz="UTC")
-      if(!is.na(stamp) && !identical(attr(state$info,'fetch_status'),'stale')) supabase_post("league_rule_snapshots",list(championship_id=championship_id,scoring_version=state$version,season=state$season,observed_at=stamp,configuration=list(scoring=state$lineup$custom,point_system=state$lineup$pointSystem,settings=state$info$configuration,capabilities=rules)))
-      state$roster <- get_players_from_team(login,championship_id,user_team_id)
-      state$market <- tryCatch(get_market_players(login,championship_id,user_team_id),error=function(e)NULL)
-      opportunities <- normalize_listing_opportunities(state$market,championship_id)
-      if(nrow(opportunities)) supabase_post('auction_opportunities',opportunities)
-      state$ids <- unique(as.character(state$players$id))
-      subscription <- tryCatch(supabase_read_all('observation_subscriptions',list(user_id=paste0('eq.',login[['userid']]),championship_id=paste0('eq.',championship_id),user_team_id=paste0('eq.',user_team_id))),error=function(e)NULL)
-      after <- if(is.data.frame(subscription)&&nrow(subscription)==1L) subscription$last_player_id else NULL
-      state$ids <- collection_player_batch(state$ids,after,30L)
-      state$completed <- tryCatch(get_finished_rounds(login,championship_id),error=function(e)NULL)
-      state$finished_numbers <- if(is.data.frame(state$completed)) state$completed$round_number[state$completed$is_finished %in% TRUE] else numeric()
-      state$player_index <- 1L; state$stage <- "players"; state$message <- "Saving player round observations"; return(state)
-    }
-    if (identical(state$stage, "players")) {
-      if (state$player_index > length(state$ids)) { state$stage <- "finish"; state$message <- "Finishing observation save"; return(state) }
-      id <- state$ids[state$player_index]
-      summary <- tryCatch(get_player_summary(login,championship_id,user_team_id,id),error=function(e)NULL)
-      if(!is.null(summary)&&!is.null(attr(summary,'observed_at'))&&!identical(attr(summary,'fetch_status'),'stale')) {
-        fixture <- normalize_fixture_observation(summary,id,championship_id,state$season,state$version)
-        if(nrow(fixture)) supabase_post('fixture_observations',fixture)
-        obs <- normalize_player_match_observations(summary,id,championship_id,state$version,state$season,observed_at=fm_time(attr(summary,'observed_at')),rounds=state$completed)
-        if(nrow(fixture)&&nrow(obs)) obs$occurred_at[obs$round==fixture$round] <- fixture$occurred_at
-        if(nrow(obs)) obs$score_status[obs$round %in% state$finished_numbers & is.finite(obs$points)] <- "final"
-        if(nrow(obs)) supabase_post("player_match_observations",obs)
-      }
-      state$completed_id <- id
-      # Persist after every player: a closed session resumes at the next ID.
-      supabase_post('observation_subscriptions',list(user_id=login[['userid']],championship_id=championship_id,user_team_id=user_team_id,last_player_id=id))
-      state$player_index <- state$player_index + 1L
-      state$message <- paste0("Saving player observations (", min(state$player_index-1L,length(state$ids)), "/", length(state$ids), ")")
-      return(state)
-    }
-    if (identical(state$stage, "finish")) {
-      if(exists("build_insight_alerts",mode="function")) tryCatch({
-        fin <- get_financial_snapshot(login,championship_id,user_team_id)
-        offers <- tryCatch(get_roster_bids(login,championship_id,user_team_id),error=function(e)NULL)
-        sale_rows <- normalize_sale_observations(offers,state$roster,login[['userid']],championship_id,user_team_id)
-        if(nrow(sale_rows)) supabase_post('sale_observations',sale_rows)
-        alerts <- build_insight_alerts(login[["userid"]],championship_id,user_team_id,fin,state$roster,offers,market=state$market)
-        if(nrow(alerts)) supabase_post("user_smart_alerts",alerts)
-      },error=function(e) message("[Observations] Insight alerts skipped for this collection."))
-      state$complete <- TRUE; state$message <- "Observations saved"; return(state)
-    }
-    fail("Observation state is invalid.")
-  }, error=function(e) fail("Observation collection stopped unexpectedly."))
-}
-
-
-read_model_auctions <- function(championship_id, auctions=NULL) {
-  d <- if(is.null(auctions))read_auction_observations(championship_id) else auctions
-  if(is.null(d) || !nrow(d)) return(d)
-  d$visibility <- ifelse(!is.na(d$visibility_complete) & d$visibility_complete,"complete","unknown")
-  d$reference_observed_at <- if("reference_at" %in% names(d)) d$reference_at else NA_character_
-  if(!"eligible_manager_ids" %in% names(d)) d$eligible_manager_ids <- rep(list(character()),nrow(d))
-  if(!"reference_value" %in% names(d)) d$reference_value <- NA_real_
-  prices <- read_player_price_history(championship_id,unique(d$player_id))
-  if(!is.null(prices) && nrow(prices)) {
-    times <- fm_time(prices$observed_at)
-    captured <- if('captured_at'%in%names(prices))fm_time(prices$captured_at) else times
-    for(i in seq_len(nrow(d))) {
-      if(is.finite(fm_number(d$reference_value[i]))) next
-      cutoff <- fm_time(d$settled_at[i])
-      eligible <- which(prices$player_id==d$player_id[i] & !is.na(times) & times<cutoff & !is.na(captured)&captured<cutoff &
-        times>=cutoff-86400 & is.finite(prices$value) & prices$value>0)
-      if(length(eligible)) {
-        row <- eligible[which.max(times[eligible])]
-        d$reference_value[i] <- prices$value[row]
-        d$reference_observed_at[i] <- as.character(prices$observed_at[row])
-      }
-    }
-  }
-  d
-}
-
-
-# Never mix scoring configurations or seasons. Historic snapshots keep their own cutoff.
-read_player_match_history <- function(championship_id, cutoff=Sys.time(), final_only=TRUE,
-                                      season=NULL, scoring_version=NULL) {
-  q <- list(championship_id=paste0("eq.",championship_id),
-    observed_at=paste0("lte.",format(fm_time(cutoff),"%Y-%m-%dT%H:%M:%OSZ",tz="UTC")),
-    order="observed_at.asc")
-  if (isTRUE(final_only)) q$score_status <- "eq.final"
-  if (!is.null(season)) q$season <- paste0("eq.",season)
-  if (!is.null(scoring_version)) q$scoring_version <- paste0("eq.",scoring_version)
-  d <- tryCatch(supabase_read_all("player_match_observations",q),error=function(e)NULL)
-  if (is.null(d) || !nrow(d)) return(d)
-  t <- fm_time(d$observed_at)
-  d <- d[!is.na(t) & t<=fm_time(cutoff),,drop=FALSE]
-  if (!nrow(d)) return(d)
-  d <- d[!is.na(d$season) & d$season!="unknown" & !is.na(d$scoring_version) & d$scoring_version!="unknown",,drop=FALSE]
-  if(!nrow(d)) return(d)
-  d$is_final <- d$score_status=="final"
-  if (isTRUE(final_only)) d <- d[d$is_final %in% TRUE,,drop=FALSE]
-  if (!nrow(d)) return(d)
-  # Default to the latest observed season/scoring context; no cross-mode pooling.
-  context <- d[which.max(fm_time(d$observed_at)),,drop=FALSE]
-  d <- d[d$season==context$season & d$scoring_version==context$scoring_version,,drop=FALSE]
-  fixtures<-tryCatch(supabase_read_all('fixture_observations',list(championship_id=paste0('eq.',championship_id),
-    season=paste0('eq.',context$season),scoring_version=paste0('eq.',context$scoring_version),
-    observed_at=paste0('lte.',format(fm_time(cutoff),'%Y-%m-%dT%H:%M:%OSZ',tz='UTC')),order='observed_at.asc')),error=function(e)NULL)
-  if(is.data.frame(fixtures)&&all(c('player_id','round','occurred_at','observed_at')%in%names(fixtures))) {
-    fixtures<-fixtures[!is.na(fm_time(fixtures$observed_at))&fm_time(fixtures$observed_at)<=fm_time(cutoff),,drop=FALSE]
-    fixtures<-fixtures[!duplicated(fixtures[c('player_id','round')],fromLast=TRUE),,drop=FALSE]
-    if(!'occurred_at'%in%names(d))d$occurred_at<-NA_character_
-    idx<-match(paste(d$player_id,d$round),paste(fixtures$player_id,fixtures$round))
-    d$occurred_at[!is.na(idx)]<-as.character(fixtures$occurred_at[idx[!is.na(idx)]])
-  }
-  d$round_id <- paste(d$season,d$scoring_version,d$round,sep=":")
-  d <- d[order(fm_time(d$observed_at)),,drop=FALSE]
-  d[!duplicated(d[c("player_id","round_id")],fromLast=TRUE),,drop=FALSE]
-}
-
-persist_forecast <- function(user_id, championship_id, player_id=NULL, model_version,
-                             forecast_type, cutoff, horizon=NULL, prediction, season=NULL, scoring_version=NULL) {
-  if (!nzchar(fm_scalar(user_id,"")) || !nzchar(fm_scalar(championship_id,""))) return(FALSE)
-  stamp <- format(fm_time(cutoff),"%Y-%m-%dT%H:%M:%OSZ",tz="UTC")
-  if (length(stamp)!=1L || is.na(stamp)) return(FALSE)
-  key <- jsonlite::toJSON(list(user_id,championship_id,player_id,model_version,forecast_type,stamp,horizon,prediction,season,scoring_version),auto_unbox=TRUE)
-  payload <- list(id=as.character(openssl::sha256(charToRaw(key))),user_id=user_id,
-    championship_id=championship_id,player_id=player_id,model_version=model_version,
-    forecast_type=forecast_type,cutoff=stamp,horizon=horizon,prediction=prediction,
-    season=season,scoring_version=scoring_version)
-  supabase_post("forecast_records",payload)
-}
-
-record_forecast_outcome <- function(user_id, championship_id, forecast_id, outcome, evaluated_at=Sys.time()) {
-  # Explicit ownership prevents a caller from attaching outcomes to another account.
-  supabase_patch("forecast_records",list(outcome=outcome,
-    evaluated_at=format(evaluated_at,"%Y-%m-%dT%H:%M:%OSZ",tz="UTC")),
-    list(id=paste0("eq.",forecast_id),user_id=paste0("eq.",user_id),
-      championship_id=paste0("eq.",championship_id),evaluated_at="is.null"))
-}
+source("history_repository.R")

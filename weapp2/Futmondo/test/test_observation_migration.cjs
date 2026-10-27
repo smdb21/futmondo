@@ -6,7 +6,7 @@ const { PGlite } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
 (async () => {
   const db = new PGlite();
   await db.exec('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;');
-  for (const file of ['scripts/schema.sql','scripts/migrations/20260905_reliable_insights.sql',
+  for (const file of ['test/fixtures/legacy_schema_before_redesign.sql','scripts/migrations/20260905_reliable_insights.sql',
     'scripts/migrations/20260907_private_history.sql','scripts/migrations/20260907_observation_lifecycle.sql']) {
     await db.exec(fs.readFileSync(file,'utf8'));
   }

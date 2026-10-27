@@ -18,9 +18,7 @@ body <- shinydashboard::dashboardBody(
   selectInput("selected_league", "League", choices = character()),
   uiOutput("background_sync"),
   shinydashboard::tabItems(
-    shinydashboard::tabItem(tabName="intelligence", intelligence_UI("intelligence")),
     shinydashboard::tabItem(tabName="notifications", notifications_UI("notifications")),
-    shinydashboard::tabItem(tabName="automation", automation_UI("automation")),
     shinydashboard::tabItem(
       tabName = "login",
       fluidRow(

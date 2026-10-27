@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 # Offline API-response -> roster -> player-card rating regressions.
-suppressPackageStartupMessages({library(shiny);source('futmondo_functions.R');source('intelligence_engine.R');source('Modules/Selected_Player_Module.R')})
+suppressPackageStartupMessages({library(shiny);source('futmondo_functions.R');source('factual_helpers.R');source('Modules/Selected_Player_Module.R')})
 checks<-0L
 check<-function(name,expr) {force(expr);checks<<-checks+1L;cat('[PASS]',name,'\n')}
 played<-list(id='played',name='Observed player',value=20e6,points=22,change=-1e6,status='',
@@ -34,34 +34,17 @@ check('actual roster parser preserves every player and canonical match fields', 
   p<-roster[roster$id=='played',]
   stopifnot(p$average.average==11,p$average.matches==2,p$average.averageLastFive==11,p$average.total==22)
 })
-check('same observed player has identical roster, market and catalog ratings', {
-  scores<-lapply(list(roster,market,catalog),calculate_fis_score)
-  reference<-scores[[1]][scores[[1]]$id=='played',]
-  for(frame in scores) {
-    p<-frame[frame$id=='played',]
-    stopifnot(p$fis_score==reference$fis_score,p$data_coverage==.8,
-      is.finite(p$perf),is.finite(p$form),is.finite(p$efficiency),is.finite(p$momentum),
-      is.na(p$fixture_risk),p$fis_status=='partial')
-  }
-})
-check('missing averages and zero appearances remain unscored', {
-  for(frame in list(roster,market,catalog)) {
-    rated<-calculate_fis_score(frame)
-    for(id in c('missing','preseason')) {
-      p<-rated[rated$id==id,]
-      stopifnot(is.na(p$fis_score),p$data_coverage==.2,is.na(p$perf),is.na(p$form),
-        is.na(p$efficiency),is.na(p$fixture_risk),p$fis_status=='unavailable')
-    }
-  }
-})
+
+
+
+
 check('missing fitness does not delete observed statistics or invent recent scores', {
   parsed<-normalize_player_average(list(average=6,matches=2))
   stopifnot(parsed$average.average==6,parsed$average.matches==2,
     is.null(parsed$average.averageLastFive),is.null(parsed$average.total),
     identical(normalize_player_average(NULL),list()),identical(normalize_player_average(list()),list()))
   p<-roster[roster$id=='no-fitness',]
-  rated<-calculate_fis_score(p)
-  stopifnot(p$average.average==6,p$average.averageLastFive==7,rated$data_coverage==1)
+  stopifnot(p$average.average==6,p$average.averageLastFive==7)
 })
 check('recent averages use observed scores only and preserve reported means', {
   parsed<-normalize_player_average(list(fitness=list(10,0,5)))
@@ -74,29 +57,8 @@ check('recent averages use observed scores only and preserve reported means', {
     stopifnot(is.null(parsed$average.averageLastFive),is.null(parsed$average.total))
   }
 })
-check('player card reuses restored match indicators and explains unknown availability', {
-  rated<-calculate_fis_score(roster)
-  p<-rated[rated$id=='played',]
-  card<-selected_player_fis_row(p)
-  stopifnot(card$fis_score==p$fis_score,card$data_coverage==.8,
-    is.finite(card$perf),is.finite(card$form),is.finite(card$efficiency))
-  locate<-function(x) {
-    if(is.call(x)&&identical(x[[1]],as.name('<-'))&&
-       identical(paste(deparse(x[[2]]),collapse=''),'output$fis_panel')) return(x[[3]][[2]])
-    if(is.call(x)||is.expression(x)||is.pairlist(x)) for(y in as.list(x)) {
-      if(missing(y)) next
-      found<-locate(y);if(!is.null(found)) return(found)
-    }
-    NULL
-  }
-  env<-new.env(parent=globalenv());env$selected_player<-function() p
-  render<-function() NULL;body(render)<-locate(parse('Modules/Selected_Player_Module.R'));environment(render)<-env
-  session<-shiny::MockShinySession$new()
-  html<-shiny::withReactiveDomain(session,as.character(render()))
-  session$close()
-  stopifnot(grepl('Data coverage: 80%',html,fixed=TRUE),grepl('Not reported',html,fixed=TRUE),
-    grepl('has not reported an availability status',html,fixed=TRUE),!grepl('Descriptive rating N/A',html,fixed=TRUE))
-})
+
+
 check('roster remains cached after normalization', {
   before<-requests
   again<-get_players_from_team(auth,'fixture-league','fixture-team')

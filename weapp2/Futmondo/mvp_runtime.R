@@ -73,7 +73,7 @@ get_finished_round_catalog <- function(login, championship_id) {
     leagues <- mvp_api_answer(login,"https://api.futmondo.com/2/league/list", "")
     if(leagues$status!="ok") return(c(leagues[c("status","reason","code","complete")],list(rounds=empty_finished_rounds())))
     normalize_mvp_catalog(active$answer,leagues$answer,championship_id)
-  }), error=function(e) list(status="connection",rounds=empty_finished_rounds(),complete=FALSE,
+  }, context=resource_context(login=login,championship_id=championship_id)), error=function(e) list(status="connection",rounds=empty_finished_rounds(),complete=FALSE,
     reason="Round discovery failed. Refresh to retry."))
 }
 
@@ -103,74 +103,62 @@ get_official_dreamteam_result <- function(login, championship_id, reference) {
     response <- mvp_api_answer(login,DREAMTEAM_URL,list(championshipId=championship_id,type="dreamteam",round=reference$round_id))
     if(response$status!="ok") return(response)
     normalize_official_dreamteam(response$answer,championship_id,reference)
-  }),error=function(e) mvp_result("connection",reason="MVP retrieval failed. Refresh to retry."))
+  }, context=resource_context(login=login,championship_id=championship_id)),error=function(e) mvp_result("connection",reason="MVP retrieval failed. Refresh to retry."))
 }
 
 # A shared reactive source belongs to the root session, not to either consumer.
-shared_mvp_source <- function(session, login, championship, active, refresh=NULL) {
-  root <- session$rootScope()
-  if(is.null(root$userData$mvp_shared)) {
-    state <- new.env(parent=emptyenv()); state$value <- shiny::reactiveVal(mvp_result("loading",reason="Loading official MVP results."))
-    state$key <- NULL; state$catalog <- NULL; state$pending <- list(); state$consumers <- list(); state$closed <- FALSE
-    root$onSessionEnded(function() state$closed <- TRUE)
-    root$userData$mvp_shared <- state
-  }
-  state <- root$userData$mvp_shared
-  consumer <- session$ns("mvp_consumer")
-  state$consumers[[consumer]] <- active
-  shiny::observe({
-    if(!isTRUE(active())) return()
-    token <- login(); cid <- championship(); shiny::req(token,cid)
-    version <- if(is.function(refresh)) refresh() else 0
-    key <- paste(fm_scalar(token[["userid"]]),cid,version,sep="|")
-    if(!identical(state$key,key)) {
-      state$key <- key; state$catalog <- NULL; state$pending <- list()
-      saved <- tryCatch(get_round_mvps(cid),error=function(e)NULL)
-      if(!is.data.frame(saved)) saved <- data.frame()
-      state$value(mvp_result("loading",saved,"Checking official round history."))
-      state$pending <- list(list(kind="catalog"))
-      shiny::invalidateLater(100,session)
-      return()
-    }
-    # Cooperative scheduling is owned by this observer; one bounded request per tick.
-    if(!length(state$pending)) return()
-    shiny::invalidateLater(100,session)
-    task <- state$pending[[1]]; state$pending <- state$pending[-1]
-    if(state$closed || !identical(state$key,key)) return()
-    current <- shiny::isolate(state$value())
-    if(identical(task$kind,"catalog")) {
-      catalog <- get_finished_round_catalog(token,cid); state$catalog <- catalog
-      rounds <- catalog$rounds
-      if(!is.data.frame(rounds)) rounds <- empty_finished_rounds()
-      done <- rounds[rounds$is_finished %in% TRUE,,drop=FALSE]
-      saved_ids <- if("round_id" %in% names(current$rows)) as.character(current$rows$round_id) else character()
-      done <- done[!done$round_id %in% saved_ids,,drop=FALSE]
-      done <- done[order(done$round_number,decreasing=TRUE,na.last=TRUE),,drop=FALSE]
-      state$pending <- lapply(seq_len(nrow(done)),function(i) list(kind="round",reference=round_reference(done$round_id[i],done$round_number[i])))
-      current$status <- if(length(state$pending)) "loading" else if(isTRUE(catalog$complete)) "ok" else catalog$status
-      current$complete <- isTRUE(catalog$complete) && !length(state$pending)
-      current$reason <- if(length(state$pending)) "Loading missing official MVPs." else if(!isTRUE(catalog$complete)) catalog$reason else if(!nrow(current$rows)) "No completed rounds are available yet." else ""
-      current$issues <- character()
-    } else {
-      result <- get_official_dreamteam_result(token,cid,task$reference)
-      if(identical(result$status,"ok")) {
-        rows <- result$rows[result$rows$is_mvp %in% TRUE,,drop=FALSE]
-        current$rows <- dplyr::bind_rows(current$rows,rows)
-        # Missing round numbers cannot satisfy the existing database schema.
-        if(is.finite(task$reference$round_number)) tryCatch(
-          supabase_post("round_dream_team",result$rows),error=function(e)NULL)
-      } else current$issues <- unique(c(current$issues,result$reason))
-      current$complete <- !length(state$pending) && !length(current$issues) && isTRUE(state$catalog$complete)
-      current$status <- if(length(state$pending)) "loading" else if(current$complete) "ok" else "partial"
-      current$reason <- paste(unique(c(if(length(state$pending)) "Loading missing official MVPs.",state$catalog$reason,current$issues)),collapse=" ")
-    }
-    if(identical(state$key,key)) state$value(current)
-  })
-  shiny::reactive(state$value())
+get_mvp_saved_catalog<-function(login,championship_id){
+ saved<-tryCatch(get_round_mvps(championship_id),error=function(e)data.frame())
+ list(saved=saved,catalog=get_finished_round_catalog(login,championship_id))
+}
+shared_mvp_source<-function(session,login,championship,active,refresh=NULL){
+ root<-session$rootScope()
+ if(is.null(root$userData$mvp_shared)){
+  state<-new.env(parent=emptyenv());state$value<-shiny::reactiveVal(mvp_result("loading",reason="Loading official MVP results."))
+  state$key<-NULL;state$queue<-list();state$consumers<-list();state$busy<-FALSE;state$closed<-FALSE;state$generation<-0L;state$catalog<-NULL
+  root$onSessionEnded(function(){state$closed<-TRUE;state$generation<-state$generation+1L;fm_transport_cancel(root$token)})
+  root$userData$mvp_shared<-state
+ }
+ state<-root$userData$mvp_shared;consumer<-session$ns("mvp_consumer");state$consumers[[consumer]]<-active
+ start_next<-function(){
+  if(state$closed||state$busy||!length(state$queue))return(invisible(NULL))
+  enabled<-shiny::isolate(any(vapply(state$consumers,function(f)isTRUE(f()),logical(1))))
+  if(!enabled)return(invisible(NULL))
+  token<-shiny::isolate(login());cid<-shiny::isolate(championship());if(!valid_login(token)||is.null(cid))return(invisible(NULL))
+  ctx<-resource_context(token,cid,session_id=root$token);generation<-state$generation
+  task<-state$queue[[1]];state$queue<-state$queue[-1];state$busy<-TRUE
+  name<-if(task$kind=="catalog")"get_mvp_saved_catalog"else "get_official_dreamteam_result"
+  args<-list(login=token,championship_id=cid);if(task$kind!="catalog")args$reference<-task$reference
+  promises::then(async_adapter_fetch(name,args,ctx),function(result){
+   if(state$closed||generation!=state$generation)return(NULL)
+   state$busy<-FALSE;current<-shiny::isolate(state$value())
+   if(task$kind=="catalog"){
+    current$rows<-if(is.data.frame(result$saved))result$saved else data.frame();state$catalog<-result$catalog
+    rounds<-result$catalog$rounds;if(!is.data.frame(rounds))rounds<-empty_finished_rounds()
+    done<-rounds[rounds$is_finished%in%TRUE,,drop=FALSE];saved<-current$rows$round_id %||% character()
+    done<-done[!done$round_id%in%saved,,drop=FALSE];done<-done[order(done$round_number,decreasing=TRUE,na.last=TRUE),,drop=FALSE]
+    state$queue<-lapply(seq_len(nrow(done)),function(i)list(kind="round",reference=round_reference(done$round_id[i],done$round_number[i])))
+    current$issues<-character()
+   }else if(identical(result$status,"ok")){
+    current$rows<-dplyr::bind_rows(current$rows,result$rows[result$rows$is_mvp%in%TRUE,,drop=FALSE])
+    if(is.finite(task$reference$round_number))shiny::withReactiveDomain(root,tryCatch(supabase_post("round_dream_team",result$rows),error=function(e)NULL))
+   }else current$issues<-unique(c(current$issues,result$reason))
+   current$complete<-!length(state$queue)&&!length(current$issues)&&isTRUE(state$catalog$complete)
+   current$status<-if(length(state$queue))"loading"else if(current$complete)"ok"else "partial"
+   current$reason<-paste(unique(c(if(length(state$queue))"Loading missing official MVPs.",state$catalog$reason,current$issues)),collapse=" ")
+   state$value(current);later::later(start_next,0);NULL
+  },function(error){
+   if(!state$closed&&generation==state$generation){state$busy<-FALSE;current<-shiny::isolate(state$value());current$status<-"partial";current$complete<-FALSE;current$reason<-"Official results could not be refreshed. Refresh to retry.";state$value(current)};NULL
+  });invisible(NULL)
+ }
+ shiny::observe({
+  if(!isTRUE(active()))return();token<-login();cid<-championship();shiny::req(valid_login(token),cid)
+  version<-if(is.function(refresh))refresh()else 0;key<-paste(token[["userid"]],cid,version,sep="|")
+  if(!identical(state$key,key)){state$key<-key;state$generation<-state$generation+1L;state$busy<-FALSE;state$catalog<-NULL;state$value(mvp_result("loading",reason="Loading official MVP results."));state$queue<-list(list(kind="catalog"))}
+  start_next()
+ });shiny::reactive(state$value())
 }
 
-# Evidence contract is deliberately explicit: generic bonuses/current rosters
-# cannot establish a historical MVP recipient. No text-description guessing.
 calculate_mvp_bonuses <- function(official, championship_id, eligibility=data.frame(), rewards=data.frame(), payments=data.frame(), coverage_complete=FALSE) {
   rows <- if(is.data.frame(official)) official else data.frame()
   if(!all(c("championship_id","round_id","player_id","is_mvp") %in% names(rows))) rows <- data.frame()

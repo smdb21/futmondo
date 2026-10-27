@@ -19,3 +19,9 @@ app.futmondo.com.pressroom.har
 app.futmondo.com.roster_clause.har
 app.futmondo.com.rounds_general.har
 app.futmondo.com.sell_players.har
+scripts
+background_runtime.R.orig
+futmondo_functions.R.orig
+global.R.orig
+server.R.orig
+ui.R.orig

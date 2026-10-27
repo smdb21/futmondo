@@ -19,6 +19,8 @@ players_in_championship_UI <- function(id) {
 
 players_in_championship_Server <- function(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger = NULL) {
   moduleServer(id, function(input, output, session) {
+    bind_factual_reads(c("get_championship_players","get_financial_snapshot"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
+
     # observers ----
 
     # reactives ----
@@ -62,7 +64,8 @@ players_in_championship_Server <- function(id, is_module_active, login_token, ch
       championship_id = championship_id,
       user_team_id = user_team_id,
       available_funds_RV = available_funds_RV,
-      refresh_trigger = refresh_trigger
+      refresh_trigger = refresh_trigger,
+      is_module_active = is_module_active
     )
 
     return(selected_player_RV)

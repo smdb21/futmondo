@@ -1,0 +1,789 @@
+{
+  "project_id": "ozhnextrcxxksswpnglt",
+  "migrations": [
+    {
+      "version": "20261027071111",
+      "name": "factual_history_indexes"
+    },
+    {
+      "version": "20261027071142",
+      "name": "retire_prediction_automation"
+    }
+  ],
+  "verification": {
+    "captured_at": "2026-10-27T07:12:20.213983+00:00",
+    "archived_tables": 12,
+    "retained_access": [
+      {
+        "rls": true,
+        "table": "auction_observations",
+        "anon_select": false,
+        "service_crud": true,
+        "authenticated_select": false
+      },
+      {
+        "rls": true,
+        "table": "bid_observations",
+        "anon_select": false,
+        "service_crud": true,
+        "authenticated_select": false
+      },
+      {
+        "rls": true,
+        "table": "championships",
+        "anon_select": false,
+        "service_crud": true,
+        "authenticated_select": false
+      },
+      {
+        "rls": true,
+        "table": "league_rule_snapshots",
+        "anon_select": false,
+        "service_crud": true,
+        "authenticated_select": false
+      },
+      {
+        "rls": true,
+        "table": "market_observations",
+        "anon_select": false,
+        "service_crud": true,
+        "authenticated_select": false
+      },
+      {
+        "rls": true,
+        "table": "market_transactions",
+        "anon_select": false,
+        "service_crud": true,
+        "authenticated_select": false
+      },
+      {
+        "rls": true,
+        "table": "observation_revisions",
+        "anon_select": false,
+        "service_crud": true,
+        "authenticated_select": false
+      },
+      {
+        "rls": true,
+        "table": "player_daily_snapshots",
+        "anon_select": false,
+        "service_crud": true,
+        "authenticated_select": false
+      },
+      {
+        "rls": true,
+        "table": "player_history",
+        "anon_select": false,
+        "service_crud": true,
+        "authenticated_select": false
+      },
+      {
+        "rls": true,
+        "table": "player_match_observations",
+        "anon_select": false,
+        "service_crud": true,
+        "authenticated_select": false
+      },
+      {
+        "rls": true,
+        "table": "players",
+        "anon_select": false,
+        "service_crud": true,
+        "authenticated_select": false
+      },
+      {
+        "rls": true,
+        "table": "real_clubs",
+        "anon_select": false,
+        "service_crud": true,
+        "authenticated_select": false
+      },
+      {
+        "rls": true,
+        "table": "round_dream_team",
+        "anon_select": false,
+        "service_crud": true,
+        "authenticated_select": false
+      },
+      {
+        "rls": true,
+        "table": "user_team_history",
+        "anon_select": false,
+        "service_crud": true,
+        "authenticated_select": false
+      },
+      {
+        "rls": true,
+        "table": "user_teams",
+        "anon_select": false,
+        "service_crud": true,
+        "authenticated_select": false
+      }
+    ],
+    "obsolete_functions": 0,
+    "archive_role_access": [
+      {
+        "role": "authenticated",
+        "schema_usage": false,
+        "table_selects": 0
+      },
+      {
+        "role": "anon",
+        "schema_usage": false,
+        "table_selects": 0
+      },
+      {
+        "role": "service_role",
+        "schema_usage": false,
+        "table_selects": 0
+      }
+    ],
+    "remaining_retired_public_tables": 0
+  },
+  "verified_indexes": [
+    {
+      "index_name": "market_transactions_buyer",
+      "indisvalid": true,
+      "indisready": true
+    },
+    {
+      "index_name": "market_transactions_seller",
+      "indisvalid": true,
+      "indisready": true
+    },
+    {
+      "index_name": "player_history_context_page",
+      "indisvalid": true,
+      "indisready": true
+    },
+    {
+      "index_name": "player_round_context_revision",
+      "indisvalid": true,
+      "indisready": true
+    },
+    {
+      "index_name": "players_club",
+      "indisvalid": true,
+      "indisready": true
+    },
+    {
+      "index_name": "team_history_context_page",
+      "indisvalid": true,
+      "indisready": true
+    },
+    {
+      "index_name": "user_teams_championship",
+      "indisvalid": true,
+      "indisready": true
+    }
+  ],
+  "checksums_after": [
+    {
+      "table_name": "auction_observations",
+      "table_schema": "public",
+      "row_count": 540,
+      "content_digest": "b36d1eab92fc454fbb432d82d2738eef"
+    },
+    {
+      "table_name": "auction_opportunities",
+      "table_schema": "public",
+      "row_count": 18182,
+      "content_digest": "d77441559fe49e797daf4d7c319897b7"
+    },
+    {
+      "table_name": "automation_account_locks",
+      "table_schema": "retired_features",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "automation_jobs",
+      "table_schema": "retired_features",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "automation_policies",
+      "table_schema": "retired_features",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "automation_sessions",
+      "table_schema": "retired_features",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "bid_observations",
+      "table_schema": "public",
+      "row_count": 933,
+      "content_digest": "9a6a4bb4300004565deb3a753f4249c7"
+    },
+    {
+      "table_name": "championships",
+      "table_schema": "public",
+      "row_count": 1,
+      "content_digest": "84f74fad12c3613e7bab414594732b8f"
+    },
+    {
+      "table_name": "decision_log",
+      "table_schema": "retired_features",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "fixture_observations",
+      "table_schema": "public",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "forecast_records",
+      "table_schema": "retired_features",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "futmondo_players",
+      "table_schema": "public",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "league_preferences",
+      "table_schema": "retired_features",
+      "row_count": 1,
+      "content_digest": "78ccd74bf4911a10b8728a642cd247cf"
+    },
+    {
+      "table_name": "league_rule_snapshots",
+      "table_schema": "public",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "manager_dna_profiles",
+      "table_schema": "retired_features",
+      "row_count": 10,
+      "content_digest": "5f2a1866a37a7c1b89083f1e6a01cfdf"
+    },
+    {
+      "table_name": "market_observations",
+      "table_schema": "public",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "market_transactions",
+      "table_schema": "public",
+      "row_count": 1054,
+      "content_digest": "d3d3c35e9bb25a2b13d4685780dfa9b4"
+    },
+    {
+      "table_name": "market_transactions_archive",
+      "table_schema": "public",
+      "row_count": 1683,
+      "content_digest": "c7eca5cd994480791649e76eba31f049"
+    },
+    {
+      "table_name": "model_evaluations",
+      "table_schema": "retired_features",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "observation_revisions",
+      "table_schema": "public",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "observation_subscriptions",
+      "table_schema": "retired_features",
+      "row_count": 1,
+      "content_digest": "fad13167b493e8fb19ec620c4c8b7e21"
+    },
+    {
+      "table_name": "player_daily_snapshots",
+      "table_schema": "public",
+      "row_count": 12952,
+      "content_digest": "78ffa63e7cd1562029b5b10aedb81395"
+    },
+    {
+      "table_name": "player_history",
+      "table_schema": "public",
+      "row_count": 113367,
+      "content_digest": "6de0e09812eb5958b937fc6917156a3b"
+    },
+    {
+      "table_name": "player_match_observations",
+      "table_schema": "public",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "players",
+      "table_schema": "public",
+      "row_count": 575,
+      "content_digest": "8b4021a6dca788b0d4e451d0327fece2"
+    },
+    {
+      "table_name": "real_clubs",
+      "table_schema": "public",
+      "row_count": 21,
+      "content_digest": "33089ea2fa1aa4eefdaf83850cea8b71"
+    },
+    {
+      "table_name": "round_dream_team",
+      "table_schema": "public",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "sale_observations",
+      "table_schema": "public",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "transfer_scenarios",
+      "table_schema": "retired_features",
+      "row_count": 0,
+      "content_digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table_name": "user_smart_alerts",
+      "table_schema": "retired_features",
+      "row_count": 32,
+      "content_digest": "8303f33bbdc31456319f8c06e8d07cbc"
+    },
+    {
+      "table_name": "user_team_history",
+      "table_schema": "public",
+      "row_count": 2570,
+      "content_digest": "7a3f9efbba34da5df13dfb83bd58bb65"
+    },
+    {
+      "table_name": "user_teams",
+      "table_schema": "public",
+      "row_count": 10,
+      "content_digest": "ca76607bbe006734339552d96fd6cf91"
+    }
+  ],
+  "differences": [],
+  "advisories": {
+    "result": {
+      "lints": [
+        {
+          "name": "rls_enabled_no_policy",
+          "title": "RLS Enabled No Policy",
+          "level": "INFO",
+          "facing": "EXTERNAL",
+          "categories": [
+            "SECURITY"
+          ],
+          "description": "Detects cases where row level security (RLS) has been enabled on a table but no RLS policies have been created.",
+          "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy",
+          "count": 32,
+          "findings": [
+            {
+              "detail": "Table \\`public.auction_observations\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "auction_observations",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`public.auction_opportunities\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "auction_opportunities",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`public.bid_observations\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "bid_observations",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`public.championships\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "championships",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`public.fixture_observations\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "fixture_observations",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`public.futmondo_players\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "futmondo_players",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`public.league_rule_snapshots\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "league_rule_snapshots",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`public.market_observations\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "market_observations",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`public.market_transactions\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "market_transactions",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`public.market_transactions_archive\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "market_transactions_archive",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`public.observation_revisions\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "observation_revisions",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`public.player_daily_snapshots\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "player_daily_snapshots",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`public.player_history\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "player_history",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`public.player_match_observations\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "player_match_observations",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`public.players\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "players",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`public.real_clubs\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "real_clubs",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`public.round_dream_team\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "round_dream_team",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`public.sale_observations\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "sale_observations",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`public.user_team_history\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "user_team_history",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`public.user_teams\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "user_teams",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`retired_features.automation_account_locks\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "automation_account_locks",
+                "type": "table",
+                "schema": "retired_features"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`retired_features.automation_jobs\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "automation_jobs",
+                "type": "table",
+                "schema": "retired_features"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`retired_features.automation_policies\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "automation_policies",
+                "type": "table",
+                "schema": "retired_features"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`retired_features.automation_sessions\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "automation_sessions",
+                "type": "table",
+                "schema": "retired_features"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`retired_features.decision_log\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "decision_log",
+                "type": "table",
+                "schema": "retired_features"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`retired_features.forecast_records\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "forecast_records",
+                "type": "table",
+                "schema": "retired_features"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`retired_features.league_preferences\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "league_preferences",
+                "type": "table",
+                "schema": "retired_features"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`retired_features.manager_dna_profiles\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "manager_dna_profiles",
+                "type": "table",
+                "schema": "retired_features"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`retired_features.model_evaluations\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "model_evaluations",
+                "type": "table",
+                "schema": "retired_features"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`retired_features.observation_subscriptions\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "observation_subscriptions",
+                "type": "table",
+                "schema": "retired_features"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`retired_features.transfer_scenarios\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "transfer_scenarios",
+                "type": "table",
+                "schema": "retired_features"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            },
+            {
+              "detail": "Table \\`retired_features.user_smart_alerts\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "user_smart_alerts",
+                "type": "table",
+                "schema": "retired_features"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            }
+          ]
+        },
+        {
+          "name": "pg_graphql_anon_table_exposed",
+          "title": "Public Can See Object in GraphQL Schema",
+          "level": "WARN",
+          "facing": "EXTERNAL",
+          "categories": [
+            "SECURITY"
+          ],
+          "description": "Detects tables, views, materialized views, and foreign tables that are visible in the GraphQL schema to anyone using your public anon key. Revoke `SELECT` from `anon` for objects that should not be discoverable before sign-in, and check lint 0027 for the matching signed-in-user exposure.",
+          "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0026_pg_graphql_anon_table_exposed",
+          "count": 1,
+          "findings": [
+            {
+              "detail": "table `public.futmondo_players` is visible in the GraphQL schema because the `anon` role can `SELECT` it. Revoke `SELECT` from `anon` if it should not be discoverable without signing in.",
+              "metadata": {
+                "name": "futmondo_players",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            }
+          ]
+        },
+        {
+          "name": "pg_graphql_authenticated_table_exposed",
+          "title": "Signed-In Users Can See Object in GraphQL Schema",
+          "level": "WARN",
+          "facing": "EXTERNAL",
+          "categories": [
+            "SECURITY"
+          ],
+          "description": "Detects tables, views, materialized views, and foreign tables that are visible in the GraphQL schema to signed-in users. Revoke `SELECT` from `authenticated` for objects that signed-in users should not discover, and check lint 0026 for the matching public exposure.",
+          "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0027_pg_graphql_authenticated_table_exposed",
+          "count": 1,
+          "findings": [
+            {
+              "detail": "table `public.futmondo_players` is visible in the GraphQL schema to signed-in users because the `authenticated` role can `SELECT` it. Revoke `SELECT` from `authenticated` if it should not be discoverable to every account.",
+              "metadata": {
+                "name": "futmondo_players",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            }
+          ]
+        },
+        {
+          "name": "anon_security_definer_function_executable",
+          "title": "Public Can Execute SECURITY DEFINER Function",
+          "level": "WARN",
+          "facing": "EXTERNAL",
+          "categories": [
+            "SECURITY"
+          ],
+          "description": "Detects `SECURITY DEFINER` functions that are callable without signing in. Revoke `EXECUTE`, switch the function to `SECURITY INVOKER`, or move it out of your exposed API schema if it is not meant to be public.",
+          "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable",
+          "count": 1,
+          "findings": [
+            {
+              "detail": "Function `public.rls_auto_enable()` can be executed by the `anon` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/rls_auto_enable`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+              "metadata": {
+                "name": "rls_auto_enable",
+                "schema": "public",
+                "language": "plpgsql",
+                "arguments": "",
+                "security_definer": true
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            }
+          ]
+        },
+        {
+          "name": "authenticated_security_definer_function_executable",
+          "title": "Signed-In Users Can Execute SECURITY DEFINER Function",
+          "level": "WARN",
+          "facing": "EXTERNAL",
+          "categories": [
+            "SECURITY"
+          ],
+          "description": "Detects `SECURITY DEFINER` functions that are callable by signed-in users. Revoke `EXECUTE`, switch the function to `SECURITY INVOKER`, or move it out of your exposed API schema if signed-in users should not call it.",
+          "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable",
+          "count": 1,
+          "findings": [
+            {
+              "detail": "Function `public.rls_auto_enable()` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/rls_auto_enable`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+              "metadata": {
+                "name": "rls_auto_enable",
+                "schema": "public",
+                "language": "plpgsql",
+                "arguments": "",
+                "security_definer": true
+              },
+              "observed_at": "2026-10-27T07:12:20.687Z"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "service_role_smoke": [
+    {
+      "price_history_rows": 113367,
+      "team_history_rows": 2570,
+      "transaction_rows": 1054,
+      "match_history_rows": 0,
+      "auction_history_view_rows": 540,
+      "bid_history_view_rows": 933
+    }
+  ]
+}

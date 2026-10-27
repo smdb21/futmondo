@@ -68,18 +68,7 @@ if (filter_by_position) {
           },
           if (filter_by_change_value) {
             column(width = 2, div(title = "Filter players by minimum 24-hour market trend in millions of EUR", numericInput(inputId = ns("change_value_filter"), label = "Min Trend (M)", min = 0, max = 1, value = default_minimum_change_value, step = 0.05, width = "100%")))
-          },
-          div(
-            class = "col-sm-2 col-xs-6",
-            title = "Filter by Futmondo Intelligence Score rating tier",
-            selectInput(
-              inputId = ns("fis_tier_filter"),
-              label = "FIS Rating",
-              choices = c("All" = "All", "Strong Buy" = "Strong Buy", "Buy" = "Buy", "Hold" = "Hold", "Sell" = "Sell"),
-              selected = "All",
-              width = "100%"
-            )
-          )
+          }
         )
       },
 
@@ -188,23 +177,26 @@ players_table_owner_choices <- function(teams_df) {
   c(choices,stats::setNames(values,labels))
 }
 
-players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL, available_funds_RV = NULL, hide_bid_column = FALSE, refresh_trigger = NULL) {
+players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL, available_funds_RV = NULL, hide_bid_column = FALSE, refresh_trigger = NULL, is_module_active = function() TRUE) {
   moduleServer(id, function(input, output, session) {
+    bind_factual_reads(c("read_player_match_history","get_financial_snapshot","get_finished_rounds"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
+
     ns <- session$ns
     table_refresh_trigger <- reactiveVal(0)
     selected_player_id_RV <- reactiveVal(NULL)
+    selected_player_snapshot_RV <- reactiveVal(NULL)
     selected_player_context_RV <- reactiveVal(NULL)
     selected_player_ready_RV <- reactiveVal(FALSE)
     player_selection_event_RV <- reactiveVal(0L)
     table_context_RV <- reactive({
-      value <- function(x) if(is.function(x)) x() else x
+      value <- function(x) tryCatch(if(is.function(x)) x() else x,error=function(e)NULL)
       auth <- value(login_token)
       list(user=if(valid_login(auth))fm_scalar(auth[["userid"]],"") else "",
         championship=fm_scalar(value(championship_id),""),team=fm_scalar(value(user_team_id),""))
     })
     observeEvent(table_context_RV(), {
       selected_player_ready_RV(FALSE)
-      selected_player_id_RV(NULL);selected_player_context_RV(NULL)
+      selected_player_id_RV(NULL);selected_player_snapshot_RV(NULL);selected_player_context_RV(NULL)
       tryCatch(updateReactable("players_table",selected=NA_integer_,session=session),error=function(e)NULL)
       removeModal()
     },ignoreNULL=FALSE,priority=100)
@@ -236,7 +228,8 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
 
     # observers ----
     # observe user_teams_RV to update market_player_team_filter ----
-    observeEvent(user_teams_RV(), {
+    observeEvent({ req(is_module_active()); user_teams_RV() }, {
+      req(is_module_active())
       teams <- user_teams_RV()
       req(teams)
       updateSelectInput(session, inputId = "team_filter",
@@ -258,7 +251,6 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
         updateCheckboxInput(session, inputId = "is_from_futmondo_filter", value = FALSE)
         updateCheckboxInput(session, inputId = "players_you_bid_filter", value = FALSE)
         updateCheckboxInput(session, inputId = "players_with_bid_filter", value = FALSE)
-        updateSelectInput(session, inputId = "fis_tier_filter", selected = "All")
         updateNumericInput(session, inputId = "recent_games_n", value = 5)
       }, error = function(e) {
         warning(paste0("[Players Table] Clear filters error: ", e$message))
@@ -299,6 +291,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       login_token = login_token,
       championship_id = championship_id,
       user_team_id = user_team_id,
+      refresh_trigger = refresh_trigger,
       on_bid_updated = handle_bid_updated
     )
     # reactives ----
@@ -310,24 +303,29 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       req(length(selected_idx) == 1L, is.data.frame(rows), selected_idx >= 1L, selected_idx <= nrow(rows))
       selected_player_ready_RV(FALSE)
       selected_player_context_RV(table_context_RV())
+      selected_player_snapshot_RV(rows[selected_idx,,drop=FALSE])
       selected_player_id_RV(as.character(rows$id[selected_idx]))
       player_selection_event_RV(isolate(player_selection_event_RV())+1L)
     }, ignoreNULL = TRUE)
-    selected_player_RV <- reactive({
-      if (!isTRUE(selected_player_ready_RV())) return(NULL)
-      if (!identical(selected_player_context_RV(),table_context_RV())) return(NULL)
-      player_id <- selected_player_id_RV()
-      if (is.null(player_id)) return(NULL)
-      rows <- players_table_filtered_RV()
-      if (is.null(rows)) return(NULL)
-      index <- match(player_id, as.character(rows$id))
-      if (is.na(index)) return(NULL)
-      rows[index, , drop = FALSE]
+    selected_player_RV<-reactive({
+      if(!isTRUE(selected_player_ready_RV())||!identical(selected_player_context_RV(),table_context_RV()))return(NULL)
+      player_id<-selected_player_id_RV();if(is.null(player_id))return(NULL)
+      attempt<-tryCatch(list(available=TRUE,rows=players_table_filtered_RV()),error=function(e)list(available=FALSE))
+      if(!attempt$available){
+        saved<-isolate(selected_player_snapshot_RV())
+        if(is.data.frame(saved)&&nrow(saved)==1L&&identical(as.character(saved$id),player_id))return(saved)
+        return(NULL)
+      }
+      rows<-attempt$rows;index<-if(is.data.frame(rows)&&"id"%in%names(rows))match(player_id,as.character(rows$id))else NA_integer_
+      if(is.na(index)){selected_player_snapshot_RV(NULL);return(NULL)}
+      row<-rows[index,,drop=FALSE];selected_player_snapshot_RV(row);row
     })
-    
+
     ## players_table_filtered_RV ----
     players_table_filtered_RV <- reactive({
+      req(is_module_active())
       table_refresh_trigger()
+      if (is.function(refresh_trigger)) refresh_trigger()
       players_table <- players_table_RV()
       if (is.null(players_table) || nrow(players_table) == 0) {
         return(NULL)
@@ -337,21 +335,24 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       if (!is.finite(recent_n)) recent_n <- 5L
       recent_n <- max(1L,min(20L,recent_n))
       champ <- if (is.function(championship_id)) championship_id() else championship_id
-      history <- if (!is.null(champ) && length(champ)==1L && !is.na(champ) && nzchar(as.character(champ))) tryCatch(
-        get_cached_data(paste0("players_table_match_history_",as.character(champ)),
-          read_player_match_history(as.character(champ),final_only=TRUE)),
-        error=function(e)data.frame()) else data.frame()
+      history <- data.frame()
+      auth <- if(is.function(login_token))login_token()else login_token
+      team <- if(is.function(user_team_id))user_team_id()else user_team_id
+      if(valid_login(auth) && !is.null(champ) && !is.null(team)) {
+        snapshot <- tryCatch(get_financial_snapshot(auth,champ,team),error=function(e)NULL)
+        rules <- snapshot$lineup_rules %||% snapshot$rules
+        season <- rules$season %||% "unknown"; scoring <- rules$scoring_version %||% "unknown"
+        if(!identical(season,"unknown") && !identical(scoring,"unknown")) {
+          rounds <- tryCatch(get_finished_rounds(auth,champ),error=function(e)data.frame())
+          completed <- rounds$round_number[rounds$is_finished %in% TRUE]
+          completed <- completed[is.finite(completed)]
+          if(length(completed))history <- tryCatch(read_player_match_history(as.character(champ),final_only=TRUE,
+            season=season,scoring_version=scoring,player_ids=as.character(players_table$id),
+            round_min=max(1L,max(completed)-recent_n+1L),round_max=max(completed)),error=function(e)data.frame())
+        }
+      }
       players_table <- players_table_normalize_owner(players_table, tryCatch(user_teams_RV(), error=function(e)NULL))
       players_table <- add_recent_points_average(players_table,history,recent_n)
-
-      # Ensure FIS scores are calculated if fis_score is not present
-      if (!"fis_score" %in% colnames(players_table)) {
-        tryCatch({
-          players_table <- calculate_fis_score(players_table)
-        }, error = function(e) {
-          warning(paste0("[Players Table] FIS score calculation failed: ", e$message))
-        })
-      }
 
       if (!is.null(input$position_filter)) {
         if (input$position_filter != "All") {
@@ -449,13 +450,6 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
             dplyr::filter(numberOfBids > 0)
         }
       }
-      # FIS Tier filter
-      if (!is.null(input$fis_tier_filter) && input$fis_tier_filter != "All") {
-        if ("fis_tier" %in% colnames(players_table)) {
-          players_table <- players_table %>%
-            dplyr::filter(fis_tier == input$fis_tier_filter)
-        }
-      }
       return(players_table)
     })
     
@@ -463,7 +457,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
     ## render players_table ----
     output$players_table <- renderReactable({
       req(players_table_filtered_RV())
-      cols_to_hide <- c(cfg_player_columns_to_hide, "data_coverage", "fis_status", "priority_score", "observed_at")
+      cols_to_hide <- c(cfg_player_columns_to_hide, "data_coverage", "observed_at")
       if (isTRUE(hide_bid_column)) {
         cols_to_hide <- c(cols_to_hide, "bid_price")
       }

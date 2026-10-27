@@ -59,6 +59,7 @@ defer_persistence <- function(name, args) { queued <<- list(name=name,args=args)
 session <- shiny::MockShinySession$new()
 shiny::withReactiveDomain(session, {
   stopifnot(isTRUE(sync_pressroom_transactions_to_supabase(feed,'league')), length(calls)==0L)
+  stopifnot(identical(queued$name,"supabase_fact_batch_direct"),supabase_fact_batch_valid(queued$args[[1]]))
   do.call(queued$name, queued$args)
   stopifnot(identical(calls,c('players','market_transactions')),
     identical(getOption('futmondo.in_session_persistence'),FALSE))

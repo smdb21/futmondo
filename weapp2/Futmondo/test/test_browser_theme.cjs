@@ -24,7 +24,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       await page.locator('#login-password').fill('fixture');
       await page.locator('#login-login_button').click();
       await page.locator('.sidebar-menu a[data-value="yourteam"]').waitFor();
-      for (const tab of ['today','yourteam','market','players_in_championship','rivals','classification','notifications','intelligence','automation']) {
+      for (const tab of ['today','yourteam','market','players_in_championship','rivals','classification','notifications','plots','round_mvps']) {
         await page.locator(`.sidebar-menu a[data-value="${tab}"]`).evaluate(el=>el.click());
         await page.waitForTimeout(350);
         const body = await page.locator('body').evaluate(el=>({background:getComputedStyle(el).backgroundColor,font:getComputedStyle(el).fontFamily}));
@@ -38,6 +38,23 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       assert.equal(overflow,false,`Page overflow at ${width}px`);
       await page.screenshot({path:`/tmp/futmondo-terminal-${width}.png`,fullPage:true});
       console.log(`PASS terminal colours, monospace, nine tabs, and responsive page at ${width}px`);
+      const roster=page.locator('#players_in_teams-players_table_in_teams-players_table');
+      await roster.locator('.rt-select-input').first().check();
+      const modal=page.locator('.modal:visible');await modal.waitFor();
+      await modal.locator('.player-recent-round-chip').first().waitFor();
+      const chips=await modal.locator('.player-recent-round-chip').allTextContents();
+      assert.ok(chips.some(x=>x.includes('0 pts'))&&chips.some(x=>x.includes('-2 pts')),`${width}px round scores: ${chips}`);
+      await modal.getByRole('radio',{name:'Round points',exact:true}).check();
+      await page.waitForFunction(()=>Array.from(document.querySelectorAll('.modal .js-plotly-plot')).some(p=>p.data&&p.data.some(t=>Array.from(t.y||[]).includes(-2))));
+      assert.deepEqual(await modal.locator('.shiny-output-error:visible').allTextContents(),[],`${width}px player card errors`);
+      assert.match(await modal.innerText(),/Player profile is unavailable/);
+      await modal.locator('button[id$="-refresh_history"]').click();
+      await page.waitForTimeout(250);
+      assert.equal(await modal.locator('.player-recent-round-chip').count(),2);
+      const modalOverflow=await modal.evaluate(el=>el.scrollWidth>el.clientWidth+2);
+      assert.equal(modalOverflow,false,`Player card overflow at ${width}px`);
+      await page.screenshot({path:`/tmp/futmondo-player-card-${width}.png`,fullPage:true});
+      console.log(`PASS player-card zero/negative scores, round plot, unavailable profile and refresh at ${width}px`);
       await page.close();
     }
   } finally { await browser.close(); }

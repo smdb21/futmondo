@@ -10,7 +10,7 @@ check("explicit missing, empty and observed data",{
 })
 check("cache isolates authenticated users and retains stale observations",{
   clear_api_cache()
-  fetch<-function(login,value,ttl=300) get_cached_data("same_request",{if(is.null(value))stop("offline");value},ttl)
+  fetch<-function(login,value,ttl=300) get_cached_data("same_request",{if(is.null(value))stop("offline");value},ttl,context=resource_context(login))
   a<-c(token="t",userid="one");b<-c(token="t",userid="two")
   stopifnot(unname(fetch(a,11))==11,unname(fetch(b,22))==22)
   stale<-fetch(a,NULL,ttl=-1)
@@ -37,10 +37,10 @@ check("missing points and actual zero stay distinct; ambiguous minutes untrusted
   stopifnot(d$points[1]==0,is.na(d$points[2]),d$score_status[2]=="unavailable",
     d$score_status[3]=="final",all(is.na(d$participation)))
 })
-check("summary scores before the current match round are finalized",{
+check("prior round numbers alone do not establish finality",{
   s<-list(match=list(r=list(number=3)),points=list(list(round=1,points=4),list(round=2,points=8),list(round=3,points=1)))
   d<-normalize_player_match_observations(s,"p","c")
-  stopifnot(identical(d$score_status,c("final","final","provisional")))
+  stopifnot(identical(d$score_status,rep("provisional",3)))
 })
 check("configured scoring weights are not normalized",{
   rules<-normalize_league_rules(list(configuration=list(moneyPerPoint=123,cpt=TRUE)),
@@ -74,7 +74,7 @@ check("admin authority uses verified login and matches only configured account",
     !is_authorized_admin(c(token="t",userid="u",user_name="other"),"admin@example.org"),
     is_authorized_admin(c(token="t",userid="u",user_name="ADMIN@example.org"),"admin@example.org"))
 })
-check("natural conflict targets cover observations and scenarios",{
+check("natural conflict targets cover factual observations",{
   stopifnot(supabase_conflict_key("bid_observations")=="championship_id,auction_id,bidder_id",
     supabase_conflict_key("market_transactions")=="championship_id,source_event_id",
     supabase_conflict_key("player_daily_snapshots")=="player_id,championship_id,snapshot_date")

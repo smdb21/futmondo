@@ -131,9 +131,9 @@ login_Server <- function(id, user = NULL, password = NULL) {
     output$text <- renderUI({
       div(
         style = "padding: 10px;",
-        h3(style = "font-weight: 700; color: var(--fm-text); margin-top: 0; font-size: 20px;", "Welcome to Futmondo Insights"),
+        h3(style = "font-weight: 700; color: var(--fm-text); margin-top: 0; font-size: 20px;", "Welcome to Futmondo"),
         p(style = "color: var(--fm-text); font-size: 13px; margin-bottom: 20px;",
-          "Advanced analytics and market intelligence platform for your Futmondo leagues."
+          "Players, historical results, finances, and manual market actions for your Futmondo leagues."
         ),
         div(
           style = "display: grid; grid-template-columns: 1fr 1fr; gap: 15px;",
@@ -152,7 +152,7 @@ login_Server <- function(id, user = NULL, password = NULL) {
           div(
             style = "background: var(--fm-surface); padding: 14px; border-radius: 8px; border: 1px solid #e2e8f0;",
             shiny::tags$i(class = "fa-solid fa-hand-holding-dollar", style = "color: var(--fm-warning); font-size: 20px;"),
-            h5(style = "font-weight: 600; margin: 8px 0 4px 0; color: var(--fm-text);", "Smart Bidding"),
+            h5(style = "font-weight: 600; margin: 8px 0 4px 0; color: var(--fm-text);", "Market Offers"),
             p(style = "color: var(--fm-text); font-size: 12px; margin: 0;", "Place, update, or cancel transfer market offers and clause buyouts.")
           ),
           div(

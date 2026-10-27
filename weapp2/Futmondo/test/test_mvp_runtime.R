@@ -91,56 +91,35 @@ check('unclassified bonuses never become MVP payment evidence', {
   stopifnot(p$team_id=='t',p$championship_id=='c',p$amount==100)
   get_user_team_moneymovements <- old
 })
-check('early collection failure survives later successful stage and matching retry clears it', {
-  old_step <- collect_account_observation_step
-  collect_account_observation_step <- function(state) {
-    if(state$stage=='catalog') {record_persistence_failure('players',400,'23503');state$stage <- 'finish'}
-    else state$complete <- TRUE
-    state
-  }
-  job <- list(owner='u',key='job',error_key='scope',fn='collect_account_observations',args=list(c(userid='u',token='t'),'c','t'))
-  .persistence_state$queue <- list();.persistence_state$active <- job
-  persistence_tick();persistence_tick()
-  stopifnot(grepl('23503',background_sync_status('u')$error))
-  persistence_record_result(job,TRUE)
-  stopifnot(is.null(background_sync_status('u')$error))
-  collect_account_observation_step <- old_step
+settle_mvp<-function(session,ready,timeout=3){deadline<-Sys.time()+timeout;repeat{session$flushReact();later::run_now(timeoutSecs=0.01);session$flushReact();if(isTRUE(shiny::isolate(ready())))return(invisible(TRUE));if(Sys.time()>=deadline)stop('Timed out settling official MVP source')}}
+pump_mvp<-function(session){for(i in seq_len(5L)){session$flushReact();later::run_now(timeoutSecs=0);session$flushReact()}}
+check('shared source recovers on refresh, survives save failure and isolates league switches',{
+ old_catalog<-get_finished_round_catalog;old_fetch<-get_official_dreamteam_result;old_saved<-get_round_mvps;old_post<-supabase_post
+ calls<-0L;catalog_calls<-0L;writes<-0L;failed<-TRUE
+ get_round_mvps<-function(...)stop('database unavailable')
+ get_finished_round_catalog<-function(login,championship_id){catalog_calls<<-catalog_calls+1L;if(failed)return(list(status='connection',rounds=empty_finished_rounds(),complete=FALSE,reason='Connection failed'));fixture<-active;fixture$championships[[1]]$id<-championship_id;normalize_mvp_catalog(fixture,leagues,championship_id)}
+ get_official_dreamteam_result<-function(login,championship_id,reference){calls<<-calls+1L;normalize_official_dreamteam(answer,championship_id,reference)}
+ supabase_post<-function(...){writes<<-writes+1L;FALSE}
+ testServer(function(input,output,session){enabled<-reactiveVal(TRUE);cid<-reactiveVal('c');refresh<-reactiveVal(0);source<-shared_mvp_source(session,function()c(userid='u',token='t'),cid,enabled,refresh)}, {
+  settle_mvp(session,function()identical(source()$status,'partial'));stopifnot(!source()$complete,grepl('Connection failed',source()$reason),calls==0L,catalog_calls==1L)
+  failed<<-FALSE;refresh(1);settle_mvp(session,function()isTRUE(source()$complete));stopifnot(source()$status=='ok',nrow(source()$rows)==1L,source()$rows$points==0,calls==1L,writes==1L,catalog_calls==2L)
+  enabled(FALSE);pump_mvp(session);stopifnot(calls==1L,catalog_calls==2L)
+  cid('other');enabled(TRUE);session$flushReact();stopifnot(!any(source()$rows$championship_id%in%'c'));settle_mvp(session,function()isTRUE(source()$complete));stopifnot(nrow(source()$rows)==1L,all(source()$rows$championship_id=='other'),calls==2L,writes==2L,catalog_calls==3L)
+ })
+ get_finished_round_catalog<-old_catalog;get_official_dreamteam_result<-old_fetch;get_round_mvps<-old_saved;supabase_post<-old_post
 })
-check('shared source recovers on refresh, survives save failure and isolates league switches', {
-  old_catalog <- get_finished_round_catalog;old_fetch <- get_official_dreamteam_result;old_saved <- get_round_mvps;old_post <- supabase_post
-  calls <- 0L;failed <- TRUE
-  get_round_mvps <- function(...) stop('database unavailable')
-  get_finished_round_catalog <- function(...) if(failed) list(status='connection',rounds=empty_finished_rounds(),complete=FALSE,reason='Connection failed') else normalize_mvp_catalog(active,leagues,'c')
-  get_official_dreamteam_result <- function(login,championship_id,reference) {calls <<- calls+1L;normalize_official_dreamteam(answer,championship_id,reference)}
-  supabase_post <- function(...) FALSE
-  testServer(function(input,output,session) {
-    enabled <- reactiveVal(TRUE);cid <- reactiveVal('c');refresh <- reactiveVal(0)
-    source <- shared_mvp_source(session,function()c(userid='u',token='t'),cid,enabled,refresh)
-  }, {
-    session$flushReact();session$elapse(150);session$flushReact();stopifnot(source()$status=='connection',calls==0)
-    failed <<- FALSE;refresh(1);session$flushReact();session$elapse(150);session$flushReact();session$elapse(150);session$flushReact()
-    stopifnot(nrow(source()$rows)==1,calls==1)
-    enabled(FALSE);session$flushReact();session$elapse(150);stopifnot(calls==1)
-    cid('other');enabled(TRUE);session$flushReact();session$elapse(150);session$flushReact();session$elapse(150);session$flushReact()
-    stopifnot(all(source()$rows$championship_id=='other'))
-  })
-  get_finished_round_catalog <- old_catalog;get_official_dreamteam_result <- old_fetch;get_round_mvps <- old_saved;supabase_post <- old_post
-})
-check('saved cards render before network discovery and inactive consumers suspend requests', {
-  old_catalog <- get_finished_round_catalog;old_fetch <- get_official_dreamteam_result;old_saved <- get_round_mvps
-  calls <- 0L
-  get_round_mvps <- function(...) official
-  get_finished_round_catalog <- function(...) {calls <<- calls+1L;normalize_mvp_catalog(active,leagues,'c')}
-  get_official_dreamteam_result <- function(...) stop('saved round must not be refetched')
-  testServer(function(input,output,session) {
-    enabled <- reactiveVal(TRUE)
-    first <- shared_mvp_source(session,function()c(userid='u',token='t'),function()'c',enabled)
-    second <- shared_mvp_source(session,function()c(userid='u',token='t'),function()'c',function()FALSE)
-  }, {
-    session$flushReact();stopifnot(nrow(first()$rows)==1L,calls==0L)
-    enabled(FALSE);session$flushReact();session$elapse(200);stopifnot(calls==0L)
-    enabled(TRUE);session$flushReact();stopifnot(calls==1L,first()$complete,identical(first(),second()))
-  })
-  get_finished_round_catalog <- old_catalog;get_official_dreamteam_result <- old_fetch;get_round_mvps <- old_saved
+check('inactive consumers start no reads; active consumers share saved rows without round refetch',{
+ old_catalog<-get_finished_round_catalog;old_fetch<-get_official_dreamteam_result;old_saved<-get_round_mvps
+ calls<-0L;saved_calls<-0L;round_calls<-0L
+ get_round_mvps<-function(...){saved_calls<<-saved_calls+1L;official}
+ get_finished_round_catalog<-function(...){calls<<-calls+1L;normalize_mvp_catalog(active,leagues,'c')}
+ get_official_dreamteam_result<-function(...){round_calls<<-round_calls+1L;stop('saved round must not be refetched')}
+ testServer(function(input,output,session){enabled<-reactiveVal(FALSE);first<-moduleServer('first',function(input,output,session)shared_mvp_source(session,function()c(userid='u',token='t'),function()'c',enabled));second<-moduleServer('second',function(input,output,session)shared_mvp_source(session,function()c(userid='u',token='t'),function()'c',function()FALSE))},{
+  pump_mvp(session);stopifnot(calls==0L,saved_calls==0L,round_calls==0L)
+  enabled(TRUE);settle_mvp(session,function()isTRUE(first()$complete));stopifnot(calls==1L,saved_calls==1L,round_calls==0L,nrow(first()$rows)==1L,first()$rows$points==0,identical(first(),second()))
+  enabled(FALSE);pump_mvp(session);stopifnot(calls==1L,saved_calls==1L,round_calls==0L)
+  enabled(TRUE);pump_mvp(session);stopifnot(calls==1L,saved_calls==1L,round_calls==0L,first()$complete,identical(first(),second()))
+ })
+ get_finished_round_catalog<-old_catalog;get_official_dreamteam_result<-old_fetch;get_round_mvps<-old_saved
 })
 cat(sprintf('MVP: %d passed / 0 failed\n',n))

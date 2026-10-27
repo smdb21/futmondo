@@ -16,6 +16,8 @@ market_Server <- function(id, is_module_active, login_token, championship_id, us
   moduleServer(
     id,
     function(input, output, session) {
+    bind_factual_reads(c("get_market_players"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
+
       # reactives ----
       ## market_players_RV ----
       market_players_RV <- reactive({
@@ -31,9 +33,9 @@ market_Server <- function(id, is_module_active, login_token, championship_id, us
 
         # Background Sync Market Snapshot to Supabase
         tryCatch({
-          defer_persistence(sync_real_clubs_to_supabase, list(players_table))
-          defer_persistence(sync_players_to_supabase, list(players_table))
-          defer_persistence(log_player_history, list(players_table, championship_id()))
+          invisible(NULL)
+          invisible(NULL)
+          invisible(NULL)
         }, error = function(e) {
           print(paste0("[Supabase] Market sync warning: ", e$message))
         })
@@ -50,7 +52,8 @@ market_Server <- function(id, is_module_active, login_token, championship_id, us
         login_token = login_token,
         championship_id = championship_id,
         user_team_id = user_team_id,
-        refresh_trigger = refresh_trigger
+        refresh_trigger = refresh_trigger,
+      is_module_active = is_module_active
       )
     }
   )

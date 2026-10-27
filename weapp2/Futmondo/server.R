@@ -3,9 +3,10 @@
 function(input, output, session) {
   login_token_RV <- login_Server(id = "login")
   refresh_trigger <- reactiveVal(0)
+  bind_factual_reads("get_active_championships",session,login_token_RV,is_active=function()valid_login(login_token_RV()))
   observeEvent(input$refresh_all, {
     req(valid_login(login_token_RV()))
-    clear_api_cache(login_token_RV()[["userid"]])
+    invalidate_resources(resource_context(login_token_RV(),isolate(championship_id_RV())),pattern="market|roster|teams|team_info|players|financial|round|notification|pressroom|history|summary|card")
     refresh_trigger(refresh_trigger() + 1)
   })
   championships_RV <- reactive({
@@ -34,6 +35,8 @@ function(input, output, session) {
   championship_id_RV <- reactive({ req(championship_RV()); unname(championship_RV()["id"]) })
   user_team_id_RV <- reactive({ req(championship_RV()); unname(championship_RV()["userteam.id"]) })
   user_team_name_RV <- reactive({ req(championship_RV()); unname(championship_RV()["userteam.name"]) })
+  bind_factual_reads(c("get_teams","get_financial_snapshot","get_finished_rounds"),session,
+    login_token_RV,championship_id_RV,user_team_id_RV,is_active=function()valid_login(login_token_RV()),refresh_trigger=refresh_trigger)
   # Keep the clock smooth without rebuilding the expensive acquisition and
   # pressroom-backed financial snapshot every second. Explicit refreshes and
   # market events still invalidate this reactive immediately.
@@ -44,14 +47,19 @@ function(input, output, session) {
     tryCatch(get_financial_snapshot(login_token_RV(), championship_id_RV(), user_team_id_RV()),
       error = function(e) NULL)
   })
+  round_catalog_RV <- reactive({
+    req(valid_login(login_token_RV()), championship_id_RV())
+    refresh_trigger()
+    invalidateLater(60000, session)
+    tryCatch(get_finished_rounds(login_token_RV(), championship_id_RV()), error=function(e) data.frame())
+  })
   output$round_countdown <- renderUI({
     invalidateLater(1000, session)
     if (!valid_login(login_token_RV())) {
       return(tags$div(class = "round-countdown-bar round-countdown-unavailable",
         icon("clock"), tags$span("Log in to see the next round countdown")))
     }
-    rounds <- tryCatch(get_finished_rounds(login_token_RV(), championship_id_RV()),
-      error = function(e) data.frame())
+    rounds <- round_catalog_RV()
     next_round <- next_round_context(rounds)
     if (!isTRUE(next_round$available)) {
       current_round <- current_round_context(rounds)
@@ -103,19 +111,6 @@ function(input, output, session) {
     get_teams(login_token_RV(), championship_id_RV())
   })
   is_admin_RV <- reactive(is_authorized_admin(login_token_RV()))
-  # Collect/persist in an isolated process. No on.exit HTTP writes or startup DB checks.
-  observe({
-    req(valid_login(login_token_RV()), championship_id_RV(), user_team_id_RV())
-    refresh_trigger()
-    defer_persistence("collect_account_observations", list(login_token_RV(), championship_id_RV(), user_team_id_RV()))
-  })
-  output$background_sync <- renderUI({
-    req(valid_login(login_token_RV()))
-    invalidateLater(5000,session)
-    status <- background_sync_status(login_token_RV()[["userid"]])
-    if (!is.null(status$error)) return(tags$p(class="text-warning",status$error))
-    if (status$pending>0) tags$p(class="text-muted",paste0("Saving observations…", if (!is.null(status$progress)) paste0(" ", status$progress) else ""))
-  })
   notifications <- notifications_Server("notifications", reactive(input$tabs == "notifications"),
     login_token_RV, championship_id_RV, user_team_id_RV, user_teams_RV, refresh_trigger,
     on_market_event=function(...)refresh_trigger(isolate(refresh_trigger())+1L))
@@ -124,11 +119,6 @@ function(input, output, session) {
     actionLink("open_notifications", label = paste0("Notifications", if (is.finite(n)) paste0(" (",n,")") else ""), icon = icon("bell"))
   })
   observeEvent(input$open_notifications, updateTabItems(session, "tabs", "notifications"))
-  intelligence_Server("intelligence", reactive(input$tabs == "intelligence"), login_token_RV,
-    championship_id_RV, user_team_id_RV, refresh_trigger)
-  automation_Server("automation", reactive(input$tabs == "automation"), login_token_RV,
-    championship_id_RV, user_team_id_RV, refresh_trigger)
-
 selected_player_RV <- players_in_teams_Server(id = "players_in_teams",
                                                  is_module_active = reactive({
                                                    input$tabs == "yourteam"
@@ -213,6 +203,9 @@ players_in_championship_Server(id = "players_in_championship",
 observeEvent(login_token_RV(),
                 {
                   if (!valid_login(login_token_RV())) {
+                    fm_transport_cancel(session$token)
+                    prior_user <- session$userData$futmondo_user_id
+                    if(!is.null(prior_user))clear_api_cache(prior_user,session$token)
                     cancel_persistence_jobs(session$userData$futmondo_user_id,
                       session$token)
                     session$userData$futmondo_user_id <- NULL
@@ -239,9 +232,7 @@ observeEvent(login_token_RV(),
     # Standard menu items
     menu_items <- list(
       shinydashboard::menuItem("Login", tabName = "login", icon = icon("right-to-bracket")),
-      shinydashboard::menuItem("Predictions", tabName = "intelligence", icon = icon("chart-line")),
       shinydashboard::menuItem("Notifications", tabName = "notifications", icon = icon("bell")),
-      shinydashboard::menuItem("Automation", tabName = "automation", icon = icon("robot")),
       shinydashboard::menuItem("Today", tabName = "today", icon = icon("bolt")),
       shinydashboard::menuItem("Your team", tabName = "yourteam", icon = icon("users")),
       shinydashboard::menuItem("Market", tabName = "market", icon = icon("money-bill-trend-up")),
