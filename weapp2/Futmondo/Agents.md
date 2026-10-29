@@ -30,6 +30,8 @@ The former prediction/automation roadmap is superseded. Keep `docs/v3_roadmap.md
 
 ## Verification
 
+Every modification must pass a performance-impact review before it is considered complete. Evaluate each affected data and UI path for API/database request volume, cache reuse and invalidation, blocking work, reactive updates and timers, memory growth, and rendering cost, including on mobile. Keep the app responsive during loading, refreshes, and navigation. For changes that may affect runtime, use the smallest relevant existing check or measurement to verify the impact, and resolve responsiveness regressions before completion. Record the review outcome and verification limits with the change. For documentation-only or other changes with no runtime effect, explicitly record that assessment; no performance tests are required.
+
 Use the smallest meaningful existing tests for each changed behavior. Add focused coverage for uncovered data, cache, isolation, or manual-action risks. Independently verify changed point/history transformations with known-answer fixtures.
 
 For shared infrastructure, startup, or cross-cutting UI changes, run `Rscript test/test_shiny_simulation.R`, the offline lifecycle harness. Never use real accounts or transactions in tests. Report executed results honestly; repair failures before claiming the affected behavior is complete.

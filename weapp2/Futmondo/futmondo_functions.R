@@ -198,8 +198,8 @@ get_players_from_team <- function(login, championship_id, user_team_id, teams = 
     response <- futmondo_post(ROSTER_URL, body = toJSON(payload), add_headers(.headers = headers))
     roster <- httr::content(response)
     roster <- roster[["answer"]]
-    if (is.list(roster) && (!is.null(roster$code) || isTRUE(roster$error))) stop("Roster unavailable")
-    if (is.null(roster) || length(roster) == 0) {
+    if (!is.list(roster) || !is.null(roster$code) || isTRUE(roster$error)) stop("Roster unavailable")
+    if (length(roster) == 0) {
       print("User team roster is empty.")
       empty_df <- data.frame(
         id = character(0), 
@@ -223,6 +223,7 @@ get_players_from_team <- function(login, championship_id, user_team_id, teams = 
       return(empty_df)
     }
     roster <- lapply(roster, FUN = function(player) {
+      player <- normalize_player_fields(player)
       average <- normalize_player_average(player$average)
       clause <- player$clause
       if (length(clause)) names(clause) <- paste0("clause_", names(clause))
@@ -237,14 +238,15 @@ get_players_from_team <- function(login, championship_id, user_team_id, teams = 
           bids <- market$bids
           if (length(bids) > 0) {
             bids_df <- lapply(bids, FUN = function(bid) {
-              b_price <- if (!is.null(bid$price)) suppressWarnings(as.numeric(bid$price)) else 0
-              b_user <- if (!is.null(bid$userTeam) && is.list(bid$userTeam) && !is.null(bid$userTeam[["name"]]) && bid$userTeam[["name"]] != "") as.character(bid$userTeam[["name"]]) else "Futmondo"
-              b_id <- if (!is.null(bid[["id"]])) as.character(bid[["id"]]) else if (!is.null(bid[["_id"]])) as.character(bid[["_id"]]) else ""
+              b_price <- fm_number(bid$price)
+              b_user <- if (is.list(bid$userTeam)) fm_scalar(bid$userTeam$name, "") else ""
+              if (!nzchar(b_user)) b_user <- "Futmondo"
+              b_id <- fm_scalar(bid$id %||% bid$`_id`, "")
               data.frame(bid_price = b_price, bid_user = b_user, bid_id = b_id, stringsAsFactors = FALSE)
             }) %>% rbindlist(fill = TRUE) %>% as.data.frame()
 
             if (nrow(bids_df) > 0) {
-              max_idx <- which.max(bids_df$bid_price)
+              max_idx <- if (anyNA(bids_df$bid_price)) which(is.na(bids_df$bid_price))[1L] else which.max(bids_df$bid_price)
               bids <- list(
                 bid_price = bids_df$bid_price[max_idx],
                 bid_user = bids_df$bid_user[max_idx],
@@ -256,7 +258,7 @@ get_players_from_team <- function(login, championship_id, user_team_id, teams = 
           }
           market <- market[-which(names(market) == "bids")]
         }
-        names(market) <- paste0("market_", names(market))
+        if (length(market)) names(market) <- paste0("market_", names(market))
       }
       # remove market element from player list
       player$market <- NULL
@@ -272,6 +274,9 @@ get_players_from_team <- function(login, championship_id, user_team_id, teams = 
     roster <- roster %>% as.data.frame()
     # make numbers as numbers
     roster <- type.convert(roster, as.is = TRUE)
+    for (field in c("value", "change", "points")) {
+      if (all(is.na(roster[[field]]))) roster[[field]] <- rep(NA_real_, nrow(roster))
+    }
 
     # add championship_id, user_team_id
     roster$championship_id <- championship_id
@@ -282,11 +287,7 @@ get_players_from_team <- function(login, championship_id, user_team_id, teams = 
     }
     
     # Join real-world team name and logo
-    clubs <- get_real_clubs(login, championship_id)
-    if (!is.null(clubs) && nrow(clubs) > 0 && "teamId" %in% colnames(roster)) {
-      roster <- roster %>% dplyr::select(!any_of(c("team", "logo")))
-      roster <- roster %>% dplyr::left_join(clubs, by = "teamId")
-    }
+    roster <- enrich_player_clubs(roster, login, championship_id)
 
     # Join active roster bids if present
     roster_bids_df <- tryCatch({
@@ -361,7 +362,7 @@ get_market_players <- function(login, championship_id, user_team_id) {
     print("Getting players in the market")
     response <- futmondo_post(MARKET_URL, body = toJSON(payload), add_headers(.headers = headers))
     players <- httr::content(response)$answer
-    if (!is.list(players) || !is.null(players$code)) stop("Market data unavailable")
+    if (!is.list(players) || !is.null(players$code) || isTRUE(players$error)) stop("Market data unavailable")
     if (!length(players)) return(data.frame())
     ret <- lapply(players, FUN = function(player) {
       player <- parse_player_json(player = player)
@@ -416,17 +417,47 @@ get_championship_players <- function(login, championship_id) {
     })
     
     # Join real-world team name and logo
-    clubs <- get_real_clubs(login, championship_id)
-    if (!is.null(clubs) && nrow(clubs) > 0 && "teamId" %in% colnames(ret)) {
-      ret <- ret %>% dplyr::select(!any_of(c("team", "logo")))
-      ret <- ret %>% dplyr::left_join(clubs, by = "teamId")
-    }
+    ret <- enrich_player_clubs(ret, login, championship_id)
     
     ret <- ret %>% dplyr::arrange(name)
     ret
   }, context=resource_context(login=login,championship_id=championship_id))
 }
 
+
+# Remove absent optional object fields without compacting observation arrays.
+# In particular, a null fitness entry must remain unknown, not shorten history.
+normalize_player_fields <- function(player) {
+  if (!is.list(player) || !length(player)) stop("Player data unavailable")
+  compact <- function(fields) {
+    if (!is.list(fields) || is.null(names(fields))) return(fields)
+    fields <- lapply(fields, compact)
+    fields[lengths(fields) > 0L]
+  }
+  player <- compact(player)
+  for (field in c("value", "change", "points")) {
+    if (!length(player[[field]])) player[[field]] <- NA_real_
+  }
+  player
+}
+
+# Club names/logos are optional enrichment; source player metadata takes priority.
+enrich_player_clubs <- function(players, login, championship_id) {
+  if (!"teamId" %in% names(players)) return(players)
+  clubs <- tryCatch(get_real_clubs(login, championship_id), error = function(e) NULL)
+  if (!is.data.frame(clubs) || !nrow(clubs) || !"teamId" %in% names(clubs)) return(players)
+  rows <- match(as.character(players$teamId), as.character(clubs$teamId))
+  for (field in intersect(c("team", "logo"), names(clubs))) {
+    values <- clubs[[field]][rows]
+    if (!field %in% names(players)) {
+      players[[field]] <- values
+    } else {
+      missing <- is.na(players[[field]]) | !nzchar(as.character(players[[field]]))
+      players[[field]][missing] <- values[missing]
+    }
+  }
+  players
+}
 
 # Flatten observed point statistics into the same columns for every endpoint.
 normalize_player_average <- function(average) {
@@ -446,6 +477,7 @@ normalize_player_average <- function(average) {
 }
 
 parse_player_json <- function(player) {
+  player <- normalize_player_fields(player)
   average <- normalize_player_average(player$average)
   player$average <- NULL
   player <- c(player, average)
@@ -2660,6 +2692,7 @@ get_roster_bids <- function(login, championship_id, user_team_id) {
     print("[API] Fetching roster bids for team (type=roster)")
     response <- futmondo_post(ROSTER_BIDS_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
     ans <- httr::content(response)
+    if (!is.list(ans$answer)) stop("Offer data unavailable")
 
     if (!is.null(ans) && "answer" %in% names(ans) && is.list(ans$answer)) {
       items <- ans$answer
@@ -2696,25 +2729,28 @@ get_roster_bids <- function(login, championship_id, user_team_id) {
           bids_arr <- item$market$bids
         }
 
-        if (!is.null(p_id) && !is.null(bids_arr) && length(bids_arr) > 0) {
+        p_id <- fm_scalar(p_id, "")
+        if (nzchar(p_id) && !is.null(bids_arr) && length(bids_arr) > 0) {
           b_df <- lapply(bids_arr, FUN = function(b) {
-            b_price <- if (!is.null(b[["price"]])) suppressWarnings(as.numeric(b[["price"]])) else 0
-            b_user <- if (!is.null(b[["userTeam"]]) && is.list(b[["userTeam"]]) && !is.null(b[["userTeam"]][["name"]]) && as.character(b[["userTeam"]][["name"]]) != "") as.character(b[["userTeam"]][["name"]]) else "Futmondo"
-            b_id <- if (!is.null(b[["id"]])) as.character(b[["id"]]) else if (!is.null(b[["_id"]])) as.character(b[["_id"]]) else ""
+            b_price <- fm_number(b$price)
+            b_user <- if (is.list(b$userTeam)) fm_scalar(b$userTeam$name, "") else ""
+            if (!nzchar(b_user)) b_user <- "Futmondo"
+            b_id <- fm_scalar(b$id %||% b$`_id`, "")
             b_bidder <- extract_bidder_team_id(b)
             data.frame(id = p_id, bid_price = b_price, bid_user = b_user, bid_id = b_id,
                        bidder_team_id = b_bidder, stringsAsFactors = FALSE)
           }) %>% rbindlist(fill = TRUE) %>% as.data.frame()
 
           if (nrow(b_df) > 0) {
-            max_idx <- which.max(b_df$bid_price)
+            max_idx <- if (anyNA(b_df$bid_price)) which(is.na(b_df$bid_price))[1L] else which.max(b_df$bid_price)
             bids_list[[length(bids_list) + 1]] <- b_df[max_idx, ]
           }
-        } else if (!is.null(p_id) && "price" %in% names(item) && !is.null(item[["price"]])) {
+        } else if (nzchar(p_id) && "price" %in% names(item)) {
           # Direct bid object format
-          b_price <- suppressWarnings(as.numeric(item[["price"]]))
-          b_user <- if ("userTeam" %in% names(item) && is.list(item[["userTeam"]]) && !is.null(item[["userTeam"]][["name"]]) && as.character(item[["userTeam"]][["name"]]) != "") as.character(item[["userTeam"]][["name"]]) else "Futmondo"
-          b_id <- if ("_id" %in% names(item)) as.character(item[["_id"]]) else if ("id" %in% names(item)) as.character(item[["id"]]) else ""
+          b_price <- fm_number(item$price)
+          b_user <- if (is.list(item$userTeam)) fm_scalar(item$userTeam$name, "") else ""
+          if (!nzchar(b_user)) b_user <- "Futmondo"
+          b_id <- fm_scalar(item$`_id` %||% item$id, "")
           b_bidder <- extract_bidder_team_id(item)
           bids_list[[length(bids_list) + 1]] <- data.frame(id = p_id, bid_price = b_price, bid_user = b_user, bid_id = b_id,
                                                             bidder_team_id = b_bidder, stringsAsFactors = FALSE)
@@ -2723,10 +2759,10 @@ get_roster_bids <- function(login, championship_id, user_team_id) {
 
       if (length(bids_list) > 0) {
         ret_df <- bind_rows(bids_list)
-        # Deduplicate per player ID taking highest bid
+        # An unknown price keeps the highest offer unverified for that player.
         ret_df <- ret_df %>%
           dplyr::group_by(id) %>%
-dplyr::slice_max(order_by = bid_price, n = 1, with_ties = FALSE) %>%
+          dplyr::slice_max(order_by = ifelse(is.na(bid_price), Inf, bid_price), n = 1, with_ties = FALSE) %>%
            dplyr::ungroup() %>%
            as.data.frame()
          return(ret_df)
@@ -2757,6 +2793,7 @@ get_my_market_players <- function(login, championship_id, user_team_id) {
     print("[API] Fetching user's listed market players")
     response <- futmondo_post(MY_PLAYERS_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
     ans <- httr::content(response)
+    if (!is.list(ans$answer) || !is.null(ans$answer$code) || isTRUE(ans$answer$error)) stop("Listed players unavailable")
 
     if (!is.null(ans) && "answer" %in% names(ans) && is.list(ans$answer)) {
       players <- ans$answer

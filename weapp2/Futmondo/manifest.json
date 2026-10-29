@@ -2220,7 +2220,7 @@
       "checksum": "fdc62a865b87e2013e1f485daded4ee4"
     },
     "futmondo_functions.R": {
-      "checksum": "a755a462c6d624ce6a589d18fd8b472d"
+      "checksum": "0029a671ba6c1252cb11b12fab365b20"
     },
     "global.R": {
       "checksum": "33f15bfbb10105519eca1cb7bedcfb37"
@@ -2265,7 +2265,7 @@
       "checksum": "57cf6b21b0a90c993a76c7a44145b1ee"
     },
     "Modules/Today_Module.R": {
-      "checksum": "91a823fd7ea8816a68fff25783600984"
+      "checksum": "8a94f1c241307cad1150224289144c24"
     },
     "mvp_runtime.R": {
       "checksum": "f8294321c1c28f953b0db2e12c59faa2"
@@ -2277,7 +2277,7 @@
       "checksum": "ba8d623a904f8a43fcc286c0f4c97487"
     },
     "server.R": {
-      "checksum": "4f60fbd6d3bc1cdc530947a5cffa7d07"
+      "checksum": "0094e2cca803e5561d168c43e4785c48"
     },
     "supabase_connector.R": {
       "checksum": "138577d7a59fdaa1fb9a8f9c8ff166b6"

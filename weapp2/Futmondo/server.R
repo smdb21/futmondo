@@ -88,7 +88,7 @@ function(input, output, session) {
     } else "Unavailable"
     solvency_class <- if (is.finite(final_balance) && final_balance > 0) "round-countdown-solvent" else "round-countdown-warning"
     solvency_text <- if (!is.finite(final_balance)) {
-      "Balance unavailable — verify it before the round"
+      "Balance after offers unavailable — refresh to verify"
     } else if (final_balance > 0) {
       NULL
     } else {

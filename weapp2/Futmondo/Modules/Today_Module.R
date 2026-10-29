@@ -28,10 +28,8 @@ today_Server <- function(id, is_module_active, login_token, championship_id, use
       shinydashboard::valueBox(player_card_money(snapshot$cash), "Current balance", icon=icon("wallet"), color="green", width=6)
     })
     output$kpi_valuation_box <- renderUI({
-      req(is_module_active()); teams <- user_teams_RV()
-      ids <- if ("teamid" %in% names(teams)) as.character(teams$teamid) else as.character(teams$id)
-      row <- teams[ids==as.character(user_team_id()),,drop=FALSE]
-      amount <- if (nrow(row)==1L && "teamValue" %in% names(row)) row$teamValue else NA_real_
+      req(is_module_active())
+      amount <- fm_number(finance()$team_value)
       shinydashboard::valueBox(player_card_money(amount), "Observed team value", icon=icon("users"), color="blue", width=6)
     })
     output$recent_transfers <- renderTable({

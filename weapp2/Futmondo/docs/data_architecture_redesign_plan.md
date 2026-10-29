@@ -151,6 +151,18 @@ Local implementation and release preparation completed on 2026-10-26 (America/Lo
 - [x] Regenerate and inspect the manifest when dependency changes require it.
 - [x] Deliver a scoped diff, migration/rollback instructions, results, and remaining deployment constraints. Mark production rollout complete only after actual deployment and smoke checks.
 
+## Availability follow-up — 2026-10-29
+
+Status: **local correction and verification complete; deployment and account-level smoke check pending**.
+
+- [x] Reproduce My Team failures from empty optional market metadata and failed club enrichment; preserve a valid roster and source names/logos.
+- [x] Handle optional null player fields without losing market/catalog rows; distinguish failed reads from verified empty results and keep unknown money unavailable.
+- [x] Reuse Today’s finance snapshot for its team-value box and clarify the balance-after-offers warning.
+- [x] Complete focused parser, cache/request-budget, Today, finance, and offline lifecycle checks; review performance impact.
+- [ ] Deploy this correction and verify the reported Today/My Team account symptoms against the live application.
+
+See [availability behavior and parser checks](player_data_availability.md) and [integrated review results](data_review_results.md#availability-correction-2026-10-29). The reported live payload was not captured, so the exact incident trigger is not established by the offline reproductions.
+
 ## Acceptance and verification
 
 | Area | Required evidence |

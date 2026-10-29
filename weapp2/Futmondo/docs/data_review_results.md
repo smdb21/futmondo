@@ -101,3 +101,24 @@ Implementation and local release preparation are complete. Existing historical m
 The database rollout is now complete. The application release and hosted environment smoke checks remain pending. PGlite establishes SQL semantics locally, not production locking/concurrency behavior. Explicit administrative counts/schema verification and manual trade preflights remain synchronous; normal factual view reads use the async transport. Pending saves are in memory and can be interrupted by process suspension/logout. API coverage and unknown season/scoring contexts remain honestly partial; no unverified historical backfill is applied.
 
 Private-HAR direct-sale/clause suites could not run because their captures were absent. Credential-dependent live-finance checks were not completed; production transaction verification was deliberately skipped. Offline payload, preflight, listing, uncertainty and context checks passed. The entire legacy test directory was not executed indiscriminately because some scripts issue live requests and other suites covered removed features.
+
+## Availability correction 2026-10-29
+
+User reports: Today showed an unavailable component below cash, missing active-offer/spending totals, and My Team did not show the roster. Offline reproduction identified two separate parsing failures: optional null fields caused market row construction to fail, and empty roster market/bid metadata caused an invalid names assignment. A failed optional club lookup also discarded an otherwise valid roster. The exact private live response was not captured.
+
+The correction retains players with empty optional fields, preserves unknown numeric data as `NA`, keeps valid roster/catalog rows when optional club labels fail, and distinguishes failed responses from verified empty lists. Missing offer amounts remain unverified for manual actions. Today now uses the already-loaded finance snapshot’s team value instead of depending on the league-teams read. The countdown warning explicitly names the missing balance after offers. See [the loader contract](player_data_availability.md).
+
+Verification executed for this correction:
+
+| Check | Result |
+| --- | --- |
+| Player data availability | 11 grouped checks passed, including actual JSON loaders, optional-field failures, missing offer prices, and cold/warm cache behavior. |
+| Existing rating-input regression | 4 grouped checks passed; zero, negative, and incomplete observed scores retained. |
+| Today availability | 3 grouped checks passed: unavailable league teams cannot hide the finance value; zero/negative cash and unknown team value remain distinct. |
+| Existing debt/countdown regression | 9 grouped checks passed. |
+| Required offline application lifecycle | 12 checks plus all 9 retained tabs passed, including My Team rendering, unavailable history, refresh, logout, and blocked HTTP/live mutations. Existing Plotly fixture warnings remain; no assertions failed. |
+| Deployment contract | 3 grouped checks passed; changed source checksums refreshed and all 30 intended release-file checksums verified. |
+
+Performance-impact review passed for the changed paths. The roster/market fixture uses 5 existing cold reads; three repeated roster/market/capacity accesses add 0 reads, 0 parses/normalizations, and no cache-entry or retained-byte growth. The Today KPI fixture serves both values with 1 finance read and 0 league-teams reads, with no additional read on repeated output access. This removes that KPI dependency; it does not claim the entire application no longer requests league teams. Club matching cannot multiply player rows and skips the club request if no team IDs exist. Added normalization only traverses the existing response on a cache miss. No retries, timers, background work, cache policies, dependencies, CSS, or mobile layout were added. Documentation and manifest checksum changes have no runtime cost. Full production concurrency, process-memory benchmarks, and new browser/device tests were deliberately not run for this scoped correction; hosted behaviour remains unverified.
+
+Luna investigated shared-table dependencies; Sol 6.1 implemented loader fixes and focused tests; the primary agent reviewed the integrated diff, implemented the Today correction, and ran its checks and the required lifecycle/finance verification. Implementation and validation made no production calls, account transactions, database migrations, or deployments. Local code is ready for deployment; the live incident is not marked resolved.
