@@ -153,13 +153,17 @@ Local implementation and release preparation completed on 2026-10-26 (America/Lo
 
 ## Availability follow-up — 2026-10-29
 
-Status: **local correction and verification complete; deployment and account-level smoke check pending**.
+Status: **the prior UI correction is visible in user screenshots, but the account symptoms persist. The follow-up request-contract correction and diagnostic checks are complete locally; redeployment and hosted verification remain pending**.
 
 - [x] Reproduce My Team failures from empty optional market metadata and failed club enrichment; preserve a valid roster and source names/logos.
 - [x] Handle optional null player fields without losing market/catalog rows; distinguish failed reads from verified empty results and keep unknown money unavailable.
 - [x] Reuse Today’s finance snapshot for its team-value box and clarify the balance-after-offers warning.
 - [x] Complete focused parser, cache/request-budget, Today, finance, and offline lifecycle checks; review performance impact.
-- [ ] Deploy this correction and verify the reported Today/My Team account symptoms against the live application.
+- [x] Review the continued incident logs; distinguish asynchronous replay progress from measured HTTP requests.
+- [x] Correct the seven factual-read scalar JSON envelopes and verify actual async roster/market/pagination requests.
+- [x] Preserve safe failure categories/references across nested reads; bound and deduplicate diagnostic logs.
+- [x] Run focused regression and required lifecycle checks; record request, cache, and responsiveness evidence.
+- [ ] Redeploy the follow-up correction and verify the reported Today/My Team account symptoms against the live application.
 
 See [availability behavior and parser checks](player_data_availability.md) and [integrated review results](data_review_results.md#availability-correction-2026-10-29). The reported live payload was not captured, so the exact incident trigger is not established by the offline reproductions.
 

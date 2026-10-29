@@ -10,12 +10,12 @@ fm_transport_pump<-function(){
 fm_transport_cancel<-function(owner){
   for(id in names(.fm_transport$tasks)){
     task<-.fm_transport$tasks[[id]]
-    if(identical(task$owner,owner)){curl::multi_cancel(task$handle);.fm_transport$tasks[[id]]<-NULL;task$reject(simpleError("Session request cancelled"))}
+    if(identical(task$owner,owner)){curl::multi_cancel(task$handle);.fm_transport$tasks[[id]]<-NULL;task$reject(resource_failure(simpleError("Session request cancelled")))}
   };invisible(TRUE)
 }
 fm_async_http<-function(url,method="GET",body=NULL,headers=character(),owner="",timeout=15){
-  if(isTRUE(getOption("futmondo.offline",FALSE)))return(promises::promise_reject(simpleError("Network disabled in offline mode")))
-  if(length(.fm_transport$tasks)>=32L)return(promises::promise_reject(simpleError("Request capacity reached")))
+  if(isTRUE(getOption("futmondo.offline",FALSE)))return(promises::promise_reject(resource_failure(resource=url,category="network")))
+  if(length(.fm_transport$tasks)>=32L)return(promises::promise_reject(resource_failure(resource=url,category="read_budget")))
   promises::promise(function(resolve,reject){
     handle<-curl::new_handle();curl::handle_setopt(handle,url=url,customrequest=method,timeout_ms=as.integer(timeout*1000),connecttimeout_ms=5000L)
     if(!is.null(body))curl::handle_setopt(handle,postfields=as.character(body))
@@ -24,7 +24,7 @@ fm_async_http<-function(url,method="GET",body=NULL,headers=character(),owner="",
     .fm_transport$tasks[[id]]<-list(handle=handle,owner=owner,reject=reject)
     finish<-function(){.fm_transport$tasks[[id]]<-NULL}
     resource_metric("requests")
-    curl::multi_add(handle,done=function(response){finish();resource_metric("bytes",length(response$content));if(response$status_code<200L||response$status_code>=300L)reject(simpleError(paste("HTTP",response$status_code)))else resolve(response)},fail=function(message){finish();reject(simpleError("Connection failed"))},pool=.fm_transport$pool)
+    curl::multi_add(handle,done=function(response){finish();resource_metric("bytes",length(response$content));if(response$status_code<200L||response$status_code>=300L)reject(resource_failure(resource=url,category="http",http_status=response$status_code))else resolve(response)},fail=function(message){finish();reject(resource_failure(resource=url,category="network"))},pool=.fm_transport$pool)
     if(!.fm_transport$scheduled){.fm_transport$scheduled<-TRUE;later::later(fm_transport_pump,0)}
   })
 }
@@ -39,6 +39,20 @@ async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id){
     object<-get(nm,.GlobalEnv)
     if(is.function(object)&&identical(environment(object),.GlobalEnv)){environment(object)<-adapter_env;assign(nm,object,adapter_env)}
   }
+  # Replaying a composite read may encounter the same optional failure again.
+  # Keep at most one safe diagnostic per source/category, capped by the read budget.
+  failures<-new.env(parent=emptyenv());log_failure<-resource_log_failure
+  report_failure<-function(error,resource=name){
+    failure<-resource_failure(error,resource)
+    key<-paste(failure$resource,failure$category,failure$http_status,sep=":")
+    previous<-failures[[key]]
+    if(!is.null(previous))return(log_failure(previous))
+    if(length(ls(failures))>=32L)failure$logged<-TRUE
+    failure<-log_failure(failure)
+    if(length(ls(failures))<32L)failures[[key]]<-failure
+    failure
+  }
+  adapter_env$resource_log_failure<-report_failure
   started_at<-Sys.time();adapter_env$Sys.time<-function()started_at
   adapter_env$resource_store<-resource_store;adapter_env$resource_cache_prune<-resource_cache_prune
   need<-function(url,method,body=NULL,headers=character(),decode=FALSE){
@@ -66,15 +80,15 @@ async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id){
   adapter_env$supabase_post_direct<-function(...)invisible(TRUE)
   adapter_env$defer_persistence<-function(...)invisible(TRUE)
   adapter_env$record_acquired_resource<-function(resource,data,context){acquired[[resource]]<<-list(resource=resource,data=data,context=context);invisible(TRUE)}
-  step<-function(){
+  step<-function()tryCatch({
     result<-tryCatch(list(done=TRUE,value=do.call(get(name,adapter_env),args)),fm_async_request=function(request)list(done=FALSE,request=request))
     if(result$done){for(record in acquired){record$context$session_id<-context$session_id;tryCatch(do.call(record_acquired_resource,record),error=function(e)NULL)};return(promises::promise_resolve(result$value))}
     requests<<-requests+1L
-    if(requests>32L)return(promises::promise_reject(simpleError("Read request budget exceeded")))
+    if(requests>32L)return(promises::promise_reject(report_failure(resource_failure(resource=name,category="read_budget"))))
     request<-result$request
-    promises::then(fm_async_read_http(request$url,request$method,request$body,request$headers,owner=owner),function(response){completed[[request$key]]<-response;step()},function(error){if(grepl("Session request cancelled",conditionMessage(error),fixed=TRUE))return(promises::promise_reject(error));completed[[request$key]]<-list(error=error);step()})
-  }
-  tryCatch(step(),error=function(e)promises::promise_reject(simpleError("Read unavailable")))
+    promises::then(fm_async_read_http(request$url,request$method,request$body,request$headers,owner=owner),function(response){completed[[request$key]]<-response;step()},function(error){if(inherits(error,"fm_async_cancelled")||grepl("Session request cancelled",conditionMessage(error),fixed=TRUE))return(promises::promise_reject(error));completed[[request$key]]<-list(error=report_failure(error,request$url));step()})
+  },error=function(e)promises::promise_reject(report_failure(e)))
+  step()
 }
 
 fm_async_read_http<-function(url,method="GET",body=NULL,headers=character(),owner=""){

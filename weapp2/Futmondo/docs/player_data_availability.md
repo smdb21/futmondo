@@ -64,3 +64,68 @@ private live response was captured, so they do not establish the exact payload
 or transport failure that triggered the reported account symptoms. No live
 accounts, transactions, or deployment were exercised. The primary integrated
 review records application lifecycle checks separately.
+
+## Scalar request contracts and safe failure references
+
+Seven existing read loaders now serialize their request bodies with
+`auto_unbox = TRUE`: clubs, active championships, roster, market, player catalog,
+lineup, and league teams. Token, account/league/team IDs, request type, and
+boolean flags are JSON scalars rather than one-element arrays. This matches the
+documented API contract and existing team-information request format; it does not add fields or requests. The
+exact rejection behind the hosted unavailable views remains unconfirmed until
+new runtime evidence is available.
+
+`resource_failure()` carries only an allowlisted category (`http`, `network`,
+`parser`, `schema`, `read_budget`, or `unknown`), known resource/function base,
+optional numeric HTTP status, and a short `FM-*` reference. Transport errors use
+explicit categories; untyped R errors use conservative pattern classification.
+Cache and async wrappers preserve this safe cause rather than replacing it
+with a generic exception. Raw messages, URLs, query strings, credentials, IDs,
+response bodies, calls, and stacks are absent from the diagnostic condition,
+log line, and unavailable UI text. The original error is not retained. The legacy synchronous HTTP wrapper
+still discards its original HTTP/network cause before this boundary; explicit
+status/category retention applies to the asynchronous UI transport.
+
+`resource_log_failure()` emits one bounded line per failure source/category
+within an async acquisition. An adapter-local registry holds at most 32 safe
+entries, matching the existing read budget, and suppresses repeated logs when
+replay encounters the same optional failure. There is no global deduplication
+history. Warm reads and reactive rendering do not log failures. References use
+a single bounded process counter rather than private identifiers.
+
+A transient diagnostic condition lets an outer finance/cache result retain
+one safe `fetch_error` when an optional market failure is caught internally.
+Stale results retain their original source observation time and safe failure;
+existing spendable-funds invalidation remains in place. The factual read UI
+shows a short source/connection category, reference, and refresh instruction
+when no data is available. Successful and partial rows remain available.
+
+Pressroom retains its completion summary and no longer prints per-page cursor
+IDs. Its local catch preserves the safe original category/reference. Repeated
+loader messages during cooperative replay do not by themselves imply repeated
+HTTP requests.
+
+Focused checks for this follow-up, using only synthetic transports:
+
+- `Rscript --vanilla test/test_read_diagnostics.R`: **6 passed, 0 failed**.
+  Covers sanitization, nested caught failures, stale and unavailable states,
+  quiet warm reads/rendering, replay deduplication, and actual unavailable UI
+  validation text.
+- `Rscript --vanilla test/test_read_request_contracts.R`: **4 passed, 0 failed**.
+  Exercises the actual sync loaders and async adapter, asserting scalar strings
+  and booleans for all seven corrected request paths. Roster plus market still
+  uses **5 cold reads and 0 warm reads**. A three-page pressroom fixture sends
+  each cursor exactly once, uses **3 cold reads and 0 warm reads**, and prints no
+  cursor IDs. A synthetic HTTP 503 retains one reference and emits one safe log.
+  The existing catalog numeric-column detection emits coercion warnings for
+  this small fixture; no request or assertion fails.
+
+Performance review: no additional HTTP/database calls, retries, timers,
+reactive consumers, or UI structures are introduced. Failure classification
+and formatting run only on failure/state creation; log deduplication scans at
+most 32 entries per acquisition. One safe diagnostic may accompany an existing
+cached value, within the unchanged 32 MiB/256-entry limits. Healthy warm reads
+perform no additional fetching or parsing. The short UI text uses existing
+validation containers; no new browser/mobile layout check was run. Central integration checks and transport
+heartbeat measurements are recorded separately by the primary review. No live
+accounts, transactions, or hosted network timings were exercised here.

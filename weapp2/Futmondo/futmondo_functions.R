@@ -77,7 +77,7 @@ get_real_clubs <- function(login, championship_id) {
   cache_key <- paste0("real_clubs_", championship_id)
   get_cached_data(cache_key, {
     print("Getting real clubs in the league")
-    response <- futmondo_post("https://api.futmondo.com/1/league/championshipteams", body = toJSON(payload), add_headers(.headers = headers))
+    response <- futmondo_post("https://api.futmondo.com/1/league/championshipteams", body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
     clubs <- httr::content(response)$answer
     
     if (is.null(clubs) || length(clubs) == 0) {
@@ -134,7 +134,7 @@ get_championships <- function(login, championship_name = NULL) {
 
     # Sending the POST request
     print("Getting championships")
-    response <- futmondo_post(ACTIVE_CHAMPIONSHIPS_URL, body = toJSON(payload), add_headers(.headers = headers))
+    response <- futmondo_post(ACTIVE_CHAMPIONSHIPS_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
     ret <- httr::content(response)$answer
     ret <- ret[["championships"]]
     if (!is.null(championship_name)) {
@@ -195,7 +195,7 @@ get_players_from_team <- function(login, championship_id, user_team_id, teams = 
     # Sending the POST request
     print("Getting players from team")
 
-    response <- futmondo_post(ROSTER_URL, body = toJSON(payload), add_headers(.headers = headers))
+    response <- futmondo_post(ROSTER_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
     roster <- httr::content(response)
     roster <- roster[["answer"]]
     if (!is.list(roster) || !is.null(roster$code) || isTRUE(roster$error)) stop("Roster unavailable")
@@ -360,7 +360,7 @@ get_market_players <- function(login, championship_id, user_team_id) {
 
     # Sending the POST request
     print("Getting players in the market")
-    response <- futmondo_post(MARKET_URL, body = toJSON(payload), add_headers(.headers = headers))
+    response <- futmondo_post(MARKET_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
     players <- httr::content(response)$answer
     if (!is.list(players) || !is.null(players$code) || isTRUE(players$error)) stop("Market data unavailable")
     if (!length(players)) return(data.frame())
@@ -399,7 +399,7 @@ get_championship_players <- function(login, championship_id) {
 
     # Sending the POST request
     print("Getting championship players")
-    response <- futmondo_post(CHAMPIONSHIP_PLAYERS, body = toJSON(payload), add_headers(.headers = headers))
+    response <- futmondo_post(CHAMPIONSHIP_PLAYERS, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
     players <- httr::content(response)$answer$players
     if (!is.list(players)) stop("Player catalog unavailable")
     if (!length(players)) return(data.frame())
@@ -603,7 +603,7 @@ get_lineup_from_team <- function(login, championship_id, user_team_id) {
   # Sending the POST request
   print("Getting lineup from team")
 
-  response <- futmondo_post(LINEUP_URL, body = toJSON(payload), add_headers(.headers = headers))
+  response <- futmondo_post(LINEUP_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
   lineup <- httr::content(response)
   lineup <- lineup[["answer"]]
   if (!is.list(lineup) || !is.null(lineup$code)) stop("Lineup unavailable")
@@ -1103,7 +1103,7 @@ get_teams <- function(login, championship_id) {
 
     # Sending the POST request
     print("Getting teams")
-    response <- futmondo_post(TEAMS_URL, body = toJSON(payload), add_headers(.headers = headers))
+    response <- futmondo_post(TEAMS_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
     ans <- httr::content(response)$answer
     
     # Support both nested 'teams' object or direct array format safely
@@ -2008,7 +2008,6 @@ get_championship_pressroom <- function(login, championship_id) {
 
       while (page_count < max_pages) {
         page_count <- page_count + 1
-        print(paste0("[API] Fetching pressroom feed - page ", page_count, ", cursor: ", if (cursor == "") "(initial)" else cursor))
 
         payload <- list(
           header = list(
@@ -2071,7 +2070,7 @@ get_championship_pressroom <- function(login, championship_id) {
 
       return(observed_data(df,status=if(page_count>=max_pages) "partial" else "ok"))
     }, error = function(e) {
-      stop("Pressroom data unavailable")
+      stop(resource_failure(e, "pressroom"))
     })
   }, timeout_sec = 300, context=resource_context(login=login,championship_id=championship_id))
 }

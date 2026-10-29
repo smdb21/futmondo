@@ -14,6 +14,77 @@ resource_policy<-function(resource){
   if(grepl("real_clubs",resource,ignore.case=TRUE))900 else 300
  list(ttl=ttl,stale_for=if(ttl<=20)60 else 3600,max_entries=256L,max_bytes=32*1024^2)
 }
+# Only allowlisted diagnostic fields may cross a fetch boundary or reach logs/UI.
+resource_diagnostic_name <- function(resource) {
+  candidate <- sub("[?#].*$", "", fm_scalar(resource, ""))
+  if (grepl("://", candidate, fixed=TRUE)) candidate <- tail(strsplit(candidate, "/", fixed=TRUE)[[1]], 1L)
+  candidate <- sub(":.*$", "", candidate)
+  allowed <- c("get_financial_snapshot", "get_acquisition_capacity", "get_players_from_team",
+    "get_market_players", "get_real_clubs", "get_user_team_info", "get_championships",
+    "get_championship_players", "get_teams", "get_lineup_from_team", "get_roster_bids",
+    "get_my_market_players", "get_player_summary", "get_player_card_history", "get_player_full_profile",
+    "get_player_matches", "get_championship_pressroom", "get_money_movements", "get_finished_rounds",
+    "get_finished_round_catalog", "get_round_dreamteam", "get_active_championships",
+    "read_player_points_history", "calculate_league_finances", "roster", "market", "real_clubs",
+    "championships", "championshipplayers", "lineup", "teams", "team_info", "user_team_info",
+    "roster_bids", "my_market_players", "acq_capacity", "financial_snapshot", "moneymovements",
+    "pressroom", "player_summary", "player_profile", "player_matches", "rounds", "dreamteam",
+    "league_finances_calc", "notifications_list", "notifications_unread", "information",
+    "activechampionships", "championshipteams", "players", "summary", "fullprofile", "matches",
+    "rosterbids", "myplayers", "getdtconfig", "unread", "list", "database")
+  matches <- allowed[candidate == allowed | startsWith(candidate, paste0(allowed, "_"))]
+  if (!length(matches)) "read" else matches[which.max(nchar(matches))]
+}
+resource_failure <- function(error=NULL, resource=NULL, category=NULL, http_status=NULL) {
+  fields <- if (is.list(error)) error else list()
+  text <- if (inherits(error, "condition")) conditionMessage(error) else ""
+  cancelled <- inherits(error, "fm_async_cancelled") || identical(text, "Session request cancelled")
+  categories <- c("http", "network", "parser", "schema", "read_budget", "unknown")
+  category <- category %||% fields$category
+  status <- suppressWarnings(as.integer(http_status %||% fields$http_status %||% fields$status_code))
+  if (length(status)!=1L || is.na(status) || status<100L || status>599L) status <- NULL
+  if (is.null(status) && grepl("^HTTP[ :]+[1-5][0-9]{2}([^0-9]|$)", text))
+    status <- as.integer(sub("^HTTP[ :]+([1-5][0-9]{2}).*$", "\\1", text))
+  if (length(category)!=1L || is.na(category) || !category %in% categories) {
+    category <- if (!is.null(status)) "http" else
+      if (inherits(error, "curl_error") || grepl("Connection failed|Network disabled|timed out|could not resolve|couldn't connect", text, ignore.case=TRUE)) "network" else
+      if (grepl("request budget|request capacity|resource capacity", text, ignore.case=TRUE)) "read_budget" else
+      if (grepl("lexical error|parse error|premature EOF|invalid JSON|trailing garbage", text, ignore.case=TRUE)) "parser" else
+      if (grepl("arguments imply differing|names.*vector|subscript|not found|unavailable|invalid.*data|Mutation forbidden", text, ignore.case=TRUE)) "schema" else "unknown"
+  }
+  base <- resource_diagnostic_name(fields$resource)
+  if (base == "read") base <- resource_diagnostic_name(resource)
+  reference <- fm_scalar(fields$reference, "")
+  if (!grepl("^FM-(HTTP|NET|PARSE|SCHEMA|LIMIT|UNKNOWN)-[0-9]{6}$", reference)) {
+    sequence <- (.resource_metrics$failure_sequence %||% 0L) %% 999999L + 1L
+    .resource_metrics$failure_sequence <- sequence
+    code <- c(http="HTTP", network="NET", parser="PARSE", schema="SCHEMA", read_budget="LIMIT", unknown="UNKNOWN")[[category]]
+    reference <- sprintf("FM-%s-%06d", code, sequence)
+  }
+  structure(list(message=if(cancelled) "Session request cancelled" else paste0("Data unavailable (", reference, "). Refresh to retry."),
+    call=NULL, category=category, resource=base, http_status=status, reference=reference,
+    logged=isTRUE(fields$logged)), class=c(if(cancelled) "fm_async_cancelled", "futmondo_unavailable", "error", "condition"))
+}
+resource_log_failure <- function(error, resource=NULL) {
+  failure <- resource_failure(error, resource)
+  if (inherits(failure, "fm_async_cancelled")) return(failure)
+  if (!failure$logged) {
+    message(sprintf("[Futmondo read] resource=%s category=%s%s ref=%s", failure$resource,
+      failure$category, if(is.null(failure$http_status)) "" else paste0(" status=",failure$http_status), failure$reference))
+    failure$logged <- TRUE
+  }
+  # Outer composite reads retain attribution even if an optional inner read is caught.
+  signalCondition(structure(list(message="Read failure diagnostic", failure=failure),
+    class=c("fm_fetch_diagnostic", "condition")))
+  failure
+}
+resource_failure_message <- function(error) {
+  if (is.null(error)) return("Data unavailable. Refresh to retry.")
+  failure <- resource_failure(error)
+  label <- c(http="Source request", network="Connection", parser="Source response", schema="Source data",
+    read_budget="Read limit", unknown="Data")[[failure$category]]
+  paste0(label, " unavailable (", failure$reference, "). Refresh to retry.")
+}
 api_cache_env <- new.env(parent=emptyenv())
 .resource_metrics <- new.env(parent=emptyenv())
 resource_metrics <- function(reset=FALSE) {
@@ -68,20 +139,26 @@ get_cached_data <- function(key,expr,timeout_sec=NULL,context=NULL) {
   }
   resource_metric("misses")
   tryCatch({
-    value<-(function()eval(code,envir=caller))();if(is.null(value))stop("Data unavailable")
+    diagnostic<-NULL
+    value<-withCallingHandlers((function()eval(code,envir=caller))(),
+      fm_fetch_diagnostic=function(note)diagnostic<<-note$failure)
+    if(is.null(value))stop(resource_failure(resource=key,category="schema"))
+    if(!is.null(diagnostic))attr(value,"fetch_error")<-diagnostic
     value<-resource_store(cache_key,value,context,key,ttl)
     if(exists("record_acquired_resource",mode="function"))tryCatch(record_acquired_resource(key,value,context),error=function(e)NULL)
     value
   },error=function(e) {
+    failure<-resource_log_failure(e,key)
     if(!is.null(cached$data)&&as.numeric(difftime(now,cached$time,units="secs"))<=max(0,ttl)+policy$stale_for) {
       resource_metric("stale");fallback<-observed_data(cached$data,status="stale",observed_at=attr(cached$data,"observed_at") %||% cached$time)
+      attr(fallback,"fetch_error")<-failure
       if(is.list(fallback)&&!is.data.frame(fallback)&&identical(fallback$status,"ok")) {
         fallback$status<-"partial";if("spendable_budget"%in%names(fallback))fallback$spendable_budget<-NA_real_
         if(is.list(fallback$funds))fallback$funds$spendable_budget<-NA_real_
       }
       return(fallback)
     }
-    stop(structure(list(message="Requested data is unavailable. Please retry.",call=NULL),class=c("futmondo_unavailable","error","condition")))
+    stop(failure)
   })
 }
 invalidate_resources <- function(context,resources=NULL,pattern=NULL) {
@@ -100,6 +177,8 @@ clear_api_cache <- function(user_id=NULL,session_id=NULL) {
   invisible(TRUE)
 }
 resource_state <- function(data=NULL,status=NULL,error=NULL,source=NULL) {
+  error<-error %||% attr(data,"fetch_error")
+  if(!is.null(error))error<-resource_failure(error)
   status<-status %||% if(is.null(data))"unavailable" else attr(data,"fetch_status") %||% if(is.data.frame(data)&&!nrow(data))"empty" else "ok"
   list(data=data,status=status,source=source %||% attr(data,"source") %||% "futmondo",
     observed_at=attr(data,"observed_at"),fetched_at=attr(data,"fetched_at"),freshness=if(status=="stale")"stale" else "fresh",
@@ -115,27 +194,29 @@ get_cached_resource_async <- function(resource,context,fetch,refresh=FALSE) {
   if(is.null(item)&&length(ls(api_cache_env))>=policy$max_entries){
     keys<-ls(api_cache_env);entries<-mget(keys,api_cache_env)
     candidates<-which(vapply(entries,function(x)is.null(x$pending),logical(1)))
-    if(!length(candidates))return(promises::promise_resolve(resource_state(status="unavailable",error="Resource capacity reached")))
+    if(!length(candidates))return(promises::promise_resolve(resource_state(status="unavailable",error=resource_log_failure(resource_failure(resource=resource,category="read_budget")))))
     ages<-vapply(entries[candidates],function(x)as.numeric(x$accessed_at %||% x$time),numeric(1))
     rm(list=keys[candidates[which.min(ages)]],envir=api_cache_env);resource_metric("evictions")
   }
   resource_metric("misses");generation<-new.env(parent=emptyenv())
   fail<-function(error){
+    failure<-resource_log_failure(error,resource)
     current<-api_cache_env[[key]]
     if(identical(current$generation,generation)){
       if(!is.null(item$data)&&as.numeric(difftime(Sys.time(),item$time,units="secs"))<policy$ttl+policy$stale_for){
         api_cache_env[[key]]<-item
-        return(resource_state(observed_data(item$data,status="stale"),error="Refresh failed"))
+        return(resource_state(observed_data(item$data,status="stale"),error=failure))
       }
       rm(list=key,envir=api_cache_env)
     }
-    resource_state(status="unavailable",error="Requested data is unavailable. Refresh to retry.")
+    resource_state(status="unavailable",error=failure)
   }
   fetched<-tryCatch(promises::promise_resolve(fetch()),error=function(e)promises::promise_reject(e))
   pending<-promises::then(fetched,function(data){
     current<-api_cache_env[[key]]
     if(!identical(current$generation,generation))return(resource_state(status="unavailable",error="Context changed"))
-    if(is.null(data)||as.numeric(object.size(data))>policy$max_bytes)return(fail(NULL))
+    if(is.null(data))return(fail(resource_failure(resource=resource,category="schema")))
+    if(as.numeric(object.size(data))>policy$max_bytes)return(fail(resource_failure(resource=resource,category="read_budget")))
     value<-resource_store(key,data,context,resource);resource_state(value)
   })
   pending<-promises::catch(pending,fail)

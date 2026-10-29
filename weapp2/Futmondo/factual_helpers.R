@@ -352,7 +352,7 @@ factual_read_adapter<-function(session,handler,login_token,championship_id=NULL,
   entry<-registry[[entry_key]];attr(entry,"last_access")<-as.numeric(Sys.time());registry[[entry_key]]<-entry;state<-entry()
   stamp<-state$fetched_at;age<-if(length(stamp)==1L&&!is.na(stamp))as.numeric(difftime(Sys.time(),stamp,units="secs"))else 0
   if(!is.null(state$data)&&is.finite(age)&&age>resource_policy(handler)$ttl){bump<-attr(entry,"demand_refresh");if(is.function(bump))shiny::isolate(bump(bump()+1L));shiny::validate(shiny::need(FALSE,"Refreshing data…"))}
-  if(is.null(state$data))shiny::validate(shiny::need(FALSE,if(identical(state$status,"loading"))"Loading data…"else "Data unavailable. Refresh to retry."))
+  if(is.null(state$data))shiny::validate(shiny::need(FALSE,if(identical(state$status,"loading"))"Loading data…"else resource_failure_message(state$error)))
   result<-state$data;if(identical(state$freshness,"stale"))attr(result,"fetch_status")<-"stale";result
  }
 }

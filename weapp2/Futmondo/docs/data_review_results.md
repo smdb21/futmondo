@@ -122,3 +122,30 @@ Verification executed for this correction:
 Performance-impact review passed for the changed paths. The roster/market fixture uses 5 existing cold reads; three repeated roster/market/capacity accesses add 0 reads, 0 parses/normalizations, and no cache-entry or retained-byte growth. The Today KPI fixture serves both values with 1 finance read and 0 league-teams reads, with no additional read on repeated output access. This removes that KPI dependency; it does not claim the entire application no longer requests league teams. Club matching cannot multiply player rows and skips the club request if no team IDs exist. Added normalization only traverses the existing response on a cache miss. No retries, timers, background work, cache policies, dependencies, CSS, or mobile layout were added. Documentation and manifest checksum changes have no runtime cost. Full production concurrency, process-memory benchmarks, and new browser/device tests were deliberately not run for this scoped correction; hosted behaviour remains unverified.
 
 Luna investigated shared-table dependencies; Sol 6.1 implemented loader fixes and focused tests; the primary agent reviewed the integrated diff, implemented the Today correction, and ran its checks and the required lifecycle/finance verification. Implementation and validation made no production calls, account transactions, database migrations, or deployments. Local code is ready for deployment; the live incident is not marked resolved.
+
+
+## Continued availability incident: request contracts and diagnostics — 2026-10-29
+
+The user's new screenshots show the previous warning text and team-value correction in the hosted UI, but Today/My Team availability remains broken. The provided Connect logs show successful multi-page pressroom pagination interleaved with repeated roster, market, and lineup progress lines; no underlying exception or response status was retained. Repeated processing lines are consistent with asynchronous adapter replay and cannot establish duplicate HTTP requests.
+
+A local request inspection confirmed that seven older factual reads serialized scalar credentials, IDs, strings, and booleans as single-element JSON arrays, contrary to the documented HAR request contract. The working team-information read already uses scalar serialization. Clubs, championships, roster, market, catalog, lineup, and league-team reads now use `auto_unbox=TRUE`. This is a confirmed request-contract correction, but the hosted API's rejection reason is still unconfirmed; the provided logs contain no private response or original exception.
+
+Fetch failures now retain an allowlisted source/category, optional HTTP status, and short reference across nested caches and asynchronous replay. UI errors expose only that safe category/reference. Optional failures caught by composite reads remain attributable in safe metadata. Raw messages, calls, bodies, credentials, IDs, and query strings are not copied to the new diagnostics. Adapter-local failure logging is deduplicated and capped at 32 entries; warm reads and repeated rendering do not log again. The misleading per-page pressroom progress line, including its cursor ID, was removed. This is not a repository-wide audit of older logging.
+
+Executed verification:
+
+| Check | Result |
+| --- | --- |
+| New read diagnostics | 6 groups passed: sanitization, nested cause/reference retention, stale fallback, async failure handling, replay log deduplication, and actual UI error formatting. |
+| New request contracts | 4 groups passed: all seven corrected synchronous and asynchronous request shapes, roster/market rows and warm reuse, paginated replay, and preserved pressroom HTTP failure. |
+| Existing data service | 9 groups passed, including bounds, coalescing, context isolation, and invalidated generations. |
+| Existing session ownership | 3 groups passed: same-session coalescing, independent sessions/logout, cancellation, and stable persistence identity. |
+| Existing player availability | 11 groups passed, including zero/negative/missing values, optional enrichment, incomplete money, and cold/warm cache behavior. |
+| Existing debt/countdown | 9 groups passed; uncertain acquisition data still fails closed. |
+| Existing async transport | 4 groups passed with local HTTP only. Dispatch took 0.0278 seconds for the delayed fixture; heartbeat ran before its response. Cold card reads=4, warm=0, explicit refresh=4. |
+| Required offline lifecycle | 12 checks plus all 9 retained tabs passed; no external HTTP or live mutations. Existing Plotly fixture warnings remain. |
+| Deployment contract | 3 groups passed. Four runtime checksums refreshed; all 30 staged bundle checksums verified. Exact 10-file scope, credential-pattern scan, and whitespace check passed. |
+
+Performance-impact review passed within fixture limits. The real async roster/market path uses 5 cold requests and 0 warm requests. Three pressroom cursors cause exactly 3 requests and 0 warm requests, despite adapter replay. A repeatedly encountered optional parser failure emits 1 safe log across 3 responses and 0 warm logs. Existing player checks show 0 warm parses and no cache-entry/retained-byte growth. No retries, timers, reactive consumers, request scheduling changes, new dependencies, or CSS changes were introduced. Diagnostic construction is limited to failures and stores bounded small metadata; rendering adds only short error text. Documentation and release checksum updates have no runtime cost. Production load/process-memory and new browser/mobile checks were deliberately not run.
+
+Luna investigated the request contract; Sol 6.1 implemented the correction, diagnostics, and focused fixtures; the primary agent reviewed the actual changes and ran the existing integration/performance checks. No account login, live trade, database change, or Posit deployment was performed. The legacy synchronous HTTP wrapper still obscures its original cause; explicit HTTP/network attribution was verified for the actual asynchronous UI transport. Hosted verification after redeploy remains pending, and this incident is not marked resolved.
