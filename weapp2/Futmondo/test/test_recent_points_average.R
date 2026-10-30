@@ -19,3 +19,11 @@ ui_html <- as.character(players_table_UI("table",filter_by_active_clause=FALSE,
   filter_by_is_favorite=FALSE,filter_by_is_from_futmondo=FALSE))
 stopifnot(grepl("recent_games_n",ui_html,fixed=TRUE),grepl("Average points: latest games",ui_html,fixed=TRUE))
 cat("RECENT POINTS AVERAGE: 6 passed / 0 failed\n")
+
+# Finality describes confirmation, not whether a reported score can be averaged.
+observed <- data.frame(player_id=rep("p1",3),round=c(8,10,9),
+  points=c(7,18,19),score_status=c("unknown","unknown","provisional"))
+stopifnot(isTRUE(all.equal(add_recent_points_average(players,observed,3)$recent_points_avg[1],44/3)))
+signed<-data.frame(player_id=rep("p1",3),round=c(1,2,3),points=c(-2,0,8))
+stopifnot(add_recent_points_average(players,signed,3)$recent_points_avg[1]==2)
+cat("RECENT OBSERVED SCORES: 2 additional checks passed\n")

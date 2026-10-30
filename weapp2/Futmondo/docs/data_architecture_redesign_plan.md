@@ -227,3 +227,5 @@ Local implementation separates asynchronous authentication, primary Today conten
 See `docs/progressive_loading.md` for runtime behavior and `docs/data_review_results.md` for measured verification and remaining limits. Production deployment/latency verification is separate from local implementation. HAR inspection of actual per-player finality fields is deferred until the user supplies captures from the other machine; missing evidence stays unknown in the meantime.
 
 Current-player round display correction: use the shared selected-player request context and round number for live points/matches when optional identifiers are absent. Keep explicit contradictions and saved-only historical context checks. See the review results for regression and mobile verification.
+
+Recent-average correction: average observed scores regardless of finality and allow the separately scoped unknown context; changing N reuses the same bounded history read. Full coverage for players without recorded round observations remains dependent on verifying the fitness-array contract in the forthcoming HAR.

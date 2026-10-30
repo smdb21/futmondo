@@ -42,14 +42,14 @@ The position breakdown card checks both the primary `role` and secondary `role2`
 
 Every shared players table includes the numeric control **Average points: latest games**, initially set to 5 and constrained to 1–20. This applies to Your Team, Market, and All Players in Championship because all three use `players_table_UI()` and `players_table_Server()`. Changing the value recalculates the column heading and values immediately as `Avg Last N`.
 
-`add_recent_points_average(players_df, history_df, n=5L)` returns `players_df` with numeric `recent_points_avg`. `players_df` requires `id`; finalized `history_df` uses `player_id`, `points`, and preferably `round`. For each player, the helper sorts rounds newest first, selects at most N finite observed scores, and calculates their arithmetic mean. Players with fewer than N recorded games use every available game. Missing observations remain `NA`. When N is exactly 5, the normalized API field `average.averageLastFive` is used only for players without stored finalized-round history.
+`add_recent_points_average(players_df, history_df, n=5L)` returns `players_df` with numeric `recent_points_avg`. `players_df` requires `id`; observed `history_df` uses `player_id`, `points`, and preferably `round`. For each player, the helper sorts rounds newest first, selects at most N finite observed scores, and calculates their arithmetic mean. Players with fewer than N recorded games use every available game. Missing observations remain `NA`. When N is exactly 5, the normalized API field `average.averageLastFive` is used only for players without stored round history.
 
 ```r
-players <- add_recent_points_average(players, finalized_match_history, n=3L)
+players <- add_recent_points_average(players, observed_match_history, n=3L)
 # players$recent_points_avg contains each player's observed last-three mean
 ```
 
-The server obtains the league-wide finalized observations with one cached `read_player_match_history()` call rather than issuing per-player requests. The control uses a fluid Bootstrap row and moves to the left on narrow screens. It does not add a package or environment variable.
+The server obtains scoped observations with a bounded cached `read_player_match_history(final_only=FALSE)` call, retaining separate unknown season/scoring scopes. Finality need not be confirmed to average a reported score. The query is independent of N, so changing N reuses the same observations and recalculates locally; it does not require the round catalog or a latest-round window. Players without recorded scores remain unavailable for N other than 5. The ordering of the API fitness array is not yet verified and is not guessed. The control uses a fluid Bootstrap row and moves to the left on narrow screens. It does not add a package or environment variable.
 
 Focused verification: `Rscript test/test_recent_points_average.R`. Cross-page rendering is covered by `Rscript test/test_application_offline.R` and the full Shiny simulation.
 

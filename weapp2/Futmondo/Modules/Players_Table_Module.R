@@ -337,14 +337,12 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
         snapshot <- tryCatch(get_financial_snapshot(auth,champ,team),error=function(e)NULL)
         rules <- snapshot$lineup_rules %||% snapshot$rules
         season <- rules$season %||% "unknown"; scoring <- rules$scoring_version %||% "unknown"
-        if(!identical(season,"unknown") && !identical(scoring,"unknown")) {
-          rounds <- tryCatch(get_finished_rounds(auth,champ),error=function(e)data.frame())
-          completed <- rounds$round_number[rounds$is_finished %in% TRUE]
-          completed <- completed[is.finite(completed)]
-          if(length(completed))history <- tryCatch(read_player_match_history(as.character(champ),final_only=TRUE,
-            season=season,scoring_version=scoring,player_ids=as.character(players_table$id),
-            round_min=max(1L,max(completed)-recent_n+1L),round_max=max(completed)),error=function(e)data.frame())
-        }
+        # Observed scores need not carry an explicit finality flag. Unknown
+        # context stays in its own scope rather than disabling the read.
+        # N changes only the local average, not the bounded cached query.
+        history <- tryCatch(read_player_match_history(as.character(champ),final_only=FALSE,
+          season=season,scoring_version=scoring,player_ids=as.character(players_table$id)),
+          error=function(e)data.frame())
       }
       players_table <- players_table_normalize_owner(players_table, if(isTRUE(optional_ready()))tryCatch(user_teams_RV(), error=function(e)NULL)else NULL)
       players_table <- add_recent_points_average(players_table,history,recent_n)
@@ -531,7 +529,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
   })
 }
 
-# Add an observed average over each player's latest N finalized rounds.
+# Add an observed average over each player's latest N recorded rounds.
 add_recent_points_average <- function(players_df,history_df,n=5L) {
   if (!is.data.frame(players_df)) return(players_df)
   n <- suppressWarnings(as.integer(n)[1]); if (!is.finite(n)) n <- 5L

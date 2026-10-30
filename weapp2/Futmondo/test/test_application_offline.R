@@ -185,6 +185,22 @@ app_check('unavailable history cannot suppress live roster rows',{
   app_settle(session);stopifnot(reads>0L,setequal(players_table_filtered_RV()$id,app_roster$id))
  });for(name in names(originals))assign(name,originals[[name]],envir=.GlobalEnv)
 })
+app_check('observed averages work with unknown finality/context and reuse reads across N',{
+ originals<-mget(c('get_financial_snapshot','read_player_match_history'),envir=.GlobalEnv);average_reads<-0L
+ get_financial_snapshot<-function(...)app_financial
+ read_player_match_history<-function(championship_id,final_only,season,scoring_version,player_ids,...){
+  stopifnot(!final_only,identical(season,'unknown'),identical(scoring_version,'unknown'))
+  average_reads<<-average_reads+1L
+  data.frame(player_id='p1',round=c(8,10,9),points=c(7,18,19),score_status=c('unknown','unknown','provisional'))
+ }
+ clear_api_cache(app_auth[['userid']])
+ shiny::testServer(players_table_Server,args=list(players_table_RV=reactive(app_roster),user_teams_RV=reactive(app_teams),login_token=reactive(app_auth),championship_id=reactive('champ'),user_team_id=reactive('team1')),{
+  session$setInputs(recent_games_n=3L);app_settle(session)
+  rows<-players_table_filtered_RV();stopifnot(isTRUE(all.equal(rows$recent_points_avg[rows$id=='p1'],44/3)))
+  before<-average_reads;session$setInputs(recent_games_n=2L);app_settle(session)
+  rows<-players_table_filtered_RV();stopifnot(rows$recent_points_avg[rows$id=='p1']==18.5,average_reads==before,before==1L)
+ });for(name in names(originals))assign(name,originals[[name]],envir=.GlobalEnv)
+})
 app_check('same-context loading preserves selection but league changes clear it',{
  original_state<-getReactableState;getReactableState<-function(outputId,name,session)session$input$fixture_selection
  loading<-reactiveVal(FALSE);league<-reactiveVal('champ');rows<-reactive({if(loading())shiny::validate(shiny::need(FALSE,'Loading fixture'));app_roster})
