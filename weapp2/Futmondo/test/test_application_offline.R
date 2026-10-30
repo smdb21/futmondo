@@ -70,6 +70,7 @@ get_player_historical_data <- function(...) data.frame()
 get_player_summary <- function(...) list(my_bid_id=NULL,my_bid_price=NULL,points=list(),match=list())
 read_player_price_history <- function(...) data.frame()
 read_player_match_history <- function(...) data.frame()
+read_league_round_points <- function(...) {d<-data.frame();attr(d,"complete")<-TRUE;d}
 read_auction_observations <- function(...) data.frame()
 read_bid_observations <- function(...) data.frame()
 supabase_get <- function(...) data.frame()
@@ -178,20 +179,21 @@ app_check('one notification click completes cold async player loading',{
  });get_championship_players<-original_catalog
 })
 app_check('unavailable history cannot suppress live roster rows',{
- originals<-mget(c('get_financial_snapshot','get_finished_rounds','read_player_match_history'),envir=.GlobalEnv);reads<-0L
- get_financial_snapshot<-function(...){x<-app_financial;x$lineup_rules<-list(season='2026',scoring_version='known');x}
- get_finished_rounds<-function(...)app_rounds;read_player_match_history<-function(...){reads<<-reads+1L;NULL};clear_api_cache(app_auth[["userid"]])
+ originals<-mget(c('read_league_round_points'),envir=.GlobalEnv);reads<-0L
+ read_league_round_points<-function(...){reads<<-reads+1L;NULL};clear_api_cache(app_auth[["userid"]])
  shiny::testServer(players_table_Server,args=list(players_table_RV=reactive(app_roster),user_teams_RV=reactive(app_teams),login_token=reactive(app_auth),championship_id=reactive('champ'),user_team_id=reactive('team1')),{
   app_settle(session);stopifnot(reads>0L,setequal(players_table_filtered_RV()$id,app_roster$id))
  });for(name in names(originals))assign(name,originals[[name]],envir=.GlobalEnv)
 })
-app_check('observed averages work with unknown finality/context and reuse reads across N',{
- originals<-mget(c('get_financial_snapshot','read_player_match_history'),envir=.GlobalEnv);average_reads<-0L
- get_financial_snapshot<-function(...)app_financial
- read_player_match_history<-function(championship_id,final_only,season,scoring_version,player_ids,...){
-  stopifnot(!final_only,identical(season,'unknown'),identical(scoring_version,'unknown'))
-  average_reads<<-average_reads+1L
-  data.frame(player_id='p1',round=c(8,10,9),points=c(7,18,19),score_status=c('unknown','unknown','provisional'))
+app_check('observed averages work with unknown finality and reuse matrix reads across N',{
+ originals<-mget(c('read_league_round_points'),envir=.GlobalEnv);average_reads<-0L
+ fixture_scoring<-normalize_league_rules(list(),get_lineup_from_team(),'champ')$scoring_version
+ read_league_round_points<-function(championship_id,...){
+  stopifnot(identical(championship_id,'champ'));average_reads<<-average_reads+1L
+  d<-data.frame(player_id='p1',championship_id='champ',season='unknown',
+   scoring_version=rep(fixture_scoring,3),round=c(8,10,9),points=c(7,18,19),
+   observed_at='2026-10-30T12:00:00Z',score_status=c('unknown','unknown','provisional'))
+  attr(d,'complete')<-TRUE;d
  }
  clear_api_cache(app_auth[['userid']])
  shiny::testServer(players_table_Server,args=list(players_table_RV=reactive(app_roster),user_teams_RV=reactive(app_teams),login_token=reactive(app_auth),championship_id=reactive('champ'),user_team_id=reactive('team1')),{

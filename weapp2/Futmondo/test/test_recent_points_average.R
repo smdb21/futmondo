@@ -6,18 +6,18 @@ history <- data.frame(player_id=c(rep("p1",4),rep("p2",2)),round=c(1,2,3,4,3,4),
 last_two <- add_recent_points_average(players,history,2)
 stopifnot(identical(last_two$recent_points_avg,c(9,3,NA_real_)))
 last_three <- add_recent_points_average(players,history,3)
-stopifnot(isTRUE(all.equal(last_three$recent_points_avg[1],22/3)),last_three$recent_points_avg[2]==3,is.na(last_three$recent_points_avg[3]))
+stopifnot(isTRUE(all.equal(last_three$recent_points_avg[1],22/3)),is.na(last_three$recent_points_avg[2]),last_three$recent_points_count[2]==2L,is.na(last_three$recent_points_avg[3]))
 last_five <- add_recent_points_average(players,history,5)
-stopifnot(last_five$recent_points_avg[1]==6,last_five$recent_points_avg[2]==3,last_five$recent_points_avg[3]==7)
+stopifnot(last_five$recent_points_avg[1]==9,last_five$recent_points_avg[2]==8,last_five$recent_points_avg[3]==7)
 revised <- rbind(history,data.frame(player_id="p1",round=4,points=14))
-# The history reader normally deduplicates revisions; the helper consumes its finalized rows in order.
+# The matrix reader deduplicates revisions; the helper uses explicit rounds.
 revised <- revised[!duplicated(revised[c("player_id","round")],fromLast=TRUE),]
 stopifnot(add_recent_points_average(players,revised,1)$recent_points_avg[1]==14)
 empty <- add_recent_points_average(players,data.frame(),4)
 stopifnot(all(is.na(empty$recent_points_avg)))
 ui_html <- as.character(players_table_UI("table",filter_by_active_clause=FALSE,
   filter_by_is_favorite=FALSE,filter_by_is_from_futmondo=FALSE))
-stopifnot(grepl("recent_games_n",ui_html,fixed=TRUE),grepl("Average points: latest games",ui_html,fixed=TRUE))
+stopifnot(grepl("recent_games_n",ui_html,fixed=TRUE),grepl("Average points: latest rounds",ui_html,fixed=TRUE))
 cat("RECENT POINTS AVERAGE: 6 passed / 0 failed\n")
 
 # Finality describes confirmation, not whether a reported score can be averaged.
@@ -26,4 +26,8 @@ observed <- data.frame(player_id=rep("p1",3),round=c(8,10,9),
 stopifnot(isTRUE(all.equal(add_recent_points_average(players,observed,3)$recent_points_avg[1],44/3)))
 signed<-data.frame(player_id=rep("p1",3),round=c(1,2,3),points=c(-2,0,8))
 stopifnot(add_recent_points_average(players,signed,3)$recent_points_avg[1]==2)
-cat("RECENT OBSERVED SCORES: 2 additional checks passed\n")
+sparse<-data.frame(player_id="p1",round=c(3,4,6,7,8,9,10),points=c(1,-2,16,3,7,19,18))
+coverage<-add_recent_points_average(players,sparse,8)
+stopifnot(is.na(coverage$recent_points_avg[1]),coverage$recent_points_count[1]==7L,
+  coverage$recent_points_required[1]==8L)
+cat("RECENT OBSERVED SCORES: 3 additional checks passed\n")

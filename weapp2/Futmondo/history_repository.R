@@ -19,7 +19,7 @@ reconcile_player_points<-function(stored,live,context){
     value<-data.frame(round_number=round,points=pts,date=as.character(rows$occurred_at %||% rows$round_start_at %||% rep(NA_character_,nrow(rows))),score_status=as.character(rows$score_status %||% rep("unknown",nrow(rows))),observed_at=as.character(rows$observed_at %||% rep(NA_character_,nrow(rows))),source=source,stringsAsFactors=FALSE)
     value$match_id<-as.character(rows$match_id %||% rep("",nrow(rows)));value$round_id<-as.character(rows$round_id %||% rep("",nrow(rows)))
     value$score_status[is.na(value$score_status)|!value$score_status%in%c("final","provisional","unknown","unavailable")]<-"unknown"
-    value[is.finite(value$round_number)&is.finite(value$points),,drop=FALSE]
+    value[is.finite(value$round_number),,drop=FALSE]
   }
   rows<-dplyr::bind_rows(normalize(stored,"supabase"),normalize(live,"futmondo"))
   if(!nrow(rows))return(data.frame(round_number=numeric(),points=numeric(),date=character(),score_status=character(),observed_at=character(),source=character()))

@@ -50,4 +50,14 @@ check('async parent failure blocks children and success unlocks dependent write'
  }
  fm_async_http<-old_http;get_sb_url<-old_url;get_sb_key<-old_key;options(futmondo.offline=TRUE)
 })
+
+check('unknown score corrections persist without repeated writes',{
+ writes<-list();unknown<-points;unknown$points[1]<-NA_real_
+ record_acquired_resource('player_card_history',list(points=unknown,previous_points=points,context=ctx),ctx)
+ stopifnot(length(writes)==1L,nrow(writes[[1]]$payload)==1L,is.na(writes[[1]]$payload$points))
+ writes<-list();record_acquired_resource('player_card_history',list(points=unknown,previous_points=unknown,context=ctx),ctx);stopifnot(length(writes)==0L)
+ record_acquired_resource('player_card_history',list(points=points,previous_points=unknown,context=ctx),ctx)
+ stopifnot(length(writes)==1L,writes[[1]]$payload$points==0)
+})
+
 cat(sprintf('OBSERVATION RECORDING: %d passed / 0 failed\n',n))

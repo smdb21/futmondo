@@ -800,3 +800,16 @@ read_player_match_history<-function(championship_id,cutoff=Sys.time(),final_only
  d[!duplicated(d[c("player_id","season","scoring_version","round")],fromLast=TRUE),,drop=FALSE]
 }
 source("history_repository.R")
+
+
+# One logical batch for the league matrix; pagination respects the server cap.
+# N and player IDs intentionally do not form part of this query/cache identity.
+read_league_round_points <- function(championship_id,max_rows=50000L) {
+  championship_id<-fm_scalar(championship_id,"")
+  if(!nzchar(championship_id))stop("A league is required for round history")
+  history_read_pages("player_round_points_latest",list(
+    championship_id=paste0("eq.",championship_id),
+    select="championship_id,player_id,season,scoring_version,round,points,score_status,observed_at,occurred_at,round_start_at",
+    order="player_id.asc,season.asc,scoring_version.asc,round.asc"),
+    max_rows=max_rows,page_size=1000L)
+}

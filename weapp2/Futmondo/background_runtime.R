@@ -2,6 +2,8 @@
 .persistence_state<-new.env(parent=emptyenv())
 .persistence_state$queue<-list();.persistence_state$active<-NULL;.persistence_state$progress<-list()
 .persistence_state$scheduled<-FALSE;.persistence_state$errors<-list();.persistence_state$acknowledged<-list()
+# Completion signal lets active backfills yield to the bounded write queue.
+.persistence_state$revision<-shiny::reactiveVal(0L)
 .persistence_max_jobs_per_owner<-25L
 persistence_job_scope<-function(name,args){
  identity<-list(fn=name)
@@ -28,7 +30,7 @@ persistence_record_result<-function(job,ok,issues=list()){
  if(length(errors)>64L)errors<-tail(errors,64L)
  .persistence_state$errors[[job$owner]]<-if(length(errors))errors else NULL
  if(length(.persistence_state$errors)>128L).persistence_state$errors<-tail(.persistence_state$errors,128L)
- if(isTRUE(ok)){.persistence_state$acknowledged[[job$key]]<-Sys.time();if(length(.persistence_state$acknowledged)>256L).persistence_state$acknowledged<-.persistence_state$acknowledged[-1]};invisible(ok)
+ if(isTRUE(ok)){.persistence_state$acknowledged[[job$key]]<-Sys.time();if(length(.persistence_state$acknowledged)>256L).persistence_state$acknowledged<-.persistence_state$acknowledged[-1]};shiny::isolate(.persistence_state$revision(.persistence_state$revision()+1L));invisible(ok)
 }
 
 defer_persistence<-function(fn,args=list(),context=getOption("futmondo.persistence_context")){
@@ -118,7 +120,9 @@ record_acquired_resource<-function(resource,data,context){
     previous<-data$previous_points
     if(nrow(points)&&is.data.frame(previous)&&nrow(previous)){
      index<-match(points$round_number,previous$round_number);new_date<-fm_time(points$date);old_date<-fm_time(previous$date[index])
-     changed<-is.na(index)|points$points!=previous$points[index]|points$score_status!=previous$score_status[index]|(!is.na(new_date)&(is.na(old_date)|new_date!=old_date))
+     old_points<-previous$points[index]
+     score_changed<-xor(is.na(points$points),is.na(old_points))|(!is.na(points$points)&!is.na(old_points)&points$points!=old_points)
+     changed<-is.na(index)|score_changed|points$score_status!=previous$score_status[index]|(!is.na(new_date)&(is.na(old_date)|new_date!=old_date))
      points<-points[changed%in%TRUE,,drop=FALSE]
     }
     if(nrow(points))supabase_post("player_match_observations",data.frame(player_id=ctx$player_id,championship_id=ctx$championship_id,season=ctx$season,scoring_version=ctx$scoring_version,round=points$round_number,points=points$points,score_status=points$score_status,occurred_at=points$date,observed_at=points$observed_at))

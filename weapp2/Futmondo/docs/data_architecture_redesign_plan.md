@@ -233,3 +233,10 @@ Recent-average correction: average observed scores regardless of finality and al
 Navigation simplification: consolidate market listings under Today and retain the bid filters there; remove the separate Market tab and server instance.
 
 Older-round display correction: associate loaded point rows before applying display limits and show up to 50 available rounds in the card. Completeness of the production history archive remains a separate verification/backfill concern, not established by this UI correction.
+
+
+## League round matrix and active-session initial fill
+
+Supersedes the earlier observed-games average correction: calculate the last N consecutive observed league rounds from one scoped player/round matrix. Load the latest-observation view in a bounded batch, retrieve source player summaries with at most two requests in flight, persist acquired scores, and reread the matrix once writes drain. Changing N performs no IO. The initial fill visits the active league catalog, prioritizing the visible table; it stops launching work on navigation/logout and resumes from shared cache or saved complete history. Missing scores stay unknown. No scheduled automation or prediction is introduced.
+
+The migration has been applied; see `round_points_matrix.md` for schema, verification, performance bounds, and source-coverage limitations. Unknown season/scoring remains isolated, so permanent reuse cannot be assumed until source context is verified. Deployment and authenticated Futmondo backfill are separate from the completed SQL migration.
