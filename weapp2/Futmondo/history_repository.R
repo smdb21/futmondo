@@ -116,7 +116,7 @@ build_player_recent_rounds <- function(points,matches,context,limit=5L,current_p
   field<-function(row,name)if(name%in%names(row))fm_scalar(row[[name]],"")else ""
   if(nrow(points)){
     points<-points[is.finite(suppressWarnings(as.numeric(points$round_number))),,drop=FALSE]
-    points<-head(points[order(as.numeric(points$round_number),decreasing=TRUE),,drop=FALSE],limit)
+    points<-points[order(as.numeric(points$round_number),decreasing=TRUE),,drop=FALSE]
   }
   if(nrow(matches))matches<-unique(matches)
   match_ids<-if("match_id"%in%names(matches))as.character(matches$match_id)else rep("",nrow(matches))
@@ -151,5 +151,5 @@ build_player_recent_rounds <- function(points,matches,context,limit=5L,current_p
   }
   unassociated<-matches[!used,,drop=FALSE]
   if(nrow(unassociated))unassociated<-head(unassociated[order(unassociated$round,decreasing=TRUE,na.last=TRUE),,drop=FALSE],limit)
-  list(rounds=groups,unassociated=unassociated)
+  list(rounds=head(groups,limit),unassociated=unassociated)
 }

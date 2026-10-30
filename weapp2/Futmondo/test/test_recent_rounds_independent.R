@@ -122,3 +122,17 @@ check("current player fallback preserves known conflicts and groups multiple fix
   got<-build_player_recent_rounds(live,conflicting,ctx,current_player_responses=TRUE)
   stopifnot(nrow(got$rounds[[1]]$fixtures)==0L)
 })
+
+check("display limits never label older paired rounds as missing associations", {
+ live<-points(1:10,11:20);live$source<-"futmondo"
+ fixtures<-matches(10:1,paste("Home",10:1),season="unknown",competition_id="")
+ ctx<-list(player_id="selected-player",season="unknown",competition_id="")
+ recent<-build_player_recent_rounds(live,fixtures,ctx,current_player_responses=TRUE)
+ stopifnot(length(recent$rounds)==5L,nrow(recent$unassociated)==0L)
+ card<-build_player_recent_rounds(live,fixtures,ctx,limit=50L,current_player_responses=TRUE)
+ stopifnot(length(card$rounds)==10L,nrow(card$unassociated)==0L,
+   card$rounds[[6]]$round_number==5,card$rounds[[6]]$points==15,
+   card$rounds[[6]]$fixtures$home=="Home 5")
+ missing<-build_player_recent_rounds(live[live$round_number!=4,],fixtures,ctx,limit=50L,current_player_responses=TRUE)
+ stopifnot(nrow(missing$unassociated)==1L,missing$unassociated$round==4)
+})

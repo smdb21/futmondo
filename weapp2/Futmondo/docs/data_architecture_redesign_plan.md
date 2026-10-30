@@ -231,3 +231,5 @@ Current-player round display correction: use the shared selected-player request 
 Recent-average correction: average observed scores regardless of finality and allow the separately scoped unknown context; changing N reuses the same bounded history read. Full coverage for players without recorded round observations remains dependent on verifying the fitness-array contract in the forthcoming HAR.
 
 Navigation simplification: consolidate market listings under Today and retain the bid filters there; remove the separate Market tab and server instance.
+
+Older-round display correction: associate loaded point rows before applying display limits and show up to 50 available rounds in the card. Completeness of the production history archive remains a separate verification/backfill concern, not established by this UI correction.

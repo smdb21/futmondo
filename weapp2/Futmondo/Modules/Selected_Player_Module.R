@@ -1787,7 +1787,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     output$recent_round_points <- renderUI({
       sp<-selected_player();req(sp);history<-card_history();match_state<-card_states$matches()
       matches<-normalize_player_matches(match_state$data)
-      rounds<-build_player_recent_rounds(history$points,matches,history$context %||% list(),current_player_responses=TRUE)
+      rounds<-build_player_recent_rounds(history$points,matches,history$context %||% list(),limit=50L,current_player_responses=TRUE)
       div(class="player-recent-rounds",h4(icon("futbol")," Recent rounds"),
         div(class="player-round-boxes",lapply(rounds$rounds,function(round){
           div(class="player-match-card player-round-box",
