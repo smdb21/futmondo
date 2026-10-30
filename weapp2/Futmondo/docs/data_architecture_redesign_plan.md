@@ -229,3 +229,5 @@ See `docs/progressive_loading.md` for runtime behavior and `docs/data_review_res
 Current-player round display correction: use the shared selected-player request context and round number for live points/matches when optional identifiers are absent. Keep explicit contradictions and saved-only historical context checks. See the review results for regression and mobile verification.
 
 Recent-average correction: average observed scores regardless of finality and allow the separately scoped unknown context; changing N reuses the same bounded history read. Full coverage for players without recorded round observations remains dependent on verifying the fitness-array contract in the forthcoming HAR.
+
+Navigation simplification: consolidate market listings under Today and retain the bid filters there; remove the separate Market tab and server instance.

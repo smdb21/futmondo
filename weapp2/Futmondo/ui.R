@@ -46,10 +46,6 @@ body <- shinydashboard::dashboardBody(
       )
     ),
     shinydashboard::tabItem(
-      tabName = "market",
-      market_UI(id = "market")
-    ),
-    shinydashboard::tabItem(
       tabName = "players_in_championship",
       players_in_championship_UI(id = "players_in_championship")
     ),

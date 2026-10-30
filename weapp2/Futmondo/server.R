@@ -170,16 +170,6 @@ selected_player_RV <- players_in_teams_Server(id = "players_in_teams",
                user_teams_RV = user_teams_RV,
                refresh_trigger = refresh_trigger)
 
-  market_Server(id = "market",
-                is_module_active = reactive({
-                  input$tabs == "market"
-                }),
-                login_token = login_token_RV, 
-                championship_id = championship_id_RV, 
-                user_team_id = user_team_id_RV, 
-                user_teams_RV = user_teams_RV,
-                refresh_trigger = refresh_trigger)
-
 players_in_championship_Server(id = "players_in_championship", 
                                   is_module_active = reactive({
                                     input$tabs == "players_in_championship"  
@@ -296,7 +286,6 @@ observeEvent(login_token_RV(),
       shinydashboard::menuItem("Notifications", tabName = "notifications", icon = icon("bell")),
       shinydashboard::menuItem("Today", tabName = "today", icon = icon("bolt")),
       shinydashboard::menuItem("Your team", tabName = "yourteam", icon = icon("users")),
-      shinydashboard::menuItem("Market", tabName = "market", icon = icon("money-bill-trend-up")),
       shinydashboard::menuItem("Players", tabName = "players_in_championship", icon = icon("table")),
       shinydashboard::menuItem("Rivals", tabName = "rivals", icon = icon("users-viewfinder")),
       shinydashboard::menuItem("Plots", tabName = "plots", icon = icon("chart-column")),

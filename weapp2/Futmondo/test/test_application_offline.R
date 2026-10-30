@@ -97,7 +97,7 @@ app_check('full server login, navigation, refresh and logout',{
   session$elapse(100);app_settle(session);stopifnot(valid_login(login_token_RV()))
   tabs<-list(today=c('today-kpi_cash_box','today-kpi_valuation_box','today-market_players-players_table','today-recent_transfers'),
    yourteam=c('players_in_teams-team_value_box','players_in_teams-players_table_in_teams-players_table'),
-   market='market-market_players_table-players_table',players_in_championship='players_in_championship-championship_players_table-players_table',
+   players_in_championship='players_in_championship-championship_players_table-players_table',
    rivals=c('rivals-league_finances_table','rivals-league_finances_plot','rivals-team_valuation_history_plot'),
    plots=c('plots-standings_plot','plots-values_plot','plots-cash_plot','plots-rank_plot','plots-owned_club_plot'),
    classification=c('classification-classification_table','classification-rank_evolution_plot','classification-dreamteam_box_ui'),
@@ -212,5 +212,5 @@ app_check('same-context loading preserves selection but league changes clear it'
  });getReactableState<-original_state
 })
 app_check('no HTTP or live database mutation attempts',stopifnot(offline_http_attempts==0L))
-cat('Offline lifecycle:',app_checks,'checks plus 9 tabs passed.\n')
+cat('Offline lifecycle:',app_checks,'checks plus 8 tabs passed.\n')
 for(method in c('GET','POST','PUT','PATCH','DELETE'))suppressMessages(untrace(method,where=asNamespace('httr')))

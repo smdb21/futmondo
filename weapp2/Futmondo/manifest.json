@@ -2265,7 +2265,7 @@
       "checksum": "57a822ea09ec2fdbc3395a711dbccc39"
     },
     "Modules/Today_Module.R": {
-      "checksum": "20196dbcf2935827d0428b7ccfbb34f1"
+      "checksum": "976f249f198195fb1ced0287b550858e"
     },
     "mvp_runtime.R": {
       "checksum": "f8294321c1c28f953b0db2e12c59faa2"
@@ -2277,7 +2277,7 @@
       "checksum": "ba8d623a904f8a43fcc286c0f4c97487"
     },
     "server.R": {
-      "checksum": "1e418ae119d08037b856abf53f1b2751"
+      "checksum": "843ff1346738b2cd3363a863de5dcd02"
     },
     "supabase_connector.R": {
       "checksum": "138577d7a59fdaa1fb9a8f9c8ff166b6"
@@ -2286,7 +2286,7 @@
       "checksum": "4787615df03516c7ab4673aa883799f4"
     },
     "ui.R": {
-      "checksum": "6789315c1349e3668dfe120337d8d210"
+      "checksum": "8d62f2ea14b7d85fb542674d2964d61a"
     },
     "utils.R": {
       "checksum": "6253d5e12d91ddef162c7e9e7624680a"

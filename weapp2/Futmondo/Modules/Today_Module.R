@@ -4,7 +4,7 @@ today_UI <- function(id) {
   tagList(h2("Today"),p("Current league balances, market listings and completed transfers."),
     fluidRow(uiOutput(ns("kpi_cash_box")),uiOutput(ns("kpi_valuation_box"))),
     uiOutput(ns("market_status")),
-    players_table_UI(ns("market_players"),box_title="Current market listings",filter_by_is_from_futmondo=TRUE),
+    players_table_UI(ns("market_players"),box_title="Current market listings",filter_by_is_from_futmondo=TRUE,filter_by_players_with_bid=TRUE),
     h3("Recent transfers"),tableOutput(ns("recent_transfers")))
 }
 today_Server <- function(id,is_module_active,login_token,championship_id,user_team_id,user_teams_RV,refresh_trigger=NULL) {

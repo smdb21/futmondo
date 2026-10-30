@@ -24,7 +24,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       await page.locator('#login-password').fill('fixture');
       await page.locator('#login-login_button').click();
       await page.locator('.sidebar-menu a[data-value="yourteam"]').waitFor();
-      for (const tab of ['today','yourteam','market','players_in_championship','rivals','classification','notifications','plots','round_mvps']) {
+      for (const tab of ['today','yourteam','players_in_championship','rivals','classification','notifications','plots','round_mvps']) {
         await page.locator(`.sidebar-menu a[data-value="${tab}"]`).evaluate(el=>el.click());
         await page.waitForTimeout(350);
         const body = await page.locator('body').evaluate(el=>({background:getComputedStyle(el).backgroundColor,font:getComputedStyle(el).fontFamily}));

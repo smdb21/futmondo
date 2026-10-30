@@ -89,3 +89,7 @@ players <- data.frame(user_team_id = "team-7", userTeam = "")
 players_table_normalize_owner(players, teams)$userTeam
 # [1] "Aurora"
 players_table_owner_choices(teams)["Aurora"]
+
+## Market access through Today
+
+Today is the sole market-listing page. Its shared players table includes both Your Bids Only and Bidded Only filters, as well as the existing player-card/manual actions. The redundant Market navigation/tab/server instance has been removed. Filters operate on already-loaded rows and do not add requests.
