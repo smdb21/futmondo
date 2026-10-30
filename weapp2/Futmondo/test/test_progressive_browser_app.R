@@ -10,12 +10,12 @@ fixture_delay <- function(value,seconds) promises::promise(function(resolve,reje
   later::later(function()resolve(value),seconds)
 })
 fm_async_login <- function(...)fixture_delay(app_auth,.8)
-get_player_summary <- function(...)observed_data(list(championship=list(season="2026",competitionId="competition"),
-  points=list(list(round=1,points=0,matchId="fixture-one",isFinished=TRUE),
-              list(round=2,points=-2,matchId="fixture-two")),prices=list()),observed_at=Sys.time())
-get_player_matches <- function(...)list(season="2026",competitionId="competition",matches=list(
-  list(id="fixture-one",r=1,h=list(name="Club A",score=0),a=list(name="Club B",score=0),info=list(date="2026-08-15")),
-  list(id="fixture-two",r=2,h=list(name="Club C with a deliberately long club name",score=2),a=list(name="Club A",score=1),info=list(date="2026-08-22"))))
+get_player_summary <- function(...)observed_data(list(championship=list(),
+  points=list(list(round=1,points=0,isFinished=TRUE),
+              list(round=2,points=-2)),prices=list()),observed_at=Sys.time())
+get_player_matches <- function(...)list(matches=list(
+  list(r=1,h=list(name="Club A",score=0),a=list(name="Club B",score=0),info=list(date="2026-08-15")),
+  list(r=2,h=list(name="Club C with a deliberately long club name",score=2),a=list(name="Club A",score=1),info=list(date="2026-08-22"))))
 get_player_full_profile <- function(...)list(profile=list(height=0,weight=0,nationality="Synthetic"),prices=list())
 read_card_round_history <- function(...)structure(data.frame(),complete=TRUE)
 read_card_price_history <- function(...)structure(data.frame(),complete=TRUE)

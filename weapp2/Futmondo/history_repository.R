@@ -106,10 +106,10 @@ assemble_player_card_history <- function(summary,lineup,stored,prices,context) {
     freshness=if(identical(attr(summary,"fetch_status"),"stale"))"stale"else "fresh")
 }
 
-# The round is a display label, never enough evidence to join two competitions.
-# Exact source match/round IDs can link records; numeric-round fallback requires
-# explicit matching competition AND season supplied by the source responses.
-build_player_recent_rounds <- function(points,matches,context,limit=5L) {
+# Current player responses share the card request context. Their round labels
+# can join live scores and fixtures even when optional IDs are omitted. Saved
+# history still requires explicit context; contradictory source evidence wins.
+build_player_recent_rounds <- function(points,matches,context,limit=5L,current_player_responses=FALSE) {
   if(!is.data.frame(points)||!all(c("round_number","points")%in%names(points)))points<-data.frame()
   if(!is.data.frame(matches)||!"round"%in%names(matches))matches<-data.frame()
   known<-function(x)length(x)==1L&&!is.na(x)&&nzchar(as.character(x))&&!identical(as.character(x),"unknown")
@@ -138,7 +138,12 @@ build_player_recent_rounds <- function(points,matches,context,limit=5L) {
     exact_match<-if(known(field(point,"match_id")))match_ids==field(point,"match_id")else rep(FALSE,nrow(matches))
     exact_round<-if(known(field(point,"round_id")))round_ids==field(point,"round_id")else rep(FALSE,nrow(matches))
     round_agrees<-!is.finite(numeric_rounds)|numeric_rounds==round
-    indices<-which(compatible&round_agrees&(exact_match|exact_round|(scoped&numeric_rounds==round)))
+    live_card<-isTRUE(current_player_responses)&&known(context$player_id)&&identical(field(point,"source"),"futmondo")
+    fallback_compatible<-rep(TRUE,nrow(matches))
+    if(known(field(point,"match_id")))fallback_compatible<-fallback_compatible&(!valid(match_ids)|exact_match)
+    if(known(field(point,"round_id")))fallback_compatible<-fallback_compatible&(!valid(round_ids)|exact_round)
+    indices<-which(compatible&round_agrees&(exact_match|exact_round|
+      ((scoped|live_card)&fallback_compatible&numeric_rounds==round)))
     # Conflicting duplicate point observations must not attach a fixture twice.
     indices<-indices[!used[indices]];used[indices]<-TRUE
     groups[[length(groups)+1L]]<-list(round_number=as.numeric(point$round_number),points=as.numeric(point$points),
