@@ -16,8 +16,9 @@ reconcile_player_points<-function(stored,live,context){
     rows<-history_context_filter(rows,context);if(!nrow(rows))return(data.frame())
     round<-suppressWarnings(as.numeric(rows$round %||% rows$round_number));pts<-suppressWarnings(as.numeric(rows$points))
     if(length(round)!=nrow(rows)||length(pts)!=nrow(rows))return(data.frame())
-    value<-data.frame(round_number=round,points=pts,date=as.character(rows$occurred_at %||% rows$round_start_at %||% rep(NA_character_,nrow(rows))),score_status=as.character(rows$score_status %||% rep("provisional",nrow(rows))),observed_at=as.character(rows$observed_at %||% rep(NA_character_,nrow(rows))),source=source,stringsAsFactors=FALSE)
-    value$score_status[is.na(value$score_status)|!value$score_status%in%c("final","provisional")]<-"provisional"
+    value<-data.frame(round_number=round,points=pts,date=as.character(rows$occurred_at %||% rows$round_start_at %||% rep(NA_character_,nrow(rows))),score_status=as.character(rows$score_status %||% rep("unknown",nrow(rows))),observed_at=as.character(rows$observed_at %||% rep(NA_character_,nrow(rows))),source=source,stringsAsFactors=FALSE)
+    value$match_id<-as.character(rows$match_id %||% rep("",nrow(rows)));value$round_id<-as.character(rows$round_id %||% rep("",nrow(rows)))
+    value$score_status[is.na(value$score_status)|!value$score_status%in%c("final","provisional","unknown","unavailable")]<-"unknown"
     value[is.finite(value$round_number)&is.finite(value$points),,drop=FALSE]
   }
   rows<-dplyr::bind_rows(normalize(stored,"supabase"),normalize(live,"futmondo"))
@@ -90,4 +91,60 @@ get_player_card_history<-function(login,championship_id,user_team_id,player_id,r
     complete<-known&&isTRUE(summary$history_complete)&&!identical(attr(summary,"fetch_status"),"stale")&&isTRUE(attr(stored,"complete"))&&isTRUE(attr(prices,"complete"))
     list(summary=summary,points=points,previous_points=previous_points,valuation=valuation,context=ctx,source=unique(c(points$source,valuation$source)),status=if(is.null(summary)&&is.null(stored)&&is.null(prices))"unavailable" else if(!nrow(points)&&!nrow(valuation))"empty" else if(complete)"ok" else "partial",freshness=if(identical(attr(summary,"fetch_status"),"stale"))"stale" else "fresh",completeness=if(complete)"complete" else "partial",coverage=list(database_rounds=if(is.data.frame(stored))nrow(stored)else 0L,live_rounds=nrow(live),season_known=ctx$season!="unknown",scoring_known=ctx$scoring_version!="unknown"),reason=if(!known)"Season or scoring context is unknown; this history is kept separate from known contexts." else if(!complete)"Historical coverage is partial." else "")
   },context=ctx)
+}
+
+# Pure assembly allows summary points to render before either stored history read.
+assemble_player_card_history <- function(summary,lineup,stored,prices,context) {
+  api_season<-league_season_context(context$championship_id,summary$championship$season %||% summary$championship$seasonId)
+  api_scoring<-normalize_league_rules(list(),lineup,context$championship_id)$scoring_version
+  live<-if(!is.null(summary))normalize_player_match_observations(summary,context$player_id,context$championship_id,
+    scoring_version=api_scoring,season=api_season,observed_at=attr(summary,"observed_at") %||% Sys.time())else data.frame()
+  points<-reconcile_player_points(stored,live,context)
+  valuation<-normalize_card_valuation(prices,summary)
+  list(summary=summary,points=points,previous_points=reconcile_player_points(stored,data.frame(),context),
+    valuation=valuation,context=context,status=if(!nrow(points)&&!nrow(valuation))"empty"else "partial",
+    freshness=if(identical(attr(summary,"fetch_status"),"stale"))"stale"else "fresh")
+}
+
+# The round is a display label, never enough evidence to join two competitions.
+# Exact source match/round IDs can link records; numeric-round fallback requires
+# explicit matching competition AND season supplied by the source responses.
+build_player_recent_rounds <- function(points,matches,context,limit=5L) {
+  if(!is.data.frame(points)||!all(c("round_number","points")%in%names(points)))points<-data.frame()
+  if(!is.data.frame(matches)||!"round"%in%names(matches))matches<-data.frame()
+  known<-function(x)length(x)==1L&&!is.na(x)&&nzchar(as.character(x))&&!identical(as.character(x),"unknown")
+  field<-function(row,name)if(name%in%names(row))fm_scalar(row[[name]],"")else ""
+  if(nrow(points)){
+    points<-points[is.finite(suppressWarnings(as.numeric(points$round_number))),,drop=FALSE]
+    points<-head(points[order(as.numeric(points$round_number),decreasing=TRUE),,drop=FALSE],limit)
+  }
+  if(nrow(matches))matches<-unique(matches)
+  match_ids<-if("match_id"%in%names(matches))as.character(matches$match_id)else rep("",nrow(matches))
+  ambiguous_ids<-unique(match_ids[nzchar(match_ids)&!is.na(match_ids)&(duplicated(match_ids)|duplicated(match_ids,fromLast=TRUE))])
+  column<-function(name,default="")if(name%in%names(matches))as.character(matches[[name]])else rep(default,nrow(matches))
+  seasons<-column("season","unknown");competitions<-column("competition_id");round_ids<-column("round_id")
+  numeric_rounds<-suppressWarnings(as.numeric(matches$round))
+  expected_season<-context$season %||% "unknown";expected_competition<-context$competition_id %||% ""
+  valid<-function(x)!is.na(x)&nzchar(x)&x!="unknown"
+  compatible<-rep(TRUE,nrow(matches))
+  if(known(expected_season))compatible<-compatible&(!valid(seasons)|seasons==expected_season)
+  if(known(expected_competition))compatible<-compatible&(!valid(competitions)|competitions==expected_competition)
+  compatible<-compatible&!match_ids%in%ambiguous_ids
+  scoped<-if(known(expected_season)&&known(expected_competition))valid(seasons)&seasons==expected_season&valid(competitions)&competitions==expected_competition else rep(FALSE,nrow(matches))
+  used<-rep(FALSE,nrow(matches));groups<-list()
+  for(i in seq_len(nrow(points))){
+    point<-points[i,,drop=FALSE]
+    round<-as.numeric(point$round_number)
+    exact_match<-if(known(field(point,"match_id")))match_ids==field(point,"match_id")else rep(FALSE,nrow(matches))
+    exact_round<-if(known(field(point,"round_id")))round_ids==field(point,"round_id")else rep(FALSE,nrow(matches))
+    round_agrees<-!is.finite(numeric_rounds)|numeric_rounds==round
+    indices<-which(compatible&round_agrees&(exact_match|exact_round|(scoped&numeric_rounds==round)))
+    # Conflicting duplicate point observations must not attach a fixture twice.
+    indices<-indices[!used[indices]];used[indices]<-TRUE
+    groups[[length(groups)+1L]]<-list(round_number=as.numeric(point$round_number),points=as.numeric(point$points),
+      score_status=field(point,"score_status"),fixtures=matches[indices,,drop=FALSE])
+  }
+  unassociated<-matches[!used,,drop=FALSE]
+  if(nrow(unassociated))unassociated<-head(unassociated[order(unassociated$round,decreasing=TRUE,na.last=TRUE),,drop=FALSE],limit)
+  list(rounds=groups,unassociated=unassociated)
 }

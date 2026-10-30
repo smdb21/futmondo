@@ -324,7 +324,7 @@ today_is_clause_open <- function(player_row, now = Sys.time()) {
 }
 
 # Session-local aliases capture immutable read arguments and share async state.
-factual_read_adapter<-function(session,handler,login_token,championship_id=NULL,user_team_id=NULL,is_active=function()TRUE,refresh_trigger=NULL){
+factual_read_adapter<-function(session,handler,login_token,championship_id=NULL,user_team_id=NULL,is_active=function()TRUE,refresh_trigger=NULL,state_only=FALSE){
  force(handler)
  if(is.null(session$userData$factual_read_registry))session$userData$factual_read_registry<-new.env(parent=emptyenv())
  registry<-session$userData$factual_read_registry
@@ -346,12 +346,13 @@ factual_read_adapter<-function(session,handler,login_token,championship_id=NULL,
    keys<-ls(registry)
    if(length(keys)>=128L){times<-vapply(keys,function(k)attr(registry[[k]],"last_access") %||% 0,numeric(1));victim<-keys[which.min(times)];dispose<-attr(registry[[victim]],"dispose");if(is.function(dispose))dispose();rm(list=victim,envir=registry)}
    captured_args<-args;captured_context<-ctx;captured_owner<-owner_context();demand_refresh<-shiny::reactiveVal(0L)
-   registry[[entry_key]]<-shared_resource(session,resource,context=function()captured_context,fetch=function(context)async_adapter_fetch(handler,captured_args,context=context),active=function()isTRUE(is_active())&&identical(owner_context(),captured_owner),refresh=function()paste(if(is.function(refresh_trigger))refresh_trigger()else 0L,demand_refresh(),sep=":"))
+   registry[[entry_key]]<-shared_resource(session,resource,context=function()captured_context,fetch=function(context)async_adapter_fetch(handler,captured_args,context=context,is_current=function()shiny::isolate(isTRUE(is_active())&&identical(owner_context(),captured_owner))),active=function()isTRUE(is_active())&&identical(owner_context(),captured_owner),refresh=function()paste(if(is.function(refresh_trigger))refresh_trigger()else 0L,demand_refresh(),sep=":"))
    attr(registry[[entry_key]],"demand_refresh")<-demand_refresh
   })
   entry<-registry[[entry_key]];attr(entry,"last_access")<-as.numeric(Sys.time());registry[[entry_key]]<-entry;state<-entry()
   stamp<-state$fetched_at;age<-if(length(stamp)==1L&&!is.na(stamp))as.numeric(difftime(Sys.time(),stamp,units="secs"))else 0
-  if(!is.null(state$data)&&is.finite(age)&&age>resource_policy(handler)$ttl){bump<-attr(entry,"demand_refresh");if(is.function(bump))shiny::isolate(bump(bump()+1L));shiny::validate(shiny::need(FALSE,"Refreshing data…"))}
+  if(!is.null(state$data)&&is.finite(age)&&age>resource_policy(handler)$ttl){bump<-attr(entry,"demand_refresh");if(is.function(bump))shiny::isolate(bump(bump()+1L));if(isTRUE(state_only))return(resource_state(status="loading"));shiny::validate(shiny::need(FALSE,"Refreshing data…"))}
+  if(isTRUE(state_only))return(state)
   if(is.null(state$data))shiny::validate(shiny::need(FALSE,if(identical(state$status,"loading"))"Loading data…"else resource_failure_message(state$error)))
   result<-state$data;if(identical(state$freshness,"stale"))attr(result,"fetch_status")<-"stale";result
  }

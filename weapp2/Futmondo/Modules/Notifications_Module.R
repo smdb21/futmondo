@@ -27,15 +27,15 @@ notifications_UI <- function(id) {
 }
 
 notifications_Server <- function(id, is_module_active, login_token, championship_id,
-                                  user_team_id, user_teams_RV, refresh_trigger = NULL, on_market_event=NULL) {
+                                  user_team_id, user_teams_RV, refresh_trigger = NULL, on_market_event=NULL, startup_ready=function()TRUE) {
   shiny::moduleServer(id, function(input, output, session) {
     bind_factual_reads(c("get_notifications","get_championship_players","get_active_championships"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=function()paste(if(is.function(refresh_trigger))refresh_trigger()else 0L,tick(),sep=":"))
 
     bind_factual_reads("get_notification_unread",session,login_token,
-      is_active=function()valid_login(login_token()),refresh_trigger=function()paste(if(is.function(refresh_trigger))refresh_trigger()else 0L,tick(),sep=":"))
+      is_active=function()valid_login(login_token())&&isTRUE(startup_ready()),refresh_trigger=function()paste(if(is.function(refresh_trigger))refresh_trigger()else 0L,tick(),sep=":"))
     tick <- shiny::reactiveVal(0L)
     count <- shiny::reactive({
-      if (!valid_login(login_token())) return(NA_integer_)
+      if (!valid_login(login_token())||!isTRUE(startup_ready())) return(NA_integer_)
       tick(); if (is.function(refresh_trigger)) refresh_trigger()
       shiny::invalidateLater(60000, session)
       get_notification_unread(login_token())

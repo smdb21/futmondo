@@ -1,4 +1,5 @@
 library(reactable)
+if(!exists("assemble_player_card_history",mode="function"))source("history_repository.R")
 
 # Transparent 1x1 GIF to prevent broken-image alt-text rendering on pre-load
 SPACER_GIF <- "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
@@ -78,6 +79,19 @@ player_card_location_label <- function(player, current_team_id = NULL) {
 selected_player_UI <- function(id) {
   ns <- NS(id)
   tagList(
+    # Delay widget construction until actual identity content has painted. The
+    # event fires before the value applies, so two animation frames follow it.
+    tags$script(HTML(paste0(
+      "(function(){var sent=false,id='",ns("player_identity_summary"),"';",
+      "function painted(){if(sent)return;var root=document.getElementById(id);",
+      "var identity=root&&root.querySelector('.player-card-identity');if(!identity)return;",
+      "sent=true;var player=identity.getAttribute('data-player-id'),generation=identity.getAttribute('data-paint-generation');",
+      "requestAnimationFrame(function(){requestAnimationFrame(function(){",
+      "Shiny.setInputValue('",ns("identity_painted"),"',{player:player,generation:generation,nonce:Math.random()},{priority:'event'});});});}",
+      "$(document).off('shiny:value.fmCardPaint",gsub("[^a-zA-Z0-9]","",ns("")),"')",
+      ".on('shiny:value.fmCardPaint",gsub("[^a-zA-Z0-9]","",ns("")),"',function(event){if(event.name===id)setTimeout(painted,0);});",
+      "setTimeout(painted,0);})();"
+    ))),
     # The modal footer is below a long card. Keep a large, keyboard-accessible
     # dismissal control at the top of the scrollable player-card content.
     div(
@@ -121,7 +135,7 @@ selected_player_UI <- function(id) {
                      selected = "valuation", inline = TRUE),
                    actionButton(ns("refresh_history"), "Refresh history", icon=icon("rotate"))
                  ),
-                 plotly::plotlyOutput(ns("player_trend_plot"), height = "280px")
+                 uiOutput(ns("player_chart_container"))
           )
         ),
         # Real-competition profile, price history, and completed match metadata.
@@ -161,9 +175,6 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
   player_source <- function() selected_player()
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-    bind_factual_reads(c("get_player_full_profile","get_player_matches"),session,
-      function()get_reactive_val(login_token),function()get_reactive_val(championship_id),function()get_reactive_val(user_team_id),
-      is_active=function()!is.null(selected_player()) && valid_login(get_reactive_val(login_token)),refresh_trigger=refresh_trigger)
 
     raw_selected_player <- player_source
     selected_player <- reactive({
@@ -321,8 +332,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           class = "player-card-identity-team-logo", alt = paste0(team, " logo"),
           onerror = "this.style.display=\"none\";")
       } else NULL
+      resource_timing("card_identity",isolate(card_started()))
       location <- player_card_location_label(sp, get_reactive_val(user_team_id))
-      div(class = "player-card-identity",
+      div(class = "player-card-identity", `data-player-id`=as.character(sp$id),`data-paint-generation`=as.character(card_paint_generation()),
         img(src = photo, class = "player-card-identity-photo", alt = player_name,
           onerror = paste0("this.src='", SPACER_GIF, "';")),
         div(class = "player-card-identity-details",
@@ -338,7 +350,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     # ---- Main observer: populate box + action buttons ----
     observeEvent(
       {
-        list(selected_player(),card_history())
+        list(selected_player(),card_history(),card_states$capacity(),card_states$listings())
       },
       {
         sp <- selected_player()
@@ -444,9 +456,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           } else if ("market_inMarket" %in% colnames(sp) && isTRUE(as.logical(sp$market_inMarket))) {
             is_listed_on_market <- TRUE
           } else if (!is.null(login) && !is.null(champ_id) && !is.null(team_id)) {
-            my_mkt_players <- tryCatch({
-              get_my_market_players(login = login, championship_id = champ_id, user_team_id = team_id)
-            }, error = function(e) NULL)
+            my_mkt_players <- card_states$listings()$data
             if (!is.null(my_mkt_players) && nrow(my_mkt_players) > 0 && "id" %in% colnames(my_mkt_players)) {
               if (as.character(sp$id) %in% as.character(my_mkt_players$id)) {
                 is_listed_on_market <- TRUE
@@ -601,8 +611,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           is_clause_open <- (clause_price_val > 0) && !is_clause_transferred && !is_clause_date_locked
 
           # Option 1: "Make Market Offer" button when player is listed on market
-          bid_gate <- run_acquisition_preflight(sp,"bid")
-          clause_gate <- run_acquisition_preflight(sp,"clause")
+          bid_gate <- passive_acquisition_gate(sp,"bid")
+          clause_gate <- passive_acquisition_gate(sp,"clause")
           blocked_reason <- if(!isTRUE(bid_gate$ok)) bid_gate$message else if(!isTRUE(clause_gate$ok)) clause_gate$message else NULL
           if(!is.null(blocked_reason)) action_buttons <- tagList(action_buttons,
             div(class="acquisition-capacity-warning",icon("triangle-exclamation")," ",blocked_reason))
@@ -656,6 +666,21 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           }
         }
 
+        readiness<-if(is_own_player)card_states$listings() else card_states$capacity()
+        if(!is_own_player && identical(card_states$summary()$status,"loading"))readiness<-resource_state(status="loading")
+        if(!is_own_player && identical(card_states$summary()$status,"unavailable"))readiness<-card_states$summary()
+        if(identical(readiness$status,"loading")) {
+          disable<-function(tag){
+            if(inherits(tag,"shiny.tag")){
+              if(identical(tag$name,"button"))tag$attribs$disabled<-"disabled"
+              tag$children<-lapply(tag$children,disable)
+            } else if(is.list(tag))tag<-lapply(tag,disable)
+            tag
+          }
+          action_buttons<-tagList(div(role="status",icon("spinner",class="fa-spin")," Checking availability…"),disable(action_buttons))
+        } else if(is.null(readiness$data)) {
+          action_buttons<-tagList(div(class="acquisition-capacity-warning",resource_failure_message(readiness$error)))
+        }
         output$action_buttons <- renderUI(action_buttons)
       }
     )
@@ -1624,27 +1649,97 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       }
     })
 
-    history_refresh <- reactive(paste(if (is.function(refresh_trigger)) refresh_trigger() else 0L,
-      input$refresh_history %||% 0L, sep=":"))
-    card_resource <- shared_resource(session,"player_card",
-      context=function() {
-        sp <- selected_player(); req(sp,sp$id)
-        auth <- get_reactive_val(login_token);champ <- get_reactive_val(championship_id)
-        req(valid_login(auth),champ)
-        resource_context(auth,champ,get_reactive_val(user_team_id),sp$id,session_id=session$token)
-      },
-      fetch=function(ctx) async_adapter_fetch("get_player_card_history",list(
-        login=get_reactive_val(login_token),championship_id=ctx$championship_id,
-        user_team_id=ctx$user_team_id,player_id=ctx$player_id,refresh=TRUE),context=ctx),
-      refresh=history_refresh)
+    history_refresh <- reactive(paste(if(is.function(refresh_trigger))refresh_trigger()else 0L,input$refresh_history %||% 0L,sep=":"))
+    observeEvent(input$refresh_history,{
+      sp<-selected_player();auth<-get_reactive_val(login_token)
+      req(sp,valid_login(auth))
+      base<-resource_context(auth,get_reactive_val(championship_id),get_reactive_val(user_team_id),sp$id)
+      invalidate_resources(base,pattern="^player_summary_|^player_card_history$")
+      invalidate_resources(resource_context(auth,base$championship_id,base$user_team_id),pattern="^lineup_")
+      invalidate_resources(resource_context(auth,player_id=sp$id),pattern="^player_matches_")
+    },ignoreInit=TRUE,priority=120)
+    card_context <- reactive({
+      sp<-selected_player();if(is.null(sp)||!valid_login(get_reactive_val(login_token)))return(NULL)
+      resource_context(get_reactive_val(login_token),get_reactive_val(championship_id),get_reactive_val(user_team_id),sp$id,session_id=session$token)
+    })
+    history_context <- reactive({
+      ctx<-card_context();if(is.null(ctx))return(NULL)
+      summary<-card_states$summary()$data;lineup<-card_states$lineup()$data
+      ctx$season<-league_season_context(ctx$championship_id,summary$championship$season %||% summary$championship$seasonId)
+      ctx$scoring_version<-normalize_league_rules(list(),lineup,ctx$championship_id)$scoring_version
+      ctx$competition_id<-fm_scalar(summary$championship$competitionId %||% summary$championship$competition$id,"")
+      ctx
+    })
+    card_read <- function(resource,handler,args,context=card_context,active=function()TRUE,refresh=history_refresh) {
+      shared_resource(session,resource,context=context,
+        active=function()!is.null(card_context())&&isTRUE(active()),refresh=refresh,
+        fetch=function(ctx) {
+          captured<-args(ctx)
+          async_adapter_fetch(handler,captured,context=ctx,is_current=function()shiny::isolate({
+            current<-context();!is.null(current)&&identical(current,ctx)&&isTRUE(active())
+          }))
+        })
+    }
+    auth_args<-function(ctx)list(login=get_reactive_val(login_token),championship_id=ctx$championship_id,user_team_id=ctx$user_team_id)
+    player_args<-function(ctx)c(auth_args(ctx),list(player_id=ctx$player_id))
+    global_refresh<-function()if(is.function(refresh_trigger))refresh_trigger()else 0L
+    card_states<-list()
+    card_states$summary<-card_read("card_summary","get_player_summary",player_args)
+    card_states$lineup<-card_read("card_lineup","get_lineup_from_team",auth_args)
+    card_states$profile<-card_read("card_profile","get_player_full_profile",function(ctx)list(login=get_reactive_val(login_token),player_id=ctx$player_id),refresh=global_refresh)
+    card_states$matches<-card_read("card_matches","get_player_matches",function(ctx)list(login=get_reactive_val(login_token),player_id=ctx$player_id))
+    context_ready<-function()!identical(card_states$summary()$status,"loading")&&!identical(card_states$lineup()$status,"loading")
+    card_states$points<-card_read("card_points","read_card_round_history",function(ctx)list(context=ctx),context=history_context,active=context_ready)
+    card_states$valuation<-card_read("card_valuation","read_card_price_history",function(ctx)list(context=ctx))
+    card_states$capacity<-card_read("card_capacity","get_acquisition_capacity",function(ctx)c(auth_args(ctx),list(target_player_id=ctx$player_id)),
+      active=function()!player_card_is_own_player(selected_player(),get_reactive_val(user_team_id)),refresh=global_refresh)
+    card_states$listings<-card_read("card_listings","get_my_market_players",auth_args,
+      active=function()player_card_is_own_player(selected_player(),get_reactive_val(user_team_id)),refresh=global_refresh)
+    passive_acquisition_gate<-function(sp,mode){
+      state<-card_states$capacity()
+      if(identical(state$status,"loading"))return(list(ok=FALSE,reason="loading",message="Checking availability…"))
+      evaluate_acquisition_preflight(state$data,mode=mode,minimum_bid=if(mode=="bid")market_bid_minimum(sp)else NULL)
+    }
+    card_started<-reactiveVal(Sys.time());timed_summary<-FALSE;timed_history<-FALSE
+    card_chart_ready<-reactiveVal(FALSE)
+    card_paint_generation<-reactiveVal(0L)
+    observeEvent(card_context(),{
+      card_started(Sys.time());timed_summary<<-FALSE;timed_history<<-FALSE;card_chart_ready(FALSE);card_paint_generation(isolate(card_paint_generation())+1L)
+
+    },ignoreNULL=FALSE,priority=100)
+    observe({
+      req(!is.null(card_context()))
+      if(!timed_summary&&!identical(card_states$summary()$status,"loading")){timed_summary<<-TRUE;resource_timing("card_summary",isolate(card_started()))}
+      states<-lapply(card_states[c("summary","lineup","points","valuation")],function(read)read())
+      if(!timed_history&&all(vapply(states,function(state)!identical(state$status,"loading"),logical(1)))){timed_history<<-TRUE;resource_timing("card_history",isolate(card_started()))}
+    })
     card_history <- reactive({
-      state <- card_resource();result <- state$data
-      if (!is.list(result)) result <- list(valuation=data.frame(),points=data.frame(),status=state$status,freshness=state$freshness,source=state$source)
-      if (identical(state$status,"loading")) result$status <- "loading"
-      if (identical(state$freshness,"stale")) result$freshness <- "stale"
+      ctx<-history_context()
+      if(is.null(ctx))return(list(summary=NULL,points=data.frame(),valuation=data.frame(),status="loading"))
+      result<-assemble_player_card_history(card_states$summary()$data,card_states$lineup()$data,
+        card_states$points()$data,card_states$valuation()$data,ctx)
+      states<-lapply(card_states[c("summary","lineup","points","valuation")],function(read)read())
+      if(any(vapply(states,function(state)identical(state$status,"loading"),logical(1))))result$status<-"loading"
       result
     })
+    observe({
+      history<-card_history()
+      if(isTRUE(context_ready())&&!identical(card_states$points()$status,"loading")&&is.list(history$context)&&exists("record_acquired_resource",mode="function")){
+        tryCatch(record_acquired_resource("player_card_history",history,history$context),error=function(e)NULL)
+      }
+    })
+    observeEvent(input$identity_painted,{
+      sp<-selected_player()
+      if(!is.null(sp)&&identical(fm_scalar(input$identity_painted$player,""),as.character(sp$id))&&
+         identical(fm_scalar(input$identity_painted$generation,""),as.character(card_paint_generation())))card_chart_ready(TRUE)
+    })
+    output$player_chart_container <- renderUI({
+      req(selected_player())
+      if(!isTRUE(card_chart_ready()))return(div(class="player-card-loading",role="status","Loading chart…"))
+      plotly::plotlyOutput(ns("player_trend_plot"),height="280px")
+    })
     output$player_trend_plot <- plotly::renderPlotly({
+      req(card_chart_ready())
       sp <- selected_player(); req(sp); history <- card_history()
       metric <- if (identical(input$player_chart_metric,"points")) "points" else "valuation"
       empty_chart <- function(message) plotly::plot_ly() %>% fm_plot_layout(
@@ -1684,66 +1779,50 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           xaxis=list(title="Date"),yaxis=list(title="Value (EUR)",autorange=FALSE,
             range=player_trend_axis_range(values$value)),showlegend=FALSE)
     })
+    render_match <- function(match) {
+      score<-if(is.finite(match$home_score)&&is.finite(match$away_score))paste0(format(match$home_score,trim=TRUE),"–",format(match$away_score,trim=TRUE))else "Score unavailable"
+      date<-if(nzchar(match$occurred_at))sub("T.*","",match$occurred_at)else "Date unavailable"
+      div(class="player-round-fixture",strong(paste(match$home,score,match$away)),span(class="player-match-date",date))
+    }
     output$recent_round_points <- renderUI({
-      sp <- selected_player(); req(sp);history <- card_history(); points <- history$points
-      if (!is.data.frame(points) || !all(c("round_number","points") %in% names(points))) points <- data.frame()
-      if (nrow(points)) {
-        points <- points[is.finite(suppressWarnings(as.numeric(points$round_number))) & is.finite(suppressWarnings(as.numeric(points$points))),,drop=FALSE]
-        points <- head(points[order(points$round_number,decreasing=TRUE),,drop=FALSE],5L)
-      }
-      div(class="player-recent-rounds",h4(icon("futbol")," Latest round points"),
-        if (!nrow(points)) span(class="player-recent-rounds-empty",recent_round_points_empty_text(sp$points)) else
-          div(class="player-recent-rounds-list",lapply(seq_len(nrow(points)),function(i)
-            div(class="player-recent-round-chip",span(class="player-recent-round-label",paste("Round",points$round_number[i])),strong(paste0(points$points[i]," pts")),
-              if ("score_status" %in% names(points) && !is.na(points$score_status[i]) && points$score_status[i]!="final")span(class="player-round-status",as.character(points$score_status[i]))))),
-        if (!is.null(history$status) && history$status %in% c("loading","partial","unavailable","error"))span(class="player-history-status",paste("History",history$status)),
-        if (identical(history$freshness,"stale")) span(class="player-history-status","Showing saved history; refresh failed."))
+      sp<-selected_player();req(sp);history<-card_history();match_state<-card_states$matches()
+      matches<-normalize_player_matches(match_state$data)
+      rounds<-build_player_recent_rounds(history$points,matches,history$context %||% list())
+      div(class="player-recent-rounds",h4(icon("futbol")," Recent rounds"),
+        div(class="player-round-boxes",lapply(rounds$rounds,function(round){
+          div(class="player-match-card player-round-box",
+            div(class="player-round-heading",span(paste("Round",round$round_number)),
+              strong(if(is.finite(round$points))paste0(round$points," pts")else "Points unavailable")),
+            if(nrow(round$fixtures))lapply(seq_len(nrow(round$fixtures)),function(i)render_match(round$fixtures[i,,drop=FALSE]))else
+              span(class="player-match-date",if(identical(match_state$status,"loading"))"Loading match details…"else "Match association unavailable"))
+        })),
+        if(!length(rounds$rounds))span(class="player-recent-rounds-empty",if(identical(history$status,"loading"))"Loading round points…"else recent_round_points_empty_text(sp$points)),
+        if(is.null(card_states$summary()$data)&&!identical(card_states$summary()$status,"loading"))span(class="player-history-status",resource_failure_message(card_states$summary()$error)),
+        if(nrow(rounds$unassociated))tagList(
+          p(class="player-history-status","Match records · points association unavailable"),
+          div(class="player-round-boxes",lapply(seq_len(nrow(rounds$unassociated)),function(i){
+            match<-rounds$unassociated[i,,drop=FALSE]
+            div(class="player-match-card player-round-box",span(class="player-match-round",paste("Round",match$round)),render_match(match))
+          }))),
+        if(is.null(match_state$data)&&!identical(match_state$status,"loading"))span(class="player-history-status",resource_failure_message(match_state$error)),
+        if(length(rounds$rounds))tags$details(class="player-points-explanation",
+          tags$summary("About these points"),p("Points are reported by Futmondo. Final confirmation is not provided for some rounds.")),
+        if(identical(history$freshness,"stale"))span(class="player-history-status","Showing saved history; refresh failed."))
     })
-
-    ## render profile and match context from captured player endpoints ----
     output$player_external_details <- renderUI({
-      sp <- selected_player(); req(sp)
-      login <- get_reactive_val(login_token)
-      if (!valid_login(login) || is.null(sp$id) || !nzchar(as.character(sp$id))) {
-        return(div(class="player-external-details", h4(icon("address-card"), " Player profile & matches"),
-          span(class="player-external-unavailable", "Player profile is unavailable until a valid session is available.")))
-      }
-      profile_answer <- tryCatch(get_player_full_profile(login, sp$id), error=function(e) NULL)
-      matches_answer <- tryCatch(get_player_matches(login, sp$id), error=function(e) NULL)
-      profile_data <- normalize_player_full_profile(profile_answer)
-      matches <- normalize_player_matches(matches_answer)
-      profile <- profile_data$profile
-      profile_bits <- c()
-      if (nzchar(profile$nationality)) profile_bits <- c(profile_bits, profile$nationality)
-      if (is.finite(profile$height_cm)) profile_bits <- c(profile_bits, paste0(format(profile$height_cm, trim=TRUE), " cm"))
-      if (is.finite(profile$weight_kg)) profile_bits <- c(profile_bits, paste0(format(profile$weight_kg, trim=TRUE), " kg"))
-      if (nzchar(profile$preferred_foot)) profile_bits <- c(profile_bits, profile$preferred_foot)
-      prices <- profile_data$price_history
-      latest_price <- if (nrow(prices)) prices[nrow(prices),,drop=FALSE] else NULL
-      price_text <- if (!is.null(latest_price) && is.finite(latest_price$social[1])) {
-        paste0("Profile valuation: ", player_card_money(latest_price$social[1]), " · ", nrow(prices), " saved values")
-      } else "Profile valuation history is unavailable."
-      div(class="player-external-details",
-        h4(icon("address-card"), " Player profile & matches"),
-        if (is.null(profile_answer)) div(class="player-external-unavailable", "Player profile is unavailable. Please refresh to retry.") else
-          div(class="player-profile-summary",
-            if (length(profile_bits)) span(paste(profile_bits, collapse=" · ")) else span("Profile details are unavailable."),
-            span(class="player-profile-price", price_text)
-          ),
-        h5("Recent matches"),
-        if (is.null(matches_answer)) div(class="player-external-unavailable", "Match history is unavailable. Please refresh to retry.") else if (!nrow(matches))
-          div(class="player-external-unavailable", "No completed matches are available.") else
-          div(class="player-match-list", lapply(seq_len(min(5L,nrow(matches))), function(i) {
-            match <- matches[i,,drop=FALSE]
-            score <- if (is.finite(match$home_score) && is.finite(match$away_score)) paste0(format(match$home_score,trim=TRUE), "–", format(match$away_score,trim=TRUE)) else "Score unavailable"
-            date <- if (nzchar(match$occurred_at)) sub("T.*", "", match$occurred_at) else "Date unavailable"
-            div(class="player-match-card",
-              span(class="player-match-round", paste("Round", format(match$round,trim=TRUE))),
-              strong(paste(match$home, score, match$away)),
-              span(class="player-match-date", date)
-            )
-          }))
-      )
+      req(selected_player());state<-card_states$profile();answer<-state$data
+      if(is.null(answer))return(div(class="player-external-details",h4(icon("address-card")," Player profile"),
+        span(if(identical(state$status,"loading"))"Loading profile…"else resource_failure_message(state$error))))
+      data<-normalize_player_full_profile(answer);profile<-data$profile;bits<-character()
+      if(nzchar(profile$nationality))bits<-c(bits,profile$nationality)
+      if(is.finite(profile$height_cm)&&profile$height_cm>0)bits<-c(bits,paste0(format(profile$height_cm,trim=TRUE)," cm"))
+      if(is.finite(profile$weight_kg)&&profile$weight_kg>0)bits<-c(bits,paste0(format(profile$weight_kg,trim=TRUE)," kg"))
+      if(nzchar(profile$preferred_foot))bits<-c(bits,profile$preferred_foot)
+      prices<-data$price_history;latest<-if(nrow(prices))tail(prices,1L)else NULL
+      div(class="player-external-details",h4(icon("address-card")," Player profile"),
+        div(class="player-profile-summary",if(length(bits))span(paste(bits,collapse=" · ")),
+          span(class="player-profile-price",if(!is.null(latest)&&is.finite(latest$social[1]))
+            paste0("Profile valuation: ",player_card_money(latest$social[1])," · ",nrow(prices)," saved values")else "Profile valuation history is unavailable.")))
     })
 
     ## render player_points_description_box ----

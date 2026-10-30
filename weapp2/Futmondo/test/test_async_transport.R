@@ -26,7 +26,7 @@ check('real card keeps zero negative undated scores when database fails',{
  saved_record<-record_acquired_resource;record_acquired_resource<-function(...)invisible(TRUE)
  args<-list(login=auth,championship_id='league',user_team_id='team',player_id='p')
  card<-await(async_adapter_fetch('get_player_card_history',args,ctx))
- stopifnot(identical(card$points$points,c(0,-2)),all(is.na(card$points$date)),all(card$points$score_status=='provisional'),card$status=='partial',is.list(card$summary),resource_metrics()$requests-before==4)
+ stopifnot(identical(card$points$points,c(0,-2)),all(is.na(card$points$date)),all(card$points$score_status=='unknown'),card$status=='partial',is.list(card$summary),resource_metrics()$requests-before==4)
  warm<-resource_metrics()$requests;again<-await(async_adapter_fetch('get_player_card_history',args,ctx))
  stopifnot(identical(again$points$points,c(0,-2)),resource_metrics()$requests==warm)
  args$refresh<-TRUE;refreshed<-await(async_adapter_fetch('get_player_card_history',args,ctx))

@@ -3,6 +3,35 @@
 function(input, output, session) {
   login_token_RV <- login_Server(id = "login")
   refresh_trigger <- reactiveVal(0)
+  startup_stage <- session$userData$startup_stage
+  startup_started <- reactiveVal(Sys.time())
+  startup_slow <- reactiveVal(FALSE)
+  startup_generation <- 0L
+  startup_closed <- FALSE
+  startup_timer <- NULL
+  session$onSessionEnded(function(){
+    startup_closed <<- TRUE
+    startup_generation <<- startup_generation+1L
+    if(is.function(startup_timer))startup_timer()
+  })
+  startup_primary_ready <- reactive({
+    if(!valid_login(login_token_RV()))return(FALSE)
+    if(is.null(input$tabs)||identical(input$tabs,"login"))return(FALSE)
+    if(!identical(input$tabs,"today"))return(TRUE)
+    tryCatch(isTRUE(today$primary_settled()),error=function(e)FALSE)
+  })
+  observeEvent(list(login_token_RV(),refresh_trigger(),input$selected_league),{
+    startup_generation <<- startup_generation+1L
+    generation<-startup_generation;startup_started(Sys.time());startup_slow(FALSE)
+    if(is.function(startup_timer))startup_timer()
+    startup_timer <<- later::later(function(){
+      if(!startup_closed&&identical(startup_generation,generation))startup_slow(TRUE)
+    },5)
+  },ignoreNULL=FALSE)
+  championship_retry<-reactiveVal(0L)
+  championship_state_read <- factual_read_adapter(session,"get_active_championships",login_token_RV,
+    is_active=function()valid_login(login_token_RV()),refresh_trigger=function()paste(refresh_trigger(),championship_retry(),sep=":"),state_only=TRUE)
+  championship_state <- reactive({req(valid_login(login_token_RV()));championship_state_read(login_token_RV())})
   bind_factual_reads("get_active_championships",session,login_token_RV,is_active=function()valid_login(login_token_RV()))
   observeEvent(input$refresh_all, {
     req(valid_login(login_token_RV()))
@@ -12,7 +41,9 @@ function(input, output, session) {
   championships_RV <- reactive({
     req(valid_login(login_token_RV()))
     refresh_trigger()
-    get_active_championships(login_token_RV())$championships
+    state<-championship_state()
+    if(is.null(state$data))shiny::validate(shiny::need(FALSE,if(identical(state$status,"loading"))"Loading leagues…"else resource_failure_message(state$error)))
+    state$data$championships
   })
   observe({
     ch <- championships_RV()
@@ -36,19 +67,19 @@ function(input, output, session) {
   user_team_id_RV <- reactive({ req(championship_RV()); unname(championship_RV()["userteam.id"]) })
   user_team_name_RV <- reactive({ req(championship_RV()); unname(championship_RV()["userteam.name"]) })
   bind_factual_reads(c("get_teams","get_financial_snapshot","get_finished_rounds"),session,
-    login_token_RV,championship_id_RV,user_team_id_RV,is_active=function()valid_login(login_token_RV()),refresh_trigger=refresh_trigger)
+    login_token_RV,championship_id_RV,user_team_id_RV,is_active=function()valid_login(login_token_RV())&&isTRUE(startup_primary_ready()),refresh_trigger=refresh_trigger)
   # Keep the clock smooth without rebuilding the expensive acquisition and
   # pressroom-backed financial snapshot every second. Explicit refreshes and
   # market events still invalidate this reactive immediately.
   round_finance_RV <- reactive({
-    req(valid_login(login_token_RV()), championship_id_RV(), user_team_id_RV())
+    req(valid_login(login_token_RV()), startup_primary_ready(), championship_id_RV(), user_team_id_RV())
     refresh_trigger()
     invalidateLater(60000, session)
     tryCatch(get_financial_snapshot(login_token_RV(), championship_id_RV(), user_team_id_RV()),
       error = function(e) NULL)
   })
   round_catalog_RV <- reactive({
-    req(valid_login(login_token_RV()), championship_id_RV())
+    req(valid_login(login_token_RV()), startup_primary_ready(), championship_id_RV())
     refresh_trigger()
     invalidateLater(60000, session)
     tryCatch(get_finished_rounds(login_token_RV(), championship_id_RV()), error=function(e) data.frame())
@@ -113,7 +144,7 @@ function(input, output, session) {
   is_admin_RV <- reactive(is_authorized_admin(login_token_RV()))
   notifications <- notifications_Server("notifications", reactive(input$tabs == "notifications"),
     login_token_RV, championship_id_RV, user_team_id_RV, user_teams_RV, refresh_trigger,
-    on_market_event=function(...)refresh_trigger(isolate(refresh_trigger())+1L))
+    on_market_event=function(...)refresh_trigger(isolate(refresh_trigger())+1L),startup_ready=startup_primary_ready)
   output$notification_bell <- renderUI({
     n <- notifications$unread()
     actionLink("open_notifications", label = paste0("Notifications", if (is.finite(n)) paste0(" (",n,")") else ""), icon = icon("bell"))
@@ -129,7 +160,7 @@ selected_player_RV <- players_in_teams_Server(id = "players_in_teams",
                                                  user_teams_RV = user_teams_RV,
                                                  refresh_trigger = refresh_trigger)
 
-  today_Server(id = "today",
+  today <- today_Server(id = "today",
                is_module_active = reactive({
                  input$tabs == "today"
                }),
@@ -198,6 +229,36 @@ players_in_championship_Server(id = "players_in_championship",
                championship_id = championship_id_RV,
                user_team_id = user_team_id_RV,
                user_teams_RV = user_teams_RV, is_admin = is_admin_RV)
+  observe({
+    if(!valid_login(login_token_RV()))return()
+    state<-championship_state()
+    if(!identical(state$status,"loading")&&identical(isolate(startup_stage()),"loading_leagues"))resource_timing("leagues",isolate(startup_started()))
+    if(identical(state$status,"loading")){startup_stage("loading_leagues");return()}
+    if(is.null(state$data)){startup_stage("failed");return()}
+    if(!length(state$data$championships)){startup_stage("empty");return()}
+    if(!isTRUE(startup_primary_ready())){startup_stage("loading_today");return()}
+    stage<-if(identical(input$tabs,"today"))today$primary_status()else "ready"
+    if(!identical(isolate(startup_stage()),stage))resource_timing("today_primary",isolate(startup_started()))
+    startup_stage(stage)
+  })
+  output$startup_status <- renderUI({
+    if(!valid_login(login_token_RV()))return(NULL)
+    stage<-startup_stage()
+    if(stage %in% c("signed_out","ready","authenticating"))return(NULL)
+    loading<-stage %in% c("loading_leagues","loading_today")
+    message<-switch(stage,loading_leagues="Signed in. Loading your leagues…",loading_today="Loading Today…",
+      empty="Signed in. No active leagues were returned.",partial="Some sections could not load. Retry the affected data.",
+      failed="The first page could not load. Refresh to retry.","")
+    if(identical(stage,"failed")){state<-tryCatch(championship_state(),error=function(e)NULL);if(!is.null(state$error))message<-resource_failure_message(state$error)}
+    if(loading&&isTRUE(startup_slow()))message<-paste(message,"Still loading data from Futmondo…")
+    div(class="startup-feedback",role="status",`aria-live`="polite",
+      if(loading)icon("spinner",class="fa-spin"),span(message),
+      if(!loading&&stage %in% c("partial","failed"))actionButton("retry_startup","Retry"))
+  })
+  observeEvent(input$retry_startup,{
+    state<-championship_state()
+    if(is.null(state$data))championship_retry(isolate(championship_retry())+1L)else today$retry_failed()
+  })
   # observers ----
   ## observe user_team_id_RV()
 observeEvent(login_token_RV(),

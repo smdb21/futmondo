@@ -14,6 +14,7 @@ body <- shinydashboard::dashboardBody(
         }
       "))
   ),
+  uiOutput("startup_status"),
   uiOutput("round_countdown"),
   selectInput("selected_league", "League", choices = character()),
   uiOutput("background_sync"),

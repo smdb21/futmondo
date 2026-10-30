@@ -51,7 +51,7 @@ check('supplementary scoring modes cannot replace league summary points', {
 })
 check('player-card UI registers independent profile and match output', {
   source_text <- paste(readLines('Modules/Selected_Player_Module.R', warn=FALSE), collapse='\n')
-  stopifnot(grepl('player_external_details', source_text, fixed=TRUE), grepl('Player profile & matches', source_text, fixed=TRUE))
+  stopifnot(grepl('player_external_details', source_text, fixed=TRUE), grepl('Recent rounds', source_text, fixed=TRUE))
 })
 check('unavailable profile retains stable empty fields', {
   p<-normalize_player_full_profile(NULL);stopifnot(identical(p$profile$nationality,''),is.na(p$profile$height_cm),!nrow(p$price_history),!nrow(normalize_player_matches(NULL)))

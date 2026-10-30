@@ -63,6 +63,11 @@ login_UI <- function(id) {
 login_Server <- function(id, user = NULL, password = NULL) {
   moduleServer(id, function(input, output, session) {
     login_token_RV <- reactiveVal(NULL)
+    login_pending_RV <- reactiveVal(FALSE)
+    generation <- 0L
+    closed <- FALSE
+    if(is.null(session$userData$startup_stage))session$userData$startup_stage <- reactiveVal("signed_out")
+    session$onSessionEnded(function(){closed<<-TRUE;generation<<-generation+1L;fm_transport_cancel(session$token)})
     # Authentication feedback is intentionally independent from the token.
     # A failed first login changes NULL to NULL, which must still be visible.
     login_feedback_RV <- reactiveVal(NULL)
@@ -78,6 +83,11 @@ login_Server <- function(id, user = NULL, password = NULL) {
       )
     })
     observeEvent(input$logout_button, {
+      generation <<- generation+1L
+      login_pending_RV(FALSE)
+      fm_transport_cancel(session$token)
+      session$userData$startup_stage("signed_out")
+      session$sendCustomMessage(session$ns("login_state"),list(busy=FALSE))
       old <- isolate(login_token_RV())
       if (valid_login(old)) clear_api_cache(old[["userid"]])
       session$userData$futmondo_user_id <- NULL
@@ -86,45 +96,47 @@ login_Server <- function(id, user = NULL, password = NULL) {
       updateTextInput(session, "user_name", value = "")
       updateTextInput(session, "password", value = "")
     })
-    observeEvent(
-      {
-        input$login_button
-      },
-      {
-        tryCatch(
-          {
-            user_name <- trimws(input$user_name %||% "")
-            password <- input$password %||% ""
-            if (!nzchar(user_name) || !nzchar(password)) {
-              login_feedback_RV(list(kind = "error", message = "Enter your username and password to log in."))
-              return()
-            }
-            login_token <- NULL
-            failure_message <- NULL
-            tryCatch(
-              { login_token <- login(user_name, password) },
-              error = function(e) {
-                # Do not expose transport or server details in the UI or logs.
-                failure_message <<- "Could not authenticate with Futmondo. Check your username and password, then try again."
-                NULL
-              }
-            )
-            if (valid_login(login_token)) {
-              session$userData$futmondo_user_id <- login_token[["userid"]]
-              login_feedback_RV(list(kind = "success", message = "Connected to Futmondo."))
-            } else {
-              session$userData$futmondo_user_id <- NULL
-              login_feedback_RV(list(kind = "error", message = failure_message %||% "Could not authenticate with Futmondo. Check your username and password, then try again."))
-            }
-            login_token_RV(login_token)
-          },
-          finally = {
-            updateTextInput(session, "password", value = "")
-            session$sendCustomMessage(session$ns("login_state"), list(busy = FALSE))
-          }
-        )
+    observeEvent(input$login_button, {
+      if(isTRUE(login_pending_RV()))return()
+      user_name <- trimws(input$user_name %||% "")
+      secret <- input$password %||% ""
+      updateTextInput(session,"password",value="")
+      if(!nzchar(user_name)||!nzchar(secret)) {
+        login_feedback_RV(list(kind="error",message="Enter your username and password to log in."))
+        session$sendCustomMessage(session$ns("login_state"),list(busy=FALSE))
+        return()
       }
-    )
+      generation <<- generation+1L
+      attempt <- generation
+      login_pending_RV(TRUE)
+      session$userData$startup_stage("authenticating")
+      login_feedback_RV(NULL)
+      started <- Sys.time()
+      request <- tryCatch(fm_async_login(user_name,secret,owner=session$token),
+        error=function(e)promises::promise_reject(e))
+      secret <- NULL
+      finish <- function(token=NULL) {
+        if(closed||!identical(attempt,generation))return(invisible(NULL))
+        resource_timing("authentication",started)
+        login_pending_RV(FALSE)
+        session$sendCustomMessage(session$ns("login_state"),list(busy=FALSE))
+        if(valid_login(token)) {
+          session$userData$futmondo_user_id <- token[["userid"]]
+          session$userData$startup_stage("loading_leagues")
+          login_feedback_RV(list(kind="success",message="Signed in. Loading your leagues…"))
+          login_token_RV(token)
+        } else {
+          session$userData$futmondo_user_id <- NULL
+          session$userData$startup_stage("failed")
+          login_feedback_RV(list(kind="error",message="Could not authenticate with Futmondo. Check your username and password, then try again."))
+          login_token_RV(NULL)
+        }
+        invisible(NULL)
+      }
+      promises::then(request,function(token)finish(token),function(error)finish())
+      # Completion updates state separately; release this observer's flush now.
+      invisible(NULL)
+    })
 
 
     # initial welcome card ----
@@ -202,14 +214,14 @@ login_Server <- function(id, user = NULL, password = NULL) {
               shiny::tags$i(class = "fa-solid fa-circle-check", style = "font-size: 28px; color: var(--fm-text);"),
               div(
                 h3(style = "font-weight: 700; color: var(--fm-text); margin: 0; font-size: 18px;", paste0("Welcome back, ", user_name, "!")),
-                p(style = "color: var(--fm-text); margin: 2px 0 0 0; font-size: 13px;", "Authenticated successfully with Futmondo")
+                p(style = "color: var(--fm-text); margin: 2px 0 0 0; font-size: 13px;", "Signed in to Futmondo")
               )
             ),
             div(
               style = "background-color: var(--fm-surface); border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-top: 10px;",
               p(style = "margin: 0; font-size: 13px; color: var(--fm-text);",
                 icon("shield-halved", style = "color: var(--fm-text); margin-right: 6px;"),
-                strong("Status: "), "Connected & Active | Redirecting to your team..."
+                strong("Status: "), "Signed in. Loading your leagues…"
               )
             )
           )

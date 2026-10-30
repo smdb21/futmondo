@@ -31,7 +31,7 @@ fm_async_http<-function(url,method="GET",body=NULL,headers=character(),owner="",
 fm_httr_response<-function(response,url){
   structure(list(url=url,status_code=response$status_code,headers=httr::insensitive(list(`content-type`="application/json; charset=utf-8")),all_headers=list(),cookies=data.frame(),content=response$content,date=Sys.time(),times=c(total=response$times[["total"]] %||% 0),request=list(method="POST",url=url)),class="response")
 }
-async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id){
+async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is_current=function()TRUE){
   name<-if(is.character(fn))fn else deparse(substitute(fn))
   if(length(name)!=1L||!grepl("^(get_|read_|calculate_league_finances$)",name))return(promises::promise_reject(simpleError("Only factual reads may use asynchronous adapters")))
   adapter_env<-new.env(parent=.GlobalEnv);completed<-new.env(parent=emptyenv());requests<-0L;acquired<-list()
@@ -81,6 +81,7 @@ async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id){
   adapter_env$defer_persistence<-function(...)invisible(TRUE)
   adapter_env$record_acquired_resource<-function(resource,data,context){acquired[[resource]]<<-list(resource=resource,data=data,context=context);invisible(TRUE)}
   step<-function()tryCatch({
+    if(!isTRUE(tryCatch(is_current(),error=function(e)FALSE)))return(promises::promise_reject(structure(list(message="Session request cancelled",call=NULL),class=c("fm_async_cancelled","error","condition"))))
     result<-tryCatch(list(done=TRUE,value=do.call(get(name,adapter_env),args)),fm_async_request=function(request)list(done=FALSE,request=request))
     if(result$done){for(record in acquired){record$context$session_id<-context$session_id;tryCatch(do.call(record_acquired_resource,record),error=function(e)NULL)};return(promises::promise_resolve(result$value))}
     requests<<-requests+1L
@@ -97,4 +98,22 @@ fm_async_read_http<-function(url,method="GET",body=NULL,headers=character(),owne
  if(!is.null(pending)){resource_metric("coalesced");return(pending)}
  pending<-promises::then(fm_async_http(url,method,body,headers,owner),function(response){.fm_transport$reads[[key]]<-NULL;response},function(error){.fm_transport$reads[[key]]<-NULL;stop(error)})
  .fm_transport$reads[[key]]<-pending;pending
+}
+
+# Authentication is intentionally a single, uncached attempt. Secrets never enter
+# resource keys, metrics, diagnostics, or the factual-read replay adapter.
+fm_async_login <- function(user_name,password,owner="") {
+  user_name <- trimws(user_name)
+  payload <- jsonlite::toJSON(list(header=list(token="null",userid=""),
+    query=list(mail=user_name,pwd=password)),auto_unbox=TRUE)
+  password <- NULL
+  request <- fm_async_http(LOGIN_URL,"POST",payload,
+    c(`Content-Type`="application/json; charset=utf-8"),owner=owner)
+  payload <- NULL
+  promises::then(request,function(response) {
+    answer <- jsonlite::fromJSON(rawToChar(response$content),simplifyVector=FALSE)$answer$mobile
+    token <- c(token=answer$token,userid=answer$userid,user_name=user_name)
+    if(!valid_login(token))stop("Authentication failed")
+    token
+  })
 }

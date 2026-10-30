@@ -24,6 +24,13 @@ check('finality correction persists unchanged score',{
  writes<-list();view<-list(points=points,previous_points=points,context=ctx);view$points$score_status[2]<-'final';record_acquired_resource('player_card_history',view,ctx)
  stopifnot(length(writes)==1L,writes[[1]]$payload$round==2,writes[[1]]$payload$points==-2,writes[[1]]$payload$score_status=='final')
 })
+check('unknown finality persists once and unchanged unknown observations deduplicate',{
+ writes<-list();unknown<-points;unknown$score_status[2]<-'unknown'
+ record_acquired_resource('player_card_history',list(points=unknown,previous_points=points,context=ctx),ctx)
+ stopifnot(length(writes)==1L,writes[[1]]$payload$score_status=='unknown',writes[[1]]$payload$points==-2)
+ writes<-list();record_acquired_resource('player_card_history',list(points=unknown,previous_points=unknown,context=ctx),ctx)
+ stopifnot(length(writes)==0L)
+})
 check('bounded errors clear after successful entity retry',{
  .persistence_state$errors<-list();for(i in 1:70)persistence_record_result(list(owner='u',key=paste0('k',i)),FALSE);stopifnot(length(.persistence_state$errors$u)==64L)
  args<-list('player_history',list(player_id='p',championship_id='c',observed_at='old',value=0),'player_id,championship_id,observed_at');changed<-args;changed[[2]]$observed_at<-'new';changed[[2]]$value<-1

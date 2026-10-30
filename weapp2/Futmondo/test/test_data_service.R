@@ -33,7 +33,16 @@ check('partial reconciliation preserves corrections zero negative and context',{
 })
 check('unknown finality and participation remain unknown',{
  got<-normalize_player_match_observations(list(match=list(r=list(number=9)),points=list(list(round=1,points=0),list(round=2,points=-2),list(round=3))),'p','league')
- stopifnot(all(got$score_status[1:2]=='provisional'),is.na(got$points[3]),all(is.na(got$participation)))
+ stopifnot(all(got$score_status[1:2]=='unknown'),is.na(got$points[3]),all(is.na(got$participation)))
+})
+check('reconciliation preserves unknown and legacy labels through revision selection',{
+ old<-data.frame(player_id='p',championship_id='league',season='2026',scoring_version='score',round=c(1,2),
+   points=c(0,-2),score_status=c('provisional','provisional'),observed_at='2026-10-01')
+ live<-old;live$round<-c(1,3);live$score_status<-c('unknown','unknown');live$observed_at<-'2026-10-02'
+ got<-reconcile_player_points(old,live,ctx)
+ stopifnot(identical(got$score_status,c('unknown','provisional','unknown')),identical(got$points,c(0,-2,-2)))
+ malformed<-live;malformed$score_status<-c(NA,'unrecognized');got<-reconcile_player_points(data.frame(),malformed,ctx)
+ stopifnot(all(got$score_status=='unknown'))
 })
 check('short server pages do not truncate history',{
  old<-supabase_get;requests<-0L;fixture<-data.frame(id=letters[1:5],value=1:5)

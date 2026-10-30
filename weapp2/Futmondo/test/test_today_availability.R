@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Offline regression: Today must use its existing finance snapshot for both KPIs.
+# Offline regression: Today must use its primary team information for both KPIs.
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages({
   library(shiny)
@@ -15,14 +15,14 @@ get_championship_pressroom <- function(...) data.frame()
 finance_reads <- 0L
 team_reads <- 0L
 fixture_snapshot <- NULL
-get_financial_snapshot <- function(...) {
+get_user_team_info <- function(...) {
   finance_reads <<- finance_reads + 1L
   fixture_snapshot
 }
 auth <- c(userid='today-fixture',token='offline-only')
 check_snapshot <- function(snapshot, cash_label, value_label) {
   clear_api_cache()
-  fixture_snapshot <<- snapshot
+  fixture_snapshot <<- list(budget=snapshot$cash,teamValue=snapshot$team_value)
   finance_reads <<- 0L
   team_reads <<- 0L
   testServer(today_Server, args=list(
@@ -32,7 +32,7 @@ check_snapshot <- function(snapshot, cash_label, value_label) {
     refresh_trigger=reactive(0L)), {
     cash <- valuation <- NULL
     deadline <- Sys.time()+3
-    while ((is.null(cash)||is.null(valuation)) && Sys.time()<deadline) {
+    while ((is.null(cash)||is.null(valuation)||is.null(team_state()$data)) && Sys.time()<deadline) {
       session$flushReact(); later::run_now(0.01)
       cash <- tryCatch(output$kpi_cash_box, error=function(e)NULL)
       valuation <- tryCatch(output$kpi_valuation_box, error=function(e)NULL)
@@ -48,7 +48,7 @@ check_snapshot <- function(snapshot, cash_label, value_label) {
 }
 check_snapshot(list(status='partial',cash=142637644,team_value=34000000),
   '142.637.644 €','34.000.000 €')
-cat('PASS partial finance renders both KPIs despite unavailable league teams; one shared read, zero teams reads\n')
+cat('PASS primary team information renders both KPIs despite unavailable league teams; one shared read, zero teams reads\n')
 check_snapshot(list(status='partial',cash=0,team_value=NA_real_), '0 €', 'Unavailable')
 cat('PASS unknown team value stays unavailable while zero cash remains visible\n')
 check_snapshot(list(status='ok',cash=-50,team_value=0), '-50 €', '0 €')

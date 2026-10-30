@@ -193,17 +193,31 @@ normalize_auction_observations <- function(pressroom_df, championship_id,
     outcome = "sold", visibility_complete = FALSE, stringsAsFactors = FALSE)
 }
 
+# Only explicit per-player logical flags establish finality. Missing, malformed
+# or contradictory evidence is unknown; round/match status cannot fill this gap.
+player_points_finality <- function(point) {
+  fields<-intersect(c("isFinished","finished"),names(point))
+  if(!length(fields))return("unknown")
+  values<-lapply(fields,function(field)point[[field]])
+  recognized<-vapply(values,function(value)is.logical(value)&&length(value)==1L&&!is.na(value),logical(1))
+  if(!all(recognized))return("unknown")
+  values<-unique(unlist(values,use.names=FALSE))
+  if(length(values)!=1L)return("unknown")
+  if(values)"final"else "provisional"
+}
+
 normalize_player_match_observations <- function(summary, player_id, championship_id,
                                                  scoring_version = "unknown",
                                                  season = "unknown", observed_at = Sys.time(), rounds = NULL) {
   points <- summary$points
   if (is.null(points) || !length(points)) return(data.frame())
   if (is.data.frame(points)) points <- split(points, seq_len(nrow(points)))
-  # Unknown finality remains provisional, including prior rounds.
+  # Historical round numbers do not establish per-player score finality.
   dplyr::bind_rows(lapply(points, function(p) {
     round <- fm_number(p$round)
     if (!is.finite(round)) return(NULL)
     pts <- fm_number(p$points)
+    source_match <- if(is.list(p$match))p$match else list()
     timing <- if(is.data.frame(rounds) && all(c('round_number','round_start_at') %in% names(rounds)))
       rounds[rounds$round_number==round,,drop=FALSE] else data.frame()
     occurred <- if(nrow(timing)==1L) fm_scalar(timing$round_start_at) else NA_character_
@@ -211,8 +225,10 @@ normalize_player_match_observations <- function(summary, player_id, championship
     # observations but do not manufacture participation or calibrated minutes.
     data.frame(player_id = as.character(player_id), championship_id = as.character(championship_id),
       season = season, scoring_version = scoring_version, round = round, points = pts,
-      score_status = if (!is.finite(pts)) "unavailable" else if (isTRUE(p$isFinished) ||
-        isTRUE(p$finished)) "final" else "provisional",
+      match_id=fm_scalar(p$matchId %||% source_match$id %||% source_match$`_id`,""),
+      round_id=fm_scalar(p$roundId,""),
+      competition_id=fm_scalar(p$competitionId %||% summary$championship$competitionId,""),
+      score_status = if (!is.finite(pts)) "unavailable" else player_points_finality(p),
       is_home = if (is.logical(p$isHomeTeam)) p$isHomeTeam else NA,
       minutes_raw = fm_number(p$minutesPlayed),
       start_raw = if (is.logical(p$initialLineUp)) p$initialLineUp else NA,

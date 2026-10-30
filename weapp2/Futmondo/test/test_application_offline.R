@@ -42,6 +42,7 @@ app_financial <- list(status='ok',cash=0,withheld=0,spendable_budget=0,legal_bid
 app_champ <- list(id='champ',name='Offline League',userteam=list(id='team1',name='Your Team'))
 app_rounds <- data.frame(round_id=c('r1','r2'),round_number=1:2,begin_process=c('2026-08-15T00:00:00Z','2026-08-22T00:00:00Z'),is_finished=TRUE)
 login <- function(...) app_auth
+fm_async_login <- function(...) promises::promise_resolve(app_auth)
 get_championships <- function(...) unlist(app_champ)
 get_active_championships <- function(...) list(championships=list(app_champ))
 get_teams <- function(...) app_teams
@@ -120,7 +121,7 @@ app_check('countdown ticks reuse fetched round catalog',{
  get_finished_rounds<-function(...){round_reads<<-round_reads+1L;app_rounds};clear_api_cache()
  shiny::testServer(app_server,{
   session$setInputs(tabs='login',`login-user_name`='offline@example.invalid',`login-password`='fixture',`login-login_button`=1)
-  session$elapse(100);app_settle(session);clock<-output$round_countdown;before<-round_reads
+  session$elapse(100);app_settle(session);session$setInputs(tabs='today');app_settle(session);clock<-output$round_countdown;before<-round_reads
   session$elapse(3100);app_settle(session);clock<-output$round_countdown;stopifnot(round_reads==before)
  });get_finished_rounds<-original_rounds
 })

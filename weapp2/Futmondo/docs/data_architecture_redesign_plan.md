@@ -218,3 +218,10 @@ Decisions are recorded in `docs/data_service.md` and `docs/data_review_results.m
 - [Shiny non-blocking operations](https://shiny.posit.co/r/articles/improve/nonblocking/) for the distinction between scheduling work and keeping the event loop responsive; its separate-process example is not assumed available on this hosting plan.
 - [Supabase query limits](https://supabase.com/docs/reference/javascript/select) and [ordered pagination](https://supabase.com/docs/reference/javascript/using-modifiers-range) for completeness checks; the application uses REST through R rather than the JavaScript client.
 - [Supabase explicit Data API grants](https://supabase.com/changelog/45329-breaking-change-tables-not-exposed-to-data-and-graphql-api-automatically) for new-table access during migration.
+
+
+## Follow-up: progressive opening — 2026-10-30
+
+Local implementation separates asynchronous authentication, primary Today content, optional enrichment, and independently loaded player-card sections. Browser flushing is part of acceptance: an observer must not return its pending request promise. Recent rounds combine points and results only when source association is established, with one explanation for missing finality evidence. No automated/prediction features are added.
+
+See `docs/progressive_loading.md` for runtime behavior and `docs/data_review_results.md` for measured verification and remaining limits. Production deployment/latency verification is separate from local implementation. HAR inspection of actual per-player finality fields is deferred until the user supplies captures from the other machine; missing evidence stays unknown in the meantime.

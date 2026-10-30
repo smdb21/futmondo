@@ -9,11 +9,11 @@ check('UTC, SQL and millisecond timestamps agree',{
   t<-fm_time(c('2026-09-01T12:00:00Z','2026-09-01 12:00:00+00:00','2026-09-01T14:00:00+02:00'))
   stopifnot(length(unique(as.numeric(t)))==1L,as.numeric(fm_time(as.numeric(t[1])*1000))==as.numeric(t[1]))
 })
-check('history filters future, provisional and changed scoring then deduplicates rounds',{
+check('history excludes unknown/provisional/future scores and changed scoring before deduplication',{
   old<-supabase_read_all
-  supabase_read_all<-function(...)data.frame(championship_id='c',player_id='p',round=c(1,1,1,2,2,3),points=c(1,3,9,0,100,50),
-    score_status=c('final','final','final','final','provisional','final'),season='2026',
-    scoring_version=c('old','new','new','new','new','new'),observed_at=c('2026-08-01T00:00:00Z','2026-08-02T00:00:00Z','2026-08-03T00:00:00Z','2026-08-04T00:00:00Z','2026-08-05T00:00:00Z','2026-09-01T00:00:00Z'))
+  supabase_read_all<-function(...)data.frame(championship_id='c',player_id='p',round=c(1,1,1,2,2,3,2),points=c(1,3,9,0,100,50,200),
+    score_status=c('final','final','final','final','provisional','final','unknown'),season='2026',
+    scoring_version=c('old','new','new','new','new','new','new'),observed_at=c('2026-08-01T00:00:00Z','2026-08-02T00:00:00Z','2026-08-03T00:00:00Z','2026-08-04T00:00:00Z','2026-08-05T00:00:00Z','2026-09-01T00:00:00Z','2026-08-06T00:00:00Z'))
   d<-read_player_match_history('c',as.POSIXct('2026-08-10',tz='UTC'),season='2026',scoring_version='new')
   stopifnot(nrow(d)==2L,identical(d$points,c(9,0)),all(d$is_final),all(d$scoring_version=='new'))
   supabase_read_all<-old

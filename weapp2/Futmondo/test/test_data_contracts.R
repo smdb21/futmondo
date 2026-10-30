@@ -40,7 +40,22 @@ check("missing points and actual zero stay distinct; ambiguous minutes untrusted
 check("prior round numbers alone do not establish finality",{
   s<-list(match=list(r=list(number=3)),points=list(list(round=1,points=4),list(round=2,points=8),list(round=3,points=1)))
   d<-normalize_player_match_observations(s,"p","c")
-  stopifnot(identical(d$score_status,rep("provisional",3)))
+  stopifnot(identical(d$score_status,rep("unknown",3)))
+})
+check("per-player finality requires consistent explicit logical evidence",{
+  rows<-list(
+    list(round=1,points=0),
+    list(round=2,points=-2,isFinished=FALSE),
+    list(round=3,points=3,finished=TRUE),
+    list(round=4,points=4,isFinished="true"),
+    list(round=5,points=5,isFinished=TRUE,finished=FALSE),
+    list(round=6,points=6,isFinished=TRUE,finished=TRUE),
+    list(round=7,points=7,isFinished=TRUE,finished=NA),
+    list(round=8,points=8,isFinished=1),
+    list(round=9,points=9,finished=NULL))
+  d<-normalize_player_match_observations(list(points=rows,match=list(isFinished=TRUE)),"p","c")
+  stopifnot(identical(d$score_status,c("unknown","provisional","final","unknown","unknown","final","unknown","unknown","unknown")),
+    identical(d$points,c(0,-2,3,4,5,6,7,8,9)))
 })
 check("configured scoring weights are not normalized",{
   rules<-normalize_league_rules(list(configuration=list(moneyPerPoint=123,cpt=TRUE)),

@@ -177,7 +177,7 @@ players_table_owner_choices <- function(teams_df) {
   c(choices,stats::setNames(values,labels))
 }
 
-players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL, available_funds_RV = NULL, hide_bid_column = FALSE, refresh_trigger = NULL, is_module_active = function() TRUE) {
+players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL, available_funds_RV = NULL, hide_bid_column = FALSE, refresh_trigger = NULL, is_module_active = function() TRUE, optional_ready = function() TRUE) {
   moduleServer(id, function(input, output, session) {
     bind_factual_reads(c("read_player_match_history","get_financial_snapshot","get_finished_rounds"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
 
@@ -228,7 +228,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
 
     # observers ----
     # observe user_teams_RV to update market_player_team_filter ----
-    observeEvent({ req(is_module_active()); user_teams_RV() }, {
+    observeEvent({ req(is_module_active(),optional_ready()); user_teams_RV() }, {
       req(is_module_active())
       teams <- user_teams_RV()
       req(teams)
@@ -267,6 +267,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
         showModal(modalDialog(
           # title = "Selected player",
           selected_player_UI(id = ns("selected_player")),
+          tags$script(HTML(paste0("$(document).off(\"hidden.bs.modal.fm",gsub("[^a-zA-Z0-9]","",ns("")),"\",\"#shiny-modal\").on(\"hidden.bs.modal.fm",gsub("[^a-zA-Z0-9]","",ns("")),"\",\"#shiny-modal\",function(){Shiny.setInputValue(\"",ns("card_closed"),"\",Math.random(),{priority:\"event\"});});"))),
           footer = div(style = "text-align: center; width: 100%;",
                        modalButton("Close")),
           easyClose = TRUE,
@@ -284,6 +285,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       },
       ignoreInit = TRUE
     )
+    observeEvent(input$card_closed,{selected_player_ready_RV(FALSE)})
     # Modules ----
     selected_player_Server(
       id = "selected_player",
@@ -310,15 +312,8 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
     selected_player_RV<-reactive({
       if(!isTRUE(selected_player_ready_RV())||!identical(selected_player_context_RV(),table_context_RV()))return(NULL)
       player_id<-selected_player_id_RV();if(is.null(player_id))return(NULL)
-      attempt<-tryCatch(list(available=TRUE,rows=players_table_filtered_RV()),error=function(e)list(available=FALSE))
-      if(!attempt$available){
-        saved<-isolate(selected_player_snapshot_RV())
-        if(is.data.frame(saved)&&nrow(saved)==1L&&identical(as.character(saved$id),player_id))return(saved)
-        return(NULL)
-      }
-      rows<-attempt$rows;index<-if(is.data.frame(rows)&&"id"%in%names(rows))match(player_id,as.character(rows$id))else NA_integer_
-      if(is.na(index)){selected_player_snapshot_RV(NULL);return(NULL)}
-      row<-rows[index,,drop=FALSE];selected_player_snapshot_RV(row);row
+      saved<-selected_player_snapshot_RV()
+      if(is.data.frame(saved)&&nrow(saved)==1L&&identical(as.character(saved$id),player_id))saved else NULL
     })
 
     ## players_table_filtered_RV ----
@@ -338,7 +333,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       history <- data.frame()
       auth <- if(is.function(login_token))login_token()else login_token
       team <- if(is.function(user_team_id))user_team_id()else user_team_id
-      if(valid_login(auth) && !is.null(champ) && !is.null(team)) {
+      if(isTRUE(optional_ready()) && valid_login(auth) && !is.null(champ) && !is.null(team)) {
         snapshot <- tryCatch(get_financial_snapshot(auth,champ,team),error=function(e)NULL)
         rules <- snapshot$lineup_rules %||% snapshot$rules
         season <- rules$season %||% "unknown"; scoring <- rules$scoring_version %||% "unknown"
@@ -351,7 +346,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
             round_min=max(1L,max(completed)-recent_n+1L),round_max=max(completed)),error=function(e)data.frame())
         }
       }
-      players_table <- players_table_normalize_owner(players_table, tryCatch(user_teams_RV(), error=function(e)NULL))
+      players_table <- players_table_normalize_owner(players_table, if(isTRUE(optional_ready()))tryCatch(user_teams_RV(), error=function(e)NULL)else NULL)
       players_table <- add_recent_points_average(players_table,history,recent_n)
 
       if (!is.null(input$position_filter)) {

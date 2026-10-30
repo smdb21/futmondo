@@ -239,6 +239,21 @@ shared_resource<-function(session,resource,context,fetch,active=function()TRUE,r
   last<<-key;version<<-next_version;generation<<-generation+1L;current_generation<-generation
   value(resource_state(status="loading"))
   promises::then(get_cached_resource_async(resource,ctx,function()fetch(ctx),force_refresh),function(result){if(!closed&&identical(generation,current_generation))value(result);NULL})
+  # Do not return the pending promise: Shiny must flush loading UI immediately.
+  invisible(NULL)
  })
  out<-shiny::reactive(value());attr(out,"dispose")<-dispose;out
 }
+
+# Fixed labels and a bounded sample ring; no account/player identifiers or bodies.
+resource_timing <- function(stage,started_at) {
+  allowed <- c("authentication","leagues","today_primary","card_identity","card_summary","card_history")
+  if(!stage %in% allowed)return(invisible(FALSE))
+  elapsed <- as.numeric(difftime(Sys.time(),started_at,units="secs"))
+  if(!is.finite(elapsed)||elapsed<0)return(invisible(FALSE))
+  samples <- .resource_metrics$timings %||% list()
+  samples[[length(samples)+1L]] <- list(stage=stage,seconds=elapsed)
+  .resource_metrics$timings <- tail(samples,64L)
+  invisible(TRUE)
+}
+resource_timings <- function() .resource_metrics$timings %||% list()
