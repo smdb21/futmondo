@@ -1,0 +1,13 @@
+# Shared round dataset migration
+
+Migration `20261030234619_player_round_dataset.sql` was applied to the configured Supabase project on 2026-10-30. It adds `player_round_history_checks` and the server-only `player_round_dataset` view. Existing score observations were neither rewritten nor converted into invented successful-fetch markers.
+
+The view returns latest score revisions and the latest successful check for each championship/player/season/scoring identity as distinct `point` and `check` rows. A check can explicitly record a valid empty source response. Timestamped check identities retain older records without allowing a late older response to replace a newer check in the view. These are shared factual league records; account isolation belongs to authenticated league selection and the session cache, not duplicated per-account scores.
+
+The app must save all normalized score chunks successfully before writing the check. A queued operation alone is not a successful check. See the controller and persistence tests for those application-level guarantees; the migration alone does not establish them.
+
+Live verification used synthetic rows inside a transaction and rolled it back. Assertions passed for latest empty check, an older check arriving later, independent seasons, latest NULL score suppressing an older number, and zero/negative points. No test check rows were retained. Privilege checks confirmed no SELECT for anon/authenticated on either object, RLS on the check table, and `security_invoker=true` on the view. The table intentionally has no client RLS policies because access is server-only, consistent with the [Supabase view/RLS guidance](https://supabase.com/docs/guides/database/postgres/row-level-security#views). The security advisor's new finding is informational RLS-without-policy; its unrelated pre-existing findings remain outside this change.
+
+At initial inspection the source contained 7,536 observations across 454 player contexts. A live limited ordered dataset query later returned 1,000 of 4,393 latest score rows in 19.283 ms database execution time. The plan used the existing `player_round_context_revision` index and the new checks primary-key index. This is a single database measurement, not a hosted round-trip or full pagination benchmark. A second covering index is not justified by the current dataset.
+
+No real account API backfill or hosted deployment was performed from this workspace. Existing observations remain immediately readable; new successful checks will be recorded by the updated application. Rollback requires restoring the old application reader before dropping the new view/table, and never requires dropping existing score observations.

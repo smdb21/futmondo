@@ -30,23 +30,36 @@ persistence_record_result<-function(job,ok,issues=list()){
  if(length(errors)>64L)errors<-tail(errors,64L)
  .persistence_state$errors[[job$owner]]<-if(length(errors))errors else NULL
  if(length(.persistence_state$errors)>128L).persistence_state$errors<-tail(.persistence_state$errors,128L)
- if(isTRUE(ok)){.persistence_state$acknowledged[[job$key]]<-Sys.time();if(length(.persistence_state$acknowledged)>256L).persistence_state$acknowledged<-.persistence_state$acknowledged[-1]};shiny::isolate(.persistence_state$revision(.persistence_state$revision()+1L));invisible(ok)
+ if(isTRUE(ok)){.persistence_state$acknowledged[[job$key]]<-Sys.time();if(length(.persistence_state$acknowledged)>256L).persistence_state$acknowledged<-.persistence_state$acknowledged[-1]};shiny::isolate(.persistence_state$revision(.persistence_state$revision()+1L))
+ for(callback in job$callbacks)tryCatch(callback(isTRUE(ok)),error=function(e)NULL)
+ invisible(ok)
 }
 
-defer_persistence<-function(fn,args=list(),context=getOption("futmondo.persistence_context")){
-  if(isTRUE(getOption("futmondo.offline",FALSE)))return(invisible(TRUE))
+defer_persistence<-function(fn,args=list(),context=getOption("futmondo.persistence_context"),on_complete=NULL){
+  if(isTRUE(getOption("futmondo.offline",FALSE))){if(is.function(on_complete))on_complete(TRUE);return(invisible(TRUE))}
   name<-if(is.character(fn))fn else deparse(substitute(fn))
-  if(!name%in%c("supabase_post_direct","supabase_fact_batch_direct"))return(FALSE)
+  if(!name%in%c("supabase_post_direct","supabase_fact_batch_direct","supabase_round_history_batch_direct"))return(FALSE)
   if(identical(name,"supabase_fact_batch_direct")&&(length(args)!=1L||!supabase_fact_batch_valid(args[[1]])))return(FALSE)
+  if(identical(name,"supabase_round_history_batch_direct")&&(length(args)!=1L||!supabase_round_history_batch_valid(args[[1]])))return(FALSE)
   domain<-if(requireNamespace("shiny",quietly=TRUE))shiny::getDefaultReactiveDomain()else NULL
   owner<-fm_scalar(context$account_id %||% if(!is.null(domain))domain$userData$futmondo_user_id else NULL,"server")
   session_id<-fm_scalar(context$session_id %||% if(!is.null(domain))domain$token else NULL,owner)
   key<-as.character(openssl::sha256(serialize(list(owner,name,args),NULL)))
   existing<-c(.persistence_state$queue,if(!is.null(.persistence_state$active))list(.persistence_state$active)else list())
   stamp<-.persistence_state$acknowledged[[key]]
-  if((!is.null(stamp)&&as.numeric(difftime(Sys.time(),stamp,units="secs"))<3600)||any(vapply(existing,function(x)identical(x$key,key),logical(1))))return(invisible(TRUE))
+  if(!is.null(stamp)&&as.numeric(difftime(Sys.time(),stamp,units="secs"))<3600){if(is.function(on_complete))on_complete(TRUE);return(invisible(TRUE))}
+  duplicate <- which(vapply(existing,function(x)identical(x$key,key),logical(1)))
+  if(length(duplicate)){
+    if(is.function(on_complete)){
+      if(!is.null(.persistence_state$active)&&identical(.persistence_state$active$key,key))
+        .persistence_state$active$callbacks<-c(.persistence_state$active$callbacks,list(on_complete))
+      else for(i in seq_along(.persistence_state$queue))if(identical(.persistence_state$queue[[i]]$key,key))
+        .persistence_state$queue[[i]]$callbacks<-c(.persistence_state$queue[[i]]$callbacks,list(on_complete))
+    }
+    return(invisible(TRUE))
+  }
   bytes<-as.numeric(object.size(args));retained<-sum(vapply(existing,function(x)as.numeric(x$bytes %||% object.size(x$args)),numeric(1)))
-  job<-list(fn=name,args=args,owner=owner,session_id=session_id,key=key,bytes=bytes,error_key=persistence_job_scope(name,args))
+  job<-list(fn=name,args=args,owner=owner,session_id=session_id,key=key,bytes=bytes,error_key=persistence_job_scope(name,args),callbacks=if(is.function(on_complete))list(on_complete)else list())
   if(bytes>1024^2||retained+bytes>16*1024^2){persistence_record_result(job,FALSE);return(FALSE)}
   if(length(existing)>=200L||sum(vapply(existing,function(x)identical(x$owner,owner),logical(1)))>=.persistence_max_jobs_per_owner){persistence_record_result(job,FALSE);return(FALSE)}
   .persistence_state$queue[[length(.persistence_state$queue)+1L]]<-job
@@ -55,9 +68,11 @@ defer_persistence<-function(fn,args=list(),context=getOption("futmondo.persisten
 }
 cancel_persistence_jobs<-function(owner,session_id=NULL){
   matches<-function(job)identical(job$owner,owner)&&(is.null(session_id)||identical(job$session_id,session_id))
-  before<-length(.persistence_state$queue);.persistence_state$queue<-Filter(function(job)!matches(job),.persistence_state$queue)
-  active<-.persistence_state$active;dropped<-before-length(.persistence_state$queue)
-  if(!is.null(active)&&matches(active)){.persistence_state$active<-NULL;fm_transport_cancel(paste0("persistence:",active$session_id));dropped<-dropped+1L;later::later(persistence_tick,0)}
+  canceled<-Filter(matches,.persistence_state$queue)
+  .persistence_state$queue<-Filter(function(job)!matches(job),.persistence_state$queue)
+  active<-.persistence_state$active;dropped<-length(canceled)
+  for(job in canceled)persistence_record_result(job,FALSE)
+  if(!is.null(active)&&matches(active)){.persistence_state$active<-NULL;persistence_record_result(active,FALSE);fm_transport_cancel(paste0("persistence:",active$session_id));dropped<-dropped+1L;later::later(persistence_tick,0)}
   invisible(dropped)
 }
 background_sync_status<-function(user_id){
@@ -69,10 +84,11 @@ persistence_tick<-function(){
   if(!is.null(.persistence_state$active))return(invisible(TRUE))
   if(!length(.persistence_state$queue)){.persistence_state$scheduled<-FALSE;return(invisible(TRUE))}
   job<-.persistence_state$queue[[1]];.persistence_state$queue<-.persistence_state$queue[-1];.persistence_state$active<-job
-  operations<-if(identical(job$fn,"supabase_fact_batch_direct"))job$args[[1]]else list(job$args)
+  operations<-if(job$fn%in%c("supabase_fact_batch_direct","supabase_round_history_batch_direct"))job$args[[1]]else list(job$args)
   index<-job$operation_index %||% 1L;op<-operations[[index]]
   finish<-function(ok,issues=list()){
     if(!identical(.persistence_state$active$key,job$key))return(NULL)
+    job$callbacks<-.persistence_state$active$callbacks
     .persistence_state$active<-NULL
     if(isTRUE(ok)&&index<length(operations)){job$operation_index<-index+1L;.persistence_state$queue<-c(list(job),.persistence_state$queue)}else persistence_record_result(job,ok,issues)
     later::later(persistence_tick,0);NULL
@@ -127,4 +143,27 @@ record_acquired_resource<-function(resource,data,context){
     }
     if(nrow(points))supabase_post("player_match_observations",data.frame(player_id=ctx$player_id,championship_id=ctx$championship_id,season=ctx$season,scoring_version=ctx$scoring_version,round=points$round_number,points=points$points,score_status=points$score_status,occurred_at=points$date,observed_at=points$observed_at))
   };invisible(TRUE)
+}
+
+
+persist_recent_points_snapshot <- function(payload,context,on_complete=NULL) {
+  points <- payload$observations
+  if(!is.data.frame(points)||nrow(points)>500L)return(FALSE)
+  checked_at <- fm_time(payload$checked_at)
+  if(length(checked_at)!=1L||is.na(checked_at))return(FALSE)
+  operations <- list()
+  if(nrow(points)){
+    columns <- c("player_id","championship_id","season","scoring_version","round","points","score_status","observed_at","occurred_at","round_start_at")
+    if(!all(columns%in%names(points)))return(FALSE)
+    for(i in seq.int(1L,nrow(points),by=100L))operations[[length(operations)+1L]] <- list(
+      "player_match_observations",points[i:min(i+99L,nrow(points)),columns,drop=FALSE],
+      "player_id,championship_id,season,scoring_version,round,observed_at",FALSE)
+  }
+  marker <- data.frame(championship_id=context$championship_id,player_id=context$player_id,
+    season=context$season,scoring_version=context$scoring_version,
+    checked_at=format(checked_at,"%Y-%m-%dT%H:%M:%OSZ",tz="UTC"),
+    result_status=if(nrow(points))"scores"else "empty",point_count=nrow(points))
+  operations[[length(operations)+1L]] <- list("player_round_history_checks",marker,
+    "championship_id,player_id,season,scoring_version,checked_at",TRUE)
+  defer_persistence("supabase_round_history_batch_direct",list(operations),context,on_complete=on_complete)
 }

@@ -2315,6 +2315,7 @@ get_player_summary <- function(login, championship_id, user_team_id = NULL, play
         data = if ("data" %in% names(ans_data)) ans_data$data else NULL,
         prices = if ("prices" %in% names(ans_data)) ans_data$prices else list(),
         points = ans_data$points %||% list(),
+        points_received = "points" %in% names(ans_data),
         match = ans_data$match %||% NULL,
         championship = ans_data$championship %||% list(),
         history_complete = isTRUE(ans_data$historyComplete),

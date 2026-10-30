@@ -813,3 +813,29 @@ read_league_round_points <- function(championship_id,max_rows=50000L) {
     order="player_id.asc,season.asc,scoring_version.asc,round.asc"),
     max_rows=max_rows,page_size=1000L)
 }
+
+
+# One logical league read, including explicit successful empty acquisitions.
+read_league_round_dataset <- function(championship_id,max_rows=50000L) {
+  championship_id <- fm_scalar(championship_id,"")
+  if(!nzchar(championship_id))stop("A league is required for round history")
+  rows <- history_read_pages("player_round_dataset",list(
+    championship_id=paste0("eq.",championship_id),
+    select="row_kind,championship_id,player_id,season,scoring_version,round,points,score_status,observed_at,occurred_at,round_start_at,checked_at,result_status,point_count",
+    order="player_id.asc,season.asc,scoring_version.asc,row_kind.asc,round.asc"),
+    max_rows=as.integer(max_rows)+2000L,page_size=1000L)
+  if(is.null(rows))stop("Saved round history unavailable")
+  points <- if("row_kind"%in%names(rows))rows[rows$row_kind=="point",,drop=FALSE]else data.frame()
+  checks <- if("row_kind"%in%names(rows))rows[rows$row_kind=="check",,drop=FALSE]else data.frame()
+  complete <- isTRUE(attr(rows,"complete"))&&nrow(points)<=max_rows&&nrow(checks)<=2000L
+  list(points=head(points,max_rows),checks=head(checks,2000L),complete=complete)
+}
+
+# This ordered job writes its success marker only after every score chunk succeeds.
+supabase_round_history_batch_valid <- function(operations) {
+  if(!is.list(operations)||!length(operations)||length(operations)>6L)return(FALSE)
+  tables <- vapply(operations,function(op)if(is.list(op)&&length(op)==4L)fm_scalar(op[[1]],"")else "",character(1))
+  identical(tail(tables,1L),"player_round_history_checks")&&
+    all(head(tables,-1L)=="player_match_observations")&&
+    all(vapply(operations,function(op)is.data.frame(op[[2]])&&nrow(op[[2]])>0L&&nrow(op[[2]])<=100L,logical(1)))
+}

@@ -71,6 +71,7 @@ get_player_summary <- function(...) list(my_bid_id=NULL,my_bid_price=NULL,points
 read_player_price_history <- function(...) data.frame()
 read_player_match_history <- function(...) data.frame()
 read_league_round_points <- function(...) {d<-data.frame();attr(d,"complete")<-TRUE;d}
+read_league_round_dataset <- function(championship_id,...) {d<-read_league_round_points(championship_id);list(points=d,checks=data.frame(),complete=isTRUE(attr(d,"complete")))}
 read_auction_observations <- function(...) data.frame()
 read_bid_observations <- function(...) data.frame()
 supabase_get <- function(...) data.frame()
@@ -82,7 +83,7 @@ calculate_league_finances <- function(...) list(team_finances=data.frame(teamid=
   net_profit_loss=0,squad_size=17,points=app_teams$points,point_bonus=0,ranking_prize=0),all_purchases=data.frame())
 # Infrastructure already respects offline mode; make all persistence boundaries
 # deterministic too, so the fixture test never launches a background process.
-defer_persistence <- function(...) invisible(TRUE)
+defer_persistence <- function(fn,args=list(),context=NULL,on_complete=NULL,...) {if(is.function(on_complete))on_complete(TRUE);invisible(TRUE)}
 for (name in c('sync_championship_to_supabase','sync_user_teams_to_supabase','log_user_team_history',
  'sync_real_clubs_to_supabase','sync_players_to_supabase','log_player_history','sync_pressroom_transactions_to_supabase',
  'log_player_daily_snapshots')) assign(name,function(...) invisible(TRUE),envir=.GlobalEnv)
