@@ -22,7 +22,7 @@ async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is
 make_source<-function(player,league='league',rounds=3:10,points=c(1,-2,0,16,3,7,19,18),season='2026'){
  ctx<-resource_context(auth,league,'team',player,season,scoring)
  observed<-data.frame(player_id=player,championship_id=league,season=season,scoring_version=rep(scoring,length(rounds)),
-  round=rounds,points=points,score_status='unknown',observed_at='2026-10-30T12:00:00Z')
+  round=rounds,points=points,score_status='unknown',observed_at=format(Sys.time(),'%Y-%m-%dT%H:%M:%OSZ',tz='UTC'))
  list(context=ctx,observations=observed,points=reconcile_player_points(data.frame(),observed,ctx),previous_points=data.frame())
 }
 server<-function(input,output,session){
@@ -53,7 +53,7 @@ shiny::testServer(server,{
  check('navigation makes outstanding work obsolete',stopifnot(!queued[['league:p2']]$current(),!queued[['league:p3']]$current()))
  before<-calls;queued[['league:p2']]$resolve(make_source('p2'));queued[['league:p3']]$resolve(make_source('p3'));settle(session)
  check('late responses are discarded with no subsequent requests or persistence',{
-  stopifnot(identical(before,calls),length(source$sources())==0L,length(recorded)==1L,!exists('league:p4',queued))
+  stopifnot(identical(before,calls),length(source$sources())==1L,length(recorded)==1L,!exists('league:p4',queued))
  })
 })
 check('missing round has explicit coverage and no shorter-window average',{
@@ -82,7 +82,7 @@ shiny::testServer(players_table_Server,args=list(players_table_RV=reactive(fixtu
  session$setInputs(recent_games_n=3);settle(session)
  check('full table renders while summaries are delayed with no finance read',{
   stopifnot(!is.null(output$players_table),all(is.na(players_table_filtered_RV()$recent_points_avg)),
-   grepl('Loading round points',output$recent_points_status$html,fixed=TRUE),length(recent_points$pending())==2L)
+   grepl('Loading round history',output$recent_points_status,fixed=TRUE),length(recent_points$pending())==2L)
  })
  queued[['league:p1']]$resolve(make_source('p1'));settle(session)
  check('full table updates N3 when first source arrives',{
@@ -166,3 +166,166 @@ shiny::testServer(server,{
  })
 })
 cat(sprintf('RECENT POINTS FINAL: %d passed / 0 failed\n',checks))
+# Regression: off-table acquisition must never rebuild an unchanged table.
+clear_api_cache();calls<-character();queued<-new.env(parent=emptyenv());recorded<-list();matrix<-data.frame();attr(matrix,'complete')<-TRUE
+get_championship_players<-function(login,championship_id)data.frame(id=paste0('p',1:30))
+publication_server<-function(input,output,session){
+ active<-reactiveVal(TRUE);publications<-0L
+ source<-recent_player_points_source(session,reactive(auth),reactive('league'),reactive('team'),reactive(players),active,
+  publish_interval=60)
+ observe({source$history();publications<<-publications+1L})
+}
+shiny::testServer(publication_server,{
+ settle(session)
+ queued[['league:p1']]$resolve(make_source('p1'));settle(session)
+ queued[['league:p2']]$resolve(make_source('p2'));settle(session)
+ before<-publications
+ check('visible group publishes promptly before remaining catalog completes',{
+  stopifnot(nrow(source$history())==16L,source$status()$remaining>0L)
+ })
+ for(player in paste0('p',3:30)){
+  queued[[paste0('league:',player)]]$resolve(make_source(player));settle(session)
+ }
+ check('28 off-table completions change progress without table invalidation',{
+  stopifnot(publications==before,source$status()$attempted==30L,source$status()$remaining==0L,
+   length(source$sources())==30L,length(recorded)==30L)
+ })
+})
+
+# Regression: delayed publication remains bounded while all rows are visible.
+clear_api_cache();calls<-character();queued<-new.env(parent=emptyenv());recorded<-list()
+all_players<-data.frame(id=paste0('p',1:30))
+batched_server<-function(input,output,session){
+ publications<-0L
+ source<-recent_player_points_source(session,reactive(auth),reactive('league'),reactive('team'),reactive(all_players),
+  reactive(TRUE),publish_interval=60)
+ observe({source$history();publications<<-publications+1L})
+}
+shiny::testServer(batched_server,{
+ settle(session);before<-publications
+ for(player in paste0('p',1:30)){
+  queued[[paste0('league:',player)]]$resolve(make_source(player));settle(session)
+ }
+ check('30 visible responses publish context and final batch rather than30 tables',{
+  stopifnot(publications-before<=2L,nrow(source$history())==240L,
+   sum(grepl('get_player_recent_points',calls))==30L)
+ })
+})
+
+# Regression: partial batches publish on the bounded timer, and navigation keeps
+# completed and empty histories while discarding obsolete in-flight requests.
+clear_api_cache();calls<-character();queued<-new.env(parent=emptyenv());recorded<-list()
+get_championship_players<-function(login,championship_id)data.frame(id=paste0('p',1:4))
+timer_server<-function(input,output,session){
+ active<-reactiveVal(TRUE)
+ source<-recent_player_points_source(session,reactive(auth),reactive('league'),reactive('team'),
+  reactive(data.frame(id=paste0('p',1:4))),active,publish_interval=.05)
+}
+shiny::testServer(timer_server,{
+ settle(session);queued[['league:p1']]$resolve(make_source('p1'));settle(session)
+ queued[['league:p2']]$resolve(make_source('p2'));settle(session)
+ later::run_now(timeoutSecs=.08);settle(session)
+ check('pending visible scores publish by the bounded timer',stopifnot(nrow(source$history())==16L))
+ active(FALSE);settle(session);before<-length(calls)
+ active(TRUE);settle(session)
+ check('navigation preserves progress and does not refetch completed players',{
+  summaries<-calls[grepl('get_player_recent_points',calls)]
+  stopifnot(sum(summaries=='get_player_recent_points:p1')==1L,
+   sum(summaries=='get_player_recent_points:p2')==1L,source$status()$attempted==2L,
+   length(source$pending())==2L,nrow(source$history())==16L)
+ })
+})
+
+# Fresh saved gaps are reusable observations, never proof of complete coverage.
+check('saved-history freshness is context scoped and retains sparse coverage',{
+ now<-Sys.time();ctx<-make_source('p1')$context
+ rows<-make_source('p1',rounds=c(8,10),points=c(7,18))$observations
+ rows$observed_at<-format(now-2*3600,'%Y-%m-%dT%H:%M:%OSZ',tz='UTC')
+ good<-list(p1=resource_state(make_source('p1')))
+ stopifnot(identical(recent_points_saved_players(rows,ctx,good,now),'p1'))
+ unknown<-ctx;unknown$season<-'unknown';rows$season<-'unknown'
+ probe<-make_source('p1',season='unknown')
+ stopifnot(!length(recent_points_saved_players(rows,unknown,list(p1=resource_state(probe)),now)))
+ rows$observed_at<-format(now-60,'%Y-%m-%dT%H:%M:%OSZ',tz='UTC')
+ stopifnot(identical(recent_points_saved_players(rows,unknown,list(p1=resource_state(probe)),now),'p1'))
+ # The helper receives context-filtered rows; a mismatched probe cannot authorize reuse.
+ stopifnot(!length(recent_points_saved_players(rows,unknown,good,now)))
+ newer<-make_source('p1',rounds=11,points=4,season='unknown')
+ stopifnot(!length(recent_points_saved_players(rows,unknown,list(p1=resource_state(newer)),now)))
+ avg<-recent_average_exact(data.frame(id='p1'),data.frame(player_id='p1',round=c(8,10),points=c(7,18)),3)
+ stopifnot(is.na(avg$recent_points_avg),avg$recent_points_count==2L)
+})
+
+# Regression: a fresh, sparse unknown-season matrix avoids catalog replay after
+# two probes, and empty responses are retained across navigation within a view.
+clear_api_cache();calls<-character();queued<-new.env(parent=emptyenv());recorded<-list()
+matrix<-dplyr::bind_rows(lapply(paste0('p',1:4),function(player)
+ make_source(player,rounds=c(8,10),points=c(7,18),season='unknown')$observations));attr(matrix,'complete')<-TRUE
+shiny::testServer(server,{
+ settle(session);queued[['league:p1']]$resolve(make_source('p1',season='unknown'));settle(session)
+ check('fresh unknown-context sparse matrix reuses saved players without catalog replay',{
+  stopifnot(sum(grepl('get_player_recent_points',calls))==2L,
+   !exists('league:p3',queued),!exists('league:p4',queued))
+ })
+})
+cat(sprintf('RECENT POINTS REDRAW REGRESSIONS: %d total passed / 0 failed\n',checks))
+
+check('partial latest-round matrix cannot hide another player missing that round',{
+ ctx<-make_source('p1')$context
+ saved<-dplyr::bind_rows(make_source('p1',rounds=11,points=4)$observations,
+  make_source('p2',rounds=10,points=8)$observations)
+ probe<-list(p1=resource_state(make_source('p1',rounds=11,points=4)))
+ stopifnot(identical(recent_points_saved_players(saved,ctx,probe),'p1'))
+ saved$championship_id<-'other-league'
+ stopifnot(!length(recent_points_saved_players(saved,ctx,probe)))
+})
+clear_api_cache();calls<-character();queued<-new.env(parent=emptyenv());recorded<-list();matrix<-data.frame();attr(matrix,'complete')<-TRUE
+off_table_server<-function(input,output,session){
+ source<-recent_player_points_source(session,reactive(auth),reactive('league'),reactive('team'),reactive(players),
+  reactive(TRUE),publish_interval=.05)
+}
+shiny::testServer(off_table_server,{
+ settle(session)
+ for(player in c('p1','p2')){queued[[paste0('league:',player)]]$resolve(make_source(player));settle(session)}
+ queued[['league:p3']]$resolve(make_source('p3',rounds=11,points=4));settle(session)
+ later::run_now(timeoutSecs=.08);settle(session)
+ check('off-table new round updates the table window without fabricating scores',{
+  stopifnot(attr(source$history(),'latest_round')==11L,
+   is.na(recent_average_exact(players,source$history(),3)$recent_points_avg[1]))
+ })
+})
+cat(sprintf('RECENT POINTS COMPLETE: %d passed / 0 failed\n',checks))
+
+clear_api_cache();calls<-character();queued<-new.env(parent=emptyenv());recorded<-list();matrix<-data.frame();attr(matrix,'complete')<-TRUE
+shiny::testServer(server,{
+ settle(session)
+ empty<-make_source('p1');empty$observations<-empty$observations[FALSE,];empty$points<-empty$points[FALSE,]
+ queued[['league:p1']]$resolve(empty);settle(session)
+ active(FALSE);settle(session);active(TRUE);settle(session)
+ check('successful empty response survives navigation without an infinite retry',{
+  stopifnot(sum(calls=='get_player_recent_points:p1')==1L,'p1'%in%names(source$sources()),
+   source$status()$attempted==1L)
+ })
+})
+cat(sprintf('RECENT POINTS FINAL REGRESSIONS: %d passed / 0 failed\n',checks))
+
+clear_api_cache();calls<-character();queued<-new.env(parent=emptyenv());recorded<-list()
+matrix<-dplyr::bind_rows(lapply(paste0('p',1:4),function(player)make_source(player)$observations));attr(matrix,'complete')<-TRUE
+refresh_table_server<-function(input,output,session){
+ refresh<-reactiveVal(0L);active<-reactiveVal(TRUE)
+ source<-recent_player_points_source(session,reactive(auth),reactive('league'),reactive('team'),
+  reactive(data.frame(id=paste0('p',1:3))),active,refresh)
+}
+shiny::testServer(refresh_table_server,{
+ settle(session)
+ for(player in c('p1','p2')){queued[[paste0('league:',player)]]$resolve(make_source(player));settle(session)}
+ stopifnot(sum(grepl('get_player_recent_points',calls))==2L,!exists('league:p3',queued))
+ # Refresh may briefly hide optional content while primary data loads.
+ active(FALSE);refresh(1L);settle(session);active(TRUE);settle(session)
+ for(player in c('p1','p2')){queued[[paste0('league:',player)]]$resolve(make_source(player));settle(session)}
+ check('explicit refresh retries all current table players but reuses other catalog history',{
+  stopifnot(exists('league:p3',queued),!exists('league:p4',queued),
+   sum(grepl('get_player_recent_points',calls))==5L)
+ })
+})
+cat(sprintf('RECENT POINTS VERIFIED: %d passed / 0 failed\n',checks))

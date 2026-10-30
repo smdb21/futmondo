@@ -110,7 +110,8 @@ if (filter_by_position) {
         column(width=12,
           numericInput(ns("recent_games_n"),"Average points: latest rounds",
             min=1,max=20,value=5,step=1,width="180px"),
-          uiOutput(ns("recent_points_status"))
+          div(class="player-round-progress",role="status",`aria-live`="polite",`aria-atomic`="true",
+            textOutput(ns("recent_points_status")))
         )
       ),
 
@@ -437,20 +438,18 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       return(players_table)
     })
     
-    output$recent_points_status <- renderUI({
+    output$recent_points_status <- renderText({
       req(is_module_active(),optional_ready())
       status <- tryCatch(recent_points$status(),error=function(e)NULL)
-      if(is.null(status))return(div(class="text-muted",role="status","Loading round points…"))
+      if(is.null(status))return("Loading round history…")
       messages <- character()
-      if(status$remaining+status$pending>0L)messages <- c(messages,paste0("Loading round points: ",
+      if(status$remaining+status$pending>0L)messages <- c(messages,paste0("Loading round history: ",
         status$total-status$remaining-status$pending,"/",status$total," players."))
-      if(status$saving>0L)messages <- c(messages,paste0("Saving round points: ",status$saving," batches pending."))
+      if(status$saving>0L)messages <- c(messages,paste0("Saving history: ",status$saving," pending."))
       if(!is.null(status$save_error))messages <- c(messages,status$save_error)
       if(status$failed>0L)messages <- c(messages,paste0(status$failed," player histories unavailable. Refresh to retry."))
       if(!status$matrix_complete)messages <- c(messages,"Saved round history is incomplete.")
-      if(!length(messages))return(NULL)
-      div(class="text-muted",role="status",paste(messages,collapse=" "),
-        " Calculated averages require every requested round; missing scores are not zero. Reported last-five averages are labeled.")
+      paste(messages,collapse=" ")
     })
 
     # renders ----
@@ -596,10 +595,36 @@ get_player_recent_points <- function(login,championship_id,user_team_id,player_i
     previous_points=data.frame(),status=if(nrow(observed))"partial"else "empty")
 }
 
-# One league matrix and at most two pending summary reads. The queue consists
-# only of IDs from the active league; no timers or autonomous activity.
+# Reuse recently observed histories only inside their exact source context.
+# A live probe establishes the current round; gaps never become zero or complete.
+recent_points_saved_players <- function(stored,context,acquired,now=Sys.time()) {
+  stored <- history_context_filter(stored,context)
+  if(!is.data.frame(stored)||!nrow(stored)||!all(c("player_id","round","observed_at")%in%names(stored)))return(character())
+  probes <- Filter(function(x)!is.null(x$data)&&!identical(x$freshness,"stale"),acquired)
+  if(!length(probes))return(character())
+  probe_rounds <- unlist(lapply(probes,function(x){
+    rows <- history_context_filter(x$data$observations,context)
+    suppressWarnings(as.numeric(rows$round))
+  }),use.names=FALSE)
+  probe_rounds <- probe_rounds[is.finite(probe_rounds)&probe_rounds>=1]
+  if(!length(probe_rounds))return(character())
+  latest_probe <- max(probe_rounds)
+  stored_rounds <- suppressWarnings(as.numeric(stored$round))
+  valid <- is.finite(stored_rounds)&stored_rounds>=1
+  if(!any(valid))return(character())
+  lifetime <- if(context$season!="unknown"&&context$scoring_version!="unknown")24*3600 else 3600
+  age <- as.numeric(difftime(now,fm_time(stored$observed_at),units="secs"))
+  fresh <- is.finite(age)&age>=-60&age<lifetime
+  reusable <- unique(as.character(stored$player_id[fresh&valid]))
+  # A partial league fill must not hide players still missing the probe round.
+  # A returned NULL score is an observation; it remains unavailable for averages.
+  intersect(reusable,as.character(stored$player_id[valid&stored_rounds==latest_probe]))
+}
+
+# Acquisition advances independently of table rendering. Only table-player
+# changes or a new league-round anchor publish at most one snapshot per 5 s.
 recent_player_points_source <- function(session,login_token,championship_id,user_team_id,
-  players_RV,is_active=function()TRUE,refresh_trigger=NULL) {
+  players_RV,is_active=function()TRUE,refresh_trigger=NULL,publish_interval=5) {
   value <- function(x)if(is.function(x))x()else x
   owner <- reactive({
     auth <- value(login_token)
@@ -623,66 +648,60 @@ recent_player_points_source <- function(session,login_token,championship_id,user
       catalog=catalog_read(login=auth,championship_id=scope$league))
   })
   sources <- reactiveVal(list());pending <- reactiveVal(list());generation <- 0L;closed <- FALSE
+  source_season <- reactiveVal("unknown");history <- reactiveVal(data.frame())
+  force_current_table <- reactiveVal(FALSE)
+  publish_tick <- reactiveVal(0L);publish_timer <- NULL;last_signature <- NULL;last_base <- NULL
+  last_published <- -Inf
   matrix_refreshed <- FALSE;persistence_attempted <- FALSE;previous_owner <- NULL
-  session$onSessionEnded(function(){closed <<- TRUE;generation <<- generation+1L})
+  cancel_publication <- function(){if(is.function(publish_timer))publish_timer();publish_timer <<- NULL}
+  session$onSessionEnded(function(){closed <<- TRUE;generation <<- generation+1L;cancel_publication()})
   observeEvent(owner(),{
     scope <- owner()
     same_scope <- !is.null(previous_owner)&&identical(scope$account,previous_owner$account)&&
       identical(scope$league,previous_owner$league)&&identical(scope$team,previous_owner$team)
-    if(same_scope&&nzchar(scope$account)&&!identical(scope$refresh,previous_owner$refresh))
-      invalidate_resources(resource_context(account_id=scope$account,championship_id=scope$league,
-        user_team_id=scope$team),pattern="^player_summary_points$|^player_summary_")
+    refreshed <- same_scope&&!identical(scope$refresh,previous_owner$refresh)
+    if(!is.null(previous_owner)&&length(isolate(pending()))&&nzchar(previous_owner$account)){
+      for(player in names(isolate(pending())))invalidate_resources(resource_context(
+        account_id=previous_owner$account,championship_id=previous_owner$league,
+        user_team_id=previous_owner$team,player_id=player,session_id=session$token),resources="player_summary_points")
+    }
+    if(refreshed&&nzchar(scope$account))invalidate_resources(resource_context(account_id=scope$account,
+      championship_id=scope$league,user_team_id=scope$team),pattern="^player_summary_points$|^player_summary_")
     previous_owner <<- scope
-    generation <<- generation+1L;sources(list());matrix_refreshed <<- FALSE;persistence_attempted <<- FALSE
+    generation <<- generation+1L;pending(list());cancel_publication()
+    if(!same_scope||refreshed){
+      sources(list());source_season("unknown");history(data.frame())
+      force_current_table(refreshed)
+      last_signature <<- NULL;last_base <<- NULL;last_published <<- -Inf
+      matrix_refreshed <<- FALSE;persistence_attempted <<- FALSE
+    }
   },ignoreNULL=FALSE,priority=90)
   context <- reactive({
     scope <- owner();req(nzchar(scope$account),nzchar(scope$league),nzchar(scope$team))
-    season <- league_season_context(scope$league)
-    for(source in sources())if(!is.null(source$data)&&source$data$context$season!="unknown"){
-      season <- source$data$context$season;break
-    }
+    season <- source_season();if(identical(season,"unknown"))season <- league_season_context(scope$league)
     lineup <- tryCatch(states()$lineup$data,error=function(e)NULL)
     resource_context(value(login_token),scope$league,scope$team,season=season,
       scoring_version=normalize_league_rules(list(),lineup,scope$league)$scoring_version,session_id=session$token)
   })
-  ids <- reactive({
+  table_ids <- reactive({
     rows <- tryCatch(players_RV(),error=function(e)NULL)
+    result <- if(is.data.frame(rows)&&"id"%in%names(rows))as.character(rows$id)else character()
+    unique(result[!is.na(result)&nzchar(result)])
+  })
+  ids <- reactive({
     catalog <- tryCatch(states()$catalog$data,error=function(e)NULL)
-    get_ids <- function(d)if(is.data.frame(d)&&"id"%in%names(d))as.character(d$id)else character()
-    result <- unique(c(get_ids(rows),get_ids(catalog)))
+    catalog_ids <- if(is.data.frame(catalog)&&"id"%in%names(catalog))as.character(catalog$id)else character()
+    result <- unique(c(table_ids(),catalog_ids))
     head(result[!is.na(result)&nzchar(result)],2000L)
   })
-  history <- reactive({
-    ctx <- context();matrix <- tryCatch(states()$matrix$data,error=function(e)NULL)
-    stored <- history_context_filter(matrix,ctx);acquired <- sources();rows <- list()
-    by_player <- if(nrow(stored))split(stored,as.character(stored$player_id))else list()
-    observed_rounds <- suppressWarnings(as.numeric(stored$round))
-    for(player in unique(c(names(by_player),names(acquired)))){
-      player_ctx <- ctx;player_ctx$player_id <- player
-      live <- history_context_filter(acquired[[player]]$data$observations,player_ctx)
-      observed_rounds <- c(observed_rounds,suppressWarnings(as.numeric(live$round)))
-      points <- reconcile_player_points(by_player[[player]],live,player_ctx)
-      if(nrow(points))rows[[player]] <- data.frame(player_id=player,round=points$round_number,
-        points=points$points,season=rep(ctx$season,nrow(points)),scoring_version=rep(ctx$scoring_version,nrow(points)))
-    }
-    result <- dplyr::bind_rows(rows)
-    observed_rounds <- observed_rounds[is.finite(observed_rounds)&observed_rounds>=1]
-    if(length(observed_rounds))attr(result,"latest_round") <- max(observed_rounds)
-    result
+  stored <- reactive(history_context_filter(tryCatch(states()$matrix$data,error=function(e)NULL),context()))
+  reusable <- reactive({
+    saved_ids <- recent_points_saved_players(stored(),context(),sources())
+    # Refresh retries the current table, without replaying the other league players.
+    if(force_current_table())setdiff(saved_ids,table_ids())else saved_ids
   })
   needed <- reactive({
-    all_ids <- ids();acquired <- sources();ctx <- context();observed <- history()
-    known <- ctx$season!="unknown"&&ctx$scoring_version!="unknown"
-    latest <- attr(observed,"latest_round") %||% if(nrow(observed))max(observed$round,na.rm=TRUE)else NA_real_
-    complete <- character()
-    if(known&&length(acquired)&&is.finite(latest)&&latest>=1){
-      valid <- is.finite(observed$points)
-      rounds_by_player <- split(observed$round[valid],as.character(observed$player_id[valid]))
-      complete <- all_ids[vapply(all_ids,function(player){
-        all(seq_len(as.integer(latest))%in%rounds_by_player[[player]])
-      },logical(1))]
-    }
-    setdiff(all_ids,c(names(acquired),names(pending()),complete))
+    setdiff(ids(),c(names(sources()),names(pending()),reusable()))
   })
   observe({
     scope <- owner();if(closed||!scope$active||!nzchar(scope$account))return()
@@ -713,11 +732,15 @@ recent_player_points_source <- function(session,login_token,championship_id,user
         busy <- isolate(pending())
         if(identical(busy[[player_id]],attempt_generation)){busy[[player_id]] <- NULL;pending(busy)}
         if(!current())return(NULL)
+        if(!is.null(result$data)&&!identical(result$freshness,"stale")){
+          season <- result$data$context$season %||% "unknown"
+          if(!identical(season,"unknown"))source_season(season)
+        }
         acquired <- isolate(sources());acquired[[player_id]] <- result;sources(acquired)
         if(!is.null(result$data)&&!identical(result$freshness,"stale")){
           payload <- result$data;payload$context$session_id <- session$token
-          stored <- history_context_filter(isolate(states())$matrix$data,payload$context)
-          payload$previous_points <- reconcile_player_points(stored,data.frame(),payload$context)
+          saved <- history_context_filter(isolate(states())$matrix$data,payload$context)
+          payload$previous_points <- reconcile_player_points(saved,data.frame(),payload$context)
           if(nrow(payload$points))persistence_attempted <<- TRUE
           tryCatch(record_acquired_resource("player_card_history",payload,payload$context),error=function(e)NULL)
         }
@@ -725,6 +748,47 @@ recent_player_points_source <- function(session,login_token,championship_id,user
       })
     })
   })
+  observe({
+    scope <- owner();if(closed||!scope$active||!nzchar(scope$account))return()
+    state <- states();if(any(vapply(state,function(x)identical(x$status,"loading"),logical(1))))return()
+    ctx <- context();saved <- stored();visible <- table_ids();acquired <- sources();publish_tick()
+    scoped_live <- lapply(acquired,function(x)history_context_filter(x$data$observations,ctx))
+    live_rounds <- unlist(lapply(scoped_live,function(x)suppressWarnings(as.numeric(x$round))),use.names=FALSE)
+    rounds <- c(suppressWarnings(as.numeric(saved$round)),live_rounds)
+    rounds <- rounds[is.finite(rounds)&rounds>=1];latest <- if(length(rounds))max(rounds)else NULL
+    base <- list(context=ctx[c("account_id","championship_id","user_team_id","season","scoring_version")],
+      ids=visible,stored=saved)
+    visible_sources <- names(Filter(function(x)is.data.frame(x)&&nrow(x)>0L,scoped_live[intersect(visible,names(scoped_live))]))
+    signature <- list(base=base,acquired=visible_sources,latest=latest)
+    if(identical(signature,last_signature))return()
+    new_base <- !identical(base,last_base)
+    visible_complete <- all(visible%in%c(names(acquired),reusable()))
+    complete <- visible_complete||(!length(needed())&&!length(pending()))
+    elapsed <- as.numeric(Sys.time())-last_published
+    if(!new_base&&!complete&&elapsed<publish_interval){
+      if(is.null(publish_timer)){
+        attempt_generation <- generation
+        publish_timer <<- later::later(function(){
+          publish_timer <<- NULL
+          if(!closed&&identical(generation,attempt_generation)&&isTRUE(isolate(is_active())))
+            shiny::isolate(publish_tick(publish_tick()+1L))
+        },max(0,publish_interval-elapsed))
+      }
+      return()
+    }
+    cancel_publication()
+    by_player <- if(nrow(saved))split(saved,as.character(saved$player_id))else list()
+    rows <- lapply(visible,function(player){
+      player_ctx <- ctx;player_ctx$player_id <- player
+      points <- reconcile_player_points(by_player[[player]],scoped_live[[player]],player_ctx)
+      if(!nrow(points))return(NULL)
+      data.frame(player_id=player,round=points$round_number,points=points$points,
+        season=rep(ctx$season,nrow(points)),scoring_version=rep(ctx$scoring_version,nrow(points)))
+    })
+    result <- dplyr::bind_rows(rows);if(!is.null(latest))attr(result,"latest_round") <- latest
+    last_signature <<- signature;last_base <<- base;last_published <<- as.numeric(Sys.time())
+    history(result)
+  },priority=-10)
   status <- reactive({
     all_ids <- ids();acquired <- sources();.persistence_state$revision()
     saving <- background_sync_status(owner()$account)

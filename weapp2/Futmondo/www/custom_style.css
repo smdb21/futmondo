@@ -1113,10 +1113,17 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 .player-recent-round-label, .player-recent-rounds-empty { color: var(--fm-muted); }
 
 .player-average-control { margin: 0 0 8px; }
-.player-average-control .col-sm-12 { display: flex; justify-content: flex-end; }
-@media (max-width: 767px) {
-  .player-average-control .col-sm-12 { justify-content: flex-start; }
+.player-average-control .col-sm-12 { display: block; min-width: 0; }
+.player-average-control .shiny-input-container { max-width: 100%; margin-bottom: 8px; }
+.player-round-progress {
+  clear: both;
+  min-height: 1.4em;
+  color: var(--fm-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
+.player-round-progress .recalculating { opacity: 1; }
 
 
 /* Completed-round MVP cards remain readable on narrow screens. */

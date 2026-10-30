@@ -2250,7 +2250,7 @@
       "checksum": "b74340bf198b703b3aad9bedb47b6ed4"
     },
     "Modules/Players_Table_Module.R": {
-      "checksum": "d06514c4643c0280b34cbaf5f10cb8df"
+      "checksum": "9a8f561a6a5d92c1e4d9b84c414e9a5b"
     },
     "Modules/Plots_Module.R": {
       "checksum": "d28b6843516e7a88406119bf287000c2"
@@ -2292,7 +2292,7 @@
       "checksum": "6253d5e12d91ddef162c7e9e7624680a"
     },
     "www/custom_style.css": {
-      "checksum": "5f84aee771089db9fdc6483f8c220843"
+      "checksum": "f0afb183ecc679d5b0bd94553d15d8a5"
     }
   },
   "users": null
