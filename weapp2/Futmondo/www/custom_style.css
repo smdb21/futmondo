@@ -1,8 +1,8 @@
 /* System monospace typography; no external font request. */
 .round-countdown-bar { position: sticky; top: 0; z-index: 1025; display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; margin: 0 0 12px; padding: 9px 14px; border: 1px solid var(--fm-border); border-radius: 3px; background: var(--fm-bg); color: var(--fm-text); font-size: 12px; line-height: 1.4; font-variant-numeric: tabular-nums; }
-.round-countdown-main { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
-.round-countdown-finance { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px 10px; text-align: right; }
-.round-countdown-finance-item, .round-countdown-solvency { white-space: nowrap; }
+.round-countdown-main { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.round-countdown-finance { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px 10px; min-width: 0; max-width: 100%; text-align: right; }
+.round-countdown-finance-item, .round-countdown-solvency { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 .round-countdown-solvency { font-weight: 600; }
 .round-countdown-solvent { border-color: var(--fm-text); }
 .round-countdown-warning { border-color: var(--fm-danger); color: var(--fm-danger); }

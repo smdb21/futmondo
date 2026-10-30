@@ -373,6 +373,10 @@ get_market_players <- function(login, championship_id, user_team_id) {
       ret <- ret %>% as.data.frame()
       ret <- ret[, which(is.na(names(ret)) == FALSE)]
     }
+    # Explicit absent-own-bid columns distinguish a valid market with no own
+    # bids from an incomplete/malformed frame at display consumers.
+    if (!"bid_id" %in% names(ret)) ret$bid_id <- rep(NA_character_, nrow(ret))
+    if (!"bid_price" %in% names(ret)) ret$bid_price <- rep(NA_real_, nrow(ret))
     ret <- ret %>% dplyr::arrange(desc(change))
     ret
   }, context=resource_context(login=login,championship_id=championship_id,user_team_id=user_team_id))

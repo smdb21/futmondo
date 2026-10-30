@@ -2211,7 +2211,7 @@
       "checksum": "73ad94f3463e3a9c6160177aa0e22844"
     },
     "data_contracts.R": {
-      "checksum": "0b577313f8cff55c12a666009c0370db"
+      "checksum": "6d526867180d5a9d36f8a7912f424774"
     },
     "data_service.R": {
       "checksum": "8b7e22bf715cb9f99ef78f7f1e2b2f94"
@@ -2220,7 +2220,7 @@
       "checksum": "e7c0ae55954bdc551b46c460c89e8a1b"
     },
     "futmondo_functions.R": {
-      "checksum": "a5906824fd6285d6aeeefd245c7afbad"
+      "checksum": "d98893469b4817206e5102748b469663"
     },
     "global.R": {
       "checksum": "33f15bfbb10105519eca1cb7bedcfb37"
@@ -2265,7 +2265,7 @@
       "checksum": "2513f68860728c6737b77d542833bcd5"
     },
     "Modules/Today_Module.R": {
-      "checksum": "976f249f198195fb1ced0287b550858e"
+      "checksum": "acf3277e9db32ae2fefc7ae93001b99e"
     },
     "mvp_runtime.R": {
       "checksum": "f8294321c1c28f953b0db2e12c59faa2"
@@ -2277,7 +2277,7 @@
       "checksum": "ba8d623a904f8a43fcc286c0f4c97487"
     },
     "server.R": {
-      "checksum": "843ff1346738b2cd3363a863de5dcd02"
+      "checksum": "966fb7d1d4e47b09427f0d8e82504f70"
     },
     "supabase_connector.R": {
       "checksum": "2c110477906581345ea637cf1714d5ed"
@@ -2292,7 +2292,7 @@
       "checksum": "6253d5e12d91ddef162c7e9e7624680a"
     },
     "www/custom_style.css": {
-      "checksum": "586f3f356b58f37ad13ca45847c92b90"
+      "checksum": "5f84aee771089db9fdc6483f8c220843"
     }
   },
   "users": null

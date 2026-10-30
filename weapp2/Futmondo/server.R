@@ -66,17 +66,37 @@ function(input, output, session) {
   championship_id_RV <- reactive({ req(championship_RV()); unname(championship_RV()["id"]) })
   user_team_id_RV <- reactive({ req(championship_RV()); unname(championship_RV()["userteam.id"]) })
   user_team_name_RV <- reactive({ req(championship_RV()); unname(championship_RV()["userteam.name"]) })
-  bind_factual_reads(c("get_teams","get_financial_snapshot","get_finished_rounds"),session,
+  bind_factual_reads(c("get_teams","get_finished_rounds"),session,
     login_token_RV,championship_id_RV,user_team_id_RV,is_active=function()valid_login(login_token_RV())&&isTRUE(startup_primary_ready()),refresh_trigger=refresh_trigger)
-  # Keep the clock smooth without rebuilding the expensive acquisition and
-  # pressroom-backed financial snapshot every second. Explicit refreshes and
-  # market events still invalidate this reactive immediately.
-  round_finance_RV <- reactive({
-    req(valid_login(login_token_RV()), startup_primary_ready(), championship_id_RV(), user_team_id_RV())
+  # Today and the banner consume the exact same account/league/team states.
+  # The display never waits for roster, pressroom, lineup or acquisition checks.
+  team_retry <- reactiveVal(0L); market_retry <- reactiveVal(0L)
+  round_finance_version <- reactive({
+    req(valid_login(login_token_RV()))
     refresh_trigger()
     invalidateLater(60000, session)
-    tryCatch(get_financial_snapshot(login_token_RV(), championship_id_RV(), user_team_id_RV()),
-      error = function(e) NULL)
+    paste(refresh_trigger(), as.numeric(Sys.time()), sep=":")
+  })
+  primary_read <- function(handler, retry) {
+    factual_read_adapter(session,handler,login_token_RV,championship_id_RV,user_team_id_RV,
+      is_active=function()valid_login(login_token_RV()),
+      refresh_trigger=function()paste(round_finance_version(),retry(),sep=":"),state_only=TRUE)
+  }
+  team_read <- primary_read("get_user_team_info", team_retry)
+  market_read <- primary_read("get_market_players", market_retry)
+  primary_team_state <- reactive({
+    req(valid_login(login_token_RV()),championship_id_RV(),user_team_id_RV())
+    team_read(login_token_RV(),championship_id_RV(),user_team_id_RV())
+  })
+  primary_market_state <- reactive({
+    req(valid_login(login_token_RV()),championship_id_RV(),user_team_id_RV())
+    market_read(login_token_RV(),championship_id_RV(),user_team_id_RV())
+  })
+  primary_sources <- list(team_state=primary_team_state,market_state=primary_market_state,
+    retry_team=function()team_retry(isolate(team_retry())+1L),
+    retry_market=function()market_retry(isolate(market_retry())+1L))
+  round_finance_RV <- reactive({
+    round_finance_display(primary_team_state(), primary_market_state())
   })
   round_catalog_RV <- reactive({
     req(valid_login(login_token_RV()), startup_primary_ready(), championship_id_RV())
@@ -90,51 +110,41 @@ function(input, output, session) {
       return(tags$div(class = "round-countdown-bar round-countdown-unavailable",
         icon("clock"), tags$span("Log in to see the next round countdown")))
     }
-    rounds <- round_catalog_RV()
+    primary_ready <- isTRUE(startup_primary_ready())
+    rounds <- if (primary_ready) round_catalog_RV() else data.frame()
     next_round <- next_round_context(rounds)
-    if (!isTRUE(next_round$available)) {
+    round_heading <- if (isTRUE(next_round$available)) {
+      tags$div(class="round-countdown-main",icon("clock"),
+        tags$strong(paste0("Round ",next_round$round_number)),tags$span(format_round_countdown(next_round$starts_at)))
+    } else {
       current_round <- current_round_context(rounds)
       if (isTRUE(current_round$available)) {
-        return(tags$div(class = "round-countdown-bar round-countdown-in-progress",
-          tags$div(class = "round-countdown-main", icon("futbol"),
-            tags$strong(paste0("Round ", current_round$round_number)),
-            tags$span("In progress"))))
-      }
-      return(tags$div(class = "round-countdown-bar round-countdown-unavailable",
-        icon("clock"), tags$span("Round schedule unavailable")))
+        tags$div(class="round-countdown-main",icon("futbol"),
+          tags$strong(paste0("Round ",current_round$round_number)),tags$span("In progress"))
+      } else tags$div(class="round-countdown-main",icon("clock"),
+        tags$span(if (primary_ready) "Round schedule unavailable" else "Loading round schedule…"))
     }
     finance <- round_finance_RV()
-    cash <- if (is.list(finance)) fm_number(finance$cash) else NA_real_
-    # commitments is a structured snapshot, not a scalar: retain both the
-    # held amount and the number of active outgoing offers for the top bar.
-    commitment_snapshot <- if (is.list(finance)) finance$commitments else NULL
-    commitments <- if (is.list(commitment_snapshot)) fm_number(commitment_snapshot$total_amount) else fm_number(commitment_snapshot)
-    active_offer_count <- if (is.list(commitment_snapshot)) fm_number(commitment_snapshot$count) else NA_real_
-    final_balance <- if (is.list(finance)) fm_number(finance$projected_committed_balance) else NA_real_
-    spendable <- if (is.list(finance)) fm_number(finance$spendable_budget) else NA_real_
-    money_text <- function(x) if (is.finite(x)) paste0(format(round(x), big.mark = ".", decimal.mark = ",", scientific = FALSE), " EUR") else "Unavailable"
+    cash <- finance$cash
+    commitments <- finance$commitments
+    active_offer_count <- finance$active_offer_count
+    final_balance <- finance$projected_committed_balance
+    spendable <- finance$spendable_budget
+    money_text <- function(x, loading=FALSE) if (is.finite(x)) paste0(format(round(x), big.mark=".", decimal.mark=",", scientific=FALSE), " EUR") else if (loading) "Loading…" else "Unavailable"
+    cash_text <- paste0(money_text(cash,finance$cash_loading),if (finance$cash_stale) " (cached)" else if (finance$cash_unverified) " (unverified)" else "")
     offers_text <- if (is.finite(commitments)) {
       suffix <- if (is.finite(active_offer_count)) paste0(" (", as.integer(active_offer_count), ")") else ""
       paste0(money_text(commitments), suffix)
-    } else "Unavailable"
-    solvency_class <- if (is.finite(final_balance) && final_balance > 0) "round-countdown-solvent" else "round-countdown-warning"
-    solvency_text <- if (!is.finite(final_balance)) {
-      "Balance after offers unavailable — refresh to verify"
-    } else if (final_balance > 0) {
-      NULL
-    } else {
-      paste0("Restore at least ", format(round(abs(final_balance) + 1), big.mark = ".", decimal.mark = ",", scientific = FALSE),
-        " EUR before kickoff to score points")
-    }
+    } else if (finance$offers_loading) "Loading…" else "Unavailable"
+    solvency_class <- finance$class
+    solvency_text <- finance$message
     tags$div(class = paste("round-countdown-bar", solvency_class),
-      tags$div(class = "round-countdown-main", icon("clock"),
-        tags$strong(paste0("Round ", next_round$round_number)),
-        tags$span(format_round_countdown(next_round$starts_at))),
+      round_heading,
       tags$div(class = "round-countdown-finance",
-        tags$span(class = "round-countdown-finance-item", paste0("Balance: ", money_text(cash))),
+        tags$span(class = "round-countdown-finance-item", paste0("Balance: ", cash_text)),
         tags$span(class = "round-countdown-finance-item", paste0("Active offers: ", offers_text)),
-        tags$span(class = "round-countdown-finance-item", paste0("After offers: ", money_text(if (is.finite(cash) && is.finite(commitments)) cash - commitments else NA_real_))),
-        tags$span(class = "round-countdown-finance-item", paste0("Can spend: ", money_text(spendable))),
+        tags$span(class = "round-countdown-finance-item", paste0("After offers: ", money_text(final_balance,finance$cash_loading || finance$offers_loading))),
+        tags$span(class = "round-countdown-finance-item", paste0("Can spend: ", money_text(spendable,finance$cash_loading || finance$offers_loading))),
         if (!is.null(solvency_text)) tags$span(class = "round-countdown-solvency", solvency_text)))
   })
   user_teams_RV <- reactive({
@@ -168,7 +178,8 @@ selected_player_RV <- players_in_teams_Server(id = "players_in_teams",
                championship_id = championship_id_RV,
                user_team_id = user_team_id_RV,
                user_teams_RV = user_teams_RV,
-               refresh_trigger = refresh_trigger)
+               refresh_trigger = refresh_trigger,
+               primary_sources = primary_sources)
 
 players_in_championship_Server(id = "players_in_championship", 
                                   is_module_active = reactive({

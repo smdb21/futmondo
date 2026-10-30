@@ -74,27 +74,69 @@ check("current round selects latest started unfinished round", {
   no_current <- current_round_context(all_finished,now)
   stopifnot(current$available,current$round_number==5,isFALSE(no_current$available))
 })
-check("global UI exposes countdown and deadline solvency warning", {
+check("known cash survives loading or failed offers without a debt warning", {
+  team <- resource_state(list(budget=180546496,withheld=0,teamValue=350438934))
+  loading <- round_finance_display(team,resource_state(status="loading"))
+  failed <- round_finance_display(team,resource_state(status="unavailable",error=simpleError("synthetic failure")))
+  stopifnot(loading$cash==180546496,loading$offers_loading,is.na(loading$commitments),
+    loading$class=="round-countdown-unavailable",loading$message=="Loading active offers…",
+    failed$cash==180546496,is.na(failed$projected_committed_balance),
+    failed$class=="round-countdown-unavailable",grepl("could not load",failed$message))
+})
+check("banner uses greater reservation once and retains exact confirmed boundaries", {
+  market <- resource_state(data.frame(bid_id=c("own","own"),bid_price=c(200,200)))
+  x <- round_finance_display(resource_state(list(budget=1000,withheld=300,teamValue=10000)),market)
+  stopifnot(x$commitments==200,x$active_offer_count==1L,x$projected_committed_balance==700,
+    x$spendable_budget==5700,x$class=="round-countdown-solvent")
+  zero <- round_finance_display(resource_state(list(budget=300,withheld=300,teamValue=10000)),market)
+  debt <- round_finance_display(resource_state(list(budget=-10)),resource_state(status="loading"))
+  stopifnot(zero$class=="round-countdown-warning",grepl("1 EUR before kickoff",zero$message,fixed=TRUE),
+    debt$class=="round-countdown-warning",grepl("active offers still need verification",debt$message,fixed=TRUE))
+})
+check("missing withheld and malformed or stale market never imply zero reservation", {
+  no_withheld <- round_finance_display(resource_state(list(budget=1000,teamValue=10000)),resource_state(data.frame()))
+  malformed <- round_finance_display(resource_state(list(budget=1000,withheld=0)),resource_state(data.frame(id="listing")))
+  invalid <- round_finance_display(resource_state(list(budget=1000,withheld=0)),resource_state(data.frame(bid_id="own",bid_price=NA_real_)))
+  stale <- round_finance_display(resource_state(observed_data(list(budget=1000,withheld=0),status="stale")),resource_state(data.frame()))
+  stale_debt <- round_finance_display(resource_state(observed_data(list(budget=-10,withheld=0),status="stale")),resource_state(data.frame()))
+  stopifnot(is.na(no_withheld$projected_committed_balance),no_withheld$class=="round-countdown-unavailable",
+    is.na(malformed$commitments),is.na(invalid$commitments),stale$cash_stale,
+    stale$class=="round-countdown-unavailable",stale_debt$class=="round-countdown-unavailable",
+    is.na(stale$projected_committed_balance),grepl("Cached",stale$message))
+})
+check("real market loader marks valid absent-own-bid fields and reuses the result", {
+  saved_post <- futmondo_post; reads <- 0L
+  futmondo_post <- function(url, ...) {
+    stopifnot(identical(url,MARKET_URL));reads <<- reads+1L
+    payload <- jsonlite::toJSON(list(answer=list(list(id="listed",name="Player",value=1000,change=0,points=0))),auto_unbox=TRUE)
+    structure(list(status_code=200L,headers=list("Content-Type"="application/json"),content=charToRaw(payload),url=url),class="response")
+  }
+  clear_api_cache()
+  auth <- c(token="synthetic",userid="market-display-fixture")
+  rows <- get_market_players(auth,"c","team")
+  rows2 <- get_market_players(auth,"c","team")
+  x <- round_finance_display(resource_state(list(budget=1000,withheld=0,teamValue=10000)),resource_state(rows))
+  stopifnot(reads==1L,nrow(rows)==1L,is.na(rows$bid_id),is.na(rows$bid_price),
+    x$commitments==0,x$class=="round-countdown-solvent",identical(rows,rows2))
+  futmondo_post <- saved_post;clear_api_cache()
+})
+check("global UI shares primary states and keeps manual capacity checks separate", {
   ui <- paste(readLines("ui.R",warn=FALSE),collapse="\n")
   server <- paste(readLines("server.R",warn=FALSE),collapse="\n")
   css <- paste(readLines("www/custom_style.css",warn=FALSE),collapse="\n")
   stopifnot(grepl('uiOutput("round_countdown")',ui,fixed=TRUE),
     grepl('output$round_countdown <- renderUI',server,fixed=TRUE),
-    grepl('round_finance_RV <- reactive',server,fixed=TRUE),
-    grepl('invalidateLater(60000, session)',server,fixed=TRUE),
-    grepl('finance <- round_finance_RV()',server,fixed=TRUE),
-    grepl('Active offers:',server,fixed=TRUE),
-    grepl('commitment_snapshot$total_amount',server,fixed=TRUE),
-    grepl('After offers:',server,fixed=TRUE),
-    grepl('Can spend:',server,fixed=TRUE),
+    grepl('round_finance_display(primary_team_state(), primary_market_state())',server,fixed=TRUE),
+    grepl('primary_sources = primary_sources',server,fixed=TRUE),
+    !grepl('get_financial_snapshot',server,fixed=TRUE),
+    grepl('Active offers:',server,fixed=TRUE),grepl('After offers:',server,fixed=TRUE),grepl('Can spend:',server,fixed=TRUE),
     grepl('projected_committed_balance',server,fixed=TRUE),
-    grepl("before kickoff to score points",server,fixed=TRUE),
     grepl('tags$span("In progress")',server,fixed=TRUE),
-    grepl("position: sticky",css,fixed=TRUE),grepl("@media (max-width: 767px)",css,fixed=TRUE))
+    grepl("position: sticky",css,fixed=TRUE),grepl("overflow-wrap: anywhere",css,fixed=TRUE))
 })
-check("countdown clock and financial refresh use separate intervals", {
+check("countdown clock and primary financial refresh use separate intervals", {
   server <- paste(readLines("server.R",warn=FALSE),collapse="\n")
-  finance_start <- regexpr("round_finance_RV <- reactive",server,fixed=TRUE)[1]
+  finance_start <- regexpr("round_finance_version <- reactive",server,fixed=TRUE)[1]
   countdown_start <- regexpr("output$round_countdown <- renderUI",server,fixed=TRUE)[1]
   stopifnot(finance_start > 0, countdown_start > finance_start,
     grepl("invalidateLater(60000, session)",substr(server,finance_start,countdown_start-1),fixed=TRUE),

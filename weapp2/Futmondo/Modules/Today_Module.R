@@ -7,21 +7,30 @@ today_UI <- function(id) {
     players_table_UI(ns("market_players"),box_title="Current market listings",filter_by_is_from_futmondo=TRUE,filter_by_players_with_bid=TRUE),
     h3("Recent transfers"),tableOutput(ns("recent_transfers")))
 }
-today_Server <- function(id,is_module_active,login_token,championship_id,user_team_id,user_teams_RV,refresh_trigger=NULL) {
+today_Server <- function(id,is_module_active,login_token,championship_id,user_team_id,user_teams_RV,refresh_trigger=NULL,primary_sources=NULL) {
   moduleServer(id,function(input,output,session) {
-    team_retry<-reactiveVal(0L);market_retry<-reactiveVal(0L)
-    observeEvent(input$retry_team,team_retry(isolate(team_retry())+1L))
-    observeEvent(input$retry_market,market_retry(isolate(market_retry())+1L))
-    retry_failed<-function(){
-      if(is.null(isolate(team_state())$data))team_retry(isolate(team_retry())+1L)
-      if(is.null(isolate(market_state())$data))market_retry(isolate(market_retry())+1L)
+    if (is.null(primary_sources)) {
+      team_retry<-reactiveVal(0L);market_retry<-reactiveVal(0L)
+      retry_team<-function()team_retry(isolate(team_retry())+1L)
+      retry_market<-function()market_retry(isolate(market_retry())+1L)
+      read_state <- function(handler)factual_read_adapter(session,handler,login_token,championship_id,user_team_id,
+        is_active=is_module_active,refresh_trigger=function()paste(if(is.function(refresh_trigger))refresh_trigger()else 0L,if(handler=="get_user_team_info")team_retry()else market_retry(),sep=":"),state_only=TRUE)
+      team_read <- read_state("get_user_team_info")
+      market_read <- read_state("get_market_players")
+      team_state <- reactive({req(is_module_active(),valid_login(login_token()),championship_id(),user_team_id());team_read(login_token(),championship_id(),user_team_id())})
+      market_state <- reactive({req(is_module_active(),valid_login(login_token()),championship_id(),user_team_id());market_read(login_token(),championship_id(),user_team_id())})
+    } else {
+      team_state <- primary_sources$team_state
+      market_state <- primary_sources$market_state
+      retry_team <- primary_sources$retry_team
+      retry_market <- primary_sources$retry_market
     }
-    read_state <- function(handler)factual_read_adapter(session,handler,login_token,championship_id,user_team_id,
-      is_active=is_module_active,refresh_trigger=function()paste(if(is.function(refresh_trigger))refresh_trigger()else 0L,if(handler=="get_user_team_info")team_retry()else market_retry(),sep=":"),state_only=TRUE)
-    team_read <- read_state("get_user_team_info")
-    market_read <- read_state("get_market_players")
-    team_state <- reactive({req(is_module_active(),valid_login(login_token()),championship_id(),user_team_id());team_read(login_token(),championship_id(),user_team_id())})
-    market_state <- reactive({req(is_module_active(),valid_login(login_token()),championship_id(),user_team_id());market_read(login_token(),championship_id(),user_team_id())})
+    observeEvent(input$retry_team,retry_team())
+    observeEvent(input$retry_market,retry_market())
+    retry_failed<-function(){
+      if(is.null(isolate(team_state())$data))retry_team()
+      if(is.null(isolate(market_state())$data))retry_market()
+    }
     primary_settled <- reactive({
       states <- list(team_state(),market_state())
       all(vapply(states,function(s)!identical(s$status,"loading"),logical(1)))
@@ -33,7 +42,7 @@ today_Server <- function(id,is_module_active,login_token,championship_id,user_te
         if(any(vapply(states,function(s)is.null(s$data),logical(1))))"partial" else "ready"
     })
     # Explicitly demand both primary reads even before the table output is visible.
-    observe({team_state();market_state()})
+    observe({req(is_module_active());team_state();market_state()})
     bind_factual_reads("get_championship_pressroom",session,login_token,championship_id,user_team_id,
       is_active=function()isTRUE(is_module_active())&&isTRUE(primary_settled()),refresh_trigger=refresh_trigger)
     require_data <- function(state) {

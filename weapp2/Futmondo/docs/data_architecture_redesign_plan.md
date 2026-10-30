@@ -240,3 +240,10 @@ Older-round display correction: associate loaded point rows before applying disp
 Supersedes the earlier observed-games average correction: calculate the last N consecutive observed league rounds from one scoped player/round matrix. Load the latest-observation view in a bounded batch, retrieve source player summaries with at most two requests in flight, persist acquired scores, and reread the matrix once writes drain. Changing N performs no IO. The initial fill visits the active league catalog, prioritizing the visible table; it stops launching work on navigation/logout and resumes from shared cache or saved complete history. Missing scores stay unknown. No scheduled automation or prediction is introduced.
 
 The migration has been applied; see `round_points_matrix.md` for schema, verification, performance bounds, and source-coverage limitations. Unknown season/scoring remains isolated, so permanent reuse cannot be assumed until source context is verified. Deployment and authenticated Futmondo backfill are separate from the completed SQL migration.
+
+
+## Follow-up: shared balance and verified banner warnings — 2026-10-30
+
+Local implementation complete: the server owns one primary team-information state and one market state and passes them to Today. The banner calculates display finances from these shared states, so an optional composite finance failure cannot blank already available cash. Red indicates only a fresh confirmed nonpositive cash/projected balance; unknown/loading/stale/failed data remains neutral and clearly labeled. The reservation is `max(withheld,outgoing offers)` and missing fields remain unknown. Full manual-action preflights are unchanged.
+
+Performance and acceptance checks are recorded in `data_review_results.md`: one team/market read, no clock/navigation refetch, focused stale/context and manual-safety checks, mandatory offline lifecycle, and 360/390-pixel browser checks. Hosted account responses and Posit deployment remain separate verification steps.
