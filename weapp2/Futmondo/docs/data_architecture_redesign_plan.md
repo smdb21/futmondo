@@ -310,3 +310,7 @@ Completion means Admin can retrieve and durably confirm missing round selections
 - Stop hidden history clients from demanding table sources.
 - Treat captured compact future/next statuses as unverified; explicitly hydrate missing round numbers from identity-checked match-list reads, reuse scoped saved numbers and show distinct IDs until resolved.
 - Verify historical match-list query acceptance on the hosted account separately; no live transaction or database migration is part of these corrections.
+
+### 2026-10-31 missing Rivals table — implemented locally
+
+Resolve the selectable team directory independently of financial and award readiness. Pending Shiny read conditions cannot interrupt saved/seed completion callbacks. A late directory starts only unscheduled team reads; one cancelable trailing publication delivers coalesced updates without polling. Show loading/unavailable guidance instead of an unexplained empty panel; preserve unknown cash and existing accounting rules. Focused regression, offline lifecycle and actual-app synthetic browser results are recorded in `data_review_results.md`; hosted account verification remains separate.

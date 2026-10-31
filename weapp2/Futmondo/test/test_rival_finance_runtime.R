@@ -79,6 +79,66 @@ check('session shared async ledger reads database once across navigation and res
   })
   async_adapter_fetch<-oldadapter;get_rival_finance_saved<-oldsaved;get_rival_finance_seed<-oldseed;get_rival_team_finance_observation<-oldteam
 })
+check('late directory, failed evidence and partial awards cannot hide rivals or stall the queue',{
+  local({
+    original<-async_adapter_fetch;on.exit(async_adapter_fetch<<-original)
+    pending<-list();calls<-character()
+    async_adapter_fetch<<-function(fn,args,context,...){
+      key<-paste(fn,args$user_team_id %||% "",sep=":");calls<<-c(calls,key)
+      promises::promise(function(resolve,reject)pending[[key]]<<-list(resolve=resolve,reject=reject))
+    }
+    flush<-function(session){for(i in seq_len(12L)){later::run_now(0);session$flushReact()}}
+    resolve<-function(key,result){pending[[key]]$resolve(result)}
+    testServer(function(input,output,session){
+      enabled<-reactiveVal(TRUE);auth<-reactiveVal(c(userid='u',token='t'));owner<-reactiveVal('u')
+      directory_mode<-reactiveVal('loading');directory_rows<-reactiveVal(teams)
+      directory<-reactive({req(identical(owner(),auth()[['userid']]))
+        if(directory_mode()=='loading')validate(need(FALSE,'Loading data…'))
+        if(directory_mode()=='failed')stop('synthetic directory failure')
+        directory_rows()})
+      awards<-reactiveVal(list(rows=data.frame(),complete=FALSE))
+      source<-shared_rival_finance_source(session,auth,function()'unknown-league',function()'a',directory,enabled,awards)
+    },{
+      flush(session);stopifnot(identical(source()$teams_status,'loading'),nrow(source()$team_finances)==0L)
+      resolve('get_rival_finance_saved:',list(evidence=list(),defaults=NULL));flush(session)
+      stopifnot('get_rival_finance_seed:a'%in%calls)
+      resolve('get_rival_finance_seed:a',list(rules=list(season='unknown'),pressroom=data.frame()));flush(session)
+      stopifnot(!any(grepl('get_rival_team_finance_observation',calls)),source()$loading)
+      directory_mode('ready');flush(session)
+      stopifnot(identical(source()$team_finances$teamname,c('A','B')),
+        all(is.na(source()$team_finances$estimated_cash)),sum(grepl('get_rival_team_finance_observation',calls))==2L)
+      resolve('get_rival_team_finance_observation:a',list(team_id='a',info=NULL,movements=NULL));flush(session)
+      resolve('get_rival_team_finance_observation:b',list(team_id='b',info=NULL,movements=NULL));flush(session)
+      stopifnot(!source()$loading)
+      # A partial awards update inside the publication window must have one
+      # trailing publication even when no more requests complete.
+      before<-length(calls)
+      awards(list(rows=data.frame(round_id='r',player_id='p',is_mvp=TRUE,is_finished=FALSE),complete=FALSE));flush(session)
+      deadline<-Sys.time()+3
+      while(!any(grepl('Unfinished',source()$team_finances$estimate_notes))){
+        if(Sys.time()>deadline)stop('trailing publication timed out')
+        later::run_now(.02);session$flushReact()
+      }
+      stopifnot(length(calls)==before)
+      directory_rows(rbind(teams,data.frame(teamid='c',teamname='C',points=300)));flush(session)
+      stopifnot(nrow(source()$team_finances)==3L,sum(grepl('get_rival_team_finance_observation',calls))==3L)
+      directory_mode('failed');flush(session)
+      stopifnot(identical(source()$teams_status,'unavailable'),grepl('Refresh to retry',source()$teams_reason),nrow(source()$team_finances)==3L)
+      old_team<-pending[['get_rival_team_finance_observation:c']]
+      auth(c(userid='v',token='t'));flush(session)
+      stopifnot(nrow(source()$team_finances)==0L)
+      old_team$resolve(list(team_id='c',info=NULL,movements=NULL));flush(session)
+      pending[['get_rival_finance_saved:']]$reject(simpleError('saved evidence unavailable'));flush(session)
+      pending[['get_rival_finance_seed:a']]$reject(simpleError('current finance unavailable'));flush(session)
+      stopifnot(nrow(source()$team_finances)==0L,grepl('could not be refreshed',source()$reason))
+      owner('v');directory_mode('ready');directory_rows(data.frame(teamid='d',teamname='New account team',points=1));flush(session)
+      stopifnot(identical(source()$team_finances$teamname,'New account team'),all(is.na(source()$team_finances$estimated_cash)),
+        sum(calls=='get_rival_team_finance_observation:d')==1L)
+      before<-length(calls);enabled(FALSE);flush(session);enabled(TRUE);flush(session)
+      stopifnot(length(calls)==before)
+    })
+  })
+})
 check('multiple player records never multiply one team-round settlement',{
   p<-list(team_id='a',round_id='r',verified=TRUE,eligible=TRUE,points_credited=TRUE,credited_points=3,money_per_point=10,historical_rules=TRUE)
   p1<-p;p1$player_id<-'p';p2<-p;p2$player_id<-'q'

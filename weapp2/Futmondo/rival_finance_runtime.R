@@ -273,23 +273,62 @@ rival_team_evidence <- function(result,account_id,championship_id,season) {
   }
   Filter(Negate(is.null),rows)
 }
+# A team directory does not depend on financial evidence being available.
+rival_finance_directory <- function(teams) {
+  if(!is.data.frame(teams)||!all(c("teamid","teamname")%in%names(teams)))return(data.frame())
+  teams<-teams[!is.na(teams$teamid)&nzchar(as.character(teams$teamid)),,drop=FALSE]
+  teams<-teams[!duplicated(teams$teamid),,drop=FALSE]
+  if(!nrow(teams))return(data.frame())
+  rows<-data.frame(teamid=as.character(teams$teamid),teamname=as.character(teams$teamname),
+    confidence="Unavailable",as_of="",cash_status="Unavailable",estimate_notes="Financial details are not available yet.",stringsAsFactors=FALSE)
+  for(field in c("estimated_cash","reconciliation_difference","team_value","points"))rows[[field]]<-NA_real_
+  for(field in intersect(c("team_value","points"),names(teams)))rows[[field]]<-suppressWarnings(as.numeric(teams[[field]]))
+  if("teamValue"%in%names(teams))rows$team_value<-suppressWarnings(as.numeric(teams$teamValue))
+  rows
+}
 # One shared root-session ledger, rendered in bounded batches rather than per write.
 shared_rival_finance_source <- function(session,login,championship,user_team,teams,active,official,refresh=NULL) {
   root<-session$rootScope()
   if(is.null(root$userData$rival_finance_shared)){
     state<-new.env(parent=emptyenv());state$value<-shiny::reactiveVal(list(team_finances=data.frame(),breakdowns=list(),loading=TRUE));state$key<-NULL
     state$generation<-0L;state$closed<-FALSE;state$queue<-list();state$busy<-0L;state$evidence<-list();state$seed<-list();state$defaults<-NULL;state$last_publish<-0
-    root$onSessionEnded(function(){state$closed<-TRUE;state$generation<-state$generation+1L})
+    state$publish_timer<-NULL;state$teams<-data.frame();state$teams_status<-"loading";state$teams_reason<-""
+    state$awards<-list(rows=data.frame(),complete=FALSE);state$finance_ready<-FALSE;state$seed_ready<-FALSE;state$scheduled_teams<-character()
+    root$onSessionEnded(function(){state$closed<-TRUE;state$generation<-state$generation+1L;if(!is.null(state$publish_timer))state$publish_timer()})
     root$userData$rival_finance_shared<-state
   }
   state<-root$userData$rival_finance_shared
   publish<-function(force=FALSE){
-    if(state$closed||(!force&&as.numeric(Sys.time())-state$last_publish<2))return(invisible(NULL))
-    data<-shiny::isolate(teams());cid<-shiny::isolate(championship());awards<-shiny::isolate(official())
-    calculated<-build_rival_cash_dataset(data,cid,state$evidence,awards$rows,state$seed$pressroom %||% data.frame(),
-      state$seed$rules %||% list(),state$defaults,coverage_complete=isTRUE(awards$complete),account_id=shiny::isolate(login())[["userid"]],season=state$season)
-    calculated$loading<-state$busy>0L||length(state$queue)>0L;calculated$reason<-state$reason %||% ""
+    if(state$closed||is.null(state$key))return(invisible(NULL))
+    elapsed<-as.numeric(Sys.time())-state$last_publish
+    if(!force&&elapsed<2){
+      if(is.null(state$publish_timer)){
+        generation<-state$generation
+        state$publish_timer<-later::later(function(){
+          state$publish_timer<-NULL
+          if(!state$closed&&generation==state$generation&&isTRUE(shiny::isolate(active())))publish(TRUE)
+        },2-elapsed)
+      }
+      return(invisible(NULL))
+    }
+    if(!is.null(state$publish_timer)){state$publish_timer();state$publish_timer<-NULL}
+    calculated<-list(team_finances=rival_finance_directory(state$teams),breakdowns=list(),all_purchases=data.frame())
+    if(state$finance_ready)calculated<-build_rival_cash_dataset(state$teams,state$championship,state$evidence,state$awards$rows,
+      state$seed$pressroom %||% data.frame(),state$seed$rules %||% list(),state$defaults,
+      coverage_complete=isTRUE(state$awards$complete),account_id=state$account,season=state$season)
+    calculated$finance_loading<-state$busy>0L||length(state$queue)>0L
+    calculated$loading<-calculated$finance_loading||identical(state$teams_status,"loading")
+    calculated$teams_status<-state$teams_status;calculated$teams_reason<-state$teams_reason
+    calculated$reason<-state$reason %||% ""
     state$last_publish<-as.numeric(Sys.time());state$value(calculated)
+  }
+  enqueue_teams<-function(){
+    if(!state$seed_ready||!is.data.frame(state$teams))return(invisible(NULL))
+    ids<-head(unique(as.character(state$teams$teamid %||% character())),100L)
+    ids<-setdiff(ids[!is.na(ids)&nzchar(ids)],state$scheduled_teams)
+    state$scheduled_teams<-c(state$scheduled_teams,ids)
+    state$queue<-c(state$queue,lapply(ids,function(id)list(kind="team",id=id)))
+    invisible(NULL)
   }
   run_next<-function(){
     if(state$closed||!isTRUE(shiny::isolate(active())))return(invisible(NULL))
@@ -304,7 +343,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
           if(state$closed||generation!=state$generation)return(NULL)
           state$busy<-state$busy-1L
           if(task$kind=="saved"){
-            state$evidence<-rival_merge_evidence(state$evidence,result$evidence);state$defaults<-result$defaults
+            state$evidence<-rival_merge_evidence(state$evidence,result$evidence);state$defaults<-result$defaults;state$finance_ready<-TRUE
             saved_rules<-rival_evidence_rows(state$evidence,"rules")
             if(length(saved_rules)){
               latest<-saved_rules[[which.max(vapply(saved_rules,function(row)as.numeric(fm_time(row$observed_at)),numeric(1)))]]
@@ -323,7 +362,8 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
             state$seed<-result
             inferred<-result$rules$season %||% "unknown"
             if(!identical(inferred,state$season)&&identical(state$season,"unknown")&&inferred!="unknown"){
-              state$season<-inferred;state$evidence<-list();state$queue<-list(list(kind="saved"));run_next();return(NULL)
+              state$season<-inferred;state$evidence<-list();state$finance_ready<-FALSE;state$seed_ready<-FALSE
+              state$scheduled_teams<-character();state$queue<-list(list(kind="saved"));run_next();return(NULL)
             }
             current<-rival_team_evidence(list(team_id=tid,info=result$info,movements=NULL),auth[["userid"]],cid,state$season)
             if(length(current)){state$evidence<-rival_merge_evidence(state$evidence,current);persist_rival_finance_evidence(current,ctx)}
@@ -336,15 +376,15 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
                 persist_rival_finance_evidence(observed,ctx)
               }
             }
-            ids<-as.character(shiny::isolate(teams())$teamid %||% character());ids<-head(unique(ids[!is.na(ids)&nzchar(ids)]),100L)
-            state$queue<-lapply(ids,function(id)list(kind="team",id=id));publish(TRUE)
+            state$finance_ready<-TRUE;state$seed_ready<-TRUE;enqueue_teams();publish(TRUE)
           }else{
             rows<-rival_team_evidence(result,auth[["userid"]],cid,state$season)
             if(length(rows)){state$evidence<-rival_merge_evidence(state$evidence,rows);persist_rival_finance_evidence(rows,ctx)}
           }
           publish(!length(state$queue)&&state$busy==0L);run_next();NULL
         },function(error){
-          if(!state$closed&&generation==state$generation){state$busy<-state$busy-1L;state$reason<-"Some financial sources could not be refreshed; saved evidence remains available.";if(task$kind=="saved")state$queue<-list(list(kind="seed"));publish(TRUE);run_next()};NULL
+          if(!state$closed&&generation==state$generation){state$busy<-state$busy-1L;state$reason<-"Some financial sources could not be refreshed; saved evidence remains available.";if(task$kind=="saved")state$queue<-list(list(kind="seed"))
+            if(task$kind=="seed"){state$seed_ready<-TRUE;enqueue_teams()};publish(TRUE);run_next()};NULL
         })
       })
     }
@@ -353,7 +393,10 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
   shiny::observe({
     auth<-login()
     if(!valid_login(auth)){
-      if(!is.null(state$key)){state$generation<-state$generation+1L;state$key<-NULL;state$evidence<-list();state$queue<-list();state$busy<-0L;state$value(list(team_finances=data.frame(),breakdowns=list(),loading=FALSE))};return()
+      if(!is.null(state$key)){state$generation<-state$generation+1L;state$key<-NULL;state$evidence<-list();state$queue<-list();state$busy<-0L
+        if(!is.null(state$publish_timer)){state$publish_timer();state$publish_timer<-NULL}
+        state$identity<-NULL;state$teams<-data.frame();state$finance_ready<-FALSE;state$seed_ready<-FALSE
+        state$value(list(team_finances=data.frame(),breakdowns=list(),loading=FALSE))};return()
     }
     if(!isTRUE(active()))return()
     cid<-championship();tid<-user_team();shiny::req(cid,tid);version<-if(is.function(refresh))refresh()else 0
@@ -362,14 +405,39 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
     if(!identical(state$key,key)){
       same<-identical(state$identity,paste(auth[["userid"]],cid,tid,sep="|"));state$identity<-paste(auth[["userid"]],cid,tid,sep="|")
       state$key<-key;state$generation<-state$generation+1L;state$busy<-0L;state$season<-league_season_context(cid);state$reason<-""
-      if(!same){state$evidence<-list();state$seed<-list();state$defaults<-NULL;state$value(list(team_finances=data.frame(),breakdowns=list(),loading=TRUE))}
+      if(!is.null(state$publish_timer)){state$publish_timer();state$publish_timer<-NULL}
+      state$account<-auth[["userid"]];state$championship<-cid;state$seed_ready<-FALSE;state$scheduled_teams<-character()
+      if(!same){state$evidence<-list();state$seed<-list();state$defaults<-NULL;state$finance_ready<-FALSE
+        state$teams<-data.frame();state$teams_status<-"loading";state$teams_reason<-"";state$awards<-list(rows=data.frame(),complete=FALSE)
+        state$value(list(team_finances=data.frame(),breakdowns=list(),loading=TRUE))}
       else invalidate_resources(resource_context(account_id=auth[["userid"]],championship_id=cid,season=state$season),pattern="rival_finance_evidence")
       state$queue<-list(list(kind="saved"));run_next()
     }else run_next()
+  },priority=100)
+  # Resolve UI dependencies in observers, never in completion callbacks. A pending
+  # factual read raises a Shiny validation condition and must not stall the queue.
+  shiny::observe({
+    shiny::req(isTRUE(active()),valid_login(login()))
+    cid<-championship();tid<-user_team()
+    shiny::req(identical(state$identity,paste(login()[["userid"]],cid,tid,sep="|")),!is.null(state$key))
+    directory<-tryCatch(teams(),error=function(error)error)
+    failed<-inherits(directory,"error")
+    pending<-failed&&inherits(directory,"shiny.silent.error")&&
+      (!nzchar(conditionMessage(directory))||grepl("Loading|Refreshing",conditionMessage(directory)))
+    valid<-is.data.frame(directory)&&all(c("teamid","teamname")%in%names(directory))
+    if(valid){
+      directory<-directory[!is.na(directory$teamid)&nzchar(as.character(directory$teamid)),,drop=FALSE]
+      state$teams<-directory[!duplicated(directory$teamid),,drop=FALSE]
+    }
+    state$teams_status<-if(valid)if(nrow(state$teams))"ready"else"empty"else if(pending)"loading"else"unavailable"
+    state$teams_reason<-if(state$teams_status%in%c("empty","unavailable"))"League teams unavailable. Use Refresh to retry."else""
+    enqueue_teams();publish(TRUE);run_next()
   })
   shiny::observe({
-    shiny::req(isTRUE(active()),valid_login(login()));awards<-official();teams()
-    if(!is.null(state$key))publish(isTRUE(awards$complete))
+    shiny::req(isTRUE(active()),valid_login(login()),!is.null(state$key))
+    awards<-tryCatch(official(),error=function(error)NULL)
+    if(is.list(awards))state$awards<-awards
+    publish(isTRUE(state$awards$complete))
   })
   shiny::reactive(state$value())
 }

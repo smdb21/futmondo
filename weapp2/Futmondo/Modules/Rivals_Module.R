@@ -265,6 +265,7 @@ tagList(
                collapsed = FALSE,
                p(style = "color: var(--fm-muted); font-size: 13px; font-weight: 500; margin-bottom: 12px;",
                  icon("hand-pointer"), " Select a user team from the table below to scout their squad and financial details."),
+               uiOutput(ns("league_finances_status")),
                reactable::reactableOutput(ns("league_finances_table"))
              )
       )
@@ -438,15 +439,23 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
     league_finances_RV <- shared_rival_finance_source(session,login_token,championship_id,
       user_team_id,user_teams_RV,is_module_active,mvp_snapshot,refresh_trigger)
 
+    output$league_finances_status <- renderUI({
+      req(isTRUE(is_module_active()))
+      state<-league_finances_RV()
+      message<-if(identical(state$teams_status,"loading")||is.null(state$teams_status))"Loading league teams…"else state$teams_reason %||% ""
+      if(!nzchar(message))message<-state$reason %||% ""
+      if(!nzchar(message)&&isTRUE(state$finance_loading))message<-"Loading financial details. Team selection is available."
+      if(!nzchar(message))return(NULL)
+      tags$p(role="status",style="color: var(--fm-muted);",message)
+    })
+
     # Render League Financial Standings Table
     output$league_finances_table <- reactable::renderReactable({
       req(is_module_active() == TRUE)
       if (!is.null(refresh_trigger)) refresh_trigger()
       finances_data <- league_finances_RV()
-      req(finances_data)
       df <- finances_data$team_finances
-      req(df)
-      if (nrow(df) == 0) return(NULL)
+      if (!is.data.frame(df) || nrow(df) == 0) return(NULL)
 
       df_display <- df %>% dplyr::select(Team=teamname, `Estimated cash`=estimated_cash,
         Confidence=confidence, `Last updated`=as_of, Status=cash_status, `Squad Value`=team_value, Points=points)
