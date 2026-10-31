@@ -314,3 +314,8 @@ Completion means Admin can retrieve and durably confirm missing round selections
 ### 2026-10-31 missing Rivals table — implemented locally
 
 Resolve the selectable team directory independently of financial and award readiness. Pending Shiny read conditions cannot interrupt saved/seed completion callbacks. A late directory starts only unscheduled team reads; one cancelable trailing publication delivers coalesced updates without polling. Show loading/unavailable guidance instead of an unexplained empty panel; preserve unknown cash and existing accounting rules. Focused regression, offline lifecycle and actual-app synthetic browser results are recorded in `data_review_results.md`; hosted account verification remains separate.
+
+
+### 2026-10-31 continued missing Rivals display — bounded resilience implemented locally
+
+Keep a native team selector independent of the financial Reactable, backed by the already fetched directory and stable account/league-scoped IDs. Preserve an empty initial selection and explicit scouting requests. Report real team/pending-task counts; catch financial build, formatting and fulfilled-callback processing failures, retain safe directory rows and report redacted diagnostic references. Do not change accounting rules, add polling, or infer that a detailed widget rendered successfully from data readiness. Captured-shape replay and synthetic malformed-data regressions are local evidence; the hosted blank-widget cause remains unconfirmed pending its runtime diagnostics.

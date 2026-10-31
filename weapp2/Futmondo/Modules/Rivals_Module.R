@@ -250,6 +250,41 @@ rivals_tx_display_df <- function(filtered) {
   filtered[, ordered_cols, drop = FALSE]
 }
 
+# Keep the directory selectable when financial cells or audit details are malformed.
+rivals_finance_table_widget <- function(finances_data,on_error=function(error)NULL) {
+  df<-finances_data$team_finances
+  if(!is.data.frame(df)||!nrow(df))return(NULL)
+  fallback<-function(){
+    directory<-rival_finance_directory(df)
+    reactable::reactable(data.frame(Team=directory$teamname,Points=directory$points),
+      compact=TRUE,striped=TRUE,highlight=TRUE,selection="single",onClick="select",defaultPageSize=10,
+      columns=list(Team=colDef(name="User Team",align="left")))
+  }
+  tryCatch({
+    df_display<-df %>% dplyr::select(Team=teamname,`Estimated cash`=estimated_cash,
+      Confidence=confidence,`Last updated`=as_of,Status=cash_status,`Squad Value`=team_value,Points=points)
+    currency<-function(value){value<-fm_number(value);if(is.finite(value))format_table_currency(value)else""}
+    reactable::reactable(df_display,compact=TRUE,striped=TRUE,highlight=TRUE,bordered=FALSE,
+      selection="single",onClick="select",defaultPageSize=10,defaultSorted=list(`Estimated cash`="desc"),
+      defaultColDef=colDef(sortNALast=TRUE),
+      columns=list(Team=colDef(name="User Team",align="left"),
+        `Estimated cash`=colDef(align="right",cell=function(value){
+          value<-fm_number(value);if(!is.finite(value))return("")
+          tags$span(style=if(value<0)"color: var(--fm-danger); font-weight:700;"else"font-weight:700;",currency(value))
+        }),`Last updated`=colDef(cell=function(value){
+          stamp<-fm_time(mvp_text(value));if(length(stamp)==1L&&!is.na(stamp))unname(format(stamp,"%d-%m %H:%M",tz="UTC"))else""
+        }),`Squad Value`=colDef(cell=currency)),
+      details=function(index){
+        row<-df[index,,drop=FALSE];detail<-finances_data$breakdowns[[as.character(row$teamid)]]
+        difference<-fm_number(row$reconciliation_difference)
+        tagList(tags$p(mvp_text(row$estimate_notes)),
+          if(is.finite(difference))tags$p("Difference from recorded cash: ",currency(difference)),
+          if(is.data.frame(detail)&&nrow(detail))reactable::reactable(detail,compact=TRUE,pagination=TRUE,defaultPageSize=10,
+            columns=list(amount=colDef(cell=currency))))
+      })
+  },error=function(error){on_error(error);fallback()})
+}
+
 rivals_UI <- function(id) {
   ns <- NS(id)
 tagList(
@@ -266,6 +301,7 @@ tagList(
                p(style = "color: var(--fm-muted); font-size: 13px; font-weight: 500; margin-bottom: 12px;",
                  icon("hand-pointer"), " Select a user team from the table below to scout their squad and financial details."),
                uiOutput(ns("league_finances_status")),
+               selectInput(ns("league_team"),"Choose a team",choices=c("Select a team…"=""),selected="",selectize=FALSE,width="100%"),
                reactable::reactableOutput(ns("league_finances_table"))
              )
       )
@@ -361,9 +397,10 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
     rival_context_RV <- reactive(list(user=fm_scalar(login_token()[["userid"]]),
       championship=fm_scalar(championship_id()),team=fm_scalar(user_team_id())))
     selected_rival_id_RV <- reactiveVal(NULL)
+    table_failure_RV<-reactiveVal(NULL)
     selected_rival_context_RV <- reactiveVal(NULL)
     observeEvent(rival_context_RV(), {
-      selected_rival_id_RV(NULL);selected_rival_context_RV(NULL)
+      selected_rival_id_RV(NULL);selected_rival_context_RV(NULL);table_failure_RV(NULL)
       tryCatch(updateReactable("league_finances_table",selected=NA_integer_,session=session),error=function(e)NULL)
     },ignoreNULL=FALSE,priority=100)
     observeEvent(getReactableState("league_finances_table","selected",session=session), {
@@ -379,6 +416,15 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       if(is.null(id) || !is.data.frame(df) || !id %in% df$teamid) return(NULL)
       id
     })
+
+    observeEvent(input$league_team, {
+      req(isTRUE(is_module_active()))
+      id<-mvp_text(input$league_team)
+      df<-league_finances_RV()$team_finances
+      if(!nzchar(id)){selected_rival_id_RV(NULL);selected_rival_context_RV(NULL);return()}
+      req(is.data.frame(df),id%in%df$teamid)
+      selected_rival_context_RV(rival_context_RV());selected_rival_id_RV(id)
+    },ignoreNULL=TRUE)
 
     # Detailed financial statistics of selected rival
     rival_financial_summary_box_RV <- reactive({
@@ -439,42 +485,44 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
     league_finances_RV <- shared_rival_finance_source(session,login_token,championship_id,
       user_team_id,user_teams_RV,is_module_active,mvp_snapshot,refresh_trigger)
 
+    last_picker_state<-NULL
+    observe({
+      req(isTRUE(is_module_active()))
+      df<-league_finances_RV()$team_finances
+      choices<-if(is.data.frame(df)&&nrow(df))stats::setNames(as.character(df$teamid),as.character(df$teamname))else character()
+      selected<-if(identical(selected_rival_context_RV(),rival_context_RV()))selected_rival_id_RV()else""
+      picker<-list(context=rival_context_RV(),choices=choices,selected=selected %||% "")
+      if(!identical(picker,last_picker_state)){
+        last_picker_state<<-picker
+        updateSelectInput(session,"league_team",choices=c("Select a team…"="",choices),selected=picker$selected)
+      }
+    })
     output$league_finances_status <- renderUI({
       req(isTRUE(is_module_active()))
-      state<-league_finances_RV()
-      message<-if(identical(state$teams_status,"loading")||is.null(state$teams_status))"Loading league teams…"else state$teams_reason %||% ""
-      if(!nzchar(message))message<-state$reason %||% ""
-      if(!nzchar(message)&&isTRUE(state$finance_loading))message<-"Loading financial details. Team selection is available."
+      state<-league_finances_RV();df<-state$team_finances
+      count<-if(is.data.frame(df))nrow(df)else 0L
+      message<-if(count)paste(count,"league teams loaded.")else if(identical(state$teams_status,"loading")||is.null(state$teams_status))"Loading league teams…"else state$teams_reason %||% ""
+      if(isTRUE(state$finance_loading))message<-paste(message,"Loading financial details.",
+        if(!is.null(state$finance_pending))paste(state$finance_pending,"requests pending.")else"")
+      issues<-Filter(nzchar,c(state$finance_error %||% "",state$reason %||% ""))
+      failure<-table_failure_RV()
+      if(!is.null(failure))issues<-c(issues,paste("Detailed table unavailable; choose a team above.",resource_failure_message(failure)))
+      message<-trimws(paste(c(message,unique(issues)),collapse=" "))
       if(!nzchar(message))return(NULL)
       tags$p(role="status",style="color: var(--fm-muted);",message)
     })
 
-    # Render League Financial Standings Table
+    # The native selector stays usable even if a browser cannot bind Reactable.
     output$league_finances_table <- reactable::renderReactable({
       req(is_module_active() == TRUE)
-      if (!is.null(refresh_trigger)) refresh_trigger()
-      finances_data <- league_finances_RV()
-      df <- finances_data$team_finances
-      if (!is.data.frame(df) || nrow(df) == 0) return(NULL)
-
-      df_display <- df %>% dplyr::select(Team=teamname, `Estimated cash`=estimated_cash,
-        Confidence=confidence, `Last updated`=as_of, Status=cash_status, `Squad Value`=team_value, Points=points)
-      reactable::reactable(df_display,compact=TRUE,striped=TRUE,highlight=TRUE,bordered=FALSE,
-        selection="single",onClick="select",defaultPageSize=10,defaultSorted=list(`Estimated cash`="desc"),
-        defaultColDef=colDef(sortNALast=TRUE),
-        columns=list(Team=colDef(name="User Team",align="left"),
-          `Estimated cash`=colDef(align="right",cell=function(value) {
-            if(!is.finite(value))return("")
-            tags$span(style=if(value<0)"color: var(--fm-danger); font-weight:700;"else"font-weight:700;",format_table_currency(value))
-          }),`Last updated`=colDef(cell=function(value)if(nzchar(value))format(fm_time(value),"%d-%m %H:%M",tz="UTC")else""),
-          `Squad Value`=colDef(cell=function(value)if(is.finite(value))format_table_currency(value)else"")),
-        details=function(index){
-          row<-df[index,,drop=FALSE];detail<-finances_data$breakdowns[[as.character(row$teamid)]]
-          tagList(tags$p(row$estimate_notes),
-            if(is.finite(row$reconciliation_difference))tags$p("Difference from recorded cash: ",format_table_currency(row$reconciliation_difference)),
-            if(is.data.frame(detail))reactable::reactable(detail,compact=TRUE,pagination=TRUE,defaultPageSize=10,
-              columns=list(amount=colDef(cell=function(value)if(is.finite(value))format_table_currency(value)else""))))
-        })
+      finances_data<-league_finances_RV()
+      failure<-NULL
+      widget<-rivals_finance_table_widget(finances_data,function(error){
+        failure<<-isolate(table_failure_RV())
+        if(is.null(failure))failure<<-resource_log_failure(resource_failure(error,resource="league_finances_calc",category="schema"))
+      })
+      table_failure_RV(failure)
+      widget
     })
 
 # Render Financial Details Summary card rows for selected rival

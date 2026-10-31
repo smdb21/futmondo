@@ -152,4 +152,62 @@ check('multiple player records never multiply one team-round settlement',{
 check('missing account fails closed before consuming private evidence',{
   stopifnot(inherits(try(build_scoped(teams,cid,list(m('private',10))),silent=TRUE),'try-error'))
 })
+check('malformed saved financial payload keeps the directory and finishes remaining reads',{
+  local({
+    original<-async_adapter_fetch;on.exit(async_adapter_fetch<<-original)
+    malformed<-rival_finance_evidence('u','unknown-league','unknown','team','a','invalid legacy payload')
+    stopifnot(inherits(try(build_scoped(teams,'unknown-league',list(malformed),account_id='u'),silent=TRUE),'try-error'))
+    calls<-character()
+    async_adapter_fetch<<-function(fn,args,context,...){
+      calls<<-c(calls,fn)
+      result<-switch(fn,get_rival_finance_saved=list(evidence=list(malformed),defaults=NULL),
+        get_rival_finance_seed=list(info=NULL,rules=list(),pressroom=data.frame()),
+        get_rival_team_finance_observation=list(team_id=args$user_team_id,info=NULL,movements=NULL))
+      promises::promise_resolve(result)
+    }
+    testServer(function(input,output,session){
+      source<-shared_rival_finance_source(session,function()c(userid='u',token='t'),function()'unknown-league',
+        function()'a',function()teams,function()TRUE,function()list(rows=data.frame(),complete=FALSE))
+    },{
+      for(i in seq_len(40L)){later::run_now(0);session$flushReact()}
+      state<-source()
+      stopifnot(identical(state$team_finances$teamid,c('a','b')),all(is.na(state$team_finances$estimated_cash)),
+        !state$finance_loading,state$finance_pending==0L,grepl('could not be prepared',state$finance_error),
+        sum(calls=='get_rival_team_finance_observation')==2L)
+    })
+  })
+})
+check('an exception inside a resolved finance callback cannot leave the queue loading forever',{
+  local({
+    original<-async_adapter_fetch;old_persist<-persist_rival_finance_evidence
+    on.exit({async_adapter_fetch<<-original;persist_rival_finance_evidence<<-old_persist})
+    persist_rival_finance_evidence<<-function(...)stop('synthetic persistence boundary failure')
+    calls<-character();info<-list(budget=0);attr(info,'observed_at')<-Sys.time()
+    async_adapter_fetch<<-function(fn,args,context,...){
+      calls<<-c(calls,fn)
+      result<-switch(fn,get_rival_finance_saved=list(evidence=list(),defaults=NULL),
+        get_rival_finance_seed=list(info=info,rules=list(),pressroom=data.frame()),
+        get_rival_team_finance_observation=list(team_id=args$user_team_id,info=NULL,movements=NULL))
+      promises::promise_resolve(result)
+    }
+    testServer(function(input,output,session){
+      source<-shared_rival_finance_source(session,function()c(userid='u',token='t'),function()'unknown-league',
+        function()'a',function()teams,function()TRUE,function()list(rows=data.frame(),complete=FALSE))
+    },{
+      for(i in seq_len(40L)){later::run_now(0);session$flushReact()}
+      stopifnot(nrow(source()$team_finances)==2L,!source()$finance_loading,source()$finance_pending==0L,
+        grepl('could not be prepared',source()$reason),sum(calls=='get_rival_team_finance_observation')==2L)
+    })
+  })
+})
+check('financial table falls back to selectable team rows when its display schema is incomplete',{
+  suppressPackageStartupMessages(source('Modules/Rivals_Module.R'))
+  failures<-0L
+  widget<-rivals_finance_table_widget(list(team_finances=teams,breakdowns=list()),function(error)failures<<-failures+1L)
+  stopifnot(inherits(widget,'reactable'),failures==1L)
+  rows<-rival_finance_directory(teams);rows$as_of<-c(NA_character_,'unavailable')
+  rows$estimated_cash<-c(0,-5);rows$team_value<-c(NA_real_,10)
+  widget<-rivals_finance_table_widget(list(team_finances=rows,breakdowns=list()),function(error)stop('unexpected formatting failure'))
+  stopifnot(inherits(widget,'reactable'))
+})
 cat(sprintf('Rival finance: %d passed / 0 failed\n',n))

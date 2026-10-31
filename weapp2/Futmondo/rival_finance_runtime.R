@@ -313,10 +313,17 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
     }
     if(!is.null(state$publish_timer)){state$publish_timer();state$publish_timer<-NULL}
     calculated<-list(team_finances=rival_finance_directory(state$teams),breakdowns=list(),all_purchases=data.frame())
-    if(state$finance_ready)calculated<-build_rival_cash_dataset(state$teams,state$championship,state$evidence,state$awards$rows,
+    if(state$finance_ready)calculated<-tryCatch(build_rival_cash_dataset(state$teams,state$championship,state$evidence,state$awards$rows,
       state$seed$pressroom %||% data.frame(),state$seed$rules %||% list(),state$defaults,
-      coverage_complete=isTRUE(state$awards$complete),account_id=state$account,season=state$season)
+      coverage_complete=isTRUE(state$awards$complete),account_id=state$account,season=state$season),error=function(error){
+        if(is.null(state$build_failure))state$build_failure<-resource_log_failure(
+          resource_failure(error,resource="league_finances_calc",category="schema"))
+        calculated$finance_error<-paste("Financial details could not be prepared.",resource_failure_message(state$build_failure))
+        calculated
+      })
+    if(is.null(calculated$finance_error))state$build_failure<-NULL
     calculated$finance_loading<-state$busy>0L||length(state$queue)>0L
+    calculated$finance_pending<-state$busy+length(state$queue)
     calculated$loading<-calculated$finance_loading||identical(state$teams_status,"loading")
     calculated$teams_status<-state$teams_status;calculated$teams_reason<-state$teams_reason
     calculated$reason<-state$reason %||% ""
@@ -342,6 +349,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
         promises::then(async_adapter_fetch(fn,args,ctx,is_current=function()!state$closed&&identical(generation,state$generation)),function(result){
           if(state$closed||generation!=state$generation)return(NULL)
           state$busy<-state$busy-1L
+          tryCatch({
           if(task$kind=="saved"){
             state$evidence<-rival_merge_evidence(state$evidence,result$evidence);state$defaults<-result$defaults;state$finance_ready<-TRUE
             saved_rules<-rival_evidence_rows(state$evidence,"rules")
@@ -381,6 +389,13 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
             rows<-rival_team_evidence(result,auth[["userid"]],cid,state$season)
             if(length(rows)){state$evidence<-rival_merge_evidence(state$evidence,rows);persist_rival_finance_evidence(rows,ctx)}
           }
+          },error=function(error){
+            failure<-resource_log_failure(resource_failure(error,resource="league_finances_calc",category="schema"))
+            state$reason<-paste("Some financial data could not be prepared.",resource_failure_message(failure))
+            if(task$kind=="saved"&&!any(vapply(state$queue,function(task)identical(task$kind,"seed"),logical(1))))
+              state$queue<-c(list(list(kind="seed")),state$queue)
+            if(task$kind=="seed"){state$seed_ready<-TRUE;enqueue_teams()}
+          })
           publish(!length(state$queue)&&state$busy==0L);run_next();NULL
         },function(error){
           if(!state$closed&&generation==state$generation){state$busy<-state$busy-1L;state$reason<-"Some financial sources could not be refreshed; saved evidence remains available.";if(task$kind=="saved")state$queue<-list(list(kind="seed"))
@@ -404,7 +419,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
     key<-paste(auth[["userid"]],cid,tid,version,publication,sep="|")
     if(!identical(state$key,key)){
       same<-identical(state$identity,paste(auth[["userid"]],cid,tid,sep="|"));state$identity<-paste(auth[["userid"]],cid,tid,sep="|")
-      state$key<-key;state$generation<-state$generation+1L;state$busy<-0L;state$season<-league_season_context(cid);state$reason<-""
+      state$key<-key;state$generation<-state$generation+1L;state$busy<-0L;state$season<-league_season_context(cid);state$reason<-"";state$build_failure<-NULL
       if(!is.null(state$publish_timer)){state$publish_timer();state$publish_timer<-NULL}
       state$account<-auth[["userid"]];state$championship<-cid;state$seed_ready<-FALSE;state$scheduled_teams<-character()
       if(!same){state$evidence<-list();state$seed<-list();state$defaults<-NULL;state$finance_ready<-FALSE

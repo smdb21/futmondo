@@ -472,3 +472,12 @@ The League Squad Value Evolution chart has been repositioned to the bottom of th
 - The plot is rendered via `plotlyOutput` for interactivity (hover tooltips, zoom, pan).
 - Positioned at the bottom of the module, after all tabs and KPI boxes.
 The main league table now displays numeric `estimated_cash` with descending initial sort, `confidence`, source update time and debt status. Opening cash is retained in the expandable audit breakdown, not a table column. `shared_rival_finance_source()` loads saved account/league/season evidence before bounded live refreshes; see [rival_cash_accounting.md](rival_cash_accounting.md). Existing roster and manual trade controls are unchanged.
+
+
+### Selectable directory and financial rendering failure recovery (2026-10-31)
+
+Rivals includes a native **Choose a team** selector (`league_team`) above the Reactable. It uses the existing shared team directory, begins with an empty selection, and stores the selected team ID with the account/championship/own-team context. Choosing an option or clicking a table row uses the same scouting selection. The native selector remains usable if the browser does not display the detailed widget. Its choices are updated only when the directory, context or selection changes, so financial progress does not rebuild an open mobile selector. It adds no API or database read; scouting requests still require an explicit selection.
+
+The status reports the number of loaded teams and the actual number of pending financial tasks. It does not infer that the table is visible from directory readiness. `rivals_finance_table_widget()` formats unknown amounts and dates as blank; a financial display-schema/detail error falls back to selectable Team/Points rows and records a redacted schema reference. A finance-build error keeps the same directory with unknown cash and an explicit failure message. Errors inside a resolved saved/seed/team callback are caught before continuing the bounded queue; they cannot leave the displayed loading state waiting for work that is no longer running. Errors never establish a balance or change accounting calculations.
+
+The hosted blank-widget cause remains unconfirmed. Locally, the captured ten-team response shape renders correctly, including its nested metadata flattened to character columns by `get_teams()`. Synthetic malformed saved payloads and completion failures reproduce distinct previously unhandled paths and are covered by focused regression checks.

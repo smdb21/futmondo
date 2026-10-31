@@ -2256,7 +2256,7 @@
       "checksum": "d28b6843516e7a88406119bf287000c2"
     },
     "Modules/Rivals_Module.R": {
-      "checksum": "0bce71cfc500b3adc0e44f9f66782b05"
+      "checksum": "27afa9e02e3d5a7ab5025b8eb356d782"
     },
     "Modules/Round_MVPs_Module.R": {
       "checksum": "5ddb52ee106a00ae7514bb7697ca689f"
@@ -2295,7 +2295,7 @@
       "checksum": "f0afb183ecc679d5b0bd94553d15d8a5"
     },
     "rival_finance_runtime.R": {
-      "checksum": "60c1066cf01007b402dbde456c0b6b65"
+      "checksum": "99680335b9cbdb9a04d74c54a5e04f9a"
     },
     "award_runtime.R": {
       "checksum": "99f1701bc8d314c4f81915b9703b1be1"
