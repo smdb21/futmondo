@@ -696,7 +696,7 @@ get_reactable_columns_for_players <- function(table) {
   # Your Bid / Received Offer Column ----
   if ("bid_price" %in% colnames(table)) {
     columns[["bid_price"]] <- colDef(
-      name = "Received Offer",
+      name = "Offer",
       align = "right",
       cell = function(value, index) {
         if (is.na(value) || is.null(value) || value == "" || value == 0) return("")
