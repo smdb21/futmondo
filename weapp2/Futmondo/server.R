@@ -223,7 +223,14 @@ players_in_championship_Server(id = "players_in_championship",
                login_token = login_token_RV,
                championship_id = championship_id_RV,
                user_team_id = user_team_id_RV,
-               user_teams_RV = user_teams_RV, is_admin = is_admin_RV,refresh_trigger=refresh_trigger)
+               user_teams_RV = user_teams_RV, is_admin = is_admin_RV,refresh_trigger=refresh_trigger,
+               league_settings_source = reactive({
+                 leagues<-championships_RV();id<-championship_id_RV()
+                 selected<-Filter(function(x)identical(as.character(x$id %||% x$`_id`),as.character(id)),leagues)
+                 state<-primary_team_state()
+                 list(league=if(length(selected))selected[[1]]else list(),info=state$data %||% list(),
+                   stale=identical(state$status,"stale")||!is.null(state$error))
+               }))
   observe({
     if(!valid_login(login_token_RV()))return()
     state<-championship_state()
