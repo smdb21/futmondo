@@ -31,3 +31,10 @@ coverage<-add_recent_points_average(players,sparse,8)
 stopifnot(is.na(coverage$recent_points_avg[1]),coverage$recent_points_count[1]==7L,
   coverage$recent_points_required[1]==8L)
 cat("RECENT OBSERVED SCORES: 3 additional checks passed\n")
+
+# Display stays numeric and sortable; unavailable values are blank, never zero.
+average_column <- players_table_recent_average_column(4L)
+stopifnot(is.numeric(last_three$recent_points_avg),identical(average_column$sortNALast,TRUE),
+  identical(average_column$cell(NA_real_),""),identical(average_column$cell(0),0),
+  identical(average_column$cell(-2.125),-2.1),identical(average_column$name,"Avg Last 4"))
+cat("NUMERIC AVERAGE DISPLAY: 1 additional check passed\n")
