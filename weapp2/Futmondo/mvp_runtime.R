@@ -109,10 +109,31 @@ get_official_dreamteam_result <- function(login, championship_id, reference) {
 # A shared reactive source belongs to the root session, not to either consumer.
 get_mvp_saved_catalog<-function(login,championship_id){
  saved<-tryCatch(get_round_mvps(championship_id),error=function(e)data.frame())
+ season<-league_season_context(championship_id)
+ evidence<-tryCatch(read_rival_finance_evidence(login[["userid"]],championship_id,season)$evidence,error=function(e)list())
+ snapshots<-rival_evidence_rows(evidence,"awards")
+ for(snapshot in snapshots){
+   rows<-tryCatch(rival_award_snapshot_rows(snapshot$payload$players),error=function(e)data.frame())
+   if(nrow(rows)&&all(c("round_id","player_id","is_mvp")%in%names(rows))){
+     saved<-saved[!saved$round_id%in%snapshot$source_id,,drop=FALSE]
+     rows$checked_at<-snapshot$observed_at;saved<-dplyr::bind_rows(saved,rows)
+   }
+ }
  list(saved=saved,catalog=get_finished_round_catalog(login,championship_id))
 }
+persist_official_award_snapshot<-function(result,login,championship_id,reference,context){
+ if(!identical(result$status,"ok")||!is.data.frame(result$rows)||!nrow(result$rows))return(FALSE)
+ stamp<-attr(result,"observed_at") %||% Sys.time()
+ if(identical(attr(result,"fetch_status"),"stale")||is.na(fm_time(stamp)))return(FALSE)
+ payload<-list(round_id=reference$round_id,round_number=reference$round_number,
+   players=lapply(seq_len(nrow(result$rows)),function(i)as.list(result$rows[i,,drop=FALSE])),publication="official_selection_observed")
+ row<-rival_finance_evidence(login[["userid"]],championship_id,league_season_context(championship_id),"awards",reference$round_id,payload,stamp)
+ persist_rival_finance_evidence(list(row),context)
+}
+
 shared_mvp_source<-function(session,login,championship,active,refresh=NULL){
  root<-session$rootScope()
+ if(is.null(root$userData$round_publication_revision))root$userData$round_publication_revision<-shiny::reactiveVal(0L)
  if(is.null(root$userData$mvp_shared)){
   state<-new.env(parent=emptyenv());state$value<-shiny::reactiveVal(mvp_result("loading",reason="Loading official MVP results."))
   state$key<-NULL;state$queue<-list();state$consumers<-list();state$busy<-FALSE;state$closed<-FALSE;state$generation<-0L;state$catalog<-NULL
@@ -136,12 +157,22 @@ shared_mvp_source<-function(session,login,championship,active,refresh=NULL){
     current$rows<-if(is.data.frame(result$saved))result$saved else data.frame();state$catalog<-result$catalog
     rounds<-result$catalog$rounds;if(!is.data.frame(rounds))rounds<-empty_finished_rounds()
     done<-rounds[rounds$is_finished%in%TRUE,,drop=FALSE];saved<-current$rows$round_id %||% character()
-    done<-done[!done$round_id%in%saved,,drop=FALSE];done<-done[order(done$round_number,decreasing=TRUE,na.last=TRUE),,drop=FALSE]
+    refresh_saved<-isTRUE(state$force)
+    checked<-vapply(done$round_id,function(id){
+      stamps<-current$rows$checked_at[current$rows$round_id%in%id];stamps<-fm_time(stamps)
+      if(!length(stamps)||all(is.na(stamps)))return(FALSE)
+      as.numeric(difftime(Sys.time(),max(stamps,na.rm=TRUE),units="secs"))<86400
+    },logical(1))
+    # Legacy selections have no verified check timestamp. Refresh them once so
+    # full XI, corrected recipients and nullable points enter a complete snapshot.
+    done<-done[refresh_saved | !checked,,drop=FALSE];done<-head(done[order(done$round_number,decreasing=TRUE,na.last=TRUE),,drop=FALSE],60L)
     state$queue<-lapply(seq_len(nrow(done)),function(i)list(kind="round",reference=round_reference(done$round_id[i],done$round_number[i])))
     current$issues<-character()
    }else if(identical(result$status,"ok")){
-    current$rows<-dplyr::bind_rows(current$rows,result$rows[result$rows$is_mvp%in%TRUE,,drop=FALSE])
-    if(is.finite(task$reference$round_number))shiny::withReactiveDomain(root,tryCatch(supabase_post("round_dream_team",result$rows),error=function(e)NULL))
+    current$rows<-current$rows[!current$rows$round_id%in%task$reference$round_id,,drop=FALSE]
+    rows<-result$rows;rows$checked_at<-rival_finance_stamp(attr(result,"observed_at") %||% Sys.time())
+    current$rows<-dplyr::bind_rows(current$rows,rows)
+    shiny::withReactiveDomain(root,tryCatch(persist_official_award_snapshot(result,token,cid,task$reference,ctx),error=function(e)NULL))
    }else current$issues<-unique(c(current$issues,result$reason))
    current$complete<-!length(state$queue)&&!length(current$issues)&&isTRUE(state$catalog$complete)
    current$status<-if(length(state$queue))"loading"else if(current$complete)"ok"else "partial"
@@ -152,9 +183,16 @@ shared_mvp_source<-function(session,login,championship,active,refresh=NULL){
   });invisible(NULL)
  }
  shiny::observe({
-  if(!isTRUE(active()))return();token<-login();cid<-championship();shiny::req(valid_login(token),cid)
-  version<-if(is.function(refresh))refresh()else 0;key<-paste(token[["userid"]],cid,version,sep="|")
-  if(!identical(state$key,key)){state$key<-key;state$generation<-state$generation+1L;state$busy<-FALSE;state$catalog<-NULL;state$value(mvp_result("loading",reason="Loading official MVP results."));state$queue<-list(list(kind="catalog"))}
+  token<-login()
+  if(!valid_login(token)){if(!is.null(state$key)){state$key<-NULL;state$generation<-state$generation+1L;state$queue<-list();state$busy<-FALSE;state$value(mvp_result("unavailable"))};return()}
+  if(!isTRUE(active()))return();cid<-championship();shiny::req(cid)
+  version<-if(is.function(refresh))refresh()else 0;publication<-root$userData$round_publication_revision()
+  key<-paste(token[["userid"]],cid,version,publication,sep="|")
+  identity<-paste(token[["userid"]],cid,sep="|")
+  state$force<-!is.null(state$key)&&identical(state$identity,identity)&&!identical(state$key,key);state$identity<-identity
+  if(!identical(state$key,key)){
+   if(isTRUE(state$force))invalidate_resources(resource_context(token,cid),pattern="official_dreamteam_|mvp_catalog_|rival_finance_evidence_")
+   state$key<-key;state$generation<-state$generation+1L;state$busy<-FALSE;state$catalog<-NULL;state$value(mvp_result("loading",reason="Loading official MVP results."));state$queue<-list(list(kind="catalog"))}
   start_next()
  });shiny::reactive(state$value())
 }

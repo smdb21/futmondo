@@ -471,3 +471,4 @@ The League Squad Value Evolution chart has been repositioned to the bottom of th
 - Each team is represented by a distinct colored line, with the user's own team and the currently scouted rival highlighted.
 - The plot is rendered via `plotlyOutput` for interactivity (hover tooltips, zoom, pan).
 - Positioned at the bottom of the module, after all tabs and KPI boxes.
+The main league table now displays numeric `estimated_cash` with descending initial sort, `confidence`, source update time and debt status. Opening cash is retained in the expandable audit breakdown, not a table column. `shared_rival_finance_source()` loads saved account/league/season evidence before bounded live refreshes; see [rival_cash_accounting.md](rival_cash_accounting.md). Existing roster and manual trade controls are unchanged.

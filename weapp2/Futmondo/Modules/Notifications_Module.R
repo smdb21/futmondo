@@ -70,6 +70,7 @@ notifications_Server <- function(id, is_module_active, login_token, championship
       auth <- login_token(); shiny::req(valid_login(auth))
       result <- tryCatch(get_notifications(auth),error=function(e)NULL)
       if (!is.null(result)) {
+        record_round_publication_signal(session$rootScope(),auth[["userid"]],championship_id(),result)
         official(result); last_success(attr(result,"observed_at") %||% Sys.time())
         stale(identical(attr(result,"fetch_status"),"stale"))
       } else stale(TRUE)

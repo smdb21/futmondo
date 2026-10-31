@@ -2220,7 +2220,7 @@
       "checksum": "e7c0ae55954bdc551b46c460c89e8a1b"
     },
     "futmondo_functions.R": {
-      "checksum": "724883f34525b893440dabd9bf6b113e"
+      "checksum": "3eddf9699e5b1e657a879bcac412d95f"
     },
     "global.R": {
       "checksum": "33f15bfbb10105519eca1cb7bedcfb37"
@@ -2241,7 +2241,7 @@
       "checksum": "676429892e2008352ddce0a3a4a2e32b"
     },
     "Modules/Notifications_Module.R": {
-      "checksum": "dbd212eb672c1809c76bf5c4ec580cfd"
+      "checksum": "66462a9054f8451455a36d09652df291"
     },
     "Modules/Players_in_Championship_Module.R": {
       "checksum": "2c6e8cc92ec85a375651ade1a765d95b"
@@ -2256,7 +2256,7 @@
       "checksum": "d28b6843516e7a88406119bf287000c2"
     },
     "Modules/Rivals_Module.R": {
-      "checksum": "b54f82d9ec465c78517e0118a7cf281b"
+      "checksum": "436e4e4de1848d3f3f48ae6677d46905"
     },
     "Modules/Round_MVPs_Module.R": {
       "checksum": "5ddb52ee106a00ae7514bb7697ca689f"
@@ -2268,7 +2268,7 @@
       "checksum": "acf3277e9db32ae2fefc7ae93001b99e"
     },
     "mvp_runtime.R": {
-      "checksum": "f8294321c1c28f953b0db2e12c59faa2"
+      "checksum": "555943bc4c6e0b1661bd58bd708116d0"
     },
     "player_columns_to_hide.txt": {
       "checksum": "569487c234e0b4a28c0027249faecc8b"
@@ -2280,7 +2280,7 @@
       "checksum": "966fb7d1d4e47b09427f0d8e82504f70"
     },
     "supabase_connector.R": {
-      "checksum": "e429912a3d8a6922fba1801df5e7eab5"
+      "checksum": "920a77802831af9ec2fdff18fee51837"
     },
     "theme.R": {
       "checksum": "4787615df03516c7ab4673aa883799f4"
@@ -2293,6 +2293,9 @@
     },
     "www/custom_style.css": {
       "checksum": "f0afb183ecc679d5b0bd94553d15d8a5"
+    },
+    "rival_finance_runtime.R": {
+      "checksum": "de443be914d2890dd10e262aa241f823"
     }
   },
   "users": null

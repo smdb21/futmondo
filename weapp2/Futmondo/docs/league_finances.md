@@ -41,3 +41,5 @@ check <- evaluate_acquisition_preflight(capacity, "bid", amount=1000000)
 ```
 
 See `test_data_contracts.R`, `test_history_persistence.R`, `test_deterministic_fixes.R` and `test_ui_reliability.R` for signed/unknown balances, financial caps, rival history and source-event regression coverage.
+
+The Rivals table now uses `shared_rival_finance_source()` and `build_rival_cash_dataset()` rather than the legacy synchronous `calculate_league_finances()` path. See [rival_cash_accounting.md](rival_cash_accounting.md) for correction-aware signed accounting, full ideal-XI/MVP treatment, confidence and conservative historical gaps. The legacy helpers remain for compatibility and are not the Rivals cash source.

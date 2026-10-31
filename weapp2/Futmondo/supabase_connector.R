@@ -318,7 +318,6 @@ get_round_mvps <- function(championship_id) {
   get_cached_data(cache_key, {
     rows <- supabase_read_all("round_dream_team", list(
       championship_id = paste0("eq.", as.character(championship_id[1])),
-      is_mvp = "is.true",
       is_finished = "is.true",
       select = "championship_id,round_id,round_number,player_id,player_name,player_role,points,is_mvp,is_finished",
       order = "round_number.desc,player_id.asc"

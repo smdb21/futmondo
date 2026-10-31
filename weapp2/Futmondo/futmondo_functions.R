@@ -32,6 +32,7 @@ library(dplyr)
 library(jsonlite)
 library(data.table)
 source("mvp_runtime.R")
+source("rival_finance_runtime.R")
 
 source("data_service.R")
 source("async_transport.R")
@@ -1845,90 +1846,10 @@ get_user_team_moneymovements <- function(login, championship_id, user_team_id) {
     print("Getting team money movements")
     response <- futmondo_post(url, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
     status <- httr::status_code(response)
-    if (status != 200L) {
-      print(paste0("[get_user_team_moneymovements] HTTP status: ", status))
-      return(data.frame(
-        id = character(0), concept = character(0), type = character(0),
-        category = character(0), money = numeric(0), date = character(0),
-        stringsAsFactors = FALSE
-      ))
-    }
+    if (status != 200L) return(normalize_money_movements(NULL))
     ans <- httr::content(response)
-    if (!is.null(ans) && "answer" %in% names(ans) && is.list(ans$answer)) {
-      raw_ans <- ans$answer
-
-      # Detect error responses: error=TRUE, or a non-ok code without an "answer" key
-      if (isTRUE(raw_ans$error) || (!is.null(raw_ans$code) && raw_ans$code != API_CODE_OK && !("answer" %in% names(raw_ans)))) {
-        return(data.frame(
-          id = character(0), concept = character(0), type = character(0),
-          category = character(0), money = numeric(0), date = character(0),
-          stringsAsFactors = FALSE
-        ))
-      }
-
-      # The API may return the movements array directly under ans$answer,
-      # or nested under ans$answer$answer. Detect which shape we have.
-      if (is.list(raw_ans) && "answer" %in% names(raw_ans) && is.list(raw_ans$answer)) {
-        movements <- raw_ans$answer
-      } else {
-        movements <- raw_ans
-      }
-
-      # If movements looks like a single movement object (scalar fields like _id, date, money
-      # alongside error/code/msg), it is an error response -- return empty.
-      if (is.list(movements) && length(movements) > 0) {
-        has_scalar_error_field <- isTRUE(movements$error) ||
-          (!is.null(movements$code) && movements$code != API_CODE_OK)
-        has_scalar_msg <- !is.null(movements$msg) && is.character(movements$msg) && length(movements$msg) == 1
-        has_movement_field <- !is.null(movements[["_id"]]) || !is.null(movements$date) || !is.null(movements$money)
-        # If it has error-like scalar fields AND no nested array structure, treat as error
-        if ((has_scalar_error_field || has_scalar_msg) && !is.list(movements[[1]])) {
-          return(data.frame(
-            id = character(0), concept = character(0), type = character(0),
-            category = character(0), money = numeric(0), date = character(0),
-            stringsAsFactors = FALSE
-          ))
-        }
-      }
-
-      if (is.null(movements) || length(movements) == 0) {
-        return(data.frame(
-          id = character(0), concept = character(0), type = character(0),
-          category = character(0), money = numeric(0), date = character(0),
-          stringsAsFactors = FALSE
-        ))
-      }
-      get_val <- function(obj, key, default = "") {
-        if (is.null(obj)) return(default)
-        nm <- names(obj)
-        if (is.null(nm) || !key %in% nm) return(default)
-        val <- obj[[key]]
-        if (is.null(val)) return(default)
-        return(val)
-      }
-      df <- lapply(movements, FUN = function(m) {
-        m <- as.list(m)
-        data.frame(
-          id = if (is.null(get_val(m, "_id"))) NA_character_ else as.character(get_val(m, "_id")),
-          concept = get_val(m, "concept", ""),
-          type = get_val(m, "type", ""),
-          category = get_val(m, "category", ""),
-          # Explicit bonus attribution is optional; never infer it from concept text.
-          bonus_type = get_val(m, "bonus_type", ""),
-          round_id = get_val(m, "round_id", ""),
-          player_id = get_val(m, "player_id", ""),
-          money = if (is.null(get_val(m, "money", NULL))) 0 else as.numeric(get_val(m, "money")),
-          date = get_val(m, "date", ""),
-          stringsAsFactors = FALSE
-        )
-      }) %>% bind_rows()
-      return(df)
-    }
-    return(data.frame(
-      id = character(0), concept = character(0), type = character(0),
-      category = character(0), money = numeric(0), date = character(0),
-      stringsAsFactors = FALSE
-    ))
+    if (!is.list(ans) || !"answer" %in% names(ans)) return(normalize_money_movements(NULL))
+    normalize_money_movements(ans$answer)
   }, context=resource_context(login=login,championship_id=championship_id,user_team_id=user_team_id))
 }
 
