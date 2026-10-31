@@ -322,3 +322,8 @@ Keep a native team selector independent of the financial Reactable, backed by th
 
 
 Selected-rival summary correction (2026-10-31): budget cards reuse the shared league ledger estimate and confidence, with expandable evidence gaps. Position uses the observed API position or total-points rank (ties share rank), explicitly labeled. No additional API/DB requests, timers, caches, or accounting changes; bounded ranking over the league directory and one ledger-row lookup. Historical reward settlement/eligibility integration remains incomplete; this change does not certify estimates or validate hosted data. Focused regression and offline lifecycle checks recorded with delivery.
+
+
+### 2026-10-31 rival balance reconstruction — implemented locally
+
+Connect the actual `/1/userteam/rounds` source and persisted historical `/1/userteam/roundlineup` snapshots to point, per-round ranking and XI/MVP subtotals. Present the reconstructed numeric balance as the rival result; an official private budget is optional. Reuse the existing scoped evidence table with typed payloads and full per-team snapshot replacement. Use the official ranking calculator, top/flop mapping and tie-sharing rules; exclude known negative starts and open rounds. Reuse saved final lineups and refresh only changed round signatures with bounded concurrency. Keep current-rule and absent ownership/manual-adjustment gaps explicit, including exact unassigned award round/player IDs. Historical roster-only award eligibility remains unconfirmed; no current-roster or undocumented cutoff inference is permitted. Source contracts and local verification limits are recorded in the accounting and review documents.

@@ -261,14 +261,14 @@ rivals_finance_table_widget <- function(finances_data,on_error=function(error)NU
       columns=list(Team=colDef(name="User Team",align="left")))
   }
   tryCatch({
-    df_display<-df %>% dplyr::select(Team=teamname,`Estimated cash`=estimated_cash,
+    df_display<-df %>% dplyr::select(Team=teamname,`Reconstructed balance`=estimated_cash,
       Confidence=confidence,`Last updated`=as_of,Status=cash_status,`Squad Value`=team_value,Points=points)
     currency<-function(value){value<-fm_number(value);if(is.finite(value))format_table_currency(value)else""}
     reactable::reactable(df_display,compact=TRUE,striped=TRUE,highlight=TRUE,bordered=FALSE,
-      selection="single",onClick="select",defaultPageSize=10,defaultSorted=list(`Estimated cash`="desc"),
+      selection="single",onClick="select",defaultPageSize=10,defaultSorted=list(`Reconstructed balance`="desc"),
       defaultColDef=colDef(sortNALast=TRUE),
       columns=list(Team=colDef(name="User Team",align="left"),
-        `Estimated cash`=colDef(align="right",cell=function(value){
+        `Reconstructed balance`=colDef(align="right",cell=function(value){
           value<-fm_number(value);if(!is.finite(value))return("")
           tags$span(style=if(value<0)"color: var(--fm-danger); font-weight:700;"else"font-weight:700;",currency(value))
         }),`Last updated`=colDef(cell=function(value){
@@ -290,7 +290,7 @@ rivals_summary_values <- function(info, teams, finances, team_id) {
   number <- function(x) { x <- suppressWarnings(as.numeric(x)); if(length(x)==1L && is.finite(x)) x else NA_real_ }
   row <- if(is.data.frame(finances) && "teamid" %in% names(finances)) finances[finances$teamid %in% team_id,,drop=FALSE] else data.frame()
   cash <- if(nrow(row)==1L)number(row$estimated_cash)else NA_real_
-  label <- if(nrow(row)==1L)paste(row$confidence,"cash balance")else "Estimated cash balance"
+  label <- if(nrow(row)==1L&&identical(row$confidence,"Verified"))"Observed cash balance"else "Reconstructed cash balance (estimate)"
   notes <- if(nrow(row)==1L)row$estimate_notes else ""
   if(!is.finite(cash) && is.finite(number(info$budget))){cash<-number(info$budget);label<-"Official cash balance"}
   position <- number(info$position)

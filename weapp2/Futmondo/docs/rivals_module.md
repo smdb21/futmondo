@@ -484,3 +484,8 @@ The hosted blank-widget cause remains unconfirmed. Locally, the captured ten-tea
 
 
 Selected-rival summary correction (2026-10-31): budget cards reuse the shared league ledger estimate and confidence, with expandable evidence gaps. Position uses the observed API position or total-points rank (ties share rank), explicitly labeled. No additional API/DB requests, timers, caches, or accounting changes; bounded ranking over the league directory and one ledger-row lookup. Historical reward settlement/eligibility integration remains incomplete; this change does not certify estimates or validate hosted data. Focused regression and offline lifecycle checks recorded with delivery.
+
+
+### Reconstructed rival balances (2026-10-31)
+
+The league column is **Reconstructed balance** and the selected-rival card is **Reconstructed cash balance (estimate)**, using the same numeric ledger result. An accessible fresh own budget remains labeled observed cash. Reconstruction includes actual round-history-derived points and ranking bonuses, saved XI/MVP selections associated with historical starter/bench ownership, public transfers, and known signed adjustments. It does not require a private rival budget. Expand the evidence notes for specific missing round/player ownership, unpublished rounds, hidden adjustments and current-rule assumptions. Historical collection uses the shared two-read queue; no card-selection request loop or timer was added. See [rival_cash_accounting.md](rival_cash_accounting.md) for contracts, reuse and correction behavior.

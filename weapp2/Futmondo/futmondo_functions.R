@@ -2401,10 +2401,14 @@ get_user_team_rounds <- function(login, championship_id, user_team_id) {
     print(paste0("[API] Fetching rounds for team: ", user_team_id))
     response <- futmondo_post(ROUNDS_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
     ans <- httr::content(response)
-    if (!is.null(ans) && "answer" %in% names(ans) && is.list(ans$answer)) {
-      return(ans$answer)
+    if (httr::status_code(response)==200L && is.list(ans) && !isTRUE(ans$error) &&
+        (is.null(ans$code) || identical(ans$code,API_CODE_OK)) && "answer" %in% names(ans) &&
+        is.list(ans$answer) && !isTRUE(ans$answer$error) && is.null(ans$answer$code)) {
+      # An explicit successful empty list can replace a reset season snapshot;
+      # a malformed/error response must never masquerade as empty history.
+      return(structure(ans$answer,valid_response=TRUE))
     }
-    return(list())
+    stop("Team round history unavailable")
   }, context=resource_context(login=login,championship_id=championship_id,user_team_id=user_team_id))
 }
 

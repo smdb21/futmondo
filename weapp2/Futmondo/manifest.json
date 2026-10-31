@@ -2220,7 +2220,7 @@
       "checksum": "e7c0ae55954bdc551b46c460c89e8a1b"
     },
     "futmondo_functions.R": {
-      "checksum": "ef9757aee47ac5b9a009bf2321091a5a"
+      "checksum": "bec61fde54d8c593d267a24b17969d91"
     },
     "global.R": {
       "checksum": "33f15bfbb10105519eca1cb7bedcfb37"
@@ -2256,7 +2256,7 @@
       "checksum": "d28b6843516e7a88406119bf287000c2"
     },
     "Modules/Rivals_Module.R": {
-      "checksum": "b0391eb5924653fda5af983e14e4c210"
+      "checksum": "b30277d3532838e8a98c338cf040d07c"
     },
     "Modules/Round_MVPs_Module.R": {
       "checksum": "5ddb52ee106a00ae7514bb7697ca689f"
@@ -2295,7 +2295,7 @@
       "checksum": "f0afb183ecc679d5b0bd94553d15d8a5"
     },
     "rival_finance_runtime.R": {
-      "checksum": "99680335b9cbdb9a04d74c54a5e04f9a"
+      "checksum": "987ed4371a6820ef98d80fc270081fc8"
     },
     "award_runtime.R": {
       "checksum": "99f1701bc8d314c4f81915b9703b1be1"
