@@ -285,6 +285,26 @@ rivals_finance_table_widget <- function(finances_data,on_error=function(error)NU
   },error=function(error){on_error(error);fallback()})
 }
 
+# Summary cards reuse the league ledger; no additional financial reads.
+rivals_summary_values <- function(info, teams, finances, team_id) {
+  number <- function(x) { x <- suppressWarnings(as.numeric(x)); if(length(x)==1L && is.finite(x)) x else NA_real_ }
+  row <- if(is.data.frame(finances) && "teamid" %in% names(finances)) finances[finances$teamid %in% team_id,,drop=FALSE] else data.frame()
+  cash <- if(nrow(row)==1L)number(row$estimated_cash)else NA_real_
+  label <- if(nrow(row)==1L)paste(row$confidence,"cash balance")else "Estimated cash balance"
+  notes <- if(nrow(row)==1L)row$estimate_notes else ""
+  if(!is.finite(cash) && is.finite(number(info$budget))){cash<-number(info$budget);label<-"Official cash balance"}
+  position <- number(info$position)
+  rank_label <- "Rank position"
+  if(!is.finite(position) && is.data.frame(teams) && all(c("teamid","points") %in% names(teams))){
+    points <- suppressWarnings(as.numeric(teams$points)); selected <- which(teams$teamid %in% team_id)
+    if(length(selected)==1L && all(is.finite(points))){
+      position <- rank(-points,ties.method="min")[selected]
+      rank_label <- "By total points (ties share rank)"
+    }
+  }
+  list(cash=cash,label=label,notes=notes,position=position,rank_label=rank_label)
+}
+
 rivals_UI <- function(id) {
   ns <- NS(id)
 tagList(
@@ -610,7 +630,8 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       pnl_color <- if (net_transfer_pnl > 0) "#10b981" else if (net_transfer_pnl < 0) "#ef4444" else "#64748b"
       pnl_sign <- if (net_transfer_pnl > 0) "+" else ""
 
-      cash <- ui_financial_amount(budget_val)
+      summary <- rivals_summary_values(info,user_teams_RV(),league_finances_RV()$team_finances,rival_id)
+      cash <- ui_financial_amount(summary$cash)
       spent_fmt <- format_table_currency(total_spent)
       money_out_fmt <- format_table_currency(money_out)
       money_in_fmt <- format_table_currency(money_in)
@@ -618,7 +639,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       net_fmt <- format_table_currency(net_gain)
       pnl_fmt <- paste0(pnl_sign, format_table_currency(net_transfer_pnl))
 
-      pos <- if (!is.null(info) && !is.null(info$position) && !is.na(info$position)) get_ordinal_position(info$position) else "-"
+      pos <- if (is.finite(summary$position)) get_ordinal_position(summary$position) else "Unavailable"
       total_teams <- if (!is.null(user_teams_RV())) nrow(user_teams_RV()) else 0
       rank_text <- paste0(pos, " of ", total_teams)
 
@@ -633,7 +654,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                    solidHeader = TRUE,
                    div(style = "text-align: center; padding: 10px;",
                        h3(style = "font-weight: 700; color: var(--fm-text); margin: 0; font-size: 20px;", rank_text),
-                       p(style = "color: var(--fm-muted); font-size: 11px; text-transform: uppercase; margin-top: 5px;", "Rank Position"))
+                       p(style = "color: var(--fm-muted); font-size: 11px; text-transform: uppercase; margin-top: 5px;", summary$rank_label))
                  )
           ),
           column(width = 3,
@@ -644,7 +665,8 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                    solidHeader = TRUE,
                    div(style = "text-align: center; padding: 10px;",
                        h3(style = "font-weight: 700; color: var(--fm-text); margin: 0; font-size: 20px;", cash),
-                       p(style = "color: var(--fm-muted); font-size: 11px; text-transform: uppercase; margin-top: 5px;", "Official Cash Balance"))
+                       p(style = "color: var(--fm-muted); font-size: 11px; text-transform: uppercase; margin-top: 5px;", summary$label),
+                       if(length(summary$notes)==1L && !is.na(summary$notes) && nzchar(summary$notes)) tags$details(tags$summary("Estimate details"),tags$p(summary$notes)))
                  )
           ),
           column(width = 3,

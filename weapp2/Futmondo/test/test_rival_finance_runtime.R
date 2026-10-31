@@ -210,4 +210,14 @@ check('financial table falls back to selectable team rows when its display schem
   widget<-rivals_finance_table_widget(list(team_finances=rows,breakdowns=list()),function(error)stop('unexpected formatting failure'))
   stopifnot(inherits(widget,'reactable'))
 })
+check('selected rival cards reuse ledger cash and derive tied standings from points',{
+  rows<-data.frame(teamid='a',estimated_cash=-25,confidence='Estimated',estimate_notes='Missing settlement evidence')
+  x<-rivals_summary_values(list(),teams,rows,'a')
+  stopifnot(x$cash==-25,x$position==2,x$label=='Estimated cash balance',nzchar(x$notes))
+  tied<-teams;tied$points<-c(200,200)
+  stopifnot(rivals_summary_values(list(),tied,rows,'a')$position==1)
+  rows$estimated_cash<-0;rows$confidence<-'Verified'
+  stopifnot(rivals_summary_values(list(position=2),teams,rows,'a')$cash==0)
+  stopifnot(is.na(rivals_summary_values(list(),teams[FALSE,],data.frame(),'a')$cash))
+})
 cat(sprintf('Rival finance: %d passed / 0 failed\n',n))
