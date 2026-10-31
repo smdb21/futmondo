@@ -11,12 +11,12 @@ official <- normalize_official_dreamteam(answer,'c',ref)$rows
 official <- official[official$is_mvp,,drop=FALSE]
 check('catalog matches league, recognizes done, joins immutable round metadata', {
   x <- normalize_mvp_catalog(active,leagues,'c')
-  stopifnot(x$complete,x$rounds$is_finished[1],!x$rounds$is_finished[2],x$rounds$round_number[1]==1)
+  stopifnot(!x$complete,x$rounds$is_finished[1],is.na(x$rounds$is_finished[2]),x$rounds$round_number[1]==1)
   stopifnot(round_is_finished(list(status='done')))
   upcoming <- active;upcoming$rounds[[1]]$beginProcess <- '2026-10-01T00:00:00Z'
   pending <- leagues;pending[[1]]$rounds[[1]]$status <- NULL;pending[[1]]$rounds[[1]]$isFinished <- FALSE
   x <- normalize_mvp_catalog(upcoming,pending,'c')
-  stopifnot(x$complete,!x$rounds$is_finished[1],x$rounds$begin_process[1]=='2026-10-01T00:00:00Z')
+  stopifnot(!x$complete,!x$rounds$is_finished[1],x$rounds$begin_process[1]=='2026-10-01T00:00:00Z')
 })
 check('upcoming-only and unknown catalogs cannot claim historical absence', {
   stopifnot(!normalize_mvp_catalog(active,list(),'c')$complete)

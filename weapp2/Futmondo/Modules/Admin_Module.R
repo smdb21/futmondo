@@ -34,7 +34,13 @@ admin_Server <- function(id,is_module_active,login_token,championship_id,user_te
   observeEvent(input$btn_verify_db,{req(is_module_active(),authorized());ok<-tryCatch(isTRUE(init_supabase_db(verbose=FALSE)),error=function(e)FALSE);showNotification(if(ok)"Database connection verified."else "Database verification failed.",type=if(ok)"message"else "warning")})
   awards<-shared_mvp_source(session,login_token,championship_id,function()isTRUE(is_module_active())&&isTRUE(authorized()),refresh_trigger)
   observe({req(is_module_active(),authorized());coverage<-awards()$coverage
-    if(is.data.frame(coverage)&&nrow(coverage))updateSelectInput(session,"award_round",choices=setNames(coverage$round_id,paste("Round",coverage$round_number)))
+    choices<-if(is.data.frame(coverage)&&nrow(coverage)){
+      coverage<-coverage[!is.na(coverage$round_id)&nzchar(trimws(coverage$round_id)),,drop=FALSE]
+      setNames(coverage$round_id,award_round_labels(coverage$round_number,coverage$round_id))
+    }else character()
+    selected<-isolate(input$award_round)
+    if(length(selected)!=1L||!selected%in%choices)selected<-head(unname(choices),1L)
+    updateSelectInput(session,"award_round",choices=choices,selected=selected)
   })
   output$award_actions<-renderUI({req(is_module_active(),authorized());snapshot<-awards();rows<-snapshot$coverage
     eligible<-is.data.frame(rows)&&nrow(rows)&&any(rows$selection=="Missing")
@@ -45,7 +51,7 @@ admin_Server <- function(id,is_module_active,login_token,championship_id,user_te
   })
   output$awards_coverage<-reactable::renderReactable({req(is_module_active(),authorized());rows<-awards()$coverage
     if(!is.data.frame(rows)||!nrow(rows))return(reactable::reactable(data.frame(Status="Round catalog unavailable or still loading.")))
-    reactable::reactable(rows,columns=list(round_id=reactable::colDef(show=FALSE),required=reactable::colDef(show=FALSE),round_number=reactable::colDef(name="Round"),selection=reactable::colDef(name="Selection"),finality=reactable::colDef(name="Finality"),mvp=reactable::colDef(name="MVP"),last_fetched=reactable::colDef(name="Last fetched"),persistence=reactable::colDef(name="Saved status"),issue=reactable::colDef(name="Issue")),defaultSorted=list(round_number="desc"),compact=TRUE,wrap=TRUE)
+    reactable::reactable(rows,columns=list(round_id=reactable::colDef(show=FALSE),required=reactable::colDef(show=FALSE),round_number=reactable::colDef(name="Round",cell=function(value,index)award_round_labels(value,rows$round_id[index])),selection=reactable::colDef(name="Selection"),finality=reactable::colDef(name="Finality"),mvp=reactable::colDef(name="MVP"),last_fetched=reactable::colDef(name="Last fetched"),persistence=reactable::colDef(name="Saved status"),issue=reactable::colDef(name="Issue")),defaultSorted=list(round_number="desc"),compact=TRUE,wrap=TRUE)
   })
   output$awards_progress<-renderText({req(is_module_active(),authorized());snapshot<-awards()
     paste0(snapshot$fetched %||% 0," fetched; ",snapshot$saved %||% 0," confirmed saved; ",snapshot$failed %||% 0," failed; ",snapshot$pending %||% 0," pending. ",snapshot$reason)

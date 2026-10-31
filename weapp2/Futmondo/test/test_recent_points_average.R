@@ -35,6 +35,8 @@ cat("RECENT OBSERVED SCORES: 3 additional checks passed\n")
 # Display stays numeric and sortable; unavailable values are blank, never zero.
 average_column <- players_table_recent_average_column(4L)
 stopifnot(is.numeric(last_three$recent_points_avg),identical(average_column$sortNALast,TRUE),
-  identical(average_column$cell(NA_real_),""),identical(average_column$cell(0),0),
-  identical(average_column$cell(-2.125),-2.1),identical(average_column$name,"Avg Last 4"))
+  inherits(average_column$cell,"JS_EVAL"),identical(average_column$name,"Avg Last 4"))
+# Evaluate the actual browser formatter with fixed signed/missing known answers.
+formatter_script<-paste0("const cell = ",as.character(average_column$cell),"; const values = [null, 0, -2.125, 3.25]; const expected = ['', '0', '-2.1', '3.3']; if (JSON.stringify(values.map(value => cell({value}))) !== JSON.stringify(expected)) process.exit(1);")
+stopifnot(system2("node",c("-e",shQuote(formatter_script)))==0L)
 cat("NUMERIC AVERAGE DISPLAY: 1 additional check passed\n")

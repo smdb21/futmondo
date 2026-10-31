@@ -4,7 +4,7 @@
 
 `round_mvp_rows(rows, championship_id)` filters the single `is_mvp` player from each positively finished round. Provisional or unknown-finality selections remain available for inspection in Admin and do not display as completed awards.
 
-`normalize_mvp_catalog(active, leagues, championship_id)` matches immutable league/round IDs and source display metadata. It preserves source status and explicit completion flags; missing flags stay unknown, without arithmetic/calendar inference. Empty/upcoming-only catalogs cannot establish historical absence.
+`normalize_mvp_catalog(active, leagues, championship_id)` matches immutable league/round IDs and source display metadata. It preserves explicit completion evidence; stale compact `future`/`next` statuses stay unknown and do not suppress explicit acquisition. Missing display numbers are enriched from unique saved metadata or identity-checked match-list responses during explicit Admin retrieval; array positions never supply ordinals. Empty/upcoming-only catalogs cannot establish historical absence.
 
 `normalize_official_dreamteam()` validates exactly eleven unique players plus one matching MVP. The request reference supplies the round ID/number/finality, because the captured answer lacks round/finality identity. The successful current-round capture is not proof of settlement. Selected roles/positions, points, formation and scoring metadata are retained.
 

@@ -71,16 +71,10 @@ function(input, output, session) {
   # Today and the banner consume the exact same account/league/team states.
   # The display never waits for roster, pressroom, lineup or acquisition checks.
   team_retry <- reactiveVal(0L); market_retry <- reactiveVal(0L)
-  round_finance_version <- reactive({
-    req(valid_login(login_token_RV()))
-    refresh_trigger()
-    invalidateLater(60000, session)
-    paste(refresh_trigger(), as.numeric(Sys.time()), sep=":")
-  })
   primary_read <- function(handler, retry) {
     factual_read_adapter(session,handler,login_token_RV,championship_id_RV,user_team_id_RV,
       is_active=function()valid_login(login_token_RV()),
-      refresh_trigger=function()paste(round_finance_version(),retry(),sep=":"),state_only=TRUE)
+      refresh_trigger=function()paste(refresh_trigger(),retry(),sep=":"),state_only=TRUE)
   }
   team_read <- primary_read("get_user_team_info", team_retry)
   market_read <- primary_read("get_market_players", market_retry)
@@ -102,7 +96,6 @@ function(input, output, session) {
   round_catalog_RV <- reactive({
     req(valid_login(login_token_RV()), startup_primary_ready(), championship_id_RV())
     refresh_trigger()
-    invalidateLater(60000, session)
     tryCatch(get_finished_rounds(login_token_RV(), championship_id_RV()), error=function(e) data.frame())
   })
   output$round_countdown <- renderUI({

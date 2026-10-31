@@ -52,9 +52,12 @@ normalize_mvp_catalog <- function(active, leagues, championship_id) {
     number <- fm_number(r$number)
     if(!is.finite(number) && length(matched)==1L) number <- fm_number(matched[[1]]$number)
     status <- tolower(mvp_text(r$status))
-    flags <- r[intersect(c("isFinished","finished","isClosed","closed","isCompleted","completed","finalized"),names(r))]
+    detail <- if(length(matched)==1L)matched[[1]]else list()
+    flags <- c(r,detail)[intersect(c("isFinished","finished","isClosed","closed","isCompleted","completed","finalized"),names(c(r,detail)))]
     explicit_false <- any(vapply(flags,function(x) identical(x,FALSE) || identical(x,0L) || identical(x,0) || tolower(mvp_text(x)) %in% c("false","f","0"),logical(1)))
-    finished <- if(round_is_finished(r) || identical(status,"done")) TRUE else if(explicit_false || status %in% c("next","future","active","playing","in_progress")) FALSE else NA
+    # Compact league/list future/next statuses can be stale even for the
+    # current round. They establish neither finality nor publication eligibility.
+    finished <- if(round_is_finished(r) || round_is_finished(detail) || identical(status,"done")) TRUE else if(explicit_false || status %in% c("active","playing","in_progress")) FALSE else NA
     begin <- mvp_text(r$beginProcess)
     if(!nzchar(begin) && length(matched)==1L) begin <- mvp_text(matched[[1]]$beginProcess)
     data.frame(round_id=id,round_number=number,begin_process=begin,is_finished=finished,status=status)
@@ -62,8 +65,16 @@ normalize_mvp_catalog <- function(active, leagues, championship_id) {
   valid <- nzchar(rows$round_id) & !duplicated(rows$round_id)
   complete <- all(valid) && !anyNA(rows$is_finished)
   rows <- rows[valid,,drop=FALSE]
+  active_details<-Filter(function(round){
+    is.list(round)&&mvp_text(round$`_id` %||% round$id)%in%rows$round_id&&
+      (!nzchar(mvp_text(round$championshipId))||identical(mvp_text(round$championshipId),as.character(championship_id)))
+  },mvp_records(active$rounds))
+  anchors<-unique(vapply(active_details,function(round)fm_number(round$number),numeric(1)))
+  anchors<-anchors[is.finite(anchors)&anchors>=1&anchors==floor(anchors)]
   list(status=if(complete) "ok" else "partial",rounds=rows,complete=complete,
-    reason=if(complete) "" else "Some rounds have unknown identities or completion status.")
+    user_team_id=mvp_text(champ$userteam$id %||% champ$userteam$`_id`),
+    current_round_number=if(length(anchors)==1L)anchors else NA_real_,
+    reason=if(complete) "" else "Some round numbers or completion states are not confirmed. Retrieve missing awards to check their schedules.")
 }
 
 get_finished_round_catalog <- function(login, championship_id) {
@@ -103,11 +114,36 @@ normalize_official_dreamteam <- function(answer, championship_id, reference) {
   result
 }
 
+# This read runs only inside explicit Admin acquisition, never on a display tick.
+# Captured match/list returns the requested round identity and number separately
+# from match results. Neither a score nor a compact status establishes payment.
+get_award_round_reference <- function(login,championship_id,reference) {
+  if(is.finite(fm_number(reference$round_number)))return(reference)
+  detail<-tryCatch(get_cached_data(paste0("award_schedule_",championship_id,"_",reference$round_id),{
+    response<-mvp_api_answer(login,"https://api.futmondo.com/1/match/list",list(
+      championshipId=championship_id,userteamId=reference$user_team_id %||% NULL,roundId=reference$round_id))
+    if(!identical(response$status,"ok"))NULL else response$answer$round
+  },context=resource_context(login,championship_id)),error=function(e)NULL)
+  id<-if(is.list(detail))mvp_text(detail$`_id` %||% detail$id)else ""
+  number<-if(is.list(detail))fm_number(detail$number)else NA_real_
+  if(!identical(id,reference$round_id)||!is.finite(number)||number<1||number!=floor(number))return(reference)
+  reference$round_number<-number
+  if(round_is_finished(detail))reference$is_finished<-TRUE
+  reference
+}
 get_official_dreamteam_result <- function(login, championship_id, reference) {
   tryCatch(get_cached_data(paste0("official_dreamteam_",championship_id,"_",reference$round_id), {
-    response <- mvp_api_answer(login,DREAMTEAM_URL,list(championshipId=championship_id,type="dreamteam",round=reference$round_id))
-    if(response$status!="ok") return(response)
-    normalize_official_dreamteam(response$answer,championship_id,reference)
+    reference<-get_award_round_reference(login,championship_id,reference)
+    current<-fm_number(reference$current_round_number)
+    if(is.finite(current)&&is.finite(fm_number(reference$round_number))&&reference$round_number>current){
+      result<-mvp_result("not_due",reason="A later round has not opened yet.")
+    }else{
+      response <- mvp_api_answer(login,DREAMTEAM_URL,list(championshipId=championship_id,type="dreamteam",round=reference$round_id))
+      if(response$status!="ok")result<-response
+      else result<-normalize_official_dreamteam(response$answer,championship_id,reference)
+    }
+    result$reference<-reference
+    result
   }, context=resource_context(login=login,championship_id=championship_id)),error=function(e) mvp_result("connection",reason="MVP retrieval failed. Refresh to retry."))
 }
 

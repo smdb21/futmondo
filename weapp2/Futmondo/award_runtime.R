@@ -1,3 +1,21 @@
+# Unknown round numbers retain a distinct official ID until schedule lookup.
+award_round_labels <- function(numbers,ids) {
+  vapply(seq_along(ids),function(i){
+    number<-fm_number(numbers[i]);id<-mvp_text(ids[i])
+    if(is.finite(number))paste("Round",number)else paste0("Round (",id,")")
+  },character(1))
+}
+# Reuse scoped persisted request metadata without inventing missing ordinals.
+award_catalog_numbers <- function(rounds,saved) {
+  if(!is.data.frame(rounds)||!nrow(rounds)||!is.data.frame(saved)||!nrow(saved)||
+     !all(c("round_id","round_number")%in%names(saved)))return(rounds)
+  for(i in which(!is.finite(rounds$round_number))){
+    numbers<-unique(saved$round_number[saved$round_id%in%rounds$round_id[i]])
+    numbers<-numbers[is.finite(numbers)&numbers>=1&numbers==floor(numbers)]
+    if(length(numbers)==1L)rounds$round_number[i]<-numbers
+  }
+  rounds
+}
 # Full-round snapshots are immutable; only acknowledged revisions count as saved.
 award_selection_valid <- function(rows) {
   is.data.frame(rows) && nrow(rows)==11L && all(c("round_id","player_id","is_mvp")%in%names(rows)) &&
@@ -65,7 +83,7 @@ award_coverage <- function(rounds,rows,failures=list()) {
   if(!is.data.frame(rounds)||!nrow(rounds))return(data.frame())
   dplyr::bind_rows(lapply(seq_len(nrow(rounds)),function(i){
     round<-rounds[i,,drop=FALSE];group<-if(is.data.frame(rows)&&"round_id"%in%names(rows))rows[rows$round_id%in%round$round_id,,drop=FALSE]else data.frame()
-    required<-!mvp_text(round$status)%in%c("next","future","upcoming")
+    required<-!mvp_text(round$status)%in%c("verified_future")
     valid<-award_selection_valid(group)
     finality<-if(!valid)"Missing"else if(all(group$is_finished%in%TRUE))"Confirmed final"else if(any(group$is_finished%in%FALSE))"Provisional / in progress"else "Finality unknown"
     data.frame(round_id=round$round_id,round_number=round$round_number,selection=if(valid)"11 players"else if(required)"Missing"else "Not due",required=required,
@@ -106,7 +124,12 @@ shared_mvp_source <- function(session,login,championship,active,refresh=NULL) {
   # No per-round publication: consumers update on completion or a two-second cap.
   state$last_publish<-state$last_publish %||% as.POSIXct(0,origin="1970-01-01",tz="UTC")
   progress<-function(force=FALSE){if(force||as.numeric(difftime(Sys.time(),state$last_publish,units="secs"))>=2){state$last_publish<-Sys.time();publish()}}
-  replace_rows<-function(rows){state$rows<-state$rows[!state$rows$round_id%in%rows$round_id,,drop=FALSE];state$rows<-dplyr::bind_rows(state$rows,rows)}
+  replace_rows<-function(rows){
+    if(is.data.frame(state$rows)&&"round_id"%in%names(state$rows))
+      state$rows<-state$rows[!state$rows$round_id%in%rows$round_id,,drop=FALSE]
+    else state$rows<-data.frame()
+    state$rows<-dplyr::bind_rows(state$rows,rows)
+  }
   save_result<-function(result,reference,auth,cid,ctx,generation,key){
     id<-reference$round_id;state$writes<-state$writes+1L
     callback<-function(ok){
@@ -140,13 +163,22 @@ shared_mvp_source <- function(session,login,championship,active,refresh=NULL) {
         finish<-function(result){
           if(!current(g,k))return(NULL)
           state$inflight<-max(0L,state$inflight-1L)
+          resolved<-result$reference %||% ref
+          if(identical(mvp_text(resolved$round_id),mvp_text(ref$round_id))){
+            index<-which(state$rounds$round_id%in%ref$round_id)
+            if(is.finite(fm_number(resolved$round_number)))state$rounds$round_number[index]<-resolved$round_number
+            if(isTRUE(resolved$is_finished))state$rounds$is_finished[index]<-TRUE
+            if(identical(result$status,"not_due"))state$rounds$status[index]<-"verified_future"
+          }else resolved<-ref
           version<-award_scoring_version(result$metadata$pointSystem,result$metadata$custom)
           compatible<-identical(state$expected_scoring,"unknown")||identical(version,state$expected_scoring)
-          if(identical(result$status,"ok")&&award_selection_valid(result$rows)&&compatible){
+          if(identical(result$status,"not_due")){
+            state$failures[[ref$round_id]]<-NULL
+          }else if(identical(result$status,"ok")&&award_selection_valid(result$rows)&&compatible){
             state$fetched<-state$fetched+1L;rows<-result$rows;rows$checked_at<-rival_finance_stamp(attr(result,"observed_at") %||% Sys.time())
             rows$finality<-mvp_text(result$metadata$finality,"unknown");rows$persistence<-"Saving";rows$season<-state$season
             rows$scoring_version<-version;replace_rows(rows)
-            save_result(result,ref,a,c,x,g,k)
+            save_result(result,resolved,a,c,x,g,k)
           }else{state$failed<-state$failed+1L;state$failures[[ref$round_id]]<-if(!compatible)"Selection scoring differs from the league configuration; it was not used."else mvp_text(result$reason,"Round selection unavailable or malformed.")}
           pump();NULL
         }
@@ -166,10 +198,11 @@ shared_mvp_source <- function(session,login,championship,active,refresh=NULL) {
       selected=intersect(as.character(round_id),coverage$round_id),character())
     launch<-function(){
       if(!isTRUE(shiny::isolate(active()))){publish();return(FALSE)}
-      if("status"%in%names(state$rounds))ids<-setdiff(ids,state$rounds$round_id[state$rounds$status%in%c("next","future","upcoming")])
+      if("status"%in%names(state$rounds))ids<-setdiff(ids,state$rounds$round_id[state$rounds$status%in%c("verified_future")])
       ids<-intersect(ids,state$rounds$round_id)
       state$queue<-lapply(head(unique(ids),120L),function(id){row<-state$rounds[state$rounds$round_id%in%id,,drop=FALSE];
-        list(kind="round",reference=list(round_id=id,round_number=row$round_number[1],is_finished=row$is_finished[1]))})
+        list(kind="round",reference=list(round_id=id,round_number=row$round_number[1],is_finished=row$is_finished[1],
+          user_team_id=state$user_team_id,current_round_number=state$current_round_number))})
       state$fetched<-state$saved<-state$failed<-0L;state$needs_recheck<-FALSE;state$running<-length(state$queue)>0L;publish();pump();TRUE
     }
     if(mode%in%c("refresh","selected")){
@@ -181,7 +214,8 @@ shared_mvp_source <- function(session,login,championship,active,refresh=NULL) {
         if(!current(g,k))return(NULL)
         state$loading<-FALSE
         if(is.data.frame(catalog$rounds)&&nrow(catalog$rounds)){
-          state$rounds<-catalog$rounds;state$catalog_complete<-isTRUE(catalog$complete);state$catalog_reason<-catalog$reason %||% "";launch()
+          state$rounds<-award_catalog_numbers(catalog$rounds,state$rows);state$catalog_complete<-isTRUE(catalog$complete);state$catalog_reason<-catalog$reason %||% ""
+          state$user_team_id<-catalog$user_team_id;state$current_round_number<-catalog$current_round_number;launch()
         }else{state$catalog_reason<-"Round status could not be refreshed. Retry before refreshing selections.";publish()};NULL
       },function(e){if(current(g,k)){state$loading<-FALSE;state$catalog_reason<-"Round status could not be refreshed. Retry before refreshing selections.";publish()};NULL})
       return(TRUE)
@@ -211,8 +245,10 @@ shared_mvp_source <- function(session,login,championship,active,refresh=NULL) {
       auth<-login();cid<-championship();ctx<-resource_context(auth,cid,season=state$season,session_id=root$token)
       promises::then(async_adapter_fetch("get_mvp_saved_catalog",list(login=auth,championship_id=cid),ctx,is_current=function()current(g,key)),function(result){
         if(!current(g,key))return(NULL)
-        state$loading<-FALSE;state$expected_scoring<-mvp_text(result$expected_scoring,"unknown");state$rows<-result$saved %||% data.frame();state$rounds<-result$catalog$rounds %||% empty_finished_rounds()
-        state$catalog_complete<-isTRUE(result$catalog$complete);state$saved_complete<-isTRUE(result$saved_complete);state$catalog_reason<-result$catalog$reason %||% "";publish();NULL
+        state$loading<-FALSE;state$expected_scoring<-mvp_text(result$expected_scoring,"unknown");state$rows<-result$saved %||% data.frame();state$rounds<-award_catalog_numbers(result$catalog$rounds %||% empty_finished_rounds(),state$rows)
+        state$catalog_complete<-isTRUE(result$catalog$complete);state$saved_complete<-isTRUE(result$saved_complete);state$catalog_reason<-result$catalog$reason %||% ""
+        state$user_team_id<-result$catalog$user_team_id;state$current_round_number<-result$catalog$current_round_number
+        publish();NULL
       },function(e){if(current(g,key)){state$loading<-FALSE;state$catalog_reason<-"Saved awards or round catalog could not load. Refresh to retry.";publish()};NULL})
     }
     if(!is.null(state$publication)&&!identical(state$publication,publication)){state$needs_recheck<-TRUE;publish()}

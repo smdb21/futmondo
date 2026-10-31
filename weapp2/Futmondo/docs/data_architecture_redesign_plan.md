@@ -301,3 +301,12 @@ Status: implemented locally; source and hosted verification limits remain explic
 7. **Acceptance and delivery.** Use sanitized synthetic fixtures matching the supplied structure: full XI plus single MVP, different round IDs, current-round provisional state, unknown finality, corrected/removed selections, partial failures, durable-save failure/retry, repeat clicks and account/league/season/scoring isolation. Independently verify known-answer rival rewards and duplicate-payment prevention, including postponed-round corrections. Measure delayed-request responsiveness and bounded request/render counts; run the offline lifecycle harness. Document actual checks and source limitations, update the deployment manifest for runtime changes, and keep raw captures/credentials out of Git and deployment.
 
 Completion means Admin can retrieve and durably confirm missing round selections and rival estimates use those saved awards with explicit eligibility/payment coverage. It does not mean every rival's exact cash is known merely because all XI lists are saved. The coach-on-login milestone above is implemented locally. Tests and limitations are tracked in [the integrated results](data_review_results.md) and [runtime interfaces](coach_and_round_awards.md).
+
+
+### 2026-10-31 reload and award-catalog corrections — implemented locally
+
+- Remove minute-based banner market/team/round refresh; retain the visual countdown, explicit Refresh, targeted retries and transaction invalidation.
+- Update existing player table data for new averages without remounting on progress or source timestamps; preserve page/search/filter state. Visible non-average changes regenerate the R-formatted cell payload.
+- Stop hidden history clients from demanding table sources.
+- Treat captured compact future/next statuses as unverified; explicitly hydrate missing round numbers from identity-checked match-list reads, reuse scoped saved numbers and show distinct IDs until resolved.
+- Verify historical match-list query acceptance on the hosted account separately; no live transaction or database migration is part of these corrections.

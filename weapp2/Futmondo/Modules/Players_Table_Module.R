@@ -183,10 +183,8 @@ players_table_owner_choices <- function(teams_df) {
 players_table_recent_average_column <- function(n=5L) {
   n <- suppressWarnings(as.integer(n)[1]);if(!is.finite(n))n <- 5L
   reactable::colDef(name=paste0("Avg Last ",max(1L,min(20L,n))),align="center",sortNALast=TRUE,
-    cell=function(value){
-      if(length(value)==1L&&is.finite(value))return(round(value,1))
-      ""
-    })
+    cell=htmlwidgets::JS("function(cellInfo) { var value = cellInfo.value; return typeof value === 'number' && Number.isFinite(value) ? String(Number(value.toFixed(1))) : ''; }")
+  )
 }
 
 players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL, available_funds_RV = NULL, hide_bid_column = FALSE, refresh_trigger = NULL, is_module_active = function() TRUE, optional_ready = function() TRUE) {
@@ -462,26 +460,52 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       paste(messages,collapse=" ")
     })
 
-    # renders ----
-    ## render players_table ----
-    output$players_table <- renderReactable({
-      req(players_table_filtered_RV())
-      cols_to_hide <- c(cfg_player_columns_to_hide, "data_coverage", "observed_at",
+    # History averages render in JavaScript and update in place. Other columns
+    # use R formatters, so changes to those values need a fresh widget payload.
+    table_display_data <- reactive({
+      rows <- players_table_filtered_RV()
+      if(is.null(rows))return(NULL)
+      cols_to_hide <- c(cfg_player_columns_to_hide,"data_coverage","observed_at",
         "recent_points_count","recent_points_required","recent_points_status")
-      if (isTRUE(hide_bid_column)) {
-        cols_to_hide <- c(cols_to_hide, "bid_price")
-      }
-      coverage_rows <- players_table_filtered_RV()
-      players_table <- coverage_rows %>%
-        reorder_player_table_columns() %>%
+      if(isTRUE(hide_bid_column))cols_to_hide<-c(cols_to_hide,"bid_price")
+      rows<-rows %>% reorder_player_table_columns() %>%
         dplyr::select(!any_of(cols_to_hide)) %>%
         dplyr::select(any_of(c("name","recent_points_avg")),everything())
-      
-      print(paste0(nrow(players_table), " players in table"))
-      # players_table <- players_table %>%
-      #   dplyr::select(
-      #     any_of(starts_with("change")), any_of(starts_with("market_")), any_of(starts_with("bid_price")), any_of(starts_with("clause_")), any_of(c("name", "role", "role2", "points", "value", "status", "team", "rating", "change", "average", "total")))
-      #
+      # Source timestamps belong to the resource state, not widget equality.
+      rows<-as.data.frame(rows)
+      attributes(rows)<-attributes(rows)[intersect(c("names","row.names","class"),names(attributes(rows)))]
+      rownames(rows)<-NULL
+      rows
+    })
+    table_display_ids<-reactive(as.character(players_table_filtered_RV()$id))
+    table_schema<-reactiveVal(NULL)
+    rendered_schema<-NULL;rendered_data<-NULL;rendered_ids<-character()
+    observe({
+      rows<-table_display_data();ids<-table_display_ids()
+      if(is.null(rows)){table_schema(NULL);return()}
+      recent_n<-suppressWarnings(as.integer(input$recent_games_n)[1])
+      if(!is.finite(recent_n))recent_n<-5L
+      schema<-list(context=table_context_RV(),columns=names(rows),
+        types=lapply(rows,function(column)if(is.numeric(column))"numeric"else class(column)),recent_n=recent_n,
+        formatted=digest::digest(lapply(rows[setdiff(names(rows),"recent_points_avg")],
+          function(column)if(is.numeric(column))as.numeric(column)else column)),ids=ids)
+      if(!identical(isolate(table_schema()),schema)){table_schema(schema);return()}
+      if(identical(rendered_schema,schema)&&(!identical(rendered_data,rows)||!identical(rendered_ids,ids))){
+        page<-isolate(getReactableState("players_table",name="page",session=session)) %||% 1L
+        page_size<-isolate(getReactableState("players_table",name="pageSize",session=session)) %||% 20L
+        page<-max(1L,min(page,max(1L,ceiling(nrow(rows)/page_size))))
+        selected<-isolate(getReactableState("players_table",name="selected",session=session))
+        # Selection indexes refer to the previous client dataset. Remap by ID.
+        selected<-match(rendered_ids[selected],ids)
+        if(!length(selected))selected<-NA_integer_
+        updateReactable("players_table",data=rows,page=page,selected=selected,session=session)
+        rendered_data<<-rows;rendered_ids<<-ids
+      }
+    },priority=10)
+    output$players_table <- renderReactable({
+      schema<-table_schema();req(schema)
+      players_table<-isolate(table_display_data());req(players_table)
+      rendered_schema<<-schema;rendered_data<<-players_table;rendered_ids<<-isolate(table_display_ids())
       table_columns <- get_reactable_columns_for_players(players_table)
       recent_n <- suppressWarnings(as.integer(input$recent_games_n)[1])
       if (!is.finite(recent_n)) recent_n <- 5L
@@ -1121,10 +1145,12 @@ recent_player_points_source <- function(session,login_token,championship_id,user
   owner<-shiny::reactive({
     auth<-value(login_token)
     if(!valid_login(auth))return(list(auth=auth,league="",team="",active=FALSE,ids=character(),fitness=data.frame(),n=5L,refresh=0L))
-    rows<-tryCatch(players_RV(),error=function(e)NULL)
+    active<-isTRUE(is_active())
+    # Hidden table clients must not demand a source read or restart acquisition.
+    rows<-if(active)tryCatch(players_RV(),error=function(e)NULL)else NULL
     ids<-if(is.data.frame(rows)&&"id"%in%names(rows))as.character(rows$id)else character()
     list(auth=auth,league=tryCatch(fm_scalar(value(championship_id),""),error=function(e)""),team=tryCatch(fm_scalar(value(user_team_id),""),error=function(e)""),
-      active=isTRUE(is_active()),ids=head(unique(ids[!is.na(ids)&nzchar(ids)]),2000L),
+      active=active,ids=head(unique(ids[!is.na(ids)&nzchar(ids)]),2000L),
       fitness=recent_points_fitness_rows(rows),n=max(1L,min(20L,fm_number(value(required_rounds),5L))),
       refresh=if(is.function(refresh_trigger))refresh_trigger()else 0L)
   })

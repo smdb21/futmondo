@@ -2229,7 +2229,7 @@
       "checksum": "9192bebc2ccf92734440c7c017671e20"
     },
     "Modules/Admin_Module.R": {
-      "checksum": "12d655d47f1169aa8f0663d96f138b4a"
+      "checksum": "7fff5403119a0e135a82a5b0e643185d"
     },
     "Modules/Classification_Module.R": {
       "checksum": "0f4484f0df4d0d3fdc84dc1d7835d239"
@@ -2250,7 +2250,7 @@
       "checksum": "b74340bf198b703b3aad9bedb47b6ed4"
     },
     "Modules/Players_Table_Module.R": {
-      "checksum": "55b7c97c1b11450abceca0c9f2e9a844"
+      "checksum": "89481e16a9d98a9c5a706de6497cc2b3"
     },
     "Modules/Plots_Module.R": {
       "checksum": "d28b6843516e7a88406119bf287000c2"
@@ -2268,7 +2268,7 @@
       "checksum": "fff1a72b72c8bd7e2d53634975e00c93"
     },
     "mvp_runtime.R": {
-      "checksum": "f83446d112b4801429fbfbc4909769d0"
+      "checksum": "4af5540b2f5de5917389048a8ab86b84"
     },
     "player_columns_to_hide.txt": {
       "checksum": "569487c234e0b4a28c0027249faecc8b"
@@ -2277,7 +2277,7 @@
       "checksum": "d5a285d8441eec4d8bf7df842bd8f70f"
     },
     "server.R": {
-      "checksum": "42b4c3931352def4cdd0a6a5f326cf41"
+      "checksum": "27c50e85c29d935b591fc3a6b057ddbc"
     },
     "supabase_connector.R": {
       "checksum": "920a77802831af9ec2fdff18fee51837"
@@ -2298,7 +2298,7 @@
       "checksum": "fcce05fc1969cfe6894eb5b374779fb6"
     },
     "award_runtime.R": {
-      "checksum": "03c373eab7b078c65af8411f7ed3be7e"
+      "checksum": "99f1701bc8d314c4f81915b9703b1be1"
     },
     "coach_runtime.R": {
       "checksum": "433720fcc832cc6e18669e887fce264d"

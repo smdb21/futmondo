@@ -79,7 +79,7 @@ fm_async_hire_coach<-old_hire
 old_async<-async_adapter_fetch;old_persist<-persist_official_award_snapshot
 requests<-0L;running<-0L;maximum<-0L;saves<-list();read_count<-0L
 async_adapter_fetch<-function(fn,args,context,...){
-  if(fn=='get_mvp_saved_catalog'){read_count<<-read_count+1L;return(promises::promise_resolve(list(saved=data.frame(),saved_complete=TRUE,catalog=list(rounds=data.frame(round_id=c('r1','r2','r3'),round_number=1:3,is_finished=c(TRUE,FALSE,FALSE),status=c('done','playing','future')),complete=TRUE,reason=''))))}
+  if(fn=='get_mvp_saved_catalog'){read_count<<-read_count+1L;return(promises::promise_resolve(list(saved=data.frame(),saved_complete=TRUE,catalog=list(rounds=data.frame(round_id=c('r1','r2','r3'),round_number=1:3,is_finished=c(TRUE,FALSE,FALSE),status=c('done','playing','verified_future')),complete=TRUE,reason=''))))}
   stopifnot(fn=='get_official_dreamteam_result');requests<<-requests+1L;running<<-running+1L;maximum<<-max(maximum,running)
   promises::promise(function(resolve,reject)later::later(function(){running<<-running-1L;resolve(normalize_official_dreamteam(xi(),args$championship_id,args$reference))},.03))
 }
@@ -100,4 +100,52 @@ check('Admin loads bulk coverage once, fetches only on click, limits concurrency
   })
 })
 async_adapter_fetch<-old_async;persist_official_award_snapshot<-old_persist
+check('captured compact catalog preserves unknown finality and distinct labels',{
+  active<-list(championships=list(list(id='c',league='l',userteam=list(id='t'))),rounds=list(list(`_id`='r12',number=12)))
+  leagues<-list(list(`_id`='l',rounds=lapply(1:38,function(i)list(`_id`=paste0('r',i),status='future'))))
+  catalog<-normalize_mvp_catalog(active,leagues,'c')
+  stopifnot(nrow(catalog$rounds)==38L,sum(is.finite(catalog$rounds$round_number))==1L,
+    all(is.na(catalog$rounds$is_finished)),catalog$current_round_number==12L,catalog$user_team_id=='t')
+  enriched<-award_catalog_numbers(catalog$rounds,data.frame(round_id=c('r1','r1','r2','r2'),round_number=c(1,1,2,99)))
+  stopifnot(enriched$round_number[1]==1L,is.na(enriched$round_number[2]),enriched$round_number[12]==12L)
+  coverage<-award_coverage(catalog$rounds,data.frame())
+  labels<-award_round_labels(coverage$round_number,coverage$round_id)
+  stopifnot(all(coverage$required),all(coverage$selection=='Missing'),!anyDuplicated(labels),!any(grepl('Round NA',labels)))
+})
+old_api<-mvp_api_answer;old_async<-async_adapter_fetch;old_save<-persist_official_award_snapshot
+check('explicit acquisition hydrates verified round IDs, saves historical awards and skips verified later rounds',{
+  clear_api_cache();schedule_queries<-character();award_queries<-character();saved_numbers<-numeric()
+  active<-list(championships=list(list(id='c',league='l',userteam=list(id='t'))),rounds=list(list(`_id`='r2',number=2)))
+  catalog<-normalize_mvp_catalog(active,list(list(`_id`='l',rounds=lapply(1:3,function(i)list(`_id`=paste0('r',i),status='future')))),'c')
+  mvp_api_answer<-function(login,url,query){
+    if(grepl('/match/list$',url)){
+      stopifnot(identical(query$userteamId,'t'));schedule_queries<<-c(schedule_queries,query$roundId)
+      return(list(status='ok',answer=list(round=list(`_id`=query$roundId,number=as.numeric(sub('r','',query$roundId))))))
+    }
+    award_queries<<-c(award_queries,query$round);list(status='ok',answer=xi())
+  }
+  async_adapter_fetch<-function(fn,args,context,...){
+    if(fn=='get_mvp_saved_catalog')return(promises::promise_resolve(list(saved=data.frame(),saved_complete=TRUE,catalog=catalog)))
+    stopifnot(fn=='get_official_dreamteam_result');promises::promise_resolve(do.call(get_official_dreamteam_result,args))
+  }
+  persist_official_award_snapshot<-function(result,login,championship_id,reference,context,on_complete){
+    saved_numbers<<-c(saved_numbers,reference$round_number);on_complete(TRUE);TRUE
+  }
+  shiny::testServer(function(input,output,session){source<-shared_mvp_source(session,function()auth,function()'c',function()TRUE)},{
+    settle(session,function()!source()$loading);stopifnot(!length(schedule_queries),!length(award_queries))
+    attr(source,'retrieve')('missing');settle(session,function()!source()$running)
+    stopifnot(setequal(schedule_queries,c('r1','r3')),setequal(award_queries,c('r1','r2')),
+      setequal(saved_numbers,1:2),source()$saved==2L,source()$failed==0L,
+      source()$coverage$selection[3]=='Not due',all(source()$coverage$round_number==1:3),
+      all(is.na(source()$rows$is_finished)),all(source()$coverage$persistence[1:2]=='Saved'))
+  })
+})
+check('mismatched schedule identity never assigns its round number',{
+  clear_api_cache()
+  mvp_api_answer<-function(...)list(status='ok',answer=list(round=list(`_id`='foreign',number=99)))
+  reference<-list(round_id='r1',round_number=NA_real_,is_finished=NA,user_team_id='t')
+  result<-get_award_round_reference(auth,'c',reference)
+  stopifnot(is.na(result$round_number),identical(result$round_id,'r1'),is.na(result$is_finished))
+})
+mvp_api_answer<-old_api;async_adapter_fetch<-old_async;persist_official_award_snapshot<-old_save
 cat(sprintf('ADMIN AWARDS / COACH: %d passed / 0 failed\n',n))
