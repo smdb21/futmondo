@@ -57,7 +57,7 @@ normalize_mvp_catalog <- function(active, leagues, championship_id) {
     finished <- if(round_is_finished(r) || identical(status,"done")) TRUE else if(explicit_false || status %in% c("next","future","active","playing","in_progress")) FALSE else NA
     begin <- mvp_text(r$beginProcess)
     if(!nzchar(begin) && length(matched)==1L) begin <- mvp_text(matched[[1]]$beginProcess)
-    data.frame(round_id=id,round_number=number,begin_process=begin,is_finished=finished)
+    data.frame(round_id=id,round_number=number,begin_process=begin,is_finished=finished,status=status)
   }))
   valid <- nzchar(rows$round_id) & !duplicated(rows$round_id)
   complete <- all(valid) && !anyNA(rows$is_finished)
@@ -90,12 +90,17 @@ normalize_official_dreamteam <- function(answer, championship_id, reference) {
     if(!is.list(p)) return(NULL)
     data.frame(championship_id=as.character(championship_id),round_id=reference$round_id,
       round_number=reference$round_number,player_id=mvp_text(p$id %||% p$`_id`),
-      player_name=mvp_text(p$name),player_role=mvp_text(p$role),points=fm_number(p$points),
-      is_mvp=identical(mvp_text(p$id %||% p$`_id`),mid),is_finished=TRUE)
+      player_name=mvp_text(p$name),player_role=mvp_text(p$role),player_position=mvp_text(p$position),points=fm_number(p$points),
+      is_mvp=identical(mvp_text(p$id %||% p$`_id`),mid),
+      is_finished=if(is.logical(reference$is_finished)&&length(reference$is_finished)==1L)reference$is_finished else NA)
   }))
-  if(!nrow(rows) || any(!nzchar(rows$player_id)) || anyDuplicated(rows$player_id) || sum(rows$is_mvp)!=1L || !nzchar(rows$player_name[rows$is_mvp]))
+  if(nrow(rows)!=11L || any(!nzchar(rows$player_id)) || anyDuplicated(rows$player_id) || sum(rows$is_mvp)!=1L || !nzchar(rows$player_name[rows$is_mvp]))
     return(mvp_result("unsupported",reason="The official MVP identity could not be resolved uniquely."))
-  mvp_result("ok",rows,complete=TRUE)
+  result <- mvp_result("ok",rows,complete=TRUE)
+  result$metadata <- list(strategy=mvp_text(answer$strategy), pointSystem=answer$pointSystem,
+    custom=answer$custom, finality=if(isTRUE(reference$is_finished))"final" else
+      if(identical(reference$is_finished,FALSE))"provisional" else "unknown")
+  result
 }
 
 get_official_dreamteam_result <- function(login, championship_id, reference) {
@@ -106,101 +111,13 @@ get_official_dreamteam_result <- function(login, championship_id, reference) {
   }, context=resource_context(login=login,championship_id=championship_id)),error=function(e) mvp_result("connection",reason="MVP retrieval failed. Refresh to retry."))
 }
 
-# A shared reactive source belongs to the root session, not to either consumer.
-get_mvp_saved_catalog<-function(login,championship_id){
- saved<-tryCatch(get_round_mvps(championship_id),error=function(e)data.frame())
- season<-league_season_context(championship_id)
- evidence<-tryCatch(read_rival_finance_evidence(login[["userid"]],championship_id,season)$evidence,error=function(e)list())
- snapshots<-rival_evidence_rows(evidence,"awards")
- for(snapshot in snapshots){
-   rows<-tryCatch(rival_award_snapshot_rows(snapshot$payload$players),error=function(e)data.frame())
-   if(nrow(rows)&&all(c("round_id","player_id","is_mvp")%in%names(rows))){
-     saved<-saved[!saved$round_id%in%snapshot$source_id,,drop=FALSE]
-     rows$checked_at<-snapshot$observed_at;saved<-dplyr::bind_rows(saved,rows)
-   }
- }
- list(saved=saved,catalog=get_finished_round_catalog(login,championship_id))
-}
-persist_official_award_snapshot<-function(result,login,championship_id,reference,context){
- if(!identical(result$status,"ok")||!is.data.frame(result$rows)||!nrow(result$rows))return(FALSE)
- stamp<-attr(result,"observed_at") %||% Sys.time()
- if(identical(attr(result,"fetch_status"),"stale")||is.na(fm_time(stamp)))return(FALSE)
- payload<-list(round_id=reference$round_id,round_number=reference$round_number,
-   players=lapply(seq_len(nrow(result$rows)),function(i)as.list(result$rows[i,,drop=FALSE])),publication="official_selection_observed")
- row<-rival_finance_evidence(login[["userid"]],championship_id,league_season_context(championship_id),"awards",reference$round_id,payload,stamp)
- persist_rival_finance_evidence(list(row),context)
-}
-
-shared_mvp_source<-function(session,login,championship,active,refresh=NULL){
- root<-session$rootScope()
- if(is.null(root$userData$round_publication_revision))root$userData$round_publication_revision<-shiny::reactiveVal(0L)
- if(is.null(root$userData$mvp_shared)){
-  state<-new.env(parent=emptyenv());state$value<-shiny::reactiveVal(mvp_result("loading",reason="Loading official MVP results."))
-  state$key<-NULL;state$queue<-list();state$consumers<-list();state$busy<-FALSE;state$closed<-FALSE;state$generation<-0L;state$catalog<-NULL
-  root$onSessionEnded(function(){state$closed<-TRUE;state$generation<-state$generation+1L;fm_transport_cancel(root$token)})
-  root$userData$mvp_shared<-state
- }
- state<-root$userData$mvp_shared;consumer<-session$ns("mvp_consumer");state$consumers[[consumer]]<-active
- start_next<-function(){
-  if(state$closed||state$busy||!length(state$queue))return(invisible(NULL))
-  enabled<-shiny::isolate(any(vapply(state$consumers,function(f)isTRUE(f()),logical(1))))
-  if(!enabled)return(invisible(NULL))
-  token<-shiny::isolate(login());cid<-shiny::isolate(championship());if(!valid_login(token)||is.null(cid))return(invisible(NULL))
-  ctx<-resource_context(token,cid,session_id=root$token);generation<-state$generation
-  task<-state$queue[[1]];state$queue<-state$queue[-1];state$busy<-TRUE
-  name<-if(task$kind=="catalog")"get_mvp_saved_catalog"else "get_official_dreamteam_result"
-  args<-list(login=token,championship_id=cid);if(task$kind!="catalog")args$reference<-task$reference
-  promises::then(async_adapter_fetch(name,args,ctx),function(result){
-   if(state$closed||generation!=state$generation)return(NULL)
-   state$busy<-FALSE;current<-shiny::isolate(state$value())
-   if(task$kind=="catalog"){
-    current$rows<-if(is.data.frame(result$saved))result$saved else data.frame();state$catalog<-result$catalog
-    rounds<-result$catalog$rounds;if(!is.data.frame(rounds))rounds<-empty_finished_rounds()
-    done<-rounds[rounds$is_finished%in%TRUE,,drop=FALSE];saved<-current$rows$round_id %||% character()
-    refresh_saved<-isTRUE(state$force)
-    checked<-vapply(done$round_id,function(id){
-      stamps<-current$rows$checked_at[current$rows$round_id%in%id];stamps<-fm_time(stamps)
-      if(!length(stamps)||all(is.na(stamps)))return(FALSE)
-      as.numeric(difftime(Sys.time(),max(stamps,na.rm=TRUE),units="secs"))<86400
-    },logical(1))
-    # Legacy selections have no verified check timestamp. Refresh them once so
-    # full XI, corrected recipients and nullable points enter a complete snapshot.
-    done<-done[refresh_saved | !checked,,drop=FALSE];done<-head(done[order(done$round_number,decreasing=TRUE,na.last=TRUE),,drop=FALSE],60L)
-    state$queue<-lapply(seq_len(nrow(done)),function(i)list(kind="round",reference=round_reference(done$round_id[i],done$round_number[i])))
-    current$issues<-character()
-   }else if(identical(result$status,"ok")){
-    current$rows<-current$rows[!current$rows$round_id%in%task$reference$round_id,,drop=FALSE]
-    rows<-result$rows;rows$checked_at<-rival_finance_stamp(attr(result,"observed_at") %||% Sys.time())
-    current$rows<-dplyr::bind_rows(current$rows,rows)
-    shiny::withReactiveDomain(root,tryCatch(persist_official_award_snapshot(result,token,cid,task$reference,ctx),error=function(e)NULL))
-   }else current$issues<-unique(c(current$issues,result$reason))
-   current$complete<-!length(state$queue)&&!length(current$issues)&&isTRUE(state$catalog$complete)
-   current$status<-if(length(state$queue))"loading"else if(current$complete)"ok"else "partial"
-   current$reason<-paste(unique(c(if(length(state$queue))"Loading missing official MVPs.",state$catalog$reason,current$issues)),collapse=" ")
-   state$value(current);later::later(start_next,0);NULL
-  },function(error){
-   if(!state$closed&&generation==state$generation){state$busy<-FALSE;current<-shiny::isolate(state$value());current$status<-"partial";current$complete<-FALSE;current$reason<-"Official results could not be refreshed. Refresh to retry.";state$value(current)};NULL
-  });invisible(NULL)
- }
- shiny::observe({
-  token<-login()
-  if(!valid_login(token)){if(!is.null(state$key)){state$key<-NULL;state$generation<-state$generation+1L;state$queue<-list();state$busy<-FALSE;state$value(mvp_result("unavailable"))};return()}
-  if(!isTRUE(active()))return();cid<-championship();shiny::req(cid)
-  version<-if(is.function(refresh))refresh()else 0;publication<-root$userData$round_publication_revision()
-  key<-paste(token[["userid"]],cid,version,publication,sep="|")
-  identity<-paste(token[["userid"]],cid,sep="|")
-  state$force<-!is.null(state$key)&&identical(state$identity,identity)&&!identical(state$key,key);state$identity<-identity
-  if(!identical(state$key,key)){
-   if(isTRUE(state$force))invalidate_resources(resource_context(token,cid),pattern="official_dreamteam_|mvp_catalog_|rival_finance_evidence_")
-   state$key<-key;state$generation<-state$generation+1L;state$busy<-FALSE;state$catalog<-NULL;state$value(mvp_result("loading",reason="Loading official MVP results."));state$queue<-list(list(kind="catalog"))}
-  start_next()
- });shiny::reactive(state$value())
-}
+# The explicit, shared Admin acquisition controller lives in award_runtime.R.
+source("award_runtime.R")
 
 calculate_mvp_bonuses <- function(official, championship_id, eligibility=data.frame(), rewards=data.frame(), payments=data.frame(), coverage_complete=FALSE) {
   rows <- if(is.data.frame(official)) official else data.frame()
   if(!all(c("championship_id","round_id","player_id","is_mvp") %in% names(rows))) rows <- data.frame()
-  if(nrow(rows)) rows <- rows[rows$championship_id==championship_id & rows$is_mvp %in% TRUE,,drop=FALSE]
+  if(nrow(rows)) rows <- rows[rows$championship_id==championship_id & rows$is_mvp %in% TRUE & if("is_finished"%in%names(rows))rows$is_finished%in%TRUE else FALSE,,drop=FALSE]
   scope <- function(df) if(is.data.frame(df) && "championship_id" %in% names(df)) df[!is.na(df$championship_id) & df$championship_id==championship_id,,drop=FALSE] else data.frame()
   eligibility <- scope(eligibility); rewards <- scope(rewards); payments <- scope(payments)
   events <- if(nrow(rows)) unique(rows[c("championship_id","round_id","player_id")]) else data.frame()

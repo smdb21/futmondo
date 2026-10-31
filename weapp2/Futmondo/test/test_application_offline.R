@@ -166,7 +166,7 @@ app_check('admin handlers reject forged operations and require confirmation',{
 })
 app_check('removed feature interfaces are absent',{
  html<-paste(as.character(today_UI('today')),as.character(players_in_teams_UI('team')),as.character(selected_player_UI('card')))
- stopifnot(!grepl('Smart Bid|Lineup Optimizer|Transfer Sandbox|Automatically hire|recommendation_types',html),!file.exists('prediction_engine.R'),!file.exists('automation_runtime.R'))
+ stopifnot(!grepl('Smart Bid|Lineup Optimizer|Transfer Sandbox|recommendation_types',html),!file.exists('prediction_engine.R'),!file.exists('automation_runtime.R'))
 })
 app_check('one notification click completes cold async player loading',{
  original_catalog<-get_championship_players;get_championship_players<-function(...)app_roster

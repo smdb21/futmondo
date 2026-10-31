@@ -25,3 +25,8 @@ futmondo_functions.R.orig
 global.R.orig
 server.R.orig
 ui.R.orig
+hirecoach
+*.har
+app.futmondo.com.clause_exercise.har
+app.futmondo.com.direct_sel.har
+app.futmondo.com.market_new.har

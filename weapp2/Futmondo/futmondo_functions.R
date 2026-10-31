@@ -36,6 +36,7 @@ source("rival_finance_runtime.R")
 
 source("data_service.R")
 source("async_transport.R")
+source("coach_runtime.R")
 
 # Only read endpoints may retry. Mutations require reconciliation after an
 # uncertain response, so a network timeout must never replay a trade.

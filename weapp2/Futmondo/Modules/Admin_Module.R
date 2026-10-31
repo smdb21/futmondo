@@ -8,10 +8,14 @@ admin_UI <- function(id) {
  ns<-NS(id)
  tagList(h2("Database administration"),p("Inspect retained factual tables. Changes require an authorized administrator."),
   actionButton(ns("btn_refresh_stats"),"Refresh table counts"),reactable::reactableOutput(ns("tables_stats_table")),
-  actionButton(ns("btn_verify_db"),"Verify database connection"),actionButton(ns("btn_sync_dreamteams"),"Save official round MVP results"),
+  actionButton(ns("btn_verify_db"),"Verify database connection"),
+  h3("Round awards"),p("Saved selections improve reward estimates. Historical eligibility and payment coverage are checked separately."),
+  uiOutput(ns("award_actions")),
+  selectInput(ns("award_round"),"Round to refresh",choices=character()),actionButton(ns("btn_refresh_selected_award"),"Refresh selected round"),
+  textOutput(ns("awards_progress")),reactable::reactableOutput(ns("awards_coverage")),
   actionButton(ns("btn_reset_db"),"Reset retained database tables",class="btn-danger"))
 }
-admin_Server <- function(id,is_module_active,login_token,championship_id,user_team_id,user_teams_RV,is_admin=NULL) {
+admin_Server <- function(id,is_module_active,login_token,championship_id,user_team_id,user_teams_RV,is_admin=NULL,refresh_trigger=NULL) {
  moduleServer(id,function(input,output,session){
   ns<-session$ns
   authorized<-reactive(valid_login(login_token()) && if(is.function(is_admin))isTRUE(is_admin())else if(!is.null(is_admin))isTRUE(is_admin)else is_authorized_admin(login_token()))
@@ -28,10 +32,28 @@ admin_Server <- function(id,is_module_active,login_token,championship_id,user_te
    };reactable::reactable(definitions,striped=TRUE,compact=TRUE)
   })
   observeEvent(input$btn_verify_db,{req(is_module_active(),authorized());ok<-tryCatch(isTRUE(init_supabase_db(verbose=FALSE)),error=function(e)FALSE);showNotification(if(ok)"Database connection verified."else "Database verification failed.",type=if(ok)"message"else "warning")})
-  observeEvent(input$btn_sync_dreamteams,{
-   req(is_module_active(),authorized(),championship_id());result<-tryCatch(sync_all_championship_dreamteams(login=login_token(),championship_id=championship_id(),verbose=FALSE),error=function(e)NULL)
-   showNotification(if(is.null(result))"Official round results could not be saved."else mvp_sync_message(result),type="message")
+  awards<-shared_mvp_source(session,login_token,championship_id,function()isTRUE(is_module_active())&&isTRUE(authorized()),refresh_trigger)
+  observe({req(is_module_active(),authorized());coverage<-awards()$coverage
+    if(is.data.frame(coverage)&&nrow(coverage))updateSelectInput(session,"award_round",choices=setNames(coverage$round_id,paste("Round",coverage$round_number)))
   })
+  output$award_actions<-renderUI({req(is_module_active(),authorized());snapshot<-awards();rows<-snapshot$coverage
+    eligible<-is.data.frame(rows)&&nrow(rows)&&any(rows$selection=="Missing")
+    button<-function(id,label,enabled)actionButton(session$ns(id),label,disabled=if(enabled&&!isTRUE(snapshot$running)&&!isTRUE(snapshot$loading))NULL else "disabled",style="white-space:normal;max-width:100%;margin-bottom:8px;")
+    tagList(button("btn_sync_dreamteams","Retrieve missing round awards",eligible),
+      button("btn_refresh_awards","Refresh provisional or changed rounds",is.data.frame(rows)&&nrow(rows)>0L),
+      button("btn_retry_award_saves","Retry failed saves",isTRUE(snapshot$unsaved>0L)))
+  })
+  output$awards_coverage<-reactable::renderReactable({req(is_module_active(),authorized());rows<-awards()$coverage
+    if(!is.data.frame(rows)||!nrow(rows))return(reactable::reactable(data.frame(Status="Round catalog unavailable or still loading.")))
+    reactable::reactable(rows,columns=list(round_id=reactable::colDef(show=FALSE),required=reactable::colDef(show=FALSE),round_number=reactable::colDef(name="Round"),selection=reactable::colDef(name="Selection"),finality=reactable::colDef(name="Finality"),mvp=reactable::colDef(name="MVP"),last_fetched=reactable::colDef(name="Last fetched"),persistence=reactable::colDef(name="Saved status"),issue=reactable::colDef(name="Issue")),defaultSorted=list(round_number="desc"),compact=TRUE,wrap=TRUE)
+  })
+  output$awards_progress<-renderText({req(is_module_active(),authorized());snapshot<-awards()
+    paste0(snapshot$fetched %||% 0," fetched; ",snapshot$saved %||% 0," confirmed saved; ",snapshot$failed %||% 0," failed; ",snapshot$pending %||% 0," pending. ",snapshot$reason)
+  })
+  observeEvent(input$btn_sync_dreamteams,{req(is_module_active(),authorized());attr(awards,"retrieve")("missing")})
+  observeEvent(input$btn_refresh_awards,{req(is_module_active(),authorized());attr(awards,"retrieve")("refresh")})
+  observeEvent(input$btn_refresh_selected_award,{req(is_module_active(),authorized());attr(awards,"retrieve")("selected",input$award_round)})
+  observeEvent(input$btn_retry_award_saves,{req(is_module_active(),authorized());attr(awards,"retry_save")()})
   observeEvent(input$btn_reset_db,{
    req(is_module_active(),authorized());reset_context(context())
    showModal(modalDialog(title="Reset retained database tables?","This removes saved factual records. Confirm only after creating a restorable backup.",footer=tagList(modalButton("Cancel"),actionButton(ns("btn_confirm_reset"),"Confirm reset",class="btn-danger"))))

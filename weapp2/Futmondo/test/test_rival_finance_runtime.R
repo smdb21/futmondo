@@ -22,7 +22,7 @@ check('latest correction replaces one movement; repeated notification is not cas
 })
 check('full ideal XI and separate MVP use historical eligibility, replaced selections remove former recipients',{
   rules<-list(initial_budget=100,dreamteam_reward=10,mvp_reward=20,money_per_point=0,ranking_pool=0)
-  official<-data.frame(round_id='r',player_id=c('p','q'),is_mvp=c(TRUE,FALSE))
+  official<-data.frame(round_id='r',player_id=c('p','q'),is_mvp=c(TRUE,FALSE),is_finished=TRUE)
   eligible<-data.frame(round_id='r',player_id=c('p','q'),team_id=c('a','b'),eligible=TRUE,verified=TRUE)
   first<-build_rival_cash_dataset(teams,cid,official=official,rules=rules,eligibility=eligible,coverage_complete=TRUE)$team_finances
   stopifnot(identical(first$estimated_cash,c(130,110)))
@@ -34,7 +34,7 @@ check('full ideal XI and separate MVP use historical eligibility, replaced selec
   stopifnot(actual$estimated_cash[1]==145) # 100 + recorded35 + only separate XI10
 })
 check('unclassified income blocks overlapping reward estimates and movement transfers never add pressroom twice',{
-  official<-data.frame(round_id='r',player_id='p',is_mvp=TRUE)
+  official<-data.frame(round_id='r',player_id='p',is_mvp=TRUE,is_finished=TRUE)
   eligibility<-data.frame(round_id='r',player_id='p',team_id='a',eligible=TRUE,verified=TRUE)
   tx<-data.frame(id='tx',buyer_team_id='a',seller_team_id='',price=50,player_id='p')
   out<-build_rival_cash_dataset(teams,cid,list(m('buy',-50,'buy'),m('award',30)),official,tx,list(initial_budget=100,mvp_reward=20,dreamteam_reward=10),eligibility=eligibility)$team_finances

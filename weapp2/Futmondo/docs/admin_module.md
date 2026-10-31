@@ -9,3 +9,8 @@
 **Reset retained database tables** requires the explicit confirmation modal and removes factual records in child-to-parent order. Take a restorable backup first. The redesign does not execute a reset. Archived retired feature tables are outside this operation.
 
 See [database lifecycle helpers](database_reset_init.md) and [migration and rollback](database_migration.md). Offline coverage includes schema helpers and the full application lifecycle.
+
+
+## Round awards — 2026-10-31
+
+Admin now reads the shared full-XI snapshot coverage and exposes explicit missing/provisional/selected retrieval and failed-save retry. Numeric round ordering, selection/finality/MVP, last fetched and acknowledged save states are independent. Acquisition never starts on navigation. See [coach_and_round_awards.md](coach_and_round_awards.md) for the API, persistence, concurrency and finality contracts.

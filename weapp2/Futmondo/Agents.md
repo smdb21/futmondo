@@ -6,6 +6,8 @@ The authoritative application is `/home/rstudio/workspace/futmondo/weapp2/Futmon
 
 Futmondo provides observed player/team/market data, historical records, official notifications, descriptive statistics, and explicit manual transactions. Prediction models, forecast-based recommendations/optimizers, Smart Bid, trading automation, coach automation, scheduled observation workers, and stored background sessions have been removed from the product scope. Do not reintroduce them or list them as future milestones without a new explicit user request.
 
+Explicit scope exception requested on 2026-10-31: implement login-time coach hiring controlled by the default-enabled **Automatically hire coach** checkbox, with an already-hired check and duplicate-submission protection. See the implemented-local milestone in `docs/data_architecture_redesign_plan.md`; other removed automation remains out of scope.
+
 Normal active-session loading, caching, and recording of already-fetched observations are data infrastructure. They must not perform autonomous trading or unattended harvesting.
 
 ## Data architecture

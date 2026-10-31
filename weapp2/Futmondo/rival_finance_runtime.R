@@ -111,11 +111,13 @@ rival_cash_latest_movements <- function(evidence,team_id) {
 rival_award_estimates <- function(official,team_id,rules,eligibility=data.frame(),payments=data.frame(),round_rules=list()) {
   empty<-data.frame(round_id=character(),player_id=character(),bonus_type=character(),amount=numeric(),reason=character(),stringsAsFactors=FALSE)
   if(!is.data.frame(official)||!all(c("round_id","player_id","is_mvp")%in%names(official)))return(list(rows=empty,missing="Official round awards unavailable."))
+  unfinished<-!"is_finished"%in%names(official)||any(!official$is_finished%in%TRUE)
+  if("is_finished"%in%names(official))official<-official[official$is_finished%in%TRUE,,drop=FALSE]else official<-official[FALSE,,drop=FALSE]
   events<-dplyr::bind_rows(lapply(seq_len(nrow(official)),function(i){
     row<-official[i,,drop=FALSE]
     data.frame(round_id=as.character(row$round_id),player_id=as.character(row$player_id),bonus_type=c("dreamteam",if(isTRUE(row$is_mvp))"mvp"),stringsAsFactors=FALSE)
   }))
-  events<-unique(events);out<-list();missing<-character()
+  events<-unique(events);out<-list();missing<-if(unfinished)"Unfinished or unverified award selections are excluded from credited cash."else character()
   for(i in seq_len(nrow(events))){
     e<-events[i,,drop=FALSE];rule<-round_rules[[e$round_id]] %||% rules
     amount<-fm_number(if(e$bonus_type=="mvp")rule$mvp_reward else rule$dreamteam_reward)
@@ -429,7 +431,7 @@ rival_award_snapshot_rows <- function(players) {
   dplyr::bind_rows(lapply(rival_finance_records(players),function(p){
     if(!is.list(p))return(NULL)
     data.frame(championship_id=mvp_text(p$championship_id),round_id=mvp_text(p$round_id),round_number=fm_number(p$round_number),
-      player_id=mvp_text(p$player_id),player_name=mvp_text(p$player_name),player_role=mvp_text(p$player_role),
+      player_id=mvp_text(p$player_id),player_name=mvp_text(p$player_name),player_role=mvp_text(p$player_role),player_position=mvp_text(p$player_position),
       points=fm_number(p$points),is_mvp=isTRUE(p$is_mvp),is_finished=isTRUE(p$is_finished),stringsAsFactors=FALSE)
   }))
 }

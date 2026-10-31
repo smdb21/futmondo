@@ -95,6 +95,7 @@ function(input, output, session) {
   primary_sources <- list(team_state=primary_team_state,market_state=primary_market_state,
     retry_team=function()team_retry(isolate(team_retry())+1L),
     retry_market=function()market_retry(isolate(market_retry())+1L))
+  coach <- coach_on_login_source(session,login_token_RV,championship_id_RV,user_team_id_RV,primary_team_state,primary_sources$retry_team)
   round_finance_RV <- reactive({
     round_finance_display(primary_team_state(), primary_market_state())
   })
@@ -179,7 +180,7 @@ selected_player_RV <- players_in_teams_Server(id = "players_in_teams",
                user_team_id = user_team_id_RV,
                user_teams_RV = user_teams_RV,
                refresh_trigger = refresh_trigger,
-               primary_sources = primary_sources)
+               primary_sources = primary_sources,coach_source = coach)
 
 players_in_championship_Server(id = "players_in_championship", 
                                   is_module_active = reactive({
@@ -229,7 +230,7 @@ players_in_championship_Server(id = "players_in_championship",
                login_token = login_token_RV,
                championship_id = championship_id_RV,
                user_team_id = user_team_id_RV,
-               user_teams_RV = user_teams_RV, is_admin = is_admin_RV)
+               user_teams_RV = user_teams_RV, is_admin = is_admin_RV,refresh_trigger=refresh_trigger)
   observe({
     if(!valid_login(login_token_RV()))return()
     state<-championship_state()

@@ -1,44 +1,15 @@
 # Round MVPs Module
 
-`round_mvps_UI(id)` renders the **Round MVPs** view. `round_mvps_Server(id, is_module_active, login_token, championship_id, refresh_trigger)` shares a session source with Rivals. Saved selections render first; missing official selections load one round per reactive timer callback while a consumer is active.
+`round_mvps_UI(id)` renders completed-round MVP cards. `round_mvps_Server(id, is_module_active, login_token, championship_id, refresh_trigger)` consumes the same root-session `shared_mvp_source` as Admin and Rivals. Page navigation loads saved full-XI snapshots; it never triggers a historical backfill.
 
-## Data source
+`round_mvp_rows(rows, championship_id)` filters the single `is_mvp` player from each positively finished round. Provisional or unknown-finality selections remain available for inspection in Admin and do not display as completed awards.
 
-`get_round_mvps(championship_id)` in `supabase_connector.R` reads `round_dream_team` with these filters: the selected `championship_id`, `is_mvp = true`, and `is_finished = true`. It returns a cached data frame ordered by descending `round_number`; an unavailable database read raises an error that the shared source catches before trying official live results.
+`normalize_mvp_catalog(active, leagues, championship_id)` matches immutable league/round IDs and source display metadata. It preserves source status and explicit completion flags; missing flags stay unknown, without arithmetic/calendar inference. Empty/upcoming-only catalogs cannot establish historical absence.
 
-The response uses `round_number`, `player_id`, `player_name`, `player_role`, and `points`. `round_mvp_rows(rows, championship_id)` validates those records, keeps one finished MVP per round, and orders the cards newest first.
+`normalize_official_dreamteam()` validates exactly eleven unique players plus one matching MVP. The request reference supplies the round ID/number/finality, because the captured answer lacks round/finality identity. The successful current-round capture is not proof of settlement. Selected roles/positions, points, formation and scoring metadata are retained.
 
-## Usage
+Use the Admin **Retrieve missing round awards**, refresh, and failed-save retry controls to acquire selections. A fetched round is marked saved only after persistence acknowledgement. Full immutable revisions replace prior membership; legacy hardcoded final flags are downgraded to unknown. Notifications mark rounds for explicit recheck rather than adding money or triggering an unattended backfill.
 
-```r
-round_mvps_Server("round_mvps", reactive(input$tabs == "round_mvps"),
-  login_token_RV, championship_id_RV, refresh_trigger)
-```
+See [coach_and_round_awards.md](coach_and_round_awards.md) for all new interfaces, controls, persistence, cache and concurrency contracts; [rival_cash_accounting.md](rival_cash_accounting.md) for historical eligibility/payment limits.
 
-Use **Sync Round Dream Teams** in Admin to backfill completed rounds when the view reports no saved MVP records.
-
-## Official discovery and availability
-
-`mvp_text(x, default="")` accepts scalar atomic text/IDs, trims whitespace, and returns the default for missing or malformed values. This prevents absent IDs from matching each other.
-
-`mvp_runtime.R` is sourced by `futmondo_functions.R`. `get_finished_round_catalog(login, championship_id)` returns `{status, rounds, complete, reason}`. It matches the selected championship's `league` to `/2/league/list`, preserves immutable round IDs, recognizes `done`, and joins display numbers from matching IDs in the active championship metadata. An upcoming-only or empty catalog does not establish historical absence. Missing completion flags remain `NA`. The existing `get_finished_rounds()` wrapper returns its data frame for legacy consumers.
-
-`mvp_api_answer(login, url, query)` returns `{status, answer}` on success or a safe `mvp_result(status, rows, reason, code, complete)` on failure. It distinguishes authentication, connection, HTTP failure, rejected API requests and unsupported shapes. Both fetching handlers use `get_cached_data()`; offline tests perform no HTTP. An empty dream-team answer is **unknown publication status**, not proof of an unpublished award. The recorded API evidence does not currently establish an explicit unpublished response contract.
-
-`normalize_mvp_catalog(active, leagues, championship_id)` accepts decoded active-championship and league-list answers. `mvp_records(x)` adapts list or data-frame collections. `normalize_official_dreamteam(answer, championship_id, reference)` accepts players with `id`/`_id` and a scalar or identity-object `mvp`. It returns all official players with championship/round identity, name, role, points, and MVP/finished flags, or an explicit failure reason. Zero and missing scores are preserved. Missing display numbers do not prevent live cards but prevent writes to the current database schema.
-
-```r
-reference <- round_reference("opaque-round-id", 3)
-result <- normalize_official_dreamteam(
-  list(mvp="p1", players=list(list(id="p1", name="Player", points=0))),
-  "league-1", reference)
-stopifnot(result$status == "ok", result$rows$points == 0)
-```
-
-`get_official_dreamteam_result(login, championship_id, reference)` caches typed official results. `shared_mvp_source(session, login, championship, active, refresh)` takes reactive identity/activity inputs and returns a reactive result. Root-session state deduplicates requests across consumers, resets on account/league/refresh changes, suspends when consumers are inactive and ends with the session. Display remains usable when saving fails. Partial results retain cards and explain missing evidence.
-
-Verification: `Rscript test/test_mvp_runtime.R`, `Rscript test/test_ui_reliability.R`, and `Rscript test/test_shiny_simulation.R`.
-
-Compatibility helpers `official_round_mvp_row(answer, championship_id, reference)` and `get_official_round_mvps(login, championship_id, rounds)` use the same parser and typed fetcher. The former returns only MVP rows; the latter aggregates supplied verified rounds and reports partial/error reasons. An empty supplied frame cannot prove no historical rounds. Example: `get_official_round_mvps(login, "league-1", catalog$rounds)`. Interactive consumers use the cooperative source instead of this batch helper.
-
-The shared source now retains the full ideal XI for accounting; `round_mvp_rows()` continues filtering `is_mvp` for the MVP cards. New account/league/season-scoped award snapshots supersede the whole saved selection and preserve null points, allowing revised awards to remove former recipients. Legacy rows are preserved. Explicit refresh, changed observed notification lists and 24-hour checks revisit saved rounds. See [rival_cash_accounting.md](rival_cash_accounting.md). An unrecognized empty response cannot authoritatively remove an award.
+Compatibility sync helpers remain available for older direct callers; the interactive Admin path uses bounded cooperative reads and acknowledged immutable evidence writes. `test/test_mvp_runtime.R`, `test/test_admin_awards_coach.R`, and the mandatory offline lifecycle cover the changed behavior.
