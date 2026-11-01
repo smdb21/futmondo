@@ -47,12 +47,13 @@ check('partial point settlement replaces estimated component and extra payment a
   out<-build_rival_cash_dataset(teams,cid,list(e('eligibility','points-r',p),m('pay1',30,bonus='points',round='r'),m('pay2',10,bonus='points',round='r')),rules=list(initial_budget=100))$team_finances
   stopifnot(out$estimated_cash[1]==140,out$point_bonus[1]==40)
 })
-check('own observed cash remains zero or negative and mismatch is not silently balanced',{
+check('observed zero or negative cash is separate from reconstruction and never silently balanced',{
   rows<-list(e('team','a',list(budget=0,observed_at=rival_finance_stamp(now))),e('team','b',list(budget=-5,observed_at=rival_finance_stamp(now))))
   out<-build_rival_cash_dataset(teams,cid,rows,rules=list(initial_budget=100),now=now)$team_finances
-  stopifnot(identical(out$estimated_cash,c(0,-5)),all(out$confidence=='Verified'),out$cash_status[2]=='Confirmed debt',out$reconciliation_difference[1]==-100)
+  stopifnot(identical(out$observed_cash,c(0,-5)),identical(out$budget,c(0,-5)),all(out$observed_cash_fresh),
+    all(out$estimated_cash==100),all(out$confidence=='Estimated'),out$reconciliation_difference[1]==-100)
   stale<-build_rival_cash_dataset(teams,cid,rows,rules=list(initial_budget=100),now=now+3600)$team_finances
-  stopifnot(all(stale$confidence=='Estimated'),all(stale$estimated_cash==100))
+  stopifnot(all(stale$confidence=='Estimated'),all(stale$estimated_cash==100),!any(stale$observed_cash_fresh),all(is.na(stale$budget)),identical(stale$observed_cash,c(0,-5)))
 })
 check('session shared async ledger reads database once across navigation and resets on account change',{
   oldadapter<-async_adapter_fetch;oldsaved<-get_rival_finance_saved;oldseed<-get_rival_finance_seed;oldteam<-get_rival_team_finance_observation

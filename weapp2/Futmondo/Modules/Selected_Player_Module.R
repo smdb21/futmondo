@@ -12,6 +12,19 @@ player_card_money <- function(value) {
     scientific = FALSE, trim = TRUE), " €")
 }
 
+# Translate offer failures without changing submission or retry behavior.
+offer_error_message <- function(result) {
+ text<-function(x)if(is.character(x)&&length(x)==1L&&!is.na(x))trimws(x)else ""
+ code<-if(is.list(result))text(result$code)else ""
+ message<-if(is.list(result))text(result$message)else ""
+ if(identical(code,"api.market.max_number_players_in_roster")||identical(message,"api.market.max_number_players_in_roster"))
+  return("Your squad has reached the league's maximum size. Pending incoming players can also count toward this limit. Complete a sale to free a place, then refresh before making another offer.")
+ if(nzchar(message)&&!grepl("^api[.]",message)&&!identical(code,"error"))return(message)
+ if(grepl("^api[.]",code)||grepl("^api[.]",message))
+  return("Futmondo rejected this offer. Refresh the player's details and check the league's buying rules before trying again.")
+ "The offer could not be confirmed. Refresh and check your active offers before trying again, so you do not submit it twice."
+}
+
 player_card_owner_id <- function(player) {
   if (!is.data.frame(player) || !nrow(player)) return("")
   for (field in c("owner_team_id", "user_team_id", "userteamId", "userTeamId",
@@ -1047,11 +1060,11 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           tryCatch(on_bid_updated(action_type = "bid_placed", player_id = player_id, new_bid_price = bid_amount, is_cancel = FALSE), error = function(e) NULL)
         }
       } else {
-        err_msg <- if (is.list(res) && !is.null(res$message) && res$message != "") res$message else "Please verify your funds and try again."
+        err_msg <- offer_error_message(res)
         shiny::showNotification(
-          paste0("Offer failed: ", err_msg),
+          tags$div(class = "fm-offer-error", paste0("Offer failed: ", err_msg)),
           type = "error",
-          duration = 6
+          duration = NULL
         )
       }
     })
@@ -1156,11 +1169,11 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           tryCatch(on_bid_updated(action_type = "owner_offer_placed", player_id = player_id, new_bid_price = offer_amount, is_cancel = FALSE), error = function(e) NULL)
         }
       } else {
-        err_msg <- if (is.list(res) && !is.null(res$message) && res$message != "") res$message else "Please verify your funds and try again."
+        err_msg <- offer_error_message(res)
         shiny::showNotification(
-          paste0("Offer failed: ", err_msg),
+          tags$div(class = "fm-offer-error", paste0("Offer failed: ", err_msg)),
           type = "error",
-          duration = 6
+          duration = NULL
         )
       }
     })

@@ -1193,3 +1193,7 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 .player-round-fixture { display:flex; flex-direction:column; gap:4px; margin-top:8px; min-width:0; }
 .player-points-explanation { margin-top:10px; color:var(--fm-muted); font-size:12px; }
 @media(max-width:600px) { .player-round-boxes { grid-template-columns:minmax(0,1fr); } }
+
+/* Keep actionable offer failures readable until dismissed, including on phones. */
+.fm-offer-error { white-space: normal !important; overflow-wrap: anywhere; line-height: 1.5; }
+#shiny-notification-panel { max-width: calc(100vw - 20px); }

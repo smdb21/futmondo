@@ -1,4 +1,5 @@
-> Financial reliability update (2026-09-07): the implementation no longer reconstructs account balances, artificial reward entries or roster purchase dates. Restricted account history displays observed transfers with unknown balances. Current official cash preserves zero and negative values. The transfer-only chart requires the configured initial budget and excludes rewards/adjustments. See [current contracts and examples](ui_reliability.md#rival-financial-evidence); historical reconstruction descriptions below are superseded.
+> Current contract (2026-10-31): [Rival cash accounting](rival_cash_accounting.md) is authoritative. Summary, league table and transaction history share one reconstructed ledger. Actual dated movements show running cash; undated rewards have a separate reconciliation section with no invented payment dates. Observed official cash is separate. Older implementation descriptions below are historical and superseded by that contract.
+
 
 # Rivals Module - Rivals Scouting Page
 
@@ -67,12 +68,12 @@ Returns `selected_player_RV`, a reactive supplied by the nested `players_table_S
 | Reactive Name                    | Purpose                                                              |
 |----------------------------------|----------------------------------------------------------------------|
 | `selected_rival_team_id`         | Holds the team ID chosen by the user in the dropdown selector.       |
-| `league_finances_RV`             | Calls `calculate_league_finances()` to compute per-team finances (total spent, budget left, squad valuation, net profit/loss) and logs snapshots to Supabase. Returns a list with `team_finances` and `all_purchases` data frames. |
+| `league_finances_RV`             | Reuses `shared_rival_finance_source()` with account/league-scoped directory, evidence, reconstructed finances, per-team cash ledgers and the shared pressroom. |
 | `rival_financial_summary_box_RV` | Fetches financial stats via `get_user_team_info()` for the selected rival. |
 | `rival_players_table_RV`         | Fetches the full squad via `get_players_from_team()`, computes `clause_ratio`, and pipes through `translate_player_positions()`, `calculate_player_changes()`, and `unify_columns()`. |
-| `is_fallback`                    | `reactiveVal` flag (boolean). `TRUE` when the moneymovements API returns empty or errors for a rival team; `FALSE` when real data is available. |
-| `rival_moneymovements_raw_RV`    | Fetches raw money movements via `get_user_team_moneymovements()` inside `tryCatch()`. Parses ISO dates, sorts ascending by timestamp, and computes `running_balance = cumsum(money)` on the full chronological dataset. If the API returns empty or errors, first tries `get_championship_pressroom()` to reconstruct transactions from the public pressroom feed for the selected rival. If the pressroom yields no matching entries, falls back to `rival_players_table_RV()` (each player with `buyPrice > 0` becomes a purchase transaction). Sets `is_fallback = TRUE` in all fallback paths. |
-| `rival_moneymovements_filtered_RV` | Takes `rival_moneymovements_raw_RV()` and sorts descending by date (newest first) for display in the reactable. No user-selectable filters are applied; all transactions are shown. |
+| `rival_moneymovements_raw_RV` | Selects the rival's precomputed `cash_ledgers` entry from the shared dataset; no HTTP/DB fetch or separate calculation. |
+| `rivals_cash_history_rows()` | Projects dated versus undated ledger rows without recalculating cash; source, amount and chronological sequence remain intact. |
+| `rivals_cash_history_widget()` | Renders all per-transaction balances, preserves numeric sorting, and labels undated amounts as calculation subtotals. |
 
 ### `output$league_finances_table`
 
@@ -489,3 +490,12 @@ Selected-rival summary correction (2026-10-31): budget cards reuse the shared le
 ### Reconstructed rival balances (2026-10-31)
 
 The league column is **Reconstructed balance** and the selected-rival card is **Reconstructed cash balance (estimate)**, using the same numeric ledger result. An accessible fresh own budget remains labeled observed cash. Reconstruction includes actual round-history-derived points and ranking bonuses, saved XI/MVP selections associated with historical starter/bench ownership, public transfers, and known signed adjustments. It does not require a private rival budget. Expand the evidence notes for specific missing round/player ownership, unpublished rounds, hidden adjustments and current-rule assumptions. Historical collection uses the shared two-read queue; no card-selection request loop or timer was added. See [rival_cash_accounting.md](rival_cash_accounting.md) for contracts, reuse and correction behavior.
+
+
+## 2026-10-31 shared running-cash history
+
+The transaction tab now consumes the same ledger as the reconstructed budget card and league table. Opening cash is applied once, signed source transfers/fees and applicable reward components are retained, and the final cumulative amount is the displayed estimate. Known movement/transfer revisions replace older rows; recorded payments suppress overlapping derived rewards. Sorting or filtering does not reset the starting cash. Same-minute transactions each show a numeric balance, with stable ID ordering explicitly distinguished from a known real ordering.
+
+Dated history excludes all components whose payment dates are unknown. Those appear under **Components without payment dates** with a **Calculation subtotal**, which ends at the same reconstructed amount. Opening cash without a supplied date is labeled as an opening balance. No current-time or round-date substitute is generated. Missing amounts remain unavailable and the known-subtotal limitation is visible; missing opening cash leaves balances unavailable. Accessible observed cash/freshness and any discrepancy are separate details.
+
+The pivot consumes the shared pressroom, and transfer summary cards consume shared purchase/sale totals rather than all signed ledger amounts. This avoids counting opening cash/bonuses as sales or fees as purchases. The pivot choice survives background ledger publications. No new HTTP/database read, timer, worker, dependency or persistence path was introduced. Both history tables paginate fifteen rows and share one bounded ledger calculation per coalesced source publication. See `data_review_results.md` for measurements and verification limits.

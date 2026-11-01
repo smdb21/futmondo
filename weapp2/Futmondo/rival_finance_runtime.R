@@ -289,10 +289,32 @@ rival_historical_components <- function(evidence,teams,rules,official) {
   list(income=income,eligibility=unique(eligibility),official=official,missing=missing,rounds=rounds)
 }
 
+# The same entries drive component totals and transaction history. An undated
+# estimate has no invented payment time and is applied only in reconciliation.
+rival_cash_entry <- function(id,component,amount,source,type="bonus",date="",category="",round_id="",player_id="",estimated=FALSE,included=TRUE) {
+  data.frame(id=id,component=component,amount=amount,source=source,type=type,date=date,category=category,
+    round_id=round_id,player_id=player_id,estimated=estimated,included=included,stringsAsFactors=FALSE)
+}
+rival_cash_ledger <- function(entries) {
+  entries$timestamp<-fm_time(entries$date)
+  entries$section<-ifelse(entries$type%in%"opening","opening",ifelse(is.na(entries$timestamp),"undated","dated"))
+  # IDs break equal-time ties reproducibly, without claiming their true sequence.
+  phase<-match(entries$section,c("opening","dated","undated"))
+  entries<-entries[order(phase,entries$timestamp,entries$id,na.last=TRUE),,drop=FALSE]
+  entries$ledger_order<-seq_len(nrow(entries))
+  known<-entries$included & is.finite(entries$amount)
+  opening<-which(entries$section%in%"opening")
+  entries$running_balance<-if(length(opening)==1L&&is.finite(entries$amount[opening]))
+    cumsum(ifelse(known,entries$amount,0))else rep(NA_real_,nrow(entries))
+  entries$unknown_amounts<-cumsum(entries$included & !is.finite(entries$amount))
+  rownames(entries)<-NULL
+  entries
+}
+
 # Public pure accounting interface; every numeric subtotal has an evidence trail.
 build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),official=data.frame(),pressroom=data.frame(),rules=list(),opening_defaults=NULL,eligibility=data.frame(),coverage_complete=FALSE,now=Sys.time(),account_id=NULL,season="unknown") {
   empty<-data.frame(teamid=character(),teamname=character(),estimated_cash=numeric(),confidence=character(),as_of=character(),stringsAsFactors=FALSE)
-  if(!is.data.frame(teams)||!nrow(teams))return(list(team_finances=empty,breakdowns=list(),all_purchases=data.frame()))
+  if(!is.data.frame(teams)||!nrow(teams))return(list(team_finances=empty,breakdowns=list(),cash_ledgers=list(),all_purchases=data.frame()))
   if(!nzchar(mvp_text(account_id)))stop("An explicit account is required for rival finance evidence.")
   evidence<-Filter(function(x)identical(mvp_text(x$championship_id),as.character(championship_id))&&identical(mvp_text(x$season,"unknown"),as.character(season))&&(is.null(account_id)||identical(mvp_text(x$account_id),as.character(account_id))),rival_merge_evidence(list(),evidence))
   scope_frame<-function(rows){
@@ -311,14 +333,14 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
   eligibility<-dplyr::bind_rows(eligibility,history$eligibility,stored_eligibility)
   if(all(c("round_id","player_id","team_id","eligible","verified")%in%names(eligibility)))
     eligibility<-unique(eligibility[,c("round_id","player_id","team_id","eligible","verified"),drop=FALSE])
-  opening<-rival_opening_cash(championship_id,rules,opening_defaults);result<-list();breakdowns<-list()
+  opening<-rival_opening_cash(championship_id,rules,opening_defaults);result<-list();breakdowns<-list();ledgers<-list()
   for(i in seq_len(nrow(teams))){
     team<-teams[i,,drop=FALSE];tid<-as.character(team$teamid %||% team$id);name<-as.character(team$teamname %||% team$name %||% tid)
     mov<-rival_cash_latest_movements(evidence,tid)
     own<-Filter(function(x)identical(mvp_text(x$source_id),tid),rival_evidence_rows(evidence,"team"));info<-if(length(own))tail(own,1)[[1]]$payload else list()
     coverage<-Filter(function(x)identical(mvp_text(x$source_id),tid),rival_evidence_rows(evidence,"coverage"));coverage<-if(length(coverage))tail(coverage,1)[[1]]$payload else list()
     actual<-fm_number(info$budget);stamp<-mvp_text(info$observed_at);fresh<-is.finite(actual)&&!is.na(fm_time(stamp))&&as.numeric(difftime(now,fm_time(stamp),units="secs"))>=-60&&as.numeric(difftime(now,fm_time(stamp),units="secs"))<=300
-    details<-data.frame(component="Opening cash",amount=opening$amount,source=opening$source,round_id="",player_id="",stringsAsFactors=FALSE)
+    details<-rival_cash_entry("opening","Opening cash",opening$amount,opening$source,type="opening")
     missing<-history$missing[[tid]] %||% character();assumptions<-character();recorded<-0;point_income<-ranking_income<-ideal_income<-mvp_income<-0
     spent<-sales<-0
     # A source with unknown payment metadata can still establish the signed cash movement.
@@ -326,11 +348,22 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
     if(nrow(mov)){
       # An explicit opening allocation replaces the separate starting amount, never adds twice.
       budget<-which(mov$type%in%"budget");valid_budget<-budget[is.finite(mov$money[budget])]
-      if(length(valid_budget)==1L){details$amount[1]<-mov$money[valid_budget];details$source[1]<-"Recorded opening allocation"}
+      if(length(valid_budget)==1L){
+        details$amount[1]<-mov$money[valid_budget];details$source[1]<-"Recorded opening allocation"
+        details$id[1]<-paste0("movement:",mov$id[valid_budget]);details$date[1]<-mov$date[valid_budget]
+      }
       if(length(valid_budget)>1L){complete_movements<-FALSE;missing<-c(missing,"Multiple budget allocations require season/reset evidence.")}
+      excluded_budget<-if(length(valid_budget)==1L)setdiff(budget,valid_budget)else budget
+      if(length(excluded_budget)){
+        b<-mov[excluded_budget,,drop=FALSE]
+        details<-dplyr::bind_rows(details,rival_cash_entry(paste0("movement:",b$id),"Unresolved budget allocation",b$money,
+          "Excluded: opening/reset allocation cannot be resolved.",type="budget",date=b$date,included=FALSE))
+        missing<-c(missing,"Unresolved budget allocation rows are shown but not added to cash.")
+      }
       nonbudget<-mov[!mov$type%in%"budget",,drop=FALSE]
       if(nrow(nonbudget)){
-        rows<-data.frame(component=ifelse(nzchar(nonbudget$concept),nonbudget$concept,nonbudget$type),amount=nonbudget$money,source="Recorded movement",round_id=nonbudget$round_id %||% "",player_id=nonbudget$player_id %||% "",stringsAsFactors=FALSE)
+        rows<-rival_cash_entry(paste0("movement:",nonbudget$id),ifelse(nzchar(nonbudget$concept),nonbudget$concept,nonbudget$type),nonbudget$money,
+          "Recorded movement",type=nonbudget$type,date=nonbudget$date,category=nonbudget$category,round_id=nonbudget$round_id,player_id=nonbudget$player_id)
         details<-dplyr::bind_rows(details,rows);recorded<-sum(nonbudget$money[is.finite(nonbudget$money)])
         spent<--sum(nonbudget$money[nonbudget$type%in%"buy" & is.finite(nonbudget$money)]);sales<-sum(nonbudget$money[nonbudget$type%in%"sell" & is.finite(nonbudget$money)])
       }
@@ -342,12 +375,25 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
       if(!is.data.frame(tx)||!all(c("buyer_team_id","seller_team_id","price")%in%names(tx)))missing<-c(missing,"Public transfer history is unavailable.")
       if(identical(attr(tx,"fetch_status"),"partial"))missing<-c(missing,"Public transfer history reached its page limit; earlier transfers may be missing.")
       if(is.data.frame(tx)&&all(c("buyer_team_id","seller_team_id","price")%in%names(tx))){
-        if("id"%in%names(tx))tx<-tx[!duplicated(tx$id),,drop=FALSE]
+        if("id"%in%names(tx)){
+          known_id<-!is.na(tx$id)&nzchar(as.character(tx$id))
+          tx<-tx[!(known_id&duplicated(tx$id,fromLast=TRUE)),,drop=FALSE]
+        }
         tx<-tx[tx$buyer_team_id%in%tid|tx$seller_team_id%in%tid,,drop=FALSE]
         if(nrow(tx)){
           money<-(as.numeric(tx$seller_team_id%in%tid)-as.numeric(tx$buyer_team_id%in%tid))*suppressWarnings(as.numeric(tx$price))
           if(any(!is.finite(money)))missing<-c(missing,"A public transfer amount is missing; the subtotal excludes it.")
-          details<-dplyr::bind_rows(details,data.frame(component=ifelse(money>=0,"Player sale","Player purchase"),amount=money,source="Pressroom transfer",round_id="",player_id=as.character(tx$player_id %||% "")))
+          # Missing source IDs receive a content key for stable ordering only;
+          # they are not presented as observed source identities or deduplicated.
+          keys<-if("id"%in%names(tx))as.character(tx$id)else rep("",nrow(tx))
+          absent<-is.na(keys)|!nzchar(keys)
+          keys[absent]<-vapply(which(absent),function(j)as.character(openssl::sha256(serialize(as.list(tx[j,,drop=FALSE]),NULL))),character(1))
+          dates<-if("created"%in%names(tx))as.character(tx$created)else rep("",nrow(tx))
+          players<-as.character(tx$player_name %||% rep("Player",nrow(tx)));players[is.na(players)|!nzchar(players)]<-"Player"
+          buying<-tx$buyer_team_id%in%tid;selling<-tx$seller_team_id%in%tid
+          type<-ifelse(buying&selling,"transfer",ifelse(buying,"buy","sell"))
+          concept<-paste0(players,ifelse(buying&selling," (Self transfer)",ifelse(buying," (Purchased)"," (Sold)")))
+          details<-dplyr::bind_rows(details,rival_cash_entry(paste0("pressroom:",keys),concept,money,"Pressroom transfer",type=type,date=dates,category="market",player_id=as.character(tx$player_id %||% "")))
           spent<--sum(money[money<0],na.rm=TRUE);sales<-sum(money[money>0],na.rm=TRUE)
         }
       }
@@ -360,7 +406,9 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
     missing<-c(missing,estimate$missing)
     if(unclassified&&nrow(estimate$rows)){missing<-c(missing,"Unclassified recorded income prevents adding potentially overlapping award estimates.");estimate$rows<-estimate$rows[FALSE,,drop=FALSE]}
     if(nrow(estimate$rows)){
-      details<-dplyr::bind_rows(details,data.frame(component=ifelse(estimate$rows$bonus_type=="mvp","MVP reward","Ideal XI reward"),amount=estimate$rows$amount,source=estimate$rows$reason,round_id=estimate$rows$round_id,player_id=estimate$rows$player_id))
+      details<-dplyr::bind_rows(details,rival_cash_entry(paste("estimate",estimate$rows$bonus_type,estimate$rows$round_id,estimate$rows$player_id,sep=":"),
+        ifelse(estimate$rows$bonus_type=="mvp","MVP reward","Ideal XI reward"),estimate$rows$amount,estimate$rows$reason,
+        round_id=estimate$rows$round_id,player_id=estimate$rows$player_id,estimated=TRUE))
       ideal_income<-sum(estimate$rows$amount[estimate$rows$bonus_type=="dreamteam"]);mvp_income<-sum(estimate$rows$amount[estimate$rows$bonus_type=="mvp"]);assumptions<-c(assumptions,estimate$rows$reason)
     }
     if(nrow(mov)){
@@ -379,31 +427,40 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
     if(unclassified&&nrow(round_income$rows)){
       missing<-c(missing,"Unclassified recorded income prevents adding potentially overlapping point/ranking estimates.")
     }else if(nrow(round_income$rows)){
-      details<-dplyr::bind_rows(details,round_income$rows)
+      rows<-round_income$rows
+      details<-dplyr::bind_rows(details,rival_cash_entry(paste("estimate",rows$component,rows$round_id,sep=":"),rows$component,rows$amount,rows$source,
+        round_id=rows$round_id,player_id=rows$player_id,estimated=TRUE))
       point_income<-point_income+sum(round_income$rows$amount[round_income$rows$component=="Point reward"])
       ranking_income<-ranking_income+sum(round_income$rows$amount[round_income$rows$component=="Ranking reward"])
       assumptions<-c(assumptions,round_income$rows$source)
     }
     if(!is.finite(details$amount[1]))missing<-c(missing,"Opening cash unavailable.")
     if(!isTRUE(coverage_complete))missing<-c(missing,"Round award coverage is incomplete.")
-    reconstructed<-if(is.finite(details$amount[1]))sum(details$amount,na.rm=TRUE)else NA_real_
+    ledger<-rival_cash_ledger(details)
+    if(any(ledger$included&!is.finite(ledger$amount)))missing<-c(missing,"Missing movement amounts are excluded; displayed balances are known-amount estimates.")
+    # Read the final cumulative amount, rather than independently summing a
+    # second history. Filtering/sorting later never changes these balances.
+    reconstructed<-tail(ledger$running_balance,1L)
     difference<-if(is.finite(actual)&&is.finite(reconstructed))actual-reconstructed else NA_real_
-    confidence<-if(fresh)"Verified"else if(!length(missing)&&!length(assumptions))"Reconstructed"else"Estimated"
-    value<-if(fresh)actual else reconstructed
+    confidence<-if(fresh&&is.finite(difference)&&abs(difference)<=0.5)"Reconciled"else if(!length(missing)&&!length(assumptions))"Reconstructed"else"Estimated"
+    value<-reconstructed
     reasons<-unique(c(missing,assumptions));if(is.finite(difference)&&abs(difference)>0.5)reasons<-c(reasons,paste0("Recorded cash differs from accounting by ",format(difference,big.mark=".",decimal.mark=",",scientific=FALSE)," EUR; no balancing adjustment added."))
     if(!nzchar(stamp)){
       times<-vapply(evidence,function(x)mvp_text(x$observed_at),character(1));times<-times[!is.na(fm_time(times))]
       stamp<-if(length(times))times[which.max(fm_time(times))]else""
     }
     result[[i]]<-data.frame(teamid=tid,teamname=name,estimated_cash=value,confidence=confidence,as_of=stamp,
-      cash_status=if(!is.finite(value))"Unavailable"else if(value<0)if(fresh)"Confirmed debt"else"Estimated negative cash"else"Positive or zero cash",
+      cash_status=if(!is.finite(value))"Unavailable"else if(value<0)if(confidence=="Reconciled")"Reconciled negative cash"else"Estimated negative cash"else"Positive or zero cash",
       initial_budget=details$amount[1],budget=if(fresh)actual else NA_real_,reconstructed_cash=reconstructed,reconciliation_difference=difference,
+      observed_cash=actual,observed_cash_fresh=fresh,
       total_spent=spent,total_sales=sales,point_bonus=point_income,ranking_prize=ranking_income,dreamteam_income=ideal_income,mvp_income=mvp_income,
       team_value=fm_number(info$teamValue %||% team$teamValue),points=fm_number(info$points %||% team$points),
       squad_size=fm_number(info$squad_size),net_profit_loss=NA_real_,estimate_notes=paste(reasons,collapse=" "),stringsAsFactors=FALSE)
-    breakdowns[[tid]]<-details
+    breakdowns[[tid]]<-ledger[,c("component","amount","source","round_id","player_id"),drop=FALSE]
+    ledger$round_number<-history$rounds$round_number[match(ledger$round_id,history$rounds$round_id)]
+    ledgers[[tid]]<-ledger
   }
-  list(team_finances=dplyr::bind_rows(result),breakdowns=breakdowns,all_purchases=data.frame())
+  list(team_finances=dplyr::bind_rows(result),breakdowns=breakdowns,cash_ledgers=ledgers,pressroom=pressroom,all_purchases=data.frame())
 }
 
 get_rival_finance_seed <- function(login,championship_id,user_team_id) {
@@ -561,7 +618,8 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
             old_transfers<-state$seed$pressroom %||% data.frame()
             if(is.data.frame(old_transfers)&&nrow(old_transfers)){
               combined<-dplyr::bind_rows(old_transfers,result$pressroom)
-              result$pressroom<-combined[!duplicated(combined$id,fromLast=TRUE),,drop=FALSE]
+              known<-!is.na(combined$id)&nzchar(as.character(combined$id))
+              result$pressroom<-combined[!(known&duplicated(combined$id,fromLast=TRUE)),,drop=FALSE]
             }
             state$seed<-result
             inferred<-result$rules$season %||% "unknown"

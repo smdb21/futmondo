@@ -250,6 +250,36 @@ rivals_tx_display_df <- function(filtered) {
   filtered[, ordered_cols, drop = FALSE]
 }
 
+# View-only projection of the complete shared ledger. Balances were calculated
+# before selection, filtering, pagination or sorting; undated cash stays separate.
+rivals_cash_history_rows <- function(ledger,undated=FALSE) {
+  if(!is.data.frame(ledger)||!nrow(ledger))return(data.frame())
+  rows<-ledger[if(undated)ledger$section%in%"undated"else!ledger$section%in%"undated",,drop=FALSE]
+  if(!nrow(rows))return(data.frame())
+  round<-ifelse(is.finite(rows$round_number),paste0(" · Round ",rows$round_number),"")
+  data.frame(date=ifelse(rows$section%in%"opening" & is.na(rows$timestamp),"Opening balance",ifelse(is.na(rows$timestamp),"Payment date unknown",format(rows$timestamp,"%d/%m/%Y %H:%M",tz="UTC"))),
+    type=ifelse(rows$estimated,"Estimated bonus",rows$type),concept=paste0(rows$component,round,ifelse(rows$included,""," (excluded)")),money=rows$amount,
+    running_balance=rows$running_balance,source=rows$source,included=rows$included,unknown_amounts=rows$unknown_amounts,
+    ledger_order=rows$ledger_order,stringsAsFactors=FALSE)
+}
+rivals_cash_history_widget <- function(ledger,undated=FALSE) {
+  display<-rivals_cash_history_rows(ledger,undated)
+  if(!nrow(display))return(reactable::reactable(data.frame(Status="No cash movements available."),compact=TRUE))
+  reactable::reactable(display,compact=TRUE,striped=TRUE,highlight=TRUE,bordered=FALSE,defaultPageSize=15,
+    defaultSorted=list(ledger_order=if(undated)"asc"else"desc"),columns=list(
+      date=colDef(name="Date",show=!undated,align="left"),type=colDef(name="Type",align="left"),
+      concept=colDef(name="Concept / Description",align="left",cell=function(value,index){
+        note<-paste(display$source[index],if(!display$included[index])"Not applied to balance."else"",
+          if(display$unknown_amounts[index]>0)"Balance excludes unknown amounts."else"")
+        tags$span(title=note,value)
+      }),money=colDef(name="Amount",align="right",cell=function(value){
+        if(!is.finite(value))return("Unavailable")
+        tags$span(style=if(value<0)"color:var(--fm-danger)"else"color:var(--fm-text)",
+          paste0(if(value>0)"+"else"",format_table_currency(value)))
+      }),running_balance=colDef(name=if(undated)"Calculation subtotal"else"Money left after (estimate)",align="right",cell=ui_financial_amount),
+      source=colDef(show=FALSE),included=colDef(show=FALSE),unknown_amounts=colDef(show=FALSE),ledger_order=colDef(show=FALSE)))
+}
+
 # Keep the directory selectable when financial cells or audit details are malformed.
 rivals_finance_table_widget <- function(finances_data,on_error=function(error)NULL) {
   df<-finances_data$team_finances
@@ -278,6 +308,7 @@ rivals_finance_table_widget <- function(finances_data,on_error=function(error)NU
         row<-df[index,,drop=FALSE];detail<-finances_data$breakdowns[[as.character(row$teamid)]]
         difference<-fm_number(row$reconciliation_difference)
         tagList(tags$p(mvp_text(row$estimate_notes)),
+          if(is.finite(fm_number(row$observed_cash)))tags$p("Observed cash",if(!isTRUE(row$observed_cash_fresh))" (stale)"else"",": ",currency(row$observed_cash)),
           if(is.finite(difference))tags$p("Difference from recorded cash: ",currency(difference)),
           if(is.data.frame(detail)&&nrow(detail))reactable::reactable(detail,compact=TRUE,pagination=TRUE,defaultPageSize=10,
             columns=list(amount=colDef(cell=currency))))
@@ -290,9 +321,13 @@ rivals_summary_values <- function(info, teams, finances, team_id) {
   number <- function(x) { x <- suppressWarnings(as.numeric(x)); if(length(x)==1L && is.finite(x)) x else NA_real_ }
   row <- if(is.data.frame(finances) && "teamid" %in% names(finances)) finances[finances$teamid %in% team_id,,drop=FALSE] else data.frame()
   cash <- if(nrow(row)==1L)number(row$estimated_cash)else NA_real_
-  label <- if(nrow(row)==1L&&identical(row$confidence,"Verified"))"Observed cash balance"else "Reconstructed cash balance (estimate)"
+  label <- if(nrow(row)==1L&&identical(row$confidence,"Reconciled"))"Reconstructed balance (matches observed cash)"else "Reconstructed cash balance (estimate)"
   notes <- if(nrow(row)==1L)row$estimate_notes else ""
-  if(!is.finite(cash) && is.finite(number(info$budget))){cash<-number(info$budget);label<-"Official cash balance"}
+  observed<-if(nrow(row)==1L)number(row$observed_cash)else number(info$budget)
+  observed_fresh<-nrow(row)==1L&&isTRUE(row$observed_cash_fresh)
+  difference<-if(nrow(row)==1L)number(row$reconciliation_difference)else NA_real_
+  purchases<-if(nrow(row)==1L)number(row$total_spent)else NA_real_
+  sales<-if(nrow(row)==1L)number(row$total_sales)else NA_real_
   position <- number(info$position)
   rank_label <- "Rank position"
   if(!is.finite(position) && is.data.frame(teams) && all(c("teamid","points") %in% names(teams))){
@@ -302,7 +337,7 @@ rivals_summary_values <- function(info, teams, finances, team_id) {
       rank_label <- "By total points (ties share rank)"
     }
   }
-  list(cash=cash,label=label,notes=notes,position=position,rank_label=rank_label)
+  list(cash=cash,label=label,notes=notes,position=position,rank_label=rank_label,observed_cash=observed,observed_cash_fresh=observed_fresh,difference=difference,purchases=purchases,sales=sales)
 }
 
 rivals_UI <- function(id) {
@@ -561,83 +596,25 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
         }
       }
 
-      # Retrieve transaction movements safely
-      tx_raw <- tryCatch({ rival_moneymovements_raw_RV() }, error = function(e) NULL)
-
-      # Derive money_out, money_in, total_spent, budget_val from reconstructed finances
-      money_out <- 0
-      money_in <- 0
-      total_spent <- 0
-      budget_val <- NA_real_
-
-      if (!is.null(tx_raw) && nrow(tx_raw) > 0) {
-        # money_out = absolute value of all negative money (purchases)
-        money_out <- sum(abs(tx_raw$money[tx_raw$money < 0]), na.rm = TRUE)
-
-        # money_in = all positive money excluding initial budget row
-        non_budget_rows <- tx_raw[tx_raw$type != "budget", ]
-        if (nrow(non_budget_rows) > 0) {
-          money_in <- sum(non_budget_rows$money[non_budget_rows$money > 0], na.rm = TRUE)
-        }
-
-        # total_spent = money_out (purchases only)
-        total_spent <- money_out
-
-      } else {
-        # No transaction data -- use roster-based calculation
-        if (!is.null(roster) && nrow(roster) > 0) {
-          if ("buyPrice" %in% colnames(roster)) {
-            total_spent <- sum(suppressWarnings(as.numeric(roster$buyPrice)), na.rm = TRUE)
-            money_out <- total_spent
-          }
-        }
-        budget_val <- NA_real_
-      }
-
-      # Override budget and squad_val with API-provided values if available and valid
-      if (!is.null(info) && length(info$budget) == 1L && is.numeric(info$budget) && is.finite(info$budget)) {
-        budget_val <- info$budget
-      }
+      # Transfer cards reuse the same source precedence/deduplication as cash.
+      # Opening allocations, rewards and signed fees are not squad purchases.
+      summary <- rivals_summary_values(info,user_teams_RV(),league_finances_RV()$team_finances,rival_id)
+      money_out <- total_spent <- summary$purchases
+      money_in <- summary$sales
       if (!is.null(info) && !is.null(info$teamValue) && is.numeric(info$teamValue) && info$teamValue > 0) {
         squad_val <- info$teamValue
       }
-
-      # net_gain = squad_val - total_spent
       net_gain <- squad_val - total_spent
-
-      # Compute net_transfer_pnl from pressroom (sum of sell_price - buy_price for completed trades)
-      net_transfer_pnl <- 0
-      if (!is.null(rival_id) && rival_id != "") {
-        tryCatch({
-          champ_id <- championship_id()
-          login <- login_token()
-          pressroom_df <- get_championship_pressroom(login = login, championship_id = champ_id)
-          if (!is.null(pressroom_df) && nrow(pressroom_df) > 0) {
-            buys <- pressroom_df[pressroom_df$buyer_team_id == rival_id, ]
-            sells <- pressroom_df[pressroom_df$seller_team_id == rival_id, ]
-            if (!is.null(buys) && nrow(buys) > 0 && "price" %in% colnames(buys)) {
-              net_transfer_pnl <- net_transfer_pnl - sum(suppressWarnings(as.numeric(buys$price)), na.rm = TRUE)
-            }
-            if (!is.null(sells) && nrow(sells) > 0 && "price" %in% colnames(sells)) {
-              net_transfer_pnl <- net_transfer_pnl + sum(suppressWarnings(as.numeric(sells$price)), na.rm = TRUE)
-            }
-          }
-        }, error = function(e) {
-          print(paste0("[Rivals] net_transfer_pnl computation warning: ", e$message))
-        })
-      }
-
-      pnl_color <- if (net_transfer_pnl > 0) "#10b981" else if (net_transfer_pnl < 0) "#ef4444" else "#64748b"
-      pnl_sign <- if (net_transfer_pnl > 0) "+" else ""
-
-      summary <- rivals_summary_values(info,user_teams_RV(),league_finances_RV()$team_finances,rival_id)
+      net_transfer_pnl <- money_in - money_out
+      pnl_color <- if (!is.finite(net_transfer_pnl)) "#64748b" else if (net_transfer_pnl > 0) "#10b981" else if (net_transfer_pnl < 0) "#ef4444" else "#64748b"
+      pnl_sign <- if (is.finite(net_transfer_pnl) && net_transfer_pnl > 0) "+" else ""
       cash <- ui_financial_amount(summary$cash)
-      spent_fmt <- format_table_currency(total_spent)
-      money_out_fmt <- format_table_currency(money_out)
-      money_in_fmt <- format_table_currency(money_in)
+      spent_fmt <- ui_financial_amount(total_spent)
+      money_out_fmt <- ui_financial_amount(money_out)
+      money_in_fmt <- ui_financial_amount(money_in)
       val_sum <- format_table_currency(squad_val)
-      net_fmt <- format_table_currency(net_gain)
-      pnl_fmt <- paste0(pnl_sign, format_table_currency(net_transfer_pnl))
+      net_fmt <- ui_financial_amount(net_gain)
+      pnl_fmt <- paste0(pnl_sign, ui_financial_amount(net_transfer_pnl))
 
       pos <- if (is.finite(summary$position)) get_ordinal_position(summary$position) else "Unavailable"
       total_teams <- if (!is.null(user_teams_RV())) nrow(user_teams_RV()) else 0
@@ -666,14 +643,17 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                    div(style = "text-align: center; padding: 10px;",
                        h3(style = "font-weight: 700; color: var(--fm-text); margin: 0; font-size: 20px;", cash),
                        p(style = "color: var(--fm-muted); font-size: 11px; text-transform: uppercase; margin-top: 5px;", summary$label),
-                       if(length(summary$notes)==1L && !is.na(summary$notes) && nzchar(summary$notes)) tags$details(tags$summary("Estimate details"),tags$p(summary$notes)))
+                       if((length(summary$notes)==1L && !is.na(summary$notes) && nzchar(summary$notes))||is.finite(summary$observed_cash))
+                         tags$details(tags$summary("Estimate details"),tags$p(summary$notes),
+                           if(is.finite(summary$observed_cash))tags$p("Observed cash",if(!summary$observed_cash_fresh)" (stale)"else"",": ",ui_financial_amount(summary$observed_cash)),
+                           if(is.finite(summary$difference))tags$p("Observed minus reconstructed: ",ui_financial_amount(summary$difference))))
                  )
           ),
           column(width = 3,
                  box(
                    title = "Observed Transfer Cash Flow",
                    width = 12,
-                   status = if (net_transfer_pnl > 0) "success" else "warning",
+                   status = if (is.finite(net_transfer_pnl) && net_transfer_pnl > 0) "success" else "warning",
                    solidHeader = TRUE,
                    div(style = "text-align: center; padding: 10px;",
                        h3(style = paste0("font-weight: 700; color: ", pnl_color, "; margin: 0; font-size: 20px;"), pnl_fmt),
@@ -923,166 +903,35 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
 
     # ---- Transaction History Reactives ----
 
-    # Raw money movements: fetch via API, compute running balance, build full reconstructed fallback if empty
-    is_fallback <- reactiveVal(FALSE)
-
+    # One shared accounting ledger supplies both the summary and every cash row.
+    # Selection and display never repeat the movements/pressroom HTTP requests.
     rival_moneymovements_raw_RV <- reactive({
-      req(is_module_active() == TRUE)
-      if (!is.null(refresh_trigger)) refresh_trigger()
-      req(login_token())
-      req(championship_id())
-      req(selected_rival_team_id())
-
-      movements <- tryCatch({
-        get_user_team_moneymovements(
-          login = login_token(),
-          championship_id = championship_id(),
-          user_team_id = selected_rival_team_id()
-        )
-      }, error = function(e) {
-        print(paste0("[Rivals] moneymovements fetch error: ", e$message))
-        NULL
-      })
-
-      # Check if movements has valid transaction data
-      is_valid_movements <- !is.null(movements) && nrow(movements) > 0 &&
-                            any(nzchar(movements$date)) &&
-                            any(nzchar(movements$concept) | movements$type == "budget")
-
-      # ---- PRIMARY PATH: API returned valid data ----
-      if (is_valid_movements) {
-        is_fallback(FALSE)
-
-        # Parse ISO dates
-        movements$timestamp <- parse_safe_datetime(movements$date)
-
-        # Sort ascending by timestamp (chronological) for running balance calculation
-        movements <- movements %>%
-          dplyr::arrange(timestamp)
-
-        # Calculate running balance on the FULL chronological dataset
-        # A visible movement page does not prove a complete account ledger.
-        # Keep historical balances unavailable without a verified opening balance.
-        movements$running_balance <- rep(NA_real_, nrow(movements))
-
-        # Batch consolidation: group by minute, compute batch_final_balance and is_batch_header
-        movements$batch_key <- format(movements$timestamp, "%Y-%m-%d %H:%M")
-        movements <- movements %>%
-          dplyr::group_by(batch_key) %>%
-          dplyr::mutate(
-            batch_final_balance = running_balance[dplyr::n()],
-            is_batch_header = dplyr::row_number() == dplyr::n()
-          ) %>%
-          dplyr::ungroup()
-
-        # Order strictly descending (newest first), batch header row first within each timestamp group
-        movements <- movements %>%
-          dplyr::arrange(desc(timestamp), desc(is_batch_header))
-
-        return(movements)
-      }
-
-      # Restricted money movements do not authorize inventing rewards, budgets,
-      # dates or account balances. Show only settled transfers visible in feed.
-      is_fallback(TRUE)
-      pressroom <- tryCatch(get_championship_pressroom(login_token(), championship_id()), error = function(e) NULL)
-      rivals_observed_transfers(pressroom, selected_rival_team_id())
-
+      req(is_module_active() == TRUE, selected_rival_team_id())
+      league_finances_RV()$cash_ledgers[[selected_rival_team_id()]] %||% data.frame()
     })
 
-    # Filtered money movements: passthrough to raw data (filters removed)
-    rival_moneymovements_filtered_RV <- reactive({
-      tryCatch({
-        rival_moneymovements_raw_RV()
-      }, error = function(e) {
-        NULL
-      })
-    })
-
-    
-
-    # Render Tab 2 UI: Transaction History
     output$rival_transactions_tab_ui <- renderUI({
-      # Compute period summary from raw data
-      filtered_tx <- rival_moneymovements_filtered_RV()
-      total_inflow <- 0
-      total_outflow <- 0
-      net_flow <- 0
-      if (!is.null(filtered_tx) && nrow(filtered_tx) > 0) {
-        total_inflow <- sum(filtered_tx$money[filtered_tx$money > 0], na.rm = TRUE)
-        total_outflow <- sum(filtered_tx$money[filtered_tx$money < 0], na.rm = TRUE)
-        net_flow <- sum(filtered_tx$money, na.rm = TRUE)
-      }
-
-      # Build period summary cards
-      net_flow_status <- if (net_flow >= 0) "primary" else "warning"
-      net_flow_color <- if (net_flow >= 0) "#3b82f6" else "#f59e0b"
-
-      period_summary_cards <- fluidRow(
-        column(width = 4,
-          box(
-            title = "Total Inflow",
-            width = 12,
-            status = "success",
-            solidHeader = TRUE,
-            div(style = "text-align: center; padding: 10px;",
-              h3(style = "font-weight: 700; color: var(--fm-text); margin: 0; font-size: 18px;",
-                format_table_currency(total_inflow)
-              ),
-              p(style = "color: var(--fm-muted); font-size: 11px; text-transform: uppercase; margin-top: 5px;", "Inflow in Period")
-            )
-          )
-        ),
-        column(width = 4,
-          box(
-            title = "Total Outflow",
-            width = 12,
-            status = "danger",
-            solidHeader = TRUE,
-            div(style = "text-align: center; padding: 10px;",
-              h3(style = "font-weight: 700; color: var(--fm-danger); margin: 0; font-size: 18px;",
-                format_table_currency(total_outflow)
-              ),
-              p(style = "color: var(--fm-muted); font-size: 11px; text-transform: uppercase; margin-top: 5px;", "Outflow in Period")
-            )
-          )
-        ),
-        column(width = 4,
-          box(
-            title = "Net Cash Flow",
-            width = 12,
-            status = net_flow_status,
-            solidHeader = TRUE,
-            div(style = "text-align: center; padding: 10px;",
-              h3(style = paste0("font-weight: 700; color: ", net_flow_color, "; margin: 0; font-size: 18px;"),
-                format_table_currency(net_flow)
-              ),
-              p(style = "color: var(--fm-muted); font-size: 11px; text-transform: uppercase; margin-top: 5px;", "Net Cash Flow")
-            )
-          )
+      ledger<-rival_moneymovements_raw_RV()
+      undated<-if(is.data.frame(ledger)&&nrow(ledger))ledger[ledger$section%in%"undated",,drop=FALSE]else data.frame()
+      final<-if(is.data.frame(ledger)&&nrow(ledger))tail(ledger$running_balance,1L)else NA_real_
+      tagList(
+        checkboxInput(ns("tx_pivot_by_player"),"Pivot by Player (Buy/Sell Ledger)",value=isTRUE(isolate(input$tx_pivot_by_player))),
+        p("Cash starts from the league's opening balance. These are reconstructed estimates; transactions sharing a timestamp have no confirmed order."),
+        if(is.data.frame(ledger)&&nrow(ledger)&&any(ledger$included&!is.finite(ledger$amount)))
+          p(class="alert alert-info","Some movement amounts are missing. Balances show the known-amount estimate and exclude those unknown amounts."),
+        div(class="well",strong("Reconstructed balance: "),ui_financial_amount(final)),
+        h4("Dated cash movements"),
+        p("These running balances exclude components whose payment dates are unknown."),
+        reactable::reactableOutput(ns("rival_transactions_table")),
+        if(nrow(undated))tagList(
+          h4("Components without payment dates"),
+          p("These amounts contribute to the final reconstructed balance. They are added below for reconciliation; their payment dates and position among the dated transactions are unknown."),
+          reactable::reactableOutput(ns("rival_undated_components_table"))
         )
       )
-
-      tagList(
-        # Pivot checkbox row
-        fluidRow(
-          style = "margin-bottom: 12px;",
-          column(width = 12,
-            checkboxInput(
-              ns("tx_pivot_by_player"),
-              "Pivot by Player (Buy/Sell Ledger)",
-              value = FALSE
-            )
-          )
-        ),
-
-        if (is_fallback()) p(class = "alert alert-info", "Only observed transfers are available. Rewards, account adjustments and historical balances are unavailable."),
-        # Period Summary Cards
-        period_summary_cards,
-
-        # Transaction Table
-        reactable::reactableOutput(ns("rival_transactions_table"))
-      )
+    })
+    output$rival_undated_components_table<-reactable::renderReactable({
+      rivals_cash_history_widget(rival_moneymovements_raw_RV(),undated=TRUE)
     })
 
 # Render Transaction Table
@@ -1091,9 +940,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
         # Pivot by player: build the paired buy/sell ledger via the pure
         # helper (pairs by player_id, fallback name; raw dates; no Sold column).
         rival_id <- selected_rival_team_id()
-        pressroom_df <- tryCatch({
-          get_championship_pressroom(login = login_token(), championship_id = championship_id())
-        }, error = function(e) NULL)
+        pressroom_df <- league_finances_RV()$pressroom %||% data.frame()
 
         ledger <- rivals_build_pivot_ledger(pressroom_df, rival_id)
 
@@ -1171,106 +1018,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
         ))
       }
 
-      # Standard chronological transaction log
-      filtered <- rival_moneymovements_filtered_RV()
-      if (is.null(filtered) || nrow(filtered) == 0) {
-        return(reactable::reactable(
-          data.frame(Status = "No transaction movements recorded for this team yet."),
-          columns = list(Status = colDef(name = "Transaction Log Status", align = "center")),
-          compact = TRUE,
-          bordered = FALSE
-        ))
-      }
-
-      # Reorder columns so "Date" renders first (visible order), followed by
-      # the hidden helper columns. Values, filtering, and the timestamp-based
-      # default sort are all preserved.
-      display_df <- rivals_tx_display_df(filtered)
-      reactable::reactable(
-        display_df,
-        compact = TRUE,
-        striped = TRUE,
-        highlight = TRUE,
-        bordered = FALSE,
-        defaultPageSize = 15,
-        # Timestamp-based default ordering (chronological, newest first) so
-        # sorting is correct across years (the raw `date` string is not used).
-        defaultSorted = list(timestamp = "desc"),
-        columns = list(
-          date = colDef(
-            name = "Date",
-            align = "left",
-            cell = function(date_val) {
-              ts <- parse_safe_datetime(date_val)
-              format(ts, "%d/%m/%Y %H:%M")
-            }
-          ),
-          type = colDef(
-            name = "Type / Category",
-            align = "center",
-            cell = function(type_val, category_val) {
-              badge_color <- "#64748b"
-              badge_label <- type_val
-              if (type_val == "buy") {
-                badge_color <- "#ef4444"
-                badge_label <- "Buy"
-              } else if (type_val == "sell") {
-                badge_color <- "#10b981"
-                badge_label <- "Sell"
-              } else if (type_val == "bonus") {
-                badge_color <- "#3b82f6"
-                badge_label <- "Bonus"
-              } else if (type_val == "budget") {
-                badge_color <- "#64748b"
-                badge_label <- "Budget"
-              }
-              shiny::tags$span(
-                style = paste0("background: ", badge_color, "; color: var(--fm-text); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;"),
-                badge_label
-              )
-            }
-          ),
-          concept = colDef(
-            name = "Concept / Description",
-            align = "left",
-            style = list(fontWeight = "500")
-          ),
-          money = colDef(
-            name = "Amount",
-            align = "right",
-            cell = function(money_val) {
-              formatted <- format_table_currency(money_val)
-              if (money_val > 0) {
-                shiny::tags$span(style = "color: var(--fm-text); font-weight: 600;", paste0("+", formatted))
-              } else if (money_val < 0) {
-                shiny::tags$span(style = "color: var(--fm-danger); font-weight: 600;", formatted)
-              } else {
-                shiny::tags$span(style = "color: var(--fm-muted);", formatted)
-              }
-            }
-          ),
-          running_balance = colDef(
-            name = "Money Left After Transaction",
-            align = "right",
-            cell = function(rb_val, rowInfo) {
-              is_hdr <- if (!is.null(rowInfo) && "is_batch_header" %in% names(rowInfo)) rowInfo$is_batch_header else TRUE
-              if (isTRUE(is_hdr)) {
-                formatted <- ui_financial_amount(rb_val)
-                shiny::tags$span(style = "font-weight: 700; color: var(--fm-text);", formatted)
-              } else {
-                shiny::tags$span(style = "color: var(--fm-muted);", "-")
-              }
-            }
-          ),
-          # Helper / internal columns are hidden from the transaction log.
-          id = colDef(show = FALSE),
-          category = colDef(show = FALSE),
-          timestamp = colDef(show = FALSE),
-          batch_key = colDef(show = FALSE),
-          is_batch_header = colDef(show = FALSE),
-          batch_final_balance = colDef(show = FALSE)
-        )
-      )
+      rivals_cash_history_widget(rival_moneymovements_raw_RV())
     })
 
     # Nested table module server call
