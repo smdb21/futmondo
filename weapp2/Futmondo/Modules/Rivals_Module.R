@@ -317,6 +317,17 @@ rivals_finance_table_widget <- function(finances_data,on_error=function(error)NU
 }
 
 # Summary cards reuse the league ledger; no additional financial reads.
+rivals_inflow_totals <- function(ledger) {
+  empty<-list(sales=NA_real_,bonuses=NA_real_,other=NA_real_,total=NA_real_,incomplete=TRUE)
+  if(!is.data.frame(ledger)||!nrow(ledger)||!all(c("amount","type","included")%in%names(ledger)))return(empty)
+  rows<-ledger[ledger$included%in%TRUE & !ledger$type%in%c("opening","budget"),,drop=FALSE]
+  positive<-is.finite(rows$amount)&rows$amount>0
+  total<-function(types)sum(rows$amount[positive & rows$type%in%types])
+  sales<-total("sell");bonuses<-total("bonus")
+  other<-sum(rows$amount[positive & !rows$type%in%c("sell","bonus")])
+  list(sales=sales,bonuses=bonuses,other=other,total=sales+bonuses+other,incomplete=any(!is.finite(rows$amount)))
+}
+
 rivals_summary_values <- function(info, teams, finances, team_id) {
   number <- function(x) { x <- suppressWarnings(as.numeric(x)); if(length(x)==1L && is.finite(x)) x else NA_real_ }
   row <- if(is.data.frame(finances) && "teamid" %in% names(finances)) finances[finances$teamid %in% team_id,,drop=FALSE] else data.frame()
@@ -671,7 +682,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                        p(style = "color: var(--fm-muted); font-size: 11px; text-transform: uppercase; margin-top: 5px;",
                          tags$span(style = "color: var(--fm-danger); font-weight: 600;", paste0("Spent: ", money_out_fmt)),
                          tags$span(style = "color: var(--fm-muted);", " . "),
-                         tags$span(style = "color: var(--fm-text); font-weight: 600;", paste0("Inflow: ", money_in_fmt)))
+                         tags$span(style = "color: var(--fm-text); font-weight: 600;", paste0("Sales: ", money_in_fmt)))
                        )
                  )
           )
@@ -912,6 +923,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
 
     output$rival_transactions_tab_ui <- renderUI({
       ledger<-rival_moneymovements_raw_RV()
+      inflow<-rivals_inflow_totals(ledger)
       undated<-if(is.data.frame(ledger)&&nrow(ledger))ledger[ledger$section%in%"undated",,drop=FALSE]else data.frame()
       final<-if(is.data.frame(ledger)&&nrow(ledger))tail(ledger$running_balance,1L)else NA_real_
       tagList(
@@ -920,6 +932,15 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
         if(is.data.frame(ledger)&&nrow(ledger)&&any(ledger$included&!is.finite(ledger$amount)))
           p(class="alert alert-info","Some movement amounts are missing. Balances show the known-amount estimate and exclude those unknown amounts."),
         div(class="well",strong("Reconstructed balance: "),ui_financial_amount(final)),
+        div(class="well",
+          h4("Total inflow"),
+          tags$p(strong(ui_financial_amount(inflow$total))),
+          tags$p("Player sales: ",ui_financial_amount(inflow$sales)),
+          tags$p("Bonuses: ",ui_financial_amount(inflow$bonuses)),
+          if(is.finite(inflow$other)&&inflow$other!=0)tags$p("Other credits: ",ui_financial_amount(inflow$other)),
+          tags$small("Excludes starting cash and outgoing amounts. Includes undated estimated bonuses.",
+            if(inflow$incomplete)" Some amounts are missing; only known inflow is included.")
+        ),
         h4("Dated cash movements"),
         p("These running balances exclude components whose payment dates are unknown."),
         reactable::reactableOutput(ns("rival_transactions_table")),
