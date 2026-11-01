@@ -174,8 +174,40 @@ empty_round_catalog <- function(status="unavailable") list(status=status, rounds
 
 get_finished_rounds <- function(login, championship_id) get_finished_round_catalog(login, championship_id)$rounds
 
-get_players_from_team <- function(login, championship_id, user_team_id, teams = NULL) {
-  cache_key <- paste0("roster_", championship_id, "_", user_team_id)
+acquisition_data_unverified <- function(data) {
+  isTRUE(any(attr(data,"fetch_status")%in%c("stale","partial","unavailable")))
+}
+
+acquisition_source_deadline <- function(data,ttl,fallback=Sys.time()) {
+  stamp<-fm_time(attr(data,"observed_at") %||% fallback)
+  if(length(stamp)!=1L||is.na(stamp))stamp<-fm_time(fallback)
+  as.numeric(stamp)+ttl
+}
+
+roster_capacity_facts <- function(roster) {
+  if(!is.data.frame(roster)||!"id"%in%names(roster))stop("Roster identities unavailable")
+  ids<-as.character(roster$id)
+  if(anyNA(ids)||any(!nzchar(ids))||anyDuplicated(ids))stop("Roster identities unavailable")
+  out<-data.frame(id=ids,value=if("value"%in%names(roster))suppressWarnings(as.numeric(roster$value))else rep(NA_real_,length(ids)),stringsAsFactors=FALSE)
+  for(field in c("fetch_status","observed_at","fetched_at","fetch_error"))attr(out,field)<-attr(roster,field)
+  out
+}
+
+get_players_from_team <- function(login, championship_id, user_team_id, teams = NULL, facts_only = FALSE) {
+  ctx<-resource_context(login=login,championship_id=championship_id,user_team_id=user_team_id)
+  if(isTRUE(facts_only)){
+    # A fresh full roster already contains these facts. Never let a minimal
+    # snapshot occupy the full presentation cache or inherit stale identities.
+    full<-api_cache_env[[api_cache_key(paste0("roster_",championship_id,"_",user_team_id),context=ctx)]]
+    if(is.data.frame(full$data)&&!acquisition_data_unverified(full$data)&&
+       as.numeric(Sys.time())<acquisition_source_deadline(full$data,30,full$time))return(roster_capacity_facts(full$data))
+  }
+  cache_key <- paste0(if(isTRUE(facts_only))"roster_facts_"else"roster_", championship_id, "_", user_team_id)
+  # Parsing/presentation never restarts the raw observation's freshness clock.
+  for(name in c(cache_key,paste0("roster_payload_",championship_id,"_",user_team_id))){
+    key<-api_cache_key(name,context=ctx);cached<-api_cache_env[[key]]
+    if(!is.null(cached$data)&&as.numeric(Sys.time())>=acquisition_source_deadline(cached$data,30,cached$time))rm(list=key,envir=api_cache_env)
+  }
   get_cached_data(cache_key, {
     payload <- list(
       header = list(
@@ -197,10 +229,19 @@ get_players_from_team <- function(login, championship_id, user_team_id, teams = 
     # Sending the POST request
     print("Getting players from team")
 
-    response <- futmondo_post(ROSTER_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
-    roster <- httr::content(response)
-    roster <- roster[["answer"]]
-    if (!is.list(roster) || !is.null(roster$code) || isTRUE(roster$error)) stop("Roster unavailable")
+    roster<-get_cached_data(paste0("roster_payload_",championship_id,"_",user_team_id),{
+      response <- futmondo_post(ROSTER_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
+      answer<-httr::content(response)[["answer"]]
+      if (!is.list(answer) || !is.null(answer$code) || isTRUE(answer$error)) stop("Roster unavailable")
+      answer
+    },timeout_sec=30,context=ctx)
+    roster_metadata<-lapply(c("fetch_status","observed_at","fetched_at","fetch_error"),function(field)attr(roster,field));names(roster_metadata)<-c("fetch_status","observed_at","fetched_at","fetch_error")
+    if(isTRUE(facts_only)){
+      facts<-data.frame(id=vapply(roster,function(player)fm_scalar(player$id,""),character(1)),
+        value=vapply(roster,function(player)fm_number(player$value),numeric(1)),stringsAsFactors=FALSE)
+      for(field in c("fetch_status","observed_at","fetched_at","fetch_error"))attr(facts,field)<-attr(roster,field)
+      return(roster_capacity_facts(facts))
+    }
     if (length(roster) == 0) {
       print("User team roster is empty.")
       empty_df <- data.frame(
@@ -222,6 +263,7 @@ get_players_from_team <- function(login, championship_id, user_team_id, teams = 
         userTeam = character(0),
         stringsAsFactors = FALSE
       )
+      for(field in names(roster_metadata))attr(empty_df,field)<-roster_metadata[[field]]
       return(empty_df)
     }
     roster <- lapply(roster, FUN = function(player) {
@@ -318,6 +360,7 @@ get_players_from_team <- function(login, championship_id, user_team_id, teams = 
       }
     }
 
+    for(field in names(roster_metadata))attr(roster,field)<-roster_metadata[[field]]
     roster
   }, timeout_sec = 30, context=resource_context(login=login,championship_id=championship_id,user_team_id=user_team_id))
 }
@@ -1315,36 +1358,50 @@ clause_buyout_error_message <- function(code,message=NULL,roster=NULL) {
   if(length(message)==1L&&!is.na(message)&&nzchar(as.character(message))) as.character(message) else if(nzchar(code)) code else "Please refresh and try again."
 }
 
-reconcile_pending_clause_transfers <- function(roster_df,pressroom_df,summaries,user_team_id,now=Sys.time()) {
-  unavailable <- list(status="unavailable",pending_outbound_ids=character(),pending_inbound_ids=character(),
-    pending_outbound_count=NA_integer_,pending_inbound_count=NA_integer_)
+pending_clause_candidates <- function(roster_df,pressroom_df,user_team_id) {
   if(!is.data.frame(roster_df)||!"id"%in%names(roster_df)||!is.data.frame(pressroom_df)||
-      !all(c("player_id","buyer_team_id","seller_team_id","created")%in%names(pressroom_df))) return(unavailable)
-  team<-as.character(user_team_id)[1]; if(is.na(team)||!nzchar(team)) return(unavailable)
-  roster_ids<-unique(as.character(roster_df$id[!is.na(roster_df$id)&nzchar(as.character(roster_df$id))]))
-  tx<-pressroom_df[!is.na(pressroom_df$player_id)&nzchar(as.character(pressroom_df$player_id)),,drop=FALSE]
-  if(nrow(tx)) {
-    when<-suppressWarnings(as.POSIXct(as.character(tx$created),tz="UTC")); when[is.na(when)]<-as.POSIXct("1970-01-01",tz="UTC")
+      !all(c("player_id","buyer_team_id","seller_team_id","created")%in%names(pressroom_df)))return(NULL)
+  roster_ids<-as.character(roster_df$id)
+  if(anyNA(roster_ids)||any(!nzchar(roster_ids))||anyDuplicated(roster_ids))return(NULL)
+  tx<-pressroom_df
+  relevant<-unique(tx$player_id[tx$buyer_team_id%in%user_team_id|tx$seller_team_id%in%user_team_id])
+  tx<-tx[tx$player_id%in%relevant,,drop=FALSE]
+  if(anyNA(tx$player_id)||any(!nzchar(as.character(tx$player_id))))return(NULL)
+  if(nrow(tx)){
+    when<-fm_time(tx$created)
+    if(anyNA(when))return(NULL)
     tx<-tx[order(when,seq_len(nrow(tx))),,drop=FALSE]
     tx<-tx[!duplicated(as.character(tx$player_id),fromLast=TRUE),,drop=FALSE]
   }
-  candidate<-tx[(as.character(tx$buyer_team_id)==team & !as.character(tx$player_id)%in%roster_ids) |
-    (as.character(tx$seller_team_id)==team & as.character(tx$player_id)%in%roster_ids),,drop=FALSE]
+  # Missing counterparty IDs mean System, and must never create NA rows.
+  mask<-(tx$buyer_team_id%in%user_team_id & !tx$player_id%in%roster_ids)|
+    (tx$seller_team_id%in%user_team_id & tx$player_id%in%roster_ids)
+  tx[mask,,drop=FALSE]
+}
+
+reconcile_pending_clause_transfers <- function(roster_df,pressroom_df,summaries,user_team_id,now=Sys.time()) {
+  unavailable <- list(status="unavailable",pending_outbound_ids=character(),pending_inbound_ids=character(),
+    pending_outbound_count=NA_integer_,pending_inbound_count=NA_integer_)
+  team<-fm_scalar(user_team_id,"");if(!nzchar(team))return(unavailable)
+  candidate<-pending_clause_candidates(roster_df,pressroom_df,team)
+  if(is.null(candidate))return(unavailable)
+  roster_ids<-as.character(roster_df$id)
   if(!nrow(candidate)) return(list(status="ok",pending_outbound_ids=character(),pending_inbound_ids=character(),
     pending_outbound_count=0L,pending_inbound_count=0L))
   outbound<-character(); incoming<-character()
   for(i in seq_len(nrow(candidate))) {
     pid<-as.character(candidate$player_id[i]); summary<-summaries[[pid]]
+    if(acquisition_data_unverified(summary))return(unavailable)
     clause<-if(is.list(summary)&&is.list(summary$championship)) summary$championship$clause else NULL
     owner<-if(is.list(summary)&&is.list(summary$championship)&&is.list(summary$championship$owner)) {
       value<-summary$championship$owner$`_id`;if(is.null(value)) value<-summary$championship$owner$id
       as.character(value)
     } else NA_character_
     transferred<-is.list(clause)&&identical(clause$transferred,TRUE)
-    transfer_at<-if(is.list(clause)&&!is.null(clause$transferDate)) suppressWarnings(as.POSIXct(as.character(clause$transferDate),tz="UTC")) else as.POSIXct(NA)
+    transfer_at<-if(is.list(clause)&&!is.null(clause$transferDate)) fm_time(clause$transferDate) else as.POSIXct(NA)
     if(!transferred||length(transfer_at)!=1L||is.na(transfer_at)||transfer_at<=now||length(owner)!=1L||is.na(owner)||!nzchar(owner)) return(unavailable)
-    if(as.character(candidate$seller_team_id[i])==team&&pid%in%roster_ids&&owner==team) outbound<-c(outbound,pid)
-    else if(as.character(candidate$buyer_team_id[i])==team&&!pid%in%roster_ids&&owner!=team) incoming<-c(incoming,pid)
+    if(candidate$seller_team_id[i]%in%team&&pid%in%roster_ids&&owner==team) outbound<-c(outbound,pid)
+    else if(candidate$buyer_team_id[i]%in%team&&!pid%in%roster_ids&&owner!=team) incoming<-c(incoming,pid)
     else return(unavailable)
   }
   outbound<-unique(outbound);incoming<-unique(incoming)
@@ -1354,7 +1411,7 @@ reconcile_pending_clause_transfers <- function(roster_df,pressroom_df,summaries,
 
 # Computes a verified acquisition-capacity snapshot for the logged-in team:
 # roster count/cap, verified spendable funds, and outstanding active bids.
-# Cached per (userid, championship, team, target player).
+# Cached per (userid, championship, team); target projection performs no reads.
 #
 # Parameters:
 #   login             -- login token vector (token, userid, user_name)
@@ -1379,7 +1436,7 @@ reconcile_pending_clause_transfers <- function(roster_df,pressroom_df,summaries,
 #   outstanding -- list(offers, count, total_amount, completeness)
 #   target      -- list(my_bid_id, my_bid_amount, highest_bid, bid_count)
 #   diagnostics -- character vector of data-availability notes
-get_acquisition_capacity <- function(login, championship_id, user_team_id, target_player_id = NULL) {
+get_team_acquisition_capacity <- function(login, championship_id, user_team_id) {
   empty_target <- list(my_bid_id = NULL, my_bid_amount = NA_real_,
                        highest_bid = NA_real_, bid_count = NA_integer_)
 
@@ -1401,14 +1458,9 @@ get_acquisition_capacity <- function(login, championship_id, user_team_id, targe
     ))
   }
 
-  target_key <- if (is.null(target_player_id) || !nzchar(as.character(target_player_id))) {
-    "all"
-  } else {
-    as.character(target_player_id)
-  }
-
-  cache_key <- paste0("acq_capacity_", login[["userid"]], "_", championship_id,
-                      "_", user_team_id, "_", target_key)
+  cache_key <- paste0("acq_capacity_",login[["userid"]],"_",championship_id,"_",user_team_id)
+  key<-api_cache_key(cache_key,context=resource_context(login,championship_id,user_team_id));cached<-api_cache_env[[key]]
+  if(!is.null(cached$data$valid_until)&&as.numeric(Sys.time())>=cached$data$valid_until)rm(list=key,envir=api_cache_env)
 
   get_cached_data(cache_key, {
     diagnostics <- character(0)
@@ -1454,11 +1506,14 @@ get_acquisition_capacity <- function(login, championship_id, user_team_id, targe
     roster_count <- NA_integer_
     roster_df <- tryCatch(
       get_players_from_team(login = login, championship_id = championship_id,
-                            user_team_id = user_team_id, teams = NULL),
+                            user_team_id = user_team_id, teams = NULL, facts_only = TRUE),
       error = function(e) NULL
     )
     if (is.null(roster_df)) {
       diagnostics <- c(diagnostics, "roster fetch failed")
+    } else if(!"id"%in%names(roster_df)||anyNA(roster_df$id)||any(!nzchar(as.character(roster_df$id)))||anyDuplicated(roster_df$id)){
+      diagnostics<-c(diagnostics,"roster identities unavailable")
+      roster_df<-NULL
     } else {
       roster_count <- as.integer(nrow(roster_df))
       if (!is.finite(team_value_val) || team_value_val < 0) {
@@ -1473,20 +1528,12 @@ get_acquisition_capacity <- function(login, championship_id, user_team_id, targe
     # ---- 3. Delayed clause transfers ----
     transfer_state <- list(status="unavailable",pending_outbound_ids=character(),pending_inbound_ids=character(),
       pending_outbound_count=NA_integer_,pending_inbound_count=NA_integer_)
+    summaries<-list()
     pressroom <- tryCatch(get_championship_pressroom(login,championship_id),error=function(e)NULL)
-    if(is.data.frame(roster_df)&&is.data.frame(pressroom)&&!identical(attr(pressroom,"fetch_status"),"stale")) {
-      summaries<-list(); candidate_ids<-character()
-      needed<-c("player_id","buyer_team_id","seller_team_id","created")
-      if(all(needed%in%names(pressroom))&&nrow(pressroom)) {
-        tx<-pressroom[!is.na(pressroom$player_id)&nzchar(as.character(pressroom$player_id)),,drop=FALSE]
-        when<-suppressWarnings(as.POSIXct(as.character(tx$created),tz="UTC"));when[is.na(when)]<-as.POSIXct("1970-01-01",tz="UTC")
-        tx<-tx[order(when,seq_len(nrow(tx))),,drop=FALSE]
-        tx<-tx[!duplicated(as.character(tx$player_id),fromLast=TRUE),,drop=FALSE]
-        roster_ids<-if("id"%in%names(roster_df)) as.character(roster_df$id) else character()
-        mismatch<-(as.character(tx$buyer_team_id)==as.character(user_team_id)&!as.character(tx$player_id)%in%roster_ids)|
-          (as.character(tx$seller_team_id)==as.character(user_team_id)&as.character(tx$player_id)%in%roster_ids)
-        candidate_ids<-unique(as.character(tx$player_id[which(mismatch)]))
-      }
+    if(is.data.frame(roster_df)&&is.data.frame(pressroom)&&!acquisition_data_unverified(pressroom)) {
+      summaries<-list()
+      candidates<-pending_clause_candidates(roster_df,pressroom,user_team_id)
+      candidate_ids<-if(is.data.frame(candidates))unique(as.character(candidates$player_id))else character()
       if(length(candidate_ids)) for(pid in candidate_ids) summaries[[pid]]<-tryCatch(
         get_player_summary(login,championship_id,user_team_id,pid),error=function(e)NULL)
       transfer_state<-reconcile_pending_clause_transfers(roster_df,pressroom,summaries,user_team_id)
@@ -1499,7 +1546,8 @@ get_acquisition_capacity <- function(login, championship_id, user_team_id, targe
     bids_complete <- FALSE; bid_count <- NA_integer_; bid_total <- NA_real_
     market <- tryCatch(get_market_players(login, championship_id, user_team_id), error=function(e) NULL)
     target <- empty_target
-    if (is.data.frame(market) && !identical(attr(market,"fetch_status"),"stale")) {
+    target_rows<-data.frame()
+    if (is.data.frame(market) && !acquisition_data_unverified(market)) {
       bids_complete <- TRUE
       own <- if ("bid_id" %in% names(market)) which(!is.na(market$bid_id) & nzchar(as.character(market$bid_id))) else integer()
       my_bids <- market[own,,drop=FALSE]
@@ -1508,22 +1556,14 @@ get_acquisition_capacity <- function(login, championship_id, user_team_id, targe
       bids_complete <- !nrow(my_bids) || (length(prices)==nrow(my_bids) && all(is.finite(prices) & prices>0))
       bid_count <- nrow(my_bids)
       bid_total <- if (bids_complete) sum(prices) else NA_real_
-      if (target_key!="all" && "id" %in% names(my_bids)) {
-        row <- my_bids[as.character(my_bids$id)==target_key,,drop=FALSE]
-        if (nrow(row)==1L) {
-          target$my_bid_id <- as.character(row$bid_id)
-          target$my_bid_amount <- fm_number(row$bid_price)
-        }
-      }
-      # Normal auctions are sealed: no rival amount can be inferred here.
-      if (target_key!="all" && "id" %in% names(market)) {
-        row <- market[as.character(market$id)==target_key,,drop=FALSE]
-        if (nrow(row)==1L) target$bid_count <- fm_number(row$numberOfBids)
-      }
+      target_rows<-as.data.frame(market)[,intersect(c("id","bid_id","bid_price","numberOfBids"),names(market)),drop=FALSE]
+      if("id"%in%names(target_rows))target_rows<-target_rows[!duplicated(target_rows$id),,drop=FALSE]
     }
     if (!bids_complete) diagnostics <- c(diagnostics,"outgoing market commitments unavailable")
-    if (identical(attr(info,"fetch_status"),"stale") || identical(attr(roster_df,"fetch_status"),"stale"))
-      bids_complete <- FALSE
+    if(acquisition_data_unverified(info)||acquisition_data_unverified(roster_df)){
+      bids_complete<-FALSE
+      diagnostics<-c(diagnostics,"team or roster data is stale or incomplete")
+    }
 
     # ---- 5. Status + spendable funds ----
     # Bids may temporarily use credit down to half the verified team value.
@@ -1587,9 +1627,44 @@ get_acquisition_capacity <- function(login, championship_id, user_team_id, targe
         completeness = if (bids_complete) "complete" else "partial"
       ),
       target = target,
-      diagnostics = diagnostics
+      valid_until = min(as.numeric(Sys.time())+15,acquisition_source_deadline(info,15),acquisition_source_deadline(roster_df,30),
+        acquisition_source_deadline(market,20),acquisition_source_deadline(pressroom,300),
+        if(length(summaries))min(vapply(summaries,acquisition_source_deadline,numeric(1),ttl=60))else Inf),
+      target_rows = target_rows,
+      diagnostics = unique(diagnostics)
     )
   }, timeout_sec = 15, context=resource_context(login=login,championship_id=championship_id,user_team_id=user_team_id))
+}
+
+# Existing interface: projecting a different target never repeats team checks.
+get_acquisition_capacity <- function(login,championship_id,user_team_id,target_player_id=NULL) {
+  out<-get_team_acquisition_capacity(login,championship_id,user_team_id)
+  rows<-out$target_rows;pid<-fm_scalar(target_player_id,"")
+  if(nzchar(pid)&&is.data.frame(rows)&&"id"%in%names(rows)){
+    row<-rows[rows$id%in%pid,,drop=FALSE]
+    if(nrow(row)==1L){
+      if("bid_id"%in%names(row)&&nzchar(fm_scalar(row$bid_id,""))){out$target$my_bid_id<-as.character(row$bid_id);out$target$my_bid_amount<-fm_number(row$bid_price)}
+      if("numberOfBids"%in%names(row))out$target$bid_count<-fm_number(row$numberOfBids)
+    }
+  }
+  out$target_rows<-NULL
+  out
+}
+
+acquisition_unavailable_message <- function(capacity) {
+  notes<-if(is.list(capacity))as.character(capacity$diagnostics)else character()
+  mapping<-c("team info unavailable"="Your team balance and league rules did not load",
+    "maxPlayersInRoster unavailable"="The league roster limit did not load",
+    "reported budget unavailable"="Your current cash balance did not load",
+    "roster fetch failed"="Your roster did not load", "team or roster data is stale or incomplete"="Your team or roster data needs a fresh read", "roster identities unavailable"="Your roster player IDs could not be verified",
+    "pending clause transfers unavailable"="Pending clause transfers could not be verified",
+    "team value unavailable (debt limit unverified)"="Your squad value is missing, so the borrowing limit cannot be verified",
+    "outgoing market commitments unavailable"="Your outgoing offers could not be verified")
+  messages<-unname(mapping[intersect(notes,names(mapping))])
+  if(any(grepl("^withheld",notes)))messages<-c(messages,"Reserved funds for active offers could not be verified")
+  if(identical(attr(capacity,"fetch_status"),"stale"))messages<-c(messages,"Some checks are using old data")
+  if(!length(messages))messages<-"The current team, funds and outgoing offers could not be verified"
+  paste0("Purchases are paused: ",paste(unique(messages),collapse="; "),". Refresh to retry.")
 }
 
 # ============================================================
@@ -1622,7 +1697,7 @@ get_acquisition_capacity <- function(login, championship_id, user_team_id, targe
 #   - Funds: when amount is known, the required spend (amount, or the positive
 #     delta for "modify") must not exceed verified spendable funds, else
 #     "funds".
-evaluate_acquisition_preflight <- function(capacity, mode, amount = NULL, existing_bid_amount = NULL, minimum_bid = NULL) {
+evaluate_acquisition_preflight <- function(capacity, mode, amount = NULL, existing_bid_amount = NULL, minimum_bid = NULL, now = Sys.time()) {
   unavailable <- function(msg) list(ok = FALSE, reason = "unavailable", message = msg)
   capacity_fail <- function(msg) list(ok = FALSE, reason = "capacity", message = msg)
   funds_fail <- function(msg) list(ok = FALSE, reason = "funds", message = msg)
@@ -1631,11 +1706,10 @@ evaluate_acquisition_preflight <- function(capacity, mode, amount = NULL, existi
   if (is.null(capacity) || !is.list(capacity)) {
     return(unavailable("Acquisition verification unavailable. Please refresh and try again."))
   }
-  if (!identical(capacity$status, "ok") || identical(attr(capacity,"fetch_status"),"stale")) {
-    return(unavailable(paste0(
-      "Acquisition verification unavailable (status: ", capacity$status,
-      "). Please refresh and try again."
-    )))
+  if("valid_until"%in%names(capacity) && (length(capacity$valid_until)!=1L||!is.finite(capacity$valid_until)||capacity$valid_until<=as.numeric(now)))
+    return(unavailable("Availability checks expired before they completed. Refresh to verify your current roster, funds and offers."))
+  if (!identical(capacity$status, "ok") || acquisition_data_unverified(capacity)) {
+    return(unavailable(acquisition_unavailable_message(capacity)))
   }
 
   has_effective_contract <- "effective_count" %in% names(capacity$roster)

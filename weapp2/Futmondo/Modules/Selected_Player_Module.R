@@ -627,7 +627,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           bid_gate <- passive_acquisition_gate(sp,"bid")
           clause_gate <- passive_acquisition_gate(sp,"clause")
           blocked_reason <- if(!isTRUE(bid_gate$ok)) bid_gate$message else if(!isTRUE(clause_gate$ok)) clause_gate$message else NULL
-          if(!is.null(blocked_reason)) action_buttons <- tagList(action_buttons,
+          if(!is.null(blocked_reason)&&!identical(bid_gate$reason,"loading")&&!identical(clause_gate$reason,"loading")) action_buttons <- tagList(action_buttons,
             div(class="acquisition-capacity-warning",icon("triangle-exclamation")," ",blocked_reason))
 
           if (!is.na(eff_market_price) && eff_market_price > 0) {
@@ -1704,13 +1704,14 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     context_ready<-function()!identical(card_states$summary()$status,"loading")&&!identical(card_states$lineup()$status,"loading")
     card_states$points<-card_read("card_points","read_card_round_history",function(ctx)list(context=ctx),context=history_context,active=context_ready)
     card_states$valuation<-card_read("card_valuation","read_card_price_history",function(ctx)list(context=ctx))
-    card_states$capacity<-card_read("card_capacity","get_acquisition_capacity",function(ctx)c(auth_args(ctx),list(target_player_id=ctx$player_id)),
+    capacity_context<-reactive({ctx<-card_context();if(!is.null(ctx))ctx$player_id<-"";ctx})
+    card_states$capacity<-card_read("card_capacity","get_team_acquisition_capacity",auth_args,context=capacity_context,
       active=function()!player_card_is_own_player(selected_player(),get_reactive_val(user_team_id)),refresh=global_refresh)
     card_states$listings<-card_read("card_listings","get_my_market_players",auth_args,
       active=function()player_card_is_own_player(selected_player(),get_reactive_val(user_team_id)),refresh=global_refresh)
     passive_acquisition_gate<-function(sp,mode){
       state<-card_states$capacity()
-      if(identical(state$status,"loading"))return(list(ok=FALSE,reason="loading",message="Checking availability…"))
+      if(identical(state$status,"loading"))return(list(ok=FALSE,reason="loading",message=NULL))
       evaluate_acquisition_preflight(state$data,mode=mode,minimum_bid=if(mode=="bid")market_bid_minimum(sp)else NULL)
     }
     card_started<-reactiveVal(Sys.time());timed_summary<-FALSE;timed_history<-FALSE

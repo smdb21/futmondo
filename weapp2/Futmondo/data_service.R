@@ -19,7 +19,7 @@ resource_diagnostic_name <- function(resource) {
   candidate <- sub("[?#].*$", "", fm_scalar(resource, ""))
   if (grepl("://", candidate, fixed=TRUE)) candidate <- tail(strsplit(candidate, "/", fixed=TRUE)[[1]], 1L)
   candidate <- sub(":.*$", "", candidate)
-  allowed <- c("get_financial_snapshot", "get_acquisition_capacity", "get_players_from_team",
+  allowed <- c("get_financial_snapshot", "get_acquisition_capacity", "get_team_acquisition_capacity", "get_players_from_team",
     "get_market_players", "get_real_clubs", "get_user_team_info", "get_championships",
     "get_championship_players", "get_teams", "get_lineup_from_team", "get_roster_bids",
     "get_my_market_players", "get_player_summary", "get_player_card_history", "get_player_full_profile",

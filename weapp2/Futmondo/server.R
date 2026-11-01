@@ -35,7 +35,7 @@ function(input, output, session) {
   bind_factual_reads("get_active_championships",session,login_token_RV,is_active=function()valid_login(login_token_RV()))
   observeEvent(input$refresh_all, {
     req(valid_login(login_token_RV()))
-    invalidate_resources(resource_context(login_token_RV(),isolate(championship_id_RV())),pattern="market|roster|teams|team_info|players|financial|round|notification|pressroom|history|summary|card")
+    invalidate_resources(resource_context(login_token_RV(),isolate(championship_id_RV())),pattern="market|roster|teams|team_info|players|financial|capacity|round|notification|pressroom|history|summary|card")
     refresh_trigger(refresh_trigger() + 1)
   })
   championships_RV <- reactive({

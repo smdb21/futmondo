@@ -109,7 +109,12 @@ app_check('full server login, navigation, refresh and logout',{
    for(id in tabs[[tab]])stopifnot(!is.null(output[[id]]))
    cat('[PASS] rendered tab:',tab,'\n')
   }
+  capacity_ctx<-resource_context(app_auth,'champ','team1')
+  failed_capacity_name<-'acq_capacity_offline-user_champ_team1'
+  failed_capacity_key<-api_cache_key(failed_capacity_name,context=capacity_ctx)
+  resource_store(failed_capacity_key,list(status='partial',diagnostics='synthetic missing funds'),capacity_ctx,failed_capacity_name)
   session$setInputs(tabs='today',refresh_all=1);app_settle(session);stopifnot(!is.null(output[['today-kpi_cash_box']]))
+  stopifnot(!exists(failed_capacity_key,api_cache_env,inherits=FALSE))
   stopifnot(!grepl('Predictions|Automation',output$menu$html))
   session$setInputs(`login-logout_button`=1);session$elapse(100);app_settle(session);stopifnot(is.null(login_token_RV()))
  })

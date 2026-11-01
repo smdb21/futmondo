@@ -24,7 +24,7 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
  settle(session)
  check('identity and safe eligibility display while all sources are pending',{
    stopifnot(grepl('Immediate Player',output$player_identity_summary$html,fixed=TRUE),
-     grepl('Checking availability',output$action_buttons$html,fixed=TRUE),
+     sum(gregexpr('Checking availability',output$action_buttons$html,fixed=TRUE)[[1]]>0)==1L,
      identical(card_states$summary()$status,'loading'),length(calls)==6L,!card_chart_ready())
  })
  check('chart waits for the current browser identity paint acknowledgment',{
@@ -52,12 +52,21 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
    stopifnot(grepl('-2 pts',html,fixed=TRUE),grepl('Home 2–1 Away',html,fixed=TRUE),
      !grepl('player-round-status',html,fixed=TRUE),identical(card_states$profile()$status,'unavailable'))
  })
+ check('changing player cards reuses the pending team capacity check',{
+   before_capacity<-sum(grepl('get_team_acquisition_capacity',calls,fixed=TRUE))
+   previous<-selected()
+   next_player<-previous;next_player$id<-'p2';next_player$name<-'Second Player'
+   selected(next_player);settle(session)
+   stopifnot(sum(grepl('get_team_acquisition_capacity',calls,fixed=TRUE))==before_capacity,
+     pending[['get_team_acquisition_capacity:']]$current())
+   selected(previous);settle(session)
+ })
  # Cache a completed history read; then close and reopen the same context.
  pending[['read_card_round_history:p1']]$resolve(data.frame())
  pending[['read_card_price_history:p1']]$resolve(data.frame());settle(session)
  selected(NULL);settle(session)
  check('closing the card makes pending composite work obsolete',{
-   stopifnot(!pending[['get_acquisition_capacity:p1']]$current())
+   stopifnot(!pending[['get_team_acquisition_capacity:']]$current())
  })
  before<-calls
  selected(data.frame(id='p1',name='Immediate Player',role='defensa',team='Club A',photo='fixture',value=1000,change=0,points=8,user_team_id='',price=1000,market_inMarket=TRUE));settle(session)
@@ -80,7 +89,7 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
      !exists(api_cache_key(raw$matches$key,context=raw$matches$ctx),api_cache_env,inherits=FALSE),
      exists(api_cache_key(raw$unrelated$key,context=raw$unrelated$ctx),api_cache_env,inherits=FALSE))
    added<-tail(calls,length(calls)-length(before))
-   stopifnot(!any(grepl('get_player_full_profile|get_acquisition_capacity|get_my_market_players',added)))
+   stopifnot(!any(grepl('get_player_full_profile|get_team_acquisition_capacity|get_my_market_players',added)))
  })
 })
 # Login checks exercise pending duplicate protection and a superseded response.

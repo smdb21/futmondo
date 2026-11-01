@@ -134,12 +134,13 @@ check("global UI shares primary states and keeps manual capacity checks separate
     grepl('tags$span("In progress")',server,fixed=TRUE),
     grepl("position: sticky",css,fixed=TRUE),grepl("overflow-wrap: anywhere",css,fixed=TRUE))
 })
-check("countdown clock and primary financial refresh use separate intervals", {
+check("countdown clock does not periodically reload primary finances", {
   server <- paste(readLines("server.R",warn=FALSE),collapse="\n")
-  finance_start <- regexpr("round_finance_version <- reactive",server,fixed=TRUE)[1]
   countdown_start <- regexpr("output$round_countdown <- renderUI",server,fixed=TRUE)[1]
-  stopifnot(finance_start > 0, countdown_start > finance_start,
-    grepl("invalidateLater(60000, session)",substr(server,finance_start,countdown_start-1),fixed=TRUE),
+  stopifnot(countdown_start>0,
+    !grepl("round_finance_version <- reactive",server,fixed=TRUE),
+    !grepl("invalidateLater(60000, session)",server,fixed=TRUE),
     grepl("invalidateLater(1000, session)",substr(server,countdown_start,nchar(server)),fixed=TRUE))
 })
+
 cat(sprintf("DEBT AND ROUND COUNTDOWN: %d passed / 0 failed\n",passed))
