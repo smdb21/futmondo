@@ -328,6 +328,21 @@ rivals_inflow_totals <- function(ledger) {
   list(sales=sales,bonuses=bonuses,other=other,total=sales+bonuses+other,incomplete=any(!is.finite(rows$amount)))
 }
 
+# Classify only recorded purchase categories; public rival-to-rival transfers are unknown.
+rivals_outflow_totals <- function(ledger) {
+  empty<-list(market=NA_real_,clauses=NA_real_,unknown=NA_real_,other=NA_real_,total=NA_real_,incomplete=TRUE)
+  if(!is.data.frame(ledger)||!nrow(ledger)||!all(c("amount","type","included")%in%names(ledger)))return(empty)
+  rows<-ledger[ledger$included%in%TRUE & !ledger$type%in%c("opening","budget"),,drop=FALSE]
+  category<-if("category"%in%names(rows))as.character(rows$category)else rep("",nrow(rows))
+  negative<-is.finite(rows$amount)&rows$amount<0
+  buy<-rows$type%in%"buy"
+  market<-buy & category%in%"market"
+  clauses<-buy & category%in%"clause"
+  amount<-function(mask)-sum(rows$amount[negative & mask])
+  list(market=amount(market),clauses=amount(clauses),unknown=amount(buy & !market & !clauses),
+    other=amount(!buy),total=amount(rep(TRUE,nrow(rows))),incomplete=any(!is.finite(rows$amount)))
+}
+
 rivals_summary_values <- function(info, teams, finances, team_id) {
   number <- function(x) { x <- suppressWarnings(as.numeric(x)); if(length(x)==1L && is.finite(x)) x else NA_real_ }
   row <- if(is.data.frame(finances) && "teamid" %in% names(finances)) finances[finances$teamid %in% team_id,,drop=FALSE] else data.frame()
@@ -924,6 +939,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
     output$rival_transactions_tab_ui <- renderUI({
       ledger<-rival_moneymovements_raw_RV()
       inflow<-rivals_inflow_totals(ledger)
+      outflow<-rivals_outflow_totals(ledger)
       undated<-if(is.data.frame(ledger)&&nrow(ledger))ledger[ledger$section%in%"undated",,drop=FALSE]else data.frame()
       final<-if(is.data.frame(ledger)&&nrow(ledger))tail(ledger$running_balance,1L)else NA_real_
       tagList(
@@ -940,6 +956,16 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
           if(is.finite(inflow$other)&&inflow$other!=0)tags$p("Other credits: ",ui_financial_amount(inflow$other)),
           tags$small("Excludes starting cash and outgoing amounts. Includes undated estimated bonuses.",
             if(inflow$incomplete)" Some amounts are missing; only known inflow is included.")
+        ),
+        div(class="well",
+          h4("Total outflow"),
+          tags$p(strong(ui_financial_amount(outflow$total))),
+          tags$p("Market purchases: ",ui_financial_amount(outflow$market)),
+          tags$p("Clause purchases: ",ui_financial_amount(outflow$clauses)),
+          if(is.finite(outflow$unknown)&&outflow$unknown!=0)tags$p("Unclassified purchases: ",ui_financial_amount(outflow$unknown)),
+          if(is.finite(outflow$other)&&outflow$other!=0)tags$p("Other debits: ",ui_financial_amount(outflow$other)),
+          tags$small("Purchase methods are shown only when identified by the source. Public transfers between teams do not identify clause purchases.",
+            if(outflow$incomplete)" Some amounts are missing; only known outflow is included.")
         ),
         h4("Dated cash movements"),
         p("These running balances exclude components whose payment dates are unknown."),

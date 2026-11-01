@@ -340,3 +340,5 @@ Pending offer-error presentation completed with the running-ledger change: marke
 
 
 Inflow breakdown (2026-10-31): transaction history shows total positive inflow split into player sales and bonuses, with other credits separately when present. Starting cash, excluded ledger entries and expenses are not inflow; undated estimates are included and labeled. Missing amounts retain a partial-data notice. The squad investment card now labels sales explicitly. `rivals_inflow_totals()` is a single linear pass over the existing shared ledger, with no API/DB reads, writes, caches or timers. Focused running-balance regression covers known-answer 30 sales + 15 bonuses + 7 other = 52 inflow, exclusions and missing values. No accounting formula changes; full lifecycle/browser/live deployment checks are not rerun for this localized display change.
+
+- Implemented locally: rival outflow split into market and clause purchases, with ambiguous purchases and other debits separately reconciled to total outflow. No new data requests or migrations.

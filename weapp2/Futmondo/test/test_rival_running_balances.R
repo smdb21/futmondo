@@ -111,4 +111,20 @@ check('inflow separates sales and bonuses without opening cash, expenses or excl
   rows$amount[2]<-NA_real_;x<-rivals_inflow_totals(rows)
   stopifnot(x$incomplete,x$total==22,is.na(rivals_inflow_totals(data.frame())$total))
 })
+check('outflow separates recorded methods and preserves unclassified purchases and other debits',{
+  rows<-data.frame(type=c('opening','buy','buy','buy','fee','bonus','sell','buy'),
+    category=c('','market','clause',NA,'','','','market'),
+    amount=c(300,-30,-20,-10,-5,-3,40,-99),included=c(rep(TRUE,7),FALSE))
+  x<-rivals_outflow_totals(rows)
+  stopifnot(x$market==30,x$clauses==20,x$unknown==10,x$other==8,x$total==68,!x$incomplete)
+  rows$amount[2]<-NA_real_;x<-rivals_outflow_totals(rows)
+  stopifnot(x$incomplete,x$total==38,is.na(rivals_outflow_totals(data.frame())$total))
+})
+check('public market buys are classified but rival transfers do not imply a purchase method',{
+  tx<-data.frame(id=c('market','private'),buyer_team_id='a',seller_team_id=c('','b'),price=c(30,20))
+  x<-build(list(),awards[FALSE,],tx)
+  totals<-rivals_outflow_totals(x$cash_ledgers$a)
+  stopifnot(totals$market==30,totals$clauses==0,totals$unknown==20,totals$total==50,
+    x$team_finances$estimated_cash==50)
+})
 cat(sprintf('Rival running balances: %d passed / 0 failed\n',n))

@@ -393,7 +393,7 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
           buying<-tx$buyer_team_id%in%tid;selling<-tx$seller_team_id%in%tid
           type<-ifelse(buying&selling,"transfer",ifelse(buying,"buy","sell"))
           concept<-paste0(players,ifelse(buying&selling," (Self transfer)",ifelse(buying," (Purchased)"," (Sold)")))
-          details<-dplyr::bind_rows(details,rival_cash_entry(paste0("pressroom:",keys),concept,money,"Pressroom transfer",type=type,date=dates,category="market",player_id=as.character(tx$player_id %||% "")))
+          details<-dplyr::bind_rows(details,rival_cash_entry(paste0("pressroom:",keys),concept,money,"Pressroom transfer",type=type,date=dates,category=ifelse(is.na(tx$seller_team_id)|!nzchar(tx$seller_team_id),"market","unknown"),player_id=as.character(tx$player_id %||% "")))
           spent<--sum(money[money<0],na.rm=TRUE);sales<-sum(money[money>0],na.rm=TRUE)
         }
       }
