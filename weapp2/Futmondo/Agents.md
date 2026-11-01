@@ -45,3 +45,5 @@ Regenerate and inspect `rsconnect::writeManifest()` after dependency changes. Ex
 Keep database credentials on the R server. Maintain context isolation, restricted database access, and safe diagnostic logging. Do not print tokens, passwords, or raw private response bodies.
 
 Use responsive Bootstrap structures and mobile-safe CSS; avoid fixed-width controls that overflow narrow screens.
+
+Explicit scope exception requested on 2026-11-01: optional seven-day remembered browser login may retain only encrypted Futmondo authentication tokens with server-side expiry/revocation and a protected HttpOnly cookie. This restores interactive access only; it does not authorize unattended API harvesting or stored-session workers.

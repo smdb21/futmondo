@@ -75,3 +75,18 @@ Exclude `.Renviron`, HAR files, `*.orig`, tests, internal docs, and development 
 
 
 Login-time coach hiring is an explicit user-requested exception to the removed automation scope. Today offers **Automatically hire coach**, enabled for a new browser preference and scoped to account/league. Choices are remembered in that browser only; no new environment variables, package dependencies, worker or schedule is required. Admin can explicitly retrieve/save missing full-XI and MVP selections. See [coach and round-award behavior](docs/coach_and_round_awards.md) for request limits, finality and persistence semantics.
+
+## Optional seven-day remembered login
+
+Remembered login is an explicit user-requested interactive-session feature. It never saves passwords or runs unattended account work. Install the pinned `sodium` dependency from `manifest.json` (`libsodium-dev` is needed when building that R package from source). Apply `scripts/migrations/20261101154802_remembered_logins.sql` for existing databases; new installations include the table in `scripts/schema.sql`.
+
+Configure the following **server-only hosting secrets**, in addition to the existing Supabase URL and server-role key:
+
+```text
+FUTMONDO_REMEMBER_ENABLED=false
+FUTMONDO_REMEMBER_KEY=YOUR_RANDOM_64_HEX_CHARACTER_KEY
+```
+
+Generate the key once using a cryptographically secure generator, for example `sodium::bin2hex(sodium::random(32))` in a private R console. Retain the same key across restarts and deploys. Never commit it, put it in a URL/client script, or use the database credential as the encryption key. Key rotation invalidates old remembered sessions.
+
+HTTPS and an original same-origin WebSocket `Origin` are required. Keep `FUTMONDO_REMEMBER_ENABLED=false` for production until the hosted cookie flow has been checked in a private test deployment, then explicitly set it to `true`. Missing configuration disables the opt-in checkbox while ordinary login remains available. The local HTTPS browser check is `node test/test_remember_login_browser.cjs`; hosted smoke testing must confirm opt-in login, browser closure/reopen, app restart, logout and Android persistence. See [login behavior](docs/login_module.md) for expiry, retry, revocation, data retention and request costs.

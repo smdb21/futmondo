@@ -342,3 +342,10 @@ Pending offer-error presentation completed with the running-ledger change: marke
 Inflow breakdown (2026-10-31): transaction history shows total positive inflow split into player sales and bonuses, with other credits separately when present. Starting cash, excluded ledger entries and expenses are not inflow; undated estimates are included and labeled. Missing amounts retain a partial-data notice. The squad investment card now labels sales explicitly. `rivals_inflow_totals()` is a single linear pass over the existing shared ledger, with no API/DB reads, writes, caches or timers. Focused running-balance regression covers known-answer 30 sales + 15 bonuses + 7 other = 52 inflow, exclusions and missing values. No accounting formula changes; full lifecycle/browser/live deployment checks are not rerun for this localized display change.
 
 - Implemented locally: rival outflow split into market and clause purchases, with ambiguous purchases and other debits separately reconciled to total outflow. No new data requests or migrations.
+
+### Seven-day remembered browser login — implemented locally; hosted activation pending (2026-11-01)
+
+- Added initially-unchecked browser opt-in, encrypted server-only authentication records, protected HttpOnly cookies, asynchronous restoration, fixed expiry, truthful retry/revocation feedback and account-switch/logout cancellation.
+- Reuses the validated league response for startup; preserves the coach preference handshake. Ordinary login works without remember configuration. No scheduled job, polling, unattended harvesting or password persistence.
+- Additive schema includes hash and expiry indexes, RLS and server-role-only grants. Production schema was applied separately; hosted secrets, Posit/Android cookie smoke testing and activation remain pending. See `docs/data_review_results.md` and `docs/login_module.md`.
+- Exit criteria: focused security/browser/lifecycle checks, independent targeted review, verified production table permissions, and a separate hosted cookie check before setting the explicit enable flag.

@@ -1,7 +1,31 @@
-# Login and session context
+# Login and remembered browser access
 
-`login(user_name=NULL, password=NULL)` uses credentials explicitly entered by the user. Tokens stay in the R server session and are not printed or rendered.
+`login(user_name=NULL, password=NULL)` and the login module authenticate credentials directly against Futmondo. Passwords are cleared from the form after submission and never persisted. Downstream modules still receive the same three named character fields (`token`, `userid`, `user_name`). Logout clears account caches and pending session work.
 
-The server lists account memberships and binds each selected league to its championship/team IDs. Logout clears authentication, private cached state, and session-owned pending work. Account or league changes invalidate selected-player action confirmations. No login credentials or encrypted sessions are retained for unattended work.
+## Remembering a browser
 
-Focused coverage belongs in the offline login tests and application lifecycle harness.
+The optional **Remember me on this device for 7 days** checkbox starts unchecked. It is disabled until the server has opted in and has the configured encryption key, database credentials and `sodium` dependency. An unavailable persistence service never prevents ordinary login.
+
+`remember_login.R` adds create, restore and revoke operations through a session-bound `registerDataObj` endpoint. The browser calls it using HTTPS, same-origin POST with a random session CSRF header and one-use operation ticket. Requests are serialized in `www/remember-login.js`; stale completions cannot replace a newer login or issue a cookie after logout. Responses contain only operation status, and use `Cache-Control: no-store`. No password, Futmondo token or remembered credential is returned in JSON, browser storage or a URL.
+
+The cookie contains a random 256-bit browser credential. Its attributes are `Secure; HttpOnly; SameSite=Lax`, with a host-only application path. Cookie names include a hash of that path so sibling application paths do not share remembered access. An opaque SHA-256 credential hash is the database lookup key. The cookie is issued only after the encrypted record is acknowledged; every explicit opted-in login issues new random credentials.
+
+`remembered_logins` stores the hash, authenticated encrypted JSON envelope, creation/expiry timestamps and optional revocation marker. Sodium secretbox uses a new random 24-byte nonce for every record. The envelope binds the browser hash, the three authentication fields and both timestamps. Decode uses bounded JSON/raw data; R object deserialization is never used. RLS is enabled with no public policies, and only `service_role` has table privileges. The ordinary historical-data reset does not include this table.
+
+## Restoration and expiry
+
+Restoration performs one indexed record lookup and one asynchronous Futmondo league-list validation. The validated league result seeds the existing account cache, so normal startup reuses it without a second league request. The coach preference still restores through the existing account/league preference handshake before hiring can run.
+
+Seven days is an absolute limit from the successful explicit login. Visits do not renew it. Both database metadata and the authenticated envelope must satisfy the bound. A one-shot session timer also signs out an already-open restored/remembered session at that deadline; it performs no polling or account harvesting. Server restarts preserve remembered access through Supabase, provided the same server encryption key is retained.
+
+Missing, revoked, corrupted or expired records clear the browser cookie and return to login. Upstream HTTP401 is treated as explicit token rejection. Captures do not establish a reliable invalid-token API body code: unknown API errors,403, network outages and storage errors preserve otherwise valid access and offer **Retry saved access** or normal login. Raw errors are never displayed. Temporary restoration failures do not silently delete the credential.
+
+Logout immediately clears in-session authentication and requests database deletion of this browser's remembered record, expiring the cookie. Revocation affects no other browser/device. If storage deletion fails, the cookie still expires when the endpoint responds; a clear message and retry button remain, and pending hashes stay in server memory for that retry. An unavailable endpoint/network may leave the HttpOnly cookie in the browser until the user retries; the UI does not claim successful revocation. An unchecked explicit login also clears prior remembered access. Cleanup endpoints remain usable when remembered restoration is disabled or the encryption key is unavailable.
+
+Revocation deletes encrypted credentials. Expired records are also deleted opportunistically by indexed expiry on new remembered issuance, at most once per process per day; no schedule or background worker is created. Cleanup failure records only a generic diagnostic and does not block ordinary login. If nobody logs in again, expired records remain unusable but require a later login or manual server-role expiry cleanup for physical deletion.
+
+## Configuration and rollout
+
+See `README.md` for server-only variables and dependency setup. Apply `scripts/migrations/20261101154802_remembered_logins.sql` to an existing database, or use the updated factual schema for a fresh installation. Production migration and hosting activation are separate steps. Rotating/removing the encryption key invalidates old remembered access; users can log in again normally. Set `FUTMONDO_REMEMBER_ENABLED=false` to disable restoration/issuance without changing ordinary login.
+
+Focused verification: `Rscript test/test_remember_login.R`, `node test/test_remember_login_browser.cjs`, `Rscript test/test_login_feedback.R --browser`, and the required offline application lifecycle. The HTTPS browser fixture uses synthetic accounts/in-memory persistence, verifies actual Shiny endpoint/cookie behavior, and never reaches Futmondo or Supabase. Posit Connect Cloud routing and Android browser persistence still need a hosted smoke check before production activation.

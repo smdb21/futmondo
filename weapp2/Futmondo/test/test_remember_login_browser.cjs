@@ -1,0 +1,80 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const http = require('node:http');
+const https = require('node:https');
+const {spawn, spawnSync} = require('node:child_process');
+const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/futmondo-review-tools/node_modules', 'playwright'));
+(async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fm-remember-browser-'));
+  const backend = 18761;
+  assert.equal(spawnSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', path.join(tmp, 'key.pem'), '-out', path.join(tmp, 'cert.pem'), '-subj', '/CN=localhost', '-days', '1'], {stdio: 'ignore'}).status, 0);
+  let log = '';
+  const app = spawn('Rscript', ['test/test_remember_browser_app.R', String(backend)]);
+  app.stdout.on('data', d => {log += d;}); app.stderr.on('data', d => {log += d;});
+  const sockets = new Set();
+  const proxy = https.createServer({key: fs.readFileSync(path.join(tmp, 'key.pem')), cert: fs.readFileSync(path.join(tmp, 'cert.pem'))}, (req, res) => {
+    const upstream = http.request({hostname: '127.0.0.1', port: backend, path: req.url, method: req.method, headers: req.headers}, reply => {res.writeHead(reply.statusCode, reply.headers); reply.pipe(res);});
+    upstream.on('error', () => {res.writeHead(503); res.end();}); req.pipe(upstream);
+  });
+  proxy.on('connection', socket => {sockets.add(socket); socket.on('close', () => sockets.delete(socket));});
+  proxy.on('upgrade', (req, downstream, head) => {
+    const upstream = http.request({hostname: '127.0.0.1', port: backend, path: req.url, method: req.method, headers: req.headers});
+    upstream.on('upgrade', (reply, socket, upstreamHead) => {
+      downstream.write(`HTTP/1.1 ${reply.statusCode} Switching Protocols\r\n` + Object.entries(reply.headers).map(([k,v]) => `${k}: ${v}\r\n`).join('') + '\r\n');
+      if (head.length) socket.write(head); if (upstreamHead.length) downstream.write(upstreamHead);
+      socket.on('error', () => downstream.destroy()); downstream.on('error', () => socket.destroy());
+      socket.pipe(downstream).pipe(socket);
+    });
+    upstream.on('error', () => downstream.destroy()); upstream.end();
+  });
+  await new Promise(resolve => proxy.listen(0, '127.0.0.1', resolve));
+  let browser;
+  try {
+    for (let i=0;i<100 && !log.includes('Listening on');i++) await new Promise(resolve => setTimeout(resolve,100));
+    assert.ok(log.includes('Listening on'), log);
+    browser = await chromium.launch({headless: true, args: ['--no-sandbox']});
+    const context = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: 390, height: 800}});
+    const page = await context.newPage(); page.setDefaultTimeout(10000);
+    const endpointStatuses = [];
+    page.on('pageerror', e => {log += '\nBROWSER: ' + e.message;});
+    page.on('console', m => {if(m.type()==='error') log += '\nCONSOLE: ' + m.text();});
+    page.on('response', async response => {if(response.url().includes('/dataobj/')) endpointStatuses.push(await response.text());});
+    await page.goto(`https://127.0.0.1:${proxy.address().port}/`);
+    await page.waitForFunction(() => window.Shiny && Shiny.shinyapp && Shiny.shinyapp.isConnected());
+    await page.locator('#login-user_name').fill('fixture@example.invalid');
+    await page.locator('#login-password').fill('synthetic-password');
+    await page.locator('#login-remember_login').check();
+    await page.locator('#login-login_button').click();
+    await page.waitForFunction(() => document.querySelector('#login-remember_feedback').textContent.includes('remembered for 7 days'));
+    for(let i=0;i<100 && !(await context.cookies()).some(c=>c.name.startsWith('__Secure-fm_remember_'));i++) await page.waitForTimeout(30);
+    const cookie = (await context.cookies()).find(c => c.name.startsWith('__Secure-fm_remember_'));
+    assert.ok(cookie, JSON.stringify(endpointStatuses));
+    assert.equal(cookie.httpOnly, true); assert.equal(cookie.secure, true); assert.equal(cookie.sameSite, 'Lax'); assert.equal(cookie.path, '/');
+    assert.ok(cookie.expires > Date.now()/1000 + 604700 && cookie.expires <= Date.now()/1000 + 604801);
+    assert.equal(await page.evaluate(() => document.cookie.includes('fm_remember_')), false);
+    assert.equal(await page.evaluate(() => Object.values(localStorage).some(v => /synthetic-browser-token|synthetic-password/.test(v))), false);
+    console.log('PASS HTTPS login issues Secure HttpOnly cookie without credentials in browser storage');
+    await page.reload();
+    await page.waitForFunction(() => document.querySelector('#login-login_feedback').textContent.includes('Session restored'));
+    assert.equal((await context.cookies()).find(c => c.name===cookie.name).expires, cookie.expires);
+    assert.equal(await page.locator('#login-password').inputValue(), '');
+    console.log('PASS new Shiny session restores login without extending cookie expiry');
+    await page.locator('#login-logout_button').click();
+    await page.waitForFunction(() => !document.querySelector('#login-login_feedback').textContent.includes('Session restored'));
+    for(let i=0;i<100 && (await context.cookies()).some(c=>c.name===cookie.name);i++) await page.waitForTimeout(30);
+    assert.equal((await context.cookies()).some(c=>c.name===cookie.name), false);
+    await page.reload();
+    await page.waitForFunction(() => window.Shiny && Shiny.shinyapp && Shiny.shinyapp.isConnected());
+    await page.waitForTimeout(150);
+    assert.equal(await page.locator('#login-login_feedback').textContent(), '');
+    console.log('PASS logout expires cookie and next page load remains signed out');
+    console.log('REMEMBER LOGIN BROWSER: 3 passed / 0 failed');
+  } catch(error) {
+    throw new Error(error.stack + '\nAPP LOG: ' + log);
+  } finally {
+    if (browser) await browser.close();
+    app.kill('SIGTERM'); for(const socket of sockets) socket.destroy(); proxy.closeAllConnections(); await new Promise(resolve => proxy.close(resolve)); fs.rmSync(tmp, {recursive: true, force: true});
+  }
+})().catch(error => {console.error(error.message); process.exitCode=1;});

@@ -1735,6 +1735,32 @@
         "RemoteSha": "2.0.6"
       }
     },
+    "sodium": {
+      "Source": "CRAN",
+      "Repository": "https://p3m.dev/cran/latest",
+      "description": {
+        "Package": "sodium",
+        "Type": "Package",
+        "Title": "A Modern and Easy-to-Use Crypto Library",
+        "Version": "1.4.0",
+        "Authors@R": "person(\"Jeroen\", \"Ooms\", role = c(\"aut\", \"cre\"), email = \"jeroenooms@gmail.com\",\n    comment = c(ORCID = \"0000-0002-4035-0289\"))",
+        "Description": "Bindings to 'libsodium' <https://doc.libsodium.org/>: a modern, \n    easy-to-use software library for encryption, decryption, signatures, password\n    hashing and more. Sodium uses curve25519, a state-of-the-art Diffie-Hellman \n    function by Daniel Bernstein, which has become very popular after it was \n    discovered that the NSA had backdoored Dual EC DRBG.",
+        "License": "MIT + file LICENSE",
+        "URL": "https://docs.ropensci.org/sodium/ https://github.com/r-lib/sodium",
+        "BugReports": "https://github.com/r-lib/sodium/issues",
+        "SystemRequirements": "libsodium (>= 1.0.3)",
+        "VignetteBuilder": "knitr",
+        "Suggests": "knitr, rmarkdown",
+        "RoxygenNote": "7.2.3",
+        "NeedsCompilation": "yes",
+        "Packaged": "2024-12-16 14:16:42 UTC; jeroen",
+        "Author": "Jeroen Ooms [aut, cre] (<https://orcid.org/0000-0002-4035-0289>)",
+        "Maintainer": "Jeroen Ooms <jeroenooms@gmail.com>",
+        "Repository": "CRAN",
+        "Date/Publication": "2024-12-16 15:00:05 UTC",
+        "Built": "R 4.6.1; x86_64-pc-linux-gnu; 2026-11-01 15:47:37 UTC; unix"
+      }
+    },
     "sourcetools": {
       "Source": "CRAN",
       "Repository": "https://p3m.dev/cran/latest",
@@ -2223,7 +2249,7 @@
       "checksum": "bec61fde54d8c593d267a24b17969d91"
     },
     "global.R": {
-      "checksum": "33f15bfbb10105519eca1cb7bedcfb37"
+      "checksum": "d068b3447101f1ee5b6aa38a4acfa692"
     },
     "history_repository.R": {
       "checksum": "9192bebc2ccf92734440c7c017671e20"
@@ -2235,7 +2261,7 @@
       "checksum": "0f4484f0df4d0d3fdc84dc1d7835d239"
     },
     "Modules/Login_Module.R": {
-      "checksum": "de54526cb6514281abcd75fde2882e78"
+      "checksum": "51917cc7bba65e117cab0b668c7ccc30"
     },
     "Modules/Market_Module.R": {
       "checksum": "676429892e2008352ddce0a3a4a2e32b"
@@ -2274,7 +2300,7 @@
       "checksum": "569487c234e0b4a28c0027249faecc8b"
     },
     "README.md": {
-      "checksum": "d5a285d8441eec4d8bf7df842bd8f70f"
+      "checksum": "7e8260d9060bb0cede31c8207a0217b5"
     },
     "server.R": {
       "checksum": "2602bc720ce1352688c43a46bb634dbb"
@@ -2302,6 +2328,12 @@
     },
     "coach_runtime.R": {
       "checksum": "433720fcc832cc6e18669e887fce264d"
+    },
+    "remember_login.R": {
+      "checksum": "0b49c89e0d3799f523c801f420c3fcd1"
+    },
+    "www/remember-login.js": {
+      "checksum": "2b037334f8088f5b4a270acbaea52e91"
     }
   },
   "users": null

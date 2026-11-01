@@ -8,6 +8,14 @@ login_UI <- function(id) {
       solidHeader = TRUE,
       textInput(inputId = ns("user_name"), label = "User name:", placeholder = "User name", value = ""),
       passwordInput(inputId = ns("password"), label = "Password:", placeholder = "password", value = ""),
+      local({
+        control<-checkboxInput(ns("remember_login"), "Remember me on this device for 7 days", value=FALSE)
+        if(!exists("remember_login_enabled",mode="function")||!remember_login_enabled())
+          control<-htmltools::tagQuery(control)$find("input")$addAttrs(disabled="disabled")$allTags()
+        control
+      }),
+      uiOutput(ns("remember_availability")),
+      singleton(tags$script(src="remember-login.js")),
       actionButton(inputId = ns("login_button"), label = "Login"),
       actionButton(inputId = ns("logout_button"), label = "Logout"),
       div(
@@ -16,6 +24,7 @@ login_UI <- function(id) {
         icon("spinner", class = "fa-spin"), span("Connecting to Futmondo…")
       ),
       uiOutput(ns("login_feedback")),
+      uiOutput(ns("remember_feedback")),
       tags$script(id = ns("login_feedback_script"), HTML(paste0(
         "(function(){function bindLogin(){",
         "var login=document.getElementById('", ns("login_button"), "');",
@@ -25,10 +34,10 @@ login_UI <- function(id) {
         "var feedback=document.getElementById('", ns("login_feedback"), "');",
         "var logout=document.getElementById('", ns("logout_button"), "');",
         "var pending=false;var label=login.textContent;",
-        "function setBusy(busy){pending=!!busy;login.disabled=pending;logout.disabled=pending;",
+        "function setBusy(busy,message){pending=!!busy;login.disabled=pending;logout.disabled=pending;",
         "login.setAttribute('aria-busy',String(pending));",
         "login.textContent=pending?'Logging in…':label;",
-        "progress.style.display=pending?'flex':'none';feedback.style.display=pending?'none':'';}",
+        "progress.querySelector('span').textContent=message||'Connecting to Futmondo…';progress.style.display=pending?'flex':'none';feedback.style.display=pending?'none':'';}",
         # Capture runs before Shiny's action-button handler, so feedback is immediate.
         "login.addEventListener('click',function(event){",
         "if(pending){event.preventDefault();event.stopImmediatePropagation();return;}",
@@ -37,7 +46,7 @@ login_UI <- function(id) {
         "document.getElementById(id).addEventListener('keydown',function(event){",
         "if(event.key==='Enter'&&!event.isComposing){event.preventDefault();",
         "if(!pending)login.click();}});});",
-        "Shiny.addCustomMessageHandler('", ns("login_state"), "',function(message){setBusy(message.busy);});",
+        "Shiny.addCustomMessageHandler('", ns("login_state"), "',function(message){setBusy(message.busy,message.message);});",
         "}if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',bindLogin,{once:true});}",
         "else{bindLogin();}})();"
       ))),
@@ -82,7 +91,19 @@ login_Server <- function(id, user = NULL, password = NULL) {
         span(feedback$message)
       )
     })
-    observeEvent(input$logout_button, {
+    remember_retry <- reactiveVal(NULL)
+    remember_feedback <- reactiveVal(NULL)
+    remembered <- NULL
+    output$remember_availability <- renderUI({
+      available <- exists("remember_login_enabled",mode="function") && remember_login_enabled()
+      if (!available) tags$small("Remembered login is not enabled on this deployment. You can log in normally.")
+    })
+    output$remember_feedback <- renderUI({
+      feedback<-remember_feedback();if(is.null(feedback))return(NULL)
+      tagList(div(class=paste("login-feedback",paste0("login-feedback-",feedback$kind)),role="status",feedback$message),
+        if(!is.null(remember_retry()))actionButton(session$ns("remember_retry"),"Retry saved access"))
+    })
+    signed_out <- function(){
       generation <<- generation+1L
       login_pending_RV(FALSE)
       fm_transport_cancel(session$token)
@@ -93,6 +114,29 @@ login_Server <- function(id, user = NULL, password = NULL) {
       session$userData$futmondo_user_id <- NULL
       login_token_RV(NULL)
       login_feedback_RV(NULL)
+    }
+    if(exists("remember_login_session",mode="function"))remembered<-remember_login_session(session,
+      on_restore=function(token){
+        generation<<-generation+1L
+        session$userData$futmondo_user_id<-token[["userid"]]
+        session$userData$startup_stage("loading_leagues")
+        login_feedback_RV(list(kind="success",message="Session restored. Loading your leagues…"))
+        login_token_RV(token)
+      },
+      on_status=function(kind,message,retry=NULL){remember_feedback(list(kind=kind,message=message));remember_retry(retry)},
+      on_begin=function(){login_pending_RV(TRUE);remember_feedback(NULL);remember_retry(NULL)
+        session$userData$startup_stage("authenticating")
+        session$sendCustomMessage(session$ns("login_state"),list(busy=TRUE,message="Restoring your session…"))
+        login_feedback_RV(list(kind="success",message="Restoring your session…"))},
+      on_end=function(){login_pending_RV(FALSE);if(!valid_login(isolate(login_token_RV())))session$userData$startup_stage("signed_out")
+        session$sendCustomMessage(session$ns("login_state"),list(busy=FALSE))},
+      on_expire=function(){signed_out();remember_feedback(list(kind="error",message="Your remembered session expired after 7 days. Log in again."))})
+    observeEvent(input$remember_retry,{if(!is.null(remembered))remembered$retry(isolate(remember_retry()))})
+    observeEvent(input$remember_result,{if(!is.null(remembered))remembered$result(input$remember_result)})
+    observeEvent(input$logout_button, {
+      signed_out()
+      remember_feedback(NULL);remember_retry(NULL)
+      if(!is.null(remembered))remembered$logout()
       updateTextInput(session, "user_name", value = "")
       updateTextInput(session, "password", value = "")
     })
@@ -106,6 +150,7 @@ login_Server <- function(id, user = NULL, password = NULL) {
         session$sendCustomMessage(session$ns("login_state"),list(busy=FALSE))
         return()
       }
+      if(!is.null(remembered))remembered$cancel()
       generation <<- generation+1L
       attempt <- generation
       login_pending_RV(TRUE)
@@ -125,6 +170,8 @@ login_Server <- function(id, user = NULL, password = NULL) {
           session$userData$startup_stage("loading_leagues")
           login_feedback_RV(list(kind="success",message="Signed in. Loading your leagues…"))
           login_token_RV(token)
+          remember_feedback(NULL);remember_retry(NULL)
+          if(!is.null(remembered))remembered$login(token,isTRUE(isolate(input$remember_login)))
         } else {
           session$userData$futmondo_user_id <- NULL
           session$userData$startup_stage("failed")
