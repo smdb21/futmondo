@@ -402,7 +402,7 @@ sync_pressroom_transactions_to_supabase<-function(pressroom_df,championship_id,d
  d<-pressroom_df;labels<-as.character(d$player_name %||% d$player_id);unknown<-is.na(labels)|!nzchar(trimws(labels));labels[unknown]<-ids[unknown]
  parents<-data.frame(id=ids,name=labels,slug="",stringsAsFactors=FALSE);parents<-parents[order(unknown),,drop=FALSE];parents<-parents[!duplicated(parents$id),,drop=FALSE]
  buyer<-as.character(d$buyer_team_id);seller<-as.character(d$seller_team_id);buyer[is.na(buyer)|!nzchar(buyer)]<-NA_character_;seller[is.na(seller)|!nzchar(seller)]<-NA_character_
- payload<-data.frame(player_id=ids,championship_id=as.character(championship_id),buyer_team_id=buyer,seller_team_id=seller,price=suppressWarnings(as.numeric(d$price)),is_clause=FALSE,source_event_id=as.character(d$id),provenance="futmondo_pressroom",transaction_date=as.character(d$created))
+ payload<-data.frame(player_id=ids,championship_id=as.character(championship_id),buyer_team_id=buyer,seller_team_id=seller,price=suppressWarnings(as.numeric(d$price)),is_clause=if("is_clause"%in%names(d))as.logical(d$is_clause)else ifelse(is.na(buyer)|is.na(seller),FALSE,NA),source_event_id=as.character(d$id),provenance="futmondo_pressroom",transaction_date=as.character(d$created))
  payload<-payload[!duplicated(payload$source_event_id),,drop=FALSE]
  domain<-if(requireNamespace("shiny",quietly=TRUE))shiny::getDefaultReactiveDomain()else NULL
  queued<-(!is.null(domain)||!is.null(getOption("futmondo.persistence_context")))&&exists("defer_persistence",mode="function")

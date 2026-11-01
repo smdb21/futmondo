@@ -103,13 +103,13 @@ check('bulk transfer history keeps one bounded ledger',{
   stopifnot(nrow(x$cash_ledgers$a)==1001L,x$team_finances$estimated_cash== -900)
   cat(sprintf('MEASURE 1000 transfers: %.3fs; ledger %.1f KiB\n',elapsed,as.numeric(object.size(x$cash_ledgers$a))/1024))
 })
-check('inflow separates sales and bonuses without opening cash, expenses or excluded entries',{
+check('inflow includes opening cash and separates sales and bonuses without expenses or excluded entries',{
   rows<-data.frame(type=c('opening','sell','bonus','bonus','fee','adjustment','sell'),
     amount=c(300000000,30,15,-3,-5,7,99),included=c(TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,FALSE))
   x<-rivals_inflow_totals(rows)
-  stopifnot(x$sales==30,x$bonuses==15,x$other==7,x$total==52,!x$incomplete)
+  stopifnot(x$sales==30,x$bonuses==15,x$other==7,x$total==300000052,!x$incomplete)
   rows$amount[2]<-NA_real_;x<-rivals_inflow_totals(rows)
-  stopifnot(x$incomplete,x$total==22,is.na(rivals_inflow_totals(data.frame())$total))
+  stopifnot(x$incomplete,x$total==300000022,is.na(rivals_inflow_totals(data.frame())$total))
 })
 check('outflow separates recorded methods and preserves unclassified purchases and other debits',{
   rows<-data.frame(type=c('opening','buy','buy','buy','fee','bonus','sell','buy'),

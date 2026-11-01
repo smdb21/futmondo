@@ -6,6 +6,7 @@ get_sb_key <- function() 'fixture'
 catalog <- data.frame(id='existing', name='Verified Name', slug='verified-slug')
 calls <- character()
 parent_status <- 201L
+expected_methods <- rep(FALSE,3)
 POST <- function(url, query, body, ...) {
   table <- tail(strsplit(url, '/', fixed=TRUE)[[1]], 1)
   calls <<- c(calls, table)
@@ -22,7 +23,7 @@ POST <- function(url, query, body, ...) {
   } else {
     stopifnot(table == 'market_transactions', all(rows$player_id %in% catalog$id),
       query$on_conflict == 'championship_id,source_event_id',
-      any(headers == 'resolution=merge-duplicates'), all(is.na(rows$seller_team_id)))
+      any(headers == 'resolution=merge-duplicates'), identical(as.logical(rows$is_clause),expected_methods))
     status <- 201L
   }
   structure(list(status_code=status, headers=list('content-type'='application/json'),
@@ -66,3 +67,10 @@ shiny::withReactiveDomain(session, {
 })
 session$close()
 cat('[PASS] Interactive calls queue one ordered operation and restore the execution context.\n')
+
+methods_feed<-feed;methods_feed$seller_team_id<-'rival'
+expected_methods<-rep(NA,3);calls<-character()
+stopifnot(isTRUE(sync_pressroom_transactions_to_supabase(methods_feed,'league')))
+methods_feed$is_clause<-c(TRUE,FALSE,NA);expected_methods<-c(TRUE,FALSE,NA)
+stopifnot(isTRUE(sync_pressroom_transactions_to_supabase(methods_feed,'league')))
+cat('[PASS] Rival-transfer imports preserve nullable unknown and explicit clause/ordinary evidence.\n')

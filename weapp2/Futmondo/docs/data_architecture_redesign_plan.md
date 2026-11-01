@@ -349,3 +349,10 @@ Inflow breakdown (2026-10-31): transaction history shows total positive inflow s
 - Reuses the validated league response for startup; preserves the coach preference handshake. Ordinary login works without remember configuration. No scheduled job, polling, unattended harvesting or password persistence.
 - Additive schema includes hash and expiry indexes, RLS and server-role-only grants. Production schema was applied separately; hosted secrets, Posit/Android cookie smoke testing and activation remain pending. See `docs/data_review_results.md` and `docs/login_module.md`.
 - Exit criteria: focused security/browser/lifecycle checks, independent targeted review, verified production table permissions, and a separate hosted cookie check before setting the explicit enable flag.
+
+### 2026-11-01 rival cash reconciliation — implemented locally; classification migration applied
+
+- Include starting cash once in inflow; use the same ledger for all totals, running cash and rival summaries. Preserve numeric amounts independently of transfer-method coverage. Separate ordinary/clause sales/purchases, position, point, MVP and Best XI rewards.
+- Normalize observed saved/live movement types and preserve source fields; replace false assumed pressroom methods with nullable unknown and protect legacy replay/adoption. Share confirmed classifications across buyer/seller through strict unique evidence matching, with one-second recording jitter only.
+- Correct the missing `roundlineup` asynchronous read permission so the existing bounded historical eligibility queue works. Group award calculations with player details and date reconstructed position/MVP/XI rows only from unambiguous recorded settlement anchors. Split rounds retain separate recorded events and undated phase-unverified estimates; no duplicate full rewards or invented timing.
+- Production classification migration applied and financial/identity digest verified separately. Historical ownership/completeness, unknown clause-completion matching and hosted deployment remain evidence limits. Focused calculation/read-path and mandatory lifecycle results are recorded in `data_review_results.md`.

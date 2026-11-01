@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS market_transactions (
     buyer_team_id TEXT REFERENCES user_teams(id) ON DELETE SET NULL,
     seller_team_id TEXT REFERENCES user_teams(id) ON DELETE SET NULL,
     price BIGINT NOT NULL,
-    is_clause BOOLEAN DEFAULT FALSE,
+    is_clause BOOLEAN DEFAULT NULL,
     source_event_id TEXT,
     provenance TEXT NOT NULL DEFAULT 'futmondo_pressroom',
     transaction_date TIMESTAMPTZ DEFAULT NOW()
@@ -226,6 +226,7 @@ AS $$
 DECLARE
   candidate_ids BIGINT[];
   existing_provenance TEXT;
+  existing_clause BOOLEAN;
 BEGIN
   -- Unidentified observations cannot reconcile historical events.
   IF NEW.source_event_id IS NULL OR NEW.source_event_id = '' OR NEW.championship_id IS NULL THEN
@@ -234,10 +235,12 @@ BEGIN
 
   -- Normal ON CONFLICT ingestion must keep its existing event identity. Keep
   -- provenance annotations from prior adoption/ambiguity on subsequent syncs.
-  SELECT provenance INTO existing_provenance
+  SELECT provenance, is_clause INTO existing_provenance, existing_clause
     FROM public.market_transactions
     WHERE championship_id = NEW.championship_id AND source_event_id = NEW.source_event_id;
   IF FOUND THEN
+    -- A pressroom replay carries no new method evidence. Retain a known method.
+    NEW.is_clause := COALESCE(NEW.is_clause, existing_clause);
     IF existing_provenance LIKE '%:legacy_%' THEN
       NEW.provenance := existing_provenance;
     END IF;
@@ -253,7 +256,7 @@ BEGIN
         AND buyer_team_id IS NOT DISTINCT FROM NEW.buyer_team_id
         AND seller_team_id IS NOT DISTINCT FROM NEW.seller_team_id
         AND price IS NOT DISTINCT FROM NEW.price
-        AND is_clause IS NOT DISTINCT FROM NEW.is_clause
+        AND (NEW.is_clause IS NULL OR is_clause IS NULL OR is_clause = NEW.is_clause)
         AND transaction_date IS NOT DISTINCT FROM NEW.transaction_date
       FOR UPDATE
     ) AS candidate;
@@ -264,6 +267,7 @@ BEGIN
     -- reassignment to a different source event after waiting for its row lock.
     UPDATE public.market_transactions
       SET source_event_id = NEW.source_event_id,
+          is_clause = COALESCE(NEW.is_clause, is_clause),
           provenance = COALESCE(NEW.provenance, 'futmondo_pressroom') || ':legacy_adopted'
       WHERE id = candidate_ids[1] AND source_event_id IS NULL AND provenance = 'legacy';
     IF FOUND THEN

@@ -62,7 +62,7 @@ check('session shared async ledger reads database once across navigation and res
     pending<<-pending+1L;maximum<<-max(maximum,pending)
     promises::promise(function(resolve,reject)later::later(function(){
       pending<<-pending-1L;resolve(do.call(get(fn,.GlobalEnv),args))
-    },.05))
+    },.1))
   }
   get_rival_finance_saved<-function(...){reads<<-reads+1L;list(evidence=list(),defaults=NULL,complete=TRUE)}
   get_rival_finance_seed<-function(...)list(rules=list(initial_budget=100,season='unknown'),pressroom=data.frame())
@@ -71,7 +71,9 @@ check('session shared async ledger reads database once across navigation and res
   testServer(function(input,output,session){enabled<-reactiveVal(FALSE);auth<-reactiveVal(c(userid='u',token='t'));cidv<-reactiveVal(cid);source<-shared_rival_finance_source(session,auth,cidv,function()'a',function()teams,enabled,function()list(rows=data.frame(),complete=FALSE))},{
     session$flushReact();stopifnot(reads==0)
     enabled(TRUE);session$flushReact()
-    later::later(function(){heartbeat<<-TRUE},.005);later::run_now(timeoutSecs=.015)
+    later::later(function(){heartbeat<<-TRUE},.005)
+    heartbeat_deadline<-Sys.time()+.08
+    while(!heartbeat&&Sys.time()<heartbeat_deadline)later::run_now(timeoutSecs=.001)
     stopifnot(heartbeat,isTRUE(shiny::isolate(source()$loading)))
     settle(session,source);stopifnot(reads==1,team_reads==2,nrow(source()$team_finances)==2,maximum==2L)
     enabled(FALSE);session$flushReact();enabled(TRUE);settle(session,source);stopifnot(reads==1,team_reads==2)

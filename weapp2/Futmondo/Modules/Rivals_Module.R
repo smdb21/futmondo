@@ -256,18 +256,29 @@ rivals_cash_history_rows <- function(ledger,undated=FALSE) {
   if(!is.data.frame(ledger)||!nrow(ledger))return(data.frame())
   rows<-ledger[if(undated)ledger$section%in%"undated"else!ledger$section%in%"undated",,drop=FALSE]
   if(!nrow(rows))return(data.frame())
-  round<-ifelse(is.finite(rows$round_number),paste0(" · Round ",rows$round_number),"")
+  label<-ifelse(is.finite(rows$round_number),as.character(rows$round_number),"")
+  if("settlement_label"%in%names(rows))label[nzchar(rows$settlement_label)]<-rows$settlement_label[nzchar(rows$settlement_label)]
+  round<-ifelse(nzchar(label),paste0(" · Round ",label),"")
   data.frame(date=ifelse(rows$section%in%"opening" & is.na(rows$timestamp),"Opening balance",ifelse(is.na(rows$timestamp),"Payment date unknown",format(rows$timestamp,"%d/%m/%Y %H:%M",tz="UTC"))),
     type=ifelse(rows$estimated,"Estimated bonus",rows$type),concept=paste0(rows$component,round,ifelse(rows$included,""," (excluded)")),money=rows$amount,
     running_balance=rows$running_balance,source=rows$source,included=rows$included,unknown_amounts=rows$unknown_amounts,
+    category=rows$category,bonus_type=rows$bonus_type,calculation=if("calculation"%in%names(rows))rows$calculation else "",
     ledger_order=rows$ledger_order,stringsAsFactors=FALSE)
 }
 rivals_cash_history_widget <- function(ledger,undated=FALSE) {
   display<-rivals_cash_history_rows(ledger,undated)
   if(!nrow(display))return(reactable::reactable(data.frame(Status="No cash movements available."),compact=TRUE))
   reactable::reactable(display,compact=TRUE,striped=TRUE,highlight=TRUE,bordered=FALSE,defaultPageSize=15,
+    details=function(index){text<-display$calculation[index];if(!is.na(text)&&nzchar(text))tags$p(style="white-space:normal;overflow-wrap:anywhere",text)else NULL},
     defaultSorted=list(ledger_order=if(undated)"asc"else"desc"),columns=list(
-      date=colDef(name="Date",show=!undated,align="left"),type=colDef(name="Type",align="left"),
+      date=colDef(name="Date",show=!undated,align="left"),type=colDef(name="Type",align="left",cell=function(value,index){
+        if(value=="opening")return("Starting cash")
+        if(value%in%c("buy","sell"))return(paste(if(display$category[index]%in%"clause")"Clause"else if(display$category[index]%in%"market")"Ordinary"else"Player",if(value=="buy")"purchase"else"sale"))
+        if(display$bonus_type[index]%in%c("ranking","mvp","dreamteam","points"))return(paste0(
+          if(value=="Estimated bonus")"Estimated "else"",
+          c(ranking="Position bonus",mvp="MVP bonus",dreamteam="Best XI bonus",points="Point bonus")[[display$bonus_type[index]]]))
+        value
+      }),
       concept=colDef(name="Concept / Description",align="left",cell=function(value,index){
         note<-paste(display$source[index],if(!display$included[index])"Not applied to balance."else"",
           if(display$unknown_amounts[index]>0)"Balance excludes unknown amounts."else"")
@@ -277,7 +288,7 @@ rivals_cash_history_widget <- function(ledger,undated=FALSE) {
         tags$span(style=if(value<0)"color:var(--fm-danger)"else"color:var(--fm-text)",
           paste0(if(value>0)"+"else"",format_table_currency(value)))
       }),running_balance=colDef(name=if(undated)"Calculation subtotal"else"Money left after (estimate)",align="right",cell=ui_financial_amount),
-      source=colDef(show=FALSE),included=colDef(show=FALSE),unknown_amounts=colDef(show=FALSE),ledger_order=colDef(show=FALSE)))
+      category=colDef(show=FALSE),bonus_type=colDef(show=FALSE),calculation=colDef(show=FALSE),source=colDef(show=FALSE),included=colDef(show=FALSE),unknown_amounts=colDef(show=FALSE),ledger_order=colDef(show=FALSE)))
 }
 
 # Keep the directory selectable when financial cells or audit details are malformed.
@@ -318,28 +329,34 @@ rivals_finance_table_widget <- function(finances_data,on_error=function(error)NU
 
 # Summary cards reuse the league ledger; no additional financial reads.
 rivals_inflow_totals <- function(ledger) {
-  empty<-list(sales=NA_real_,bonuses=NA_real_,other=NA_real_,total=NA_real_,incomplete=TRUE)
-  if(!is.data.frame(ledger)||!nrow(ledger)||!all(c("amount","type","included")%in%names(ledger)))return(empty)
-  rows<-ledger[ledger$included%in%TRUE & !ledger$type%in%c("opening","budget"),,drop=FALSE]
+  names<-c("opening","sales","market","clauses","unknown","bonuses","points","ranking","mvp","dreamteam","other","total")
+  empty<-as.list(setNames(rep(NA_real_,length(names)),names));empty$incomplete<-TRUE
+  if(!is.data.frame(ledger)||!nrow(ledger)||!all(c("amount","type","included")%in%colnames(ledger)))return(empty)
+  rows<-ledger[ledger$included%in%TRUE,,drop=FALSE]
+  category<-if("category"%in%colnames(rows))as.character(rows$category)else rep("",nrow(rows))
+  bonus<-if("bonus_type"%in%colnames(rows))as.character(rows$bonus_type)else rep("",nrow(rows))
   positive<-is.finite(rows$amount)&rows$amount>0
-  total<-function(types)sum(rows$amount[positive & rows$type%in%types])
-  sales<-total("sell");bonuses<-total("bonus")
-  other<-sum(rows$amount[positive & !rows$type%in%c("sell","bonus")])
-  list(sales=sales,bonuses=bonuses,other=other,total=sales+bonuses+other,incomplete=any(!is.finite(rows$amount)))
+  amount<-function(mask)sum(rows$amount[positive & mask])
+  sales<-rows$type%in%c("sell","clause_sell");clauses<-sales & (category%in%"clause"|rows$type%in%"clause_sell")
+  market<-sales & category%in%"market" & !clauses
+  rewards<-rows$type%in%c("bonus","ranking")
+  list(opening=amount(rows$type%in%"opening"),sales=amount(sales),market=amount(market),clauses=amount(clauses),unknown=amount(sales & !market & !clauses),
+    bonuses=amount(rewards),points=amount(rewards & bonus%in%"points"),ranking=amount(rewards & (bonus%in%"ranking"|rows$type%in%"ranking")),
+    mvp=amount(rewards & bonus%in%"mvp"),dreamteam=amount(rewards & bonus%in%"dreamteam"),
+    other=amount(!rows$type%in%c("opening","sell","clause_sell","bonus","ranking")),total=amount(rep(TRUE,nrow(rows))),incomplete=any(!is.finite(rows$amount)))
 }
 
-# Classify only recorded purchase categories; public rival-to-rival transfers are unknown.
 rivals_outflow_totals <- function(ledger) {
-  empty<-list(market=NA_real_,clauses=NA_real_,unknown=NA_real_,other=NA_real_,total=NA_real_,incomplete=TRUE)
+  empty<-list(market=NA_real_,clauses=NA_real_,purchases=NA_real_,unknown=NA_real_,other=NA_real_,total=NA_real_,incomplete=TRUE)
   if(!is.data.frame(ledger)||!nrow(ledger)||!all(c("amount","type","included")%in%names(ledger)))return(empty)
-  rows<-ledger[ledger$included%in%TRUE & !ledger$type%in%c("opening","budget"),,drop=FALSE]
+  rows<-ledger[ledger$included%in%TRUE,,drop=FALSE]
   category<-if("category"%in%names(rows))as.character(rows$category)else rep("",nrow(rows))
   negative<-is.finite(rows$amount)&rows$amount<0
-  buy<-rows$type%in%"buy"
-  market<-buy & category%in%"market"
-  clauses<-buy & category%in%"clause"
+  buy<-rows$type%in%c("buy","clause")
+  clauses<-buy & (category%in%"clause"|rows$type%in%"clause")
+  market<-buy & category%in%"market" & !clauses
   amount<-function(mask)-sum(rows$amount[negative & mask])
-  list(market=amount(market),clauses=amount(clauses),unknown=amount(buy & !market & !clauses),
+  list(market=amount(market),clauses=amount(clauses),purchases=amount(buy),unknown=amount(buy & !market & !clauses),
     other=amount(!buy),total=amount(rep(TRUE,nrow(rows))),incomplete=any(!is.finite(rows$amount)))
 }
 
@@ -951,22 +968,33 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
         div(class="well",
           h4("Total inflow"),
           tags$p(strong(ui_financial_amount(inflow$total))),
+          tags$p("Starting cash: ",ui_financial_amount(inflow$opening)),
           tags$p("Player sales: ",ui_financial_amount(inflow$sales)),
-          tags$p("Bonuses: ",ui_financial_amount(inflow$bonuses)),
+          tags$p("Ordinary sales (identified): ",ui_financial_amount(inflow$market)),
+          tags$p("Clause sales (identified): ",ui_financial_amount(inflow$clauses)),
+          tags$p("Position bonuses: ",ui_financial_amount(inflow$ranking)),
+          tags$p("MVP bonuses: ",ui_financial_amount(inflow$mvp)),
+          tags$p("Best XI bonuses: ",ui_financial_amount(inflow$dreamteam)),
+          tags$p("Point bonuses: ",ui_financial_amount(inflow$points)),
+          if(is.finite(inflow$bonuses)&&inflow$bonuses!=inflow$points+inflow$ranking+inflow$mvp+inflow$dreamteam)
+            tags$p("Other recorded bonuses: ",ui_financial_amount(inflow$bonuses-inflow$points-inflow$ranking-inflow$mvp-inflow$dreamteam)),
           if(is.finite(inflow$other)&&inflow$other!=0)tags$p("Other credits: ",ui_financial_amount(inflow$other)),
-          tags$small("Excludes starting cash and outgoing amounts. Includes undated estimated bonuses.",
+          tags$small("Includes starting cash and every included positive ledger amount, including reconstructed bonuses.",
             if(inflow$incomplete)" Some amounts are missing; only known inflow is included.")
         ),
         div(class="well",
           h4("Total outflow"),
           tags$p(strong(ui_financial_amount(outflow$total))),
-          tags$p("Market purchases: ",ui_financial_amount(outflow$market)),
-          tags$p("Clause purchases: ",ui_financial_amount(outflow$clauses)),
-          if(is.finite(outflow$unknown)&&outflow$unknown!=0)tags$p("Unclassified purchases: ",ui_financial_amount(outflow$unknown)),
+          tags$p("Player purchases: ",ui_financial_amount(outflow$purchases)),
+          tags$p("Ordinary purchases (identified): ",ui_financial_amount(outflow$market)),
+          tags$p("Clause purchases (identified): ",ui_financial_amount(outflow$clauses)),
           if(is.finite(outflow$other)&&outflow$other!=0)tags$p("Other debits: ",ui_financial_amount(outflow$other)),
-          tags$small("Purchase methods are shown only when identified by the source. Public transfers between teams do not identify clause purchases.",
+          tags$small("Every purchase is included in the numeric total. Its method is identified from recorded transfer evidence.",
             if(outflow$incomplete)" Some amounts are missing; only known outflow is included.")
         ),
+        if(is.finite(inflow$unknown)&&is.finite(outflow$unknown)&&(inflow$unknown+outflow$unknown)>0)
+          p(class="alert alert-info",paste0("Transfer-method evidence still needed for ",format_table_currency(inflow$unknown)," of sales and ",format_table_currency(outflow$unknown)," of purchases. These amounts are already included in the totals.")),
+        p(strong("Total inflow − total outflow = reconstructed cash: "),ui_financial_amount(inflow$total-outflow$total)),
         h4("Dated cash movements"),
         p("These running balances exclude components whose payment dates are unknown."),
         reactable::reactableOutput(ns("rival_transactions_table")),

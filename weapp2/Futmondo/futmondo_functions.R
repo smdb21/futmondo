@@ -43,7 +43,7 @@ source("coach_runtime.R")
 futmondo_post <- function(url, ...) {
   if (isTRUE(getOption("futmondo.offline", FALSE))) stop("Network disabled in offline mode")
   read_routes <- c("information", "activechampionships", "teams", "roster", "rounds",
-    "dreamteam", "nightmareteam", "lineup", "championshipplayers", "championshipteams",
+    "dreamteam", "nightmareteam", "roundlineup", "lineup", "championshipplayers", "championshipteams",
     "players", "summary", "fullprofile", "matches", "pressroom", "moneymovements", "rosterbids", "myplayers",
     "list", "unread", "getdtconfig")
   route <- tail(strsplit(url, "/", fixed = TRUE)[[1]], 1)
