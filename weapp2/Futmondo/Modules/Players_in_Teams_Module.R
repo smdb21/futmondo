@@ -4,7 +4,8 @@ players_in_teams_UI <- function(id) {
   tagList(uiOutput(ns("team_value_box")),
     actionButton(ns("btn_put_all_on_market"), "Put All Players on Market", icon=icon("tags")),
     players_table_UI(ns("players_table_in_teams"), box_title="Players in Team",
-      filter_by_team=FALSE, filter_by_is_favorite=FALSE, filter_by_is_from_futmondo=FALSE,
+      filter_by_team=FALSE, filter_by_value=FALSE, filter_by_change_value=FALSE,
+      filter_by_is_favorite=FALSE, filter_by_is_from_futmondo=FALSE,
       show_position_breakdown=TRUE, hide_bid_column=FALSE))
 }
 players_in_teams_Server <- function(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger=NULL) {

@@ -130,3 +130,5 @@ Initial widgets receive metadata; history updates send numeric data and metadata
 Metric presentation update: color is now passed through a cell CSS variable to a padded 7px-radius badge around the value. The cell keeps its normal background; badge text is dark instead of inheriting the table's forced green text. Both metric headers use explicit line breaks and scoped wrapping to remain readable on narrow screens. Numeric data, global domains and update behavior are unchanged.
 
 The Points column also uses the shared numeric badge renderer and its own finite min/max over the full loaded player dataset. Filtering and pagination do not change this scale; points remain numeric and sortable.
+
+Filter layout: checkbox controls and Clear Filters are inside the same bordered panel as dropdown/numeric filters, in both shared layouts. My Team enables only Position and Active Clause Only in that panel; the average-round count remains a calculation control outside it.

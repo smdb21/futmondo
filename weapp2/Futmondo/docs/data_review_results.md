@@ -541,3 +541,7 @@ Primary implementation, no delegation. Resolved party display names from the exi
 Focused fixtures cover buyer/seller labels, source fallback, system IDs, zero/missing prices, rounding, escaping malicious names, historical crest preference, 20-row limit, explicit true/false/unknown clause status and timestamp offsets/minute precision. Performance review: decoration is limited to 20 rows, uses loaded source data and small cached-name/ID lookups; lazy club images add browser CDN fetches only. No new Futmondo/DB reads, finance tasks, timers or progress-driven redraws. Hosted rendering not verified.
 
 Validation completed: focused transfer checks passed; offline lifecycle passed 13 checks plus eight tabs with no external mutations; deployment checks passed 3/3.
+
+## 2026-11-02 — Consolidated filter panel
+
+Primary implementation, no delegation. Reused the checkbox-control group inside both shared filter-panel layouts. My Team disables value/trend controls as well as its already disabled owner/favorite/free-agent controls; Position and Active Clause Only remain. Position uses the available panel width in this simplified layout. DOM checks confirmed all checkbox/dropdown controls share one panel and My Team contains only its requested filters; existing player filter suite passed 6/6. Performance review: static UI relocation/configuration only, no extra reactive computation, requests, timers or data copies. Full lifecycle and hosted/mobile rendering deliberately not run for this presentation-only change.

@@ -13,68 +13,13 @@ players_table_UI <- function(id, box_title = NULL,
                              filter_by_clause_under_available_funds = FALSE,
                              filter_by_is_favorite = TRUE,
                              filter_by_is_from_futmondo = TRUE,
-filter_by_players_with_bid = FALSE,
+                             filter_by_players_with_bid = FALSE,
                              show_position_breakdown = FALSE,
                              hide_bid_column = FALSE,
                              default_active_clause = FALSE,
                              default_free_agents = FALSE) {
   ns <- NS(id)
-  tagList(
-    shinydashboardPlus::box(
-      width = 12,
-      solidHeader = solidHeader,
-      status = status,
-      title = box_title,
-
-      # Top Filter Bar Grid
-      if (show_position_breakdown) {
-        fluidRow(
-          column(width = 7,
-                 fluidRow(
-                   style = "background: var(--fm-surface); padding: 15px; border-radius: 8px; margin: 0 0 20px 0; border: 1px solid #e2e8f0;",
-if (filter_by_position) {
-                      column(width = 4, div(title = "Filter players by primary or secondary position (Goalkeeper, Defender, Midfielder, Forward)", selectInput(inputId = ns("position_filter"), label = "Position", choices = c("All", "Goalkeeper", "Defender", "Midfielder", "Forward"), selected = "All", width = "100%")))
-                    },
-                    if (filter_by_team) {
-                      column(width = 4, div(title = "Filter players by current user team owner or free agents", selectInput(inputId = ns("team_filter"), label = "User Team Owner", choices = c("All"), width = "100%")))
-                    },
-                    if (filter_by_value) {
-                      tagList(
-                        column(width = 4, div(title = "Filter players by minimum market valuation in millions of EUR", numericInput(inputId = ns("min_value_filter"), label = "Min Val (M)", min = 0, max = 1000, value = 0, step = 10, width = "100%"))),
-                        column(width = 4, div(title = "Filter players by maximum market valuation in millions of EUR", numericInput(inputId = ns("max_value_filter"), label = "Max Val (M)", min = 0, max = 1000, value = 1000, step = 10, width = "100%")))
-                      )
-                    },
-                    if (filter_by_change_value) {
-                      column(width = 4, div(title = "Filter players by minimum 24-hour market trend in millions of EUR", numericInput(inputId = ns("change_value_filter"), label = "Min Trend (M)", min = 0, max = 1, value = default_minimum_change_value, step = 0.05, width = "100%")))
-                    }
-                 )
-          ),
-          column(width = 5,
-                 uiOutput(ns("position_breakdown_ui"))
-          )
-        )
-      } else {
-        fluidRow(
-          style = "background: var(--fm-surface); padding: 15px; border-radius: 8px; margin: 0 0 20px 0; border: 1px solid #e2e8f0;",
-          if (filter_by_position) {
-            column(width = 3, div(title = "Filter players by primary or secondary position (Goalkeeper, Defender, Midfielder, Forward)", selectInput(inputId = ns("position_filter"), label = "Position", choices = c("All", "Goalkeeper", "Defender", "Midfielder", "Forward"), selected = "All", width = "100%")))
-          },
-          if (filter_by_team) {
-            column(width = 3, div(title = "Filter players by current user team owner or free agents", selectInput(inputId = ns("team_filter"), label = "User Team Owner", choices = c("All"), width = "100%")))
-          },
-          if (filter_by_value) {
-            tagList(
-              column(width = 2, div(title = "Filter players by minimum market valuation in millions of EUR", numericInput(inputId = ns("min_value_filter"), label = "Min Val (M)", min = 0, max = 1000, value = 0, step = 10, width = "100%"))),
-              column(width = 2, div(title = "Filter players by maximum market valuation in millions of EUR", numericInput(inputId = ns("max_value_filter"), label = "Max Val (M)", min = 0, max = 1000, value = 1000, step = 10, width = "100%")))
-            )
-          },
-          if (filter_by_change_value) {
-            column(width = 2, div(title = "Filter players by minimum 24-hour market trend in millions of EUR", numericInput(inputId = ns("change_value_filter"), label = "Min Trend (M)", min = 0, max = 1, value = default_minimum_change_value, step = 0.05, width = "100%")))
-          }
-        )
-      },
-
-      # Checkboxes Inline Grid
+  checkbox_filters <-
       if (filter_by_active_clause || filter_by_max_clause_value || filter_by_clause_under_available_funds || filter_by_is_favorite || filter_by_is_from_futmondo || filter_by_players_with_bid) {
         fluidRow(
           style = "padding: 0 15px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 20px; align-items: center;",
@@ -104,6 +49,64 @@ if (filter_by_position) {
             )
           },
           div(actionButton(ns("btn_clear_filters"), label = "Clear Filters", icon = icon("eraser"), class = "btn btn-sm btn-outline-secondary"), style = "margin-left: 10px;", title = "Reset all table filters to default values")
+        )
+      }
+  tagList(
+    shinydashboardPlus::box(
+      width = 12,
+      solidHeader = solidHeader,
+      status = status,
+      title = box_title,
+
+      # Top Filter Bar Grid
+      if (show_position_breakdown) {
+        fluidRow(
+          column(width = 7,
+                 fluidRow(
+                   class = "player-filter-panel",
+                   style = "background: var(--fm-surface); padding: 15px; border-radius: 8px; margin: 0 0 20px 0; border: 1px solid #e2e8f0;",
+                    if (filter_by_position) {
+                      column(width = if(!filter_by_team&&!filter_by_value&&!filter_by_change_value)12 else 4, div(title = "Filter players by primary or secondary position (Goalkeeper, Defender, Midfielder, Forward)", selectInput(inputId = ns("position_filter"), label = "Position", choices = c("All", "Goalkeeper", "Defender", "Midfielder", "Forward"), selected = "All", width = "100%")))
+                    },
+                    if (filter_by_team) {
+                      column(width = 4, div(title = "Filter players by current user team owner or free agents", selectInput(inputId = ns("team_filter"), label = "User Team Owner", choices = c("All"), width = "100%")))
+                    },
+                    if (filter_by_value) {
+                      tagList(
+                        column(width = 4, div(title = "Filter players by minimum market valuation in millions of EUR", numericInput(inputId = ns("min_value_filter"), label = "Min Val (M)", min = 0, max = 1000, value = 0, step = 10, width = "100%"))),
+                        column(width = 4, div(title = "Filter players by maximum market valuation in millions of EUR", numericInput(inputId = ns("max_value_filter"), label = "Max Val (M)", min = 0, max = 1000, value = 1000, step = 10, width = "100%")))
+                      )
+                    },
+                    if (filter_by_change_value) {
+                      column(width = 4, div(title = "Filter players by minimum 24-hour market trend in millions of EUR", numericInput(inputId = ns("change_value_filter"), label = "Min Trend (M)", min = 0, max = 1, value = default_minimum_change_value, step = 0.05, width = "100%")))
+                    },
+                    column(width=12, checkbox_filters)
+                 )
+          ),
+          column(width = 5,
+                 uiOutput(ns("position_breakdown_ui"))
+          )
+        )
+      } else {
+        fluidRow(
+          class = "player-filter-panel",
+          style = "background: var(--fm-surface); padding: 15px; border-radius: 8px; margin: 0 0 20px 0; border: 1px solid #e2e8f0;",
+          if (filter_by_position) {
+            column(width = 3, div(title = "Filter players by primary or secondary position (Goalkeeper, Defender, Midfielder, Forward)", selectInput(inputId = ns("position_filter"), label = "Position", choices = c("All", "Goalkeeper", "Defender", "Midfielder", "Forward"), selected = "All", width = "100%")))
+          },
+          if (filter_by_team) {
+            column(width = 3, div(title = "Filter players by current user team owner or free agents", selectInput(inputId = ns("team_filter"), label = "User Team Owner", choices = c("All"), width = "100%")))
+          },
+          if (filter_by_value) {
+            tagList(
+              column(width = 2, div(title = "Filter players by minimum market valuation in millions of EUR", numericInput(inputId = ns("min_value_filter"), label = "Min Val (M)", min = 0, max = 1000, value = 0, step = 10, width = "100%"))),
+              column(width = 2, div(title = "Filter players by maximum market valuation in millions of EUR", numericInput(inputId = ns("max_value_filter"), label = "Max Val (M)", min = 0, max = 1000, value = 1000, step = 10, width = "100%")))
+            )
+          },
+          if (filter_by_change_value) {
+            column(width = 2, div(title = "Filter players by minimum 24-hour market trend in millions of EUR", numericInput(inputId = ns("change_value_filter"), label = "Min Trend (M)", min = 0, max = 1, value = default_minimum_change_value, step = 0.05, width = "100%")))
+          },
+          column(width=12, checkbox_filters)
         )
       },
 
