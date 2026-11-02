@@ -135,3 +135,5 @@ Filter layout: checkbox controls and Clear Filters are inside the same bordered 
 
 ### Positive-only metric scale (2026-11-02)
 Points, Avg Last N and value ratios use compact pills from the active `--fm-surface` background at the source minimum to green at the maximum. Equal domains remain neutral. The callback reads the theme surface and chooses black/white text by mixed-background luminance (4.5:1 contrast); source-wide domains and numeric sorting are unchanged. The current app theme remains fixed dark; this does not introduce device-theme switching.
+
+Position pills show GK, DEF, MID and FWD, retaining full names in tooltips and original data for filters and sorting.

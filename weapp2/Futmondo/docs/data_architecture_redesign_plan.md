@@ -385,3 +385,5 @@ Inflow breakdown (2026-10-31): transaction history shows total positive inflow s
 - Focused real-transport synthetic, storage-roundtrip, known-answer, malformed/open/context and offline lifecycle checks pass. No migration/dependency change. Live ranking/lineup API verification, confirmed production saving and hosted/mobile deployment remain separate exit criteria.
 
 - Implemented locally (2026-11-02): positive-only theme-background-to-green numeric pill scale; existing source-wide domains and sorting retained. See data_review_results.md for verification.
+
+Implemented (2026-11-02): abbreviated shared position pills with full-name tooltips.

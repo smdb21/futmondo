@@ -582,3 +582,5 @@ Final frozen-code verification after preparation reuse: `test_rival_cash_reconci
 No delegation. Shared Points/Avg N/ratio badge palette now runs from theme surface to green, with neutral equal domains and luminance-selected black/white text. Existing metric checks passed 8/8, including exact emitted JavaScript, simulated dark/white/light-gray backgrounds at 4.5:1 contrast, numeric domain stability, filtering and updates. Performance review: constant work per rendered cell plus a computed-theme-property read; no data queries, timers, source scans or additional reactive invalidations. Browser/device rendering was not checked; existing application theme is fixed dark, not device-switched.
 
 Required offline lifecycle passed: 13 checks plus eight tabs, with no live HTTP or database mutations.
+
+Position-pill abbreviation change: no delegation. Presentation-only mapping to GK/DEF/MID/FWD with full-name tooltips; existing colors and source/filter values retained. Performance review: constant string lookup, no extra requests or reactive work. Focused renderer assertion used; full lifecycle and phone checks skipped for this label-only change.

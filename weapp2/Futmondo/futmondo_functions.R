@@ -993,7 +993,8 @@ get_reactable_columns_for_players <- function(table) {
 
           display_name <- if (pos_clean %in% c("portero", "GK", "P")) "Goalkeeper" else if (pos_clean %in% c("defensa", "DF", "D")) "Defender" else if (pos_clean %in% c("centrocampista", "MD", "M")) "Midfielder" else if (pos_clean %in% c("delantero", "FW", "F")) "Forward" else pos_clean
 
-          shiny::tags$span(class = class_name, display_name)
+          short_name <- switch(display_name, Goalkeeper="GK", Defender="DEF", Midfielder="MID", Forward="FWD", display_name)
+          shiny::tags$span(class = class_name, title = display_name, short_name)
         })
 
         badges <- badges[!sapply(badges, is.null)]
