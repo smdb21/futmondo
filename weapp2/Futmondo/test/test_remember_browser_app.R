@@ -1,7 +1,11 @@
 # Synthetic HTTPS-proxied app for persistent HttpOnly cookie verification.
 options(futmondo.offline=TRUE,futmondo.remember_fixture=TRUE)
 suppressPackageStartupMessages(source("global.R"))
-fixture_key<-sodium::random(32);fixture_records<-new.env(parent=emptyenv());fixture_fail_write<-FALSE
+fixture_storage<-commandArgs(TRUE)[2]
+fixture_key<-sodium::hex2bin(Sys.getenv("FUTMONDO_TEST_REMEMBER_KEY"))
+fixture_records<-new.env(parent=emptyenv());fixture_fail_write<-FALSE
+if(file.exists(fixture_storage))list2env(jsonlite::fromJSON(fixture_storage,simplifyVector=FALSE),envir=fixture_records)
+fixture_save<-function()writeLines(jsonlite::toJSON(as.list(fixture_records),auto_unbox=TRUE,null="null"),fixture_storage)
 remember_login_enabled<-function()TRUE
 remember_login_key<-function()fixture_key
 remember_login_store<-function(method="GET",hash=NULL,payload=NULL,owner="",expires_before=NULL){
@@ -9,6 +13,7 @@ remember_login_store<-function(method="GET",hash=NULL,payload=NULL,owner="",expi
  if(method=="POST"&&fixture_fail_write)return(promises::promise_reject(simpleError("Synthetic storage failure")))
  value<-switch(method,GET=fixture_records[[hash]],POST={fixture_records[[payload$browser_hash]]<-payload;TRUE},
   DELETE={if(!is.null(fixture_records[[hash]]))rm(list=hash,envir=fixture_records);TRUE})
+ if(method%in%c("POST","DELETE"))fixture_save()
  promises::promise_resolve(value)
 }
 remember_login_validate<-function(...)promises::promise_resolve(TRUE)

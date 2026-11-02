@@ -420,3 +420,10 @@ Implemented (2026-11-02): wrapping shared headers, unclipped offer badges and so
 - Request genuinely absent demanded legacy rounds only for affected visible players. Newer conflicting last-five evidence selects affected players and uses the existing verified snapshot anchor; ignore vectors superseded by newer labelled history/checks.
 - Keep manual current-table Refresh, persistence acknowledgement, context isolation, bounded concurrency/backpressure and publication throttling. No migration, new query, polling or live account call.
 - Focused reuse/correction/failure checks, the 527-player x38-round local fixture and required offline lifecycle passed. Older corrections beyond available last-five evidence need explicit labelled-source retrieval or Refresh; hosted persistence remains unverified. See data_review_results.md.
+
+
+### 2026-11-02 remembered login through hosted proxies — implemented and verified locally
+
+- Remove the silent dependency on an original browser WebSocket Origin, which hosted Shiny proxies may omit. Verify HTTPS/same-origin on the cookie HTTP request using its Origin and Host, while retaining an available WebSocket origin, CSRF header, one-use ticket and same-site checks.
+- Confirm the returned browser cookie before showing seven-day success. Keep the stable public cookie path across changing Posit worker routes and persistent server storage across process restarts; no new hosting variable, paid hosting feature or background worker.
+- Proxy reproduction failed before the fix and passed afterward. Security, actual browser closure plus R restart, worker-route changes, desktop/mobile presentation and offline lifecycle checks passed; detailed evidence and hosted verification limits are in `data_review_results.md`.

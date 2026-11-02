@@ -62,8 +62,8 @@ remember_login_validate<-function(token,owner=""){
  if(validate_status=="ok")promises::promise_resolve(TRUE) else promises::promise_reject(
   if(validate_status=="unauthorized")structure(list(message="HTTP401",http_status=401L),class=c("error","condition")) else simpleError("private API diagnostic"))
 }
-fixture<-function(){
- s<-new.env(parent=emptyenv());s$token<-remember_login_random();s$request<-list(HTTP_ORIGIN="https://app.invalid")
+fixture<-function(websocket_origin="https://app.invalid"){
+ s<-new.env(parent=emptyenv());s$token<-remember_login_random();s$request<-list(HTTP_ORIGIN=websocket_origin)
  s$clientData<-shiny::reactiveValues(url_pathname="/futmondo/");s$messages<-list();s$ends<-list();s$filter<-NULL
  s$ns<-function(id)paste0("login-",id);s$sendCustomMessage<-function(type,message){s$messages[[length(s$messages)+1L]]<-list(type=type,message=message)}
  s$registerDataObj<-function(name,data,filterFunc){s$filter<-filterFunc;"session/fixture/dataobj/remember?w="}
@@ -72,9 +72,9 @@ fixture<-function(){
  f$r<-remember_login_session(s,function(token)f$auth<-token,function(kind,message,retry=NULL)f$statuses[[length(f$statuses)+1L]]<-list(kind=kind,message=message,retry=retry),
   function()f$begin<-f$begin+1L,function()f$end<-f$end+1L,function()f$expired<-TRUE)
  f$init<-function()shiny:::flushReact()
- f$call<-function(cookie=NULL,method="POST",origin="https://app.invalid",csrf=f$r$state$csrf,ticket=f$r$state$seq,action=f$r$state$action){
+ f$call<-function(cookie=NULL,method="POST",origin="https://app.invalid",csrf=f$r$state$csrf,ticket=f$r$state$seq,action=f$r$state$action,host="app.invalid"){
   body<-charToRaw(jsonlite::toJSON(list(ticket=ticket,action=action),auto_unbox=TRUE))
-  req<-list(REQUEST_METHOD=method,HTTP_ORIGIN=origin,HTTP_X_FUTMONDO_CSRF=csrf,CONTENT_LENGTH=as.character(length(body)),
+  req<-list(REQUEST_METHOD=method,HTTP_ORIGIN=origin,HTTP_HOST=host,HTTP_X_FUTMONDO_CSRF=csrf,CONTENT_LENGTH=as.character(length(body)),
     HTTP_COOKIE=cookie,HTTP_SEC_FETCH_SITE="same-origin",rook.input=list(read=function(...)body))
   result<-s$filter(NULL,req);if(promises::is.promise(result))await(result)else result
  }
@@ -87,6 +87,33 @@ check("absence and malformed credentials do not query storage",{
 check("GET cross-origin and missing CSRF requests are rejected before storage",{
  f<-fixture();f$init();before<-length(db_calls)
  stopifnot(f$call(method="GET")$status==403L,f$call(origin="https://evil.invalid")$status==403L,f$call(csrf="wrong")$status==403L,length(db_calls)==before);f$close()
+})
+check("proxied sessions without a browser WebSocket Origin still save and restore",{
+ f<-fixture(NULL);f$init();stopifnot(f$r$state$ready,is.null(f$r$state$origin))
+ f$r$login(auth,TRUE);issued<-f$call();proxy_cookie<-new_cookie(f,issued)
+ stopifnot(!any(vapply(f$statuses,function(x)grepl("remembered for 7 days",x$message,fixed=TRUE),logical(1))))
+ f$r$result(list(ticket=f$r$state$seq,status="remembered"));before<-length(db_calls);f$call(proxy_cookie)
+ stopifnot(identical(f$r$state$action,"confirm"),length(db_calls)==before,
+   grepl("remembered for 7 days",tail(f$statuses,1)[[1]]$message,fixed=TRUE))
+ g<-fixture(NULL);g$init();g$call(proxy_cookie);stopifnot(identical(g$auth,auth))
+ g$r$logout();g$call(proxy_cookie);f$close();g$close();validations<-0L
+})
+check("proxy fallback rejects missing or mismatched HTTP origin and host before storage",{
+ f<-fixture(NULL);f$init();before<-length(db_calls)
+ stopifnot(f$call(origin=NULL)$status==403L,f$call(origin="https://evil.invalid")$status==403L,
+   f$call(host="internal.invalid")$status==403L,f$call(host=NULL)$status==403L,
+   f$call(host="app.invalid,evil.invalid")$status==403L,f$call(origin="http://app.invalid")$status==403L,
+   f$call(csrf="wrong")$status==403L,length(db_calls)==before)
+ stopifnot(remember_login_same_origin(list(HTTP_ORIGIN="https://APP.invalid:443",HTTP_HOST="app.invalid")),
+   !remember_login_same_origin(list(HTTP_ORIGIN="https://evil.invalid",HTTP_HOST="evil.invalid"),"https://app.invalid"))
+ f$close()
+})
+check("browser cookie rejection cannot produce a remembered confirmation",{
+ f<-fixture(NULL);f$init();f$r$login(auth,TRUE);f$call()
+ f$r$result(list(ticket=f$r$state$seq,status="remembered"));before<-length(db_calls);f$call()
+ stopifnot(length(db_calls)==before,grepl("did not retain saved access",tail(f$statuses,1)[[1]]$message,fixed=TRUE),
+   !any(vapply(f$statuses,function(x)grepl("remembered for 7 days",x$message,fixed=TRUE),logical(1))))
+ f$r$logout();f$call();f$close()
 })
 check("unchecked login before endpoint initialization never creates a credential",{
  f<-fixture();f$r$login(auth,FALSE);f$init();before<-length(db_calls);res<-f$call()
