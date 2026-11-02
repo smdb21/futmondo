@@ -383,6 +383,15 @@ rivals_summary_values <- function(info, teams, finances, team_id) {
   list(cash=cash,label=label,notes=notes,position=position,rank_label=rank_label,observed_cash=observed,observed_cash_fresh=observed_fresh,difference=difference,purchases=purchases,sales=sales)
 }
 
+rivals_status_message <- function(message, loading=FALSE) {
+  if(!nzchar(message))return(NULL)
+  tags$div(role="status",`aria-live`="polite",`aria-atomic`="true",
+    class=if(loading)"rivals-loading-status"else NULL,
+    style=if(loading)"padding:12px; margin-bottom:12px; border:1px solid var(--fm-border); border-radius:7px; color:var(--fm-text);"else"color:var(--fm-muted); margin-bottom:12px;",
+    if(loading)icon("spinner",class="fa-spin",`aria-hidden`="true"),
+    " ",message)
+}
+
 rivals_UI <- function(id) {
   ns <- NS(id)
 tagList(
@@ -398,7 +407,8 @@ tagList(
                collapsed = FALSE,
                p(style = "color: var(--fm-muted); font-size: 13px; font-weight: 500; margin-bottom: 12px;",
                  icon("hand-pointer"), " Select a user team from the table below to scout their squad and financial details."),
-               uiOutput(ns("league_finances_status")),
+               tags$div(id=ns("league_finances_status"),class="shiny-html-output",
+                 rivals_status_message("Loading rivals… This may take a moment.",loading=TRUE)),
                selectInput(ns("league_team"),"Choose a team",choices=c("Select a team…"=""),selected="",selectize=FALSE,width="100%"),
                reactable::reactableOutput(ns("league_finances_table"))
              )
@@ -599,15 +609,17 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       req(isTRUE(is_module_active()))
       state<-league_finances_RV();df<-state$team_finances
       count<-if(is.data.frame(df))nrow(df)else 0L
-      message<-if(count)paste(count,"league teams loaded.")else if(identical(state$teams_status,"loading")||is.null(state$teams_status))"Loading league teams…"else state$teams_reason %||% ""
-      if(isTRUE(state$finance_loading))message<-paste(message,"Loading financial details.",
-        if(!is.null(state$finance_pending))paste(state$finance_pending,"requests pending.")else"")
+      loading<-isTRUE(state$loading)||isTRUE(state$finance_loading)||
+        identical(state$teams_status,"loading")||(is.null(state$teams_status)&&count==0L)
+      message<-if(loading){
+        if(count)"Updating rival balances… You can already choose a team."else
+          "Loading rivals… Retrieving league teams and balances. This may take a moment."
+      }else if(count)paste(count,"league teams loaded.")else state$teams_reason %||% ""
       issues<-Filter(nzchar,c(state$finance_error %||% "",state$reason %||% ""))
       failure<-table_failure_RV()
       if(!is.null(failure))issues<-c(issues,paste("Detailed table unavailable; choose a team above.",resource_failure_message(failure)))
       message<-trimws(paste(c(message,unique(issues)),collapse=" "))
-      if(!nzchar(message))return(NULL)
-      tags$p(role="status",style="color: var(--fm-muted);",message)
+      rivals_status_message(message,loading=loading)
     })
 
     # The native selector stays usable even if a browser cannot bind Reactable.
