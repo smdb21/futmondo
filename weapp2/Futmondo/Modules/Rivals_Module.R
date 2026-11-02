@@ -314,16 +314,7 @@ rivals_finance_table_widget <- function(finances_data,on_error=function(error)NU
           tags$span(style=if(value<0)"color: var(--fm-danger); font-weight:700;"else"font-weight:700;",currency(value))
         }),`Last updated`=colDef(cell=function(value){
           stamp<-fm_time(mvp_text(value));if(length(stamp)==1L&&!is.na(stamp))unname(format(stamp,"%d-%m %H:%M",tz="UTC"))else""
-        }),`Squad Value`=colDef(cell=currency)),
-      details=function(index){
-        row<-df[index,,drop=FALSE];detail<-finances_data$breakdowns[[as.character(row$teamid)]]
-        difference<-fm_number(row$reconciliation_difference)
-        tagList(tags$p(mvp_text(row$estimate_notes)),
-          if(is.finite(fm_number(row$observed_cash)))tags$p("Observed cash",if(!isTRUE(row$observed_cash_fresh))" (stale)"else"",": ",currency(row$observed_cash)),
-          if(is.finite(difference))tags$p("Difference from recorded cash: ",currency(difference)),
-          if(is.data.frame(detail)&&nrow(detail))reactable::reactable(detail,compact=TRUE,pagination=TRUE,defaultPageSize=10,
-            columns=list(amount=colDef(cell=currency))))
-      })
+        }),`Squad Value`=colDef(cell=currency)))
   },error=function(error){on_error(error);fallback()})
 }
 
@@ -366,6 +357,7 @@ rivals_summary_values <- function(info, teams, finances, team_id) {
   cash <- if(nrow(row)==1L)number(row$estimated_cash)else NA_real_
   label <- if(nrow(row)==1L&&identical(row$confidence,"Reconciled"))"Reconstructed balance (matches observed cash)"else "Reconstructed cash balance (estimate)"
   notes <- if(nrow(row)==1L)row$estimate_notes else ""
+  status <- if(nrow(row)==1L)mvp_text(row$estimate_summary)else ""
   observed<-if(nrow(row)==1L)number(row$observed_cash)else number(info$budget)
   observed_fresh<-nrow(row)==1L&&isTRUE(row$observed_cash_fresh)
   difference<-if(nrow(row)==1L)number(row$reconciliation_difference)else NA_real_
@@ -380,7 +372,7 @@ rivals_summary_values <- function(info, teams, finances, team_id) {
       rank_label <- "By total points (ties share rank)"
     }
   }
-  list(cash=cash,label=label,notes=notes,position=position,rank_label=rank_label,observed_cash=observed,observed_cash_fresh=observed_fresh,difference=difference,purchases=purchases,sales=sales)
+  list(cash=cash,label=label,notes=notes,status=status,position=position,rank_label=rank_label,observed_cash=observed,observed_cash_fresh=observed_fresh,difference=difference,purchases=purchases,sales=sales)
 }
 
 rivals_status_message <- function(message, loading=FALSE) {
@@ -698,8 +690,9 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                    div(style = "text-align: center; padding: 10px;",
                        h3(style = "font-weight: 700; color: var(--fm-text); margin: 0; font-size: 20px;", cash),
                        p(style = "color: var(--fm-muted); font-size: 11px; text-transform: uppercase; margin-top: 5px;", summary$label),
+                       if(nzchar(summary$status))p(style="white-space:normal;overflow-wrap:anywhere;",summary$status),
                        if((length(summary$notes)==1L && !is.na(summary$notes) && nzchar(summary$notes))||is.finite(summary$observed_cash))
-                         tags$details(tags$summary("Estimate details"),tags$p(summary$notes),
+                         tags$details(tags$summary("Calculation details"),tags$p(style="white-space:normal;overflow-wrap:anywhere;",summary$notes),
                            if(is.finite(summary$observed_cash))tags$p("Observed cash",if(!summary$observed_cash_fresh)" (stale)"else"",": ",ui_financial_amount(summary$observed_cash)),
                            if(is.finite(summary$difference))tags$p("Observed minus reconstructed: ",ui_financial_amount(summary$difference))))
                  )

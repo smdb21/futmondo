@@ -28,23 +28,29 @@ normalize_money_movements <- function(answer) {
   rows
 }
 rival_finance_evidence <- function(account_id,championship_id,season,type,id,payload,observed_at=Sys.time()) {
-  if(type%in%c("team_rounds","round_lineup")){
-    payload$kind<-type;id<-paste0(if(type=="team_rounds")"rounds:"else"lineup:",id);type<-"eligibility"
+  if(type%in%c("team_rounds","round_lineup","round_ranking")){
+    payload$kind<-type;id<-paste0(switch(type,team_rounds="rounds:",round_lineup="lineup:",round_ranking="ranking:"),id);type<-"eligibility"
   }
   list(account_id=as.character(account_id),championship_id=as.character(championship_id),season=mvp_text(season,"unknown"),
     evidence_type=type,source_id=as.character(id),observed_at=rival_finance_stamp(observed_at),payload=payload)
 }
 rival_evidence_rows <- function(evidence,type) {
   if(!is.list(evidence))return(list())
-  Filter(function(x)is.list(x)&&if(type%in%c("team_rounds","round_lineup"))
+  Filter(function(x)is.list(x)&&if(type%in%c("team_rounds","round_lineup","round_ranking"))
     identical(x$evidence_type,"eligibility")&&is.list(x$payload)&&identical(x$payload$kind,type)
     else identical(x$evidence_type,type),evidence)
 }
 rival_evidence_decode <- function(rows) {
   if(!is.data.frame(rows)||!nrow(rows))return(list())
+  # jsonlite simplifies heterogeneous JSON objects to nested data frames. A
+  # frame row's list columns must be indexed, not kept as one-item wrappers:
+  # players/rounds already contain their complete nested records at [[i]].
+  record<-function(frame,index)lapply(frame,function(column){
+    if(is.data.frame(column))record(column,index)else if(is.list(column))column[[index]]else column[index]
+  })
   lapply(seq_len(nrow(rows)),function(i){
     row<-as.list(rows[i,,drop=FALSE]);p<-rows$payload
-    row$payload<-if(is.data.frame(p))as.list(p[i,,drop=FALSE])else p[[i]]
+    row$payload<-if(is.data.frame(p))record(p,i)else p[[i]]
     if(is.character(row$payload))row$payload<-tryCatch(jsonlite::fromJSON(row$payload,simplifyVector=FALSE),error=function(e)list())
     row
   })
@@ -251,12 +257,68 @@ rival_team_round_rows <- function(answer,team_id) {
   })))
   rows[!duplicated(rows$round_id,fromLast=TRUE),,drop=FALSE]
 }
-rival_saved_rounds <- function(evidence) {
+# The official round-ranking endpoint returns the complete historical participant
+# list. Its metadata status must confirm closure before it supplies cash inputs.
+rival_round_ranking_rows <- function(payload) {
+  empty<-data.frame(team_id=character(),round_id=character(),round_number=numeric(),points=numeric(),status=character(),negative=logical(),stringsAsFactors=FALSE)
+  if(!is.list(payload)||!round_is_finished(list(status=payload$status))||!nzchar(mvp_text(payload$round_id)))return(empty)
+  records<-mvp_records(payload$ranking)
+  rows<-dplyr::bind_rows(c(list(empty),lapply(records,function(row){
+    if(!is.list(row))return(NULL)
+    data.frame(team_id=mvp_text(row$id),round_id=mvp_text(payload$round_id),round_number=fm_number(payload$round_number),
+      points=fm_number(row$points),status=mvp_text(payload$status),negative=NA,stringsAsFactors=FALSE)
+  })))
+  if(!length(records)||nrow(rows)!=length(records)||any(!nzchar(rows$team_id))||anyDuplicated(rows$team_id)||any(!is.finite(rows$points)))return(empty)
+  rows
+}
+rival_saved_rankings <- function(evidence,teams=NULL,source=NULL) {
+  if(is.null(source))source<-rival_saved_rounds(evidence,include_ranking=FALSE)
+  rows<-lapply(rival_evidence_rows(evidence,"round_ranking"),function(record){
+    p<-record$payload;parsed<-rival_round_ranking_rows(p)
+    ids<-if(is.null(teams))as.character(unlist(p$source_teams,use.names=FALSE))else as.character(teams)
+    if(!nrow(parsed)||!length(ids)||!identical(mvp_text(p$signature),rival_ranking_signature(source,mvp_text(p$round_id),ids)))return(NULL)
+    attr(record,"ranking_rows")<-parsed;record
+  })
+  Filter(Negate(is.null),rows)
+}
+rival_supplement_rounds <- function(rows,rankings) {
+  for(record in rankings){
+    ranking<-attr(record,"ranking_rows")
+    key<-paste(rows$team_id,rows$round_id,sep="|")
+    add<-!paste(ranking$team_id,ranking$round_id,sep="|")%in%key
+    rows<-dplyr::bind_rows(rows,ranking[add,,drop=FALSE])
+  }
+  rows
+}
+rival_saved_rounds <- function(evidence,include_ranking=TRUE,teams=NULL) {
   empty<-rival_team_round_rows(list(),"")
-  dplyr::bind_rows(c(list(empty),lapply(rival_evidence_rows(evidence,"team_rounds"),function(row){
+  rows<-dplyr::bind_rows(c(list(empty),lapply(rival_evidence_rows(evidence,"team_rounds"),function(row){
     if(!is.list(row$payload))return(NULL)
     rival_team_round_rows(row$payload$rounds,mvp_text(row$payload$team_id))
   })))
+  if(isTRUE(include_ranking))rows<-rival_supplement_rounds(rows,rival_saved_rankings(evidence,teams,rows))
+  rows
+}
+rival_ranking_signature <- function(rows,round_id,teams) {
+  selected<-rows[rows$round_id%in%round_id,intersect(c("team_id","round_id","round_number","points","status","negative"),names(rows)),drop=FALSE]
+  selected<-selected[order(selected$team_id),,drop=FALSE];rownames(selected)<-NULL
+  mvp_text(as.character(openssl::sha256(serialize(list(rows=selected,teams=sort(unique(as.character(teams)))),NULL))))
+}
+get_rival_round_ranking_observation <- function(login,championship_id,user_team_id,round_id,round_number,signature,source_teams) {
+  response<-mvp_api_answer(login,"https://api.futmondo.com/1/ranking/round",list(
+    championshipId=championship_id,roundNumber=round_number,userteamId=user_team_id))
+  result<-list(round_id=round_id,round_number=round_number,signature=signature,source_teams=as.list(source_teams),status=response$status,
+    answer=if(identical(response$status,"ok"))response$answer else NULL)
+  attr(result,"observed_at")<-Sys.time();result
+}
+rival_ranking_evidence <- function(result,account_id,championship_id,season) {
+  answer<-result$answer
+  if(!is.list(answer)||isTRUE(answer$error)||!is.null(answer$code))return(list())
+  payload<-list(round_id=result$round_id,round_number=result$round_number,status=mvp_text(answer$metadata$status),
+    ranking=answer$ranking,signature=result$signature,source_teams=result$source_teams)
+  if(!nrow(rival_round_ranking_rows(payload)))return(list())
+  list(rival_finance_evidence(account_id,championship_id,season,"round_ranking",result$round_id,payload,
+    attr(result,"observed_at") %||% Sys.time()))
 }
 rival_round_signature <- function(row,awards) {
   selected<-if(is.data.frame(awards)&&all(c("round_id","player_id")%in%names(awards)))awards[awards$round_id%in%row$round_id,,drop=FALSE]else data.frame()
@@ -296,18 +358,22 @@ rival_ranking_allocations <- function(points,pool,mode,users_to_rank=-1) {
 }
 # One preparation pass per publication, shared by all team calculations.
 rival_historical_components <- function(evidence,teams,rules,official) {
-  rounds<-rival_saved_rounds(evidence);all_rounds<-rounds
+  source<-rival_saved_rounds(evidence,include_ranking=FALSE)
+  saved_rankings<-rival_saved_rankings(evidence,teams$teamid,source)
+  rounds<-rival_supplement_rounds(source,saved_rankings);all_rounds<-rounds
   final<-if(nrow(rounds))vapply(seq_len(nrow(rounds)),function(i)round_is_finished(as.list(rounds[i,,drop=FALSE])),logical(1))else logical()
   rounds<-rounds[final,,drop=FALSE]
-  source_rounds<-rounds
   lineups<-rival_evidence_rows(evidence,"round_lineup")
+  keys<-paste(rounds$team_id,rounds$round_id,sep="|")
+  lineup_groups<-split(lineups,vapply(lineups,function(record)paste(mvp_text(record$payload$team_id),mvp_text(record$payload$round_id),sep="|"),character(1)))
+  signatures<-stats::setNames(rep("",nrow(rounds)),keys)
+  needed<-which(keys%in%names(lineup_groups))
+  signatures[needed]<-vapply(needed,function(i)rival_round_signature(rounds[i,,drop=FALSE],official),character(1))
   for(i in seq_len(nrow(rounds))){
-    row<-rounds[i,,drop=FALSE]
     candidates<-Filter(function(record){
       p<-record$payload
-      is.list(p)&&identical(mvp_text(p$team_id),row$team_id)&&identical(mvp_text(p$round_id),row$round_id)&&
-        (!nzchar(mvp_text(p$signature))||identical(mvp_text(p$signature),mvp_text(rival_round_signature(row,official))))
-    },lineups)
+      !nzchar(mvp_text(p$signature))||identical(mvp_text(p$signature),unname(signatures[i]))
+    },lineup_groups[[keys[i]]])
     if(length(candidates)){
       negative<-rival_flag(tail(candidates,1)[[1]]$payload$negative)
       if(isTRUE(negative)||is.na(rounds$negative[i]))rounds$negative[i]<-negative
@@ -338,7 +404,14 @@ rival_historical_components <- function(evidence,teams,rules,official) {
       next
     }
     rows<-rounds[rounds$round_id%in%round&rounds$team_id%in%teams$teamid,,drop=FALSE]
-    if(!setequal(rows$team_id,as.character(teams$teamid))||any(!is.finite(rows$points))){
+    saved_ranking<-Filter(function(record)identical(mvp_text(record$payload$round_id),round),saved_rankings)
+    authoritative<-length(saved_ranking)>0L
+    if(authoritative){
+      ranked<-attr(tail(saved_ranking,1)[[1]],"ranking_rows")
+      ranked$negative<-rows$negative[match(ranked$team_id,rows$team_id)]
+      rows<-ranked
+    }
+    if((!authoritative&&!setequal(rows$team_id,as.character(teams$teamid)))||any(!is.finite(rows$points))){
       for(id in as.character(teams$teamid))add_missing(id,paste("Ranking history incomplete for round",rounds$round_number[match(round,rounds$round_id)]));next
     }
     # Negative-start teams do not take part in automatic premiums (FAQ142).
@@ -347,7 +420,8 @@ rival_historical_components <- function(evidence,teams,rules,official) {
       mvp_text(rules$ranking_mode),fm_number(rules$users_to_rank %||% rules$configuration$usersToRank))
     for(i in seq_len(nrow(rows))){
       if(!is.finite(value[i])){add_missing(rows$team_id[i],"Ranking reward configuration is unavailable or unsupported.");next}
-      source<-"Published round standings; assumes unchanged ranking rules and historical league membership."
+      if(!rows$team_id[i]%in%teams$teamid)next
+      source<-if(authoritative)"Official historical round ranking; assumes unchanged reward rules."else"Published round standings; assumes unchanged ranking rules and historical league membership."
       if(anyNA(rows$negative))source<-paste(source,"Assumes eligibility where starting cash is unknown.")
       income<-dplyr::bind_rows(income,data.frame(team_id=rows$team_id[i],round_id=round,bonus_type="ranking",amount=value[i],source=source))
     }
@@ -360,8 +434,7 @@ rival_historical_components <- function(evidence,teams,rules,official) {
     r<-rounds[rounds$team_id%in%mvp_text(p$team_id)&rounds$round_id%in%mvp_text(p$round_id),,drop=FALSE]
     if(!nrow(r))next
     if(mvp_text(p$status)%in%c("running","next")){add_missing(p$team_id,"Historical lineup is still marked open; its awards are excluded.");next}
-    source<-source_rounds[source_rounds$team_id%in%mvp_text(p$team_id)&source_rounds$round_id%in%mvp_text(p$round_id),,drop=FALSE]
-    expected<-rival_round_signature(source[1,,drop=FALSE],official)
+    expected<-unname(signatures[paste(mvp_text(p$team_id),mvp_text(p$round_id),sep="|")])
     if(nzchar(mvp_text(p$signature))&&!identical(mvp_text(p$signature),mvp_text(expected))){
       add_missing(p$team_id,"A changed round is waiting for its historical lineup to refresh.");next
     }
@@ -404,6 +477,19 @@ rival_cash_ledger <- function(entries) {
   entries$unknown_amounts<-cumsum(entries$included & !is.finite(entries$amount))
   rownames(entries)<-NULL
   entries
+}
+
+rival_estimate_summary <- function(missing,assumptions=character(),difference=NA_real_) {
+  issues<-unique(missing[nzchar(missing)])
+  standings<-grepl("^Ranking history incomplete for round ",issues)
+  eligibility<-grepl("historical ownership|historical lineup|changed round",issues,ignore.case=TRUE)
+  parts<-character()
+  if(any(standings))parts<-c(parts,paste("Missing standings for",sum(standings),if(sum(standings)==1L)"round."else"rounds."))
+  if(any(eligibility))parts<-c(parts,"Historical award eligibility is incomplete.")
+  if(any(grepl("award coverage|Official round awards",issues,ignore.case=TRUE)))parts<-c(parts,"Round award history is incomplete.")
+  if(is.finite(difference)&&abs(difference)>0.5)parts<-c(parts,"Reconstruction differs from observed cash.")
+  if(!length(parts))parts<-if(length(issues))"Estimate uses available history; some financial evidence is incomplete."else if(length(assumptions))"Estimate assumes unchanged reward rules."else"No missing components in available financial evidence."
+  paste(parts,collapse=" ")
 }
 
 # Public pure accounting interface; every numeric subtotal has an evidence trail.
@@ -588,7 +674,7 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
       total_outflow=-sum(ledger$amount[ledger$included & is.finite(ledger$amount)&ledger$amount<0]),
       total_spent=spent,total_sales=sales,point_bonus=point_income,ranking_prize=ranking_income,dreamteam_income=ideal_income,mvp_income=mvp_income,
       team_value=fm_number(info$teamValue %||% team$teamValue),points=fm_number(info$points %||% team$points),
-      squad_size=fm_number(info$squad_size),net_profit_loss=NA_real_,estimate_notes=paste(reasons,collapse=" "),stringsAsFactors=FALSE)
+      squad_size=fm_number(info$squad_size),net_profit_loss=NA_real_,estimate_summary=rival_estimate_summary(missing,assumptions,difference),estimate_notes=paste(reasons,collapse=" "),stringsAsFactors=FALSE)
     breakdowns[[tid]]<-ledger[,c("component","amount","source","round_id","player_id"),drop=FALSE]
     ledger$round_number<-history$rounds$round_number[match(ledger$round_id,history$rounds$round_id)]
     ledgers[[tid]]<-ledger
@@ -658,7 +744,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
     state<-new.env(parent=emptyenv());state$value<-shiny::reactiveVal(list(team_finances=data.frame(),breakdowns=list(),loading=TRUE));state$key<-NULL
     state$generation<-0L;state$closed<-FALSE;state$queue<-list();state$busy<-0L;state$evidence<-list();state$seed<-list();state$defaults<-NULL;state$last_publish<-0
     state$publish_timer<-NULL;state$teams<-data.frame();state$teams_status<-"loading";state$teams_reason<-""
-    state$awards<-list(rows=data.frame(),complete=FALSE);state$finance_ready<-FALSE;state$seed_ready<-FALSE;state$scheduled_teams<-character();state$scheduled_lineups<-character()
+    state$awards<-list(rows=data.frame(),complete=FALSE);state$finance_ready<-FALSE;state$seed_ready<-FALSE;state$scheduled_teams<-character();state$scheduled_lineups<-character();state$scheduled_rankings<-character();state$pending_team_ids<-character()
     root$onSessionEnded(function(){state$closed<-TRUE;state$generation<-state$generation+1L;if(!is.null(state$publish_timer))state$publish_timer()})
     root$userData$rival_finance_shared<-state
   }
@@ -699,12 +785,35 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
     ids<-head(unique(as.character(state$teams$teamid %||% character())),100L)
     ids<-setdiff(ids[!is.na(ids)&nzchar(ids)],state$scheduled_teams)
     state$scheduled_teams<-c(state$scheduled_teams,ids)
+    state$pending_team_ids<-unique(c(state$pending_team_ids,ids))
     state$queue<-c(state$queue,lapply(ids,function(id)list(kind="team",id=id)))
+    invisible(NULL)
+  }
+  enqueue_rankings<-function(){
+    # Complete the ordinary team reads first; otherwise an in-flight team looks
+    # like a history gap and creates unnecessary historical ranking requests.
+    if(!state$seed_ready||length(state$pending_team_ids)>0L)return(invisible(NULL))
+    source<-rival_saved_rounds(state$evidence,include_ranking=FALSE)
+    saved<-rival_saved_rankings(state$evidence,state$teams$teamid,source)
+    closed<-if(nrow(source))vapply(seq_len(nrow(source)),function(i)round_is_finished(as.list(source[i,,drop=FALSE])),logical(1))else logical()
+    for(id in unique(source$round_id[closed])){
+      rows<-source[source$round_id%in%id,,drop=FALSE]
+      complete<-setequal(rows$team_id,as.character(state$teams$teamid))&&all(is.finite(rows$points))&&
+        all(vapply(seq_len(nrow(rows)),function(i)round_is_finished(as.list(rows[i,,drop=FALSE])),logical(1)))
+      if(complete||any(vapply(saved,function(record)identical(mvp_text(record$payload$round_id),id),logical(1))))next
+      number<-unique(rows$round_number[is.finite(rows$round_number)&rows$round_number>=1&rows$round_number==floor(rows$round_number)])
+      if(length(number)!=1L)next
+      signature<-rival_ranking_signature(source,id,state$teams$teamid);key<-paste(id,signature,sep=":")
+      if(key%in%state$scheduled_rankings)next
+      if(length(state$scheduled_rankings)>=120L){state$reason<-"Historical ranking batch limit reached. Use Refresh to continue.";break}
+      state$scheduled_rankings<-c(state$scheduled_rankings,key)
+      state$queue<-c(state$queue,list(list(kind="ranking",id=id,number=number,signature=signature,source_teams=as.character(state$teams$teamid))))
+    }
     invisible(NULL)
   }
   enqueue_lineups<-function(){
     if(!state$seed_ready)return(invisible(NULL))
-    rounds<-rival_saved_rounds(state$evidence)
+    rounds<-rival_saved_rounds(state$evidence,teams=state$teams$teamid)
     awards<-state$awards$rows
     if(!nrow(rounds)||!is.data.frame(awards)||!nrow(awards)||!"round_id"%in%names(awards))return(invisible(NULL))
     snapshots<-rival_evidence_rows(state$evidence,"round_lineup")
@@ -729,12 +838,14 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
     while(state$busy<2L&&length(state$queue)){
       task<-state$queue[[1]];state$queue<-state$queue[-1];state$busy<-state$busy+1L
       local({task<-task
-        fn<-switch(task$kind,saved="get_rival_finance_saved",seed="get_rival_finance_seed",team="get_rival_team_finance_observation",lineup="get_rival_round_lineup_observation")
+        fn<-switch(task$kind,saved="get_rival_finance_saved",seed="get_rival_finance_seed",team="get_rival_team_finance_observation",lineup="get_rival_round_lineup_observation",ranking="get_rival_round_ranking_observation")
         args<-if(task$kind=="saved")list(account_id=auth[["userid"]],championship_id=cid,season=state$season)else list(login=auth,championship_id=cid,user_team_id=if(task$kind%in%c("team","lineup"))task$id else tid)
         if(task$kind=="lineup")args<-c(args,list(round_id=task$round,signature=task$signature))
+        if(task$kind=="ranking")args<-c(args,list(round_id=task$id,round_number=task$number,signature=task$signature,source_teams=task$source_teams))
         promises::then(async_adapter_fetch(fn,args,ctx,is_current=function()!state$closed&&identical(generation,state$generation)),function(result){
           if(state$closed||generation!=state$generation)return(NULL)
           state$busy<-state$busy-1L
+          if(task$kind=="team")state$pending_team_ids<-setdiff(state$pending_team_ids,task$id)
           tryCatch({
           if(task$kind=="saved"){
             state$evidence<-rival_merge_evidence(state$evidence,result$evidence);state$defaults<-result$defaults;state$finance_ready<-TRUE
@@ -758,7 +869,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
             inferred<-result$rules$season %||% "unknown"
             if(!identical(inferred,state$season)&&identical(state$season,"unknown")&&inferred!="unknown"){
               state$season<-inferred;state$evidence<-list();state$finance_ready<-FALSE;state$seed_ready<-FALSE
-              state$scheduled_teams<-character();state$scheduled_lineups<-character();state$queue<-list(list(kind="saved"));run_next();return(NULL)
+              state$scheduled_teams<-character();state$scheduled_lineups<-character();state$scheduled_rankings<-character();state$pending_team_ids<-character();state$queue<-list(list(kind="saved"));run_next();return(NULL)
             }
             current<-rival_team_evidence(list(team_id=tid,info=result$info,movements=NULL),auth[["userid"]],cid,state$season)
             if(length(current)){state$evidence<-rival_merge_evidence(state$evidence,current);persist_rival_finance_evidence(current,ctx)}
@@ -773,10 +884,13 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
             }
             state$finance_ready<-TRUE;state$seed_ready<-TRUE;enqueue_teams();publish(TRUE)
           }else{
-            rows<-if(task$kind=="lineup")rival_lineup_evidence(result,auth[["userid"]],cid,state$season)else rival_team_evidence(result,auth[["userid"]],cid,state$season)
+            rows<-switch(task$kind,lineup=rival_lineup_evidence(result,auth[["userid"]],cid,state$season),
+              ranking=rival_ranking_evidence(result,auth[["userid"]],cid,state$season),
+              rival_team_evidence(result,auth[["userid"]],cid,state$season))
             if(length(rows)){state$evidence<-rival_merge_evidence(state$evidence,rows);persist_rival_finance_evidence(rows,ctx)}
             if(task$kind=="lineup"&&!length(rows))state$reason<-paste("Some historical lineups could not be retrieved; affected MVP/Best XI bonuses are not included. Use Refresh to retry.",mvp_text(result$reason))
-            if(task$kind=="team")enqueue_lineups()
+            if(task$kind=="ranking"&&!length(rows))state$reason<-"A historical round ranking could not be confirmed; its position bonuses remain excluded."
+            if(task$kind%in%c("team","ranking")){enqueue_rankings();enqueue_lineups()}
           }
           },error=function(error){
             failure<-resource_log_failure(resource_failure(error,resource="league_finances_calc",category="schema"))
@@ -787,8 +901,8 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
           })
           publish(!length(state$queue)&&state$busy==0L);run_next();NULL
         },function(error){
-          if(!state$closed&&generation==state$generation){state$busy<-state$busy-1L;state$reason<-"Some financial sources could not be refreshed; saved evidence remains available.";if(task$kind=="saved")state$queue<-list(list(kind="seed"))
-            if(task$kind=="seed"){state$seed_ready<-TRUE;enqueue_teams()};publish(TRUE);run_next()};NULL
+          if(!state$closed&&generation==state$generation){state$busy<-state$busy-1L;if(task$kind=="team")state$pending_team_ids<-setdiff(state$pending_team_ids,task$id);state$reason<-"Some financial sources could not be refreshed; saved evidence remains available.";if(task$kind=="saved")state$queue<-list(list(kind="seed"))
+            if(task$kind=="seed"){state$seed_ready<-TRUE;enqueue_teams()};enqueue_rankings();publish(TRUE);run_next()};NULL
         })
       })
     }
@@ -810,7 +924,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
       same<-identical(state$identity,paste(auth[["userid"]],cid,tid,sep="|"));state$identity<-paste(auth[["userid"]],cid,tid,sep="|")
       state$key<-key;state$generation<-state$generation+1L;state$busy<-0L;state$season<-league_season_context(cid);state$reason<-"";state$build_failure<-NULL
       if(!is.null(state$publish_timer)){state$publish_timer();state$publish_timer<-NULL}
-      state$account<-auth[["userid"]];state$championship<-cid;state$seed_ready<-FALSE;state$scheduled_teams<-character();state$scheduled_lineups<-character()
+      state$account<-auth[["userid"]];state$championship<-cid;state$seed_ready<-FALSE;state$scheduled_teams<-character();state$scheduled_lineups<-character();state$scheduled_rankings<-character();state$pending_team_ids<-character()
       if(!same){state$evidence<-list();state$seed<-list();state$defaults<-NULL;state$finance_ready<-FALSE
         state$teams<-data.frame();state$teams_status<-"loading";state$teams_reason<-"";state$awards<-list(rows=data.frame(),complete=FALSE)
         state$value(list(team_finances=data.frame(),breakdowns=list(),loading=TRUE))}
@@ -841,7 +955,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
     shiny::req(isTRUE(active()),valid_login(login()),!is.null(state$key))
     awards<-tryCatch(official(),error=function(error)NULL)
     if(is.list(awards))state$awards<-awards
-    enqueue_lineups();publish(isTRUE(state$awards$complete));run_next()
+    enqueue_rankings();enqueue_lineups();publish(isTRUE(state$awards$complete));run_next()
   })
   shiny::reactive(state$value())
 }

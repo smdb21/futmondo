@@ -376,3 +376,10 @@ Inflow breakdown (2026-10-31): transaction history shows total positive inflow s
 - Apply independent red/yellow/green source-wide color scales to Avg Last N in shared player tables and to existing points-to-price columns. Include zero/negative values, leave missing values uncolored and use yellow for equal ranges.
 - Compute enrichment and finite ranges before application filters; use Reactable metadata for constant-time client styling unaffected by search, sort or pagination. Publish data and metadata together without widget recreation on history-only changes, including changed hidden extremes.
 - Focused generated-JavaScript/module, ratio/average, refresh-stability, deployment and mandatory offline lifecycle checks passed. No I/O, polling, dependency or schema changes. Hosted/mobile visual verification remains separate.
+
+### 2026-11-02 rival bonus recovery and presentation — implemented locally
+
+- Fix nested PostgREST/jsonlite snapshot decoding so saved full XIs, rounds and historical lineups retain their actual arrays; existing scope, scoring, XI validity and finality checks remain authoritative.
+- Recover missing completed-round standings with the captured official unpaged ranking endpoint. Persist signature-bound source rankings within existing eligibility evidence; use actual historical participants without manufacturing a score for an absent directory member. Reuse saved rankings/lineups with two concurrent reads, 120 ranking tasks and the existing 600-lineup cap per refresh.
+- Replace automatic expanded raw audits on team selection with concise status plus optional collapsed calculation notes. Preserve the full cash ledger and all reconciliation surfaces.
+- Focused real-transport synthetic, storage-roundtrip, known-answer, malformed/open/context and offline lifecycle checks pass. No migration/dependency change. Live ranking/lineup API verification, confirmed production saving and hosted/mobile deployment remain separate exit criteria.

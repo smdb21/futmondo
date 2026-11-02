@@ -213,6 +213,20 @@ check('financial table falls back to selectable team rows when its display schem
   widget<-rivals_finance_table_widget(list(team_finances=rows,breakdowns=list()),function(error)stop('unexpected formatting failure'))
   stopifnot(inherits(widget,'reactable'))
 })
+check('rival selection does not auto-expand the raw calculation ledger',{
+  rows<-rival_finance_directory(teams);rows$estimated_cash<-c(0,-5)
+  widget<-rivals_finance_table_widget(list(team_finances=rows,breakdowns=list(a=data.frame(component='Opening cash',amount=100))))
+  stopifnot(is.null(widget$x$tag$attribs$details),identical(widget$x$tag$attribs$onClick,'select'),identical(widget$x$tag$attribs$selection,'single'))
+})
+check('repeated coverage notes have one concise status while full reasons remain auditable',{
+  notes<-paste('Ranking history incomplete for round',1:10)
+  summary<-rival_estimate_summary(c(notes,'Round r player p: historical ownership unavailable.'))
+  stopifnot(grepl('Missing standings for 10 rounds.',summary,fixed=TRUE),nchar(summary)<160L,
+    grepl('Historical award eligibility is incomplete.',summary,fixed=TRUE),!grepl('round 1',summary,fixed=TRUE))
+  rows<-data.frame(teamid='a',estimated_cash=100,confidence='Estimated',estimate_notes=paste(notes,collapse=' '),estimate_summary=summary)
+  values<-rivals_summary_values(list(),teams,rows,'a')
+  stopifnot(identical(values$status,summary),grepl(notes[1],values$notes,fixed=TRUE))
+})
 check('selected rival cards reuse ledger cash and derive tied standings from points',{
   rows<-data.frame(teamid='a',estimated_cash=-25,confidence='Estimated',estimate_notes='Missing settlement evidence')
   x<-rivals_summary_values(list(),teams,rows,'a')

@@ -68,7 +68,7 @@ async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is
   adapter_env$futmondo_post<-function(url,...){
     route<-tail(strsplit(url,"/",fixed=TRUE)[[1]],1)
     allowed<-c("information","activechampionships","teams","roster","rounds","dreamteam","nightmareteam","roundlineup","lineup","championshipplayers","championshipteams","players","summary","fullprofile","matches","pressroom","moneymovements","rosterbids","myplayers","list","unread","getdtconfig")
-    if(!route%in%allowed)stop("Mutation forbidden in asynchronous read")
+    if(!route%in%allowed&&!identical(url,"https://api.futmondo.com/1/ranking/round"))stop("Mutation forbidden in asynchronous read")
     dots<-list(...);need(url,"POST",dots$body,c(`Content-Type`="application/json; charset=utf-8"))
   }
   adapter_env$supabase_get<-function(table_name,query_params=list()){
