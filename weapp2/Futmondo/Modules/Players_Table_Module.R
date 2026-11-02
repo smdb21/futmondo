@@ -212,10 +212,39 @@ players_table_owner_choices <- function(teams_df) {
   c(choices,stats::setNames(values,labels))
 }
 
+# One finite range per metric over the loaded source, before any table filters.
+players_table_metric_ranges <- function(rows) {
+  columns <- intersect(c("recent_points_avg", "recent_points_ratio"), names(rows))
+  stats::setNames(lapply(columns, function(column) {
+    values <- rows[[column]]
+    values <- values[is.finite(values)]
+    if (!length(values)) return(list(min=NULL, max=NULL))
+    list(min=min(values), max=max(values))
+  }), columns)
+}
+
+# Reactable supplies row, column and table state. Never scan client-visible rows:
+# their search, sorting and pagination must not change the source color scale.
+players_table_metric_style <- function() htmlwidgets::JS("function(rowInfo, column, state) {
+  var value = rowInfo.values[column.id];
+  var ranges = state.meta && state.meta.playerMetricRanges;
+  var range = ranges && ranges[column.id];
+  if (typeof value !== 'number' || !Number.isFinite(value) || !range ||
+      typeof range.min !== 'number' || !Number.isFinite(range.min) ||
+      typeof range.max !== 'number' || !Number.isFinite(range.max)) return {};
+  var t = range.max === range.min ? 0.5 : Math.max(0, Math.min(1, (value - range.min) / (range.max - range.min)));
+  var from = t <= 0.5 ? [255, 107, 107] : [244, 201, 93];
+  var to = t <= 0.5 ? [244, 201, 93] : [124, 255, 155];
+  var amount = t <= 0.5 ? t * 2 : (t - 0.5) * 2;
+  var color = from.map(function(channel, index) { return Math.round(channel + (to[index] - channel) * amount); });
+  return { backgroundColor: 'rgb(' + color.join(', ') + ')', color: '#102019' };
+}")
+
 # Keep the data numeric for sorting; missing averages have an empty cell.
 players_table_recent_average_column <- function(n=5L) {
   n <- suppressWarnings(as.integer(n)[1]);if(!is.finite(n))n <- 5L
   reactable::colDef(name=paste0("Avg Last ",max(1L,min(20L,n))),align="center",sortNALast=TRUE,
+    style=players_table_metric_style(),
     cell=htmlwidgets::JS("function(cellInfo) { var value = cellInfo.value; return typeof value === 'number' && Number.isFinite(value) ? String(Number(value.toFixed(1))) : ''; }")
   )
 }
@@ -363,8 +392,8 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       players_table_RV,is_active=function()isTRUE(is_module_active())&&isTRUE(optional_ready()),
       refresh_trigger=refresh_trigger,required_rounds=function()input$recent_games_n %||% 5L)
 
-    ## players_table_filtered_RV ----
-    players_table_filtered_RV <- reactive({
+    # Enrich once per source/history/N change; filters reuse these numeric values.
+    players_table_enriched_RV <- reactive({
       req(is_module_active())
       table_refresh_trigger()
       if (is.function(refresh_trigger)) refresh_trigger()
@@ -380,7 +409,17 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       history <- if(isTRUE(optional_ready()))tryCatch(recent_points$history(),error=function(e)data.frame())else data.frame()
       players_table <- players_table_normalize_owner(players_table, if(isTRUE(optional_ready()))tryCatch(user_teams_RV(), error=function(e)NULL)else NULL)
       players_table <- add_recent_points_average(players_table,history,recent_n)
+      if(!is.null(points_ratio_basis))players_table<-players_table_points_ratio(players_table,points_ratio_basis)
+      attr(players_table,"filter_added_fields")<-filter_added_fields
+      players_table
+    })
+    table_color_meta <- reactive(list(playerMetricRanges=players_table_metric_ranges(players_table_enriched_RV())))
 
+    ## players_table_filtered_RV ----
+    players_table_filtered_RV <- reactive({
+      players_table <- players_table_enriched_RV()
+      if(is.null(players_table))return(NULL)
+      filter_added_fields<-attr(players_table,"filter_added_fields")
       if (!is.null(input$position_filter)) {
         if (input$position_filter != "All") {
           players_table <- players_table %>%
@@ -483,7 +522,6 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
     table_display_data <- reactive({
       rows <- players_table_filtered_RV()
       if(is.null(rows))return(NULL)
-      if(!is.null(points_ratio_basis))rows<-players_table_points_ratio(rows,points_ratio_basis)
       cols_to_hide <- c(cfg_player_columns_to_hide,attr(rows,"filter_added_fields"),"data_coverage","observed_at","is_free_agent",
         "recent_points_count","recent_points_required","recent_points_status")
       if(isTRUE(hide_bid_column))cols_to_hide<-c(cols_to_hide,"bid_price")
@@ -498,9 +536,9 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
     })
     table_display_ids<-reactive(as.character(players_table_filtered_RV()$id))
     table_schema<-reactiveVal(NULL)
-    rendered_schema<-NULL;rendered_data<-NULL;rendered_ids<-character()
+    rendered_schema<-NULL;rendered_data<-NULL;rendered_ids<-character();rendered_meta<-NULL
     observe({
-      rows<-table_display_data();ids<-table_display_ids()
+      rows<-table_display_data();ids<-table_display_ids();meta<-table_color_meta()
       if(is.null(rows)){table_schema(NULL);return()}
       recent_n<-suppressWarnings(as.integer(input$recent_games_n)[1])
       if(!is.finite(recent_n))recent_n<-5L
@@ -509,7 +547,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
         formatted=digest::digest(lapply(rows[setdiff(names(rows),c("recent_points_avg","recent_points_ratio"))],
           function(column)if(is.numeric(column))as.numeric(column)else column)),ids=ids)
       if(!identical(isolate(table_schema()),schema)){table_schema(schema);return()}
-      if(identical(rendered_schema,schema)&&(!identical(rendered_data,rows)||!identical(rendered_ids,ids))){
+      if(identical(rendered_schema,schema)&&(!identical(rendered_data,rows)||!identical(rendered_ids,ids)||!identical(rendered_meta,meta))){
         page<-isolate(getReactableState("players_table",name="page",session=session)) %||% 1L
         page_size<-isolate(getReactableState("players_table",name="pageSize",session=session)) %||% 20L
         page<-max(1L,min(page,max(1L,ceiling(nrow(rows)/page_size))))
@@ -517,24 +555,25 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
         # Selection indexes refer to the previous client dataset. Remap by ID.
         selected<-match(rendered_ids[selected],ids)
         if(!length(selected))selected<-NA_integer_
-        updateReactable("players_table",data=rows,page=page,selected=selected,session=session)
-        rendered_data<<-rows;rendered_ids<<-ids
+        updateReactable("players_table",data=rows,meta=meta,page=page,selected=selected,session=session)
+        rendered_data<<-rows;rendered_ids<<-ids;rendered_meta<<-meta
       }
     },priority=10)
     output$players_table <- renderReactable({
       schema<-table_schema();req(schema)
       players_table<-isolate(table_display_data());req(players_table)
-      rendered_schema<<-schema;rendered_data<<-players_table;rendered_ids<<-isolate(table_display_ids())
+      rendered_schema<<-schema;rendered_data<<-players_table;rendered_ids<<-isolate(table_display_ids());rendered_meta<<-isolate(table_color_meta())
       table_columns <- get_reactable_columns_for_players(players_table)
       recent_n <- suppressWarnings(as.integer(input$recent_games_n)[1])
       if (!is.finite(recent_n)) recent_n <- 5L
       table_columns[["recent_points_avg"]] <- players_table_recent_average_column(recent_n)
       if(!is.null(points_ratio_basis))table_columns[["recent_points_ratio"]]<-reactable::colDef(
         name=paste0("Avg Last ",recent_n," / ",if(points_ratio_basis=="value")"Value"else"Clause"," (€M)"),
-        align="center",sortNALast=TRUE,
+        align="center",sortNALast=TRUE,style=players_table_metric_style(),
         cell=htmlwidgets::JS("function(cellInfo) { var value = cellInfo.value; return typeof value === 'number' && Number.isFinite(value) ? String(Number(value.toFixed(3))) : ''; }"))
       reactable(players_table,
                 columns = table_columns,
+                meta = rendered_meta,
                 defaultSorted = list(recent_points_avg="desc"),
                 searchable = TRUE,
                 filterable = TRUE,

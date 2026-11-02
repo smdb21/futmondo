@@ -370,3 +370,9 @@ Inflow breakdown (2026-10-31): transaction history shows total positive inflow s
 - Normalize only filter inputs, preserve unknowns and original display columns, share authoritative ownership/free-agent semantics, and use positive price/transfer state plus optional UTC lock dates for active clauses. Empty results render and recover without hiding a data exception.
 - Scope initial defaults to Today's market (Free Agents Only) and Players (Active Clause Only); retain Clear Filters and other table defaults. Clarify Today's market heading while retaining its existing content.
 - Focused filter/widget and existing UI/lifecycle checks pass. No new reads, polling, dependencies or schema changes; hosted/mobile deployment verification remains separate.
+
+### 2026-11-01 numeric player metric colors — implemented locally
+
+- Apply independent red/yellow/green source-wide color scales to Avg Last N in shared player tables and to existing points-to-price columns. Include zero/negative values, leave missing values uncolored and use yellow for equal ranges.
+- Compute enrichment and finite ranges before application filters; use Reactable metadata for constant-time client styling unaffected by search, sort or pagination. Publish data and metadata together without widget recreation on history-only changes, including changed hidden extremes.
+- Focused generated-JavaScript/module, ratio/average, refresh-stability, deployment and mandatory offline lifecycle checks passed. No I/O, polling, dependency or schema changes. Hosted/mobile visual verification remains separate.
