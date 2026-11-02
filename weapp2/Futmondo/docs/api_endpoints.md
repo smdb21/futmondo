@@ -182,7 +182,7 @@ This section documents the underlying game mechanics and transaction rules that 
 
 ### 2. Release Clause Purchases (`isClause: true`)
 * **Context**: Used to steal a player directly from another active user's roster.
-* **Consent**: Completely bypasses the owner's consent. If the buyer pays the release clause price, the player is instantly transferred to their squad.
+* **Consent**: Completely bypasses the owner's consent. Paying the clause confirms the purchase; delivery may be delayed by the league configuration. Use the player summary's `championship.clause.transferDate` for the scheduled arrival. The player remains separate from the current roster until the source confirms arrival.
 * **Cost**: Highly expensive. Calculated automatically by the system based on the player's performance, valuation, and league settings.
 
 ### ⚠️ Player Transfer Cooldown & Protection Rules

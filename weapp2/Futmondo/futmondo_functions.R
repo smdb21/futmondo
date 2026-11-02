@@ -1378,7 +1378,7 @@ clause_buyout_error_message <- function(code,message=NULL,roster=NULL) {
   if(length(message)==1L&&!is.na(message)&&nzchar(as.character(message))) as.character(message) else if(nzchar(code)) code else "Please refresh and try again."
 }
 
-pending_clause_candidates <- function(roster_df,pressroom_df,user_team_id) {
+pending_clause_candidates <- function(roster_df,pressroom_df,user_team_id,previous_records=NULL) {
   if(!is.data.frame(roster_df)||!"id"%in%names(roster_df)||!is.data.frame(pressroom_df)||
       !all(c("player_id","buyer_team_id","seller_team_id","created")%in%names(pressroom_df)))return(NULL)
   roster_ids<-as.character(roster_df$id)
@@ -1396,37 +1396,104 @@ pending_clause_candidates <- function(roster_df,pressroom_df,user_team_id) {
   # Missing counterparty IDs mean System, and must never create NA rows.
   mask<-(tx$buyer_team_id%in%user_team_id & !tx$player_id%in%roster_ids)|
     (tx$seller_team_id%in%user_team_id & tx$player_id%in%roster_ids)
-  tx[mask,,drop=FALSE]
+  candidates<-tx[mask,,drop=FALSE]
+  # History may be truncated or temporarily omit a previously confirmed buy.
+  # Keep it until a fresh roster/summary or a newer sale confirms resolution.
+  if(is.data.frame(previous_records)&&nrow(previous_records)) {
+    for(i in seq_len(nrow(previous_records))) {
+      old<-previous_records[i,,drop=FALSE];pid<-as.character(old$player_id)
+      if(pid%in%c(roster_ids,as.character(candidates$player_id)))next
+      latest<-tx[tx$player_id%in%pid,,drop=FALSE]
+      sold_after<-nrow(latest)&&latest$seller_team_id%in%user_team_id&&
+        isTRUE(fm_time(latest$created)>=old$purchased_at)
+      if(sold_after)next
+      extra<-pressroom_df[NA_integer_,,drop=FALSE]
+      extra$player_id<-pid;extra$buyer_team_id<-user_team_id;extra$seller_team_id<-old$seller_team_id
+      extra$created<-format(old$purchased_at,"%Y-%m-%dT%H:%M:%OSZ",tz="UTC")
+      if("player_name"%in%names(extra))extra$player_name<-old$player_name
+      if("id"%in%names(extra))extra$id<-paste0("pending:",pid)
+      candidates<-rbind(candidates,extra)
+    }
+  }
+  candidates
 }
 
-reconcile_pending_clause_transfers <- function(roster_df,pressroom_df,summaries,user_team_id,now=Sys.time()) {
-  unavailable <- list(status="unavailable",pending_outbound_ids=character(),pending_inbound_ids=character(),
-    pending_outbound_count=NA_integer_,pending_inbound_count=NA_integer_)
-  team<-fm_scalar(user_team_id,"");if(!nzchar(team))return(unavailable)
-  candidate<-pending_clause_candidates(roster_df,pressroom_df,team)
-  if(is.null(candidate))return(unavailable)
-  roster_ids<-as.character(roster_df$id)
-  if(!nrow(candidate)) return(list(status="ok",pending_outbound_ids=character(),pending_inbound_ids=character(),
-    pending_outbound_count=0L,pending_inbound_count=0L))
-  outbound<-character(); incoming<-character()
-  for(i in seq_len(nrow(candidate))) {
-    pid<-as.character(candidate$player_id[i]); summary<-summaries[[pid]]
-    if(acquisition_data_unverified(summary))return(unavailable)
-    clause<-if(is.list(summary)&&is.list(summary$championship)) summary$championship$clause else NULL
-    owner<-if(is.list(summary)&&is.list(summary$championship)&&is.list(summary$championship$owner)) {
-      value<-summary$championship$owner$`_id`;if(is.null(value)) value<-summary$championship$owner$id
-      as.character(value)
-    } else NA_character_
-    transferred<-is.list(clause)&&identical(clause$transferred,TRUE)
-    transfer_at<-if(is.list(clause)&&!is.null(clause$transferDate)) fm_time(clause$transferDate) else as.POSIXct(NA)
-    if(!transferred||length(transfer_at)!=1L||is.na(transfer_at)||transfer_at<=now||length(owner)!=1L||is.na(owner)||!nzchar(owner)) return(unavailable)
-    if(candidate$seller_team_id[i]%in%team&&pid%in%roster_ids&&owner==team) outbound<-c(outbound,pid)
-    else if(candidate$buyer_team_id[i]%in%team&&!pid%in%roster_ids&&owner!=team) incoming<-c(incoming,pid)
-    else return(unavailable)
+incoming_clause_empty <- function() {
+  data.frame(player_id=character(), player_name=character(), seller_team_id=character(),
+    purchased_at=as.POSIXct(character(),tz="UTC"), joins_at=as.POSIXct(character(),tz="UTC"),
+    observed_at=as.POSIXct(character(),tz="UTC"), role=character(), team=character(),logo=character(),
+    timing_error=character(), overdue=logical(),stringsAsFactors=FALSE)
+}
+
+reconcile_pending_clause_transfers <- function(roster_df,pressroom_df,summaries,user_team_id,now=Sys.time(),previous_records=NULL) {
+  records<-incoming_clause_empty()
+  result <- function(status="unavailable",outbound=character(),incoming=character()) list(status=status,
+    pending_outbound_ids=unique(outbound),pending_inbound_ids=unique(incoming),
+    pending_outbound_count=if(status=="ok")length(unique(outbound))else NA_integer_,
+    pending_inbound_count=if(status=="ok")length(unique(incoming))else NA_integer_,incoming_records=records)
+  team<-fm_scalar(user_team_id,"");if(!nzchar(team))return(result())
+  candidate<-if(acquisition_data_unverified(roster_df)||acquisition_data_unverified(pressroom_df))NULL else pending_clause_candidates(roster_df,pressroom_df,team,previous_records)
+  if(is.null(candidate)) {
+    if(is.data.frame(previous_records))records<-previous_records
+    return(result())
   }
-  outbound<-unique(outbound);incoming<-unique(incoming)
-  list(status="ok",pending_outbound_ids=outbound,pending_inbound_ids=incoming,
-    pending_outbound_count=length(outbound),pending_inbound_count=length(incoming))
+  roster_ids<-as.character(roster_df$id)
+  if(!nrow(candidate))return(result("ok"))
+  outbound<-incoming<-character();verified<-TRUE
+  for(i in seq_len(nrow(candidate))) {
+    tx<-candidate[i,,drop=FALSE];pid<-as.character(tx$player_id);summary<-summaries[[pid]]
+    incoming_purchase<-tx$buyer_team_id%in%team&&!pid%in%roster_ids
+    fresh<-is.list(summary)&&length(summary)>0L&&!acquisition_data_unverified(summary)
+    championship<-if(fresh&&is.list(summary$championship))summary$championship else list()
+    clause<-championship$clause
+    owner<-if(is.list(championship$owner))
+      fm_scalar(championship$owner$`_id` %||% championship$owner$id,"")else ""
+    transferred<-is.list(clause)&&identical(clause$transferred,TRUE)
+    transfer_at<-if(is.list(clause))fm_time(clause$transferDate %||% NA_character_)else as.POSIXct(NA,tz="UTC")
+    valid_time<-length(transfer_at)==1L&&!is.na(transfer_at)
+    # Capacity remains fail-closed on ambiguous, stale or overdue observations.
+    usable<-fresh&&transferred&&valid_time&&transfer_at>now&&nzchar(owner)
+    if(usable&&tx$seller_team_id%in%team&&pid%in%roster_ids&&owner==team)outbound<-c(outbound,pid)
+    else if(usable&&incoming_purchase&&owner!=team)incoming<-c(incoming,pid)
+    else verified<-FALSE
+    if(!incoming_purchase)next
+    # Only a fresh, explicit source result confirms arrival/cancellation. A
+    # passed transferDate by itself never removes a confirmed incoming player.
+    resolved<-fresh&&nzchar(owner)&&(owner==team||
+      (is.list(clause)&&identical(clause$transferred,FALSE)))
+    if(resolved)next
+    old<-if(is.data.frame(previous_records)&&"player_id"%in%names(previous_records))
+      previous_records[previous_records$player_id%in%pid,,drop=FALSE]else incoming_clause_empty()
+    data<-if(fresh&&is.list(summary$data))summary$data else list()
+    field<-function(name,fallback="")fm_scalar(data[[name]],fm_scalar(tx[[name]],fallback))
+    stamp<-attr(summary,"observed_at") %||% as.POSIXct(NA,tz="UTC")
+    issue<-if(!fresh)"Arrival verification failed: the player summary could not be retrieved."else
+      if(!nzchar(owner))"Arrival verification failed: the player summary omitted the current owner."else
+      if(!transferred)"Arrival verification failed: the player summary omitted the pending clause status."else
+      if(!valid_time)"Arrival time missing or malformed in Futmondo's transferDate."else ""
+    arrival<-if(valid_time)transfer_at else if(nrow(old))old$joins_at[1]else as.POSIXct(NA,tz="UTC")
+    records<-rbind(records,data.frame(player_id=pid,player_name=field("name",fm_scalar(tx$player_name,pid)),
+      seller_team_id=fm_scalar(tx$seller_team_id,""),purchased_at=fm_time(tx$created),joins_at=arrival,
+      observed_at=fm_time(stamp),role=field("role",if(nrow(old))old$role[1]else ""),
+      team=field("team",if(nrow(old))old$team[1]else ""),logo=field("logo",if(nrow(old))old$logo[1]else ""),
+      timing_error=issue,overdue=length(arrival)==1L&&!is.na(arrival)&&arrival<=now,stringsAsFactors=FALSE))
+  }
+  if(nrow(records))records<-records[order(records$joins_at,records$player_id,na.last=TRUE),,drop=FALSE]
+  result(if(verified)"ok"else"unavailable",outbound,incoming)
+}
+
+# These are absolute source timestamps, formatted only at the UI boundary.
+incoming_clause_time <- function(value) {
+  stamp<-fm_time(value)
+  if(length(stamp)!=1L||is.na(stamp))return("")
+  format(stamp,"%d %b %Y, %H:%M %Z",tz="Europe/Madrid")
+}
+incoming_clause_round_label <- function(joins_at,next_round) {
+  stamp<-fm_time(joins_at)
+  if(length(stamp)!=1L||is.na(stamp)||!isTRUE(next_round$available))return("")
+  delta<-as.numeric(difftime(stamp,next_round$starts_at,units="secs"))
+  if(!is.finite(delta))return("")
+  if(delta<0)"Before round starts"else if(delta>0)"After round starts"else "At round start"
 }
 
 # Computes a verified acquisition-capacity snapshot for the logged-in team:

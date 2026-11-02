@@ -1,14 +1,15 @@
 library(reactable)
 players_in_teams_UI <- function(id) {
   ns <- NS(id)
-  tagList(uiOutput(ns("team_value_box")),
+  tagList(tags$style(HTML(".fm-incoming-panel{border:1px solid var(--fm-border,#315540);border-radius:8px;padding:16px;margin-bottom:20px}.fm-incoming-panel h3{margin-top:0}.fm-incoming-player{display:flex;gap:16px;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid var(--fm-border,#315540)}.fm-incoming-identity{display:flex;gap:10px;align-items:center;flex-wrap:wrap;min-width:0}.fm-incoming-identity a{overflow-wrap:anywhere}.fm-incoming-arrival{display:flex;flex-direction:column;gap:4px;text-align:right;min-width:0}.fm-incoming-round{font-weight:600}.fm-incoming-schedule{color:var(--fm-muted)}.fm-incoming-error{color:var(--fm-warning,#f0c75e);overflow-wrap:anywhere}@media(max-width:600px){.fm-incoming-player{display:flex;flex-direction:column;align-items:stretch;gap:8px}.fm-incoming-arrival{text-align:left}.fm-incoming-panel{padding:12px}}")),
+    uiOutput(ns("incoming_players")),uiOutput(ns("team_value_box")),
     actionButton(ns("btn_put_all_on_market"), "Put All Players on Market", icon=icon("tags")),
     players_table_UI(ns("players_table_in_teams"), box_title="Players in Team",
       filter_by_team=FALSE, filter_by_value=FALSE, filter_by_change_value=FALSE,
       filter_by_is_favorite=FALSE, filter_by_is_from_futmondo=FALSE,
       show_position_breakdown=TRUE, hide_bid_column=FALSE))
 }
-players_in_teams_Server <- function(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger=NULL) {
+players_in_teams_Server <- function(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger=NULL, round_catalog=NULL) {
   moduleServer(id, function(input, output, session) {
     bind_factual_reads(c("get_players_from_team","get_my_market_players"),session,login_token,championship_id,user_team_id,
       is_active=is_module_active,refresh_trigger=refresh_trigger)
@@ -16,6 +17,48 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
     ns <- session$ns
     get_reactive_val <- function(x) if (is.function(x)) x() else x
     current_context <- reactive(list(user=fm_scalar(login_token()[["userid"]]), championship=fm_scalar(championship_id()), team=fm_scalar(user_team_id())))
+    incoming <- incoming_clause_source(session,login_token,championship_id,user_team_id,is_module_active,refresh_trigger)
+    incoming_selected <- reactiveVal(NULL)
+    incoming_context <- reactiveVal(NULL)
+    incoming_requested <- reactiveVal(NULL)
+    output$incoming_players <- renderUI({
+      req(is_module_active())
+      rounds<-if(is.function(round_catalog))tryCatch(round_catalog(),error=function(e)data.frame())else data.frame()
+      incoming_clause_panel(incoming(),next_round_context(rounds),ns)
+    })
+    # Register click handlers once per row identity; remove handlers for old rows.
+    incoming_handlers<-list()
+    observe({
+      req(is_module_active());rows<-incoming()$records
+      for(handler in incoming_handlers)handler$destroy()
+      incoming_handlers<<-lapply(as.character(rows$player_id),function(player_id) {
+        observeEvent(input[[paste0("incoming_open_",player_id)]],{
+          current<-incoming()$records
+          record<-current[current$player_id%in%player_id,,drop=FALSE]
+          req(nrow(record)==1L)
+          incoming_requested(player_id)
+          incoming_context(current_context())
+          # Preserve the full cached source row for the existing player card.
+          summary<-incoming_clause_cached_summary(login_token(),championship_id(),user_team_id(),record$player_id)
+          card_row<-incoming_clause_card_snapshot(record,summary)
+          incoming_selected(NULL)
+          showModal(modalDialog(selected_player_UI(ns("incoming_card")),
+            tags$script(HTML(paste0("$(document).off('hidden.bs.modal.fmIncoming','#shiny-modal').on('hidden.bs.modal.fmIncoming','#shiny-modal',function(){Shiny.setInputValue('",ns("incoming_closed"),"',Math.random(),{priority:'event'});});"))),
+            footer=modalButton("Close"),easyClose=TRUE,size="l"))
+          session$onFlushed(function(){
+            if(identical(isolate(current_context()),isolate(incoming_context()))&&identical(isolate(incoming_requested()),player_id))
+              incoming_selected(card_row)
+          },once=TRUE)
+        },ignoreInit=TRUE)
+      })
+    })
+    observeEvent(input$incoming_closed,{incoming_selected(NULL);incoming_requested(NULL)})
+    selected_player_Server("incoming_card",reactive({
+      if(!isTRUE(is_module_active()))return(NULL)
+      if(!identical(incoming_context(),current_context()))return(NULL)
+      incoming_selected()
+    }),login_token,championship_id,user_team_id,refresh_trigger=refresh_trigger,
+      on_bid_updated=function(...)if(is.function(refresh_trigger))refresh_trigger(isolate(refresh_trigger())+1L))
     bulk_context <- reactiveVal(NULL)
     observeEvent(current_context(), { bulk_context(NULL) }, ignoreNULL=FALSE, priority=100)
     players_table_RV <- reactive({
@@ -69,7 +112,13 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       req(is_module_active());roster <- players_table_RV()
       values <- suppressWarnings(as.numeric(roster$value))
       total <- if (length(values) && all(is.finite(values))) player_card_money(sum(values)) else "Unavailable"
-      shinydashboard::valueBox(total, paste(nrow(roster), "players in your squad"), icon=icon("users"), color="green", width=12)
+      arrivals<-incoming();count<-nrow(arrivals$records)
+      incoming_text<-if(identical(arrivals$status,"loading")) {
+        if(count)paste0(count," incoming (checking)")else "checking incoming"
+      }else if(identical(arrivals$status,"partial")) {
+        if(count)paste0(count," incoming · verification incomplete")else "incoming signings need verification"
+      }else paste0(count," incoming")
+      shinydashboard::valueBox(total, paste0(nrow(roster)," players in your squad · ",incoming_text), icon=icon("users"), color="green", width=12)
     })
     # ---- Put All Players on Market Modal ----
     observeEvent(input$btn_put_all_on_market, {
@@ -188,4 +237,159 @@ get_ordinal_position <- function(position) {
     TRUE ~ paste0(position, "th")
   )
   return(position)
+}
+
+# Page-scoped queue: at most two summary reads, with the same account-scoped
+# raw cache used by cards/preflight. Navigation never starts whole-league work.
+incoming_clause_cached_summary <- function(login,championship_id,user_team_id,player_id) {
+  context<-resource_context(login,championship_id,user_team_id,player_id)
+  key<-api_cache_key(paste0("player_summary_",login[["userid"]],"_",championship_id,"_",user_team_id,"_",player_id),context=context)
+  item<-api_cache_env[[key]]
+  if(is.null(item$data)||acquisition_data_unverified(item$data)||
+     as.numeric(difftime(Sys.time(),item$time,units="secs"))>=resource_policy("summary")$ttl)return(NULL)
+  item$data
+}
+
+incoming_clause_source <- function(session,login_token,championship_id,user_team_id,is_active,refresh_trigger=NULL) {
+  state<-shiny::reactiveVal(list(status="loading",records=incoming_clause_empty(),error=NULL))
+  roster_read<-factual_read_adapter(session,"get_players_from_team",login_token,championship_id,user_team_id,
+    is_active=is_active,refresh_trigger=refresh_trigger,state_only=TRUE)
+  history_read<-factual_read_adapter(session,"get_championship_pressroom",login_token,championship_id,user_team_id,
+    is_active=is_active,refresh_trigger=refresh_trigger,state_only=TRUE)
+  generation<-0L;closed<-FALSE;was_active<-FALSE;signature<-NULL;owner<-NULL
+  jobs<-list();queue<-character();summaries<-list();snapshot<-NULL;job_sequence<-0L
+  publish<-function(loading=FALSE) {
+    if(is.null(snapshot))return(invisible(NULL))
+    prior<-shiny::isolate(state())$records
+    result<-reconcile_pending_clause_transfers(snapshot$roster,snapshot$history,summaries,snapshot$team,
+      previous_records=prior)
+    rows<-result$incoming_records
+    state(list(status=if(loading)"loading"else if(any(nzchar(rows$timing_error)))"partial"else "ok",
+      records=rows,error=NULL))
+    invisible(NULL)
+  }
+  pump<-function() {
+    if(closed||!was_active||is.null(snapshot))return(invisible(NULL))
+    while(length(jobs)<2L&&length(queue)) {
+      pid<-queue[1];queue<<-queue[-1];job_sequence<<-job_sequence+1L
+      job_id<-as.character(job_sequence);job_generation<-generation;captured<-snapshot
+      jobs[[job_id]]<<-TRUE
+      # A fresh cache read can settle synchronously without another request.
+      cached<-incoming_clause_cached_summary(captured$login,captured$league,captured$team,pid)
+      if(!is.null(cached)) {summaries[[pid]]<<-cached;jobs[[job_id]]<<-NULL;next}
+      local({
+        id<-job_id;player_id<-pid;version<-job_generation;ctx<-captured
+        current<-function()!closed&&was_active&&identical(generation,version)
+        finish<-function(value=NULL) {
+          jobs[[id]]<<-NULL
+          if(current()) {summaries[player_id]<<-list(value);publish(length(queue)>0L||length(jobs)>0L)}
+          pump();invisible(NULL)
+        }
+        request<-tryCatch(async_adapter_fetch("get_player_summary",list(login=ctx$login,
+          championship_id=ctx$league,user_team_id=ctx$team,player_id=player_id),
+          context=resource_context(ctx$login,ctx$league,ctx$team,player_id,session_id=session$token),
+          is_current=current),error=function(e)promises::promise_reject(e))
+        promises::then(request,function(value)finish(value),function(error)finish())
+      })
+    }
+    if(!length(queue)&&!length(jobs))publish()
+    invisible(NULL)
+  }
+  observer<-shiny::observe({
+    active<-isTRUE(is_active());auth<-login_token()
+    context<-if(valid_login(auth))list(account=fm_scalar(auth[["userid"]]),league=fm_scalar(championship_id()),team=fm_scalar(user_team_id()))else NULL
+    if(!identical(owner,context)) {
+      generation<<-generation+1L;owner<<-context;signature<<-NULL;snapshot<<-NULL;queue<<-character();summaries<<-list()
+      state(list(status="loading",records=incoming_clause_empty(),error=NULL))
+    }
+    if(!active||is.null(context)) {
+      if(was_active){generation<<-generation+1L;queue<<-character();signature<<-NULL}
+      was_active<<-FALSE;return()
+    }
+    was_active<<-TRUE
+    roster<-roster_read(login=auth,championship_id=context$league,user_team_id=context$team,teams=NULL)
+    history<-history_read(login=auth,championship_id=context$league)
+    refresh<-if(is.function(refresh_trigger))refresh_trigger()else 0L
+    if(is.null(roster$data)||is.null(history$data)||roster$status%in%c("stale","partial","unavailable")||
+       history$status%in%c("stale","partial","unavailable")||identical(roster$freshness,"stale")||identical(history$freshness,"stale")||
+       acquisition_data_unverified(roster$data)||acquisition_data_unverified(history$data)) {
+      generation<<-generation+1L;signature<<-NULL;queue<<-character();snapshot<<-NULL
+      previous<-shiny::isolate(state())
+      loading<-roster$status%in%c("loading","refreshing")||history$status%in%c("loading","refreshing")
+      state(list(status=if(loading)"loading"else "partial",records=previous$records,
+        error=if(loading)NULL else "Incoming signings could not be verified because the roster or transaction history failed to load. Use Refresh to retry."))
+      return()
+    }
+    candidates<-pending_clause_candidates(roster$data,history$data,context$team,shiny::isolate(state())$records)
+    if(is.null(candidates)) {
+      generation<<-generation+1L;signature<<-NULL;queue<<-character();snapshot<<-NULL
+      previous<-shiny::isolate(state());state(list(status="partial",records=previous$records,
+        error="Incoming signings could not be verified: roster or transaction identities/timestamps are malformed. Use Refresh to retry."));return()
+    }
+    next_signature<-as.character(openssl::sha256(serialize(list(context,roster$data$id,candidates,
+      attr(roster$data,"observed_at"),attr(history$data,"observed_at"),refresh),NULL)))
+    if(identical(signature,next_signature))return()
+    signature<<-next_signature;generation<<-generation+1L
+    snapshot<<-list(login=auth,league=context$league,team=context$team,roster=roster$data,history=history$data)
+    ids<-unique(as.character(candidates$player_id[candidates$buyer_team_id%in%context$team&!candidates$player_id%in%roster$data$id]));summaries<<-list()
+    for(pid in ids){cached<-incoming_clause_cached_summary(auth,context$league,context$team,pid);if(!is.null(cached))summaries[[pid]]<<-cached}
+    queue<<-setdiff(ids,names(summaries));publish(length(queue)>0L||length(jobs)>0L);pump()
+  })
+  session$onSessionEnded(function(){closed<<-TRUE;generation<<-generation+1L;queue<<-character();snapshot<<-NULL;summaries<<-list();observer$destroy()})
+  shiny::reactive(state())
+}
+
+incoming_clause_panel <- function(state,next_round,ns) {
+  rows<-state$records
+  timing<-if(isTRUE(next_round$available))paste0("Round ",next_round$round_number," starts ",incoming_clause_time(next_round$starts_at)," (Spain)")else "Next round schedule is loading or could not be verified."
+  shiny::tags$section(class="fm-incoming-panel",`aria-labelledby`=ns("incoming_heading"),
+    shiny::tags$h3(id=ns("incoming_heading"),if(!nrow(rows)&&!identical(state$status,"ok"))"Incoming players"else paste0("Incoming players (",nrow(rows),")")),
+    shiny::tags$p(class="fm-incoming-schedule",timing),
+    if(identical(state$status,"loading"))shiny::tags$p(role="status",shiny::icon("spinner",class="fa-spin")," Checking incoming signings…"),
+    if(!is.null(state$error))shiny::tags$p(role="alert",class="fm-incoming-error",state$error),
+    if(!nrow(rows)&&identical(state$status,"ok"))shiny::tags$p("No incoming clause signings."),
+    lapply(seq_len(nrow(rows)),function(i) {
+      row<-rows[i,,drop=FALSE];label<-incoming_clause_round_label(row$joins_at,next_round)
+      logo<-get_team_image_name(row$team,logo=row$logo)
+      roles<-analytics_player_positions(data.frame(role=row$role),multiposition=TRUE)[[1]]
+      role_names<-c(GK="Goalkeeper",DEF="Defender",MID="Midfielder",FWD="Forward")
+      role<-paste(unname(role_names[roles]),collapse=", ")
+      position<-get_reactable_columns_for_players(data.frame(role=role))$role$cell(role)
+      shiny::tags$div(class="fm-incoming-player",
+        shiny::tags$div(class="fm-incoming-identity",
+          if(nzchar(logo))shiny::tags$img(src=paste0(TEAM_LOGO_URL,logo,".png"),alt="",title=row$team,width=24,height=24,loading="lazy",onerror="this.style.display='none';"),
+          shiny::actionLink(ns(paste0("incoming_open_",row$player_id)),row$player_name),position),
+        shiny::tags$div(class="fm-incoming-arrival",
+          shiny::tags$strong(if(!is.na(row$joins_at))paste0("Joins: ",incoming_clause_time(row$joins_at)," (Spain)")else
+            if(identical(state$status,"loading"))"Confirming arrival time…"else "Arrival time could not be verified"),
+          if(nzchar(label))shiny::tags$span(class="fm-incoming-round",label),
+          if(isTRUE(row$overdue))shiny::tags$span("Scheduled time has passed; arrival is awaiting source confirmation."),
+          if(nzchar(row$timing_error)&&!identical(state$status,"loading"))shiny::tags$span(class="fm-incoming-error",row$timing_error)))
+    }))
+}
+
+
+incoming_clause_card_snapshot <- function(record,summary=NULL) {
+  fallback<-list(id=record$player_id,name=record$player_name,
+    role=record$role,team=record$team,logo=record$logo)
+  source_id<-if(is.list(summary$data))fm_scalar(summary$data$id %||% summary$data$`_id`,"")else ""
+  # A response for another player cannot supply either profile or ownership.
+  if(nzchar(source_id)&&!identical(source_id,as.character(record$player_id)))summary<-NULL
+  data<-if(is.list(summary$data))summary$data else fallback
+  data$id<-as.character(record$player_id)
+  data$name<-fm_scalar(data$name,as.character(record$player_name))
+  for(field in c("role","team","logo"))data[[field]]<-fm_scalar(data[[field]],as.character(record[[field]]))
+  row<-translate_player_positions(parse_player_json(data))
+  championship<-if(is.list(summary$championship))summary$championship else list()
+  owner<-if(is.list(championship$owner))championship$owner else list()
+  owner_id<-fm_scalar(owner$`_id` %||% owner$id,fm_scalar(record$seller_team_id,""))
+  # Summary data is profile data: its championship block owns identity and
+  # clause status. An incoming signing must never inherit own-roster actions.
+  for(field in c("owner_team_id","user_team_id","userteamId","userTeamId",
+                 "userTeam._id","userTeam.id","userteam._id","userteam.id"))row[[field]]<-owner_id
+  row$userTeam<-fm_scalar(owner$name,"")
+  row$clause_transferred<-TRUE
+  clause<-championship$clause
+  if(is.list(clause))for(field in names(clause))row[[paste0("clause_",field)]]<-clause[[field]]
+  row
 }

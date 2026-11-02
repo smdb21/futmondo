@@ -162,7 +162,8 @@ selected_player_RV <- players_in_teams_Server(id = "players_in_teams",
                                                  championship_id = championship_id_RV,
                                                  user_team_id = user_team_id_RV,
                                                  user_teams_RV = user_teams_RV,
-                                                 refresh_trigger = refresh_trigger)
+                                                 refresh_trigger = refresh_trigger,
+                                                 round_catalog = round_catalog_RV)
 
   today <- today_Server(id = "today",
                is_module_active = reactive({

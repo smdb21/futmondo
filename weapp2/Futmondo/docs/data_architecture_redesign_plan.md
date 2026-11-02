@@ -389,3 +389,10 @@ Inflow breakdown (2026-10-31): transaction history shows total positive inflow s
 Implemented (2026-11-02): abbreviated shared position pills with full-name tooltips.
 
 Implemented (2026-11-02): wrapping shared headers, unclipped offer badges and source-wide duplicate-price suppression; verification in data_review_results.md.
+
+### 2026-11-02 incoming clause signings — implemented locally
+
+- Add a separate incoming-player panel and an incoming count alongside the actual squad count in My Team. Reuse shared transactions and player summaries to show authoritative `transferDate`, Madrid CET/CEST, and strict before/at/after the next shared round start.
+- Preserve partial/overdue purchases until fresh source evidence confirms arrival, cancellation or a later sale. Incoming card snapshots use championship ownership and pending-clause state; incoming players stay outside current-roster valuation, counts, lineup and listing actions. Existing acquisition-capacity checks remain fail-closed.
+- Queue only incoming candidates with at most two summary reads, reuse existing raw caches, guard contexts/delayed callbacks, and refresh only on stale navigation, manual demand or acknowledged actions. No polling, league-wide scan, migration or new login dependency.
+- Focused regressions, existing acquisition checks, mandatory offline lifecycle and synthetic desktop/phone browser checks passed. See `data_review_results.md` for exact results. Production account data and hosted deployment remain separate verification steps.
