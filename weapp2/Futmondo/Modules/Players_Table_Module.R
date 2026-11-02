@@ -237,15 +237,23 @@ players_table_metric_style <- function() htmlwidgets::JS("function(rowInfo, colu
   var to = t <= 0.5 ? [244, 201, 93] : [124, 255, 155];
   var amount = t <= 0.5 ? t * 2 : (t - 0.5) * 2;
   var color = from.map(function(channel, index) { return Math.round(channel + (to[index] - channel) * amount); });
-  return { backgroundColor: 'rgb(' + color.join(', ') + ')', color: '#102019' };
+  return { '--fm-metric-bg': 'rgb(' + color.join(', ') + ')' };
 }")
+
+# Color belongs to a child badge, not the cell; numeric source values stay intact.
+players_table_metric_cell <- function(digits=1L) htmlwidgets::JS(paste0("function(cellInfo) {
+  var value = cellInfo.value;
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '';
+  return React.createElement('span', {className: 'fm-metric-badge'}, String(Number(value.toFixed(",as.integer(digits),"))));
+}"))
 
 # Keep the data numeric for sorting; missing averages have an empty cell.
 players_table_recent_average_column <- function(n=5L) {
   n <- suppressWarnings(as.integer(n)[1]);if(!is.finite(n))n <- 5L
   reactable::colDef(name=paste0("Avg Last ",max(1L,min(20L,n))),align="center",sortNALast=TRUE,
-    style=players_table_metric_style(),
-    cell=htmlwidgets::JS("function(cellInfo) { var value = cellInfo.value; return typeof value === 'number' && Number.isFinite(value) ? String(Number(value.toFixed(1))) : ''; }")
+    minWidth=110, headerClass="fm-metric-header",
+    header=htmltools::span("Avg last",htmltools::tags$br(),max(1L,min(20L,n))),
+    style=players_table_metric_style(), cell=players_table_metric_cell(1L)
   )
 }
 
@@ -569,8 +577,10 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       table_columns[["recent_points_avg"]] <- players_table_recent_average_column(recent_n)
       if(!is.null(points_ratio_basis))table_columns[["recent_points_ratio"]]<-reactable::colDef(
         name=paste0("Avg Last ",recent_n," / ",if(points_ratio_basis=="value")"Value"else"Clause"," (€M)"),
-        align="center",sortNALast=TRUE,style=players_table_metric_style(),
-        cell=htmlwidgets::JS("function(cellInfo) { var value = cellInfo.value; return typeof value === 'number' && Number.isFinite(value) ? String(Number(value.toFixed(3))) : ''; }"))
+        align="center",sortNALast=TRUE,minWidth=145,headerClass="fm-metric-header",
+        header=htmltools::span(paste0("Avg ",recent_n),htmltools::tags$br(),
+          paste0("/ ",if(points_ratio_basis=="value")"Value"else"Clause"," (€M)")),
+        style=players_table_metric_style(),cell=players_table_metric_cell(3L))
       reactable(players_table,
                 columns = table_columns,
                 meta = rendered_meta,

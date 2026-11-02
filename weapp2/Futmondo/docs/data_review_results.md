@@ -513,3 +513,11 @@ Executed local checks:
 - Mandatory `Rscript test/test_shiny_simulation.R`: **13 checks plus eight tabs passed**, zero external HTTP/live DB mutations; existing benign Plotly warnings remain. `Rscript test/test_deployment_contract.R`: **3 passed**. Only the changed table module's deployment checksum was updated; no dependency/bundle-content changes.
 
 Performance review: a 524-player, 5,240-history-row synthetic fixture measured **51.4 ms** for a complete average+ratio+range publication across 100 iterations; resulting data **54.8 KiB**, metadata **1.6 KiB**. The new two-column range scan alone measured **0.0460 ms** per publication across 10,000 iterations. It runs once per enriched dataset, not per filter or rendered cell. Client styling is constant work per visible metric cell. Metadata-only changes reuse the existing widget and send data+metadata together; page/selection stay intact. No API/DB request, cache invalidation, timer, background work or persistence was added. These are local measurements; hosted/Android visual rendering and live data were deliberately not exercised. Sol 6.1 implemented the change; primary review confirmed the pre-filter domains, independent metadata updates, numeric sorting and scoped diff. Hosted deployment remains separate.
+
+## 2026-11-01 — Mobile metric headers and rounded badges
+
+Primary implementation, no delegation. Replaced full-cell coloring with padded rounded value badges; fixed the theme's forced green text inheritance with dark badge text. Added explicit two-line metric headings and scoped wrapping to override global nowrap/truncation. Source domains, numeric sorting and in-place metadata updates are unchanged. Performance review: one lightweight span per metric cell; no extra calculation, request, timer or table update.
+
+Focused metric colors (8), average formatting/calculation (10) and ratio checks passed. A local real Reactable/Shiny browser fixture with the production CSS passed at 360, 390 and 1200px: dark badge text, rounded padding, uncolored surrounding cells and non-truncated header content. Inspected the 360px screenshot; wide tables retain horizontal scrolling. Hosted Android rendering was not verified.
+
+The mandatory offline lifecycle passed 13 checks plus eight tabs; deployment checks passed 3/3.

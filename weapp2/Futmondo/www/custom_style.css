@@ -1197,3 +1197,24 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 /* Keep actionable offer failures readable until dismissed, including on phones. */
 .fm-offer-error { white-space: normal !important; overflow-wrap: anywhere; line-height: 1.5; }
 #shiny-notification-panel { max-width: calc(100vw - 20px); }
+
+/* Numeric table metrics: compact badges and two-line mobile-readable headings. */
+.reactable .fm-metric-badge {
+  display: inline-block;
+  background-color: var(--fm-metric-bg, transparent);
+  color: #102019;
+  border-radius: 7px;
+  padding: 5px 9px;
+  min-width: 3.5em;
+  text-align: center;
+  font-weight: 600;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+.reactable .rt-th.fm-metric-header,
+.reactable .fm-metric-header .rt-th-content {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  line-height: 1.35;
+}
