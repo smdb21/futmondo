@@ -525,3 +525,7 @@ The mandatory offline lifecycle passed 13 checks plus eight tabs; deployment che
 ## 2026-11-01 — Position color badges
 
 Primary implementation, no delegation. Shared player tables render position labels with padded 7px-radius badges: green goalkeeper, orange defender, blue midfielder, red forward, all with dark text. Primary/secondary position columns reuse the existing position renderer when present. Verified all four shared role mappings and actual CSS rendering at 390px, including colors, text contrast styling, padding and radius. Performance review: existing per-cell badge markup is reused; no requests, timers, refreshes or new dependencies. Hosted rendering was not tested; full lifecycle deliberately skipped for this presentation-only change.
+
+## 2026-11-01 — Total points color scale
+
+Primary implementation, no delegation. Added the existing red/yellow/green rounded numeric badge to Points in every shared player table. Points have an independent full-source domain before filters, preserving numeric sorting and signed/zero/missing handling. Extended metric regressions passed 8/8, checking Points alongside average and ratio in the actual widget and stable source ranges after filtering. Performance review: one additional linear numeric range scan per source update and the existing constant-time visible-cell renderer; no network, database, timer or new refresh work. Full lifecycle deliberately skipped for this small presentation extension; hosted rendering not verified.

@@ -22,7 +22,7 @@ check('actual generated client style applies palette and accessible text consist
 })
 scores<-shiny::reactiveVal(data.frame(player_id=rep(c('a','b','c'),each=3),round=rep(1:3,3),points=c(0,0,0,0,5,10,10,20,30)))
 recent_player_points_source<-function(...)list(history=scores,status=function()NULL)
-source_rows<-shiny::reactiveVal(data.frame(id=c('a','b','c'),name=c('A','B','C'),role=c('Defender','Forward','Midfielder'),value=c(1e6,2e6,4e6)))
+source_rows<-shiny::reactiveVal(data.frame(id=c('a','b','c'),name=c('A','B','C'),role=c('Defender','Forward','Midfielder'),points=c(-2,0,100),value=c(1e6,2e6,4e6)))
 updates<-list()
 updateReactable<-function(outputId,data=NULL,...){if(!is.null(data))updates[[length(updates)+1L]]<<-list(data=data,args=list(...));invisible(NULL)}
 getReactableState<-function(outputId,name,session){switch(name,page=1L,pageSize=5L,selected=NULL,NULL)}
@@ -32,13 +32,13 @@ settle<-function(session){for(i in seq_len(5)){later::run_now(0);session$flushRe
 shiny::testServer(players_table_Server,args=list(players_table_RV=source_rows,user_teams_RV=shiny::reactive(NULL),points_ratio_basis='value'),{
  session$setInputs(recent_games_n=3L);settle(session)
  initial<-output$players_table;global_meta<-table_color_meta();before<-enrichments
- check('initial widget carries independent source ranges and both column styles',{
+ check('initial widget carries independent source ranges and all metric column styles',{
   widget<-jsonlite::fromJSON(initial,simplifyVector=FALSE)$x$tag$attribs
-  stopifnot(identical(global_meta,list(playerMetricRanges=list(recent_points_avg=list(min=0,max=20),recent_points_ratio=list(min=0,max=5)))),
+  stopifnot(identical(global_meta,list(playerMetricRanges=list(recent_points_avg=list(min=0,max=20),recent_points_ratio=list(min=0,max=5),points=list(min=-2,max=100)))),
     widget$meta$playerMetricRanges$recent_points_avg$max==20)
   columns<-widget$columns
-  metric_columns<-Filter(function(column)column$id%in%c('recent_points_avg','recent_points_ratio'),columns)
-  stopifnot(length(metric_columns)==2L,all(vapply(metric_columns,function(column)identical(column$style,as.character(players_table_metric_style())),logical(1))))
+  metric_columns<-Filter(function(column)column$id%in%c('recent_points_avg','recent_points_ratio','points'),columns)
+  stopifnot(length(metric_columns)==3L,all(vapply(metric_columns,function(column)identical(column$style,as.character(players_table_metric_style())),logical(1))))
  })
  session$setInputs(position_filter='Forward');settle(session);filtered_widget<-output$players_table
  check('app filter keeps global ranges without recalculating enrichment',{

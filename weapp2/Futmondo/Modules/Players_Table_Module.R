@@ -214,7 +214,7 @@ players_table_owner_choices <- function(teams_df) {
 
 # One finite range per metric over the loaded source, before any table filters.
 players_table_metric_ranges <- function(rows) {
-  columns <- intersect(c("recent_points_avg", "recent_points_ratio"), names(rows))
+  columns <- intersect(c("recent_points_avg", "recent_points_ratio", "points"), names(rows))
   stats::setNames(lapply(columns, function(column) {
     values <- rows[[column]]
     values <- values[is.finite(values)]
@@ -572,6 +572,9 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       players_table<-isolate(table_display_data());req(players_table)
       rendered_schema<<-schema;rendered_data<<-players_table;rendered_ids<<-isolate(table_display_ids());rendered_meta<<-isolate(table_color_meta())
       table_columns <- get_reactable_columns_for_players(players_table)
+      if("points" %in% names(players_table))table_columns[["points"]]<-reactable::colDef(
+        name="Points",align="center",sortNALast=TRUE,
+        style=players_table_metric_style(),cell=players_table_metric_cell(0L))
       recent_n <- suppressWarnings(as.integer(input$recent_games_n)[1])
       if (!is.finite(recent_n)) recent_n <- 5L
       table_columns[["recent_points_avg"]] <- players_table_recent_average_column(recent_n)

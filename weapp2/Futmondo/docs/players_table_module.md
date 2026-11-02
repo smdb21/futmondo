@@ -128,3 +128,5 @@ Avg Last N has a continuous red (`#FF6B6B`) → yellow (`#F4C95D`) → green (`#
 Initial widgets receive metadata; history updates send numeric data and metadata together through `updateReactable()`. Metadata is compared independently of displayed rows, so a changed filtered-out player recolors visible cells even when their values are unchanged. Such updates preserve the existing widget, page and selection. Changing N rebuilds the existing header/schema as before. No additional requests, timers, persistence, dependencies or browser asset are introduced.
 
 Metric presentation update: color is now passed through a cell CSS variable to a padded 7px-radius badge around the value. The cell keeps its normal background; badge text is dark instead of inheriting the table's forced green text. Both metric headers use explicit line breaks and scoped wrapping to remain readable on narrow screens. Numeric data, global domains and update behavior are unchanged.
+
+The Points column also uses the shared numeric badge renderer and its own finite min/max over the full loaded player dataset. Filtering and pagination do not change this scale; points remain numeric and sortable.
