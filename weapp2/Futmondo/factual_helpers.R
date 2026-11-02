@@ -33,7 +33,7 @@ player_value_growth_ratio <- function(players_df) {
   ratio
 }
 
-market_bid_minimum <- function(player_row) {
+market_bid_minimum <- function(player_row, minimum_at_value = NA) {
   if (is.data.frame(player_row)) {
     if (nrow(player_row) == 0L) return(NA_real_)
     player_row <- as.list(player_row[1, , drop = FALSE])
@@ -53,7 +53,12 @@ market_bid_minimum <- function(player_row) {
       break
     }
   }
-  amounts <- c(value, asking)
+  # The value floor is a league rule, not an unconditional minimum. The
+  # supplied listing amount remains a separate floor when present.
+  enabled<-if(length(minimum_at_value)==1L&&!is.na(minimum_at_value))tolower(as.character(minimum_at_value))else ""
+  if(!enabled%in%c("true","false"))return(NA_real_)
+  if(enabled=="true"&&!is.finite(value))return(NA_real_)
+  amounts <- c(if(enabled=="true")value else NA_real_, asking)
   if (!any(is.finite(amounts))) return(NA_real_)
   ceiling(max(amounts, na.rm = TRUE))
 }

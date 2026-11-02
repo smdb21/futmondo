@@ -349,6 +349,7 @@ Inflow breakdown (2026-10-31): transaction history shows total positive inflow s
 - Reuses the validated league response for startup; preserves the coach preference handshake. Ordinary login works without remember configuration. No scheduled job, polling, unattended harvesting or password persistence.
 - Additive schema includes hash and expiry indexes, RLS and server-role-only grants. Production schema was applied separately; hosted secrets, Posit/Android cookie smoke testing and activation remain pending. See `docs/data_review_results.md` and `docs/login_module.md`.
 - Exit criteria: focused security/browser/lifecycle checks, independent targeted review, verified production table permissions, and a separate hosted cookie check before setting the explicit enable flag.
+- 2026-11-02 follow-up: user reports hosting key/enable variables configured and browser opt-in checked. Fixed locally: saved-access success/failure now stays visible above all page tabs after automatic navigation to Today. Browser regression uses the real dashboard layout with synthetic success/failure and mobile visibility checks. Hosted cookie issuance/restoration remains unverified; configuration alone does not establish that it worked.
 
 ### 2026-11-01 rival cash reconciliation — implemented locally; classification migration applied
 
@@ -390,9 +391,19 @@ Implemented (2026-11-02): abbreviated shared position pills with full-name toolt
 
 Implemented (2026-11-02): wrapping shared headers, unclipped offer badges and source-wide duplicate-price suppression; verification in data_review_results.md.
 
+
 ### 2026-11-02 incoming clause signings — implemented locally
 
 - Add a separate incoming-player panel and an incoming count alongside the actual squad count in My Team. Reuse shared transactions and player summaries to show authoritative `transferDate`, Madrid CET/CEST, and strict before/at/after the next shared round start.
 - Preserve partial/overdue purchases until fresh source evidence confirms arrival, cancellation or a later sale. Incoming card snapshots use championship ownership and pending-clause state; incoming players stay outside current-roster valuation, counts, lineup and listing actions. Existing acquisition-capacity checks remain fail-closed.
 - Queue only incoming candidates with at most two summary reads, reuse existing raw caches, guard contexts/delayed callbacks, and refresh only on stale navigation, manual demand or acknowledged actions. No polling, league-wide scan, migration or new login dependency.
 - Focused regressions, existing acquisition checks, mandatory offline lifecycle and synthetic desktop/phone browser checks passed. See `data_review_results.md` for exact results. Production account data and hosted deployment remain separate verification steps.
+
+
+### 2026-11-02 observed league settings and rival directory — implemented locally
+
+- Use public team-directory squad values, last-access timestamps and signed points consistently in the Rivals table and selected card. Add the requested theme-background-to-red points pills and sortable UTC access column, including financial-error recovery.
+- Replace the league-specific €300M/user-confirmed opening-cash fallback with observed `configuration.budget`, retaining saved configuration reuse and actual opening movement precedence. Remove the obsolete defaults-table read.
+- Replace the fixed 50% borrowing assumption with `configuration.mnmp` in both display and acquisition checks; respect `mbmv` in bid minimums and retain authoritative API ceilings and final manual preflights.
+- Expand Admin to the supplied configuration keys using verified public client/translation evidence, compact responsive disclosure rows, dynamic clause delay and explicit unresolved codes. Exact incoming arrival continues to use source `transferDate`.
+- Local focused accounting/configuration, desktop/mobile and lifecycle checks are tracked in `data_review_results.md`. No live account transactions, database migration, deployment or hosted verification are included. This supersedes earlier opening-cash fallback descriptions in this plan.

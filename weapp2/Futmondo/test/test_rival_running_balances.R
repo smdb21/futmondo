@@ -6,7 +6,7 @@ suppressPackageStartupMessages({
 })
 n<-0L
 check<-function(name,expr){force(expr);n<<-n+1L;cat('PASS',name,'\n')}
-now<-as.POSIXct('2026-10-31T12:00:00',tz='UTC');cid<-rival_cash_league_id
+now<-as.POSIXct('2026-10-31T12:00:00',tz='UTC');cid<-'fixture-league'
 teams<-data.frame(teamid='a',teamname='A',points=5)
 rules<-list(initial_budget=100,money_per_point=2,ranking_pool=0,ranking_mode='top',users_to_rank=-1,dreamteam_reward=5,mvp_reward=10)
 e<-function(type,id,p,at=now)rival_finance_evidence('u',cid,'unknown',type,id,p,at)

@@ -1,6 +1,13 @@
 > Current contract (2026-10-31): [Rival cash accounting](rival_cash_accounting.md) is authoritative. Summary, league table and transaction history share one reconstructed ledger. Actual dated movements show running cash; undated rewards have a separate reconciliation section with no invented payment dates. Observed official cash is separate. Older implementation descriptions below are historical and superseded by that contract.
 
 
+## Current directory display — 2026-11-02
+
+The selectable financial standings table now retains public **Squad Value**, **Last Access (UTC)** and **Points** even when financial details are unavailable. Raw monetary/score values and numeric timestamps remain sortable. `rivals_last_access_cell()` formats UTC dates with a precise timestamp tooltip. `rivals_points_pills()` precomputes one league-wide background-to-red scale; negative/zero scores remain numeric, missing scores remain unavailable, and equal scores use the background color. Text switches between black/white for readable contrast. Sorting and pagination preserve the color domain.
+
+`rivals_summary_values()` returns `squad_value` using directory `teamValue`, ledger `team_value`, then information `teamValue`. The selected card no longer recomputes a roster sum or invents zero while loading. These display changes make no extra data requests. The former fixed €300M default described in historical sections below is removed; see the current accounting contract.
+
+
 # Rivals Module - Rivals Scouting Page
 
 This document describes the `Rivals_Module.R` Shiny module that implements the "Rivals" scouting page. It allows the logged-in user to select any team in the championship, view their financial overview, and inspect their full player roster with clause-to-value ratio indicators.

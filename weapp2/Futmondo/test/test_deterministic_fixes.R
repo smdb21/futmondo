@@ -124,7 +124,7 @@ futmondo_post <- function(...) stop("Unexpected external API request in offline 
 
 
 det_record("capacity_ok_snapshot", {
-  det_seed_capacity(list(budget=50000000,withheld=10000000,configuration=list(maxPlayersInRoster=25)),
+  det_seed_capacity(list(budget=50000000,withheld=10000000,configuration=list(maxPlayersInRoster=25,mnmp=.5,mbmv=TRUE)),
     data.frame(id=c(pid,"other_player"),bid_id=c("bid1","bid2"),bid_price=c(5000000,7000000),numberOfBids=c(2,1)))
   cap <- get_acquisition_capacity(login, champ, team, target_player_id=pid)
   stopifnot(cap$status=="ok",cap$roster$count==24L,cap$roster$cap==25L,cap$roster$remaining_slots==1L,
@@ -218,7 +218,7 @@ det_record("preflight_funds_over_spendable_rejected_modify_delta", {
 })
 
 det_record("capacity_missing_withheld_partial_preflight_blocks", {
-  det_seed_capacity(list(budget=50000000,configuration=list(maxPlayersInRoster=25)),det_empty_market())
+  det_seed_capacity(list(budget=50000000,configuration=list(maxPlayersInRoster=25,mnmp=.5,mbmv=TRUE)),det_empty_market())
   cap <- get_acquisition_capacity(login,champ,team)
   stopifnot(cap$status=="partial",is.na(cap$funds$spendable_budget))
   for(action in c("bid","clause")) {
@@ -228,13 +228,13 @@ det_record("capacity_missing_withheld_partial_preflight_blocks", {
 })
 
 det_record("capacity_negative_withheld_partial", {
-  det_seed_capacity(list(budget=50000000,withheld=-5000000,configuration=list(maxPlayersInRoster=25)),det_empty_market())
+  det_seed_capacity(list(budget=50000000,withheld=-5000000,configuration=list(maxPlayersInRoster=25,mnmp=.5,mbmv=TRUE)),det_empty_market())
   cap<-get_acquisition_capacity(login,champ,team)
   stopifnot(cap$status=="partial",is.na(cap$funds$spendable_budget),!evaluate_acquisition_preflight(cap,"bid",1000000)$ok)
 })
 
 det_record("capacity_valid_zero_withheld_ok", {
-  det_seed_capacity(list(budget=0,withheld=0,configuration=list(maxPlayersInRoster=25)),det_empty_market())
+  det_seed_capacity(list(budget=0,withheld=0,configuration=list(maxPlayersInRoster=25,mnmp=.5,mbmv=TRUE)),det_empty_market())
   cap<-get_acquisition_capacity(login,champ,team)
   stopifnot(cap$status=="ok",cap$funds$reported_budget==0,cap$funds$spendable_budget==0,
     !evaluate_acquisition_preflight(cap,"bid",1000000)$ok)
@@ -242,7 +242,7 @@ det_record("capacity_valid_zero_withheld_ok", {
 
 det_record("capacity_incoming_offers_are_not_outgoing_bids", {
   incoming<-data.frame(id=pid,bid_id="incoming",bid_price=9000000,bidder_team_id="rival")
-  det_seed_capacity(list(budget=50000000,withheld=10000000,configuration=list(maxPlayersInRoster=25)),det_empty_market(),incoming)
+  det_seed_capacity(list(budget=50000000,withheld=10000000,configuration=list(maxPlayersInRoster=25,mnmp=.5,mbmv=TRUE)),det_empty_market(),incoming)
   cap<-get_acquisition_capacity(login,champ,team,target_player_id=pid)
   stopifnot(cap$status=="ok",cap$outstanding$count==0,cap$outstanding$total_amount==0,
     cap$funds$spendable_budget==40000000,is.null(cap$target$my_bid_id),is.na(cap$target$my_bid_amount),
@@ -252,7 +252,7 @@ det_record("capacity_incoming_offers_are_not_outgoing_bids", {
 det_record("capacity_own_market_bid_is_counted_once_and_sealed_amounts_remain_unknown", {
   market<-data.frame(id=c(pid,pid),bid_id="own",bid_price=5000000,numberOfBids=2)
   incoming<-data.frame(id=pid,bid_id="incoming",bid_price=9000000,bidder_team_id="rival")
-  det_seed_capacity(list(budget=50000000,withheld=10000000,configuration=list(maxPlayersInRoster=25)),market,incoming)
+  det_seed_capacity(list(budget=50000000,withheld=10000000,configuration=list(maxPlayersInRoster=25,mnmp=.5,mbmv=TRUE)),market,incoming)
   cap<-get_acquisition_capacity(login,champ,team,target_player_id=pid)
   stopifnot(cap$status=="ok",cap$outstanding$count==1,cap$outstanding$total_amount==5000000,
     cap$funds$spendable_budget==40000000,cap$target$my_bid_id=="own",cap$target$my_bid_amount==5000000,

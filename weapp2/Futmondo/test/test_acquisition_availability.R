@@ -9,7 +9,7 @@ response<-function(url,body){
  route<-tail(strsplit(url,'/',fixed=TRUE)[[1]],1);q<-jsonlite::fromJSON(body)$query
  requests<<-c(requests,route)
  answer<-switch(route,information={
-   value<-list(budget=1000,withheld=0,teamValue=2000,maxBid=2000,configuration=list(maxPlayersInRoster=20))
+   value<-list(budget=1000,withheld=0,teamValue=2000,maxBid=2000,configuration=list(maxPlayersInRoster=20,mnmp=.5,mbmv=TRUE))
    if(missing_withheld)value$withheld<-NULL;value
  },roster=list(list(id='owned',name='Owned',role='defensa',value=2000,change=0,points=5,teamId='club')),
  players=list(list(id='target',name='Target',role='defensa',value=1000,change=0,points=5,bid=list(id='own',price=100),numberOfBids=1)),

@@ -189,3 +189,9 @@ This section documents the underlying game mechanics and transaction rules that 
 To prevent teams from hoarding players or repeatedly stealing players in rapid succession, Futmondo implements a systemic protection rule:
 * **Release Clause Cooldown**: Immediately after a player is acquired by a user (via bidding or release clause), they are temporarily protected. They **cannot be bought by release clause** until the league-specific system cooldown duration expires.
 * **Custom Offers Protected Window**: During this protection window, other users are still permitted to submit custom transfer bids to the new owner. However, because release clauses are locked, the new owner holds absolute veto power—they can choose to manually accept or decline any received bids.
+
+## Information configuration and rival directory (2026-11-02)
+
+`/1/userteam/information` distinguishes current `answer.budget` from starting `answer.configuration.budget`. Acquisition borrowing uses `configuration.mnmp`, minimum-value bidding uses `configuration.mbmv`, and top-level `answer.maxBid` remains a monetary API cap. Clause delivery delay is `configuration.playerMoveInDays`; exact arrival remains the player summary's `championship.clause.transferDate`. See [Admin mapping](admin_module.md) for verified abbreviated fields and unresolved codes.
+
+`/2/championship/teams` returns `answer.teams[].teamValue`, `points` and `lastAccess`. Rivals uses these public fields without a second per-team request; timestamps remain UTC and absent values remain distinct from zero. No request credentials or captured private bodies are included in the regression fixtures or documentation.

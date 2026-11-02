@@ -35,13 +35,13 @@ fm_time <- function(x) {
   as.POSIXct(values, origin="1970-01-01", tz="UTC")
 }
 
-# Futmondo permits a temporary negative balance down to half the team value.
+# Temporary borrowing follows configuration$mnmp, with no assumed percentage.
 # `withheld` is the API's reservation for active outgoing offers. When the
 # market endpoint reports the same offers, both fields describe the same held
 # money and must not be subtracted twice. This is acquisition headroom only:
 # cash must be positive when a round begins.
 acquisition_headroom <- function(cash, team_value, withheld = 0,
-                                 commitments = 0, debt_fraction = 0.5) {
+                                 commitments = 0, debt_fraction = NA_real_) {
   values <- vapply(list(cash, team_value, withheld, commitments, debt_fraction),
     fm_number, numeric(1))
   names(values) <- c("cash", "team_value", "withheld", "commitments", "debt_fraction")
@@ -85,7 +85,10 @@ round_finance_display <- function(team_state, market_state) {
   projected_committed_balance <- spendable <- NA_real_
   if (fresh(team_state) && is.finite(cash) && is.finite(withheld) && withheld >= 0 && is.finite(commitments)) {
     projected_committed_balance <- cash - max(withheld, commitments)
-    spendable <- acquisition_headroom(cash, team_value, withheld, commitments)$spendable_budget
+    spendable <- acquisition_headroom(cash, team_value, withheld, commitments,
+      debt_fraction=fm_number(team$configuration$mnmp))$spendable_budget
+    api_limit<-fm_number(team$maxBid)
+    if(is.finite(spendable)&&is.finite(api_limit))spendable<-min(spendable,max(0,api_limit))
   }
   confirmed_problem <- fresh(team_state) &&
     ((is.finite(cash) && cash <= 0) || (is.finite(projected_committed_balance) && projected_committed_balance <= 0))

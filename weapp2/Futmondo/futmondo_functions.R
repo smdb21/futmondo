@@ -1511,15 +1511,15 @@ incoming_clause_round_label <- function(joins_at,next_round) {
 # Returns a structured list:
 #   status      -- "ok" | "partial" | "unavailable". Status is "ok" only when
 #                  roster cap, roster count, reported budget, outstanding bids,
-#                  AND a valid (finite, non-negative) withheld are all present.
+#                  AND valid withheld and configured borrowing fraction are present.
 #                  A missing / non-finite / negative withheld makes funds
 #                  verification incomplete -> status "partial" (fail closed; we
 #                  never assume withheld = 0).
 #   roster      -- list(count, cap, remaining_slots)
 #   funds       -- list(reported_budget, withheld, team_value, debt_limit,
 #                  minimum_balance, spendable_budget). Spendable funds include
-#                  temporary borrowing down to -50% of verified team value.
-#                  withheld is not valid (funds verification incomplete).
+#                  temporary borrowing using configuration$mnmp and verified team value.
+#   rules       -- list(minimum_bid_at_value), from configuration$mbmv.
 #   outstanding -- list(offers, count, total_amount, completeness)
 #   target      -- list(my_bid_id, my_bid_amount, highest_bid, bid_count)
 #   diagnostics -- character vector of data-availability notes
@@ -1557,6 +1557,7 @@ get_team_acquisition_capacity <- function(login, championship_id, user_team_id) 
     budget_val <- NA_real_
     team_value_val <- NA_real_
     withheld_val <- NA_real_
+    debt_fraction <- NA_real_
     withheld_valid <- FALSE
     info <- tryCatch(
       get_user_team_info(login = login, championship_id = championship_id, user_team_id = user_team_id),
@@ -1566,6 +1567,7 @@ get_team_acquisition_capacity <- function(login, championship_id, user_team_id) 
       diagnostics <- c(diagnostics, "team info unavailable")
     } else {
       cfg <- if (is.list(info)) info[["configuration"]] else NULL
+      debt_fraction <- fm_number(cfg$mnmp)
       if (!is.null(cfg) && !is.null(cfg[["maxPlayersInRoster"]])) {
         cap_val <- suppressWarnings(as.integer(cfg[["maxPlayersInRoster"]]))
       }
@@ -1653,8 +1655,10 @@ get_team_acquisition_capacity <- function(login, championship_id, user_team_id) 
     }
 
     # ---- 5. Status + spendable funds ----
-    # Bids may temporarily use credit down to half the verified team value.
-    borrowing <- acquisition_headroom(budget_val, team_value_val, withheld_val, bid_total)
+    # A missing league percentage never becomes an assumed borrowing allowance.
+    if(!is.finite(debt_fraction)||debt_fraction<0)
+      diagnostics<-c(diagnostics,"league borrowing percentage unavailable")
+    borrowing <- acquisition_headroom(budget_val, team_value_val, withheld_val, bid_total, debt_fraction)
     spendable <- if (bids_complete && withheld_valid) borrowing$spendable_budget else NA_real_
 
     required_available <- sum(
@@ -1668,9 +1672,9 @@ get_team_acquisition_capacity <- function(login, championship_id, user_team_id) 
       status <- "unavailable"
     } else if (required_available < 5) {
       status <- "partial"
-    } else if (!withheld_valid) {
-      # All structural data is present, but funds cannot be verified (withheld
-      # missing / non-finite / negative). Fail closed: do not assume withheld = 0.
+    } else if (!withheld_valid || !is.finite(borrowing$spendable_budget)) {
+      # Structural data alone cannot establish funds when held funds or the
+      # configured borrowing allowance are missing/invalid.
       status <- "partial"
     } else {
       status <- "ok"
@@ -1696,7 +1700,9 @@ get_team_acquisition_capacity <- function(login, championship_id, user_team_id) 
         pending_inbound_ids=transfer_state$pending_inbound_ids,
         pending_inbound_count=transfer_state$pending_inbound_count
       ),
+      rules = list(minimum_bid_at_value = info$configuration$mbmv %||% NA),
       funds = list(
+        debt_fraction = debt_fraction,
         reported_budget = budget_val,
         withheld = withheld_val,
         team_value = team_value_val,
@@ -1743,6 +1749,7 @@ acquisition_unavailable_message <- function(capacity) {
   mapping<-c("team info unavailable"="Your team balance and league rules did not load",
     "maxPlayersInRoster unavailable"="The league roster limit did not load",
     "reported budget unavailable"="Your current cash balance did not load",
+    "league borrowing percentage unavailable"="The league borrowing allowance could not be verified",
     "roster fetch failed"="Your roster did not load", "team or roster data is stale or incomplete"="Your team or roster data needs a fresh read", "roster identities unavailable"="Your roster player IDs could not be verified",
     "pending clause transfers unavailable"="Pending clause transfers could not be verified",
     "team value unavailable (debt limit unverified)"="Your squad value is missing, so the borrowing limit cannot be verified",
@@ -2591,7 +2598,7 @@ get_official_round_mvps <- function(login, championship_id, rounds) {
   mvp_result(if(ok) "ok" else "partial",rows,paste(unique(vapply(results,function(x)x$reason,character(1))),collapse=" "),complete=ok)
 }
 
-calculate_futmondo_ranking_prizes <- function(money = 30000000, members = 1) {
+calculate_futmondo_ranking_prizes <- function(money, members = 1) {
   if (is.null(members) || is.na(members) || members <= 0) members <- 1
   if (is.null(money) || is.na(money) || money <= 0) money <- 0
 

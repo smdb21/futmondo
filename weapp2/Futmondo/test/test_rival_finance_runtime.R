@@ -5,7 +5,7 @@ n<-0L
 check<-function(name,expr){force(expr);n<<-n+1L;cat('PASS',name,'\n')}
 build_scoped<-build_rival_cash_dataset
 build_rival_cash_dataset<-function(...,account_id='u')build_scoped(...,account_id=account_id)
-cid<-rival_cash_league_id;now<-as.POSIXct('2026-10-31T12:00:00',tz='UTC')
+cid<-'fixture-league';now<-as.POSIXct('2026-10-31T12:00:00',tz='UTC')
 teams<-data.frame(teamid=c('a','b'),teamname=c('A','B'),points=c(100,200))
 e<-function(type,id,p,at=now,season='unknown')rival_finance_evidence('u',cid,season,type,id,p,at)
 m<-function(id,money,type='bonus',bonus='',round='',player='',at=now)e('movements',paste('a',id,sep=':'),list(id=id,team_id='a',money=money,type=type,category='',concept=id,date=rival_finance_stamp(at),bonus_type=bonus,round_id=round,player_id=player),at)
@@ -15,10 +15,47 @@ check('movement decoder preserves signed/missing amounts and identities without 
   x<-normalize_money_movements(list(list(`_id`='x')));stopifnot(is.na(x$money),!attr(x,'complete'))
   stopifnot(!attr(normalize_money_movements(list(error=TRUE)),'complete'))
 })
+check('opening cash uses configuration rather than current balance or legacy defaults',{
+  legacy<-data.frame(championship_id=cid,amount=300000000,source='user_confirmed')
+  for(amount in c(0,42000000,300000000)){
+    rules<-normalize_league_rules(list(budget=63047149,configuration=list(budget=amount)),championship_id=cid)
+    opening<-rival_opening_cash(cid,rules,legacy)
+    stopifnot(opening$amount==amount,opening$source=='league configuration')
+    out<-build_rival_cash_dataset(teams,cid,rules=rules,opening_defaults=legacy)$team_finances
+    stopifnot(all(out$initial_budget==amount),all(out$estimated_cash==amount))
+  }
+  opening<-rival_opening_cash(cid,normalize_league_rules(list(budget=63047149)),legacy)
+  stopifnot(is.na(opening$amount),opening$source=='unknown')
+  out<-build_rival_cash_dataset(teams,cid,opening_defaults=legacy)$team_finances
+  stopifnot(all(is.na(out$initial_budget)),all(is.na(out$estimated_cash)))
+})
+check('saved observed configuration restores opening cash during a live information failure',{
+  local({
+    original<-async_adapter_fetch;on.exit(async_adapter_fetch<<-original)
+    info<-list(budget=63047149,configuration=list(budget=42000000))
+    attr(info,'observed_at')<-now
+    saved<-rival_team_evidence(list(team_id='a',info=info,movements=NULL),'u',cid,'unknown')
+    stopifnot(length(rival_evidence_rows(saved,'rules'))==1L)
+    async_adapter_fetch<<-function(fn,args,context,...){
+      result<-switch(fn,get_rival_finance_saved=list(evidence=saved,complete=TRUE),
+        get_rival_finance_seed=list(info=NULL,rules=normalize_league_rules(NULL),pressroom=data.frame()),
+        get_rival_team_finance_observation=list(team_id=args$user_team_id,info=NULL,movements=NULL))
+      promises::promise_resolve(result)
+    }
+    testServer(function(input,output,session){
+      source<-shared_rival_finance_source(session,function()c(userid='u',token='synthetic'),function()cid,
+        function()'a',function()teams,function()TRUE,function()list(rows=data.frame(),complete=FALSE))
+    },{
+      for(i in seq_len(40L)){later::run_now(0);session$flushReact()}
+      stopifnot(!source()$finance_loading,all(source()$team_finances$initial_budget==42000000),
+        all(source()$team_finances$estimated_cash==42000000))
+    })
+  })
+})
 check('latest correction replaces one movement; repeated notification is not cash',{
   rows<-list(m('x',10),m('x',15,at=now+1),e('notifications','n',list(round_id='r',message='points published')))
-  out<-build_rival_cash_dataset(teams,cid,evidence=rows,now=now,account_id='u')$team_finances
-  stopifnot(out$estimated_cash[1]==300000015,out$estimated_cash[2]==300000000)
+  out<-build_rival_cash_dataset(teams,cid,evidence=rows,rules=list(initial_budget=100),now=now,account_id='u')$team_finances
+  stopifnot(out$estimated_cash[1]==115,out$estimated_cash[2]==100)
 })
 check('full ideal XI and separate MVP use historical eligibility, replaced selections remove former recipients',{
   rules<-list(initial_budget=100,dreamteam_reward=10,mvp_reward=20,money_per_point=0,ranking_pool=0)

@@ -587,6 +587,7 @@ Position-pill abbreviation change: no delegation. Presentation-only mapping to G
 
 Header/price presentation, 2026-11-02: no delegation. Fixed nowrap headers and actual rt-text-content clipping; widened offer columns to 180px. Full-source price deduplication preserves distinct asking prices and NA versus zero. Existing metric suite passed 9/9; offline lifecycle passed 13 checks plus eight tabs. Final Chromium fixture at 1440px and 390px confirmed five full headers and two offer amounts (including a billion-value amount) fit. Performance: CSS/width changes add no data work; duplicate detection compares at most three numeric vectors on existing table updates, no API reads or timers. Hosted browser not verified.
 
+
 ## Incoming clause signings — 2026-11-02
 
 Implemented a separate My Team incoming-signings panel and a separate incoming count in the current squad subtitle. Captured summary responses supply the actual `transferDate` (including Madrid-midnight deliveries), rather than a guessed 96-hour delay. The shared round catalog drives strict before/at/after start labels; source-confirmed arrivals/cancellations and later sales retire rows, while overdue, stale, omitted-history and failed-summary observations retain prior confirmed purchases with an actionable explanation. Current-roster actions and fail-closed acquisition checks retain their original scope.
@@ -595,4 +596,53 @@ Performance review: the active My Team source reuses cached roster/history and r
 
 Verification: incoming-signing regressions 20/20, acquisition availability 7/7, deterministic fixes 30/30, mandatory offline lifecycle 13 checks plus 8 tabs passed. A synthetic actual-app Chromium check passed at 1440, 390 and 360 px: incoming rows/counts, before/after labels, row/stack layout, no panel overflow, and visible player-card identity on clicking an incoming player, authoritative rival ownership and no own-roster sale controls; no JavaScript or visible Shiny errors. No live account request, database migration or hosted deployment verification was performed.
 
+
 Sol implemented the feature; an independent validator checked timing, capacity safety and callback isolation, and the primary agent reviewed the integration and phone panel screenshot. Primary review also corrected incoming-card ownership mapping before delivery. Hosted/live-account verification was deliberately not performed.
+
+### Remembered-login feedback after navigation — 2026-11-02
+
+The user reported a checked remember-device option but no confirmation after login. Traced the feedback from the persistence completion through `Login_Module.R` to the Login tab: the app automatically selects Today on authentication, hiding and suspending the feedback output. The previous browser fixture left Login visible, so it missed this path. Moved the existing namespaced `remember_feedback` output into the shared dashboard layout above the tabs. Success, persistence errors and existing retry controls remain visible after navigation; cookie issuance, storage and authentication logic are unchanged.
+
+Verification:
+- Updated the synthetic HTTPS fixture to use the real `ui.R` dashboard and automatic Login-to-Today transition. Before the fix, it failed waiting for `#login-remember_feedback`: the output was hidden/recalculating after Today opened.
+- `node test/test_remember_login_browser.cjs`: **4 passed / 0 failed** after the fix. Checks visible success after navigation, protected cookie issuance, fresh-session restoration without expiry renewal, logout/reopen, and an injected persistence failure visibly reported on Today without issuing a cookie. Success and error views do not overflow at 390px.
+- `Rscript test/test_remember_login.R`: **16 passed / 0 failed**, including asynchronous validation/cache reuse, security, expiry, isolation and cancellation checks.
+- `Rscript test/test_shiny_simulation.R`: **13 checks plus 8 tabs passed**, including login, navigation, refresh, logout and zero live HTTP/database mutation attempts. The harness emitted fixture/loading diagnostics and empty-plot warnings but no failed checks.
+- The executor initially lacked `sodium` and Playwright. Installed the existing manifest's `sodium` 1.4.0 into `/tmp/futmondo-r-test-library` and browser tools into `/tmp/futmondo-review-tools` and `/tmp/futmondo-playwright-browsers`; checks used `R_LIBS_USER` and `PLAYWRIGHT_BROWSERS_PATH` for those temporary locations. No application dependency or deployment-manifest changes.
+
+Performance review: this relocates one small existing reactive output instead of duplicating it. It adds no API/database requests, cache invalidations, timers, blocking work or growing state; the single feedback render now runs while Today is visible. Authentication/data loading and tables are unaffected. Actual mobile dashboard success/error visibility and overflow checks passed. Documentation has no runtime effect.
+
+Limitations: this confirms the local visibility defect and synthetic cookie flow, not the user's hosted cookie. User reports configuring both hosting variables and checking the option. No live browser cookie, hosting routing, Android persistence or restart behavior was inspected, and nothing was deployed. The current deployed Login tab can still be opened to inspect its saved-access result; hosted issuance/restoration must be checked separately.
+
+
+
+### Configured league rules, compact Admin and public rival fields — 2026-11-02
+
+Fixed the rival squad-value loss at publication: optional team-information `NA` previously masked a finite public-directory `teamValue`. The financial table, loading/error directory and selected card now prefer the public source, preserve true zero/negative points, retain `lastAccess`, and avoid a fabricated zero roster valuation. Points use a stable whole-league background-to-red pill scale with contrast-aware text; timestamps sort numerically and display in UTC.
+
+Starting cash now uses observed `configuration.budget`, including zero, with recorded opening allocations taking precedence once. Both the hardcoded league-specific €300M and stored user-confirmed fallback are removed. Saved observed configuration is still reused across failures; no obsolete `league_cash_defaults` query remains. No table or migration was deleted.
+
+Public Flutter serializer/update handlers plus Spanish translation assets establish the new Admin meanings, units and sentinel values (see `admin_module.md`). All 48 supplied configuration keys are accounted for, with five unresolved codes left explicit. Clause delay uses `playerMoveInDays`; exact incoming time continues to use `transferDate`, never an assumed four-day duration. Admin uses six compact category cards, three columns on desktop and one on phones; explanations/unknown codes open on demand.
+
+A further audit found the hardcoded 0.5 borrowing fraction in shared acquisition/display calculations and an unconditional player-value bid floor. `configuration.mnmp` now supplies the fraction; absent/invalid rules leave purchases unverified. `mbmv` controls the value floor while explicit asking prices remain observed floors. The real dialog and final preflight reuse the same verified minimum. Reported `maxBid`, held-fund deduplication, pending transfers, roster capacity, expiry checks and manual-action protections remain. No live account request or transaction was sent.
+
+Executed verification:
+
+- `test/test_admin_league_settings.R`: six check groups passed, covering zero/false, information precedence, no fixed opening amount, 0/1/2/7/10-day delays, all added mapping choices and compact disclosure markup.
+- `test/test_rival_team_directory.R`: **7 passed**, including the previously failing NA-over-public-value path, cached account/league isolation, selected-card consistency, numeric sorting inputs and no extra requests. `--browser` via `test/test_rival_admin_browser.cjs` passed at **1440px and 390px**: values, stable colors after sort, at least 4.5:1 text contrast, UTC access, disclosure controls, responsive columns and no page overflow. Final desktop screenshot inspected.
+- `test/test_rival_finance_runtime.R`: **18 passed**, including varying configured budgets, rejection of legacy defaults and restoration of saved observed rules when live information fails.
+- Accounting checks: reconciliation **9**, reconstruction **14**, running balances **13**, saved bonus recovery **6** passed. Saved transport verifies zero additional requests when the shared evidence cache is already warm, and no defaults-table request.
+- `test/test_configured_acquisition_rules.R`: **6 passed**. Known-answer borrowing at 0%, 20%, 50%; invalid/missing settings; API ceilings; reservation reuse; the supplied numeric example; true/false/unknown bid floors; actual player-card dialog input minimum and final preflight. All HTTP and mutation paths are blocked or synthetic.
+- Existing debt/countdown **13**, acquisition availability **7**, deterministic fixes **30**, factual helpers **7**, data contracts **13**, history/persistence **7**, and player-data availability checks passed. Successful fixtures now declare their assumed league rules explicitly.
+- Required `test/test_shiny_simulation.R`: **13 checks plus 8 tabs passed** after the final runtime/UI changes, including zero real HTTP/database mutation attempts. Existing fixture/schema diagnostics and empty-plot warnings remain; no failed checks.
+- Scoped whitespace review passed with existing CRLF respected. No application dependency/environment-variable changes; no manifest regeneration was required. Temporary browser tooling from the remembered-login validation was reused.
+
+Performance review:
+
+- No new API/database requests, polling, timers or async tasks. One obsolete defaults-table read is removed. Directory metadata reuses the already cached response; selected valuation no longer depends on roster aggregation. Existing account/league/season isolation, bounded cache sizes, two-request acquisition concurrency, and coalesced finance publication remain unchanged.
+- Local warmed table-construction comparison (10 iterations): 10-team table **12.0 → 15.4 ms**, 100-team table **49.8 → 105.0 ms**. Extra formatted access cells/pills add bounded linear work; colors are calculated once per table, not per sort. These are server construction timings, not hosted browser latency. Existing maximum directory refresh is 100 teams; the ordinary supplied directory has 10.
+- Expanded Admin adapter plus UI averaged **18.18 ms** over 100 local iterations for 46 rows (44 descriptive rows plus two present opaque fields). Native disclosures require no extra JS or requests; full supplied configuration adds three more opaque rows. No state grows with repeated rendering.
+- Actual async acquisition fixture retained **5 cold factual reads**, **0 additional warm target reads**, a responsive heartbeat during delayed responses, **0.690s** local cold completion and **9.7 KiB** result. These figures include the unchanged underlying reads and are not hosting guarantees.
+- Running-ledger check measured **0.094s** for 1,000 transfers, **223.9 KiB**. Documentation and fixture changes have no production runtime cost.
+
+Limitations: implementation and validation are local. Nothing was deployed; current hosted data, hosting latency and actual database persistence acknowledgements were not replayed. Unknown code meanings and extra-payment timing remain unresolved rather than guessed. Direct-sale and clause prices continue to rely on source facts rather than invented formulas; current settings do not establish historical payments or rule changes.

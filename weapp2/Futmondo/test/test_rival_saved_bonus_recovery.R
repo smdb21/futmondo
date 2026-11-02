@@ -37,7 +37,7 @@ fm_async_read_http<-function(url,method='GET',body=NULL,headers=character(),owne
  }else if(identical(url,'https://api.futmondo.com/1/ranking/round')){
   sent<-jsonlite::fromJSON(body);stopifnot(identical(sent$query,list(championshipId=cid,roundNumber=1L,userteamId='a')))
   list(answer=ranking_answer)
- }else if(grepl('/rest/v1/league_cash_defaults',url,fixed=TRUE))list()else stop('Unexpected synthetic request')
+ }else stop('Unexpected synthetic request')
  promises::promise_resolve(list(status_code=200L,content=charToRaw(jsonlite::toJSON(value,auto_unbox=TRUE,na='null',null='null')),times=c(total=.001)))
 }
 await<-function(p){done<-FALSE;value<-failure<-NULL;promises::then(p,function(x){value<<-x;done<<-TRUE},function(x){failure<<-x;done<<-TRUE});deadline<-Sys.time()+5;while(!done){later::run_now(.001);if(Sys.time()>deadline)stop('async timeout')};if(!is.null(failure))stop(failure);value}
@@ -49,7 +49,7 @@ check('actual async DB transport and saved award catalog reuse the corrected dec
  before<-length(http_calls)
  saved<-await(async_adapter_fetch('get_rival_finance_saved',list(account_id=account,championship_id=cid,season='unknown'),ctx))
  stopifnot(length(saved$evidence)==4L,nrow(rival_saved_rounds(saved$evidence))==4L,
-  sum(grepl('/rival_finance_evidence_latest',http_calls))==2L,length(http_calls)==before+1L)
+  sum(grepl('/rival_finance_evidence_latest',http_calls))==2L,length(http_calls)==before,!any(grepl("league_cash_defaults",http_calls,fixed=TRUE)))
 })
 source_rounds<-rival_saved_rounds(decoded,include_ranking=FALSE)
 sig<-rival_ranking_signature(source_rounds,'r1',teams$teamid)

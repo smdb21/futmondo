@@ -47,7 +47,11 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
     await page.locator('#login-password').fill('synthetic-password');
     await page.locator('#login-remember_login').check();
     await page.locator('#login-login_button').click();
+    await page.locator('#shiny-tab-today').waitFor({state: 'visible'});
+    await page.locator('#login-remember_feedback').waitFor({state: 'visible'});
     await page.waitForFunction(() => document.querySelector('#login-remember_feedback').textContent.includes('remembered for 7 days'));
+    assert.equal(await page.locator('#login-login_button').isVisible(), false);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2), false);
     for(let i=0;i<100 && !(await context.cookies()).some(c=>c.name.startsWith('__Secure-fm_remember_'));i++) await page.waitForTimeout(30);
     const cookie = (await context.cookies()).find(c => c.name.startsWith('__Secure-fm_remember_'));
     assert.ok(cookie, JSON.stringify(endpointStatuses));
@@ -55,8 +59,10 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
     assert.ok(cookie.expires > Date.now()/1000 + 604700 && cookie.expires <= Date.now()/1000 + 604801);
     assert.equal(await page.evaluate(() => document.cookie.includes('fm_remember_')), false);
     assert.equal(await page.evaluate(() => Object.values(localStorage).some(v => /synthetic-browser-token|synthetic-password/.test(v))), false);
-    console.log('PASS HTTPS login issues Secure HttpOnly cookie without credentials in browser storage');
+    console.log('PASS HTTPS login confirms remembered access on Today at mobile width and issues a protected cookie');
     await page.reload();
+    await page.locator('#shiny-tab-today').waitFor({state: 'visible'});
+    await page.locator('.sidebar-menu a[data-value="login"]').evaluate(el => el.click());
     await page.waitForFunction(() => document.querySelector('#login-login_feedback').textContent.includes('Session restored'));
     assert.equal((await context.cookies()).find(c => c.name===cookie.name).expires, cookie.expires);
     assert.equal(await page.locator('#login-password').inputValue(), '');
@@ -70,7 +76,18 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
     await page.waitForTimeout(150);
     assert.equal(await page.locator('#login-login_feedback').textContent(), '');
     console.log('PASS logout expires cookie and next page load remains signed out');
-    console.log('REMEMBER LOGIN BROWSER: 3 passed / 0 failed');
+    await page.locator('#login-user_name').fill('remember-failure@example.invalid');
+    await page.locator('#login-password').fill('synthetic-password');
+    await page.locator('#login-remember_login').check();
+    await page.locator('#login-login_button').click();
+    await page.locator('#shiny-tab-today').waitFor({state: 'visible'});
+    await page.locator('#login-remember_feedback').waitFor({state: 'visible'});
+    await page.waitForFunction(() => document.querySelector('#login-remember_feedback').textContent.includes('Remembering this device failed'));
+    assert.equal((await context.cookies()).some(c => c.name.startsWith('__Secure-fm_remember_')), false);
+    assert.equal(await page.locator('#login-login_button').isVisible(), false);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2), false);
+    console.log('PASS failed persistence remains visible on Today without issuing a remembered cookie');
+    console.log('REMEMBER LOGIN BROWSER: 4 passed / 0 failed');
   } catch(error) {
     throw new Error(error.stack + '\nAPP LOG: ' + log);
   } finally {

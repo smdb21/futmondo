@@ -1,5 +1,4 @@
 # League-scoped observed accounting. See docs/rival_cash_accounting.md.
-rival_cash_league_id <- "5b55f9d767214483120b87cf"
 rival_finance_stamp <- function(x=Sys.time()) format(fm_time(x),"%Y-%m-%dT%H:%M:%OS6Z",tz="UTC")
 rival_finance_records <- function(x) {
   if(is.data.frame(x)) return(lapply(seq_len(nrow(x)),function(i)as.list(x[i,,drop=FALSE])))
@@ -65,7 +64,6 @@ read_rival_finance_evidence <- function(account_id,championship_id,season="unkno
 }
 get_rival_finance_saved <- function(account_id,championship_id,season="unknown") {
   result<-tryCatch(read_rival_finance_evidence(account_id,championship_id,season),error=function(e)list(evidence=list(),complete=FALSE))
-  result$defaults<-tryCatch(supabase_get("league_cash_defaults",list(championship_id=paste0("eq.",championship_id),select="championship_id,amount,source")),error=function(e)NULL)
   result
 }
 persist_rival_finance_evidence <- function(evidence,context) {
@@ -95,14 +93,11 @@ rival_merge_evidence <- function(old,new,max_rows=20000L) {
   order<-order(stamp);rows<-rows[order];key<-key[order]
   tail(rows[!duplicated(key,fromLast=TRUE)],max_rows)
 }
+# Legacy context/default arguments remain accepted for callers; only observed
+# configuration establishes opening cash. Recorded opening movements override it.
 rival_opening_cash <- function(championship_id,rules=list(),defaults=NULL) {
   value<-fm_number(rules$initial_budget)
   if(is.finite(value)&&value>=0)return(list(amount=value,source="league configuration"))
-  if(is.data.frame(defaults)&&all(c("championship_id","amount","source")%in%names(defaults))){
-    row<-defaults[defaults$championship_id%in%championship_id & defaults$source%in%"user_confirmed",,drop=FALSE]
-    if(nrow(row)==1L&&is.finite(fm_number(row$amount))&&fm_number(row$amount)>=0)return(list(amount=fm_number(row$amount),source="user confirmed"))
-  }
-  if(identical(as.character(championship_id),rival_cash_league_id))return(list(amount=300000000,source="user confirmed"))
   list(amount=NA_real_,source="unknown")
 }
 rival_cash_latest_movements <- function(evidence,team_id) {
@@ -673,7 +668,10 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
       total_inflow=sum(ledger$amount[ledger$included & is.finite(ledger$amount)&ledger$amount>0]),
       total_outflow=-sum(ledger$amount[ledger$included & is.finite(ledger$amount)&ledger$amount<0]),
       total_spent=spent,total_sales=sales,point_bonus=point_income,ranking_prize=ranking_income,dreamteam_income=ideal_income,mvp_income=mvp_income,
-      team_value=fm_number(info$teamValue %||% team$teamValue),points=fm_number(info$points %||% team$points),
+      # Public directory values are authoritative; optional finance observations
+      # may contain NA and must not erase them when the ledger is republished.
+      team_value=fm_number(team$teamValue,fm_number(info$teamValue)),points=fm_number(team$points,fm_number(info$points)),
+      last_access=mvp_text(team$lastAccess %||% team$last_access,NA_character_),
       squad_size=fm_number(info$squad_size),net_profit_loss=NA_real_,estimate_summary=rival_estimate_summary(missing,assumptions,difference),estimate_notes=paste(reasons,collapse=" "),stringsAsFactors=FALSE)
     breakdowns[[tid]]<-ledger[,c("component","amount","source","round_id","player_id"),drop=FALSE]
     ledger$round_number<-history$rounds$round_number[match(ledger$round_id,history$rounds$round_id)]
@@ -735,6 +733,7 @@ rival_finance_directory <- function(teams) {
   for(field in c("estimated_cash","reconciliation_difference","team_value","points"))rows[[field]]<-NA_real_
   for(field in intersect(c("team_value","points"),names(teams)))rows[[field]]<-suppressWarnings(as.numeric(teams[[field]]))
   if("teamValue"%in%names(teams))rows$team_value<-suppressWarnings(as.numeric(teams$teamValue))
+  rows$last_access<-as.character(teams$lastAccess %||% teams$last_access %||% rep(NA_character_,nrow(teams)))
   rows
 }
 # One shared root-session ledger, rendered in bounded batches rather than per write.

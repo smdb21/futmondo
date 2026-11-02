@@ -291,13 +291,16 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         error = function(e) NULL
       )
 
-      evaluate_acquisition_preflight(
+      minimum<-if(mode %in% c("bid","modify"))market_bid_minimum(sp,capacity$rules$minimum_bid_at_value)else NULL
+      result<-evaluate_acquisition_preflight(
         capacity = capacity,
         mode = mode,
         amount = amount,
         existing_bid_amount = existing_bid_amount,
-        minimum_bid = if (mode %in% c("bid", "modify")) market_bid_minimum(sp) else NULL
+        minimum_bid = minimum
       )
+      result$minimum_bid<-minimum
+      result
     }
 
     # Show a preflight failure notification, distinguishing unavailable
@@ -741,12 +744,12 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         title = tagList(icon("pen-to-square"), " Update Your Active Bid"),
         p(strong(sp$name)),
         p("Current Active Bid: ", strong(player_card_money(bid_info$price))),
-        p("Minimum market bid: ", strong(player_card_money(market_bid_minimum(sp)))),
+        p("Minimum market bid: ", strong(player_card_money(pf$minimum_bid))),
         numericInput(
           ns("new_bid_amount"),
           label = "New Bid Amount (EUR):",
-          value = max(bid_info$price, market_bid_minimum(sp)),
-          min = market_bid_minimum(sp),
+          value = max(bid_info$price, pf$minimum_bid),
+          min = pf$minimum_bid,
           step = 10000
         ),
         uiOutput(ns("new_bid_amount_preview")),
@@ -912,7 +915,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         return(invisible(FALSE))
       }
 
-      market_price <- market_bid_minimum(sp)
+      market_price <- pf$minimum_bid
 
       remember_action_context("bid")
       offer_modal_opened_RV(TRUE)
@@ -1712,7 +1715,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     passive_acquisition_gate<-function(sp,mode){
       state<-card_states$capacity()
       if(identical(state$status,"loading"))return(list(ok=FALSE,reason="loading",message=NULL))
-      evaluate_acquisition_preflight(state$data,mode=mode,minimum_bid=if(mode=="bid")market_bid_minimum(sp)else NULL)
+      evaluate_acquisition_preflight(state$data,mode=mode,minimum_bid=if(mode=="bid")market_bid_minimum(sp,state$data$rules$minimum_bid_at_value)else NULL)
     }
     card_started<-reactiveVal(Sys.time());timed_summary<-FALSE;timed_history<-FALSE
     card_chart_ready<-reactiveVal(FALSE)

@@ -35,7 +35,7 @@ app_market$id <- paste0('m',1:3);app_market$name<-paste('Market Player',1:3)
 app_market$userteamId<-NA_character_;app_market$user_team_id<-NA_character_;app_market$userTeam<-NA_character_
 app_market$computer<-TRUE;app_market$market_inMarket<-TRUE;app_market$price<-2e6;app_market$effective_market_price<-2e6
 app_cfg <- list(budget=30e6,moneyPerPoint=123,moneyPerRanking=456,rankingMode='flop',
-                mvpPlayer=789,dreamTeamPlayer=321,maxPlayersInRoster=20)
+                mvpPlayer=789,dreamTeamPlayer=321,maxPlayersInRoster=20,mnmp=.5,mbmv=TRUE)
 app_financial <- list(status='ok',cash=0,withheld=0,spendable_budget=0,legal_bid_limit=10e6,
   roster_count=17,roster_cap=20,observed_at=Sys.time(),configuration=app_cfg,commitments=list(),
   lineup_rules=list(roster_cap=20))

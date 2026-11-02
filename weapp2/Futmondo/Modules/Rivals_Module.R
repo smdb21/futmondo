@@ -291,30 +291,65 @@ rivals_cash_history_widget <- function(ledger,undated=FALSE) {
       category=colDef(show=FALSE),bonus_type=colDef(show=FALSE),calculation=colDef(show=FALSE),source=colDef(show=FALSE),included=colDef(show=FALSE),unknown_amounts=colDef(show=FALSE),ledger_order=colDef(show=FALSE)))
 }
 
-# Keep the directory selectable when financial cells or audit details are malformed.
+# One scale over the whole league; sorting/pagination do not change its domain.
+rivals_points_pills <- function(points) {
+  points<-vapply(points,fm_number,numeric(1));known<-is.finite(points)
+  colors<-ink<-rep(NA_character_,length(points))
+  if(any(known)){
+    bounds<-range(points[known]);weights<-if(diff(bounds)==0)rep(0,sum(known))else(points[known]-bounds[1])/diff(bounds)
+    tokens<-fm_theme_tokens()
+    rgb<-round(grDevices::colorRamp(c(tokens$surface,tokens$danger))(weights))
+    colors[known]<-grDevices::rgb(rgb[,1],rgb[,2],rgb[,3],maxColorValue=255)
+    linear<-rgb/255;linear<-ifelse(linear<=0.04045,linear/12.92,((linear+0.055)/1.055)^2.4)
+    luminance<-as.vector(linear %*% c(0.2126,0.7152,0.0722))
+    ink[known]<-ifelse(luminance>0.179,"#000000","#FFFFFF")
+  }
+  lapply(seq_along(points),function(i){
+    if(!known[i])return("Unavailable")
+    tags$span(class="fm-metric-badge",style=paste0("--fm-metric-bg:",colors[i],";--fm-metric-fg:",ink[i],";"),
+      format(points[i],trim=TRUE,scientific=FALSE))
+  })
+}
+rivals_last_access_cell <- function(value) {
+  stamp<-fm_time(value)
+  if(length(stamp)!=1L||is.na(stamp))return("Unavailable")
+  tags$span(title=format(stamp,"%Y-%m-%d %H:%M:%OS3 UTC",tz="UTC"),format(stamp,"%d/%m/%Y %H:%M",tz="UTC"))
+}
+
+# Keep observed team fields selectable even if financial audit details fail.
 rivals_finance_table_widget <- function(finances_data,on_error=function(error)NULL) {
   df<-finances_data$team_finances
   if(!is.data.frame(df)||!nrow(df))return(NULL)
+  currency<-function(value){value<-fm_number(value);if(is.finite(value))format_table_currency(value)else""}
+  public_columns<-function(rows){
+    pills<-rivals_points_pills(rows$Points)
+    list(Team=colDef(name="User Team",align="left",minWidth=130),
+      `Squad Value`=colDef(cell=currency,align="right",minWidth=125),
+      `Last Access`=colDef(header=tags$span("Last Access",tags$br(),tags$small("UTC")),
+        minWidth=145,cell=rivals_last_access_cell,headerClass="fm-metric-header"),
+      Points=colDef(align="center",minWidth=90,cell=function(value,index)pills[[index]]))
+  }
   fallback<-function(){
     directory<-rival_finance_directory(df)
-    reactable::reactable(data.frame(Team=directory$teamname,Points=directory$points),
-      compact=TRUE,striped=TRUE,highlight=TRUE,selection="single",onClick="select",defaultPageSize=10,
-      columns=list(Team=colDef(name="User Team",align="left")))
+    rows<-data.frame(Team=directory$teamname,`Squad Value`=directory$team_value,
+      `Last Access`=as.numeric(fm_time(directory$last_access)),Points=directory$points,check.names=FALSE)
+    reactable::reactable(rows,compact=TRUE,striped=TRUE,highlight=TRUE,selection="single",onClick="select",defaultPageSize=10,
+      defaultColDef=colDef(sortNALast=TRUE),columns=public_columns(rows))
   }
   tryCatch({
     df_display<-df %>% dplyr::select(Team=teamname,`Reconstructed balance`=estimated_cash,
-      Confidence=confidence,`Last updated`=as_of,Status=cash_status,`Squad Value`=team_value,Points=points)
-    currency<-function(value){value<-fm_number(value);if(is.finite(value))format_table_currency(value)else""}
+      Confidence=confidence,`Last updated`=as_of,Status=cash_status,`Squad Value`=team_value,`Last Access`=last_access,Points=points)
+    df_display$`Last Access`<-as.numeric(fm_time(df_display$`Last Access`))
     reactable::reactable(df_display,compact=TRUE,striped=TRUE,highlight=TRUE,bordered=FALSE,
       selection="single",onClick="select",defaultPageSize=10,defaultSorted=list(`Reconstructed balance`="desc"),
       defaultColDef=colDef(sortNALast=TRUE),
-      columns=list(Team=colDef(name="User Team",align="left"),
+      columns=c(public_columns(df_display),list(
         `Reconstructed balance`=colDef(align="right",cell=function(value){
           value<-fm_number(value);if(!is.finite(value))return("")
           tags$span(style=if(value<0)"color: var(--fm-danger); font-weight:700;"else"font-weight:700;",currency(value))
         }),`Last updated`=colDef(cell=function(value){
           stamp<-fm_time(mvp_text(value));if(length(stamp)==1L&&!is.na(stamp))unname(format(stamp,"%d-%m %H:%M",tz="UTC"))else""
-        }),`Squad Value`=colDef(cell=currency)))
+        }))))
   },error=function(error){on_error(error);fallback()})
 }
 
@@ -363,6 +398,8 @@ rivals_summary_values <- function(info, teams, finances, team_id) {
   difference<-if(nrow(row)==1L)number(row$reconciliation_difference)else NA_real_
   purchases<-if(nrow(row)==1L)number(row$total_spent)else NA_real_
   sales<-if(nrow(row)==1L)number(row$total_sales)else NA_real_
+  public_team<-if(is.data.frame(teams)&&"teamid"%in%names(teams))teams[teams$teamid%in%team_id,,drop=FALSE]else data.frame()
+  squad_value<-fm_number(public_team$teamValue,fm_number(row$team_value,fm_number(info$teamValue)))
   position <- number(info$position)
   rank_label <- "Rank position"
   if(!is.finite(position) && is.data.frame(teams) && all(c("teamid","points") %in% names(teams))){
@@ -372,7 +409,7 @@ rivals_summary_values <- function(info, teams, finances, team_id) {
       rank_label <- "By total points (ties share rank)"
     }
   }
-  list(cash=cash,label=label,notes=notes,status=status,position=position,rank_label=rank_label,observed_cash=observed,observed_cash_fresh=observed_fresh,difference=difference,purchases=purchases,sales=sales)
+  list(cash=cash,label=label,notes=notes,status=status,position=position,rank_label=rank_label,observed_cash=observed,observed_cash_fresh=observed_fresh,difference=difference,purchases=purchases,sales=sales,squad_value=squad_value)
 }
 
 rivals_status_message <- function(message, loading=FALSE) {
@@ -632,25 +669,14 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       req(is_module_active() == TRUE)
       if (!is.null(refresh_trigger)) refresh_trigger()
       info <- rival_financial_summary_box_RV()
-      roster <- rival_players_table_RV()
       rival_id <- selected_rival_team_id()
-
-      # Compute squad value from roster
-      squad_val <- 0
-      if (!is.null(roster) && nrow(roster) > 0) {
-        if ("value" %in% colnames(roster)) {
-          squad_val <- sum(suppressWarnings(as.numeric(roster$value)), na.rm = TRUE)
-        }
-      }
 
       # Transfer cards reuse the same source precedence/deduplication as cash.
       # Opening allocations, rewards and signed fees are not squad purchases.
       summary <- rivals_summary_values(info,user_teams_RV(),league_finances_RV()$team_finances,rival_id)
       money_out <- total_spent <- summary$purchases
       money_in <- summary$sales
-      if (!is.null(info) && !is.null(info$teamValue) && is.numeric(info$teamValue) && info$teamValue > 0) {
-        squad_val <- info$teamValue
-      }
+      squad_val <- summary$squad_value
       net_gain <- squad_val - total_spent
       net_transfer_pnl <- money_in - money_out
       pnl_color <- if (!is.finite(net_transfer_pnl)) "#64748b" else if (net_transfer_pnl > 0) "#10b981" else if (net_transfer_pnl < 0) "#ef4444" else "#64748b"
@@ -659,7 +685,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       spent_fmt <- ui_financial_amount(total_spent)
       money_out_fmt <- ui_financial_amount(money_out)
       money_in_fmt <- ui_financial_amount(money_in)
-      val_sum <- format_table_currency(squad_val)
+      val_sum <- ui_financial_amount(squad_val)
       net_fmt <- ui_financial_amount(net_gain)
       pnl_fmt <- paste0(pnl_sign, ui_financial_amount(net_transfer_pnl))
 

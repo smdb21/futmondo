@@ -3,7 +3,7 @@ options(futmondo.offline=TRUE)
 suppressPackageStartupMessages({source('futmondo_functions.R');source('supabase_connector.R');source('background_runtime.R');library(shiny)})
 n<-0L
 check<-function(name,expr){force(expr);n<<-n+1L;cat('PASS',name,'\n')}
-cid<-rival_cash_league_id;now<-as.POSIXct('2026-10-31T12:00:00',tz='UTC')
+cid<-'fixture-league';now<-as.POSIXct('2026-10-31T12:00:00',tz='UTC')
 e<-function(type,id,p,at=now)rival_finance_evidence('u',cid,'unknown',type,id,p,at)
 teams<-data.frame(teamid=c('a','b','c'),teamname=c('A','B','C'),points=c(30,20,10))
 rules<-list(initial_budget=300,money_per_point=2,ranking_pool=60,ranking_mode='top',users_to_rank=-1,dreamteam_reward=5,mvp_reward=10)

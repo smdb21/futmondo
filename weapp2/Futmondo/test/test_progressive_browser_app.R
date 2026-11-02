@@ -20,7 +20,7 @@ get_player_full_profile <- function(...)list(profile=list(height=0,weight=0,nati
 read_card_round_history <- function(...)structure(data.frame(),complete=TRUE)
 read_card_price_history <- function(...)structure(data.frame(),complete=TRUE)
 get_acquisition_capacity <- function(...)list(status="ok",roster=list(count=17,cap=20,status="ok"),
-  outstanding=list(count=0),funds=list(spendable_budget=10000000))
+  outstanding=list(count=0),funds=list(spendable_budget=10000000),rules=list(minimum_bid_at_value=TRUE))
 fixture_original_async <- async_adapter_fetch
 async_adapter_fetch <- function(fn,args=list(),context,owner=context$session_id,is_current=function()TRUE) {
   name<-if(is.character(fn))fn else deparse(substitute(fn))

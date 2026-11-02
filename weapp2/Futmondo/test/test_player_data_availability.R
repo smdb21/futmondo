@@ -38,7 +38,7 @@ futmondo_post <- function(url, ...) {
 }
 # Keep finance prerequisites deterministic; player and offer loaders stay real.
 get_user_team_info <- function(...) list(budget = -100, withheld = 200, teamValue = 10000,
-  maxBid = 10000, configuration = list(maxPlayersInRoster = 20))
+  maxBid = 10000, configuration=list(maxPlayersInRoster=20,mnmp=.5,mbmv=TRUE))
 get_championship_pressroom <- function(...) data.frame(player_id = character(),
   buyer_team_id = character(), seller_team_id = character(), created = character())
 load_roster <- function() get_players_from_team(auth, league, team)

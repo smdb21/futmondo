@@ -24,7 +24,6 @@ login_UI <- function(id) {
         icon("spinner", class = "fa-spin"), span("Connecting to Futmondo…")
       ),
       uiOutput(ns("login_feedback")),
-      uiOutput(ns("remember_feedback")),
       tags$script(id = ns("login_feedback_script"), HTML(paste0(
         "(function(){function bindLogin(){",
         "var login=document.getElementById('", ns("login_button"), "');",
