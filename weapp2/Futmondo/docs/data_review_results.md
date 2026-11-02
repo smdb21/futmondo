@@ -646,3 +646,10 @@ Performance review:
 - Running-ledger check measured **0.094s** for 1,000 transfers, **223.9 KiB**. Documentation and fixture changes have no production runtime cost.
 
 Limitations: implementation and validation are local. Nothing was deployed; current hosted data, hosting latency and actual database persistence acknowledgements were not replayed. Unknown code meanings and extra-payment timing remain unresolved rather than guessed. Direct-sale and clause prices continue to rely on source facts rather than invented formulas; current settings do not establish historical payments or rule changes.
+
+
+### Local chat attachment exclusion — 2026-11-02
+
+Added `.codex-attachments/` to the repository-root `.gitignore`. Verified that all 24 images were untracked, all 24 match the ignore rule, Git reports no changes within that directory, and all images remain on disk. Existing ignore entries and unrelated working changes are preserved. Other checkouts receive the rule when they pull it; already tracked attachments, if any elsewhere, would need separate index removal.
+
+Performance review: Git ignore rules and documentation only; no application runtime, API/database, cache, reactive rendering, timer or memory impact. No application tests are needed for this change.

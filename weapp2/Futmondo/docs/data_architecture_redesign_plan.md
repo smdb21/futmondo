@@ -407,3 +407,8 @@ Implemented (2026-11-02): wrapping shared headers, unclipped offer badges and so
 - Replace the fixed 50% borrowing assumption with `configuration.mnmp` in both display and acquisition checks; respect `mbmv` in bid minimums and retain authoritative API ceilings and final manual preflights.
 - Expand Admin to the supplied configuration keys using verified public client/translation evidence, compact responsive disclosure rows, dynamic clause delay and explicit unresolved codes. Exact incoming arrival continues to use source `transferDate`.
 - Local focused accounting/configuration, desktop/mobile and lifecycle checks are tracked in `data_review_results.md`. No live account transactions, database migration, deployment or hosted verification are included. This supersedes earlier opening-cash fallback descriptions in this plan.
+
+
+### 2026-11-02 local chat attachment exclusion — complete locally
+
+- Ignore `.codex-attachments/` in the repository's shared Git rules. All 24 existing untracked images remain on disk and no longer appear in Git changes; future attachments inherit the rule. This repository housekeeping change has no application runtime effect.

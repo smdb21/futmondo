@@ -6,3 +6,6 @@ target/**
 **/rsconnect/**
 *.har
 /weapp2/Futmondo/muxu
+
+# Local chat attachments
+.codex-attachments/
