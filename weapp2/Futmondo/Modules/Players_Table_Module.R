@@ -534,7 +534,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
         "recent_points_count","recent_points_required","recent_points_status")
       if(isTRUE(hide_bid_column))cols_to_hide<-c(cols_to_hide,"bid_price")
       rows<-rows %>% reorder_player_table_columns() %>%
-        dplyr::select(!any_of(cols_to_hide)) %>%
+        dplyr::select(!any_of(setdiff(cols_to_hide,"logo"))) %>%
         dplyr::select(any_of(c("name","recent_points_avg","recent_points_ratio")),everything())
       # Source timestamps belong to the resource state, not widget equality.
       rows<-as.data.frame(rows)

@@ -728,6 +728,22 @@ reorder_player_table_columns <- function(df) {
 get_reactable_columns_for_players <- function(table) {
   columns <- list()
 
+  # Keep the club name as the sortable/filterable value; decorate it with its crest.
+  if ("logo" %in% names(table)) columns[["logo"]] <- colDef(show=FALSE)
+  if ("team" %in% names(table)) columns[["team"]] <- colDef(
+    name="Team", minWidth=190,
+    cell=function(value, index) {
+      if(is.null(value) || is.na(value) || !nzchar(value)) return("")
+      logo <- if("logo" %in% names(table)) table$logo[index] else NULL
+      image_name <- get_team_image_name(value, logo=logo)
+      crest <- if(nzchar(image_name)) shiny::tags$img(
+        src=paste0(TEAM_LOGO_URL,image_name,".png"),alt="",width=22,height=22,
+        loading="lazy",decoding="async",class="fm-team-crest",
+        onerror="this.style.display='none';") else NULL
+      shiny::tags$span(class="fm-team-label",crest,shiny::tags$span(value))
+    }
+  )
+
   # Bids Column ----
   if ("numberOfBids" %in% colnames(table)) {
     columns[["numberOfBids"]] <- colDef(
