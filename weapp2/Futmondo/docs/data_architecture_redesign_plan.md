@@ -429,3 +429,5 @@ Implemented (2026-11-02): wrapping shared headers, unclipped offer badges and so
 - Proxy reproduction failed before the fix and passed afterward. Security, actual browser closure plus R restart, worker-route changes, desktop/mobile presentation and offline lifecycle checks passed; detailed evidence and hosted verification limits are in `data_review_results.md`.
 
 - Hosted follow-up: requests now reach the endpoint; its own 403 required support for rewritten backend Host. The strict browser Fetch Metadata fallback and fixed diagnostic labels passed focused security, proxy restart, lifecycle and deployment checks. Final hosted/device verification remains separate.
+
+- Hosted unauthenticated routing/security verification passed after automatic deployment of `a7e0107`: HTTP 200 / absent-cookie response. Authenticated device save/reopen verification remains pending user confirmation; no hosting upgrade or security-setting change was required.
