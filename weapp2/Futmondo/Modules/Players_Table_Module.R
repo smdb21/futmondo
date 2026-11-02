@@ -15,7 +15,9 @@ players_table_UI <- function(id, box_title = NULL,
                              filter_by_is_from_futmondo = TRUE,
 filter_by_players_with_bid = FALSE,
                              show_position_breakdown = FALSE,
-                             hide_bid_column = FALSE) {
+                             hide_bid_column = FALSE,
+                             default_active_clause = FALSE,
+                             default_free_agents = FALSE) {
   ns <- NS(id)
   tagList(
     shinydashboardPlus::box(
@@ -77,7 +79,7 @@ if (filter_by_position) {
         fluidRow(
           style = "padding: 0 15px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 20px; align-items: center;",
           if (filter_by_active_clause) {
-            div(checkboxInput(inputId = ns("active_clause_filter"), label = "Active Clause Only", value = FALSE), style = "font-weight: 500;", title = "Show only players whose buyout clause is currently payable (lock period has expired)")
+            div(checkboxInput(inputId = ns("active_clause_filter"), label = "Active Clause Only", value = isTRUE(default_active_clause)), style = "font-weight: 500;", title = "Show only players whose buyout clause is currently payable (lock period has expired)")
           },
           if (filter_by_max_clause_value) {
             div(numericInput(inputId = ns("max_clause_value_filter"), label = "Max Clause (M)", min = 0,
@@ -93,7 +95,7 @@ if (filter_by_position) {
             div(checkboxInput(inputId = ns("is_favorite_filter"), label = "Favorites Only", value = FALSE), style = "font-weight: 500;", title = "Show only players you have starred as favorite")
           },
           if (filter_by_is_from_futmondo) {
-            div(checkboxInput(inputId = ns("is_from_futmondo_filter"), label = "Free Agents Only", value = FALSE), style = "font-weight: 500;", title = "Show only unowned players without a user team (free agents / market)")
+            div(checkboxInput(inputId = ns("is_from_futmondo_filter"), label = "Free Agents Only", value = isTRUE(default_free_agents)), style = "font-weight: 500;", title = "Show only unowned players without a user team (free agents / market)")
           },
           if (filter_by_players_with_bid) {
             tagList(
@@ -160,10 +162,41 @@ players_table_normalize_owner <- function(players_df, teams_df = NULL) {
       owner_name[!nzchar(owner_name) & use_mapped] <- mapped[!nzchar(owner_name) & use_mapped]
     }
   }
+  # A populated owner ID/name takes precedence over a conflicting System flag.
+  # Without owner fields, only an explicit computer=TRUE establishes a free agent.
+  owner_id_supplied<-any(c("owner_team_id","user_team_id","userteamId","userTeamId",
+    "userTeam._id","userTeam.id","userteam._id","userteam.id")%in%names(players_df))
+  computer<-if("computer"%in%names(players_df))suppressWarnings(as.logical(as.character(players_df$computer)))else rep(NA,n)
+  players_df$is_free_agent<-!nzchar(owner_id)&!nzchar(owner_name)&
+    (computer%in%TRUE | (is.na(computer)&owner_id_supplied))
   players_df$owner_team_id <- owner_id
   players_df$user_team_id <- owner_id
   players_df$userTeam <- owner_name
   players_df
+}
+
+# Endpoint-optional filter fields remain typed missing, never fabricated zero.
+players_table_filter_fields <- function(rows) {
+  if(!is.data.frame(rows))return(rows)
+  n<-nrow(rows)
+  for(field in c("value","change","bid_price","numberOfBids","clause_price"))
+    rows[[field]]<-if(field%in%names(rows))suppressWarnings(as.numeric(as.character(rows[[field]])))else rep(NA_real_,n)
+  for(field in c("role","role2","clause_date"))
+    rows[[field]]<-if(field%in%names(rows))as.character(rows[[field]])else rep(NA_character_,n)
+  for(field in c("fav","isClause","clause_transferred"))
+    rows[[field]]<-if(field%in%names(rows))suppressWarnings(as.logical(as.character(rows[[field]])))else rep(NA,n)
+  rows
+}
+players_table_active_clause <- function(rows,now=Sys.time()) {
+  field<-function(key,default)if(key%in%names(rows))rows[[key]]else rep(default,nrow(rows))
+  price<-suppressWarnings(as.numeric(as.character(field("clause_price",NA_real_))))
+  transferred<-suppressWarnings(as.logical(as.character(field("clause_transferred",NA))))
+  flag<-suppressWarnings(as.logical(as.character(field("isClause",NA))))
+  available<-transferred%in%FALSE | (is.na(transferred)&flag%in%TRUE)
+  date<-as.character(field("clause_date",NA_character_));no_lock<-is.na(date)|!nzchar(trimws(date))
+  until<-rep(NA_real_,nrow(rows))
+  if(any(!no_lock))until[!no_lock]<-as.numeric(fm_time(date[!no_lock]))
+  is.finite(price)&price>0&available&(no_lock | (is.finite(until)&until<=as.numeric(now)))
 }
 
 players_table_owner_choices <- function(teams_df) {
@@ -219,21 +252,6 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       if (!is.null(refresh_trigger) && is.function(refresh_trigger)) {
         refresh_trigger(isolate(refresh_trigger()) + 1L)
       }
-    }
-
-    # Safe date parsing helper
-    parse_safe_datetime <- function(date_vec) {
-      if (is.null(date_vec) || length(date_vec) == 0) return(as.POSIXct(character(0)))
-      date_str <- as.character(date_vec)
-      clean_str <- gsub("T", " ", date_str)
-      clean_str <- gsub("Z", "", clean_str)
-      clean_str <- gsub("\\..*", "", clean_str)
-      parsed <- suppressWarnings(as.POSIXct(clean_str, format = "%Y-%m-%d %H:%M:%S"))
-      na_idx <- is.na(parsed)
-      if (any(na_idx)) {
-        parsed[na_idx] <- suppressWarnings(as.POSIXct(clean_str[na_idx], format = "%Y-%m-%d"))
-      }
-      return(parsed)
     }
 
     # observers ----
@@ -336,9 +354,10 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       table_refresh_trigger()
       if (is.function(refresh_trigger)) refresh_trigger()
       players_table <- players_table_RV()
-      if (is.null(players_table) || nrow(players_table) == 0) {
-        return(NULL)
-      }
+      if (!is.data.frame(players_table))return(NULL)
+      source_columns<-names(players_table)
+      players_table<-players_table_filter_fields(players_table)
+      filter_added_fields<-setdiff(names(players_table),source_columns)
 
       recent_n <- suppressWarnings(as.integer(input$recent_games_n)[1])
       if (!is.finite(recent_n)) recent_n <- 5L
@@ -357,7 +376,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
         if (input$team_filter != "All") {
           if (input$team_filter == "Free") {
             players_table <- players_table %>%
-              dplyr::filter(is.na(owner_team_id) | !nzchar(trimws(as.character(owner_team_id))))
+              dplyr::filter(is_free_agent)
           } else if (startsWith(as.character(input$team_filter), "team:")) {
             selected_owner <- sub("^team:", "", as.character(input$team_filter))
             players_table <- players_table %>%
@@ -398,17 +417,8 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
           players_table <- players_table[is.finite(clause_values) & clause_values > 0 & clause_values <= funds, , drop = FALSE]
         }
       }
-      if (!is.null(input$active_clause_filter)) {
-        if (input$active_clause_filter) {
-          now_time <- Sys.time()
-          players_table <- players_table %>%
-            dplyr::filter(
-              isClause & (
-                is.na(clause_date) | clause_date == "" | parse_safe_datetime(clause_date) <= now_time
-              )
-            )
-        }
-      }
+      if(isTRUE(input$active_clause_filter))
+        players_table<-players_table[players_table_active_clause(players_table),,drop=FALSE]
       # is_favorite_filter
       if (!is.null(input$is_favorite_filter)) {
         if (input$is_favorite_filter) {
@@ -416,16 +426,8 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
             dplyr::filter(fav == TRUE)
         }
       }
-      if (!is.null(input$is_from_futmondo_filter)) {
-        if (input$is_from_futmondo_filter) {
-          if ("computer" %in% colnames(players_table)) {
-            players_table <- players_table %>%
-              dplyr::filter(computer == TRUE)
-          } else {
-            warning("is_from_futmondo_filter is active but 'computer' column is missing from players_table.")
-          }
-        }
-      }
+      if(isTRUE(input$is_from_futmondo_filter))
+        players_table<-players_table[players_table$is_free_agent%in%TRUE,,drop=FALSE]
       if (!is.null(input$change_value_filter) && !is.na(input$change_value_filter)) {
         players_table <- players_table %>%
           dplyr::filter(change >= input$change_value_filter * 1000000)
@@ -443,6 +445,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
             dplyr::filter(numberOfBids > 0)
         }
       }
+      attr(players_table,"filter_added_fields")<-filter_added_fields
       return(players_table)
     })
     
@@ -465,7 +468,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
     table_display_data <- reactive({
       rows <- players_table_filtered_RV()
       if(is.null(rows))return(NULL)
-      cols_to_hide <- c(cfg_player_columns_to_hide,"data_coverage","observed_at",
+      cols_to_hide <- c(cfg_player_columns_to_hide,attr(rows,"filter_added_fields"),"data_coverage","observed_at","is_free_agent",
         "recent_points_count","recent_points_required","recent_points_status")
       if(isTRUE(hide_bid_column))cols_to_hide<-c(cols_to_hide,"bid_price")
       rows<-rows %>% reorder_player_table_columns() %>%

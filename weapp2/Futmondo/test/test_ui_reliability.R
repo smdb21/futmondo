@@ -2,6 +2,7 @@
 # Offline regression tests: no credentials, HTTP requests or database writes.
 suppressPackageStartupMessages({library(shiny);library(dplyr);library(reactable)})
 options(futmondo.offline=TRUE)
+cfg_player_columns_to_hide <- character()
 source('futmondo_functions.R');source('factual_helpers.R');source('supabase_connector.R')
 get_player_card_history<-function(...)list(points=data.frame(),valuation=data.frame(),status='empty')
 get_player_full_profile<-function(...)NULL

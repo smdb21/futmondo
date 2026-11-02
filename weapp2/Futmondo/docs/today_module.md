@@ -12,3 +12,7 @@ Banner display finances use team information plus normalized own outgoing bids f
 
 
 The optional `coach_source` argument supplies Today’s login-only default-enabled coach checkbox and status. The root owns action safety; the module owns a context-keyed localStorage preference handshake and persistence warnings. Initial primary-settled state is latched per account/league/team, so coach confirmation refreshes team/staff/balance without suspending player-table enrichment or reopening startup UI. See [coach_and_round_awards.md](coach_and_round_awards.md).
+
+## Market presentation (2026-11-01)
+
+The page heading is **Today's market** and its description identifies available market players/offers alongside the existing balances and completed transfers. Its market table starts with **Free Agents Only** checked. This is a table-specific initial setting; users can uncheck it or use Clear Filters to see owned listings too. The navigation label remains Today. No retrieval, financial calculation, action or refresh behavior changed.

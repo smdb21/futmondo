@@ -10,6 +10,7 @@ players_in_championship_UI <- function(id) {
       filter_by_team = TRUE,
       filter_by_value = TRUE,
       filter_by_active_clause = TRUE,
+      default_active_clause = TRUE,
       filter_by_max_clause_value = TRUE,
       filter_by_clause_under_available_funds = TRUE
     )

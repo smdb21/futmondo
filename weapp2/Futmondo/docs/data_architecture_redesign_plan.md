@@ -363,3 +363,10 @@ Inflow breakdown (2026-10-31): transaction history shows total positive inflow s
 - Correct System counterparty handling and ISO chronology in pending-clause reconciliation; do not perform candidate-summary reads for obsolete same-day trades. Preserve source ages across derived caches, inherit source expiry and keep existing 15-second maximum preflight validity.
 - Show one loading status and specific prerequisite explanations without relaxing transaction checks. Explicit app Refresh invalidates capacity and failed prerequisite caches. No polling or new background work.
 - Real asynchronous synthetic and saved-HAR replay validate successful retrieval/reuse. The captured prerequisites are valid; the exact hosted screenshot `partial` cause is not established, and deployment/live runtime verification remains an exit criterion. Local checks/performance are recorded in `data_review_results.md`.
+
+### 2026-11-01 optional player-filter disconnect — fixed locally
+
+- Reproduced the original module's fatal schema-observer error and destroyed Shiny test session when Active Clause Only encounters a native row without optional `clause_date`. Also cover raw rows without derived `isClause`.
+- Normalize only filter inputs, preserve unknowns and original display columns, share authoritative ownership/free-agent semantics, and use positive price/transfer state plus optional UTC lock dates for active clauses. Empty results render and recover without hiding a data exception.
+- Scope initial defaults to Today's market (Free Agents Only) and Players (Active Clause Only); retain Clear Filters and other table defaults. Clarify Today's market heading while retaining its existing content.
+- Focused filter/widget and existing UI/lifecycle checks pass. No new reads, polling, dependencies or schema changes; hosted/mobile deployment verification remains separate.

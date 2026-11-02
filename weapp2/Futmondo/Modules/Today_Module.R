@@ -1,12 +1,12 @@
 # Primary factual content resolves independently of optional history/finances.
 today_UI <- function(id) {
   ns <- NS(id)
-  tagList(h2("Today"),p("Current league balances, market listings and completed transfers."),
+  tagList(h2("Today's market"),p("Available market players and offers, current league balances and completed transfers."),
     coach_preference_script(),checkboxInput(ns("automatically_hire_coach"),"Automatically hire coach",value=TRUE),
     textOutput(ns("coach_status"),container=tags$p),
     fluidRow(uiOutput(ns("kpi_cash_box")),uiOutput(ns("kpi_valuation_box"))),
     uiOutput(ns("market_status")),
-    players_table_UI(ns("market_players"),box_title="Current market listings",filter_by_is_from_futmondo=TRUE,filter_by_players_with_bid=TRUE),
+    players_table_UI(ns("market_players"),box_title="Current market listings",filter_by_is_from_futmondo=TRUE,default_free_agents=TRUE,filter_by_players_with_bid=TRUE),
     h3("Recent transfers"),tableOutput(ns("recent_transfers")))
 }
 today_Server <- function(id,is_module_active,login_token,championship_id,user_team_id,user_teams_RV,refresh_trigger=NULL,primary_sources=NULL,coach_source=NULL) {

@@ -104,3 +104,13 @@ players_table_owner_choices(teams)["Aurora"]
 ## Market access through Today
 
 Today is the sole market-listing page. Its shared players table includes both Your Bids Only and Bidded Only filters, as well as the existing player-card/manual actions. The redundant Market navigation/tab/server instance has been removed. Filters operate on already-loaded rows and do not add requests.
+
+## Optional filters and initial page defaults (2026-11-01)
+
+`players_table_UI()` accepts `default_active_clause=FALSE` and `default_free_agents=FALSE`. Today opts into Free Agents Only initially; the Players page opts into Active Clause Only initially. Other call sites keep their previous unchecked defaults. Clear Filters continues to clear both checkboxes.
+
+`players_table_filter_fields()` supplies typed missing values for source-optional filter fields. These additions are filter-only: the table projection removes newly added placeholders, preserving each endpoint's original displayed columns plus intentional owner/average columns. Missing roles, favorites, offer counts and clause metadata therefore cannot crash the unguarded schema observer, and unknown values are not converted to zero. A genuine zero-row source and a zero-match filter combination retain a renderable empty table and recover when filters change.
+
+`players_table_active_clause(rows, now)` requires a positive observed clause price, an available transfer state (or an explicit normalized clause flag when the transfer field is absent), and no supplied future lock. Missing/empty lock dates mean no supplied lock, matching the Futmondo payload contract; malformed nonempty dates remain ineligible. UTC/offset timestamps use the shared parser. This does not change transaction submission checks or the separate Today clause helper.
+
+Ownership normalization also produces an internal `is_free_agent` mask shared by the owner dropdown's Free agents choice and the checkbox. A populated owner ID alias or owner name takes precedence over `computer`. An explicit computer FALSE with unknown ownership is not treated as free; computer TRUE can establish a free agent when owner fields are absent. The internal mask is hidden from rendered columns.
