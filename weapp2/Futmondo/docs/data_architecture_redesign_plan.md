@@ -383,3 +383,5 @@ Inflow breakdown (2026-10-31): transaction history shows total positive inflow s
 - Recover missing completed-round standings with the captured official unpaged ranking endpoint. Persist signature-bound source rankings within existing eligibility evidence; use actual historical participants without manufacturing a score for an absent directory member. Reuse saved rankings/lineups with two concurrent reads, 120 ranking tasks and the existing 600-lineup cap per refresh.
 - Replace automatic expanded raw audits on team selection with concise status plus optional collapsed calculation notes. Preserve the full cash ledger and all reconciliation surfaces.
 - Focused real-transport synthetic, storage-roundtrip, known-answer, malformed/open/context and offline lifecycle checks pass. No migration/dependency change. Live ranking/lineup API verification, confirmed production saving and hosted/mobile deployment remain separate exit criteria.
+
+- Implemented locally (2026-11-02): positive-only theme-background-to-green numeric pill scale; existing source-wide domains and sorting retained. See data_review_results.md for verification.

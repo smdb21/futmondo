@@ -235,12 +235,15 @@ players_table_metric_style <- function() htmlwidgets::JS("function(rowInfo, colu
   if (typeof value !== 'number' || !Number.isFinite(value) || !range ||
       typeof range.min !== 'number' || !Number.isFinite(range.min) ||
       typeof range.max !== 'number' || !Number.isFinite(range.max)) return {};
-  var t = range.max === range.min ? 0.5 : Math.max(0, Math.min(1, (value - range.min) / (range.max - range.min)));
-  var from = t <= 0.5 ? [255, 107, 107] : [244, 201, 93];
-  var to = t <= 0.5 ? [244, 201, 93] : [124, 255, 155];
-  var amount = t <= 0.5 ? t * 2 : (t - 0.5) * 2;
-  var color = from.map(function(channel, index) { return Math.round(channel + (to[index] - channel) * amount); });
-  return { '--fm-metric-bg': 'rgb(' + color.join(', ') + ')' };
+  var t = range.max === range.min ? 0 : Math.max(0, Math.min(1, (value - range.min) / (range.max - range.min)));
+  var surface = getComputedStyle(document.documentElement).getPropertyValue('--fm-surface').trim();
+  var hex = surface.match(/^#([0-9a-f]{6})$/i);
+  var base = hex ? hex[1].match(/../g).map(function(v) { return parseInt(v, 16); }) : [11, 18, 13];
+  var color = base.map(function(v, i) { return v + ([124, 255, 155][i] - v) * t; });
+  var luminance = color.map(function(v) { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); })
+    .reduce(function(sum, v, i) { return sum + v * [0.2126, 0.7152, 0.0722][i]; }, 0);
+  return { '--fm-metric-bg': 'color-mix(in srgb, var(--fm-surface) ' + ((1 - t) * 100) + '%, #7cff9b)',
+    '--fm-metric-fg': luminance > 0.179 ? '#000000' : '#ffffff' };
 }")
 
 # Color belongs to a child badge, not the cell; numeric source values stay intact.

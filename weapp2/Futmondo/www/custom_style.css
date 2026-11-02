@@ -1181,7 +1181,7 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 .reactable .fm-metric-badge {
   display: inline-block;
   background-color: var(--fm-metric-bg, transparent);
-  color: #102019;
+  color: var(--fm-metric-fg, var(--fm-text));
   border-radius: 7px;
   padding: 5px 9px;
   min-width: 3.5em;

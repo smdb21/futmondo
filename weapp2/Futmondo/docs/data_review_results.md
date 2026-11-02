@@ -576,3 +576,9 @@ No live Futmondo rankings/lineups, production writes or hosted/mobile rendering 
 Final primary review and independent validator checks: saved-data replay, ranking allocations (including ties and negative-start exclusion), stale-signature rejection, account/league/season isolation and recorded-payment deduplication passed. Deployment contract passed 3/3; only the three changed runtime checksums were updated. Live API verification was not performed: automatic approval review rejected reuse of a HAR token without specific authorization, and the permission question remains pending.
 
 Final frozen-code verification after preparation reuse: `test_rival_cash_reconciliation.R` again passed **9/9**, and mandatory `test_shiny_simulation.R` again passed **13 checks plus eight tabs**, with zero external HTTP/live DB mutation attempts. No further runtime changes followed these checks.
+
+## 2026-11-02 — Positive-only numeric pill scale
+
+No delegation. Shared Points/Avg N/ratio badge palette now runs from theme surface to green, with neutral equal domains and luminance-selected black/white text. Existing metric checks passed 8/8, including exact emitted JavaScript, simulated dark/white/light-gray backgrounds at 4.5:1 contrast, numeric domain stability, filtering and updates. Performance review: constant work per rendered cell plus a computed-theme-property read; no data queries, timers, source scans or additional reactive invalidations. Browser/device rendering was not checked; existing application theme is fixed dark, not device-switched.
+
+Required offline lifecycle passed: 13 checks plus eight tabs, with no live HTTP or database mutations.

@@ -132,3 +132,6 @@ Metric presentation update: color is now passed through a cell CSS variable to a
 The Points column also uses the shared numeric badge renderer and its own finite min/max over the full loaded player dataset. Filtering and pagination do not change this scale; points remain numeric and sortable.
 
 Filter layout: checkbox controls and Clear Filters are inside the same bordered panel as dropdown/numeric filters, in both shared layouts. My Team enables only Position and Active Clause Only in that panel; the average-round count remains a calculation control outside it.
+
+### Positive-only metric scale (2026-11-02)
+Points, Avg Last N and value ratios use compact pills from the active `--fm-surface` background at the source minimum to green at the maximum. Equal domains remain neutral. The callback reads the theme surface and chooses black/white text by mixed-background luminance (4.5:1 contrast); source-wide domains and numeric sorting are unchanged. The current app theme remains fixed dark; this does not introduce device-theme switching.
