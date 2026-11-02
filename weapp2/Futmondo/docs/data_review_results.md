@@ -533,3 +533,11 @@ Primary implementation, no delegation. Added the existing red/yellow/green round
 ## 2026-11-01 — Team crests in player tables
 
 Primary implementation, no delegation. The shared Team column displays a 22px club crest beside the unchanged sortable/filterable team name. Retains source logo metadata as a hidden column and reuses the existing player-card image resolver/CDN; missing images leave the name visible. Verified row-specific source logo/name, hidden metadata, lazy image attributes and missing names; metric suite 8/8 and ratio checks passed. Performance review: small hidden logo strings and one lazy, asynchronously decoded image per rendered Team cell; browser caching can reuse club URLs. No new API/database reads or timers. Hosted image loading not verified; full lifecycle skipped for this localized presentation change.
+
+## 2026-11-01 — Readable Today transfer history
+
+Primary implementation, no delegation. Resolved party display names from the existing team directory and captured names; normalized system parties to Futmondo. Added zero-decimal separated euro prices, Date/Name headers, UTC minute precision, player club crest and evidence-based transfer labels. Inspected saved pressroom HAR schema only: all 268 news entries have `_playerTeam` with club name/slug, but none have a transfer-method flag. Parser now retains historical club metadata. Clause methods reuse the isolated current-context rival ledger when it has already classified matching event IDs; otherwise rival method remains explicitly unconfirmed.
+
+Focused fixtures cover buyer/seller labels, source fallback, system IDs, zero/missing prices, rounding, escaping malicious names, historical crest preference, 20-row limit, explicit true/false/unknown clause status and timestamp offsets/minute precision. Performance review: decoration is limited to 20 rows, uses loaded source data and small cached-name/ID lookups; lazy club images add browser CDN fetches only. No new Futmondo/DB reads, finance tasks, timers or progress-driven redraws. Hosted rendering not verified.
+
+Validation completed: focused transfer checks passed; offline lifecycle passed 13 checks plus eight tabs with no external mutations; deployment checks passed 3/3.

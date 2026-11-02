@@ -16,3 +16,9 @@ The optional `coach_source` argument supplies Today’s login-only default-enabl
 ## Market presentation (2026-11-01)
 
 The page heading is **Today's market** and its description identifies available market players/offers alongside the existing balances and completed transfers. Its market table starts with **Free Agents Only** checked. This is a table-specific initial setting; users can uncheck it or use Clear Filters to see owned listings too. The navigation label remains Today. No retrieval, financial calculation, action or refresh behavior changed.
+
+## Recent transfer presentation (2026-11-01)
+
+The latest 20 transfers show Date (`DD/MM/YYYY HH:MM`, UTC like the rival ledger), Name, Price, Buyer, Seller and Type. Names use the existing league directory with captured party names as fallback; system counterparties read Futmondo. Prices use dot thousands separators and no decimals. Historical club name/slug from captured `_playerTeam` is retained for the crest beside the player name; already loaded market metadata is a fallback. All text is HTML-escaped before the table permits generated image markup.
+
+Transfer types reuse explicit classifications already published by the same account/league/team's rival-finance ledger. Today does not start expensive finance retrieval or subscribe to its progress updates. A system side identifies a Futmondo transfer; confirmed methods distinguish clause buyouts and ordinary rival buy/sell. The captured pressroom feed has no clause flag, so unmatched rival transfers say `Between rivals · method unconfirmed`. No method is inferred from price, current clause value or missing bids.

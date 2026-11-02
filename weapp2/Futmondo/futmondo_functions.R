@@ -2004,6 +2004,8 @@ get_championship_pressroom <- function(login, championship_id) {
         created = as.character(get_val(item, "created", "")),
         player_id = p_id,
         player_name = p_name,
+        player_team_name = as.character(get_val(get_val(item, "_playerTeam", NULL), "name", "")),
+        player_team_slug = as.character(get_val(get_val(item, "_playerTeam", NULL), "slug", "")),
         buyer_team_id = b_id,
         buyer_team_name = if (b_id == "") "Futmondo / Mercado" else b_name,
         seller_team_id = s_id,
