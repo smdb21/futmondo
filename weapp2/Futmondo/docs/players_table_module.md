@@ -137,3 +137,5 @@ Filter layout: checkbox controls and Clear Filters are inside the same bordered 
 Points, Avg Last N and value ratios use compact pills from the active `--fm-surface` background at the source minimum to green at the maximum. Equal domains remain neutral. The callback reads the theme surface and chooses black/white text by mixed-background luminance (4.5:1 contrast); source-wide domains and numeric sorting are unchanged. The current app theme remains fixed dark; this does not introduce device-theme switching.
 
 Position pills show GK, DEF, MID and FWD, retaining full names in tooltips and original data for filters and sorting.
+
+Shared table headings now wrap at words (and within long labels when necessary), including Reactable rt-text-content. Offer, My Offer and Offers by Others have 180px minimum widths. Price fields are hidden only when their numeric values and missingness match another price field across the full loaded source; filtered subsets do not change this decision.

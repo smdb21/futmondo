@@ -137,11 +137,11 @@ body, .content-wrapper, .right-side {
     text-transform: uppercase !important;
     font-size: 11px !important;
     letter-spacing: 0.5px !important;
-    white-space: nowrap !important;
+    white-space: normal !important;
 }
 .rt-thead .rt-th {
     padding: 8px 8px !important;
-    white-space: nowrap !important;
+    white-space: normal !important;
 }
 .rt-tbody .rt-tr-group {
     border-bottom: 1px solid var(--fm-border) !important;
@@ -1249,4 +1249,15 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
   .player-checkbox-filters .shiny-input-container { width: 100% !important; }
   .player-clear-filters { margin-top: 8px; }
   .player-clear-filters .btn { width: 100%; min-height: 42px; }
+}
+
+/* Let complete headers wrap on desktop and mobile, including sort controls. */
+.reactable .rt-th-content,
+.reactable .rt-th .rt-text-content {
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  min-width: 0;
+  line-height: 1.35;
 }

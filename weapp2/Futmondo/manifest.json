@@ -2246,7 +2246,7 @@
       "checksum": "e7c0ae55954bdc551b46c460c89e8a1b"
     },
     "futmondo_functions.R": {
-      "checksum": "e6a239bc62912ea7001859b3adc68bdc"
+      "checksum": "4065d57a13b0acd2f98ca1c6023f1603"
     },
     "global.R": {
       "checksum": "d068b3447101f1ee5b6aa38a4acfa692"
@@ -2276,7 +2276,7 @@
       "checksum": "7786345793ff6a463556b43aec3368fb"
     },
     "Modules/Players_Table_Module.R": {
-      "checksum": "7a8f3423e2e7f213763ea72fe9fed6f5"
+      "checksum": "4c04c51ec877de05495e603f02f15ccd"
     },
     "Modules/Plots_Module.R": {
       "checksum": "d28b6843516e7a88406119bf287000c2"
@@ -2318,7 +2318,7 @@
       "checksum": "6253d5e12d91ddef162c7e9e7624680a"
     },
     "www/custom_style.css": {
-      "checksum": "b43def32fde7d325002a1e506da19989"
+      "checksum": "410e38ab7007ab0a040e6c349e48bc39"
     },
     "rival_finance_runtime.R": {
       "checksum": "bed7ffba8468e89853cfc739ce35037d"

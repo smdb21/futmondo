@@ -584,3 +584,5 @@ No delegation. Shared Points/Avg N/ratio badge palette now runs from theme surfa
 Required offline lifecycle passed: 13 checks plus eight tabs, with no live HTTP or database mutations.
 
 Position-pill abbreviation change: no delegation. Presentation-only mapping to GK/DEF/MID/FWD with full-name tooltips; existing colors and source/filter values retained. Performance review: constant string lookup, no extra requests or reactive work. Focused renderer assertion used; full lifecycle and phone checks skipped for this label-only change.
+
+Header/price presentation, 2026-11-02: no delegation. Fixed nowrap headers and actual rt-text-content clipping; widened offer columns to 180px. Full-source price deduplication preserves distinct asking prices and NA versus zero. Existing metric suite passed 9/9; offline lifecycle passed 13 checks plus eight tabs. Final Chromium fixture at 1440px and 390px confirmed five full headers and two offer amounts (including a billion-value amount) fit. Performance: CSS/width changes add no data work; duplicate detection compares at most three numeric vectors on existing table updates, no API reads or timers. Hosted browser not verified.

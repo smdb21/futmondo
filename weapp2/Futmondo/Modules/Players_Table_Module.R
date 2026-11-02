@@ -215,6 +215,16 @@ players_table_owner_choices <- function(teams_df) {
   c(choices,stats::setNames(values,labels))
 }
 
+# Hide only price columns identical across the full source, including missingness.
+players_table_duplicate_price_columns <- function(rows) {
+  kept <- character(); duplicates <- character()
+  for (column in intersect(c("price", "market_price", "effective_market_price"), names(rows))) {
+    same <- vapply(kept, function(other) identical(as.numeric(rows[[column]]), as.numeric(rows[[other]])), logical(1))
+    if (any(same)) duplicates <- c(duplicates, column) else kept <- c(kept, column)
+  }
+  duplicates
+}
+
 # One finite range per metric over the loaded source, before any table filters.
 players_table_metric_ranges <- function(rows) {
   columns <- intersect(c("recent_points_avg", "recent_points_ratio", "points"), names(rows))
@@ -536,7 +546,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
     table_display_data <- reactive({
       rows <- players_table_filtered_RV()
       if(is.null(rows))return(NULL)
-      cols_to_hide <- c(cfg_player_columns_to_hide,attr(rows,"filter_added_fields"),"data_coverage","observed_at","is_free_agent",
+      cols_to_hide <- c(cfg_player_columns_to_hide,players_table_duplicate_price_columns(players_table_enriched_RV()),attr(rows,"filter_added_fields"),"data_coverage","observed_at","is_free_agent",
         "recent_points_count","recent_points_required","recent_points_status")
       if(isTRUE(hide_bid_column))cols_to_hide<-c(cols_to_hide,"bid_price")
       rows<-rows %>% reorder_player_table_columns() %>%

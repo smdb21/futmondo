@@ -387,3 +387,5 @@ Inflow breakdown (2026-10-31): transaction history shows total positive inflow s
 - Implemented locally (2026-11-02): positive-only theme-background-to-green numeric pill scale; existing source-wide domains and sorting retained. See data_review_results.md for verification.
 
 Implemented (2026-11-02): abbreviated shared position pills with full-name tooltips.
+
+Implemented (2026-11-02): wrapping shared headers, unclipped offer badges and source-wide duplicate-price suppression; verification in data_review_results.md.

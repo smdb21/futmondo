@@ -4,6 +4,14 @@ suppressPackageStartupMessages(source('global.R'))
 selected_player_Server<-function(...)NULL
 checks<-0L
 check<-function(name,expr){force(expr);checks<<-checks+1L;cat('PASS',name,'\n')}
+check('only fully duplicate price columns are hidden, preserving distinct or missing asking prices',{
+ rows<-data.frame(price=c(10,NA,30),market_price=c(10,NA,30),effective_market_price=c(10,NA,30))
+ stopifnot(identical(players_table_duplicate_price_columns(rows),c("market_price","effective_market_price")))
+ rows$effective_market_price[3]<-35
+ stopifnot(identical(players_table_duplicate_price_columns(rows),"market_price"))
+ rows$effective_market_price<-c(10,0,30)
+ stopifnot(identical(players_table_duplicate_price_columns(rows),"market_price"))
+})
 check('source ranges include zero/negative and independent finite metric domains',{
  ranges<-players_table_metric_ranges(data.frame(recent_points_avg=c(-4,0,8,NA,Inf),recent_points_ratio=c(-2,0,2,NA,-Inf)))
  stopifnot(identical(ranges,list(recent_points_avg=list(min=-4,max=8),recent_points_ratio=list(min=-2,max=2))))

@@ -757,6 +757,7 @@ get_reactable_columns_for_players <- function(table) {
     columns[["bid_price"]] <- colDef(
       name = "Offer",
       align = "right",
+      minWidth = 180,
       cell = function(value, index) {
         if (is.na(value) || is.null(value) || value == "" || value == 0) return("")
         num_val <- suppressWarnings(as.numeric(value))
@@ -786,6 +787,7 @@ get_reactable_columns_for_players <- function(table) {
     columns[["my_bid_price"]] <- colDef(
       name = "My Offer",
       align = "right",
+      minWidth = 180,
       cell = function(value) {
         if (is.na(value) || is.null(value) || value <= 0) return("")
         shiny::tags$span(
@@ -803,6 +805,7 @@ get_reactable_columns_for_players <- function(table) {
     columns[[bid_col_name]] <- colDef(
       name = "Offers by Others",
       align = "right",
+      minWidth = 180,
       cell = function(value, index) {
         if (is.na(value) || is.null(value) || value <= 0) return("")
         bidder <- if ("other_bid_user" %in% colnames(table) && !is.na(table$other_bid_user[index]) && nzchar(as.character(table$other_bid_user[index]))) {
