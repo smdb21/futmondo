@@ -8,6 +8,7 @@ const {spawn, spawnSync} = require('node:child_process');
 const {randomBytes} = require('node:crypto');
 const {once} = require('node:events');
 const proxyWithoutOrigin = process.env.FUTMONDO_TEST_PROXY_NO_WS_ORIGIN === 'true';
+const proxyRewritesHost = process.env.FUTMONDO_TEST_PROXY_REWRITE_HOST === 'true';
 const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/futmondo-review-tools/node_modules', 'playwright'));
 (async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fm-remember-browser-'));
@@ -28,7 +29,7 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
   const upstreamPath = url => url.replace(/^\/_w_fixture_[ab]\//, '/');
   const sockets = new Set();
   const proxy = https.createServer({key: fs.readFileSync(path.join(tmp, 'key.pem')), cert: fs.readFileSync(path.join(tmp, 'cert.pem'))}, (req, res) => {
-    const upstream = http.request({hostname: '127.0.0.1', port: backend, path: upstreamPath(req.url), method: req.method, headers: {...req.headers,'accept-encoding':'identity'}}, reply => {
+    const upstream = http.request({hostname: '127.0.0.1', port: backend, path: upstreamPath(req.url), method: req.method, headers: {...req.headers,'accept-encoding':'identity',...(proxyRewritesHost ? {host:`127.0.0.1:${backend}`} : {})}}, reply => {
       const headers = {...reply.headers};
       if (req.url === '/' && /text\/html/.test(headers['content-type'] || '')) {
         let html = ''; reply.on('data', chunk => {html += chunk;});
@@ -129,7 +130,7 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
     assert.equal(await page.locator('#login-login_button').isVisible(), false);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2), false);
     console.log('PASS failed persistence remains visible on Today without issuing a remembered cookie');
-    console.log(`REMEMBER LOGIN BROWSER (${proxyWithoutOrigin ? 'proxied without WebSocket Origin' : 'original WebSocket Origin'}): 5 passed / 0 failed`);
+    console.log(`REMEMBER LOGIN BROWSER (${proxyWithoutOrigin ? 'proxied without WebSocket Origin' : 'original WebSocket Origin'}${proxyRewritesHost ? ', rewritten Host' : ''}): 5 passed / 0 failed`);
   } catch(error) {
     throw new Error(error.stack + '\nAPP LOG: ' + log);
   } finally {

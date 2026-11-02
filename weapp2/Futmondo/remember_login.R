@@ -101,15 +101,20 @@ remember_login_origin <- function(x) {
   sub(":443$", "", tolower(x))
 }
 # Hosted Shiny may open an internal WebSocket without the browser Origin.
-# Bind the cookie exchange to its real HTTP Origin and Host in that case; never
-# accept an origin supplied through Shiny inputs or arbitrary forwarded headers.
+# Bind the cookie exchange to its real HTTP Origin plus Host or browser Fetch
+# Metadata; never trust Shiny-input origins or arbitrary forwarded headers.
 remember_login_same_origin <- function(req, websocket_origin=NULL) {
   origin<-remember_login_origin(req$HTTP_ORIGIN)
   if(is.null(origin))return(FALSE)
   if(!is.null(websocket_origin))return(identical(origin,websocket_origin))
   host<-req$HTTP_HOST
   if(!is.character(host)||length(host)!=1L||is.na(host))return(FALSE)
-  identical(origin,remember_login_origin(paste0("https://",host)))
+  host_origin<-remember_login_origin(paste0("https://",host))
+  if(is.null(host_origin))return(FALSE)
+  # Managed proxies may rewrite Host as well. Fetch Metadata is set by the
+  # browser and cannot be supplied by page JavaScript. Require exact same-origin;
+  # same-site, navigation (none), absent or malformed metadata cannot use this path.
+  identical(origin,host_origin)||identical(req$HTTP_SEC_FETCH_SITE,"same-origin")
 }
 remember_login_path <- function(x) {
   if(!is.character(x)||length(x)!=1L||is.na(x)||!grepl("^/[A-Za-z0-9_./~%-]*$",x)||
@@ -127,11 +132,13 @@ remember_login_read_cookie <- function(header,path) {
   values<-substring(items[startsWith(items,prefix)],nchar(prefix)+1L)
   if(length(values)!=1L||is.null(remember_login_hash(values)))NULL else values
 }
-remember_login_response <- function(status="ok",cookie=NULL,http_status=200L) {
+remember_login_response <- function(status="ok",cookie=NULL,http_status=200L,reason=NULL) {
   headers<-list(`Cache-Control`="no-store",Pragma="no-cache",`X-Content-Type-Options`="nosniff")
   if(!is.null(cookie))headers$`Set-Cookie`<-cookie
+  body<-list(status=status)
+  if(!is.null(reason))body$reason<-reason
   shiny:::httpResponse(http_status,"application/json; charset=utf-8",
-    jsonlite::toJSON(list(status=status),auto_unbox=TRUE),headers)
+    jsonlite::toJSON(body,auto_unbox=TRUE),headers)
 }
 # A session endpoint exchanges the HttpOnly cookie directly with the browser.
 # Only operation status is returned: no login token or browser secret in JSON.
@@ -163,9 +170,12 @@ remember_login_session <- function(session,on_restore,on_status,on_begin,on_end,
     request
   }
   filter<-function(data,req){
-    if(!identical(req$REQUEST_METHOD,"POST")||!remember_login_same_origin(req,state$origin)||
-      !identical(req$HTTP_X_FUTMONDO_CSRF,state$csrf)||
-      (!is.null(req$HTTP_SEC_FETCH_SITE)&&!req$HTTP_SEC_FETCH_SITE%in%c("same-origin","none")))return(remember_login_response("forbidden",http_status=403L))
+    # Return only a fixed failure-stage label, never header values or credentials.
+    rejection<-if(!identical(req$REQUEST_METHOD,"POST"))"method"
+      else if(!remember_login_same_origin(req,state$origin))"origin"
+      else if(!identical(req$HTTP_X_FUTMONDO_CSRF,state$csrf))"csrf"
+      else if(!is.null(req$HTTP_SEC_FETCH_SITE)&&!req$HTTP_SEC_FETCH_SITE%in%c("same-origin","none"))"fetch_site" else NULL
+    if(!is.null(rejection))return(remember_login_response("forbidden",http_status=403L,reason=rejection))
     size<-suppressWarnings(as.integer(req$CONTENT_LENGTH %||% "0"))
     if(length(size)!=1L||is.na(size)||size<1L||size>1024L)return(remember_login_response("invalid",http_status=400L))
     body<-tryCatch(jsonlite::fromJSON(rawToChar(req$rook.input$read(1025L)),simplifyVector=FALSE),error=function(e)NULL)

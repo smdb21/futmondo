@@ -72,10 +72,10 @@ fixture<-function(websocket_origin="https://app.invalid"){
  f$r<-remember_login_session(s,function(token)f$auth<-token,function(kind,message,retry=NULL)f$statuses[[length(f$statuses)+1L]]<-list(kind=kind,message=message,retry=retry),
   function()f$begin<-f$begin+1L,function()f$end<-f$end+1L,function()f$expired<-TRUE)
  f$init<-function()shiny:::flushReact()
- f$call<-function(cookie=NULL,method="POST",origin="https://app.invalid",csrf=f$r$state$csrf,ticket=f$r$state$seq,action=f$r$state$action,host="app.invalid"){
+ f$call<-function(cookie=NULL,method="POST",origin="https://app.invalid",csrf=f$r$state$csrf,ticket=f$r$state$seq,action=f$r$state$action,host="app.invalid",fetch_site="same-origin"){
   body<-charToRaw(jsonlite::toJSON(list(ticket=ticket,action=action),auto_unbox=TRUE))
   req<-list(REQUEST_METHOD=method,HTTP_ORIGIN=origin,HTTP_HOST=host,HTTP_X_FUTMONDO_CSRF=csrf,CONTENT_LENGTH=as.character(length(body)),
-    HTTP_COOKIE=cookie,HTTP_SEC_FETCH_SITE="same-origin",rook.input=list(read=function(...)body))
+    HTTP_COOKIE=cookie,HTTP_SEC_FETCH_SITE=fetch_site,rook.input=list(read=function(...)body))
   result<-s$filter(NULL,req);if(promises::is.promise(result))await(result)else result
  }
  f$close<-function(){for(fn in s$ends)fn()};f
@@ -100,13 +100,24 @@ check("proxied sessions without a browser WebSocket Origin still save and restor
 })
 check("proxy fallback rejects missing or mismatched HTTP origin and host before storage",{
  f<-fixture(NULL);f$init();before<-length(db_calls)
- stopifnot(f$call(origin=NULL)$status==403L,f$call(origin="https://evil.invalid")$status==403L,
-   f$call(host="internal.invalid")$status==403L,f$call(host=NULL)$status==403L,
+ stopifnot(f$call(origin=NULL)$status==403L,f$call(origin="https://evil.invalid",fetch_site="cross-site")$status==403L,
+   f$call(host="internal.invalid",fetch_site=NULL)$status==403L,f$call(host=NULL)$status==403L,
    f$call(host="app.invalid,evil.invalid")$status==403L,f$call(origin="http://app.invalid")$status==403L,
    f$call(csrf="wrong")$status==403L,length(db_calls)==before)
  stopifnot(remember_login_same_origin(list(HTTP_ORIGIN="https://APP.invalid:443",HTTP_HOST="app.invalid")),
    !remember_login_same_origin(list(HTTP_ORIGIN="https://evil.invalid",HTTP_HOST="evil.invalid"),"https://app.invalid"))
  f$close()
+})
+check("rewritten proxy hosts require browser-controlled exact same-origin metadata",{
+ f<-fixture(NULL);f$init();before<-length(db_calls)
+ for(site in list(NULL,"none","same-site","cross-site","invalid"))
+   stopifnot(f$call(host="127.0.0.1:3838",fetch_site=site)$status==403L)
+ stopifnot(f$call(host="127.0.0.1:3838",csrf="wrong")$status==403L,length(db_calls)==before)
+ f$r$login(auth,TRUE);issued<-f$call(host="127.0.0.1:3838");proxy_cookie<-new_cookie(f,issued)
+ f$r$result(list(ticket=f$r$state$seq,status="remembered"));f$call(proxy_cookie,host="127.0.0.1:3838")
+ stopifnot(grepl("remembered for 7 days",tail(f$statuses,1)[[1]]$message,fixed=TRUE))
+ g<-fixture(NULL);g$init();g$call(proxy_cookie,host="127.0.0.1:3838");stopifnot(identical(g$auth,auth))
+ g$r$logout();g$call(proxy_cookie,host="127.0.0.1:3838");f$close();g$close();validations<-0L
 })
 check("browser cookie rejection cannot produce a remembered confirmation",{
  f<-fixture(NULL);f$init();f$r$login(auth,TRUE);f$call()
