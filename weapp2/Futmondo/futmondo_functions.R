@@ -948,9 +948,9 @@ get_reactable_columns_for_players <- function(table) {
     )
   }
 
-  if ("role" %in% colnames(table)) {
-    columns[["role"]] <- colDef(
-      name = "Position",
+  for (position_column in intersect(c("role", "primary_role", "secondary_role"), colnames(table))) {
+    columns[[position_column]] <- colDef(
+      name = switch(position_column, primary_role="Primary position", secondary_role="Secondary position", "Position"),
       align = "center",
       minWidth = 170,
       cell = function(value) {

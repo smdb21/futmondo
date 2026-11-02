@@ -521,3 +521,7 @@ Primary implementation, no delegation. Replaced full-cell coloring with padded r
 Focused metric colors (8), average formatting/calculation (10) and ratio checks passed. A local real Reactable/Shiny browser fixture with the production CSS passed at 360, 390 and 1200px: dark badge text, rounded padding, uncolored surrounding cells and non-truncated header content. Inspected the 360px screenshot; wide tables retain horizontal scrolling. Hosted Android rendering was not verified.
 
 The mandatory offline lifecycle passed 13 checks plus eight tabs; deployment checks passed 3/3.
+
+## 2026-11-01 — Position color badges
+
+Primary implementation, no delegation. Shared player tables render position labels with padded 7px-radius badges: green goalkeeper, orange defender, blue midfielder, red forward, all with dark text. Primary/secondary position columns reuse the existing position renderer when present. Verified all four shared role mappings and actual CSS rendering at 390px, including colors, text contrast styling, padding and radius. Performance review: existing per-cell badge markup is reused; no requests, timers, refreshes or new dependencies. Hosted rendering was not tested; full lifecycle deliberately skipped for this presentation-only change.

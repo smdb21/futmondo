@@ -167,41 +167,20 @@ body, .content-wrapper, .right-side {
 }
 
 /* Custom Badges & Pill Styling */
-.badge-gk {
-    background-color: var(--fm-surface) !important; /* Green */
-    color: var(--fm-text) !important;
-    font-weight: 600;
-    border-radius: 100px;
-    font-size: 11px;
-}
-.badge-df {
-    background-color: var(--fm-surface) !important; /* Orange */
-    color: var(--fm-text) !important;
-    font-weight: 600;
-    border-radius: 100px;
-    font-size: 11px;
-}
-.badge-md {
-    background-color: var(--fm-surface) !important; /* Blue */
-    color: var(--fm-text) !important;
-    font-weight: 600;
-    border-radius: 100px;
-    font-size: 11px;
-}
-.badge-fw {
-    background-color: var(--fm-surface) !important; /* Red */
-    color: var(--fm-danger) !important;
-    font-weight: 600;
-    border-radius: 100px;
-    font-size: 11px;
-}
-
-/* Tighter padding and forced nowrap for position badges */
+/* Position badges share the metric badges' padded, softly squared shape. */
+.badge-gk { background-color: #7CFF9B !important; }
+.badge-df { background-color: #FFB366 !important; }
+.badge-md { background-color: #80BFFF !important; }
+.badge-fw { background-color: #FF6B6B !important; }
 .badge-gk, .badge-df, .badge-md, .badge-fw {
-    padding: 2px 8px !important;
+    color: #102019 !important;
+    font-weight: 600;
+    font-size: inherit;
+    border-radius: 7px;
+    padding: 5px 9px !important;
     white-space: nowrap !important;
     display: inline-block !important;
-    line-height: 1.4 !important;
+    line-height: 1.35 !important;
 }
 
 /* Circular Avatar for tables */
