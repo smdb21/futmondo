@@ -22,7 +22,7 @@ players_table_UI <- function(id, box_title = NULL,
   checkbox_filters <-
       if (filter_by_active_clause || filter_by_max_clause_value || filter_by_clause_under_available_funds || filter_by_is_favorite || filter_by_is_from_futmondo || filter_by_players_with_bid) {
         fluidRow(
-          style = "padding: 0 15px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 20px; align-items: center;",
+          class = "player-checkbox-filters",
           if (filter_by_active_clause) {
             div(checkboxInput(inputId = ns("active_clause_filter"), label = "Active Clause Only", value = isTRUE(default_active_clause)), style = "font-weight: 500;", title = "Show only players whose buyout clause is currently payable (lock period has expired)")
           },
@@ -48,7 +48,7 @@ players_table_UI <- function(id, box_title = NULL,
               div(checkboxInput(inputId = ns("players_with_bid_filter"), label = "Bidded Only", value = FALSE), style = "font-weight: 500;", title = "Show only players with active bids from any league team")
             )
           },
-          div(actionButton(ns("btn_clear_filters"), label = "Clear Filters", icon = icon("eraser"), class = "btn btn-sm btn-outline-secondary"), style = "margin-left: 10px;", title = "Reset all table filters to default values")
+          div(actionButton(ns("btn_clear_filters"), label = "Clear Filters", icon = icon("eraser"), class = "btn btn-sm btn-outline-secondary"), class = "player-clear-filters", title = "Reset all table filters to default values")
         )
       }
   tagList(

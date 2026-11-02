@@ -1209,3 +1209,44 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
   flex: 0 0 22px;
   object-fit: contain;
 }
+
+/* Align filter labels and touch targets without Bootstrap checkbox offsets. */
+.player-checkbox-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+  margin: 4px 0 0;
+}
+.player-checkbox-filters .shiny-input-container {
+  width: auto;
+  margin-bottom: 0;
+}
+.player-checkbox-filters .checkbox { margin: 0; }
+.player-checkbox-filters .checkbox label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding-left: 0;
+  white-space: normal;
+}
+.player-checkbox-filters input[type="checkbox"] {
+  position: static;
+  flex: 0 0 auto;
+  margin: 0;
+}
+.player-clear-filters { margin: 0; }
+@media (max-width: 767px) {
+  .player-filter-panel { padding: 12px !important; }
+  .player-filter-panel > [class*="col-"] { padding-left: 0; padding-right: 0; }
+  .player-checkbox-filters {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+  .player-checkbox-filters > div { min-width: 0; }
+  .player-checkbox-filters .shiny-input-container { width: 100% !important; }
+  .player-clear-filters { margin-top: 8px; }
+  .player-clear-filters .btn { width: 100%; min-height: 42px; }
+}
