@@ -128,7 +128,7 @@ today_Server <- function(id,is_module_active,login_token,championship_id,user_te
       head(rows[,intersect(c("created","player_name","price","buyer_team_id","seller_team_id"),names(rows)),drop=FALSE],20L)
     })
     players_table_Server("market_players",market,user_teams_RV,login_token,championship_id,user_team_id,
-      refresh_trigger=refresh_trigger,is_module_active=is_module_active,optional_ready=primary_settled)
+      refresh_trigger=refresh_trigger,is_module_active=is_module_active,optional_ready=primary_settled,points_ratio_basis="value")
     list(primary_settled=primary_settled,primary_status=primary_status,retry_failed=retry_failed)
   })
 }

@@ -65,6 +65,7 @@ players_in_championship_Server <- function(id, is_module_active, login_token, ch
       championship_id = championship_id,
       user_team_id = user_team_id,
       available_funds_RV = available_funds_RV,
+      points_ratio_basis = "clause_price",
       refresh_trigger = refresh_trigger,
       is_module_active = is_module_active
     )

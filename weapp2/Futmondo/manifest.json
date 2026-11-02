@@ -2270,13 +2270,13 @@
       "checksum": "66462a9054f8451455a36d09652df291"
     },
     "Modules/Players_in_Championship_Module.R": {
-      "checksum": "d00bf3bd0793f851af23ea772155543b"
+      "checksum": "0c220663de1f047b20b843e3998a1f8b"
     },
     "Modules/Players_in_Teams_Module.R": {
       "checksum": "b74340bf198b703b3aad9bedb47b6ed4"
     },
     "Modules/Players_Table_Module.R": {
-      "checksum": "39591a3b1bdfcfa00eff26f49325ebb4"
+      "checksum": "b766cdf7fa4bf859d035226355265c19"
     },
     "Modules/Plots_Module.R": {
       "checksum": "d28b6843516e7a88406119bf287000c2"
@@ -2291,7 +2291,7 @@
       "checksum": "84445a91497de1f2f4e0ef4ecee2444e"
     },
     "Modules/Today_Module.R": {
-      "checksum": "55316b1553c1f9307c5808a4f3d3db49"
+      "checksum": "ccef8e8af45d98df593f4551b1b68b13"
     },
     "mvp_runtime.R": {
       "checksum": "4af5540b2f5de5917389048a8ab86b84"

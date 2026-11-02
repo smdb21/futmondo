@@ -220,7 +220,22 @@ players_table_recent_average_column <- function(n=5L) {
   )
 }
 
-players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL, available_funds_RV = NULL, hide_bid_column = FALSE, refresh_trigger = NULL, is_module_active = function() TRUE, optional_ready = function() TRUE) {
+# Points per million euros; reuse the exact displayed N-round average.
+players_table_points_ratio <- function(rows, basis) {
+  ratio <- rep(NA_real_, nrow(rows))
+  if (all(c("recent_points_avg", basis) %in% names(rows))) {
+    average <- suppressWarnings(as.numeric(as.character(rows$recent_points_avg)))
+    price <- suppressWarnings(as.numeric(as.character(rows[[basis]])))
+    valid <- is.finite(average) & is.finite(price) & price > 0
+    ratio[valid] <- average[valid] / (price[valid] / 1e6)
+    ratio[!is.finite(ratio)] <- NA_real_
+  }
+  rows$recent_points_ratio <- ratio
+  rows
+}
+
+players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL, available_funds_RV = NULL, hide_bid_column = FALSE, refresh_trigger = NULL, is_module_active = function() TRUE, optional_ready = function() TRUE, points_ratio_basis = NULL) {
+  if (!is.null(points_ratio_basis)) points_ratio_basis <- match.arg(points_ratio_basis, c("value", "clause_price"))
   moduleServer(id, function(input, output, session) {
     bind_factual_reads(c("get_finished_rounds"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
 
@@ -468,12 +483,13 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
     table_display_data <- reactive({
       rows <- players_table_filtered_RV()
       if(is.null(rows))return(NULL)
+      if(!is.null(points_ratio_basis))rows<-players_table_points_ratio(rows,points_ratio_basis)
       cols_to_hide <- c(cfg_player_columns_to_hide,attr(rows,"filter_added_fields"),"data_coverage","observed_at","is_free_agent",
         "recent_points_count","recent_points_required","recent_points_status")
       if(isTRUE(hide_bid_column))cols_to_hide<-c(cols_to_hide,"bid_price")
       rows<-rows %>% reorder_player_table_columns() %>%
         dplyr::select(!any_of(cols_to_hide)) %>%
-        dplyr::select(any_of(c("name","recent_points_avg")),everything())
+        dplyr::select(any_of(c("name","recent_points_avg","recent_points_ratio")),everything())
       # Source timestamps belong to the resource state, not widget equality.
       rows<-as.data.frame(rows)
       attributes(rows)<-attributes(rows)[intersect(c("names","row.names","class"),names(attributes(rows)))]
@@ -490,7 +506,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       if(!is.finite(recent_n))recent_n<-5L
       schema<-list(context=table_context_RV(),columns=names(rows),
         types=lapply(rows,function(column)if(is.numeric(column))"numeric"else class(column)),recent_n=recent_n,
-        formatted=digest::digest(lapply(rows[setdiff(names(rows),"recent_points_avg")],
+        formatted=digest::digest(lapply(rows[setdiff(names(rows),c("recent_points_avg","recent_points_ratio"))],
           function(column)if(is.numeric(column))as.numeric(column)else column)),ids=ids)
       if(!identical(isolate(table_schema()),schema)){table_schema(schema);return()}
       if(identical(rendered_schema,schema)&&(!identical(rendered_data,rows)||!identical(rendered_ids,ids))){
@@ -513,6 +529,10 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       recent_n <- suppressWarnings(as.integer(input$recent_games_n)[1])
       if (!is.finite(recent_n)) recent_n <- 5L
       table_columns[["recent_points_avg"]] <- players_table_recent_average_column(recent_n)
+      if(!is.null(points_ratio_basis))table_columns[["recent_points_ratio"]]<-reactable::colDef(
+        name=paste0("Avg Last ",recent_n," / ",if(points_ratio_basis=="value")"Value"else"Clause"," (€M)"),
+        align="center",sortNALast=TRUE,
+        cell=htmlwidgets::JS("function(cellInfo) { var value = cellInfo.value; return typeof value === 'number' && Number.isFinite(value) ? String(Number(value.toFixed(3))) : ''; }"))
       reactable(players_table,
                 columns = table_columns,
                 defaultSorted = list(recent_points_avg="desc"),
