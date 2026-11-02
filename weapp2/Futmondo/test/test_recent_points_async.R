@@ -50,10 +50,10 @@ shiny::testServer(server,{
  check('returning reuses completed work and league read',stopifnot(sum(calls=='get_player_recent_points:p1')==1L,sum(calls=='get_player_recent_points:p2')==1L,sum(grepl('read_league_round_dataset',calls))==1L))
 })
 saved<-dplyr::bind_rows(make_source('p1',rounds=c(8,10),points=c(7,NA_real_))$observations,make_source('p2')$observations,make_source('p3')$observations)
-reset(saved,marker('p4','empty'))
+reset(saved,dplyr::bind_rows(marker('p1'),marker('p4','empty')))
 shiny::testServer(server,{
  settle(session)
- check('fresh sparse legacy scores and empty marker require zero API calls',stopifnot(!any(grepl('get_player_recent_points',calls)),source$status()$remaining==0L,nrow(source$history())==10L,is.na(add_recent_points_average(players,source$history(),3)$recent_points_avg[1])))
+ check('acknowledged sparse history and empty marker require zero API calls',stopifnot(!any(grepl('get_player_recent_points',calls)),source$status()$remaining==0L,nrow(source$history())==10L,is.na(add_recent_points_average(players,source$history(),3)$recent_points_avg[1])))
  refresh(1L);settle(session)
  check('manual refresh targets current table IDs only',stopifnot(sum(grepl('get_player_recent_points',calls))==2L,exists('league:p1',queued),exists('league:p2',queued),!exists('league:p3',queued),!exists('league:p4',queued)))
 })
@@ -89,11 +89,11 @@ shiny::testServer(server,{
  .persistence_state$queue<-list();.persistence_state$revision(isolate(.persistence_state$revision())+1L);settle(session)
  check('write completion resumes exactly two slots',stopifnot(sum(grepl('get_player_recent_points',calls))==2L))
 })
-check('freshness and exact context isolation preserve sparse coverage',{
+check('durable history and exact context isolation preserve sparse coverage',{
  ctx<-make_source('p1')$context;ctx$player_id<-''
  stopifnot(setequal(recent_points_saved_players(saved,ctx,marker('p4','empty')),c('p1','p2','p3','p4')))
  foreign<-ctx;foreign$season<-'another';stopifnot(!length(recent_points_saved_players(saved,foreign,marker('p4','empty'))))
- old<-saved;old$observed_at<-format(Sys.time()-7200,'%Y-%m-%dT%H:%M:%OSZ',tz='UTC');stopifnot(!length(recent_points_saved_players(old,ctx,marker('p4','empty',age=7200))))
+ old<-saved;old$observed_at<-format(Sys.time()-7200,'%Y-%m-%dT%H:%M:%OSZ',tz='UTC');stopifnot(setequal(recent_points_saved_players(old,ctx,marker('p4','empty',age=7200)),c('p1','p2','p3','p4')))
 })
 check('500-player x38-round mean remains bounded',{
  p<-data.frame(id=paste0('x',1:500));h<-data.frame(player_id=rep(p$id,each=38),round=rep(1:38,500),points=rep(1:38,500))
@@ -136,3 +136,61 @@ shiny::testServer(account_server,{
  })
 })
 cat(sprintf('SHARED ROUND DATASET COMPLETE: %d passed / 0 failed\n',checks))
+
+# History survives process/session boundaries and arbitrary wall-clock age.
+old<-dplyr::bind_rows(make_source('p1')$observations,make_source('p2')$observations,make_source('p3')$observations)
+old$observed_at<-format(Sys.time()-90*86400,'%Y-%m-%dT%H:%M:%OSZ',tz='UTC')
+reset(old,marker('p4','empty',age=90*86400))
+window_server<-function(input,output,session){
+ n<-reactiveVal(3L)
+ source<-recent_player_points_source(session,reactive(auth),reactive('league'),reactive('team'),reactive(players),reactive(TRUE),required_rounds=n)
+}
+shiny::testServer(window_server,{
+ settle(session)
+ for(wanted in c(3L,5L,8L)){n(wanted);settle(session)}
+ check('90-day legacy matrix and empty check serve N3 N5 N8 with zero summary requests',{
+  stopifnot(!any(grepl('get_player_recent_points',calls)),sum(grepl('read_league_round_dataset',calls))==1L,
+   add_recent_points_average(players,source$history(),8)$recent_points_avg[1]==62/8)
+ })
+})
+reset(saved,marker('p4','empty',age=90*86400))
+shiny::testServer(window_server,{
+ settle(session)
+ check('missing demanded legacy rounds target only the affected player',{
+  stopifnot(identical(calls[grepl('get_player_recent_points',calls)],'get_player_recent_points:p1'),
+   !exists('league:p2',queued),!exists('league:p3',queued),!exists('league:p4',queued))
+ })
+})
+reset(saved,dplyr::bind_rows(marker('p1',age=90*86400),marker('p2',age=90*86400),marker('p3',age=90*86400),marker('p4','empty',age=90*86400)))
+shiny::testServer(window_server,{
+ settle(session);n(8L);settle(session)
+ check('old successful sparse and empty acquisitions do not repeat for genuine source gaps',stopifnot(!any(grepl('get_player_recent_points',calls))))
+})
+cat(sprintf('DURABLE HISTORY COMPLETE: %d passed / 0 failed\n',checks))
+
+check('corrupt future markers are not durable acquisition evidence',{
+ ctx<-make_source('p1')$context;ctx$player_id<-''
+ stopifnot(!length(recent_points_saved_players(data.frame(),ctx,marker('p4','empty',age=-3600))))
+})
+# Measure a fully populated league in the actual controller, including N changes.
+full_players<-data.frame(id=paste0('matrix-',1:527))
+full_points<-make_source('template',rounds=1:38,points=seq_len(38))$observations
+full_points<-full_points[rep(seq_len(nrow(full_points)),527L),,drop=FALSE]
+full_points$player_id<-rep(full_players$id,each=38L)
+full_points$observed_at<-format(Sys.time()-90*86400,'%Y-%m-%dT%H:%M:%OSZ',tz='UTC')
+get_championship_players<-function(...)full_players
+reset(full_points)
+full_server<-function(input,output,session){
+ n<-reactiveVal(3L)
+ source<-recent_player_points_source(session,reactive(auth),reactive('league'),reactive('team'),reactive(full_players),reactive(TRUE),required_rounds=n)
+}
+elapsed<-system.time(shiny::testServer(full_server,{
+ settle(session)
+ for(wanted in c(5L,8L)){n(wanted);settle(session)}
+ check('527-player x38-round old matrix navigation remains local and request-free',{
+  stopifnot(!any(grepl('get_player_recent_points',calls)),sum(grepl('read_league_round_dataset',calls))==1L,
+   all(add_recent_points_average(full_players,source$history(),8)$recent_points_avg==34.5))
+ })
+}))[['elapsed']]
+cat(sprintf('527-player x38-round controller startup, N3/N5/N8 publication: %.3fs\n',elapsed))
+cat(sprintf('DURABLE HISTORY FINAL: %d passed / 0 failed\n',checks))

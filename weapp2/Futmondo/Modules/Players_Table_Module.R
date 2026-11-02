@@ -732,22 +732,37 @@ get_player_recent_points <- function(login,championship_id,user_team_id,player_i
     previous_points=data.frame(),status=if(nrow(observed))"partial"else "empty")
 }
 
-# Check metadata means a successful endpoint response, not complete appearances.
-# Legacy score observations receive the same bounded freshness without claiming
-# an acquisition marker. Neither gaps nor NULL scores cause repeated API calls.
+# Successful acquisition checks and score observations are durable facts. Their
+# observation time orders corrections; elapsed cache time never invalidates them.
+# A check acknowledges even sparse/empty history, rather than promising appearances.
 recent_points_saved_players <- function(stored,context,checks=data.frame(),now=Sys.time()) {
-  lifetime <- if(context$season!="unknown"&&context$scoring_version!="unknown")24*3600 else 3600
-  fresh_ids <- function(rows,stamp){
+  saved_ids <- function(rows,stamp){
     rows <- history_context_filter(rows,context)
     if(!nrow(rows)||!all(c("player_id",stamp)%in%names(rows)))return(character())
-    age <- as.numeric(difftime(now,fm_time(rows[[stamp]]),units="secs"))
-    unique(as.character(rows$player_id[is.finite(age)&age>=-60&age<lifetime]))
+    observed <- fm_time(rows[[stamp]])
+    valid <- !is.na(observed)&observed<=now+60&!is.na(rows$player_id)&nzchar(as.character(rows$player_id))
+    unique(as.character(rows$player_id[valid]))
   }
   checks <- history_context_filter(checks,context)
   if(nrow(checks)&&all(c("result_status","point_count")%in%names(checks)))
-    checks <- checks[checks$result_status%in%c("scores","empty")&is.finite(checks$point_count),,drop=FALSE]
+    checks <- checks[checks$result_status%in%c("scores","empty")&is.finite(checks$point_count)&checks$point_count>=0,,drop=FALSE]
   else checks <- data.frame()
-  unique(c(fresh_ids(checks,"checked_at"),fresh_ids(stored,"observed_at")))
+  unique(c(saved_ids(checks,"checked_at"),saved_ids(stored,"observed_at")))
+}
+
+# Legacy rows and mapped last-five observations may already cover a longer N.
+# Missing source rows can warrant one acquisition; a stored successful check
+# separately acknowledges any genuine gaps or explicitly unavailable scores.
+recent_points_covered_players <- function(stored,context,n=5L) {
+  stored <- history_context_filter(stored,context)
+  if(!nrow(stored)||!all(c("player_id","round")%in%names(stored)))return(character())
+  rounds <- suppressWarnings(as.numeric(stored$round))
+  keep <- is.finite(rounds)&rounds>=1&rounds==floor(rounds)
+  stored <- stored[keep,,drop=FALSE];rounds <- rounds[keep]
+  if(!length(rounds))return(character())
+  latest <- max(rounds);wanted <- seq.int(max(1L,latest-n+1L),latest)
+  groups <- split(rounds,as.character(stored$player_id))
+  names(groups)[vapply(groups,function(x)all(wanted%in%x),logical(1))]
 }
 
 # Fitness is the source's last five consecutive league rounds, oldest first.
@@ -798,6 +813,30 @@ recent_points_fitness_agrees <- function(rows,points,context) {
     old <- suppressWarnings(as.numeric(saved$points[index]))
     all((is.na(values)&is.na(old))|(!is.na(values)&!is.na(old)&values==old))
   },logical(1))]
+}
+
+# A newer full-history check supersedes an older unlabelled fitness vector.
+# Likewise, a complete window observed after that vector must not be rolled back.
+recent_points_fitness_superseded <- function(rows,points,checks,context) {
+  if(!nrow(rows))return(character())
+  points <- history_context_filter(points,context)
+  checks <- history_context_filter(checks,context)
+  checked <- recent_points_saved_players(data.frame(),context,checks)
+  checks <- checks[checks$player_id%in%checked,,drop=FALSE]
+  latest <- if(nrow(points))max(suppressWarnings(as.numeric(points$round)),na.rm=TRUE)else NA_real_
+  by_player <- if(nrow(points))split(points,as.character(points$player_id))else list()
+  rows$player_id[vapply(seq_len(nrow(rows)),function(i){
+    observed <- fm_time(rows$observed_at[i])
+    player_checks <- checks[checks$player_id==rows$player_id[i],,drop=FALSE]
+    if(nrow(player_checks)&&any(fm_time(player_checks$checked_at)>=observed,na.rm=TRUE))return(TRUE)
+    saved <- by_player[[rows$player_id[i]]]
+    values <- recent_points_fitness_values(rows$fitness[i])
+    if(is.null(saved)||!is.finite(latest)||length(values)!=min(5L,latest))return(FALSE)
+    saved <- saved[order(fm_time(saved$observed_at)),,drop=FALSE]
+    saved <- saved[!duplicated(saved$round,fromLast=TRUE),,drop=FALSE]
+    index <- match(seq.int(latest-length(values)+1L,latest),saved$round)
+    !anyNA(index)&&all(fm_time(saved$observed_at[index])>=observed,na.rm=FALSE)
+  },logical(1))%in%TRUE]
 }
 
 recent_points_fitness_anchor <- function(row,payload,context) {
@@ -928,12 +967,14 @@ new_shared_round_points_controller <- function(root,publish_interval=5) {
     if(!entry$fitness_dirty)return()
     entry$fitness_dirty <- FALSE
     rows <- entry$fitness;ctx <- context_for(entry)
-    entry$fitness_probes <- list();entry$fitness_holding <- character();entry$fitness_ready <- character()
+    entry$fitness_probes <- list();entry$fitness_holding <- character();entry$fitness_ready <- character();entry$fitness_changed <- character()
     if(!nrow(rows))return()
     for(field in c("championship_id","season","scoring_version"))
       rows <- rows[is.na(rows[[field]])|!nzchar(rows[[field]])|rows[[field]]==ctx[[field]],,drop=FALSE]
     existing <- dplyr::bind_rows(c(list(entry$points),entry$live))
-    entry$fitness_ready <- recent_points_fitness_agrees(rows,existing,ctx)
+    entry$fitness_ready <- unique(c(recent_points_fitness_agrees(rows,existing,ctx),
+      recent_points_fitness_superseded(rows,existing,entry$checks,ctx)))
+    entry$fitness_changed <- setdiff(rows$player_id,entry$fitness_ready)
     for(snapshot in unique(rows$snapshot)){
       group <- rows[rows$snapshot==snapshot,,drop=FALSE]
       anchor <- entry$fitness_anchors[[snapshot]]
@@ -950,15 +991,16 @@ new_shared_round_points_controller <- function(root,publish_interval=5) {
         }
       }else if(!all(group$player_id%in%entry$fitness_ready)&&
         (is.null(entry$fitness_probe_attempted[[snapshot]])||any(group$player_id%in%names(entry$pending)))){
-        candidates <- group[vapply(group$fitness,function(x){v<-recent_points_fitness_values(x);sum(is.finite(v))>=2L&&length(unique(v[is.finite(v)]))>=2L},logical(1)),,drop=FALSE]
+        candidates <- group[group$player_id%in%entry$fitness_changed&vapply(group$fitness,function(x){v<-recent_points_fitness_values(x);sum(is.finite(v))>=2L&&length(unique(v[is.finite(v)]))>=2L},logical(1)),,drop=FALSE]
         if(nrow(candidates)){
           preferred <- candidates$player_id[candidates$player_id%in%visible_ids()]
           player <- c(preferred,candidates$player_id)[1]
           entry$fitness_probes[[snapshot]] <- player
-          entry$fitness_holding <- unique(c(entry$fitness_holding,group$player_id))
+          entry$fitness_holding <- unique(c(entry$fitness_holding,intersect(group$player_id,entry$fitness_changed)))
         }
       }
     }
+    entry$fitness_changed <- setdiff(entry$fitness_changed,entry$fitness_ready)
   }
   save_fitness <- function(entry){
     if(!nrow(entry$fitness_unsaved))return()
@@ -988,11 +1030,19 @@ new_shared_round_points_controller <- function(root,publish_interval=5) {
     })
   }
   needed_for <- function(entry){
-    candidates<-ids_for(entry)
-    long_ids<-unique(unlist(lapply(current_clients(),function(x)if(x$n>5L)x$ids else character()),use.names=FALSE))
-    checked<-recent_points_saved_players(data.frame(),context_for(entry),entry$checks)
-    ready<-setdiff(entry$fitness_ready,setdiff(long_ids,checked))
-    reused<-setdiff(unique(c(reusable_for(entry),ready)),c(entry$forced,setdiff(long_ids,checked)))
+    candidates<-ids_for(entry);ctx<-context_for(entry)
+    checked<-recent_points_saved_players(data.frame(),ctx,entry$checks)
+    requested_missing<-character()
+    demanding<-Filter(function(x)length(setdiff(x$ids,checked)),current_clients())
+    if(length(demanding)){
+      existing<-dplyr::bind_rows(c(list(entry$points),entry$live))
+      for(client in demanding){
+        covered<-recent_points_covered_players(existing,ctx,client$n)
+        requested_missing<-unique(c(requested_missing,setdiff(client$ids,c(checked,covered))))
+      }
+    }
+    reused<-setdiff(unique(c(reusable_for(entry),entry$fitness_ready)),
+      c(entry$forced,requested_missing,entry$fitness_changed))
     normal<-setdiff(candidates,c(names(entry$attempted),names(entry$pending),reused,entry$fitness_holding))
     probes<-setdiff(unlist(entry$fitness_probes,use.names=FALSE),c(names(entry$attempted),names(entry$pending)))
     unique(c(probes,normal))
@@ -1051,7 +1101,7 @@ new_shared_round_points_controller <- function(root,publish_interval=5) {
     entry$finished_signature<-NULL;entry$published_ids<-character()
     entry$catalog_fitness<-data.frame();entry$fitness<-data.frame();entry$fitness_dirty<-TRUE
     entry$fitness_anchors<-list();entry$fitness_probe_attempted<-list();entry$fitness_probes<-list()
-    entry$fitness_ready<-character();entry$fitness_holding<-character();entry$fitness_unsaved<-data.frame();entry$fitness_failed<-data.frame()
+    entry$fitness_ready<-character();entry$fitness_changed<-character();entry$fitness_holding<-character();entry$fitness_unsaved<-data.frame();entry$fitness_failed<-data.frame()
     entries[[key]]<<-entry
     expected<-generation
     calls<-list(matrix=list("read_league_round_dataset",list(championship_id=client$league)),
@@ -1196,6 +1246,7 @@ new_shared_round_points_controller <- function(root,publish_interval=5) {
                 entry$checks<-dplyr::bind_rows(entry$checks,marker)
                 entry$checks<-tail(entry$checks[!duplicated(entry$checks[c("championship_id","player_id","season","scoring_version")],fromLast=TRUE),,drop=FALSE],2000L)
                 entry$save_errors<-setdiff(entry$save_errors,player_id)
+                entry$fitness_dirty<-TRUE
               }else entry$save_errors<-unique(c(entry$save_errors,player_id))
               touch();NULL
             }

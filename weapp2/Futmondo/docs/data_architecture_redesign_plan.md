@@ -412,3 +412,11 @@ Implemented (2026-11-02): wrapping shared headers, unclipped offer badges and so
 ### 2026-11-02 local chat attachment exclusion — complete locally
 
 - Ignore `.codex-attachments/` in the repository's shared Git rules. All 24 existing untracked images remain on disk and no longer appear in Git changes; future attachments inherit the rule. This repository housekeeping change has no application runtime effect.
+
+
+### 2026-11-02 durable round history — implemented locally
+
+- Remove the history/check age expiry that could restart league-wide acquisition. Reuse exact-context stored facts, including old acknowledged sparse/empty source responses and complete legacy windows for any requested N.
+- Request genuinely absent demanded legacy rounds only for affected visible players. Newer conflicting last-five evidence selects affected players and uses the existing verified snapshot anchor; ignore vectors superseded by newer labelled history/checks.
+- Keep manual current-table Refresh, persistence acknowledgement, context isolation, bounded concurrency/backpressure and publication throttling. No migration, new query, polling or live account call.
+- Focused reuse/correction/failure checks, the 527-player x38-round local fixture and required offline lifecycle passed. Older corrections beyond available last-five evidence need explicit labelled-source retrieval or Refresh; hosted persistence remains unverified. See data_review_results.md.

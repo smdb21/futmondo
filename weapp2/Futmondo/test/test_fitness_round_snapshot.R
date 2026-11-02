@@ -158,3 +158,46 @@ shiny::testServer(server,{
  })
 })
 cat(sprintf('FITNESS ROUND SNAPSHOT FINAL: %d passed / 0 failed\n',checks))
+
+# A current source change overrides a durable old acquisition for that player.
+rows<-data.frame(id=paste0('p',1:63),average.fitness='2,5,12,12,6',observed_at=format(stamp,'%Y-%m-%dT%H:%M:%OS6Z',tz='UTC'))
+rows$average.fitness[2]<-'2,5,12,12,9'
+old<-stamp-90*86400
+old_points<-dplyr::bind_rows(lapply(rows$id,function(id)observations(id,time=old)))
+old_checks<-data.frame(championship_id='league',player_id=rows$id,season='unknown',scoring_version=scoring,
+ checked_at=format(old,'%Y-%m-%dT%H:%M:%OS6Z',tz='UTC'),result_status='scores',point_count=5L)
+dataset<-list(points=old_points,checks=old_checks,complete=TRUE)
+reset()
+shiny::testServer(server,{
+ settle(session)
+ check('changed last-five score requests only its affected player despite old successful checks',{
+  stopifnot(identical(calls[grepl('get_player_recent_points',calls)],'get_player_recent_points:p2'))
+ })
+ pending[['p2']]$resolve(payload('p2',points=c(2,5,12,12,9)));settle(session)
+ check('changed current score is published and persisted without replaying unchanged players',{
+  h<-source$history()
+  stopifnot(h$points[h$player_id=='p2'&h$round==10L]==9,
+   h$points[h$player_id=='p1'&h$round==10L]==6,
+   length(recorded)==1L,recorded[[1]]$payload$context$player_id=='p2',
+   sum(grepl('get_player_recent_points',calls))==1L)
+ })
+})
+reset()
+shiny::testServer(server,{
+ settle(session);pending[['p2']]$resolve(NULL);settle(session)
+ check('failed targeted retrieval preserves every saved score and leaves an explicit failure',{
+  h<-source$history()
+  stopifnot(h$points[h$player_id=='p2'&h$round==10L]==6,
+   h$points[h$player_id=='p1'&h$round==10L]==6,source$status()$failed==1L,
+   !length(recorded),sum(grepl('get_player_recent_points',calls))==1L)
+ })
+})
+# No fresh vector can displace newer explicit-round observations/checks.
+dataset$points<-dplyr::bind_rows(lapply(rows$id,function(id)observations(id,time=stamp+10)))
+dataset$checks$checked_at<-format(stamp+10,'%Y-%m-%dT%H:%M:%OS6Z',tz='UTC')
+reset()
+shiny::testServer(server,{
+ settle(session)
+ check('older disagreeing fitness never replays or rolls back newer explicit history',stopifnot(!any(grepl('get_player_recent_points',calls)),!length(writes)))
+})
+cat(sprintf('DURABLE FITNESS CORRECTIONS: %d passed / 0 failed\n',checks))

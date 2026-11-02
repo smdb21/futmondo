@@ -65,8 +65,8 @@ legacy <- data.frame(championship_id=c("league-A","league-A"),
   scoring_version=c("scoring-A","scoring-A"),round=c(4L,4L),points=c(0,8),
   observed_at=c(now,now),stringsAsFactors=FALSE)
 reusable <- recent_points_saved_players(legacy,context,check_rows,now)
-check("only fresh exact-context checks and legacy rows are reused", {
-  stopifnot(setequal(reusable,c("empty-A","legacy-A")))
+check("old and recent exact-context checks and legacy rows remain reusable", {
+  stopifnot(setequal(reusable,c("empty-A","old-check","legacy-A")))
 })
 check("an empty result cannot be reused until its successful check is stored", {
   stopifnot(!length(recent_points_saved_players(data.frame(),context,data.frame(),now)),

@@ -653,3 +653,20 @@ Limitations: implementation and validation are local. Nothing was deployed; curr
 Added `.codex-attachments/` to the repository-root `.gitignore`. Verified that all 24 images were untracked, all 24 match the ignore rule, Git reports no changes within that directory, and all images remain on disk. Existing ignore entries and unrelated working changes are preserved. Other checkouts receive the rule when they pull it; already tracked attachments, if any elsewhere, would need separate index removal.
 
 Performance review: Git ignore rules and documentation only; no application runtime, API/database, cache, reactive rendering, timer or memory impact. No application tests are needed for this change.
+
+
+### Durable round history and targeted repairs — 2026-11-02
+
+The reappearing history run traced to `recent_points_saved_players()` expiring every saved player/check after 24 hours, or one hour for unknown context, combined with a full catalog queue. Removed that age expiry while keeping exact league/season/scoring context, valid observation times and the original future-timestamp guard. Successful sparse/empty source checks remain durable and never imply invented zero scores. Legacy or mapped rows already covering a requested N avoid source replay without requiring an acquisition marker; only visible players missing demanded rows require that acquisition.
+
+Newer conflicting fitness evidence now overrides durable reuse for affected players. A shared snapshot probe chooses an affected player, then the existing explicitly verified round anchor supports bounded mapping/repair. Ambiguous or failed anchoring leaves affected players eligible for individual labelled-source retrieval instead of suppressing repairs behind old reusable rows. Older vectors cannot roll back newer complete explicit windows or successful full-history checks. Failed reads preserve saved scores; persistence remains score-first/marker-last.
+
+Verification:
+- `Rscript test/test_recent_points_async.R`: **27 passed / 0 failed**, covering 90-day-old N3/N5/N8 reuse with zero summaries, old sparse/empty checks, targeted missing legacy rounds, corrupt future markers, unchanged navigation, two in-flight requests, backpressure, acknowledgement failure and no per-player publication/redraw regression.
+- `Rscript test/test_fitness_round_snapshot.R`: **18 passed / 0 failed**, including affected-only changed-score acquisition/persistence, preserved successful/saved entries on failure, stale-vector rejection, ambiguity/constant patterns, bulk repairs, N>5 demand and failed-save explicit retry.
+- `Rscript test/test_shared_round_dataset_independent.R`: **10 passed / 0 failed**, including exact-context durable checks and existing ordered persistence/cancellation contracts.
+- `Rscript test/test_application_offline.R`: **13 checks plus 8 tabs passed**, zero live HTTP/database mutation attempts. Existing fixture/schema diagnostics and empty-plot warnings appeared; no failed checks.
+
+Performance review: no new source/database endpoint, polling, recurring timer or migration. A fully populated **527-player x38-round**, 90-day-old matrix used **one logical database read and zero per-player summary requests** across N3/N5/N8. Actual controller startup/publication and those N changes in the synthetic test harness took **4.489s**; the existing 500-player N8 arithmetic alone took **0.045s**. The 500-player five-round sparse bulk acquisition/map/merge/publication fixture took **2.220s**, using **one** source probe. These include local R/test/reactive overhead and are not hosted latency measurements. Concurrency, queue/row caps and publication throttling are retained. Documentation has no runtime effect.
+
+Limitations: no hosted deployment, live API call, live database inspection or production save replay was performed. Corrections older than available last-five evidence need explicit labelled-source retrieval or manual Refresh; unchanged/repeated score patterns cannot establish a new round anchor and are never guessed from schedules.
