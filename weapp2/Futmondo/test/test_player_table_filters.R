@@ -31,6 +31,16 @@ shiny::testServer(players_table_Server,args=list(players_table_RV=source_rows,us
  })
 
 })
+shiny::testServer(players_table_Server,args=list(players_table_RV=shiny::reactive(data.frame(id=c("low","high"),name=c("Low","High"),value=c(1e6,2e9))),user_teams_RV=shiny::reactive(NULL),optional_ready=function()FALSE),{
+ check('blank maximum includes values above 1000M and a supplied cap still filters',{
+  session$setInputs(max_value_filter=NA_real_);settle(session)
+  stopifnot(nrow(players_table_filtered_RV())==2)
+  session$setInputs(max_value_filter=1000);settle(session)
+  stopifnot(identical(players_table_filtered_RV()$id,"low"))
+  session$setInputs(max_value_filter=NA_real_);settle(session)
+  stopifnot(nrow(players_table_filtered_RV())==2)
+ })
+})
 check('clause eligibility uses price, transfer state and UTC lock times',{
  now<-as.POSIXct('2026-11-01 12:00:00',tz='UTC')
  rows<-data.frame(clause_price=c(10,10,10,10,10,0,10,10),clause_transferred=c(FALSE,FALSE,FALSE,FALSE,TRUE,FALSE,NA,NA),

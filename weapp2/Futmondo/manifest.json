@@ -2246,7 +2246,7 @@
       "checksum": "e7c0ae55954bdc551b46c460c89e8a1b"
     },
     "futmondo_functions.R": {
-      "checksum": "77304fb4a9d58c45d3caa3c3a709ad04"
+      "checksum": "5cdc83663873f2baace4d02fe93d2754"
     },
     "global.R": {
       "checksum": "d068b3447101f1ee5b6aa38a4acfa692"
@@ -2276,13 +2276,13 @@
       "checksum": "daee1a8a319bc2a3a40a362c48b4c463"
     },
     "Modules/Players_Table_Module.R": {
-      "checksum": "c06724e26ef1e5d99b79ef61d37f51f5"
+      "checksum": "8e1ddde0f78c7471bf5218d69a576077"
     },
     "Modules/Plots_Module.R": {
       "checksum": "d28b6843516e7a88406119bf287000c2"
     },
     "Modules/Rivals_Module.R": {
-      "checksum": "7df487b6880f8fddbee43095fd81c4d5"
+      "checksum": "43a2540d5a9e308abdb70405509f1dfe"
     },
     "Modules/Round_MVPs_Module.R": {
       "checksum": "5ddb52ee106a00ae7514bb7697ca689f"
@@ -2291,7 +2291,7 @@
       "checksum": "84445a91497de1f2f4e0ef4ecee2444e"
     },
     "Modules/Today_Module.R": {
-      "checksum": "eb5dcb1ed0fda8a8c686528d375d5814"
+      "checksum": "c54f27d9445942eee2adcbcc9242b7c4"
     },
     "mvp_runtime.R": {
       "checksum": "4af5540b2f5de5917389048a8ab86b84"
@@ -2321,7 +2321,7 @@
       "checksum": "410e38ab7007ab0a040e6c349e48bc39"
     },
     "rival_finance_runtime.R": {
-      "checksum": "a828c8006d7595f4b6b15951e92fbbdf"
+      "checksum": "515295ead1df5e47102a76fb9cda480c"
     },
     "award_runtime.R": {
       "checksum": "99f1701bc8d314c4f81915b9703b1be1"
@@ -2336,7 +2336,7 @@
       "checksum": "2b037334f8088f5b4a270acbaea52e91"
     },
     "www/release-info.json": {
-      "checksum": "79b335d92511fc0961c924ce350928f9"
+      "checksum": "3cc89c19094b0d28aae4adc520fd2254"
     }
   },
   "users": null

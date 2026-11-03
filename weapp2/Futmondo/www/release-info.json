@@ -1,5 +1,6 @@
 {
-  "release": "history-rounds-local-time-2026-11-03",
-  "rival_finance_sha256": "5a647c82bd733de54ba1c04cb2d830f4120a3fb07021d971857d07e63e730962",
-  "rivals_module_sha256": "b98039f8c2c71b503975f48779f38547a318a9d9ac1ae6fb06c5c6d51c19960f"
+  "release": "league-transfer-history-2026-11-03",
+  "rival_finance_sha256": "d2d753e4bd7b3c26e07e9bc83129b7e20f0ff291b2f3d6a9b8bbd29ea4e36804",
+  "rivals_module_sha256": "0a11242a2dce68c6fd27274ab4f7e9455fa5ff3866cec36bb13d0249e2c1997d",
+  "today_module_sha256": "03a44e78269c7da9231f5ac1e3cac0390ed47062879861d0e510212cb86fc90d"
 }

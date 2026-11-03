@@ -2100,9 +2100,10 @@ get_championship_pressroom <- function(login, championship_id) {
       cursor <- ""
       all_news <- list()
       page_count <- 0
-      max_pages <- 25
+      seen_cursors <- character()
+      complete <- FALSE
 
-      while (page_count < max_pages) {
+      repeat {
         page_count <- page_count + 1
 
         payload <- list(
@@ -2126,6 +2127,7 @@ get_championship_pressroom <- function(login, championship_id) {
 
         news <- ans$answer$news
         if (is.null(news) || length(news) == 0) {
+          complete <- TRUE
           print("[Pressroom] Empty news array, all pages fetched.")
           break
         }
@@ -2140,11 +2142,12 @@ get_championship_pressroom <- function(login, championship_id) {
         last_id <- get_val(as.list(last_item), "_id", "")
 
         # If last_id is empty or same as current cursor, we've reached the end
-        if (last_id == "" || last_id == cursor) {
+        if (last_id == "" || last_id == cursor || last_id %in% seen_cursors) {
           print("[Pressroom] Reached end of pagination (no new cursor).")
           break
         }
 
+        seen_cursors <- c(seen_cursors,cursor)
         cursor <- last_id
       }
 
@@ -2164,7 +2167,7 @@ get_championship_pressroom <- function(login, championship_id) {
         dplyr::distinct(id, .keep_all = TRUE) %>%
         dplyr::arrange(desc(created))
 
-      return(observed_data(df,status=if(page_count>=max_pages) "partial" else "ok"))
+      return(observed_data(df,status=if(complete) "ok" else "partial"))
     }, error = function(e) {
       stop(resource_failure(e, "pressroom"))
     })

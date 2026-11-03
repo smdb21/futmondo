@@ -250,6 +250,33 @@ rivals_tx_display_df <- function(filtered) {
   filtered[, ordered_cols, drop = FALSE]
 }
 
+# Shared player cell used by both league and selected-team transaction tables.
+rivals_transfer_player_html <- function(name,club,logo,id,players=NULL) {
+  clean<-function(x){x<-as.character(x);x[is.na(x)]<-"";x}
+  name<-clean(name);club<-clean(club);logo<-clean(logo);id<-clean(id)
+  if(is.data.frame(players)&&all(c("id","team")%in%names(players))){
+    index<-match(id,as.character(players$id))
+    for(i in which(!is.na(index)&!nzchar(club)&!nzchar(logo))){
+      club[i]<-clean(players$team[index[i]])
+      if("logo"%in%names(players))logo[i]<-clean(players$logo[index[i]])
+    }
+  }
+  label<-as.character(htmltools::htmlEscape(name))
+  keys<-paste(club,logo,sep="|");unique_rows<-which(!duplicated(keys))
+  images<-vapply(unique_rows,function(i){
+    image_name<-get_team_image_name(club[i],logo=logo[i])
+    if(!nzchar(image_name))return("")
+    as.character(shiny::tags$img(src=paste0(TEAM_LOGO_URL,image_name,".png"),alt="",width=22,height=22,
+      loading="lazy",decoding="async",style="object-fit:contain; margin-right:7px; vertical-align:middle;",
+      onerror="this.style.display='none';"))
+  },character(1))
+  label<-paste0(images[match(keys,keys[unique_rows])],label)
+  label
+}
+rivals_timezone_script <- function(input_id) {
+  tags$script(HTML(sprintf("(function(){function send(){var zone=Intl.DateTimeFormat().resolvedOptions().timeZone;Shiny.setInputValue(%s,zone,{priority:'event'});}$(document).one('shiny:connected',send);if(window.Shiny&&Shiny.shinyapp&&Shiny.shinyapp.isConnected())send();})();",jsonlite::toJSON(input_id,auto_unbox=TRUE))))
+}
+
 rivals_display_text <- function(text) {
   text<-gsub("reconstructed","estimated",text,ignore.case=TRUE)
   gsub("reconstruction","calculation",text,ignore.case=TRUE)
@@ -285,18 +312,23 @@ rivals_cash_history_rows <- function(ledger,undated=NULL,timezone="UTC") {
       paste0(" · Position ",rows$round_position[indices],ifelse(rows$round_position_tied[indices]%in%TRUE," (tied)",""))," · Round position unavailable")
   }
   date_source<-if("payment_date_source"%in%names(rows))rows$payment_date_source else rep("",nrow(rows))
-  data.frame(date=ifelse(rows$section%in%"opening" & is.na(rows$timestamp),"Opening balance",ifelse(date_source%in%c("reference_payment_pending","round_settlement_pending"),"Payment not confirmed",ifelse(is.na(rows$timestamp),"Payment date unknown",format(rows$timestamp,"%d/%m/%Y %H:%M %Z",tz=timezone)))),
+  output<-data.frame(date=ifelse(rows$section%in%"opening" & is.na(rows$timestamp),"Opening balance",ifelse(date_source%in%c("reference_payment_pending","round_settlement_pending"),"Payment not confirmed",ifelse(is.na(rows$timestamp),"Payment date unknown",format(rows$timestamp,"%d/%m/%Y %H:%M %Z",tz=timezone)))),
     type=ifelse(rows$component%in%"Best XI/MVP payment","Recorded Best XI/MVP payment",ifelse(rows$estimated,"Estimated bonus",rows$type)),concept=paste0(description,round,round_detail,ifelse(rows$included,""," (excluded)")),money=rows$amount,
     payment_date_estimated=if("payment_date_estimated"%in%names(rows))rows$payment_date_estimated%in%TRUE else rep(FALSE,nrow(rows)),
     payment_date_source=if("payment_date_source"%in%names(rows))as.character(rows$payment_date_source)else rep("",nrow(rows)),
     running_balance=rows$running_balance,source=rivals_display_text(rows$source),included=rows$included,unknown_amounts=rows$unknown_amounts,
     category=rows$category,bonus_type=rows$bonus_type,calculation=if("calculation"%in%names(rows))rows$calculation else "",
     ledger_order=rows$ledger_order,stringsAsFactors=FALSE)
+  field<-function(key)if(key%in%names(rows))as.character(rows[[key]])else rep("",nrow(rows))
+  name<-field("transfer_player_name");name[is.na(name)|!nzchar(name)]<-output$concept[is.na(name)|!nzchar(name)]
+  output$player<-rivals_transfer_player_html(name,field("transfer_club"),field("transfer_logo"),field("player_id"))
+  output$buyer<-field("transfer_buyer");output$seller<-field("transfer_seller")
+  output[,c("date","player","money","buyer","seller","type","running_balance",setdiff(names(output),c("date","player","money","buyer","seller","type","running_balance"))),drop=FALSE]
 }
 rivals_cash_history_widget <- function(ledger,undated=NULL,timezone="UTC") {
   display<-rivals_cash_history_rows(ledger,undated,timezone)
   if(!nrow(display))return(reactable::reactable(data.frame(Status="No cash movements available."),compact=TRUE))
-  reactable::reactable(display,compact=TRUE,striped=TRUE,highlight=TRUE,bordered=FALSE,defaultPageSize=15,
+  reactable::reactable(display,compact=TRUE,striped=TRUE,highlight=TRUE,bordered=FALSE,defaultPageSize=15,showPageSizeOptions=TRUE,pageSizeOptions=c(15,30,50),
     details=function(index){text<-display$calculation[index];if(!is.na(text)&&nzchar(text))tags$p(style="white-space:normal;overflow-wrap:anywhere",text)else NULL},
     defaultSorted=list(ledger_order=if(isTRUE(undated))"asc"else"desc"),columns=list(
       date=colDef(name="Date",show=!isTRUE(undated),align="left",cell=function(value,index){
@@ -317,11 +349,12 @@ rivals_cash_history_widget <- function(ledger,undated=NULL,timezone="UTC") {
           c(ranking="Position bonus",mvp="MVP bonus",dreamteam="Best XI bonus",points="Point bonus")[[display$bonus_type[index]]]))
         value
       }),
-      concept=colDef(name="Concept / Description",align="left",cell=function(value,index){
+      player=colDef(name="Name",html=TRUE,align="left"),buyer=colDef(name="Buyer",align="left"),seller=colDef(name="Seller",align="left"),
+      concept=colDef(show=FALSE,name="Concept / Description",align="left",cell=function(value,index){
         note<-paste(display$source[index],if(!display$included[index])"Not applied to balance."else"",
           if(display$unknown_amounts[index]>0)"Balance excludes unknown amounts."else"")
         tags$span(title=note,value)
-      }),money=colDef(name="Amount",align="right",cell=function(value){
+      }),money=colDef(name="Price",align="right",cell=function(value){
         if(!is.finite(value))return("Unavailable")
         tags$span(style=if(value<0)"color:var(--fm-danger)"else"color:var(--fm-text)",
           paste0(if(value>0)"+"else"",format_table_currency(value)))
@@ -473,7 +506,7 @@ rivals_status_message <- function(message, loading=FALSE) {
 rivals_UI <- function(id) {
   ns <- NS(id)
 tagList(
-    tags$script(HTML(sprintf("(function(){function send(){var zone=Intl.DateTimeFormat().resolvedOptions().timeZone;Shiny.setInputValue(%s,zone,{priority:'event'});}$(document).one('shiny:connected',send);if(window.Shiny&&Shiny.shinyapp&&Shiny.shinyapp.isConnected())send();})();",jsonlite::toJSON(ns("browser_timezone"),auto_unbox=TRUE)))),
+    rivals_timezone_script(ns("browser_timezone")),
     # League Financial Standings Overview & Scouting Target Selection
     fluidRow(
       column(width = 12,

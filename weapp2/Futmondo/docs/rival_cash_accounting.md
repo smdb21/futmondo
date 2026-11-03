@@ -176,3 +176,12 @@ History excludes unpaid estimated entries while retaining the full accounting le
 `rivals_inflow_totals()` reports included positive cash by category. A pending position/point round no longer hides already paid income; unknown combined-award allocation still prevents an invented XI/MVP split. Total income and Total expenses share the same ledger and appear in responsive half-width boxes. Estimated balance remains distinguished from confirmed cash, using plain user-facing labels. The roster tab is Current team and has no redundant heading; history remains the default.
 
 The browser reports its IANA timezone once per connection through the namespaced `browser_timezone` input. History, Last Access and Last Updated format timestamps locally with event-specific timezone abbreviations; UTC is retained internally and used as the fallback. These display inputs do not trigger acquisition.
+
+
+### Shared league/selected-team transfer presentation — 2026-11-03
+
+Today displays League transfers with 15/30/50-row pagination over the complete fetched feed. The legacy 20-row presentation cap and 25-page source cap are removed. Cursor acquisition stops only on an empty page or a repeated/invalid cursor; the latter is explicitly partial. Existing account/league cache, async acquisition and deduplicated persistence remain in use. Pagination is local and does not issue requests.
+
+Rival history follows Date, Name, Price, Buyer, Seller, Type, plus Balance; bonus rows carry their round description in Name. `rival_transfer_metadata()` attaches historical player/club and counterparties once per dataset publication. Direct source IDs are vector-matched; private movements require unique participating-team/player/amount/time agreement (one-second tolerance) or their source event ID. Ambiguous counterparties remain Unknown. This display join cannot add or alter ledger cash. `rivals_transfer_player_html()` is shared with Today, escapes player text and renders lazy club crests, preferring historical club evidence.
+
+The shared finance source publishes a separate `transfers` reactive value so Today receives updated verified transfer methods without repainting for unchanged loading progress. No method is guessed: unidentified transfers use the neutral Transfer between teams label. Both views format browser-local times with timezone abbreviations. Maximum valuation and clause filters start/reset blank (no upper limit); explicit user values still filter.

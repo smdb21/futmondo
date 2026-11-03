@@ -491,3 +491,8 @@ Implemented the requested display change: excluded bonus estimates remain audita
 ### Rival payment-history presentation — implemented locally 2026-11-03
 
 Added round points/actual position, browser-local date labels, separate Total income/Total expenses boxes, paid category subtotals despite pending rounds, plain balance labels, and Current team tab without the redundant roster heading. Excluded pending bonuses remain absent from payment history. Accounting evidence and cash totals remain unchanged. Focused accounting, recovery, rendering and offline lifecycle checks pass; production startup verification is recorded separately.
+
+
+### Full league transfer history and aligned rival table — implemented locally 2026-11-03
+
+Removed default maximum-value/maximum-clause caps. Added full fetched league history with local pagination, shared crest presentation, exact source metadata joins for selected-team ledger rows and publication-aware method labels. Removed fixed source page cap while preserving cycle detection and partial coverage. Focused and delayed-loading checks plus offline lifecycle pass. Live authenticated oldest-history coverage remains separate from source-contract fixtures and public rollout verification.
