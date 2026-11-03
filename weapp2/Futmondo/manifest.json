@@ -2277,13 +2277,13 @@
       "checksum": "8d1a1a4f9a4c0b32bdf207ce695f81e9"
     },
     "data_service.R": {
-      "checksum": "82ba4aaff837d029138fb035e99d2a9b"
+      "checksum": "9b74fa077f385d6b4a5e878be18fa589"
     },
     "factual_helpers.R": {
       "checksum": "9a7616315995b23d7862cc6e4d8ece96"
     },
     "futmondo_functions.R": {
-      "checksum": "cf76e01c8ce5209573be0b89bdd2aa16"
+      "checksum": "89579f9567bb7c7f3dbe55e0cccbd19f"
     },
     "global.R": {
       "checksum": "d068b3447101f1ee5b6aa38a4acfa692"
@@ -2322,7 +2322,7 @@
       "checksum": "d28b6843516e7a88406119bf287000c2"
     },
     "Modules/Rivals_Module.R": {
-      "checksum": "398ba036ee710542415c7ab1381fad89"
+      "checksum": "9a599bd8ba87f94ea92485dd64dd1c27"
     },
     "Modules/Round_MVPs_Module.R": {
       "checksum": "5ddb52ee106a00ae7514bb7697ca689f"
@@ -2346,7 +2346,7 @@
       "checksum": "a243c91a9c01604ce74d517e116e3e61"
     },
     "rival_finance_runtime.R": {
-      "checksum": "3a61b078a7c2b4ee74b6132efb248132"
+      "checksum": "8716ffb7ed75ca2f6cfa2d8dc4eaa813"
     },
     "server.R": {
       "checksum": "99e89173e500fba3b916088dd424b099"
@@ -2367,7 +2367,7 @@
       "checksum": "410e38ab7007ab0a040e6c349e48bc39"
     },
     "www/release-info.json": {
-      "checksum": "8854ac7676a16edd7570f7fb9d2a619f"
+      "checksum": "ccc26a2fd3ba354ca4d496aeb7006e74"
     },
     "www/remember-login.js": {
       "checksum": "2b037334f8088f5b4a270acbaea52e91"

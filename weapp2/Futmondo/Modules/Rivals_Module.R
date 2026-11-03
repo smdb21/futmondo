@@ -299,7 +299,8 @@ rivals_cash_history_rows <- function(ledger,undated=NULL,timezone="UTC") {
   round<-paste0(round,ifelse(nzchar(settlement)&settlement!=label,paste0(" · Settlement ",settlement),""))
   description<-rows$component
   description[rows$bonus_type%in%"points" & description!="Combined round point payment"]<-"Point reward"
-  description[rows$bonus_type%in%"ranking"]<-"Position reward"
+  description[rows$bonus_type%in%"ranking"]<-"Position"
+  description[rows$bonus_type%in%"dreamteam" & description=="Best XI reward"]<-"Best XI"
   round_detail<-rep("",nrow(rows))
   if("round_points"%in%names(rows)){
     indices<-which(rows$bonus_type%in%"points")
@@ -311,9 +312,16 @@ rivals_cash_history_rows <- function(ledger,undated=NULL,timezone="UTC") {
     round_detail[indices]<-ifelse(is.finite(rows$round_position[indices]),
       paste0(" · Position ",rows$round_position[indices],ifelse(rows$round_position_tied[indices]%in%TRUE," (tied)",""))," · Round position unavailable")
   }
+  point_rows<-which(rows$bonus_type%in%"points")
+  for(i in point_rows){
+    score<-if("round_points"%in%names(rows)&&is.finite(rows$round_points[i]))format(rows$round_points[i],trim=TRUE,scientific=FALSE)else "unavailable"
+    description[i]<-paste0("Points (Round ",if(nzchar(label[i]))label[i]else "?",": ",score,
+      if(nzchar(settlement[i])&&settlement[i]!=label[i])paste0("; payment ",settlement[i])else "",")")
+    round[i]<-"";round_detail[i]<-""
+  }
   date_source<-if("payment_date_source"%in%names(rows))rows$payment_date_source else rep("",nrow(rows))
   output<-data.frame(date=ifelse(rows$section%in%"opening" & is.na(rows$timestamp),"Opening balance",ifelse(date_source%in%c("reference_payment_pending","round_settlement_pending"),"Payment not confirmed",ifelse(is.na(rows$timestamp),"Payment date unknown",format(rows$timestamp,"%d/%m/%Y %H:%M",tz=timezone)))),
-    type=ifelse(rows$component%in%"Best XI/MVP payment","Recorded Best XI/MVP payment",ifelse(rows$estimated,"Estimated bonus",rows$type)),concept=paste0(description,round,round_detail,ifelse(rows$included,""," (excluded)")),money=rows$amount,
+    type=ifelse(rows$component%in%"Best XI/MVP payment","Recorded Best XI/MVP payment",ifelse(rows$estimated,"Bonus",rows$type)),concept=paste0(description,round,round_detail,ifelse(rows$included,""," (excluded)")),money=rows$amount,
     payment_date_estimated=if("payment_date_estimated"%in%names(rows))rows$payment_date_estimated%in%TRUE else rep(FALSE,nrow(rows)),
     payment_date_source=if("payment_date_source"%in%names(rows))as.character(rows$payment_date_source)else rep("",nrow(rows)),
     running_balance=rows$running_balance,source=rivals_display_text(rows$source),included=rows$included,unknown_amounts=rows$unknown_amounts,
@@ -350,7 +358,6 @@ rivals_cash_history_widget <- function(ledger,undated=NULL,timezone="UTC") {
         if(value=="opening")return("Starting cash")
         if(value%in%c("buy","sell"))return(paste(if(display$category[index]%in%"clause")"Clause"else if(display$category[index]%in%"market")"Ordinary"else"Player",if(value=="buy")"purchase"else"sale"))
         if(display$bonus_type[index]%in%c("ranking","mvp","dreamteam","points"))return(paste0(
-          if(value=="Estimated bonus")"Estimated "else"",
           c(ranking="Position bonus",mvp="MVP bonus",dreamteam="Best XI bonus",points="Point bonus")[[display$bonus_type[index]]]))
         value
       }),
@@ -399,14 +406,22 @@ rivals_last_access_cell <- function(value,timezone="UTC") {
 }
 
 # Keep observed team fields selectable even if financial audit details fail.
-rivals_finance_table_widget <- function(finances_data,on_error=function(error)NULL,timezone="UTC") {
+rivals_finance_table_widget <- function(finances_data,on_error=function(error)NULL,timezone="UTC",selected_id=NULL,selection_input=NULL,selection_context=NULL,table_id=NULL) {
   timezone<-rivals_display_timezone(timezone)
   df<-finances_data$team_finances
   if(!is.data.frame(df)||!nrow(df))return(NULL)
+  selected<-match(selected_id,as.character(df$teamid));selected<-selected[!is.na(selected)]
+  click<-"select"
+  if(!is.null(selection_input)&&!is.null(table_id)){
+    click<-htmlwidgets::JS(paste0("function(rowInfo,column,state){if(!rowInfo)return;var ids=",
+      jsonlite::toJSON(as.character(df$teamid)),";Reactable.getInstance(",jsonlite::toJSON(table_id,auto_unbox=TRUE),").setRowsSelected([String(rowInfo.index)]);Shiny.setInputValue(",
+      jsonlite::toJSON(selection_input,auto_unbox=TRUE),",{id:ids[rowInfo.index],context:",jsonlite::toJSON(selection_context,auto_unbox=TRUE),
+      ",nonce:Date.now()},{priority:'event'});}"))
+  }
   currency<-function(value){value<-fm_number(value);if(is.finite(value))format_table_currency(value)else""}
   public_columns<-function(rows){
     pills<-rivals_points_pills(rows$Points)
-    list(Team=colDef(name="User Team",align="left",minWidth=130),
+    list(team_id_hidden=colDef(show=FALSE),Team=colDef(name="User Team",align="left",minWidth=130),
       `Squad Value`=colDef(cell=currency,align="right",minWidth=125),
       `Last Access`=colDef(header=tags$span("Last Access"),
         minWidth=165,cell=function(value)rivals_last_access_cell(value,timezone),headerClass="fm-metric-header"),
@@ -416,16 +431,17 @@ rivals_finance_table_widget <- function(finances_data,on_error=function(error)NU
     directory<-rival_finance_directory(df)
     rows<-data.frame(Team=directory$teamname,`Squad Value`=directory$team_value,
       `Last Access`=as.numeric(fm_time(directory$last_access)),Points=directory$points,check.names=FALSE)
-    reactable::reactable(rows,compact=TRUE,striped=TRUE,highlight=TRUE,selection="single",onClick="select",defaultPageSize=10,
+    rows$team_id_hidden<-directory$teamid
+    reactable::reactable(rows,compact=TRUE,striped=TRUE,highlight=TRUE,selection="single",onClick=click,defaultSelected=selected,defaultPageSize=10,
       defaultColDef=colDef(sortNALast=TRUE),columns=public_columns(rows))
   }
-  tryCatch({
+  widget<-tryCatch({
     df_display<-df %>% dplyr::select(Team=teamname,`Balance`=estimated_cash,
-      Confidence=confidence,`Last updated`=as_of,Status=cash_status,`Squad Value`=team_value,`Last Access`=last_access,Points=points)
-    df_display$Confidence[df_display$Confidence%in%"Reconstructed"]<-"Complete"
+      `Last updated`=as_of,`Squad Value`=team_value,`Last Access`=last_access,Points=points)
+    df_display$team_id_hidden<-df$teamid
     df_display$`Last Access`<-as.numeric(fm_time(df_display$`Last Access`))
     reactable::reactable(df_display,compact=TRUE,striped=TRUE,highlight=TRUE,bordered=FALSE,
-      selection="single",onClick="select",defaultPageSize=10,defaultSorted=list(`Balance`="desc"),
+      selection="single",onClick=click,defaultSelected=selected,defaultPageSize=10,defaultSorted=list(`Balance`="desc"),
       defaultColDef=colDef(sortNALast=TRUE),
       columns=c(public_columns(df_display),list(
         `Balance`=colDef(align="right",cell=function(value){
@@ -435,6 +451,20 @@ rivals_finance_table_widget <- function(finances_data,on_error=function(error)NU
           stamp<-fm_time(mvp_text(value));if(length(stamp)==1L&&!is.na(stamp))unname(format(stamp,"%d-%m %H:%M",tz=timezone))else""
         }))))
   },error=function(error){on_error(error);fallback()})
+  if(!is.null(selection_input))widget<-htmlwidgets::onRender(widget,
+    "function(el,x,data){
+      if(el._fmRivalOff)el._fmRivalOff();
+      var table=Reactable.getInstance(el.id),index=table.data.findIndex(function(row){return row.team_id_hidden===data.selected;});
+      table.setRowsSelected(index<0?[]:[String(index)]);
+      var previous=data.selected;
+      el._fmRivalOff=Reactable.onStateChange(el.id,function(state){
+        if(!state.selected||state.selected.length!==1)return;
+        var row=Reactable.getInstance(el.id).data[state.selected[0]],id=row&&row.team_id_hidden;
+        if(!id||id===previous)return;previous=id;
+        Shiny.setInputValue(data.input,{id:id,context:data.context,nonce:Date.now()},{priority:'event'});
+      });
+    }",data=list(input=selection_input,context=selection_context,selected=selected_id))
+  widget
 }
 
 # Summary cards reuse the league ledger; no additional financial reads.
@@ -622,23 +652,24 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
     rival_context_RV <- reactive(list(user=fm_scalar(login_token()[["userid"]]),
       championship=fm_scalar(championship_id()),team=fm_scalar(user_team_id())))
     selected_rival_id_RV <- reactiveVal(NULL)
+    selection_team_ids_RV<-reactiveVal(character())
+    league_table_rows_RV<-reactiveVal(data.frame())
     table_failure_RV<-reactiveVal(NULL)
     selected_rival_context_RV <- reactiveVal(NULL)
     observeEvent(rival_context_RV(), {
       selected_rival_id_RV(NULL);selected_rival_context_RV(NULL);table_failure_RV(NULL)
       tryCatch(updateReactable("league_finances_table",selected=NA_integer_,session=session),error=function(e)NULL)
     },ignoreNULL=FALSE,priority=100)
-    observeEvent(getReactableState("league_finances_table","selected",session=session), {
-      idx<-getReactableState("league_finances_table","selected",session=session)
-      df<-league_finances_RV()$team_finances
-      req(length(idx)==1L,is.numeric(idx),is.data.frame(df),idx>=1,idx<=nrow(df))
-      selected_rival_context_RV(rival_context_RV());selected_rival_id_RV(as.character(df$teamid[idx]))
+    observeEvent(input$rival_team_selection, {
+      choice<-input$rival_team_selection;df<-league_finances_RV()$team_finances
+      req(identical(choice$context,rival_context_RV()),is.data.frame(df),
+        length(choice$id)==1L,choice$id%in%as.character(df$teamid))
+      selected_rival_context_RV(rival_context_RV());selected_rival_id_RV(as.character(choice$id))
     },ignoreNULL=TRUE)
     selected_rival_team_id <- reactive({
       if(!identical(selected_rival_context_RV(),rival_context_RV())) return(NULL)
       id<-selected_rival_id_RV()
-      df<-league_finances_RV()$team_finances
-      if(is.null(id) || !is.data.frame(df) || !id %in% df$teamid) return(NULL)
+      if(is.null(id) || !id %in% selection_team_ids_RV()) return(NULL)
       id
     })
 
@@ -700,6 +731,12 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
     # One shared, asynchronous league ledger. Saved evidence renders first.
     league_finances_RV <- shared_rival_finance_source(session,login_token,championship_id,
       user_team_id,user_teams_RV,is_module_active,mvp_snapshot,refresh_trigger)
+    observeEvent(league_finances_RV(),{
+      rows<-league_finances_RV()$team_finances
+      league_table_rows_RV(rows)
+      selection_team_ids_RV(if(is.data.frame(rows))sort(as.character(rows$teamid))else character())
+    },ignoreNULL=FALSE)
+
 
     output$league_finances_status <- renderUI({
       req(isTRUE(is_module_active()))
@@ -708,7 +745,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       loading<-isTRUE(state$loading)||isTRUE(state$finance_loading)||
         identical(state$teams_status,"loading")||(is.null(state$teams_status)&&count==0L)
       message<-if(loading){
-        if(count)"Updating rival balances… You can already choose a team."else
+        if(count)"Updating balances… Your selected team will stay open."else
           "Loading rivals… Retrieving league teams and balances. This may take a moment."
       }else if(count)paste(count,"league teams loaded.")else state$teams_reason %||% ""
       issues<-Filter(nzchar,c(state$finance_error %||% "",state$reason %||% ""))
@@ -721,12 +758,13 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
     # The table is the single selection control for rival scouting.
     output$league_finances_table <- reactable::renderReactable({
       req(is_module_active() == TRUE)
-      finances_data<-league_finances_RV()
+      finances_data<-list(team_finances=league_table_rows_RV())
       failure<-NULL
       widget<-rivals_finance_table_widget(finances_data,function(error){
         failure<<-isolate(table_failure_RV())
         if(is.null(failure))failure<<-resource_log_failure(resource_failure(error,resource="league_finances_calc",category="schema"))
-      },timezone=display_timezone())
+      },timezone=display_timezone(),selected_id=isolate(selected_rival_id_RV()),
+        selection_input=session$ns("rival_team_selection"),selection_context=rival_context_RV(),table_id=session$ns("league_finances_table"))
       table_failure_RV(failure)
       widget
     })
@@ -782,12 +820,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                    solidHeader = TRUE,
                    div(style = "text-align: center; padding: 10px;",
                        h3(style = "font-weight: 700; color: var(--fm-text); margin: 0; font-size: 20px;", cash),
-                       p(style = "color: var(--fm-muted); font-size: 11px; text-transform: uppercase; margin-top: 5px;", summary$label),
-                       if(nzchar(summary$status))p(style="white-space:normal;overflow-wrap:anywhere;",summary$status),
-                       if((length(summary$notes)==1L && !is.na(summary$notes) && nzchar(summary$notes))||is.finite(summary$observed_cash))
-                         tags$details(tags$summary("Calculation details"),tags$p(style="white-space:normal;overflow-wrap:anywhere;",summary$notes),
-                           if(is.finite(summary$observed_cash))tags$p("Observed cash",if(!summary$observed_cash_fresh)" (stale)"else"",": ",ui_financial_amount(summary$observed_cash)),
-                           if(is.finite(summary$difference))tags$p("Difference from recorded cash: ",ui_financial_amount(summary$difference))))
+                       p(style = "color: var(--fm-muted); font-size: 11px; text-transform: uppercase; margin-top: 5px;", summary$label))
                  )
           ),
           column(width = 3,

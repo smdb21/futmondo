@@ -207,3 +207,8 @@ Cash payment time is locker `created`; the later `/1/locker/pressroom` time is r
 ### Pressroom mixed-order cursor boundary — 2026-11-03
 
 Observed `/1/locker/pressroom` returns up to 150 records sorted by `created` descending, but `from` filters Mongo ObjectId order. Different writers generate nonmonotonic IDs within one second. Advancing directly to the last returned ID silently skips earlier-created events whose IDs are larger. `get_championship_pressroom()` now overlaps the complete boundary second using its ObjectId upper bound, deduplicates native IDs, then advances to the lower bound when a short repeated-boundary page establishes exhaustion. Only an empty response establishes complete coverage. A saturated single-second page or cursor cycle remains partial instead of claiming completeness. Non-ObjectId test/source cursors retain ordinary cursor behavior.
+
+
+### Incremental pressroom refresh — 2026-11-03
+
+No endpoint or payload change. A fully fetched, context-scoped cached result retains `full_history_at`. While that audit is less than 24 hours old, subsequent uncached refreshes stop on a whole page of known source IDs and merge new/revised rows into the previous native history before reconciling locker payments. Same-second ObjectId overlap remains in force when advancing pages. Explicit Refresh/cache invalidation or an older audit triggers the full scan. Existing normalized database transactions provide saved-balance recovery while current acquisition is pending/unavailable; they are not treated as proof of complete API coverage.

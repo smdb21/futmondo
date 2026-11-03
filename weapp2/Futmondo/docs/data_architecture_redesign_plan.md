@@ -511,3 +511,8 @@ Fixed pressroom's differing timestamp sort/ObjectId filter contract. Source repl
 ### Tied ranking reconciliation — implemented and locally verified 2026-11-03
 
 Confirmed actual round-6 payment establishes whole-euro truncation of shared position rewards. After recovered purchases and this calculation correction, HOPE ledger equals independently reported current balance 426,122,711 EUR exactly. Previous half-euro evidence limitation is resolved; hosted rollout remains separately verified.
+
+
+### Rival balance recovery, incremental updates and selection — implemented locally 2026-11-03
+
+Reproduced hosted HOPE 632,606,939 EUR as clause-only history: omitted ordinary transfers net -206,484,228 EUR. Existing database recovery plus saved clauses produces the confirmed 426,122,711 EUR. Added adoption of a concurrently recovered complete feed, semantic calculation reuse, per-team invalidation, bounded shared process cache, and incremental transfer pages with full-audit safeguards. Stabilized team-ID selection through redraw/reorder and applied requested simplified columns/labels. Local regression/browser/lifecycle results and hosted delivery are tracked separately. Persistent serialized calculation snapshots were not implemented; server restarts still rebuild from the existing saved source evidence.

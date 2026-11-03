@@ -1,8 +1,9 @@
 {
-  "release": "tied-position-whole-euros-2026-11-03",
+  "release": "rival-reuse-and-transfer-recovery-2026-11-03",
   "locker_transfers_sha256": "0c4e797eb6795cbd1eddf2f167e3838f91c19c0c79f9d35bd1978c99b0df3774",
-  "rival_finance_sha256": "e5cc07058de7542eb9b93c2f4ccd4e02f2e0742275b6327a7609d6c3ac29fa11",
-  "rivals_module_sha256": "638f606f98fddb4940ccd9b29d64af62058a6512ca897b19960c9c5b11d39cb7",
+  "rival_finance_sha256": "0f605f25abecb37ca1d0ae9d2a9b9eee731a63e303ee6d17e0ecd76979f0b1c5",
+  "rivals_module_sha256": "028b0b1b34632cde1a34a4041f7931da21e1cf21b90e18c37277cefe53a053e0",
   "today_module_sha256": "5e9cf9a466185cdb66329f6132fa2215e36543a45d55e28006e1443e95fe6b1f",
-  "futmondo_functions_sha256": "c708ec6ab23678c449b03e7e3eef83e8cfad3e0c2e76e3c91ef08ecbe052d320"
+  "futmondo_functions_sha256": "2f433b3cf04105aaa7c2b421415127e95cfc26fea25eaa3933fc0927fc37694d",
+  "data_service_sha256": "4f167f83dee70ab641308f41b4866937d84c4db9ab1203029dc21d487df4012a"
 }

@@ -1,3 +1,6 @@
+# Successful transfer reads notify active consumers after concurrent recovery.
+# The counter carries no account data; cache reads remain context-scoped.
+transfer_publication_revision <- shiny::reactiveVal(0L)
 # Explicit bounded cache and session resource states.
 resource_context <- function(login=NULL, championship_id=NULL, user_team_id=NULL, player_id=NULL,
   season="unknown", scoring_version="unknown", account_id=NULL, session_id=NULL) {
@@ -127,7 +130,11 @@ resource_store <- function(key,data,context,resource,ttl=NULL) {
   item<-list(data=data,time=now,accessed_at=now,context=context,resource=resource,
     expires_at=as.numeric(now)+max(0,ttl)+policy$stale_for,bytes=as.numeric(object.size(data)))
   if(item$bytes<=policy$max_bytes)api_cache_env[[key]]<-item
-  resource_cache_prune(now);data
+  resource_cache_prune(now)
+  if(identical(resource,paste0("pressroom_",context$championship_id))&&
+     is.data.frame(data)&&identical(attr(data,"fetch_status"),"ok"))
+    transfer_publication_revision(shiny::isolate(transfer_publication_revision())+1L)
+  data
 }
 get_cached_data <- function(key,expr,timeout_sec=NULL,context=NULL) {
   code<-substitute(expr);caller<-parent.frame()

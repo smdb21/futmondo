@@ -1,0 +1,30 @@
+options(futmondo.offline=TRUE)
+suppressPackageStartupMessages(source('global.R'))
+clear_api_cache();record_acquired_resource<-function(...)TRUE
+news<-lapply(seq_len(310),function(i)list(`_id`=sprintf('%08x0000000000000001',1879048192+i),created=format(as.POSIXct('2026-08-01',tz='UTC')+i,'%Y-%m-%dT%H:%M:%SZ',tz='UTC'),`_player`=list(`_id`='p',name='Player'),`_buyer`=list(`_id`='a',name='A'),price=i))
+requests<-0L
+fm_async_read_http<-function(url,method,body,headers,owner){
+ query<-jsonlite::fromJSON(body)$query
+ if(endsWith(url,'/news'))answer<-list(news=list())else{
+  requests<<-requests+1L;rows<-Filter(function(x)!nzchar(query$from)||x$`_id`<query$from,news)
+  rows<-rows[order(vapply(rows,function(x)x$created,character(1)),decreasing=TRUE)];answer<-list(news=head(rows,150L))
+ }
+ promises::promise_resolve(list(status_code=200L,content=charToRaw(jsonlite::toJSON(list(answer=answer),auto_unbox=TRUE)),times=list(total=0)))
+}
+await<-function(p){done<-FALSE;out<-NULL;error<-NULL;promises::then(p,function(x){out<<-x;done<<-TRUE},function(e){error<<-e;done<<-TRUE});deadline<-Sys.time()+20;while(!done&&Sys.time()<deadline)later::run_now(.01);stopifnot(done);if(!is.null(error))stop(error);out}
+auth<-c(userid='u',token='fixture');ctx<-resource_context(auth,'c',session_id='fixture');args<-list(login=auth,championship_id='c')
+read<-function()await(async_adapter_fetch('get_championship_pressroom',args,ctx))
+x<-read();stopifnot(nrow(x)==310L,identical(attr(x,'fetch_status'),'ok'),requests>1L)
+key<-api_cache_key('pressroom_c',context=resource_context(auth,'c'))
+before<-requests;invisible(read());stopifnot(requests==before)
+api_cache_env[[key]]$time<-Sys.time()-301
+news[[310]]$price<-999
+x<-read();stopifnot(requests==before+1L,nrow(x)==310L,x$price[x$id==news[[310]]$`_id`]==999)
+api_cache_env[[key]]$time<-Sys.time()-301
+news[[311]]<-list(`_id`='700001ff0000000000000001',created='2026-08-02T00:00:00Z',`_player`=list(`_id`='p',name='Player'),`_buyer`=list(`_id`='a',name='A'),price=7)
+before<-requests;x<-read();stopifnot(nrow(x)==311L,!anyDuplicated(x$id),requests==before+2L)
+# Older revisions are recovered by the bounded daily active-session audit.
+news[[1]]$price<-91;api_cache_env[[key]]$time<-Sys.time()-301
+attr(api_cache_env[[key]]$data,'full_history_at')<-Sys.time()-86401
+before<-requests;x<-read();stopifnot(requests>before+2L,x$price[x$id==news[[1]]$`_id`]==91)
+cat('PASS full baseline, zero-read warm reuse, one-page unchanged refresh, new/revised events and daily historical revision audit\n')

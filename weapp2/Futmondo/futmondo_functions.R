@@ -2035,6 +2035,12 @@ get_championship_pressroom <- function(login, championship_id) {
   }
 
   cache_key <- paste0("pressroom_", championship_id)
+  cached <- api_cache_env[[api_cache_key(cache_key,context=resource_context(login=login,championship_id=championship_id))]]$data
+  audited_at <- attr(cached,"full_history_at")
+  incremental <- is.data.frame(cached)&&identical(attr(cached,"fetch_status"),"ok")&&
+    length(audited_at)==1L&&!is.na(fm_time(audited_at))&&
+    as.numeric(difftime(Sys.time(),fm_time(audited_at),units="secs"))<86400
+  previous <- if(incremental)cached else NULL
   get_cached_data(cache_key, {
     locker<-get_locker_clause_payments(login,championship_id)
     teams<-if(nrow(locker))get_teams(login,championship_id)else data.frame()
@@ -2140,6 +2146,13 @@ get_championship_pressroom <- function(login, championship_id) {
           all_news[[length(all_news) + 1]] <- item
         }
 
+        # One wholly known page establishes overlap with a previously complete
+        # history. Keep source revisions on the fetched pages; audit older pages
+        # daily during active use or after explicit cache invalidation/Refresh.
+        if(incremental&&length(news)&&all(vapply(news,function(item)as.character(item$`_id`),character(1))%in%previous$id)){
+          complete<-TRUE;break
+        }
+
         # Get the last item's _id to use as the cursor for the next page
         last_item <- news[[length(news)]]
         last_id <- get_val(as.list(last_item), "_id", "")
@@ -2174,6 +2187,10 @@ get_championship_pressroom <- function(login, championship_id) {
         parse_news_item(item)
       }) %>% bind_rows()
 
+      if(incremental){
+        old<-previous[!startsWith(previous$id,"locker:"),,drop=FALSE]
+        df<-dplyr::bind_rows(df,old)
+      }
       # Deduplicate across cursor page boundaries
       df <- df %>%
         dplyr::filter(!is.na(id) & nzchar(id)) %>%
@@ -2185,6 +2202,7 @@ get_championship_pressroom <- function(login, championship_id) {
         if(any(!nzchar(locker$player_id)))locker<-locker_resolve_parties(locker,df,teams,get_championship_players(login,championship_id))
         df<-merge_locker_transfers(df,locker)
       }
+      attr(df,"full_history_at")<-if(incremental)audited_at else if(complete)Sys.time()else NULL
       return(observed_data(df,status=if(complete) "ok" else "partial"))
     }, error = function(e) {
       stop(resource_failure(e, "pressroom"))

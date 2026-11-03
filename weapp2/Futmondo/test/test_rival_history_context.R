@@ -2,7 +2,7 @@ source('test/test_rival_reference_bonus_gate.R')
 x<-build(list(payment('points',20),payment('ranking',20,'8.1')))
 b<-x$cash_ledgers$b;a<-x$cash_ledgers$a
 view<-rivals_cash_history_rows(b)
-stopifnot(grepl('Round total: 5 points',view$concept[view$bonus_type=='points']),
+stopifnot(grepl('Points (Round 8: 5)',view$concept[view$bonus_type=='points'],fixed=TRUE),
  grepl('Position 2',view$concept[view$bonus_type=='ranking']),
  grepl('Position 1',rivals_cash_history_rows(a)$concept[rivals_cash_history_rows(a)$bonus_type=='ranking']))
 # Prize direction does not reverse actual standings; equal scores share rank.
