@@ -431,3 +431,19 @@ Implemented (2026-11-02): wrapping shared headers, unclipped offer badges and so
 - Hosted follow-up: requests now reach the endpoint; its own 403 required support for rewritten backend Host. The strict browser Fetch Metadata fallback and fixed diagnostic labels passed focused security, proxy restart, lifecycle and deployment checks. Final hosted/device verification remains separate.
 
 - Hosted unauthenticated routing/security verification passed after automatic deployment of `a7e0107`: HTTP 200 / absent-cookie response. Authenticated device save/reopen verification remains pending user confirmation; no hosting upgrade or security-setting change was required.
+
+
+### Table-only rival selection — 2026-11-02
+
+- Remove duplicate rival dropdown and synchronization observers; keep Reactable selection/context safeguards.
+- Show all common ledger rows in one financial history, including reconstructed rewards; retain reconciliation and explicit date-source labels. Verify offline lifecycle and saved-bonus recovery; hosted bonus completeness is separate.
+
+
+### 2026-11-02 reconstructed reward dates from official publications — implemented locally
+
+- Keep each recorded movement's real timestamp. For calculated position/Best XI/MVP ledger entries, prefer an unambiguous unsplit shared position-payment time, then the matching official round-close notification creation instant. Point estimates use notification dates, without borrowing position-payment times. Mark all inferred dates explicitly and retain amount precedence.
+- Reuse saved notification IDs/round metadata. Repeated/split-round publications update the one cumulative reward's assumed date to the latest creation time without duplicating cash; read-state updates cannot move it.
+- Recover missing dates with verified `notification/list` older-ID pagination, one page per existing asynchronous task, at most two concurrent finance reads and 20 pages per refresh. Persist successful events plus exhausted/continuation cursors in existing evidence and merge fresh seed notifications immediately.
+- Focused notification transport/queue, saved-date reuse, failures, context isolation, missing configured-rate, duplication and finance regressions pass. Root lifecycle/deployment checks are reported separately. Older-source retention and hosted date recovery are not established by local tests; precise missing-round evidence remains visible if the source is exhausted.
+
+- Final validation correction: suppress finite zero-valued reconstructed reward cashflows/date demands while preserving actual zero movements and unknown amounts; no totals change.

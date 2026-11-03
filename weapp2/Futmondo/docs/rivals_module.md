@@ -1,4 +1,4 @@
-> Current contract (2026-10-31): [Rival cash accounting](rival_cash_accounting.md) is authoritative. Summary, league table and transaction history share one reconstructed ledger. Actual dated movements show running cash; undated rewards have a separate reconciliation section with no invented payment dates. Observed official cash is separate. Older implementation descriptions below are historical and superseded by that contract.
+> Current contract (2026-10-31): [Rival cash accounting](rival_cash_accounting.md) is authoritative. Summary, league table and transaction history share one reconstructed ledger. Actual dated movements show running cash; all included rewards appear in the main financial history, with source-backed reconstructed dates labelled and unresolved dates kept explicit. Observed official cash is separate. Older implementation descriptions below are historical and superseded by that contract.
 
 
 ## Current directory display — 2026-11-02
@@ -74,12 +74,12 @@ Returns `selected_player_RV`, a reactive supplied by the nested `players_table_S
 
 | Reactive Name                    | Purpose                                                              |
 |----------------------------------|----------------------------------------------------------------------|
-| `selected_rival_team_id`         | Holds the team ID chosen by the user in the dropdown selector.       |
+| `selected_rival_team_id`         | Holds the team ID chosen by clicking a row in the rivals table.       |
 | `league_finances_RV`             | Reuses `shared_rival_finance_source()` with account/league-scoped directory, evidence, reconstructed finances, per-team cash ledgers and the shared pressroom. |
 | `rival_financial_summary_box_RV` | Fetches financial stats via `get_user_team_info()` for the selected rival. |
 | `rival_players_table_RV`         | Fetches the full squad via `get_players_from_team()`, computes `clause_ratio`, and pipes through `translate_player_positions()`, `calculate_player_changes()`, and `unify_columns()`. |
 | `rival_moneymovements_raw_RV` | Selects the rival's precomputed `cash_ledgers` entry from the shared dataset; no HTTP/DB fetch or separate calculation. |
-| `rivals_cash_history_rows()` | Projects dated versus undated ledger rows without recalculating cash; source, amount and chronological sequence remain intact. |
+| `rivals_cash_history_rows()` | Projects the complete ledger by default without recalculating cash; explicit dated/undated subsets remain supported. |
 | `rivals_cash_history_widget()` | Renders all per-transaction balances, preserves numeric sorting, and labels undated amounts as calculation subtotals. |
 
 ### `output$league_finances_table`
@@ -484,7 +484,7 @@ The main league table now displays numeric `estimated_cash` with descending init
 
 ### Selectable directory and financial rendering failure recovery (2026-10-31)
 
-Rivals includes a native **Choose a team** selector (`league_team`) above the Reactable. It uses the existing shared team directory, begins with an empty selection, and stores the selected team ID with the account/championship/own-team context. Choosing an option or clicking a table row uses the same scouting selection. The native selector remains usable if the browser does not display the detailed widget. Its choices are updated only when the directory, context or selection changes, so financial progress does not rebuild an open mobile selector. It adds no API or database read; scouting requests still require an explicit selection.
+Rivals uses only the Reactable row selection for scouting. The selected team ID remains scoped to the account/championship/own-team context and is cleared when that context changes. Removing the duplicate dropdown also removes its synchronization observer; no API or database reads are added.
 
 The status reports the number of loaded teams and the actual number of pending financial tasks. It does not infer that the table is visible from directory readiness. `rivals_finance_table_widget()` formats unknown amounts and dates as blank; a financial display-schema/detail error falls back to selectable Team/Points rows and records a redacted schema reference. A finance-build error keeps the same directory with unknown cash and an explicit failure message. Errors inside a resolved saved/seed/team callback are caught before continuing the bounded queue; they cannot leave the displayed loading state waiting for work that is no longer running. Errors never establish a balance or change accounting calculations.
 
@@ -503,7 +503,7 @@ The league column is **Reconstructed balance** and the selected-rival card is **
 
 The transaction tab now consumes the same ledger as the reconstructed budget card and league table. Opening cash is applied once, signed source transfers/fees and applicable reward components are retained, and the final cumulative amount is the displayed estimate. Known movement/transfer revisions replace older rows; recorded payments suppress overlapping derived rewards. Sorting or filtering does not reset the starting cash. Same-minute transactions each show a numeric balance, with stable ID ordering explicitly distinguished from a known real ordering.
 
-Dated history excludes all components whose payment dates are unknown. Those appear under **Components without payment dates** with a **Calculation subtotal**, which ends at the same reconstructed amount. Opening cash without a supplied date is labeled as an opening balance. No current-time or round-date substitute is generated. Missing amounts remain unavailable and the known-subtotal limitation is visible; missing opening cash leaves balances unavailable. Accessible observed cash/freshness and any discrepancy are separate details.
+The main **Financial history** shows every ledger component, including all applicable bonus types. Reconstructed notification-based dates are labelled. Any still-undated rows remain visible for reconciliation and do not claim a historical payment sequence; the final subtotal matches the reconstructed amount. Opening cash without a supplied date is labeled as an opening balance. No current-time or round-date substitute is generated. Missing amounts remain unavailable and the known-subtotal limitation is visible; missing opening cash leaves balances unavailable. Accessible observed cash/freshness and any discrepancy are separate details.
 
 The pivot consumes the shared pressroom, and transfer summary cards consume shared purchase/sale totals rather than all signed ledger amounts. This avoids counting opening cash/bonuses as sales or fees as purchases. The pivot choice survives background ledger publications. No new HTTP/database read, timer, worker, dependency or persistence path was introduced. Both history tables paginate fifteen rows and share one bounded ledger calculation per coalesced source publication. See `data_review_results.md` for measurements and verification limits.
 
@@ -512,8 +512,13 @@ The pivot consumes the shared pressroom, and transfer summary cards consume shar
 
 Starting cash is an explicit inflow component. `rivals_inflow_totals()` and `rivals_outflow_totals()` consume every included positive/negative ledger amount, so their difference equals final reconstructed cash. Ordinary/clause sale and purchase subtotals use observed source evidence; numeric parent totals include unresolved methods, whose coverage notice is separate. Position, point, MVP and Best XI bonuses have separate inflow lines. The cash table labels each reward type and expands grouped player award calculations.
 
-Unambiguous recorded league position-payment times date reconstructed position/MVP/XI bonuses under the confirmed same-time-payment rule. Split or ambiguous settlements remain in the undated reconciliation section with explicit reasons; no latest full selection is retroactively assigned to a payment phase. Recorded payments replace applicable estimates. Raw clause/ordinary types are normalized consistently across the summary and history, and historical eligibility now loads through the corrected asynchronous read allowlist. Existing ownership, hidden adjustment and missing-amount limitations remain visible. See `rival_cash_accounting.md` for exact matching and correction contracts.
+Unambiguous recorded league position-payment times date reconstructed position/MVP/XI bonuses under the confirmed same-time-payment rule. Any missing notification remains an explicit source-data issue; repeated notifications do not multiply cumulative award amounts. Recorded payments replace applicable estimates. Raw clause/ordinary types are normalized consistently across the summary and history, and historical eligibility now loads through the corrected asynchronous read allowlist. Existing ownership, hidden adjustment and missing-amount limitations remain visible. See `rival_cash_accounting.md` for exact matching and correction contracts.
 
 ## Concise reconstruction status (2026-11-02)
 
 Selecting a league row now selects its team without expanding a second raw calculation table. The selected budget card shows `estimate_summary`, which groups repeated missing-standings notes into a round count and summarizes award-eligibility/coverage gaps. The original `estimate_notes`, observed balance and discrepancy remain available under a collapsed native **Calculation details** control with mobile-safe wrapping. The transaction history tab retains the complete dated/undated cash ledger, running balances and reconciliation totals. No selected-team or transaction data is discarded.
+
+
+### Unified financial history and notification dates — 2026-11-02
+
+The financial history shows the full shared ledger, including position, Best XI, MVP and configured per-point bonuses. Actual movement dates are retained. Reconstructed position/MVP/Best XI bonuses keep unambiguous recorded league payment dates where applicable; otherwise reconstructed bonuses use the matching round-points publication date. These assigned dates are labelled **reconstructed** in the Date column. Per-point estimates do not borrow position-payment timestamps. Older notification coverage is not presumed complete. Undated entries remain visible when source evidence is missing; no arbitrary date or balancing cash adjustment is invented. All amounts and running subtotals come from the same ledger as the balance cards.

@@ -205,6 +205,42 @@ rival_reward_date <- function(round_id,anchors) {
   if(nrow(x)==1L&&!grepl("[.]",x$settlement_label))x$date else ""
 }
 
+
+# The official round-close notification uses directObject for a round: the
+# shared decoder preserves its id/name as player_id/player_name. Persisted
+# production evidence confirms type="round", action="close" and created_at.
+# This dates reconstructed rewards; it neither creates income nor proves payment.
+rival_round_publication_dates <- function(evidence,catalog=data.frame()) {
+  empty<-data.frame(round_id=character(),date=character(),notification_id=character(),publication_count=integer(),stringsAsFactors=FALSE)
+  rows<-dplyr::bind_rows(lapply(rival_evidence_rows(evidence,"notifications"),function(record){
+    p<-record$payload
+    if(!mvp_text(p$type)%in%c("round","rounds")||!identical(mvp_text(p$action),"close"))return(NULL)
+    if(nzchar(mvp_text(p$championship_id))&&!identical(mvp_text(p$championship_id),mvp_text(record$championship_id)))return(NULL)
+    id<-mvp_text(p$round_id,mvp_text(p$player_id));number<-fm_number(p$round_number,fm_number(p$player_name))
+    if(all(c("round_id","round_number")%in%names(catalog))){
+      if(nzchar(id)){
+        known<-unique(catalog$round_number[catalog$round_id%in%id&is.finite(catalog$round_number)])
+        if(is.finite(number)&&length(known)&&!number%in%known)return(NULL)
+      }else if(is.finite(number)){
+        ids<-unique(catalog$round_id[is.finite(catalog$round_number)&catalog$round_number==number])
+        if(length(ids)==1L)id<-ids
+      }
+    }
+    date<-mvp_text(p$created_at)
+    # updated_at may change when a notification is read. Observation time is
+    # retrieval time. Neither can substitute for the publication timestamp.
+    if(!nzchar(id)||is.na(fm_time(date)))return(NULL)
+    data.frame(round_id=id,date=date,notification_id=mvp_text(p$id,mvp_text(record$source_id)),stringsAsFactors=FALSE)
+  }))
+  if(!nrow(rows))return(empty)
+  rows<-unique(rows)
+  dplyr::bind_rows(lapply(split(seq_len(nrow(rows)),rows$round_id),function(indices){
+    x<-rows[indices,,drop=FALSE]
+    latest<-x[order(fm_time(x$date),x$notification_id,decreasing=TRUE)[1],,drop=FALSE]
+    latest$publication_count<-nrow(x);latest
+  }))
+}
+
 # Eligibility is accepted only as explicit historical evidence. No current roster lookup.
 rival_award_estimates <- function(official,team_id,rules,eligibility=data.frame(),payments=data.frame(),round_rules=list()) {
   empty<-data.frame(round_id=character(),player_id=character(),bonus_type=character(),amount=numeric(),reason=character(),stringsAsFactors=FALSE)
@@ -451,12 +487,14 @@ rival_historical_components <- function(evidence,teams,rules,official) {
   list(income=income,eligibility=unique(eligibility),official=official,missing=missing,rounds=rounds)
 }
 
-# The same entries drive component totals and transaction history. An undated
-# estimate has no invented payment time and is applied only in reconciliation.
-rival_cash_entry <- function(id,component,amount,source,type="bonus",date="",category="",round_id="",player_id="",estimated=FALSE,included=TRUE,bonus_type="",calculation="",source_type="",source_category="",settlement_label="") {
+# The same entries drive component totals and transaction history. Reconstructed
+# dates prefer applicable payment evidence, then round publication; recorded
+# rows retain source dates.
+rival_cash_entry <- function(id,component,amount,source,type="bonus",date="",category="",round_id="",player_id="",estimated=FALSE,included=TRUE,bonus_type="",calculation="",source_type="",source_category="",settlement_label="",payment_date_estimated=FALSE,payment_date_source="") {
   data.frame(id=id,component=component,amount=amount,source=source,type=type,date=date,category=category,
     round_id=round_id,player_id=player_id,estimated=estimated,included=included,bonus_type=bonus_type,calculation=calculation,
-    source_type=source_type,source_category=source_category,settlement_label=settlement_label,stringsAsFactors=FALSE)
+    source_type=source_type,source_category=source_category,settlement_label=settlement_label,payment_date_estimated=payment_date_estimated,
+    payment_date_source=payment_date_source,stringsAsFactors=FALSE)
 }
 rival_cash_ledger <- function(entries) {
   entries$timestamp<-fm_time(entries$date)
@@ -519,6 +557,7 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
     pressroom<-pressroom[!(known&duplicated(pressroom$id,fromLast=TRUE)),,drop=FALSE]
   }
   pressroom<-rival_classify_transfers(pressroom,all_movements)
+  publications<-rival_round_publication_dates(evidence,catalog)
   anchors<-rival_payment_anchors(all_movements)
   opening<-rival_opening_cash(championship_id,rules,opening_defaults);result<-list();breakdowns<-list();ledgers<-list()
   for(i in seq_len(nrow(teams))){
@@ -626,6 +665,10 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
       ranking_income<-ranking_income+sum(round_income$rows$amount[round_income$rows$component=="Ranking reward"])
       assumptions<-c(assumptions,round_income$rows$source)
     }
+    # A configured zero reward is no cash movement and needs no payment date.
+    # Preserve real zero-valued movements and all unknown amounts for auditing.
+    zero_reward<-details$estimated & details$bonus_type%in%c("points","ranking","mvp","dreamteam") & is.finite(details$amount) & details$amount==0
+    details<-details[!zero_reward,,drop=FALSE]
     if(!is.finite(details$amount[1]))missing<-c(missing,"Opening cash unavailable.")
     if(!isTRUE(coverage_complete))missing<-c(missing,"Round award coverage is incomplete.")
     # Group per-player award calculations into the two actual award components.
@@ -641,11 +684,25 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
       })
       details<-dplyr::bind_rows(details[!award,,drop=FALSE],dplyr::bind_rows(grouped))
     }
-    for(j in which(details$estimated & details$bonus_type%in%c("ranking","mvp","dreamteam"))){
-      date<-rival_reward_date(details$round_id[j],anchors)
-      if(nzchar(date)){
-        details$date[j]<-date;details$source[j]<-paste(details$source[j],"Reconstructed at recorded league position-payment time; simultaneous rewards confirmed by league user.")
-      }else details$source[j]<-paste(details$source[j],"Payment date unverified; split settlements require phase-specific evidence.")
+    for(j in which(details$estimated & details$bonus_type%in%c("points","ranking","mvp","dreamteam"))){
+      publication<-publications[publications$round_id%in%details$round_id[j],,drop=FALSE]
+      anchor<-if(details$bonus_type[j]%in%c("ranking","mvp","dreamteam"))rival_reward_date(details$round_id[j],anchors)else""
+      if(nzchar(anchor)){
+        details$date[j]<-anchor;details$payment_date_estimated[j]<-TRUE;details$payment_date_source[j]<-"league_position_payment"
+        details$source[j]<-paste(details$source[j],"Date reconstructed at the unambiguous recorded league position-payment time; simultaneous position/MVP/Best XI rewards confirmed by league user.")
+      }else if(nrow(publication)==1L){
+        details$date[j]<-publication$date
+        details$payment_date_estimated[j]<-TRUE
+        details$payment_date_source[j]<-"round_points_publication"
+        details$source[j]<-paste(details$source[j],"Date reconstructed from the round points-publication notification; actual payment time is not observed.",
+          if(publication$publication_count>1L)"Repeated/split-round publications: the cumulative round reward is dated once at the latest publication."else"")
+      }else{
+        details$payment_date_source[j]<-"missing_round_publication"
+        number<-unique(catalog$round_number[catalog$round_id%in%details$round_id[j]&is.finite(catalog$round_number)])
+        label<-if(length(number)==1L)as.character(number)else details$round_id[j]
+        issue<-paste("Round",label,"points-publication notification is missing; its reconstructed reward date cannot be established from saved evidence.")
+        missing<-c(missing,issue);details$source[j]<-paste(details$source[j],issue)
+      }
     }
     details$component[details$component%in%"Ranking reward"]<-"Position reward"
     ledger<-rival_cash_ledger(details)
@@ -685,6 +742,26 @@ get_rival_finance_seed <- function(login,championship_id,user_team_id) {
   list(info=info,rules=normalize_league_rules(info,championship_id=championship_id),
     pressroom=tryCatch(get_championship_pressroom(login,championship_id),error=function(e)data.frame()),
     notifications=tryCatch(get_notifications(login),error=function(e)NULL))
+}
+# Official client: fetchPreviousNotifications(oldest._id) -> list {to: id}.
+# Read one page per async task so historical notifications cannot block the seed.
+get_rival_round_notification_page <- function(login,championship_id,user_team_id,cursor) {
+  response<-notification_request(login,"list",list(to=as.character(cursor)))
+  if(!identical(response$status,"ok")||!is.list(response$data$items))
+    return(list(status="unavailable",notifications=data.frame(),cursor=as.character(cursor)))
+  items<-response$data$items
+  if(length(items)>1000L)return(list(status="unavailable",notifications=data.frame(),cursor=as.character(cursor)))
+  rows<-normalize_notifications(items)
+  if(length(items)&&(!nrow(rows)||nrow(rows)!=length(items)||any(!nzchar(rows$id))))
+    return(list(status="unavailable",notifications=data.frame(),cursor=as.character(cursor)))
+  next_cursor<-if(nrow(rows))tail(rows$id,1L)else as.character(cursor)
+  list(status=if(!nrow(rows))"empty"else if(identical(next_cursor,as.character(cursor)))"repeated"else"ok",
+    notifications=rows,cursor=next_cursor,observed_at=rival_finance_stamp())
+}
+rival_notification_evidence <- function(rows,account_id,championship_id,season,observed_at) {
+  if(!is.data.frame(rows)||!all(c("id","championship_id")%in%names(rows))||length(observed_at)!=1L||is.na(fm_time(observed_at)))return(list())
+  rows<-rows[rows$championship_id%in%championship_id,,drop=FALSE]
+  lapply(seq_len(nrow(rows)),function(i)rival_finance_evidence(account_id,championship_id,season,"notifications",rows$id[i],as.list(rows[i,,drop=FALSE]),observed_at))
 }
 get_rival_team_finance_observation <- function(login,championship_id,user_team_id) {
   list(team_id=as.character(user_team_id),info=tryCatch(get_user_team_info(login,championship_id,user_team_id),error=function(e)NULL),
@@ -742,6 +819,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
   if(is.null(root$userData$rival_finance_shared)){
     state<-new.env(parent=emptyenv());state$value<-shiny::reactiveVal(list(team_finances=data.frame(),breakdowns=list(),loading=TRUE));state$key<-NULL
     state$generation<-0L;state$closed<-FALSE;state$queue<-list();state$busy<-0L;state$evidence<-list();state$seed<-list();state$defaults<-NULL;state$last_publish<-0
+    state$notification_cursor<-"";state$notification_status<-"initial";state$scheduled_notification_cursors<-character();state$notification_pending<-FALSE
     state$publish_timer<-NULL;state$teams<-data.frame();state$teams_status<-"loading";state$teams_reason<-""
     state$awards<-list(rows=data.frame(),complete=FALSE);state$finance_ready<-FALSE;state$seed_ready<-FALSE;state$scheduled_teams<-character();state$scheduled_lineups<-character();state$scheduled_rankings<-character();state$pending_team_ids<-character()
     root$onSessionEnded(function(){state$closed<-TRUE;state$generation<-state$generation+1L;if(!is.null(state$publish_timer))state$publish_timer()})
@@ -810,6 +888,41 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
     }
     invisible(NULL)
   }
+  enqueue_notifications<-function(){
+    if(!state$seed_ready||state$notification_pending||length(state$pending_team_ids)>0L)return(invisible(NULL))
+    rewards<-vapply(c("money_per_point","ranking_pool","dreamteam_reward","mvp_reward"),function(field)fm_number(state$seed$rules[[field]]),numeric(1),USE.NAMES=TRUE)
+    if(!any(is.finite(rewards)&rewards>0))return(invisible(NULL))
+    rounds<-rival_saved_rounds(state$evidence,teams=state$teams$teamid)
+    closed<-if(nrow(rounds))vapply(seq_len(nrow(rounds)),function(i)round_is_finished(as.list(rounds[i,,drop=FALSE])),logical(1))else logical()
+    catalog<-unique(dplyr::bind_rows(rounds[closed,c("round_id","round_number"),drop=FALSE],
+      if(is.data.frame(state$awards$rows)&&all(c("round_id","round_number","is_finished")%in%names(state$awards$rows)))
+        state$awards$rows[state$awards$rows$is_finished%in%TRUE,c("round_id","round_number"),drop=FALSE]else data.frame()))
+    publications<-rival_round_publication_dates(state$evidence,catalog)
+    missing<-setdiff(catalog$round_id,publications$round_id)
+    # Points may be credited in phases, so another team's position payment can
+    # date position/XI/MVP estimates only, never a per-point reward.
+    if(!is.finite(rewards[["money_per_point"]])||rewards[["money_per_point"]]<=0){
+      movements<-dplyr::bind_rows(lapply(unique(vapply(rival_evidence_rows(state$evidence,"movements"),function(record)mvp_text(record$payload$team_id),character(1))),function(id)
+        rival_normalize_movements(rival_cash_latest_movements(state$evidence,id),catalog)))
+      anchors<-rival_payment_anchors(movements)
+      dated<-vapply(missing,function(id)nzchar(rival_reward_date(id,anchors)),logical(1))
+      missing<-missing[!dated]
+    }
+    if(!length(missing)||!nzchar(state$notification_cursor)||!state$notification_status%in%c("initial","ok"))return(invisible(NULL))
+    scans<-Filter(function(record)identical(mvp_text(record$source_id),"round-publication-scan"),rival_evidence_rows(state$evidence,"notifications"))
+    if(length(scans)){
+      scan<-tail(scans,1)[[1]]$payload
+      if(!length(setdiff(missing,unlist(scan$missing_rounds,use.names=FALSE)))){
+        if(mvp_text(scan$status)%in%c("empty","repeated"))return(invisible(NULL))
+        if(!length(state$scheduled_notification_cursors)&&identical(mvp_text(scan$status),"limit")&&nzchar(mvp_text(scan$cursor)))state$notification_cursor<-mvp_text(scan$cursor)
+      }
+    }
+    cursor<-state$notification_cursor
+    if(cursor%in%state$scheduled_notification_cursors||length(state$scheduled_notification_cursors)>=20L)return(invisible(NULL))
+    state$scheduled_notification_cursors<-c(state$scheduled_notification_cursors,cursor);state$notification_pending<-TRUE
+    state$queue<-c(state$queue,list(list(kind="notifications",cursor=cursor,missing=missing)))
+    invisible(NULL)
+  }
   enqueue_lineups<-function(){
     if(!state$seed_ready)return(invisible(NULL))
     rounds<-rival_saved_rounds(state$evidence,teams=state$teams$teamid)
@@ -837,14 +950,16 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
     while(state$busy<2L&&length(state$queue)){
       task<-state$queue[[1]];state$queue<-state$queue[-1];state$busy<-state$busy+1L
       local({task<-task
-        fn<-switch(task$kind,saved="get_rival_finance_saved",seed="get_rival_finance_seed",team="get_rival_team_finance_observation",lineup="get_rival_round_lineup_observation",ranking="get_rival_round_ranking_observation")
+        fn<-switch(task$kind,saved="get_rival_finance_saved",seed="get_rival_finance_seed",team="get_rival_team_finance_observation",lineup="get_rival_round_lineup_observation",ranking="get_rival_round_ranking_observation",notifications="get_rival_round_notification_page")
         args<-if(task$kind=="saved")list(account_id=auth[["userid"]],championship_id=cid,season=state$season)else list(login=auth,championship_id=cid,user_team_id=if(task$kind%in%c("team","lineup"))task$id else tid)
+        if(task$kind=="notifications")args<-c(args,list(cursor=task$cursor))
         if(task$kind=="lineup")args<-c(args,list(round_id=task$round,signature=task$signature))
         if(task$kind=="ranking")args<-c(args,list(round_id=task$id,round_number=task$number,signature=task$signature,source_teams=task$source_teams))
         promises::then(async_adapter_fetch(fn,args,ctx,is_current=function()!state$closed&&identical(generation,state$generation)),function(result){
           if(state$closed||generation!=state$generation)return(NULL)
           state$busy<-state$busy-1L
           if(task$kind=="team")state$pending_team_ids<-setdiff(state$pending_team_ids,task$id)
+          if(task$kind=="notifications")state$notification_pending<-FALSE
           tryCatch({
           if(task$kind=="saved"){
             state$evidence<-rival_merge_evidence(state$evidence,result$evidence);state$defaults<-result$defaults;state$finance_ready<-TRUE
@@ -873,15 +988,29 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
             current<-rival_team_evidence(list(team_id=tid,info=result$info,movements=NULL),auth[["userid"]],cid,state$season)
             if(length(current)){state$evidence<-rival_merge_evidence(state$evidence,current);persist_rival_finance_evidence(current,ctx)}
             if(is.data.frame(result$notifications)&&nrow(result$notifications)){
+              state$notification_cursor<-tail(result$notifications$id,1L)
               notification<-result$notifications[result$notifications$championship_id%in%cid,,drop=FALSE]
               record_round_publication_signal(root,auth[["userid"]],cid,notification)
               stamp<-attr(result$notifications,"observed_at")
               if(!is.null(stamp)&&!identical(attr(result$notifications,"fetch_status"),"stale")){
-                observed<-lapply(seq_len(nrow(notification)),function(i)rival_finance_evidence(auth[["userid"]],cid,state$season,"notifications",notification$id[i],as.list(notification[i,,drop=FALSE]),stamp))
+                observed<-rival_notification_evidence(notification,auth[["userid"]],cid,state$season,stamp)
+                state$evidence<-rival_merge_evidence(state$evidence,observed)
                 persist_rival_finance_evidence(observed,ctx)
               }
             }
-            state$finance_ready<-TRUE;state$seed_ready<-TRUE;enqueue_teams();publish(TRUE)
+            state$finance_ready<-TRUE;state$seed_ready<-TRUE;enqueue_teams();enqueue_notifications();publish(TRUE)
+          }else if(task$kind=="notifications"){
+            state$notification_status<-mvp_text(result$status,"unavailable")
+            state$notification_cursor<-mvp_text(result$cursor,task$cursor)
+            if(state$notification_cursor%in%state$scheduled_notification_cursors&&state$notification_status=="ok")state$notification_status<-"repeated"
+            observed<-rival_notification_evidence(result$notifications,auth[["userid"]],cid,state$season,result$observed_at)
+            status<-if(state$notification_status=="ok"&&length(state$scheduled_notification_cursors)>=20L)"limit"else state$notification_status
+            scan<-rival_finance_evidence(auth[["userid"]],cid,state$season,"notifications","round-publication-scan",
+              list(kind="round_publication_scan",cursor=state$notification_cursor,status=status,missing_rounds=task$missing),Sys.time())
+            observed<-c(observed,list(scan));state$evidence<-rival_merge_evidence(state$evidence,observed);persist_rival_finance_evidence(observed,ctx)
+            if(state$notification_status=="unavailable")state$reason<-"Older round-publication notifications could not be retrieved; saved dates remain available."
+            if(status=="limit")state$reason<-"Round-publication history page limit reached; Refresh continues from the saved cursor."
+            enqueue_notifications()
           }else{
             rows<-switch(task$kind,lineup=rival_lineup_evidence(result,auth[["userid"]],cid,state$season),
               ranking=rival_ranking_evidence(result,auth[["userid"]],cid,state$season),
@@ -889,9 +1018,10 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
             if(length(rows)){state$evidence<-rival_merge_evidence(state$evidence,rows);persist_rival_finance_evidence(rows,ctx)}
             if(task$kind=="lineup"&&!length(rows))state$reason<-paste("Some historical lineups could not be retrieved; affected MVP/Best XI bonuses are not included. Use Refresh to retry.",mvp_text(result$reason))
             if(task$kind=="ranking"&&!length(rows))state$reason<-"A historical round ranking could not be confirmed; its position bonuses remain excluded."
-            if(task$kind%in%c("team","ranking")){enqueue_rankings();enqueue_lineups()}
+            if(task$kind%in%c("team","ranking")){enqueue_rankings();enqueue_lineups();enqueue_notifications()}
           }
           },error=function(error){
+            if(task$kind=="notifications"){state$notification_pending<-FALSE;state$notification_status<-"unavailable"}
             failure<-resource_log_failure(resource_failure(error,resource="league_finances_calc",category="schema"))
             state$reason<-paste("Some financial data could not be prepared.",resource_failure_message(failure))
             if(task$kind=="saved"&&!any(vapply(state$queue,function(task)identical(task$kind,"seed"),logical(1))))
@@ -900,7 +1030,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
           })
           publish(!length(state$queue)&&state$busy==0L);run_next();NULL
         },function(error){
-          if(!state$closed&&generation==state$generation){state$busy<-state$busy-1L;if(task$kind=="team")state$pending_team_ids<-setdiff(state$pending_team_ids,task$id);state$reason<-"Some financial sources could not be refreshed; saved evidence remains available.";if(task$kind=="saved")state$queue<-list(list(kind="seed"))
+          if(!state$closed&&generation==state$generation){state$busy<-state$busy-1L;if(task$kind=="notifications"){state$notification_pending<-FALSE;state$notification_status<-"unavailable"};if(task$kind=="team")state$pending_team_ids<-setdiff(state$pending_team_ids,task$id);state$reason<-"Some financial sources could not be refreshed; saved evidence remains available.";if(task$kind=="saved")state$queue<-list(list(kind="seed"))
             if(task$kind=="seed"){state$seed_ready<-TRUE;enqueue_teams()};enqueue_rankings();publish(TRUE);run_next()};NULL
         })
       })
@@ -923,7 +1053,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
       same<-identical(state$identity,paste(auth[["userid"]],cid,tid,sep="|"));state$identity<-paste(auth[["userid"]],cid,tid,sep="|")
       state$key<-key;state$generation<-state$generation+1L;state$busy<-0L;state$season<-league_season_context(cid);state$reason<-"";state$build_failure<-NULL
       if(!is.null(state$publish_timer)){state$publish_timer();state$publish_timer<-NULL}
-      state$account<-auth[["userid"]];state$championship<-cid;state$seed_ready<-FALSE;state$scheduled_teams<-character();state$scheduled_lineups<-character();state$scheduled_rankings<-character();state$pending_team_ids<-character()
+      state$account<-auth[["userid"]];state$championship<-cid;state$seed_ready<-FALSE;state$notification_cursor<-"";state$notification_status<-"initial";state$scheduled_notification_cursors<-character();state$notification_pending<-FALSE;state$scheduled_teams<-character();state$scheduled_lineups<-character();state$scheduled_rankings<-character();state$pending_team_ids<-character()
       if(!same){state$evidence<-list();state$seed<-list();state$defaults<-NULL;state$finance_ready<-FALSE
         state$teams<-data.frame();state$teams_status<-"loading";state$teams_reason<-"";state$awards<-list(rows=data.frame(),complete=FALSE)
         state$value(list(team_finances=data.frame(),breakdowns=list(),loading=TRUE))}
@@ -954,7 +1084,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
     shiny::req(isTRUE(active()),valid_login(login()),!is.null(state$key))
     awards<-tryCatch(official(),error=function(error)NULL)
     if(is.list(awards))state$awards<-awards
-    enqueue_rankings();enqueue_lineups();publish(isTRUE(state$awards$complete));run_next()
+    enqueue_rankings();enqueue_lineups();enqueue_notifications();publish(isTRUE(state$awards$complete));run_next()
   })
   shiny::reactive(state$value())
 }

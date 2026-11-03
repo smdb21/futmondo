@@ -251,27 +251,35 @@ rivals_tx_display_df <- function(filtered) {
 }
 
 # View-only projection of the complete shared ledger. Balances were calculated
-# before selection, filtering, pagination or sorting; undated cash stays separate.
-rivals_cash_history_rows <- function(ledger,undated=FALSE) {
+# before selection, filtering, pagination or sorting; undated rows retain their labels.
+rivals_cash_history_rows <- function(ledger,undated=NULL) {
   if(!is.data.frame(ledger)||!nrow(ledger))return(data.frame())
-  rows<-ledger[if(undated)ledger$section%in%"undated"else!ledger$section%in%"undated",,drop=FALSE]
+  rows<-if(is.null(undated))ledger else ledger[if(undated)ledger$section%in%"undated"else!ledger$section%in%"undated",,drop=FALSE]
   if(!nrow(rows))return(data.frame())
   label<-ifelse(is.finite(rows$round_number),as.character(rows$round_number),"")
   if("settlement_label"%in%names(rows))label[nzchar(rows$settlement_label)]<-rows$settlement_label[nzchar(rows$settlement_label)]
   round<-ifelse(nzchar(label),paste0(" · Round ",label),"")
   data.frame(date=ifelse(rows$section%in%"opening" & is.na(rows$timestamp),"Opening balance",ifelse(is.na(rows$timestamp),"Payment date unknown",format(rows$timestamp,"%d/%m/%Y %H:%M",tz="UTC"))),
     type=ifelse(rows$estimated,"Estimated bonus",rows$type),concept=paste0(rows$component,round,ifelse(rows$included,""," (excluded)")),money=rows$amount,
+    payment_date_estimated=if("payment_date_estimated"%in%names(rows))rows$payment_date_estimated%in%TRUE else rep(FALSE,nrow(rows)),
+    payment_date_source=if("payment_date_source"%in%names(rows))as.character(rows$payment_date_source)else rep("",nrow(rows)),
     running_balance=rows$running_balance,source=rows$source,included=rows$included,unknown_amounts=rows$unknown_amounts,
     category=rows$category,bonus_type=rows$bonus_type,calculation=if("calculation"%in%names(rows))rows$calculation else "",
     ledger_order=rows$ledger_order,stringsAsFactors=FALSE)
 }
-rivals_cash_history_widget <- function(ledger,undated=FALSE) {
+rivals_cash_history_widget <- function(ledger,undated=NULL) {
   display<-rivals_cash_history_rows(ledger,undated)
   if(!nrow(display))return(reactable::reactable(data.frame(Status="No cash movements available."),compact=TRUE))
   reactable::reactable(display,compact=TRUE,striped=TRUE,highlight=TRUE,bordered=FALSE,defaultPageSize=15,
     details=function(index){text<-display$calculation[index];if(!is.na(text)&&nzchar(text))tags$p(style="white-space:normal;overflow-wrap:anywhere",text)else NULL},
-    defaultSorted=list(ledger_order=if(undated)"asc"else"desc"),columns=list(
-      date=colDef(name="Date",show=!undated,align="left"),type=colDef(name="Type",align="left",cell=function(value,index){
+    defaultSorted=list(ledger_order=if(isTRUE(undated))"asc"else"desc"),columns=list(
+      date=colDef(name="Date",show=!isTRUE(undated),align="left",cell=function(value,index){
+        if(isTRUE(display$payment_date_estimated[index]))return(tags$span(
+          title=if(identical(display$payment_date_source[index],"league_position_payment"))
+            "Reconstructed using the recorded league position-payment date."else
+            "Reconstructed using the round points-publication notification; not a recorded payment timestamp.",value,tags$small(" (reconstructed)")))
+        value
+      }),type=colDef(name="Type",align="left",cell=function(value,index){
         if(value=="opening")return("Starting cash")
         if(value%in%c("buy","sell"))return(paste(if(display$category[index]%in%"clause")"Clause"else if(display$category[index]%in%"market")"Ordinary"else"Player",if(value=="buy")"purchase"else"sale"))
         if(display$bonus_type[index]%in%c("ranking","mvp","dreamteam","points"))return(paste0(
@@ -287,8 +295,8 @@ rivals_cash_history_widget <- function(ledger,undated=FALSE) {
         if(!is.finite(value))return("Unavailable")
         tags$span(style=if(value<0)"color:var(--fm-danger)"else"color:var(--fm-text)",
           paste0(if(value>0)"+"else"",format_table_currency(value)))
-      }),running_balance=colDef(name=if(undated)"Calculation subtotal"else"Money left after (estimate)",align="right",cell=ui_financial_amount),
-      category=colDef(show=FALSE),bonus_type=colDef(show=FALSE),calculation=colDef(show=FALSE),source=colDef(show=FALSE),included=colDef(show=FALSE),unknown_amounts=colDef(show=FALSE),ledger_order=colDef(show=FALSE)))
+      }),running_balance=colDef(name=if(isTRUE(undated))"Calculation subtotal"else"Reconstructed balance",align="right",cell=ui_financial_amount),
+      payment_date_estimated=colDef(show=FALSE),payment_date_source=colDef(show=FALSE),category=colDef(show=FALSE),bonus_type=colDef(show=FALSE),calculation=colDef(show=FALSE),source=colDef(show=FALSE),included=colDef(show=FALSE),unknown_amounts=colDef(show=FALSE),ledger_order=colDef(show=FALSE)))
 }
 
 # One scale over the whole league; sorting/pagination do not change its domain.
@@ -438,7 +446,6 @@ tagList(
                  icon("hand-pointer"), " Select a user team from the table below to scout their squad and financial details."),
                tags$div(id=ns("league_finances_status"),class="shiny-html-output",
                  rivals_status_message("Loading rivals… This may take a moment.",loading=TRUE)),
-               selectInput(ns("league_team"),"Choose a team",choices=c("Select a team…"=""),selected="",selectize=FALSE,width="100%"),
                reactable::reactableOutput(ns("league_finances_table"))
              )
       )
@@ -554,15 +561,6 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       id
     })
 
-    observeEvent(input$league_team, {
-      req(isTRUE(is_module_active()))
-      id<-mvp_text(input$league_team)
-      df<-league_finances_RV()$team_finances
-      if(!nzchar(id)){selected_rival_id_RV(NULL);selected_rival_context_RV(NULL);return()}
-      req(is.data.frame(df),id%in%df$teamid)
-      selected_rival_context_RV(rival_context_RV());selected_rival_id_RV(id)
-    },ignoreNULL=TRUE)
-
     # Detailed financial statistics of selected rival
     rival_financial_summary_box_RV <- reactive({
       req(is_module_active() == TRUE)
@@ -622,18 +620,6 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
     league_finances_RV <- shared_rival_finance_source(session,login_token,championship_id,
       user_team_id,user_teams_RV,is_module_active,mvp_snapshot,refresh_trigger)
 
-    last_picker_state<-NULL
-    observe({
-      req(isTRUE(is_module_active()))
-      df<-league_finances_RV()$team_finances
-      choices<-if(is.data.frame(df)&&nrow(df))stats::setNames(as.character(df$teamid),as.character(df$teamname))else character()
-      selected<-if(identical(selected_rival_context_RV(),rival_context_RV()))selected_rival_id_RV()else""
-      picker<-list(context=rival_context_RV(),choices=choices,selected=selected %||% "")
-      if(!identical(picker,last_picker_state)){
-        last_picker_state<<-picker
-        updateSelectInput(session,"league_team",choices=c("Select a team…"="",choices),selected=picker$selected)
-      }
-    })
     output$league_finances_status <- renderUI({
       req(isTRUE(is_module_active()))
       state<-league_finances_RV();df<-state$team_finances
@@ -646,12 +632,12 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       }else if(count)paste(count,"league teams loaded.")else state$teams_reason %||% ""
       issues<-Filter(nzchar,c(state$finance_error %||% "",state$reason %||% ""))
       failure<-table_failure_RV()
-      if(!is.null(failure))issues<-c(issues,paste("Detailed table unavailable; choose a team above.",resource_failure_message(failure)))
+      if(!is.null(failure))issues<-c(issues,paste("Rival table could not be displayed.",resource_failure_message(failure)))
       message<-trimws(paste(c(message,unique(issues)),collapse=" "))
       rivals_status_message(message,loading=loading)
     })
 
-    # The native selector stays usable even if a browser cannot bind Reactable.
+    # The table is the single selection control for rival scouting.
     output$league_finances_table <- reactable::renderReactable({
       req(is_module_active() == TRUE)
       finances_data<-league_finances_RV()
@@ -988,7 +974,6 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       ledger<-rival_moneymovements_raw_RV()
       inflow<-rivals_inflow_totals(ledger)
       outflow<-rivals_outflow_totals(ledger)
-      undated<-if(is.data.frame(ledger)&&nrow(ledger))ledger[ledger$section%in%"undated",,drop=FALSE]else data.frame()
       final<-if(is.data.frame(ledger)&&nrow(ledger))tail(ledger$running_balance,1L)else NA_real_
       tagList(
         checkboxInput(ns("tx_pivot_by_player"),"Pivot by Player (Buy/Sell Ledger)",value=isTRUE(isolate(input$tx_pivot_by_player))),
@@ -1026,18 +1011,10 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
         if(is.finite(inflow$unknown)&&is.finite(outflow$unknown)&&(inflow$unknown+outflow$unknown)>0)
           p(class="alert alert-info",paste0("Transfer-method evidence still needed for ",format_table_currency(inflow$unknown)," of sales and ",format_table_currency(outflow$unknown)," of purchases. These amounts are already included in the totals.")),
         p(strong("Total inflow − total outflow = reconstructed cash: "),ui_financial_amount(inflow$total-outflow$total)),
-        h4("Dated cash movements"),
-        p("These running balances exclude components whose payment dates are unknown."),
-        reactable::reactableOutput(ns("rival_transactions_table")),
-        if(nrow(undated))tagList(
-          h4("Components without payment dates"),
-          p("These amounts contribute to the final reconstructed balance. They are added below for reconciliation; their payment dates and position among the dated transactions are unknown."),
-          reactable::reactableOutput(ns("rival_undated_components_table"))
-        )
+        h4("Financial history"),
+        p("Includes transfers and all applicable bonuses. Bonus dates use recorded payments where applicable, otherwise the round points-publication notification. Any entries still missing a source date appear first for reconciliation, not as a verified payment timeline."),
+        reactable::reactableOutput(ns("rival_transactions_table"))
       )
-    })
-    output$rival_undated_components_table<-reactable::renderReactable({
-      rivals_cash_history_widget(rival_moneymovements_raw_RV(),undated=TRUE)
     })
 
 # Render Transaction Table

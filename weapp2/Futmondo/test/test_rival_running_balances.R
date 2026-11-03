@@ -41,7 +41,7 @@ check('same-time transactions have stable per-row cash, including same-minute en
 })
 check('undated estimated rewards have no invented dates and are separate calculation subtotals',{
   undated<-ledger[ledger$section=='undated',,drop=FALSE]
-  stopifnot(nrow(undated)==3L,sum(undated$amount)==15,all(undated$date==''),all(is.na(undated$timestamp)),all(undated$estimated),
+  stopifnot(nrow(undated)==2L,sum(undated$amount)==15,all(undated$date==''),all(is.na(undated$timestamp)),all(undated$estimated),
     tail(ledger$running_balance[ledger$section!='undated'],1)==95,
     tail(undated$running_balance,1)==out$team_finances$estimated_cash,
     all(rivals_cash_history_rows(ledger,TRUE)$date=='Payment date unknown'),
@@ -128,3 +128,12 @@ check('public market buys are classified but rival transfers do not imply a purc
     x$team_finances$estimated_cash==50)
 })
 cat(sprintf('Rival running balances: %d passed / 0 failed\n',n))
+
+check('main financial history includes undated bonuses and reconciles to selected rival cash',{
+ display<-rivals_cash_history_rows(ledger)
+ stopifnot(nrow(display)==nrow(ledger),
+   sum(display$date=='Payment date unknown')==sum(ledger$section=='undated'),
+   all(ledger$bonus_type[ledger$section=='undated']%in%display$bonus_type),
+   tail(display$running_balance,1)==out$team_finances$estimated_cash,
+   inherits(rivals_cash_history_widget(ledger),'reactable'))
+})
