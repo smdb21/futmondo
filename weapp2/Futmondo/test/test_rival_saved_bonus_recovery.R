@@ -85,7 +85,7 @@ check('malformed or open ranking responses cannot establish complete historical 
 })
 check('shared recovery persists one missing ranking and reuses saved lineups across sessions',{
  original_adapter<-async_adapter_fetch;original_persist<-persist_rival_finance_evidence
- persisted<-decoded;calls<-character();busy<-0L;maximum<-0L
+ persisted<-c(decoded,list(e('movements','point-a',list(id='point-a',team_id='a',type='points',concept='1',money=20,date='2026-11-01T12:00:00Z'))));calls<-character();busy<-0L;maximum<-0L
  persist_rival_finance_evidence<-function(rows,context){persisted<<-rival_merge_evidence(persisted,rows);TRUE}
  async_adapter_fetch<-function(fn,args,context,...){
   calls<<-c(calls,fn);busy<<-busy+1L;maximum<<-max(maximum,busy)

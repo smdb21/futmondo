@@ -274,12 +274,14 @@ rivals_cash_history_widget <- function(ledger,undated=NULL) {
     details=function(index){text<-display$calculation[index];if(!is.na(text)&&nzchar(text))tags$p(style="white-space:normal;overflow-wrap:anywhere",text)else NULL},
     defaultSorted=list(ledger_order=if(isTRUE(undated))"asc"else"desc"),columns=list(
       date=colDef(name="Date",show=!isTRUE(undated),align="left",cell=function(value,index){
+        if(identical(display$payment_date_source[index],"league_point_payment"))return(tags$span(title="Known league payment date; reconstructed combined round amount.",value,tags$small(" (known payment)")))
         if(isTRUE(display$payment_date_estimated[index]))return(tags$span(
           title=if(identical(display$payment_date_source[index],"league_position_payment"))
             "Reconstructed using the recorded league position-payment date."else
             "Reconstructed using the round points-publication notification; not a recorded payment timestamp.",value,tags$small(" (reconstructed)")))
         value
       }),type=colDef(name="Type",align="left",cell=function(value,index){
+        if(identical(display$payment_date_source[index],"league_point_payment"))return("Reconstructed point bonus")
         if(value=="opening")return("Starting cash")
         if(value%in%c("buy","sell"))return(paste(if(display$category[index]%in%"clause")"Clause"else if(display$category[index]%in%"market")"Ordinary"else"Player",if(value=="buy")"purchase"else"sale"))
         if(display$bonus_type[index]%in%c("ranking","mvp","dreamteam","points"))return(paste0(
@@ -380,7 +382,7 @@ rivals_inflow_totals <- function(ledger) {
   market<-sales & category%in%"market" & !clauses
   rewards<-rows$type%in%c("bonus","ranking")
   list(opening=amount(rows$type%in%"opening"),sales=amount(sales),market=amount(market),clauses=amount(clauses),unknown=amount(sales & !market & !clauses),
-    bonuses=amount(rewards),points=amount(rewards & bonus%in%"points"),ranking=amount(rewards & (bonus%in%"ranking"|rows$type%in%"ranking")),
+    bonuses=amount(rewards),points=if(isTRUE(attr(ledger,"point_rewards_incomplete")))NA_real_ else amount(rewards & bonus%in%"points"),ranking=amount(rewards & (bonus%in%"ranking"|rows$type%in%"ranking")),
     mvp=amount(rewards & bonus%in%"mvp"),dreamteam=amount(rewards & bonus%in%"dreamteam"),
     other=amount(!rows$type%in%c("opening","sell","clause_sell","bonus","ranking")),total=amount(rep(TRUE,nrow(rows))),incomplete=any(!is.finite(rows$amount)))
 }

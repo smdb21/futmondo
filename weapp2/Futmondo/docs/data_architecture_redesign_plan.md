@@ -454,6 +454,12 @@ Implemented (2026-11-02): wrapping shared headers, unclipped offer badges and so
 - Reconstruct position rewards for the complete remaining participants, including unpaid rounds, through the shared ledger. Reuse the same participant resolver in refresh scheduling to avoid unnecessary historical-ranking requests. Keep the inactive team in the directory; no invented zero score or duplicate recorded payment.
 - Passed: 6 focused participant checks, 18 finance-runtime checks, 16 reconciliation checks, 3 deployment checks and the mandatory offline lifecycle's 13 checks plus 8 tabs. A production-sized pure resolver benchmark averaged 61.5 ms over 20 runs, with no API/database reads. Documentation and the changed runtime deployment checksum are updated. Hosted rollout/data verification remains separate.
 
+### Point settlements validated against reference payments — 2026-11-03
+
+Implemented locally: native point movement normalization, split settlement grouping, independently verified whole-round income, known league payment date / reconstructed amount separation, final-settlement consolidation for rivals, scoped one-batch async repair, persistence reuse, and truthful incomplete point subtotals. Reference records remain separate. Offline acceptance covers supplied rounds 1/6, stale and mismatched round 11, context isolation, corrections, negative points and bounded repair across sessions.
+
+Hosted exit criteria remain open: deploy the change, allow active-session reads to refresh round 11, verify its independently observed final score and eligibility reconcile with recorded payments, and verify the saved result is reused. Production still held 95 running points at read-only inspection; a fixture's 105 closed points is not production evidence. No production mutation or deployment was performed for this work.
+
 ## 2026-11-03 — Classification bonus columns (implemented locally)
 
 Added four selected-round euro totals (points, MVP, Best XI, position) backed by the shared reconstructed cash ledger. Both round controls apply consistently, recorded payments replace estimates, and missing coverage stays distinct from confirmed zero. Focused known-answer checks, UI reliability and the offline lifecycle harness passed. Selection performance measured locally; hosted rendering/mobile inspection and deployment are not claimed. See `classification_module.md` and the review record.

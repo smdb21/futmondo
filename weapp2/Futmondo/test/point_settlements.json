@@ -1,0 +1,114 @@
+[
+  {
+    "_id": "fixture-point-21",
+    "type": "points",
+    "category": "bonus",
+    "concept": "1",
+    "money": 1960000,
+    "date": "2026-08-20T05:47:50.561Z"
+  },
+  {
+    "_id": "fixture-point-30",
+    "type": "points",
+    "category": "bonus",
+    "concept": "2",
+    "money": 4760000,
+    "date": "2026-08-25T07:45:07.808Z"
+  },
+  {
+    "_id": "fixture-point-37",
+    "type": "points",
+    "category": "bonus",
+    "concept": "1.1",
+    "money": 3780000,
+    "date": "2026-08-28T09:48:04.049Z"
+  },
+  {
+    "_id": "fixture-point-48",
+    "type": "points",
+    "category": "bonus",
+    "concept": "3",
+    "money": 4200000,
+    "date": "2026-09-01T07:39:45.969Z"
+  },
+  {
+    "_id": "fixture-point-50",
+    "type": "points",
+    "category": "bonus",
+    "concept": "6",
+    "money": 910000,
+    "date": "2026-09-04T07:08:07.048Z"
+  },
+  {
+    "_id": "fixture-point-57",
+    "type": "points",
+    "category": "bonus",
+    "concept": "4",
+    "money": 6230000,
+    "date": "2026-09-08T08:58:23.515Z"
+  },
+  {
+    "_id": "fixture-point-79",
+    "type": "points",
+    "category": "bonus",
+    "concept": "5",
+    "money": 6300000,
+    "date": "2026-09-15T07:40:41.796Z"
+  },
+  {
+    "_id": "fixture-point-94",
+    "type": "points",
+    "category": "bonus",
+    "concept": "6.1",
+    "money": 3920000,
+    "date": "2026-09-18T07:32:21.676Z"
+  },
+  {
+    "_id": "fixture-point-103",
+    "type": "points",
+    "category": "bonus",
+    "concept": "7",
+    "money": 5390000,
+    "date": "2026-09-21T12:12:25.318Z"
+  },
+  {
+    "_id": "fixture-point-144",
+    "type": "points",
+    "category": "bonus",
+    "concept": "8",
+    "money": 4200000,
+    "date": "2026-10-13T08:33:13.435Z"
+  },
+  {
+    "_id": "fixture-point-159",
+    "type": "points",
+    "category": "bonus",
+    "concept": "9",
+    "money": 5040000,
+    "date": "2026-10-20T10:32:12.024Z"
+  },
+  {
+    "_id": "fixture-point-163",
+    "type": "points",
+    "category": "bonus",
+    "concept": "6.2",
+    "money": 770000,
+    "date": "2026-10-22T13:47:08.654Z"
+  },
+  {
+    "_id": "fixture-point-178",
+    "type": "points",
+    "category": "bonus",
+    "concept": "10",
+    "money": 5250000,
+    "date": "2026-10-27T14:21:51.976Z"
+  },
+  {
+    "_id": "fixture-point-190",
+    "type": "points",
+    "category": "bonus",
+    "concept": "11",
+    "money": 7350000,
+    "date": "2026-11-03T10:08:57.637Z"
+  }
+]
