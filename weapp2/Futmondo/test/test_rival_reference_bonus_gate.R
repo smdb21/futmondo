@@ -15,9 +15,12 @@ check('point payments and interim closed selections cannot unlock final bonuses'
  stopifnot(tail(b$running_balance,1)==110,sum(b$amount[b$included & b$bonus_type=='points'])==10,
   !b$included[b$bonus_type=='ranking'],!any(b$included[b$bonus_type%in%c('dreamteam','mvp')]),
   b$payment_date_source[b$bonus_type=='ranking']=='reference_payment_pending',
-  is.na(rivals_inflow_totals(b)$ranking),is.na(x$team_finances$mvp_income[2]))
+  rivals_inflow_totals(b)$ranking==0,is.na(x$team_finances$mvp_income[2]))
  t<-attr(b,'round_bonus_totals');stopifnot(is.na(t$amount[t$bonus_type=='ranking']),is.na(t$amount[t$bonus_type=='dreamteam']),is.na(t$amount[t$bonus_type=='mvp']) )
- stopifnot(any(rivals_cash_history_rows(b)$date=='Payment not confirmed'))
+ display<-rivals_cash_history_rows(b)
+ stopifnot(!any(display$date=='Payment not confirmed'),!any(!display$included),
+   tail(display$running_balance,1)==tail(b$running_balance,1),
+   any(!b$included & b$bonus_type=='ranking'))
 })
 check('position settlement unlocks position; award payments can date independent awards',{
  base<-list(payment('points',20),payment('ranking',20,'8.1'),payment('dreamTeam',5,'8.1',date='2026-10-14T09:00:01Z'))

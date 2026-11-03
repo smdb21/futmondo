@@ -2282,7 +2282,7 @@
       "checksum": "d28b6843516e7a88406119bf287000c2"
     },
     "Modules/Rivals_Module.R": {
-      "checksum": "bd79b382f42e8bd258701b89d1ac5cce"
+      "checksum": "7df487b6880f8fddbee43095fd81c4d5"
     },
     "Modules/Round_MVPs_Module.R": {
       "checksum": "5ddb52ee106a00ae7514bb7697ca689f"
@@ -2321,7 +2321,7 @@
       "checksum": "410e38ab7007ab0a040e6c349e48bc39"
     },
     "rival_finance_runtime.R": {
-      "checksum": "69bca1cd5755cdb52a3ccab73d6db3b6"
+      "checksum": "a828c8006d7595f4b6b15951e92fbbdf"
     },
     "award_runtime.R": {
       "checksum": "99f1701bc8d314c4f81915b9703b1be1"
@@ -2336,7 +2336,7 @@
       "checksum": "2b037334f8088f5b4a270acbaea52e91"
     },
     "www/release-info.json": {
-      "checksum": "332aa23a17055ba1da67fbd6eacae7f1"
+      "checksum": "79b335d92511fc0961c924ce350928f9"
     }
   },
   "users": null

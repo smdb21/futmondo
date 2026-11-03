@@ -481,3 +481,13 @@ Fixed the source-contract defect that discarded 14 point and three Best XI payme
 ### Combined award reconciliation and default financial history — 2026-11-03
 
 Full saved-evidence replay reproduced the remaining 2,000,000 EUR overstatement: native dreamTeam receipts already included two MVP premiums. Added exact independent combined-payment attribution, retained original cash transactions, removed overlapping MVP estimates, and split the same recorded total across bonus columns. Reference reconstructed cash is 52,129,125 EUR. Fixed renderUI's unknown-subtotal Boolean failure and made Transaction & Financial History the default selected-rival tab. Exact isolated checks and rollout are recorded in review results.
+
+
+### Hide unpaid estimates from Financial History — 2026-11-03
+
+Implemented the requested display change: excluded bonus estimates remain auditable in calculation details but no longer appear in Financial History for either the reference team or rivals. Accounting and balances are unchanged. Focused projection, combined-award/history rendering and deployment checks passed; lifecycle and rollout checks are recorded in review results.
+
+
+### Rival payment-history presentation — implemented locally 2026-11-03
+
+Added round points/actual position, browser-local date labels, separate Total income/Total expenses boxes, paid category subtotals despite pending rounds, plain balance labels, and Current team tab without the redundant roster heading. Excluded pending bonuses remain absent from payment history. Accounting evidence and cash totals remain unchanged. Focused accounting, recovery, rendering and offline lifecycle checks pass; production startup verification is recorded separately.

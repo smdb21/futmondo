@@ -105,7 +105,7 @@ check('bounded asynchronous repair persists fresh round eleven and reuses it nex
    repeat{later::run_now(.005);beats<<-beats+1L;session$flushReact();if(!isTRUE(shiny::isolate(value()$finance_loading)))break;if(Sys.time()>deadline)stop('timeout')}
    v<-value();stopifnot(maximum<=2)
    if(run<3L)stopifnot(all(v$point_reconciliation$status=='validated'),sum(v$cash_ledgers$b$bonus_type=='points')==11)
-   else stopifnot(v$point_reconciliation$status[v$point_reconciliation$round_id=='r11']=='mismatch',!any(v$cash_ledgers$b$round_id=='r11'),is.na(rivals_inflow_totals(v$cash_ledgers$b)$points))
+   else stopifnot(v$point_reconciliation$status[v$point_reconciliation$round_id=='r11']=='mismatch',!any(v$cash_ledgers$b$round_id=='r11'),rivals_inflow_totals(v$cash_ledgers$b)$incomplete, is.finite(rivals_inflow_totals(v$cash_ledgers$b)$points))
    before<-counts;session$flushReact();stopifnot(identical(before,counts))
   })
  }

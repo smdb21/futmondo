@@ -545,6 +545,7 @@ rival_historical_components <- function(evidence,teams,rules,official) {
     }
   }
   income<-data.frame(team_id=character(),round_id=character(),bonus_type=character(),amount=numeric(),source=character(),stringsAsFactors=FALSE)
+  standings<-data.frame(team_id=character(),round_id=character(),position=numeric(),tied=logical())
   missing<-list();add_missing<-function(id,text)missing[[id]]<<-unique(c(missing[[id]],text))
   for(id in as.character(teams$teamid)){
     rows<-rounds[rounds$team_id%in%id,,drop=FALSE]
@@ -579,6 +580,11 @@ rival_historical_components <- function(evidence,teams,rules,official) {
     if((!authoritative&&!rival_ranking_round_complete(rows,participants$team_ids))||any(!is.finite(rows$points))){
       for(id in as.character(teams$teamid))add_missing(id,paste("Ranking history incomplete for round",rounds$round_number[match(round,rounds$round_id)]));next
     }
+    # Actual score order, independent of top/flop prize distribution. Ties
+    # share a position; incomplete participant sets never create a rank.
+    standings<-dplyr::bind_rows(standings,data.frame(team_id=rows$team_id,round_id=round,
+      position=rank(-rows$points,ties.method="min"),
+      tied=duplicated(rows$points)|duplicated(rows$points,fromLast=TRUE)))
     # Negative-start teams do not take part in automatic premiums (FAQ142).
     eligible<-!rows$negative%in%TRUE
     value<-rep(0,nrow(rows));value[eligible]<-rival_ranking_allocations(rows$points[eligible],fm_number(rules$ranking_pool),
@@ -620,7 +626,7 @@ rival_historical_components <- function(evidence,teams,rules,official) {
   },unique(all_rounds$round_id))
   if(is.data.frame(official)&&nrow(official)&&"is_finished"%in%names(official))
     official$is_finished[is.na(official$is_finished)&official$round_id%in%completed]<-TRUE
-  list(income=income,eligibility=unique(eligibility),official=official,missing=missing,rounds=rounds)
+  list(income=income,eligibility=unique(eligibility),official=official,missing=missing,rounds=rounds,standings=standings)
 }
 
 # The same entries drive component totals and transaction history. Reconstructed
@@ -982,6 +988,11 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
       squad_size=fm_number(info$squad_size),net_profit_loss=NA_real_,estimate_summary=rival_estimate_summary(missing,assumptions,difference),estimate_notes=paste(reasons,collapse=" "),stringsAsFactors=FALSE)
     breakdowns[[tid]]<-ledger[,c("component","amount","source","round_id","player_id"),drop=FALSE]
     ledger$round_number<-history$rounds$round_number[match(ledger$round_id,history$rounds$round_id)]
+    own_rounds<-history$rounds[history$rounds$team_id%in%tid,,drop=FALSE]
+    own_standings<-history$standings[history$standings$team_id%in%tid,,drop=FALSE]
+    ledger$round_points<-own_rounds$points[match(ledger$round_id,own_rounds$round_id)]
+    ledger$round_position<-own_standings$position[match(ledger$round_id,own_standings$round_id)]
+    ledger$round_position_tied<-own_standings$tied[match(ledger$round_id,own_standings$round_id)]
     # Preserve confirmed zero rewards and award coverage for round-filtered views.
     # Amounts always come from the included ledger, never a second cash calculation.
     bonus_rounds<-list()

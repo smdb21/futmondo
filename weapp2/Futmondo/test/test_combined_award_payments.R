@@ -12,7 +12,7 @@ stopifnot(x$team_finances$reconstructed_cash==52129125,x$team_finances$mvp_incom
  x$team_finances$dreamteam_income==1500000,!any(ledger$estimated & ledger$bonus_type%in%c('mvp','dreamteam')),
  sum(ledger$component=='Best XI/MVP payment')==3,sum(ledger$amount[ledger$component=='Best XI/MVP payment'])==3500000)
 inflow<-rivals_inflow_totals(ledger)
-stopifnot(inflow$mvp==2000000,inflow$dreamteam==1500000,is.na(inflow$ranking))
+stopifnot(inflow$mvp==2000000,inflow$dreamteam==1500000,inflow$ranking==32000000)
 h<-data.frame(team_id='reference',team_name='Reference',round=c(1,4,7),points=1)
 columns<-classification_bonus_table(data.frame(team_id='reference'),h,x,c(1,11))
 stopifnot(columns$mvp_bonus==2000000,columns$best_xi_bonus==1500000)
@@ -24,7 +24,7 @@ ui_expr<-parse(text=module_lines[start:(end-1)])[[1]][[3]][[2]]
 stopifnot(!is.null(ui_expr))
 rival_moneymovements_raw_RV<-function()ledger;input<-list(tx_pivot_by_player=FALSE);ns<-identity
 html<-htmltools::renderTags(eval(ui_expr))$html
-stopifnot(grepl('Financial history',html),inherits(rivals_cash_history_widget(ledger),'reactable'))
+stopifnot(grepl('Total income',html),grepl('Total expenses',html),grepl('col-sm-6',html),grepl('Financial history',html),inherits(rivals_cash_history_widget(ledger),'reactable'))
 # A mismatch preserves actual cash and blocks unverified component attribution.
 bad<-awards;bad$is_mvp<-FALSE
 failed<-build_combined(bad)

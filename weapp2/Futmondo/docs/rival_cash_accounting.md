@@ -162,3 +162,17 @@ The native `dreamTeam` transaction can contain both the Best XI member reward an
 The shared ledger retains one original transaction labelled Best XI/MVP payment. Its `award_payment_allocations` metadata allocates the same amount to MVP/Best XI summary cards and Classification bonus columns without creating cash rows. For the reference capture: combined payments 3,500,000 EUR = XI 1,500,000 EUR + MVP 2,000,000 EUR. Payment attribution is performed on shared publication only, restricted to rounds with native payments.
 
 The financial-history summary now handles unknown category totals without evaluating NA as a Boolean. Pending position bonuses remain unavailable and excluded, rather than becoming zero. Transaction & Financial History is the selected default tab whenever the selected rival detail is rendered; the roster remains accessible.
+
+
+### Excluded estimates are not payment-history rows — 2026-11-03
+
+`rivals_cash_history_rows()` omits estimated ledger entries that are not included in cash, including pending round-8 position and award calculations. The full shared ledger and calculation details retain their amounts, exclusion reasons and unknown category status. Included reconstructed payments and actual source transactions remain visible. This is a view-only filter after balance calculation; neither cash totals nor payment/eligibility rules change.
+
+
+### Financial history presentation and paid-income totals — 2026-11-03
+
+History excludes unpaid estimated entries while retaining the full accounting ledger. Point descriptions include the team's cumulative round points (explicitly “Round total” for split settlements); position descriptions include actual score rank, including ties, independent of top/flop prize direction. `rival_historical_components()` publishes standings once alongside shared historical evidence; ledger rows carry `round_points`, `round_position`, and `round_position_tied`. Incomplete participant evidence never creates a rank.
+
+`rivals_inflow_totals()` reports included positive cash by category. A pending position/point round no longer hides already paid income; unknown combined-award allocation still prevents an invented XI/MVP split. Total income and Total expenses share the same ledger and appear in responsive half-width boxes. Estimated balance remains distinguished from confirmed cash, using plain user-facing labels. The roster tab is Current team and has no redundant heading; history remains the default.
+
+The browser reports its IANA timezone once per connection through the namespaced `browser_timezone` input. History, Last Access and Last Updated format timestamps locally with event-specific timezone abbreviations; UTC is retained internally and used as the fallback. These display inputs do not trigger acquisition.

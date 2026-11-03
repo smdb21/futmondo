@@ -267,7 +267,7 @@ check('repeated coverage notes have one concise status while full reasons remain
 check('selected rival cards reuse ledger cash and derive tied standings from points',{
   rows<-data.frame(teamid='a',estimated_cash=-25,confidence='Estimated',estimate_notes='Missing settlement evidence')
   x<-rivals_summary_values(list(),teams,rows,'a')
-  stopifnot(x$cash==-25,x$position==2,x$label=='Reconstructed cash balance (estimate)',nzchar(x$notes))
+  stopifnot(x$cash==-25,x$position==2,x$label=='Estimated balance',nzchar(x$notes))
   tied<-teams;tied$points<-c(200,200)
   stopifnot(rivals_summary_values(list(),tied,rows,'a')$position==1)
   rows$estimated_cash<-0;rows$confidence<-'Verified'

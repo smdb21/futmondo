@@ -250,40 +250,65 @@ rivals_tx_display_df <- function(filtered) {
   filtered[, ordered_cols, drop = FALSE]
 }
 
+rivals_display_text <- function(text) {
+  text<-gsub("reconstructed","estimated",text,ignore.case=TRUE)
+  gsub("reconstruction","calculation",text,ignore.case=TRUE)
+}
 # View-only projection of the complete shared ledger. Balances were calculated
 # before selection, filtering, pagination or sorting; undated rows retain their labels.
-rivals_cash_history_rows <- function(ledger,undated=NULL) {
+rivals_display_timezone <- function(timezone) {
+  if(is.character(timezone)&&length(timezone)==1L&&!is.na(timezone)&&timezone%in%OlsonNames())timezone else "UTC"
+}
+rivals_cash_history_rows <- function(ledger,undated=NULL,timezone="UTC") {
+  timezone<-rivals_display_timezone(timezone)
   if(!is.data.frame(ledger)||!nrow(ledger))return(data.frame())
   rows<-if(is.null(undated))ledger else ledger[if(undated)ledger$section%in%"undated"else!ledger$section%in%"undated",,drop=FALSE]
+  # Unpaid estimates remain in the calculation ledger, not payment history.
+  rows<-rows[!(rows$estimated%in%TRUE & !rows$included%in%TRUE),,drop=FALSE]
   if(!nrow(rows))return(data.frame())
   label<-ifelse(is.finite(rows$round_number),as.character(rows$round_number),"")
-  if("settlement_label"%in%names(rows))label[nzchar(rows$settlement_label)]<-rows$settlement_label[nzchar(rows$settlement_label)]
+  settlement<-if("settlement_label"%in%names(rows))rows$settlement_label else rep("",nrow(rows))
   round<-ifelse(nzchar(label),paste0(" · Round ",label),"")
+  round<-paste0(round,ifelse(nzchar(settlement)&settlement!=label,paste0(" · Settlement ",settlement),""))
+  description<-rows$component
+  description[rows$bonus_type%in%"points" & description!="Combined round point payment"]<-"Point reward"
+  description[rows$bonus_type%in%"ranking"]<-"Position reward"
+  round_detail<-rep("",nrow(rows))
+  if("round_points"%in%names(rows)){
+    indices<-which(rows$bonus_type%in%"points")
+    round_detail[indices]<-ifelse(is.finite(rows$round_points[indices]),
+      paste0(" · Round total: ",format(rows$round_points[indices],trim=TRUE,scientific=FALSE)," points")," · Round points unavailable")
+  }
+  if("round_position"%in%names(rows)){
+    indices<-which(rows$bonus_type%in%"ranking")
+    round_detail[indices]<-ifelse(is.finite(rows$round_position[indices]),
+      paste0(" · Position ",rows$round_position[indices],ifelse(rows$round_position_tied[indices]%in%TRUE," (tied)",""))," · Round position unavailable")
+  }
   date_source<-if("payment_date_source"%in%names(rows))rows$payment_date_source else rep("",nrow(rows))
-  data.frame(date=ifelse(rows$section%in%"opening" & is.na(rows$timestamp),"Opening balance",ifelse(date_source%in%c("reference_payment_pending","round_settlement_pending"),"Payment not confirmed",ifelse(is.na(rows$timestamp),"Payment date unknown",format(rows$timestamp,"%d/%m/%Y %H:%M",tz="UTC")))),
-    type=ifelse(rows$component%in%"Best XI/MVP payment","Recorded Best XI/MVP payment",ifelse(rows$estimated,"Estimated bonus",rows$type)),concept=paste0(rows$component,round,ifelse(rows$included,""," (excluded)")),money=rows$amount,
+  data.frame(date=ifelse(rows$section%in%"opening" & is.na(rows$timestamp),"Opening balance",ifelse(date_source%in%c("reference_payment_pending","round_settlement_pending"),"Payment not confirmed",ifelse(is.na(rows$timestamp),"Payment date unknown",format(rows$timestamp,"%d/%m/%Y %H:%M %Z",tz=timezone)))),
+    type=ifelse(rows$component%in%"Best XI/MVP payment","Recorded Best XI/MVP payment",ifelse(rows$estimated,"Estimated bonus",rows$type)),concept=paste0(description,round,round_detail,ifelse(rows$included,""," (excluded)")),money=rows$amount,
     payment_date_estimated=if("payment_date_estimated"%in%names(rows))rows$payment_date_estimated%in%TRUE else rep(FALSE,nrow(rows)),
     payment_date_source=if("payment_date_source"%in%names(rows))as.character(rows$payment_date_source)else rep("",nrow(rows)),
-    running_balance=rows$running_balance,source=rows$source,included=rows$included,unknown_amounts=rows$unknown_amounts,
+    running_balance=rows$running_balance,source=rivals_display_text(rows$source),included=rows$included,unknown_amounts=rows$unknown_amounts,
     category=rows$category,bonus_type=rows$bonus_type,calculation=if("calculation"%in%names(rows))rows$calculation else "",
     ledger_order=rows$ledger_order,stringsAsFactors=FALSE)
 }
-rivals_cash_history_widget <- function(ledger,undated=NULL) {
-  display<-rivals_cash_history_rows(ledger,undated)
+rivals_cash_history_widget <- function(ledger,undated=NULL,timezone="UTC") {
+  display<-rivals_cash_history_rows(ledger,undated,timezone)
   if(!nrow(display))return(reactable::reactable(data.frame(Status="No cash movements available."),compact=TRUE))
   reactable::reactable(display,compact=TRUE,striped=TRUE,highlight=TRUE,bordered=FALSE,defaultPageSize=15,
     details=function(index){text<-display$calculation[index];if(!is.na(text)&&nzchar(text))tags$p(style="white-space:normal;overflow-wrap:anywhere",text)else NULL},
     defaultSorted=list(ledger_order=if(isTRUE(undated))"asc"else"desc"),columns=list(
       date=colDef(name="Date",show=!isTRUE(undated),align="left",cell=function(value,index){
-        if(display$payment_date_source[index]%in%c("league_point_payment","league_same_bonus_payment"))return(tags$span(title="Known league payment date; reconstructed combined round amount.",value,tags$small(" (known payment)")))
+        if(display$payment_date_source[index]%in%c("league_point_payment","league_same_bonus_payment"))return(tags$span(title="Known league payment date for the combined round bonus.",value,tags$small(" (known payment)")))
         if(isTRUE(display$payment_date_estimated[index]))return(tags$span(
           title=if(identical(display$payment_date_source[index],"league_position_payment"))
-            "Reconstructed using the recorded league position-payment date."else
-            "Reconstructed using the round points-publication notification; not a recorded payment timestamp.",value,tags$small(" (reconstructed)")))
+            "Date based on the recorded league position payment."else
+            "Estimated date based on the round points-publication notification.",value,tags$small(" (estimated date)")))
         value
       }),type=colDef(name="Type",align="left",cell=function(value,index){
         if(display$payment_date_source[index]%in%c("reference_payment_pending","round_settlement_pending"))return(paste("Unconfirmed",c(ranking="position bonus",mvp="MVP bonus",dreamteam="Best XI bonus")[[display$bonus_type[index]]]))
-        if(identical(display$payment_date_source[index],"league_point_payment"))return("Reconstructed point bonus")
+        if(identical(display$payment_date_source[index],"league_point_payment"))return("Point bonus")
         if(value=="Recorded Best XI/MVP payment")return(value)
         if(value=="opening")return("Starting cash")
         if(value%in%c("buy","sell"))return(paste(if(display$category[index]%in%"clause")"Clause"else if(display$category[index]%in%"market")"Ordinary"else"Player",if(value=="buy")"purchase"else"sale"))
@@ -300,7 +325,7 @@ rivals_cash_history_widget <- function(ledger,undated=NULL) {
         if(!is.finite(value))return("Unavailable")
         tags$span(style=if(value<0)"color:var(--fm-danger)"else"color:var(--fm-text)",
           paste0(if(value>0)"+"else"",format_table_currency(value)))
-      }),running_balance=colDef(name=if(isTRUE(undated))"Calculation subtotal"else"Reconstructed balance",align="right",cell=ui_financial_amount),
+      }),running_balance=colDef(name=if(isTRUE(undated))"Calculation subtotal"else"Balance",align="right",cell=ui_financial_amount),
       payment_date_estimated=colDef(show=FALSE),payment_date_source=colDef(show=FALSE),category=colDef(show=FALSE),bonus_type=colDef(show=FALSE),calculation=colDef(show=FALSE),source=colDef(show=FALSE),included=colDef(show=FALSE),unknown_amounts=colDef(show=FALSE),ledger_order=colDef(show=FALSE)))
 }
 
@@ -328,14 +353,16 @@ rivals_points_pills <- function(points) {
       format(points[i],trim=TRUE,scientific=FALSE))
   })
 }
-rivals_last_access_cell <- function(value) {
+rivals_last_access_cell <- function(value,timezone="UTC") {
+  timezone<-rivals_display_timezone(timezone)
   stamp<-fm_time(value)
   if(length(stamp)!=1L||is.na(stamp))return("Unavailable")
-  tags$span(title=format(stamp,"%Y-%m-%d %H:%M:%OS3 UTC",tz="UTC"),format(stamp,"%d/%m/%Y %H:%M",tz="UTC"))
+  tags$span(title=format(stamp,"%Y-%m-%d %H:%M:%OS3 UTC",tz="UTC"),format(stamp,"%d/%m/%Y %H:%M %Z",tz=timezone))
 }
 
 # Keep observed team fields selectable even if financial audit details fail.
-rivals_finance_table_widget <- function(finances_data,on_error=function(error)NULL) {
+rivals_finance_table_widget <- function(finances_data,on_error=function(error)NULL,timezone="UTC") {
+  timezone<-rivals_display_timezone(timezone)
   df<-finances_data$team_finances
   if(!is.data.frame(df)||!nrow(df))return(NULL)
   currency<-function(value){value<-fm_number(value);if(is.finite(value))format_table_currency(value)else""}
@@ -343,8 +370,8 @@ rivals_finance_table_widget <- function(finances_data,on_error=function(error)NU
     pills<-rivals_points_pills(rows$Points)
     list(Team=colDef(name="User Team",align="left",minWidth=130),
       `Squad Value`=colDef(cell=currency,align="right",minWidth=125),
-      `Last Access`=colDef(header=tags$span("Last Access",tags$br(),tags$small("UTC")),
-        minWidth=145,cell=rivals_last_access_cell,headerClass="fm-metric-header"),
+      `Last Access`=colDef(header=tags$span(title=timezone,"Last Access"),
+        minWidth=165,cell=function(value)rivals_last_access_cell(value,timezone),headerClass="fm-metric-header"),
       Points=colDef(align="center",minWidth=90,cell=function(value,index)pills[[index]]))
   }
   fallback<-function(){
@@ -355,18 +382,19 @@ rivals_finance_table_widget <- function(finances_data,on_error=function(error)NU
       defaultColDef=colDef(sortNALast=TRUE),columns=public_columns(rows))
   }
   tryCatch({
-    df_display<-df %>% dplyr::select(Team=teamname,`Reconstructed balance`=estimated_cash,
+    df_display<-df %>% dplyr::select(Team=teamname,`Balance`=estimated_cash,
       Confidence=confidence,`Last updated`=as_of,Status=cash_status,`Squad Value`=team_value,`Last Access`=last_access,Points=points)
+    df_display$Confidence[df_display$Confidence%in%"Reconstructed"]<-"Complete"
     df_display$`Last Access`<-as.numeric(fm_time(df_display$`Last Access`))
     reactable::reactable(df_display,compact=TRUE,striped=TRUE,highlight=TRUE,bordered=FALSE,
-      selection="single",onClick="select",defaultPageSize=10,defaultSorted=list(`Reconstructed balance`="desc"),
+      selection="single",onClick="select",defaultPageSize=10,defaultSorted=list(`Balance`="desc"),
       defaultColDef=colDef(sortNALast=TRUE),
       columns=c(public_columns(df_display),list(
-        `Reconstructed balance`=colDef(align="right",cell=function(value){
+        `Balance`=colDef(align="right",cell=function(value){
           value<-fm_number(value);if(!is.finite(value))return("")
           tags$span(style=if(value<0)"color: var(--fm-danger); font-weight:700;"else"font-weight:700;",currency(value))
         }),`Last updated`=colDef(cell=function(value){
-          stamp<-fm_time(mvp_text(value));if(length(stamp)==1L&&!is.na(stamp))unname(format(stamp,"%d-%m %H:%M",tz="UTC"))else""
+          stamp<-fm_time(mvp_text(value));if(length(stamp)==1L&&!is.na(stamp))unname(format(stamp,"%d-%m %H:%M %Z",tz=timezone))else""
         }))))
   },error=function(error){on_error(error);fallback()})
 }
@@ -385,11 +413,12 @@ rivals_inflow_totals <- function(ledger) {
   market<-sales & category%in%"market" & !clauses
   rewards<-rows$type%in%c("bonus","ranking")
   allocations<-attr(ledger,"award_payment_allocations")
+  unresolved_awards<-is.data.frame(allocations)&&nrow(allocations)>0L&&any(allocations$status!="validated")
   attributed_mvp<-if(is.data.frame(allocations)&&nrow(allocations)&&all(allocations$status=="validated"))sum(allocations$mvp)else 0
   list(opening=amount(rows$type%in%"opening"),sales=amount(sales),market=amount(market),clauses=amount(clauses),unknown=amount(sales & !market & !clauses),
-    bonuses=amount(rewards),points=if(isTRUE(attr(ledger,"point_rewards_incomplete")))NA_real_ else amount(rewards & bonus%in%"points"),ranking=if("ranking"%in%attr(ledger,"pending_bonus_types"))NA_real_ else amount(rewards & (bonus%in%"ranking"|rows$type%in%"ranking")),
-    mvp=if("mvp"%in%attr(ledger,"pending_bonus_types"))NA_real_ else amount(rewards & bonus%in%"mvp")+attributed_mvp,dreamteam=if("dreamteam"%in%attr(ledger,"pending_bonus_types"))NA_real_ else amount(rewards & bonus%in%"dreamteam")-attributed_mvp,
-    other=amount(!rows$type%in%c("opening","sell","clause_sell","bonus","ranking")),total=amount(rep(TRUE,nrow(rows))),incomplete=any(!is.finite(rows$amount)))
+    bonuses=amount(rewards),points=amount(rewards & bonus%in%"points"),ranking=amount(rewards & (bonus%in%"ranking"|rows$type%in%"ranking")),
+    mvp=if(unresolved_awards)NA_real_ else amount(rewards & bonus%in%"mvp")+attributed_mvp,dreamteam=if(unresolved_awards)NA_real_ else amount(rewards & bonus%in%"dreamteam")-attributed_mvp,
+    other=amount(!rows$type%in%c("opening","sell","clause_sell","bonus","ranking")),total=amount(rep(TRUE,nrow(rows))),incomplete=any(!is.finite(rows$amount))||length(attr(ledger,"pending_bonus_types"))>0L||isTRUE(attr(ledger,"point_rewards_incomplete")))
 }
 
 rivals_outflow_totals <- function(ledger) {
@@ -410,9 +439,9 @@ rivals_summary_values <- function(info, teams, finances, team_id) {
   number <- function(x) { x <- suppressWarnings(as.numeric(x)); if(length(x)==1L && is.finite(x)) x else NA_real_ }
   row <- if(is.data.frame(finances) && "teamid" %in% names(finances)) finances[finances$teamid %in% team_id,,drop=FALSE] else data.frame()
   cash <- if(nrow(row)==1L)number(row$estimated_cash)else NA_real_
-  label <- if(nrow(row)==1L&&identical(row$confidence,"Reconciled"))"Reconstructed balance (matches observed cash)"else "Reconstructed cash balance (estimate)"
-  notes <- if(nrow(row)==1L)row$estimate_notes else ""
-  status <- if(nrow(row)==1L)mvp_text(row$estimate_summary)else ""
+  label <- if(nrow(row)==1L&&identical(row$confidence,"Reconciled"))"Balance matches recorded cash"else "Estimated balance"
+  notes <- rivals_display_text(if(nrow(row)==1L)row$estimate_notes else "")
+  status <- rivals_display_text(if(nrow(row)==1L)mvp_text(row$estimate_summary)else "")
   observed<-if(nrow(row)==1L)number(row$observed_cash)else number(info$budget)
   observed_fresh<-nrow(row)==1L&&isTRUE(row$observed_cash_fresh)
   difference<-if(nrow(row)==1L)number(row$reconciliation_difference)else NA_real_
@@ -444,6 +473,7 @@ rivals_status_message <- function(message, loading=FALSE) {
 rivals_UI <- function(id) {
   ns <- NS(id)
 tagList(
+    tags$script(HTML(sprintf("(function(){function send(){var zone=Intl.DateTimeFormat().resolvedOptions().timeZone;Shiny.setInputValue(%s,zone,{priority:'event'});}$(document).one('shiny:connected',send);if(window.Shiny&&Shiny.shinyapp&&Shiny.shinyapp.isConnected())send();})();",jsonlite::toJSON(ns("browser_timezone"),auto_unbox=TRUE)))),
     # League Financial Standings Overview & Scouting Target Selection
     fluidRow(
       column(width = 12,
@@ -475,6 +505,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
     bind_factual_reads(c("get_user_team_info","get_players_from_team","get_financial_snapshot","get_championship_pressroom","get_league_standings_history","get_user_team_moneymovements"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
 
     ns <- session$ns
+    display_timezone<-reactive(rivals_display_timezone(input$browser_timezone))
     mvp_snapshot <- shared_mvp_source(session,login_token,championship_id,is_module_active,refresh_trigger)
     
     # Observers ----
@@ -657,7 +688,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       widget<-rivals_finance_table_widget(finances_data,function(error){
         failure<<-isolate(table_failure_RV())
         if(is.null(failure))failure<<-resource_log_failure(resource_failure(error,resource="league_finances_calc",category="schema"))
-      })
+      },timezone=display_timezone())
       table_failure_RV(failure)
       widget
     })
@@ -718,7 +749,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                        if((length(summary$notes)==1L && !is.na(summary$notes) && nzchar(summary$notes))||is.finite(summary$observed_cash))
                          tags$details(tags$summary("Calculation details"),tags$p(style="white-space:normal;overflow-wrap:anywhere;",summary$notes),
                            if(is.finite(summary$observed_cash))tags$p("Observed cash",if(!summary$observed_cash_fresh)" (stale)"else"",": ",ui_financial_amount(summary$observed_cash)),
-                           if(is.finite(summary$difference))tags$p("Observed minus reconstructed: ",ui_financial_amount(summary$difference))))
+                           if(is.finite(summary$difference))tags$p("Difference from recorded cash: ",ui_financial_amount(summary$difference))))
                  )
           ),
           column(width = 3,
@@ -952,10 +983,10 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
         tagList(
           uiOutput(ns("rival_financial_summary_box")),
           tabsetPanel(id = ns("rival_tabs"), type = "pills", selected = "history",
-            tabPanel(title = "Player Roster & Clauses", value = "roster", icon = icon("users"),
+            tabPanel(title = "Current team", value = "roster", icon = icon("users"),
               players_table_UI(
                 id = ns("rival_squad_table"),
-                box_title = "Scouted Player Roster & Purchase Breakdown",
+                box_title = NULL,
                 filter_by_position = TRUE,
                 filter_by_team = FALSE,
                 filter_by_value = TRUE,
@@ -989,12 +1020,12 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       final<-if(is.data.frame(ledger)&&nrow(ledger))tail(ledger$running_balance,1L)else NA_real_
       tagList(
         checkboxInput(ns("tx_pivot_by_player"),"Pivot by Player (Buy/Sell Ledger)",value=isTRUE(isolate(input$tx_pivot_by_player))),
-        p("Cash starts from the league's opening balance. These are reconstructed estimates; transactions sharing a timestamp have no confirmed order."),
+        p("Your balance includes starting cash, transfers and paid bonuses."),
         if(is.data.frame(ledger)&&nrow(ledger)&&any(ledger$included&!is.finite(ledger$amount)))
           p(class="alert alert-info","Some movement amounts are missing. Balances show the known-amount estimate and exclude those unknown amounts."),
-        div(class="well",strong("Reconstructed balance: "),ui_financial_amount(final)),
-        div(class="well",
-          h4("Total inflow"),
+        div(class="well",strong("Balance: "),ui_financial_amount(final)),
+        fluidRow(
+        box(width=6,title="Total income",
           tags$p(strong(ui_financial_amount(inflow$total))),
           tags$p("Starting cash: ",ui_financial_amount(inflow$opening)),
           tags$p("Player sales: ",ui_financial_amount(inflow$sales)),
@@ -1007,24 +1038,23 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
           if(isTRUE(is.finite(inflow$bonuses)&&inflow$bonuses!=inflow$points+inflow$ranking+inflow$mvp+inflow$dreamteam))
             tags$p("Other recorded bonuses: ",ui_financial_amount(inflow$bonuses-inflow$points-inflow$ranking-inflow$mvp-inflow$dreamteam)),
           if(is.finite(inflow$other)&&inflow$other!=0)tags$p("Other credits: ",ui_financial_amount(inflow$other)),
-          tags$small("Includes starting cash and every included positive ledger amount, including reconstructed bonuses.",
-            if(inflow$incomplete)" Some amounts are missing; only known inflow is included.")
+          tags$small("Includes starting cash, player sales and paid bonuses.",
+            if(inflow$incomplete)" Pending or unresolved bonuses do not replace the known income shown here.")
         ),
-        div(class="well",
-          h4("Total outflow"),
+        box(width=6,title="Total expenses",
           tags$p(strong(ui_financial_amount(outflow$total))),
           tags$p("Player purchases: ",ui_financial_amount(outflow$purchases)),
           tags$p("Ordinary purchases (identified): ",ui_financial_amount(outflow$market)),
           tags$p("Clause purchases (identified): ",ui_financial_amount(outflow$clauses)),
           if(is.finite(outflow$other)&&outflow$other!=0)tags$p("Other debits: ",ui_financial_amount(outflow$other)),
           tags$small("Every purchase is included in the numeric total. Its method is identified from recorded transfer evidence.",
-            if(outflow$incomplete)" Some amounts are missing; only known outflow is included.")
-        ),
+            if(outflow$incomplete)" Some amounts are missing; only known expenses are included.")
+        )),
         if(is.finite(inflow$unknown)&&is.finite(outflow$unknown)&&(inflow$unknown+outflow$unknown)>0)
           p(class="alert alert-info",paste0("Transfer-method evidence still needed for ",format_table_currency(inflow$unknown)," of sales and ",format_table_currency(outflow$unknown)," of purchases. These amounts are already included in the totals.")),
-        p(strong("Total inflow − total outflow = reconstructed cash: "),ui_financial_amount(inflow$total-outflow$total)),
+        p(strong("Total income − total expenses = balance: "),ui_financial_amount(inflow$total-outflow$total)),
         h4("Financial history"),
-        p("Points and position bonuses follow your recorded payments; point amounts must also reconcile. Best XI and MVP are reconstructed independently from final award and historical eligibility evidence, even if you received neither. Position and award payments awaiting final settlement remain excluded; interim closed rounds and provisional selections do not prove that postponed matches have finished."),
+        p("Includes transfers and paid bonuses. Pending bonuses are not shown or added to your balance."),
         reactable::reactableOutput(ns("rival_transactions_table"))
       )
     })
@@ -1113,7 +1143,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
         ))
       }
 
-      rivals_cash_history_widget(rival_moneymovements_raw_RV())
+      rivals_cash_history_widget(rival_moneymovements_raw_RV(),timezone=display_timezone())
     })
 
     # Nested table module server call
