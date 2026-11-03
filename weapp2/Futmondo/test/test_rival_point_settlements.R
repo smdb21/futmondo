@@ -46,6 +46,38 @@ check('scope isolation never borrows reference payments from another context',{
   stopifnot(!any(build(ev)$cash_ledgers$b$bonus_type=='points'))
  }
 })
+check('payment arrivals replace one cumulative rival entry and never invent instalments',{
+ snapshot<-function(id,points,at)e('team_rounds',id,list(team_id=id,rounds=list(
+  list(id='r1',number=1,points=points,status='closed',negative=FALSE))),at)
+ first<-payments[[which(vapply(payments,function(p)identical(p$payload$concept,'1'),logical(1)))[1]]]
+ second<-payments[[which(vapply(payments,function(p)identical(p$payload$concept,'1.1'),logical(1)))[1]]]
+ legacy<-e('eligibility','discarded-interim',list(team_id='b',round_id='r1',verified=TRUE,
+  points_credited=TRUE,credited_points=1,money_per_point=70000,historical_rules=TRUE,round_settled=FALSE))
+ notification<-e('notifications','published',list(type='round',action='close',player_id='r1',created_at='2026-08-20T03:47:00Z'))
+ saved<-list(snapshot('a',28,stamp),snapshot('b',20,stamp),legacy,notification)
+ stopifnot(!any(build(saved)$cash_ledgers$b$bonus_type=='points'))
+ saved<-rival_merge_evidence(saved,list(first))
+ x<-build(saved);initial<-x$cash_ledgers$b[x$cash_ledgers$b$bonus_type=='points',]
+ stopifnot(nrow(initial)==1L,initial$amount==1400000,initial$date==first$payload$date)
+ # A newly observed payment must not be reconciled by altering the old score.
+ saved<-rival_merge_evidence(saved,list(second))
+ x<-build(saved)
+ stopifnot(x$point_reconciliation$status=='mismatch',!any(x$cash_ledgers$b$bonus_type=='points'),
+  sum(x$cash_ledgers$a$bonus_type=='points')==2L)
+ # Independently updated cumulative scores replace the earlier rival entry.
+ saved<-rival_merge_evidence(saved,list(snapshot('a',82,stamp+1),snapshot('b',84,stamp+1)))
+ for(replay in 1:3){
+  saved<-rival_merge_evidence(saved,list(first,second,legacy))
+  x<-build(saved);b<-x$cash_ledgers$b[x$cash_ledgers$b$bonus_type=='points',]
+  stopifnot(nrow(b)==1L,b$id==initial$id,b$amount==5880000,b$date==second$payload$date,
+    sum(x$cash_ledgers$a$bonus_type=='points')==2L,
+    rivals_inflow_totals(x$cash_ledgers$b)$points==5880000,
+    tail(x$cash_ledgers$b$running_balance,1)==5880100)
+ }
+ # Rebuilding a fresh dataset from saved evidence produces the same single row.
+ restored<-unserialize(serialize(saved,NULL));again<-build(restored)
+ stopifnot(identical(again$cash_ledgers$b,x$cash_ledgers$b))
+})
 cat(sprintf('POINT SETTLEMENTS: %d passed / 0 failed\n',n))
 check('bounded asynchronous repair persists fresh round eleven and reuses it next session',{
  original_adapter<-async_adapter_fetch;original_persist<-persist_rival_finance_evidence

@@ -2321,7 +2321,7 @@
       "checksum": "410e38ab7007ab0a040e6c349e48bc39"
     },
     "rival_finance_runtime.R": {
-      "checksum": "5a572c7a7058dd5c60a833745f5aa9d8"
+      "checksum": "456c7bb7a79845c05a06ede18c7c3e86"
     },
     "award_runtime.R": {
       "checksum": "99f1701bc8d314c4f81915b9703b1be1"
@@ -2336,7 +2336,7 @@
       "checksum": "2b037334f8088f5b4a270acbaea52e91"
     },
     "www/release-info.json": {
-      "checksum": "f0710339a42f62c2ce71ba4ecd630d25"
+      "checksum": "25c10da6ae73f6b075eb3a60bdba87aa"
     }
   },
   "users": null

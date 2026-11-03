@@ -467,3 +467,7 @@ Added four selected-round euro totals (points, MVP, Best XI, position) backed by
 ### Reference points/position and independent awards — 2026-11-03
 
 Implemented locally: position bonuses require a reference position payment; points retain exact reference reconciliation. Best XI/MVP remain independent of reference award receipt, but require final-category settlement evidence from any recorded league recipient, plus selections and historical eligibility. Interim closed histories and point payments cannot release final awards. Pending rows remain excluded and totals unknown. User accepted official full-round completion on 2026-11-03. Focused final validation and deployment are recorded in data_review_results.md; authenticated round 11 recovery remains unverified in production.
+
+### Payment-driven cumulative rival points — 2026-11-03
+
+Existing live accounting verified to require reference payments and retain one cumulative derived entry per rival/round. Added a sequential no-payment/first-payment/later-payment/score-recovery/replay regression. Corrected latest-payment wording so it cannot imply final completion. No synthetic transaction persistence or destructive cleanup is needed; real instalments and source revisions remain intact. Validation and rollout are recorded in data_review_results.md.

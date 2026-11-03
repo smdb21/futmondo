@@ -212,7 +212,7 @@ rival_reward_date <- function(round_id,anchors) {
 }
 
 
-# Validate the whole-round amount independently before sharing payment timing.
+# Validate cumulative recorded payments independently before sharing their timing.
 rival_point_reconciliation <- function(rounds,movements,rules,reference_team_id) {
   empty<-data.frame(round_id=character(),recorded=numeric(),expected=numeric(),difference=numeric(),settlement_labels=character(),date=character(),status=character())
   if(!nrow(rounds)&&!nrow(movements))return(empty)
@@ -862,8 +862,8 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
         details$date[j]<-check$date;details$payment_date_estimated[j]<-FALSE
         details$payment_date_source[j]<-"league_point_payment"
         details$component[j]<-"Combined round point payment"
-        details$source[j]<-paste(details$source[j],"Reconstructed amount; known league payment date from reference-team settlements",check$settlement_labels,
-          ". Earlier instalments are consolidated at the final settlement; intermediate balances do not reproduce the instalment schedule.")
+        details$source[j]<-paste(details$source[j],"Reconstructed cumulative amount; known league payment date from reference-team settlements",check$settlement_labels,
+          ". Earlier instalments are consolidated at the latest observed payment. A later payment replaces this cumulative entry after reconciliation; this date does not establish final round completion. Intermediate balances do not reproduce the instalment schedule.")
         next
       }
       if(!is.null(reference_team_id)&&details$bonus_type[j]%in%c("dreamteam","mvp")){
