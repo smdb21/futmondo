@@ -77,6 +77,8 @@ read_rival_finance_evidence <- function(account_id,championship_id,season="unkno
 }
 get_rival_finance_saved <- function(account_id,championship_id,season="unknown") {
   result<-tryCatch(read_rival_finance_evidence(account_id,championship_id,season),error=function(e)list(evidence=list(),complete=FALSE))
+  result$pressroom<-locker_saved_transfer_rows(result$evidence)
+  if(nrow(result$pressroom))attr(result$pressroom,"fetch_status")<-"partial"
   result
 }
 persist_rival_finance_evidence <- function(evidence,context) {
@@ -1337,11 +1339,20 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
             state$queue<-c(list(list(kind="seed")),state$queue);publish(TRUE)
           }else if(task$kind=="seed"){
             if(is.null(result$info))result$rules<-state$seed$rules %||% result$rules
+            live_transfer_status<-attr(result$pressroom,"fetch_status")
+            live_transfer_available<-is.data.frame(result$pressroom)&&all(c("id","price","buyer_team_id","seller_team_id")%in%names(result$pressroom))
             old_transfers<-state$seed$pressroom %||% data.frame()
             if(is.data.frame(old_transfers)&&nrow(old_transfers)){
-              combined<-dplyr::bind_rows(old_transfers,result$pressroom)
+              saved_locker<-if("locker_event_id"%in%names(old_transfers))old_transfers[!is.na(old_transfers$locker_event_id)&nzchar(old_transfers$locker_event_id),,drop=FALSE]else data.frame()
+              if(nrow(saved_locker)){
+                if("locker_event_id"%in%names(result$pressroom))saved_locker<-saved_locker[!saved_locker$locker_event_id%in%result$pressroom$locker_event_id,,drop=FALSE]
+                result$pressroom<-merge_locker_transfers(result$pressroom,saved_locker)
+              }
+              other<-if("locker_event_id"%in%names(old_transfers))old_transfers[is.na(old_transfers$locker_event_id)|!nzchar(old_transfers$locker_event_id),,drop=FALSE]else old_transfers
+              combined<-dplyr::bind_rows(other,result$pressroom)
               known<-!is.na(combined$id)&nzchar(as.character(combined$id))
               result$pressroom<-combined[!(known&duplicated(combined$id,fromLast=TRUE)),,drop=FALSE]
+              attr(result$pressroom,"fetch_status")<-if(live_transfer_available&&!identical(live_transfer_status,"partial"))"ok"else"partial"
             }
             state$seed<-result
             inferred<-result$rules$season %||% "unknown"

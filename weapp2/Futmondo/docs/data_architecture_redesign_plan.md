@@ -496,3 +496,8 @@ Added round points/actual position, browser-local date labels, separate Total in
 ### Full league transfer history and aligned rival table — implemented locally 2026-11-03
 
 Removed default maximum-value/maximum-clause caps. Added full fetched league history with local pagination, shared crest presentation, exact source metadata joins for selected-team ledger rows and publication-aware method labels. Removed fixed source page cap while preserving cycle detection and partial coverage. Focused and delayed-loading checks plus offline lifecycle pass. Live authenticated oldest-history coverage remains separate from source-contract fixtures and public rollout verification.
+
+
+### Locker payment/delivery reconciliation — implemented locally 2026-11-03
+
+Integrated authenticated locker news clause payments into the shared transfer feed and rival cash ledger. Preserved distinct payment/delivery times, linked duplicate source representations, persisted stable normalized source evidence, reused saved facts and preserved context/refresh isolation. Added plain local table dates and matching-size bonus icons. Captured-source replay and offline checks pass; public hosted rollout proof is recorded separately. Current-season source evidence establishes 121 clause payments, 110 later deliveries and 11 paid purchases still absent from pressroom. No claim is made that unrelated rival bonus/manual-adjustment uncertainties have disappeared.

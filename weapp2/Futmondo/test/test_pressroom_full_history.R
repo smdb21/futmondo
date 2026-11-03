@@ -1,6 +1,7 @@
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages(source('global.R'))
 get_cached_data<-function(key,expr,...)force(expr)
+get_locker_clause_payments<-function(...)data.frame()
 page<-0L
 futmondo_post<-function(url,body,...){
  page<<-page+1L

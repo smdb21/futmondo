@@ -28,7 +28,7 @@ cat('PASS evidence-based clause labels and historical club crest preference\n')
 rows$created<-c('2026-11-01T13:25:59.123Z','2026-11-01T14:20:03+01:00','2026-10-30T05:01:00Z')
 x<-today_transfer_rows(rows,teams,players)
 stopifnot(identical(names(x),c('Date','Name','Price','Buyer','Seller','Type')),
- identical(x$Date,c('01/11/2026 13:25 UTC','01/11/2026 13:20 UTC','30/10/2026 05:01 UTC')))
+ identical(x$Date,c('01/11/2026 13:25','01/11/2026 13:20','30/10/2026 05:01')))
 cat('PASS Date/Name headers and timezone-aware minute precision\n')
 # Newly published method evidence updates Today without another transfer fetch.
 reads<-0L

@@ -312,7 +312,7 @@ rivals_cash_history_rows <- function(ledger,undated=NULL,timezone="UTC") {
       paste0(" · Position ",rows$round_position[indices],ifelse(rows$round_position_tied[indices]%in%TRUE," (tied)",""))," · Round position unavailable")
   }
   date_source<-if("payment_date_source"%in%names(rows))rows$payment_date_source else rep("",nrow(rows))
-  output<-data.frame(date=ifelse(rows$section%in%"opening" & is.na(rows$timestamp),"Opening balance",ifelse(date_source%in%c("reference_payment_pending","round_settlement_pending"),"Payment not confirmed",ifelse(is.na(rows$timestamp),"Payment date unknown",format(rows$timestamp,"%d/%m/%Y %H:%M %Z",tz=timezone)))),
+  output<-data.frame(date=ifelse(rows$section%in%"opening" & is.na(rows$timestamp),"Opening balance",ifelse(date_source%in%c("reference_payment_pending","round_settlement_pending"),"Payment not confirmed",ifelse(is.na(rows$timestamp),"Payment date unknown",format(rows$timestamp,"%d/%m/%Y %H:%M",tz=timezone)))),
     type=ifelse(rows$component%in%"Best XI/MVP payment","Recorded Best XI/MVP payment",ifelse(rows$estimated,"Estimated bonus",rows$type)),concept=paste0(description,round,round_detail,ifelse(rows$included,""," (excluded)")),money=rows$amount,
     payment_date_estimated=if("payment_date_estimated"%in%names(rows))rows$payment_date_estimated%in%TRUE else rep(FALSE,nrow(rows)),
     payment_date_source=if("payment_date_source"%in%names(rows))as.character(rows$payment_date_source)else rep("",nrow(rows)),
@@ -322,6 +322,18 @@ rivals_cash_history_rows <- function(ledger,undated=NULL,timezone="UTC") {
   field<-function(key)if(key%in%names(rows))as.character(rows[[key]])else rep("",nrow(rows))
   name<-field("transfer_player_name");name[is.na(name)|!nzchar(name)]<-output$concept[is.na(name)|!nzchar(name)]
   output$player<-rivals_transfer_player_html(name,field("transfer_club"),field("transfer_logo"),field("player_id"))
+  bonus_icons<-c(points="coins",ranking="trophy",dreamteam="users",mvp="star",combined="award",other="gift")
+  bonus_labels<-c(points="Points bonus",ranking="Position bonus",dreamteam="Best XI bonus",mvp="MVP bonus",combined="Best XI/MVP payment",other="Bonus")
+  bonus_kind<-as.character(rows$bonus_type)
+  bonus_kind[rows$component%in%"Best XI/MVP payment"]<-"combined"
+  bonus_kind[rows$type%in%c("bonus","ranking") & !bonus_kind%in%names(bonus_icons)]<-"other"
+  for(kind in intersect(names(bonus_icons),unique(bonus_kind))){
+    indices<-which(bonus_kind%in%kind)
+    symbol<-as.character(tags$span(class="fm-bonus-icon",title=bonus_labels[[kind]],
+      style="display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center;margin-right:7px;vertical-align:middle;",
+      icon(bonus_icons[[kind]],style="font-size:18px;margin:0;")))
+    output$player[indices]<-paste0(symbol,output$player[indices])
+  }
   output$buyer<-field("transfer_buyer");output$seller<-field("transfer_seller")
   output[,c("date","player","money","buyer","seller","type","running_balance",setdiff(names(output),c("date","player","money","buyer","seller","type","running_balance"))),drop=FALSE]
 }
@@ -331,14 +343,7 @@ rivals_cash_history_widget <- function(ledger,undated=NULL,timezone="UTC") {
   reactable::reactable(display,compact=TRUE,striped=TRUE,highlight=TRUE,bordered=FALSE,defaultPageSize=15,showPageSizeOptions=TRUE,pageSizeOptions=c(15,30,50),
     details=function(index){text<-display$calculation[index];if(!is.na(text)&&nzchar(text))tags$p(style="white-space:normal;overflow-wrap:anywhere",text)else NULL},
     defaultSorted=list(ledger_order=if(isTRUE(undated))"asc"else"desc"),columns=list(
-      date=colDef(name="Date",show=!isTRUE(undated),align="left",cell=function(value,index){
-        if(display$payment_date_source[index]%in%c("league_point_payment","league_same_bonus_payment"))return(tags$span(title="Known league payment date for the combined round bonus.",value,tags$small(" (known payment)")))
-        if(isTRUE(display$payment_date_estimated[index]))return(tags$span(
-          title=if(identical(display$payment_date_source[index],"league_position_payment"))
-            "Date based on the recorded league position payment."else
-            "Estimated date based on the round points-publication notification.",value,tags$small(" (estimated date)")))
-        value
-      }),type=colDef(name="Type",align="left",cell=function(value,index){
+      date=colDef(name="Date",show=!isTRUE(undated),align="left"),type=colDef(name="Type",align="left",cell=function(value,index){
         if(display$payment_date_source[index]%in%c("reference_payment_pending","round_settlement_pending"))return(paste("Unconfirmed",c(ranking="position bonus",mvp="MVP bonus",dreamteam="Best XI bonus")[[display$bonus_type[index]]]))
         if(identical(display$payment_date_source[index],"league_point_payment"))return("Point bonus")
         if(value=="Recorded Best XI/MVP payment")return(value)
@@ -390,7 +395,7 @@ rivals_last_access_cell <- function(value,timezone="UTC") {
   timezone<-rivals_display_timezone(timezone)
   stamp<-fm_time(value)
   if(length(stamp)!=1L||is.na(stamp))return("Unavailable")
-  tags$span(title=format(stamp,"%Y-%m-%d %H:%M:%OS3 UTC",tz="UTC"),format(stamp,"%d/%m/%Y %H:%M %Z",tz=timezone))
+  format(stamp,"%d/%m/%Y %H:%M",tz=timezone)
 }
 
 # Keep observed team fields selectable even if financial audit details fail.
@@ -403,7 +408,7 @@ rivals_finance_table_widget <- function(finances_data,on_error=function(error)NU
     pills<-rivals_points_pills(rows$Points)
     list(Team=colDef(name="User Team",align="left",minWidth=130),
       `Squad Value`=colDef(cell=currency,align="right",minWidth=125),
-      `Last Access`=colDef(header=tags$span(title=timezone,"Last Access"),
+      `Last Access`=colDef(header=tags$span("Last Access"),
         minWidth=165,cell=function(value)rivals_last_access_cell(value,timezone),headerClass="fm-metric-header"),
       Points=colDef(align="center",minWidth=90,cell=function(value,index)pills[[index]]))
   }
@@ -427,7 +432,7 @@ rivals_finance_table_widget <- function(finances_data,on_error=function(error)NU
           value<-fm_number(value);if(!is.finite(value))return("")
           tags$span(style=if(value<0)"color: var(--fm-danger); font-weight:700;"else"font-weight:700;",currency(value))
         }),`Last updated`=colDef(cell=function(value){
-          stamp<-fm_time(mvp_text(value));if(length(stamp)==1L&&!is.na(stamp))unname(format(stamp,"%d-%m %H:%M %Z",tz=timezone))else""
+          stamp<-fm_time(mvp_text(value));if(length(stamp)==1L&&!is.na(stamp))unname(format(stamp,"%d-%m %H:%M",tz=timezone))else""
         }))))
   },error=function(error){on_error(error);fallback()})
 }

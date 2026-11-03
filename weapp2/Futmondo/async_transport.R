@@ -34,7 +34,7 @@ fm_httr_response<-function(response,url){
 async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is_current=function()TRUE){
   name<-if(is.character(fn))fn else deparse(substitute(fn))
   if(length(name)!=1L||!grepl("^(get_|read_|calculate_league_finances$)",name))return(promises::promise_reject(simpleError("Only factual reads may use asynchronous adapters")))
-  adapter_env<-new.env(parent=.GlobalEnv);completed<-new.env(parent=emptyenv());requests<-0L;acquired<-list()
+  adapter_env<-new.env(parent=.GlobalEnv);completed<-new.env(parent=emptyenv());requests<-0L;page_requests<-0L;acquired<-list()
   for(nm in ls(.GlobalEnv,all.names=TRUE)){
     object<-get(nm,.GlobalEnv)
     if(is.function(object)&&identical(environment(object),.GlobalEnv)){environment(object)<-adapter_env;assign(nm,object,adapter_env)}
@@ -67,7 +67,7 @@ async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is
   }
   adapter_env$futmondo_post<-function(url,...){
     route<-tail(strsplit(url,"/",fixed=TRUE)[[1]],1)
-    allowed<-c("information","activechampionships","teams","roster","rounds","dreamteam","nightmareteam","roundlineup","lineup","championshipplayers","championshipteams","players","summary","fullprofile","matches","pressroom","moneymovements","rosterbids","myplayers","list","unread","getdtconfig")
+    allowed<-c("information","activechampionships","teams","roster","rounds","dreamteam","nightmareteam","roundlineup","lineup","championshipplayers","championshipteams","players","summary","fullprofile","matches","pressroom","news","moneymovements","rosterbids","myplayers","list","unread","getdtconfig")
     if(!route%in%allowed&&!identical(url,"https://api.futmondo.com/1/ranking/round"))stop("Mutation forbidden in asynchronous read")
     dots<-list(...);need(url,"POST",dots$body,c(`Content-Type`="application/json; charset=utf-8"))
   }
@@ -84,8 +84,9 @@ async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is
     if(!isTRUE(tryCatch(is_current(),error=function(e)FALSE)))return(promises::promise_reject(structure(list(message="Session request cancelled",call=NULL),class=c("fm_async_cancelled","error","condition"))))
     result<-tryCatch(list(done=TRUE,value=do.call(get(name,adapter_env),args)),fm_async_request=function(request)list(done=FALSE,request=request))
     if(result$done){for(record in acquired){record$context$session_id<-context$session_id;tryCatch(do.call(record_acquired_resource,record),error=function(e)NULL)};return(promises::promise_resolve(result$value))}
-    requests<<-requests+1L
-    if(requests>32L)return(promises::promise_reject(report_failure(resource_failure(resource=name,category="read_budget"))))
+    route<-result$request$url
+    if(route%in%c("https://api.futmondo.com/1/locker/pressroom","https://api.futmondo.com/2/locker/news"))page_requests<<-page_requests+1L else requests<<-requests+1L
+    if(requests>32L||page_requests>1024L)return(promises::promise_reject(report_failure(resource_failure(resource=name,category="read_budget"))))
     request<-result$request
     promises::then(fm_async_read_http(request$url,request$method,request$body,request$headers,owner=owner),function(response){completed[[request$key]]<-response;step()},function(error){if(inherits(error,"fm_async_cancelled")||grepl("Session request cancelled",conditionMessage(error),fixed=TRUE))return(promises::promise_reject(error));completed[[request$key]]<-list(error=report_failure(error,request$url));step()})
   },error=function(e)promises::promise_reject(report_failure(e)))

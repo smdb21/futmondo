@@ -1,4 +1,5 @@
 source("data_contracts.R")
+source("locker_transfers.R")
 LOGIN_URL <- "https://api.futmondo.com/5/login/with_mail"
 ACTIVE_CHAMPIONSHIPS_URL <- "https://api.futmondo.com/2/user/activechampionships"
 TEAMS_URL <- "https://api.futmondo.com/2/championship/teams"
@@ -2035,6 +2036,8 @@ get_championship_pressroom <- function(login, championship_id) {
 
   cache_key <- paste0("pressroom_", championship_id)
   get_cached_data(cache_key, {
+    locker<-get_locker_clause_payments(login,championship_id)
+    teams<-if(nrow(locker))get_teams(login,championship_id)else data.frame()
     headers <- c("Content-Type" = "application/json; charset=utf-8")
 
     empty_df <- data.frame(
@@ -2153,11 +2156,7 @@ get_championship_pressroom <- function(login, championship_id) {
 
       print(paste0("[Pressroom] Pagination complete: ", length(all_news), " items across ", page_count, " pages."))
 
-      if (length(all_news) == 0) {
-        return(empty_df)
-      }
-
-      df <- lapply(all_news, FUN = function(item) {
+      df <- if(!length(all_news))empty_df else lapply(all_news, FUN = function(item) {
         parse_news_item(item)
       }) %>% bind_rows()
 
@@ -2167,6 +2166,11 @@ get_championship_pressroom <- function(login, championship_id) {
         dplyr::distinct(id, .keep_all = TRUE) %>%
         dplyr::arrange(desc(created))
 
+      if(nrow(locker)){
+        locker<-locker_resolve_parties(locker,df,teams)
+        if(any(!nzchar(locker$player_id)))locker<-locker_resolve_parties(locker,df,teams,get_championship_players(login,championship_id))
+        df<-merge_locker_transfers(df,locker)
+      }
       return(observed_data(df,status=if(complete) "ok" else "partial"))
     }, error = function(e) {
       stop(resource_failure(e, "pressroom"))

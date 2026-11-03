@@ -1,6 +1,7 @@
 {
-  "release": "league-transfer-history-2026-11-03",
-  "rival_finance_sha256": "d2d753e4bd7b3c26e07e9bc83129b7e20f0ff291b2f3d6a9b8bbd29ea4e36804",
-  "rivals_module_sha256": "0a11242a2dce68c6fd27274ab4f7e9455fa5ff3866cec36bb13d0249e2c1997d",
-  "today_module_sha256": "03a44e78269c7da9231f5ac1e3cac0390ed47062879861d0e510212cb86fc90d"
+  "release": "locker-clause-payments-2026-11-03",
+  "locker_transfers_sha256": "0c4e797eb6795cbd1eddf2f167e3838f91c19c0c79f9d35bd1978c99b0df3774",
+  "rival_finance_sha256": "628dfbfde30ba37abd8e30df91e870648451e433ad5ebd5d34babc79b98f30f3",
+  "rivals_module_sha256": "638f606f98fddb4940ccd9b29d64af62058a6512ca897b19960c9c5b11d39cb7",
+  "today_module_sha256": "5e9cf9a466185cdb66329f6132fa2215e36543a45d55e28006e1443e95fe6b1f"
 }

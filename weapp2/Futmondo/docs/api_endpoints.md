@@ -195,3 +195,10 @@ To prevent teams from hoarding players or repeatedly stealing players in rapid s
 `/1/userteam/information` distinguishes current `answer.budget` from starting `answer.configuration.budget`. Acquisition borrowing uses `configuration.mnmp`, minimum-value bidding uses `configuration.mbmv`, and top-level `answer.maxBid` remains a monetary API cap. Clause delivery delay is `configuration.playerMoveInDays`; exact arrival remains the player summary's `championship.clause.transferDate`. See [Admin mapping](admin_module.md) for verified abbreviated fields and unresolved codes.
 
 `/2/championship/teams` returns `answer.teams[].teamValue`, `points` and `lastAccess`. Rivals uses these public fields without a second per-team request; timestamps remain UTC and absent values remain distinct from zero. No request credentials or captured private bodies are included in the regression fixtures or documentation.
+
+
+### Locker clause payment feed — integrated 2026-11-03
+
+`POST https://api.futmondo.com/2/locker/news` uses the authenticated header and `query = {championshipId, from}`; `from` starts empty and advances to the last news `_id`. `answer.news` mixes administrative/system news with user events. Only observed `styp="clause"` payment records are financially parsed. Their `txt` has four strong elements: buyer team name, euro amount using dot thousands separators, seller team name and player name. The captured Spanish sentence structure is validated, HTML entities decoded with xml2 NONET, and source `_id`/`created` preserved. Actor profile `u`, arbitrary HTML, credentials and unrelated news never enter persisted payment evidence.
+
+Cash payment time is locker `created`; the later `/1/locker/pressroom` time is retained as `delivery_at`. Link identical player ID, buyer, seller and amount across the delivery delay. Ambiguous overlap/identity fails explicitly. Team aliases come from the current directory plus source transfer history; player IDs come from history, with the existing catalog as recovery.

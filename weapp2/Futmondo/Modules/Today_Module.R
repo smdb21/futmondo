@@ -32,7 +32,7 @@ today_transfer_rows <- function(rows, teams=NULL, players=NULL,timezone="UTC") {
   price<-suppressWarnings(as.numeric(field("price")))
   money<-rep("",length(price));valid<-is.finite(price)
   money[valid]<-paste0(formatC(price[valid],format="f",digits=0,big.mark=".",decimal.mark=",")," €")
-  data.frame(Date=escape(format(fm_time(field("created")),"%d/%m/%Y %H:%M %Z",tz=rivals_display_timezone(timezone))),Name=player,Price=escape(money),
+  data.frame(Date=escape(format(fm_time(field("created")),"%d/%m/%Y %H:%M",tz=rivals_display_timezone(timezone))),Name=player,Price=escape(money),
     Buyer=party("buyer"),Seller=party("seller"),Type=escape(transfer_type),check.names=FALSE)
 }
 

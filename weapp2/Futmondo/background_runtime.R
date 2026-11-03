@@ -105,6 +105,8 @@ record_acquired_resource<-function(resource,data,context){
   old<-getOption("futmondo.persistence_context");options(futmondo.persistence_context=context)
   on.exit(options(futmondo.persistence_context=old),add=TRUE)
   league<-context$championship_id
+  # Raw parsed locker rows are cached; only resolved merged payment facts persist.
+  if(startsWith(resource,"pressroom_locker_payments_"))return(invisible(TRUE))
   if(identical(resource,"active_championship_objects")&&is.list(data)){
    champs<-dplyr::bind_rows(lapply(data$championships,function(champ){
     id<-fm_scalar(champ$id %||% champ$`_id`,"");name<-fm_scalar(champ$name,"")
@@ -129,7 +131,18 @@ record_acquired_resource<-function(resource,data,context){
     stamp<-attr(data,"observed_at");cash<-fm_number(data$budget);value<-fm_number(data$teamValue %||% data$team_value);points<-fm_number(data$points)
     if(nzchar(context$user_team_id)&&length(stamp)==1L&&!is.na(fm_time(stamp))&&any(is.finite(c(cash,value,points))))supabase_post("user_team_history",list(user_team_id=context$user_team_id,championship_id=league,observed_at=format(fm_time(stamp),"%Y-%m-%dT%H:%M:%OSZ",tz="UTC"),budget=cash,team_value=value,points=points))
   }else if(grepl("pressroom",resource)&&is.data.frame(data)){
-    persist_auction_history(data,league)
+    if("locker_event_id"%in%names(data)){
+      locker<-data[!is.na(data$locker_event_id)&nzchar(data$locker_event_id),,drop=FALSE]
+      season<-league_season_context(league)
+      evidence<-lapply(seq_len(nrow(locker)),function(i){
+        # Store normalized payment facts; never authentication or actor profiles.
+        fields<-intersect(c("id","locker_event_id","created","delivery_at","player_id","player_name","player_team_name","player_team_slug","buyer_team_id","buyer_team_name","seller_team_id","seller_team_name","price","is_clause"),names(locker))
+        payload<-list(kind="locker_transfer",transfer=as.list(locker[i,fields,drop=FALSE]))
+        rival_finance_evidence(context$account_id,league,season,"notifications",paste0("locker_transfer:",locker$locker_event_id[i]),payload,attr(data,"observed_at") %||% Sys.time())
+      })
+      persist_rival_finance_evidence(evidence,context)
+    }
+    persist_auction_history(if("id"%in%names(data))data[!startsWith(as.character(data$id),"locker:"),,drop=FALSE]else data,league)
   }else if(grepl("^player_card_history$",resource)&&is.list(data)&&nrow(data$points)){
     points<-data$points;ctx<-data$context
     points<-points[points$source=="futmondo"&!is.na(fm_time(points$observed_at)),,drop=FALSE]
