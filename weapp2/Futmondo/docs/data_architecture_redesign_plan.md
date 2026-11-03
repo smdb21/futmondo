@@ -463,3 +463,7 @@ Hosted exit criteria remain open: deploy the change, allow active-session reads 
 ## 2026-11-03 — Classification bonus columns (implemented locally)
 
 Added four selected-round euro totals (points, MVP, Best XI, position) backed by the shared reconstructed cash ledger. Both round controls apply consistently, recorded payments replace estimates, and missing coverage stays distinct from confirmed zero. Focused known-answer checks, UI reliability and the offline lifecycle harness passed. Selection performance measured locally; hosted rendering/mobile inspection and deployment are not claimed. See `classification_module.md` and the review record.
+
+### Reference points/position and independent awards — 2026-11-03
+
+Implemented locally: position bonuses require a reference position payment; points retain exact reference reconciliation. Best XI/MVP remain independent of reference award receipt, but require final-category settlement evidence from any recorded league recipient, plus selections and historical eligibility. Interim closed histories and point payments cannot release final awards. Pending rows remain excluded and totals unknown. User accepted official full-round completion on 2026-11-03. Focused final validation and deployment are recorded in data_review_results.md; authenticated round 11 recovery remains unverified in production.

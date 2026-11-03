@@ -259,7 +259,8 @@ rivals_cash_history_rows <- function(ledger,undated=NULL) {
   label<-ifelse(is.finite(rows$round_number),as.character(rows$round_number),"")
   if("settlement_label"%in%names(rows))label[nzchar(rows$settlement_label)]<-rows$settlement_label[nzchar(rows$settlement_label)]
   round<-ifelse(nzchar(label),paste0(" · Round ",label),"")
-  data.frame(date=ifelse(rows$section%in%"opening" & is.na(rows$timestamp),"Opening balance",ifelse(is.na(rows$timestamp),"Payment date unknown",format(rows$timestamp,"%d/%m/%Y %H:%M",tz="UTC"))),
+  date_source<-if("payment_date_source"%in%names(rows))rows$payment_date_source else rep("",nrow(rows))
+  data.frame(date=ifelse(rows$section%in%"opening" & is.na(rows$timestamp),"Opening balance",ifelse(date_source%in%c("reference_payment_pending","round_settlement_pending"),"Payment not confirmed",ifelse(is.na(rows$timestamp),"Payment date unknown",format(rows$timestamp,"%d/%m/%Y %H:%M",tz="UTC")))),
     type=ifelse(rows$estimated,"Estimated bonus",rows$type),concept=paste0(rows$component,round,ifelse(rows$included,""," (excluded)")),money=rows$amount,
     payment_date_estimated=if("payment_date_estimated"%in%names(rows))rows$payment_date_estimated%in%TRUE else rep(FALSE,nrow(rows)),
     payment_date_source=if("payment_date_source"%in%names(rows))as.character(rows$payment_date_source)else rep("",nrow(rows)),
@@ -274,13 +275,14 @@ rivals_cash_history_widget <- function(ledger,undated=NULL) {
     details=function(index){text<-display$calculation[index];if(!is.na(text)&&nzchar(text))tags$p(style="white-space:normal;overflow-wrap:anywhere",text)else NULL},
     defaultSorted=list(ledger_order=if(isTRUE(undated))"asc"else"desc"),columns=list(
       date=colDef(name="Date",show=!isTRUE(undated),align="left",cell=function(value,index){
-        if(identical(display$payment_date_source[index],"league_point_payment"))return(tags$span(title="Known league payment date; reconstructed combined round amount.",value,tags$small(" (known payment)")))
+        if(display$payment_date_source[index]%in%c("league_point_payment","league_same_bonus_payment"))return(tags$span(title="Known league payment date; reconstructed combined round amount.",value,tags$small(" (known payment)")))
         if(isTRUE(display$payment_date_estimated[index]))return(tags$span(
           title=if(identical(display$payment_date_source[index],"league_position_payment"))
             "Reconstructed using the recorded league position-payment date."else
             "Reconstructed using the round points-publication notification; not a recorded payment timestamp.",value,tags$small(" (reconstructed)")))
         value
       }),type=colDef(name="Type",align="left",cell=function(value,index){
+        if(display$payment_date_source[index]%in%c("reference_payment_pending","round_settlement_pending"))return(paste("Unconfirmed",c(ranking="position bonus",mvp="MVP bonus",dreamteam="Best XI bonus")[[display$bonus_type[index]]]))
         if(identical(display$payment_date_source[index],"league_point_payment"))return("Reconstructed point bonus")
         if(value=="opening")return("Starting cash")
         if(value%in%c("buy","sell"))return(paste(if(display$category[index]%in%"clause")"Clause"else if(display$category[index]%in%"market")"Ordinary"else"Player",if(value=="buy")"purchase"else"sale"))
@@ -382,8 +384,8 @@ rivals_inflow_totals <- function(ledger) {
   market<-sales & category%in%"market" & !clauses
   rewards<-rows$type%in%c("bonus","ranking")
   list(opening=amount(rows$type%in%"opening"),sales=amount(sales),market=amount(market),clauses=amount(clauses),unknown=amount(sales & !market & !clauses),
-    bonuses=amount(rewards),points=if(isTRUE(attr(ledger,"point_rewards_incomplete")))NA_real_ else amount(rewards & bonus%in%"points"),ranking=amount(rewards & (bonus%in%"ranking"|rows$type%in%"ranking")),
-    mvp=amount(rewards & bonus%in%"mvp"),dreamteam=amount(rewards & bonus%in%"dreamteam"),
+    bonuses=amount(rewards),points=if(isTRUE(attr(ledger,"point_rewards_incomplete")))NA_real_ else amount(rewards & bonus%in%"points"),ranking=if("ranking"%in%attr(ledger,"pending_bonus_types"))NA_real_ else amount(rewards & (bonus%in%"ranking"|rows$type%in%"ranking")),
+    mvp=if("mvp"%in%attr(ledger,"pending_bonus_types"))NA_real_ else amount(rewards & bonus%in%"mvp"),dreamteam=if("dreamteam"%in%attr(ledger,"pending_bonus_types"))NA_real_ else amount(rewards & bonus%in%"dreamteam"),
     other=amount(!rows$type%in%c("opening","sell","clause_sell","bonus","ranking")),total=amount(rep(TRUE,nrow(rows))),incomplete=any(!is.finite(rows$amount)))
 }
 
@@ -1019,7 +1021,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
           p(class="alert alert-info",paste0("Transfer-method evidence still needed for ",format_table_currency(inflow$unknown)," of sales and ",format_table_currency(outflow$unknown)," of purchases. These amounts are already included in the totals.")),
         p(strong("Total inflow − total outflow = reconstructed cash: "),ui_financial_amount(inflow$total-outflow$total)),
         h4("Financial history"),
-        p("Includes transfers and all applicable bonuses. Bonus dates use recorded payments where applicable, otherwise the round points-publication notification. Any entries still missing a source date appear first for reconciliation, not as a verified payment timeline."),
+        p("Points and position bonuses follow your recorded payments; point amounts must also reconcile. Best XI and MVP are reconstructed independently from final award and historical eligibility evidence, even if you received neither. Position and award payments awaiting final settlement remain excluded; interim closed rounds and provisional selections do not prove that postponed matches have finished."),
         reactable::reactableOutput(ns("rival_transactions_table"))
       )
     })

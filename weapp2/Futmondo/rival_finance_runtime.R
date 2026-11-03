@@ -124,11 +124,15 @@ rival_normalize_movements <- function(rows,catalog=data.frame()) {
   ordinary<-rows$type%in%c("buy","sell")
   rows$category[clause]<-"clause";rows$category[ordinary]<-"market"
   rows$type[rows$type%in%"clause"]<-"buy";rows$type[rows$type%in%"clause_sell"]<-"sell"
+  # Native award types carry the same numeric settlement concept as points.
+  native<-c(dreamTeam="dreamteam",dreamteam="dreamteam",mvp="mvp")
+  award<-rows$type%in%names(native)
+  rows$bonus_type[award]<-unname(native[rows$type[award]]);rows$type[award]<-"bonus"
   point<-rows$type%in%"points"
   rows$bonus_type[point]<-"points";rows$type[point]<-"bonus"
   ranking<-rows$type%in%"ranking"
   rows$bonus_type[ranking]<-"ranking";rows$type[ranking]<-"bonus"
-  for(i in which(ranking|point|rows$bonus_type%in%"points")){
+  for(i in which(rows$bonus_type%in%c("points","ranking","dreamteam","mvp"))){
     label<-trimws(rows$concept[i])
     if(!grepl("^[0-9]+([.][0-9]+)?$",label))next
     rows$settlement_label[i]<-label
@@ -226,6 +230,22 @@ rival_point_reconciliation <- function(rounds,movements,rules,reference_team_id)
     status<-if(!is.finite(amount))"missing_payments"else if(!is.finite(expected))"unverified_history"else if(amount!=expected)"mismatch"else if(!valid_dates)"missing_date"else "validated"
     data.frame(round_id=id,recorded=amount,expected=expected,difference=amount-expected,
       settlement_labels=if(nrow(payments))paste(unique(payments$settlement_label),collapse=", ")else "",date=date,status=status)
+  })))
+}
+
+# Same-type reference payments establish the league settlement calendar.
+rival_reference_payments <- function(movements,reference_team_id) {
+  empty<-data.frame(round_id=character(),bonus_type=character(),date=character(),settlement_labels=character())
+  if(is.null(reference_team_id)||!nrow(movements))return(empty)
+  rows<-movements[movements$team_id%in%reference_team_id & movements$bonus_type%in%c("points","ranking","dreamteam","mvp") & nzchar(movements$round_id),,drop=FALSE]
+  if(!nrow(rows))return(empty)
+  groups<-split(seq_len(nrow(rows)),paste(rows$round_id,rows$bonus_type,sep="|"))
+  dplyr::bind_rows(c(list(empty),lapply(groups,function(indices){
+    r<-rows[indices,,drop=FALSE];times<-fm_time(r$date)
+    # A payment of another bonus type is never proof for this one.
+    if(any(!is.finite(r$money))||anyNA(times))return(NULL)
+    data.frame(round_id=r$round_id[1],bonus_type=r$bonus_type[1],date=r$date[which.max(as.numeric(times))],
+      settlement_labels=paste(unique(r$settlement_label),collapse=", "))
   })))
 }
 
@@ -546,8 +566,9 @@ rival_historical_components <- function(evidence,teams,rules,official) {
       eligible=!isTRUE(p$negative)&&!isTRUE(r$negative[1]),verified=TRUE))
     if(is.na(rival_flag(p$negative))&&is.na(r$negative[1]))add_missing(p$team_id,"Award rewards assume eligible starting cash where the historical flag is absent.")
   }
-  # A completed team-round is actual publication/finality evidence even when an
-  # old saved award snapshot predates schedule finality metadata.
+  # Closed team histories permit candidate calculations for old award snapshots.
+  # In reference mode, final-settlement evidence below gates their paid cash;
+  # a team history can close between instalments of a postponed round.
   completed<-Filter(function(id){
     rows<-all_rounds[all_rounds$round_id%in%id,,drop=FALSE]
     nrow(rows)>0L&&setequal(rows$team_id,as.character(teams$teamid))&&
@@ -630,6 +651,14 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
   pressroom<-rival_classify_transfers(pressroom,all_movements)
   publications<-rival_round_publication_dates(evidence,catalog)
   anchors<-rival_payment_anchors(all_movements)
+  reference_payments<-rival_reference_payments(all_movements,reference_team_id)
+  # Official postponed-match policy: ranking/Best XI are settled only after all
+  # matches. A dated final-category payment to ANY recipient proves settlement;
+  # points, retrieved selections and team-round closed flags do not.
+  final_settlements<-if(nrow(all_movements))unique(all_movements$round_id[
+    all_movements$bonus_type%in%c("ranking","dreamteam","mvp") &
+    is.finite(all_movements$money) & all_movements$money>0 &
+    !is.na(fm_time(all_movements$date)) & nzchar(all_movements$round_id)])else character()
   raw_rounds<-rival_saved_rounds(evidence)
   point_rounds<-dplyr::bind_rows(history$rounds,raw_rounds[!paste(raw_rounds$team_id,raw_rounds$round_id)%in%paste(history$rounds$team_id,history$rounds$round_id),,drop=FALSE])
   point_checks<-rival_point_reconciliation(point_rounds,all_movements,rules,reference_team_id)
@@ -774,6 +803,37 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
       ranking_income<-ranking_income+sum(round_income$rows$amount[round_income$rows$component=="Ranking reward"])
       assumptions<-c(assumptions,round_income$rows$source)
     }
+    # Reference position payments gate position cash; award ownership is independent.
+    # Keep unconfirmed estimates auditable, but never include them in balances.
+    pending_bonus<-character()
+    if(!is.null(reference_team_id))for(j in which(details$estimated & details$bonus_type%in%"ranking" & (!is.finite(details$amount)|details$amount!=0))){
+      payment<-reference_payments[reference_payments$round_id%in%details$round_id[j] & reference_payments$bonus_type%in%details$bonus_type[j],,drop=FALSE]
+      if(nrow(payment)!=1L){
+        details$included[j]<-FALSE;details$date[j]<-""
+        details$payment_date_source[j]<-"reference_payment_pending"
+        details$source[j]<-paste(details$source[j],"No reference-team payment of this bonus type is recorded for this round. Not counted as paid cash; a publication or another bonus type cannot establish payment.")
+        pending_bonus<-unique(c(pending_bonus,details$bonus_type[j]))
+        missing<-c(missing,paste("Reference payment not confirmed:",details$bonus_type[j],"round",details$round_id[j],"; excluded from paid cash."))
+      }else{
+        details$date[j]<-payment$date;details$payment_date_estimated[j]<-FALSE
+        details$payment_date_source[j]<-"league_same_bonus_payment"
+        details$source[j]<-paste(details$source[j],"Known league payment date from the reference team's same-type settlements",payment$settlement_labels,"; amount reconstructed independently. Combined at the latest recorded settlement; no future payment is assumed.")
+      }
+    }
+    if(!is.null(reference_team_id))for(j in which(details$estimated & details$bonus_type%in%c("dreamteam","mvp") &
+        !details$round_id%in%final_settlements & (!is.finite(details$amount)|details$amount!=0))){
+      details$included[j]<-FALSE;details$date[j]<-""
+      details$payment_date_source[j]<-"round_settlement_pending"
+      details$source[j]<-paste(details$source[j],"Whole-round settlement is not yet evidenced. A retrieved selection or interim closed history cannot establish completion while matches may remain pending. Excluded from paid cash.")
+      pending_bonus<-unique(c(pending_bonus,details$bonus_type[j]))
+      missing<-c(missing,paste("Final settlement not confirmed for round",details$round_id[j],";",details$bonus_type[j],"excluded from paid cash."))
+    }
+    for(kind in c("ranking","mvp","dreamteam")){
+      value<-sum(details$amount[details$included & details$bonus_type%in%kind],na.rm=TRUE)
+      if(kind=="ranking")ranking_income<-value
+      if(kind=="mvp")mvp_income<-value
+      if(kind=="dreamteam")ideal_income<-value
+    }
     # A configured zero reward is no cash movement and needs no payment date.
     # Preserve real zero-valued movements and all unknown amounts for auditing.
     zero_reward<-details$estimated & details$bonus_type%in%c("points","ranking","mvp","dreamteam") & is.finite(details$amount) & details$amount==0
@@ -795,6 +855,8 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
       details<-dplyr::bind_rows(details[!award,,drop=FALSE],dplyr::bind_rows(grouped))
     }
     for(j in which(details$estimated & details$bonus_type%in%c("points","ranking","mvp","dreamteam"))){
+      if(!details$included[j])next
+      if(!is.null(reference_team_id)&&details$bonus_type[j]=="ranking")next
       check<-point_checks[point_checks$round_id%in%details$round_id[j],,drop=FALSE]
       if(!is.null(reference_team_id)&&details$bonus_type[j]=="points"&&nrow(check)==1L&&check$status=="validated"){
         details$date[j]<-check$date;details$payment_date_estimated[j]<-FALSE
@@ -803,6 +865,15 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
         details$source[j]<-paste(details$source[j],"Reconstructed amount; known league payment date from reference-team settlements",check$settlement_labels,
           ". Earlier instalments are consolidated at the final settlement; intermediate balances do not reproduce the instalment schedule.")
         next
+      }
+      if(!is.null(reference_team_id)&&details$bonus_type[j]%in%c("dreamteam","mvp")){
+        payment<-reference_payments[reference_payments$round_id%in%details$round_id[j] & reference_payments$bonus_type%in%details$bonus_type[j],,drop=FALSE]
+        details$source[j]<-paste(details$source[j],"Payment assumed from retrieved final award and historical eligibility, independently of whether the reference team received this award.")
+        if(nrow(payment)==1L){
+          details$date[j]<-payment$date;details$payment_date_estimated[j]<-FALSE
+          details$payment_date_source[j]<-"league_same_bonus_payment"
+          next
+        }
       }
       publication<-publications[publications$round_id%in%details$round_id[j],,drop=FALSE]
       anchor<-if(details$bonus_type[j]%in%c("ranking","mvp","dreamteam"))rival_reward_date(details$round_id[j],anchors)else""
@@ -826,6 +897,7 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
     details$component[details$component%in%"Ranking reward"]<-"Position reward"
     ledger<-rival_cash_ledger(details)
     attr(ledger,"point_rewards_incomplete")<-point_incomplete
+    attr(ledger,"pending_bonus_types")<-pending_bonus
     if(any(ledger$included&!is.finite(ledger$amount)))missing<-c(missing,"Missing movement amounts are excluded; displayed balances are known-amount estimates.")
     # Read the final cumulative amount, rather than independently summing a
     # second history. Filtering/sorting later never changes these balances.
@@ -844,7 +916,7 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
       observed_cash=actual,observed_cash_fresh=fresh,
       total_inflow=sum(ledger$amount[ledger$included & is.finite(ledger$amount)&ledger$amount>0]),
       total_outflow=-sum(ledger$amount[ledger$included & is.finite(ledger$amount)&ledger$amount<0]),
-      total_spent=spent,total_sales=sales,point_bonus=if(point_incomplete)NA_real_ else point_income,ranking_prize=ranking_income,dreamteam_income=ideal_income,mvp_income=mvp_income,
+      total_spent=spent,total_sales=sales,point_bonus=if(point_incomplete)NA_real_ else point_income,ranking_prize=if("ranking"%in%pending_bonus)NA_real_ else ranking_income,dreamteam_income=if("dreamteam"%in%pending_bonus)NA_real_ else ideal_income,mvp_income=if("mvp"%in%pending_bonus)NA_real_ else mvp_income,
       # Public directory values are authoritative; optional finance observations
       # may contain NA and must not erase them when the ledger is republished.
       team_value=fm_number(team$teamValue,fm_number(info$teamValue)),points=fm_number(team$points,fm_number(info$points)),
@@ -866,6 +938,8 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
           rate<-fm_number(if(kind=="mvp")rules$mvp_reward else rules$dreamteam_reward)
           known<-is.finite(rate)&&rate==0 || (nrow(awards)>0L && (isTRUE(coverage_complete)||length(unique(awards$player_id))==11L) && !length(award_check$missing) && !unclassified)
         }
+        pending<-any(!ledger$included & ledger$round_id%in%rid & ledger$bonus_type%in%kind & ledger$payment_date_source%in%c("reference_payment_pending","round_settlement_pending"))
+        if(pending)known<-FALSE
         unscoped<-any(ledger$included & ledger$bonus_type%in%kind & (is.na(ledger$round_id)|!nzchar(ledger$round_id)))
         bonus_rounds[[length(bonus_rounds)+1L]]<-data.frame(round_id=rid,
           round_number=history$rounds$round_number[match(rid,history$rounds$round_id)],bonus_type=kind,
@@ -875,7 +949,7 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
     attr(ledger,"round_bonus_totals")<-dplyr::bind_rows(bonus_rounds)
     ledgers[[tid]]<-ledger
   }
-  list(point_reconciliation=point_checks,team_finances=dplyr::bind_rows(result),breakdowns=breakdowns,cash_ledgers=ledgers,pressroom=pressroom,all_purchases=data.frame())
+  list(reference_payments=reference_payments,point_reconciliation=point_checks,team_finances=dplyr::bind_rows(result),breakdowns=breakdowns,cash_ledgers=ledgers,pressroom=pressroom,all_purchases=data.frame())
 }
 
 get_rival_finance_seed <- function(login,championship_id,user_team_id) {
