@@ -447,3 +447,9 @@ Implemented (2026-11-02): wrapping shared headers, unclipped offer badges and so
 - Focused notification transport/queue, saved-date reuse, failures, context isolation, missing configured-rate, duplication and finance regressions pass. Root lifecycle/deployment checks are reported separately. Older-source retention and hosted date recovery are not established by local tests; precise missing-round evidence remains visible if the source is exhausted.
 
 - Final validation correction: suppress finite zero-valued reconstructed reward cashflows/date demands while preserving actual zero movements and unknown amounts; no totals change.
+
+### 2026-11-02 inactive rival and position bonuses — implemented locally
+
+- Refine historical participants only for a rival with an explicitly saved empty full history when configured allocations match actual position payments in at least two independent closed rounds. Preserve missing/partial/malformed-history safeguards, actual negative-start eligibility and official ranking precedence.
+- Reconstruct position rewards for the complete remaining participants, including unpaid rounds, through the shared ledger. Reuse the same participant resolver in refresh scheduling to avoid unnecessary historical-ranking requests. Keep the inactive team in the directory; no invented zero score or duplicate recorded payment.
+- Passed: 6 focused participant checks, 18 finance-runtime checks, 16 reconciliation checks, 3 deployment checks and the mandatory offline lifecycle's 13 checks plus 8 tabs. A production-sized pure resolver benchmark averaged 61.5 ms over 20 runs, with no API/database reads. Documentation and the changed runtime deployment checksum are updated. Hosted rollout/data verification remains separate.

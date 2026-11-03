@@ -387,9 +387,56 @@ rival_ranking_allocations <- function(points,pool,mode,users_to_rank=-1) {
   for(score in unique(ordered)){indices<-which(ordered==score);out[order[indices]]<-mean(slots[indices])}
   out
 }
+# An explicitly empty, successfully saved history can identify a nonparticipant,
+# but absence alone cannot establish the ranking denominator. Require the same
+# remaining participants to reproduce payments in two different closed rounds.
+rival_ranking_participants <- function(evidence,team_ids,rules,rounds=NULL) {
+  ids<-unique(as.character(team_ids));ids<-ids[!is.na(ids)&nzchar(ids)]
+  unchanged<-list(team_ids=ids,excluded=character(),verified_rounds=character())
+  histories<-rival_evidence_rows(evidence,"team_rounds")
+  empty<-vapply(ids,function(id){
+    records<-Filter(function(row)identical(mvp_text(row$payload$team_id),id),histories)
+    if(!length(records))return(FALSE)
+    stamps<-vapply(records,function(row)as.numeric(fm_time(row$observed_at)),numeric(1));stamps[!is.finite(stamps)]<--Inf
+    p<-records[[tail(order(stamps),1)]]$payload
+    "rounds"%in%names(p)&&is.list(p$rounds)&&length(p$rounds)==0L
+  },logical(1))
+  if(!any(empty)||all(empty)||!is.finite(fm_number(rules$ranking_pool))||fm_number(rules$ranking_pool)<=0)return(unchanged)
+  participants<-ids[!empty]
+  if(is.null(rounds))rounds<-rival_saved_rounds(evidence,include_ranking=FALSE)
+  if(!nrow(rounds)||any(rounds$team_id%in%ids[empty]))return(unchanged)
+  catalog<-unique(rounds[,c("round_id","round_number"),drop=FALSE])
+  movements<-dplyr::bind_rows(lapply(ids,function(id)rival_normalize_movements(rival_cash_latest_movements(evidence,id),catalog)))
+  if(!nrow(movements))return(unchanged)
+  paid<-movements[movements$bonus_type%in%"ranking",,drop=FALSE]
+  if(!nrow(paid)||any(paid$team_id%in%ids[empty])||any(!nzchar(paid$round_id))||any(!is.finite(paid$money)))return(unchanged)
+  verified<-character()
+  for(round in unique(paid$round_id)){
+    rows<-rounds[rounds$round_id%in%round&rounds$team_id%in%ids,,drop=FALSE]
+    if(!rival_ranking_round_complete(rows,participants)||anyNA(rows$negative))next
+    eligible<-!rows$negative
+    expected<-rep(0,nrow(rows));expected[eligible]<-rival_ranking_allocations(rows$points[eligible],fm_number(rules$ranking_pool),
+      mvp_text(rules$ranking_mode),fm_number(rules$users_to_rank %||% rules$configuration$usersToRank))
+    if(any(!is.finite(expected)))return(unchanged)
+    payments<-paid[paid$round_id%in%round,,drop=FALSE]
+    # Latest revisions are already deduplicated by movement ID. Separate source
+    # IDs, including split settlements, add once before comparison.
+    totals<-tapply(payments$money,payments$team_id,sum)
+    calculated<-expected[match(names(totals),rows$team_id)]
+    if(anyNA(calculated)||any(abs(totals-calculated)>1e-7))return(unchanged)
+    if(any(totals>0))verified<-c(verified,round)
+  }
+  if(length(verified)<2L)return(unchanged)
+  list(team_ids=participants,excluded=ids[empty],verified_rounds=verified)
+}
+rival_ranking_round_complete <- function(rows,team_ids) {
+  nrow(rows)==length(team_ids)&&setequal(rows$team_id,as.character(team_ids))&&all(is.finite(rows$points))&&
+    all(vapply(seq_len(nrow(rows)),function(i)round_is_finished(as.list(rows[i,,drop=FALSE])),logical(1)))
+}
 # One preparation pass per publication, shared by all team calculations.
 rival_historical_components <- function(evidence,teams,rules,official) {
   source<-rival_saved_rounds(evidence,include_ranking=FALSE)
+  participants<-rival_ranking_participants(evidence,teams$teamid,rules,source)
   saved_rankings<-rival_saved_rankings(evidence,teams$teamid,source)
   rounds<-rival_supplement_rounds(source,saved_rankings);all_rounds<-rounds
   final<-if(nrow(rounds))vapply(seq_len(nrow(rounds)),function(i)round_is_finished(as.list(rounds[i,,drop=FALSE])),logical(1))else logical()
@@ -442,7 +489,7 @@ rival_historical_components <- function(evidence,teams,rules,official) {
       ranked$negative<-rows$negative[match(ranked$team_id,rows$team_id)]
       rows<-ranked
     }
-    if((!authoritative&&!setequal(rows$team_id,as.character(teams$teamid)))||any(!is.finite(rows$points))){
+    if((!authoritative&&!rival_ranking_round_complete(rows,participants$team_ids))||any(!is.finite(rows$points))){
       for(id in as.character(teams$teamid))add_missing(id,paste("Ranking history incomplete for round",rounds$round_number[match(round,rounds$round_id)]));next
     }
     # Negative-start teams do not take part in automatic premiums (FAQ142).
@@ -453,6 +500,7 @@ rival_historical_components <- function(evidence,teams,rules,official) {
       if(!is.finite(value[i])){add_missing(rows$team_id[i],"Ranking reward configuration is unavailable or unsupported.");next}
       if(!rows$team_id[i]%in%teams$teamid)next
       source<-if(authoritative)"Official historical round ranking; assumes unchanged reward rules."else"Published round standings; assumes unchanged ranking rules and historical league membership."
+      if(!authoritative&&length(participants$excluded))source<-paste("Published round standings; nonparticipation supported by explicitly empty histories and matching recorded position payments in",length(participants$verified_rounds),"rounds; assumes unchanged reward rules.")
       if(anyNA(rows$negative))source<-paste(source,"Assumes eligibility where starting cash is unknown.")
       income<-dplyr::bind_rows(income,data.frame(team_id=rows$team_id[i],round_id=round,bonus_type="ranking",amount=value[i],source=source))
     }
@@ -872,11 +920,11 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
     if(!state$seed_ready||length(state$pending_team_ids)>0L)return(invisible(NULL))
     source<-rival_saved_rounds(state$evidence,include_ranking=FALSE)
     saved<-rival_saved_rankings(state$evidence,state$teams$teamid,source)
+    participants<-rival_ranking_participants(state$evidence,state$teams$teamid,state$seed$rules %||% list(),source)
     closed<-if(nrow(source))vapply(seq_len(nrow(source)),function(i)round_is_finished(as.list(source[i,,drop=FALSE])),logical(1))else logical()
     for(id in unique(source$round_id[closed])){
       rows<-source[source$round_id%in%id,,drop=FALSE]
-      complete<-setequal(rows$team_id,as.character(state$teams$teamid))&&all(is.finite(rows$points))&&
-        all(vapply(seq_len(nrow(rows)),function(i)round_is_finished(as.list(rows[i,,drop=FALSE])),logical(1)))
+      complete<-rival_ranking_round_complete(rows,participants$team_ids)
       if(complete||any(vapply(saved,function(record)identical(mvp_text(record$payload$round_id),id),logical(1))))next
       number<-unique(rows$round_number[is.finite(rows$round_number)&rows$round_number>=1&rows$round_number==floor(rows$round_number)])
       if(length(number)!=1L)next

@@ -726,3 +726,21 @@ Independent validation identified a configured-zero edge case: existing zero poi
 
 
 Final integration: primary reviewed the payment-first/notification-second rule, unified history and table-only selection. Sol implemented notification recovery; Luna investigated source contracts and independently validated account/league/season/round isolation, configured-zero handling and a separate known-answer balance of 135. Final checks passed: reconciliation16, notification pagination6, running balances14, deployment3, and mandatory offline lifecycle13 checks plus8 tabs. The finance-runtime18 checks also passed before the isolated zero-row filter, which received focused revalidation. No live Futmondo requests or production writes were made. Read-only production evidence confirmed a 70,000 EUR per-point setting and round10 publication; older-date recovery remains to be verified in the hosted app. Shared position-payment dates for reconstructed awards remain explicitly inferred from available movement evidence, not proof that all historical installments were captured.
+
+
+## Inactive rival and historical position bonuses — 2026-11-02
+
+The zero position-bonus subtotal came from requiring all ten current directory members in each historical standings set when one rival has an explicitly saved empty history. The primary agent's read-only comparison reproduced all nine saved own-team position payments exactly among the nine actual participants using the configured €30M `flop` pool. No corresponding Round 8 payment was saved; that amount remains reconstructed.
+
+The shared `rival_ranking_participants()` resolver now accepts this reduced participant set only after at least two distinct completed rounds reproduce their actual position payments exactly. Latest successful empty full-history evidence qualifies; absent, malformed or nonempty histories do not. Validation requires finite points and known starting-cash eligibility. Latest movement-ID revisions replace earlier values, separate split-payment IDs add once per team/round, and contradictory known payments reject the inference. Missing active-round scores still block that round, while saved closed official rankings retain precedence. Both the calculation and ranking queue reuse the same decision. The inactive team remains selectable; no missing score becomes zero.
+
+Executed verification:
+
+- `Rscript test/test_rival_inactive_participants.R`: **6 passed / 0 failed**. Covers exact nine-participant allocations, unpaid Round 8, ledger totals and recorded-payment replacement; missing/malformed/nonempty/unknown-eligibility history; one-round/replayed/partial/contradictory payments; latest revisions and split settlements; saved JSON roundtrip with an explicit empty list; incomplete active rounds; official ranking priority; and zero redundant ranking calls on initial recovery/navigation.
+- `Rscript test/test_rival_finance_runtime.R`: **18 passed / 0 failed**.
+- `Rscript test/test_rival_cash_reconciliation.R`: **16 passed / 0 failed**.
+- `Rscript test/test_deployment_contract.R`: **3 passed / 0 failed**; changed runtime checksum refreshed.
+- Required `Rscript test/test_shiny_simulation.R`: **13 checks plus 8 tabs passed**, with zero live HTTP/database mutation attempts. Existing empty-plot warnings and deliberate fixture schema diagnostics remain.
+- `git diff --check` passed for the implementation, accounting documentation and manifest.
+
+Performance review: one pure preparation helper reuses already loaded histories/movements. A local 20-run fixture with ten directory members, 90 completed score rows and nine payment anchors averaged **61.5 ms per call**. This introduces no source request, database read/write, cache growth, polling, dependency, migration or login work. It avoids ranking requests when existing payment evidence already establishes the historical set; ordinary missing-history acquisition remains bounded by the existing two-read queue. Hosted latency and production balances after rollout were not verified by these offline checks.
