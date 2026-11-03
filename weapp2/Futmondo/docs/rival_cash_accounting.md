@@ -196,3 +196,8 @@ Normalized locker facts persist in existing account/league/season-scoped evidenc
 The parsed locker cache uses the pressroom prefix so explicit refresh/manual-action invalidation also refreshes payments. Page reads remain cooperative and context-isolated; only the two fixed locker read endpoints receive a separate bounded 1024-page budget, leaving the 32-read non-pagination budget intact. No UI selection starts another feed request.
 
 Presentation: tables retain browser-local times but omit timezone labels and date explanations. Bonus types have distinct coins/trophy/users/star/award icons in 22×22px slots matching club crests. Provenance and exact UTC timestamps remain internal.
+
+
+### Confirmed whole-euro tied position payment — 2026-11-03
+
+HOPE confirmed the actual round-6 tied position payment as 5,666,666 EUR. The occupied rounded slots average 5,666,666.50 EUR. `rival_ranking_allocations()` now floors that shared allocation to whole euros after averaging; it does not adjust the ending balance. Individual slot rounding remains unchanged, as do actual recorded movements. This source confirmation resolves the prior half-euro discrepancy.

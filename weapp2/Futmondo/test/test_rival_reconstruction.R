@@ -165,3 +165,10 @@ check('saved final lineups are reused and only changed round signatures enqueue 
   })
 })
 cat(sprintf('Rival reconstruction: %d passed / 0 failed\n',n))
+
+# Sanitized known-answer tie: nine participants, two tied for the last slots.
+# Confirmed actual payment truncates 5,666,666.50 rather than rounding it up.
+tied_rewards<-rival_ranking_allocations(c(100,90,80,70,60,50,40,30,30),30000000,'flop',-1)
+stopifnot(identical(tail(tied_rewards,2),c(5666666,5666666)),
+          all(tied_rewards==floor(tied_rewards)))
+cat('PASS confirmed tied position payment uses whole-euro truncation\n')

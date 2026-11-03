@@ -507,6 +507,8 @@ get_rival_round_lineup_observation <- function(login,championship_id,user_team_i
 }
 # FAQ142 + its linked official calculator; Math.round is floor(x + .5), not R's
 # round-to-even. Tied teams share the prizes of all slots they occupy (FAQ134).
+# Confirmed round-6 payment: truncate the shared prize to whole euros after
+# averaging rounded slots (5,666,666.50 -> 5,666,666); do not round the balance.
 rival_ranking_allocations <- function(points,pool,mode,users_to_rank=-1) {
   n<-length(points);unknown<-rep(NA_real_,n)
   if(!n||any(!is.finite(points))||!is.finite(pool)||pool<0||!mode%in%c("top","flop"))return(unknown)
@@ -516,7 +518,7 @@ rival_ranking_allocations <- function(points,pool,mode,users_to_rank=-1) {
   weights<-if(count==n&&users_to_rank==-1)rev(seq_len(n))/sum(seq_len(n)) else if(count==3L)c(.5,.3,.2)else if(count==5L)c(.4,.3,.15,.1,.05)else return(unknown)
   slots<-c(floor(pool*weights+.5),rep(0,max(0,n-length(weights))))[seq_len(n)]
   order<-order(points,decreasing=mode=="top");ordered<-points[order];out<-numeric(n)
-  for(score in unique(ordered)){indices<-which(ordered==score);out[order[indices]]<-mean(slots[indices])}
+  for(score in unique(ordered)){indices<-which(ordered==score);out[order[indices]]<-floor(mean(slots[indices]))}
   out
 }
 # An explicitly empty, successfully saved history can identify a nonparticipant,

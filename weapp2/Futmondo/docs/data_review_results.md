@@ -866,3 +866,8 @@ Performance review: overlap uses existing cooperative HTTP/cache/persistence pat
 Executed local checks: full-history pagination, new adversarial same-second ID/time ordering fixture, repeated-cursor partial coverage; locker identity/overlap/scoped persistence; locker asynchronous heartbeat/cache/isolation; 18 finance-runtime checks. Hosted authenticated balances are not yet directly verified.
 
 Additional checks: offline Shiny lifecycle passed all 13 checks plus eight tabs; deployment contract passed all three checks. No authenticated hosted screen was used as a substitute for these local checks.
+
+
+### Exact HOPE reconciliation after confirmed tied payment — 2026-11-03
+
+User relayed actual round-6 position payment of 5,666,666 EUR. Updated shared tie allocation to floor the mean of rounded slot prizes. Captured-source replay now equals independently reported 426,122,711 EUR exactly; reference actual cash stays 52,129,125 EUR. No balance adjustment or fictional transaction was added. Fourteen reconstruction checks and a sanitized known-answer tied payout fixture pass. Performance review: one scalar floor per existing tied-score group; no added API/DB request, cache invalidation, persistence work, reactive publication, or memory structure. Existing shared calculation reuse remains intact. No dependency/schema/bundle membership changes.

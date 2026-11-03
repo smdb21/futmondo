@@ -506,3 +506,8 @@ Integrated authenticated locker news clause payments into the shared transfer fe
 ### Transfer pagination boundary recovery — implemented locally 2026-11-03
 
 Fixed pressroom's differing timestamp sort/ObjectId filter contract. Source replay recovered seven omitted purchases across three rivals. HOPE's three missing expenses total 47,843,546 EUR; corrected ledger is 426,122,711.50 EUR versus the owner-reported 426,122,711 EUR. The remaining half euro is a fractional round-6 tied ranking allocation; exact payment/rounding evidence is still requested, and no balancing adjustment is inserted. Deployment proof is tracked separately.
+
+
+### Tied ranking reconciliation — implemented and locally verified 2026-11-03
+
+Confirmed actual round-6 payment establishes whole-euro truncation of shared position rewards. After recovered purchases and this calculation correction, HOPE ledger equals independently reported current balance 426,122,711 EUR exactly. Previous half-euro evidence limitation is resolved; hosted rollout remains separately verified.
