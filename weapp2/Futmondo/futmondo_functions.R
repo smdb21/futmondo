@@ -2144,14 +2144,28 @@ get_championship_pressroom <- function(login, championship_id) {
         last_item <- news[[length(news)]]
         last_id <- get_val(as.list(last_item), "_id", "")
 
-        # If last_id is empty or same as current cursor, we've reached the end
-        if (last_id == "" || last_id == cursor || last_id %in% seen_cursors) {
+        # The API sorts by created but filters its cursor by Mongo ObjectId.
+        # IDs from different writers are not ordered within the same second.
+        # Replay the entire boundary second before advancing past it, otherwise
+        # purchases with an earlier created time and larger ID are skipped.
+        next_cursor <- last_id
+        if (grepl("^[0-9a-f]{24}$",last_id)) {
+          boundary <- substr(last_id,1L,8L)
+          upper <- paste0(boundary,"ffffffffffffffff")
+          if (identical(cursor,upper)) {
+            # A short page establishes that the boundary second is exhausted.
+            # A saturated single-second page cannot prove complete coverage.
+            if (length(news)>=150L) break
+            next_cursor <- paste0(boundary,"0000000000000000")
+          } else next_cursor <- upper
+        }
+        if (next_cursor == "" || next_cursor == cursor || next_cursor %in% seen_cursors) {
           print("[Pressroom] Reached end of pagination (no new cursor).")
           break
         }
 
         seen_cursors <- c(seen_cursors,cursor)
-        cursor <- last_id
+        cursor <- next_cursor
       }
 
       print(paste0("[Pressroom] Pagination complete: ", length(all_news), " items across ", page_count, " pages."))

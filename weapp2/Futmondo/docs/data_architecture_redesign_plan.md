@@ -501,3 +501,8 @@ Removed default maximum-value/maximum-clause caps. Added full fetched league his
 ### Locker payment/delivery reconciliation — implemented locally 2026-11-03
 
 Integrated authenticated locker news clause payments into the shared transfer feed and rival cash ledger. Preserved distinct payment/delivery times, linked duplicate source representations, persisted stable normalized source evidence, reused saved facts and preserved context/refresh isolation. Added plain local table dates and matching-size bonus icons. Captured-source replay and offline checks pass; public hosted rollout proof is recorded separately. Current-season source evidence establishes 121 clause payments, 110 later deliveries and 11 paid purchases still absent from pressroom. No claim is made that unrelated rival bonus/manual-adjustment uncertainties have disappeared.
+
+
+### Transfer pagination boundary recovery — implemented locally 2026-11-03
+
+Fixed pressroom's differing timestamp sort/ObjectId filter contract. Source replay recovered seven omitted purchases across three rivals. HOPE's three missing expenses total 47,843,546 EUR; corrected ledger is 426,122,711.50 EUR versus the owner-reported 426,122,711 EUR. The remaining half euro is a fractional round-6 tied ranking allocation; exact payment/rounding evidence is still requested, and no balancing adjustment is inserted. Deployment proof is tracked separately.

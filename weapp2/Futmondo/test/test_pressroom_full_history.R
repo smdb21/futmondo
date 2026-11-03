@@ -19,3 +19,22 @@ futmondo_post<-function(...){page<<-page+1L;structure(list(url="https://fixture.
 x<-get_championship_pressroom(list(userid='fixture',token='fixture'),'league')
 stopifnot(page==2,nrow(x)==1,identical(attr(x,'fetch_status'),'partial'))
 cat('PASS repeated cursors terminate with explicit partial coverage\n')
+# Production contract: created-desc ordering, ObjectId cursor filtering. Several
+# writers generate IDs in the same second, so ID order differs from time order.
+source_rows<-lapply(seq_len(149),function(i)list(`_id`=sprintf('70000002%016x',i),created=sprintf('2026-10-17T04:22:26.%03dZ',1000-i),price=1))
+source_rows<-c(source_rows,list(
+ list(`_id`='700000010000000000000001',created='2026-10-17T04:22:25.500Z',price=1),
+ list(`_id`='700000010000000000000003',created='2026-10-17T04:22:25.490Z',price=1276591),
+ list(`_id`='700000010000000000000002',created='2026-10-17T04:22:25.480Z',price=23566956),
+ list(`_id`='700000000000000000000001',created='2026-10-17T04:22:24.000Z',price=22999999)))
+page<-0L
+futmondo_post<-function(url,body,...){
+ page<<-page+1L;q<-jsonlite::fromJSON(body)$query
+ rows<-Filter(function(x)!nzchar(q$from)||x$`_id`<q$from,source_rows)
+ rows<-head(rows,150L)
+ fm_httr_response(list(status_code=200L,content=charToRaw(jsonlite::toJSON(list(answer=list(news=rows)),auto_unbox=TRUE)),times=list(total=0)),url)
+}
+x<-get_championship_pressroom(list(userid='fixture',token='fixture'),'league')
+stopifnot(nrow(x)==153L,!anyDuplicated(x$id),sum(x$price)==47843546+150,
+ identical(attr(x,'fetch_status'),'ok'),page==4L)
+cat('PASS nonmonotonic ObjectIds recover boundary purchases exactly once and reach an empty page\n')
