@@ -716,6 +716,7 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
     # A configured zero reward is no cash movement and needs no payment date.
     # Preserve real zero-valued movements and all unknown amounts for auditing.
     zero_reward<-details$estimated & details$bonus_type%in%c("points","ranking","mvp","dreamteam") & is.finite(details$amount) & details$amount==0
+    zero_bonus_rows<-details[zero_reward,c("round_id","bonus_type"),drop=FALSE]
     details<-details[!zero_reward,,drop=FALSE]
     if(!is.finite(details$amount[1]))missing<-c(missing,"Opening cash unavailable.")
     if(!isTRUE(coverage_complete))missing<-c(missing,"Round award coverage is incomplete.")
@@ -780,6 +781,27 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
       squad_size=fm_number(info$squad_size),net_profit_loss=NA_real_,estimate_summary=rival_estimate_summary(missing,assumptions,difference),estimate_notes=paste(reasons,collapse=" "),stringsAsFactors=FALSE)
     breakdowns[[tid]]<-ledger[,c("component","amount","source","round_id","player_id"),drop=FALSE]
     ledger$round_number<-history$rounds$round_number[match(ledger$round_id,history$rounds$round_id)]
+    # Preserve confirmed zero rewards and award coverage for round-filtered views.
+    # Amounts always come from the included ledger, never a second cash calculation.
+    bonus_rounds<-list()
+    for(rid in unique(history$rounds$round_id[history$rounds$team_id%in%tid])){
+      awards<-if("round_id"%in%names(official))official[official$round_id%in%rid,,drop=FALSE]else data.frame()
+      award_check<-if(!length(estimate$missing))estimate else rival_award_estimates(awards,tid,rules,eligibility,mov)
+      for(kind in c("points","mvp","dreamteam","ranking")){
+        entries<-ledger[ledger$included & ledger$round_id%in%rid & ledger$bonus_type%in%kind,,drop=FALSE]
+        zero<-any(zero_bonus_rows$round_id%in%rid & zero_bonus_rows$bonus_type%in%kind)
+        known<-nrow(entries)>0L||zero
+        if(kind%in%c("mvp","dreamteam")){
+          rate<-fm_number(if(kind=="mvp")rules$mvp_reward else rules$dreamteam_reward)
+          known<-is.finite(rate)&&rate==0 || (nrow(awards)>0L && (isTRUE(coverage_complete)||length(unique(awards$player_id))==11L) && !length(award_check$missing) && !unclassified)
+        }
+        unscoped<-any(ledger$included & ledger$bonus_type%in%kind & (is.na(ledger$round_id)|!nzchar(ledger$round_id)))
+        bonus_rounds[[length(bonus_rounds)+1L]]<-data.frame(round_id=rid,
+          round_number=history$rounds$round_number[match(rid,history$rounds$round_id)],bonus_type=kind,
+          amount=if(known&&!unscoped&&all(is.finite(entries$amount)))sum(entries$amount)else NA_real_)
+      }
+    }
+    attr(ledger,"round_bonus_totals")<-dplyr::bind_rows(bonus_rounds)
     ledgers[[tid]]<-ledger
   }
   list(team_finances=dplyr::bind_rows(result),breakdowns=breakdowns,cash_ledgers=ledgers,pressroom=pressroom,all_purchases=data.frame())

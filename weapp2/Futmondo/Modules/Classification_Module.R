@@ -63,6 +63,22 @@ classification_window_table <- function(rows, window = NULL, single = "all") {
            rank = rank(-points, ties.method = "min", na.last = "keep")) %>% arrange(rank, team_name)
 }
 
+# Project the shared ledger's coverage-aware round totals without I/O.
+classification_bonus_table <- function(standings, history, finances, window=NULL, single="all") {
+  kinds<-c(points_bonus="points",mvp_bonus="mvp",best_xi_bonus="dreamteam",position_bonus="ranking")
+  selected<-sort(unique(history$round))
+  if(length(single)==1L && single!="all") selected<-selected[selected==as.numeric(single)]
+  else if(length(window)==2L && all(is.finite(window))) selected<-selected[selected>=window[1]&selected<=window[2]]
+  for(column in names(kinds)) standings[[column]]<-vapply(as.character(standings$team_id),function(id){
+    totals<-attr(finances$cash_ledgers[[id]],"round_bonus_totals")
+    if(!length(selected)||!is.data.frame(totals)||!nrow(totals))return(NA_real_)
+    rows<-totals[totals$bonus_type%in%kinds[[column]] & totals$round_number%in%selected,,drop=FALSE]
+    if(nrow(rows)!=length(selected)||!setequal(rows$round_number,selected)||any(!is.finite(rows$amount)))return(NA_real_)
+    sum(rows$amount)
+  },numeric(1))
+  standings
+}
+
 classification_dreamteam_rows <- function(answer) {
   if (is.null(answer) || isTRUE(answer$error) || !length(answer$players)) return(data.frame())
   players <- answer$players
@@ -82,6 +98,10 @@ classification_Server <- function(id, is_module_active, login_token, championshi
                                   user_teams_RV, refresh_trigger = NULL) {
   moduleServer(id, function(input, output, session) {
     bind_factual_reads(c("get_finished_rounds","get_user_team_rounds","get_financial_snapshot","get_round_dreamteam"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
+
+    mvp_snapshot <- shared_mvp_source(session,login_token,championship_id,is_module_active,refresh_trigger)
+    finances_RV <- shared_rival_finance_source(session,login_token,championship_id,
+      user_team_id,user_teams_RV,is_module_active,mvp_snapshot,refresh_trigger)
 
     rounds_RV <- reactive({
       req(is_module_active() == TRUE, login_token(), championship_id())
@@ -112,21 +132,26 @@ classification_Server <- function(id, is_module_active, login_token, championshi
       rows <- round_rows_RV()
       if (!nrow(rows)) return(p("Round history is unavailable. Current official cumulative totals are shown below; round filters require published results."))
       if (!nrow(filtered_rows_RV())) return(p("No published results in this selection."))
-      p("Points are summed only from published round records. Missing scores remain unavailable.")
+      p("Points and reconstructed bonus totals follow the selected rounds. Bonuses reuse the rival financial ledger, including recorded payments. Missing scores or bonus evidence remain unavailable.")
     })
     output$classification_table <- renderReactable({
       req(is_module_active() == TRUE)
       rows <- filtered_rows_RV()
       if (!nrow(round_rows_RV())) {
         teams <- user_teams_RV(); req(teams)
-        rows <- data.frame(team_name = teams$teamname,
+        rows <- data.frame(team_id = as.character(teams$teamid), team_name = teams$teamname,
                            points = suppressWarnings(as.numeric(teams$points)),
                            rank = suppressWarnings(as.numeric(teams$position)))
       }
       if (!nrow(rows)) return(reactable(data.frame(Message = "No results available.")))
-      rows <- rows[, intersect(c("rank", "team_name", "points", "rounds"), names(rows)), drop = FALSE]
+      rows <- classification_bonus_table(rows, round_rows_RV(), finances_RV(), input$round_range_slider, input$single_round_select)
+      rows <- rows[, intersect(c("rank", "team_name", "points", "rounds", "points_bonus", "mvp_bonus", "best_xi_bonus", "position_bonus"), names(rows)), drop = FALSE]
       reactable(rows, compact = TRUE, striped = TRUE, defaultSorted = "rank", defaultColDef = colDef(na = "Unavailable"),
-                columns = list(rank = colDef(name = "Rank"), team_name = colDef(name = "Team"), points = colDef(name = "Points")))
+                columns = list(rank = colDef(name = "Rank", minWidth = 65), team_name = colDef(name = "Team", minWidth = 150), points = colDef(name = "Points"),
+                  points_bonus = colDef(name = "Points bonus (€)", minWidth = 140, format = colFormat(separators = TRUE, digits = 0)),
+                  mvp_bonus = colDef(name = "MVP bonus (€)", minWidth = 140, format = colFormat(separators = TRUE, digits = 0)),
+                  best_xi_bonus = colDef(name = "Best XI bonus (€)", minWidth = 140, format = colFormat(separators = TRUE, digits = 0)),
+                  position_bonus = colDef(name = "Position bonus (€)", minWidth = 140, format = colFormat(separators = TRUE, digits = 0))))
     })
     output$rank_evolution_plot <- renderPlotly({
       rows <- round_rows_RV()
