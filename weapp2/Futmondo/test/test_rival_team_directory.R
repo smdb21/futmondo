@@ -40,6 +40,10 @@ check('points pills use background-to-red with distinct signed zero and missing 
  pills<-rivals_points_pills(c(-2,0,2,NA_real_));html<-vapply(pills,as.character,character(1))
  stopifnot(grepl('--fm-metric-bg:#0B120D',html[1],fixed=TRUE),grepl('--fm-metric-bg:#FF6B6B',html[3],fixed=TRUE),grepl('>0</span>',html[2],fixed=TRUE),grepl('Unavailable',html[4]),!grepl('fm-metric-badge',html[4]))
  stopifnot(all(vapply(rivals_points_pills(c(5,5)),function(x)grepl('#0B120D',as.character(x),fixed=TRUE),logical(1))),length(rivals_points_pills(numeric()))==0L)
+ positive<-vapply(rivals_points_pills(c(0,700,800,900)),as.character,character(1))
+ baseline<-vapply(rivals_points_pills(c(700,800,900)),as.character,character(1))
+ stopifnot(identical(positive[-1],baseline),grepl('--fm-metric-bg:#0B120D',positive[1],fixed=TRUE),
+   all(vapply(rivals_points_pills(c(0,0)),function(x)grepl('--fm-metric-bg:#0B120D',as.character(x),fixed=TRUE),logical(1))))
 })
 check('both full and fallback widgets keep public columns numeric and selectable',{
  for(data in list(rows,teams)){

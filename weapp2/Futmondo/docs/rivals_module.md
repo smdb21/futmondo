@@ -522,3 +522,7 @@ Selecting a league row now selects its team without expanding a second raw calcu
 ### Unified financial history and notification dates — 2026-11-02
 
 The financial history shows the full shared ledger, including position, Best XI, MVP and configured per-point bonuses. Actual movement dates are retained. Reconstructed position/MVP/Best XI bonuses keep unambiguous recorded league payment dates where applicable; otherwise reconstructed bonuses use the matching round-points publication date. These assigned dates are labelled **reconstructed** in the Date column. Per-point estimates do not borrow position-payment timestamps. Older notification coverage is not presumed complete. Undated entries remain visible when source evidence is missing; no arbitrary date or balancing cash adjustment is invented. All amounts and running subtotals come from the same ledger as the balance cards.
+
+
+The rivals points pill scale excludes zero scores from its minimum and maximum. Zero remains visible with the neutral theme surface; nonzero scores use the full existing colour scale. Sorting and pagination do not change the scale.
+Performance: this changes only the existing linear colour calculation, with no additional requests, database work or reactive updates. Focused rival-directory checks (7) and deployment checks (3) passed; full lifecycle and hosted visual checks were skipped for this presentation-only change. No delegation.

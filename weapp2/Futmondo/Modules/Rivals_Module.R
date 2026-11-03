@@ -299,12 +299,17 @@ rivals_cash_history_widget <- function(ledger,undated=NULL) {
       payment_date_estimated=colDef(show=FALSE),payment_date_source=colDef(show=FALSE),category=colDef(show=FALSE),bonus_type=colDef(show=FALSE),calculation=colDef(show=FALSE),source=colDef(show=FALSE),included=colDef(show=FALSE),unknown_amounts=colDef(show=FALSE),ledger_order=colDef(show=FALSE)))
 }
 
-# One scale over the whole league; sorting/pagination do not change its domain.
+# One nonzero scale over the whole league; zero scores keep the surface color.
+# Sorting/pagination do not change the domain.
 rivals_points_pills <- function(points) {
   points<-vapply(points,fm_number,numeric(1));known<-is.finite(points)
   colors<-ink<-rep(NA_character_,length(points))
   if(any(known)){
-    bounds<-range(points[known]);weights<-if(diff(bounds)==0)rep(0,sum(known))else(points[known]-bounds[1])/diff(bounds)
+    values<-points[known];nonzero<-values!=0;weights<-rep(0,length(values))
+    if(any(nonzero)){
+      bounds<-range(values[nonzero])
+      if(diff(bounds)>0)weights[nonzero]<-(values[nonzero]-bounds[1])/diff(bounds)
+    }
     tokens<-fm_theme_tokens()
     rgb<-round(grDevices::colorRamp(c(tokens$surface,tokens$danger))(weights))
     colors[known]<-grDevices::rgb(rgb[,1],rgb[,2],rgb[,3],maxColorValue=255)
