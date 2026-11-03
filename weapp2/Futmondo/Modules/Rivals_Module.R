@@ -261,7 +261,7 @@ rivals_cash_history_rows <- function(ledger,undated=NULL) {
   round<-ifelse(nzchar(label),paste0(" · Round ",label),"")
   date_source<-if("payment_date_source"%in%names(rows))rows$payment_date_source else rep("",nrow(rows))
   data.frame(date=ifelse(rows$section%in%"opening" & is.na(rows$timestamp),"Opening balance",ifelse(date_source%in%c("reference_payment_pending","round_settlement_pending"),"Payment not confirmed",ifelse(is.na(rows$timestamp),"Payment date unknown",format(rows$timestamp,"%d/%m/%Y %H:%M",tz="UTC")))),
-    type=ifelse(rows$estimated,"Estimated bonus",rows$type),concept=paste0(rows$component,round,ifelse(rows$included,""," (excluded)")),money=rows$amount,
+    type=ifelse(rows$component%in%"Best XI/MVP payment","Recorded Best XI/MVP payment",ifelse(rows$estimated,"Estimated bonus",rows$type)),concept=paste0(rows$component,round,ifelse(rows$included,""," (excluded)")),money=rows$amount,
     payment_date_estimated=if("payment_date_estimated"%in%names(rows))rows$payment_date_estimated%in%TRUE else rep(FALSE,nrow(rows)),
     payment_date_source=if("payment_date_source"%in%names(rows))as.character(rows$payment_date_source)else rep("",nrow(rows)),
     running_balance=rows$running_balance,source=rows$source,included=rows$included,unknown_amounts=rows$unknown_amounts,
@@ -284,6 +284,7 @@ rivals_cash_history_widget <- function(ledger,undated=NULL) {
       }),type=colDef(name="Type",align="left",cell=function(value,index){
         if(display$payment_date_source[index]%in%c("reference_payment_pending","round_settlement_pending"))return(paste("Unconfirmed",c(ranking="position bonus",mvp="MVP bonus",dreamteam="Best XI bonus")[[display$bonus_type[index]]]))
         if(identical(display$payment_date_source[index],"league_point_payment"))return("Reconstructed point bonus")
+        if(value=="Recorded Best XI/MVP payment")return(value)
         if(value=="opening")return("Starting cash")
         if(value%in%c("buy","sell"))return(paste(if(display$category[index]%in%"clause")"Clause"else if(display$category[index]%in%"market")"Ordinary"else"Player",if(value=="buy")"purchase"else"sale"))
         if(display$bonus_type[index]%in%c("ranking","mvp","dreamteam","points"))return(paste0(
@@ -383,9 +384,11 @@ rivals_inflow_totals <- function(ledger) {
   sales<-rows$type%in%c("sell","clause_sell");clauses<-sales & (category%in%"clause"|rows$type%in%"clause_sell")
   market<-sales & category%in%"market" & !clauses
   rewards<-rows$type%in%c("bonus","ranking")
+  allocations<-attr(ledger,"award_payment_allocations")
+  attributed_mvp<-if(is.data.frame(allocations)&&nrow(allocations)&&all(allocations$status=="validated"))sum(allocations$mvp)else 0
   list(opening=amount(rows$type%in%"opening"),sales=amount(sales),market=amount(market),clauses=amount(clauses),unknown=amount(sales & !market & !clauses),
     bonuses=amount(rewards),points=if(isTRUE(attr(ledger,"point_rewards_incomplete")))NA_real_ else amount(rewards & bonus%in%"points"),ranking=if("ranking"%in%attr(ledger,"pending_bonus_types"))NA_real_ else amount(rewards & (bonus%in%"ranking"|rows$type%in%"ranking")),
-    mvp=if("mvp"%in%attr(ledger,"pending_bonus_types"))NA_real_ else amount(rewards & bonus%in%"mvp"),dreamteam=if("dreamteam"%in%attr(ledger,"pending_bonus_types"))NA_real_ else amount(rewards & bonus%in%"dreamteam"),
+    mvp=if("mvp"%in%attr(ledger,"pending_bonus_types"))NA_real_ else amount(rewards & bonus%in%"mvp")+attributed_mvp,dreamteam=if("dreamteam"%in%attr(ledger,"pending_bonus_types"))NA_real_ else amount(rewards & bonus%in%"dreamteam")-attributed_mvp,
     other=amount(!rows$type%in%c("opening","sell","clause_sell","bonus","ranking")),total=amount(rep(TRUE,nrow(rows))),incomplete=any(!is.finite(rows$amount)))
 }
 
@@ -948,8 +951,8 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       } else {
         tagList(
           uiOutput(ns("rival_financial_summary_box")),
-          tabsetPanel(id = ns("rival_tabs"), type = "pills",
-            tabPanel(title = "Player Roster & Clauses", icon = icon("users"),
+          tabsetPanel(id = ns("rival_tabs"), type = "pills", selected = "history",
+            tabPanel(title = "Player Roster & Clauses", value = "roster", icon = icon("users"),
               players_table_UI(
                 id = ns("rival_squad_table"),
                 box_title = "Scouted Player Roster & Purchase Breakdown",
@@ -962,7 +965,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                 filter_by_is_from_futmondo = FALSE
               )
             ),
-            tabPanel(title = "Transaction & Financial History", icon = icon("receipt"),
+            tabPanel(title = "Transaction & Financial History", value = "history", icon = icon("receipt"),
               uiOutput(ns("rival_transactions_tab_ui"))
             ),
           )
@@ -1001,7 +1004,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
           tags$p("MVP bonuses: ",ui_financial_amount(inflow$mvp)),
           tags$p("Best XI bonuses: ",ui_financial_amount(inflow$dreamteam)),
           tags$p("Point bonuses: ",ui_financial_amount(inflow$points)),
-          if(is.finite(inflow$bonuses)&&inflow$bonuses!=inflow$points+inflow$ranking+inflow$mvp+inflow$dreamteam)
+          if(isTRUE(is.finite(inflow$bonuses)&&inflow$bonuses!=inflow$points+inflow$ranking+inflow$mvp+inflow$dreamteam))
             tags$p("Other recorded bonuses: ",ui_financial_amount(inflow$bonuses-inflow$points-inflow$ranking-inflow$mvp-inflow$dreamteam)),
           if(is.finite(inflow$other)&&inflow$other!=0)tags$p("Other credits: ",ui_financial_amount(inflow$other)),
           tags$small("Includes starting cash and every included positive ledger amount, including reconstructed bonuses.",

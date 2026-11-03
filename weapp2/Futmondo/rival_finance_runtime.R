@@ -315,7 +315,13 @@ rival_award_estimates <- function(official,team_id,rules,eligibility=data.frame(
     unscoped<-nrow(payments)&&all(c("round_id","bonus_type")%in%names(payments))&&any(payments$bonus_type%in%e$bonus_type & !nzchar(payments$round_id))
     if(unscoped){missing<-c(missing,paste("Recorded",e$bonus_type,"income has no round identity; overlapping estimates of that reward type are excluded."));next}
     same<-if(nrow(payments)&&all(c("round_id","player_id","bonus_type")%in%names(payments)))payments$round_id%in%e$round_id & (!nzchar(payments$player_id)|payments$player_id%in%e$player_id) & payments$bonus_type%in%e$bonus_type else logical()
-    if(any(same))next
+    # Native dreamTeam is one payment for XI members AND their MVP premium.
+    # Its amount must be reconciled before attribution, never supplemented by
+    # an estimated MVP merely because the source type is not literally mvp.
+    combined<-nrow(payments)&&"source_type"%in%names(payments)&&any(
+      payments$source_type%in%c("dreamTeam","dreamteam") &
+      (payments$round_id%in%e$round_id | !nzchar(payments$round_id)))
+    if(any(same)||combined)next
     evidence<-if(is.data.frame(eligibility)&&all(c("round_id","player_id","team_id","eligible","verified")%in%names(eligibility)))
       unique(eligibility[eligibility$round_id%in%e$round_id & eligibility$player_id%in%e$player_id & eligibility$verified%in%TRUE,c("team_id","eligible"),drop=FALSE])else data.frame()
     if(nrow(evidence)>1L){missing<-c(missing,paste("Conflicting historical ownership/eligibility for round",e$round_id,"player",e$player_id,"; reward excluded."));next}
@@ -326,6 +332,31 @@ rival_award_estimates <- function(official,team_id,rules,eligibility=data.frame(
   }
   list(rows=dplyr::bind_rows(c(list(empty),out)),missing=unique(missing))
 }
+# Attribute a recorded native XI/MVP payment only when independent historical
+# recipient calculations reproduce its total, including separately recorded MVP.
+rival_award_payment_allocations <- function(official,team_id,rules,eligibility,movements) {
+  empty<-data.frame(round_id=character(),recorded=numeric(),expected=numeric(),dreamteam=numeric(),mvp=numeric(),status=character())
+  if(!nrow(movements)||!"source_type"%in%names(movements))return(empty)
+  native<-movements$source_type%in%c("dreamTeam","dreamteam")
+  if(!any(native))return(empty)
+  selected<-if(is.data.frame(official)&&"round_id"%in%names(official))official[official$round_id%in%movements$round_id[native],,drop=FALSE]else data.frame()
+  expected<-rival_award_estimates(selected,team_id,rules,eligibility)$rows
+  dplyr::bind_rows(c(list(empty),lapply(unique(movements$round_id[native]),function(id){
+    paid<-movements[native & movements$round_id%in%id,,drop=FALSE]
+    separate<-movements[!native & movements$round_id%in%id & movements$bonus_type%in%"mvp",,drop=FALSE]
+    rows<-expected[expected$round_id%in%id,,drop=FALSE]
+    xi<-sum(rows$amount[rows$bonus_type%in%"dreamteam"])
+    mvp<-sum(rows$amount[rows$bonus_type%in%"mvp"])
+    recorded<-if(all(is.finite(paid$money)))sum(paid$money)else NA_real_
+    explicit<-if(all(is.finite(separate$money)))sum(separate$money)else NA_real_
+    valid<-nzchar(id)&&nrow(rows)>0L&&is.finite(recorded)&&is.finite(explicit)&&
+      recorded+explicit==xi+mvp&&mvp>=explicit
+    data.frame(round_id=id,recorded=recorded,expected=if(nrow(rows))xi+mvp-explicit else NA_real_,
+      dreamteam=if(valid)xi else NA_real_,mvp=if(valid)mvp-explicit else NA_real_,
+      status=if(valid)"validated"else"unresolved")
+  })))
+}
+
 # Source contract: public Futmondo Entities.Round (id, number, points, status,
 # negative) and /1/userteam/roundlineup (players, bench.players, negative, status).
 # Store one full round list per team; source revisions replace its earlier list.
@@ -766,6 +797,13 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
     # Any unclassified reward can already include these bonuses. Suppress estimated
     # rewards until it can be matched, rather than count an unidentified payment twice.
     unclassified<-nrow(mov)&&any((!is.finite(mov$money)|mov$money>0) & !mov$type%in%c("buy","sell","budget") & !mov$bonus_type%in%c("points","ranking","dreamteam","mvp"))
+    award_allocations<-rival_award_payment_allocations(official,tid,rules,eligibility,mov)
+    if(any(award_allocations$status!="validated"))missing<-c(missing,"Recorded combined Best XI/MVP payment does not yet reconcile with historical recipients/rules; its actual cash is retained, component attribution is unknown.")
+    native_details<-which(!details$estimated & details$source_type%in%c("dreamTeam","dreamteam"))
+    if(length(native_details)){
+      details$component[native_details]<-"Best XI/MVP payment"
+      details$source[native_details]<-paste(details$source[native_details],"Native dreamTeam payment covers Best XI and MVP together; no additional estimated MVP is added.")
+    }
     estimate<-rival_award_estimates(official,tid,rules,eligibility,mov)
     missing<-c(missing,estimate$missing)
     if(unclassified&&nrow(estimate$rows)){missing<-c(missing,"Unclassified recorded income prevents adding potentially overlapping award estimates.");estimate$rows<-estimate$rows[FALSE,,drop=FALSE]}
@@ -847,6 +885,12 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
       if(kind=="mvp")mvp_income<-value
       if(kind=="dreamteam")ideal_income<-value
     }
+    if(nrow(award_allocations)){
+      if(all(award_allocations$status=="validated")){
+        attributed_mvp<-sum(award_allocations$mvp)
+        ideal_income<-ideal_income-attributed_mvp;mvp_income<-mvp_income+attributed_mvp
+      }else pending_bonus<-unique(c(pending_bonus,"dreamteam","mvp"))
+    }
     # A configured zero reward is no cash movement and needs no payment date.
     # Preserve real zero-valued movements and all unknown amounts for auditing.
     zero_reward<-details$estimated & details$bonus_type%in%c("points","ranking","mvp","dreamteam") & is.finite(details$amount) & details$amount==0
@@ -911,6 +955,7 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
     ledger<-rival_cash_ledger(details)
     attr(ledger,"point_rewards_incomplete")<-point_incomplete
     attr(ledger,"pending_bonus_types")<-pending_bonus
+    attr(ledger,"award_payment_allocations")<-award_allocations
     if(any(ledger$included&!is.finite(ledger$amount)))missing<-c(missing,"Missing movement amounts are excluded; displayed balances are known-amount estimates.")
     # Read the final cumulative amount, rather than independently summing a
     # second history. Filtering/sorting later never changes these balances.
@@ -951,12 +996,18 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
           rate<-fm_number(if(kind=="mvp")rules$mvp_reward else rules$dreamteam_reward)
           known<-is.finite(rate)&&rate==0 || (nrow(awards)>0L && (isTRUE(coverage_complete)||length(unique(awards$player_id))==11L) && !length(award_check$missing) && !unclassified)
         }
+        allocation<-award_allocations[award_allocations$round_id%in%rid,,drop=FALSE]
+        adjustment<-0
+        if(kind%in%c("dreamteam","mvp")&&nrow(allocation)){
+          known<-all(allocation$status=="validated")
+          adjustment<-if(known)sum(allocation$mvp)*if(kind=="mvp")1 else -1 else 0
+        }
         pending<-any(!ledger$included & ledger$round_id%in%rid & ledger$bonus_type%in%kind & ledger$payment_date_source%in%c("reference_payment_pending","round_settlement_pending"))
         if(pending)known<-FALSE
         unscoped<-any(ledger$included & ledger$bonus_type%in%kind & (is.na(ledger$round_id)|!nzchar(ledger$round_id)))
         bonus_rounds[[length(bonus_rounds)+1L]]<-data.frame(round_id=rid,
           round_number=history$rounds$round_number[match(rid,history$rounds$round_id)],bonus_type=kind,
-          amount=if(known&&!unscoped&&all(is.finite(entries$amount)))sum(entries$amount)else NA_real_)
+          amount=if(known&&!unscoped&&all(is.finite(entries$amount)))sum(entries$amount)+adjustment else NA_real_)
       }
     }
     attr(ledger,"round_bonus_totals")<-dplyr::bind_rows(bonus_rounds)
