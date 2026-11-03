@@ -471,3 +471,8 @@ Implemented locally: position bonuses require a reference position payment; poin
 ### Payment-driven cumulative rival points — 2026-11-03
 
 Existing live accounting verified to require reference payments and retain one cumulative derived entry per rival/round. Added a sequential no-payment/first-payment/later-payment/score-recovery/replay regression. Corrected latest-payment wording so it cannot imply final completion. No synthetic transaction persistence or destructive cleanup is needed; real instalments and source revisions remain intact. Validation and rollout are recorded in data_review_results.md.
+
+
+### ID-less native bonus payment ingestion — 2026-11-03
+
+Fixed the source-contract defect that discarded 14 point and three Best XI payments without `_id`. Explicit local settlement identity now preserves real payments and revisions through the existing storage path. Sanitized full-response regression reconciles cash to 52,129,125 EUR; original ID-preserving synthetic fixtures did not cover this contract. Restored the 17 omitted source records from the user-provided capture without overwriting existing identities. Production evidence totals now match observed cash exactly; reference point amounts also independently match saved round histories 1–11, including refreshed 105-point round 11. See review results for validation and hosted deployment evidence.

@@ -21,7 +21,20 @@ normalize_money_movements <- function(answer) {
       bonus_type=mvp_text(m$bonus_type),round_id=mvp_text(m$round_id),player_id=mvp_text(m$player_id),
       source_updated_at=mvp_text(m$updated %||% m$updated_at),source_event_id=mvp_text(m$source_event_id),stringsAsFactors=FALSE)
   })))
-  # Missing amounts remain unknown; malformed identities never become fabricated IDs.
+  # Futmondo omits IDs on native point/award settlements. Retain the absent
+  # source ID separately and use a deterministic local key for storage/replays.
+  # Amount is excluded so a revised settlement replaces its prior value.
+  rows$source_movement_id<-rows$id
+  rows$identity_source<-ifelse(nzchar(rows$id),"source","missing")
+  native<-!nzchar(rows$id) & rows$type%in%c("points","dreamTeam","dreamteam","mvp") &
+    grepl("^[0-9]+([.][0-9]+)?$",rows$concept) & !is.na(fm_time(rows$date))
+  for(i in which(native)){
+    key<-list(type=tolower(rows$type[i]),settlement=rows$concept[i],date=rows$date[i],player=rows$player_id[i])
+    rows$id[i]<-paste0("settlement:",as.character(openssl::sha256(serialize(key,NULL,version=2))))
+    rows$identity_source[i]<-"derived_settlement"
+  }
+  # Missing amounts remain unknown. Unidentified non-settlement transactions
+  # still fail completeness; a local settlement key is never an API movement ID.
   attr(rows,"complete")<-nrow(rows)==length(records)&&all(nzchar(rows$id))&&all(is.finite(rows$money))
   attr(rows,"fetch_status")<-if(isTRUE(attr(rows,"complete")))if(nrow(rows))"ok"else"empty"else"partial"
   rows

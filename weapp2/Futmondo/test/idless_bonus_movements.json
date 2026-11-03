@@ -1,0 +1,1521 @@
+[
+  {
+    "concept": "",
+    "type": "budget",
+    "category": "bonus",
+    "money": 300000000,
+    "date": "2026-07-30T12:58:37.331Z",
+    "_id": "source-0"
+  },
+  {
+    "concept": "Fixture player 1",
+    "type": "buy",
+    "category": "market",
+    "money": -12345512,
+    "date": "2026-08-03T04:15:24.804Z",
+    "_id": "source-1"
+  },
+  {
+    "concept": "Fixture player 2",
+    "type": "buy",
+    "category": "market",
+    "money": -9451222,
+    "date": "2026-08-03T04:15:24.880Z",
+    "_id": "source-2"
+  },
+  {
+    "concept": "Fixture player 3",
+    "type": "buy",
+    "category": "market",
+    "money": -25666433,
+    "date": "2026-08-04T04:15:47.319Z",
+    "_id": "source-3"
+  },
+  {
+    "concept": "Fixture player 4",
+    "type": "buy",
+    "category": "market",
+    "money": -30188455,
+    "date": "2026-08-04T04:15:47.388Z",
+    "_id": "source-4"
+  },
+  {
+    "concept": "Fixture player 5",
+    "type": "buy",
+    "category": "market",
+    "money": -14661551,
+    "date": "2026-08-04T04:15:47.480Z",
+    "_id": "source-5"
+  },
+  {
+    "concept": "Fixture player 6",
+    "type": "buy",
+    "category": "market",
+    "money": -1354551,
+    "date": "2026-08-06T04:16:22.689Z",
+    "_id": "source-6"
+  },
+  {
+    "concept": "Fixture player 7",
+    "type": "buy",
+    "category": "market",
+    "money": -3085555,
+    "date": "2026-08-10T04:17:23.756Z",
+    "_id": "source-7"
+  },
+  {
+    "concept": "Fixture player 8",
+    "type": "buy",
+    "category": "market",
+    "money": -1078542,
+    "date": "2026-08-10T04:17:23.795Z",
+    "_id": "source-8"
+  },
+  {
+    "concept": "Fixture player 9",
+    "type": "buy",
+    "category": "market",
+    "money": -21130000,
+    "date": "2026-08-10T04:17:24.116Z",
+    "_id": "source-9"
+  },
+  {
+    "concept": "Fixture player 10",
+    "type": "buy",
+    "category": "market",
+    "money": -6421222,
+    "date": "2026-08-10T04:17:24.126Z",
+    "_id": "source-10"
+  },
+  {
+    "concept": "Fixture player 11",
+    "type": "sell",
+    "category": "market",
+    "money": 12762554,
+    "date": "2026-08-10T20:29:19.170Z",
+    "_id": "source-11"
+  },
+  {
+    "concept": "Fixture player 12",
+    "type": "buy",
+    "category": "market",
+    "money": -1664551,
+    "date": "2026-08-11T04:17:47.407Z",
+    "_id": "source-12"
+  },
+  {
+    "concept": "Fixture player 13",
+    "type": "buy",
+    "category": "market",
+    "money": -3522111,
+    "date": "2026-08-11T04:17:47.429Z",
+    "_id": "source-13"
+  },
+  {
+    "concept": "Fixture player 14",
+    "type": "buy",
+    "category": "market",
+    "money": -25312212,
+    "date": "2026-08-12T04:17:56.157Z",
+    "_id": "source-14"
+  },
+  {
+    "concept": "Fixture player 15",
+    "type": "buy",
+    "category": "market",
+    "money": -9145122,
+    "date": "2026-08-13T04:18:09.520Z",
+    "_id": "source-15"
+  },
+  {
+    "concept": "Fixture player 16",
+    "type": "buy",
+    "category": "market",
+    "money": -9111144,
+    "date": "2026-08-13T04:18:09.609Z",
+    "_id": "source-16"
+  },
+  {
+    "concept": "Fixture player 17",
+    "type": "buy",
+    "category": "market",
+    "money": -102222001,
+    "date": "2026-08-13T04:18:09.684Z",
+    "_id": "source-17"
+  },
+  {
+    "concept": "Fixture player 18",
+    "type": "buy",
+    "category": "market",
+    "money": -22078455,
+    "date": "2026-08-14T04:18:26.588Z",
+    "_id": "source-18"
+  },
+  {
+    "concept": "Fixture player 19",
+    "type": "sell",
+    "category": "market",
+    "money": 1337809,
+    "date": "2026-08-17T13:51:27.882Z",
+    "_id": "source-19"
+  },
+  {
+    "concept": "Fixture player 20",
+    "type": "sell",
+    "category": "market",
+    "money": 9201672,
+    "date": "2026-08-17T13:52:46.489Z",
+    "_id": "source-20"
+  },
+  {
+    "concept": "1",
+    "type": "points",
+    "category": "bonus",
+    "money": 1960000,
+    "date": "2026-08-20T05:47:50.561Z"
+  },
+  {
+    "concept": "Fixture player 22",
+    "type": "buy",
+    "category": "market",
+    "money": -1395555,
+    "date": "2026-08-22T04:19:25.848Z",
+    "_id": "source-22"
+  },
+  {
+    "concept": "Fixture player 23",
+    "type": "buy",
+    "category": "market",
+    "money": -50112222,
+    "date": "2026-08-24T04:19:45.274Z",
+    "_id": "source-23"
+  },
+  {
+    "concept": "Fixture player 24",
+    "type": "buy",
+    "category": "market",
+    "money": -21455122,
+    "date": "2026-08-24T04:19:45.443Z",
+    "_id": "source-24"
+  },
+  {
+    "concept": "Fixture player 25",
+    "type": "buy",
+    "category": "market",
+    "money": -1522111,
+    "date": "2026-08-25T04:19:58.537Z",
+    "_id": "source-25"
+  },
+  {
+    "concept": "Fixture player 26",
+    "type": "buy",
+    "category": "market",
+    "money": -7999999,
+    "date": "2026-08-25T04:19:59.627Z",
+    "_id": "source-26"
+  },
+  {
+    "concept": "Fixture player 27",
+    "type": "sell",
+    "category": "market",
+    "money": 3203985,
+    "date": "2026-08-25T04:35:15.063Z",
+    "_id": "source-27"
+  },
+  {
+    "concept": "Fixture player 28",
+    "type": "sell",
+    "category": "market",
+    "money": 29246263,
+    "date": "2026-08-25T04:35:24.088Z",
+    "_id": "source-28"
+  },
+  {
+    "concept": "Fixture player 29",
+    "type": "sell",
+    "category": "market",
+    "money": 20327132,
+    "date": "2026-08-25T04:35:38.422Z",
+    "_id": "source-29"
+  },
+  {
+    "concept": "2",
+    "type": "points",
+    "category": "bonus",
+    "money": 4760000,
+    "date": "2026-08-25T07:45:07.808Z"
+  },
+  {
+    "concept": "2",
+    "type": "ranking",
+    "category": "bonus",
+    "money": 4000000,
+    "date": "2026-08-25T07:45:08.008Z",
+    "_id": "source-31"
+  },
+  {
+    "concept": "Fixture player 32",
+    "type": "clause",
+    "category": "market",
+    "money": -20135390,
+    "date": "2026-08-26T18:02:05.924Z",
+    "_id": "source-32"
+  },
+  {
+    "concept": "Fixture player 33",
+    "type": "sell",
+    "category": "market",
+    "money": 992037,
+    "date": "2026-08-27T04:42:56.616Z",
+    "_id": "source-33"
+  },
+  {
+    "concept": "Fixture player 34",
+    "type": "sell",
+    "category": "market",
+    "money": 4566380,
+    "date": "2026-08-27T04:43:49.906Z",
+    "_id": "source-34"
+  },
+  {
+    "concept": "Fixture player 35",
+    "type": "sell",
+    "category": "market",
+    "money": 20430957,
+    "date": "2026-08-27T13:11:06.330Z",
+    "_id": "source-35"
+  },
+  {
+    "concept": "Fixture player 36",
+    "type": "sell",
+    "category": "market",
+    "money": 21848454,
+    "date": "2026-08-27T13:11:15.458Z",
+    "_id": "source-36"
+  },
+  {
+    "concept": "1.1",
+    "type": "points",
+    "category": "bonus",
+    "money": 3780000,
+    "date": "2026-08-28T09:48:04.049Z"
+  },
+  {
+    "concept": "1.1",
+    "type": "ranking",
+    "category": "bonus",
+    "money": 3333333,
+    "date": "2026-08-28T09:48:04.396Z",
+    "_id": "source-38"
+  },
+  {
+    "concept": "1.1",
+    "type": "dreamTeam",
+    "category": "bonus",
+    "money": 1500000,
+    "date": "2026-08-28T09:48:05.285Z"
+  },
+  {
+    "concept": "Fixture player 40",
+    "type": "clause_sell",
+    "category": "market",
+    "money": 22184977,
+    "date": "2026-08-30T22:45:22.088Z",
+    "_id": "source-40"
+  },
+  {
+    "concept": "Fixture player 41",
+    "type": "clause_sell",
+    "category": "market",
+    "money": 152886159,
+    "date": "2026-08-30T22:55:41.820Z",
+    "_id": "source-41"
+  },
+  {
+    "concept": "Fixture player 42",
+    "type": "buy",
+    "category": "market",
+    "money": -1998888,
+    "date": "2026-08-31T04:20:44.432Z",
+    "_id": "source-42"
+  },
+  {
+    "concept": "Fixture player 43",
+    "type": "buy",
+    "category": "market",
+    "money": -1312228,
+    "date": "2026-08-31T04:20:44.477Z",
+    "_id": "source-43"
+  },
+  {
+    "concept": "Fixture player 44",
+    "type": "buy",
+    "category": "market",
+    "money": -9044455,
+    "date": "2026-08-31T04:20:44.505Z",
+    "_id": "source-44"
+  },
+  {
+    "concept": "Fixture player 45",
+    "type": "clause",
+    "category": "market",
+    "money": -107784846,
+    "date": "2026-08-31T19:53:26.625Z",
+    "_id": "source-45"
+  },
+  {
+    "concept": "Fixture player 46",
+    "type": "clause",
+    "category": "market",
+    "money": -74932999,
+    "date": "2026-08-31T19:54:08.702Z",
+    "_id": "source-46"
+  },
+  {
+    "concept": "Fixture player 47",
+    "type": "buy",
+    "category": "market",
+    "money": -1345518,
+    "date": "2026-09-01T04:20:53.985Z",
+    "_id": "source-47"
+  },
+  {
+    "concept": "3",
+    "type": "points",
+    "category": "bonus",
+    "money": 4200000,
+    "date": "2026-09-01T07:39:45.969Z"
+  },
+  {
+    "concept": "3",
+    "type": "ranking",
+    "category": "bonus",
+    "money": 6000000,
+    "date": "2026-09-01T07:39:46.149Z",
+    "_id": "source-49"
+  },
+  {
+    "concept": "6",
+    "type": "points",
+    "category": "bonus",
+    "money": 910000,
+    "date": "2026-09-04T07:08:07.048Z"
+  },
+  {
+    "concept": "Fixture player 51",
+    "type": "clause",
+    "category": "market",
+    "money": -21661732,
+    "date": "2026-09-05T02:39:09.389Z",
+    "_id": "source-51"
+  },
+  {
+    "concept": "Fixture player 52",
+    "type": "sell",
+    "category": "market",
+    "money": 9291575,
+    "date": "2026-09-06T03:45:01.095Z",
+    "_id": "source-52"
+  },
+  {
+    "concept": "Fixture player 53",
+    "type": "buy",
+    "category": "market",
+    "money": -20455155,
+    "date": "2026-09-07T04:21:27.572Z",
+    "_id": "source-53"
+  },
+  {
+    "concept": "Fixture player 54",
+    "type": "buy",
+    "category": "market",
+    "money": -3245515,
+    "date": "2026-09-07T04:21:28.257Z",
+    "_id": "source-54"
+  },
+  {
+    "concept": "Fixture player 55",
+    "type": "sell",
+    "category": "market",
+    "money": 1162904,
+    "date": "2026-09-07T16:00:40.017Z",
+    "_id": "source-55"
+  },
+  {
+    "concept": "Fixture player 56",
+    "type": "sell",
+    "category": "market",
+    "money": 8115743,
+    "date": "2026-09-07T16:01:05.557Z",
+    "_id": "source-56"
+  },
+  {
+    "concept": "4",
+    "type": "points",
+    "category": "bonus",
+    "money": 6230000,
+    "date": "2026-09-08T08:58:23.515Z"
+  },
+  {
+    "concept": "4",
+    "type": "ranking",
+    "category": "bonus",
+    "money": 2666667,
+    "date": "2026-09-08T08:58:23.748Z",
+    "_id": "source-58"
+  },
+  {
+    "concept": "4",
+    "type": "dreamTeam",
+    "category": "bonus",
+    "money": 500000,
+    "date": "2026-09-08T08:58:24.673Z"
+  },
+  {
+    "concept": "Fixture player 60",
+    "type": "sell",
+    "category": "market",
+    "money": 1147572,
+    "date": "2026-09-11T04:21:24.585Z",
+    "_id": "source-60"
+  },
+  {
+    "concept": "Fixture player 61",
+    "type": "buy",
+    "category": "market",
+    "money": -1824221,
+    "date": "2026-09-11T04:21:38.615Z",
+    "_id": "source-61"
+  },
+  {
+    "concept": "Fixture player 62",
+    "type": "buy",
+    "category": "market",
+    "money": -13545515,
+    "date": "2026-09-11T04:21:38.661Z",
+    "_id": "source-62"
+  },
+  {
+    "concept": "Fixture player 63",
+    "type": "sell",
+    "category": "market",
+    "money": 7979212,
+    "date": "2026-09-11T04:21:41.986Z",
+    "_id": "source-63"
+  },
+  {
+    "concept": "Fixture player 64",
+    "type": "sell",
+    "category": "market",
+    "money": 8077392,
+    "date": "2026-09-11T04:21:51.284Z",
+    "_id": "source-64"
+  },
+  {
+    "concept": "Fixture player 65",
+    "type": "sell",
+    "category": "market",
+    "money": 1404786,
+    "date": "2026-09-11T04:22:07.041Z",
+    "_id": "source-65"
+  },
+  {
+    "concept": "Fixture player 66",
+    "type": "sell",
+    "category": "market",
+    "money": 2633994,
+    "date": "2026-09-11T04:22:15.572Z",
+    "_id": "source-66"
+  },
+  {
+    "concept": "Fixture player 67",
+    "type": "sell",
+    "category": "market",
+    "money": 21584762,
+    "date": "2026-09-12T00:38:16.440Z",
+    "_id": "source-67"
+  },
+  {
+    "concept": "Fixture player 68",
+    "type": "buy",
+    "category": "market",
+    "money": -1261470,
+    "date": "2026-09-13T04:21:31.807Z",
+    "_id": "source-68"
+  },
+  {
+    "concept": "Fixture player 69",
+    "type": "buy",
+    "category": "market",
+    "money": -1313292,
+    "date": "2026-09-14T04:21:42.586Z",
+    "_id": "source-69"
+  },
+  {
+    "concept": "Fixture player 70",
+    "type": "buy",
+    "category": "market",
+    "money": -1000000,
+    "date": "2026-09-14T04:21:42.692Z",
+    "_id": "source-70"
+  },
+  {
+    "concept": "Fixture player 71",
+    "type": "clause",
+    "category": "market",
+    "money": -12815426,
+    "date": "2026-09-14T05:10:00.963Z",
+    "_id": "source-71"
+  },
+  {
+    "concept": "Fixture player 72",
+    "type": "clause_sell",
+    "category": "market",
+    "money": 7182909,
+    "date": "2026-09-14T22:31:37.430Z",
+    "_id": "source-72"
+  },
+  {
+    "concept": "Fixture player 73",
+    "type": "clause_sell",
+    "category": "market",
+    "money": 160091122,
+    "date": "2026-09-14T22:45:01.358Z",
+    "_id": "source-73"
+  },
+  {
+    "concept": "Fixture player 74",
+    "type": "clause",
+    "category": "market",
+    "money": -190599313,
+    "date": "2026-09-14T22:50:25.877Z",
+    "_id": "source-74"
+  },
+  {
+    "concept": "Fixture player 75",
+    "type": "buy",
+    "category": "market",
+    "money": -1331612,
+    "date": "2026-09-15T04:21:52.427Z",
+    "_id": "source-75"
+  },
+  {
+    "concept": "Fixture player 76",
+    "type": "sell",
+    "category": "market",
+    "money": 1620136,
+    "date": "2026-09-15T05:34:18.865Z",
+    "_id": "source-76"
+  },
+  {
+    "concept": "Fixture player 77",
+    "type": "sell",
+    "category": "market",
+    "money": 48612049,
+    "date": "2026-09-15T05:34:53.860Z",
+    "_id": "source-77"
+  },
+  {
+    "concept": "Fixture player 78",
+    "type": "sell",
+    "category": "market",
+    "money": 4673804,
+    "date": "2026-09-15T05:39:12.338Z",
+    "_id": "source-78"
+  },
+  {
+    "concept": "5",
+    "type": "points",
+    "category": "bonus",
+    "money": 6300000,
+    "date": "2026-09-15T07:40:41.796Z"
+  },
+  {
+    "concept": "5",
+    "type": "ranking",
+    "category": "bonus",
+    "money": 1333333,
+    "date": "2026-09-15T07:40:42.124Z",
+    "_id": "source-80"
+  },
+  {
+    "concept": "Fixture player 81",
+    "type": "clause",
+    "category": "market",
+    "money": -45466161,
+    "date": "2026-09-15T13:46:44.865Z",
+    "_id": "source-81"
+  },
+  {
+    "concept": "Fixture player 82",
+    "type": "sell",
+    "category": "market",
+    "money": 1132016,
+    "date": "2026-09-15T13:47:09.654Z",
+    "_id": "source-82"
+  },
+  {
+    "concept": "Fixture player 83",
+    "type": "buy",
+    "category": "market",
+    "money": -7215319,
+    "date": "2026-09-16T04:21:54.412Z",
+    "_id": "source-83"
+  },
+  {
+    "concept": "Fixture player 84",
+    "type": "buy",
+    "category": "market",
+    "money": -2410000,
+    "date": "2026-09-16T04:21:54.559Z",
+    "_id": "source-84"
+  },
+  {
+    "concept": "Fixture player 85",
+    "type": "buy",
+    "category": "market",
+    "money": -6122433,
+    "date": "2026-09-16T04:21:54.614Z",
+    "_id": "source-85"
+  },
+  {
+    "concept": "Fixture player 86",
+    "type": "buy",
+    "category": "market",
+    "money": -1047170,
+    "date": "2026-09-16T04:21:54.691Z",
+    "_id": "source-86"
+  },
+  {
+    "concept": "Fixture player 87",
+    "type": "clause",
+    "category": "market",
+    "money": -8036636,
+    "date": "2026-09-16T17:08:35.369Z",
+    "_id": "source-87"
+  },
+  {
+    "concept": "Fixture player 88",
+    "type": "clause_sell",
+    "category": "market",
+    "money": 117051838,
+    "date": "2026-09-16T18:27:06.349Z",
+    "_id": "source-88"
+  },
+  {
+    "concept": "Fixture player 89",
+    "type": "clause",
+    "category": "market",
+    "money": -5100000,
+    "date": "2026-09-16T20:49:10.814Z",
+    "_id": "source-89"
+  },
+  {
+    "concept": "Fixture player 90",
+    "type": "buy",
+    "category": "market",
+    "money": -2283280,
+    "date": "2026-09-17T10:21:13.544Z",
+    "_id": "source-90"
+  },
+  {
+    "concept": "Fixture player 91",
+    "type": "clause_sell",
+    "category": "market",
+    "money": 40591620,
+    "date": "2026-09-17T22:00:10.118Z",
+    "_id": "source-91"
+  },
+  {
+    "concept": "Fixture player 92",
+    "type": "sell",
+    "category": "market",
+    "money": 25908810,
+    "date": "2026-09-17T23:29:38.068Z",
+    "_id": "source-92"
+  },
+  {
+    "concept": "Fixture player 93",
+    "type": "sell",
+    "category": "market",
+    "money": 7645374,
+    "date": "2026-09-17T23:30:26.733Z",
+    "_id": "source-93"
+  },
+  {
+    "concept": "6.1",
+    "type": "points",
+    "category": "bonus",
+    "money": 3920000,
+    "date": "2026-09-18T07:32:21.676Z"
+  },
+  {
+    "concept": "Fixture player 95",
+    "type": "buy",
+    "category": "market",
+    "money": -1053669,
+    "date": "2026-09-19T04:21:48.690Z",
+    "_id": "source-95"
+  },
+  {
+    "concept": "Fixture player 96",
+    "type": "sell",
+    "category": "market",
+    "money": 1017904,
+    "date": "2026-09-20T04:32:24.087Z",
+    "_id": "source-96"
+  },
+  {
+    "concept": "Fixture player 97",
+    "type": "sell",
+    "category": "market",
+    "money": 1217441,
+    "date": "2026-09-20T04:39:45.076Z",
+    "_id": "source-97"
+  },
+  {
+    "concept": "Fixture player 98",
+    "type": "sell",
+    "category": "market",
+    "money": 2138374,
+    "date": "2026-09-20T20:53:15.598Z",
+    "_id": "source-98"
+  },
+  {
+    "concept": "Fixture player 99",
+    "type": "clause_sell",
+    "category": "market",
+    "money": 27634535,
+    "date": "2026-09-20T20:56:20.186Z",
+    "_id": "source-99"
+  },
+  {
+    "concept": "Fixture player 100",
+    "type": "clause",
+    "category": "market",
+    "money": -54908903,
+    "date": "2026-09-20T21:01:11.753Z",
+    "_id": "source-100"
+  },
+  {
+    "concept": "Fixture player 101",
+    "type": "sell",
+    "category": "market",
+    "money": 1275177,
+    "date": "2026-09-20T23:48:01.062Z",
+    "_id": "source-101"
+  },
+  {
+    "concept": "Fixture player 102",
+    "type": "buy",
+    "category": "market",
+    "money": -1212248,
+    "date": "2026-09-21T04:22:18.948Z",
+    "_id": "source-102"
+  },
+  {
+    "concept": "7",
+    "type": "points",
+    "category": "bonus",
+    "money": 5390000,
+    "date": "2026-09-21T12:12:25.318Z"
+  },
+  {
+    "concept": "7",
+    "type": "ranking",
+    "category": "bonus",
+    "money": 2666667,
+    "date": "2026-09-21T12:12:25.473Z",
+    "_id": "source-104"
+  },
+  {
+    "concept": "7",
+    "type": "dreamTeam",
+    "category": "bonus",
+    "money": 1500000,
+    "date": "2026-09-21T12:12:26.374Z"
+  },
+  {
+    "concept": "Fixture player 106",
+    "type": "sell",
+    "category": "market",
+    "money": 8987374,
+    "date": "2026-09-22T04:15:47.707Z",
+    "_id": "source-106"
+  },
+  {
+    "concept": "Fixture player 107",
+    "type": "sell",
+    "category": "market",
+    "money": 10742754,
+    "date": "2026-09-22T04:17:35.130Z",
+    "_id": "source-107"
+  },
+  {
+    "concept": "Fixture player 108",
+    "type": "sell",
+    "category": "market",
+    "money": 2747485,
+    "date": "2026-09-22T04:18:51.106Z",
+    "_id": "source-108"
+  },
+  {
+    "concept": "Fixture player 109",
+    "type": "sell",
+    "category": "market",
+    "money": 2974853,
+    "date": "2026-09-22T04:20:00.236Z",
+    "_id": "source-109"
+  },
+  {
+    "concept": "Fixture player 110",
+    "type": "buy",
+    "category": "market",
+    "money": -3207545,
+    "date": "2026-09-22T04:22:19.354Z",
+    "_id": "source-110"
+  },
+  {
+    "concept": "Fixture player 111",
+    "type": "buy",
+    "category": "market",
+    "money": -2952555,
+    "date": "2026-09-22T04:22:19.354Z",
+    "_id": "source-111"
+  },
+  {
+    "concept": "Fixture player 112",
+    "type": "clause",
+    "category": "market",
+    "money": -9946120,
+    "date": "2026-09-22T04:26:32.618Z",
+    "_id": "source-112"
+  },
+  {
+    "concept": "Fixture player 113",
+    "type": "clause",
+    "category": "market",
+    "money": -9645692,
+    "date": "2026-09-22T04:28:49.081Z",
+    "_id": "source-113"
+  },
+  {
+    "concept": "Fixture player 114",
+    "type": "clause",
+    "category": "market",
+    "money": -30335717,
+    "date": "2026-09-22T04:29:47.916Z",
+    "_id": "source-114"
+  },
+  {
+    "concept": "Fixture player 115",
+    "type": "clause",
+    "category": "market",
+    "money": -16969918,
+    "date": "2026-09-22T04:44:20.102Z",
+    "_id": "source-115"
+  },
+  {
+    "concept": "Fixture player 116",
+    "type": "clause",
+    "category": "market",
+    "money": -14444271,
+    "date": "2026-09-22T04:45:20.949Z",
+    "_id": "source-116"
+  },
+  {
+    "concept": "Fixture player 117",
+    "type": "clause",
+    "category": "market",
+    "money": -13639042,
+    "date": "2026-09-25T03:14:56.880Z",
+    "_id": "source-117"
+  },
+  {
+    "concept": "Fixture player 118",
+    "type": "sell",
+    "category": "market",
+    "money": 3358011,
+    "date": "2026-09-25T03:22:23.521Z",
+    "_id": "source-118"
+  },
+  {
+    "concept": "Fixture player 119",
+    "type": "sell",
+    "category": "market",
+    "money": 5735064,
+    "date": "2026-09-25T03:24:56.411Z",
+    "_id": "source-119"
+  },
+  {
+    "concept": "Fixture player 120",
+    "type": "clause_sell",
+    "category": "market",
+    "money": 28416424,
+    "date": "2026-09-28T22:00:02.720Z",
+    "_id": "source-120"
+  },
+  {
+    "concept": "Fixture player 121",
+    "type": "clause",
+    "category": "market",
+    "money": -26261819,
+    "date": "2026-09-29T03:13:33.041Z",
+    "_id": "source-121"
+  },
+  {
+    "concept": "Fixture player 122",
+    "type": "buy",
+    "category": "market",
+    "money": -2331224,
+    "date": "2026-09-29T04:22:08.450Z",
+    "_id": "source-122"
+  },
+  {
+    "concept": "Fixture player 123",
+    "type": "sell",
+    "category": "market",
+    "money": 12390840,
+    "date": "2026-09-29T12:56:28.785Z",
+    "_id": "source-123"
+  },
+  {
+    "concept": "Fixture player 124",
+    "type": "buy",
+    "category": "market",
+    "money": -2181491,
+    "date": "2026-09-30T04:22:10.297Z",
+    "_id": "source-124"
+  },
+  {
+    "concept": "Fixture player 125",
+    "type": "buy",
+    "category": "market",
+    "money": -2863982,
+    "date": "2026-09-30T04:22:10.304Z",
+    "_id": "source-125"
+  },
+  {
+    "concept": "Fixture player 126",
+    "type": "sell",
+    "category": "market",
+    "money": 1252905,
+    "date": "2026-09-30T04:29:37.090Z",
+    "_id": "source-126"
+  },
+  {
+    "concept": "Fixture player 127",
+    "type": "buy",
+    "category": "market",
+    "money": -8612458,
+    "date": "2026-10-01T04:22:16.329Z",
+    "_id": "source-127"
+  },
+  {
+    "concept": "Fixture player 128",
+    "type": "sell",
+    "category": "market",
+    "money": 4154426,
+    "date": "2026-10-02T04:36:22.389Z",
+    "_id": "source-128"
+  },
+  {
+    "concept": "Fixture player 129",
+    "type": "buy",
+    "category": "market",
+    "money": -2333121,
+    "date": "2026-10-04T04:21:52.440Z",
+    "_id": "source-129"
+  },
+  {
+    "concept": "Fixture player 130",
+    "type": "clause_sell",
+    "category": "market",
+    "money": 76984217,
+    "date": "2026-10-05T21:37:21.475Z",
+    "_id": "source-130"
+  },
+  {
+    "concept": "Fixture player 131",
+    "type": "clause",
+    "category": "market",
+    "money": -6301819,
+    "date": "2026-10-06T00:21:01.683Z",
+    "_id": "source-131"
+  },
+  {
+    "concept": "Fixture player 132",
+    "type": "clause",
+    "category": "market",
+    "money": -16133425,
+    "date": "2026-10-06T00:21:58.022Z",
+    "_id": "source-132"
+  },
+  {
+    "concept": "Fixture player 133",
+    "type": "sell",
+    "category": "market",
+    "money": 12864879,
+    "date": "2026-10-09T14:43:34.170Z",
+    "_id": "source-133"
+  },
+  {
+    "concept": "Fixture player 134",
+    "type": "buy",
+    "category": "market",
+    "money": -6122454,
+    "date": "2026-10-10T04:21:53.282Z",
+    "_id": "source-134"
+  },
+  {
+    "concept": "Fixture player 135",
+    "type": "sell",
+    "category": "market",
+    "money": 3896669,
+    "date": "2026-10-10T22:12:48.436Z",
+    "_id": "source-135"
+  },
+  {
+    "concept": "Fixture player 136",
+    "type": "clause",
+    "category": "market",
+    "money": -70135403,
+    "date": "2026-10-10T22:14:07.379Z",
+    "_id": "source-136"
+  },
+  {
+    "concept": "Fixture player 137",
+    "type": "sell",
+    "category": "market",
+    "money": 13073083,
+    "date": "2026-10-10T22:14:49.323Z",
+    "_id": "source-137"
+  },
+  {
+    "concept": "Fixture player 138",
+    "type": "clause",
+    "category": "market",
+    "money": -56792527,
+    "date": "2026-10-10T22:15:20.065Z",
+    "_id": "source-138"
+  },
+  {
+    "concept": "Fixture player 139",
+    "type": "clause_sell",
+    "category": "market",
+    "money": 8671684,
+    "date": "2026-10-10T23:25:58.851Z",
+    "_id": "source-139"
+  },
+  {
+    "concept": "Fixture player 140",
+    "type": "clause",
+    "category": "market",
+    "money": -85994686,
+    "date": "2026-10-11T03:45:07.006Z",
+    "_id": "source-140"
+  },
+  {
+    "concept": "Fixture player 141",
+    "type": "sell",
+    "category": "market",
+    "money": 9364101,
+    "date": "2026-10-11T03:47:02.883Z",
+    "_id": "source-141"
+  },
+  {
+    "concept": "Fixture player 142",
+    "type": "clause_sell",
+    "category": "market",
+    "money": 5493397,
+    "date": "2026-10-11T09:54:50.155Z",
+    "_id": "source-142"
+  },
+  {
+    "concept": "Fixture player 143",
+    "type": "buy",
+    "category": "market",
+    "money": -19212242,
+    "date": "2026-10-12T04:22:21.755Z",
+    "_id": "source-143"
+  },
+  {
+    "concept": "8",
+    "type": "points",
+    "category": "bonus",
+    "money": 4200000,
+    "date": "2026-10-13T08:33:13.435Z"
+  },
+  {
+    "concept": "Fixture player 145",
+    "type": "sell",
+    "category": "market",
+    "money": 2989535,
+    "date": "2026-10-14T04:55:44.270Z",
+    "_id": "source-145"
+  },
+  {
+    "concept": "Fixture player 146",
+    "type": "sell",
+    "category": "market",
+    "money": 2716606,
+    "date": "2026-10-14T04:56:11.665Z",
+    "_id": "source-146"
+  },
+  {
+    "concept": "Fixture player 147",
+    "type": "sell",
+    "category": "market",
+    "money": 9602198,
+    "date": "2026-10-14T04:56:43.450Z",
+    "_id": "source-147"
+  },
+  {
+    "concept": "Fixture player 148",
+    "type": "sell",
+    "category": "market",
+    "money": 10341898,
+    "date": "2026-10-14T04:58:42.060Z",
+    "_id": "source-148"
+  },
+  {
+    "concept": "Fixture player 149",
+    "type": "buy",
+    "category": "market",
+    "money": -2705447,
+    "date": "2026-10-15T04:22:35.113Z",
+    "_id": "source-149"
+  },
+  {
+    "concept": "Fixture player 150",
+    "type": "sell",
+    "category": "market",
+    "money": 8165221,
+    "date": "2026-10-16T15:15:31.119Z",
+    "_id": "source-150"
+  },
+  {
+    "concept": "Fixture player 151",
+    "type": "clause_sell",
+    "category": "market",
+    "money": 29775375,
+    "date": "2026-10-18T23:30:12.798Z",
+    "_id": "source-151"
+  },
+  {
+    "concept": "Fixture player 152",
+    "type": "buy",
+    "category": "market",
+    "money": -5322245,
+    "date": "2026-10-19T04:22:50.610Z",
+    "_id": "source-152"
+  },
+  {
+    "concept": "Fixture player 153",
+    "type": "clause_sell",
+    "category": "market",
+    "money": 264882328,
+    "date": "2026-10-19T05:45:54.947Z",
+    "_id": "source-153"
+  },
+  {
+    "concept": "Fixture player 154",
+    "type": "clause",
+    "category": "market",
+    "money": -32173059,
+    "date": "2026-10-19T14:03:47.858Z",
+    "_id": "source-154"
+  },
+  {
+    "concept": "Fixture player 155",
+    "type": "clause",
+    "category": "market",
+    "money": -62023263,
+    "date": "2026-10-19T15:24:22.959Z",
+    "_id": "source-155"
+  },
+  {
+    "concept": "Fixture player 156",
+    "type": "clause",
+    "category": "market",
+    "money": -42727229,
+    "date": "2026-10-19T15:25:33.178Z",
+    "_id": "source-156"
+  },
+  {
+    "concept": "Fixture player 157",
+    "type": "clause",
+    "category": "market",
+    "money": -85010642,
+    "date": "2026-10-19T15:26:20.018Z",
+    "_id": "source-157"
+  },
+  {
+    "concept": "Fixture player 158",
+    "type": "buy",
+    "category": "market",
+    "money": -13755488,
+    "date": "2026-10-20T04:22:56.227Z",
+    "_id": "source-158"
+  },
+  {
+    "concept": "9",
+    "type": "points",
+    "category": "bonus",
+    "money": 5040000,
+    "date": "2026-10-20T10:32:12.024Z"
+  },
+  {
+    "concept": "9",
+    "type": "ranking",
+    "category": "bonus",
+    "money": 3333333,
+    "date": "2026-10-20T10:32:12.072Z",
+    "_id": "source-160"
+  },
+  {
+    "concept": "Fixture player 161",
+    "type": "sell",
+    "category": "market",
+    "money": 2971787,
+    "date": "2026-10-20T16:32:24.736Z",
+    "_id": "source-161"
+  },
+  {
+    "concept": "Fixture player 162",
+    "type": "clause_sell",
+    "category": "market",
+    "money": 16973370,
+    "date": "2026-10-22T06:42:51.985Z",
+    "_id": "source-162"
+  },
+  {
+    "concept": "6.2",
+    "type": "points",
+    "category": "bonus",
+    "money": 770000,
+    "date": "2026-10-22T13:47:08.654Z"
+  },
+  {
+    "concept": "6.2",
+    "type": "ranking",
+    "category": "bonus",
+    "money": 2000000,
+    "date": "2026-10-22T13:47:09.015Z",
+    "_id": "source-164"
+  },
+  {
+    "concept": "Fixture player 165",
+    "type": "buy",
+    "category": "market",
+    "money": -3657094,
+    "date": "2026-10-24T04:22:37.845Z",
+    "_id": "source-165"
+  },
+  {
+    "concept": "Fixture player 166",
+    "type": "buy",
+    "category": "market",
+    "money": -15562453,
+    "date": "2026-10-24T04:22:37.849Z",
+    "_id": "source-166"
+  },
+  {
+    "concept": "Fixture player 167",
+    "type": "clause",
+    "category": "market",
+    "money": -15191721,
+    "date": "2026-10-24T17:04:04.422Z",
+    "_id": "source-167"
+  },
+  {
+    "concept": "Fixture player 168",
+    "type": "sell",
+    "category": "market",
+    "money": 12282522,
+    "date": "2026-10-24T17:05:48.792Z",
+    "_id": "source-168"
+  },
+  {
+    "concept": "Fixture player 169",
+    "type": "clause",
+    "category": "market",
+    "money": -15522945,
+    "date": "2026-10-24T17:06:59.625Z",
+    "_id": "source-169"
+  },
+  {
+    "concept": "Fixture player 170",
+    "type": "sell",
+    "category": "market",
+    "money": 3447583,
+    "date": "2026-10-24T17:10:08.331Z",
+    "_id": "source-170"
+  },
+  {
+    "concept": "Fixture player 171",
+    "type": "clause",
+    "category": "market",
+    "money": -25566397,
+    "date": "2026-10-24T17:11:00.295Z",
+    "_id": "source-171"
+  },
+  {
+    "concept": "Fixture player 172",
+    "type": "clause_sell",
+    "category": "market",
+    "money": 29621759,
+    "date": "2026-10-25T04:04:10.435Z",
+    "_id": "source-172"
+  },
+  {
+    "concept": "Fixture player 173",
+    "type": "clause",
+    "category": "market",
+    "money": -12601874,
+    "date": "2026-10-25T16:44:53.834Z",
+    "_id": "source-173"
+  },
+  {
+    "concept": "Fixture player 174",
+    "type": "sell",
+    "category": "market",
+    "money": 11081706,
+    "date": "2026-10-25T16:46:14.867Z",
+    "_id": "source-174"
+  },
+  {
+    "concept": "Fixture player 175",
+    "type": "sell",
+    "category": "market",
+    "money": 20869991,
+    "date": "2026-10-25T16:46:20.737Z",
+    "_id": "source-175"
+  },
+  {
+    "concept": "Fixture player 176",
+    "type": "clause",
+    "category": "market",
+    "money": -37864273,
+    "date": "2026-10-25T16:46:35.521Z",
+    "_id": "source-176"
+  },
+  {
+    "concept": "Fixture player 177",
+    "type": "clause_sell",
+    "category": "market",
+    "money": 92616106,
+    "date": "2026-10-25T23:00:10.931Z",
+    "_id": "source-177"
+  },
+  {
+    "concept": "10",
+    "type": "points",
+    "category": "bonus",
+    "money": 5250000,
+    "date": "2026-10-27T14:21:51.976Z"
+  },
+  {
+    "concept": "10",
+    "type": "ranking",
+    "category": "bonus",
+    "money": 4000000,
+    "date": "2026-10-27T14:21:52.063Z",
+    "_id": "source-179"
+  },
+  {
+    "concept": "Fixture player 180",
+    "type": "buy",
+    "category": "market",
+    "money": -3042585,
+    "date": "2026-10-28T05:23:06.508Z",
+    "_id": "source-180"
+  },
+  {
+    "concept": "Fixture player 181",
+    "type": "sell",
+    "category": "market",
+    "money": 15793821,
+    "date": "2026-10-30T08:04:23.237Z",
+    "_id": "source-181"
+  },
+  {
+    "concept": "Fixture player 182",
+    "type": "sell",
+    "category": "market",
+    "money": 22115031,
+    "date": "2026-10-30T08:04:50.694Z",
+    "_id": "source-182"
+  },
+  {
+    "concept": "Fixture player 183",
+    "type": "clause",
+    "category": "market",
+    "money": -49531305,
+    "date": "2026-10-31T03:31:56.451Z",
+    "_id": "source-183"
+  },
+  {
+    "concept": "Fixture player 184",
+    "type": "clause",
+    "category": "market",
+    "money": -6331322,
+    "date": "2026-10-31T03:34:10.258Z",
+    "_id": "source-184"
+  },
+  {
+    "concept": "Fixture player 185",
+    "type": "buy",
+    "category": "market",
+    "money": -39107845,
+    "date": "2026-10-31T05:22:45.792Z",
+    "_id": "source-185"
+  },
+  {
+    "concept": "Fixture player 186",
+    "type": "sell",
+    "category": "market",
+    "money": 4507079,
+    "date": "2026-11-01T19:03:13.358Z",
+    "_id": "source-186"
+  },
+  {
+    "concept": "Fixture player 187",
+    "type": "clause",
+    "category": "market",
+    "money": -55201809,
+    "date": "2026-11-01T19:03:28.668Z",
+    "_id": "source-187"
+  },
+  {
+    "concept": "Fixture player 188",
+    "type": "sell",
+    "category": "market",
+    "money": 28165855,
+    "date": "2026-11-02T15:44:37.031Z",
+    "_id": "source-188"
+  },
+  {
+    "concept": "Fixture player 189",
+    "type": "clause",
+    "category": "market",
+    "money": -20934691,
+    "date": "2026-11-02T22:03:01.261Z",
+    "_id": "source-189"
+  },
+  {
+    "concept": "11",
+    "type": "points",
+    "category": "bonus",
+    "money": 7350000,
+    "date": "2026-11-03T10:08:57.637Z"
+  },
+  {
+    "concept": "11",
+    "type": "ranking",
+    "category": "bonus",
+    "money": 2666667,
+    "date": "2026-11-03T10:08:57.922Z",
+    "_id": "source-191"
+  }
+]
