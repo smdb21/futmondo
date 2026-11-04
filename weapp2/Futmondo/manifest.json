@@ -2265,7 +2265,7 @@
       "checksum": "6f45a34c8a9aca129dc01ca093feed62"
     },
     "award_runtime.R": {
-      "checksum": "99f1701bc8d314c4f81915b9703b1be1"
+      "checksum": "b45f65855149a08e88e8934eaf380555"
     },
     "background_runtime.R": {
       "checksum": "9c391d713415e435fde02b8f39320fcf"
@@ -2346,7 +2346,7 @@
       "checksum": "a243c91a9c01604ce74d517e116e3e61"
     },
     "rival_finance_runtime.R": {
-      "checksum": "8716ffb7ed75ca2f6cfa2d8dc4eaa813"
+      "checksum": "108b4acb8bf711eb97cec588aaab71ee"
     },
     "server.R": {
       "checksum": "99e89173e500fba3b916088dd424b099"
@@ -2367,7 +2367,7 @@
       "checksum": "410e38ab7007ab0a040e6c349e48bc39"
     },
     "www/release-info.json": {
-      "checksum": "ccc26a2fd3ba354ca4d496aeb7006e74"
+      "checksum": "e1eb2aef564efd92197cd85e1ed07275"
     },
     "www/remember-login.js": {
       "checksum": "2b037334f8088f5b4a270acbaea52e91"

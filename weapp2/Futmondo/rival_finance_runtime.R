@@ -279,7 +279,7 @@ rival_payment_anchors <- function(movements) {
     repeated<-any(table(settlements$team_id)>1L)
     # Split/repeated evidence from ANY team invalidates a full-round date. A
     # reference team cannot hide another team's known later settlement.
-    if(any(grepl("[.]",round$settlement_label))||repeated){
+    if(length(unique(round$settlement_label))>1L||repeated){
       return(data.frame(round_id=round$round_id[1],date="",settlement_label="unverified split settlement"))
     }
     reference<-sort(unique(round$team_id))[1]
@@ -288,9 +288,9 @@ rival_payment_anchors <- function(movements) {
 }
 rival_reward_date <- function(round_id,anchors) {
   x<-anchors[anchors$round_id%in%round_id,,drop=FALSE]
-  # Revised/split settlements require phase-specific selections. A latest full
-  # selection cannot be assigned retroactively to the first or last payment.
-  if(nrow(x)==1L&&!grepl("[.]",x$settlement_label))x$date else ""
+  # One position settlement establishes the completed-round payment, including
+  # a sole decimal label such as 6.2. Multiple distinct settlements stay ambiguous.
+  if(nrow(x)==1L)x$date else ""
 }
 
 
@@ -740,7 +740,7 @@ rival_estimate_summary <- function(missing,assumptions=character(),difference=NA
 
 # Public pure accounting interface; every numeric subtotal has an evidence trail.
 # Versioned, context-bound calculation cache. Source records remain authoritative.
-rival_calculation_version <- "2026-11-03-incremental-v1"
+rival_calculation_version <- "2026-11-04-settled-awards-v2"
 rival_calculation_hash <- function(x) as.character(openssl::sha256(serialize(x,NULL,version=2)))
 rival_calculation_evidence <- function(evidence) {
   rows<-Filter(function(x)!x$evidence_type%in%c("team","coverage","rules"),evidence)

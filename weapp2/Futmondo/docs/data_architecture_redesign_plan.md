@@ -516,3 +516,8 @@ Confirmed actual round-6 payment establishes whole-euro truncation of shared pos
 ### Rival balance recovery, incremental updates and selection — implemented locally 2026-11-03
 
 Reproduced hosted HOPE 632,606,939 EUR as clause-only history: omitted ordinary transfers net -206,484,228 EUR. Existing database recovery plus saved clauses produces the confirmed 426,122,711 EUR. Added adoption of a concurrently recovered complete feed, semantic calculation reuse, per-team invalidation, bounded shared process cache, and incremental transfer pages with full-audit safeguards. Stabilized team-ID selection through redraw/reorder and applied requested simplified columns/labels. Local regression/browser/lifecycle results and hosted delivery are tracked separately. Persistent serialized calculation snapshots were not implemented; server restarts still rebuild from the existing saved source evidence.
+
+
+### Settled award freshness — 2026-11-04
+
+Implemented locally: detect award snapshots predating final-category payments; recover them through shared async acquisition and existing snapshot persistence; reuse after successful save. Correct sole decimal position-settlement date handling. Exit checks include a sanitized €500,000 Best XI revision, persistence/reuse across sessions, and full offline lifecycle. Hosted authenticated balances remain a separate verification step.

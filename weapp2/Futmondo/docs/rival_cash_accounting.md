@@ -214,3 +214,10 @@ A successful `resource_store()` publication of the exact scoped pressroom resour
 Transfer acquisition uses a previously complete process cache as the baseline: fetch newest pages until a wholly known page establishes overlap, retain revised rows on fetched pages, deduplicate native IDs and reconcile locker deliveries. Full history is audited once per day during active use, after cache eviction/server restart, or explicit invalidation/Refresh, preserving detection of older corrections. This is not blind append-only accounting.
 
 Selection travels as team ID plus account/league/team context, not a row index. Browser callbacks restore the selected row after reorder/redraw, support row clicks and radio buttons, dispose the prior state listener, and reject obsolete-context selections. Status/Confidence columns and the verbose calculation explanation are removed. Historical Type labels omit Estimated; bonus descriptions use Best XI, Position, and Points (Round N: score), retaining split settlement identity where applicable.
+
+
+### Award revisions after settlement — 2026-11-04
+
+`award_settlement_rechecks(evidence, rows, catalog)` compares saved selection capture times with dated positive ranking/XI/MVP payments in the already scoped evidence. Points alone do not establish final settlement. `get_mvp_saved_catalog()` returns the affected round IDs; the active shared award source refreshes only those IDs through its existing asynchronous, two-request acquisition and acknowledged snapshot persistence path. Subsequent sessions reuse a snapshot captured after settlement. Changed selections invalidate the existing historical-lineup signatures, causing eligibility recovery through the normal rival queue. No new endpoint, schema, timer or background worker is introduced.
+
+A single position settlement such as `6.2` is a usable completed-round award date. The decimal label alone no longer disqualifies it. Multiple distinct position labels or repeated position payments remain ambiguous and retain the existing notification recovery behavior. Actual transactions and amount calculations remain unchanged by this date correction.

@@ -54,12 +54,31 @@ award_saved_rows <- function(snapshots,championship_id,season,expected_scoring="
     rows
   }))
 }
+# A selection captured before settlement can still be provisional even when the
+# catalog called the round closed. Recheck once after a dated final-category payment.
+award_settlement_rechecks <- function(evidence,rows,catalog) {
+  if(!is.data.frame(catalog)||!all(c("round_id","round_number")%in%names(catalog)))return(character())
+  movements<-rival_evidence_rows(evidence,"movements")
+  teams<-unique(vapply(movements,function(x)mvp_text(x$payload$team_id),character(1)))
+  payments<-dplyr::bind_rows(lapply(teams,function(id)
+    rival_normalize_movements(rival_cash_latest_movements(evidence,id),catalog)))
+  if(!nrow(payments))return(character())
+  payments<-payments[payments$bonus_type%in%c("ranking","dreamteam","mvp") &
+    is.finite(payments$money)&payments$money>0 & !is.na(fm_time(payments$date)),,drop=FALSE]
+  Filter(function(id){
+    checked<-if(is.data.frame(rows)&&all(c("round_id","checked_at")%in%names(rows)))
+      fm_time(rows$checked_at[rows$round_id%in%id])else as.POSIXct(character())
+    !length(checked)||anyNA(checked)||min(checked)<max(fm_time(payments$date[payments$round_id%in%id]))
+  },intersect(unique(payments$round_id),catalog$round_id))
+}
 get_mvp_saved_catalog <- function(login,championship_id) {
   season<-league_season_context(championship_id)
   saved<-tryCatch(read_rival_finance_evidence(login[["userid"]],championship_id,season),error=function(e)list(evidence=list(),complete=FALSE))
   expected<-award_expected_scoring(login,championship_id)
-  list(saved=award_saved_rows(rival_evidence_rows(saved$evidence,"awards"),championship_id,season,expected,login[["userid"]]),expected_scoring=expected,
-    saved_complete=isTRUE(saved$complete),catalog=get_finished_round_catalog(login,championship_id),season=season)
+  rows<-award_saved_rows(rival_evidence_rows(saved$evidence,"awards"),championship_id,season,expected,login[["userid"]])
+  catalog<-get_finished_round_catalog(login,championship_id)
+  list(saved=rows,expected_scoring=expected,saved_complete=isTRUE(saved$complete),catalog=catalog,season=season,
+    settlement_rechecks=award_settlement_rechecks(saved$evidence,rows,award_catalog_numbers(catalog$rounds,rows)))
 }
 award_snapshot_evidence <- function(result,login,championship_id,reference,context) {
   if(!identical(result$status,"ok")||!award_selection_valid(result$rows))return(NULL)
@@ -248,7 +267,19 @@ shared_mvp_source <- function(session,login,championship,active,refresh=NULL) {
         state$loading<-FALSE;state$expected_scoring<-mvp_text(result$expected_scoring,"unknown");state$rows<-result$saved %||% data.frame();state$rounds<-award_catalog_numbers(result$catalog$rounds %||% empty_finished_rounds(),state$rows)
         state$catalog_complete<-isTRUE(result$catalog$complete);state$saved_complete<-isTRUE(result$saved_complete);state$catalog_reason<-result$catalog$reason %||% ""
         state$user_team_id<-result$catalog$user_team_id;state$current_round_number<-result$catalog$current_round_number
-        publish();NULL
+        # Active-session recovery only; the normal bounded async acquisition and
+        # acknowledged persistence path handles these paid-round revisions.
+        ids<-intersect(result$settlement_rechecks %||% character(),state$rounds$round_id)
+        if(length(ids)&&enabled()){
+          state$acquisition_active<-active
+          state$queue<-lapply(head(unique(ids),120L),function(id){
+            row<-state$rounds[state$rounds$round_id%in%id,,drop=FALSE]
+            list(kind="round",reference=list(round_id=id,round_number=row$round_number[1],is_finished=TRUE,
+              user_team_id=state$user_team_id,current_round_number=state$current_round_number))
+          })
+          state$running<-TRUE
+        }
+        publish();pump();NULL
       },function(e){if(current(g,key)){state$loading<-FALSE;state$catalog_reason<-"Saved awards or round catalog could not load. Refresh to retry.";publish()};NULL})
     }
     if(!is.null(state$publication)&&!identical(state$publication,publication)){state$needs_recheck<-TRUE;publish()}
