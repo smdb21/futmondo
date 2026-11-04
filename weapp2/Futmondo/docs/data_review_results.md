@@ -893,3 +893,12 @@ Read-only source investigation reproduced adri_g42's €33,768,672. Saved round 
 Verification: sanitized settlement freshness/reuse tests, 16 cash-reconciliation checks, 11 Admin award/coach checks, saved-bonus recovery, reference bonus gates, calculation reuse, and offline Shiny lifecycle. Private read-only capture replay is separate from tests and remains outside the bundle. No authenticated hosted financial screen was inspected.
 
 Performance review: freshness comparison scans the evidence already loaded for the award catalog, adding no database read. Only affected settled rounds need award HTTP requests, with the existing concurrency limit of two and acknowledged persistence. A changed selection can refresh historical lineups through the existing signature queue; unchanged saved selections do not repeat this work. The new fixture verifies one acquisition/save across two sessions and no request on repeated navigation. Calculation cache version advances so old ledgers cannot retain the date bug. No new timers, workers or unbounded caches; first recovery still incurs the existing full shared calculation cost.
+
+
+### Recent rounds disclosure — 2026-11-03
+
+Replaced the player-card Recent rounds wrapper with native details/summary, closed by default, and adapted its heading styling. Expansion uses browser behavior; reactive rebuilds reset it to collapsed. Passed `test/test_player_profile_endpoints.R` (6 checks), `test/test_recent_rounds_independent.R` (11 checks), and `test/test_shiny_simulation.R` (13 checks plus 8 tabs, no HTTP/live database mutations). Scoped diff whitespace check passed.
+
+Performance review: no added requests, database work, cache invalidations, timers, reactive dependencies, or JavaScript handlers. Existing bounded round computation and DOM content are unchanged; collapsed content saves visible space. Responsive wrapping remains unchanged and no fixed width was added. Browser/mobile appearance and hosted deployment were not verified.
+
+Push preparation (2026-11-04): applied only the Recent rounds change to remote branch 2.0 at 8bfd3a9, preserving unrelated workspace edits. Refreshed the two changed asset checksums. The exact isolated release passed the 6 profile checks, 11 round checks, 3 deployment checks and offline lifecycle (13 checks plus 8 tabs). No new requests or runtime work were added; hosted rollout is not verified by these checks.

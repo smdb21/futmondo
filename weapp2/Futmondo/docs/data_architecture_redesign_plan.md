@@ -521,3 +521,8 @@ Reproduced hosted HOPE 632,606,939 EUR as clause-only history: omitted ordinary 
 ### Settled award freshness — 2026-11-04
 
 Implemented locally: detect award snapshots predating final-category payments; recover them through shared async acquisition and existing snapshot persistence; reuse after successful save. Correct sole decimal position-settlement date handling. Exit checks include a sanitized €500,000 Best XI revision, persistence/reuse across sessions, and full offline lifecycle. Hosted authenticated balances remain a separate verification step.
+
+
+### Recent rounds collapsed by default — 2026-11-03
+
+Implemented locally: the player-card Recent rounds section uses a closed native disclosure with a clickable, keyboard-accessible heading. Existing round content remains available on expansion. Focused profile/round checks and the offline lifecycle harness passed; deployment and browser/mobile visual verification are not claimed.

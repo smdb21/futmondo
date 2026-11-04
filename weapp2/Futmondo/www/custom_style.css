@@ -1076,7 +1076,8 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
   padding-top: 14px;
   border-top: 1px solid var(--fm-border, #e2e8f0);
 }
-.player-recent-rounds h4 { margin: 0 0 10px; font-size: 14px; font-weight: 700; }
+.player-recent-rounds > summary { cursor: pointer; font-size: 14px; font-weight: 700; }
+.player-recent-rounds[open] > summary { margin-bottom: 10px; }
 .player-recent-rounds-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .player-recent-round-chip {
   flex: 1 1 100px;
