@@ -466,7 +466,12 @@ Added four selected-round euro totals (points, MVP, Best XI, position) backed by
 
 ### Reference points/position and independent awards — 2026-11-03
 
-Implemented locally: position bonuses require a reference position payment; points retain exact reference reconciliation. Best XI/MVP remain independent of reference award receipt, but require final-category settlement evidence from any recorded league recipient, plus selections and historical eligibility. Interim closed histories and point payments cannot release final awards. Pending rows remain excluded and totals unknown. User accepted official full-round completion on 2026-11-03. Focused final validation and deployment are recorded in data_review_results.md; authenticated round 11 recovery remains unverified in production.
+Implemented and hosted (commit `fd72e80`, release marker verified): position bonuses require a reference position payment; points retain exact reference reconciliation. Best XI/MVP remain independent of reference award receipt, but require final-category settlement evidence from any recorded league recipient, plus selections and historical eligibility. Interim closed histories and point payments cannot release final awards. Pending rows remain excluded and totals unknown. User accepted official full-round completion on 2026-11-03. Focused final validation and deployment are recorded in data_review_results.md; authenticated round 11 recovery remains unverified in production.
+
+### Recent rounds collapsed by default — 2026-11-03
+
+Implemented locally: the player-card Recent rounds section uses a closed native disclosure with a clickable, keyboard-accessible heading. Existing round content remains available on expansion. Focused profile/round checks and the offline lifecycle harness passed; deployment and browser/mobile visual verification are not claimed.
+
 
 ### Payment-driven cumulative rival points — 2026-11-03
 
@@ -523,13 +528,9 @@ Reproduced hosted HOPE 632,606,939 EUR as clause-only history: omitted ordinary 
 Implemented locally: detect award snapshots predating final-category payments; recover them through shared async acquisition and existing snapshot persistence; reuse after successful save. Correct sole decimal position-settlement date handling. Exit checks include a sanitized €500,000 Best XI revision, persistence/reuse across sessions, and full offline lifecycle. Hosted authenticated balances remain a separate verification step.
 
 
-### Recent rounds collapsed by default — 2026-11-03
-
-Implemented locally: the player-card Recent rounds section uses a closed native disclosure with a clickable, keyboard-accessible heading. Existing round content remains available on expansion. Focused profile/round checks and the offline lifecycle harness passed; deployment and browser/mobile visual verification are not claimed.
-
 ## Incremental query follow-up — 2026-11-05
 
-Status: **implemented and validated locally; new baseline-cache database migration and application deployment pending**.
+Status: **deployed with the database migration applied; public startup verified; authenticated cold/warm history verification pending**.
 
 - [x] Trace slow transaction refreshes through pressroom, locker news, display-cache eviction, replay, and repeated persistence.
 - [x] Reuse complete source baselines across normal refreshes; scan the current head through a one-day overlap; retain identity, same-second pagination, payment/delivery and truthful failure behavior.
@@ -537,23 +538,39 @@ Status: **implemented and validated locally; new baseline-cache database migrati
 - [x] Make card and shared league history reads incremental by ingestion/observation timestamps; preserve old-round corrections, empty acquisitions, zero, negative and unavailable scores.
 - [x] Skip acknowledged unchanged transaction writes; retain retry eligibility after failed/unconfirmed writes.
 - [x] Run focused request-count, correction, isolation, failed-save, delayed-response and offline lifecycle checks; review memory, CPU, queue limits and bundling.
-- [ ] Apply `20261105201845_complete_history_baselines.sql` in the hosted database, deploy the updated app, and verify cold/warm loading with the user's actual league. No production latency reduction is claimed from fixture results.
+- [x] Apply the prepared baseline-cache migration (hosted version `20261105220658`) and deploy commit `3bbb12de0e1bea9e138f1cd49e9bab46eb19b165`; verify the public release marker and connected Shiny session.
+- [ ] Verify authenticated cold/warm loading with the user's actual league. No production latency reduction is claimed from fixture results.
 
 Periodic full reads remain explicit correctness safeguards: daily for database history and every seven days for source transaction/news history during active demand. Changes older than the overlap are detected by these audits; source APIs do not expose a verified date-filter query.
 
 
 ## History availability and incoming-signing recovery — 2026-11-05
 
-Status: **implemented and validated locally; application deployment and authenticated hosted verification pending**.
+Status: **deployed and public startup verified; authenticated hosted history recovery remains unverified**.
 
 - [x] Preserve an identified round with an omitted score as unavailable rather than reject the player's full history; retain the missing-container/malformed-response acquisition gate.
 - [x] Settle synchronous/rejected reads, retry transient factual reads within shared bounds, count only genuinely completed/reused players, and preserve fitness-anchor reuse during recovery.
 - [x] Prevent stranded save jobs, retain sanitized failure categories, retry only safe historical writes, keep acquisition markers after acknowledged score writes, and cancel retries on logout.
 - [x] Reuse exact verified locker-payment identities after team renames/catalog removal; keep incomplete/stale source and manual-action gates intact.
 - [x] Finish focused/integrated checks and document request counts, responsiveness, memory bounds and verification limits.
-- [ ] Deploy the application and verify the reported authenticated league path. The status text alone does not identify the user's failing source response or player; no hosted recovery is claimed from synthetic fixtures.
+- [x] Deploy the application and verify HTTP 200, the new release marker and a connected Shiny session.
+- [ ] Verify the reported authenticated league path. The status text alone does not identify the user's failing source response or player; no authenticated recovery is claimed from synthetic fixtures.
 
-This recovery change adds no dependency or database migration. The prior durable transaction-baseline migration remains separately pending as recorded above.
+This recovery change adds no dependency or database migration. The prior durable transaction-baseline migration is now applied as recorded above.
 
 
 2026-11-05 authorized rollout update: the private history-cache migration is applied in the configured database (hosted version `20261105220658`), with schema, privileges and update-trigger checks passed. The isolated application release passes its focused and full offline checks; publication and authenticated production behavior are tracked separately in the review results.
+
+Hosted rollout confirmed on 2026-11-05: release `history-loading-recovery-2026-11-05`, commit `3bbb12de0e1bea9e138f1cd49e9bab46eb19b165`, HTTP 200 and a connected Shiny session. Public release hashes match the tested runtime.
+
+
+## Player availability delayed during history saving — 2026-11-05
+
+Status: **local implementation, independent review and exact release validation complete; deployment pending**.
+
+- [x] Reproduce repeated server processing while seven save acknowledgements update a 527-player history matrix.
+- [x] Reuse scoped, bounded point-coverage projections and avoid rechecking already resolved fitness after saves.
+- [x] Exercise the actual Players-table card path with seven held saves and preserve verified acquisition controls.
+- [x] Complete independent cache-invalidation review, focused regressions, responsiveness measurement and offline lifecycle checks.
+- [ ] Deploy the scoped follow-up and verify the public release marker and Shiny connection.
+- [ ] Confirm the reported delay in an authenticated hosted session; local timings are not hosted latency measurements.

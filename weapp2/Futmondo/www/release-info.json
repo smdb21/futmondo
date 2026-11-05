@@ -1,5 +1,5 @@
 {
-  "release": "history-loading-recovery-2026-11-05",
+  "release": "player-card-save-responsiveness-2026-11-05",
   "runtime_sha256": {
     "async_transport.R": "40fac5dc0c0993e252aacbdfc6edbb621f4dc59e8ce48d3c80781afcf662a604",
     "background_runtime.R": "24fe816e01923d04ad6e2dbcf6139c0ae6031beac165708ab3576fa8ec639ff8",
@@ -10,7 +10,7 @@
     "history_repository.R": "4e1106f76950689cdb8108487d64392b4fb99f615ae9b1f4757ac3f9a63b54d1",
     "locker_transfers.R": "f90b4b3e18a40e471f6fe4d4a328e6eff57fa42e279fa79d282982b20bdc86b4",
     "Modules/Players_in_Teams_Module.R": "f3a9faa85510a98cf6da277fdf2b4587806fbd640096745accf1d0b4e70d84c7",
-    "Modules/Players_Table_Module.R": "ee41a628de4e77f05402126e926e9dec07a67ea95fb80c426c1ba9df93eb4c33",
+    "Modules/Players_Table_Module.R": "4619557fe5e92068c7136aa9a059fe5be4a60190e5b01ce6782ac22bc263be71",
     "supabase_connector.R": "5627e8c85122fd9da3279733e369388a2aa21819ce46538d23f3cf72988b3bdd"
   }
 }

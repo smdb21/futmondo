@@ -2319,7 +2319,7 @@
       "checksum": "75e6f7d05ba457990b4dcd7d59adffe5"
     },
     "Modules/Players_Table_Module.R": {
-      "checksum": "7c3aee70912b940cb09682390b560f70"
+      "checksum": "5b28d3b8c14ddd6ff56ac37087bc747e"
     },
     "Modules/Plots_Module.R": {
       "checksum": "d28b6843516e7a88406119bf287000c2"
@@ -2370,7 +2370,7 @@
       "checksum": "fafb509b30ecc9b57bc9b145a35e5571"
     },
     "www/release-info.json": {
-      "checksum": "a530e4453f2e36622bd108b624d8cccc"
+      "checksum": "ce43bfbbf9d0f0670fb7d605637e4c27"
     },
     "www/remember-login.js": {
       "checksum": "2b037334f8088f5b4a270acbaea52e91"

@@ -65,3 +65,10 @@ Progress exposes `completed`, `remaining`, `pending`, `retrying`, `failed`, `fai
 
 
 `read_league_round_dataset()` preserves the underlying rows' `fetch_status` and sanitized `fetch_error` on its returned list. An incremental database failure can therefore retain previously saved points/checks while reporting the actual stale source failure; a later successful read clears that metadata. This adds no query or row copy beyond the existing list assembly.
+
+
+## Player-card responsiveness during saves (2026-11-05)
+
+The shared controller caches IDs with valid stored observations, round-window coverage for each requested N, and the latest observed round. These caches belong to the existing account/league/team entry, carry the season/scoring scope, and keep ID sets restricted to the current requested/catalog players (at most 2,000). A changed player set invalidates those ID projections. Replacing the saved matrix invalidates these projections and fitness reconciliation; merging new live points invalidates window coverage. Advancing the latest round also rechecks fitness immediately, before persistence finishes. A different N gets its own projection (the UI permits 1–20); at most 20 keys are retained even for fractional client input, and season/scoring changes rebuild the scoped projections. Stored-ID validity also expires when an excluded future-dated observation reaches the existing sixty-second eligibility boundary. No clock timer is added. Check markers remain read from current state, so acknowledgement, missing scores, sparse histories and failed saves preserve their existing semantics.
+
+A successful save only invalidates fitness reconciliation when that player's vector still needs reconciliation. Already resolved fitness vectors do not change merely because their observations have finished saving. This removes repeated scans of the full league on every decrement of the pending-save counter. Save failures, bounded acquisition/backpressure, explicit retries, context isolation and score-first/check-last persistence remain in effect. No additional requests, timers, workers, packages or mobile layout elements are introduced.

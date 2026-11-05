@@ -779,6 +779,13 @@ A fresh unauthenticated Chromium session at `https://smdb21-futmondo-v2.share.co
 
 The connector upload was initially rejected by automatic review. Verified the configured destination and local GitHub owner's admin/push permission before the successful retry through the owner account; the connector itself was read-only. Local Git object storage permissions prevented fetching the published commit back into this workspace, so the local HEAD/index were left unchanged and working files preserved. The remote release branch and hosted app were verified independently.
 
+### Recent rounds disclosure — 2026-11-03
+
+Replaced the player-card Recent rounds wrapper with native details/summary, closed by default, and adapted its heading styling. Expansion uses browser behavior; reactive rebuilds reset it to collapsed. Passed `test/test_player_profile_endpoints.R` (6 checks), `test/test_recent_rounds_independent.R` (11 checks), and `test/test_shiny_simulation.R` (13 checks plus 8 tabs, no HTTP/live database mutations). Scoped diff whitespace check passed.
+
+Performance review: no added requests, database work, cache invalidations, timers, reactive dependencies, or JavaScript handlers. Existing bounded round computation and DOM content are unchanged; collapsed content saves visible space. Responsive wrapping remains unchanged and no fixed width was added. Browser/mobile appearance and hosted deployment were not verified.
+
+
 ### Final settlement gate and independent awards — 2026-11-03
 
 User accepted official whole-round completion for postponed games. Native award movements now normalize and deduplicate by the existing identity/revision contract. Reference position payments govern position income; point reconciliation remains unchanged. Best XI/MVP require independent selections/eligibility and a positive dated final-category payment to any recorded recipient as corroborating settlement evidence. Reference award receipt is not required. Interim closed team history, points and publication notifications cannot release final awards. Pending rows remain visible, excluded and undated; shared cash, summary and classification amounts agree.
@@ -790,6 +797,9 @@ Performance: finality is one vector scan over the existing normalized shared mov
 Limitations: settlement evidence establishes completion without a new match endpoint; a league lacking any recorded final-category recipient needs payment evidence recovery before awards can be published as paid. MVP finality is inferred from its dependence on final Best XI; the official postponement article explicitly names ranking and Best XI. No finish timestamp is invented. Newly closed production round 11 still needs independent authenticated history recovery; synthetic successful repair does not prove that it happened live. Hosted verification is recorded separately after deployment.
 
 
+Hosted verification: deployed scoped commit `fd72e80817f6ad14c9f7ade27d5bfacb77246033` to the existing `2.0` release branch without force. A fresh Chromium session returned HTTP 200, connected to Shiny, and served `final-award-settlement-2026-11-03` with runtime SHA-256 `c97aa69015832521250cb72db40b42e53eccfd5ed2885cd0513d6070e6ef9c96`, matching the tested isolated release. The first check still served the prior release; the subsequent fresh check confirmed rollout. No authenticated league read or production reconciliation was claimed. Unrelated Recent rounds edits were preserved locally and excluded from the published documentation. Local Git HEAD was left untouched because its object storage remains unwritable; remote publication and hosted verification are independent.
+
+
 ### Cumulative reference-triggered point entries — 2026-11-03
 
 Verified existing accounting already implements the requested behavior: no reference payment means no reconstructed rival point entry, and later payments replace one cumulative rival/round entry after exact reference reconciliation. Source evidence is persisted; derived entries are not stored as synthetic transactions. Legacy partial-credit evidence is excluded, so no destructive data cleanup is needed. Corrected the source explanation from final settlement to latest observed payment, explicitly avoiding a round-completion claim.
@@ -797,6 +807,9 @@ Verified existing accounting already implements the requested behavior: no refer
 Added a sequential known-answer regression: no payment plus notification/legacy credit produces no entry; first payment validates 28 reference points and a 20-point rival; second payment with stale history blocks reconstruction; independently refreshed 82/84-point histories produce exactly one 5,880,000 EUR rival entry at the second date. Stable entry identity, original two reference instalments, repeat loads, saved-evidence rebuild, inflow total and final cash are checked.
 
 Exact isolated release passed seven point-settlement groups (including bounded async recovery and persisted cross-session reuse), seven final-bonus gate groups, three deployment checks, and the required offline lifecycle harness (13 checks plus eight tabs). No real-account calls occurred in tests. Performance review: accounting algorithms, request counts, storage, cache invalidation, reactive work and layout are unchanged; only explanatory text and regression coverage changed. No new benchmark was warranted. Authenticated production round-11 reconciliation remains outside this isolated validation.
+
+
+Hosted rollout verified: commit `d3502b32179013176d7b49dad8ce572d632add79` on branch `2.0`; fresh public browser session returned HTTP 200, connected to Shiny and served `cumulative-point-payments-2026-11-03` with runtime SHA-256 `4669e1978f759f97723912dcb3f7516686ce6fa1c30ac0369a95fef951e710a1`, matching the tested runtime. This verifies deployment/startup, not authenticated league balances.
 
 
 ### ID-less settlement loss and exact cash recovery — 2026-11-03
@@ -810,6 +823,9 @@ Performance: one key calculation per ID-less native settlement on acquisition (1
 Production repair inserted only the 17 missing settlement identities from the user's supplied response, marked recovered_from=user_supplied_money_movement_response; existing identities were not overwritten. A follow-up query verified all stored actual movements sum to 52,129,125 EUR, matching the independently stored observed budget exactly (difference zero). A second comparison joined recorded cumulative point amounts with independently fetched historical scores/eligibility: all rounds 1–11 matched at 70,000 EUR/point; round 11 is now 105 points, closed, eligible, and paid 7,350,000 EUR. Round 8's interim closed/point match does not establish final award settlement. Source-contract repair and saved production evidence are verified; authenticated browser rendering is separate from public hosted startup verification.
 
 
+Hosted verification: scoped commit `227c90e37f67188f174e7a1c3b977c256365da67` deployed on branch `2.0`. A fresh Chromium session returned HTTP 200, connected to Shiny and served release `idless-bonus-payments-2026-11-03`, runtime SHA-256 `c614809631f3619832a63464153d235819eba7781bb35b662f3467999251408c`, matching the isolated tested runtime. Initial check served the previous release; the next confirmed rollout. Production database recovery and exact cash/round-point comparisons were verified separately; authenticated browser rendering was not inspected.
+
+
 ### Full-evidence award overlap and history UI repair — 2026-11-03
 
 The earlier transaction-only cash check did not exercise saved award estimates. Replayed all 341 scoped production evidence records through the actual builder and reproduced 54,129,125 EUR exactly. Two extra 1,000,000 EUR MVP estimates for rounds 1/7 sat on top of native dreamTeam payments. Independent historical eligibility and configured 500,000/1,000,000 rewards establish that each 1,500,000 EUR receipt already covers XI and MVP. The corrected full replay gives 52,129,125 EUR; summary attribution is XI 1,500,000 and MVP 2,000,000, with no new cash entries. No database mutation was required for this correction.
@@ -819,6 +835,9 @@ User logs identified `missing value where TRUE/FALSE needed` in output$rivals-ri
 Exact isolated release passed the new combined regression (including the full sanitized ID-less capture), seven point groups, seven reference/finality groups, six saved recovery groups, 18 finance runtime groups, 16 cash reconciliation groups, Classification/running-balance checks, three deployment checks, and offline lifecycle 13 checks plus eight tabs. All tests are offline and sanitized; the separate production evidence replay was read-only.
 
 Performance: no extra HTTP/database calls, timers, invalidations or per-selection calculations. Attribution runs only for teams/rounds with native payments during shared publication. Three full saved-dataset builds took 9.429s versus 8.692s previously (~0.246s additional per publication); result size 583,672 versus 571,528 bytes. This is a measurable bounded CPU cost, not a network operation; full publication remains about three seconds locally and hosted CPU latency is unmeasured. Classification projection was 0.341s for 100 selections; 1,000-transfer ledger check ~0.10s. UI layout width is unchanged. Public hosted release verification is separate from authenticated browser rendering.
+
+
+Hosted verification: commit `7a1be662af40a2bc7c9d598f5a883059265a17a5` pushed to branch `2.0`. Fresh public Chromium session returned HTTP 200, connected to Shiny and served `combined-award-payments-2026-11-03` with runtime SHA-256 `16de2b4209f015a662f64e53da9a119199899475c58f1c32ebc9c127a2b877cd`, matching the tested isolated release. Full saved-evidence accounting and actual history render expression were tested locally; no authenticated browser session was inspected.
 
 
 ### Financial-history projection excludes unpaid estimates — 2026-11-03
@@ -834,12 +853,16 @@ Isolated release checks passed: round score/rank/tie and winter/summer timezone 
 
 Performance review: rank metadata is computed in the existing shared history pass, once per dataset publication, and adds three scalar columns per ledger row. Display filtering and formatting use the existing ledger; two responsive boxes do not duplicate accounting work. One browser timezone input per connection affects only display, with no API/database requests, persistence changes, cache invalidation, timers or extra acquisition. Existing runtime tests confirm shared asynchronous loading and reuse on navigation; lifecycle verifies no live HTTP/database mutation. The actual timezone-reporting script was also checked in Chromium contexts for America/Los_Angeles and Europe/Madrid. No dependency or schema changes. Authenticated hosted visual checks remain separate from these local tests.
 
+Hosted rollout verified for commit `179bda9784e43638a6b3b3e37b88a75a25c1c487`: public page returned HTTP 200, Shiny connected, and `history-rounds-local-time-2026-11-03` matched runtime SHA256 `5a647c82bd733de54ba1c04cb2d830f4120a3fb07021d971857d07e63e730962` and Rivals module SHA256 `b98039f8c2c71b503975f48779f38547a318a9d9ac1ae6fb06c5c6d51c19960f`. This verifies deployed assets and startup, not an authenticated financial-screen inspection.
+
 
 ### League transfers, crest metadata and uncapped filters — 2026-11-03
 
 Checks passed in isolated release: Today party/system/HTML/crest/timezone/full-history fixtures; seven player-filter groups including blank maximum and values above 1000M; transfer metadata with unique/ambiguous matches, bonuses and unchanged balances; 31-request synthetic cursor fixture (30 populated pages then empty), and repeated-cursor partial fixture; 13 running-balance checks; 18 finance-runtime checks; combined-award/history renderUI; round/timezone reference gates; three deployment checks. Progressive loading passed 16 checks, including delayed primary resources and targeted retry without extra optional-history fetches. Offline Shiny lifecycle passed 13 checks plus eight tabs. No real account or transaction was used in tests.
 
 Performance review: vectorized event-ID matching and shared crest markup reduced the representative 1,000-transfer metadata/display projection from 0.797 seconds to 0.037 seconds locally, with a 122 KiB display frame. Metadata is attached once per shared publication, not per rival selection. Today listens to a separate equality-checked transfer value, avoiding redraws on unchanged financial loading progress. Pagination renders 15 rows by default and makes no HTTP/database requests. Blank filters add no work. First uncached history acquisition can now exceed 25 requests by design, one per source cursor page until completion; existing async transport, context cache and persistence are retained. Full history is held in memory/client table data, so extremely large leagues can cost more memory than the fixture; no live largest-league benchmark was performed. No dependencies or schema changes.
+
+Hosted rollout: commit `f557718e7c2feb6a9729c61d924047a55611224c` is live. Public startup returned HTTP 200 with Shiny connected and release `league-transfer-history-2026-11-03`; runtime, Rivals and Today hashes match the tested release. The additional Today reactive fixture passed: newly published verified methods become visible without initiating finance acquisition. No authenticated live oldest-transfer coverage claim is made.
 
 
 ### Locker clause payments: verified cash timing and one-entry accounting — 2026-11-03
@@ -854,6 +877,8 @@ Performance review: parsed raw locker facts and merged feeds reuse existing boun
 
 Regenerated and inspected rsconnect::writeManifest(): xml2 and locker_transfers.R added, no package version changes. This environment lacks sodium and has different installed curl/data.table/httr versions. The generated manifest was reviewed and existing deployed package records were retained; only xml2 was added, avoiding unrelated dependency changes. All credentials, captures, test files, internal docs and scripts remain excluded.
 
+Hosted rollout verified for commit `7187d1b09b9c33cbfc94e4f3825d954fcfbf91ef`: public HTTP 200, Shiny connected, and release `locker-clause-payments-2026-11-03` matched all tested hashes (locker parser `0c4e797eb6795cbd1eddf2f167e3838f91c19c0c79f9d35bd1978c99b0df3774`, finance runtime `628dfbfde30ba37abd8e30df91e870648451e433ad5ebd5d34babc79b98f30f3`, Rivals `638f606f98fddb4940ccd9b29d64af62058a6512ca897b19960c9c5b11d39cb7`, Today `5e9cf9a466185cdb66329f6132fa2215e36543a45d55e28006e1443e95fe6b1f`). Public startup/deployed assets are verified; authenticated hosted financial rendering and subsequent production persistence are not claimed as directly inspected.
+
 
 ### HOPE balance audit and skipped transfer pages — 2026-11-03
 
@@ -867,10 +892,14 @@ Executed local checks: full-history pagination, new adversarial same-second ID/t
 
 Additional checks: offline Shiny lifecycle passed all 13 checks plus eight tabs; deployment contract passed all three checks. No authenticated hosted screen was used as a substitute for these local checks.
 
+Hosted rollout proof: commit `8c06d6f0ffb71cda73b7b1ea026e96f33edc0392` pushed non-force to branch `2.0`. Fresh browser reached HTTP 200 and a connected Shiny session with release `transfer-page-boundaries-2026-11-03` and verified `futmondo_functions.R` SHA256 `c708ec6ab23678c449b03e7e3eef83e8cfad3e0c2e76e3c91ef08ecbe052d320`. The live source also returned an empty page after the recovered earliest boundary second, establishing source exhaustion. Authenticated hosted financial screens and subsequent database persistence were not directly inspected; the half-euro tied-prize residual remains unresolved pending actual payment evidence.
+
 
 ### Exact HOPE reconciliation after confirmed tied payment — 2026-11-03
 
 User relayed actual round-6 position payment of 5,666,666 EUR. Updated shared tie allocation to floor the mean of rounded slot prizes. Captured-source replay now equals independently reported 426,122,711 EUR exactly; reference actual cash stays 52,129,125 EUR. No balance adjustment or fictional transaction was added. Fourteen reconstruction checks and a sanitized known-answer tied payout fixture pass. Performance review: one scalar floor per existing tied-score group; no added API/DB request, cache invalidation, persistence work, reactive publication, or memory structure. Existing shared calculation reuse remains intact. No dependency/schema/bundle membership changes.
+
+Tied-payment delivery checks: 18 finance-runtime checks, seven reference-payment gate checks and three deployment checks also passed. Commit `1a59734e9954c8981a66ffeec979ccd1eebb7b31` pushed non-force to `2.0`; a fresh hosted browser returned HTTP 200, connected Shiny and release `tied-position-whole-euros-2026-11-03` with runtime hash `e5cc07058de7542eb9b93c2f4ccd4e02f2e0742275b6327a7609d6c3ac29fa11`. Exact balance equality was verified in the captured-source ledger replay; authenticated hosted financial screens were not directly inspected.
 
 
 ### Hosted clause-only balance root cause and calculation reuse — 2026-11-03
@@ -885,6 +914,8 @@ An automatic approval review rejected a proposed serialized database calculation
 
 Final executed checks: 18 finance-runtime checks; seven reference-payment gates; round/date/history display checks; new reuse/recovery tests; incremental and boundary pagination tests; locker identity/persistence tests; cooperative locker heartbeat/cache isolation; browser row-click and radio selection/reorder/context checks; offline Shiny lifecycle (13 checks plus eight tabs); three deployment-contract checks. Status-only updates no longer replace the table data, and unchanged directory membership no longer invalidates the selected-team resource reads. No authenticated hosted financial screen has yet been inspected.
 
+Hosted delivery: pushed scoped commit `6e65b61f87ac06a3b3d8a3e31749d6e8df792db3` non-force to `2.0`. Fresh browser verified HTTP 200, connected Shiny, release `rival-reuse-and-transfer-recovery-2026-11-03`, finance hash `0f605f25abecb37ca1d0ae9d2a9b9eee731a63e303ee6d17e0ecd76979f0b1c5`, rivals hash `028b0b1b34632cde1a34a4041f7931da21e1cf21b90e18c37277cefe53a053e0`, data-service hash `4f167f83dee70ab641308f41b4866937d84c4db9ab1203029dc21d487df4012a`, and source-functions hash `2f433b3cf04105aaa7c2b421415127e95cfc26fea25eaa3933fc0927fc37694d`. Authenticated hosted balance presentation is not claimed verified; exact value was established through existing-DB and captured-source replays.
+
 
 ### Settled award freshness and missing date — 2026-11-04
 
@@ -894,14 +925,8 @@ Verification: sanitized settlement freshness/reuse tests, 16 cash-reconciliation
 
 Performance review: freshness comparison scans the evidence already loaded for the award catalog, adding no database read. Only affected settled rounds need award HTTP requests, with the existing concurrency limit of two and acknowledged persistence. A changed selection can refresh historical lineups through the existing signature queue; unchanged saved selections do not repeat this work. The new fixture verifies one acquisition/save across two sessions and no request on repeated navigation. Calculation cache version advances so old ledgers cannot retain the date bug. No new timers, workers or unbounded caches; first recovery still incurs the existing full shared calculation cost.
 
+Delivery verification: commit `8bfd3a9c3c5abd6f7b7fc015c92db8fe5bde9ba1` pushed to `2.0`. A fresh hosted browser returned HTTP 200, connected to Shiny, and served release `settled-award-refresh-2026-11-04` with matching finance and award runtime hashes. This verifies the deployed bundle/startup, not the authenticated hosted rival balance; the exact €34,268,672 comparison was the separate read-only source replay.
 
-### Recent rounds disclosure — 2026-11-03
-
-Replaced the player-card Recent rounds wrapper with native details/summary, closed by default, and adapted its heading styling. Expansion uses browser behavior; reactive rebuilds reset it to collapsed. Passed `test/test_player_profile_endpoints.R` (6 checks), `test/test_recent_rounds_independent.R` (11 checks), and `test/test_shiny_simulation.R` (13 checks plus 8 tabs, no HTTP/live database mutations). Scoped diff whitespace check passed.
-
-Performance review: no added requests, database work, cache invalidations, timers, reactive dependencies, or JavaScript handlers. Existing bounded round computation and DOM content are unchanged; collapsed content saves visible space. Responsive wrapping remains unchanged and no fixed width was added. Browser/mobile appearance and hosted deployment were not verified.
-
-Push preparation (2026-11-04): applied only the Recent rounds change to remote branch 2.0 at 8bfd3a9, preserving unrelated workspace edits. Refreshed the two changed asset checksums. The exact isolated release passed the 6 profile checks, 11 round checks, 3 deployment checks and offline lifecycle (13 checks plus 8 tabs). No new requests or runtime work were added; hosted rollout is not verified by these checks.
 
 ## Incremental query optimization — 2026-11-05
 
@@ -962,3 +987,22 @@ The final `Rscript test/test_shiny_simulation.R` passed all 13 checks plus eight
 The user authorized deployment. The Supabase connector applied `complete_history_baselines` as version `20261105220658` after its separate confirmation was approved; the two earlier confirmation expirations made no schema change. Production metadata checks confirm the expected 12 columns, scope primary key, payload/hash/resource constraints, RLS enabled, no browser-role object grants and service-role-only privileges. The update trigger is enabled, SECURITY INVOKER, with an empty search path. The new table was empty at verification; no existing observations or account records were rewritten. Its intentional private-table/no-policy advisory is informational ([Supabase advisory reference](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy)); preexisting unrelated warnings were unchanged. Local REST credentials were unavailable, so an actual hosted server REST acknowledgement remains distinct from SQL privilege verification.
 
 Prepared the release from deployed branch head `b18f1b930b0f17dfc9a42ae447cbff295fbb39be`, preserving unrelated workspace changes in round-MVP presentation, player columns, theme and utilities. Existing deployed package records were retained; no package addition or version change was included. The exact isolated release passed round recovery14, real HTTP/missing-score persistence3, incoming-source recovery6, deployment3 and the mandatory lifecycle13 plus eight tabs. All38 bundled files have matching checksums. The static `history-loading-recovery-2026-11-05` marker reports hashes for the11 changed runtime files and adds no application timer or source query. Hosted publication verification follows below after push.
+
+
+Hosted publication succeeded: commit `3bbb12de0e1bea9e138f1cd49e9bab46eb19b165` was pushed non-force to `2.0`. A fresh public Chromium session at [Futmondo](https://smdb21-futmondo-v2.share.connect.posit.cloud/) returned HTTP200, connected to Shiny and served `history-loading-recovery-2026-11-05` with the11 prepared runtime SHA256 values. Key deployed hashes: Players Table `ee41a628de4e77f05402126e926e9dec07a67ea95fb80c426c1ba9df93eb4c33`, Incoming Players `f3a9faa85510a98cf6da277fdf2b4587806fbd640096745accf1d0b4e70d84c7`, source functions `f253e0fe347d623b3e75e7ec1a31537f1098f508195711b2d919ad6ada876300`, and persistence runtime `24fe816e01923d04ad6e2dbcf6139c0ae6031beac165708ab3576fa8ec639ff8`. The exact committed bundle's38 checksums were independently rechecked after push. No account login or trade was performed; authenticated 527-player recovery, incoming-signing verification and cache-save acknowledgement still require actual active-session evidence. Updating release documentation/static metadata has no additional runtime request, database or rendering cost.
+
+
+### Player availability delayed by history-save processing — 2026-11-05
+
+Opening a player from Players had no explicit dependency on saving, but each successful recent-history acknowledgement rescanned the saved matrix and marked all fitness reconciliation dirty. This blocked the R event loop while the pending-save count decreased, delaying otherwise asynchronous card callbacks. A synthetic 527-player ×38-round scenario with seven remaining saves reproduced 18.071 seconds of acknowledgement processing and a 2.640-second maximum continuous heartbeat gap. Without fitness vectors the same redundant matrix scans alone consumed about 5.2 seconds. These are local reproducible causes, not measurements of the user's hosted Berenguer session.
+
+The controller now retains bounded, context-scoped stored-ID/window-coverage/latest-round projections, invalidates them when their inputs change, and rechecks fitness on acknowledgement only for a still-unresolved player. Independent review caught and fixed two invalidation edges: a newly retrieved global round rechecks other players before acknowledgement, and an initially future-dated observation becomes eligible at the existing now+60-second boundary. Replacing a saved matrix also invalidates all projections and fitness. No unknown score is changed to zero, no acquisition marker precedes successful persistence, and manual-action preflights are unchanged.
+
+Clean final measurement: seven acknowledgements took **0.232 seconds**, with **0.127 seconds** maximum heartbeat gap; zero repeated full-matrix/fitness scans, additional reads or shared-history publications. All527 acquisition checks remained present. Retained cache size was 139,048 bytes for the active N and 782,160 bytes across all 20 cached windows, including the scalar latest round, within each existing bounded controller entry. The two-entry/50,000-row limits remain; caches retain IDs rather than another full matrix. No new packages, network requests, timers, workers, database migration, DOM elements or mobile layout changes.
+
+`test_player_card_during_saves.R` passed 4 actual table-to-card groups with a synthetic Berenguer row and seven held saves: availability dispatches and verified controls render before saves finish, then acknowledgement counts settle without refetching the card or losing zero/negative points. `test_round_history_ack_responsiveness.R` passed the 527×38 benchmark and requested-N/live-round/season invalidation assertions. Independent `test_round_history_cache_invalidation.R` passed 7 groups for cache bounds, membership, changed rounds, held/failed saves, truthful completion, future timestamps and season isolation. The offline lifecycle passed 13 checks plus eight tabs before the final edge-case corrections; the exact release is rechecked below.
+
+Separate localhost transport analysis confirmed bounded request contention remains possible: four sequential availability reads with 80ms total synthetic server delay finished in 1.78s when queued after slower optional/background reads. This release leaves the four-connection transport and freshness checks unchanged. Remaining upstream latency and authenticated hosted responsiveness are not established by these fixtures.
+
+
+Final exact-release checks on frozen Players Table SHA256 `4619557fe5e92068c7136aa9a059fe5be4a60190e5b01ce6782ac22bc263be71`: table/card4, cache invalidation7, round recovery14, deployment3, and required offline lifecycle13 plus eight tabs all passed. Existing recent-points controller27 also passed after cache bounds; the clean responsiveness fixture passed2 groups on the same frozen source. The final private-helper test supplies its requested catalog IDs explicitly, matching the new cache membership contract. All38 bundle checksums match and all78 deployed package records remain unchanged. The only runtime-code modification is the Players Table controller; the release marker and documentation/tests accompany it. No account login or live transaction was performed.

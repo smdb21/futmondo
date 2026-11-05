@@ -979,7 +979,44 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
   context_for <- function(entry){ctx<-entry$context;ctx$season<-entry$season;ctx$scoring_version<-entry$scoring;ctx}
   visible_ids <- function()unique(unlist(lapply(current_clients(),`[[`,"ids"),use.names=FALSE))
   ids_for <- function(entry)head(unique(c(visible_ids(),entry$catalog_ids)),2000L)
-  reusable_for <- function(entry)recent_points_saved_players(entry$points,context_for(entry),entry$checks)
+  saved_ids_for <- function(entry){
+    ctx<-context_for(entry);scope<-ctx[c("championship_id","season","scoring_version")];scope$players<-sort(ids_for(entry));now<-as.numeric(Sys.time())
+    cache<-entry$saved_ids_cache
+    if(is.null(cache)||!identical(cache$scope,scope)||now>=cache$valid_until){
+      rows<-history_context_filter(entry$points,ctx);ids<-character();valid_until<-Inf
+      if(nrow(rows)&&all(c("player_id","observed_at")%in%names(rows))){
+        observed<-as.numeric(fm_time(rows$observed_at))
+        valid<-is.finite(observed)&observed<=now+60&!is.na(rows$player_id)&nzchar(as.character(rows$player_id))
+        ids<-intersect(unique(as.character(rows$player_id[valid])),scope$players)
+        future<-observed[is.finite(observed)&observed>now+60]
+        if(length(future))valid_until<-min(future)-60
+      }
+      entry$saved_ids_cache<-list(scope=scope,ids=ids,valid_until=valid_until)
+    }
+    entry$saved_ids_cache$ids
+  }
+  latest_round_for <- function(entry){
+    ctx<-context_for(entry);scope<-ctx[c("championship_id","season","scoring_version")]
+    if(is.null(entry$latest_round_cache)||!identical(entry$latest_round_cache$scope,scope)){
+      rounds<-unlist(lapply(c(list(entry$points),entry$live),function(rows)history_context_filter(rows,ctx)$round),use.names=FALSE)
+      rounds<-suppressWarnings(as.numeric(rounds));rounds<-rounds[is.finite(rounds)&rounds>=1]
+      entry$latest_round_cache<-list(scope=scope,value=if(length(rounds))max(rounds)else 0)
+    }
+    entry$latest_round_cache$value
+  }
+  covered_for <- function(entry,n){
+    scope<-context_for(entry)[c("championship_id","season","scoring_version")];scope$players<-sort(ids_for(entry))
+    if(is.null(entry$coverage_cache)||!identical(entry$coverage_cache$scope,scope))
+      entry$coverage_cache<-list(scope=scope,by_n=list())
+    key<-as.character(n);cached<-entry$coverage_cache$by_n[[key]]
+    if(is.null(cached)){
+      existing<-dplyr::bind_rows(c(list(entry$points),entry$live))
+      cached<-intersect(recent_points_covered_players(existing,context_for(entry),n),scope$players)
+      entry$coverage_cache$by_n[[key]]<-cached
+      entry$coverage_cache$by_n<-tail(entry$coverage_cache$by_n,20L)
+    }
+    cached
+  }
   update_fitness <- function(entry){
     rows <- dplyr::bind_rows(c(lapply(current_clients(),`[[`,"fitness"),list(entry$catalog_fitness)))
     if(nrow(rows)){
@@ -990,6 +1027,16 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
     if(!identical(rows,entry$fitness)){entry$fitness<-rows;entry$fitness_dirty<-TRUE}
   }
   merge_live <- function(entry,observations){
+    if(nrow(observations)){
+      entry$coverage_cache<-NULL
+      previous<-latest_round_for(entry)
+      rounds<-suppressWarnings(as.numeric(history_context_filter(observations,context_for(entry))$round))
+      rounds<-rounds[is.finite(rounds)&rounds>=1]
+      if(length(rounds)&&max(rounds)>previous){
+        entry$latest_round_cache$value<-max(rounds)
+        entry$fitness_dirty<-TRUE
+      }
+    }
     groups <- split(observations,as.character(observations$player_id))
     for(player in names(groups)){
       rows <- dplyr::bind_rows(entry$live[[player]],groups[[player]])
@@ -1073,13 +1120,12 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
     requested_missing<-character()
     demanding<-Filter(function(x)length(setdiff(x$ids,checked)),current_clients())
     if(length(demanding)){
-      existing<-dplyr::bind_rows(c(list(entry$points),entry$live))
       for(client in demanding){
-        covered<-recent_points_covered_players(existing,ctx,client$n)
+        covered<-covered_for(entry,client$n)
         requested_missing<-unique(c(requested_missing,setdiff(client$ids,c(checked,covered))))
       }
     }
-    reused<-setdiff(unique(c(reusable_for(entry),entry$fitness_ready)),
+    reused<-setdiff(unique(c(saved_ids_for(entry),checked,entry$fitness_ready)),
       c(entry$forced,requested_missing,entry$fitness_changed))
     blocked<-names(entry$attempted)[vapply(names(entry$attempted),function(player)
       !retry_waiting(entry,player)||entry$attempted[[player]]$retry_at>as.numeric(Sys.time()),logical(1))]
@@ -1166,6 +1212,7 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
         tryCatch({
         if(type=="matrix"&&is.list(data)){
           entry$points<-head(data$points %||% data.frame(),50000L)
+          entry$saved_ids_cache<-NULL;entry$coverage_cache<-NULL;entry$latest_round_cache<-NULL;entry$fitness_dirty<-TRUE
           entry$checks<-head(data$checks %||% data.frame(),2000L)
           entry$matrix_complete<-isTRUE(data$complete)
           trim_entries()
@@ -1191,6 +1238,7 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
     entry$context<-resource_context(client$auth,client$league,client$team,session_id=root$token)
     entry$season<-league_season_context(client$league);entry$scoring<-"unknown"
     entry$points<-data.frame();entry$checks<-data.frame();entry$catalog_ids<-character()
+    entry$saved_ids_cache<-NULL;entry$coverage_cache<-NULL;entry$latest_round_cache<-NULL
     entry$live<-list();entry$attempted<-list();entry$pending<-list();entry$forced<-character();entry$retry_reads<-0L;entry$request_sequence<-0L
     entry$loading<-c(matrix=TRUE,lineup=TRUE,catalog=TRUE);entry$matrix_complete<-FALSE;entry$initial_errors<-list();entry$initial_pending<-list();entry$initial_sequence<-0L
     entry$save_errors<-character();entry$saving<-0L;entry$overflow<-FALSE
@@ -1358,7 +1406,9 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
                 entry$checks<-dplyr::bind_rows(entry$checks,marker)
                 entry$checks<-tail(entry$checks[!duplicated(entry$checks[c("championship_id","player_id","season","scoring_version")],fromLast=TRUE),,drop=FALSE],2000L)
                 entry$save_errors<-setdiff(entry$save_errors,player_id)
-                entry$fitness_dirty<-TRUE
+                # A saved marker only changes fitness eligibility when this
+                # player still needs it; already resolved vectors stay valid.
+                if(player_id%in%entry$fitness_changed)entry$fitness_dirty<-TRUE
               }else entry$save_errors<-unique(c(entry$save_errors,player_id))
               touch();NULL
             }
