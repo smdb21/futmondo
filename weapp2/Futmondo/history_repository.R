@@ -51,11 +51,86 @@ history_read_pages<-function(table,query,max_rows=20000L,page_size=500L,cursor_f
   attr(rows,"fetch_status")<-if(complete)if(nrow(rows))"ok" else "empty" else "partial"
   rows
 }
+# Reuse only a complete, bounded baseline. The overlap catches recent source
+# corrections; a periodic full read also repairs older delayed inserts/deletions.
+# This uses the normal account-scoped cache, including its byte/entry/logout caps.
+read_history_incremental <- function(table,query,context=NULL,identity_fields,watermark_fields,
+  max_rows=20000L,page_size=500L,cursor_fields=NULL,overlap_days=1,full_refresh_after=86400) {
+  if(is.null(context))return(history_read_pages(table,query,max_rows,page_size,cursor_fields))
+  stopifnot(length(identity_fields)>0L,length(watermark_fields)>0L,
+    is.finite(overlap_days),overlap_days>=0,is.finite(full_refresh_after),full_refresh_after>0)
+  signature<-as.character(openssl::sha256(serialize(list(table,query,identity_fields,watermark_fields,
+    max_rows,page_size,cursor_fields,overlap_days,full_refresh_after),NULL)))
+  resource<-paste0("history_baseline_",table,"_",signature)
+  key<-api_cache_key(resource,context=context)
+  resource_cache_prune();entry<-api_cache_env[[key]];baseline<-entry$data
+  usable<-is.data.frame(baseline)&&isTRUE(attr(baseline,"complete"))
+  now<-Sys.time();full_at<-attr(baseline,"history_full_read_at")
+  full_age<-if(length(full_at)==1L)as.numeric(difftime(now,full_at,units="secs"))else Inf
+  incremental<-usable&&nrow(baseline)>0L&&is.finite(full_age)&&full_age<full_refresh_after
+  newest_stamp<-function(rows){
+    stamps<-unlist(lapply(intersect(watermark_fields,names(rows)),function(field)as.numeric(fm_time(unique(rows[[field]])))),use.names=FALSE)
+    stamps<-stamps[is.finite(stamps)]
+    if(length(stamps))max(stamps)else NA_real_
+  }
+  cutoff<-NULL;q<-query;watermark<-attr(baseline,"history_watermark")
+  if(incremental){
+    if(length(watermark)!=1L||!is.finite(watermark))watermark<-newest_stamp(baseline)
+    if(!is.finite(watermark))incremental<-FALSE else{
+      cutoff<-format(as.POSIXct(watermark-overlap_days*86400,origin="1970-01-01",tz="UTC"),"%Y-%m-%dT%H:%M:%OSZ",tz="UTC")
+      clauses<-paste0(watermark_fields,".gte.",cutoff)
+      # Keep cursor pagination's OR separate from the watermark alternatives.
+      boundary<-if(length(clauses)==1L)clauses else paste0("or(",paste(clauses,collapse=","),")")
+      q$and<-paste0("(",if(!is.null(q$and))paste0(sub("^\\((.*)\\)$","\\1",q$and),",")else "",boundary,")")
+    }
+  }
+  failure<-NULL
+  fresh<-tryCatch(history_read_pages(table,q,max_rows,page_size,cursor_fields),error=function(e){failure<<-e;NULL})
+  if(is.null(fresh)){
+    if(!usable){if(!is.null(failure))stop(failure);return(NULL)}
+    fallback<-baseline;attr(fallback,"complete")<-FALSE;attr(fallback,"fetch_status")<-"stale"
+    if(!is.null(failure))attr(fallback,"fetch_error")<-failure
+    return(fallback)
+  }
+  if(nrow(fresh)&&!all(identity_fields%in%names(fresh)))stop("History identity columns are missing")
+  complete<-isTRUE(attr(fresh,"complete"))
+  rows<-if(usable&&(incremental||!complete))dplyr::bind_rows(baseline,fresh)else fresh
+  if(nrow(rows)){
+    rows<-rows[!duplicated(rows[identity_fields],fromLast=TRUE),,drop=FALSE]
+    terms<-strsplit(query$order,",",fixed=TRUE)[[1]];fields<-sub("\\.(asc|desc).*$","",terms)
+    if(all(fields%in%names(rows))){
+      values<-lapply(seq_along(fields),function(i){v<-xtfrm(rows[[fields[i]]]);if(grepl("\\.desc",terms[i]))-v else v})
+      rows<-rows[do.call(order,c(values,list(na.last=TRUE))),,drop=FALSE]
+    }
+  }
+  if(nrow(rows)>max_rows){rows<-head(rows,max_rows);complete<-FALSE}
+  rownames(rows)<-NULL
+  attr(rows,"complete")<-complete
+  attr(rows,"fetch_status")<-if(complete)if(nrow(rows))"ok"else "empty"else "partial"
+  attr(rows,"history_incremental")<-incremental
+  attr(rows,"history_cutoff")<-cutoff
+  attr(rows,"history_full_read_at")<-if(incremental)full_at else now
+  stamps<-c(if(incremental)watermark else NULL,newest_stamp(fresh));stamps<-stamps[is.finite(stamps)]
+  attr(rows,"history_watermark")<-if(length(stamps))max(stamps)else NA_real_
+  attr(rows,"source")<-"supabase"
+  attr(rows,"fetch_error")<-NULL
+  if(complete){
+    rows<-resource_store(key,rows,context,resource)
+    # Long-lived baselines are never returned without checking the source; the
+    # existing global LRU/byte caps still evict them under memory pressure.
+    cached<-api_cache_env[[key]]
+    if(!is.null(cached)){
+      cached$expires_at<-as.numeric(now)+7*86400
+      api_cache_env[[key]]<-cached
+    }
+  }
+  rows
+}
 read_card_price_history<-function(context,max_rows=5000L){
-  history_read_pages("player_history",list(championship_id=paste0("eq.",context$championship_id),player_id=paste0("eq.",context$player_id),select="id,player_id,championship_id,value,observed_at,recorded_at",order="recorded_at.asc,id.asc"),max_rows=max_rows,cursor_fields=c("recorded_at","id"))
+  read_history_incremental("player_history",list(championship_id=paste0("eq.",context$championship_id),player_id=paste0("eq.",context$player_id),select="id,player_id,championship_id,value,observed_at,recorded_at",order="recorded_at.asc,id.asc"),context=context,identity_fields="id",watermark_fields="recorded_at",max_rows=max_rows,cursor_fields=c("recorded_at","id"))
 }
 read_card_round_history<-function(context,max_rows=5000L){
-  history_read_pages("player_match_observations",list(championship_id=paste0("eq.",context$championship_id),player_id=paste0("eq.",context$player_id),season=paste0("eq.",context$season),scoring_version=paste0("eq.",context$scoring_version),select="player_id,championship_id,season,scoring_version,round,points,score_status,round_start_at,occurred_at,observed_at",order="round.asc,observed_at.asc"),max_rows=max_rows,cursor_fields=c("round","observed_at"))
+  read_history_incremental("player_match_observations",list(championship_id=paste0("eq.",context$championship_id),player_id=paste0("eq.",context$player_id),season=paste0("eq.",context$season),scoring_version=paste0("eq.",context$scoring_version),select="player_id,championship_id,season,scoring_version,round,points,score_status,round_start_at,occurred_at,observed_at",order="round.asc,observed_at.asc"),context=context,identity_fields=c("player_id","championship_id","season","scoring_version","round","observed_at"),watermark_fields="observed_at",max_rows=max_rows,cursor_fields=c("round","observed_at"))
 }
 normalize_card_valuation<-function(stored,summary){
   live<-summary$prices
@@ -89,7 +164,7 @@ get_player_card_history<-function(login,championship_id,user_team_id,player_id,r
     points<-reconcile_player_points(stored,live,ctx);valuation<-normalize_card_valuation(prices,summary)
     known<-ctx$season!="unknown"&&ctx$scoring_version!="unknown"
     complete<-known&&isTRUE(summary$history_complete)&&!identical(attr(summary,"fetch_status"),"stale")&&isTRUE(attr(stored,"complete"))&&isTRUE(attr(prices,"complete"))
-    list(summary=summary,points=points,previous_points=previous_points,valuation=valuation,context=ctx,source=unique(c(points$source,valuation$source)),status=if(is.null(summary)&&is.null(stored)&&is.null(prices))"unavailable" else if(!nrow(points)&&!nrow(valuation))"empty" else if(complete)"ok" else "partial",freshness=if(identical(attr(summary,"fetch_status"),"stale"))"stale" else "fresh",completeness=if(complete)"complete" else "partial",coverage=list(database_rounds=if(is.data.frame(stored))nrow(stored)else 0L,live_rounds=nrow(live),season_known=ctx$season!="unknown",scoring_known=ctx$scoring_version!="unknown"),reason=if(!known)"Season or scoring context is unknown; this history is kept separate from known contexts." else if(!complete)"Historical coverage is partial." else "")
+    list(summary=summary,points=points,previous_points=previous_points,valuation=valuation,context=ctx,source=unique(c(points$source,valuation$source)),status=if(is.null(summary)&&is.null(stored)&&is.null(prices))"unavailable" else if(!nrow(points)&&!nrow(valuation))"empty" else if(complete)"ok" else "partial",freshness=if(any(vapply(list(summary,stored,prices),function(x)identical(attr(x,"fetch_status"),"stale"),logical(1))))"stale" else "fresh",completeness=if(complete)"complete" else "partial",coverage=list(database_rounds=if(is.data.frame(stored))nrow(stored)else 0L,live_rounds=nrow(live),season_known=ctx$season!="unknown",scoring_known=ctx$scoring_version!="unknown"),reason=if(!known)"Season or scoring context is unknown; this history is kept separate from known contexts." else if(!complete)"Historical coverage is partial." else "")
   },context=ctx)
 }
 
@@ -103,7 +178,7 @@ assemble_player_card_history <- function(summary,lineup,stored,prices,context) {
   valuation<-normalize_card_valuation(prices,summary)
   list(summary=summary,points=points,previous_points=reconcile_player_points(stored,data.frame(),context),
     valuation=valuation,context=context,status=if(!nrow(points)&&!nrow(valuation))"empty"else "partial",
-    freshness=if(identical(attr(summary,"fetch_status"),"stale"))"stale"else "fresh")
+    freshness=if(any(vapply(list(summary,stored,prices),function(x)identical(attr(x,"fetch_status"),"stale"),logical(1))))"stale"else "fresh")
 }
 
 # Current player responses share the card request context. Their round labels

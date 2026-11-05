@@ -165,9 +165,9 @@ shiny::testServer(persistence_server, {
   stopifnot(isTRUE(persist_recent_points_snapshot(payload,ctx,function(ok)callback_result<<-isTRUE(ok))))
   settle(session)
   stopifnot(length(http_pending)==1L,identical(http_pending[[1L]]$table,"player_match_observations"))
-  http_pending[[1L]]$reject(simpleError("HTTP 500"))
+  http_pending[[1L]]$reject(simpleError("HTTP 400"))
   settle(session)
-  check("score write failure is reported and prevents marker write", {
+  check("permanent score write failure is reported and prevents marker write", {
     stopifnot(identical(callback_result,FALSE),length(http_pending)==1L,
       identical(http_pending[[1L]]$table,"player_match_observations"),
       grepl("history could not be saved",background_sync_status("account-A")$error,ignore.case=TRUE))

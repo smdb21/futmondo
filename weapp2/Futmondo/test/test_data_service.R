@@ -29,7 +29,7 @@ check('partial reconciliation preserves corrections zero negative and context',{
  stored<-dplyr::bind_rows(row(1,0,'2026-10-01'),row(2,8,'2026-10-01'),row(2,9,'2026-10-02'),row(1,99,'2025-10-01',season='2025'),row(4,99,'2026-10-01',season='unknown'))
  live<-dplyr::bind_rows(row(2,7,'2026-10-01'),row(3,-2,'2026-10-03',status='provisional'),row(4,NA,'2026-10-03'))
  got<-reconcile_player_points(stored,live,ctx)
- stopifnot(identical(got$round_number,c(1,2,3)),identical(got$points,c(0,9,-2)),all(is.na(got$date)),got$score_status[3]=='provisional')
+ stopifnot(identical(got$round_number,c(1,2,3,4)),identical(got$points,c(0,9,-2,NA_real_)),all(is.na(got$date)),got$score_status[3]=='provisional')
 })
 check('unknown finality and participation remain unknown',{
  got<-normalize_player_match_observations(list(match=list(r=list(number=9)),points=list(list(round=1,points=0),list(round=2,points=-2),list(round=3))),'p','league')

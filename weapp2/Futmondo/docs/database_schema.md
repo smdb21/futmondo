@@ -23,3 +23,12 @@ The R server uses explicit service-role grants. Browser roles cannot read privat
 ## Verification
 
 `node test/test_factual_schema.cjs` checks fresh installation, repeat execution, known-answer score revisions, league ownership, private access, existing-install preservation, retirement, and transaction rollback. `test/test_observation_migration.cjs` checks preserved historical migration behavior using the pre-redesign schema fixture.
+
+
+## Complete source history baselines
+
+The additive migration `scripts/migrations/20261105201845_complete_history_baselines.sql` adds `complete_history_baselines`; fresh installations include the same DDL in `scripts/schema.sql`. This is a server-only cache with RLS enabled and no public, anon, or authenticated privileges. Only `service_role` can read/write it. Its primary key is `(account_id, championship_id, season, scoring_version, resource)`; allowed resources are the league's pressroom and locker-payment feeds.
+
+The bounded, compressed normalized JSON snapshot and completion metadata are stored atomically with encoding, compressed-payload SHA-256, uncompressed byte count, semantic snapshot hash, source observation time and database recorded time. The app rejects partial, malformed, mismatched, oversized or credential-bearing content. Per snapshot limits: 20,000 rows, 16 MiB JSON and 900 KiB encoded payload; the existing queue still caps each job at 1 MiB. A trigger prevents an older concurrent observation overwriting a newer snapshot. This table does not replace factual transfer/auction/bid ledgers or prove their separate writes succeeded. Removing cache rows only forces reacquisition. The normal reset helper clears this cache before factual tables.
+
+The authorized rollout applied this migration to the configured production database on 2026-11-05, recorded as `20261105220658`. Column/constraint/RLS/grant/trigger metadata checks passed; authenticated application cache saves are verified separately.

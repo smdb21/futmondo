@@ -250,6 +250,31 @@ incoming_clause_cached_summary <- function(login,championship_id,user_team_id,pl
   item$data
 }
 
+incoming_clause_source_unverified <- function(state) {
+  is.null(state$data)||state$status%in%c("stale","partial","unavailable")||
+    identical(state$freshness,"stale")||acquisition_data_unverified(state$data)
+}
+incoming_clause_prerequisite_failure <- function(roster,history) {
+  states<-list(roster=roster,transactions=history)
+  labels<-c(roster="Roster",transactions="Transaction history")
+  messages<-character();failures<-list()
+  for(key in names(states)) {
+    state<-states[[key]]
+    if(!incoming_clause_source_unverified(state))next
+    error<-state$error %||% attr(state$data,"fetch_error")
+    if(!is.null(error)) {
+      failure<-resource_failure(error,if(key=="roster")"roster"else"pressroom")
+      failures[[key]]<-failure
+      messages<-c(messages,paste0(labels[[key]],": ",resource_failure_message(failure)))
+    } else {
+      reason<-if(identical(state$freshness,"stale")||identical(state$status,"stale")||identical(attr(state$data,"fetch_status"),"stale"))"is stale"else
+        if(identical(state$status,"partial")||identical(attr(state$data,"fetch_status"),"partial"))"is incomplete"else"could not be loaded"
+      messages<-c(messages,paste0(labels[[key]]," ",reason,". Refresh to retry."))
+    }
+  }
+  list(message=paste("Incoming signings could not be verified.",paste(messages,collapse=" ")),failures=failures)
+}
+
 incoming_clause_source <- function(session,login_token,championship_id,user_team_id,is_active,refresh_trigger=NULL) {
   state<-shiny::reactiveVal(list(status="loading",records=incoming_clause_empty(),error=NULL))
   roster_read<-factual_read_adapter(session,"get_players_from_team",login_token,championship_id,user_team_id,
@@ -310,14 +335,13 @@ incoming_clause_source <- function(session,login_token,championship_id,user_team
     roster<-roster_read(login=auth,championship_id=context$league,user_team_id=context$team,teams=NULL)
     history<-history_read(login=auth,championship_id=context$league)
     refresh<-if(is.function(refresh_trigger))refresh_trigger()else 0L
-    if(is.null(roster$data)||is.null(history$data)||roster$status%in%c("stale","partial","unavailable")||
-       history$status%in%c("stale","partial","unavailable")||identical(roster$freshness,"stale")||identical(history$freshness,"stale")||
-       acquisition_data_unverified(roster$data)||acquisition_data_unverified(history$data)) {
+    if(incoming_clause_source_unverified(roster)||incoming_clause_source_unverified(history)) {
       generation<<-generation+1L;signature<<-NULL;queue<<-character();snapshot<<-NULL
       previous<-shiny::isolate(state())
       loading<-roster$status%in%c("loading","refreshing")||history$status%in%c("loading","refreshing")
+      problem<-if(loading)NULL else incoming_clause_prerequisite_failure(roster,history)
       state(list(status=if(loading)"loading"else "partial",records=previous$records,
-        error=if(loading)NULL else "Incoming signings could not be verified because the roster or transaction history failed to load. Use Refresh to retry."))
+        error=if(loading)NULL else problem$message,source_errors=if(loading)list()else problem$failures))
       return()
     }
     candidates<-pending_clause_candidates(roster$data,history$data,context$team,shiny::isolate(state())$records)

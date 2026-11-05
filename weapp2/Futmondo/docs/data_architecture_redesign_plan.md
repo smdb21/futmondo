@@ -526,3 +526,34 @@ Implemented locally: detect award snapshots predating final-category payments; r
 ### Recent rounds collapsed by default — 2026-11-03
 
 Implemented locally: the player-card Recent rounds section uses a closed native disclosure with a clickable, keyboard-accessible heading. Existing round content remains available on expansion. Focused profile/round checks and the offline lifecycle harness passed; deployment and browser/mobile visual verification are not claimed.
+
+## Incremental query follow-up — 2026-11-05
+
+Status: **implemented and validated locally; new baseline-cache database migration and application deployment pending**.
+
+- [x] Trace slow transaction refreshes through pressroom, locker news, display-cache eviction, replay, and repeated persistence.
+- [x] Reuse complete source baselines across normal refreshes; scan the current head through a one-day overlap; retain identity, same-second pagination, payment/delivery and truthful failure behavior.
+- [x] Add atomic, account/league/context-scoped persisted source snapshots without storing authentication or enabling unattended collection.
+- [x] Make card and shared league history reads incremental by ingestion/observation timestamps; preserve old-round corrections, empty acquisitions, zero, negative and unavailable scores.
+- [x] Skip acknowledged unchanged transaction writes; retain retry eligibility after failed/unconfirmed writes.
+- [x] Run focused request-count, correction, isolation, failed-save, delayed-response and offline lifecycle checks; review memory, CPU, queue limits and bundling.
+- [ ] Apply `20261105201845_complete_history_baselines.sql` in the hosted database, deploy the updated app, and verify cold/warm loading with the user's actual league. No production latency reduction is claimed from fixture results.
+
+Periodic full reads remain explicit correctness safeguards: daily for database history and every seven days for source transaction/news history during active demand. Changes older than the overlap are detected by these audits; source APIs do not expose a verified date-filter query.
+
+
+## History availability and incoming-signing recovery — 2026-11-05
+
+Status: **implemented and validated locally; application deployment and authenticated hosted verification pending**.
+
+- [x] Preserve an identified round with an omitted score as unavailable rather than reject the player's full history; retain the missing-container/malformed-response acquisition gate.
+- [x] Settle synchronous/rejected reads, retry transient factual reads within shared bounds, count only genuinely completed/reused players, and preserve fitness-anchor reuse during recovery.
+- [x] Prevent stranded save jobs, retain sanitized failure categories, retry only safe historical writes, keep acquisition markers after acknowledged score writes, and cancel retries on logout.
+- [x] Reuse exact verified locker-payment identities after team renames/catalog removal; keep incomplete/stale source and manual-action gates intact.
+- [x] Finish focused/integrated checks and document request counts, responsiveness, memory bounds and verification limits.
+- [ ] Deploy the application and verify the reported authenticated league path. The status text alone does not identify the user's failing source response or player; no hosted recovery is claimed from synthetic fixtures.
+
+This recovery change adds no dependency or database migration. The prior durable transaction-baseline migration remains separately pending as recorded above.
+
+
+2026-11-05 authorized rollout update: the private history-cache migration is applied in the configured database (hosted version `20261105220658`), with schema, privileges and update-trigger checks passed. The isolated application release passes its focused and full offline checks; publication and authenticated production behavior are tracked separately in the review results.

@@ -1,10 +1,16 @@
 {
-  "release": "settled-award-refresh-2026-11-04",
-  "locker_transfers_sha256": "0c4e797eb6795cbd1eddf2f167e3838f91c19c0c79f9d35bd1978c99b0df3774",
-  "rival_finance_sha256": "d682d9b90d57f7c2e9b0e2219e52bd00b347a60efd338108ef63e818143f7c70",
-  "rivals_module_sha256": "028b0b1b34632cde1a34a4041f7931da21e1cf21b90e18c37277cefe53a053e0",
-  "today_module_sha256": "5e9cf9a466185cdb66329f6132fa2215e36543a45d55e28006e1443e95fe6b1f",
-  "futmondo_functions_sha256": "2f433b3cf04105aaa7c2b421415127e95cfc26fea25eaa3933fc0927fc37694d",
-  "data_service_sha256": "4f167f83dee70ab641308f41b4866937d84c4db9ab1203029dc21d487df4012a",
-  "award_runtime_sha256": "4d75a41afdde65cfde7c935398699a7fdc7cd1ccc7e69c04682653fb9634face"
+  "release": "history-loading-recovery-2026-11-05",
+  "runtime_sha256": {
+    "async_transport.R": "40fac5dc0c0993e252aacbdfc6edbb621f4dc59e8ce48d3c80781afcf662a604",
+    "background_runtime.R": "24fe816e01923d04ad6e2dbcf6139c0ae6031beac165708ab3576fa8ec639ff8",
+    "data_service.R": "1bb9f0d2c6c6f9330fef0eec57d069c8b337812b817d9c2dcc6135e87e462a33",
+    "futmondo_functions.R": "f253e0fe347d623b3e75e7ec1a31537f1098f508195711b2d919ad6ada876300",
+    "global.R": "bac858749db05fb58f724d3318ac55a75cd72783d6777d9f5a23d54a60be9c17",
+    "history_baseline_store.R": "c69c9a5a01fe079e5ee233b4289baba928b1d53a708cca2c0e804a6734a976f7",
+    "history_repository.R": "4e1106f76950689cdb8108487d64392b4fb99f615ae9b1f4757ac3f9a63b54d1",
+    "locker_transfers.R": "f90b4b3e18a40e471f6fe4d4a328e6eff57fa42e279fa79d282982b20bdc86b4",
+    "Modules/Players_in_Teams_Module.R": "f3a9faa85510a98cf6da277fdf2b4587806fbd640096745accf1d0b4e70d84c7",
+    "Modules/Players_Table_Module.R": "ee41a628de4e77f05402126e926e9dec07a67ea95fb80c426c1ba9df93eb4c33",
+    "supabase_connector.R": "5627e8c85122fd9da3279733e369388a2aa21819ce46538d23f3cf72988b3bdd"
+  }
 }

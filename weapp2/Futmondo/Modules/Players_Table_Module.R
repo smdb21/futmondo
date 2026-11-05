@@ -533,10 +533,20 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       if(is.null(status))return("Loading round history…")
       messages <- character()
       if(status$remaining+status$pending>0L)messages <- c(messages,paste0("Loading round history: ",
-        status$total-status$remaining-status$pending,"/",status$total," players."))
+        status$completed %||% (status$total-status$remaining-status$pending),"/",status$total," players."))
+      if((status$retrying %||% 0L)>0L)messages <- c(messages,paste0("Retrying ",status$retrying," player histories…"))
       if(status$saving>0L)messages <- c(messages,paste0("Saving history: ",status$saving," pending."))
       if(!is.null(status$save_error))messages <- c(messages,status$save_error)
-      if(status$failed>0L)messages <- c(messages,paste0(status$failed," player histories unavailable. Refresh to retry."))
+      if(status$failed>0L){
+        references<-unique(vapply(status$failure_details %||% list(),function(x)fm_scalar(x$reference,""),character(1)))
+        references<-head(references[nzchar(references)],3L)
+        messages <- c(messages,paste0(status$failed," player histories unavailable",
+          if(length(references))paste0(" (",paste(references,collapse=", "),")")else "",". Refresh to retry."))
+      }
+      if(length(status$initial_errors %||% list())){
+        references<-unique(vapply(status$initial_errors,function(x)fm_scalar(x$reference,""),character(1)))
+        messages <- c(messages,paste0("History source unavailable (",paste(references,collapse=", "),")."))
+      }
       if(!status$matrix_complete)messages <- c(messages,"Saved round history is incomplete.")
       paste(messages,collapse=" ")
     })
@@ -710,9 +720,10 @@ recent_points_summary_valid <- function(summary) {
   if(is.data.frame(points))points <- split(points,seq_len(nrow(points)))
   if(!is.list(points)||length(points)>500L)return(FALSE)
   all(vapply(points,function(row){
-    if(!is.list(row)||!all(c("round","points")%in%names(row)))return(FALSE)
+    if(!is.list(row)||!"round"%in%names(row))return(FALSE)
     score<-row$points
-    valid_score<-is.null(score)||(length(score)==1L&&(is.na(score)||is.finite(fm_number(score))))
+    valid_score<-is.null(score)||(is.atomic(score)&&length(score)==1L&&
+      (is.na(score)||((is.numeric(score)||is.character(score))&&is.finite(fm_number(score)))))
     valid_score&&length(row$round)==1L&&is.finite(fm_number(row$round))&&fm_number(row$round)>=1&&
       fm_number(row$round)==floor(fm_number(row$round))
   },logical(1)))
@@ -720,7 +731,8 @@ recent_points_summary_valid <- function(summary) {
 
 get_player_recent_points <- function(login,championship_id,user_team_id,player_id,scoring_version="unknown") {
   summary <- get_player_summary(login,championship_id,user_team_id,player_id)
-  if(!recent_points_summary_valid(summary))stop("Player round points unavailable")
+  if(!recent_points_summary_valid(summary))stop(attr(summary,"fetch_error") %||%
+    resource_failure(resource="get_player_recent_points",category="schema"))
   season <- league_season_context(championship_id,summary$championship$season %||% summary$championship$seasonId)
   ctx <- resource_context(login,championship_id,user_team_id,player_id,season,scoring_version)
   checked_at <- attr(summary,"observed_at") %||% Sys.time()
@@ -911,11 +923,14 @@ recent_points_fitness_buffer <- function(rows) {
 
 # A single root-session controller owns the league read and API acquisition.
 # Module wrappers below only register visible IDs and join published snapshots.
-new_shared_round_points_controller <- function(root,publish_interval=5) {
+new_shared_round_points_controller <- function(root,publish_interval=5,retry_delays=c(1,3),retry_budget=32L) {
+  stopifnot(is.numeric(retry_delays),length(retry_delays)<=2L,all(is.finite(retry_delays)&retry_delays>=0),
+    length(retry_budget)==1L,is.finite(retry_budget),retry_budget>=0,retry_budget<=32L)
   clients <- shiny::reactiveVal(list());revision <- shiny::reactiveVal(0L)
   published <- shiny::reactiveVal(list(key=NULL,points=data.frame(),context=NULL))
   entries <- list();current_key <- NULL;generation <- 0L;closed <- FALSE
   publish_timer <- NULL;last_publish <- -Inf;previous_refresh <- list();pending_refresh <- list()
+  retry_timer <- NULL;retry_deadline <- Inf
   touch <- function()shiny::isolate(revision(revision()+1L))
   active_clients <- function()Filter(function(x)isTRUE(x$active)&&valid_login(x$auth)&&
     nzchar(x$league)&&nzchar(x$team),shiny::isolate(clients()))
@@ -930,6 +945,26 @@ new_shared_round_points_controller <- function(root,publish_interval=5) {
     }
   }
   cancel_timer <- function(){if(is.function(publish_timer))publish_timer();publish_timer<<-NULL}
+  cancel_retry <- function(){if(is.function(retry_timer))retry_timer();retry_timer<<-NULL;retry_deadline<<-Inf}
+  retry_waiting <- function(entry,player){
+    attempt<-entry$attempted[[player]]
+    !is.null(attempt)&&!isTRUE(attempt$ok)&&!isTRUE(attempt$terminal)&&
+      length(attempt$retry_at)==1L&&is.finite(attempt$retry_at)&&entry$retry_reads<retry_budget
+  }
+  schedule_retry <- function(entry){
+    players<-setdiff(names(entry$attempted),names(entry$pending))
+    due<-vapply(players,function(player)if(retry_waiting(entry,player))entry$attempted[[player]]$retry_at else Inf,numeric(1))
+    due<-due[is.finite(due)&due>as.numeric(Sys.time())]
+    next_deadline<-if(length(due))min(due)else Inf
+    if(identical(next_deadline,retry_deadline))return()
+    cancel_retry()
+    if(!is.finite(next_deadline))return()
+    expected<-generation;retry_deadline<<-next_deadline
+    retry_timer<<-later::later(function(){
+      retry_timer<<-NULL;retry_deadline<<-Inf
+      if(!closed&&identical(generation,expected)&&identical(current_key,entry$key)&&length(current_clients()))touch()
+    },max(0,next_deadline-as.numeric(Sys.time())))
+  }
   clear_pending <- function(entry){
     if(is.null(entry))return()
     for(player in names(entry$pending)){
@@ -990,8 +1025,11 @@ new_shared_round_points_controller <- function(root,publish_interval=5) {
           trim_entries()
         }
       }else if(!all(group$player_id%in%entry$fitness_ready)&&
-        (is.null(entry$fitness_probe_attempted[[snapshot]])||any(group$player_id%in%names(entry$pending)))){
+        (is.null(entry$fitness_probe_attempted[[snapshot]])||any(group$player_id%in%names(entry$pending))||
+         any(vapply(group$player_id,function(player)retry_waiting(entry,player),logical(1))))){
         candidates <- group[group$player_id%in%entry$fitness_changed&vapply(group$fitness,function(x){v<-recent_points_fitness_values(x);sum(is.finite(v))>=2L&&length(unique(v[is.finite(v)]))>=2L},logical(1)),,drop=FALSE]
+        eligible<-vapply(candidates$player_id,function(player){attempt<-entry$attempted[[player]];is.null(attempt)||(!isTRUE(attempt$ok)&&!isTRUE(attempt$terminal))},logical(1))
+        candidates<-candidates[eligible,,drop=FALSE]
         if(nrow(candidates)){
           preferred <- candidates$player_id[candidates$player_id%in%visible_ids()]
           player <- c(preferred,candidates$player_id)[1]
@@ -1029,7 +1067,7 @@ new_shared_round_points_controller <- function(root,publish_interval=5) {
       if(!isTRUE(ok))acknowledged(FALSE)
     })
   }
-  needed_for <- function(entry){
+  availability_for <- function(entry){
     candidates<-ids_for(entry);ctx<-context_for(entry)
     checked<-recent_points_saved_players(data.frame(),ctx,entry$checks)
     requested_missing<-character()
@@ -1043,9 +1081,22 @@ new_shared_round_points_controller <- function(root,publish_interval=5) {
     }
     reused<-setdiff(unique(c(reusable_for(entry),entry$fitness_ready)),
       c(entry$forced,requested_missing,entry$fitness_changed))
-    normal<-setdiff(candidates,c(names(entry$attempted),names(entry$pending),reused,entry$fitness_holding))
-    probes<-setdiff(unlist(entry$fitness_probes,use.names=FALSE),c(names(entry$attempted),names(entry$pending)))
-    unique(c(probes,normal))
+    blocked<-names(entry$attempted)[vapply(names(entry$attempted),function(player)
+      !retry_waiting(entry,player)||entry$attempted[[player]]$retry_at>as.numeric(Sys.time()),logical(1))]
+    normal<-setdiff(candidates,c(blocked,names(entry$pending),reused,entry$fitness_holding))
+    probes<-setdiff(unlist(entry$fitness_probes,use.names=FALSE),c(blocked,names(entry$pending)))
+    list(needed=unique(c(probes,normal)),reused=reused)
+  }
+  needed_for <- function(entry)availability_for(entry)$needed
+  completed_for <- function(entry){
+    if(!is.null(entry$initial_errors$lineup))return(character())
+    good<-names(entry$attempted)[vapply(entry$attempted,function(x)isTRUE(x$ok)&&
+      identical(x$season,entry$season)&&identical(x$scoring_version,entry$scoring),logical(1))]
+    setdiff(unique(c(good,availability_for(entry)$reused)),names(entry$pending))
+  }
+  failed_for <- function(entry,completed=completed_for(entry)){
+    setdiff(names(entry$attempted)[vapply(names(entry$attempted),function(player)
+      !isTRUE(entry$attempted[[player]]$ok)&&!retry_waiting(entry,player)&&!player%in%names(entry$pending),logical(1))],completed)
   }
   assemble <- function(entry){
     ctx<-context_for(entry);saved<-history_context_filter(entry$points,ctx)
@@ -1068,7 +1119,8 @@ new_shared_round_points_controller <- function(root,publish_interval=5) {
     if(closed||!identical(entry$key,current_key))return()
     elapsed<-as.numeric(Sys.time())-last_publish
     visible<-visible_ids()
-    finished<-all(visible%in%c(names(entry$attempted),reusable_for(entry),entry$fitness_ready))&&
+    completed<-completed_for(entry)
+    finished<-all(visible%in%c(completed,failed_for(entry,completed)))&&
       !any(visible%in%entry$fitness_holding)
     signature<-list(ids=visible,context=context_for(entry)[c("season","scoring_version")])
     just_finished<-finished&&!identical(signature,entry$finished_signature)
@@ -1090,30 +1142,28 @@ new_shared_round_points_controller <- function(root,publish_interval=5) {
     snapshot<-list(key=entry$key,points=assemble(entry),context=context_for(entry))
     if(!identical(shiny::isolate(published()),snapshot))published(snapshot)
   }
-  load_entry <- function(client,key){
-    entry<-new.env(parent=emptyenv());entry$key<-key
-    entry$context<-resource_context(client$auth,client$league,client$team,session_id=root$token)
-    entry$season<-league_season_context(client$league);entry$scoring<-"unknown"
-    entry$points<-data.frame();entry$checks<-data.frame();entry$catalog_ids<-character()
-    entry$live<-list();entry$attempted<-list();entry$pending<-list();entry$forced<-character()
-    entry$loading<-c(matrix=TRUE,lineup=TRUE,catalog=TRUE);entry$matrix_complete<-FALSE
-    entry$save_errors<-character();entry$saving<-0L;entry$overflow<-FALSE
-    entry$finished_signature<-NULL;entry$published_ids<-character()
-    entry$catalog_fitness<-data.frame();entry$fitness<-data.frame();entry$fitness_dirty<-TRUE
-    entry$fitness_anchors<-list();entry$fitness_probe_attempted<-list();entry$fitness_probes<-list()
-    entry$fitness_ready<-character();entry$fitness_changed<-character();entry$fitness_holding<-character();entry$fitness_unsaved<-data.frame();entry$fitness_failed<-data.frame()
-    entries[[key]]<<-entry
-    expected<-generation
-    calls<-list(matrix=list("read_league_round_dataset",list(championship_id=client$league)),
+  load_initial <- function(entry,client,types=c("matrix","lineup","catalog")){
+    key<-entry$key
+    calls<-list(matrix=list("read_league_round_dataset",list(championship_id=client$league,context=entry$context)),
       lineup=list("get_lineup_from_team",list(login=client$auth,championship_id=client$league,user_team_id=client$team)),
       catalog=list("get_championship_players",list(login=client$auth,championship_id=client$league)))
-    for(kind in names(calls))local({
+    for(kind in intersect(types,names(calls)))local({
+      if(isTRUE(entry$loading[[kind]])&&!is.null(entry$initial_pending[[kind]]))return()
       type<-kind;call<-calls[[type]]
-      current<-function()!closed&&identical(entries[[key]],entry)
-      promise<-async_adapter_fetch(call[[1]],call[[2]],context=entry$context,is_current=current)
-      finish<-function(data){
+      entry$loading[[type]]<-TRUE
+      entry$initial_sequence<-entry$initial_sequence+1L;request_token<-entry$initial_sequence
+      entry$initial_pending[[type]]<-request_token
+      current<-function()!closed&&identical(entries[[key]],entry)&&identical(entry$initial_pending[[type]],request_token)
+      promise<-tryCatch(async_adapter_fetch(call[[1]],call[[2]],context=entry$context,is_current=current),
+        error=function(error)promises::promise_reject(error))
+      finish<-function(data,error=NULL){
         if(!current())return(NULL)
         entry$loading[[type]]<-FALSE
+        entry$initial_pending[[type]]<-NULL
+        if(is.null(error))error<-attr(data,"fetch_error")
+        if(is.null(error)&&identical(attr(data,"fetch_status"),"stale"))error<-resource_failure(resource=call[[1]],category="unknown")
+        entry$initial_errors[[type]]<-if(is.null(error))NULL else resource_log_failure(error,call[[1]])
+        tryCatch({
         if(type=="matrix"&&is.list(data)){
           entry$points<-head(data$points %||% data.frame(),50000L)
           entry$checks<-head(data$checks %||% data.frame(),2000L)
@@ -1128,26 +1178,43 @@ new_shared_round_points_controller <- function(root,publish_interval=5) {
         if(!any(entry$loading)&&identical(current_key,key)){
           update_fitness(entry);prepare_fitness(entry);publish(entry,TRUE)
         }
+        },error=function(error){entry$initial_errors[[type]]<-resource_log_failure(error,call[[1]])})
         touch()
         NULL
       }
-      promises::then(promise,finish,function(error)finish(NULL))
+      promises::then(promise,finish,function(error)finish(NULL,error))
     })
+    invisible(NULL)
+  }
+  load_entry <- function(client,key){
+    entry<-new.env(parent=emptyenv());entry$key<-key
+    entry$context<-resource_context(client$auth,client$league,client$team,session_id=root$token)
+    entry$season<-league_season_context(client$league);entry$scoring<-"unknown"
+    entry$points<-data.frame();entry$checks<-data.frame();entry$catalog_ids<-character()
+    entry$live<-list();entry$attempted<-list();entry$pending<-list();entry$forced<-character();entry$retry_reads<-0L;entry$request_sequence<-0L
+    entry$loading<-c(matrix=TRUE,lineup=TRUE,catalog=TRUE);entry$matrix_complete<-FALSE;entry$initial_errors<-list();entry$initial_pending<-list();entry$initial_sequence<-0L
+    entry$save_errors<-character();entry$saving<-0L;entry$overflow<-FALSE
+    entry$finished_signature<-NULL;entry$published_ids<-character()
+    entry$catalog_fitness<-data.frame();entry$fitness<-data.frame();entry$fitness_dirty<-TRUE
+    entry$fitness_anchors<-list();entry$fitness_probe_attempted<-list();entry$fitness_probes<-list()
+    entry$fitness_ready<-character();entry$fitness_changed<-character();entry$fitness_holding<-character();entry$fitness_unsaved<-data.frame();entry$fitness_failed<-data.frame()
+    entries[[key]]<<-entry
+    load_initial(entry,client)
     entry
   }
-  root$onSessionEnded(function(){closed<<-TRUE;generation<<-generation+1L;cancel_timer();entries<<-list()})
+  root$onSessionEnded(function(){closed<<-TRUE;generation<<-generation+1L;cancel_timer();cancel_retry();entries<<-list()})
   shiny::observe({
     all<-clients();active<-active_clients()
     accounts<-unique(vapply(Filter(function(x)valid_login(x$auth),all),function(x)as.character(x$auth[["userid"]]),character(1)))
     if(!length(accounts)){
       clear_pending(current_entry());entries<<-list();current_key<<-NULL
-      generation<<-generation+1L;cancel_timer();published(list(key=NULL,points=data.frame(),context=NULL));touch();return()
+      generation<<-generation+1L;cancel_timer();cancel_retry();published(list(key=NULL,points=data.frame(),context=NULL));touch();return()
     }
     # Drop every prior account's private data on logout or account replacement.
     for(key in names(entries))if(!entries[[key]]$context$account_id%in%accounts)entries[[key]]<<-NULL
     next_key<-if(length(active))key_for(active[[1]])else NULL
     if(!identical(next_key,current_key)){
-      clear_pending(current_entry());generation<<-generation+1L;cancel_timer();current_key<<-next_key
+      clear_pending(current_entry());generation<<-generation+1L;cancel_timer();cancel_retry();current_key<<-next_key
       if(is.null(next_key)){touch();return()}
       if(is.null(entries[[next_key]]))load_entry(active[[1]],next_key)
       else publish(entries[[next_key]],TRUE)
@@ -1165,12 +1232,14 @@ new_shared_round_points_controller <- function(root,publish_interval=5) {
           entry$fitness_unsaved<-recent_points_fitness_buffer(dplyr::bind_rows(entry$fitness_unsaved,entry$fitness_failed))
           entry$fitness_failed<-data.frame()
         }
-        entry$finished_signature<-NULL
+        entry$finished_signature<-NULL;entry$retry_reads<-0L
         for(player in wanted){
+          entry$pending[[player]]<-NULL
           entry$attempted[[player]]<-NULL
           ctx<-context_for(entry);ctx$player_id<-player;ctx$session_id<-""
           invalidate_resources(ctx,pattern="^player_summary_points$|^player_summary_")
         }
+        if(length(entry$initial_errors))load_initial(entry,client,names(entry$initial_errors))
         pending_refresh[[id]]<<-FALSE
       }
       previous_refresh[[id]]<<-client$refresh
@@ -1184,11 +1253,12 @@ new_shared_round_points_controller <- function(root,publish_interval=5) {
   shiny::observe({
     revision();clients()
     if(closed||!length(current_clients()))return()
-    entry<-current_entry();if(is.null(entry)||any(entry$loading)||entry$overflow)return()
+    entry<-current_entry();if(is.null(entry)||any(entry$loading)||entry$overflow||!is.null(entry$initial_errors$lineup))return()
     .persistence_state$revision()
     saving<-background_sync_status(entry$context$account_id)
     queued<-c(.persistence_state$queue,if(!is.null(.persistence_state$active))list(.persistence_state$active)else list())
     bytes<-sum(vapply(queued,function(job)as.numeric(job$bytes %||% 0),numeric(1)))
+    schedule_retry(entry)
     if(saving$pending>=20L||length(queued)>=190L||bytes>=14*1024^2)return()
     prepare_fitness(entry);save_fitness(entry)
     needed<-needed_for(entry);slots<-max(0L,2L-length(entry$pending))
@@ -1198,27 +1268,69 @@ new_shared_round_points_controller <- function(root,publish_interval=5) {
       auth<-current_clients()[[1]]$auth
       current<-function()isTRUE(shiny::isolate(!closed&&identical(generation,expected)&&
         identical(current_key,entry$key)&&length(current_clients())>0L))
-      entry$pending[[player_id]]<-expected
+      previous_attempt<-entry$attempted[[player_id]]
+      attempt_number<-as.integer(previous_attempt$attempts %||% 0L)+1L
+      if(attempt_number>1L&&entry$retry_reads>=retry_budget)return()
+      if(attempt_number>1L)entry$retry_reads<-entry$retry_reads+1L
+      entry$request_sequence<-entry$request_sequence+1L;request_token<-entry$request_sequence
+      entry$pending[[player_id]]<-request_token;settled<-FALSE
       probe_snapshots<-names(Filter(function(id)identical(id,player_id),entry$fitness_probes))
       for(snapshot in probe_snapshots)entry$fitness_probe_attempted[[snapshot]]<-TRUE
       entry$fitness_probe_attempted<-tail(entry$fitness_probe_attempted,32L)
-      if(length(probe_snapshots)){
+      if(length(probe_snapshots)||attempt_number>1L){
         fresh_ctx<-ctx;fresh_ctx$session_id<-""
         invalidate_resources(fresh_ctx,pattern="^player_summary_points$|^player_summary_")
       }
       args<-list(login=auth,championship_id=ctx$championship_id,user_team_id=ctx$user_team_id,
         player_id=player_id,scoring_version=ctx$scoring_version)
-      promise<-get_cached_resource_async("player_summary_points",ctx,function()
-        async_adapter_fetch("get_player_recent_points",args,context=ctx,is_current=current))
-      promises::then(promise,function(result){
-        if(!current())return(NULL)
-        entry$pending[[player_id]]<-NULL
+      failed<-function(error,processing=FALSE){
+        if((settled&&!processing)||!current()||(!processing&&!identical(entry$pending[[player_id]],request_token)))return(NULL)
+        settled<<-TRUE;entry$pending[[player_id]]<-NULL
+        failure<-resource_log_failure(error,"get_player_recent_points")
+        transient<-failure$category%in%c("network","read_budget")||
+          (identical(failure$category,"http")&&!is.null(failure$http_status)&&
+           (failure$http_status%in%c(408L,429L)||failure$http_status>=500L))
+        retry<-transient&&attempt_number<=length(retry_delays)&&entry$retry_reads<retry_budget
+        entry$attempted[[player_id]]<-list(ok=FALSE,attempts=attempt_number,error=failure,terminal=!retry,
+          retry_at=if(retry)as.numeric(Sys.time())+retry_delays[attempt_number]else NULL)
+        entry$fitness_dirty<-TRUE
+        processing_failed<-function(error){entry$attempted[[player_id]]<-list(ok=FALSE,attempts=attempt_number,
+          error=resource_log_failure(error,"get_player_recent_points"),terminal=TRUE,retry_at=NULL);touch();NULL}
+        tryCatch(prepare_fitness(entry),error=processing_failed)
+        touch();tryCatch(publish(entry),error=processing_failed);NULL
+      }
+      finish<-function(result){
+        if(settled||!current()||!identical(entry$pending[[player_id]],request_token))return(NULL)
+        tryCatch({
         good<-!is.null(result$data)&&!identical(result$freshness,"stale")
-        entry$attempted[[player_id]]<-list(ok=good)
+        if(!good)return(failed(result$error %||% resource_failure(resource="get_player_recent_points",category="schema")))
+        payload<-result$data
+        valid<-is.list(payload)&&is.list(payload$context)&&is.data.frame(payload$observations)&&
+          nrow(payload$observations)<=500L&&identical(payload$context$player_id,player_id)&&
+          identical(payload$context$championship_id,ctx$championship_id)&&
+          identical(payload$context$account_id,ctx$account_id)&&identical(payload$context$user_team_id,ctx$user_team_id)&&
+          identical(payload$context$scoring_version,ctx$scoring_version)&&identical(payload$context$scoring_version,entry$scoring)&&
+          length(payload$context$season)==1L&&!is.na(payload$context$season)&&nzchar(payload$context$season)&&
+          (identical(entry$season,"unknown")||identical(payload$context$season,entry$season))&&
+          length(fm_time(payload$checked_at))==1L&&!is.na(fm_time(payload$checked_at))
+        if(isTRUE(valid)&&nrow(payload$observations)){
+          observed<-payload$observations
+          valid<-all(c("player_id","championship_id","season","scoring_version","round","points","score_status","observed_at")%in%names(observed))&&
+            all(observed$player_id==player_id&observed$championship_id==ctx$championship_id&
+              observed$season==payload$context$season&observed$scoring_version==ctx$scoring_version)
+        }
+        if(!isTRUE(valid))return(failed(resource_failure(resource="get_player_recent_points",category="schema")))
         if(good){
           payload<-result$data;payload$context$session_id<-root$token
           season<-payload$context$season %||% "unknown"
-          if(season!="unknown"&&!identical(season,entry$season))entry$fitness_dirty<-TRUE
+          if(season!="unknown"&&!identical(season,entry$season)){
+            entry$fitness_dirty<-TRUE
+            # Earlier unknown-season successes cannot satisfy the discovered season.
+            for(previous_player in names(entry$attempted)){
+              attempt<-entry$attempted[[previous_player]]
+              if(isTRUE(attempt$ok)&&!identical(attempt$season,season))entry$attempted[[previous_player]]<-NULL
+            }
+          }
           if(season!="unknown")entry$season<-season
           for(snapshot in probe_snapshots){
             evidence<-entry$fitness[entry$fitness$snapshot==snapshot&entry$fitness$player_id==player_id,,drop=FALSE]
@@ -1227,7 +1339,7 @@ new_shared_round_points_controller <- function(root,publish_interval=5) {
           }
           entry$fitness_anchors<-tail(entry$fitness_anchors,32L)
           projected<-nrow(entry$points)+sum(vapply(entry$live,nrow,integer(1)))+nrow(payload$observations)
-          if(projected>50000L){entry$overflow<-TRUE;entry$attempted[[player_id]]<-list(ok=FALSE)}
+          if(projected>50000L){entry$overflow<-TRUE;return(failed(resource_failure(resource="get_player_recent_points",category="schema")))}
           else{
             merge_live(entry,payload$observations)
             trim_entries()
@@ -1254,21 +1366,31 @@ new_shared_round_points_controller <- function(root,publish_interval=5) {
             if(!isTRUE(queued_ok)&&entry$saving>0L)acknowledged(FALSE)
           }
         }
+        settled<<-TRUE;entry$pending[[player_id]]<-NULL
+        entry$attempted[[player_id]]<-list(ok=TRUE,attempts=attempt_number,season=season,scoring_version=ctx$scoring_version)
         if(length(probe_snapshots))entry$fitness_dirty<-TRUE
         prepare_fitness(entry)
         touch();publish(entry);NULL
-      })
+        },error=function(error)failed(error,processing=settled))
+      }
+      promise<-tryCatch(get_cached_resource_async("player_summary_points",ctx,function()
+        async_adapter_fetch("get_player_recent_points",args,context=ctx,is_current=current)),error=function(error)promises::promise_reject(error))
+      promises::then(promise,finish,failed)
     })
     touch()
   })
   status<-shiny::reactive({
     revision();clients();entry<-current_entry()
     if(is.null(entry))return(list(total=0L,remaining=0L,attempted=0L,pending=0L,saving=0L,save_error=NULL,failed=0L,matrix_complete=TRUE))
-    ids<-ids_for(entry)
-    list(total=length(ids),remaining=length(needed_for(entry)),attempted=length(entry$attempted),
-      pending=length(entry$pending),saving=entry$saving+ceiling(nrow(entry$fitness_unsaved)/100L),
+    ids<-ids_for(entry);complete<-intersect(ids,completed_for(entry));failed<-intersect(ids,failed_for(entry,complete))
+    retrying<-names(entry$attempted)[vapply(names(entry$attempted),function(player)
+      retry_waiting(entry,player)||(!isTRUE(entry$attempted[[player]]$ok)&&player%in%names(entry$pending)),logical(1))]
+    list(total=length(ids),completed=length(complete),
+      remaining=length(setdiff(ids,c(complete,failed,names(entry$pending)))),attempted=length(entry$attempted),
+      pending=length(entry$pending),retrying=length(setdiff(intersect(ids,retrying),complete)),
+      saving=entry$saving+ceiling(nrow(entry$fitness_unsaved)/100L),
       save_error=if(length(entry$save_errors))"Round history could not be saved. Refresh to retry."else NULL,
-      failed=sum(!vapply(entry$attempted,function(x)isTRUE(x$ok),logical(1))),
+      failed=length(failed),failure_details=lapply(entry$attempted[failed],function(x)x$error),initial_errors=entry$initial_errors,
       matrix_complete=entry$matrix_complete&&!entry$overflow)
   })
   list(clients=clients,dataset=published,status=status,entry=current_entry,

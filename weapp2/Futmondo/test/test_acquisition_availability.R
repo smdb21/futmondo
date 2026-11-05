@@ -1,6 +1,9 @@
 #!/usr/bin/env Rscript
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages(source('futmondo_functions.R'))
+# This native capacity fixture has no locker payments; dedicated incoming/locker
+# regressions cover that source and its pending-transfer reconciliation.
+get_locker_clause_payments<-function(...)observed_data(data.frame())
 n<-0L;check<-function(name,expr){force(expr);n<<-n+1L;cat('PASS',name,'\n')}
 auth<-c(userid='acquisition-fixture',token='synthetic-only');cid<-'league';team<-'mine';ctx<-resource_context(auth,cid,team,session_id='availability-fixture')
 await<-function(p){done<-FALSE;result<-NULL;failure<-NULL;promises::then(p,function(x){result<<-x;done<<-TRUE},function(e){failure<<-e;done<<-TRUE});deadline<-Sys.time()+4;while(!done&&Sys.time()<deadline)later::run_now(.01);stopifnot(done);if(!is.null(failure))stop(failure);result}

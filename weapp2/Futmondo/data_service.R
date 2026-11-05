@@ -26,12 +26,12 @@ resource_diagnostic_name <- function(resource) {
     "get_market_players", "get_real_clubs", "get_user_team_info", "get_championships",
     "get_championship_players", "get_teams", "get_lineup_from_team", "get_roster_bids",
     "get_my_market_players", "get_player_summary", "get_player_card_history", "get_player_full_profile",
-    "get_player_matches", "get_championship_pressroom", "get_money_movements", "get_finished_rounds",
+    "get_player_matches", "get_player_recent_points", "get_championship_pressroom", "get_money_movements", "get_finished_rounds",
     "get_finished_round_catalog", "get_round_dreamteam", "get_active_championships",
     "read_player_points_history", "calculate_league_finances", "roster", "market", "real_clubs",
     "championships", "championshipplayers", "lineup", "teams", "team_info", "user_team_info",
     "roster_bids", "my_market_players", "acq_capacity", "financial_snapshot", "moneymovements",
-    "pressroom", "player_summary", "player_profile", "player_matches", "rounds", "dreamteam",
+    "pressroom", "player_summary", "player_summary_points", "player_profile", "player_matches", "rounds", "dreamteam",
     "league_finances_calc", "notifications_list", "notifications_unread", "information",
     "activechampionships", "championshipteams", "players", "summary", "fullprofile", "matches",
     "rosterbids", "myplayers", "getdtconfig", "unread", "list", "database")
@@ -180,6 +180,7 @@ invalidate_resources <- function(context,resources=NULL,pattern=NULL) {
   invisible(sum(drop))
 }
 clear_api_cache <- function(user_id=NULL,session_id=NULL) {
+  if(exists("clear_completed_history_baselines",mode="function"))clear_completed_history_baselines(user_id,session_id)
   if(is.null(user_id)){keys<-ls(api_cache_env);if(length(keys))rm(list=keys,envir=api_cache_env)}else invalidate_resources(resource_context(account_id=user_id,session_id=session_id))
   invisible(TRUE)
 }

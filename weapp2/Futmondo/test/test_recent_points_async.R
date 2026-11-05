@@ -16,7 +16,7 @@ reset<-function(points=data.frame(),saved_checks=data.frame()){
  dataset<<-list(points=points,checks=saved_checks,complete=TRUE)
  .persistence_state$queue<-list();.persistence_state$active<-NULL
 }
-read_league_round_dataset<-function(championship_id,max_rows=50000L)dataset
+read_league_round_dataset<-function(championship_id,max_rows=50000L,context=NULL)dataset
 get_championship_players<-function(login,championship_id)data.frame(id=paste0('p',1:4))
 get_lineup_from_team<-function(login,championship_id,user_team_id)list(pointSystem='fixture')
 persist_recent_points_snapshot<-function(payload,context,on_complete){recorded[[length(recorded)+1L]]<<-list(payload=payload,context=context,ack=on_complete);TRUE}

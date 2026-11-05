@@ -2023,6 +2023,107 @@ get_user_team_moneymovements <- function(login, championship_id, user_team_id) {
   }, context=resource_context(login=login,championship_id=championship_id,user_team_id=user_team_id))
 }
 
+# Complete transaction snapshots outlive the short display cache. Account/league
+# keys isolate private history; size, count and idle age bound retained memory.
+.transaction_history_baselines <- new.env(parent=emptyenv())
+transaction_history_prune <- function(now=Sys.time()) {
+  for(key in ls(.transaction_history_baselines)) {
+    item <- .transaction_history_baselines[[key]]
+    if(as.numeric(difftime(now,item$accessed_at,units="days"))>30)
+      rm(list=key,envir=.transaction_history_baselines)
+  }
+  repeat {
+    keys <- ls(.transaction_history_baselines)
+    items <- mget(keys,.transaction_history_baselines)
+    bytes <- sum(vapply(items,function(item)item$bytes,numeric(1)))
+    if(length(keys)<=32L&&bytes<=16*1024^2)break
+    oldest <- which.min(vapply(items,function(item)as.numeric(item$accessed_at),numeric(1)))
+    rm(list=keys[oldest],envir=.transaction_history_baselines)
+  }
+  invisible(TRUE)
+}
+transaction_history_context <- function(context) {
+  if(identical(fm_scalar(context$season,"unknown"),"unknown"))
+    context$season <- league_season_context(context$championship_id)
+  context
+}
+read_completed_history_baseline <- function(resource,context) {
+  context <- transaction_history_context(context)
+  transaction_history_prune()
+  key <- api_cache_key(resource,context=context)
+  item <- .transaction_history_baselines[[key]]
+  if(!is.null(item)) {
+    item$accessed_at <- Sys.time();.transaction_history_baselines[[key]] <- item
+    return(item$data)
+  }
+  if(exists("read_persisted_history_baseline",mode="function")) {
+    saved <- read_persisted_history_baseline(resource,context)
+    if(!is.null(saved)&&isTRUE(write_completed_history_baseline(resource,saved,context)))return(saved)
+  }
+  NULL
+}
+write_completed_history_baseline <- function(resource,data,context) {
+  context <- transaction_history_context(context)
+  stamp <- fm_time(attr(data,"full_history_at"))
+  if(!is.data.frame(data)||!identical(attr(data,"fetch_status"),"ok")||
+     length(stamp)!=1L||is.na(stamp))return(invisible(FALSE))
+  bytes <- as.numeric(object.size(data))
+  if(bytes>16*1024^2)return(invisible(FALSE))
+  .transaction_history_baselines[[api_cache_key(resource,context=context)]] <-
+    list(data=data,accessed_at=Sys.time(),bytes=bytes)
+  transaction_history_prune();invisible(TRUE)
+}
+clear_completed_history_baselines <- function(user_id=NULL,session_id=NULL) {
+  # These account-scoped snapshots are shared by concurrent browser sessions.
+  if(nzchar(fm_scalar(session_id,"")))return(invisible(TRUE))
+  keys <- ls(.transaction_history_baselines)
+  if(!is.null(user_id))keys <- keys[startsWith(keys,paste0("account:",user_id,":"))]
+  if(length(keys))rm(list=keys,envir=.transaction_history_baselines)
+  invisible(TRUE)
+}
+transaction_history_window <- function(previous) {
+  audited <- fm_time(attr(previous,"full_history_at"))
+  latest <- fm_time(attr(previous,"source_latest_at"))
+  incremental <- is.data.frame(previous)&&identical(attr(previous,"fetch_status"),"ok")&&
+    length(audited)==1L&&!is.na(audited)&&
+    as.numeric(difftime(Sys.time(),audited,units="days"))<7&&
+    length(latest)==1L&&!is.na(latest)
+  list(incremental=incremental,cutoff=if(incremental)latest-86400 else NULL,audited_at=audited)
+}
+transaction_history_passed_window <- function(news,cutoff) {
+  if(is.null(cutoff)||!length(news))return(FALSE)
+  times <- fm_time(vapply(news,function(item)fm_scalar(item$created,""),character(1)))
+  # Finish only after the entire overlap boundary second. Pages are ordered by
+  # created, while the API cursor uses ObjectId; boundary writers can differ.
+  all(!is.na(times))&&all(diff(as.numeric(times))<=0)&&
+    as.numeric(tail(times,1L))<floor(as.numeric(cutoff))
+}
+transaction_history_latest <- function(news,previous=NULL) {
+  stamps <- c(as.numeric(fm_time(attr(previous,"source_latest_at"))),
+    as.numeric(fm_time(vapply(news,function(item)fm_scalar(item$created,""),character(1)))))
+  stamps <- stamps[is.finite(stamps)]
+  if(length(stamps))as.POSIXct(max(stamps),origin="1970-01-01",tz="UTC")else NULL
+}
+transaction_history_delta_ids <- function(data,previous) {
+  if(!is.data.frame(previous))return(NULL)
+  if(!nrow(data))return(character())
+  old_index <- match(data$id,previous$id)
+  fields <- sort(union(names(data),names(previous)))
+  canonical <- function(value) {
+    if(is.list(value))return(lapply(value,canonical))
+    if(length(value)==1L&&is.atomic(value)&&is.na(value))return(NA)
+    if(is.integer(value))value <- as.numeric(value)
+    unname(value)
+  }
+  row <- function(frame,index)lapply(fields,function(field) {
+    if(!field%in%names(frame))return(NA)
+    canonical(frame[[field]][[index]])
+  })
+  changed <- vapply(seq_len(nrow(data)),function(i)
+    is.na(old_index[i])||!identical(row(data,i),row(previous,old_index[i])),logical(1))
+  as.character(data$id[changed])
+}
+
 get_championship_pressroom <- function(login, championship_id) {
   if (is.null(login) || is.null(championship_id)) {
     return(data.frame(
@@ -2035,14 +2136,14 @@ get_championship_pressroom <- function(login, championship_id) {
   }
 
   cache_key <- paste0("pressroom_", championship_id)
-  cached <- api_cache_env[[api_cache_key(cache_key,context=resource_context(login=login,championship_id=championship_id))]]$data
-  audited_at <- attr(cached,"full_history_at")
-  incremental <- is.data.frame(cached)&&identical(attr(cached,"fetch_status"),"ok")&&
-    length(audited_at)==1L&&!is.na(fm_time(audited_at))&&
-    as.numeric(difftime(Sys.time(),fm_time(audited_at),units="secs"))<86400
-  previous <- if(incremental)cached else NULL
+  context <- resource_context(login=login,championship_id=championship_id)
   get_cached_data(cache_key, {
+    previous <- read_completed_history_baseline(cache_key,context)
+    window <- transaction_history_window(previous)
+    incremental <- window$incremental
     locker<-get_locker_clause_payments(login,championship_id)
+    if(isTRUE(attr(locker,"fetch_status")%in%c("stale","partial","unavailable")))
+      stop(resource_failure(attr(locker,"fetch_error"),"pressroom"))
     teams<-if(nrow(locker))get_teams(login,championship_id)else data.frame()
     headers <- c("Content-Type" = "application/json; charset=utf-8")
 
@@ -2082,13 +2183,15 @@ get_championship_pressroom <- function(login, championship_id) {
       s_name <- if (!is.null(seller_obj)) as.character(get_val(seller_obj, "name", "")) else ""
 
       # Extract price
-      price_val <- get_val(item, "price", 0)
-      price_num <- suppressWarnings(as.numeric(price_val))
-      if (is.na(price_num)) price_num <- 0
+      price_num <- fm_number(get_val(item, "price", NULL))
+      source_id <- fm_scalar(get_val(item, "_id", ""), "")
+      source_date <- fm_scalar(get_val(item, "created", ""), "")
+      if(!nzchar(source_id)||is.na(fm_time(source_date))||!is.finite(price_num))
+        stop("Pressroom transaction identity, date or amount unavailable")
 
       data.frame(
-        id = as.character(get_val(item, "_id", "")),
-        created = as.character(get_val(item, "created", "")),
+        id = source_id,
+        created = source_date,
         player_id = p_id,
         player_name = p_name,
         player_team_name = as.character(get_val(get_val(item, "_playerTeam", NULL), "name", "")),
@@ -2111,6 +2214,7 @@ get_championship_pressroom <- function(login, championship_id) {
       page_count <- 0
       seen_cursors <- character()
       complete <- FALSE
+      full_scan <- FALSE
 
       repeat {
         page_count <- page_count + 1
@@ -2137,19 +2241,16 @@ get_championship_pressroom <- function(login, championship_id) {
         news <- ans$answer$news
         if (is.null(news) || length(news) == 0) {
           complete <- TRUE
+          full_scan <- TRUE
           print("[Pressroom] Empty news array, all pages fetched.")
           break
         }
 
-        # Append news items to the accumulator
-        for (item in news) {
-          all_news[[length(all_news) + 1]] <- item
-        }
+        all_news <- c(all_news,news)
 
-        # One wholly known page establishes overlap with a previously complete
-        # history. Keep source revisions on the fetched pages; audit older pages
-        # daily during active use or after explicit cache invalidation/Refresh.
-        if(incremental&&length(news)&&all(vapply(news,function(item)as.character(item$`_id`),character(1))%in%previous$id)){
+        # Refresh from the source head through one day before the newest saved
+        # source event. A known first page does not prove the overlap is covered.
+        if(incremental&&transaction_history_passed_window(news,window$cutoff)) {
           complete<-TRUE;break
         }
 
@@ -2187,7 +2288,7 @@ get_championship_pressroom <- function(login, championship_id) {
         parse_news_item(item)
       }) %>% bind_rows()
 
-      if(incremental){
+      if(incremental&&!full_scan){
         old<-previous[!startsWith(previous$id,"locker:"),,drop=FALSE]
         df<-dplyr::bind_rows(df,old)
       }
@@ -2198,12 +2299,18 @@ get_championship_pressroom <- function(login, championship_id) {
         dplyr::arrange(desc(created))
 
       if(nrow(locker)){
-        locker<-locker_resolve_parties(locker,df,teams)
-        if(any(!nzchar(locker$player_id)))locker<-locker_resolve_parties(locker,df,teams,get_championship_players(login,championship_id))
+        locker<-locker_resolve_parties(locker,df,teams,previous=previous)
+        if(any(!nzchar(locker$player_id)))locker<-locker_resolve_parties(locker,df,teams,get_championship_players(login,championship_id),previous=previous)
         df<-merge_locker_transfers(df,locker)
       }
-      attr(df,"full_history_at")<-if(incremental)audited_at else if(complete)Sys.time()else NULL
-      return(observed_data(df,status=if(complete) "ok" else "partial"))
+      attr(df,"full_history_at") <- if(complete) {
+        if(incremental&&!full_scan)window$audited_at else Sys.time()
+      } else NULL
+      attr(df,"source_latest_at") <- transaction_history_latest(all_news,if(incremental&&!full_scan)previous else NULL)
+      attr(df,"history_delta_ids") <- transaction_history_delta_ids(df,previous)
+      df <- observed_data(df,status=if(complete) "ok" else "partial")
+      if(complete)write_completed_history_baseline(cache_key,df,context)
+      return(df)
     }, error = function(e) {
       stop(resource_failure(e, "pressroom"))
     })

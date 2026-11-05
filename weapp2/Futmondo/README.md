@@ -93,3 +93,10 @@ HTTPS and same-origin cookie requests are required. Posit Connect Cloud may omit
 
 
 Locker clause payments are read from Futmondo's authenticated `/2/locker/news` endpoint during active-session transfer loading. The `xml2` package parses the observed HTML payment template with network access disabled. Its dependency is included in the deployment manifest. No additional environment variables, saved authentication, scheduled worker, or database migration is needed.
+
+
+## Incremental transaction and player history
+
+Active refreshes reuse verified history and query a 24-hour overlap behind the latest recorded source timestamp. Player score queries use observation time so corrections to older rounds are retained. Initial loads and periodic completeness audits still retrieve full histories. No new package or environment variable is required.
+
+For transfer reuse across app restarts, apply `scripts/migrations/20261105201845_complete_history_baselines.sql` before deploying the updated app. New databases include it in `scripts/schema.sql`. The new server-only cache contains normalized factual records and completion metadata, never login tokens or passwords. Missing schema or an invalid snapshot safely falls back to source acquisition. The configured hosted database received this migration on 2026-11-05 (recorded version `20261105220658`). Release verification and performance limits are recorded in `docs/data_review_results.md`.

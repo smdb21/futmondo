@@ -46,7 +46,7 @@ check('async parent failure blocks children and success unlocks dependent write'
   fm_async_http<-function(url,...){called<<-c(called,tail(strsplit(sub('\\?.*$','',url),'/',fixed=TRUE)[[1]],1));if(succeed)promises::promise_resolve(list(status_code=201))else promises::promise_reject(simpleError('HTTP 503'))}
   options(futmondo.offline=FALSE);stopifnot(isTRUE(defer_persistence('supabase_fact_batch_direct',list(operations),ctx)))
   deadline<-Sys.time()+3;while(background_sync_status('u')$pending&&Sys.time()<deadline){later::run_now(.01);Sys.sleep(.001)}
-  stopifnot(identical(called,if(succeed)c('players','market_transactions')else 'players'),background_sync_status('u')$pending==0L,identical(is.null(background_sync_status('u')$error),succeed))
+  stopifnot(identical(called,if(succeed)c('players','market_transactions')else rep('players',3L)),background_sync_status('u')$pending==0L,identical(is.null(background_sync_status('u')$error),succeed))
  }
  fm_async_http<-old_http;get_sb_url<-old_url;get_sb_key<-old_key;options(futmondo.offline=TRUE)
 })

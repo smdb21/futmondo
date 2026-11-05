@@ -470,11 +470,11 @@ supabase_delete <- function(table_name, filter = "id=neq.00000000-0000-0000-0000
 
 supabase_primary_key <- function(table_name) {
   # A nonnullable identity component for count and delete filters.
-  if(table_name %in% c("auction_observations","bid_observations","market_observations","league_rule_snapshots","observation_revisions")) "championship_id" else if(identical(table_name,"player_match_observations")) "player_id" else "id"
+  if(table_name %in% c("auction_observations","bid_observations","market_observations","league_rule_snapshots","observation_revisions","complete_history_baselines")) "championship_id" else if(identical(table_name,"player_match_observations")) "player_id" else "id"
 }
 
 supabase_known_tables <- function() {
-  c("championships", "real_clubs", "players", "user_teams", "user_team_history", "player_history", "market_transactions", "round_dream_team", "player_daily_snapshots", "auction_observations", "bid_observations", "market_observations", "player_match_observations", "league_rule_snapshots", "observation_revisions")
+  c("championships", "real_clubs", "players", "user_teams", "user_team_history", "player_history", "market_transactions", "round_dream_team", "player_daily_snapshots", "auction_observations", "bid_observations", "market_observations", "player_match_observations", "league_rule_snapshots", "observation_revisions", "complete_history_baselines")
 }
 
 supabase_delete_all <- function(table_name) {
@@ -492,7 +492,7 @@ supabase_reset_database <- function(force = FALSE) {
   }
 
   reset_order <- c(
-    "observation_revisions", "bid_observations", "auction_observations", "market_observations", "player_match_observations", "league_rule_snapshots",
+    "complete_history_baselines", "observation_revisions", "bid_observations", "auction_observations", "market_observations", "player_match_observations", "league_rule_snapshots",
     "player_daily_snapshots",
     "round_dream_team",
     "market_transactions",
@@ -775,13 +775,107 @@ supabase_patch <- function(table_name, payload, filters) {
   }, error = function(e) FALSE)
 }
 
+# Acknowledged source fingerprints prevent unchanged historical writes. They
+# remain bounded by the normal cache and never suppress a failed/unconfirmed save.
+pressroom_history_fingerprints <- function(rows) {
+  fields<-sort(setdiff(names(rows),c("observed_at","recorded_at")))
+  canonical<-function(x){if(is.list(x))return(lapply(x,canonical));if(is.integer(x))return(as.numeric(x));unname(x)}
+  hashes<-vapply(seq_len(nrow(rows)),function(i){
+    record<-lapply(rows[fields],function(column)canonical(column[[i]]))
+    as.character(openssl::sha256(serialize(record,NULL)))
+  },character(1))
+  stats::setNames(hashes,as.character(rows$id))
+}
+pressroom_history_batch_operations <- function(d,championship_id,stamp) {
+  stamp<-as.POSIXct(as.numeric(fm_time(stamp)),origin="1970-01-01",tz="UTC")
+  ids<-as.character(d$player_id)
+  if(anyNA(ids)||any(!nzchar(trimws(ids))))stop("Transfer player identity unavailable")
+  labels<-as.character(d$player_name %||% ids);unknown<-is.na(labels)|!nzchar(trimws(labels));labels[unknown]<-ids[unknown]
+  parents<-data.frame(id=ids,name=labels,slug="",stringsAsFactors=FALSE)
+  parents<-parents[order(unknown),,drop=FALSE];parents<-parents[!duplicated(parents$id),,drop=FALSE]
+  buyer<-as.character(d$buyer_team_id);seller<-as.character(d$seller_team_id)
+  buyer[is.na(buyer)|!nzchar(buyer)]<-NA_character_;seller[is.na(seller)|!nzchar(seller)]<-NA_character_
+  facts<-data.frame(player_id=ids,championship_id=as.character(championship_id),buyer_team_id=buyer,seller_team_id=seller,
+    price=suppressWarnings(as.numeric(d$price)),is_clause=if("is_clause"%in%names(d))as.logical(d$is_clause)else ifelse(is.na(buyer)|is.na(seller),FALSE,NA),
+    source_event_id=as.character(d$id),provenance="futmondo_pressroom",transaction_date=as.character(d$created))
+  rows<-list(players=parents,market_transactions=facts,
+    auction_observations=normalize_auction_observations(d,championship_id,stamp),
+    bid_observations=normalize_bid_observations(d,championship_id,stamp))
+  operations<-list()
+  for(table in names(rows))if(nrow(rows[[table]]))for(i in seq.int(1L,nrow(rows[[table]]),by=100L)){
+    operations[[length(operations)+1L]]<-list(table,rows[[table]][i:min(i+99L,nrow(rows[[table]])),,drop=FALSE],
+      if(table=="players")"id"else supabase_conflict_key(table),table=="players")
+  }
+  operations
+}
+supabase_pressroom_history_batch_valid <- function(operations) {
+  is.list(operations)&&length(operations)>=2L&&length(operations)<=128L&&
+    all(vapply(operations,function(op)is.list(op)&&length(op)==4L&&
+      op[[1]]%in%c("players","market_transactions","auction_observations","bid_observations")&&
+      is.data.frame(op[[2]])&&nrow(op[[2]])>0L&&nrow(op[[2]])<=100L,logical(1)))&&
+    identical(operations[[1]][[1]],"players")&&identical(operations[[2]][[1]],"market_transactions")
+}
+supabase_pressroom_history_batch_direct <- function(operations) {
+  if(!supabase_pressroom_history_batch_valid(operations))return(FALSE)
+  for(op in operations){code<-tryCatch(do.call(supabase_post_direct,op),error=function(e)NULL)
+    if(!is.numeric(code)||length(code)!=1L||is.na(code)||code<200||code>=300)return(FALSE)}
+  TRUE
+}
+# Keep only unsaved rows in the continuation; callbacks never close over a full
+# read, its encoded snapshot, or other scratch objects from the producer.
+pressroom_history_ack_callback <- function(state,hashes) {
+  force(state);force(hashes)
+  function(ok){
+    if(!isTRUE(ok)){state$rows<-NULL;state$signatures<-NULL;return(NULL)}
+    latest<-api_cache_env[[state$key]]$data$hashes %||% character();latest[names(hashes)]<-hashes
+    resource_store(state$key,list(hashes=latest),state$context,state$resource)
+    entry<-api_cache_env[[state$key]]
+    if(!is.null(entry)){entry$expires_at<-as.numeric(Sys.time())+7*86400;api_cache_env[[state$key]]<-entry}
+    saved<-seq_len(length(hashes))
+    state$rows<-state$rows[-saved,,drop=FALSE];state$signatures<-state$signatures[-saved]
+    # Enqueue while the completed job is being acknowledged, so logout sees
+    # every continuation instead of leaving an untracked scheduled callback.
+    if(nrow(state$rows))pressroom_history_next_batch(state)else{state$rows<-NULL;state$signatures<-NULL}
+    NULL
+  }
+}
+pressroom_history_next_batch <- function(state) {
+  if(!is.data.frame(state$rows)||!nrow(state$rows))return(invisible(TRUE))
+  indices<-seq_len(min(100L,nrow(state$rows)));hashes<-state$signatures[indices]
+  operations<-tryCatch(pressroom_history_batch_operations(state$rows[indices,,drop=FALSE],
+    state$championship_id,state$stamp),error=function(e)NULL)
+  if(is.null(operations)){state$rows<-NULL;state$signatures<-NULL;return(invisible(FALSE))}
+  # Count the continuation in the shared queue budget as well as this batch's
+  # HTTP payload. Recompute after each acknowledgement drops the saved rows.
+  retained<-as.numeric(object.size(as.list(state)))+as.numeric(object.size(hashes))
+  defer_persistence("supabase_pressroom_history_batch_direct",list(operations),context=state$context,
+    on_complete=pressroom_history_ack_callback(state,hashes),retained_bytes=retained)
+}
 persist_auction_history <- function(pressroom_df, championship_id) {
-  stamp <- attr(pressroom_df,'observed_at')
-  if(is.null(stamp) || identical(attr(pressroom_df,'fetch_status'),'stale')) return(invisible(FALSE))
-  sync_pressroom_transactions_to_supabase(pressroom_df, championship_id)
-  supabase_post("auction_observations", normalize_auction_observations(pressroom_df, championship_id,stamp))
-  supabase_post("bid_observations", normalize_bid_observations(pressroom_df, championship_id,stamp))
-  invisible(TRUE)
+  stamp<-attr(pressroom_df,"observed_at")
+  if(is.null(stamp)||identical(attr(pressroom_df,"fetch_status"),"stale"))return(invisible(FALSE))
+  context<-getOption("futmondo.persistence_context")
+  if(is.null(context)){
+    sync_pressroom_transactions_to_supabase(pressroom_df,championship_id)
+    supabase_post("auction_observations",normalize_auction_observations(pressroom_df,championship_id,stamp))
+    supabase_post("bid_observations",normalize_bid_observations(pressroom_df,championship_id,stamp))
+    return(invisible(TRUE))
+  }
+  if(!is.data.frame(pressroom_df)||!nrow(pressroom_df))return(invisible(TRUE))
+  required<-c("id","player_id","buyer_team_id","seller_team_id","price","created")
+  if(!all(required%in%names(pressroom_df))||anyNA(pressroom_df$id)||any(!nzchar(pressroom_df$id)))return(invisible(FALSE))
+  pressroom_df<-pressroom_df[!duplicated(pressroom_df$id),,drop=FALSE]
+  signatures<-pressroom_history_fingerprints(pressroom_df)
+  resource<-"history_write_ack_pressroom";key<-api_cache_key(resource,context=context)
+  resource_cache_prune();saved<-api_cache_env[[key]]$data$hashes %||% character()
+  previous<-saved[names(signatures)]
+  changed<-is.na(previous)|previous!=signatures
+  if(!any(changed))return(invisible(TRUE))
+  state<-new.env(parent=emptyenv())
+  state$rows<-pressroom_df[unname(changed),,drop=FALSE];state$signatures<-signatures[changed]
+  state$context<-context;state$championship_id<-championship_id;state$stamp<-stamp
+  state$key<-key;state$resource<-resource
+  isTRUE(pressroom_history_next_batch(state))
 }
 
 read_player_match_history<-function(championship_id,cutoff=Sys.time(),final_only=TRUE,season="unknown",scoring_version="unknown",player_ids=NULL,round_min=NULL,round_max=NULL,max_rows=5000L){
@@ -803,10 +897,14 @@ source("history_repository.R")
 
 # One logical batch for the league matrix; pagination respects the server cap.
 # N and player IDs intentionally do not form part of this query/cache identity.
-read_league_round_points <- function(championship_id,max_rows=50000L) {
+read_league_round_points <- function(championship_id,max_rows=50000L,context=NULL) {
   championship_id<-fm_scalar(championship_id,"")
   if(!nzchar(championship_id))stop("A league is required for round history")
-  history_read_pages("player_round_points_latest",list(
+  if(!is.null(context)&&!identical(context$championship_id,championship_id))stop("History context does not match the league")
+  reader<-if(is.null(context))history_read_pages else function(table,query,...)read_history_incremental(
+    table,query,context=context,identity_fields=c("championship_id","player_id","season","scoring_version","round"),
+    watermark_fields="observed_at",...)
+  reader("player_round_points_latest",list(
     championship_id=paste0("eq.",championship_id),
     select="championship_id,player_id,season,scoring_version,round,points,score_status,observed_at,occurred_at,round_start_at",
     order="player_id.asc,season.asc,scoring_version.asc,round.asc"),
@@ -815,10 +913,14 @@ read_league_round_points <- function(championship_id,max_rows=50000L) {
 
 
 # One logical league read, including explicit successful empty acquisitions.
-read_league_round_dataset <- function(championship_id,max_rows=50000L) {
+read_league_round_dataset <- function(championship_id,max_rows=50000L,context=NULL) {
   championship_id <- fm_scalar(championship_id,"")
   if(!nzchar(championship_id))stop("A league is required for round history")
-  rows <- history_read_pages("player_round_dataset",list(
+  if(!is.null(context)&&!identical(context$championship_id,championship_id))stop("History context does not match the league")
+  reader<-if(is.null(context))history_read_pages else function(table,query,...)read_history_incremental(
+    table,query,context=context,identity_fields=c("row_kind","championship_id","player_id","season","scoring_version","round"),
+    watermark_fields=c("observed_at","checked_at"),...)
+  rows <- reader("player_round_dataset",list(
     championship_id=paste0("eq.",championship_id),
     select="row_kind,championship_id,player_id,season,scoring_version,round,points,score_status,observed_at,occurred_at,round_start_at,checked_at,result_status,point_count",
     order="player_id.asc,season.asc,scoring_version.asc,row_kind.asc,round.asc"),
@@ -827,7 +929,10 @@ read_league_round_dataset <- function(championship_id,max_rows=50000L) {
   points <- if("row_kind"%in%names(rows))rows[rows$row_kind=="point",,drop=FALSE]else data.frame()
   checks <- if("row_kind"%in%names(rows))rows[rows$row_kind=="check",,drop=FALSE]else data.frame()
   complete <- isTRUE(attr(rows,"complete"))&&nrow(points)<=max_rows&&nrow(checks)<=2000L
-  list(points=head(points,max_rows),checks=head(checks,2000L),complete=complete)
+  result <- list(points=head(points,max_rows),checks=head(checks,2000L),complete=complete)
+  attr(result,"fetch_status") <- attr(rows,"fetch_status")
+  if(!is.null(attr(rows,"fetch_error")))attr(result,"fetch_error") <- resource_failure(attr(rows,"fetch_error"),"database")
+  result
 }
 
 # This ordered job writes its success marker only after every score chunk succeeds.

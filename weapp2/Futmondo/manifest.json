@@ -2262,13 +2262,13 @@
   },
   "files": {
     "async_transport.R": {
-      "checksum": "6f45a34c8a9aca129dc01ca093feed62"
+      "checksum": "e038e86aa1f89f80ea88c67901dbc027"
     },
     "award_runtime.R": {
       "checksum": "b45f65855149a08e88e8934eaf380555"
     },
     "background_runtime.R": {
-      "checksum": "9c391d713415e435fde02b8f39320fcf"
+      "checksum": "66840053afe459236249dd4fe5f92bbb"
     },
     "coach_runtime.R": {
       "checksum": "433720fcc832cc6e18669e887fce264d"
@@ -2277,22 +2277,25 @@
       "checksum": "8d1a1a4f9a4c0b32bdf207ce695f81e9"
     },
     "data_service.R": {
-      "checksum": "9b74fa077f385d6b4a5e878be18fa589"
+      "checksum": "361aa80637c5f24b2652d11d034c2d10"
     },
     "factual_helpers.R": {
       "checksum": "9a7616315995b23d7862cc6e4d8ece96"
     },
     "futmondo_functions.R": {
-      "checksum": "89579f9567bb7c7f3dbe55e0cccbd19f"
+      "checksum": "b5c4b33f017a332b29d8ea2bcea8ea3d"
     },
     "global.R": {
-      "checksum": "d068b3447101f1ee5b6aa38a4acfa692"
+      "checksum": "a5477bbdb0b8ef630c95f32f8cefc574"
+    },
+    "history_baseline_store.R": {
+      "checksum": "95296dd4ba7ecdcd93d861a8bf048851"
     },
     "history_repository.R": {
-      "checksum": "9192bebc2ccf92734440c7c017671e20"
+      "checksum": "699a35452339a3adc4e71780e781a617"
     },
     "locker_transfers.R": {
-      "checksum": "425105d1e53c447abf01d8daf920c9f4"
+      "checksum": "ad519c02f856c6b48bcb035d3427f99d"
     },
     "Modules/Admin_Module.R": {
       "checksum": "04baed0b12d229e54b73ea7590d94b7a"
@@ -2313,10 +2316,10 @@
       "checksum": "0c220663de1f047b20b843e3998a1f8b"
     },
     "Modules/Players_in_Teams_Module.R": {
-      "checksum": "daee1a8a319bc2a3a40a362c48b4c463"
+      "checksum": "75e6f7d05ba457990b4dcd7d59adffe5"
     },
     "Modules/Players_Table_Module.R": {
-      "checksum": "8e1ddde0f78c7471bf5218d69a576077"
+      "checksum": "7c3aee70912b940cb09682390b560f70"
     },
     "Modules/Plots_Module.R": {
       "checksum": "d28b6843516e7a88406119bf287000c2"
@@ -2340,7 +2343,7 @@
       "checksum": "569487c234e0b4a28c0027249faecc8b"
     },
     "README.md": {
-      "checksum": "c99065f03e2101a24625f1416b9e44ef"
+      "checksum": "fd67441fa5f8e6548d4b60d32937dfa3"
     },
     "remember_login.R": {
       "checksum": "a243c91a9c01604ce74d517e116e3e61"
@@ -2352,7 +2355,7 @@
       "checksum": "99e89173e500fba3b916088dd424b099"
     },
     "supabase_connector.R": {
-      "checksum": "06a5a820e226fa4ff8418dc8a216dd4d"
+      "checksum": "04b841cf63a9fe630c9f091071e29ffe"
     },
     "theme.R": {
       "checksum": "4787615df03516c7ab4673aa883799f4"
@@ -2367,7 +2370,7 @@
       "checksum": "fafb509b30ecc9b57bc9b145a35e5571"
     },
     "www/release-info.json": {
-      "checksum": "e1eb2aef564efd92197cd85e1ed07275"
+      "checksum": "a530e4453f2e36622bd108b624d8cccc"
     },
     "www/remember-login.js": {
       "checksum": "2b037334f8088f5b4a270acbaea52e91"

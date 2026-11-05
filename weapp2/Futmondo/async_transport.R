@@ -1,13 +1,17 @@
 # Cooperative libcurl transport. No socket waits or background processes.
 .fm_transport<-new.env(parent=emptyenv())
 .fm_transport$pool<-curl::new_pool(total_con=4L,host_con=4L)
-.fm_transport$reads<-list();.fm_transport$tasks<-list();.fm_transport$scheduled<-FALSE
+.fm_transport$reads<-list();.fm_transport$read_states<-list();.fm_transport$tasks<-list();.fm_transport$scheduled<-FALSE
 fm_transport_pump<-function(){
   curl::multi_run(timeout=0,pool=.fm_transport$pool)
   if(length(.fm_transport$tasks))later::later(fm_transport_pump,0.01)else .fm_transport$scheduled<-FALSE
   invisible(TRUE)
 }
 fm_transport_cancel<-function(owner){
+  for(key in names(.fm_transport$read_states)){
+    state<-.fm_transport$read_states[[key]]
+    if(identical(state$owner,owner)&&is.function(state$cancel))state$cancel()
+  }
   for(id in names(.fm_transport$tasks)){
     task<-.fm_transport$tasks[[id]]
     if(identical(task$owner,owner)){curl::multi_cancel(task$handle);.fm_transport$tasks[[id]]<-NULL;task$reject(resource_failure(simpleError("Session request cancelled")))}
@@ -93,12 +97,65 @@ async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is
   step()
 }
 
+# Retry only idempotent factual reads. Authentication and manual actions use
+# fm_async_http directly and must never be replayed after an uncertain response.
+fm_async_read_retry_allowed <- function(url,method) {
+  if(identical(toupper(method),"GET"))return(TRUE)
+  if(!identical(toupper(method),"POST"))return(FALSE)
+  route<-tail(strsplit(sub("[?#].*$","",url),"/",fixed=TRUE)[[1]],1L)
+  route%in%c("information","activechampionships","teams","roster","rounds",
+    "dreamteam","nightmareteam","roundlineup","lineup","championshipplayers","championshipteams",
+    "players","summary","fullprofile","matches","pressroom","news","moneymovements",
+    "rosterbids","myplayers","list","unread","getdtconfig")||
+    identical(url,"https://api.futmondo.com/1/ranking/round")
+}
+fm_async_read_retryable <- function(error) {
+  failure<-resource_failure(error)
+  !inherits(failure,"fm_async_cancelled")&&
+    (identical(failure$category,"network")||
+       (identical(failure$category,"http")&&isTRUE(failure$http_status%in%c(408L,429L,500L,502L,503L,504L))))
+}
 fm_async_read_http<-function(url,method="GET",body=NULL,headers=character(),owner=""){
- key<-as.character(openssl::sha256(serialize(list(url,method,body,headers,owner),NULL)))
- pending<-.fm_transport$reads[[key]]
- if(!is.null(pending)){resource_metric("coalesced");return(pending)}
- pending<-promises::then(fm_async_http(url,method,body,headers,owner),function(response){.fm_transport$reads[[key]]<-NULL;response},function(error){.fm_transport$reads[[key]]<-NULL;stop(error)})
- .fm_transport$reads[[key]]<-pending;pending
+  key<-as.character(openssl::sha256(serialize(list(url,method,body,headers,owner),NULL)))
+  pending<-.fm_transport$reads[[key]]
+  if(!is.null(pending)){resource_metric("coalesced");return(pending)}
+  if(length(.fm_transport$read_states)>=32L)return(promises::promise_reject(resource_failure(resource=url,category="read_budget")))
+  state<-new.env(parent=emptyenv());state$owner<-owner;state$settled<-FALSE;state$timer<-NULL;state$attempts<-0L
+  .fm_transport$read_states[[key]]<-state
+  pending<-promises::promise(function(resolve,reject){
+    finish<-function(value=NULL,error=NULL){
+      if(state$settled)return(invisible(NULL))
+      state$settled<-TRUE
+      if(is.function(state$timer))state$timer()
+      state$timer<-NULL
+      if(identical(.fm_transport$read_states[[key]],state)){
+        .fm_transport$reads[[key]]<-NULL;.fm_transport$read_states[[key]]<-NULL
+      }
+      if(is.null(error))resolve(value)else reject(error)
+      invisible(NULL)
+    }
+    state$cancel<-function()finish(error=resource_failure(simpleError("Session request cancelled")))
+    attempt<-function(){
+      state$timer<-NULL
+      if(state$settled)return(invisible(NULL))
+      state$attempts<-state$attempts+1L
+      request<-tryCatch(promises::promise_resolve(fm_async_http(url,method,body,headers,owner)),
+        error=function(error)promises::promise_reject(error))
+      promises::then(request,function(response){finish(response);NULL},function(error){
+        if(state$settled)return(NULL)
+        if(state$attempts<2L&&fm_async_read_retry_allowed(url,method)&&fm_async_read_retryable(error)){
+          failure<-resource_failure(error,resource=url)
+          delay<-if(identical(failure$http_status,429L))1 else .25
+          state$timer<-later::later(attempt,delay)
+        }else finish(error=error)
+        NULL
+      })
+      invisible(NULL)
+    }
+    attempt()
+  })
+  .fm_transport$reads[[key]]<-pending
+  pending
 }
 
 # Authentication is intentionally a single, uncached attempt. Secrets never enter
