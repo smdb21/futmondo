@@ -87,14 +87,15 @@ check('derived roster caches and capacity deadlines preserve the raw observation
    !'expired'%in%get_players_from_team(auth,cid,team,facts_only=TRUE)$id)
  clear_api_cache();near_expiry<-data.frame(id='owned',value=2000);attr(near_expiry,'observed_at')<-Sys.time()-29
  resource_store(api_cache_key('roster_league_mine',context=scope),near_expiry,scope,'roster_league_mine')
+ before<-sum(requests=='roster')
  value<-await(async_adapter_fetch('get_team_acquisition_capacity',args,ctx))
- stopifnot(value$valid_until-as.numeric(Sys.time())<1.5,
+ stopifnot(value$valid_until-as.numeric(Sys.time())>10,sum(requests=='roster')==before+1L,
    !evaluate_acquisition_preflight(value,'bid',100,now=value$valid_until+1)$ok,
    grepl('expired',evaluate_acquisition_preflight(value,'bid',100,now=value$valid_until+1)$message))
  key<-api_cache_key('acq_capacity_acquisition-fixture_league_mine',context=scope)
  api_cache_env[[key]]$data$valid_until<-as.numeric(Sys.time())-1
  api_cache_env[[api_cache_key('roster_league_mine',context=scope)]]$data<-observed_data(near_expiry,observed_at=Sys.time()-31)
  before<-sum(requests=='roster');value<-await(async_adapter_fetch('get_team_acquisition_capacity',args,ctx))
- stopifnot(value$status=='ok',sum(requests=='roster')==before+1L,value$valid_until>as.numeric(Sys.time()))
+ stopifnot(value$status=='ok',sum(requests=='roster')==before,value$valid_until>as.numeric(Sys.time()))
 })
 cat(sprintf('ACQUISITION AVAILABILITY: %d passed / 0 failed\n',n))

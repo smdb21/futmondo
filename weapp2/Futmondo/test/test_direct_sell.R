@@ -26,10 +26,17 @@ response <- function(code=API_CODE_OK,status=200L) structure(list(status_code=st
   headers=list('Content-Type'='application/json'),content=charToRaw(jsonlite::toJSON(list(answer=list(code=code)),auto_unbox=TRUE)),url=DIRECT_SELL_URL),class='response')
 futmondo_post <- function(url,body,...) {calls <<- calls+1L;stopifnot(identical(url,DIRECT_SELL_URL));response()}
 check('owned unlisted player can be sold with no bid and fresh verification', {
-  api_cache_env[[api_cache_key('player_summary_synthetic-user_c_t_p',auth)]] <- list(data=summary,time=Sys.time())
+  resource <- 'player_summary_synthetic-user_c_t_p'
+  context <- resource_context(auth,'c','t','p')
+  cache_key <- api_cache_key(resource,context=context)
+  other_context <- resource_context(auth,'other-league','t','p')
+  other_key <- api_cache_key(resource,context=other_context)
+  resource_store(cache_key,summary,context,resource)
+  resource_store(other_key,summary,other_context,resource)
   result <- direct_sell_player(auth,'c','t','p')
   stopifnot(result$success,!result$uncertain,calls==1L,
-    !exists(api_cache_key('player_summary_synthetic-user_c_t_p',auth),api_cache_env,inherits=FALSE))
+    !exists(cache_key,api_cache_env,inherits=FALSE),
+    exists(other_key,api_cache_env,inherits=FALSE))
 })
 check('rival free-agent listed stale and mismatched players cannot be sold', {
   original <- summary
@@ -76,17 +83,19 @@ find_handler <- function(x,event) {
 }
 check('confirmation is one-use and success refreshes via explicit sale event', {
   handler <- find_handler(parse('Modules/Selected_Player_Module.R'),'input$submit_direct_sell')
-  env <- new.env(parent=globalenv());allowed <- TRUE;writes <- 0L;events <- list()
+  env <- new.env(parent=globalenv());allowed <- TRUE;writes <- 0L;events <- list();invalidations <- list()
   env$consume_action_context <- function(action) {ok<-allowed && action=='direct_sell';allowed <<- FALSE;ok}
   env$selected_player <- function() data.frame(id='p',user_team_id='t')
   env$login_token <- auth;env$championship_id <- 'c';env$user_team_id <- 't';env$get_reactive_val <- identity
   env$direct_sell_player <- function(...) {writes <<- writes+1L;list(success=TRUE,uncertain=FALSE,message='Sold')}
-  env$removeModal <- function(...) NULL;env$showNotification <- function(...) NULL;env$clear_api_cache <- function(...) NULL
+  env$removeModal <- function(...) NULL;env$showNotification <- function(...) NULL
+  env$invalidate_manual_resources <- function(...) invalidations[[length(invalidations)+1L]] <<- list(...)
   env$on_bid_updated <- function(...) events[[length(events)+1L]] <<- list(...)
   session <- MockShinySession$new()
   withReactiveDomain(session,eval(handler,env))
   tryCatch(withReactiveDomain(session,eval(handler,env)),shiny.silent.error=function(e)NULL)
-  stopifnot(writes==1L,length(events)==1L,events[[1]]$action_type=='player_sold_direct',events[[1]]$player_id=='p')
+  stopifnot(writes==1L,length(events)==1L,events[[1]]$action_type=='player_sold_direct',events[[1]]$player_id=='p',
+    length(invalidations)==1L,identical(invalidations[[1]],list(auth,'c','t','p')))
   session$close()
 })
 cat(sprintf('DIRECT SELL: %d passed / 0 failed\n',n))

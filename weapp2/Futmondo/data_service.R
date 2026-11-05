@@ -136,12 +136,20 @@ resource_store <- function(key,data,context,resource,ttl=NULL) {
     transfer_publication_revision(shiny::isolate(transfer_publication_revision())+1L)
   data
 }
+# A composite snapshot may expire before the ordinary resource TTL. Its source
+# deadline survives outer caches; parsing or reopening cannot extend it.
+resource_snapshot_unexpired <- function(data,now=Sys.time()) {
+  if(!is.list(data)||!"valid_until"%in%names(data))return(TRUE)
+  deadline<-data[["valid_until"]]
+  is.numeric(deadline)&&length(deadline)==1L&&is.finite(deadline)&&
+    as.numeric(now)<deadline
+}
 get_cached_data <- function(key,expr,timeout_sec=NULL,context=NULL) {
   code<-substitute(expr);caller<-parent.frame()
   if(is.null(context))stop("get_cached_data requires explicit context")
   cache_key<-api_cache_key(key,context=context);now<-Sys.time();policy<-resource_policy(key)
   ttl<-min(timeout_sec %||% policy$ttl,policy$ttl);resource_cache_prune(now);cached<-api_cache_env[[cache_key]]
-  if(!is.null(cached$data)&&as.numeric(difftime(now,cached$time,units="secs"))<ttl) {
+  if(!is.null(cached$data)&&as.numeric(difftime(now,cached$time,units="secs"))<ttl&&resource_snapshot_unexpired(cached$data,now)) {
     cached$accessed_at<-now;api_cache_env[[cache_key]]<-cached;resource_metric("hits");return(cached$data)
   }
   resource_metric("misses")
@@ -197,7 +205,7 @@ get_cached_resource_async <- function(resource,context,fetch,refresh=FALSE) {
   if(nzchar(fm_scalar(context$session_id,"")))key<-paste0(key,":session:",as.character(openssl::sha256(serialize(context$session_id,NULL))))
   resource_cache_prune();item<-api_cache_env[[key]];policy<-resource_policy(resource)
   if(!is.null(item$pending)){resource_metric("coalesced");return(item$pending)}
-  if(!refresh&&!is.null(item$data)&&as.numeric(difftime(Sys.time(),item$time,units="secs"))<policy$ttl){resource_metric("hits");return(promises::promise_resolve(resource_state(item$data)))}
+  if(!refresh&&!is.null(item$data)&&as.numeric(difftime(Sys.time(),item$time,units="secs"))<policy$ttl&&resource_snapshot_unexpired(item$data)){resource_metric("hits");return(promises::promise_resolve(resource_state(item$data)))}
   if(refresh)invalidate_resources(context,resources=resource)
   if(is.null(item)&&length(ls(api_cache_env))>=policy$max_entries){
     keys<-ls(api_cache_env);entries<-mget(keys,api_cache_env)

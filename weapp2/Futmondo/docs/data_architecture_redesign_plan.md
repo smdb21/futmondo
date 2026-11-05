@@ -566,11 +566,26 @@ Hosted rollout confirmed on 2026-11-05: release `history-loading-recovery-2026-1
 
 ## Player availability delayed during history saving — 2026-11-05
 
-Status: **local implementation, independent review and exact release validation complete; deployment pending**.
+Status: **deployed and public startup verified; authenticated hosted timing remains unverified**.
 
 - [x] Reproduce repeated server processing while seven save acknowledgements update a 527-player history matrix.
 - [x] Reuse scoped, bounded point-coverage projections and avoid rechecking already resolved fitness after saves.
 - [x] Exercise the actual Players-table card path with seven held saves and preserve verified acquisition controls.
 - [x] Complete independent cache-invalidation review, focused regressions, responsiveness measurement and offline lifecycle checks.
-- [ ] Deploy the scoped follow-up and verify the public release marker and Shiny connection.
+- [x] Deploy the scoped follow-up and verify the public release marker and Shiny connection.
 - [ ] Confirm the reported delay in an authenticated hosted session; local timings are not hosted latency measurements.
+
+Hosted follow-up verified: `790cc1bdab777449f79beaf26a242176c493ea60`, release `player-card-save-responsiveness-2026-11-05`, HTTP200, connected Shiny session and matching tested runtime hash.
+
+
+## Player-card availability expiry — 2026-11-05
+
+Status: **exact release verified locally; hosted publication pending**.
+
+- [x] Reproduce the reported expiry in the actual card with a synthetic 31-second history delay; trace frozen composite time, sequential reads, queue contention and nested cache expiry.
+- [x] Acquire independent prerequisites concurrently, refresh only expired facts once, reconcile changed pending players, and retain source-based deadlines and manual preflights.
+- [x] Prioritize interactive queued reads without raising concurrency/request limits; exclude connection-queue time from network timeout; preserve fairness, owner cancellation and single-attempt manual operations.
+- [x] Honor absolute validity in outer caches and recheck once if a late summary outlives team checks; use Boolean action-button disable flags.
+- [x] Independently review scheduling/cancellation, cache reuse, candidate changes and failure gates; run focused delayed/reopening fixtures.
+- [ ] Pass the final exact-release lifecycle and bundle checks, deploy and verify public startup/hash.
+- [ ] Confirm authenticated hosted Berenguer behavior; fixture timing does not establish production latency.

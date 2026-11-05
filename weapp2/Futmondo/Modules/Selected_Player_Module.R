@@ -517,7 +517,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
           action_buttons <- tagList(action_buttons, actionButton(ns("btn_direct_sell"),
             label=tagList(icon("money-bill-transfer")," Sell directly to Futmondo"),
-            class="btn btn-danger", disabled=if(is_listed_on_market) "disabled" else NULL,
+            class="btn btn-danger", disabled=isTRUE(is_listed_on_market),
             title=if(is_listed_on_market) "Remove the existing listing first." else "Sell to Futmondo without waiting for an offer."))
 
           # Check for received offer on squad player
@@ -639,7 +639,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
               actionButton(
                 ns("btn_bid_market"),
                 label = tagList(icon("hand-holding-dollar"), " Make Market Offer"),
-                class = "btn btn-buy-market", disabled=if(!isTRUE(bid_gate$ok)) "disabled" else NULL,
+                class = "btn btn-buy-market", disabled=!isTRUE(bid_gate$ok),
                 title=if(!isTRUE(bid_gate$ok)) bid_gate$message else NULL
               )
             )
@@ -653,7 +653,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
               actionButton(
                 ns("btn_offer_owner"),
                 label = tagList(icon("hand-holding-dollar"), paste0(" Offer to ", owner_name)),
-                class = "btn btn-offer-money", disabled=if(!isTRUE(bid_gate$ok)) "disabled" else NULL,
+                class = "btn btn-offer-money", disabled=!isTRUE(bid_gate$ok),
                 title=if(!isTRUE(bid_gate$ok)) bid_gate$message else NULL
               )
             )
@@ -667,7 +667,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
               actionButton(
                 ns("btn_pay_clause"),
                 label = tagList(icon("bolt"), clause_label),
-                class = "btn btn-buy-clause", disabled=if(!isTRUE(clause_gate$ok)) "disabled" else NULL,
+                class = "btn btn-buy-clause", disabled=!isTRUE(clause_gate$ok),
                 title=if(!isTRUE(clause_gate$ok)) clause_gate$message else NULL
               )
             )
@@ -1708,10 +1708,31 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     card_states$points<-card_read("card_points","read_card_round_history",function(ctx)list(context=ctx),context=history_context,active=context_ready)
     card_states$valuation<-card_read("card_valuation","read_card_price_history",function(ctx)list(context=ctx))
     capacity_context<-reactive({ctx<-card_context();if(!is.null(ctx))ctx$player_id<-"";ctx})
+    capacity_recheck<-reactiveVal(0L)
+    capacity_recheck_context<-NULL;capacity_rechecks<-0L
     card_states$capacity<-card_read("card_capacity","get_team_acquisition_capacity",auth_args,context=capacity_context,
-      active=function()!player_card_is_own_player(selected_player(),get_reactive_val(user_team_id)),refresh=global_refresh)
+      active=function()!player_card_is_own_player(selected_player(),get_reactive_val(user_team_id)),
+      refresh=function()paste(global_refresh(),capacity_recheck(),sep=":"))
     card_states$listings<-card_read("card_listings","get_my_market_players",auth_args,
       active=function()player_card_is_own_player(selected_player(),get_reactive_val(user_team_id)),refresh=global_refresh)
+    # A slow player summary can outlive otherwise successful team checks.
+    # Reacquire once when both settle; never extend the old source timestamps.
+    observe({
+      ctx<-card_context();scope<-list(context=ctx,refresh=global_refresh())
+      if(!identical(scope,capacity_recheck_context)){
+        capacity_recheck_context<<-scope;capacity_rechecks<<-0L
+      }
+      if(is.null(ctx)||player_card_is_own_player(selected_player(),get_reactive_val(user_team_id)))return()
+      summary<-card_states$summary();capacity<-card_states$capacity()
+      if(identical(summary$status,"loading")||is.null(summary$data)||
+         identical(capacity$status,"loading")||is.null(capacity$data))return()
+      deadline<-capacity$data$valid_until
+      if(is.numeric(deadline)&&length(deadline)==1L&&is.finite(deadline)&&
+         deadline<=as.numeric(Sys.time())&&capacity_rechecks<1L){
+        capacity_rechecks<<-capacity_rechecks+1L
+        isolate(capacity_recheck(capacity_recheck()+1L))
+      }
+    },priority=-1)
     passive_acquisition_gate<-function(sp,mode){
       state<-card_states$capacity()
       if(identical(state$status,"loading"))return(list(ok=FALSE,reason="loading",message=NULL))

@@ -2,9 +2,74 @@
 .fm_transport<-new.env(parent=emptyenv())
 .fm_transport$pool<-curl::new_pool(total_con=4L,host_con=4L)
 .fm_transport$reads<-list();.fm_transport$read_states<-list();.fm_transport$tasks<-list();.fm_transport$scheduled<-FALSE
+.fm_transport$timer<-NULL;.fm_transport$interactive_run<-0L;.fm_transport$dispatch_read_key<-NULL
+fm_transport_priority<-function(priority){
+  if(!is.character(priority)||length(priority)!=1L||!priority%in%c("normal","interactive"))stop("Invalid request priority")
+  priority
+}
+# One logical read reserves one place across queued/active HTTP and retry backoff.
+# Direct writes/authentication count too, without counting a read's handle twice.
+fm_transport_admitted<-function(){
+  direct<-vapply(.fm_transport$tasks,function(task)is.null(task$read_key)||
+    is.null(.fm_transport$read_states[[task$read_key]]),logical(1))
+  length(.fm_transport$read_states)+sum(direct)
+}
+fm_transport_schedule<-function(delay=0){
+  if(!.fm_transport$scheduled&&length(.fm_transport$tasks)){
+    .fm_transport$scheduled<-TRUE;.fm_transport$timer<-later::later(fm_transport_pump,delay)
+  }
+  invisible(NULL)
+}
+fm_transport_finish<-function(id,response=NULL,error=NULL){
+  task<-.fm_transport$tasks[[id]]
+  if(is.null(task))return(invisible(NULL))
+  .fm_transport$tasks[[id]]<-NULL
+  if(is.null(error)){
+    resource_metric("bytes",length(response$content))
+    if(response$status_code<200L||response$status_code>=300L)
+      error<-resource_failure(resource=task$url,category="http",http_status=response$status_code)
+  }
+  if(is.null(error))task$resolve(response)else task$reject(error)
+  invisible(NULL)
+}
+fm_transport_start<-function(id){
+  task<-.fm_transport$tasks[[id]]
+  if(is.null(task)||isTRUE(task$active))return(invisible(NULL))
+  tryCatch({
+    # libcurl counts its internal connection queue against both timeouts. Add a
+    # handle only when a slot is free, so network timers start at dispatch.
+    handle<-curl::new_handle();curl::handle_setopt(handle,url=task$url,customrequest=task$method,
+      timeout_ms=as.integer(task$timeout*1000),connecttimeout_ms=5000L)
+    if(!is.null(task$body))curl::handle_setopt(handle,postfields=as.character(task$body))
+    if(length(task$headers))curl::handle_setheaders(handle,.list=as.list(task$headers))
+    task$handle<-handle;task$active<-TRUE
+    curl::multi_add(handle,done=function(response)fm_transport_finish(id,response),
+      fail=function(message)fm_transport_finish(id,error=resource_failure(resource=task$url,category="network")),
+      pool=.fm_transport$pool)
+    resource_metric("requests")
+  },error=function(error){
+    if(isTRUE(task$active)&&!is.null(task$handle))try(curl::multi_cancel(task$handle),silent=TRUE)
+    fm_transport_finish(id,error=resource_failure(error,resource=task$url))
+  })
+  invisible(NULL)
+}
 fm_transport_pump<-function(){
+  .fm_transport$scheduled<-FALSE;.fm_transport$timer<-NULL
+  active<-sum(vapply(.fm_transport$tasks,function(task)isTRUE(task$active),logical(1)))
+  while(active<4L){
+    waiting<-names(Filter(function(task)!isTRUE(task$active),.fm_transport$tasks))
+    if(!length(waiting))break
+    interactive<-vapply(.fm_transport$tasks[waiting],function(task)identical(task$priority,"interactive"),logical(1))
+    # FIFO within each class; a normal request follows at most four interactive
+    # dispatches while both classes wait. Never interrupt an active request.
+    high<-which(interactive);normal<-which(!interactive)
+    pick<-if(length(high)&&(!length(normal)||.fm_transport$interactive_run<4L))high[1]else normal[1]
+    .fm_transport$interactive_run<-if(interactive[pick])min(4L,.fm_transport$interactive_run+1L)else 0L
+    fm_transport_start(waiting[pick])
+    active<-sum(vapply(.fm_transport$tasks,function(task)isTRUE(task$active),logical(1)))
+  }
   curl::multi_run(timeout=0,pool=.fm_transport$pool)
-  if(length(.fm_transport$tasks))later::later(fm_transport_pump,0.01)else .fm_transport$scheduled<-FALSE
+  fm_transport_schedule(0.01)
   invisible(TRUE)
 }
 fm_transport_cancel<-function(owner){
@@ -14,30 +79,43 @@ fm_transport_cancel<-function(owner){
   }
   for(id in names(.fm_transport$tasks)){
     task<-.fm_transport$tasks[[id]]
-    if(identical(task$owner,owner)){curl::multi_cancel(task$handle);.fm_transport$tasks[[id]]<-NULL;task$reject(resource_failure(simpleError("Session request cancelled")))}
-  };invisible(TRUE)
+    if(identical(task$owner,owner)){
+      if(isTRUE(task$active))curl::multi_cancel(task$handle)
+      fm_transport_finish(id,error=resource_failure(simpleError("Session request cancelled")))
+    }
+  }
+  if(!length(.fm_transport$tasks)){
+    if(is.function(.fm_transport$timer)).fm_transport$timer()
+    .fm_transport$timer<-NULL;.fm_transport$scheduled<-FALSE
+  }else fm_transport_schedule()
+  invisible(TRUE)
 }
-fm_async_http<-function(url,method="GET",body=NULL,headers=character(),owner="",timeout=15){
+fm_async_http<-function(url,method="GET",body=NULL,headers=character(),owner="",timeout=15,priority="normal"){
+  priority<-fm_transport_priority(priority)
   if(isTRUE(getOption("futmondo.offline",FALSE)))return(promises::promise_reject(resource_failure(resource=url,category="network")))
-  if(length(.fm_transport$tasks)>=32L)return(promises::promise_reject(resource_failure(resource=url,category="read_budget")))
+  read_key<-.fm_transport$dispatch_read_key
+  reserved<-!is.null(read_key)&&!is.null(.fm_transport$read_states[[read_key]])
+  if(!reserved&&fm_transport_admitted()>=32L)return(promises::promise_reject(resource_failure(resource=url,category="read_budget")))
   promises::promise(function(resolve,reject){
-    handle<-curl::new_handle();curl::handle_setopt(handle,url=url,customrequest=method,timeout_ms=as.integer(timeout*1000),connecttimeout_ms=5000L)
-    if(!is.null(body))curl::handle_setopt(handle,postfields=as.character(body))
-    if(length(headers))curl::handle_setheaders(handle,.list=as.list(headers))
     id<-as.character(openssl::sha256(serialize(list(url,Sys.time(),runif(1)),NULL)))
-    .fm_transport$tasks[[id]]<-list(handle=handle,owner=owner,reject=reject)
-    finish<-function(){.fm_transport$tasks[[id]]<-NULL}
-    resource_metric("requests")
-    curl::multi_add(handle,done=function(response){finish();resource_metric("bytes",length(response$content));if(response$status_code<200L||response$status_code>=300L)reject(resource_failure(resource=url,category="http",http_status=response$status_code))else resolve(response)},fail=function(message){finish();reject(resource_failure(resource=url,category="network"))},pool=.fm_transport$pool)
-    if(!.fm_transport$scheduled){.fm_transport$scheduled<-TRUE;later::later(fm_transport_pump,0)}
+    task<-new.env(parent=emptyenv());task$url<-url;task$method<-method;task$body<-body;task$headers<-headers
+    task$owner<-owner;task$timeout<-timeout;task$priority<-priority;task$read_key<-if(reserved)read_key else NULL
+    task$active<-FALSE;task$handle<-NULL;task$resolve<-resolve;task$reject<-reject
+    .fm_transport$tasks[[id]]<-task
+    fm_transport_schedule()
   })
 }
 fm_httr_response<-function(response,url){
   structure(list(url=url,status_code=response$status_code,headers=httr::insensitive(list(`content-type`="application/json; charset=utf-8")),all_headers=list(),cookies=data.frame(),content=response$content,date=Sys.time(),times=c(total=response$times[["total"]] %||% 0),request=list(method="POST",url=url)),class="response")
 }
-async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is_current=function()TRUE){
+async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is_current=function()TRUE,priority=NULL){
   name<-if(is.character(fn))fn else deparse(substitute(fn))
   if(length(name)!=1L||!grepl("^(get_|read_|calculate_league_finances$)",name))return(promises::promise_reject(simpleError("Only factual reads may use asynchronous adapters")))
+  if(is.null(priority))priority<-if(name%in%c("get_team_acquisition_capacity","get_acquisition_capacity",
+    "get_player_summary","get_my_market_players"))"interactive"else "normal"
+  priority<-fm_transport_priority(priority)
+  if(identical(name,"get_team_acquisition_capacity")&&exists("get_team_acquisition_capacity_async",mode="function"))
+    return(do.call(get_team_acquisition_capacity_async,c(args,list(context=context,is_current=is_current,priority=priority,owner=owner))))
   adapter_env<-new.env(parent=.GlobalEnv);completed<-new.env(parent=emptyenv());requests<-0L;page_requests<-0L;acquired<-list()
   for(nm in ls(.GlobalEnv,all.names=TRUE)){
     object<-get(nm,.GlobalEnv)
@@ -92,7 +170,9 @@ async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is
     if(route%in%c("https://api.futmondo.com/1/locker/pressroom","https://api.futmondo.com/2/locker/news"))page_requests<<-page_requests+1L else requests<<-requests+1L
     if(requests>32L||page_requests>1024L)return(promises::promise_reject(report_failure(resource_failure(resource=name,category="read_budget"))))
     request<-result$request
-    promises::then(fm_async_read_http(request$url,request$method,request$body,request$headers,owner=owner),function(response){completed[[request$key]]<-response;step()},function(error){if(inherits(error,"fm_async_cancelled")||grepl("Session request cancelled",conditionMessage(error),fixed=TRUE))return(promises::promise_reject(error));completed[[request$key]]<-list(error=report_failure(error,request$url));step()})
+    read_args<-list(request$url,request$method,request$body,request$headers,owner=owner)
+    if(identical(priority,"interactive"))read_args$priority<-priority
+    promises::then(do.call(fm_async_read_http,read_args),function(response){completed[[request$key]]<-response;step()},function(error){if(inherits(error,"fm_async_cancelled")||grepl("Session request cancelled",conditionMessage(error),fixed=TRUE))return(promises::promise_reject(error));completed[[request$key]]<-list(error=report_failure(error,request$url));step()})
   },error=function(e)promises::promise_reject(report_failure(e)))
   step()
 }
@@ -115,12 +195,20 @@ fm_async_read_retryable <- function(error) {
     (identical(failure$category,"network")||
        (identical(failure$category,"http")&&isTRUE(failure$http_status%in%c(408L,429L,500L,502L,503L,504L))))
 }
-fm_async_read_http<-function(url,method="GET",body=NULL,headers=character(),owner=""){
+fm_async_read_http<-function(url,method="GET",body=NULL,headers=character(),owner="",priority="normal"){
+  priority<-fm_transport_priority(priority)
   key<-as.character(openssl::sha256(serialize(list(url,method,body,headers,owner),NULL)))
   pending<-.fm_transport$reads[[key]]
-  if(!is.null(pending)){resource_metric("coalesced");return(pending)}
-  if(length(.fm_transport$read_states)>=32L)return(promises::promise_reject(resource_failure(resource=url,category="read_budget")))
+  if(!is.null(pending)){
+    if(identical(priority,"interactive")){
+      .fm_transport$read_states[[key]]$priority<-priority
+      for(task in .fm_transport$tasks)if(identical(task$read_key,key))task$priority<-priority
+    }
+    resource_metric("coalesced");return(pending)
+  }
+  if(fm_transport_admitted()>=32L)return(promises::promise_reject(resource_failure(resource=url,category="read_budget")))
   state<-new.env(parent=emptyenv());state$owner<-owner;state$settled<-FALSE;state$timer<-NULL;state$attempts<-0L
+  state$priority<-priority
   .fm_transport$read_states[[key]]<-state
   pending<-promises::promise(function(resolve,reject){
     finish<-function(value=NULL,error=NULL){
@@ -139,8 +227,15 @@ fm_async_read_http<-function(url,method="GET",body=NULL,headers=character(),owne
       state$timer<-NULL
       if(state$settled)return(invisible(NULL))
       state$attempts<-state$attempts+1L
-      request<-tryCatch(promises::promise_resolve(fm_async_http(url,method,body,headers,owner)),
+      # The reservation is dynamic only during this synchronous admission call;
+      # legacy transport test doubles retain their original positional interface.
+      previous_key<-.fm_transport$dispatch_read_key;.fm_transport$dispatch_read_key<-key
+      on.exit(.fm_transport$dispatch_read_key<-previous_key,add=TRUE)
+      http_args<-list(url,method,body,headers,owner)
+      if(identical(state$priority,"interactive"))http_args$priority<-state$priority
+      request<-tryCatch(promises::promise_resolve(do.call(fm_async_http,http_args)),
         error=function(error)promises::promise_reject(error))
+      .fm_transport$dispatch_read_key<-previous_key
       promises::then(request,function(response){finish(response);NULL},function(error){
         if(state$settled)return(NULL)
         if(state$attempts<2L&&fm_async_read_retry_allowed(url,method)&&fm_async_read_retryable(error)){
