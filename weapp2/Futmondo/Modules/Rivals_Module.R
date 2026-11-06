@@ -515,6 +515,8 @@ rivals_summary_values <- function(info, teams, finances, team_id) {
   difference<-if(nrow(row)==1L)number(row$reconciliation_difference)else NA_real_
   purchases<-if(nrow(row)==1L)number(row$total_spent)else NA_real_
   sales<-if(nrow(row)==1L)number(row$total_sales)else NA_real_
+  net_gain<-if(nrow(row)==1L)number(row$net_profit_loss)else NA_real_
+  net_gain_estimated<-nrow(row)!=1L||!identical(row$net_gain_estimated,FALSE)
   public_team<-if(is.data.frame(teams)&&"teamid"%in%names(teams))teams[teams$teamid%in%team_id,,drop=FALSE]else data.frame()
   squad_value<-fm_number(public_team$teamValue,fm_number(row$team_value,fm_number(info$teamValue)))
   position <- number(info$position)
@@ -526,7 +528,7 @@ rivals_summary_values <- function(info, teams, finances, team_id) {
       rank_label <- "By total points (ties share rank)"
     }
   }
-  list(cash=cash,label=label,notes=notes,status=status,position=position,rank_label=rank_label,observed_cash=observed,observed_cash_fresh=observed_fresh,difference=difference,purchases=purchases,sales=sales,squad_value=squad_value)
+  list(cash=cash,label=label,notes=notes,status=status,position=position,rank_label=rank_label,observed_cash=observed,observed_cash_fresh=observed_fresh,difference=difference,purchases=purchases,sales=sales,squad_value=squad_value,net_gain=net_gain,net_gain_estimated=net_gain_estimated)
 }
 
 rivals_status_message <- function(message, loading=FALSE) {
@@ -782,7 +784,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       money_out <- total_spent <- summary$purchases
       money_in <- summary$sales
       squad_val <- summary$squad_value
-      net_gain <- squad_val - total_spent
+      net_gain <- summary$net_gain
       net_transfer_pnl <- money_in - money_out
       pnl_color <- if (!is.finite(net_transfer_pnl)) "#64748b" else if (net_transfer_pnl > 0) "#10b981" else if (net_transfer_pnl < 0) "#ef4444" else "#64748b"
       pnl_sign <- if (is.finite(net_transfer_pnl) && net_transfer_pnl > 0) "+" else ""
@@ -860,7 +862,8 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                    solidHeader = TRUE,
                    div(style = "text-align: center; padding: 10px;",
                        h3(style = "font-weight: 700; color: var(--fm-danger); margin: 0; font-size: 20px;", val_sum),
-                       p(style = "color: var(--fm-muted); font-size: 11px; text-transform: uppercase; margin-top: 5px;", paste0("Net Gain: ", net_fmt)))
+                       p(style = "color: var(--fm-muted); font-size: 11px; text-transform: uppercase; margin-top: 5px;", paste0(if(summary$net_gain_estimated)"Net Gain (estimate): "else"Net Gain: ", net_fmt)),
+                       p(style = "color: var(--fm-muted); font-size: 11px; margin-top: 5px;", "Ledger total excluding starting cash"))
                  )
           )
         )

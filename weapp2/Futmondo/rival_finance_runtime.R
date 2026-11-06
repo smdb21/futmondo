@@ -725,6 +725,18 @@ rival_cash_ledger <- function(entries) {
   entries
 }
 
+# Signed cash change from the same included ledger, excluding opening funding.
+# Unknown opening cash does not hide known activity; unknown activity stays unknown.
+rival_cash_net_gain <- function(ledger) {
+  if(!is.data.frame(ledger)||!nrow(ledger)||!all(c("amount","type","included")%in%names(ledger)))return(NA_real_)
+  if(anyNA(ledger$included))return(NA_real_)
+  included<-ledger$included%in%TRUE
+  opening<-ledger$type%in%"opening"
+  if(anyNA(ledger$type[included])||any(!nzchar(ledger$type[included]))||!any(included & opening))return(NA_real_)
+  amounts<-ledger$amount[included & !opening]
+  if(any(!is.finite(amounts)))NA_real_ else sum(amounts)
+}
+
 rival_estimate_summary <- function(missing,assumptions=character(),difference=NA_real_) {
   issues<-unique(missing[nzchar(missing)])
   standings<-grepl("^Ranking history incomplete for round ",issues)
@@ -740,7 +752,7 @@ rival_estimate_summary <- function(missing,assumptions=character(),difference=NA
 
 # Public pure accounting interface; every numeric subtotal has an evidence trail.
 # Versioned, context-bound calculation cache. Source records remain authoritative.
-rival_calculation_version <- "2026-11-04-settled-awards-v2"
+rival_calculation_version <- "2026-11-06-ledger-net-gain-v1"
 rival_calculation_hash <- function(x) as.character(openssl::sha256(serialize(x,NULL,version=2)))
 rival_calculation_evidence <- function(evidence) {
   rows<-Filter(function(x)!x$evidence_type%in%c("team","coverage","rules"),evidence)
@@ -1099,7 +1111,8 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
       # may contain NA and must not erase them when the ledger is republished.
       team_value=fm_number(team$teamValue,fm_number(info$teamValue)),points=fm_number(team$points,fm_number(info$points)),
       last_access=mvp_text(team$lastAccess %||% team$last_access,NA_character_),
-      squad_size=fm_number(info$squad_size),net_profit_loss=NA_real_,estimate_summary=rival_estimate_summary(missing,assumptions,difference),estimate_notes=paste(reasons,collapse=" "),stringsAsFactors=FALSE)
+      squad_size=fm_number(info$squad_size),net_profit_loss=rival_cash_net_gain(ledger),
+      net_gain_estimated=length(reasons)>0L||any(ledger$included & ledger$estimated),estimate_summary=rival_estimate_summary(missing,assumptions,difference),estimate_notes=paste(reasons,collapse=" "),stringsAsFactors=FALSE)
     breakdowns[[tid]]<-ledger[,c("component","amount","source","round_id","player_id"),drop=FALSE]
     ledger$round_number<-history$rounds$round_number[match(ledger$round_id,history$rounds$round_id)]
     own_rounds<-history$rounds[history$rounds$team_id%in%tid,,drop=FALSE]

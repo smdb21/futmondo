@@ -93,7 +93,7 @@ Renders a `reactable` table bound to `league_finances_RV()$team_finances`. Displ
 | `total_spent`     | Sum of `buyPrice` across all players in the current roster.  |
 | `budget`          | Money Left = initial_budget - total_spent + total_sales. No artificial bonuses. Overridden by API `actual_info$budget` when available. |
 | `team_value`      | Total squad valuation (sum of player `value`).               |
-| `net_profit_loss` | team_value - total_spent.                                    |
+| `net_profit_loss` | Signed included cash-ledger activity excluding opening cash; independent of squad value. |
 | `squad_size`      | Number of players in the roster.                             |
 | `points`          | Championship points accumulated.                             |
 | `point_bonus`     | Points multiplied by 70,000 EUR.                             |
@@ -107,7 +107,7 @@ The module renders four summary boxes in a fluid row:
 | Standings Position| `info$position` | `get_user_team_info()`     |
 | Money Left (Budget)| `budget` from `league_finances_RV()$team_finances` | Pressroom-driven `budget` column from `calculate_league_finances()`, which overrides the default `300000000 - total_spent` calculation. This ensures the summary box matches the main standings table and plot. |
 | Squad Investment  | `total_spent` (roster) / `money_out` (transactions) | Computed from roster `buyPrice` and transaction movements |
-| Squad Valuation & Gain | `info$teamValue` | `get_user_team_info()`     |
+| Squad Valuation & Gain | `summary$squad_value` / `summary$net_gain` | Observed directory valuation / shared ledger total excluding starting cash; reconstructed totals are labelled estimates. |
 
 #### Squad Investment Card -- Money Out / Money In Calculation
 
@@ -526,3 +526,8 @@ The financial history shows the full shared ledger, including position, Best XI,
 
 The rivals points pill scale excludes zero scores from its minimum and maximum. Zero remains visible with the neutral theme surface; nonzero scores use the full existing colour scale. Sorting and pagination do not change the scale.
 Performance: this changes only the existing linear colour calculation, with no additional requests, database work or reactive updates. Focused rival-directory checks (7) and deployment checks (3) passed; full lifecycle and hosted visual checks were skipped for this presentation-only change. No delegation.
+
+
+### Ledger-based Net Gain — 2026-11-06
+
+The selected-rival card uses `rivals_summary_values()$net_gain`, published as `team_finances$net_profit_loss` from `rival_cash_net_gain()`. This is the signed total of all included financial-history entries except the opening allocation. It includes sales and rewards alongside purchases, fees and adjustments. Squad value remains a separate observed amount; lifetime purchases are no longer subtracted from it. The card explains the starting-cash exclusion and uses `net_gain_estimated` to label reconstructed results. Unknown transaction amounts remain unavailable. The existing shared calculation and context-bound cache are reused; card selection, history filters, sorting and paging make no additional request or ledger calculation. See [rival_cash_accounting.md](rival_cash_accounting.md) for the exact contract.

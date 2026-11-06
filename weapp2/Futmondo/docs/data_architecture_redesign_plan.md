@@ -642,3 +642,15 @@ Status: **implemented locally; verification in progress**.
 - [ ] Verify the actual menu, mobile sidebar, full offline lifecycle and generated bundle; push only this task's changes.
 
 This is a text-only presentation change. It adds no request, reactive dependency, timer, cache, database operation, package or environment variable.
+
+
+## Rival Net Gain ledger reconciliation — 2026-11-06
+
+Status: **implemented and verified locally; authenticated hosted behavior remains unverified**.
+
+- [x] Trace the reported −€4,864,399,502 to squad value minus cumulative historical purchases, which omitted other ledger activity.
+- [x] Publish one signed net gain from the shared cash ledger, excluding initial funding and excluded entries; keep observed squad valuation separate.
+- [x] Preserve unknown amounts, estimate labels, source revisions, account/league/season isolation and versioned cache reuse.
+- [x] Complete independent known-answer, rendered-card, cache/performance and offline lifecycle checks. Scoped delivery targets the current `2.0` branch remote; the pushed commit is reported separately.
+
+No authenticated account or transaction is used for local verification. Hosted balances and deployment require separate verification; this change does not establish complete source evidence for the reported rival.
