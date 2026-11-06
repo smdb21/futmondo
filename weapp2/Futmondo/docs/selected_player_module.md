@@ -10,6 +10,10 @@ Zero and negative scores are valid. A known round does not need a timestamp to b
 
 Cumulative price-snapshot totals never become per-round scores. Price charts use actual observed values only; no synthetic trend or default historical value fills gaps.
 
+The history chart displays both series together: solid green valuation on the left EUR scale and dashed amber round points on the right scale. The legend identifies both series and can toggle either line. Each vertical scale keeps its own padded range. A shared date axis uses saved round dates or the existing context-checked match details (the last fixture date for a round with several matches). If any score remains undated, every score is preserved on a separate top round axis with an explicit notice that it is not aligned with valuation dates. Points alone use round numbers when undated. Missing series retain their availability explanation.
+
+This presentation reuses the card's shared history and already requested match resource. It adds no requests, database reads, polling or cache entries; match completion can redraw the chart once to align its dates. Focused verification: `Rscript test/test_player_trend_plot.R`.
+
 ## Interaction
 
 Reopening the same fresh player shares cached resources. Refresh updates the card resources; changing account/league/player rejects old results and clears pending confirmations. Notification, market, roster, and catalog entry paths use the same card behavior.

@@ -143,9 +143,6 @@ selected_player_UI <- function(id) {
           column(12,
                  div(class = "player-chart-heading",
                    h4(style = "font-weight: 600; color: var(--fm-text); margin: 0;", "Historical Valuation & Performance"),
-                   radioButtons(ns("player_chart_metric"), label = NULL,
-                     choices = c("Valuation" = "valuation", "Round points" = "points"),
-                     selected = "valuation", inline = TRUE),
                    actionButton(ns("refresh_history"), "Refresh history", icon=icon("rotate"))
                  ),
                  uiOutput(ns("player_chart_container"))
@@ -1776,48 +1773,69 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     output$player_chart_container <- renderUI({
       req(selected_player())
       if(!isTRUE(card_chart_ready()))return(div(class="player-card-loading",role="status","Loading chart…"))
-      plotly::plotlyOutput(ns("player_trend_plot"),height="280px")
+      plotly::plotlyOutput(ns("player_trend_plot"),height="340px")
     })
     output$player_trend_plot <- plotly::renderPlotly({
       req(card_chart_ready())
       sp <- selected_player(); req(sp); history <- card_history()
-      metric <- if (identical(input$player_chart_metric,"points")) "points" else "valuation"
       empty_chart <- function(message) plotly::plot_ly() %>% fm_plot_layout(
         paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",
         xaxis=list(visible=FALSE),yaxis=list(visible=FALSE),
         annotations=list(list(text=message,x=.5,y=.5,xref="paper",yref="paper",showarrow=FALSE)))
       if (identical(history$status,"loading") && !nrow(history$points) && !nrow(history$valuation)) return(empty_chart("Loading player history…"))
-      if (metric=="points") {
-        points <- history$points
-        if (!is.data.frame(points) || !all(c("round_number","points") %in% names(points))) points <- data.frame()
-        if (nrow(points)) {
-          points$round_number <- suppressWarnings(as.numeric(points$round_number));points$points <- suppressWarnings(as.numeric(points$points))
-          points <- points[is.finite(points$round_number)&is.finite(points$points),,drop=FALSE]
-        }
-        if (!nrow(points)) return(empty_chart(recent_round_points_empty_text(sp$points)))
+      points <- history$points
+      if (!is.data.frame(points) || !all(c("round_number","points") %in% names(points))) points <- data.frame()
+      if (nrow(points)) {
+        points$round_number <- suppressWarnings(as.numeric(points$round_number));points$points <- suppressWarnings(as.numeric(points$points))
+        points <- points[is.finite(points$round_number)&is.finite(points$points),,drop=FALSE]
         points <- points[order(points$round_number),,drop=FALSE]
-        points$label <- paste0("Round ",points$round_number,"<br>Points: ",points$points,
-          if ("score_status" %in% names(points)) paste0("<br>",points$score_status) else "")
-        return(plotly::plot_ly(points) %>% plotly::add_trace(type="scatter",mode="lines+markers",
-          x=~round_number,y=~points,text=~label,hoverinfo="text",name="Round points",
-          line=list(color="#10b981",width=2.5),marker=list(size=8)) %>%
-          fm_plot_layout(paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",
-            xaxis=list(title="Round",dtick=1),yaxis=list(title="Points",autorange=FALSE,
-              range=player_trend_axis_range(points$points)),showlegend=FALSE))
       }
       values <- history$valuation
       if (!is.data.frame(values) || !all(c("recorded_at","value") %in% names(values))) values <- data.frame()
       if (nrow(values)) {
         values$date <- fm_time(values$recorded_at);values$value <- suppressWarnings(as.numeric(values$value))
         values <- values[!is.na(values$date)&is.finite(values$value),,drop=FALSE]
+        values <- values[order(values$date),,drop=FALSE]
       }
-      if (!nrow(values)) return(empty_chart(paste0("Valuation history unavailable. Current value: ",player_card_money(sp$value))))
-      values <- values[order(values$date),,drop=FALSE]
-      plotly::plot_ly(values) %>% plotly::add_trace(type="scatter",mode="lines+markers",x=~date,y=~value,
-        name="Observed value",line=list(color="#00ff88",width=2.5)) %>%
-        fm_plot_layout(paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",
-          xaxis=list(title="Date"),yaxis=list(title="Value (EUR)",autorange=FALSE,
-            range=player_trend_axis_range(values$value)),showlegend=FALSE)
+      notes <- character()
+      if (!nrow(values)) notes <- c(notes,paste0("Valuation history unavailable. Current value: ",player_card_money(sp$value)))
+      if (!nrow(points)) notes <- c(notes,recent_round_points_empty_text(sp$points))
+      if (!nrow(values) && !nrow(points)) return(empty_chart(paste(notes,collapse="<br>")))
+
+      # Reuse the already requested match details to date rounds; never use
+      # observation/save timestamps as match dates or discard undated scores.
+      points_dates <- player_trend_points_dates(points,normalize_player_matches(card_states$matches()$data),history$context %||% list())
+      dated_points <- nrow(points)>0L && all(!is.na(points_dates))
+      separate_round_axis <- nrow(values)>0L && nrow(points)>0L && !dated_points
+      if (separate_round_axis) notes <- c(notes,"Match dates unavailable:<br>round axis is not aligned with dates.")
+      chart <- plotly::plot_ly()
+      if (nrow(values)) chart <- chart %>% plotly::add_trace(data=values,type="scatter",mode="lines+markers",x=~date,y=~value,
+        name="Valuation",yaxis="y",line=list(color="#00ff88",width=2.5,dash="solid"),marker=list(size=5),
+        hovertemplate="%{x|%d %b %Y}<br>Valuation: %{y:,.0f} EUR<extra></extra>")
+      if (nrow(points)) {
+        points$plot_x <- if(dated_points)points_dates else points$round_number
+        points$label <- paste0("Round ",points$round_number,"<br>Points: ",points$points,
+          if(dated_points)paste0("<br>",format(points_dates,"%d %b %Y",tz="UTC"))else "",
+          if("score_status" %in% names(points))paste0("<br>",points$score_status)else "")
+        chart <- chart %>% plotly::add_trace(data=points,type="scatter",mode="lines+markers",
+          x=~plot_x,y=~points,text=~label,hoverinfo="text",name="Points",yaxis="y2",
+          xaxis=if(separate_round_axis)"x2"else "x",
+          line=list(color="#F4C95D",width=2.5,dash="dash"),marker=list(size=7,color="#F4C95D"))
+      }
+      chart %>% fm_plot_layout(
+        xaxis=list(title=if(nrow(values)||dated_points)"Date"else "Round",
+          type=if(nrow(values)||dated_points)"date"else "linear",
+          dtick=if(!nrow(values)&&!dated_points)1 else NULL),
+        xaxis2=if(separate_round_axis)list(title="Round (dates unavailable)",overlaying="x",side="top",dtick=1,showgrid=FALSE)else list(visible=FALSE),
+        yaxis=list(title="Value (EUR)",visible=nrow(values)>0L,autorange=FALSE,
+          range=player_trend_axis_range(values$value),tickformat=".3s",color="#00ff88"),
+        yaxis2=list(title="Points",visible=nrow(points)>0L,overlaying="y",side="right",autorange=FALSE,
+          range=player_trend_axis_range(points$points),showgrid=FALSE,color="#F4C95D",tickformat="~g"),
+        showlegend=TRUE,legend=list(orientation="h",x=0,y=1.35,font=list(size=11)),
+        margin=list(l=55,r=50,b=if(length(notes))120 else 55,t=if(separate_round_axis)80 else 45),
+        annotations=if(length(notes))list(list(text=paste(unlist(lapply(notes,function(note)
+          strwrap(gsub("<br>","\n",note,fixed=TRUE),width=36))),collapse="<br>"),x=.5,y=0,yshift=-70,
+          xref="paper",yref="paper",showarrow=FALSE,xanchor="center",yanchor="top",font=list(size=10)))else list())
     })
     render_match <- function(match) {
       score<-if(is.finite(match$home_score)&&is.finite(match$away_score))paste0(format(match$home_score,trim=TRUE),"–",format(match$away_score,trim=TRUE))else "Score unavailable"
@@ -2004,6 +2022,21 @@ player_trend_axis_range <- function(values) {
   bounds <- range(values)
   padding <- max(diff(bounds) * 0.20, abs(bounds) * 0.04, 2)
   bounds + c(-padding, padding)
+}
+
+# Match association applies the same context checks as the recent-round cards.
+# For rounds with several fixtures, use the last actual fixture date.
+player_trend_points_dates <- function(points,matches,context) {
+  dates <- fm_time(points$date %||% rep(NA_character_,nrow(points)))
+  if (!nrow(points) || !anyNA(dates)) return(dates)
+  rounds <- build_player_recent_rounds(points,matches,context,limit=nrow(points),current_player_responses=TRUE)$rounds
+  for (round in rounds) {
+    indices <- which(points$round_number==round$round_number & is.na(dates))
+    fixture_dates <- fm_time(round$fixtures$occurred_at %||% character())
+    fixture_dates <- fixture_dates[!is.na(fixture_dates)]
+    if(length(indices) && length(fixture_dates))dates[indices] <- max(fixture_dates)
+  }
+  dates
 }
 
 # Convert stored final per-round observations into the card chart series.

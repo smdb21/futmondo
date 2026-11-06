@@ -44,7 +44,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       await modal.locator('.player-recent-round-chip').first().waitFor();
       const chips=await modal.locator('.player-recent-round-chip').allTextContents();
       assert.ok(chips.some(x=>x.includes('0 pts'))&&chips.some(x=>x.includes('-2 pts')),`${width}px round scores: ${chips}`);
-      await modal.getByRole('radio',{name:'Round points',exact:true}).check();
+      assert.equal(await modal.locator('[id$="-player_chart_metric"]').count(),0);
       await page.waitForFunction(()=>Array.from(document.querySelectorAll('.modal .js-plotly-plot')).some(p=>p.data&&p.data.some(t=>Array.from(t.y||[]).includes(-2))));
       assert.deepEqual(await modal.locator('.shiny-output-error:visible').allTextContents(),[],`${width}px player card errors`);
       assert.match(await modal.innerText(),/Player profile is unavailable/);

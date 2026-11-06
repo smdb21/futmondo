@@ -9,8 +9,9 @@ find_output<-function(node,target){
 }
 tree<-parse("Modules/Selected_Player_Module.R");plot_body<-find_output(tree,"player_trend_plot");recent_body<-find_output(tree,"recent_round_points")
 empty<-function()list(valuation=data.frame(),points=data.frame(),status="empty",freshness="fresh")
-render_fixture<-function(history=empty(),metric="points",total=12,value=1000000){
- env<-new.env(parent=globalenv());env$selected_player<-function()data.frame(id="p",points=total,value=value);env$card_history<-function()history;env$input<-list(player_chart_metric=metric);env$card_chart_ready<-function()TRUE
+render_fixture<-function(history=empty(),total=12,value=1000000,matches=list()){
+ env<-new.env(parent=globalenv());env$selected_player<-function()data.frame(id="p",points=total,value=value);env$card_history<-function()history;env$card_chart_ready<-function()TRUE
+ env$card_states<-list(matches=function()list(data=matches))
  plotly::plotly_build(eval(plot_body,env))$x
 }
 check("zero negative and large values have padded axes",{for(values in list(0,-2,c(-2,0,5),c(99e6,100e6))){bounds<-player_trend_axis_range(values);stopifnot(all(is.finite(bounds)),all(values>bounds[1]),all(values<bounds[2]))}})
@@ -30,8 +31,31 @@ check("unknown point finality is preserved in chart provenance",{
  stopifnot(grepl("unknown",tail(chart$data[[1]]$text,1),fixed=TRUE),identical(as.numeric(unlist(chart$data[[1]]$y)),c(4,0,-2,3)))
 })
 check("cumulative totals never become round scores",{chart<-render_fixture(total=37);stopifnot(grepl("Total points: 37",chart$layout$annotations[[1]]$text,fixed=TRUE));text<-paste(readLines("Modules/Selected_Player_Module.R"),collapse="\n");stopifnot(!grepl("build_player_points_trace|get_player_historical_data",text))})
-check("unknown valuation has no fabricated curve",{chart<-render_fixture(metric="valuation",value=1234567);stopifnot(grepl("Valuation history unavailable",chart$layout$annotations[[1]]$text,fixed=TRUE),grepl("1.234.567",chart$layout$annotations[[1]]$text,fixed=TRUE))})
-check("valuation keeps only actual finite dated observations",{history<-known;history$valuation<-data.frame(recorded_at=c("2026-10-01T00:00:00Z","2026-10-02T00:00:00Z","bad"),value=c(99e6,100e6,1));chart<-render_fixture(history,"valuation");stopifnot(identical(as.numeric(unlist(chart$data[[1]]$y)),c(99e6,100e6)))})
+check("unknown valuation has no fabricated curve",{chart<-render_fixture(value=1234567);stopifnot(grepl("Valuation history unavailable",chart$layout$annotations[[1]]$text,fixed=TRUE),grepl("1.234.567",chart$layout$annotations[[1]]$text,fixed=TRUE))})
+combined<-known;combined$valuation<-data.frame(recorded_at=c("2026-10-01T00:00:00Z","2026-10-02T00:00:00Z","bad"),value=c(99e6,100e6,1))
+check("valuation keeps only actual finite dated observations",{chart<-render_fixture(combined);stopifnot(identical(as.numeric(unlist(chart$data[[1]]$y)),c(99e6,100e6)))})
+check("both series have independent vertical scales and distinct styles",{
+ history<-combined;history$points$date<-as.POSIXct("2026-10-01",tz="UTC")+0:3*86400
+ chart<-render_fixture(history);value<-chart$data[[1]];points<-chart$data[[2]]
+ stopifnot(length(chart$data)==2L,value$yaxis=="y",points$yaxis=="y2",points$xaxis=="x",
+   value$line$dash=="solid",points$line$dash=="dash",value$line$color!=points$line$color,
+   chart$layout$yaxis2$overlaying=="y",chart$layout$yaxis2$side=="right",isTRUE(chart$layout$showlegend),
+   all(c(99e6,100e6)>chart$layout$yaxis$range[1]),all(c(99e6,100e6)<chart$layout$yaxis$range[2]),
+   all(c(-2,4)>chart$layout$yaxis2$range[1]),all(c(-2,4)<chart$layout$yaxis2$range[2]))
+})
+check("undated scores stay visible with an explicitly independent round axis",{
+ chart<-render_fixture(combined)
+ stopifnot(chart$data[[2]]$xaxis=="x2",identical(as.numeric(chart$data[[2]]$x),as.numeric(1:4)),
+   chart$layout$xaxis2$overlaying=="x",grepl("not aligned with dates",chart$layout$annotations[[1]]$text,fixed=TRUE))
+})
+check("existing scoped match dates align points without a new read",{
+ history<-combined;history$context<-list(player_id="p",season="2026",competition_id="league")
+ history$points$source<-"futmondo"
+ matches<-data.frame(round=1:4,occurred_at=paste0("2026-10-0",1:4,"T12:00:00Z"),season="2026",competition_id="league")
+ dates<-player_trend_points_dates(history$points,matches,history$context)
+ stopifnot(identical(as.numeric(dates),as.numeric(fm_time(matches$occurred_at))))
+ matches$season<-"2025";stopifnot(all(is.na(player_trend_points_dates(history$points,matches,history$context))))
+})
 check("stored undated final scores remain available",{rows<-data.frame(round=c(1,2,3),points=c(0,-2,5),score_status=c("final","final","provisional"));trace<-player_match_points_trace(rows);stopifnot(trace$has_points,identical(trace$points_df$points,c(0,-2)),all(is.na(trace$points_df$date)))})
-check("card exposes refresh without advice",{html<-as.character(selected_player_UI("card"));stopifnot(grepl("refresh_history",html,fixed=TRUE),!grepl("Smart Bid|fis_panel|smart_bid_widget",html))})
+check("card exposes refresh and one combined chart",{html<-as.character(selected_player_UI("card"));stopifnot(grepl("refresh_history",html,fixed=TRUE),!grepl("Smart Bid|fis_panel|smart_bid_widget|player_chart_metric",html))})
 cat("Player trend plot:",n,"checks passed.\n")
