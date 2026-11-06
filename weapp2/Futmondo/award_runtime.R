@@ -96,7 +96,7 @@ get_mvp_saved_catalog <- function(login,championship_id) {
   saved<-tryCatch(read_rival_finance_evidence(login[["userid"]],championship_id,season),error=function(e)list(evidence=list(),complete=FALSE))
   expected<-award_expected_scoring(login,championship_id)
   rows<-award_saved_rows(rival_evidence_rows(saved$evidence,"awards"),championship_id,season,expected,login[["userid"]])
-  catalog<-get_finished_round_catalog(login,championship_id)
+  catalog<-get_award_round_catalog(login,championship_id,rows)
   list(saved=rows,expected_scoring=expected,saved_complete=isTRUE(saved$complete),catalog=catalog,season=season,
     settlement_rechecks=award_settlement_rechecks(saved$evidence,rows,award_catalog_numbers(catalog$rounds,rows)))
 }
@@ -120,17 +120,19 @@ persist_official_award_snapshot <- function(result,login,championship_id,referen
 }
 # Eligibility for retrieval is separate from finality/credited rewards. A known
 # current or later round is not due unless the source explicitly confirms closure.
-award_round_pending <- function(reference,current_round_number=reference$current_round_number) {
+award_round_pending <- function(reference,current_round_number=reference$current_round_number,current_round_id=reference$current_round_id) {
   if(isTRUE(reference$is_finished))return(FALSE)
   if(identical(reference$is_finished,FALSE))return(TRUE)
+  current_id<-mvp_text(current_round_id)
+  if(nzchar(current_id)&&identical(mvp_text(reference$round_id),current_id))return(TRUE)
   number<-fm_number(reference$round_number);current<-fm_number(current_round_number)
   is.finite(number)&&is.finite(current)&&number>=current
 }
-award_coverage <- function(rounds,rows,failures=list(),current_round_number=NA_real_) {
+award_coverage <- function(rounds,rows,failures=list(),current_round_number=NA_real_,current_round_id="") {
   if(!is.data.frame(rounds)||!nrow(rounds))return(data.frame())
   dplyr::bind_rows(lapply(seq_len(nrow(rounds)),function(i){
     round<-rounds[i,,drop=FALSE];group<-if(is.data.frame(rows)&&"round_id"%in%names(rows))rows[rows$round_id%in%round$round_id,,drop=FALSE]else data.frame()
-    required<-!mvp_text(round$status)%in%c("verified_future")&&!award_round_pending(round,current_round_number)
+    required<-!mvp_text(round$status)%in%c("verified_future")&&!award_round_pending(round,current_round_number,current_round_id)
     valid<-award_selection_valid(group)
     finality<-if(!valid){if(required)"Missing"else "Not closed"}else if(all(group$is_finished%in%TRUE))"Confirmed final"else if(any(group$is_finished%in%FALSE))"Provisional / in progress"else "Finality unknown"
     data.frame(round_id=round$round_id,round_number=round$round_number,selection=if(valid)"11 players"else if(required)"Missing"else "Not due",required=required,
@@ -156,7 +158,7 @@ shared_mvp_source <- function(session,login,championship,active,refresh=NULL) {
   identity<-function(){auth<-login();if(!valid_login(auth))return("");paste(auth[["userid"]],championship(),league_season_context(championship()),sep="|")}
   current<-function(generation,key) !state$closed&&identical(generation,state$generation)&&identical(key,state$key)&&identical(shiny::isolate(identity()),key)
   publish<-function(){
-    coverage<-award_coverage(state$rounds,state$rows,state$failures,state$current_round_number)
+    coverage<-award_coverage(state$rounds,state$rows,state$failures,state$current_round_number,state$current_round_id)
     required<-if(nrow(coverage))coverage[coverage$required%in%TRUE,,drop=FALSE]else coverage
     # Missing completion flags on future rounds are not missing historical data.
     relevant<-if(nrow(required))match(required$round_id,state$rounds$round_id)else integer()
@@ -252,11 +254,11 @@ shared_mvp_source <- function(session,login,championship,active,refresh=NULL) {
   }
   request<-function(mode="missing",round_id=NULL){
     if(!isTRUE(shiny::isolate(active()))||state$loading||state$running||!nzchar(shiny::isolate(identity()))||!identical(state$key,shiny::isolate(identity())))return(FALSE)
-    coverage<-award_coverage(state$rounds,state$rows,state$failures,state$current_round_number);if(!nrow(coverage))return(FALSE)
+    coverage<-award_coverage(state$rounds,state$rows,state$failures,state$current_round_number,state$current_round_id);if(!nrow(coverage))return(FALSE)
     state$acquisition_active<-active
     launch<-function(){
       if(!isTRUE(shiny::isolate(active()))){publish();return(FALSE)}
-      eligible<-award_coverage(state$rounds,state$rows,state$failures,state$current_round_number)
+      eligible<-award_coverage(state$rounds,state$rows,state$failures,state$current_round_number,state$current_round_id)
       # Choose after a catalog refresh so a newly closed round is included.
       ids<-switch(mode,missing=eligible$round_id[eligible$selection=="Missing"&eligible$required%in%TRUE],
         refresh=eligible$round_id[eligible$required%in%TRUE&(eligible$finality!="Confirmed final"|isTRUE(state$needs_recheck))],
@@ -264,20 +266,21 @@ shared_mvp_source <- function(session,login,championship,active,refresh=NULL) {
       ids<-intersect(ids,eligible$round_id[eligible$required%in%TRUE])
       state$queue<-lapply(head(unique(ids),120L),function(id){row<-state$rounds[state$rounds$round_id%in%id,,drop=FALSE];
         list(kind="round",reference=list(round_id=id,round_number=row$round_number[1],is_finished=row$is_finished[1],
-          user_team_id=state$user_team_id,current_round_number=state$current_round_number))})
+          user_team_id=state$user_team_id,current_round_number=state$current_round_number,current_round_id=state$current_round_id))})
       state$fetched<-state$saved<-state$failed<-0L;state$needs_recheck<-FALSE;state$running<-length(state$queue)>0L;publish();pump();TRUE
     }
-    if(mode%in%c("refresh","selected")){
-      # Recheck catalog finality before refreshing old provisional selections.
+    if(mode%in%c("missing","refresh","selected")){
+      # Recheck metadata for every explicit batch, including rounds that closed
+      # while Admin stayed open. The numbered catalog/schedule caches are reused.
       auth<-shiny::isolate(login());cid<-shiny::isolate(championship());g<-state$generation;k<-state$key
       ctx<-resource_context(auth,cid,season=state$season,session_id=root$token)
-      invalidate_resources(resource_context(auth,cid),resources=paste0("mvp_catalog_",cid));state$loading<-TRUE;publish()
-      promises::then(async_adapter_fetch("get_finished_round_catalog",list(login=auth,championship_id=cid),ctx,is_current=function()current(g,k)),function(catalog){
+      invalidate_resources(resource_context(auth,cid),resources=paste0(c("mvp_catalog_","award_round_metadata_"),cid));state$loading<-TRUE;publish()
+      promises::then(async_adapter_fetch("get_award_round_catalog",list(login=auth,championship_id=cid,saved=state$rows),ctx,is_current=function()current(g,k)),function(catalog){
         if(!current(g,k))return(NULL)
         state$loading<-FALSE
         if(is.data.frame(catalog$rounds)&&nrow(catalog$rounds)){
           state$rounds<-award_catalog_numbers(catalog$rounds,state$rows);state$catalog_complete<-isTRUE(catalog$complete);state$catalog_identity_complete<-isTRUE(catalog$identity_complete %||% catalog$complete);state$catalog_reason<-catalog$reason %||% ""
-          state$user_team_id<-catalog$user_team_id;state$current_round_number<-catalog$current_round_number;launch()
+          state$user_team_id<-catalog$user_team_id;state$current_round_number<-catalog$current_round_number;state$current_round_id<-catalog$current_round_id;launch()
         }else{state$catalog_reason<-"Round status could not be refreshed. Retry before refreshing selections.";publish()};NULL
       },function(e){if(current(g,k)){state$loading<-FALSE;state$catalog_reason<-"Round status could not be refreshed. Retry before refreshing selections.";publish()};NULL})
       return(TRUE)
@@ -309,7 +312,7 @@ shared_mvp_source <- function(session,login,championship,active,refresh=NULL) {
         if(!current(g,key))return(NULL)
         state$loading<-FALSE;state$expected_scoring<-mvp_text(result$expected_scoring,"unknown");state$rows<-result$saved %||% data.frame();state$rounds<-award_catalog_numbers(result$catalog$rounds %||% empty_finished_rounds(),state$rows)
         state$catalog_complete<-isTRUE(result$catalog$complete);state$catalog_identity_complete<-isTRUE(result$catalog$identity_complete %||% result$catalog$complete);state$saved_complete<-isTRUE(result$saved_complete);state$catalog_reason<-result$catalog$reason %||% ""
-        state$user_team_id<-result$catalog$user_team_id;state$current_round_number<-result$catalog$current_round_number
+        state$user_team_id<-result$catalog$user_team_id;state$current_round_number<-result$catalog$current_round_number;state$current_round_id<-result$catalog$current_round_id
         # Active-session recovery only; the normal bounded async acquisition and
         # acknowledged persistence path handles these paid-round revisions.
         ids<-intersect(result$settlement_rechecks %||% character(),state$rounds$round_id)
@@ -318,7 +321,7 @@ shared_mvp_source <- function(session,login,championship,active,refresh=NULL) {
           state$queue<-lapply(head(unique(ids),120L),function(id){
             row<-state$rounds[state$rounds$round_id%in%id,,drop=FALSE]
             list(kind="round",reference=list(round_id=id,round_number=row$round_number[1],is_finished=TRUE,
-              user_team_id=state$user_team_id,current_round_number=state$current_round_number))
+              user_team_id=state$user_team_id,current_round_number=state$current_round_number,current_round_id=state$current_round_id))
           })
           state$running<-TRUE
         }

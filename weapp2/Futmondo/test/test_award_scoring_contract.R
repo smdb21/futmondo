@@ -97,7 +97,7 @@ check('API, HTTP, network, parser and malformed responses retain the real failur
     reset_fixture(kind)
     shiny::testServer(function(input,output,session){source<-shared_mvp_source(session,function()auth,function()cid,function()TRUE)},{
       settle(session,function()!source()$loading);stopifnot(length(fixture$requests)==0L)
-      stopifnot(attr(source,'retrieve')('missing'));settle(session,function()!source()$running)
+      stopifnot(attr(source,'retrieve')('missing'));settle(session,function()!source()$loading&&!source()$running)
       issue<-source()$coverage$issue
       expected<-if(kind=='api')'Futmondo rejected the request (api.error.invalid).'else if(kind=='http')
         'Futmondo access was denied. Log in again.'else if(kind=='parser')'Futmondo returned a malformed data response.'else if(kind=='malformed')
@@ -112,7 +112,7 @@ check('valid XI with missing scoring is distinct from genuine weight or mode con
   for(kind in c('missing','missing_custom','weight','mode')){
     reset_fixture(kind)
     shiny::testServer(function(input,output,session){source<-shared_mvp_source(session,function()auth,function()cid,function()TRUE)},{
-      settle(session,function()!source()$loading);attr(source,'retrieve')('missing');settle(session,function()!source()$running)
+      settle(session,function()!source()$loading);attr(source,'retrieve')('missing');settle(session,function()!source()$loading&&!source()$running)
       expected<-if(kind%in%c('missing','missing_custom'))'Selection scoring metadata is missing or unrecognized; compatibility with the league configuration could not be verified.'else
         'Selection scoring differs from the league configuration; it was not used.'
       stopifnot(source()$coverage$issue==expected,source()$failed==1L,source()$fetched==0L,
@@ -130,31 +130,31 @@ check('explicit selected retry evicts only scoped source caches and waits for ac
   get_cached_data(unrelated,list(marker='another-round'),context=resource_context(auth,cid))
   get_cached_data(paste0('mvp_catalog_',cid),catalog,context=resource_context(auth,cid))
   shiny::testServer(function(input,output,session){source<-shared_mvp_source(session,function()auth,function()cid,function()TRUE)},{
-    settle(session,function()!source()$loading);attr(source,'retrieve')('missing');settle(session,function()!source()$running)
+    settle(session,function()!source()$loading);attr(source,'retrieve')('missing');settle(session,function()!source()$loading&&!source()$running)
     stopifnot(source()$failed==1L,dreamteam_reads()==1L)
     fixture$mode<-'ok';stopifnot(attr(source,'retrieve')('selected','r1'))
     settle(session,function()length(fixture$pending)==1L)
     state<-session$rootScope()$userData$mvp_shared
     stopifnot(state$fetched==1L,state$failed==0L,source()$saved==0L,source()$running,
       all(state$rows$persistence=='Saving'),dreamteam_reads()==2L,
-      sum(vapply(fixture$requests,function(x)identical(x$url,ACTIVE_CHAMPIONSHIPS_URL),logical(1)))==1L,
-      sum(vapply(fixture$requests,function(x)identical(x$url,'https://api.futmondo.com/2/league/list'),logical(1)))==1L)
+      sum(vapply(fixture$requests,function(x)identical(x$url,ACTIVE_CHAMPIONSHIPS_URL),logical(1)))==2L,
+      sum(vapply(fixture$requests,function(x)identical(x$url,'https://api.futmondo.com/2/league/list'),logical(1)))==2L)
     stopifnot(exists(api_cache_key(paste0('official_dreamteam_',cid,'_r1'),context=foreign),api_cache_env,inherits=FALSE),
       exists(api_cache_key('official_dreamteam_other-league_r1',context=other_league),api_cache_env,inherits=FALSE),
       exists(api_cache_key(unrelated,context=resource_context(auth,cid)),api_cache_env,inherits=FALSE))
     pending<-fixture$pending[['r1']];fixture$persisted<-list(pending$row);pending$complete(TRUE)
-    settle(session,function()!source()$running)
+    settle(session,function()!source()$loading&&!source()$running)
     stopifnot(source()$saved==1L,source()$complete,source()$coverage$persistence=='Saved',
       all(source()$rows$scoring_version==version),!nzchar(source()$coverage$issue))
   })
-  before<-length(fixture$requests)
+  before<-length(fixture$requests);before_awards<-dreamteam_reads()
   shiny::testServer(function(input,output,session){source<-shared_mvp_source(session,function()auth,function()cid,function()TRUE)},{
     settle(session,function()!source()$loading)
     stopifnot(source()$complete,nrow(source()$rows)==11L,source()$coverage$persistence=='Saved')
-    attr(source,'retrieve')('missing');settle(session,function()!source()$running)
-    stopifnot(length(fixture$requests)==before)
+    attr(source,'retrieve')('missing');settle(session,function()!source()$loading&&!source()$running)
+    stopifnot(length(fixture$requests)==before+2L,dreamteam_reads()==before_awards)
   })
-  cat('MEASURE rejected_read=1 selected_retry_dreamteam_reads=1 catalog_reads=2 saved_reuse_reads=0\n')
+  cat('MEASURE rejected_read=1 selected_retry_dreamteam_reads=1 catalog_reads=4 saved_reuse_award_reads=0 saved_reuse_metadata_reads=2\n')
 })
 get_mvp_saved_catalog<-original_catalog;persist_official_award_snapshot<-original_save
 fm_async_http<-original_http;futmondo_post<-original_post;get_sb_url<-original_url;get_sb_key<-original_key

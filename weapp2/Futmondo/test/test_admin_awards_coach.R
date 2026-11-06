@@ -79,7 +79,7 @@ fm_async_hire_coach<-old_hire
 old_async<-async_adapter_fetch;old_persist<-persist_official_award_snapshot
 requests<-0L;running<-0L;maximum<-0L;saves<-list();read_count<-0L
 async_adapter_fetch<-function(fn,args,context,...){
-  if(fn=='get_mvp_saved_catalog'){read_count<<-read_count+1L;return(promises::promise_resolve(list(saved=data.frame(),saved_complete=TRUE,catalog=list(rounds=data.frame(round_id=c('r1','r2','r3'),round_number=1:3,is_finished=c(TRUE,NA,FALSE),status=c('done','unknown','verified_future')),complete=TRUE,reason=''))))}
+  if(fn%in%c('get_mvp_saved_catalog','get_award_round_catalog')){if(fn=='get_mvp_saved_catalog')read_count<<-read_count+1L;value<-list(saved=data.frame(),saved_complete=TRUE,catalog=list(rounds=data.frame(round_id=c('r1','r2','r3'),round_number=1:3,is_finished=c(TRUE,NA,FALSE),status=c('done','unknown','verified_future')),complete=TRUE,reason=''));return(promises::promise_resolve(if(fn=='get_mvp_saved_catalog')value else value$catalog))}
   stopifnot(fn=='get_official_dreamteam_result');requests<<-requests+1L;running<<-running+1L;maximum<<-max(maximum,running)
   promises::promise(function(resolve,reject)later::later(function(){running<<-running-1L;resolve(normalize_official_dreamteam(xi(),args$championship_id,args$reference))},.03))
 }
@@ -90,10 +90,10 @@ check('Admin loads bulk coverage once, fetches only on click, limits concurrency
     attr(source,'retrieve')('missing');settle(session,function()length(saves)==2L)
     stopifnot(requests==2L,maximum==2L,source()$saved==0L,source()$running,!any(source()$coverage$persistence%in%'Saved'))
     stopifnot(!attr(source,'retrieve')('missing'))
-    saves[['r1']](TRUE);saves[['r2']](FALSE);settle(session,function()!source()$running)
+    saves[['r1']](TRUE);saves[['r2']](FALSE);settle(session,function()!source()$loading&&!source()$running)
     stopifnot(source()$saved==1L,source()$failed==1L,source()$unsaved==1L,!source()$complete,
       source()$coverage$selection[3]=='Not due',source()$coverage$persistence[2]=='Save failed',source()$coverage$finality[2]=='Finality unknown')
-    before<-requests;attr(source,'retry_save')();settle(session);saves[['r2']](TRUE);settle(session,function()!source()$running)
+    before<-requests;attr(source,'retry_save')();settle(session);saves[['r2']](TRUE);settle(session,function()!source()$loading&&!source()$running)
     stopifnot(requests==before,source()$unsaved==0L,source()$complete,all(source()$coverage$persistence[1:2]=='Saved'))
     enabled(FALSE);settle(session);enabled(TRUE);settle(session);stopifnot(read_count==1L,requests==2L)
     cid('other');settle(session,function()!source()$loading);stopifnot(read_count==2L,nrow(source()$rows)==0L)
@@ -126,6 +126,7 @@ check('explicit acquisition hydrates verified round IDs, saves historical awards
   }
   async_adapter_fetch<-function(fn,args,context,...){
     if(fn=='get_mvp_saved_catalog')return(promises::promise_resolve(list(saved=data.frame(),saved_complete=TRUE,catalog=catalog)))
+    if(fn=='get_award_round_catalog')return(promises::promise_resolve(catalog))
     stopifnot(fn=='get_official_dreamteam_result');promises::promise_resolve(do.call(get_official_dreamteam_result,args))
   }
   persist_official_award_snapshot<-function(result,login,championship_id,reference,context,on_complete){
@@ -133,7 +134,7 @@ check('explicit acquisition hydrates verified round IDs, saves historical awards
   }
   shiny::testServer(function(input,output,session){source<-shared_mvp_source(session,function()auth,function()'c',function()TRUE)},{
     settle(session,function()!source()$loading);stopifnot(!length(schedule_queries),!length(award_queries))
-    attr(source,'retrieve')('missing');settle(session,function()!source()$running)
+    attr(source,'retrieve')('missing');settle(session,function()!source()$loading&&!source()$running)
     stopifnot(setequal(schedule_queries,c('r1','r3')),setequal(award_queries,'r1'),
       setequal(saved_numbers,1),source()$saved==1L,source()$failed==0L,
       all(source()$coverage$selection[2:3]=='Not due'),all(source()$coverage$round_number==1:3),

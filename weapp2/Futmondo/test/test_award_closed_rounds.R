@@ -25,7 +25,7 @@ check('38-round coverage requires 11 closed rounds and labels the other 27 not d
 original_async<-async_adapter_fetch;original_persist<-persist_official_award_snapshot
 async_adapter_fetch<-function(fn,args,context,...){
   if(fn=='get_mvp_saved_catalog')return(promises::promise_resolve(list(saved=data.frame(),saved_complete=TRUE,catalog=fixture$catalog)))
-  if(fn=='get_finished_round_catalog')return(promises::promise_resolve(fixture$catalog))
+  if(fn=='get_award_round_catalog')return(promises::promise_resolve(fixture$catalog))
   stopifnot(fn=='get_official_dreamteam_result')
   fixture$requests<-c(fixture$requests,args$reference$round_id)
   promises::promise_resolve(normalize_official_dreamteam(xi,args$championship_id,args$reference))
@@ -35,7 +35,7 @@ settle<-function(session,predicate){deadline<-Sys.time()+4;repeat{session$flushR
 check('missing and refresh actions never request unclosed rounds or count them as failures',{
   shiny::testServer(function(input,output,session){source<-shared_mvp_source(session,function()auth,function()cid,function()TRUE)},{
     settle(session,function()!source()$loading)
-    attr(source,'retrieve')('missing');settle(session,function()!source()$running)
+    attr(source,'retrieve')('missing');settle(session,function()!source()$loading&&!source()$running)
     stopifnot(setequal(fixture$requests,paste0('r',1:11)),length(fixture$requests)==11L,
       source()$fetched==11L,source()$saved==11L,source()$failed==0L,source()$complete,
       sum(source()$coverage$selection=='Not due')==27L,!nzchar(trimws(source()$reason)))

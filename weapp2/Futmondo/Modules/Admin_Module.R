@@ -154,8 +154,9 @@ admin_Server <- function(id,is_module_active,login_token,championship_id,user_te
     updateSelectInput(session,"award_round",choices=choices,selected=selected)
   })
   output$award_actions<-renderUI({req(is_module_active(),authorized());snapshot<-awards();rows<-snapshot$coverage
+    if(is.data.frame(rows)&&nrow(rows))rows<-rows[rows$required%in%TRUE,,drop=FALSE]
     eligible<-is.data.frame(rows)&&nrow(rows)&&any(rows$selection=="Missing")
-    button<-function(id,label,enabled)actionButton(session$ns(id),label,disabled=if(enabled&&!isTRUE(snapshot$running)&&!isTRUE(snapshot$loading))NULL else "disabled",style="white-space:normal;max-width:100%;margin-bottom:8px;")
+    button<-function(id,label,enabled)actionButton(session$ns(id),label,disabled=!(enabled&&!isTRUE(snapshot$running)&&!isTRUE(snapshot$loading)),style="white-space:normal;max-width:100%;margin-bottom:8px;")
     tagList(button("btn_sync_dreamteams","Retrieve missing round awards",eligible),
       button("btn_refresh_awards","Refresh provisional or changed rounds",is.data.frame(rows)&&nrow(rows)>0L),
       button("btn_retry_award_saves","Retry failed saves",isTRUE(snapshot$unsaved>0L)))
@@ -167,8 +168,9 @@ admin_Server <- function(id,is_module_active,login_token,championship_id,user_te
     reactable::reactable(rows,columns=list(round_id=reactable::colDef(show=FALSE),required=reactable::colDef(show=FALSE),round_number=reactable::colDef(name="Round",cell=function(value,index)award_round_labels(value,rows$round_id[index])),selection=reactable::colDef(name="Selection"),finality=reactable::colDef(name="Finality"),mvp=reactable::colDef(name="MVP"),last_fetched=reactable::colDef(name="Last fetched"),persistence=reactable::colDef(name="Saved status"),issue=reactable::colDef(name="Issue")),defaultSorted=list(round_number="desc"),compact=TRUE,wrap=TRUE)
   })
   output$awards_progress<-renderText({req(is_module_active(),authorized());snapshot<-awards()
+    if(isTRUE(snapshot$loading))return("Loading round details…")
     # Keep the actual failure visible above the table on narrow screens.
-    issues<-if(is.data.frame(snapshot$coverage)&&"issue"%in%names(snapshot$coverage))snapshot$coverage$issue else character()
+    issues<-if(is.data.frame(snapshot$coverage)&&all(c("issue","required")%in%names(snapshot$coverage)))snapshot$coverage$issue[snapshot$coverage$required%in%TRUE] else character()
     issues<-issues[!is.na(issues)&nzchar(trimws(issues))]
     counts<-sort(table(issues),decreasing=TRUE)
     details<-if(length(counts))paste0("Failures: ",paste(paste0(head(as.integer(counts),3L)," × ",head(names(counts),3L)),collapse="; "),". ")else ""

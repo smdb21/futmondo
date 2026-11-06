@@ -54,6 +54,8 @@ normalize_mvp_catalog <- function(active, leagues, championship_id) {
   rounds <- mvp_records(selected[[1]]$rounds)
   if(!length(rounds)) return(unknown("Futmondo returned an empty round catalog; historical coverage is unknown."))
   metadata <- c(mvp_records(active$rounds),mvp_records(champ$rounds))
+  metadata <- Filter(function(round)is.list(round)&&
+    (!nzchar(mvp_text(round$championshipId))||mvp_text(round$championshipId)%in%c(lid,as.character(championship_id))),metadata)
   rows <- dplyr::bind_rows(lapply(rounds,function(r) {
     if(!is.list(r)) r <- list()
     id <- mvp_text(r$`_id` %||% r$id)
@@ -76,12 +78,13 @@ normalize_mvp_catalog <- function(active, leagues, championship_id) {
   rows <- rows[valid,,drop=FALSE]
   active_details<-Filter(function(round){
     is.list(round)&&mvp_text(round$`_id` %||% round$id)%in%rows$round_id&&
-      (!nzchar(mvp_text(round$championshipId))||identical(mvp_text(round$championshipId),as.character(championship_id)))
+      (!nzchar(mvp_text(round$championshipId))||mvp_text(round$championshipId)%in%c(lid,as.character(championship_id)))
   },mvp_records(active$rounds))
   anchors<-unique(vapply(active_details,function(round)fm_number(round$number),numeric(1)))
   anchors<-anchors[is.finite(anchors)&anchors>=1&anchors==floor(anchors)]
   list(status=if(complete) "ok" else "partial",rounds=rows,complete=complete,identity_complete=all(valid),
-    user_team_id=mvp_text(champ$userteam$id %||% champ$userteam$`_id`),
+    league_id=lid,user_team_id=mvp_text(champ$userteam$id %||% champ$userteam$`_id`),
+    current_round_id=if(length(active_details)==1L)mvp_text(active_details[[1]]$`_id` %||% active_details[[1]]$id)else "",
     current_round_number=if(length(anchors)==1L)anchors else NA_real_,
     reason=if(complete) "" else "Some round numbers or completion states are not confirmed. Retrieve missing awards to check their schedules.")
 }
@@ -95,6 +98,71 @@ get_finished_round_catalog <- function(login, championship_id) {
     normalize_mvp_catalog(active$answer,leagues$answer,championship_id)
   }, context=resource_context(login=login,championship_id=championship_id)), error=function(e) list(status="connection",rounds=empty_finished_rounds(),complete=FALSE,
     reason="Round discovery failed. Refresh to retry."))
+}
+
+# The official client uses this bulk source for its numbered match calendar.
+# Cache only compact round metadata, never the nested fixtures or response body.
+get_award_round_metadata <- function(login,championship_id,league_id) {
+  get_cached_data(paste0("award_round_metadata_",championship_id),{
+    response<-mvp_api_answer(login,"https://api.futmondo.com/2/league/matches",list(leagueId=league_id))
+    if(!identical(response$status,"ok"))return(response)
+    records<-mvp_records(response$answer$rounds)
+    if(!length(records)||length(records)>120L)return(mvp_result("unsupported",reason="The numbered round calendar could not be read."))
+    rows<-dplyr::bind_rows(lapply(records,function(round){
+      if(!is.list(round))return(NULL)
+      number<-fm_number(round$number)
+      if(!is.finite(number)||number<1||number!=floor(number))number<-NA_real_
+      flags<-round[intersect(c("isFinished","finished","isClosed","closed","isCompleted","completed","finalized"),names(round))]
+      unfinished<-any(vapply(flags,function(x)identical(x,FALSE)||identical(x,0L)||identical(x,0)||tolower(mvp_text(x))%in%c("false","f","0"),logical(1)))
+      status<-tolower(mvp_text(round$status))
+      data.frame(round_id=mvp_text(round$`_id` %||% round$id),round_number=number,
+        is_finished=if(round_is_finished(round))TRUE else if(unfinished||status%in%c("active","playing","in_progress"))FALSE else NA,
+        status=status,stringsAsFactors=FALSE)
+    }))
+    list(status="ok",rows=rows)
+  },context=resource_context(login,championship_id))
+}
+
+# Metadata acquisition is safe during active-page loading; it fetches no awards.
+# It runs inside the cooperative read adapter (one bulk HTTP request when cold).
+get_award_round_catalog <- function(login,championship_id,saved=data.frame()) {
+  catalog<-get_finished_round_catalog(login,championship_id)
+  rounds<-award_catalog_numbers(catalog$rounds,saved)
+  if(!is.data.frame(rounds)||!nrow(rounds))return(catalog)
+  required_before<-!vapply(seq_len(nrow(rounds)),function(i)award_round_pending(rounds[i,,drop=FALSE],
+    catalog$current_round_number,catalog$current_round_id),logical(1))
+  unresolved<-any(!is.finite(rounds$round_number[required_before]))||anyNA(rounds$is_finished[required_before])
+  metadata_reason<-""
+  if(unresolved&&nzchar(mvp_text(catalog$league_id))){
+    metadata<-get_award_round_metadata(login,championship_id,catalog$league_id)
+    if(identical(metadata$status,"ok")&&is.data.frame(metadata$rows)){
+      for(i in seq_len(nrow(rounds))){
+        detail<-metadata$rows[metadata$rows$round_id%in%rounds$round_id[i],,drop=FALSE]
+        if(!nrow(detail))next
+        if(nrow(detail)!=1L){metadata_reason<-"The numbered round calendar contains conflicting round identities.";next}
+        number<-fm_number(detail$round_number)
+        if(is.finite(number)){
+          if(is.finite(rounds$round_number[i])&&rounds$round_number[i]!=number){
+            metadata_reason<-"Round numbers conflict with the league catalog.";next
+          }
+          rounds$round_number[i]<-number
+        }
+        if(isTRUE(detail$is_finished))rounds$is_finished[i]<-TRUE
+        else if(is.na(rounds$is_finished[i])&&identical(detail$is_finished,FALSE))rounds$is_finished[i]<-FALSE
+      }
+    }else metadata_reason<-mvp_text(metadata$reason,"The numbered round calendar could not be loaded.")
+  }
+  catalog$rounds<-rounds
+  current<-which(rounds$round_id%in%mvp_text(catalog$current_round_id))
+  if(length(current)==1L&&is.finite(rounds$round_number[current]))catalog$current_round_number<-rounds$round_number[current]
+  required<-!vapply(seq_len(nrow(rounds)),function(i)award_round_pending(rounds[i,,drop=FALSE],
+    catalog$current_round_number,catalog$current_round_id),logical(1))
+  # Future completion flags are irrelevant to historical award coverage.
+  resolved<-all(is.finite(rounds$round_number[required]))&&all(rounds$is_finished[required]%in%TRUE)
+  catalog$complete<-isTRUE(catalog$identity_complete)&&resolved&&!nzchar(metadata_reason)
+  catalog$status<-if(catalog$complete)"ok"else "partial"
+  catalog$reason<-if(nzchar(metadata_reason))metadata_reason else if(resolved)""else catalog$reason
+  catalog
 }
 
 normalize_official_dreamteam <- function(answer, championship_id, reference) {

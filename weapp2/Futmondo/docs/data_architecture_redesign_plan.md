@@ -624,3 +624,10 @@ Status: **implemented and verified locally; authenticated hosted behavior remain
 - [x] Complete focused, offline lifecycle, request-count and performance checks; deliver the scoped change to branch `2.0`.
 
 Authenticated hosted behavior remains unverified; no live transaction was used.
+
+
+### Admin initial round labels and future awards — 2026-11-06
+
+Implemented locally: restore the captured league-ID current-round marker; populate initial Admin labels with one cached, ID-joined official bulk-calendar metadata read; exclude current/future rounds from retrieval, table/selector, grouped issues and actionable missing coverage. All explicit retrieval modes refresh the scoped calendar before choosing rounds, including newly completed rounds after a warm cache. Unknown future finality alone causes no metadata read or warning. Historical missing/conflicting evidence remains explicit.
+
+Verification: focused initial-load/reuse/delayed-request, future-boundary and newly-closed-round fixtures, plus the mandatory offline lifecycle. The supplied capture verifies the marker relationship and saved official-client code establishes the bulk endpoint; no authenticated bulk-calendar response or hosted account session was exercised. See `docs/coach_and_round_awards.md` and `docs/data_review_results.md`; local checks do not establish hosted deployment.
