@@ -1074,3 +1074,10 @@ Final isolated current-remote release passed **38 focused checks**: initial Admi
 Performance review: one additional bulk-calendar request when cold replaces per-round numbering lookups; normal warm navigation adds zero requests. Explicit retrieval refreshes only the selected account/championship's base and bulk calendar (up to three metadata HTTP reads), then fetches only due awards. Award concurrency remains at most two. Delayed synthetic metadata/award responses preserve an event-loop heartbeat. Only at most 120 compact calendar records enter the existing bounded scoped cache; nested matches are discarded, and no per-player redraw/request is added. No schema, package, timer, worker or layout structure changed. All 38 release bundle checksums match and all 78 package records are unchanged; credentials, captures, tests, docs and development scripts remain excluded. Documentation-only edits have no runtime cost.
 
 Delivery is prepared from remote branch 2.0 head 1a9d926 in an isolated checkout, preserving unrelated local/staged work. These checks establish the implemented behavior and request budget with synthetic HTTP/storage boundaries; authenticated bulk-calendar success, live account behavior, browser/mobile rendering and hosted deployment are not claimed.
+
+
+### Navigation names — 2026-11-06
+
+The actual sidebar menu now labels `today` as **Today's market** and `yourteam` as **My team**. Their tab identifiers, page modules, loading order and actions are unchanged. The first-page loading status uses the same new market name. The Today heading was already **Today's market**. Current guides use the new page names.
+
+Performance impact: these static strings are rendered in the existing menu and status output. They add zero API/database requests, cache invalidations, timers, reactive redraws or stored state. The longer label is checked against the existing mobile sidebar width; no runtime measurement is needed for the text-only change. The existing offline lifecycle fixture asserts both rendered labels and unchanged tab IDs. Actual checks and any limits are recorded after verification.

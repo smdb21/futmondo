@@ -2343,7 +2343,7 @@
       "checksum": "569487c234e0b4a28c0027249faecc8b"
     },
     "README.md": {
-      "checksum": "fd67441fa5f8e6548d4b60d32937dfa3"
+      "checksum": "7970542b6567083df9c51aa00e550bbe"
     },
     "remember_login.R": {
       "checksum": "a243c91a9c01604ce74d517e116e3e61"
@@ -2352,7 +2352,7 @@
       "checksum": "108b4acb8bf711eb97cec588aaab71ee"
     },
     "server.R": {
-      "checksum": "3fa1eb13b10bd12e434830c2d6d1a8c8"
+      "checksum": "f1c7ba3b2b7dc48aa4e6bd5743ac4cff"
     },
     "supabase_connector.R": {
       "checksum": "04b841cf63a9fe630c9f091071e29ffe"

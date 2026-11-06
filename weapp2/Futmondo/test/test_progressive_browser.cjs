@@ -25,7 +25,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       }));
       assert.ok(feedbackMs.visible && feedbackMs.ms<500,JSON.stringify(feedbackMs));
       await page.locator('#startup_status').filter({hasText:'Signed in. Loading your leagues…'}).waitFor();
-      await page.locator('#startup_status').filter({hasText:'Loading Today…'}).waitFor();
+      await page.locator('#startup_status').filter({hasText:"Loading today's market…"}).waitFor();
       await page.locator('#today-kpi_cash_box').getByText('Current balance',{exact:true}).waitFor();
       await page.locator('#today-market_players-players_table .rt-select-input').first().waitFor();
       assert.match(await page.locator('#today-recent_transfers').innerText(),/Loading/);

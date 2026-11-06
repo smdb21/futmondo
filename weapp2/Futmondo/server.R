@@ -254,7 +254,7 @@ players_in_championship_Server(id = "players_in_championship",
     stage<-startup_stage()
     if(stage %in% c("signed_out","ready","authenticating"))return(NULL)
     loading<-stage %in% c("loading_leagues","loading_today")
-    message<-switch(stage,loading_leagues="Signed in. Loading your leagues…",loading_today="Loading Today…",
+    message<-switch(stage,loading_leagues="Signed in. Loading your leagues…",loading_today="Loading today's market…",
       empty="Signed in. No active leagues were returned.",partial="Some sections could not load. Retry the affected data.",
       failed="The first page could not load. Refresh to retry.","")
     if(identical(stage,"failed")){state<-tryCatch(championship_state(),error=function(e)NULL);if(!is.null(state$error))message<-resource_failure_message(state$error)}
@@ -302,8 +302,8 @@ observeEvent(login_token_RV(),
     menu_items <- list(
       shinydashboard::menuItem("Login", tabName = "login", icon = icon("right-to-bracket")),
       shinydashboard::menuItem("Notifications", tabName = "notifications", icon = icon("bell")),
-      shinydashboard::menuItem("Today", tabName = "today", icon = icon("bolt")),
-      shinydashboard::menuItem("Your team", tabName = "yourteam", icon = icon("users")),
+      shinydashboard::menuItem("Today's market", tabName = "today", icon = icon("bolt")),
+      shinydashboard::menuItem("My team", tabName = "yourteam", icon = icon("users")),
       shinydashboard::menuItem("Players", tabName = "players_in_championship", icon = icon("table")),
       shinydashboard::menuItem("Rivals", tabName = "rivals", icon = icon("users-viewfinder")),
       shinydashboard::menuItem("Plots", tabName = "plots", icon = icon("chart-column")),

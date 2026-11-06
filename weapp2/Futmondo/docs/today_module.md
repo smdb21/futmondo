@@ -1,6 +1,6 @@
-# Today
+# Today's market
 
-Today summarizes observed cash and spending capacity, roster/market state, and recent transfers. It shares the same resource observations as the corresponding detailed screens.
+Today's market summarizes observed cash and spending capacity, roster/market state, and recent transfers. It shares the same resource observations as the corresponding detailed screens.
 
 The view contains no generated buy/sell advice, target bids, predicted points, or model scores. Missing financial evidence is shown as unavailable rather than replaced with guessed amounts. Manual actions remain in their explicit player/market controls.
 
@@ -15,7 +15,7 @@ The optional `coach_source` argument supplies Today’s login-only default-enabl
 
 ## Market presentation (2026-11-01)
 
-The page heading is **Today's market** and its description identifies available market players/offers alongside the existing balances and completed transfers. Its market table starts with **Free Agents Only** checked. This is a table-specific initial setting; users can uncheck it or use Clear Filters to see owned listings too. The navigation label remains Today. No retrieval, financial calculation, action or refresh behavior changed.
+The page heading is **Today's market** and its description identifies available market players/offers alongside the existing balances and completed transfers. Its market table starts with **Free Agents Only** checked. This is a table-specific initial setting; users can uncheck it or use Clear Filters to see owned listings too. The navigation label is **Today's market**. The team page appears in navigation as **My team**. No retrieval, financial calculation, action or refresh behavior changed.
 
 ## Recent transfer presentation (2026-11-01)
 

@@ -631,3 +631,14 @@ Authenticated hosted behavior remains unverified; no live transaction was used.
 Implemented locally: restore the captured league-ID current-round marker; populate initial Admin labels with one cached, ID-joined official bulk-calendar metadata read; exclude current/future rounds from retrieval, table/selector, grouped issues and actionable missing coverage. All explicit retrieval modes refresh the scoped calendar before choosing rounds, including newly completed rounds after a warm cache. Unknown future finality alone causes no metadata read or warning. Historical missing/conflicting evidence remains explicit.
 
 Verification: focused initial-load/reuse/delayed-request, future-boundary and newly-closed-round fixtures, plus the mandatory offline lifecycle. The supplied capture verifies the marker relationship and saved official-client code establishes the bulk endpoint; no authenticated bulk-calendar response or hosted account session was exercised. See `docs/coach_and_round_awards.md` and `docs/data_review_results.md`; local checks do not establish hosted deployment.
+
+
+## Navigation names — 2026-11-06
+
+Status: **implemented locally; verification in progress**.
+
+- [x] Name the `today` menu item **Today's market** and the `yourteam` menu item **My team**; retain the existing tab identifiers and page behavior.
+- [x] Align the visible first-page loading message and current user guides with the menu names.
+- [ ] Verify the actual menu, mobile sidebar, full offline lifecycle and generated bundle; push only this task's changes.
+
+This is a text-only presentation change. It adds no request, reactive dependency, timer, cache, database operation, package or environment variable.

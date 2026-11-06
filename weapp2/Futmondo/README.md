@@ -74,7 +74,7 @@ rsconnect::writeManifest()
 Exclude `.Renviron`, HAR files, `*.orig`, tests, internal docs, and development scripts. The installed bundler reads literal names per directory: keep both `.rscignore` and `Modules/.rscignore` updated, and run `Rscript test/test_deployment_contract.R` after regeneration. Manifest generation does not deploy the app. Production migration/deployment status is recorded separately in the results document.
 
 
-Login-time coach hiring is an explicit user-requested exception to the removed automation scope. Today offers **Automatically hire coach**, enabled for a new browser preference and scoped to account/league. Choices are remembered in that browser only; no new environment variables, package dependencies, worker or schedule is required. Admin can explicitly retrieve/save missing full-XI and MVP selections. See [coach and round-award behavior](docs/coach_and_round_awards.md) for request limits, finality and persistence semantics.
+Login-time coach hiring is an explicit user-requested exception to the removed automation scope. Today's market offers **Automatically hire coach**, enabled for a new browser preference and scoped to account/league. Choices are remembered in that browser only; no new environment variables, package dependencies, worker or schedule is required. Admin can explicitly retrieve/save missing full-XI and MVP selections. See [coach and round-award behavior](docs/coach_and_round_awards.md) for request limits, finality and persistence semantics.
 
 ## Optional seven-day remembered login
 

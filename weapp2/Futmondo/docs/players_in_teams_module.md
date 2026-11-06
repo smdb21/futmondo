@@ -1,6 +1,6 @@
-# Your Team
+# My team
 
-Your Team displays the actual roster, observed player details, and explicit listing controls. Player selection opens the shared player card. Bulk listing remains a deliberate manual operation and must validate the current account, league, team, and market state.
+My team displays the actual roster, observed player details, and explicit listing controls. Player selection opens the shared player card. Bulk listing remains a deliberate manual operation and must validate the current account, league, team, and market state.
 
 The module no longer contains lineup forecasts, optimized XI selection, transfer simulations, generated trading advice, or automatic coach preferences.
 

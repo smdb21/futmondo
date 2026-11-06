@@ -115,7 +115,12 @@ app_check('full server login, navigation, refresh and logout',{
   resource_store(failed_capacity_key,list(status='partial',diagnostics='synthetic missing funds'),capacity_ctx,failed_capacity_name)
   session$setInputs(tabs='today',refresh_all=1);app_settle(session);stopifnot(!is.null(output[['today-kpi_cash_box']]))
   stopifnot(!exists(failed_capacity_key,api_cache_env,inherits=FALSE))
-  stopifnot(!grepl('Predictions|Automation',output$menu$html))
+  menu_html <- output$menu$html
+  stopifnot(!grepl('Predictions|Automation',menu_html),
+    grepl("Today's market|Today&#39;s market",menu_html),
+    grepl('My team',menu_html),
+    grepl('data-value="today"',menu_html,fixed=TRUE),
+    grepl('data-value="yourteam"',menu_html,fixed=TRUE))
   session$setInputs(`login-logout_button`=1);session$elapse(100);app_settle(session);stopifnot(is.null(login_token_RV()))
  })
 })
