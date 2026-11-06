@@ -39,9 +39,19 @@ check("both series have independent vertical scales and distinct styles",{
  chart<-render_fixture(history);value<-chart$data[[1]];points<-chart$data[[2]]
  stopifnot(length(chart$data)==2L,value$yaxis=="y",points$yaxis=="y2",points$xaxis=="x",
    value$line$dash=="solid",points$line$dash=="dash",value$line$color!=points$line$color,
-   chart$layout$yaxis2$overlaying=="y",chart$layout$yaxis2$side=="right",isTRUE(chart$layout$showlegend),
+   chart$layout$yaxis2$overlaying=="y",chart$layout$yaxis2$side=="right",identical(chart$layout$showlegend,FALSE),
    all(c(99e6,100e6)>chart$layout$yaxis$range[1]),all(c(99e6,100e6)<chart$layout$yaxis$range[2]),
    all(c(-2,4)>chart$layout$yaxis2$range[1]),all(c(-2,4)<chart$layout$yaxis2$range[2]))
+})
+check("dense histories use sparse automatic dates without an empty dtick",{
+ history<-known
+ history$valuation<-data.frame(recorded_at=format(as.POSIXct("2026-07-01",tz="UTC")+0:123*86400,"%Y-%m-%dT%H:%M:%SZ",tz="UTC"),value=22e6+sin(0:123/12)*1e6)
+ history$points$date<-as.POSIXct("2026-07-01",tz="UTC")+0:3*7*86400
+ chart<-render_fixture(history)
+ stopifnot(chart$layout$xaxis$tickmode=="auto",chart$layout$xaxis$nticks==4,
+   is.null(chart$layout$xaxis$dtick),chart$layout$xaxis$tickformat=="%d %b",chart$layout$xaxis$tickangle==0,
+   identical(chart$layout$xaxis$showgrid,FALSE),identical(chart$layout$showlegend,FALSE),
+   length(chart$data[[1]]$y)==124L)
 })
 check("undated scores stay visible with an explicitly independent round axis",{
  chart<-render_fixture(combined)

@@ -1854,17 +1854,25 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           xaxis=if(separate_round_axis)"x2"else "x",
           line=list(color="#F4C95D",width=2.5,dash="dash"),marker=list(size=7,color="#F4C95D"))
       }
+      date_axis <- nrow(values)>0L || dated_points
+      horizontal_axis <- list(title=if(date_axis)"Date"else "Round",
+        type=if(date_axis)"date"else "linear",tickmode="auto",nticks=4,tickangle=0,showgrid=FALSE)
+      # A NULL dtick serializes as [] and forces daily ticks on Plotly's date
+      # axis. Omit it entirely for dates; keep numeric round ticks integral.
+      round_spacing <- if(nrow(points))max(1,ceiling(diff(range(points$round_number))/3))else 1
+      if(date_axis)horizontal_axis$tickformat <- "%d %b" else {
+        horizontal_axis$tickmode <- "linear";horizontal_axis$dtick <- round_spacing
+      }
       chart %>% fm_plot_layout(
-        xaxis=list(title=if(nrow(values)||dated_points)"Date"else "Round",
-          type=if(nrow(values)||dated_points)"date"else "linear",
-          dtick=if(!nrow(values)&&!dated_points)1 else NULL),
-        xaxis2=if(separate_round_axis)list(title="Round (dates unavailable)",overlaying="x",side="top",dtick=1,showgrid=FALSE)else list(visible=FALSE),
+        xaxis=horizontal_axis,
+        xaxis2=if(separate_round_axis)list(title="Round (dates unavailable)",overlaying="x",side="top",
+          tickmode="linear",dtick=round_spacing,tickangle=0,showgrid=FALSE)else list(visible=FALSE),
         yaxis=list(title="Value (EUR)",visible=nrow(values)>0L,autorange=FALSE,
           range=player_trend_axis_range(values$value),tickformat=".3s",color="#00ff88"),
         yaxis2=list(title="Points",visible=nrow(points)>0L,overlaying="y",side="right",autorange=FALSE,
           range=player_trend_axis_range(points$points),showgrid=FALSE,color="#F4C95D",tickformat="~g"),
-        showlegend=TRUE,legend=list(orientation="h",x=0,y=1.35,font=list(size=11)),
-        margin=list(l=55,r=50,b=if(length(notes))120 else 55,t=if(separate_round_axis)80 else 45),
+        showlegend=FALSE,
+        margin=list(l=55,r=50,b=if(length(notes))120 else 55,t=if(separate_round_axis)60 else 20),
         annotations=if(length(notes))list(list(text=paste(unlist(lapply(notes,function(note)
           strwrap(gsub("<br>","\n",note,fixed=TRUE),width=36))),collapse="<br>"),x=.5,y=0,yshift=-70,
           xref="paper",yref="paper",showarrow=FALSE,xanchor="center",yanchor="top",font=list(size=10)))else list())
