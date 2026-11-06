@@ -83,6 +83,8 @@ round_mvps_Server <- function(id, is_module_active, login_token, championship_id
       rows <- round_mvp_rows(snapshot$rows, championship_id())
       notice <- if(nzchar(snapshot$reason)) tags$p(class="round-mvps-empty",snapshot$reason)
       if (!nrow(rows)) {
+        if (is.data.frame(snapshot$coverage) && nrow(snapshot$coverage) && !any(snapshot$coverage$required %in% TRUE) && is.null(notice))
+          return(tags$p("No completed round awards yet."))
         return(notice %||% tags$p("Round awards are unavailable; the reason could not be determined."))
       }
       tagList(notice,tags$div(class = "round-mvps-grid", lapply(seq_len(nrow(rows)), function(i) {

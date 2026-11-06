@@ -31,7 +31,16 @@ mvp_api_answer <- function(login, url, query) {
       return(mvp_result("rejected", reason=paste0("Futmondo rejected the request",if(nzchar(code)) paste0(" (",code,")") else "","."), code=code))
     }
     list(status="ok", answer=answer)
-  }, error=function(e) mvp_result("connection", reason="Futmondo data could not be loaded because the connection failed. Refresh to retry."))
+  }, error=function(e) {
+    # Async HTTP/parser failures arrive as conditions before an httr response.
+    failure<-resource_failure(e,resource=url)
+    if(identical(failure$category,"http")&&!is.null(failure$http_status)){
+      if(failure$http_status%in%c(401L,403L))return(mvp_result("authentication",reason="Futmondo access was denied. Log in again."))
+      return(mvp_result("error",reason=paste("Futmondo request failed (HTTP",failure$http_status,").")))
+    }
+    if(identical(failure$category,"parser"))return(mvp_result("unsupported",reason="Futmondo returned a malformed data response."))
+    mvp_result("connection",reason="Futmondo data could not be loaded because the connection failed. Refresh to retry.")
+  })
 }
 
 normalize_mvp_catalog <- function(active, leagues, championship_id) {
@@ -71,7 +80,7 @@ normalize_mvp_catalog <- function(active, leagues, championship_id) {
   },mvp_records(active$rounds))
   anchors<-unique(vapply(active_details,function(round)fm_number(round$number),numeric(1)))
   anchors<-anchors[is.finite(anchors)&anchors>=1&anchors==floor(anchors)]
-  list(status=if(complete) "ok" else "partial",rounds=rows,complete=complete,
+  list(status=if(complete) "ok" else "partial",rounds=rows,complete=complete,identity_complete=all(valid),
     user_team_id=mvp_text(champ$userteam$id %||% champ$userteam$`_id`),
     current_round_number=if(length(anchors)==1L)anchors else NA_real_,
     reason=if(complete) "" else "Some round numbers or completion states are not confirmed. Retrieve missing awards to check their schedules.")
@@ -132,11 +141,14 @@ get_award_round_reference <- function(login,championship_id,reference) {
   reference
 }
 get_official_dreamteam_result <- function(login, championship_id, reference) {
+  # Known unclosed rounds need neither an award request nor a schedule lookup.
+  if(award_round_pending(reference)){
+    result<-mvp_result("not_due");result$reference<-reference;return(result)
+  }
   tryCatch(get_cached_data(paste0("official_dreamteam_",championship_id,"_",reference$round_id), {
     reference<-get_award_round_reference(login,championship_id,reference)
-    current<-fm_number(reference$current_round_number)
-    if(is.finite(current)&&is.finite(fm_number(reference$round_number))&&reference$round_number>current){
-      result<-mvp_result("not_due",reason="A later round has not opened yet.")
+    if(award_round_pending(reference)){
+      result<-mvp_result("not_due",reason="The round has not closed yet.")
     }else{
       response <- mvp_api_answer(login,DREAMTEAM_URL,list(championshipId=championship_id,type="dreamteam",round=reference$round_id))
       if(response$status!="ok")result<-response

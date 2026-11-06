@@ -79,7 +79,7 @@ fm_async_hire_coach<-old_hire
 old_async<-async_adapter_fetch;old_persist<-persist_official_award_snapshot
 requests<-0L;running<-0L;maximum<-0L;saves<-list();read_count<-0L
 async_adapter_fetch<-function(fn,args,context,...){
-  if(fn=='get_mvp_saved_catalog'){read_count<<-read_count+1L;return(promises::promise_resolve(list(saved=data.frame(),saved_complete=TRUE,catalog=list(rounds=data.frame(round_id=c('r1','r2','r3'),round_number=1:3,is_finished=c(TRUE,FALSE,FALSE),status=c('done','playing','verified_future')),complete=TRUE,reason=''))))}
+  if(fn=='get_mvp_saved_catalog'){read_count<<-read_count+1L;return(promises::promise_resolve(list(saved=data.frame(),saved_complete=TRUE,catalog=list(rounds=data.frame(round_id=c('r1','r2','r3'),round_number=1:3,is_finished=c(TRUE,NA,FALSE),status=c('done','unknown','verified_future')),complete=TRUE,reason=''))))}
   stopifnot(fn=='get_official_dreamteam_result');requests<<-requests+1L;running<<-running+1L;maximum<<-max(maximum,running)
   promises::promise(function(resolve,reject)later::later(function(){running<<-running-1L;resolve(normalize_official_dreamteam(xi(),args$championship_id,args$reference))},.03))
 }
@@ -92,7 +92,7 @@ check('Admin loads bulk coverage once, fetches only on click, limits concurrency
     stopifnot(!attr(source,'retrieve')('missing'))
     saves[['r1']](TRUE);saves[['r2']](FALSE);settle(session,function()!source()$running)
     stopifnot(source()$saved==1L,source()$failed==1L,source()$unsaved==1L,!source()$complete,
-      source()$coverage$selection[3]=='Not due',source()$coverage$persistence[2]=='Save failed',source()$coverage$finality[2]=='Provisional / in progress')
+      source()$coverage$selection[3]=='Not due',source()$coverage$persistence[2]=='Save failed',source()$coverage$finality[2]=='Finality unknown')
     before<-requests;attr(source,'retry_save')();settle(session);saves[['r2']](TRUE);settle(session,function()!source()$running)
     stopifnot(requests==before,source()$unsaved==0L,source()$complete,all(source()$coverage$persistence[1:2]=='Saved'))
     enabled(FALSE);settle(session);enabled(TRUE);settle(session);stopifnot(read_count==1L,requests==2L)
@@ -134,10 +134,10 @@ check('explicit acquisition hydrates verified round IDs, saves historical awards
   shiny::testServer(function(input,output,session){source<-shared_mvp_source(session,function()auth,function()'c',function()TRUE)},{
     settle(session,function()!source()$loading);stopifnot(!length(schedule_queries),!length(award_queries))
     attr(source,'retrieve')('missing');settle(session,function()!source()$running)
-    stopifnot(setequal(schedule_queries,c('r1','r3')),setequal(award_queries,c('r1','r2')),
-      setequal(saved_numbers,1:2),source()$saved==2L,source()$failed==0L,
-      source()$coverage$selection[3]=='Not due',all(source()$coverage$round_number==1:3),
-      all(is.na(source()$rows$is_finished)),all(source()$coverage$persistence[1:2]=='Saved'))
+    stopifnot(setequal(schedule_queries,c('r1','r3')),setequal(award_queries,'r1'),
+      setequal(saved_numbers,1),source()$saved==1L,source()$failed==0L,
+      all(source()$coverage$selection[2:3]=='Not due'),all(source()$coverage$round_number==1:3),
+      all(is.na(source()$rows$is_finished)),source()$coverage$persistence[1]=='Saved')
   })
 })
 check('mismatched schedule identity never assigns its round number',{

@@ -146,7 +146,7 @@ admin_Server <- function(id,is_module_active,login_token,championship_id,user_te
   awards<-shared_mvp_source(session,login_token,championship_id,function()isTRUE(is_module_active())&&isTRUE(authorized()),refresh_trigger)
   observe({req(is_module_active(),authorized());coverage<-awards()$coverage
     choices<-if(is.data.frame(coverage)&&nrow(coverage)){
-      coverage<-coverage[!is.na(coverage$round_id)&nzchar(trimws(coverage$round_id)),,drop=FALSE]
+      coverage<-coverage[coverage$required%in%TRUE&!is.na(coverage$round_id)&nzchar(trimws(coverage$round_id)),,drop=FALSE]
       setNames(coverage$round_id,award_round_labels(coverage$round_number,coverage$round_id))
     }else character()
     selected<-isolate(input$award_round)
@@ -162,10 +162,17 @@ admin_Server <- function(id,is_module_active,login_token,championship_id,user_te
   })
   output$awards_coverage<-reactable::renderReactable({req(is_module_active(),authorized());rows<-awards()$coverage
     if(!is.data.frame(rows)||!nrow(rows))return(reactable::reactable(data.frame(Status="Round catalog unavailable or still loading.")))
+    rows<-rows[rows$required%in%TRUE,,drop=FALSE]
+    if(!nrow(rows))return(reactable::reactable(data.frame(Status="No completed rounds yet.")))
     reactable::reactable(rows,columns=list(round_id=reactable::colDef(show=FALSE),required=reactable::colDef(show=FALSE),round_number=reactable::colDef(name="Round",cell=function(value,index)award_round_labels(value,rows$round_id[index])),selection=reactable::colDef(name="Selection"),finality=reactable::colDef(name="Finality"),mvp=reactable::colDef(name="MVP"),last_fetched=reactable::colDef(name="Last fetched"),persistence=reactable::colDef(name="Saved status"),issue=reactable::colDef(name="Issue")),defaultSorted=list(round_number="desc"),compact=TRUE,wrap=TRUE)
   })
   output$awards_progress<-renderText({req(is_module_active(),authorized());snapshot<-awards()
-    paste0(snapshot$fetched %||% 0," fetched; ",snapshot$saved %||% 0," confirmed saved; ",snapshot$failed %||% 0," failed; ",snapshot$pending %||% 0," pending. ",snapshot$reason)
+    # Keep the actual failure visible above the table on narrow screens.
+    issues<-if(is.data.frame(snapshot$coverage)&&"issue"%in%names(snapshot$coverage))snapshot$coverage$issue else character()
+    issues<-issues[!is.na(issues)&nzchar(trimws(issues))]
+    counts<-sort(table(issues),decreasing=TRUE)
+    details<-if(length(counts))paste0("Failures: ",paste(paste0(head(as.integer(counts),3L)," × ",head(names(counts),3L)),collapse="; "),". ")else ""
+    paste0(snapshot$fetched %||% 0," fetched; ",snapshot$saved %||% 0," confirmed saved; ",snapshot$failed %||% 0," failed; ",snapshot$pending %||% 0," pending. ",details,snapshot$reason)
   })
   observeEvent(input$btn_sync_dreamteams,{req(is_module_active(),authorized());attr(awards,"retrieve")("missing")})
   observeEvent(input$btn_refresh_awards,{req(is_module_active(),authorized());attr(awards,"retrieve")("refresh")})
