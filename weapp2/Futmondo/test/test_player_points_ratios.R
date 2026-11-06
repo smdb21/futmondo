@@ -23,3 +23,44 @@ x<-players_table_points_ratio(data.frame(recent_points_avg=c(10,0,-2,NA,10,10,10
 stopifnot(identical(x$recent_points_ratio,c(5,0,-1,NA_real_,NA_real_,NA_real_,NA_real_)),
  length(players_table_points_ratio(data.frame(recent_points_avg=numeric(),value=numeric()),'value')$recent_points_ratio)==0L)
 cat('Player points ratios: both page bases, N changes, in-place history updates and invalid denominators passed.\n')
+
+# Reproduce N5 -> N2 when the table has source scores but numbered history is empty.
+scores(data.frame())
+rows <- data.frame(id='p',name='Player',value=2e6,clause_price=4e6,
+  average.fitness='2,5,12,12,6',average.averageLastFive=7.4)
+for(basis in c('value','clause_price')){
+ shiny::testServer(players_table_Server,args=list(players_table_RV=shiny::reactive(rows),user_teams_RV=shiny::reactive(NULL),points_ratio_basis=basis),{
+  session$setInputs(recent_games_n=5L);settle(session)
+  stopifnot(table_display_data()$recent_points_avg==7.4)
+  session$setInputs(recent_games_n=2L);settle(session)
+  divisor<-if(basis=='value')2 else 4
+  stopifnot(table_display_data()$recent_points_avg==9,table_display_data()$recent_points_ratio==9/divisor)
+  widget<-jsonlite::fromJSON(output$players_table,simplifyVector=FALSE)$x$tag$attribs
+  data<-if(is.character(widget$data))jsonlite::fromJSON(widget$data)else widget$data
+  stopifnot(data$recent_points_avg==9,data$recent_points_ratio==9/divisor)
+  session$setInputs(recent_games_n=6L);settle(session)
+  stopifnot(is.na(table_display_data()$recent_points_avg),is.na(table_display_data()$recent_points_ratio))
+  session$setInputs(recent_games_n=2L);settle(session)
+  scores(data.frame(player_id='p',round=9:10,points=c(20,30)));settle(session)
+  stopifnot(table_display_data()$recent_points_avg==25,table_display_data()$recent_points_ratio==25/divisor)
+ });scores(data.frame())
+}
+cat('Source recent scores: N5 -> N2 widget values and both ratios, unavailable N6, and explicit-history replacement passed.\n')
+
+# Wider windows use all eight labelled source scores, including zero and negatives.
+scores(data.frame(player_id='p',round=1:10,points=c(99,99,1,-2,0,16,3,7,19,18)))
+rows <- data.frame(id='p',name='Player',role='Defender',value=2e6,clause_price=4e6,
+  average.fitness='16,3,7,19,18',average.averageLastFive=12.6)
+for(basis in c('value','clause_price')){
+ shiny::testServer(players_table_Server,args=list(players_table_RV=shiny::reactive(rows),user_teams_RV=shiny::reactive(NULL),points_ratio_basis=basis),{
+  divisor<-if(basis=='value')2 else 4
+  for(n in c(5L,2L,8L,2L,8L)){
+   session$setInputs(recent_games_n=n);settle(session)
+   expected<-switch(as.character(n),'5'=12.6,'2'=18.5,'8'=7.75)
+   stopifnot(table_display_data()$recent_points_avg==expected,
+    table_display_data()$recent_points_ratio==expected/divisor,
+    identical(names(table_display_data())[1:4],c('name','role','recent_points_avg','recent_points_ratio')))
+  }
+ })
+}
+cat('Eight-round known answer: 7.75 with signed/zero scores, both ratio bases and Position after Name passed.\n')

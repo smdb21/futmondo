@@ -561,7 +561,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       if(isTRUE(hide_bid_column))cols_to_hide<-c(cols_to_hide,"bid_price")
       rows<-rows %>% reorder_player_table_columns() %>%
         dplyr::select(!any_of(setdiff(cols_to_hide,"logo"))) %>%
-        dplyr::select(any_of(c("name","recent_points_avg","recent_points_ratio")),everything())
+        dplyr::select(any_of(c("name","role","recent_points_avg","recent_points_ratio")),everything())
       # Source timestamps belong to the resource state, not widget equality.
       rows<-as.data.frame(rows)
       attributes(rows)<-attributes(rows)[intersect(c("names","row.names","class"),names(attributes(rows)))]
@@ -701,6 +701,21 @@ add_recent_points_average <- function(players_df,history_df,n=5L) {
         if(coverage==n){players_df$recent_points_avg[i] <- mean(values);players_df$recent_points_status[i] <- "complete"}
         else if(coverage)players_df$recent_points_status[i] <- "partial"
       }
+    }
+  }
+  # The source already supplies its recent-score sequence, oldest first.
+  # It can answer a short window even while numbered history is sparse or its
+  # anchor is unresolved. Do not assign round IDs or create acquisition checks.
+  if(n<=5L&&"average.fitness"%in%names(players_df)){
+    missing <- which(!is.finite(players_df$recent_points_avg))
+    for(i in missing){
+      values <- recent_points_fitness_values(players_df$average.fitness[i])
+      if(length(values)<n)next
+      values <- tail(values,n)
+      if(!all(is.finite(values)))next
+      players_df$recent_points_avg[i] <- mean(values)
+      players_df$recent_points_count[i] <- n
+      players_df$recent_points_status[i] <- "reported"
     }
   }
   if(n==5L&&"average.averageLastFive"%in%names(players_df)){

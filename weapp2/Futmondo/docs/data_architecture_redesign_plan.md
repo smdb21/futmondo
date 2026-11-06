@@ -600,3 +600,15 @@ Status: **implemented and verified offline; authenticated hosted verification pe
 - [x] Verify the actual successful clause callback against a 527-player matrix, delayed catalog refresh, explicit correction refresh, retained acknowledgement and targeted changed-score behavior.
 - [x] Run focused regression and required offline lifecycle checks; refresh scoped deployment checksums.
 - [ ] Verify authenticated hosted clause purchase after deployment. No real purchase was performed for offline verification.
+
+
+## Configurable averages and player identity columns — 2026-11-06
+
+Status: **implemented and verified locally; authenticated hosted behavior remains unverified**.
+
+- [x] Trace five-round values versus blank two-round values to the ignored source recent-score sequence; compare sanitized captured source shapes and values.
+- [x] Calculate short source windows without inventing numbered observations; preserve explicit historical windows for N>5, including eight, and keep zero/negative/unavailable semantics.
+- [x] Move the club crest into Name, remove visible Team, and put Position immediately after Name.
+- [x] Complete independent known-answer, acquisition/persistence reuse, desktop/mobile browser, performance and offline lifecycle checks. Delivery uses a scoped commit to the current branch remote, preserving unrelated local/staged work.
+
+No dependency, database migration or unattended activity is introduced. Authenticated hosted data and timing remain separate from local verification.

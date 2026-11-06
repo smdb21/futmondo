@@ -2265,7 +2265,7 @@
       "checksum": "c1635542064236c7c28eb15567568f72"
     },
     "award_runtime.R": {
-      "checksum": "b45f65855149a08e88e8934eaf380555"
+      "checksum": "5fd66eb45315010d0b04dca86db9d834"
     },
     "background_runtime.R": {
       "checksum": "66840053afe459236249dd4fe5f92bbb"
@@ -2283,7 +2283,7 @@
       "checksum": "e4b348b018201afb1434bc5051c095ee"
     },
     "futmondo_functions.R": {
-      "checksum": "8eb3d819940605c4831e685ad003aa66"
+      "checksum": "f72e9e33dbcadc8cb09739b4e67a7427"
     },
     "global.R": {
       "checksum": "a5477bbdb0b8ef630c95f32f8cefc574"
@@ -2298,10 +2298,10 @@
       "checksum": "ad519c02f856c6b48bcb035d3427f99d"
     },
     "Modules/Admin_Module.R": {
-      "checksum": "04baed0b12d229e54b73ea7590d94b7a"
+      "checksum": "fdc59af8693f222f6a7ecc10b14cc248"
     },
     "Modules/Classification_Module.R": {
-      "checksum": "9787084a47e9de1446a1e993c52f538a"
+      "checksum": "964bc253a8189fcae9b62776478ebaad"
     },
     "Modules/Login_Module.R": {
       "checksum": "6a78dbb400b40482a93e09dd9886983d"
@@ -2319,7 +2319,7 @@
       "checksum": "75e6f7d05ba457990b4dcd7d59adffe5"
     },
     "Modules/Players_Table_Module.R": {
-      "checksum": "bcb903d435a7eabec7563aa2e12e509b"
+      "checksum": "d1e0d8277ffd8781dac91f82467983a3"
     },
     "Modules/Plots_Module.R": {
       "checksum": "d28b6843516e7a88406119bf287000c2"
@@ -2328,16 +2328,16 @@
       "checksum": "9a599bd8ba87f94ea92485dd64dd1c27"
     },
     "Modules/Round_MVPs_Module.R": {
-      "checksum": "5ddb52ee106a00ae7514bb7697ca689f"
+      "checksum": "d4fe07b931edaded4b9037809e3d920d"
     },
     "Modules/Selected_Player_Module.R": {
-      "checksum": "7b5606efd011898da9c8cfe9b10751f0"
+      "checksum": "773d9fe3b62d780591c1485a6995e190"
     },
     "Modules/Today_Module.R": {
       "checksum": "3e5572af3bb7154be89f8678acb9d94b"
     },
     "mvp_runtime.R": {
-      "checksum": "4af5540b2f5de5917389048a8ab86b84"
+      "checksum": "79249c8561a73131c0caf0d65dc5b300"
     },
     "player_columns_to_hide.txt": {
       "checksum": "569487c234e0b4a28c0027249faecc8b"
@@ -2352,7 +2352,7 @@
       "checksum": "108b4acb8bf711eb97cec588aaab71ee"
     },
     "server.R": {
-      "checksum": "74dd88584d1cafba20c11c4ce1afeab2"
+      "checksum": "3fa1eb13b10bd12e434830c2d6d1a8c8"
     },
     "supabase_connector.R": {
       "checksum": "04b841cf63a9fe630c9f091071e29ffe"
@@ -2367,7 +2367,7 @@
       "checksum": "6253d5e12d91ddef162c7e9e7624680a"
     },
     "www/custom_style.css": {
-      "checksum": "fafb509b30ecc9b57bc9b145a35e5571"
+      "checksum": "9a592cbc726b40fb04091ba6abcac1ee"
     },
     "www/release-info.json": {
       "checksum": "1cf734ad324e6616a0082726e3d3657e"

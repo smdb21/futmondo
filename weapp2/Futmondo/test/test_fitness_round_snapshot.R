@@ -140,7 +140,12 @@ shiny::testServer(server,{
 dataset$points<-saved;reset()
 shiny::testServer(server,{
  settle(session);pending[['p1']]$resolve(payload(rounds=integer(),points=numeric()));settle(session)
- check('empty probe never manufactures fitness round assignments',stopifnot(!length(writes),nrow(source$history())==9L,all(is.na(add_recent_points_average(rows[1:3,,drop=FALSE],source$history(),4)$recent_points_avg))))
+ check('empty probe keeps source averages separate from numbered observations',{
+  averages<-add_recent_points_average(rows[1:3,,drop=FALSE],source$history(),4)
+  stopifnot(!length(writes),nrow(source$history())==9L,
+    all(averages$recent_points_avg==8.75),all(averages$recent_points_status=='reported'),
+    all(is.na(add_recent_points_average(rows[1:3,,drop=FALSE],source$history(),8)$recent_points_avg)))
+ })
 })
 cat(sprintf('FITNESS ROUND SNAPSHOT: %d passed / 0 failed\n',checks))
 # Time the actual controller's bulk mapping/merge once at a representative size.

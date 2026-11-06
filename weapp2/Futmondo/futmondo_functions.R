@@ -729,19 +729,25 @@ reorder_player_table_columns <- function(df) {
 get_reactable_columns_for_players <- function(table) {
   columns <- list()
 
-  # Keep the club name as the sortable/filterable value; decorate it with its crest.
+  # Keep names as plain sortable/filterable values and show the club crest beside them.
+  # Club metadata stays in the payload for this formatter, without a separate Team column.
   if ("logo" %in% names(table)) columns[["logo"]] <- colDef(show=FALSE)
-  if ("team" %in% names(table)) columns[["team"]] <- colDef(
-    name="Team", minWidth=190,
+  if ("team" %in% names(table)) columns[["team"]] <- colDef(show=FALSE)
+  if ("name" %in% names(table)) columns[["name"]] <- colDef(
+    name="Name", minWidth=180,
     cell=function(value, index) {
       if(is.null(value) || is.na(value) || !nzchar(value)) return("")
+      club <- if("team" %in% names(table)) as.character(table$team[index]) else ""
+      if(is.na(club)) club <- ""
       logo <- if("logo" %in% names(table)) table$logo[index] else NULL
-      image_name <- get_team_image_name(value, logo=logo)
+      image_name <- get_team_image_name(club, logo=logo)
       crest <- if(nzchar(image_name)) shiny::tags$img(
-        src=paste0(TEAM_LOGO_URL,image_name,".png"),alt="",width=22,height=22,
+        src=paste0(TEAM_LOGO_URL,image_name,".png"),alt=club,width=22,height=22,
         loading="lazy",decoding="async",class="fm-team-crest",
         onerror="this.style.display='none';") else NULL
-      shiny::tags$span(class="fm-team-label",crest,shiny::tags$span(value))
+      shiny::tags$span(class="fm-team-label",title=if(nzchar(club))club else NULL,
+        style="max-width: 100%;",crest,
+        shiny::tags$span(style="min-width: 0; white-space: normal; overflow-wrap: anywhere;",value))
     }
   )
 
