@@ -663,6 +663,6 @@ Status: **implemented and verified locally; authenticated hosted behavior remain
 - [x] Display completed player sale/purchase profit separately from reconstructed cash plus current squad value minus starting cash.
 - [x] Reuse one source-backed, included shared ledger for matching, related fees, card totals and the player pivot; preserve held assets, revisions, unknowns and context isolation.
 - [x] Keep evidence notes/estimate labels, cache reuse and responsive stacking; add no source reads, workers, dependencies or schema changes.
-- [x] Complete independent known-answer, source-mapping/cache, rendered-card, mobile/performance and offline lifecycle checks. Scoped commit/push delivery to remote branch `2.0` is recorded separately after confirmation.
+- [x] Complete independent known-answer, source-mapping/cache, rendered-card, mobile/performance and offline lifecycle checks; commit and push only this task's implementation to remote branch `2.0` (`9fb89aa`).
 
 Local fixtures do not certify the user's authenticated history or a hosted deployment. Wealth is measured relative to actual starting cash; no unsupported historical squad allocation is created.
