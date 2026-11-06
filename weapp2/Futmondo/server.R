@@ -84,6 +84,14 @@ function(input, output, session) {
     req(valid_login(login_token_RV()),championship_id_RV(),user_team_id_RV())
     team_read(login_token_RV(),championship_id_RV(),user_team_id_RV())
   })
+  league_settings_source <- reactive({
+    leagues<-championships_RV();id<-championship_id_RV()
+    selected<-Filter(function(x)identical(as.character(x$id %||% x$`_id`),as.character(id)),leagues)
+    state<-primary_team_state()
+    list(league=if(length(selected))selected[[1]]else list(),info=state$data %||% list(),
+      status=state$status,error=state$error,
+      stale=identical(state$freshness,"stale")||identical(state$status,"stale")||!is.null(state$error))
+  })
   primary_market_state <- reactive({
     req(valid_login(login_token_RV()),championship_id_RV(),user_team_id_RV())
     market_read(login_token_RV(),championship_id_RV(),user_team_id_RV())
@@ -209,7 +217,8 @@ players_in_championship_Server(id = "players_in_championship",
                         login_token = login_token_RV,
                         championship_id = championship_id_RV,
                         user_team_id = user_team_id_RV,
-                        user_teams_RV = user_teams_RV, refresh_trigger = refresh_trigger)
+                        user_teams_RV = user_teams_RV, refresh_trigger = refresh_trigger,
+                        league_settings_source = league_settings_source)
 
   round_mvps_Server(id = "round_mvps",
                     is_module_active = reactive({
@@ -227,13 +236,7 @@ players_in_championship_Server(id = "players_in_championship",
                championship_id = championship_id_RV,
                user_team_id = user_team_id_RV,
                user_teams_RV = user_teams_RV, is_admin = is_admin_RV,refresh_trigger=refresh_trigger,
-               league_settings_source = reactive({
-                 leagues<-championships_RV();id<-championship_id_RV()
-                 selected<-Filter(function(x)identical(as.character(x$id %||% x$`_id`),as.character(id)),leagues)
-                 state<-primary_team_state()
-                 list(league=if(length(selected))selected[[1]]else list(),info=state$data %||% list(),
-                   stale=identical(state$status,"stale")||!is.null(state$error))
-               }))
+               league_settings_source = league_settings_source)
   observe({
     if(!valid_login(login_token_RV()))return()
     state<-championship_state()

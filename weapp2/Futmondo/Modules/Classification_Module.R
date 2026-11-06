@@ -12,7 +12,8 @@ classification_UI <- function(id) {
       fluidRow(column(6, sliderInput(ns("round_range_slider"), "Points between rounds", min = 1, max = 38, value = c(1, 38))),
                column(6, selectInput(ns("single_round_select"), "Inspect one round", choices = c("All rounds" = "all")))))),
     fluidRow(box(width = 12, title = "Standings", uiOutput(ns("classification_status")), reactableOutput(ns("classification_table")))),
-    fluidRow(box(width = 12, title = "Dream team and configured rewards", uiOutput(ns("dreamteam_box_ui"))))
+    fluidRow(box(width = 12, title = "Dream team and configured rewards",
+      uiOutput(ns("configured_rewards_ui")), uiOutput(ns("dreamteam_box_ui"))))
   )
 }
 
@@ -95,9 +96,9 @@ classification_dreamteam_rows <- function(answer) {
 }
 
 classification_Server <- function(id, is_module_active, login_token, championship_id, user_team_id,
-                                  user_teams_RV, refresh_trigger = NULL) {
+                                  user_teams_RV, refresh_trigger = NULL, league_settings_source = NULL) {
   moduleServer(id, function(input, output, session) {
-    bind_factual_reads(c("get_finished_rounds","get_user_team_rounds","get_financial_snapshot","get_round_dreamteam"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
+    bind_factual_reads(c("get_finished_rounds","get_user_team_rounds","get_user_team_info","get_round_dreamteam"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
 
     mvp_snapshot <- shared_mvp_source(session,login_token,championship_id,is_module_active,refresh_trigger)
     finances_RV <- shared_rival_finance_source(session,login_token,championship_id,
@@ -128,13 +129,7 @@ classification_Server <- function(id, is_module_active, login_token, championshi
     filtered_rows_RV <- reactive({
       classification_window_table(round_rows_RV(), input$round_range_slider, input$single_round_select)
     })
-    output$classification_status <- renderUI({
-      rows <- round_rows_RV()
-      if (!nrow(rows)) return(p("Round history is unavailable. Current official cumulative totals are shown below; round filters require published results."))
-      if (!nrow(filtered_rows_RV())) return(p("No published results in this selection."))
-      p("Points and reconstructed bonus totals follow the selected rounds. Bonuses reuse the rival financial ledger, including recorded payments. Missing scores or bonus evidence remain unavailable.")
-    })
-    output$classification_table <- renderReactable({
+    standings_RV <- reactive({
       req(is_module_active() == TRUE)
       rows <- filtered_rows_RV()
       if (!nrow(round_rows_RV())) {
@@ -143,8 +138,23 @@ classification_Server <- function(id, is_module_active, login_token, championshi
                            points = suppressWarnings(as.numeric(teams$points)),
                            rank = suppressWarnings(as.numeric(teams$position)))
       }
+      if (!nrow(rows)) return(rows)
+      classification_bonus_table(rows, round_rows_RV(), finances_RV(), input$round_range_slider, input$single_round_select)
+    })
+    output$classification_status <- renderUI({
+      if (!nrow(round_rows_RV())) return(p("Round history is unavailable. Current official cumulative totals are shown below; round filters require published results."))
+      rows <- standings_RV()
+      if (!nrow(rows)) return(p("No published results in this selection."))
+      bonus_columns <- c("points_bonus", "mvp_bonus", "best_xi_bonus", "position_bonus")
+      missing_bonus <- any(!is.finite(as.matrix(rows[, bonus_columns, drop = FALSE])))
+      tagList(p("Points and reconstructed bonus totals for the selected rounds."),
+        if (any(!is.finite(rows$points))) p("Some selected round scores are missing; affected point totals are unavailable."),
+        if (missing_bonus) p(if (isTRUE(finances_RV()$loading)) "Bonus totals are loading."
+          else "Some bonus totals lack complete round or award records and are shown as Unavailable."))
+    })
+    output$classification_table <- renderReactable({
+      rows <- standings_RV()
       if (!nrow(rows)) return(reactable(data.frame(Message = "No results available.")))
-      rows <- classification_bonus_table(rows, round_rows_RV(), finances_RV(), input$round_range_slider, input$single_round_select)
       rows <- rows[, intersect(c("rank", "team_name", "points", "rounds", "points_bonus", "mvp_bonus", "best_xi_bonus", "position_bonus"), names(rows)), drop = FALSE]
       reactable(rows, compact = TRUE, striped = TRUE, defaultSorted = "rank", defaultColDef = colDef(na = "Unavailable"),
                 columns = list(rank = colDef(name = "Rank", minWidth = 65), team_name = colDef(name = "Team", minWidth = 150), points = colDef(name = "Points"),
@@ -166,24 +176,40 @@ classification_Server <- function(id, is_module_active, login_token, championshi
       plot_ly(history, x = ~round, y = ~rank, color = ~team_name, type = "scatter", mode = "lines+markers") %>%
         fm_plot_layout(xaxis = list(title = "Round", dtick = 1), yaxis = list(title = "Cumulative rank", autorange = "reversed", dtick = 1))
     })
-    output$dreamteam_box_ui <- renderUI({
+    output$configured_rewards_ui <- renderUI({
       req(is_module_active() == TRUE, login_token(), championship_id(), user_team_id())
       if (!is.null(refresh_trigger)) refresh_trigger()
-      snapshot <- tryCatch(get_financial_snapshot(login_token(), championship_id(), user_team_id()), error = function(e) NULL)
-      rules <- normalize_league_rules(list(configuration = snapshot$configuration))
-      rewards <- p("Configured rewards — points: ", ui_financial_amount(rules$money_per_point),
+      # Reuse the configuration already loaded for League settings. Standalone
+      # callers can still acquire it through the scoped team-information cache.
+      snapshot <- NULL
+      if (is.function(league_settings_source)) {
+        snapshot <- league_settings_source()
+        configuration <- utils::modifyList(snapshot$league$configuration %||% list(),
+          snapshot$info$configuration %||% list())
+        if (!length(configuration)) validate(need(FALSE,
+          if (identical(snapshot$status, "loading")) "Loading league settings…"
+          else resource_failure_message(snapshot$error)))
+        info <- list(configuration = configuration)
+      } else info <- get_user_team_info(login_token(), championship_id(), user_team_id())
+      rules <- normalize_league_rules(info)
+      tagList(p("Configured rewards — points: ", ui_financial_amount(rules$money_per_point),
         "; ranking pool: ", ui_financial_amount(rules$ranking_pool),
         "; ranking mode: ", if (length(rules$ranking_mode) && !is.na(rules$ranking_mode)) rules$ranking_mode else "Unavailable",
-        "; MVP: ", ui_financial_amount(rules$mvp_reward), "; dream-team player: ", ui_financial_amount(rules$dreamteam_reward))
-      if (is.null(input$single_round_select) || input$single_round_select == "all") return(tagList(rewards, p("Select one round to see its published dream team and MVP.")))
+        "; MVP: ", ui_financial_amount(rules$mvp_reward), "; dream-team player: ", ui_financial_amount(rules$dreamteam_reward)),
+        if (isTRUE(snapshot$stale)) p("Showing saved league settings while the latest configuration is unavailable."))
+    })
+    output$dreamteam_box_ui <- renderUI({
+      req(is_module_active() == TRUE, login_token(), championship_id())
+      if (!is.null(refresh_trigger)) refresh_trigger()
+      if (is.null(input$single_round_select) || input$single_round_select == "all") return(p("Select one round to see its published dream team and MVP."))
       catalog <- rounds_RV(); index <- match(as.numeric(input$single_round_select), catalog$round_number)
-      if (is.na(index)) return(tagList(rewards, p("Round identity unavailable.")))
-      ans <- tryCatch(get_round_dreamteam(login_token(), championship_id(), catalog$round_id[index]), error = function(e) NULL)
+      if (is.na(index)) return(p("Round identity unavailable."))
+      ans <- get_round_dreamteam(login_token(), championship_id(), catalog$round_id[index])
       players <- classification_dreamteam_rows(ans)
-      if (!nrow(players)) return(tagList(rewards, p("The dream team has not been published or is unavailable.")))
-      tagList(rewards, tags$ul(lapply(seq_len(nrow(players)), function(i) tags$li(
+      if (!nrow(players)) return(p("The dream team has not been published or is unavailable."))
+      tags$ul(lapply(seq_len(nrow(players)), function(i) tags$li(
         players$player[i], " — ", if (is.finite(players$points[i])) players$points[i] else "Unavailable", " points",
-        if (isTRUE(players$mvp[i])) strong(" · MVP")))))
+        if (isTRUE(players$mvp[i])) strong(" · MVP"))))
     })
   })
 }
