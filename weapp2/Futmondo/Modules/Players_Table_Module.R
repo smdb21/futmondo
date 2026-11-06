@@ -787,7 +787,9 @@ recent_points_covered_players <- function(stored,context,n=5L) {
   keep <- is.finite(rounds)&rounds>=1&rounds==floor(rounds)
   stored <- stored[keep,,drop=FALSE];rounds <- rounds[keep]
   if(!length(rounds))return(character())
-  latest <- max(rounds);wanted <- seq.int(max(1L,latest-n+1L),latest)
+  latest <- max(rounds)
+  if(latest<n)return(character())
+  wanted <- seq.int(latest-n+1L,latest)
   groups <- split(rounds,as.character(stored$player_id))
   names(groups)[vapply(groups,function(x)all(wanted%in%x),logical(1))]
 }
@@ -1132,18 +1134,27 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
   availability_for <- function(entry){
     candidates<-ids_for(entry);ctx<-context_for(entry)
     checked<-recent_points_saved_players(data.frame(),ctx,entry$checks)
-    requested_missing<-character()
-    demanding<-Filter(function(x)length(setdiff(x$ids,checked)),current_clients())
-    if(length(demanding)){
-      for(client in demanding){
-        covered<-covered_for(entry,client$n)
-        requested_missing<-unique(c(requested_missing,setdiff(client$ids,c(checked,covered))))
-      }
+    # An old successful check proves a source read, not coverage for a newly
+    # requested wider window. Probe only visible players missing numbered rows.
+    requested_missing<-character();demanded<-integer()
+    demanding<-Filter(function(x)length(x$ids)>0L,current_clients())
+    for(client in demanding){
+      covered<-covered_for(entry,client$n)
+      missing<-setdiff(client$ids,if(client$n>5L)covered else c(checked,covered))
+      requested_missing<-unique(c(requested_missing,missing))
+      prior<-demanded[missing];prior[is.na(prior)]<-0L
+      demanded[missing]<-pmax(prior,as.integer(client$n))
     }
     reused<-setdiff(unique(c(saved_ids_for(entry),checked,entry$fitness_ready)),
       c(entry$forced,requested_missing,entry$fitness_changed))
-    blocked<-names(entry$attempted)[vapply(names(entry$attempted),function(player)
-      !retry_waiting(entry,player)||entry$attempted[[player]]$retry_at>as.numeric(Sys.time()),logical(1))]
+    blocked<-names(entry$attempted)[vapply(names(entry$attempted),function(player){
+      attempt<-entry$attempted[[player]];need<-demanded[player]
+      if(isTRUE(attempt$ok)&&length(need)&&!is.na(need)){
+        seen<-as.integer(attempt$required_rounds %||% 0L)
+        return(seen>5L||seen>=need)
+      }
+      !retry_waiting(entry,player)||attempt$retry_at>as.numeric(Sys.time())
+    },logical(1))]
     normal<-setdiff(candidates,c(blocked,names(entry$pending),reused,entry$fitness_holding))
     probes<-setdiff(unlist(entry$fitness_probes,use.names=FALSE),c(blocked,names(entry$pending)))
     list(needed=unique(c(probes,normal)),reused=reused)
@@ -1151,9 +1162,10 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
   needed_for <- function(entry)availability_for(entry)$needed
   completed_for <- function(entry){
     if(!is.null(entry$initial_errors$lineup))return(character())
+    available<-availability_for(entry)
     good<-names(entry$attempted)[vapply(entry$attempted,function(x)isTRUE(x$ok)&&
       identical(x$season,entry$season)&&identical(x$scoring_version,entry$scoring),logical(1))]
-    setdiff(unique(c(good,availability_for(entry)$reused)),names(entry$pending))
+    setdiff(unique(c(setdiff(good,available$needed),available$reused)),names(entry$pending))
   }
   failed_for <- function(entry,completed=completed_for(entry)){
     setdiff(names(entry$attempted)[vapply(names(entry$attempted),function(player)
@@ -1326,13 +1338,19 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
     prepare_fitness(entry);save_fitness(entry)
     needed<-needed_for(entry);slots<-max(0L,2L-length(entry$pending))
     if(!length(needed)||!slots)return()
+    if(any(needed%in%visible_ids()))entry$finished_signature<-NULL
     for(player in head(needed,slots))local({
       player_id<-player;expected<-generation;ctx<-context_for(entry);ctx$player_id<-player_id
       auth<-current_clients()[[1]]$auth
       current<-function()isTRUE(shiny::isolate(!closed&&identical(generation,expected)&&
         identical(current_key,entry$key)&&length(current_clients())>0L))
       previous_attempt<-entry$attempted[[player_id]]
-      attempt_number<-as.integer(previous_attempt$attempts %||% 0L)+1L
+      requested_n<-max(c(0L,vapply(current_clients(),function(client)
+        if(player_id%in%client$ids)as.integer(client$n)else 0L,integer(1))))
+      # One short-to-wide upgrade is enough: the source request is N-independent.
+      wider<-isTRUE(previous_attempt$ok)&&requested_n>5L&&
+        as.integer(previous_attempt$required_rounds %||% 0L)<=5L
+      attempt_number<-if(wider)1L else as.integer(previous_attempt$attempts %||% 0L)+1L
       if(attempt_number>1L&&entry$retry_reads>=retry_budget)return()
       if(attempt_number>1L)entry$retry_reads<-entry$retry_reads+1L
       entry$request_sequence<-entry$request_sequence+1L;request_token<-entry$request_sequence
@@ -1340,7 +1358,7 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
       probe_snapshots<-names(Filter(function(id)identical(id,player_id),entry$fitness_probes))
       for(snapshot in probe_snapshots)entry$fitness_probe_attempted[[snapshot]]<-TRUE
       entry$fitness_probe_attempted<-tail(entry$fitness_probe_attempted,32L)
-      if(length(probe_snapshots)||attempt_number>1L){
+      if(length(probe_snapshots)||attempt_number>1L||wider){
         fresh_ctx<-ctx;fresh_ctx$session_id<-""
         invalidate_resources(fresh_ctx,pattern="^player_summary_points$|^player_summary_")
       }
@@ -1432,7 +1450,8 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
           }
         }
         settled<<-TRUE;entry$pending[[player_id]]<-NULL
-        entry$attempted[[player_id]]<-list(ok=TRUE,attempts=attempt_number,season=season,scoring_version=ctx$scoring_version)
+        entry$attempted[[player_id]]<-list(ok=TRUE,attempts=attempt_number,season=season,
+          scoring_version=ctx$scoring_version,required_rounds=requested_n)
         if(length(probe_snapshots))entry$fitness_dirty<-TRUE
         prepare_fitness(entry)
         touch();publish(entry);NULL

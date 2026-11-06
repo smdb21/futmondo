@@ -112,7 +112,14 @@ shiny::testServer(server,{
    all(add_recent_points_average(rows[1:3,,drop=FALSE],source$history(),3)$recent_points_avg==10))
  })
  n(8L);settle(session)
- check('N greater than five can still fetch older histories for mapped players',stopifnot(sum(grepl('get_player_recent_points',calls))==3L,exists('p2',pending),exists('p3',pending)))
+ check('N greater than five upgrades the short probe and fetches older visible histories',{
+  stopifnot(sum(grepl('get_player_recent_points',calls))==3L,
+    exists('p1',pending),exists('p2',pending),!exists('p3',pending))
+  pending[['p1']]$resolve(payload(rounds=1:10,points=c(1,2,3,4,5,2,5,12,12,6)))
+  settle(session)
+  stopifnot(exists('p3',pending),sum(grepl('get_player_recent_points',calls))==4L,
+    add_recent_points_average(rows[1,,drop=FALSE],session$userData$shared_round_points$entry()$live[['p1']],8)$recent_points_avg==49/8)
+ })
 })
 # Failed observation-only batches wait for explicit Refresh and retain their facts.
 reset()

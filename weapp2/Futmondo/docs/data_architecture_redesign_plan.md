@@ -612,3 +612,15 @@ Status: **implemented and verified locally; authenticated hosted behavior remain
 - [x] Complete independent known-answer, acquisition/persistence reuse, desktop/mobile browser, performance and offline lifecycle checks. Delivery uses a scoped commit to the current branch remote, preserving unrelated local/staged work.
 
 No dependency, database migration or unattended activity is introduced. Authenticated hosted data and timing remain separate from local verification.
+
+
+## Eight-round average recovery — 2026-11-06
+
+Status: **implemented and verified locally; authenticated hosted behavior remains unverified**.
+
+- [x] Reproduce N2 working while N8 stays blank behind an old successful five-round source check.
+- [x] Make active N>5 demand fetch missing numbered history, publish on completion, and persist/reuse retrieved scores.
+- [x] Preserve bounded requests, source errors, sparse scores, season/scoring isolation and manual Refresh.
+- [x] Complete focused, offline lifecycle, request-count and performance checks; deliver the scoped change to branch `2.0`.
+
+Authenticated hosted behavior remains unverified; no live transaction was used.

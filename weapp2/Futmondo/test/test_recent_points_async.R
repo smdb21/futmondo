@@ -164,7 +164,10 @@ shiny::testServer(window_server,{
 reset(saved,dplyr::bind_rows(marker('p1',age=90*86400),marker('p2',age=90*86400),marker('p3',age=90*86400),marker('p4','empty',age=90*86400)))
 shiny::testServer(window_server,{
  settle(session);n(8L);settle(session)
- check('old successful sparse and empty acquisitions do not repeat for genuine source gaps',stopifnot(!any(grepl('get_player_recent_points',calls))))
+ check('wider demand rechecks only visible sparse history once',{
+  requested<-calls[grepl('get_player_recent_points',calls)]
+  stopifnot(identical(requested,'get_player_recent_points:p1'),!exists('league:p4',queued))
+ })
 })
 cat(sprintf('DURABLE HISTORY COMPLETE: %d passed / 0 failed\n',checks))
 

@@ -118,15 +118,20 @@ shiny::testServer(players_table_Server,args=module_args(),{
  })
  before<-calls
  session$setInputs(recent_games_n=8L);settle(session)
- check('N8 uses eight genuine explicit rounds and retains missing source history as missing',{
+ check('N8 uses eight genuine explicit rounds and checks only the empty visible source',{
   shown<-players_table_enriched_RV()
   stopifnot(identical(shown$recent_points_avg,c(83/8,NA_real_)),
    identical(shown$recent_points_ratio,c(83/16,NA_real_)),
-   identical(shown$recent_points_count,c(8L,0L)),identical(calls,before))
+   identical(shown$recent_points_count,c(8L,0L)),
+   identical(tail(calls,length(calls)-length(before)),'get_player_recent_points:source-2'))
  })
+ pending[['source-2']]$resolve(make_payload('source-2'));settle(session)
+ stopifnot(length(saves)==3L,nrow(saves[[3]]$payload$observations)==0L)
+ saves[[3]]$ack(TRUE);settle(session)
+ before<-calls
  for(n in c(5L,2L,8L,2L)){session$setInputs(recent_games_n=n);settle(session)}
  check('later N changes reuse acquired history without new requests or saves',
-  stopifnot(identical(calls,before),length(saves)==2L))
+  stopifnot(identical(calls,before),length(saves)==3L))
 })
 reset()
 shiny::testServer(players_table_Server,args=module_args(),{
@@ -136,7 +141,8 @@ shiny::testServer(players_table_Server,args=module_args(),{
    length(saves)==0L,length(observation_writes)==0L,
    identical(players_table_enriched_RV()$recent_points_avg,c(25,2)))
   before<-calls;session$setInputs(recent_games_n=8L);settle(session)
-  stopifnot(identical(players_table_enriched_RV()$recent_points_avg,c(83/8,NA_real_)),identical(calls,before))
+  stopifnot(identical(players_table_enriched_RV()$recent_points_avg,c(83/8,NA_real_)),
+   identical(tail(calls,length(calls)-length(before)),'get_player_recent_points:source-2'))
  })
 })
 
