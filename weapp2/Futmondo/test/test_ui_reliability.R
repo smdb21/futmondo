@@ -257,9 +257,10 @@ record('bid cancellation sends the selected ID and explicit action', {
   env$selected_player <- function() list(id='selected-player',name='Selected')
   env$login_token <- 'fake';env$championship_id<-'champ';env$user_team_id<-'team'
   env$get_reactive_val <- identity
-  env$active_bid_info_RV <- function() list(id='own-bid',price=10)
+  env$modal_bid_info_RV <- function() list(cancel=list(id='own-bid',price=10))
+  env$verify_active_bid <- function(sp,expected) expected
   env$consume_action_context <- function(action) identical(action,'cancel')
-  env$cancel_bid <- function(...) TRUE
+  env$cancel_bid <- function(...){stopifnot(list(...)$bid_id=='own-bid');TRUE}
   env$removeModal <- function(...) NULL
   env$clear_api_cache <- function(...) NULL
   env$on_bid_updated <- function(...) events[[length(events)+1L]] <<- list(...)

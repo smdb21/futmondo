@@ -49,6 +49,33 @@ player_card_can_buy_clause <- function(player,current_team_id,clause_open) {
   isTRUE(clause_open) && !player_card_is_own_player(player,current_team_id)
 }
 
+# Direct bid fields in the account/team-scoped market response describe our
+# offer. Selected player rows can contain rival/received bids and are not used.
+player_card_active_bid <- function(summary, capacity, player_id, now = Sys.time()) {
+  valid_bid <- function(id, price) {
+    id <- fm_scalar(id, ""); price <- fm_number(price)
+    if (!nzchar(id) || !is.finite(price) || price <= 0) return(NULL)
+    list(id=id, price=price)
+  }
+  deadline <- capacity$own_bid_valid_until %||% capacity$valid_until
+  rows <- capacity$target_rows
+  if (!acquisition_data_unverified(capacity) && is.numeric(deadline) &&
+      length(deadline)==1L && is.finite(deadline) && deadline>as.numeric(now) &&
+      is.data.frame(rows) && "id" %in% names(rows)) {
+    rows <- rows[!is.na(rows$id) & as.character(rows$id)==fm_scalar(player_id,""),,drop=FALSE]
+    if (nrow(rows)) {
+      if (nrow(rows)!=1L) return(NULL)
+      return(valid_bid(rows$bid_id, rows$bid_price))
+    }
+  }
+  # Off-market owner offers may instead have immutable own-team evidence in
+  # the summary. Its age and status must remain independently verifiable.
+  if (is.list(summary) && !acquisition_data_unverified(summary) &&
+      acquisition_source_deadline(summary,60,now)>as.numeric(now))
+    return(valid_bid(summary$my_bid_id, summary$my_bid_price))
+  NULL
+}
+
 # The first valid player context follows the loading shell and must not dismiss
 # it. Once a player context has existed, any later change invalidates its modal.
 player_card_context_changed <- function(previous_context, current_context) {
@@ -196,6 +223,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     })
 
     active_bid_info_RV <- reactiveVal(NULL)
+    modal_bid_info_RV <- reactiveVal(list())
 
 
     # Records whether the regular market-offer modal was opened by the shared
@@ -236,7 +264,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     observeEvent(player_action_context_RV(), {
       current_context <- player_action_context_RV()
       previous_context <- isolate(previous_player_action_context_RV())
-      active_bid_info_RV(NULL);modal_context_RV(list())
+      active_bid_info_RV(NULL);modal_context_RV(list());modal_bid_info_RV(list())
       offer_modal_opened_RV(FALSE);clause_modal_opened_RV(FALSE);modify_modal_opened_RV(FALSE)
       if (player_card_context_changed(previous_context, current_context)) removeModal()
       previous_player_action_context_RV(current_context)
@@ -251,6 +279,37 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       if(is.null(context) || !identical(values[[action]],context)) return(FALSE)
       values[[action]]<-NULL;modal_context_RV(values)
       TRUE
+    }
+
+    # Re-read the team-scoped source for manual actions. Never write using a
+    # replacement offer or an amount that changed after confirmation opened.
+    verify_active_bid <- function(sp, expected = NULL) {
+      login <- get_reactive_val(login_token)
+      champ <- get_reactive_val(championship_id)
+      team <- get_reactive_val(user_team_id)
+      req(valid_login(login),nzchar(fm_scalar(champ,"")),nzchar(fm_scalar(team,"")))
+      ctx <- resource_context(login,champ,team)
+      invalidate_resources(ctx,pattern="^market_")
+      rows <- tryCatch(get_market_players(login,champ,team),error=function(e)NULL)
+      bid <- NULL
+      if (is.data.frame(rows) && !acquisition_data_unverified(rows)) {
+        summary <- NULL
+        if (!"id" %in% names(rows) || !any(as.character(rows$id) %in% as.character(sp$id))) {
+          invalidate_resources(resource_context(login,champ,team,sp$id),pattern="^player_summary_")
+          summary <- tryCatch(get_player_summary(login,champ,team,sp$id),error=function(e)NULL)
+        }
+        bid <- player_card_active_bid(summary,list(target_rows=rows,
+          own_bid_valid_until=acquisition_source_deadline(rows,20)),sp$id)
+      }
+      if (is.null(bid) || (!is.null(expected) && !identical(bid,expected))) {
+        shiny::showNotification("Your active offer could not be verified or has changed. Reopen the player before confirming another action.",
+          type="warning",duration=6)
+        return(NULL)
+      }
+      bid
+    }
+    remember_bid <- function(action,bid) {
+      values <- modal_bid_info_RV();values[[action]] <- bid;modal_bid_info_RV(values)
     }
 
     # ---- Acquisition capacity preflight (shared by all acquisition paths) ----
@@ -373,31 +432,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         champ_id <- get_reactive_val(championship_id)
         team_id <- get_reactive_val(user_team_id)
 
-        my_bid_id <- NULL
-        my_bid_price <- NULL
-
-        if (!is.null(login) && !is.null(champ_id) && !is.null(team_id) && !is.null(sp$id)) {
-          summary_res <- card_history()$summary
-
-          # Only trust summary-level my_bid_id/my_bid_price: get_player_summary
-          # now returns them ONLY when a bid's immutable team ID matches our
-          # team (NULL otherwise). No sp$bid_price fallback -- that field is the
-          # market's current bid and may belong to a rival, so it must never be
-          # treated as our own active bid (the modify flow would then target a
-          # rival's bid).
-          if (!is.null(summary_res)) {
-            my_bid_id <- summary_res$my_bid_id
-            my_bid_price <- summary_res$my_bid_price
-          }
-        }
-
-        # Expose an active bid only when we have a verified own-bid ID + price.
-        if (!is.null(my_bid_id) && nzchar(as.character(my_bid_id)) &&
-            !is.null(my_bid_price) && is.finite(my_bid_price) && my_bid_price > 0) {
-          active_bid_info_RV(list(id = my_bid_id, price = my_bid_price))
-        } else {
-          active_bid_info_RV(NULL)
-        }
+        active_bid_info_RV(player_card_active_bid(card_history()$summary,
+          card_states$capacity()$data,sp$id))
 
         print(paste0("Selected player: ", sp$name))
         player_name <- sp$name
@@ -680,8 +716,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         }
 
         readiness<-if(is_own_player)card_states$listings() else card_states$capacity()
-        if(!is_own_player && identical(card_states$summary()$status,"loading"))readiness<-resource_state(status="loading")
-        if(!is_own_player && identical(card_states$summary()$status,"unavailable"))readiness<-card_states$summary()
+        if(!is_own_player && has_active_bid)readiness<-resource_state(data=active_bid_info_RV())
+        if(!is_own_player && !has_active_bid && identical(card_states$summary()$status,"loading"))readiness<-resource_state(status="loading")
+        if(!is_own_player && !has_active_bid && identical(card_states$summary()$status,"unavailable"))readiness<-card_states$summary()
         if(identical(readiness$status,"loading")) {
           disable<-function(tag){
             if(inherits(tag,"shiny.tag")){
@@ -706,26 +743,13 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       team_id <- get_reactive_val(user_team_id)
       req(sp, login, champ_id, team_id)
 
-      # Reverify immutable own-team bid evidence immediately before opening.
-      summary_res <- tryCatch(
-        get_player_summary(login = login, championship_id = champ_id,
-                           user_team_id = team_id, player_id = sp$id),
-        error = function(e) NULL
-      )
-      bid_id <- if (!is.null(summary_res)) summary_res$my_bid_id else NULL
-      bid_price <- if (!is.null(summary_res)) suppressWarnings(as.numeric(summary_res$my_bid_price)) else NA_real_
-      if (is.null(bid_id) || !nzchar(as.character(bid_id)) ||
-          length(bid_price) != 1L || !is.finite(bid_price) || bid_price <= 0) {
+      bid_info <- verify_active_bid(sp)
+      if (is.null(bid_info)) {
         active_bid_info_RV(NULL)
         modify_modal_opened_RV(FALSE)
-        shiny::showNotification(
-          "Your active bid could not be verified and may no longer exist. Please refresh and try again.",
-          type = "warning", duration = 5
-        )
         return(invisible(FALSE))
       }
-      active_bid_info_RV(list(id = as.character(bid_id), price = bid_price))
-      bid_info <- active_bid_info_RV()
+      active_bid_info_RV(bid_info)
 
       pf <- run_acquisition_preflight(sp, "modify", amount = NULL,
                                       existing_bid_amount = bid_info$price)
@@ -736,6 +760,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       }
 
       remember_action_context("modify")
+      remember_bid("modify",bid_info)
       modify_modal_opened_RV(TRUE)
       showModal(modalDialog(
         title = tagList(icon("pen-to-square"), " Update Your Active Bid"),
@@ -770,8 +795,11 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       login <- get_reactive_val(login_token)
       champ_id <- get_reactive_val(championship_id)
       team_id <- get_reactive_val(user_team_id)
-      bid_info <- active_bid_info_RV()
+      bid_info <- modal_bid_info_RV()[["modify"]]
       req(sp, login, champ_id, team_id, bid_info)
+
+      bid_info <- verify_active_bid(sp,bid_info)
+      req(bid_info)
 
       new_price <- input$new_bid_amount
       if (is.null(new_price) || is.na(new_price) || !is.numeric(new_price) || new_price <= 0) {
@@ -831,11 +859,12 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
     # ---- Cancel Active Bid Modal ----
     observeEvent(input$btn_cancel_bid, {
-      remember_action_context("cancel")
       sp <- selected_player()
       req(sp)
-      bid_info <- active_bid_info_RV()
+      bid_info <- verify_active_bid(sp)
       req(bid_info)
+      remember_action_context("cancel")
+      remember_bid("cancel",bid_info)
 
       showModal(modalDialog(
         title = tagList(icon("trash-can"), " Cancel Active Bid"),
@@ -857,8 +886,11 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       login <- get_reactive_val(login_token)
       champ_id <- get_reactive_val(championship_id)
       team_id <- get_reactive_val(user_team_id)
-      bid_info <- active_bid_info_RV()
+      bid_info <- modal_bid_info_RV()[["cancel"]]
       req(sp, login, champ_id, team_id, bid_info)
+
+      bid_info <- verify_active_bid(sp,bid_info)
+      req(bid_info)
 
       player_id <- sp$id
       bid_id <- bid_info$id

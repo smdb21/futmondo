@@ -1579,7 +1579,6 @@ calculate_team_acquisition_capacity <- function(info,roster_df,pressroom,market,
       bid_count <- nrow(my_bids)
       bid_total <- if (bids_complete) sum(prices) else NA_real_
       target_rows<-as.data.frame(market)[,intersect(c("id","bid_id","bid_price","numberOfBids"),names(market)),drop=FALSE]
-      if("id"%in%names(target_rows))target_rows<-target_rows[!duplicated(target_rows$id),,drop=FALSE]
     }
     if (!bids_complete) diagnostics <- c(diagnostics,"outgoing market commitments unavailable")
     if(acquisition_data_unverified(info)||acquisition_data_unverified(roster_df)){
@@ -1657,6 +1656,8 @@ calculate_team_acquisition_capacity <- function(info,roster_df,pressroom,market,
         acquisition_source_deadline(market,20),acquisition_source_deadline(pressroom,300),
         if(length(summaries))min(vapply(summaries,acquisition_source_deadline,numeric(1),ttl=60))else Inf),
       target_rows = target_rows,
+      own_bid_valid_until = if (is.data.frame(market) && !acquisition_data_unverified(market))
+        min(as.numeric(now)+20, acquisition_source_deadline(market,20)) else NA_real_,
       diagnostics = unique(diagnostics)
     )
 }

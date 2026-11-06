@@ -8,6 +8,8 @@ Smart Bid, recommended bids, forecast-based amounts, and automatic bidding are r
 
 The retained bid and offer tests exercise amount validation, context changes, and the manual handlers without real API writes.
 
+Player cards also read the direct own-bid ID and price from the team-scoped market response already acquired for capacity checks. This preserves Update Bid and Cancel Bid when an existing offer fills the final roster slot, even if the player summary omits the offer. Market evidence retains its own source deadline independently of unrelated roster or funds failures. Selected-row rival or received bids are never used as own-offer evidence. Each manual update/cancellation rechecks the scoped market source and compares the confirmed bid ID and amount before writing; changed, stale or ambiguous offers require a new confirmation. Updates retain existing-offer funds checks; cancellation does not require acquisition capacity. Passive card rendering adds no requests; each action opening and submission adds one current market read (plus a summary read for offers outside the market).
+
 
 ## Configured borrowing and minimum bids — 2026-11-02
 
