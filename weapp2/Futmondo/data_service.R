@@ -251,10 +251,21 @@ shared_resource<-function(session,resource,context,fetch,active=function()TRUE,r
   if(!nzchar(ctx$session_id))ctx$session_id<-session$token
   key<-api_cache_key(resource,context=ctx);next_version<-refresh();resumed<-!was_active;was_active<<-TRUE
   if(identical(last,key)&&identical(version,next_version)&&!resumed)return()
-  force_refresh<-identical(last,key)&&!identical(version,next_version)
+  same_context<-identical(last,key)
+  force_refresh<-same_context&&!identical(version,next_version)
+  previous<-if(same_context)shiny::isolate(value())else NULL
   last<<-key;version<<-next_version;generation<<-generation+1L;current_generation<-generation
-  value(resource_state(status="loading"))
-  promises::then(get_cached_resource_async(resource,ctx,function()fetch(ctx),force_refresh),function(result){if(!closed&&identical(generation,current_generation))value(result);NULL})
+  loading<-resource_state(if(!is.null(previous$data))observed_data(previous$data,status="stale")else NULL,status="loading")
+  if(!is.null(loading$data))loading$freshness<-"stale"
+  value(loading)
+  promises::then(get_cached_resource_async(resource,ctx,function()fetch(ctx),force_refresh),function(result){
+   if(!closed&&identical(generation,current_generation)){
+    if(is.null(result$data)&&!is.null(previous$data))
+      result<-resource_state(observed_data(previous$data,status="stale"),status="stale",error=result$error,source=previous$source)
+    value(result)
+   }
+   NULL
+  })
   # Do not return the pending promise: Shiny must flush loading UI immediately.
   invisible(NULL)
  })

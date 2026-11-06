@@ -1665,7 +1665,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       }
     })
 
-    history_refresh <- reactive(paste(if(is.function(refresh_trigger))refresh_trigger()else 0L,input$refresh_history %||% 0L,sep=":"))
+    history_refresh_trigger <- round_history_refresh_trigger(session)
+    history_refresh <- reactive(paste(history_refresh_trigger(),input$refresh_history %||% 0L,sep=":"))
     observeEvent(input$refresh_history,{
       sp<-selected_player();auth<-get_reactive_val(login_token)
       req(sp,valid_login(auth))
@@ -1700,7 +1701,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     player_args<-function(ctx)c(auth_args(ctx),list(player_id=ctx$player_id))
     global_refresh<-function()if(is.function(refresh_trigger))refresh_trigger()else 0L
     card_states<-list()
-    card_states$summary<-card_read("card_summary","get_player_summary",player_args)
+    card_states$summary<-card_read("card_summary","get_player_summary",player_args,
+      refresh=function()paste(global_refresh(),history_refresh(),sep=":"))
     card_states$lineup<-card_read("card_lineup","get_lineup_from_team",auth_args)
     card_states$profile<-card_read("card_profile","get_player_full_profile",function(ctx)list(login=get_reactive_val(login_token),player_id=ctx$player_id),refresh=global_refresh)
     card_states$matches<-card_read("card_matches","get_player_matches",function(ctx)list(login=get_reactive_val(login_token),player_id=ctx$player_id))

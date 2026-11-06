@@ -589,3 +589,14 @@ Status: **exact release verified locally; hosted publication pending**.
 - [x] Independently review scheduling/cancellation, cache reuse, candidate changes and failure gates; run focused delayed/reopening fixtures.
 - [ ] Pass the final exact-release lifecycle and bundle checks, deploy and verify public startup/hash.
 - [ ] Confirm authenticated hosted Berenguer behavior; fixture timing does not establish production latency.
+
+## Clause-purchase history refresh scope — 2026-11-05
+
+Status: **implemented and verified offline; authenticated hosted verification pending**.
+
+- [x] Trace successful clause submission through scoped resource invalidation, table callback, shared mutation revision and full history requeue.
+- [x] Separate explicit global/card history correction demand from market mutation updates; retain saved/live points, acquisition checks and pending saves.
+- [x] Keep the current table visible during a same-context refresh, label retained resource state stale/loading, and preserve acquisition gates and context isolation.
+- [x] Verify the actual successful clause callback against a 527-player matrix, delayed catalog refresh, explicit correction refresh, retained acknowledgement and targeted changed-score behavior.
+- [x] Run focused regression and required offline lifecycle checks; refresh scoped deployment checksums.
+- [ ] Verify authenticated hosted clause purchase after deployment. No real purchase was performed for offline verification.

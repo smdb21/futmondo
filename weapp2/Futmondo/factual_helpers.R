@@ -328,6 +328,14 @@ today_is_clause_open <- function(player_row, now = Sys.time()) {
   dt <= now
 }
 
+# Market mutations change ownership/funds, never historical scores. Only an
+# explicit global history refresh advances this session-wide correction demand.
+round_history_refresh_trigger<-function(session){
+ root<-session$rootScope()
+ if(is.null(root$userData$round_history_refresh))root$userData$round_history_refresh<-shiny::reactiveVal(0L)
+ root$userData$round_history_refresh
+}
+
 # Session-local aliases capture immutable read arguments and share async state.
 factual_read_adapter<-function(session,handler,login_token,championship_id=NULL,user_team_id=NULL,is_active=function()TRUE,refresh_trigger=NULL,state_only=FALSE){
  force(handler)
@@ -356,7 +364,12 @@ factual_read_adapter<-function(session,handler,login_token,championship_id=NULL,
   })
   entry<-registry[[entry_key]];attr(entry,"last_access")<-as.numeric(Sys.time());registry[[entry_key]]<-entry;state<-entry()
   stamp<-state$fetched_at;age<-if(length(stamp)==1L&&!is.na(stamp))as.numeric(difftime(Sys.time(),stamp,units="secs"))else 0
-  if(!is.null(state$data)&&is.finite(age)&&age>resource_policy(handler)$ttl){bump<-attr(entry,"demand_refresh");if(is.function(bump))shiny::isolate(bump(bump()+1L));if(isTRUE(state_only))return(resource_state(status="loading"));shiny::validate(shiny::need(FALSE,"Refreshing data…"))}
+  if(!is.null(state$data)&&is.finite(age)&&age>resource_policy(handler)$ttl&&
+     !identical(state$status,"loading")&&!identical(state$freshness,"stale")){
+   bump<-attr(entry,"demand_refresh");if(is.function(bump))shiny::isolate(bump(bump()+1L))
+   state<-resource_state(observed_data(state$data,status="stale"),status="loading",source=state$source)
+   state$freshness<-"stale"
+  }
   if(isTRUE(state_only))return(state)
   if(is.null(state$data))shiny::validate(shiny::need(FALSE,if(identical(state$status,"loading"))"Loading data…"else resource_failure_message(state$error)))
   result<-state$data;if(identical(state$freshness,"stale"))attr(result,"fetch_status")<-"stale";result

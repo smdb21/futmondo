@@ -1,17 +1,19 @@
 {
-  "release": "player-availability-freshness-2026-11-05",
+  "release": "clause-history-reuse-2026-11-05",
   "runtime_sha256": {
     "async_transport.R": "cd9e20b307643909f58c357ef051e344eda07b7b3073e80a628ee87bd1946a2e",
     "background_runtime.R": "24fe816e01923d04ad6e2dbcf6139c0ae6031beac165708ab3576fa8ec639ff8",
-    "data_service.R": "69cfe9abd65a15acddebf16cd51b70be2cafde0f5ea5f48fbe757f41fa80f1d1",
+    "data_service.R": "017f5ab7243645c64a7e254c6308e572cec531a71c66346f87d272e594700cc2",
     "futmondo_functions.R": "77830a364a0d1fc66b0eac2568cb3cf384bdd0bb86475d6ca4827d513e18e09f",
     "global.R": "bac858749db05fb58f724d3318ac55a75cd72783d6777d9f5a23d54a60be9c17",
     "history_baseline_store.R": "c69c9a5a01fe079e5ee233b4289baba928b1d53a708cca2c0e804a6734a976f7",
     "history_repository.R": "4e1106f76950689cdb8108487d64392b4fb99f615ae9b1f4757ac3f9a63b54d1",
     "locker_transfers.R": "f90b4b3e18a40e471f6fe4d4a328e6eff57fa42e279fa79d282982b20bdc86b4",
     "Modules/Players_in_Teams_Module.R": "f3a9faa85510a98cf6da277fdf2b4587806fbd640096745accf1d0b4e70d84c7",
-    "Modules/Players_Table_Module.R": "4619557fe5e92068c7136aa9a059fe5be4a60190e5b01ce6782ac22bc263be71",
+    "Modules/Players_Table_Module.R": "a29d3bc70bda48bbc0328e7b898476a9036f0f974c1afa0ae82043e145f12833",
     "supabase_connector.R": "5627e8c85122fd9da3279733e369388a2aa21819ce46538d23f3cf72988b3bdd",
-    "Modules/Selected_Player_Module.R": "46e506656c87ed8dedd9f1a14c52e4a0f3a56fd93047880983a0d180372d8fe8"
+    "Modules/Selected_Player_Module.R": "a33396a8c58142daef338b22a75e4b814e81f0e3ba6a2c3be3cf0f69ae989905",
+    "factual_helpers.R": "8e4a8f5521f326a69189e9ff1263dd10d2bd7133a164ace04092d7d542a4dddc",
+    "server.R": "a3ae2fafb516c4d74e1b822e30737d0306a9508e49d2872c8ed258b6cd3c5534"
   }
 }

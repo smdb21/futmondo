@@ -3,6 +3,7 @@
 function(input, output, session) {
   login_token_RV <- login_Server(id = "login")
   refresh_trigger <- reactiveVal(0)
+  history_refresh_trigger <- round_history_refresh_trigger(session)
   startup_stage <- session$userData$startup_stage
   startup_started <- reactiveVal(Sys.time())
   startup_slow <- reactiveVal(FALSE)
@@ -36,6 +37,7 @@ function(input, output, session) {
   observeEvent(input$refresh_all, {
     req(valid_login(login_token_RV()))
     invalidate_resources(resource_context(login_token_RV(),isolate(championship_id_RV())),pattern="market|roster|teams|team_info|players|financial|capacity|round|notification|pressroom|history|summary|card")
+    history_refresh_trigger(isolate(history_refresh_trigger()) + 1L)
     refresh_trigger(refresh_trigger() + 1)
   })
   championships_RV <- reactive({

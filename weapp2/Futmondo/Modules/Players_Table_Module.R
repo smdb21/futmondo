@@ -414,7 +414,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
 
     recent_points <- recent_player_points_source(session,login_token,championship_id,user_team_id,
       players_table_RV,is_active=function()isTRUE(is_module_active())&&isTRUE(optional_ready()),
-      refresh_trigger=refresh_trigger,required_rounds=function()input$recent_games_n %||% 5L)
+      refresh_trigger=round_history_refresh_trigger(session),required_rounds=function()input$recent_games_n %||% 5L)
 
     # Enrich once per source/history/N change; filters reuse these numeric values.
     players_table_enriched_RV <- reactive({

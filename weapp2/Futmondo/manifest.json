@@ -2277,10 +2277,10 @@
       "checksum": "8d1a1a4f9a4c0b32bdf207ce695f81e9"
     },
     "data_service.R": {
-      "checksum": "f8f0d2902fae1dc298c0bb2ee343b598"
+      "checksum": "36f2d8d68a8cc25b1be998ec92a034de"
     },
     "factual_helpers.R": {
-      "checksum": "9a7616315995b23d7862cc6e4d8ece96"
+      "checksum": "e4b348b018201afb1434bc5051c095ee"
     },
     "futmondo_functions.R": {
       "checksum": "8eb3d819940605c4831e685ad003aa66"
@@ -2319,7 +2319,7 @@
       "checksum": "75e6f7d05ba457990b4dcd7d59adffe5"
     },
     "Modules/Players_Table_Module.R": {
-      "checksum": "5b28d3b8c14ddd6ff56ac37087bc747e"
+      "checksum": "bcb903d435a7eabec7563aa2e12e509b"
     },
     "Modules/Plots_Module.R": {
       "checksum": "d28b6843516e7a88406119bf287000c2"
@@ -2331,7 +2331,7 @@
       "checksum": "5ddb52ee106a00ae7514bb7697ca689f"
     },
     "Modules/Selected_Player_Module.R": {
-      "checksum": "7f653da3b46bc08cb45a02499a8e23b9"
+      "checksum": "7b5606efd011898da9c8cfe9b10751f0"
     },
     "Modules/Today_Module.R": {
       "checksum": "3e5572af3bb7154be89f8678acb9d94b"
@@ -2352,7 +2352,7 @@
       "checksum": "108b4acb8bf711eb97cec588aaab71ee"
     },
     "server.R": {
-      "checksum": "99e89173e500fba3b916088dd424b099"
+      "checksum": "74dd88584d1cafba20c11c4ce1afeab2"
     },
     "supabase_connector.R": {
       "checksum": "04b841cf63a9fe630c9f091071e29ffe"
@@ -2370,7 +2370,7 @@
       "checksum": "fafb509b30ecc9b57bc9b145a35e5571"
     },
     "www/release-info.json": {
-      "checksum": "c40aba400d2810899cfeb8d7dd4db493"
+      "checksum": "1cf734ad324e6616a0082726e3d3657e"
     },
     "www/remember-login.js": {
       "checksum": "2b037334f8088f5b4a270acbaea52e91"
