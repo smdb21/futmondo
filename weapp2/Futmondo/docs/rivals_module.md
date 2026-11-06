@@ -37,7 +37,7 @@ Returns a `tagList` containing:
 1. A Net Transfer Profit/Loss KPI box (standalone summary box in the top summary row).
 2. A League Financial Standings & Budget Left table (`reactableOutput`) displaying per-team finances.
 3. A `uiOutput` placeholder (`scouted_rival_details_ui`) for the selected rival details, which renders:
-    - Financial summary cards (Standings Position, Money Left, Squad Investment, Squad Valuation & Net Gain).
+    - Financial summary cards (Standings Position, Money Left, Trading profit, Squad Investment, Squad valuation and Overall wealth gained).
 - A `tabsetPanel` (type = "pills") with tabs including:
       - **Tab 1: "Player Roster & Clauses"** -- Contains the `players_table_UI` call for the scouted player roster and purchase breakdown.
       - **Tab 2: "Transaction & Financial History"** -- Displays all transactions directly (no filter bar). Includes a "Pivot by Player" toggle that switches the view between the full chronological transaction log and a per-player pivot summary.
@@ -107,7 +107,9 @@ The module renders four summary boxes in a fluid row:
 | Standings Position| `info$position` | `get_user_team_info()`     |
 | Money Left (Budget)| `budget` from `league_finances_RV()$team_finances` | Pressroom-driven `budget` column from `calculate_league_finances()`, which overrides the default `300000000 - total_spent` calculation. This ensures the summary box matches the main standings table and plot. |
 | Squad Investment  | `total_spent` (roster) / `money_out` (transactions) | Computed from roster `buyPrice` and transaction movements |
-| Squad Valuation & Gain | `summary$squad_value` / `summary$net_gain` | Observed directory valuation / shared ledger total excluding starting cash; reconstructed totals are labelled estimates. |
+| Trading profit | `summary$trading_profit` | Completed shared-ledger sale/purchase cycles, less related fees; unresolved sold costs remain unavailable. |
+| Squad valuation | `summary$squad_value` | Observed directory valuation, with existing shared-finance/information fallback. |
+| Overall wealth gained | `summary$wealth_gained` | Reconstructed cash plus observed squad value minus starting cash; estimated where source/reward assumptions remain. |
 
 #### Squad Investment Card -- Money Out / Money In Calculation
 
@@ -528,6 +530,10 @@ The rivals points pill scale excludes zero scores from its minimum and maximum. 
 Performance: this changes only the existing linear colour calculation, with no additional requests, database work or reactive updates. Focused rival-directory checks (7) and deployment checks (3) passed; full lifecycle and hosted visual checks were skipped for this presentation-only change. No delegation.
 
 
-### Ledger-based Net Gain — 2026-11-06
+### Trading profit and overall wealth gained — 2026-11-06
 
-The selected-rival card uses `rivals_summary_values()$net_gain`, published as `team_finances$net_profit_loss` from `rival_cash_net_gain()`. This is the signed total of all included financial-history entries except the opening allocation. It includes sales and rewards alongside purchases, fees and adjustments. Squad value remains a separate observed amount; lifetime purchases are no longer subtracted from it. The card explains the starting-cash exclusion and uses `net_gain_estimated` to label reconstructed results. Unknown transaction amounts remain unavailable. The existing shared calculation and context-bound cache are reused; card selection, history filters, sorting and paging make no additional request or ledger calculation. See [rival_cash_accounting.md](rival_cash_accounting.md) for the exact contract.
+The summary now displays **Trading profit** and **Overall wealth gained**, with observed **Squad valuation** separate. Trading profit replaces the former transfer-cash-flow card and totals completed sale/purchase cycles less related fees. The wealth card uses reconstructed cash plus current squad value minus starting cash, with an estimate label and expandable evidence notes. Starting cash is the actual ledger allocation, not a hardcoded €300M; no historical initial squad allocation is invented. Unknown source amounts/valuation/baseline remain unavailable with specific missing-input details.
+
+`rivals_summary_values()` consumes the shared `trading_profit`, `trading_profit_complete`, `trading_profit_notes` and `cash_activity_complete` fields and returns those trading fields plus `wealth_gained`, `wealth_gain_estimated` and `wealth_gain_notes`. The internal cash-activity compatibility fields remain available but no longer drive a displayed Net Gain figure.
+
+The **Pivot by Player** table now calls `rivals_realized_trade_rows()` on the selected shared cash ledger. It projects the same cached completed pairs used by the trading card and retains unsold purchases and unmatched sales with unknown opposite costs/profit. A **Related fees** column makes deductions visible. There is no second public-feed matching calculation. Buy/sale date tooltips use actual row indices and source dates. The former `rivals_build_pivot_ledger()` helper remains for legacy isolated callers; the active view no longer calls it. Card details use native expandable controls, and the valuation/wealth columns stack through the existing Bootstrap grid. Selecting a rival, sorting/paging the pivot or opening details adds no HTTP/database request or historical retrieval. Exact calculation and uncertainty behavior is documented in [rival_cash_accounting.md](rival_cash_accounting.md).

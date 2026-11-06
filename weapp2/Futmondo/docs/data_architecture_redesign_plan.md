@@ -654,3 +654,15 @@ Status: **implemented and verified locally; authenticated hosted behavior remain
 - [x] Complete independent known-answer, rendered-card, cache/performance and offline lifecycle checks; push only this task's implementation and regression changes to remote branch `2.0` (`c18b045`).
 
 No authenticated account or transaction is used for local verification. Hosted balances and deployment require separate verification; this change does not establish complete source evidence for the reported rival.
+
+
+## Separate realised trading profit and overall wealth gained — 2026-11-06
+
+Status: **implemented and verified locally; authenticated hosted behavior remains unverified**. This supersedes the earlier Net Gain display interpretation while retaining the internal cash-ledger compatibility helper.
+
+- [x] Display completed player sale/purchase profit separately from reconstructed cash plus current squad value minus starting cash.
+- [x] Reuse one source-backed, included shared ledger for matching, related fees, card totals and the player pivot; preserve held assets, revisions, unknowns and context isolation.
+- [x] Keep evidence notes/estimate labels, cache reuse and responsive stacking; add no source reads, workers, dependencies or schema changes.
+- [x] Complete independent known-answer, source-mapping/cache, rendered-card, mobile/performance and offline lifecycle checks. Scoped commit/push delivery to remote branch `2.0` is recorded separately after confirmation.
+
+Local fixtures do not certify the user's authenticated history or a hosted deployment. Wealth is measured relative to actual starting cash; no unsupported historical squad allocation is created.

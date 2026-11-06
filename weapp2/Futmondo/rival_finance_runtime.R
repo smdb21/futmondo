@@ -258,6 +258,17 @@ rival_transfer_metadata <- function(ledger,pressroom,team_id,teams,movements=dat
   selected<-selected[!is.na(matches[selected])];index<-matches[selected]
   field<-function(key){x<-if(key%in%names(pressroom))as.character(pressroom[[key]][index])else rep("",length(index));x[is.na(x)]<-"";x}
   ledger$transfer_player_name[selected]<-field("player_name");ledger$transfer_club[selected]<-field("player_team_name");ledger$transfer_logo[selected]<-field("player_team_slug")
+  ledger$transfer_identity_conflict<-rep(FALSE,nrow(ledger))
+  observed_players<-field("player_id")
+  ledger$transfer_identity_conflict[selected]<-nzchar(observed_players)&!is.na(ledger$player_id[selected])&
+    nzchar(ledger$player_id[selected])&ledger$player_id[selected]!=observed_players
+  # A unique observed event supplies identity for recorded movements that omit it.
+  missing_player<-is.na(ledger$player_id[selected])|!nzchar(ledger$player_id[selected])
+  ledger$player_id[selected[missing_player]]<-field("player_id")[missing_player]
+  if("source_event_id"%in%names(ledger)){
+    missing_event<-is.na(ledger$source_event_id[selected])|!nzchar(ledger$source_event_id[selected])
+    ledger$source_event_id[selected[missing_event]]<-field("id")[missing_event]
+  }
   for(side in c("buyer","seller")){
     ids<-field(paste0(side,"_team_id"));labels<-field(paste0(side,"_team_name"));keys<-paste(ids,labels,sep="|");unique_rows<-which(!duplicated(keys))
     names<-vapply(unique_rows,function(j)party(ids[j],labels[j]),character(1))
@@ -703,11 +714,11 @@ rival_historical_components <- function(evidence,teams,rules,official) {
 # The same entries drive component totals and transaction history. Reconstructed
 # dates prefer applicable payment evidence, then round publication; recorded
 # rows retain source dates.
-rival_cash_entry <- function(id,component,amount,source,type="bonus",date="",category="",round_id="",player_id="",estimated=FALSE,included=TRUE,bonus_type="",calculation="",source_type="",source_category="",settlement_label="",payment_date_estimated=FALSE,payment_date_source="") {
+rival_cash_entry <- function(id,component,amount,source,type="bonus",date="",category="",round_id="",player_id="",estimated=FALSE,included=TRUE,bonus_type="",calculation="",source_type="",source_category="",settlement_label="",payment_date_estimated=FALSE,payment_date_source="",source_event_id="") {
   data.frame(id=id,component=component,amount=amount,source=source,type=type,date=date,category=category,
     round_id=round_id,player_id=player_id,estimated=estimated,included=included,bonus_type=bonus_type,calculation=calculation,
     source_type=source_type,source_category=source_category,settlement_label=settlement_label,payment_date_estimated=payment_date_estimated,
-    payment_date_source=payment_date_source,stringsAsFactors=FALSE)
+    payment_date_source=payment_date_source,source_event_id=source_event_id,stringsAsFactors=FALSE)
 }
 rival_cash_ledger <- function(entries) {
   entries$timestamp<-fm_time(entries$date)
@@ -737,6 +748,155 @@ rival_cash_net_gain <- function(ledger) {
   if(any(!is.finite(amounts)))NA_real_ else sum(amounts)
 }
 
+# Realised transfer margins use completed ownership cycles from the included
+# cash ledger. Equal-time rows are resolved only by ownership or a fully closed
+# aggregate; source IDs never fabricate transaction order.
+rival_realized_trades <- function(ledger) {
+  empty<-data.frame(buy_id=character(),sell_id=character(),player_id=character(),
+    buy_price=numeric(),sell_price=numeric(),fees=numeric(),profit=numeric(),stringsAsFactors=FALSE)
+  unavailable<-function(note)list(profit=NA_real_,pairs=empty,complete=FALSE,notes=note)
+  if(!is.data.frame(ledger)||!nrow(ledger)||!all(c("amount","type","included")%in%names(ledger)))
+    return(unavailable("Transfer ledger is not available."))
+  n<-nrow(ledger)
+  text<-function(field){x<-if(field%in%names(ledger))as.character(ledger[[field]])else rep("",n);x[is.na(x)]<-"";trimws(x)}
+  type<-text("type");ids<-text("id");player<-text("player_id");events<-text("source_event_id")
+  selected<-ledger$included%in%TRUE
+  if(anyNA(ledger$included)||any(selected & !nzchar(type)))return(unavailable("A ledger entry has unknown inclusion or transaction type."))
+  buying<-type%in%c("buy","clause");selling<-type%in%c("sell","clause_sell")
+  trades<-which(selected & (buying|selling))
+  if("transfer_identity_conflict"%in%names(ledger)&&any(ledger$transfer_identity_conflict[trades]%in%TRUE))
+    return(unavailable("Recorded and public transfer player identities conflict; the source event must be reconciled."))
+  amount<-ledger$amount
+  dates<-if("date"%in%names(ledger))as.numeric(fm_time(ledger$date))else
+    if("timestamp"%in%names(ledger))as.numeric(ledger$timestamp)else rep(NA_real_,n)
+  names<-text("transfer_player_name")
+  fallback<-sub(" [(]Purchased[)]$| [(]Sold[)]$","",text("component"))
+  names[!nzchar(names)]<-fallback[!nzchar(names)]
+  names[tolower(names)%in%c("player","unknown","buy","sell","transfer","clause")]<-""
+  # An exact observed name can bridge a missing ID only if it does not denote
+  # multiple known players. IDs remain authoritative when labels change.
+  names_with_ids<-split(player[trades[nzchar(player[trades]) & nzchar(names[trades])]],
+    names[trades[nzchar(player[trades]) & nzchar(names[trades])]])
+  names_with_ids<-lapply(names_with_ids,unique)
+  key<-ifelse(nzchar(player),paste0("id:",player),"")
+  for(index in trades[!nzchar(key[trades]) & nzchar(names[trades])]){
+    candidates<-names_with_ids[[names[index]]]
+    if(length(candidates)==1L){player[index]<-candidates;key[index]<-paste0("id:",candidates)}
+  }
+  notes<-character();closed<-list();held<-list()
+  unknown<-trades[!nzchar(key[trades])]
+  if(length(unknown)&&any(selling[trades]))notes<-c(notes,"A transfer player cannot be identified; its sale cost cannot be established.")
+  groups<-split(trades[nzchar(key[trades])],key[trades[nzchar(key[trades])]])
+  # Most histories contain one closed acquisition per player. Match those
+  # vectors together; repeated ownership, source gaps and explicit fees retain
+  # the general cycle resolver below.
+  category<-text("category")
+  related_fees<-selected & type%in%c("fee","commission","trade_fee","transfer_fee") &
+    (type%in%c("trade_fee","transfer_fee")|category%in%c("trade","transfer","market","clause")|nzchar(events))
+  if(!length(notes)&&!any(related_fees)&&length(groups)){
+    sold_groups<-groups[vapply(groups,function(rows)any(selling[rows]),logical(1))]
+    if(length(sold_groups)&&all(lengths(sold_groups)==2L)){
+      first<-vapply(sold_groups,function(rows)rows[1L],integer(1))
+      second<-vapply(sold_groups,function(rows)rows[2L],integer(1))
+      one_each<-buying[first]!=buying[second] & selling[first]!=selling[second]
+      buys<-ifelse(buying[first],first,second);sells<-ifelse(selling[first],first,second)
+      known<-all(one_each)&&all(is.finite(amount[c(buys,sells)]))&&all(is.finite(dates[c(buys,sells)]))&&
+        all(dates[buys]<=dates[sells])&&all(amount[buys]<=0)&&all(amount[sells]>=0)
+      if(known){
+        pairs<-data.frame(buy_id=ids[buys],sell_id=ids[sells],player_id=player[buys],
+          buy_price=-amount[buys],sell_price=amount[sells],fees=rep(0,length(buys)),
+          profit=amount[sells]+amount[buys],stringsAsFactors=FALSE,row.names=NULL)
+        return(list(profit=sum(pairs$profit),pairs=pairs,complete=TRUE,notes=""))
+      }
+    }
+  }
+  close_cycle<-function(buys,sells,identity){
+    if(any(!is.finite(amount[c(buys,sells)]))||any(amount[buys]>0)||any(amount[sells]<0)){
+      notes<<-c(notes,paste("Purchase or sale amount is missing or has an invalid sign for",identity,"."));return(invisible(NULL))
+    }
+    closed[[length(closed)+1L]]<<-list(buys=buys,sells=sells,key=identity,
+      from=min(dates[buys]),to=max(dates[sells]),fees=numeric())
+    invisible(NULL)
+  }
+  for(identity in names(groups)){
+    rows<-groups[[identity]]
+    if(!any(selling[rows])){held[[identity]]<-rows[buying[rows]];next}
+    # The usual single acquisition/sale needs no per-timestamp inventory scan.
+    if(length(rows)==2L&&sum(buying[rows])==1L&&all(is.finite(dates[rows]))&&
+      dates[rows[buying[rows]]]<=dates[rows[selling[rows]]]){
+      close_cycle(rows[buying[rows]],rows[selling[rows]],identity);next
+    }
+    if(any(!is.finite(dates[rows]))){
+      notes<-c(notes,paste("A transfer date is missing for",identity,"; completed cycles cannot be ordered."));next
+    }
+    rows<-rows[order(dates[rows])]
+    batches<-split(rows,match(dates[rows],unique(dates[rows])))
+    inventory<-0L;pending_buys<-pending_sells<-integer();bad<-FALSE
+    for(batch in batches){
+      buys<-batch[buying[batch]];sells<-batch[selling[batch]]
+      next_inventory<-inventory+length(buys)-length(sells)
+      if(!next_inventory%in%c(0L,1L)){
+        notes<-c(notes,paste("Transfer history for",identity,"has a sale without a matching purchase or overlapping ownership."));bad<-TRUE;break
+      }
+      if(next_inventory==0L){
+        close_cycle(c(pending_buys,buys),c(pending_sells,sells),identity)
+        pending_buys<-pending_sells<-integer()
+      }else if(inventory==1L&&length(buys)==1L&&length(sells)==1L){
+        # With one player already held, selling it precedes its re-purchase.
+        close_cycle(pending_buys,c(pending_sells,sells),identity)
+        pending_buys<-buys;pending_sells<-integer()
+      }else{
+        pending_buys<-c(pending_buys,buys);pending_sells<-c(pending_sells,sells)
+      }
+      inventory<-next_inventory
+    }
+    if(!bad&&inventory==1L){
+      held[[identity]]<-pending_buys
+      if(length(pending_sells))notes<-c(notes,paste("Equal-time re-purchases for",identity,"leave an unidentified unsold cost; realised profit cannot be separated."))
+    }
+  }
+  # A fee belongs to a completed trade only through an explicit source event or
+  # an explicitly typed/categorised transfer fee with one historical owner cycle.
+  fee_rows<-which(selected & type%in%c("fee","commission","trade_fee","transfer_fee"))
+  if(length(fee_rows)){
+    aliases<-lapply(closed,function(cycle){j<-c(cycle$buys,cycle$sells);unique(c(ids[j],sub("^(movement|pressroom):","",ids[j]),events[j]))})
+    alias_keys<-unlist(lapply(aliases,function(x)x[nzchar(x)]),use.names=FALSE)
+    alias_values<-rep(seq_along(closed),lengths(lapply(aliases,function(x)x[nzchar(x)])))
+    lookup<-split(alias_values,alias_keys)
+    category<-text("category")
+    open_rows<-unlist(held,use.names=FALSE)
+    open_aliases<-unique(c(ids[open_rows],sub("^(movement|pressroom):","",ids[open_rows]),events[open_rows]))
+    for(index in fee_rows){
+      linked<-integer()
+      if(nzchar(events[index]))linked<-unique(lookup[[events[index]]])
+      explicit<-type[index]%in%c("trade_fee","transfer_fee")||category[index]%in%c("trade","transfer","market","clause")
+      if(!length(linked)&&explicit&&nzchar(player[index])&&is.finite(dates[index])){
+        fee_key<-paste0("id:",player[index])
+        linked<-which(vapply(closed,function(cycle)identical(cycle$key,fee_key)&&dates[index]>=cycle$from&&dates[index]<=cycle$to,logical(1)))
+      }
+      if(length(linked)==1L){
+        if(!is.finite(amount[index]))notes<-c(notes,"A fee for a completed transfer has an unknown amount.")
+        else closed[[linked]]$fees<-c(closed[[linked]]$fees,amount[index])
+      }else if(length(linked)>1L)notes<-c(notes,"A transfer fee matches more than one completed cycle.")
+      else if(explicit||nzchar(events[index])){
+        held_fee<-nzchar(events[index])&&events[index]%in%open_aliases
+        if(!held_fee&&explicit&&nzchar(player[index])&&is.finite(dates[index])){
+          owned<-held[[paste0("id:",player[index])]]
+          held_fee<-length(owned)>0L&&all(is.finite(dates[owned]))&&dates[index]>=min(dates[owned])
+        }
+        if(!held_fee)notes<-c(notes,"An explicit transfer fee cannot be assigned to a completed or unsold purchase; its source event or date is missing or inconsistent.")
+      }
+    }
+  }
+  pairs<-if(length(closed))dplyr::bind_rows(lapply(closed,function(cycle){
+    buys<-cycle$buys;sells<-cycle$sells;cost<--sum(amount[buys]);proceeds<-sum(amount[sells]);fees<--sum(cycle$fees)
+    list(buy_id=paste(ids[buys],collapse=","),sell_id=paste(ids[sells],collapse=","),
+      player_id=sub("^(id|name):","",cycle$key),buy_price=cost,sell_price=proceeds,fees=fees,profit=proceeds-cost-fees)
+  }))else empty
+  notes<-unique(notes)
+  list(profit=if(length(notes))NA_real_ else sum(pairs$profit),pairs=pairs,complete=!length(notes),notes=paste(notes,collapse=" "))
+}
+
 rival_estimate_summary <- function(missing,assumptions=character(),difference=NA_real_) {
   issues<-unique(missing[nzchar(missing)])
   standings<-grepl("^Ranking history incomplete for round ",issues)
@@ -752,7 +912,7 @@ rival_estimate_summary <- function(missing,assumptions=character(),difference=NA
 
 # Public pure accounting interface; every numeric subtotal has an evidence trail.
 # Versioned, context-bound calculation cache. Source records remain authoritative.
-rival_calculation_version <- "2026-11-06-ledger-net-gain-v1"
+rival_calculation_version <- "2026-11-06-realized-profit-wealth-v1"
 rival_calculation_hash <- function(x) as.character(openssl::sha256(serialize(x,NULL,version=2)))
 rival_calculation_evidence <- function(evidence) {
   rows<-Filter(function(x)!x$evidence_type%in%c("team","coverage","rules"),evidence)
@@ -888,7 +1048,7 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
       if(nrow(nonbudget)){
         rows<-rival_cash_entry(paste0("movement:",nonbudget$id),ifelse(nzchar(nonbudget$concept),nonbudget$concept,nonbudget$type),nonbudget$money,
           "Recorded movement",type=nonbudget$type,date=nonbudget$date,category=nonbudget$category,round_id=nonbudget$round_id,player_id=nonbudget$player_id,
-          bonus_type=nonbudget$bonus_type,source_type=nonbudget$source_type,source_category=nonbudget$source_category,settlement_label=nonbudget$settlement_label)
+          bonus_type=nonbudget$bonus_type,source_type=nonbudget$source_type,source_category=nonbudget$source_category,settlement_label=nonbudget$settlement_label,source_event_id=nonbudget$source_event_id)
         ranked<-rows$bonus_type%in%"ranking"
         rows$component[ranked]<-"Position reward"
         details<-dplyr::bind_rows(details,rows);recorded<-sum(nonbudget$money[is.finite(nonbudget$money)])
@@ -1100,6 +1260,7 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
       times<-vapply(evidence,function(x)mvp_text(x$observed_at),character(1));times<-times[!is.na(fm_time(times))]
       stamp<-if(length(times))times[which.max(fm_time(times))]else""
     }
+    net_activity<-rival_cash_net_gain(ledger)
     result[[i]]<-data.frame(teamid=tid,teamname=name,estimated_cash=value,confidence=confidence,as_of=stamp,
       cash_status=if(!is.finite(value))"Unavailable"else if(value<0)if(confidence=="Reconciled")"Reconciled negative cash"else"Estimated negative cash"else"Positive or zero cash",
       initial_budget=details$amount[1],budget=if(fresh)actual else NA_real_,reconstructed_cash=reconstructed,reconciliation_difference=difference,
@@ -1111,7 +1272,7 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
       # may contain NA and must not erase them when the ledger is republished.
       team_value=fm_number(team$teamValue,fm_number(info$teamValue)),points=fm_number(team$points,fm_number(info$points)),
       last_access=mvp_text(team$lastAccess %||% team$last_access,NA_character_),
-      squad_size=fm_number(info$squad_size),net_profit_loss=rival_cash_net_gain(ledger),
+      squad_size=fm_number(info$squad_size),net_profit_loss=net_activity,cash_activity_complete=is.finite(net_activity),
       net_gain_estimated=length(reasons)>0L||any(ledger$included & ledger$estimated),estimate_summary=rival_estimate_summary(missing,assumptions,difference),estimate_notes=paste(reasons,collapse=" "),stringsAsFactors=FALSE)
     breakdowns[[tid]]<-ledger[,c("component","amount","source","round_id","player_id"),drop=FALSE]
     ledger$round_number<-history$rounds$round_number[match(ledger$round_id,history$rounds$round_id)]
@@ -1121,6 +1282,23 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
     ledger$round_position<-own_standings$position[match(ledger$round_id,own_standings$round_id)]
     ledger$round_position_tied<-own_standings$tied[match(ledger$round_id,own_standings$round_id)]
     ledger<-rival_transfer_metadata(ledger,pressroom,tid,teams,mov)
+    trading<-rival_realized_trades(ledger)
+    transfer_source<-nrow(mov)>0L||isTRUE(coverage$complete)||
+      (is.data.frame(pressroom)&&all(c("buyer_team_id","seller_team_id","price")%in%names(pressroom))&&
+        !mvp_text(attr(pressroom,"fetch_status"))%in%c("unavailable","error","loading"))
+    if(!transfer_source){
+      trading$profit<-NA_real_;trading$complete<-FALSE
+      trading$notes<-paste(trading$notes,"Transfer history source is unavailable; a zero profit cannot be established.")
+    }
+    if(transfer_source&&!complete_movements)trading$notes<-paste(trading$notes,
+      "Profit covers retrieved completed transfers; full-season history completeness is unverified.")
+    if(!nrow(mov)&&identical(attr(pressroom,"fetch_status"),"partial"))trading$notes<-paste(trading$notes,
+      "Public transfer history reached its page limit; earlier transfers may be missing.")
+    result[[i]]$cash_activity_complete<-is.finite(net_activity)&&transfer_source
+    result[[i]]$trading_profit<-trading$profit
+    result[[i]]$trading_profit_complete<-trading$complete
+    result[[i]]$trading_profit_notes<-trimws(trading$notes)
+    attr(ledger,"realized_trades")<-trading
     # Preserve confirmed zero rewards and award coverage for round-filtered views.
     # Amounts always come from the included ledger, never a second cash calculation.
     bonus_rounds<-list()

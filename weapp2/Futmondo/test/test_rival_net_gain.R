@@ -165,7 +165,7 @@ check("directory loading preserves unavailable net gain and valuation changes re
       changed$team_finances, "a")$net_gain == 10)
 })
 
-check("selected rival card renders published ledger net and its estimate explanation", {
+check("selected rival card distinguishes trading profit from total wealth gain", {
   local({
     stub_names <- c("bind_factual_reads", "shared_mvp_source", "shared_rival_finance_source",
       "get_user_team_info", "get_players_from_team", "get_financial_snapshot",
@@ -195,10 +195,11 @@ check("selected rival card renders published ledger net and its estimate explana
         user = "fixture-account", championship = championship, team = "a")))
       session$flushReact()
       html <- output$rival_financial_summary_box$html
-      stopifnot(grepl("Net Gain (estimate)", html, fixed = TRUE),
-        grepl("Ledger total excluding starting cash", html, fixed = TRUE),
-        grepl(paste0("Net Gain (estimate): ", ui_financial_amount(10)), html, fixed = TRUE),
-        !grepl(ui_financial_amount(711915656 - 30), html, fixed = TRUE))
+      stopifnot(grepl("Trading profit", html, fixed = TRUE),
+        grepl("Overall wealth gained", html, fixed = TRUE),
+        grepl("Cash plus squad value minus starting cash", html, fixed = TRUE),
+        grepl(ui_financial_amount(711915666), html, fixed = TRUE),
+        !grepl("Net Gain (estimate)", html, fixed = TRUE))
     })
   })
 })
