@@ -1,5 +1,10 @@
 # Futmondo project requirements
 
+## Task completion
+
+- After finishing each task and its appropriate verification, commit the task's changes and push the commit to the current branch's remote before reporting completion. This is standing authorization; do not ask for confirmation each time.
+- Include only changes belonging to the completed task. Preserve unrelated working-tree and staged changes. If committing or pushing fails, report the specific blocker and do not claim it succeeded.
+
 ## Data completeness and root-cause fixes
 
 - Treat expected application data as deterministic and retrievable or reconstructible from authoritative sources. An unexpected missing value, partial result, or unavailable message is a defect to investigate, not an acceptable finished implementation.
