@@ -1366,7 +1366,7 @@ capacity_roster_message <- function(roster, commitments=0L) {
   if(anyNA(c(raw,effective,cap))) return("Roster capacity cannot be verified. Refresh the data before buying another player.")
   paste0("Roster capacity reached: ",effective," effective players (",raw," current - ",out,
     " pending departure",if(out==1L) "" else "s"," + ",incoming," pending arrival",if(incoming==1L) "" else "s",
-    ")",if(commitments>0) paste0(" + ",commitments," active acquisition commitment",if(commitments==1L) "" else "s") else "",
+    ")",if(commitments>0) paste0(" + ",commitments," active offer",if(commitments==1L) "" else "s") else "",
     ", maximum ",cap,". Sell a player first before making another purchase.")
 }
 
