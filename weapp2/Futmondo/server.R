@@ -305,7 +305,7 @@ observeEvent(login_token_RV(),
       shinydashboard::menuItem("Rivals", tabName = "rivals", icon = icon("users-viewfinder")),
       shinydashboard::menuItem("Plots", tabName = "plots", icon = icon("chart-column")),
       shinydashboard::menuItem("Classification", tabName = "classification", icon = icon("trophy")),
-      shinydashboard::menuItem("Round MVPs", tabName = "round_mvps", icon = icon("medal"))
+      shinydashboard::menuItem("Round awards", tabName = "round_mvps", icon = icon("medal"))
     )
 
     # Append Admin menu item as the last item if user is admin

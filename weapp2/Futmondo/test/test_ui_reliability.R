@@ -166,12 +166,12 @@ record('round MVP records keep completed MVPs in newest-first order', {
   stopifnot(identical(out$player_id,c('p2','p1')), identical(out$round_number,c(2,1)),
             nrow(round_mvp_rows(rows[rows$is_finished %in% FALSE,,drop=FALSE], 'league')) == 0L)
 })
-record('round MVP UI has dedicated responsive card output', {
+record('round awards UI has dedicated responsive card output', {
   html <- htmltools::renderTags(round_mvps_UI('mvp'))$html
-  stopifnot(grepl('mvp-mvp_cards', html, fixed=TRUE), grepl('Round MVPs', html, fixed=TRUE))
+  stopifnot(grepl('mvp-mvp_cards', html, fixed=TRUE), grepl('Round awards', html, fixed=TRUE))
   server_source <- paste(readLines('server.R', warn=FALSE), collapse='\n')
   stopifnot(grepl('tabName = "round_mvps"', server_source, fixed=TRUE),
-            grepl('menuItem("Round MVPs"', server_source, fixed=TRUE))
+            grepl('menuItem("Round awards"', server_source, fixed=TRUE))
 })
 record('dream team preserves actual MVP and missing scores', {
   d <- classification_dreamteam_rows(list(mvp='p1',players=list(list(id='p1',name='A',role=1,points=0),list(id='p2',name='B',role=2))))

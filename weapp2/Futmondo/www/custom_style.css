@@ -1106,13 +1106,23 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 .player-round-progress .recalculating { opacity: 1; }
 
 
-/* Completed-round MVP cards remain readable on narrow screens. */
+/* Completed-round awards keep the full XI readable on narrow screens. */
 .round-mvps-intro, .round-mvps-empty { color: var(--fm-muted); }
-.round-mvps-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.round-mvps-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 12px; align-items: start; }
 .round-mvp-card { min-width: 0; padding: 14px; border: 1px solid var(--fm-border); border-radius: 8px; background: var(--fm-surface); }
 .round-mvp-round { color: var(--fm-warning); font-size: 12px; font-weight: 800; text-transform: uppercase; }
 .round-mvp-player { margin-top: 5px; color: var(--fm-text); font-size: 17px; font-weight: 800; overflow-wrap: anywhere; }
 .round-mvp-meta { margin-top: 4px; color: var(--fm-muted); font-size: 13px; overflow-wrap: anywhere; }
+.round-mvp-badge { display: inline-block; padding: 2px 5px; border: 1px solid var(--fm-warning); border-radius: 4px; color: var(--fm-warning); font-size: 10px; font-weight: 800; vertical-align: middle; }
+.round-best-xi-title { margin: 16px 0 8px; color: var(--fm-text); font-size: 14px; font-weight: 800; }
+.round-best-xi-table { width: 100%; table-layout: fixed; color: var(--fm-text); font-size: 12px; }
+.round-best-xi-table th, .round-best-xi-table td { padding: 7px 4px; border-bottom: 1px solid var(--fm-border); overflow-wrap: anywhere; vertical-align: top; }
+.round-best-xi-table th { color: var(--fm-muted); font-weight: 600; }
+.round-best-xi-table th:first-child { width: 48px; }
+.round-best-xi-table th:last-child { width: 80px; }
+.round-best-xi-table th:last-child, .round-best-xi-table td:last-child { text-align: right; }
+.round-best-xi-mvp td { font-weight: 800; }
+
 
 /* Player profile and match history use responsive wrapping cards. */
 .player-external-details { color: var(--fm-text); }
