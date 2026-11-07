@@ -13,6 +13,7 @@ rows<-data.frame(teamid=c('a','b','c','d'),teamname=c('Alpha','Beta','Gamma','De
   observed_cash=NA_real_,observed_cash_fresh=FALSE,reconciliation_difference=NA_real_,
   total_spent=30*M,total_sales=40*M,net_profit_loss=c(0,-10,0,0)*M,
   confidence='Estimated',as_of='2026-11-06T12:00:00Z',last_access=NA_character_,points=c(1,-2,0,NA_real_))
+rows$player_transactions<-c(12L,2L,0L,NA_integer_)
 metrics<-rivals_financial_metrics(rows)
 check('independent wealth and completed profit retain positive, negative, zero and unknown',{
   stopifnot(identical(metrics$wealth_gained,c(25,-10,0,NA_real_)*M),
@@ -52,6 +53,8 @@ check('both new table columns are numeric and unknowns sort last',{
     all(vapply(attrs$columns,function(x)isTRUE(x$sortNALast),logical(1))))
   columns<-vapply(attrs$columns,function(x)x$id,character(1))
   stopifnot(all(c('Overall wealth gained','Trading profit')%in%columns))
+  stopifnot(identical(as.numeric(data$`Player transactions`),c(12,2,0,NA_real_)),
+    'Player transactions'%in%columns)
 })
 check('fallback directory keeps both metric columns truthfully unavailable',{
   directory<-data.frame(teamid='a',teamname='Alpha',teamValue=25*M,points=1)
@@ -59,6 +62,7 @@ check('fallback directory keeps both metric columns truthfully unavailable',{
   attrs<-widget$x$tag$attribs;data<-jsonlite::fromJSON(attrs$data)
   stopifnot(all(c('Overall wealth gained','Trading profit')%in%names(data)),
     all(is.na(data$`Overall wealth gained`)),all(is.na(data$`Trading profit`)),
+    all(is.na(data$`Player transactions`)),
     identical(attrs$selection,'single'))
 })
 summary<-rivals_summary_values(list(),NULL,rows,'a')

@@ -101,6 +101,21 @@ build <- function(args = arguments, cache = NULL) {
 }
 dataset <- build()
 
+check("player transaction count excludes fees and rewards and reuses reconciled events", {
+  stopifnot(dataset$team_finances$player_transactions == 2L)
+  args <- arguments
+  args$evidence <- c(args$evidence, list(movement("clause-buy", -10, "clause"),
+    movement("clause-sell", 15, "clause_sell"), movement("transfer", 0, "transfer"),
+    movement("points", 12, "bonus", "points", observed = now + 1)))
+  stopifnot(build(args)$team_finances$player_transactions == 5L)
+  args$evidence <- c(args$evidence, args$evidence)
+  stopifnot(build(args)$team_finances$player_transactions == 5L)
+  args$evidence <- list(movement("points-only", 10, "bonus", "points"))
+  stopifnot(build(args)$team_finances$player_transactions == 0L)
+  args$evidence <- list()
+  stopifnot(is.na(build(args)$team_finances$player_transactions))
+})
+
 check("shared dataset and summary publish the same known-answer ledger net gain", {
   stopifnot(dataset$team_finances$net_profit_loss == 10,
     dataset$team_finances$estimated_cash == 110,

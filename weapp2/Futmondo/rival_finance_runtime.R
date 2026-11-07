@@ -912,7 +912,7 @@ rival_estimate_summary <- function(missing,assumptions=character(),difference=NA
 
 # Public pure accounting interface; every numeric subtotal has an evidence trail.
 # Versioned, context-bound calculation cache. Source records remain authoritative.
-rival_calculation_version <- "2026-11-06-realized-profit-wealth-v1"
+rival_calculation_version <- "2026-11-06-player-transactions-v2"
 rival_calculation_hash <- function(x) as.character(openssl::sha256(serialize(x,NULL,version=2)))
 rival_calculation_evidence <- function(evidence) {
   rows<-Filter(function(x)!x$evidence_type%in%c("team","coverage","rules"),evidence)
@@ -1295,6 +1295,9 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
     if(!nrow(mov)&&identical(attr(pressroom,"fetch_status"),"partial"))trading$notes<-paste(trading$notes,
       "Public transfer history reached its page limit; earlier transfers may be missing.")
     result[[i]]$cash_activity_complete<-is.finite(net_activity)&&transfer_source
+    # Count reconciled player movements once; rewards and fees are not trades.
+    result[[i]]$player_transactions<-if(transfer_source)
+      sum(ledger$included%in%TRUE & ledger$type%in%c("buy","sell","clause","clause_sell","transfer"))else NA_integer_
     result[[i]]$trading_profit<-trading$profit
     result[[i]]$trading_profit_complete<-trading$complete
     result[[i]]$trading_profit_notes<-trimws(trading$notes)

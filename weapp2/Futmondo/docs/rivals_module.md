@@ -3,6 +3,8 @@
 
 ## Current directory display — 2026-11-02
 
+The **Player transactions** column counts included purchases and sales, including clause transfers, once per reconciled ledger entry. Bonuses, fees, opening cash and excluded entries are omitted. The numeric count is sortable and covers retrieved history; unavailable history stays unavailable, while a known history containing only bonuses gives zero. Counts are cached with the existing per-team ledger calculation and projected into the table without new requests, persistence or trade matching.
+
 The selectable financial standings table now retains public **Squad Value**, **Last Access (UTC)** and **Points** even when financial details are unavailable. Raw monetary/score values and numeric timestamps remain sortable. `rivals_last_access_cell()` formats UTC dates with a precise timestamp tooltip. `rivals_points_pills()` precomputes one league-wide background-to-red scale; negative/zero scores remain numeric, missing scores remain unavailable, and equal scores use the background color. Text switches between black/white for readable contrast. Sorting and pagination preserve the color domain.
 
 `rivals_summary_values()` returns `squad_value` using directory `teamValue`, ledger `team_value`, then information `teamValue`. The selected card no longer recomputes a roster sum or invents zero while loading. These display changes make no extra data requests. The former fixed €300M default described in historical sections below is removed; see the current accounting contract.

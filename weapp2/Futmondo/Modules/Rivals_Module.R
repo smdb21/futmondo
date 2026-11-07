@@ -537,6 +537,7 @@ rivals_finance_table_widget <- function(finances_data,on_error=function(error)NU
   timezone<-rivals_display_timezone(timezone)
   df<-finances_data$team_finances
   if(!is.data.frame(df)||!nrow(df))return(NULL)
+  transaction_counts<-if("player_transactions"%in%names(df))as.numeric(df$player_transactions)else rep(NA_real_,nrow(df))
   selected<-match(selected_id,as.character(df$teamid));selected<-selected[!is.na(selected)]
   click<-"select"
   if(!is.null(selection_input)&&!is.null(table_id)){
@@ -560,6 +561,8 @@ rivals_finance_table_widget <- function(finances_data,on_error=function(error)NU
           if(is.finite(value))currency(value)else "Unavailable")
       }),
       `Squad Value`=colDef(cell=currency,align="right",minWidth=125),
+      `Player transactions`=colDef(align="right",minWidth=145,na="Unavailable",format=colFormat(separators=TRUE,digits=0),
+        header=tags$span("Player transactions",title="Recorded player purchases and sales, including clauses. Bonuses and fees excluded; covers retrieved history.")),
       `Last Access`=colDef(header=tags$span("Last Access"),
         minWidth=165,cell=function(value)rivals_last_access_cell(value,timezone),headerClass="fm-metric-header"),
       Points=colDef(align="center",minWidth=90,cell=function(value,index)pills[[index]]))
@@ -570,6 +573,7 @@ rivals_finance_table_widget <- function(finances_data,on_error=function(error)NU
       `Last Access`=as.numeric(fm_time(directory$last_access)),Points=directory$points,check.names=FALSE)
     rows$`Overall wealth gained`<-rep(NA_real_,nrow(rows))
     rows$`Trading profit`<-rep(NA_real_,nrow(rows))
+    rows$`Player transactions`<-transaction_counts[match(directory$teamid,as.character(df$teamid))]
     rows$team_id_hidden<-directory$teamid
     reactable::reactable(rows,compact=TRUE,striped=TRUE,highlight=TRUE,selection="single",onClick=click,defaultSelected=selected,defaultPageSize=10,
       defaultColDef=colDef(sortNALast=TRUE),columns=public_columns(rows))
@@ -578,6 +582,7 @@ rivals_finance_table_widget <- function(finances_data,on_error=function(error)NU
     metrics<-rivals_financial_metrics(df)
     df_display<-data.frame(Team=df$teamname,Balance=df$estimated_cash,
       `Overall wealth gained`=metrics$wealth_gained,`Trading profit`=metrics$trading_profit,
+      `Player transactions`=transaction_counts,
       `Squad Value`=df$team_value,`Last Access`=df$last_access,Points=df$points,
       `Last updated`=df$as_of,check.names=FALSE)
     if(!all(c("teamname","estimated_cash","as_of","team_value","last_access","points")%in%names(df)))stop("Financial directory is incomplete")
