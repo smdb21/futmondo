@@ -1272,3 +1272,53 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
   min-width: 0;
   line-height: 1.35;
 }
+
+/* Six financial cards share a desktop row and wrap for smaller screens. */
+.rivals-summary-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.rivals-summary-grid > [class*="col-"] {
+  float: none;
+  width: auto;
+  min-width: 0;
+  padding: 0;
+  display: flex;
+}
+.rivals-summary-grid > [class*="col-"] > [class*="col-"] {
+  float: none;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  display: flex;
+}
+.rivals-summary-grid .box { width: 100%; margin-bottom: 0; }
+.rivals-summary-grid .box-header { padding: 12px; }
+.rivals-summary-grid .box-title { font-size: 16px; line-height: 1.35; }
+.rivals-summary-grid .box-body { padding: 8px; }
+.rivals-summary-grid .box-body > div { padding: 6px !important; }
+.rivals-summary-grid h3 { font-size: clamp(14px, 1.05vw, 20px) !important; }
+.rivals-summary-grid p { overflow-wrap: anywhere; }
+.rivals-calculation-details { margin-top: 8px; font-size: 11px; text-align: left; }
+.rivals-calculation-details > summary { cursor: pointer; text-align: center; }
+.rivals-calculation-breakdown { margin: 12px 0 0; }
+.rivals-calculation-breakdown dt { font-weight: normal; color: var(--fm-muted); }
+.rivals-calculation-breakdown dd { margin: 0 0 8px; font-variant-numeric: tabular-nums; }
+.rivals-calculation-breakdown dt:last-of-type,
+.rivals-calculation-breakdown dd:last-of-type { font-weight: 700; color: var(--fm-text); }
+.rivals-calculation-notes { padding-left: 16px; margin: 10px 0 0; overflow-wrap: anywhere; }
+.rivals-calculation-notes li + li { margin-top: 8px; }
+@media (min-width: 480px) {
+  .rivals-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 768px) {
+  .rivals-summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 1200px) {
+  .rivals-summary-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+@media (max-width: 767px) {
+  .rivals-summary-grid h3 { font-size: 20px !important; }
+}

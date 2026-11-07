@@ -456,6 +456,82 @@ rivals_last_access_cell <- function(value,timezone="UTC") {
   format(stamp,"%d/%m/%Y %H:%M",tz=timezone)
 }
 
+# Project the same numeric metrics into cards and sortable league columns.
+# Missing acquisition flags/inputs remain unknown, including in loading directories.
+rivals_financial_metrics <- function(rows) {
+  n<-nrow(rows)
+  number<-function(field)if(field%in%names(rows))suppressWarnings(as.numeric(rows[[field]]))else rep(NA_real_,n)
+  flag<-function(field)if(field%in%names(rows))rows[[field]]%in%TRUE else rep(FALSE,n)
+  cash<-number("estimated_cash");value<-number("team_value");opening<-number("initial_budget")
+  wealth<-cash+value-opening
+  wealth[!flag("cash_activity_complete")|!is.finite(wealth)]<-NA_real_
+  profit<-number("trading_profit")
+  profit[!flag("trading_profit_complete")|!is.finite(profit)]<-NA_real_
+  data.frame(wealth_gained=wealth,trading_profit=profit)
+}
+
+# Group evidence limitations for people; full source diagnostics stay in the
+# shared dataset. Never turn missing ownership, payment or source evidence into zero.
+rivals_calculation_coverage <- function(note) {
+  note<-paste(note,collapse=" ")
+  if(!nzchar(note))return(character())
+  groups<-c(
+    "historical ownership|historical lineup|changed round|historical eligibility"="Some historical Best XI/MVP recipients or their eligibility are unverified. Missing evidence can leave rewards out of the wealth estimate.",
+    "Movement history completeness|full-season history completeness|page limit"="The retrieved transaction history is not verified as complete for the season.",
+    "private/manual adjustments"="Private or manual cash adjustments are not visible in the public transfer history.",
+    "starting cash eligibility|assume eligible starting cash"="Some historical reward eligibility assumes the team had sufficient starting cash; this is unverified.",
+    "per-round point history|Points missing for round"="Some historical round scores are missing, so their point rewards cannot be fully reconstructed.",
+    "Historical per-round standings|Ranking reward configuration"="Historical standings or supported position reward rules are missing.",
+    "income lacks round identity|income has no round identity"="Some recorded reward payments cannot yet be linked to a round; overlapping estimates are excluded.",
+    "Multiple budget allocations|Unresolved budget allocation"="Starting or reset cash allocations need reconciliation; unresolved allocations are excluded from cash.",
+    "Public transfer history is unavailable|Transfer history source is unavailable"="The transfer history source is unavailable; complete cash activity and trading profit cannot be established.",
+    "award coverage|Official round awards"="Some official round awards are still missing.",
+    "Ranking history incomplete|position.*requires|Reference payment not confirmed"="Some position rewards lack historical standings or a confirmed payment.",
+    "Point reward|Reference point reconciliation"="Some point rewards await score, eligibility or payment reconciliation.",
+    "Final settlement not confirmed|Unfinished or unverified award selections|selection still marks the round unfinished"="Unconfirmed final round rewards are excluded from cash.",
+    "points-publication notification is missing"="Some reward dates cannot be established from the saved round publication history.",
+    "historical league membership"="Historical position rewards assume the known league membership also applied to those rounds.",
+    "Point reward rule unavailable"="The point reward rule is unavailable.",
+    "combined Best XI/MVP payment"="Recorded Best XI/MVP cash is retained, but its split between the two rewards is unverified.",
+    "Unclassified recorded income"="Some recorded income has an unknown reward type; overlapping estimates are excluded.",
+    "Recorded cash differs"="Reconstructed cash differs from the recorded balance; no balancing adjustment is invented.",
+    "current.*rule|unchanged.*rule|current.*configuration"="Historical rewards use the available league rules; past rule changes are unverified.")
+  present<-vapply(names(groups),function(pattern)grepl(pattern,note,ignore.case=TRUE),logical(1))
+  unname(groups[present])
+}
+
+rivals_calculation_details <- function(summary,ledger,metric=c("wealth","trading")) {
+  metric<-match.arg(metric)
+  if(metric=="wealth"){
+    labels<-c("Cash balance","Current squad value","Starting cash (subtract)","Overall wealth gained")
+    values<-c(summary$cash,summary$squad_value,summary$opening_cash,summary$wealth_gained)
+    notes<-rivals_calculation_coverage(summary$wealth_gain_notes)
+    notes<-c(notes,summary$wealth_missing)
+    if(!length(notes)&&isTRUE(summary$wealth_gain_estimated))notes<-summary$status
+  }else{
+    trades<-attr(ledger,"realized_trades")
+    pairs<-trades$pairs
+    known<-isTRUE(summary$trading_profit_complete)&&is.data.frame(pairs)&&
+      all(c("sell_price","buy_price","fees")%in%names(pairs))
+    labels<-c("Completed sales","Matched purchase costs (subtract)","Related fees (subtract)","Trading profit")
+    values<-c(if(known)sum(pairs$sell_price)else NA_real_,if(known)sum(pairs$buy_price)else NA_real_,
+      if(known)sum(pairs$fees)else NA_real_,summary$trading_profit)
+    notes<-rivals_calculation_coverage(summary$trading_profit_notes)
+    # Trade-specific diagnostics already describe the missing cost/date/fee.
+    # Remove internal player keys and repeated sentences before presentation.
+    detail<-gsub("id:[^ ;.]+","the affected player",summary$trading_profit_notes)
+    detail<-gsub("[[:xdigit:]]{24}","the affected record",detail)
+    detail<-unique(strsplit(detail,"(?<=[.])\\s+",perl=TRUE)[[1]])
+    if(!isTRUE(summary$trading_profit_complete))notes<-c(notes,detail)
+  }
+  notes<-unique(notes[!is.na(notes)&nzchar(notes)])
+  tags$details(class="rivals-calculation-details",
+    tags$summary("Calculation details"),
+    tags$dl(class="rivals-calculation-breakdown",lapply(seq_along(labels),function(i)
+      tagList(tags$dt(labels[i]),tags$dd(ui_financial_amount(values[i]))))),
+    if(length(notes))tags$ul(class="rivals-calculation-notes",lapply(notes,tags$li)))
+}
+
 # Keep observed team fields selectable even if financial audit details fail.
 rivals_finance_table_widget <- function(finances_data,on_error=function(error)NULL,timezone="UTC",selected_id=NULL,selection_input=NULL,selection_context=NULL,table_id=NULL) {
   timezone<-rivals_display_timezone(timezone)
@@ -473,6 +549,16 @@ rivals_finance_table_widget <- function(finances_data,on_error=function(error)NU
   public_columns<-function(rows){
     pills<-rivals_points_pills(rows$Points)
     list(team_id_hidden=colDef(show=FALSE),Team=colDef(name="User Team",align="left",minWidth=130),
+      `Overall wealth gained`=colDef(align="right",minWidth=155,cell=function(value,index){
+        note<-if(!"net_gain_estimated"%in%names(df)||!identical(df$net_gain_estimated[index],FALSE))"Estimate: cash plus squad value minus starting cash"else "Cash plus squad value minus starting cash"
+        tags$span(title=note,style=if(is.finite(value)&&value<0)"color:var(--fm-danger)"else NULL,
+          if(is.finite(value))currency(value)else "Unavailable")
+      }),
+      `Trading profit`=colDef(align="right",minWidth=140,cell=function(value){
+        tags$span(title="Retrieved completed sales minus matched purchase costs and related fees",
+          style=if(is.finite(value)&&value<0)"color:var(--fm-danger)"else NULL,
+          if(is.finite(value))currency(value)else "Unavailable")
+      }),
       `Squad Value`=colDef(cell=currency,align="right",minWidth=125),
       `Last Access`=colDef(header=tags$span("Last Access"),
         minWidth=165,cell=function(value)rivals_last_access_cell(value,timezone),headerClass="fm-metric-header"),
@@ -482,13 +568,19 @@ rivals_finance_table_widget <- function(finances_data,on_error=function(error)NU
     directory<-rival_finance_directory(df)
     rows<-data.frame(Team=directory$teamname,`Squad Value`=directory$team_value,
       `Last Access`=as.numeric(fm_time(directory$last_access)),Points=directory$points,check.names=FALSE)
+    rows$`Overall wealth gained`<-rep(NA_real_,nrow(rows))
+    rows$`Trading profit`<-rep(NA_real_,nrow(rows))
     rows$team_id_hidden<-directory$teamid
     reactable::reactable(rows,compact=TRUE,striped=TRUE,highlight=TRUE,selection="single",onClick=click,defaultSelected=selected,defaultPageSize=10,
       defaultColDef=colDef(sortNALast=TRUE),columns=public_columns(rows))
   }
   widget<-tryCatch({
-    df_display<-df %>% dplyr::select(Team=teamname,`Balance`=estimated_cash,
-      `Last updated`=as_of,`Squad Value`=team_value,`Last Access`=last_access,Points=points)
+    metrics<-rivals_financial_metrics(df)
+    df_display<-data.frame(Team=df$teamname,Balance=df$estimated_cash,
+      `Overall wealth gained`=metrics$wealth_gained,`Trading profit`=metrics$trading_profit,
+      `Squad Value`=df$team_value,`Last Access`=df$last_access,Points=df$points,
+      `Last updated`=df$as_of,check.names=FALSE)
+    if(!all(c("teamname","estimated_cash","as_of","team_value","last_access","points")%in%names(df)))stop("Financial directory is incomplete")
     df_display$team_id_hidden<-df$teamid
     df_display$`Last Access`<-as.numeric(fm_time(df_display$`Last Access`))
     reactable::reactable(df_display,compact=TRUE,striped=TRUE,highlight=TRUE,bordered=FALSE,
@@ -580,9 +672,12 @@ rivals_summary_values <- function(info, teams, finances, team_id) {
     if(!cash_activity_complete)"Included cash activity contains missing amounts or has not loaded.",
     if(!is.finite(squad_value))"Current squad valuation is unavailable.",
     if(!is.finite(opening))"Starting cash allocation is unavailable.")
-  wealth_gained<-if(!length(wealth_missing))cash+squad_value-opening else NA_real_
+  metric_row<-row
+  metric_row$team_value<-rep(squad_value,nrow(metric_row))
+  metrics<-rivals_financial_metrics(metric_row)
+  wealth_gained<-if(nrow(metrics)==1L)metrics$wealth_gained else NA_real_
   wealth_gain_estimated<-net_gain_estimated||length(wealth_missing)>0L
-  wealth_gain_notes<-if(length(wealth_missing))paste(wealth_missing,collapse=" ")else notes
+  wealth_gain_notes<-paste(c(wealth_missing,notes),collapse=" ")
   position <- number(info$position)
   rank_label <- "Rank position"
   if(!is.finite(position) && is.data.frame(teams) && all(c("teamid","points") %in% names(teams))){
@@ -594,7 +689,7 @@ rivals_summary_values <- function(info, teams, finances, team_id) {
   }
   list(cash=cash,label=label,notes=notes,status=status,position=position,rank_label=rank_label,observed_cash=observed,observed_cash_fresh=observed_fresh,difference=difference,purchases=purchases,sales=sales,squad_value=squad_value,net_gain=net_gain,net_gain_estimated=net_gain_estimated,
     trading_profit=trading_profit,trading_profit_complete=trading_profit_complete,trading_profit_notes=trading_profit_notes,
-    wealth_gained=wealth_gained,wealth_gain_estimated=wealth_gain_estimated,wealth_gain_notes=wealth_gain_notes)
+    opening_cash=opening,wealth_missing=wealth_missing,wealth_gained=wealth_gained,wealth_gain_estimated=wealth_gain_estimated,wealth_gain_notes=wealth_gain_notes)
 }
 
 rivals_status_message <- function(message, loading=FALSE) {
@@ -852,8 +947,8 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       squad_val <- summary$squad_value
       trading_profit <- summary$trading_profit
       metric_color <- function(value) if(!is.finite(value)||value==0)"var(--fm-muted)"else if(value>0)"var(--fm-text)"else"var(--fm-danger)"
-      metric_details <- function(note) if(nzchar(note))tags$details(style="font-size:11px; margin-top:8px; overflow-wrap:anywhere;",
-        tags$summary("Calculation details"),tags$p(note))
+      ledger<-league_finances_RV()$cash_ledgers[[rival_id]]
+      metric_details<-function(metric)rivals_calculation_details(summary,ledger,metric)
       cash <- ui_financial_amount(summary$cash)
       money_out_fmt <- ui_financial_amount(money_out)
       money_in_fmt <- ui_financial_amount(money_in)
@@ -866,9 +961,8 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       rank_text <- paste0(pos, " of ", total_teams)
 
       tagList(
-        # Row 1: 4 boxes
-        fluidRow(
-          column(width = 3,
+        div(class="rivals-summary-grid",
+          column(width = 2,
                  box(
                    title = "Standings Position",
                    width = 12,
@@ -879,7 +973,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                        p(style = "color: var(--fm-muted); font-size: 11px; text-transform: uppercase; margin-top: 5px;", summary$rank_label))
                  )
           ),
-          column(width = 3,
+          column(width = 2,
                  box(
                    title = "Money Left (Budget)",
                    width = 12,
@@ -890,7 +984,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                        p(style = "color: var(--fm-muted); font-size: 11px; text-transform: uppercase; margin-top: 5px;", summary$label))
                  )
           ),
-          column(width = 3,
+          column(width = 2,
                  box(
                    title = "Trading profit",
                    width = 12,
@@ -899,10 +993,10 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                    div(style = "text-align: center; padding: 10px;",
                        h3(style = paste0("font-weight: 700; color: ", metric_color(trading_profit), "; margin: 0; font-size: 20px;"), profit_fmt),
                        p(style = "color: var(--fm-muted); font-size: 11px; margin-top: 5px;", "Retrieved completed sales minus their purchase costs and related fees"),
-                       metric_details(summary$trading_profit_notes))
+                       metric_details("trading"))
                  )
           ),
-          column(width = 3,
+          column(width = 2,
                  box(
                    title = "Squad Investment",
                    width = 12,
@@ -916,11 +1010,8 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                          tags$span(style = "color: var(--fm-text); font-weight: 600;", paste0("Sales: ", money_in_fmt)))
                        )
                  )
-          )
-        ),
-        # Row 2: observed squad valuation and the change in overall wealth.
-        fluidRow(
-          column(width = 6,
+          ),
+          column(width = 2,
                  box(
                    title = "Squad valuation",
                    width = 12,
@@ -931,7 +1022,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                        p(style = "color: var(--fm-muted); font-size: 11px; margin-top: 5px;", "Current value of players still owned"))
                  )
           ),
-          column(width = 6,
+          column(width = 2,
                  box(
                    title = "Overall wealth gained",
                    width = 12,
@@ -941,7 +1032,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                        h3(style = paste0("font-weight: 700; color:",metric_color(summary$wealth_gained),"; margin: 0; font-size: 20px;"),wealth_fmt),
                        p(style = "color: var(--fm-muted); font-size: 11px; margin-top: 5px;", "Cash plus squad value minus starting cash"),
                        if(summary$wealth_gain_estimated)p(style="color:var(--fm-muted); font-size:11px;", "Estimate based on reconstructed cash"),
-                       metric_details(summary$wealth_gain_notes))
+                       metric_details("wealth"))
                  )
           )
         )

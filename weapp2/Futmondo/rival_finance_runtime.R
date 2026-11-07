@@ -1673,11 +1673,28 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
           }else{
             if(task$kind=="team"&&identical(task$id,tid)&&is.list(result$info$configuration))
               state$seed$rules<-normalize_league_rules(result$info,championship_id=cid)
-            rows<-switch(task$kind,lineup=rival_lineup_evidence(result,auth[["userid"]],cid,state$season),
+            # A corrected selection/round can finish before its older in-flight
+            # lineup. Never let that late observation replace or persist over
+            # the current signature merely because its completion time is newer.
+            superseded_lineup<-FALSE
+            if(task$kind=="lineup"){
+              own<-Filter(function(record)identical(mvp_text(record$payload$team_id),task$id),
+                rival_evidence_rows(state$evidence,"team_rounds"))
+              current<-dplyr::bind_rows(lapply(own,function(record)rival_team_round_rows(
+                Filter(function(row)is.list(row)&&identical(mvp_text(row$id),task$round),mvp_records(record$payload$rounds)),task$id)))
+              if(!nrow(current)){
+                current<-rival_saved_rounds(state$evidence,teams=state$teams$teamid)
+                current<-current[current$team_id%in%task$id & current$round_id%in%task$round,,drop=FALSE]
+              }
+              superseded_lineup<-nrow(current)!=1L||
+                !identical(task$signature,rival_round_signature(current,state$awards$rows))
+            }
+            rows<-if(superseded_lineup)list()else switch(task$kind,lineup=rival_lineup_evidence(result,auth[["userid"]],cid,state$season),
               ranking=rival_ranking_evidence(result,auth[["userid"]],cid,state$season),
               rival_team_evidence(result,auth[["userid"]],cid,state$season))
             if(length(rows)){state$evidence<-rival_merge_evidence(state$evidence,rows);persist_rival_finance_evidence(rows,ctx)}
-            if(task$kind=="lineup"&&!length(rows))state$reason<-paste("Some historical lineups could not be retrieved; affected MVP/Best XI bonuses are not included. Use Refresh to retry.",mvp_text(result$reason))
+            if(superseded_lineup)enqueue_lineups()
+            if(task$kind=="lineup"&&!length(rows)&&!superseded_lineup)state$reason<-paste("Some historical lineups could not be retrieved; affected MVP/Best XI bonuses are not included. Use Refresh to retry.",mvp_text(result$reason))
             if(task$kind=="ranking"&&!length(rows))state$reason<-"A historical round ranking could not be confirmed; its position bonuses remain excluded."
             if(task$kind%in%c("team","ranking")){enqueue_point_repair();enqueue_rankings();enqueue_lineups();enqueue_notifications()}
           }

@@ -666,3 +666,16 @@ Status: **implemented and verified locally; authenticated hosted behavior remain
 - [x] Complete independent known-answer, source-mapping/cache, rendered-card, mobile/performance and offline lifecycle checks; commit and push only this task's implementation to remote branch `2.0` (`9fb89aa`).
 
 Local fixtures do not certify the user's authenticated history or a hosted deployment. Wealth is measured relative to actual starting cash; no unsupported historical squad allocation is created.
+
+
+## Rival financial row, standings metrics and calculation details — 2026-11-06
+
+Status: **implemented and verified locally; authenticated hosted evidence and deployment remain unverified**.
+
+- [x] Put all six selected-team financial cards in one desktop row, with responsive smaller-screen wrapping and no page overflow.
+- [x] Add sortable Overall wealth gained and Trading profit to the top table using the same known-input gates and cached ledger calculations as the cards; preserve selection, negative values, true zero and unavailable states.
+- [x] Show actual numeric formula components and readable grouped coverage notes; retain full internal diagnostics and unresolved historical inputs.
+- [x] Reproduce and repair the lineup revision completion race, preserving only current evidence in memory and persistence, with bounded acquisition and reuse.
+- [x] Complete known-answer, delayed-response, cache/persistence, desktop/mobile, performance and required offline lifecycle checks on the scoped release; deliver only this task's changes to current remote branch `2.0`.
+
+No dependency, migration, background worker or unattended action is introduced. Available historical lineups still cannot prove absent roster-only ownership or an unavailable historical cutoff; the presentation and local race fix do not establish complete authenticated account totals.
