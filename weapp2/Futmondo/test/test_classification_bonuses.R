@@ -34,3 +34,50 @@ for(id in names(large$cash_ledgers))attr(large$cash_ledgers[[id]],'round_bonus_t
 st<-data.frame(team_id=as.character(1:10));hh<-data.frame(round=1:38)
 elapsed<-system.time(for(i in 1:100)classification_bonus_table(st,hh,large,c(1,38)))[['elapsed']]
 cat(sprintf('MEASURE 100 selections, 10 teams x 38 rounds: %.3fs; metadata %.1f KiB\n',elapsed,as.numeric(object.size(large))/1024))
+
+# A complete final XI can contain players whose historical owner is unknown.
+# Those XI gaps must not obscure an independently verified MVP recipient.
+full_xi<-data.frame(round_id='r1',player_id=c('p',paste0('q',1:10)),
+  is_mvp=c(TRUE,rep(FALSE,10)),is_finished=TRUE)
+partial_owners<-build_rival_cash_dataset(teams,cid,list(history),full_xi,rules=rules,
+  eligibility=eligibility,coverage_complete=FALSE,account_id='u')
+one_round<-data.frame(team_id='a',team_name='A',round=1,points=5)
+projection<-function(value)classification_bonus_table(classification_window_table(one_round),one_round,value,c(1,1))
+x<-projection(partial_owners)
+# Opening 100 + points 10 + verified XI member 5 + MVP 10 = known subtotal 125.
+stopifnot(x$mvp_bonus==10,is.na(x$best_xi_bonus),x$points_bonus==10,
+  partial_owners$team_finances$estimated_cash==125,
+  tail(partial_owners$cash_ledgers$a$running_balance,1)==125)
+other_owner<-eligibility;other_owner$team_id<-'b'
+other_owners<-build_rival_cash_dataset(teams,cid,list(history),full_xi,rules=rules,
+  eligibility=other_owner,coverage_complete=FALSE,account_id='u')
+stopifnot(projection(other_owners)$mvp_bonus==0,is.na(projection(other_owners)$best_xi_bonus))
+for(ownership in list(eligibility[FALSE,],rbind(eligibility,other_owner))){
+  unknown_mvp<-build_rival_cash_dataset(teams,cid,list(history),full_xi,rules=rules,
+    eligibility=ownership,coverage_complete=FALSE,account_id='u')
+  stopifnot(is.na(projection(unknown_mvp)$mvp_bonus))
+}
+# Missing eligibility for another round cannot poison the selected round.
+second_xi<-transform(full_xi,round_id='r2')
+more_rounds<-build_rival_cash_dataset(teams,cid,list(history),rbind(full_xi,second_xi),rules=rules,
+  eligibility=eligibility,coverage_complete=FALSE,account_id='u')
+stopifnot(projection(more_rounds)$mvp_bonus==10,is.na(projection(more_rounds)$best_xi_bonus))
+# The existing wire format carries component coverage through a process restart.
+wire<-jsonlite::toJSON(rival_snapshot_encode(partial_owners$cash_ledgers$a),auto_unbox=TRUE,na='null',null='null',digits=NA)
+restored_ledger<-rival_snapshot_decode(jsonlite::fromJSON(wire,simplifyVector=FALSE))
+restored<-list(cash_ledgers=list(a=restored_ledger))
+stopifnot(projection(restored)$mvp_bonus==10,is.na(projection(restored)$best_xi_bonus),
+  identical(restored_ledger,partial_owners$cash_ledgers$a))
+cat('PASS independent MVP coverage, unknown/conflicting owners, round isolation and persisted ledger reuse\n')
+# Matching a partial recipient subtotal is insufficient to split a recorded
+# combined payment. Its actual cash survives even when attribution is unknown.
+combined_payment<-e('movements','a:native',list(id='native',team_id='a',type='dreamTeam',
+  concept='1',money=15,date='2026-10-03T10:00:00Z'))
+combined<-build_rival_cash_dataset(teams,cid,list(history,combined_payment),full_xi,rules=rules,
+  eligibility=eligibility,coverage_complete=FALSE,account_id='u')
+allocation<-attr(combined$cash_ledgers$a,'award_payment_allocations')
+stopifnot(all(allocation$status=='unresolved'),is.na(projection(combined)$mvp_bonus),
+  is.na(projection(combined)$best_xi_bonus),
+  sum(combined$cash_ledgers$a$amount[combined$cash_ledgers$a$source_type=='dreamTeam'])==15,
+  combined$team_finances$estimated_cash==125)
+cat('PASS partial recipients cannot validate combined payment attribution; actual cash retained\n')

@@ -1,5 +1,5 @@
 {
-  "release": "lineup-loading-recovery-2026-11-07",
+  "release": "classification-mvp-coverage-2026-11-07",
   "runtime_sha256": {
     "async_transport.R": "cd9e20b307643909f58c357ef051e344eda07b7b3073e80a628ee87bd1946a2e",
     "background_runtime.R": "4bdfc286228cd8f752995e7e2ad949c897d23b7a911c8ff95a6365abb155581a",
@@ -16,7 +16,7 @@
     "factual_helpers.R": "b2410b97b6bef9494f0e069d72535610432aa0326cb2e53ffdde79ca35b90651",
     "server.R": "31d90744a0f6cda33cf88670bf46d2dded747f06815e47e95570ff7a482affde",
     "Modules/Classification_Module.R": "8e244de9a6e3893aa8edc58ef7b61d68564eadc7c5e9fc4d3a112ceea78c50e3",
-    "rival_finance_runtime.R": "75a9f28f1b376991b0a1aabf5c62f45a56ccf6a0d9b9dba219e50e786dc9969e",
+    "rival_finance_runtime.R": "ad86a8b37b67cfd42d33b1cab7df91f138a7fd10f7e5cde67abe95c11b6f9d15",
     "rival_calculation_store.R": "810c901742f35748ee7c6992f689400862318c670fc471dde6f7b625d70c4eb4",
     "lineup_api.R": "72fb8df398e6e31bebfd711b4e9f51d76c02531f4b84de2baa11df9938c8a122"
   }

@@ -746,3 +746,8 @@ Changed active non-admin access rechecks to two minutes at the user’s request.
 ## Classification failure identity — 2026-11-07
 
 Implemented locally: preserve original structured read failures across Shiny validation and Classification's status formatting, with safe source labels for catalog/ranking/history/lineup reads. This fixes misclassified error categories and displayed references that did not match server logs. Focused diagnostic and required lifecycle verification are recorded in data_review_results.md. The screenshot's underlying production acquisition failure remains unconfirmed without a failing response or matching diagnostic evidence; it is not marked fixed.
+
+
+## Previous-round award component coverage — 2026-11-07
+
+Implemented and independently verified locally: round-filtered MVP coverage is independent of unrelated Best XI ownership gaps, and combined-payment attribution requires complete round-specific recipient evidence. The durable calculation version was advanced; recorded cash and shared source evidence are retained. Read-only hosted evidence confirmed that round 11's final XI/MVP is saved, but four award players lack verified historical ownership in the saved lineup/bench records. MVP coverage is corrected; complete Best XI attribution remains unresolved pending authoritative historical ownership evidence. No missing owners were invented, and hosted application deployment is unverified. See `rival_cash_accounting.md` and the executed results.

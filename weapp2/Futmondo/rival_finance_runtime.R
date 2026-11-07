@@ -379,7 +379,7 @@ rival_round_publication_dates <- function(evidence,catalog=data.frame()) {
 }
 
 # Eligibility is accepted only as explicit historical evidence. No current roster lookup.
-rival_award_estimates <- function(official,team_id,rules,eligibility=data.frame(),payments=data.frame(),round_rules=list()) {
+rival_award_estimates <- function(official,team_id,rules,eligibility=data.frame(),payments=data.frame(),round_rules=list(),bonus_types=c("dreamteam","mvp")) {
   empty<-data.frame(round_id=character(),player_id=character(),bonus_type=character(),amount=numeric(),reason=character(),stringsAsFactors=FALSE)
   if(!is.data.frame(official)||!all(c("round_id","player_id","is_mvp")%in%names(official)))return(list(rows=empty,missing="Official round awards unavailable."))
   unfinished<-!"is_finished"%in%names(official)||any(!official$is_finished%in%TRUE)
@@ -388,6 +388,7 @@ rival_award_estimates <- function(official,team_id,rules,eligibility=data.frame(
     row<-official[i,,drop=FALSE]
     data.frame(round_id=as.character(row$round_id),player_id=as.character(row$player_id),bonus_type=c("dreamteam",if(isTRUE(row$is_mvp))"mvp"),stringsAsFactors=FALSE)
   }))
+  if(nrow(events))events<-events[events$bonus_type%in%bonus_types,,drop=FALSE]
   events<-unique(events);out<-list();missing<-if(unfinished)"Unfinished or unverified award selections are excluded from reconstructed cash."else character()
   for(i in seq_len(nrow(events))){
     e<-events[i,,drop=FALSE];rule<-round_rules[[e$round_id]] %||% rules
@@ -421,16 +422,17 @@ rival_award_payment_allocations <- function(official,team_id,rules,eligibility,m
   native<-movements$source_type%in%c("dreamTeam","dreamteam")
   if(!any(native))return(empty)
   selected<-if(is.data.frame(official)&&"round_id"%in%names(official))official[official$round_id%in%movements$round_id[native],,drop=FALSE]else data.frame()
-  expected<-rival_award_estimates(selected,team_id,rules,eligibility)$rows
   dplyr::bind_rows(c(list(empty),lapply(unique(movements$round_id[native]),function(id){
     paid<-movements[native & movements$round_id%in%id,,drop=FALSE]
     separate<-movements[!native & movements$round_id%in%id & movements$bonus_type%in%"mvp",,drop=FALSE]
-    rows<-expected[expected$round_id%in%id,,drop=FALSE]
+    round_selection<-if(nrow(selected))selected[selected$round_id%in%id,,drop=FALSE]else selected
+    expected<-rival_award_estimates(round_selection,team_id,rules,eligibility)
+    rows<-expected$rows
     xi<-sum(rows$amount[rows$bonus_type%in%"dreamteam"])
     mvp<-sum(rows$amount[rows$bonus_type%in%"mvp"])
     recorded<-if(all(is.finite(paid$money)))sum(paid$money)else NA_real_
     explicit<-if(all(is.finite(separate$money)))sum(separate$money)else NA_real_
-    valid<-nzchar(id)&&nrow(rows)>0L&&is.finite(recorded)&&is.finite(explicit)&&
+    valid<-nzchar(id)&&!length(expected$missing)&&nrow(rows)>0L&&is.finite(recorded)&&is.finite(explicit)&&
       recorded+explicit==xi+mvp&&mvp>=explicit
     data.frame(round_id=id,recorded=recorded,expected=if(nrow(rows))xi+mvp-explicit else NA_real_,
       dreamteam=if(valid)xi else NA_real_,mvp=if(valid)mvp-explicit else NA_real_,
@@ -914,7 +916,7 @@ rival_estimate_summary <- function(missing,assumptions=character(),difference=NA
 
 # Public pure accounting interface; every numeric subtotal has an evidence trail.
 # Versioned, context-bound calculation cache. Source records remain authoritative.
-rival_calculation_version <- "2026-11-06-persistent-v3"
+rival_calculation_version <- "2026-11-07-award-components-v4"
 rival_calculation_hash <- function(x) unname(unclass(as.character(openssl::sha256(serialize(x,NULL,version=2)))))
 rival_calculation_evidence <- function(evidence) {
   rows<-Filter(function(x)!rival_snapshot_record(x)&&!x$evidence_type%in%c("team","coverage","rules"),evidence)
@@ -1346,12 +1348,14 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
     bonus_rounds<-list()
     for(rid in unique(history$rounds$round_id[history$rounds$team_id%in%tid])){
       awards<-if("round_id"%in%names(official))official[official$round_id%in%rid,,drop=FALSE]else data.frame()
-      award_check<-if(!length(estimate$missing))estimate else rival_award_estimates(awards,tid,rules,eligibility,mov)
       for(kind in c("points","mvp","dreamteam","ranking")){
         entries<-ledger[ledger$included & ledger$round_id%in%rid & ledger$bonus_type%in%kind,,drop=FALSE]
         zero<-any(zero_bonus_rows$round_id%in%rid & zero_bonus_rows$bonus_type%in%kind)
         known<-nrow(entries)>0L||zero
         if(kind%in%c("mvp","dreamteam")){
+          # A missing XI recipient cannot make a verified MVP unknown. Check
+          # only this round/component while projecting the same cash ledger.
+          award_check<-rival_award_estimates(awards,tid,rules,eligibility,mov,bonus_types=kind)
           rate<-fm_number(if(kind=="mvp")rules$mvp_reward else rules$dreamteam_reward)
           known<-is.finite(rate)&&rate==0 || (nrow(awards)>0L && (isTRUE(coverage_complete)||length(unique(awards$player_id))==11L) && !length(award_check$missing) && !unclassified)
         }
