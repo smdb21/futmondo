@@ -1,5 +1,7 @@
 # Round awards module
 
+Position labels in the official Best XI use the existing background pills: green GK, orange DEF, blue MID and red FWD. Unknown roles stay explicit plain text. This presentation reuses the shared badge CSS without adding source requests or changing award data.
+
 `round_mvps_UI(id)` renders **Round awards**, with the MVP and full official Best XI for each completed round, newest first. Each lineup shows roles and points and highlights the MVP. Unknown scores remain unavailable; zero and negative scores are preserved. `round_mvps_Server(id, is_module_active, login_token, championship_id, refresh_trigger)` consumes the same root-session `shared_mvp_source` as Admin and Rivals. Page navigation loads saved full-XI snapshots; it never triggers a historical backfill.
 
 `round_mvp_rows(rows, championship_id)` filters the single `is_mvp` player from each positively finished round. Provisional or unknown-finality selections remain available for inspection in Admin and do not display as completed awards. `round_best_xi_rows()` selects the same round by immutable ID (falling back to the display number only for legacy rows without IDs), checks eleven unique players and one MVP, and orders source roles as GK/DEF/MID/FWD using the existing role mapping. Internal module, tab and output IDs remain unchanged.

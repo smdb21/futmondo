@@ -50,6 +50,7 @@ round_best_xi_rows <- function(rows, championship_id, round) {
 }
 
 round_award_card <- function(mvp, xi) {
+  position_classes <- c(GK = "badge-gk", DEF = "badge-df", MID = "badge-md", FWD = "badge-fw")
   tags$article(class = "round-mvp-card",
     tags$div(class = "round-mvp-round", if (is.finite(mvp$round_number))
       paste("Round", format(mvp$round_number, trim = TRUE, scientific = FALSE)) else "Round number unavailable"),
@@ -61,8 +62,10 @@ round_award_card <- function(mvp, xi) {
       tags$table(class = "round-best-xi-table", `aria-label` = "Official Best XI",
         tags$thead(tags$tr(tags$th(scope = "col", "Role"), tags$th(scope = "col", "Player"), tags$th(scope = "col", "Points"))),
         tags$tbody(lapply(seq_len(nrow(xi)), function(i) {
+          position <- xi$display_role[i]
+          position_class <- unname(position_classes[position])
           tags$tr(class = if (xi$is_mvp[i]) "round-best-xi-mvp",
-            tags$td(xi$display_role[i]),
+            tags$td(if (is.na(position_class)) position else tags$span(class = position_class, position)),
             tags$td(xi$player_name[i], if (xi$is_mvp[i]) tagList(" ", tags$span(class = "round-mvp-badge", "MVP"))),
             tags$td(if (is.finite(xi$points[i])) format(xi$points[i], trim = TRUE) else "Unavailable"))
         }))))

@@ -701,3 +701,8 @@ Status: **implemented and verified locally; hosted durability and latency remain
 - [x] Verify cache/uncached parity, scope and invalidation, stale callbacks, malformed payload rejection, independent known answers, mobile/desktop saved-table rendering and the required offline lifecycle.
 
 No migration, dependency or unattended worker is introduced. Oversized caches retain a table-only snapshot; award metadata rechecks may conservatively rebuild. This tracking update has no runtime or request cost.
+
+
+## Round Awards position pills — 2026-11-06
+
+Completed locally: Best XI positions reuse the established colored badges, retaining source roles and explicit unknown values. Focused rendering and 390px/1440px browser checks passed. No shared infrastructure, source, persistence or dependency changes; hosted deployment remains unverified.
