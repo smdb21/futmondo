@@ -18,8 +18,7 @@ shiny::testServer(fixture_server,{
   fixture_reply(ACTIVE_CHAMPIONSHIPS_URL,fixture$active);fixture_settle(session)
   fixture_reply('https://api.futmondo.com/2/league/list',fixture$leagues);fixture_settle(session)
   fixture_reply('https://api.futmondo.com/2/league/matches',fixture$calendar);fixture_settle(session)
-  stopifnot(identical(as.numeric(messages$round_range_slider$value),c(12,12)),
-    messages$round_range_slider$max==12,
+  stopifnot(messages$round_range_slider$max==12,
     fixture_reads('https://api.futmondo.com/1/ranking/round')==1L,
     tail(fixture$requests,1)[[1]]$query$roundNumber==12)
   session$setInputs('classification-round_range_slider'=c(12,12))
@@ -30,11 +29,11 @@ shiny::testServer(fixture_server,{
     grepl('provisional',html('classification_status'),fixed=TRUE),fixture$writes==1L,
     fixture_reads(ROUNDS_URL)==0L,grepl('Loading league settings',html('configured_rewards_ui'),fixed=TRUE))
   # General cannot accidentally display the live-only 26 as cumulative points.
-  session$setInputs('classification-general_classification'=1,'classification-round_range_slider'=c(1,12))
+  session$setInputs('classification-classification_view'='partial','classification-round_range_slider'=c(1,12))
   fixture_settle(session)
   stopifnot(grepl('Loading official cumulative standings',html('classification_status'),fixed=TRUE),
     !grepl('Alpha',table(),fixed=TRUE))
-  session$setInputs('classification-latest_round'=1,'classification-round_range_slider'=c(12,12))
+  session$setInputs('classification-classification_view'='rounds','classification-round_range_slider'=c(12,12))
   fixture_settle(session)
   # A real directory failure and an independent settings failure preserve live scores.
   fixture_reply(TEAMS_URL,error=resource_failure(resource=TEAMS_URL,category='schema'))
@@ -60,7 +59,7 @@ shiny::testServer(fixture_server,{
     grepl('Historical round scores are loading',status,fixed=TRUE),
     grepl('70.000',output[['classification-configured_rewards_ui']]$html,fixed=TRUE),
     fixture_reads(ROUNDS_URL)==2L,fixture_reads('https://api.futmondo.com/1/ranking/round')==1L,fixture$writes==1L)
-  session$setInputs('classification-general_classification'=1,'classification-round_range_slider'=c(1,12))
+  session$setInputs('classification-classification_view'='partial','classification-round_range_slider'=c(1,12))
   fixture_settle(session)
   stopifnot(grepl('100',output[['classification-classification_table']],fixed=TRUE))
   session$setInputs('classification-round_range_slider'=c(11,11))
@@ -90,7 +89,7 @@ shiny::testServer(fixture_server,{
   messages<-list();root<-session$rootScope();root$sendInputMessage<-function(inputId,message)messages[[sub('^classification-','',inputId)]]<<-message
   session$setInputs('classification-round_range_slider'=c(12,12))
   fixture_settle(session)
-  stopifnot(identical(as.numeric(messages$round_range_slider$value),c(12,12)),
+  stopifnot(messages$round_range_slider$max==12,
     grepl('26',output[['classification-classification_table']],fixed=TRUE),
     fixture_reads('https://api.futmondo.com/1/ranking/round')==1L,fixture$writes==1L)
 })
@@ -101,7 +100,7 @@ cat('PASS legacy catalog/calendar and persisted JSON ranking: recovered playing1
 shiny::testServer(classification_Server,args=list(is_module_active=function()TRUE,
   login_token=function()fixture$auth,championship_id=function()'league',user_team_id=function()'a',
   user_teams_RV=function()data.frame(teamid='a',teamname='Alpha')) ,{
-  session$setInputs(round_range_slider=c(1,12),general_classification=1)
+  session$setInputs(round_range_slider=c(1,12),classification_view='partial')
   fixture_settle(session)
   stopifnot(grepl('unavailable',output$classification_status$html,fixed=TRUE),
     !grepl('26',output$classification_table,fixed=TRUE))

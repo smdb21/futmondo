@@ -68,34 +68,34 @@ teams<-data.frame(teamid=letters[1:9],teamname=paste('Team',1:9),points=100:108)
 shiny::testServer(classification_Server,args=list(is_module_active=reactive(TRUE),login_token=reactive(auth),
   championship_id=reactive(cid),user_team_id=reactive('a'),user_teams_RV=reactive(teams)),{
   messages<-list();root<-session$rootScope();root$sendInputMessage<-function(inputId,message)messages[[sub('^.*-','',inputId)]]<<-message
-  session$setInputs(single_round_select='all',round_range_slider=c(1,38))
-  stopifnot(selection_mode()=='latest')
+  session$setInputs(classification_view='rounds',round_range_slider=c(1,38))
+  stopifnot(is.null(picked_round_RV()))
   catalog(list(current_round_id='r13',current_round_number=13,rounds=data.frame(round_id=paste0('r',11:13),round_number=11:13,is_finished=c(TRUE,FALSE,FALSE),status=c('closed','next','future'))))
   session$flushReact()
-  stopifnot(max(round_numbers_RV())==11,selection_mode()=='latest')
+  stopifnot(max(round_numbers_RV())==11,is.null(picked_round_RV()))
   session$setInputs(round_range_slider=c(11,11))
   ranking(live);session$flushReact()
-  stopifnot(identical(as.numeric(messages$round_range_slider$value),c(12,12)),max(round_numbers_RV())==12)
+  stopifnot(selected_round_RV()==12,max(round_numbers_RV())==12)
   session$setInputs(round_range_slider=c(12,12))
   stopifnot(identical(standings_RV()$points,c(26,18,15,9,8,6,2,0,0)),all(is.na(standings_RV()$points_bonus)),
-    grepl('provisional',output$classification_status$html,fixed=TRUE),selection_mode()=='latest')
+    grepl('provisional',output$classification_status$html,fixed=TRUE),is.null(picked_round_RV()))
   # Empty history is not permission to call current-only points General.
-  session$setInputs(general_classification=1);session$setInputs(round_range_slider=c(11,12))
+  session$setInputs(classification_view='partial',round_range_slider=c(11,12))
   stopifnot(identical(standings_RV()$points,as.numeric(100:108)),identical(as.numeric(standings_RV()$rank),as.numeric(9:1)))
-  session$setInputs(round_range_slider=c(11,11));stopifnot(all(is.na(standings_RV()$points)),selection_mode()=='manual')
+  session$setInputs(round_range_slider=c(11,11));stopifnot(all(is.na(standings_RV()$points)),partial_view_RV())
   # A background publication cannot override a deliberate manual selection.
   history(list(list(round=11,points=7)));session$flushReact()
-  stopifnot(selection_mode()=='manual',standings_RV()$points[standings_RV()$team_id=='a']==7)
+  stopifnot(partial_view_RV(),standings_RV()$points[standings_RV()$team_id=='a']==7)
   # A same-round history snapshot is replaced, never added to the live value.
   history(list(list(round=11,points=7),list(round=12,points=999)))
-  session$setInputs(latest_round=2);session$setInputs(round_range_slider=c(12,12));session$flushReact()
+  session$setInputs(classification_view='rounds');session$flushReact()
   stopifnot(standings_RV()$points[standings_RV()$team_id=='a']==26,
     sum(round_rows_RV()$team_id=='a'&round_rows_RV()$round==12)==1L)
   history(list(list(round=11,points=7)))
   fail_live(TRUE)
   catalog(list(current_round_id='r12',current_round_number=12,rounds=data.frame(round_id=paste0('r',11:13),
     round_number=11:13,is_finished=c(TRUE,FALSE,FALSE),status=c('closed','playing','next'))))
-  session$setInputs(latest_round=3);session$flushReact()
+  session$flushReact()
   stopifnot(max(round_numbers_RV())==12,all(is.na(standings_RV()$points)),
     grepl('unavailable',output$classification_status$html,fixed=TRUE))
 })

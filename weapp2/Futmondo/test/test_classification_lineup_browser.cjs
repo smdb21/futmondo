@@ -13,7 +13,23 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
       const table = page.locator('#classification-classification_table');
       await table.getByRole('row').filter({hasText:'Your Team'}).waitFor();
       assert.equal(await page.locator('#classification-single_round_select').count(),0);
-      await page.getByRole('button',{name:'Round 11',exact:true}).click();
+      const rounds = page.locator('.fm-classification-rounds');
+      await rounds.getByRole('button',{name:'Round 11',exact:true}).waitFor();
+      assert.deepEqual(await rounds.locator('button').evaluateAll(nodes=>nodes.map(n=>Number(n.dataset.round))),[11,10,9,8,7,6,5,4,3,2,1]);
+      assert.equal(await rounds.getByRole('button',{name:'Round 12',exact:true}).count(),0);
+      assert.equal(await page.locator('#classification-round_range_slider').isVisible(),false);
+      assert.equal(await rounds.locator('[aria-pressed="true"]').getAttribute('data-round'),'11');
+      if(width<600){
+        assert.ok(await rounds.evaluate(n=>n.scrollWidth>n.clientWidth));
+        await rounds.evaluate(n=>n.scrollLeft=n.scrollWidth);
+        assert.ok(await rounds.evaluate(n=>n.scrollLeft>0));
+        await rounds.evaluate(n=>n.scrollLeft=0);
+      }
+      await page.screenshot({path:`/tmp/futmondo-round-buttons-${width}.png`,fullPage:true});
+      await rounds.getByRole('button',{name:'Round 1',exact:true}).click();
+      await page.waitForFunction(()=>document.querySelector('.fm-round-button[data-round="1"]').getAttribute('aria-pressed')==='true');
+      if(width<600)assert.ok(await rounds.evaluate(n=>n.scrollLeft>0),'Selecting an older round must retain horizontal scroll');
+      await rounds.getByRole('button',{name:'Round 11',exact:true}).click();
       await table.getByRole('button',{name:'Your Team',exact:true}).waitFor();
       await table.getByRole('row').filter({hasText:'Your Team'}).getByRole('cell',{name:'105',exact:true}).click();
       const modal = page.locator('.modal');
@@ -39,10 +55,16 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
       assert.match(await modal.locator('.modal-title').innerText(),/Rival Team/);
       await modal.locator('.fm-lineup-pitch [data-player-id="rival-0"]').waitFor();
       await modal.getByRole('button',{name:'Close',exact:true}).click();
-      await page.getByRole('button',{name:'Multiple rounds',exact:true}).click();
+      await page.getByRole('tab',{name:'Partial classifications',exact:true}).click();
+      await page.locator('#classification-round_range_slider').waitFor({state:'visible'});
+      assert.equal(await page.locator('#classification-dreamteam_box_ui').isVisible(),false);
+      await page.evaluate(()=>Shiny.setInputValue('classification-round_range_slider',[9,9],{priority:'event'}));
+      await table.getByRole('row').filter({hasText:'Your Team'}).getByRole('cell',{name:'72',exact:true}).waitFor();
       await page.waitForFunction(()=>document.querySelectorAll('#classification-classification_table button.fm-lineup-open').length===0);
       assert.equal(await modal.count(),0);
-      await page.getByRole('button',{name:'Round 9',exact:true}).click();
+      await page.getByRole('tab',{name:'Round classifications',exact:true}).click();
+      assert.equal(await rounds.locator('[aria-pressed="true"]').getAttribute('data-round'),'11');
+      await rounds.getByRole('button',{name:'Round 9',exact:true}).click();
       await table.getByRole('button',{name:'Your Team',exact:true}).click();
       await modal.getByText('Formation 4-3-3',{exact:true}).waitFor();
       assert.deepEqual(await modal.locator('.fm-lineup-row').evaluateAll(nodes=>nodes.map(n=>n.querySelectorAll('.fm-lineup-player').length)),[3,3,4,1]);

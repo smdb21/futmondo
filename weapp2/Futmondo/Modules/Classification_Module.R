@@ -10,13 +10,16 @@ classification_UI <- function(id) {
   ns <- NS(id)
   tagList(
     fluidRow(box(width = 12, title = "Matchday results", status = "primary", solidHeader = TRUE,
-      div(class = "form-group",
-          actionButton(ns("latest_round"), "Latest round"),
-          actionButton(ns("general_classification"), "General classification")),
-      sliderInput(ns("round_range_slider"), "Points between rounds", min = 1, max = 38, value = c(1, 38)))),
+      tabsetPanel(id=ns("classification_view"), selected="rounds",
+        tabPanel("Round classifications", value="rounds",
+          div(class="fm-classification-rounds",role="group",`aria-label`="Select a played round",
+            uiOutput(ns("round_buttons"),inline=TRUE))),
+        tabPanel("Partial classifications", value="partial",
+          sliderInput(ns("round_range_slider"), "Points between rounds", min=1, max=38, value=c(1,38)))))),
     fluidRow(box(width = 12, title = "Standings", uiOutput(ns("classification_status")), reactableOutput(ns("classification_table")))),
-    fluidRow(box(width = 12, title = "Dream team and configured rewards",
-      uiOutput(ns("configured_rewards_ui")), uiOutput(ns("dreamteam_box_ui"))))
+    conditionalPanel(condition="input.classification_view !== 'partial'", ns=ns,
+      fluidRow(box(width = 12, title = "Dream team and configured rewards",
+        uiOutput(ns("configured_rewards_ui")), uiOutput(ns("dreamteam_box_ui")))))
   )
 }
 
@@ -237,42 +240,65 @@ classification_Server <- function(id, is_module_active, login_token, championshi
       if(!is.null(ranking)&&nrow(ranking$rows))numbers<-numbers[numbers<=ranking$round_number]
       numbers
     })
-    selection_mode <- reactiveVal("latest")
-    single_round_RV <- reactive(classification_single_round(input$round_range_slider))
-    sent_selection <- NULL
-    send_selection <- function(numbers,mode) {
-      window <- if(mode=="latest")rep(max(numbers),2)else range(numbers)
-      sent_selection <<- list(window=as.numeric(window))
-      updateSliderInput(session,"round_range_slider",value=window)
-    }
+    partial_view_RV <- reactive(identical(input$classification_view,"partial"))
+    picked_round_RV <- reactiveVal(NULL)
+    selected_round_RV <- reactive({
+      numbers <- round_numbers_RV()
+      if(!length(numbers))return(NULL)
+      picked <- picked_round_RV()
+      if(length(picked)==1L&&picked%in%numbers)picked else max(numbers)
+    })
+    single_round_RV <- reactive({
+      selected <- selected_round_RV()
+      if(partial_view_RV()||!length(selected))"all"else as.character(selected)
+    })
+    round_window_RV <- reactive({
+      if(partial_view_RV())input$round_range_slider else rep(selected_round_RV(),2L)
+    })
+    round_buttons_context_RV <- reactive({
+      auth <- login_token()
+      paste(if(valid_login(auth))auth[["userid"]]else "",championship_id(),sep=":")
+    })
+    observeEvent(round_buttons_context_RV(),picked_round_RV(NULL),ignoreInit=TRUE)
+    previous_domain <- NULL
     observeEvent(round_numbers_RV(), {
       numbers <- round_numbers_RV()
-      if (!length(numbers)) return()
-      updateSliderInput(session, "round_range_slider", min = min(numbers), max = max(c(numbers, min(numbers) + 1)))
-      mode <- isolate(selection_mode())
-      if(mode%in%c("latest","general"))send_selection(numbers,mode)
+      if(!length(numbers))return()
+      window <- isolate(input$round_range_slider)
+      # A full-range selection follows new rounds; a custom partial range stays put.
+      if(is.null(previous_domain)||length(window)!=2L||identical(as.numeric(window),as.numeric(range(previous_domain))))
+        window <- range(numbers)
+      else window <- pmax(min(numbers),pmin(max(numbers),window))
+      previous_domain <<- numbers
+      updateSliderInput(session,"round_range_slider",min=min(numbers),max=max(c(numbers,min(numbers)+1)),value=window)
     })
-    observeEvent(input$latest_round, {
-      selection_mode("latest")
-      numbers <- round_numbers_RV()
-      if(length(numbers))send_selection(numbers,"latest")
+    observeEvent(input$round_button, {
+      click <- input$round_button
+      if(!is.list(click)||!identical(mvp_text(click$context),round_buttons_context_RV()))return()
+      number <- fm_number(click$number);numbers <- round_numbers_RV()
+      if(!is.finite(number)||!number%in%numbers)return()
+      # Selecting the newest round follows the next published/playing round.
+      picked_round_RV(if(number==max(numbers))NULL else number)
     })
-    observeEvent(input$general_classification, {
-      selection_mode("general")
-      numbers <- round_numbers_RV()
-      if(length(numbers))send_selection(numbers,"general")
+    output$round_buttons <- renderUI({
+      numbers <- sort(round_numbers_RV(),decreasing=TRUE)
+      if(!length(numbers))return(p("Loading played rounds…"))
+      tagList(lapply(numbers,function(number){
+          selected <- identical(as.numeric(number),as.numeric(selected_round_RV()))
+          tags$button(type="button",class=paste("btn fm-round-button",if(selected)"active"),
+            `data-round`=number,`aria-pressed`=if(selected)"true"else"false",
+            onclick=paste0("Shiny.setInputValue(",jsonlite::toJSON(session$ns("round_button"),auto_unbox=TRUE),
+              ",{number:",number,",context:",jsonlite::toJSON(round_buttons_context_RV(),auto_unbox=TRUE),
+              ",nonce:Date.now()},{priority:'event'});"),paste("Round",number))
+        }))
     })
-    observeEvent(input$round_range_slider, {
-      if(!is.null(sent_selection)&&identical(as.numeric(input$round_range_slider),sent_selection$window))return()
-      selection_mode("manual")
-    },ignoreInit=TRUE,priority=-1)
     filtered_rows_RV <- reactive({
-      classification_window_table(round_rows_RV(), input$round_range_slider, single_round_RV(),round_numbers_RV())
+      classification_window_table(round_rows_RV(), round_window_RV(), single_round_RV(),round_numbers_RV())
     })
     general_selection_RV <- reactive({
-      numbers <- round_numbers_RV();window <- input$round_range_slider
+      numbers <- round_numbers_RV();window <- round_window_RV()
       (is.null(single_round_RV())||single_round_RV()=="all")&&
-        !identical(selection_mode(),"latest")&&(!length(numbers)||length(window)!=2L||
+        partial_view_RV()&&(!length(numbers)||length(window)!=2L||
           (window[1]<=min(numbers)&&window[2]>=max(numbers)))
     })
     standings_RV <- reactive({
@@ -289,7 +315,7 @@ classification_Server <- function(id, is_module_active, login_token, championshi
           rank=rank(-suppressWarnings(as.numeric(teams$points)),ties.method="min",na.last="keep"))
       }
       if (!nrow(rows)) return(rows)
-      classification_bonus_table(rows, round_rows_RV(), finance_data_RV(), input$round_range_slider, single_round_RV(),round_numbers_RV())
+      classification_bonus_table(rows, round_rows_RV(), finance_data_RV(), round_window_RV(), single_round_RV(),round_numbers_RV())
     })
     empty_standings_message_RV <- reactive({
       teams <- teams_state_RV()
@@ -312,11 +338,11 @@ classification_Server <- function(id, is_module_active, login_token, championshi
       missing_bonus <- any(!is.finite(as.matrix(rows[, bonus_columns, drop = FALSE])))
       selected <- round_rows_RV()
       if(length(single_round_RV())==1L&&single_round_RV()!="all")selected<-selected[selected$round==as.numeric(single_round_RV()),,drop=FALSE]
-      else if(length(input$round_range_slider)==2L)selected<-selected[selected$round>=input$round_range_slider[1]&selected$round<=input$round_range_slider[2],,drop=FALSE]
+      else if(length(round_window_RV())==2L)selected<-selected[selected$round>=round_window_RV()[1]&selected$round<=round_window_RV()[2],,drop=FALSE]
       live <- nrow(selected)&&"score_status"%in%names(selected)&&any(selected$score_status%in%c("provisional","unavailable"))
       stale <- identical(attr(active_ranking_RV(),"fetch_status"),"stale")
       tagList(p("Points and reconstructed bonus totals for the selected rounds."),
-        p(if(single_round_RV()!="all")"Click a team to see its formation and ordered substitutes for this round."else "Select one round with the range slider to open a team lineup."),
+        p(if(single_round_RV()!="all")"Click a team to see its formation and ordered substitutes for this round."else "Partial classification for the selected range of rounds."),
         if(live)p("Live round points are provisional. Rewards remain unavailable until the round and its payments are confirmed."),
         if(length(failures))p(resource_failure_message(failures[[1]])),
         if(isTRUE(history$loading))p("Historical round scores are loading; available live scores are shown."),
@@ -382,7 +408,7 @@ classification_Server <- function(id, is_module_active, login_token, championshi
       history <- bind_rows(lapply(numbers, function(n) {
         d <- classification_window_table(rows, c(min(numbers), n)); d$round <- n; d
       }))
-      range <- input$round_range_slider
+      range <- round_window_RV()
       if (length(range) == 2L) history <- history[history$round >= range[1] & history$round <= range[2], , drop = FALSE]
       if (!is.null(single_round_RV()) && single_round_RV() != "all") history <- history[history$round == as.numeric(single_round_RV()), , drop = FALSE]
       plot_ly(history, x = ~round, y = ~rank, color = ~team_name, type = "scatter", mode = "lines+markers") %>%

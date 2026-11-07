@@ -2310,7 +2310,7 @@
       "checksum": "fbfca04b271427fdff60410f9b393f30"
     },
     "Modules/Classification_Module.R": {
-      "checksum": "e663a870b654943f22670215019521d5"
+      "checksum": "aed356d75951e460c53b9e3bb685f5cc"
     },
     "Modules/Login_Module.R": {
       "checksum": "187a7ded863473d5f0d50732e4bfbe44"
@@ -2379,7 +2379,7 @@
       "checksum": "6253d5e12d91ddef162c7e9e7624680a"
     },
     "www/custom_style.css": {
-      "checksum": "69f958b6f710a63f05f25ffb34b4b6a0"
+      "checksum": "9c2bb0b6d5eed41ce304b9b95e5cafff"
     },
     "www/release-info.json": {
       "checksum": "45c384d1b12930623de6901841cbda91"

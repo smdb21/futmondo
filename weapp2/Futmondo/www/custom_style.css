@@ -1352,3 +1352,11 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 .fm-lineup-order { display: block; font-size: 10px; color: #b8cbb9; margin-bottom: 4px; }
 .fm-lineup-legend { font-size: 11px; color: #b9cbbb; margin-top: 10px; }
 @media(max-width: 480px) { .fm-lineup-pitch { padding: 12px 3px; } .fm-lineup-row { min-height: 118px; gap: 2px; } .fm-lineup-portrait { height: 50px; } .fm-lineup-portrait > img { height: 50px; } .fm-lineup-name { font-size: 9px; } .fm-lineup-points { font-size: 11px; min-width: 24px; padding: 0 3px; } .fm-lineup-bench { padding: 8px 4px; } .fm-lineup-bench-row { gap: 4px; } .fm-lineup-change { width: 19px; height: 19px; font-size: 16px; line-height: 19px; } }
+
+/* Newest-first round navigation stays in one horizontally scrollable row. */
+.fm-classification-rounds { display:flex; flex-wrap:nowrap; gap:8px; overflow-x:auto; padding:14px 2px 12px; overscroll-behavior-x:contain; }
+.fm-round-button { flex:0 0 auto; min-width:88px; border:1px solid var(--fm-border,#547064); background:var(--fm-surface,#162e2a); color:var(--fm-text,#f0f6ef); }
+.fm-round-button.active { background:var(--fm-text,#f0f6ef) !important; color:var(--fm-bg,#0a100c) !important; border-color:var(--fm-text,#f0f6ef); font-weight:700; }
+.fm-round-button:focus-visible { outline:2px solid var(--fm-text,#f0f6ef); outline-offset:2px; }
+
+.fm-classification-rounds > .shiny-html-output { display:flex; flex:0 0 auto; gap:8px; }

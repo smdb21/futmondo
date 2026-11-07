@@ -22,7 +22,7 @@ shiny::testServer(classification_Server, args = list(
   is_module_active = reactive(TRUE), login_token = reactive(auth),
   championship_id = reactive("league"), user_team_id = reactive("a"),
   user_teams_RV = reactive(teams)), {
-  session$setInputs(round_range_slider = c(1, 2))
+  session$setInputs(classification_view="partial", round_range_slider = c(1, 2))
   settle(session)
   stopifnot(sum(calls == "get_user_team_info") == 1L,
     !any(calls %in% c("get_financial_snapshot", "get_acquisition_capacity", "get_lineup_from_team")),
@@ -48,7 +48,7 @@ shiny::testServer(classification_Server, args = list(
   stopifnot(!grepl("unavailable|missing|loading", status, ignore.case = TRUE))
   # Selecting a round starts only its dream-team read; settings stay visible.
   before <- calls
-  session$setInputs(round_range_slider = c(1, 1))
+  session$setInputs(classification_view="rounds")
   settle(session)
   stopifnot(identical(tail(calls, length(calls) - length(before)), "get_round_dreamteam"),
     identical(output$configured_rewards_ui$html, rewards))
@@ -63,7 +63,7 @@ shiny::testServer(classification_Server, args = list(
   settle(session)
   stopifnot(grepl("Some bonus totals lack complete", output$classification_status$html, fixed = TRUE),
     is.na(standings_RV()$mvp_bonus))
-  session$setInputs(round_range_slider = c(1, 2))
+  session$setInputs(classification_view="partial", round_range_slider = c(1, 2))
   settle(session)
   stopifnot(sum(calls == "get_user_team_info") == 1L)
 })
@@ -80,7 +80,7 @@ shiny::testServer(classification_Server, args = list(
   is_module_active = reactive(TRUE), login_token = reactive(auth),
   championship_id = reactive("league"), user_team_id = reactive("a"),
   user_teams_RV = reactive(teams), league_settings_source = settings), {
-  session$setInputs(round_range_slider = c(1, 2))
+  session$setInputs(classification_view="partial", round_range_slider = c(1, 2))
   settle(session)
   html <- gsub("[[:space:]]+", " ", output$configured_rewards_ui$html)
   stopifnot(grepl("70.000", html, fixed = TRUE), grepl("MVP: 0", html, fixed = TRUE),

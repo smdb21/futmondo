@@ -25,48 +25,40 @@ get_round_dreamteam <- function(...) {
   list()
 }
 html <- htmltools::renderTags(classification_UI("classification"))$html
-stopifnot(grepl('id="classification-latest_round"', html, fixed = TRUE),
-          grepl('id="classification-general_classification"', html, fixed = TRUE))
-shiny::testServer(classification_Server, args = list(
-  is_module_active = reactive(TRUE), login_token = reactive("fixture"),
-  championship_id = reactive("league"), user_team_id = reactive("a"),
-  user_teams_RV = reactive(data.frame(teamid = "a", teamname = "Alpha", points = 25))), {
-  messages <- list()
-  root <- session$rootScope()
-  root$sendInputMessage <- function(inputId, message) {
-    messages[[sub("^.*-", "", inputId)]] <<- message
-  }
-  session$setInputs(round_range_slider = c(1, 4))
-  before <- calls
-  # The latest history round can arrive before the catalog includes it.
-  session$setInputs(latest_round = 1)
-  stopifnot(identical(as.numeric(messages$round_range_slider$value), c(4, 4)),
-            identical(calls, before))
-  session$setInputs(round_range_slider = c(4, 4))
-  stopifnot(filtered_rows_RV()$points == 12, filtered_rows_RV()$rounds == 1)
-  # General classification must restore the full range after a one-round selection.
-  session$setInputs(round_range_slider = c(1, 1))
-  before <- calls
-  session$setInputs(general_classification = 1)
-  stopifnot(identical(as.numeric(messages$round_range_slider$value), c(1, 4)),
-            identical(calls, before))
-  session$setInputs(round_range_slider = c(1, 4))
-  stopifnot(filtered_rows_RV()$points == 25, filtered_rows_RV()$rounds == 3)
-  session$setInputs(round_range_slider = c(1, 3))
-  stopifnot(filtered_rows_RV()$points == 13)
-  # With only one available round, both presets select that round.
-  available(list(catalog = data.frame(round_id = "r3", round_number = 3),
-                 history = list(list(round = 3, points = 8))))
-  session$flushReact()
-  session$setInputs(latest_round = 2)
-  stopifnot(identical(as.numeric(messages$round_range_slider$value), c(3, 3)))
-  session$setInputs(general_classification = 2)
-  stopifnot(identical(as.numeric(messages$round_range_slider$value), c(3, 3)))
-  # Empty history cannot generate an invalid slider range.
-  available(list(catalog = data.frame(), history = list()))
-  session$flushReact()
-  messages <- list()
-  session$setInputs(latest_round = 3, general_classification = 3)
-  stopifnot(length(messages) == 0L)
+stopifnot(grepl('Partial classifications',html,fixed=TRUE),grepl('classification-round_buttons',html,fixed=TRUE),
+  !grepl('classification-latest_round|classification-general_classification',html))
+shiny::testServer(classification_Server,args=list(
+  is_module_active=reactive(TRUE),login_token=reactive("fixture"),championship_id=reactive("league"),
+  user_team_id=reactive("a"),user_teams_RV=reactive(data.frame(teamid="a",teamname="Alpha",points=25))),{
+  messages<-list();root<-session$rootScope()
+  root$sendInputMessage<-function(inputId,message)messages[[sub("^.*-","",inputId)]]<<-message
+  session$setInputs(classification_view="rounds",round_range_slider=c(1,4))
+  click<-function(n,context=round_buttons_context_RV())session$setInputs(round_button=list(number=n,context=context,nonce=runif(1)))
+  stopifnot(selected_round_RV()==4,single_round_RV()=="4",filtered_rows_RV()$points==12)
+  buttons<-output$round_buttons$html
+  stopifnot(grepl('data-round="4"',buttons,fixed=TRUE),
+    regexpr('data-round="4"',buttons,fixed=TRUE)<regexpr('data-round="3"',buttons,fixed=TRUE),
+    regexpr('data-round="3"',buttons,fixed=TRUE)<regexpr('data-round="1"',buttons,fixed=TRUE))
+  before<-calls[calls%in%c("catalog","history")]
+  click(1);stopifnot(selected_round_RV()==1,filtered_rows_RV()$points==5)
+  click(99);click(3,"different-league");stopifnot(selected_round_RV()==1)
+  session$setInputs(classification_view="partial",round_range_slider=c(1,3))
+  stopifnot(single_round_RV()=="all",filtered_rows_RV()$points==13,!general_selection_RV())
+  session$setInputs(round_range_slider=c(1,4));stopifnot(general_selection_RV(),standings_RV()$points==25)
+  session$setInputs(round_range_slider=c(3,3));stopifnot(single_round_RV()=="all",standings_RV()$points==8)
+  session$setInputs(classification_view="rounds");stopifnot(selected_round_RV()==1,standings_RV()$points==5)
+  stopifnot(identical(calls[calls%in%c("catalog","history")],before))
+  click(4)
+  available(list(catalog=data.frame(round_id=c("r1","r3","r4","r5"),round_number=c(1,3,4,5)),
+    history=list(list(round=1,points=5),list(round=3,points=8),list(round=4,points=12),list(round=5,points=6))))
+  session$flushReact();stopifnot(selected_round_RV()==5,standings_RV()$points==6)
+  click(1)
+  available(list(catalog=data.frame(round_id=c("r1","r6"),round_number=c(1,6)),
+    history=list(list(round=1,points=5),list(round=6,points=9))))
+  session$flushReact();stopifnot(selected_round_RV()==1,standings_RV()$points==5)
+  available(list(catalog=data.frame(round_id="r3",round_number=3),history=list(list(round=3,points=8))))
+  session$flushReact();stopifnot(selected_round_RV()==3,standings_RV()$points==8)
+  available(list(catalog=data.frame(),history=list()));session$flushReact()
+  stopifnot(is.null(selected_round_RV()),single_round_RV()=="all")
 })
-cat("PASS classification presets: latest/general ranges, single-range reset, manual filters, edge cases, no extra reads\n")
+cat("PASS round navigation: newest-first buttons, latest following, older selection, partial range independence, one-round partial, stale/invalid clicks, no extra source reads\n")

@@ -4,7 +4,7 @@ suppressPackageStartupMessages(source('global.R'))
 bind_factual_reads <- function(...)invisible(NULL)
 shared_mvp_source <- function(...)reactive(list())
 shared_rival_finance_source <- function(...)reactive(list(loading=FALSE))
-get_classification_round_catalog <- function(...)list(rounds=data.frame(round_id=c('round-nine','round-eleven'),round_number=c(9,11),is_finished=TRUE))
+get_classification_round_catalog <- function(...)list(rounds=data.frame(round_id=c(paste0('round-',1:8),'round-nine','round-ten','round-eleven','future-round'),round_number=1:12,is_finished=c(rep(TRUE,11),FALSE)))
 get_finished_rounds <- function(...)get_classification_round_catalog(...)$rounds
 get_user_team_rounds <- function(login,championship_id,user_team_id)list(list(round=9,points=72),list(round=11,points=if(user_team_id=='own')105 else 90))
 get_user_team_info <- function(...)list(configuration=list())
@@ -19,13 +19,10 @@ get_round_lineup_snapshot <- function(login,championship_id,user_team_id,round_i
 }
 ui <- shinydashboard::dashboardPage(shinydashboard::dashboardHeader(title='Lineup fixture'),shinydashboard::dashboardSidebar(disable=TRUE),
   shinydashboard::dashboardBody(tags$head(tags$style(HTML(fm_theme_css())),includeCSS('www/custom_style.css')),
-    actionButton('one','Round 11'),actionButton('other','Round 9'),actionButton('many','Multiple rounds'),textOutput('requests'),classification_UI('classification')))
+    textOutput('requests'),classification_UI('classification')))
 server <- function(input,output,session){
   classification_Server('classification',reactive(TRUE),reactive(c(userid='fixture-account',token='synthetic')),reactive('fixture-league'),reactive('own'),
     reactive(data.frame(teamid=c('own','rival'),teamname=c('Your Team','Rival Team'),points=c(177,162))))
-  observeEvent(input$one,updateSliderInput(session,'classification-round_range_slider',value=c(11,11)))
-  observeEvent(input$other,updateSliderInput(session,'classification-round_range_slider',value=c(9,9)))
-  observeEvent(input$many,updateSliderInput(session,'classification-round_range_slider',value=c(9,11)))
   output$requests <- renderText({invalidateLater(250);paste('Lineup reads:',fixture_reads)})
 }
 shiny::runApp(shiny::shinyApp(ui,server),host='127.0.0.1',port=as.integer(Sys.getenv('FUTMONDO_LINEUP_TEST_PORT','8501')),launch.browser=FALSE)
