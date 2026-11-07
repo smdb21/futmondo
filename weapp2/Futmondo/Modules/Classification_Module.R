@@ -350,22 +350,13 @@ classification_Server <- function(id, is_module_active, login_token, championshi
       failures <- Filter(Negate(is.null), c(list(catalog$error, ranking$error, finances_state_RV()$error), history$errors))
       rows <- standings_RV()
       if (!nrow(rows)) return(p(empty_standings_message_RV()))
-      bonus_columns <- c("points_bonus", "mvp_bonus", "best_xi_bonus", "position_bonus")
-      missing_bonus <- any(!is.finite(as.matrix(rows[, bonus_columns, drop = FALSE])))
-      selected <- round_rows_RV()
-      if(length(single_round_RV())==1L&&single_round_RV()!="all")selected<-selected[selected$round==as.numeric(single_round_RV()),,drop=FALSE]
-      else if(length(round_window_RV())==2L)selected<-selected[selected$round>=round_window_RV()[1]&selected$round<=round_window_RV()[2],,drop=FALSE]
-      live <- nrow(selected)&&"score_status"%in%names(selected)&&any(selected$score_status%in%c("provisional","unavailable"))
       stale <- identical(attr(active_ranking_RV(),"fetch_status"),"stale")
       tagList(p("Points and reconstructed bonus totals for the selected rounds."),
         p(if(single_round_RV()!="all")"Click a team to see its formation and ordered substitutes for this round."else "Partial classification for the selected range of rounds."),
-        if(live)p("Live round points are provisional. Rewards remain unavailable until the round and its payments are confirmed."),
         if(length(failures))p(resource_failure_message(failures[[1]])),
         if(isTRUE(history$loading))p("Historical round scores are loading; available live scores are shown."),
         if(stale)p("Showing saved round standings while the latest source request is unavailable."),
-        if (any(!is.finite(rows$points))) p("Some selected round scores are missing; affected point totals are unavailable."),
-        if (missing_bonus) p(if (isTRUE(finance_data_RV()$loading)) "Bonus totals are loading."
-          else "Some bonus totals lack complete round or award records and are shown as Unavailable."))
+        if (any(!is.finite(rows$points))) p("Some selected round scores are missing; affected point totals are unavailable."))
     })
     lineup_context_RV <- reactive({
       round <- single_round_RV();catalog <- rounds_RV()

@@ -488,7 +488,6 @@ rivals_calculation_coverage <- function(note) {
     "award coverage|Official round awards"="Some official round awards are still missing.",
     "Ranking history incomplete|position.*requires|Reference payment not confirmed"="Some position rewards lack historical standings or a confirmed payment.",
     "Point reward|Reference point reconciliation"="Some point rewards await score, eligibility or payment reconciliation.",
-    "Final settlement not confirmed|Unfinished or unverified award selections|selection still marks the round unfinished"="Unconfirmed final round rewards are excluded from cash.",
     "points-publication notification is missing"="Some reward dates cannot be established from the saved round publication history.",
     "historical league membership"="Historical position rewards assume the known league membership also applied to those rounds.",
     "Point reward rule unavailable"="The point reward rule is unavailable.",

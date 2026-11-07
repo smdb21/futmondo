@@ -87,7 +87,7 @@ check('resolving an unknown current or future number avoids the dreamteam reques
   # Being earlier than the active round allows retrieval; it does not invent finality.
   historical<-list(round_id='r11',round_number=11,is_finished=NA,current_round_number=12)
   rows<-normalize_official_dreamteam(xi,cid,historical)$rows
-  stopifnot(all(is.na(rows$is_finished)),nrow(round_mvp_rows(rows,cid))==0L)
+  stopifnot(all(is.na(rows$is_finished)),nrow(round_mvp_rows(rows,cid))==1L)
   mvp_api_answer<-original_api
 })
 cat(sprintf('CLOSED ROUND AWARDS: %d passed / 0 failed; 11 award requests, 27 skipped\n',n))

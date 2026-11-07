@@ -107,8 +107,8 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
     catalog_issue<-shiny::reactive({
       catalog<-round_catalog()
       if(!is.data.frame(catalog)||!nrow(catalog))return('Round schedule is unavailable or still loading.')
-      if(acquisition_data_unverified(catalog))return('Round schedule could not be verified from Futmondo.')
-      if(identical(attr(catalog,'catalog_complete'),FALSE))return(paste('Completed-round schedule is not verified.',fm_scalar(attr(catalog,'catalog_reason'),'')))
+      if(acquisition_data_unverified(catalog))return('Round schedule is unavailable from Futmondo.')
+      if(identical(attr(catalog,'catalog_complete'),FALSE))return(fm_scalar(attr(catalog,'catalog_reason'),''))
       ''
     })
     scoring_catalog<-shiny::reactive({catalog<-round_catalog();if(nzchar(catalog_issue()))data.frame()else catalog})

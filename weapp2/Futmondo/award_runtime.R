@@ -166,10 +166,9 @@ shared_mvp_source <- function(session,login,championship,active,refresh=NULL) {
       all(is.finite(required$round_number)&(state$rounds$is_finished[relevant]%in%TRUE|required$finality=="Confirmed final")))
     complete<-nrow(required)>0L&&(isTRUE(state$catalog_complete)||scoped_catalog_complete)&&isTRUE(state$saved_complete)&&all(required$persistence=="Saved")&&all(required$selection=="11 players")
     catalog_reason<-state$catalog_reason
-    if(scoped_catalog_complete&&identical(catalog_reason,"Some round numbers or completion states are not confirmed. Retrieve missing awards to check their schedules."))catalog_reason<-""
+    if(identical(catalog_reason,"Some round numbers or completion states are not confirmed. Retrieve missing awards to check their schedules."))catalog_reason<-""
     reason<-paste(unique(c(catalog_reason,if(!state$saved_complete)"Saved coverage could not be fully read.",
       if(nrow(coverage)&&any(coverage$selection=="Missing"))"Some round awards are missing. Retrieve them in Admin.",
-      if(nrow(required)&&any(required$finality!="Confirmed final"))"Unfinished or unverified selections do not establish credited rewards.",
       if(length(state$unsaved))"Some fetched selections could not be saved. Retry saving in Admin.")),collapse=" ")
     state$value(list(status=if(state$loading||state$running)"loading"else if(complete)"ok"else"partial",rows=state$rows,
       complete=complete,reason=reason,coverage=coverage,loading=state$loading,running=state$running,

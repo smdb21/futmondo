@@ -12,7 +12,7 @@ round_mvp_rows <- function(rows, championship_id = NULL) {
   }
   as_flag <- function(x) tolower(trimws(as.character(x))) %in% c("true", "t", "1")
   columns <- c(required[required != "is_mvp" & required != "is_finished"],intersect("round_id",names(out)))
-  out <- out[as_flag(out$is_mvp) & as_flag(out$is_finished), columns, drop = FALSE]
+  out <- out[as_flag(out$is_mvp), columns, drop = FALSE]
   if (!nrow(out)) return(empty)
   out$round_number <- suppressWarnings(as.numeric(out$round_number))
   out$points <- suppressWarnings(as.numeric(out$points))
@@ -36,7 +36,6 @@ round_best_xi_rows <- function(rows, championship_id, round) {
     rows <- rows[rows$round_number %in% round$round_number, , drop = FALSE]
   }
   as_flag <- function(x) tolower(trimws(as.character(x))) %in% c("true", "t", "1")
-  rows <- rows[as_flag(rows$is_finished), , drop = FALSE]
   rows$is_mvp <- as_flag(rows$is_mvp)
   if (nrow(rows) != 11L || anyNA(rows$player_id) || any(!nzchar(rows$player_id)) ||
       anyDuplicated(rows$player_id) || sum(rows$is_mvp) != 1L) return(data.frame())
@@ -82,7 +81,7 @@ round_award_card <- function(mvp, xi, players = NULL) {
 round_mvps_UI <- function(id) {
   ns <- NS(id)
   fluidRow(box(width = 12, title = "Round awards", status = "primary", solidHeader = TRUE,
-    p(class = "round-mvps-intro", "Official MVPs and Best XI selections from completed rounds."),
+    p(class = "round-mvps-intro", "Published official MVPs and Best XI selections."),
     uiOutput(ns("mvp_cards"))))
 }
 

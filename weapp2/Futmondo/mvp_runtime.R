@@ -86,7 +86,7 @@ normalize_mvp_catalog <- function(active, leagues, championship_id) {
     league_id=lid,user_team_id=mvp_text(champ$userteam$id %||% champ$userteam$`_id`),
     current_round_id=if(length(active_details)==1L)mvp_text(active_details[[1]]$`_id` %||% active_details[[1]]$id)else "",
     current_round_number=if(length(anchors)==1L)anchors else NA_real_,
-    reason=if(complete) "" else "Some round numbers or completion states are not confirmed. Retrieve missing awards to check their schedules.")
+    reason=if(!all(valid)) "The round catalog contains missing or duplicate round identities." else if(any(!is.finite(rows$round_number))) "Some round numbers are unavailable." else "")
 }
 
 get_finished_round_catalog <- function(login, championship_id) {

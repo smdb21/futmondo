@@ -82,12 +82,24 @@ catalog<-shiny::reactiveVal(partial);args$round_catalog<-catalog
 shiny::testServer(lineup_Server,args=args,{
  settle(session);before<-draft();session$setInputs(best=1);settle(session)
  stopifnot(identical(draft(),before),all(is.na(scores()$average)),!length(wanted()),
-  grepl('not verified',output$status$html),!grepl('0 completed rounds',output$status$html),state$submits==0L)
+  grepl('Numbered calendar read failed.',output$status$html,fixed=TRUE),!grepl('0 completed rounds',output$status$html),state$submits==0L)
  stopifnot(grepl('Best XI is waiting',notice()))
  catalog(rounds);settle(session)
  stopifnot(all(is.finite(scores()$average)),identical(wanted(),as.numeric(2:6)),
   all(nzchar(draft()$starters)),!grepl('not verified',output$status$html),state$submits==0L)
  cat('PASS a queued Best XI reports incomplete calendar and automatically recovers on verified publication\n')
+})
+# Unknown finality elsewhere does not block known completed scores or add warnings.
+reset()
+partial<-rounds;partial$is_finished[1]<-NA
+attr(partial,'catalog_complete')<-FALSE;attr(partial,'catalog_reason')<-''
+args$round_catalog<-function()partial
+shiny::testServer(lineup_Server,args=args,{
+ settle(session);session$setInputs(best=1);settle(session)
+ stopifnot(identical(wanted(),as.numeric(2:6)),all(is.finite(scores()$average)),
+  all(nzchar(draft()$starters)),!nzchar(catalog_issue()),
+  !grepl('not verified|waiting for the completed-round schedule',output$status$html),state$submits==0L)
+ cat('PASS unknown finality does not block available completed rounds or display a warning\n')
 })
 # The two goalkeepers deliberately reverse ranking between the five- and
 # two-round windows; no optimizer implementation is used to derive the answer.
@@ -143,4 +155,4 @@ shiny::testServer(lineup_Server,args=args,{
   grepl('Undo changes',as.character(lineup_UI('fixture')),fixed=TRUE))
  cat('PASS Undo changes restores the latest successfully saved and verified lineup\n')
 })
-cat('LINEUP MODULE: 10 groups passed / 0 failed\n')
+cat('LINEUP MODULE: 11 groups passed / 0 failed\n')

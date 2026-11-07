@@ -14,9 +14,9 @@ provisional <- first; provisional$round_id <- 'provisional'; provisional$is_fini
 unverified <- first; unverified$round_id <- 'unverified'; unverified$is_finished <- NA
 foreign <- first; foreign$championship_id <- 'other'; foreign$player_name <- 'Foreign player'
 rows <- rbind(first, second, unknown, provisional, unverified, foreign)
-check('all eleven completed-round players are scoped, newest first, with source scores', {
+check('all available official selections are scoped, newest first, with source scores', {
   mvps <- round_mvp_rows(rows, 'league')
-  stopifnot(identical(mvps$round_id, c('r2', 'r1', 'unknown')))
+  stopifnot(identical(mvps$round_id, c('r2', 'r1', 'provisional', 'unverified', 'unknown')))
   for (i in seq_len(nrow(mvps))) {
     xi <- round_best_xi_rows(rows, 'league', mvps[i, , drop = FALSE])
     stopifnot(nrow(xi) == 11L, all(xi$round_id == mvps$round_id[i]),
@@ -24,6 +24,9 @@ check('all eleven completed-round players are scoped, newest first, with source 
       identical(xi$display_role, c('GK', rep('DEF', 4), rep('MID', 4), rep('FWD', 2))),
       xi$points[1] == 0, xi$points[2] == -2, is.na(xi$points[3]))
   }
+})
+check('round finality does not add a rival cash warning', {
+  stopifnot(!length(rivals_calculation_coverage('Final settlement not confirmed. Unfinished or unverified award selections are excluded from reconstructed cash.')))
 })
 check('immutable IDs separate equal display numbers; legacy numbers still work', {
   repeated <- second; repeated$round_number <- 1
@@ -53,8 +56,8 @@ check('module renders full lineups and MVP highlights from one shared snapshot',
     login_token = function() NULL, championship_id = function() 'league'), {
     html <- output$mvp_cards$html
     dom <- xml2::read_html(html)
-    stopifnot(length(xml2::xml_find_all(dom, '//table/tbody/tr')) == 33L,
-      length(xml2::xml_find_all(dom, '//*[@class="round-best-xi-mvp"]')) == 3L,
+    stopifnot(length(xml2::xml_find_all(dom, '//table/tbody/tr')) == 55L,
+      length(xml2::xml_find_all(dom, '//*[@class="round-best-xi-mvp"]')) == 5L,
       grepl('Coverage notice', html, fixed = TRUE), grepl('Unavailable', html, fixed = TRUE),
       grepl('>-2<', html, fixed = TRUE), !grepl('Foreign player', html, fixed = TRUE), reads == 1L)
     session$flushReact(); stopifnot(reads == 1L)

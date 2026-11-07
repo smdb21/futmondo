@@ -101,7 +101,7 @@ shiny::testServer(classification_Server,args=list(is_module_active=reactive(TRUE
   stopifnot(selected_round_RV()==12,max(round_numbers_RV())==12)
   session$setInputs(round_range_slider=c(12,12))
   stopifnot(identical(standings_RV()$points,c(26,18,15,9,8,6,2,0,0)),all(is.na(standings_RV()$points_bonus)),
-    grepl('provisional',output$classification_status$html,fixed=TRUE),is.null(picked_round_RV()),
+    !grepl('provisional|confirmed|complete round',output$classification_status$html),is.null(picked_round_RV()),
     identical(standings_RV()$players_left,c(9,7,5,3,1,0,2,4,6)),
     grepl('Players left',output$classification_table,fixed=TRUE))
   # Empty history is not permission to call current-only points General.
