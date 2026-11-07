@@ -20,13 +20,14 @@ shiny::testServer(fixture_server,{
   fixture_reply('https://api.futmondo.com/2/league/matches',fixture$calendar);fixture_settle(session)
   stopifnot(messages$round_range_slider$max==12,
     fixture_reads('https://api.futmondo.com/1/ranking/round')==1L,
-    tail(fixture$requests,1)[[1]]$query$roundNumber==12)
+    tail(fixture$requests,1)[[1]]$query$roundNumber=='r12')
   session$setInputs('classification-round_range_slider'=c(12,12))
   fixture_reply('https://api.futmondo.com/1/ranking/round',fixture$ranking);fixture_settle(session)
   # Directory, every team history, settings and finance are all still pending.
   live_table <- table()
   stopifnot(grepl('Alpha',live_table,fixed=TRUE),grepl('26',live_table,fixed=TRUE),
-    grepl('provisional',html('classification_status'),fixed=TRUE),fixture$writes==1L,
+    grepl('26 (5)',live_table,fixed=TRUE),grepl('18 (0)',live_table,fixed=TRUE),
+    !grepl('Source data unavailable',html('classification_status'),fixed=TRUE),fixture$writes==1L,
     fixture_reads(ROUNDS_URL)==0L,grepl('Loading league settings',html('configured_rewards_ui'),fixed=TRUE))
   # General cannot accidentally display the live-only 26 as cumulative points.
   session$setInputs('classification-classification_view'='partial','classification-round_range_slider'=c(1,12))
@@ -80,17 +81,23 @@ legacy <- list(status='partial',identity_complete=TRUE,complete=FALSE,league_id=
 invisible(resource_store(api_cache_key('mvp_catalog_league',context=resource_context(fixture$auth,'league')),
   legacy,resource_context(fixture$auth,'league'),'mvp_catalog_league'))
 invisible(resource_store(api_cache_key('award_round_metadata_league',context=resource_context(fixture$auth,'league')),
-  list(status='ok',rows=data.frame(round_id=paste0('r',1:38),round_number=as.numeric(1:38),
-    is_finished=c(rep(TRUE,11),FALSE,rep(NA,26)),status=c(rep('done',11),'playing',rep('future',26)))),
+  list(status='ok',scope=list(account_id=unname(fixture$auth[['userid']]),championship_id='league',
+    season='unknown',league_id='competition',current_round_id=''),
+    rows=data.frame(round_id=paste0('r',1:38),round_number=as.numeric(1:38),
+    is_finished=c(rep(TRUE,11),FALSE,rep(NA,26)),status=c(rep('done',11),'running',rep('future',26)))),
   resource_context(fixture$auth,'league'),'award_round_metadata_league'))
 # Read back through JSON's default simplifyVector behavior, as database reads do.
-fixture$saved[[1]]$payload <- jsonlite::fromJSON(jsonlite::toJSON(fixture$saved[[1]]$payload,auto_unbox=TRUE,null='null',na='null'))
+fixture$saved <- lapply(fixture$saved,function(row){
+  row$payload <- jsonlite::fromJSON(jsonlite::toJSON(row$payload,auto_unbox=TRUE,null='null',na='null'))
+  row
+})
 shiny::testServer(fixture_server,{
   messages<-list();root<-session$rootScope();root$sendInputMessage<-function(inputId,message)messages[[sub('^classification-','',inputId)]]<<-message
   session$setInputs('classification-round_range_slider'=c(12,12))
   fixture_settle(session)
   stopifnot(messages$round_range_slider$max==12,
-    grepl('26',output[['classification-classification_table']],fixed=TRUE),
+    grepl('26 (5)',output[['classification-classification_table']],fixed=TRUE),
+    grepl('18 (0)',output[['classification-classification_table']],fixed=TRUE),
     fixture_reads('https://api.futmondo.com/1/ranking/round')==1L,fixture$writes==1L)
 })
 cat('PASS legacy catalog/calendar and persisted JSON ranking: recovered playing12 and26 without another ranking request/write\n')

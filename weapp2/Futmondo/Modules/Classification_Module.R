@@ -71,7 +71,7 @@ classification_available_rounds <- function(catalog, history) {
   closed <- if(is.data.frame(rounds)&&all(c("round_number","is_finished")%in%names(rounds)))
     rounds$round_number[rounds$is_finished%in%TRUE]else numeric()
   playing <- if(is.data.frame(rounds)&&all(c("round_number","status")%in%names(rounds)))
-    rounds$round_number[tolower(rounds$status)%in%c("active","playing","in_progress")]else numeric()
+    rounds$round_number[tolower(rounds$status)%in%c("active","playing","in_progress","running")]else numeric()
   numbers <- sort(unique(c(observed,closed,playing,if(isTRUE(catalog$current_verified)&&is.finite(current))current)))
   # Numbered preceding rounds are required coverage even when their completion
   # flags are missing. This is a filter domain, never financial finality.
@@ -127,7 +127,7 @@ classification_remaining_table <- function(standings, history, single, rounds) {
   catalog <- rounds[rounds$round_number%in%as.numeric(single),,drop=FALSE]
   finished <- any(statuses%in%"final") || any(catalog$is_finished%in%TRUE)
   unfinished <- any(statuses%in%"provisional") || any(catalog$is_finished%in%FALSE) ||
-    any(tolower(catalog$status)%in%c("active","playing","in_progress"))
+    any(tolower(catalog$status)%in%c("active","playing","in_progress","running"))
   if(finished || !unfinished)return(standings)
   standings$players_left <- if("players_left"%in%names(selected))
     selected$players_left[match(standings$team_id,selected$team_id)] else rep(NA_real_,nrow(standings))
@@ -226,7 +226,7 @@ classification_Server <- function(id, is_module_active, login_token, championshi
       if(!is.data.frame(rounds)||!nrow(rounds))return(NULL)
       # A numbered playing row is authoritative even when an older saved
       # catalog has no lineup marker. Do not infer a current round from order.
-      playing <- if("status" %in% names(rounds)) rounds$round_number[tolower(rounds$status)%in%c("active","playing","in_progress")] else numeric()
+      playing <- if("status" %in% names(rounds)) rounds$round_number[tolower(rounds$status)%in%c("active","playing","in_progress","running")] else numeric()
       playing <- unique(playing[is.finite(playing)])
       if(!is.finite(number) && length(playing)==1L)number <- playing
       if(!is.finite(number))return(NULL)
@@ -234,7 +234,7 @@ classification_Server <- function(id, is_module_active, login_token, championshi
       # calendar identities, and check at most that marker plus its predecessor.
       candidates <- rounds[is.finite(rounds$round_number)&rounds$round_number<=number,,drop=FALSE]
       candidates <- head(candidates[order(candidates$round_number,decreasing=TRUE),,drop=FALSE],2L)
-      if("status"%in%names(candidates))candidates <- candidates[order(!tolower(candidates$status)%in%c("active","playing","in_progress")),,drop=FALSE]
+      if("status"%in%names(candidates))candidates <- candidates[order(!tolower(candidates$status)%in%c("active","playing","in_progress","running")),,drop=FALSE]
       failure <- NULL;loading <- FALSE
       for(i in seq_len(nrow(candidates))){
         result <- tryCatch(get_classification_round_ranking(login_token(),championship_id(),user_team_id(),
@@ -246,7 +246,7 @@ classification_Server <- function(id, is_module_active, login_token, championshi
         if(!is.null(result)&&is.data.frame(result$rows)&&nrow(result$rows))return(result)
         # A failed known live round remains unavailable. A completed prior
         # round cannot silently replace it as the latest matchday.
-        if("status"%in%names(candidates)&&tolower(candidates$status[i])%in%c("active","playing","in_progress"))break
+        if("status"%in%names(candidates)&&tolower(candidates$status[i])%in%c("active","playing","in_progress","running"))break
       }
       list(rows=data.frame(),loading=loading,error=failure)
     })

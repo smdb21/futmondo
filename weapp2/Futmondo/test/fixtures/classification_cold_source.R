@@ -9,15 +9,18 @@ fixture$active <- list(championships=list(list(id='league',league='competition',
 fixture$leagues <- list(list(`_id`='competition',rounds=lapply(1:38,function(n)
   list(`_id`=paste0('r',n),status=if(n<12)'done'else if(n==12)'next'else'future'))))
 fixture$calendar <- list(rounds=lapply(38:1,function(n)list(`_id`=paste0('r',n),number=n,
-  status=if(n<12)'done'else if(n==12)'playing'else'future')))
-fixture$ranking <- list(metadata=list(status='playing'),ranking=list(
-  list(id='a',name='Alpha',points=26),list(id='b',name='Beta',points=18)))
+  status=if(n<12)'done'else if(n==12)'running'else'future')))
+fixture$ranking <- list(metadata=list(status='V'),ranking=list(
+  list(id='a',name='Alpha',points=26,live=5,starting=26,bench=19),list(id='b',name='Beta',points=18,live=0,starting=18,bench=12)))
 get_sb_url <- function()''
 get_sb_key <- function()''
 supabase_post <- function(...)invisible(TRUE)
 read_rival_finance_evidence <- function(...)list(evidence=fixture$saved,complete=TRUE)
 persist_rival_finance_evidence <- function(evidence,context){
-  fixture$saved <- c(fixture$saved,evidence);fixture$writes <- fixture$writes+1L;TRUE
+  fixture$saved <- c(fixture$saved,evidence)
+  fixture$writes <- fixture$writes+sum(vapply(evidence,function(row)
+    identical(row$payload$kind,'classification_round_ranking'),logical(1)))
+  TRUE
 }
 shared_mvp_source <- function(...)shiny::reactive(list())
 shared_rival_finance_source <- function(...)shiny::reactive({

@@ -2992,7 +2992,9 @@ get_classification_round_ranking <- function(login, championship_id, user_team_i
       }
     }
     payload <- list(header=list(token=login[["token"]],userid=login[["userid"]]),
-      query=list(championshipId=championship_id,roundNumber=as.numeric(round_number),userteamId=user_team_id),answer=list())
+      # The native client sends the opaque round ID under the misleading
+      # roundNumber key. A calendar number returns answer="api.error.general".
+      query=list(championshipId=championship_id,roundNumber=as.character(round_id),userteamId=user_team_id),answer=list())
     response <- futmondo_post("https://api.futmondo.com/1/ranking/round",body=toJSON(payload,auto_unbox=TRUE),
       add_headers(.headers=c("Content-Type"="application/json; charset=utf-8")))
     body <- httr::content(response)

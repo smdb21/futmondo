@@ -11,9 +11,9 @@ read_rival_finance_evidence<-function(...)saved
 persist_rival_finance_evidence<-function(evidence,context){writes<<-c(writes,evidence);TRUE}
 fm_async_read_http<-function(url,method='GET',body=NULL,...){
   stopifnot(identical(url,'https://api.futmondo.com/1/ranking/round'),method=='POST')
-  p<-jsonlite::fromJSON(body);stopifnot(p$query$roundNumber%in%c(12L,13L),identical(p$query$championshipId,cid),identical(p$query$userteamId,'a'))
+  p<-jsonlite::fromJSON(body);stopifnot(p$query$roundNumber%in%c('r12','r13'),identical(p$query$championshipId,cid),identical(p$query$userteamId,'a'))
   requests<<-requests+1L
-  response<-if(p$query$roundNumber==13L)list(metadata=list(status='next'),ranking=list())else answer
+  response<-if(p$query$roundNumber=='r13')list(metadata=list(status='next'),ranking=list())else answer
   promises::promise_resolve(list(status_code=200L,content=charToRaw(jsonlite::toJSON(list(answer=response),auto_unbox=TRUE,null='null',na='null')),times=c(total=0)))
 }
 await<-function(p){done<-FALSE;out<-err<-NULL;promises::then(p,function(x){out<<-x;done<<-TRUE},function(e){err<<-e;done<<-TRUE});deadline<-Sys.time()+3;while(!done&&Sys.time()<deadline)later::run_now(.001);stopifnot(done);if(!is.null(err))stop(err);out}
@@ -46,9 +46,9 @@ stopifnot(isTRUE(future$not_started),nrow(future$rows)==0L,length(writes)==1L,re
 original_catalog<-get_award_round_catalog;original_metadata<-get_award_round_metadata
 get_award_round_catalog<-function(...)list(league_id='competition',current_round_id='r13',current_round_number=13,
   rounds=data.frame(round_id=paste0('r',11:13),round_number=11:13,is_finished=c(TRUE,FALSE,FALSE),status=c('done','next','future')))
-get_award_round_metadata<-function(...)list(status='ok',rows=data.frame(round_id=c('r13','r12','r11'),round_number=c(13,12,11),status=c('next','playing','closed')))
+get_award_round_metadata<-function(...)list(status='ok',rows=data.frame(round_id=c('r13','r12','r11'),round_number=c(13,12,11),status=c('next','running','closed')))
 hydrated<-get_classification_round_catalog(auth,cid)
-stopifnot(hydrated$current_round_number==13,hydrated$rounds$status[hydrated$rounds$round_number==12]=='playing')
+stopifnot(hydrated$current_round_number==13,hydrated$rounds$status[hydrated$rounds$round_number==12]=='running')
 get_award_round_catalog<-original_catalog;get_award_round_metadata<-original_metadata
 ledger<-data.frame();attr(ledger,'round_bonus_totals')<-data.frame(round_number=12,bonus_type=c('points','mvp','dreamteam','ranking'),amount=1)
 bonus<-classification_bonus_table(data.frame(team_id='a'),live$rows,list(cash_ledgers=list(a=ledger)),c(12,12))
@@ -57,7 +57,7 @@ cat('PASS live request/parser: 26/18/15 known answers, missing/negative/zero, on
 # Team identity, rather than current rank/order, controls the remaining count.
 projection <- data.frame(team_id=c('b','absent','a'))
 observed <- data.frame(team_id=c('a','b'),round=12,score_status='provisional',players_left=c(3,0))
-calendar <- data.frame(round_number=12,is_finished=FALSE,status='playing')
+calendar <- data.frame(round_number=12,is_finished=FALSE,status='running')
 projected <- classification_remaining_table(projection,observed,'12',calendar)
 stopifnot(identical(projected$players_left,c(0,NA_real_,3)),
   !'players_left'%in%names(classification_remaining_table(projection,observed,'all',calendar)))
