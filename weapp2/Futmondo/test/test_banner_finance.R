@@ -8,6 +8,11 @@ for (expr in expressions) {
 }
 checks <- 0L
 check <- function(name, code) { force(code); checks <<- checks+1L; cat("PASS",name,"\n") }
+check("league selection lives only on Welcome", {
+  stopifnot(length(htmltools::tagQuery(body)$find("#selected_league")$selectedTags()) == 1L,
+    length(htmltools::tagQuery(body)$find("#shiny-tab-login #selected_league")$selectedTags()) == 1L,
+    grepl("Welcome", as.character(login_UI("login")), fixed=TRUE))
+})
 original_async <- async_adapter_fetch
 calls <- character(); pending <- new.env(parent=emptyenv())
 async_adapter_fetch <- function(fn,args=list(),context,owner=context$session_id,is_current=function()TRUE) {
@@ -65,6 +70,17 @@ shiny::testServer(app_server,{
     added <- if (length(calls)>length(before))tail(calls,length(calls)-length(before))else character()
     stopifnot(!any(added %in% c("get_user_team_info","get_market_players","get_financial_snapshot")))
   })
+  check("balance banner appears only on market, players, and my team", {
+    for (tab in c("today", "players_in_championship", "yourteam")) {
+      session$setInputs(tabs=tab);app_settle(session)
+      stopifnot(grepl("round-countdown-bar",output$round_countdown$html,fixed=TRUE))
+    }
+    for (tab in c("login", "notifications", "lineup", "rivals", "plots", "classification", "round_mvps", "admin")) {
+      session$setInputs(tabs=tab);app_settle(session)
+      stopifnot(is.null(output$round_countdown))
+    }
+    stopifnot(grepl("Welcome",output$menu$html,fixed=TRUE))
+  })
   session$setInputs(tabs="today",refresh_all=1);app_settle(session)
   pending[[team_key]]$resolve(list(budget=-10,withheld=0,teamValue=1000))
   pending[[market_key]]$resolve(data.frame());app_settle(session)
@@ -75,7 +91,12 @@ shiny::testServer(app_server,{
   # Superseding a context must discard known old balance before new data arrives.
   .GlobalEnv$app_champ <- list(id="different-league",name="Other League",userteam=list(id="different-team",name="Other Team"))
   invalidate_resources(resource_context(app_auth),pattern="active_championship")
-  session$setInputs(refresh_all=2);app_settle(session)
+  session$setInputs(tabs="login",refresh_all=2);app_settle(session)
+  check("Welcome updates league context without displaying the banner", {
+    session$setInputs(selected_league="different-league");app_settle(session)
+    stopifnot(identical(championship_id_RV(),"different-league"),is.null(output$round_countdown))
+  })
+  session$setInputs(tabs="today");app_settle(session)
   check("context change clears old team cash while new context loads", {
     html <- output$round_countdown$html
     stopifnot(identical(championship_id_RV(),"different-league"),!grepl("Balance: -10 EUR",html,fixed=TRUE),

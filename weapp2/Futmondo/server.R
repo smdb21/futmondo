@@ -109,6 +109,7 @@ function(input, output, session) {
     tryCatch(get_finished_rounds(login_token_RV(), championship_id_RV()), error=function(e) data.frame())
   })
   output$round_countdown <- renderUI({
+    if (!isTRUE(input$tabs %in% c("today", "players_in_championship", "yourteam"))) return(NULL)
     invalidateLater(1000, session)
     if (!valid_login(login_token_RV())) {
       return(tags$div(class = "round-countdown-bar round-countdown-unavailable",
@@ -304,7 +305,7 @@ observeEvent(login_token_RV(),
 
     # Standard menu items
     menu_items <- list(
-      shinydashboard::menuItem("Login", tabName = "login", icon = icon("right-to-bracket")),
+      shinydashboard::menuItem("Welcome", tabName = "login", icon = icon("right-to-bracket")),
       shinydashboard::menuItem("Notifications", tabName = "notifications", icon = icon("bell")),
       shinydashboard::menuItem("Today's market", tabName = "today", icon = icon("bolt")),
       shinydashboard::menuItem("My team", tabName = "yourteam", icon = icon("users")),

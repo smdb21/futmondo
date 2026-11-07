@@ -16,15 +16,18 @@ body <- shinydashboard::dashboardBody(
   ),
   uiOutput("startup_status"),
   uiOutput("page_preference_status"),
-  # Saved-access feedback must remain visible after navigation away from Login.
+  # Saved-access feedback must remain visible after navigation away from Welcome.
   uiOutput(shiny::NS("login", "remember_feedback")),
-  uiOutput("round_countdown"),
-  selectInput("selected_league", "League", choices = character()),
+  conditionalPanel(
+    condition = "['today', 'players_in_championship', 'yourteam'].includes(input.tabs)",
+    uiOutput("round_countdown")
+  ),
   uiOutput("background_sync"),
   shinydashboard::tabItems(
     shinydashboard::tabItem(tabName="notifications", notifications_UI("notifications")),
     shinydashboard::tabItem(
       tabName = "login",
+      selectInput("selected_league", "League", choices = character()),
       fluidRow(
         column(
           width = 12,

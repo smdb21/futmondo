@@ -4,7 +4,7 @@ login_UI <- function(id) {
     shinydashboardPlus::box(
       width = 4,
       id = ns("login_box"),
-      title = h4("Login"),
+      title = h4("Welcome"),
       solidHeader = TRUE,
       textInput(inputId = ns("user_name"), label = "User name:", placeholder = "User name", value = ""),
       passwordInput(inputId = ns("password"), label = "Password:", placeholder = "password", value = ""),
