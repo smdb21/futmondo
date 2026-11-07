@@ -114,13 +114,58 @@ login_Server <- function(id, user = NULL, password = NULL) {
       login_token_RV(NULL)
       login_feedback_RV(NULL)
     }
+    deny_access <- function(unavailable = FALSE) {
+      signed_out()
+      login_feedback_RV(list(kind="error", message=if (unavailable)
+        "App access could not be verified. Please try logging in again shortly." else
+        "The app is currently restricted to administrators. Please try again when access is reopened."))
+    }
+    authorize <- function(token, on_allowed) {
+      attempt <- generation
+      promises::then(fm_app_access(token, owner=session$token), function(allowed) {
+        if (closed || !identical(attempt, generation)) return(FALSE)
+        if (isTRUE(allowed)) { on_allowed(); return(TRUE) }
+        deny_access(); FALSE
+      }, function(error) {
+        if (!closed && identical(attempt, generation)) deny_access(TRUE)
+        FALSE
+      })
+    }
+    # One bounded asynchronous read every 15 seconds for admitted non-admins.
+    # The database remains authoritative across processes and redeployments.
+    last_access_token <- NULL
+    access_check_busy <- FALSE
+    observe({
+      token <- login_token_RV()
+      if (!valid_login(token) || is_authorized_admin(token)) {
+        last_access_token <<- NULL
+        return()
+      }
+      invalidateLater(15000, session)
+      if (!identical(token, last_access_token)) {
+        last_access_token <<- token
+        return() # Admission already checked the database.
+      }
+      if (access_check_busy) return()
+      access_check_busy <<- TRUE
+      promises::then(authorize(token, function() NULL), function(allowed) {
+        access_check_busy <<- FALSE
+        NULL
+      }, function(error) {
+        access_check_busy <<- FALSE
+        NULL
+      })
+      invisible(NULL)
+    }, priority=200)
     if(exists("remember_login_session",mode="function"))remembered<-remember_login_session(session,
       on_restore=function(token){
         generation<<-generation+1L
-        session$userData$futmondo_user_id<-token[["userid"]]
-        session$userData$startup_stage("loading_leagues")
-        login_feedback_RV(list(kind="success",message="Session restored. Loading your leagues…"))
-        login_token_RV(token)
+        authorize(token, function() {
+          session$userData$futmondo_user_id<-token[["userid"]]
+          session$userData$startup_stage("loading_leagues")
+          login_feedback_RV(list(kind="success",message="Session restored. Loading your leagues…"))
+          login_token_RV(token)
+        })
       },
       on_status=function(kind,message,retry=NULL){remember_feedback(list(kind=kind,message=message));remember_retry(retry)},
       on_begin=function(){login_pending_RV(TRUE);remember_feedback(NULL);remember_retry(NULL)
@@ -165,12 +210,18 @@ login_Server <- function(id, user = NULL, password = NULL) {
         login_pending_RV(FALSE)
         session$sendCustomMessage(session$ns("login_state"),list(busy=FALSE))
         if(valid_login(token)) {
-          session$userData$futmondo_user_id <- token[["userid"]]
-          session$userData$startup_stage("loading_leagues")
-          login_feedback_RV(list(kind="success",message="Signed in. Loading your leagues…"))
-          login_token_RV(token)
-          remember_feedback(NULL);remember_retry(NULL)
-          if(!is.null(remembered))remembered$login(token,isTRUE(isolate(input$remember_login)))
+          login_pending_RV(TRUE)
+          session$sendCustomMessage(session$ns("login_state"),list(busy=TRUE,message="Checking app access…"))
+          authorize(token, function() {
+            login_pending_RV(FALSE)
+            session$sendCustomMessage(session$ns("login_state"),list(busy=FALSE))
+            session$userData$futmondo_user_id <- token[["userid"]]
+            session$userData$startup_stage("loading_leagues")
+            login_feedback_RV(list(kind="success",message="Signed in. Loading your leagues…"))
+            login_token_RV(token)
+            remember_feedback(NULL);remember_retry(NULL)
+            if(!is.null(remembered))remembered$login(token,isTRUE(isolate(input$remember_login)))
+          })
         } else {
           session$userData$futmondo_user_id <- NULL
           session$userData$startup_stage("failed")
@@ -234,7 +285,7 @@ login_Server <- function(id, user = NULL, password = NULL) {
             div(
               class = "login-result login-result-error",
               h4(style = "margin-top: 0; font-weight: 700;", "Login Failed"),
-              p(style = "margin-bottom: 0;", "Could not authenticate with Futmondo. Check your username and password, then try again.")
+              p(style = "margin-bottom: 0;", login_feedback_RV()$message %||% "You are signed out.")
             )
           })
           updateBox(

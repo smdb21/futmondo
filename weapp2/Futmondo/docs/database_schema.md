@@ -32,3 +32,7 @@ The additive migration `scripts/migrations/20261105201845_complete_history_basel
 The bounded, compressed normalized JSON snapshot and completion metadata are stored atomically with encoding, compressed-payload SHA-256, uncompressed byte count, semantic snapshot hash, source observation time and database recorded time. The app rejects partial, malformed, mismatched, oversized or credential-bearing content. Per snapshot limits: 20,000 rows, 16 MiB JSON and 900 KiB encoded payload; the existing queue still caps each job at 1 MiB. A trigger prevents an older concurrent observation overwriting a newer snapshot. This table does not replace factual transfer/auction/bid ledgers or prove their separate writes succeeded. Removing cache rows only forces reacquisition. The normal reset helper clears this cache before factual tables.
 
 The authorized rollout applied this migration to the configured production database on 2026-11-05, recorded as `20261105220658`. Column/constraint/RLS/grant/trigger metadata checks passed; authenticated application cache saves are verified separately.
+
+## Application admission policy
+
+`application_access` is a server-only singleton (`id = main`) with `admin_only BOOLEAN NOT NULL DEFAULT TRUE` and `updated_at TIMESTAMPTZ`. The migration seeds TRUE; RLS and revoked browser grants protect reads/writes. Only service_role can select/insert/update; deletion is not granted and factual-data resets exclude this table. See [app_access.md](app_access.md).

@@ -2261,6 +2261,9 @@
     }
   },
   "files": {
+    "app_access.R": {
+      "checksum": "e83e28820da1428fa23d66747c5b630a"
+    },
     "round_lineup_runtime.R": {
       "checksum": "f74ea5d54355ba254d81d171695ec4fe"
     },
@@ -2292,7 +2295,7 @@
       "checksum": "70cf464787ab043e688a1c24652a072c"
     },
     "global.R": {
-      "checksum": "25d61b8cf63c6a161982aa7d667ca26c"
+      "checksum": "ade2f83eea8f040ca9d2a3a2dd11fbf4"
     },
     "history_baseline_store.R": {
       "checksum": "95296dd4ba7ecdcd93d861a8bf048851"
@@ -2304,13 +2307,13 @@
       "checksum": "ad519c02f856c6b48bcb035d3427f99d"
     },
     "Modules/Admin_Module.R": {
-      "checksum": "09dc52dc51c23f34204ffa9d2fa96ffb"
+      "checksum": "fbfca04b271427fdff60410f9b393f30"
     },
     "Modules/Classification_Module.R": {
       "checksum": "e663a870b654943f22670215019521d5"
     },
     "Modules/Login_Module.R": {
-      "checksum": "6a78dbb400b40482a93e09dd9886983d"
+      "checksum": "187a7ded863473d5f0d50732e4bfbe44"
     },
     "Modules/Market_Module.R": {
       "checksum": "676429892e2008352ddce0a3a4a2e32b"
@@ -2352,7 +2355,7 @@
       "checksum": "7970542b6567083df9c51aa00e550bbe"
     },
     "remember_login.R": {
-      "checksum": "a243c91a9c01604ce74d517e116e3e61"
+      "checksum": "bf22ac53858d8d735951c8b001e1a691"
     },
     "rival_calculation_store.R": {
       "checksum": "7e8ba27e8188220995297b76414cacec"

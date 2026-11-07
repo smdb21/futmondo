@@ -62,14 +62,14 @@ remember_login_validate<-function(token,owner=""){
  if(validate_status=="ok")promises::promise_resolve(TRUE) else promises::promise_reject(
   if(validate_status=="unauthorized")structure(list(message="HTTP401",http_status=401L),class=c("error","condition")) else simpleError("private API diagnostic"))
 }
-fixture<-function(websocket_origin="https://app.invalid"){
+fixture<-function(websocket_origin="https://app.invalid",restore=NULL){
  s<-new.env(parent=emptyenv());s$token<-remember_login_random();s$request<-list(HTTP_ORIGIN=websocket_origin)
  s$clientData<-shiny::reactiveValues(url_pathname="/futmondo/");s$messages<-list();s$ends<-list();s$filter<-NULL
  s$ns<-function(id)paste0("login-",id);s$sendCustomMessage<-function(type,message){s$messages[[length(s$messages)+1L]]<-list(type=type,message=message)}
  s$registerDataObj<-function(name,data,filterFunc){s$filter<-filterFunc;"session/fixture/dataobj/remember?w="}
  s$onFlushed<-function(fn,once=TRUE)fn();s$onSessionEnded<-function(fn){s$ends[[length(s$ends)+1L]]<-fn}
  f<-new.env(parent=emptyenv());f$statuses<-list();f$auth<-NULL;f$begin<-0L;f$end<-0L;f$expired<-FALSE;f$s<-s
- f$r<-remember_login_session(s,function(token)f$auth<-token,function(kind,message,retry=NULL)f$statuses[[length(f$statuses)+1L]]<-list(kind=kind,message=message,retry=retry),
+ f$r<-remember_login_session(s,function(token){if(is.function(restore))restore(token)else f$auth<-token},function(kind,message,retry=NULL)f$statuses[[length(f$statuses)+1L]]<-list(kind=kind,message=message,retry=retry),
   function()f$begin<-f$begin+1L,function()f$end<-f$end+1L,function()f$expired<-TRUE)
  f$init<-function()shiny:::flushReact()
  f$call<-function(cookie=NULL,method="POST",origin="https://app.invalid",csrf=f$r$state$csrf,ticket=f$r$state$seq,action=f$r$state$action,host="app.invalid",fetch_site="same-origin"){
@@ -185,6 +185,15 @@ check("disabled restoration still permits logout cleanup of an existing cookie",
  hash<-f$r$state$hash;f$close();remember_login_enabled<-function()FALSE
  g<-fixture();g$init();g$r$logout();res<-g$call(cookie)
  stopifnot(grepl("Max-Age=0",res$headers$`Set-Cookie`,fixed=TRUE),is.null(records[[hash]]));g$close()
+})
+check("asynchronous application denial cannot activate a remembered session",{
+ remember_login_enabled<-function()TRUE
+ f<-fixture();f$init();f$r$login(auth,TRUE);cookie<-new_cookie(f,f$call())
+ completed<-FALSE
+ g<-fixture(restore=function(token)promises::promise(function(resolve,reject){later::later(function(){completed<<-TRUE;resolve(FALSE)},.02)}))
+ g$init();res<-g$call(cookie)
+ stopifnot(completed,jsonlite::fromJSON(res$content)$status=="blocked",is.null(g$auth),is.null(g$r$state$token),is.null(g$r$state$expiry_cancel),g$begin==1L,g$end==1L)
+ f$r$logout();f$call(cookie);f$close();g$close()
 })
 remember_login_enabled<-original_enabled
 check("feature is gated and ordinary login remains available without configuration",{

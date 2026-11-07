@@ -243,8 +243,13 @@ remember_login_session <- function(session,on_restore,on_status,on_begin,on_end,
       request<-remember_login_validate(decoded$token,owner)
       promises::then(request,function(...){
         if(!current(seq))return(remember_login_response("cancelled",http_status=409L))
-        state$token<-decoded$token;expiry(decoded$expires);on_restore(decoded$token);on_end()
-        remember_login_response("restored")
+        promises::then(promises::promise_resolve(on_restore(decoded$token)),function(allowed){
+          if(!current(seq))return(remember_login_response("cancelled",http_status=409L))
+          on_end()
+          if(identical(allowed,FALSE)){state$token<-NULL;return(remember_login_response("blocked"))}
+          state$token<-decoded$token;expiry(decoded$expires)
+          remember_login_response("restored")
+        })
       },function(error){
         if(!current(seq))return(remember_login_response("cancelled",http_status=409L))
         # 403 may be a hosting/firewall/storage policy problem; only an explicit

@@ -43,6 +43,7 @@ app_champ <- list(id='champ',name='Offline League',userteam=list(id='team1',name
 app_rounds <- data.frame(round_id=c('r1','r2'),round_number=1:2,begin_process=c('2026-08-15T00:00:00Z','2026-08-22T00:00:00Z'),is_finished=TRUE)
 login <- function(...) app_auth
 fm_async_login <- function(...) promises::promise_resolve(app_auth)
+fm_access_store <- function(...) promises::promise_resolve(FALSE) # explicit open-policy fixture
 get_championships <- function(...) unlist(app_champ)
 get_active_championships <- function(...) list(championships=list(app_champ))
 get_teams <- function(...) app_teams

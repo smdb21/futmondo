@@ -109,7 +109,7 @@ admin_league_settings_UI <- function(rows,stale=FALSE) {
 
 admin_UI <- function(id) {
  ns<-NS(id)
- tagList(h2("League settings"),uiOutput(ns("league_settings")),h2("Database administration"),p("Inspect retained factual tables. Changes require an authorized administrator."),
+ tagList(h2("App access"),uiOutput(ns("access_control")),h2("League settings"),uiOutput(ns("league_settings")),h2("Database administration"),p("Inspect retained factual tables. Changes require an authorized administrator."),
   actionButton(ns("btn_refresh_stats"),"Refresh table counts"),reactable::reactableOutput(ns("tables_stats_table")),
   actionButton(ns("btn_verify_db"),"Verify database connection"),
   h3("Round awards"),p("Saved selections improve reward estimates. Historical eligibility and payment coverage are checked separately."),
@@ -122,6 +122,7 @@ admin_Server <- function(id,is_module_active,login_token,championship_id,user_te
  moduleServer(id,function(input,output,session){
   ns<-session$ns
   authorized<-reactive(valid_login(login_token()) && if(is.function(is_admin))isTRUE(is_admin())else if(!is.null(is_admin))isTRUE(is_admin)else is_authorized_admin(login_token()))
+  fm_admin_access(session,login_token,reactive(isTRUE(is_module_active()) && isTRUE(authorized())))
   output$league_settings<-renderUI({
    req(is_module_active(),authorized())
    if(!is.function(league_settings_source))return(tags$p("League settings are unavailable."))

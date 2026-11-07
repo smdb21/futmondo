@@ -66,3 +66,7 @@ Existing reward, roster-size, team-count and season fields remain displayed. `ex
 [Official clause help](https://help.futmondo.com/article/156-que-son-las-clausulas-y-como-activarlas) establishes daily processing and cutoff behavior. An exact arrival must use the player's `championship.clause.transferDate`, not purchase time plus `playerMoveInDays * 86400`. Incoming-player reconciliation already follows that timestamp. Current settings are not proof of historical rules or paid rewards.
 
 Top-level `withheld` is reserved funds, `teamValue` is squad valuation, `points`/`position` describe standings, and `maxBid` is the API monetary bidding limit. League identity, permissions, sponsorship, subscription and staff metadata are not additional configurable financial rules and do not become budget assumptions.
+
+## Application access
+
+The first Admin section contains the database-backed, default-enabled Block non-admin access switch. Normal and remembered logins enforce it on the server; active non-admin sessions recheck it every 15 seconds. See [app_access.md](app_access.md) for failure handling, privileges and request bounds.
