@@ -131,7 +131,7 @@ login_Server <- function(id, user = NULL, password = NULL) {
         FALSE
       })
     }
-    # One bounded asynchronous read every 15 seconds for admitted non-admins.
+    # One bounded asynchronous read every 2 minutes for admitted non-admins.
     # The database remains authoritative across processes and redeployments.
     last_access_token <- NULL
     access_check_busy <- FALSE
@@ -141,7 +141,7 @@ login_Server <- function(id, user = NULL, password = NULL) {
         last_access_token <<- NULL
         return()
       }
-      invalidateLater(15000, session)
+      invalidateLater(120000, session)
       if (!identical(token, last_access_token)) {
         last_access_token <<- token
         return() # Admission already checked the database.

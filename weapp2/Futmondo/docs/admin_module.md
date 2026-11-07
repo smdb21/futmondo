@@ -69,4 +69,4 @@ Top-level `withheld` is reserved funds, `teamValue` is squad valuation, `points`
 
 ## Application access
 
-The first Admin section contains the database-backed, default-enabled Block non-admin access switch. Normal and remembered logins enforce it on the server; active non-admin sessions recheck it every 15 seconds. See [app_access.md](app_access.md) for failure handling, privileges and request bounds.
+The first Admin section contains the database-backed, default-enabled Block non-admin access switch. Normal and remembered logins enforce it on the server; active non-admin sessions recheck it every 2 minutes. See [app_access.md](app_access.md) for failure handling, privileges and request bounds.

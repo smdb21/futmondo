@@ -737,3 +737,7 @@ Complete normalized offer observations now persist in the existing server-only e
 ## Administrator-controlled app access — 2026-11-07
 
 Implemented: default-enabled Admin switch with server-only database persistence, normal/remembered admission gating, fail-closed errors, admin access preservation, and serialized active-session rechecks. Hosted migration is installed with the enabled seed. Focused synthetic and hosted schema verification are recorded in data_review_results.md; hosted application deployment remains separate.
+
+## App access recheck interval — 2026-11-07
+
+Changed active non-admin access rechecks to two minutes at the user’s request. Initial admission still checks the persisted policy immediately. The timer-boundary regression, deployment contract and mandatory offline lifecycle passed; see data_review_results.md.

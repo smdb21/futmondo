@@ -80,7 +80,10 @@ check('active non-admin session is removed on the next policy check',{
   session$setInputs(user_name='fixture',password='synthetic',login_button=1)
   settle(session,function()valid_login(login_token_RV()))
   blocked_policy<<-TRUE
-  session$elapse(15001)
+  before<-reads
+  session$elapse(119999);settle(session)
+  stopifnot(valid_login(login_token_RV()),reads==before)
+  session$elapse(2)
   settle(session,function()is.null(login_token_RV()));stopifnot(grepl('restricted',login_feedback_RV()$message))
  })
 })
