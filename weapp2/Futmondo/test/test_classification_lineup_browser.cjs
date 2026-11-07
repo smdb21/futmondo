@@ -42,6 +42,9 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
       assert.deepEqual(await modal.locator('.fm-lineup-bench-row .fm-lineup-player').evaluateAll(nodes=>nodes.map(n=>n.dataset.playerId)),['bench-0','','bench-2','bench-3']);
       assert.equal(await modal.locator('.fm-lineup-pitch .fm-lineup-in').count(),1);
       assert.equal(await modal.locator('.fm-lineup-bench-row .fm-lineup-out').count(),1);
+      assert.equal(await modal.locator('[data-player-id="own-3"] .fm-lineup-points').innerText(),'7*');
+      assert.equal(await modal.locator('[data-player-id="bench-3"] .fm-lineup-points').innerText(),'-4*');
+      assert.match(await modal.locator('.fm-lineup-legend').innerText(),/Provisional points/);
       const pitch = await modal.locator('.fm-lineup-pitch').boundingBox();
       assert.ok(pitch.width <= width && pitch.x>=0 && pitch.x+pitch.width<=width);
       const overflow = await modal.locator('.fm-lineup-player').evaluateAll(nodes => nodes.some(n=>n.scrollWidth>n.clientWidth+1));
@@ -79,6 +82,7 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
       await modal.getByText('Formation 3-6-1',{exact:true}).waitFor();
       assert.match(await modal.locator('.modal-title').innerText(),/Rival Team/);
       await modal.locator('.fm-lineup-pitch [data-player-id="rival-0"]').waitFor();
+      assert.equal(await modal.locator('[data-player-id="rival-3"] .fm-lineup-points').innerText(),'7*');
       await modal.getByRole('button',{name:'Close',exact:true}).click();
       await page.getByRole('tab',{name:'Partial classifications',exact:true}).click();
       await page.locator('#classification-round_range_slider').waitFor({state:'visible'});

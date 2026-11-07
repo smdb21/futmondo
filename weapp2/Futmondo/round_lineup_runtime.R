@@ -26,7 +26,10 @@ round_lineup_slots <- function(items,size) {
     if(!is.finite(position)||position!=floor(position)||position<0||position>=size||!is.null(slots[[position+1L]]))
       stop("Historical lineup position unavailable")
     # Only the public display fields cross the persistence boundary.
-    clean<-player[intersect(c("id","name","photo","position","points","changed","rated","zeroPointsReason","customPoints"),names(player))]
+    clean<-player[intersect(c("id","name","photo","position","role","points","changed","rated","zeroPointsReason","customPoints"),names(player))]
+    if(is.list(player$detailedPoints))clean$detailedPoints<-list(po=lapply(
+      round_lineup_records(player$detailedPoints$po),function(score)
+        if(is.list(score))score[intersect(c("mode","r","p"),names(score))]else list()))
     if(is.list(player$team))clean$team<-player$team[intersect(c("id","name","logo"),names(player$team))]
     slots[position+1L]<-list(clean)
   }
@@ -42,22 +45,24 @@ normalize_round_lineup <- function(answer) {
   field<-round_lineup_slots(answer$players,11L)
   bench<-round_lineup_slots(answer$bench$players %||% list(),4L)
   list(strategy=strategy,rows=c(rev(parts),1L),players=field,bench=bench,
-    status=mvp_text(answer$status),negative=rival_flag(answer$negative))
+    status=mvp_text(answer$status),pointSystem=mvp_text(answer$pointSystem,"press"),negative=rival_flag(answer$negative))
 }
 round_lineup_clean_answer <- function(answer) {
   normalized<-normalize_round_lineup(answer)
   list(strategy=normalized$strategy,players=Filter(Negate(is.null),normalized$players),
-    bench=list(players=Filter(Negate(is.null),normalized$bench)),status=normalized$status,negative=normalized$negative)
+    bench=list(players=Filter(Negate(is.null),normalized$bench)),status=normalized$status,
+    pointSystem=normalized$pointSystem,negative=normalized$negative)
 }
 round_lineup_scope <- function(context) context[c("account_id","championship_id","user_team_id","season","scoring_version")]
-round_lineup_snapshot_id <- function(context,round_id) paste0("rival-cache:round-lineup-v1:",
+# v1 discarded provisional score inputs; it cannot hydrate a complete display.
+round_lineup_snapshot_id <- function(context,round_id) paste0("rival-cache:round-lineup-v2:",
   as.character(openssl::sha256(serialize(list(team=context$user_team_id,round=round_id,scoring=context$scoring_version),NULL,version=2))))
 persist_round_lineup_snapshot <- function(data,context) {
   if(!is.list(data)||isTRUE(data$from_saved)||!is.null(attr(data,"fetch_error")))return(invisible(FALSE))
   answer<-tryCatch(round_lineup_clean_answer(data$answer),error=function(e)NULL)
   stamp<-fm_time(attr(data,"observed_at"))
   if(is.null(answer)||length(stamp)!=1L||is.na(stamp)||!nzchar(mvp_text(data$round_id)))return(invisible(FALSE))
-  payload<-list(kind="classification_round_lineup",version=1L,scope=round_lineup_scope(context),round_id=data$round_id,
+  payload<-list(kind="classification_round_lineup",version=2L,scope=round_lineup_scope(context),round_id=data$round_id,
     answer=answer,source="futmondo",source_observed_at=rival_finance_stamp(stamp),
     valid_until=rival_finance_stamp(stamp+300),completeness="complete")
   record<-rival_finance_evidence(context$account_id,context$championship_id,context$season,"eligibility",
@@ -73,7 +78,7 @@ read_saved_round_lineup <- function(context,round_id,now=Sys.time()) {
   tryCatch({
     record<-rival_evidence_decode(saved)[[1]];p<-record$payload;scope<-round_lineup_scope(context)
     stamp<-fm_time(p$source_observed_at);until<-fm_time(p$valid_until)
-    if(!is.list(p)||as.numeric(object.size(p))>256*1024L||!identical(record$evidence_type,"eligibility")||!identical(p$kind,"classification_round_lineup")||!identical(as.integer(p$version),1L)||
+    if(!is.list(p)||as.numeric(object.size(p))>256*1024L||!identical(record$evidence_type,"eligibility")||!identical(p$kind,"classification_round_lineup")||!identical(as.integer(p$version),2L)||
        !identical(p$completeness,"complete")||!identical(p$source,"futmondo")||!identical(mvp_text(p$round_id),as.character(round_id))||
        !is.list(p$scope)||!setequal(names(p$scope),names(scope))||
        !all(vapply(names(scope),function(k)identical(mvp_text(p$scope[[k]]),mvp_text(scope[[k]])),logical(1)))||
@@ -110,11 +115,29 @@ get_round_lineup_snapshot <- function(login,championship_id,user_team_id,round_i
     result
   },timeout_sec=300,context=context)
 }
-round_lineup_player_ui <- function(player,bench=FALSE,index) {
+round_lineup_player_score <- function(player,point_system="press",status="") {
+  points<-NA_real_;provisional<-FALSE
+  if(is.list(player)){
+    if(nzchar(mvp_text(player$zeroPointsReason)))points<-0
+    else if(isTRUE(player$rated))points<-fm_number(player$points)
+    else if(is.list(player$detailedPoints)){
+      # Official RoundLineUp._getPlayerPoints selects the mode AND chosen role.
+      scores<-Filter(function(score)is.list(score)&&nzchar(mvp_text(player$role))&&
+        identical(mvp_text(score$mode),point_system)&&identical(mvp_text(score$r),mvp_text(player$role)),
+        round_lineup_records(player$detailedPoints$po))
+      if(length(scores)==1L)points<-fm_number(scores[[1]]$p)
+      provisional<-is.finite(points)
+    }else if(is.null(player$rated))points<-fm_number(player$points)
+    # An explicit unrated flag without a matching score is not a numeric zero.
+  }
+  list(points=points,provisional=is.finite(points)&&(provisional||status%in%c("running","playing")))
+}
+round_lineup_player_ui <- function(player,bench=FALSE,index,point_system="press",status="") {
   occupied<-is.list(player)&&nzchar(mvp_text(player$id))
   changed<-occupied&&isTRUE(player$changed)
   label<-if(occupied)mvp_text(player$name,paste("Player",mvp_text(player$id)))else "Empty position"
-  points<-if(occupied)fm_number(player$points)else NA_real_
+  score<-round_lineup_player_score(if(occupied)player else NULL,point_system,status)
+  points<-score$points
   photo<-if(occupied)mvp_text(player$photo)else ""
   logo<-if(occupied)mvp_text(player$team$logo)else ""
   asset_url<-function(value,base){
@@ -129,7 +152,8 @@ round_lineup_player_ui <- function(player,bench=FALSE,index) {
   shiny::div(class=paste("fm-lineup-player",if(!occupied)"fm-lineup-empty",if(changed)if(bench)"fm-lineup-out"else"fm-lineup-in"),
     `data-slot`=index,`data-player-id`=if(occupied)mvp_text(player$id)else "",title=label,
     if(bench)shiny::span(class="fm-lineup-order",paste("Bench",index)),
-    shiny::div(class="fm-lineup-points",if(occupied)if(is.finite(points))format(points,trim=TRUE)else "—" else "—"),
+    shiny::div(class="fm-lineup-points",title=if(score$provisional)"Provisional points"else"Round points",
+      if(is.finite(points))paste0(format(points,trim=TRUE),if(score$provisional)"*"else"")else "—"),
     shiny::div(class="fm-lineup-portrait",
       if(safe_image(photo))shiny::tags$img(src=photo,alt="",loading="lazy",onerror="this.style.display='none'")
       else shiny::span(class="fm-lineup-silhouette",if(occupied)"●"else "+",`aria-hidden`="true"),
@@ -146,8 +170,10 @@ round_lineup_pitch_ui <- function(answer) {
     shiny::div(class="fm-lineup-pitch",role="group",`aria-label`=paste("Pitch, formation",lineup$strategy),
       shiny::div(class="fm-lineup-markings",`aria-hidden`="true",shiny::div(class="fm-lineup-circle"),shiny::div(class="fm-lineup-goal-top"),shiny::div(class="fm-lineup-goal-bottom")),
       lapply(which(lineup$rows>0),function(row)shiny::div(class="fm-lineup-row",style=paste0("--lineup-count:",lineup$rows[row]),
-        lapply(seq.int(starts[row],ends[row]),function(i)round_lineup_player_ui(lineup$players[[i]],index=i))))),
+        lapply(seq.int(starts[row],ends[row]),function(i)round_lineup_player_ui(lineup$players[[i]],index=i,
+          point_system=lineup$pointSystem,status=lineup$status))))),
     shiny::div(class="fm-lineup-bench",shiny::h4("Substitutes"),shiny::div(class="fm-lineup-bench-row",
-      lapply(seq_len(4L),function(i)round_lineup_player_ui(lineup$bench[[i]],bench=TRUE,index=i)))),
-    shiny::p(class="fm-lineup-legend","↑ Substituted in · ↓ Substituted out · — Points unavailable. Bench order is 1–4."))
+      lapply(seq_len(4L),function(i)round_lineup_player_ui(lineup$bench[[i]],bench=TRUE,index=i,
+        point_system=lineup$pointSystem,status=lineup$status)))),
+    shiny::p(class="fm-lineup-legend","* Provisional points · ↑ Substituted in · ↓ Substituted out · — Points unavailable. Bench order is 1–4."))
 }

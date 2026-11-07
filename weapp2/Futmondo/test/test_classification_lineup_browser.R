@@ -15,7 +15,11 @@ get_round_lineup_snapshot <- function(login,championship_id,user_team_id,round_i
   slots <- setdiff(0:10,4)
   players <- lapply(slots,function(i)list(id=paste(user_team_id,i,sep='-'),position=i,name=paste(if(user_team_id=='own')'Own'else'Rival',i),points=if(i==2)0 else i,changed=i==1))
   bench <- lapply(c(3,0,2),function(i)list(id=paste0('bench-',i),position=i,name=paste('Reserve',i),points=i,changed=i==2))
-  list(round_id=round_id,answer=list(strategy=if(round_id=='round-eleven')'3-6-1'else'4-3-3',players=players,bench=list(players=bench),status='done'))
+  players[[4]]$rated<-FALSE;players[[4]]$role<-'centrocampista';players[[4]]$points<-0
+  players[[4]]$detailedPoints<-list(po=list(list(mode='press',r='centrocampista',p=7)))
+  bench[[1]]$rated<-FALSE;bench[[1]]$role<-'delantero';bench[[1]]$points<-0
+  bench[[1]]$detailedPoints<-list(po=list(list(mode='press',r='delantero',p=-4)))
+  list(round_id=round_id,answer=list(strategy=if(round_id=='round-eleven')'3-6-1'else'4-3-3',players=players,bench=list(players=bench),status='done',pointSystem='press'))
 }
 ui <- shinydashboard::dashboardPage(shinydashboard::dashboardHeader(title='Lineup fixture'),shinydashboard::dashboardSidebar(disable=TRUE),
   shinydashboard::dashboardBody(tags$head(tags$style(HTML(fm_theme_css())),includeCSS('www/custom_style.css')),

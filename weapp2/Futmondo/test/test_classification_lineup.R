@@ -8,7 +8,37 @@ player<-function(id,position,changed=FALSE,points=5)list(id=id,name=paste('Playe
 raw<-list(strategy='3-6-1',status='done',negative=FALSE,
   players=list(player('keeper',10),player('incoming',4,TRUE),player('striker',0,points=0),player('lastdef',9,points=-2)),
   bench=list(players=list(player('fourth',3),player('outgoing',1,TRUE),player('first',0,points=NA_real_))))
+live_player<-player('unrated',2,points=0)
+live_player$rated<-FALSE;live_player$role<-'centrocampista'
+live_player$detailedPoints<-list(po=list(list(mode='stats',r='centrocampista',p=99),
+  list(mode='press',r='defensa',p=11),list(mode='press',r='centrocampista',p=7,private='discard')),private='discard')
+raw$pointSystem<-'press';raw$players<-c(raw$players,list(live_player))
+raw$bench$players[[1]]$rated<-FALSE;raw$bench$players[[1]]$role<-'delantero'
+raw$bench$players[[1]]$detailedPoints<-list(po=list(list(mode='press',r='delantero',p=-4)))
 auth<-c(userid='u',token='synthetic-private-token');ctx<-resource_context(auth,'league','a',season=league_season_context('league'))
+check('unrated pitch and bench points use the official scoring mode and chosen role instead of placeholder zero',{
+  clean<-round_lineup_clean_answer(raw)
+  stopifnot(clean$pointSystem=='press',round_lineup_player_score(clean$players[[2]],'press')$points==7,
+    round_lineup_player_score(clean$bench$players[[3]],'press')$points== -4,
+    !grepl('private|discard',jsonlite::toJSON(clean,auto_unbox=TRUE)))
+  html<-htmltools::renderTags(round_lineup_pitch_ui(clean))$html
+  stopifnot(grepl('title="Provisional points">7\\*</div>',html),grepl('title="Provisional points">-4\\*</div>',html))
+  stats<-raw;stats$pointSystem<-'stats'
+  stopifnot(grepl('title="Provisional points">99\\*</div>',htmltools::renderTags(round_lineup_pitch_ui(stats))$html))
+})
+check('rated, reasoned zero, provisional zero and unavailable points remain distinct',{
+  p<-live_player;p$rated<-TRUE;p$points<- -2
+  stopifnot(round_lineup_player_score(p)$points== -2,!round_lineup_player_score(p)$provisional,
+    round_lineup_player_score(p,status='running')$provisional)
+  p$zeroPointsReason<-'notPlayed';stopifnot(round_lineup_player_score(p)$points==0)
+  p<-live_player;p$detailedPoints$po[[3]]$p<-0
+  stopifnot(round_lineup_player_score(p)$points==0,round_lineup_player_score(p)$provisional)
+  p$detailedPoints<-NULL;stopifnot(is.na(round_lineup_player_score(p)$points))
+  p<-live_player;p$role<-'portero';stopifnot(is.na(round_lineup_player_score(p)$points))
+  p<-live_player;p$detailedPoints$po[[3]]$p<-NULL;stopifnot(is.na(round_lineup_player_score(p)$points))
+  p<-live_player;p$detailedPoints$po[[4]]<-p$detailedPoints$po[[3]]
+  stopifnot(is.na(round_lineup_player_score(p)$points))
+})
 check('official positions retain eleven places, 3-6-1 rows, holes and four ordered bench positions',{
   got<-normalize_round_lineup(raw)
   stopifnot(identical(got$rows,c(1L,6L,3L,1L)),length(got$players)==11L,length(got$bench)==4L,
@@ -85,6 +115,7 @@ futmondo_post<-function(url,...){
 check('first retrieval uses opaque round ID and persists full success without authentication',{
   clear_api_cache();got<-get_round_lineup_snapshot(auth,'league','a','opaque-round')
   stopifnot(calls==1L,db_reads==1L,length(saved)==1L,saved[[1]]$payload$completeness=='complete',
+    saved[[1]]$payload$version==2L,grepl('round-lineup-v2:',saved[[1]]$source_id,fixed=TRUE),
     !grepl('synthetic-private-token',jsonlite::toJSON(saved,auto_unbox=TRUE)),normalize_round_lineup(got$answer)$players[[5]]$id=='incoming')
 })
 check('memory reuse and persisted JSON reuse avoid repeat API calls after memory clears',{
@@ -92,6 +123,8 @@ check('memory reuse and persisted JSON reuse avoid repeat API calls after memory
   clear_api_cache();got<-get_round_lineup_snapshot(auth,'league','a','opaque-round')
   stopifnot(calls==1L,db_reads==2L,isTRUE(got$from_saved),normalize_round_lineup(got$answer)$bench[[2]]$id=='outgoing',
     normalize_round_lineup(got$answer)$players[[5]]$team$logo=='club.png')
+  html<-htmltools::renderTags(round_lineup_pitch_ui(got$answer))$html
+  stopifnot(grepl('title="Provisional points">7\\*</div>',html),grepl('title="Provisional points">-4\\*</div>',html))
 })
 check('wrong scope and expired snapshots refetch; failures preserve truthful stale data',{
   original<-saved;saved[[1]]$payload$scope$user_team_id<-'other'
