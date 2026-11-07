@@ -63,6 +63,12 @@ fm_transport_pump<-function(){
     # FIFO within each class; a normal request follows at most four interactive
     # dispatches while both classes wait. Never interrupt an active request.
     high<-which(interactive);normal<-which(!interactive)
+    # Backfills may occupy three sockets; the fourth remains available to a
+    # user request. Keep the existing total cap and fairness among eligible work.
+    normal_active<-sum(vapply(.fm_transport$tasks,function(task)
+      isTRUE(task$active)&&!identical(task$priority,"interactive"),logical(1)))
+    if(normal_active>=3L)normal<-integer()
+    if(!length(high)&&!length(normal))break
     pick<-if(length(high)&&(!length(normal)||.fm_transport$interactive_run<4L))high[1]else normal[1]
     .fm_transport$interactive_run<-if(interactive[pick])min(4L,.fm_transport$interactive_run+1L)else 0L
     fm_transport_start(waiting[pick])
@@ -108,11 +114,11 @@ fm_async_http<-function(url,method="GET",body=NULL,headers=character(),owner="",
 fm_httr_response<-function(response,url){
   structure(list(url=url,status_code=response$status_code,headers=httr::insensitive(list(`content-type`="application/json; charset=utf-8")),all_headers=list(),cookies=data.frame(),content=response$content,date=Sys.time(),times=c(total=response$times[["total"]] %||% 0),request=list(method="POST",url=url)),class="response")
 }
-async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is_current=function()TRUE,priority=NULL){
+async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is_current=function()TRUE,priority=NULL,on_progress=NULL){
   name<-if(is.character(fn))fn else deparse(substitute(fn))
   if(length(name)!=1L||!grepl("^(get_|read_|calculate_league_finances$)",name))return(promises::promise_reject(simpleError("Only factual reads may use asynchronous adapters")))
   if(is.null(priority))priority<-if(name%in%c("get_team_acquisition_capacity","get_acquisition_capacity",
-    "get_player_summary","get_my_market_players"))"interactive"else "normal"
+    "get_player_summary","get_my_market_players","get_round_lineup_snapshot"))"interactive"else "normal"
   priority<-fm_transport_priority(priority)
   if(identical(name,"get_team_acquisition_capacity")&&exists("get_team_acquisition_capacity_async",mode="function"))
     return(do.call(get_team_acquisition_capacity_async,c(args,list(context=context,is_current=is_current,priority=priority,owner=owner))))
@@ -135,6 +141,16 @@ async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is
     failure
   }
   adapter_env$resource_log_failure<-report_failure
+  # Composite reads replay after each HTTP response. Publish the same saved
+  # snapshot once, without extending its source timestamp or cache deadline.
+  progress_key<-NULL
+  adapter_env$publish_resource_progress<-function(data){
+    if(!is.function(on_progress)||is.null(data)||!isTRUE(tryCatch(is_current(),error=function(e)FALSE)))return(invisible(FALSE))
+    key<-as.character(openssl::sha256(serialize(data,NULL)))
+    if(identical(progress_key,key))return(invisible(FALSE))
+    progress_key<<-key
+    tryCatch({on_progress(data);invisible(TRUE)},error=function(e)invisible(FALSE))
+  }
   started_at<-Sys.time();adapter_env$Sys.time<-function()started_at
   adapter_env$resource_store<-resource_store;adapter_env$resource_cache_prune<-resource_cache_prune
   need<-function(url,method,body=NULL,headers=character(),decode=FALSE){

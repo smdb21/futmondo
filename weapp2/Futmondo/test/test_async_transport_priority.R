@@ -32,7 +32,7 @@ main<-function(){
   })
   curl::multi_run(timeout=2,pool=pool)
   stopifnot(identical(results[[5]],FALSE),is.null(stats('old-timeout')$counts[['/request-5']]))
-  blockers<-lapply(1:4,function(i)fm_async_http(url(paste0('block-',i),250,'new-timeout'),owner='timeout'))
+  blockers<-lapply(1:3,function(i)fm_async_http(url(paste0('block-',i),250,'new-timeout'),owner='timeout'))
   flush(.03);start<-Sys.time()
   target<-fm_async_http(url('target',20,'new-timeout'),owner='timeout',timeout=.1)
   stopifnot(await(target)$status_code==200L,as.numeric(Sys.time()-start)>.18)
@@ -58,6 +58,20 @@ main<-function(){
   stopifnot(priority$total<ordinary$total*.6,priority$total<500)
   cat(sprintf('MEASURE capacity_normal_ms=%.0f capacity_interactive_ms=%.0f server_work_ms=80 requests_each=12 max_connections=4\n',ordinary$total,priority$total))
  })
+ check('a foreground request completes while three slow background sockets remain active',{
+  jobs<-lapply(1:6,function(i)fm_async_http(url(paste0('background-',i),400,'reserved'),owner='reserved'))
+  flush(.03)
+  normal_active<-function()sum(vapply(.fm_transport$tasks,function(task)isTRUE(task$active)&&task$priority=='normal',logical(1)))
+  stopifnot(normal_active()==3L,sum(vapply(.fm_transport$tasks,function(task)isTRUE(task$active),logical(1)))==3L)
+  start<-Sys.time();target<-fm_async_http(url('foreground',20,'reserved'),owner='reserved',priority='interactive')
+  stopifnot(await(target)$status_code==200L,normal_active()==3L)
+  elapsed<-as.numeric(difftime(Sys.time(),start,units='secs'))*1000
+  await(promises::promise_all(.list=jobs));clean()
+  result<-stats('reserved');background<-result$events[grepl('background-',result$events$route),]
+  stopifnot(nrow(result$events)==7L,all(result$counts==1L),result$maxActive==4L,
+   max(vapply(background$arrival,function(at)sum(background$arrival<=at&background$finished>at),integer(1)))==3L)
+  cat(sprintf('MEASURE foreground_with_reserved_slot_ms=%.0f background_delay_ms=400 background_connections=3 max_connections=4 requests=7\n',elapsed))
+ })
  check('normal FIFO requests run after at most four interactive dispatches',{
   original_start<-fm_transport_start;order<-character();.fm_transport$interactive_run<-0L
   fm_transport_start<<-function(id){order<<-c(order,basename(sub('\\?.*$','',.fm_transport$tasks[[id]]$url)));original_start(id)}
@@ -69,14 +83,14 @@ main<-function(){
  check('coalescing promotes an already queued read without adding a request',{
   original_start<-fm_transport_start;order<-character();.fm_transport$interactive_run<-0L
   fm_transport_start<<-function(id){order<<-c(order,basename(sub('\\?.*$','',.fm_transport$tasks[[id]]$url)));original_start(id)}
-  jobs<-lapply(1:4,function(i)fm_async_http(url(paste0('block-',i),150,'promotion'),owner='promotion'));flush(.03)
+  jobs<-lapply(1:3,function(i)fm_async_http(url(paste0('block-',i),150,'promotion'),owner='promotion'));flush(.03)
   for(i in 1:4)jobs[[length(jobs)+1L]]<-fm_async_http(url(paste0('optional-',i),150,'promotion'),owner='promotion')
   low<-fm_async_read_http(url('target',20,'promotion'),owner='promotion')
   high<-fm_async_read_http(url('target',20,'promotion'),owner='promotion',priority='interactive')
   stopifnot(identical(low,high),length(.fm_transport$read_states)==1L,
    all(vapply(Filter(function(task)!is.null(task$read_key),.fm_transport$tasks),function(task)task$priority=='interactive',logical(1))))
   jobs[[length(jobs)+1L]]<-low;await(promises::promise_all(.list=jobs));fm_transport_start<<-original_start;clean()
-  stopifnot(order[5]=='target',stats('promotion')$counts[['/target']]==1L)
+  stopifnot(order[4]=='target',stats('promotion')$counts[['/target']]==1L)
  })
  check('direct work plus logical reads share 32 admissions; active and queued cancellation settle once',{
   jobs<-c(lapply(1:16,function(i)handled(fm_async_http(url(paste0('direct-',i),300,'admission'),owner='admission'))),
@@ -84,16 +98,16 @@ main<-function(){
   stopifnot(fm_transport_admitted()==32L,length(.fm_transport$tasks)==32L,length(.fm_transport$read_states)==16L)
   stopifnot(settle_error(fm_async_http(url('extra-direct'),owner='admission'))$category=='read_budget',
    settle_error(fm_async_read_http(url('extra-read'),owner='admission'))$category=='read_budget')
-  flush(.03);stopifnot(sum(vapply(.fm_transport$tasks,function(task)isTRUE(task$active),logical(1)))==4L)
+  flush(.03);stopifnot(sum(vapply(.fm_transport$tasks,function(task)isTRUE(task$active),logical(1)))==3L)
   fm_transport_cancel('admission');result<-await(promises::promise_all(.list=jobs));clean()
   stopifnot(length(result)==32L,all(vapply(result,inherits,logical(1),'fm_async_cancelled')),
-   nrow(stats('admission')$events)<=4L)
+   nrow(stats('admission')$events)<=3L)
  })
  check('retry backoff reserves capacity and promotion survives to the queued retry',{
   result<-handled(fm_async_read_http(url('flaky',20,'retry-bound','&fail_first=1'),owner='retry-bound'))
   flush(.08);stopifnot(length(.fm_transport$tasks)==0L,length(.fm_transport$read_states)==1L)
   promoted<-fm_async_read_http(url('flaky',20,'retry-bound','&fail_first=1'),owner='retry-bound',priority='interactive')
-  jobs<-lapply(1:31,function(i)handled(fm_async_http(url(paste0('direct-',i),600,'retry-bound'),owner='retry-bound')))
+  jobs<-lapply(1:31,function(i)handled(fm_async_http(url(paste0('direct-',i),600,'retry-bound'),owner='retry-bound',priority='interactive')))
   stopifnot(fm_transport_admitted()==32L)
   flush(.3)
   retry_tasks<-Filter(function(task)!is.null(task$read_key),.fm_transport$tasks)
@@ -103,7 +117,7 @@ main<-function(){
   await(promises::promise_all(.list=jobs));clean()
  })
  check('adapter priority covers every replay stage, supports override and preserves owner',{
-  old_summary<-get_player_summary;old_url<-get_sb_url;old_key<-get_sb_key
+  old_summary<-get_player_summary;old_lineup<-get0('get_round_lineup_snapshot',envir=.GlobalEnv,mode='function');old_url<-get_sb_url;old_key<-get_sb_key
   original_start<-fm_transport_start;priorities<-character();owners<-character()
   get_sb_url<<-function()base;get_sb_key<<-function()'synthetic'
   get_player_summary<<-eval(quote(function(){for(i in 1:4)supabase_get(paste0('stage-',i),list(run='adapter',delay=10));TRUE}),envir=.GlobalEnv)
@@ -111,7 +125,11 @@ main<-function(){
   ctx<-resource_context(account_id='fixture',session_id='adapter-owner')
   stopifnot(isTRUE(await(async_adapter_fetch('get_player_summary',context=ctx))),identical(priorities,rep('interactive',4L)),all(owners=='adapter-owner'))
   priorities<-character();stopifnot(isTRUE(await(async_adapter_fetch('get_player_summary',context=ctx,priority='normal'))),identical(priorities,rep('normal',4L)))
-  fm_transport_start<<-original_start;get_player_summary<<-old_summary;get_sb_url<<-old_url;get_sb_key<<-old_key;clean()
+  get_round_lineup_snapshot<<-get_player_summary;priorities<-character()
+  stopifnot(isTRUE(await(async_adapter_fetch('get_round_lineup_snapshot',context=ctx))),identical(priorities,rep('interactive',4L)))
+  fm_transport_start<<-original_start;get_player_summary<<-old_summary
+  if(is.null(old_lineup))rm('get_round_lineup_snapshot',envir=.GlobalEnv)else get_round_lineup_snapshot<<-old_lineup
+  get_sb_url<<-old_url;get_sb_key<<-old_key;clean()
  })
  check('synchronous dispatch failure cancels its handle and releases the next queued request',{
   original_metric<-resource_metric;fail_once<-TRUE

@@ -97,6 +97,9 @@ get_round_lineup_snapshot <- function(login,championship_id,user_team_id,round_i
   get_cached_data(paste0("round_lineup_snapshot_",championship_id,"_",user_team_id,"_",round_id),{
     saved<-read_saved_round_lineup(context,round_id)
     if(!is.null(saved)&&as.numeric(Sys.time())<saved$valid_until)return(saved)
+    # A validated expired snapshot can paint while the source refresh runs.
+    # The adapter marks this preview stale; only the completed read is cached.
+    if(!is.null(saved)&&exists("publish_resource_progress",mode="function"))publish_resource_progress(saved)
     result<-tryCatch({
       payload<-list(header=list(token=login[["token"]],userid=login[["userid"]]),
         query=list(championshipId=championship_id,userteamId=user_team_id,round=round_id),answer=list())

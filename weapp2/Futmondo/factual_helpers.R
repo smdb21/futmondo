@@ -359,7 +359,17 @@ factual_read_adapter<-function(session,handler,login_token,championship_id=NULL,
    keys<-ls(registry)
    if(length(keys)>=128L){times<-vapply(keys,function(k)attr(registry[[k]],"last_access") %||% 0,numeric(1));victim<-keys[which.min(times)];dispose<-attr(registry[[victim]],"dispose");if(is.function(dispose))dispose();rm(list=victim,envir=registry)}
    captured_args<-args;captured_context<-ctx;captured_owner<-owner_context();demand_refresh<-shiny::reactiveVal(0L)
-   registry[[entry_key]]<-shared_resource(session,resource,context=function()captured_context,fetch=function(context)async_adapter_fetch(handler,captured_args,context=context,is_current=function()shiny::isolate(isTRUE(is_active())&&identical(owner_context(),captured_owner))),active=function()isTRUE(is_active())&&identical(owner_context(),captured_owner),refresh=function()paste(if(is.function(refresh_trigger))refresh_trigger()else 0L,demand_refresh(),sep=":"))
+   progressive<-identical(handler,"get_round_lineup_snapshot")
+   fetch<-function(context,publish=NULL){
+    request<-list(handler,captured_args,context=context,
+      is_current=function()shiny::isolate(isTRUE(is_active())&&identical(owner_context(),captured_owner)))
+    if(progressive)request$on_progress<-publish
+    do.call(async_adapter_fetch,request)
+   }
+   registry[[entry_key]]<-shared_resource(session,resource,context=function()captured_context,fetch=fetch,
+     active=function()isTRUE(is_active())&&identical(owner_context(),captured_owner),
+     refresh=function()paste(if(is.function(refresh_trigger))refresh_trigger()else 0L,demand_refresh(),sep=":"),
+     progressive=progressive)
    attr(registry[[entry_key]],"demand_refresh")<-demand_refresh
   })
   entry<-registry[[entry_key]];attr(entry,"last_access")<-as.numeric(Sys.time());registry[[entry_key]]<-entry;state<-entry()

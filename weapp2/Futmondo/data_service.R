@@ -239,8 +239,8 @@ get_cached_resource_async <- function(resource,context,fetch,refresh=FALSE) {
   api_cache_env[[key]]<-list(pending=pending,generation=generation,context=context,resource=resource,time=Sys.time(),bytes=0)
   pending
 }
-shared_resource<-function(session,resource,context,fetch,active=function()TRUE,refresh=function()0){
- value<-shiny::reactiveVal(resource_state(status="loading"));last<-NULL;version<-NULL;closed<-FALSE;generation<-0L;was_active<-FALSE;cancel_end<-NULL
+shared_resource<-function(session,resource,context,fetch,active=function()TRUE,refresh=function()0,progressive=FALSE){
+ value<-shiny::reactiveVal(resource_state(status="loading"));last<-NULL;version<-NULL;closed<-FALSE;generation<-0L;was_active<-FALSE;cancel_end<-NULL;progress_relay<-NULL
  dispose<-function(){closed<<-TRUE;generation<<-generation+1L;observer$destroy();if(is.function(cancel_end))cancel_end()}
  cancel_end<-session$onSessionEnded(function(){dispose();fm_transport_cancel(session$token)})
  observer<-shiny::observe({
@@ -255,13 +255,50 @@ shared_resource<-function(session,resource,context,fetch,active=function()TRUE,r
   force_refresh<-same_context&&!identical(version,next_version)
   previous<-if(same_context)shiny::isolate(value())else NULL
   last<<-key;version<<-next_version;generation<<-generation+1L;current_generation<-generation
-  loading<-resource_state(if(!is.null(previous$data))observed_data(previous$data,status="stale")else NULL,status="loading")
+  stale_data<-function(data){if(!is.null(data))attr(data,"fetch_status")<-"stale";data}
+  loading<-resource_state(stale_data(previous$data),status="loading")
   if(!is.null(loading$data))loading$freshness<-"stale"
   value(loading)
-  promises::then(get_cached_resource_async(resource,ctx,function()fetch(ctx),force_refresh),function(result){
+  fallback<-previous
+  # Preview data belongs only to this read generation. It is neither a fresh
+  # cache hit nor a successful acquisition, and must retain its original age.
+  publish<-function(data){
+   current<-shiny::isolate({
+    current_context<-context()
+    if(!is.null(current_context)&&!nzchar(current_context$session_id))current_context$session_id<-session$token
+    !closed&&identical(generation,current_generation)&&isTRUE(active())&&
+      identical(current_context,ctx)&&identical(refresh(),next_version)
+   })
+   if(!isTRUE(progressive)||!isTRUE(current)||is.null(data)||
+      as.numeric(object.size(data))>resource_policy(resource)$max_bytes)return(invisible(FALSE))
+   preview<-resource_state(stale_data(data),status="loading");preview$freshness<-"stale"
+   fallback<<-preview;value(preview);invisible(TRUE)
+  }
+  acquire<-function(){
+   if(!isTRUE(progressive))return(fetch(ctx))
+   relay<-new.env(parent=emptyenv())
+   relay$context<-ctx;relay$publish<-publish;relay$pending<-NULL;relay$active<-TRUE
+   progress_relay<<-relay
+   fetch(ctx,function(data){
+    if(isTRUE(relay$active)&&identical(progress_relay,relay))relay$publish(data)else invisible(FALSE)
+   })
+  }
+  pending<-get_cached_resource_async(resource,ctx,acquire,force_refresh)
+  relay<-progress_relay
+  # A refresh may join the same unfinished read before its saved GET returns.
+  # Route that read's preview to the current generation, preserving its guards.
+  if(isTRUE(progressive)&&!is.null(relay)&&identical(relay$context,ctx)&&
+     (is.null(relay$pending)||identical(relay$pending,pending))){
+   relay$pending<-pending;relay$publish<-publish
+  }else relay<-NULL
+  promises::then(pending,function(result){
+   if(!is.null(relay)){
+    relay$active<-FALSE
+    if(identical(progress_relay,relay))progress_relay<<-NULL
+   }
    if(!closed&&identical(generation,current_generation)){
-    if(is.null(result$data)&&!is.null(previous$data))
-      result<-resource_state(observed_data(previous$data,status="stale"),status="stale",error=result$error,source=previous$source)
+    if(is.null(result$data)&&!is.null(fallback$data))
+      result<-resource_state(stale_data(fallback$data),status="stale",error=result$error,source=fallback$source)
     value(result)
    }
    NULL

@@ -419,21 +419,15 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       )
     })
 
-    # ---- Main observer: populate box + action buttons ----
-    observeEvent(
-      {
-        list(selected_player(),card_history(),card_states$capacity(),card_states$listings())
-      },
-      {
+    # Identity is already available in the selected row. Optional history and
+    # availability completions must not reconstruct the surrounding player box.
+    observeEvent(selected_player(), {
         sp <- selected_player()
         req(sp)
 
         login <- get_reactive_val(login_token)
         champ_id <- get_reactive_val(championship_id)
         team_id <- get_reactive_val(user_team_id)
-
-        active_bid_info_RV(player_card_active_bid(card_history()$summary,
-          card_states$capacity()$data,sp$id))
 
         print(paste0("Selected player: ", sp$name))
         player_name <- sp$name
@@ -480,7 +474,20 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           )
         )
 
-        # ---- Build action buttons ----
+    })
+
+    # Actions need ownership, current bids, and verified acquisition/listing
+    # state. Stored points, valuation, profile, and scoring are independent.
+    observeEvent(
+      list(selected_player(), card_states$summary(), card_states$capacity(), card_states$listings()),
+      {
+        sp <- selected_player()
+        req(sp)
+        login <- get_reactive_val(login_token)
+        champ_id <- get_reactive_val(championship_id)
+        team_id <- get_reactive_val(user_team_id)
+        active_bid_info_RV(player_card_active_bid(card_states$summary()$data,
+          card_states$capacity()$data,sp$id))
         action_buttons <- tagList()
 
         current_user_team <- get_reactive_val(user_team_id)
@@ -1729,22 +1736,25 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     auth_args<-function(ctx)list(login=get_reactive_val(login_token),championship_id=ctx$championship_id,user_team_id=ctx$user_team_id)
     player_args<-function(ctx)c(auth_args(ctx),list(player_id=ctx$player_id))
     global_refresh<-function()if(is.function(refresh_trigger))refresh_trigger()else 0L
+    # These reads describe the team, not the clicked player. Keep one pending
+    # read while navigating cards, with account/league/team/session isolation.
+    team_card_context<-reactive({ctx<-card_context();if(!is.null(ctx))ctx$player_id<-"";ctx})
     card_states<-list()
     card_states$summary<-card_read("card_summary","get_player_summary",player_args,
       refresh=function()paste(global_refresh(),history_refresh(),sep=":"))
-    card_states$lineup<-card_read("card_lineup","get_lineup_from_team",auth_args)
+    card_states$lineup<-card_read("card_lineup","get_lineup_from_team",auth_args,context=team_card_context)
     card_states$profile<-card_read("card_profile","get_player_full_profile",function(ctx)list(login=get_reactive_val(login_token),player_id=ctx$player_id),refresh=global_refresh)
     card_states$matches<-card_read("card_matches","get_player_matches",function(ctx)list(login=get_reactive_val(login_token),player_id=ctx$player_id))
     context_ready<-function()!identical(card_states$summary()$status,"loading")&&!identical(card_states$lineup()$status,"loading")
     card_states$points<-card_read("card_points","read_card_round_history",function(ctx)list(context=ctx),context=history_context,active=context_ready)
     card_states$valuation<-card_read("card_valuation","read_card_price_history",function(ctx)list(context=ctx))
-    capacity_context<-reactive({ctx<-card_context();if(!is.null(ctx))ctx$player_id<-"";ctx})
+    capacity_context<-team_card_context
     capacity_recheck<-reactiveVal(0L)
     capacity_recheck_context<-NULL;capacity_rechecks<-0L
     card_states$capacity<-card_read("card_capacity","get_team_acquisition_capacity",auth_args,context=capacity_context,
       active=function()!player_card_is_own_player(selected_player(),get_reactive_val(user_team_id)),
       refresh=function()paste(global_refresh(),capacity_recheck(),sep=":"))
-    card_states$listings<-card_read("card_listings","get_my_market_players",auth_args,
+    card_states$listings<-card_read("card_listings","get_my_market_players",auth_args,context=team_card_context,
       active=function()player_card_is_own_player(selected_player(),get_reactive_val(user_team_id)),refresh=global_refresh)
     # A slow player summary can outlive otherwise successful team checks.
     # Reacquire once when both settle; never extend the old source timestamps.

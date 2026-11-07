@@ -40,7 +40,7 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
    stopifnot(grepl('-2 pts',html,fixed=TRUE),grepl('Loading match details',html,fixed=TRUE),
      identical(card_states$profile()$status,'loading'),!any(grepl('read_card_round_history',calls)))
  })
- pending[['get_lineup_from_team:p1']]$resolve(list(pointSystem='fixture'));settle(session)
+ pending[['get_lineup_from_team:']]$resolve(list(pointSystem='fixture'));settle(session)
  check('scoped stored points start only after summary and scoring context settle',{
    stopifnot(sum(grepl('read_card_round_history',calls))==1L,identical(history_context()$season,'2026'))
  })
