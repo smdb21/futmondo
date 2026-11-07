@@ -2286,10 +2286,10 @@
       "checksum": "8d1a1a4f9a4c0b32bdf207ce695f81e9"
     },
     "data_service.R": {
-      "checksum": "c3951382a3e7d9b83f4767b1f387c924"
+      "checksum": "f3f042c627e90651abfe5a0b3879911e"
     },
     "factual_helpers.R": {
-      "checksum": "023f8513ab9d6d5078465b268bb5b0ca"
+      "checksum": "f910174e48b160e90bac37a49517edf0"
     },
     "futmondo_functions.R": {
       "checksum": "70cf464787ab043e688a1c24652a072c"
@@ -2382,7 +2382,7 @@
       "checksum": "9c2bb0b6d5eed41ce304b9b95e5cafff"
     },
     "www/release-info.json": {
-      "checksum": "45c384d1b12930623de6901841cbda91"
+      "checksum": "212a59081f7a0cbe9625f8ed6d3d94bd"
     },
     "www/remember-login.js": {
       "checksum": "2b037334f8088f5b4a270acbaea52e91"

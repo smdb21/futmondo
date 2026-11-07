@@ -21,6 +21,13 @@ check("allowlisted diagnostics discard raw messages, private fields, calls, and 
     resource="SECRET",reference="SECRET"),class=c("error","condition")))
   stopifnot(hostile$category=="unknown",hostile$resource=="read",is.null(hostile$http_status))
 })
+check("classification diagnostics retain allowlisted source names without account or round suffixes",{
+  for(name in c("get_classification_round_catalog","get_classification_round_ranking",
+    "get_user_team_rounds","get_round_lineup_snapshot","classification_ranking")){
+    failure<-resource_failure(resource=paste0(name,"_private-league_private-round:private-hash"),category="schema")
+    stopifnot(identical(failure$resource,name),!grepl("private",failure$resource))
+  }
+})
 check("nested cache failures preserve source category and log once even when caught by finance",{
   clear_api_cache();attempts<-0L
   load<-function()get_cached_data("financial_snapshot_private-league_private-team",{
@@ -99,6 +106,29 @@ check("the factual unavailable UI carries only the safe category and reference",
   text<-conditionMessage(got$value)
   stopifnot(inherits(got$value,"shiny.silent.error"),grepl(failure$reference,text,fixed=TRUE),
     grepl("Source request unavailable",text,fixed=TRUE),!grepl("SECRET|private",text),length(got$logs)==0L)
+  # Classification catches the validation condition and formats it again.
+  # That second formatting must still refer to the logged source failure.
+  source("Modules/Classification_Module.R")
+  for(category in c("network","http","parser","schema","read_budget","unknown")){
+    failure<-resource_failure(simpleError("SECRET"),"market_private-league",category=category,
+      http_status=if(category=="http")503L else NULL)
+    registry[[paste0(session$ns(""),resource)]]<-shiny::reactive(resource_state(status="unavailable",error=failure))
+    sequence<-.resource_metrics$failure_sequence
+    got<-capture(shiny::isolate(classification_read_state(function()do.call(adapter,args))))
+    recovered<-resource_failure(got$value$error)
+    stopifnot(!got$value$loading,is.null(got$value$data),
+      inherits(got$value$error,"shiny.silent.error"),
+      identical(recovered$category,failure$category),
+      identical(recovered$reference,failure$reference),
+      identical(recovered$resource,failure$resource),
+      identical(recovered$http_status,failure$http_status),
+      identical(resource_failure_message(got$value$error),resource_failure_message(failure)),
+      identical(.resource_metrics$failure_sequence,sequence),length(got$logs)==0L,
+      !grepl("SECRET|private",paste(capture.output(str(got$value$error)),collapse=" ")))
+  }
+  registry[[paste0(session$ns(""),resource)]]<-shiny::reactive(resource_state(status="loading"))
+  loading<-shiny::isolate(classification_read_state(function()do.call(adapter,args)))
+  stopifnot(loading$loading,is.null(loading$error),is.null(loading$data))
   session$close()
 })
 cat(sprintf("READ DIAGNOSTICS: %d passed / 0 failed\n",n))

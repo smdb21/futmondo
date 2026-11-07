@@ -741,3 +741,8 @@ Implemented: default-enabled Admin switch with server-only database persistence,
 ## App access recheck interval — 2026-11-07
 
 Changed active non-admin access rechecks to two minutes at the user’s request. Initial admission still checks the persisted policy immediately. The timer-boundary regression, deployment contract and mandatory offline lifecycle passed; see data_review_results.md.
+
+
+## Classification failure identity — 2026-11-07
+
+Implemented locally: preserve original structured read failures across Shiny validation and Classification's status formatting, with safe source labels for catalog/ranking/history/lineup reads. This fixes misclassified error categories and displayed references that did not match server logs. Focused diagnostic and required lifecycle verification are recorded in data_review_results.md. The screenshot's underlying production acquisition failure remains unconfirmed without a failing response or matching diagnostic evidence; it is not marked fixed.

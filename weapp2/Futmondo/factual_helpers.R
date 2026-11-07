@@ -386,7 +386,17 @@ factual_read_adapter<-function(session,handler,login_token,championship_id=NULL,
    state$freshness<-"stale"
   }
   if(isTRUE(state_only))return(state)
-  if(is.null(state$data))shiny::validate(shiny::need(FALSE,if(identical(state$status,"loading"))"Loading data…"else resource_failure_message(state$error)))
+  if(is.null(state$data)){
+   if(identical(state$status,"loading"))shiny::validate(shiny::need(FALSE,"Loading data…"))
+   # Keep the logged source failure when a module catches and reformats the
+   # Shiny validation condition; parsing its display text loses this identity.
+   failure<-resource_failure(state$error,handler)
+   tryCatch(shiny::validate(shiny::need(FALSE,resource_failure_message(failure))),error=function(condition){
+    failure$message<-conditionMessage(condition)
+    class(failure)<-unique(c(class(condition),class(failure)))
+    stop(failure)
+   })
+  }
   result<-state$data;if(identical(state$freshness,"stale"))attr(result,"fetch_status")<-"stale";result
  }
 }

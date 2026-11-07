@@ -28,6 +28,8 @@ resource_diagnostic_name <- function(resource) {
     "get_my_market_players", "get_player_summary", "get_player_card_history", "get_player_full_profile",
     "get_player_matches", "get_player_recent_points", "get_championship_pressroom", "get_money_movements", "get_finished_rounds",
     "get_finished_round_catalog", "get_round_dreamteam", "get_active_championships",
+    "get_classification_round_catalog", "get_classification_round_ranking", "get_user_team_rounds",
+    "get_round_lineup_snapshot", "classification_ranking",
     "read_player_points_history", "calculate_league_finances", "roster", "market", "real_clubs",
     "championships", "championshipplayers", "lineup", "teams", "team_info", "user_team_info",
     "roster_bids", "my_market_players", "acq_capacity", "financial_snapshot", "moneymovements",
