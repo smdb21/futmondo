@@ -6,6 +6,8 @@ The pitch supports the twelve official 11-player formations, including 4-6-0. Av
 
 **Clear lineup** empties starters, four substitutes and captain locally, preserving the selected formation, N and injury toggle. It makes no request and cannot submit an invalid empty XI. **Reset to official lineup** restores the last observed official selection. Drafts survive navigation during the session; official successful observations survive restarts through database snapshots. A direct account replacement discards prior private drafts.
 
+Player tiles display a compact club crest over the portrait for both starters and substitutes. The roster parser retains the source `team.logo` (or flat `logo`) in the existing database snapshot; hydration reuses it without new API or database requests. Older snapshots use the existing club-name image lookup until the normal 30-second refresh supplies source metadata. Images load lazily and share browser caching by URL. Position colors underline names without a separate abbreviation; bench colors use the main role only.
+
 ## Best XI and bench
 
 **Best XI + bench** compares arithmetic means over the same latest N source-confirmed completed rounds for all squad players, default five, selectable from one to twenty. Before N rounds exist, the actual completed count is displayed. Ongoing rounds and unanchored last-five vectors are excluded. Explicit zeroes and negative scores count normally; absent scores remain unknown. Missing histories are requested through the shared bounded controller and persisted through its existing score-first/check-last workflow. A result omitting unknown histories is explicitly labelled “Best among players with complete scores.”

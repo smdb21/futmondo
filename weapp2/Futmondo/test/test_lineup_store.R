@@ -2,7 +2,12 @@
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages(source('global.R'))
 ctx<-resource_context(c(userid='account',token='private-fixture'),'league','team',season='S1',scoring_version='score')
-snapshot<-list(version=1L,roster=list(list(id='p1',name='Player',role='portero',role2='')),official=lineup_empty(),
+players<-list(list(id='p1',name='Player',role='portero',team=list(name='Real Madrid',logo='source-club.png')),
+ list(id='p2',name='Other player',role='defensa',team='Barcelona',logo='other-club.png'))
+parsed_roster<-lineup_roster_records(players)
+stopifnot(parsed_roster[[1]]$logo=='source-club.png',parsed_roster[[1]]$club=='Real Madrid',
+ parsed_roster[[2]]$logo=='other-club.png',parsed_roster[[2]]$club=='Barcelona')
+snapshot<-list(version=1L,roster=parsed_roster,official=lineup_empty(),
  rules=list(allowed='4-4-2',multiposition=FALSE,bench_enabled=TRUE,captain_enabled=FALSE),
  source=list(wire=list(strategy='4-4-2',players=list()),locked=list()),season='S1',scoring_version='score',
  observed_at='2026-11-07T00:00:00Z',expires_at='2026-11-07T00:00:30Z')
@@ -16,6 +21,8 @@ settle<-function(p){failure<<-NULL;value<<-NULL;promises::then(p,function(x){val
 settle(lineup_snapshot_store(ctx,'r7'))
 stopifnot(is.null(failure),is.character(value$official$starters),length(value$official$starters)==11L,
  !length(writes),grepl('season=eq.S1',requests[[1]],fixed=TRUE),grepl('scoring_version=eq.score',requests[[1]],fixed=TRUE))
+stopifnot(lineup_roster_frame(value)$logo[1]=='source-club.png',lineup_roster_frame(value)$club[1]=='Real Madrid')
+cat('PASS source crests survive normalized roster parsing and persisted JSON hydration\n')
 cat('PASS source arrays normalize on hydration, UTC representations compare equally, known context filters and reads do not write\n')
 row$account_id<-'other';settle(lineup_snapshot_store(ctx,'r7'));stopifnot(!is.null(failure),is.null(value));row$account_id<-'account'
 row$scoring_version<-'other';settle(lineup_snapshot_store(ctx,'r7'));stopifnot(!is.null(failure));row$scoring_version<-'score'
@@ -23,6 +30,10 @@ cat('PASS mismatched account or known scoring scope cannot hydrate\n')
 settle(lineup_snapshot_store(ctx,'r7',snapshot))
 stopifnot(isTRUE(value),length(writes)==1L,!grepl('private-fixture|private-database-fixture|token',writes[[1]]$body),
  grepl('"complete":true',writes[[1]]$body,fixed=TRUE))
-cat('PASS normalized successful snapshot writes exclude authentication material\n')
+stored<-jsonlite::fromJSON(writes[[1]]$body,simplifyVector=FALSE)
+stopifnot(stored$payload$roster[[1]]$logo=='source-club.png')
+legacy<-snapshot;legacy$roster<-lapply(legacy$roster,function(player){player$logo<-NULL;player})
+stopifnot(all(lineup_roster_frame(legacy)$logo==''),nrow(lineup_roster_frame(NULL))==0L)
+cat('PASS normalized successful snapshot writes exclude authentication material; logos persist and older snapshots remain readable\n')
 row$payload$rules$bench_enabled<-'unknown';settle(lineup_snapshot_store(ctx,'r7'));stopifnot(!is.null(failure))
 cat('PASS malformed cached capability state is rejected\nLINEUP STORE: 4 groups passed / 0 failed\n')
