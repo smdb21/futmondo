@@ -10,7 +10,7 @@
 
 @media (max-width: 767px) { .round-countdown-bar { align-items: flex-start; flex-direction: column; padding: 9px 10px; } .round-countdown-finance { justify-content: flex-start; text-align: left; } }
 .login-feedback { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; padding: 10px 12px; border: 1px solid var(--fm-border); border-radius: 3px; font-size: 12px; line-height: 1.45; }
-.login-feedback-error, .login-result-error { background: #24100f; border-color: var(--fm-danger); color: var(--fm-danger); }
+.login-feedback-error, .login-result-error { background: var(--fm-error); border-color: var(--fm-danger); color: var(--fm-danger); }
 .login-feedback-success { background: var(--fm-bg); border-color: var(--fm-text); color: var(--fm-text); }
 .login-result { padding: 15px; border-radius: 3px; }
 .fis-score-badge { display: inline-block; min-width: 50px; padding: 3px 6px; border: 1px solid var(--fm-border); border-radius: 2px; background: var(--fm-bg); font-size: 11px; font-weight: 700; line-height: 1.35; text-align: center; font-variant-numeric: tabular-nums; }
@@ -976,7 +976,6 @@ body, .wrapper {
 @media (max-width: 600px) { .fm-notification { padding: .75rem; } .fm-notification .btn { width: 100%; margin-right: 0; } }
 
 /* Shared readable terminal treatment for Bootstrap and HTML widgets. */
-html { color-scheme: dark; }
 h1, h2, h3, h4, h5, h6 { font-family: var(--fm-font) !important; }
 .box { border: 1px solid var(--fm-border) !important; border-radius: 3px !important; }
 .box-header { border-radius: 3px 3px 0 0 !important; }
@@ -1365,3 +1364,12 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 .fm-round-button:focus-visible { outline:2px solid var(--fm-text,#f0f6ef); outline-offset:2px; }
 
 .fm-classification-rounds > .shiny-html-output { display:flex; flex:0 0 auto; gap:8px; }
+
+/* Native theme selector stays available before login and on narrow screens. */
+.main-header .navbar .fm-theme-control { display: flex; align-items: center; gap: 6px; min-height: 50px; padding: 3px 10px; color: var(--fm-text); }
+.fm-theme-control label { margin: 0; font-size: 12px; }
+.fm-theme-control select { min-height: 40px; max-width: 105px; padding: 5px; border: 1px solid var(--fm-border); border-radius: 3px; background: var(--fm-surface); color: var(--fm-text); }
+.fm-lineup-heading { color: var(--fm-text); }
+.fm-lineup-heading span, .fm-lineup-legend { color: var(--fm-muted); }
+@media (max-width: 400px) { .fm-theme-control label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); } }
+.waiter-overlay { background-color: var(--fm-bg) !important; color: var(--fm-text) !important; }

@@ -5,7 +5,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
   const browser = await chromium.launch({headless:true,args:['--no-sandbox']});
   try {
     for (const width of [1440,390,360]) {
-      const page = await browser.newPage({viewport:{width,height:1000}});
+      const page = await browser.newPage({viewport:{width,height:1000},colorScheme:'dark'});
       await page.route('**/*',route => route.request().url().startsWith('http://127.0.0.1:38765/') ? route.continue() : route.abort());
       await page.goto('http://127.0.0.1:38765/');
       // Test the production UI without an extra fixture stylesheet, before login.

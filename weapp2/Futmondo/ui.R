@@ -1,5 +1,11 @@
 header <- shinydashboardPlus::dashboardHeader(
   title = "Futmondo",
+  tags$li(class = "dropdown fm-theme-control",
+    tags$label(`for` = "fm-theme-choice", "Theme"),
+    tags$select(id = "fm-theme-choice", `aria-label` = "Color theme",
+      tags$option(value = "system", "System"),
+      tags$option(value = "light", "Light"),
+      tags$option(value = "dark", "Dark"))),
   tags$li(class = "dropdown", uiOutput("notification_bell"))
 )
 body <- shinydashboard::dashboardBody(
@@ -8,6 +14,7 @@ body <- shinydashboard::dashboardBody(
     shiny::tags$style(shiny::HTML(fm_theme_css())),
     # Embed the current stylesheet: cached legacy CSS must not restore white surfaces.
     shiny::includeCSS("www/custom_style.css"),
+    shiny::includeScript("www/theme-switch.js"),
     shiny::tags$style(shiny::HTML("
         .ReactTable .rt-thead {
           z-index: 1;
