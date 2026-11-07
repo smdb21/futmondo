@@ -41,17 +41,67 @@
     var root = document.documentElement;
     var changed = root.getAttribute('data-fm-theme') !== theme;
     root.setAttribute('data-fm-theme', theme);
-    var selector = document.getElementById('fm-theme-choice');
-    if (selector) selector.value = choice;
+    var toggle = document.getElementById('fm-theme-toggle');
+    if (toggle) {
+      var label = 'Color theme: ' + choice.charAt(0).toUpperCase() + choice.slice(1);
+      toggle.setAttribute('aria-label', label);
+      toggle.title = label;
+      toggle.dataset.themeChoice = choice;
+      document.querySelectorAll('#fm-theme-options [data-theme]').forEach(function (button) {
+        var selected = button.dataset.theme === choice;
+        button.setAttribute('aria-pressed', String(selected));
+        if (selected) toggle.replaceChildren(button.firstElementChild.cloneNode(true));
+      });
+    }
     if (changed) document.querySelectorAll('.js-plotly-plot').forEach(window.fmApplyPlotTheme);
   }
   apply(); // Resolve the saved preference in the head, before the body is painted.
   document.addEventListener('DOMContentLoaded', apply);
-  document.addEventListener('change', function (event) {
-    if (event.target.id !== 'fm-theme-choice' || !valid(event.target.value)) return;
-    choice = event.target.value;
-    try { window.localStorage.setItem(storageKey, choice); } catch (error) { /* Session-only fallback. */ }
-    apply();
+  function setOpen(open, restoreFocus) {
+    var toggle = document.getElementById('fm-theme-toggle');
+    var options = document.getElementById('fm-theme-options');
+    if (!toggle || !options) return;
+    options.hidden = !open;
+    toggle.setAttribute('aria-expanded', String(open));
+    if (open) options.querySelector('[aria-pressed="true"]').focus();
+    else if (restoreFocus) toggle.focus();
+  }
+  document.addEventListener('click', function (event) {
+    var control = document.querySelector('.fm-theme-control');
+    if (!control) return;
+    if (event.target.closest('#fm-theme-toggle')) {
+      setOpen(document.getElementById('fm-theme-options').hidden);
+      return;
+    }
+    var option = event.target.closest('#fm-theme-options [data-theme]');
+    if (option && valid(option.dataset.theme)) {
+      choice = option.dataset.theme;
+      try { window.localStorage.setItem(storageKey, choice); } catch (error) { /* Session-only fallback. */ }
+      apply();
+      setOpen(false, true);
+    } else if (!control.contains(event.target)) setOpen(false);
+  });
+  document.addEventListener('keydown', function (event) {
+    if (!event.target.closest('.fm-theme-control')) return;
+    if (event.key === 'Escape') {
+      setOpen(false, true);
+      event.preventDefault();
+    } else if (event.target.id === 'fm-theme-toggle' && event.key === 'ArrowDown') {
+      setOpen(true);
+      event.preventDefault();
+    } else if (event.target.closest('#fm-theme-options') && ['ArrowLeft', 'ArrowRight', 'Home', 'End'].indexOf(event.key) !== -1) {
+      var buttons = Array.from(document.querySelectorAll('#fm-theme-options [data-theme]'));
+      var index = buttons.indexOf(event.target);
+      if (event.key === 'Home') index = 0;
+      else if (event.key === 'End') index = buttons.length - 1;
+      else index = (index + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
+      buttons[index].focus();
+      event.preventDefault();
+    }
+  });
+  document.addEventListener('focusout', function (event) {
+    var control = event.target.closest('.fm-theme-control');
+    if (control && !control.contains(event.relatedTarget)) setOpen(false);
   });
   function systemChanged() { if (choice === 'system') apply(); }
   if (media.addEventListener) media.addEventListener('change', systemChanged);

@@ -2373,16 +2373,16 @@
       "checksum": "a1e1d838c6dcce0a85e626a48ad799e9"
     },
     "ui.R": {
-      "checksum": "2a729bfbe5b420ea220ad84e86220560"
+      "checksum": "9bdf30f42ff7ee868a2ab73aa0cc669a"
     },
     "utils.R": {
       "checksum": "6253d5e12d91ddef162c7e9e7624680a"
     },
     "www/custom_style.css": {
-      "checksum": "248afdc748e54b9334f5ca4972872f1a"
+      "checksum": "ca74b2a28dd699c88a343f902eea98f3"
     },
     "www/theme-switch.js": {
-      "checksum": "2cfc98234201b9d5ffb4d8f26adc6014"
+      "checksum": "616593ba18b7d3bb585da89e204c0cf4"
     },
     "www/release-info.json": {
       "checksum": "11153803616c437d45dea26e1f080b1e"

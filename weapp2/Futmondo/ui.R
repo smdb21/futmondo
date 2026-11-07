@@ -1,11 +1,17 @@
 header <- shinydashboardPlus::dashboardHeader(
   title = "Futmondo",
   tags$li(class = "dropdown fm-theme-control",
-    tags$label(`for` = "fm-theme-choice", "Theme"),
-    tags$select(id = "fm-theme-choice", `aria-label` = "Color theme",
-      tags$option(value = "system", "System"),
-      tags$option(value = "light", "Light"),
-      tags$option(value = "dark", "Dark"))),
+    tags$button(id = "fm-theme-toggle", type = "button", class = "btn fm-theme-button",
+      `aria-label` = "Color theme: System", title = "Color theme: System",
+      `aria-expanded` = "false", `aria-controls` = "fm-theme-options", icon("desktop")),
+    tags$div(id = "fm-theme-options", class = "fm-theme-options", hidden = "hidden",
+      role = "group", `aria-label` = "Theme options",
+      tags$button(type = "button", class = "btn fm-theme-button", `data-theme` = "system",
+        `aria-label` = "Follow system", title = "Follow system", `aria-pressed` = "true", icon("desktop")),
+      tags$button(type = "button", class = "btn fm-theme-button", `data-theme` = "light",
+        `aria-label` = "Light", title = "Light", `aria-pressed` = "false", icon("sun")),
+      tags$button(type = "button", class = "btn fm-theme-button", `data-theme` = "dark",
+        `aria-label` = "Dark", title = "Dark", `aria-pressed` = "false", icon("moon")))),
   tags$li(class = "dropdown", uiOutput("notification_bell"))
 )
 body <- shinydashboard::dashboardBody(
