@@ -690,3 +690,14 @@ Status: **implemented and verified locally; authenticated current-account behavi
 - [x] Verify focused request/parser/cache/persistence/selection/coverage fixtures, existing classification regressions and required offline lifecycle. Primary-agent browser verification and integrated review are recorded separately before delivery.
 
 No migration, dependency, autonomous activity or external account/database mutation was performed for verification.
+
+
+## Persistent rival calculation reuse — 2026-11-06
+
+Status: **implemented and verified locally; hosted durability and latency remain unverified**.
+
+- [x] Persist bounded, scoped calculation snapshots through the existing acknowledged database queue; paint saved table rows before full history acquisition.
+- [x] Reuse unchanged ledgers across R processes, rebuild affected transaction participants, and preserve live metadata, unknown values and original cash observation timestamps.
+- [x] Verify cache/uncached parity, scope and invalidation, stale callbacks, malformed payload rejection, independent known answers, mobile/desktop saved-table rendering and the required offline lifecycle.
+
+No migration, dependency or unattended worker is introduced. Oversized caches retain a table-only snapshot; award metadata rechecks may conservatively rebuild. This tracking update has no runtime or request cost.

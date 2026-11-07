@@ -2348,8 +2348,11 @@
     "remember_login.R": {
       "checksum": "a243c91a9c01604ce74d517e116e3e61"
     },
+    "rival_calculation_store.R": {
+      "checksum": "7e8ba27e8188220995297b76414cacec"
+    },
     "rival_finance_runtime.R": {
-      "checksum": "c23a1f6522d196f69017a5a2f5addc0f"
+      "checksum": "515e468f7fe3d50cf8a69513cff610a5"
     },
     "server.R": {
       "checksum": "f1c7ba3b2b7dc48aa4e6bd5743ac4cff"
