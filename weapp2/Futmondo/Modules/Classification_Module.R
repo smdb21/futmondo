@@ -1,3 +1,4 @@
+source("round_lineup_runtime.R")
 library(reactable)
 library(shiny)
 library(shinydashboard)
@@ -12,8 +13,7 @@ classification_UI <- function(id) {
       div(class = "form-group",
           actionButton(ns("latest_round"), "Latest round"),
           actionButton(ns("general_classification"), "General classification")),
-      fluidRow(column(6, sliderInput(ns("round_range_slider"), "Points between rounds", min = 1, max = 38, value = c(1, 38))),
-               column(6, selectInput(ns("single_round_select"), "Inspect one round", choices = c("All rounds" = "all")))))),
+      sliderInput(ns("round_range_slider"), "Points between rounds", min = 1, max = 38, value = c(1, 38)))),
     fluidRow(box(width = 12, title = "Standings", uiOutput(ns("classification_status")), reactableOutput(ns("classification_table")))),
     fluidRow(box(width = 12, title = "Dream team and configured rewards",
       uiOutput(ns("configured_rewards_ui")), uiOutput(ns("dreamteam_box_ui"))))
@@ -151,7 +151,7 @@ classification_dreamteam_rows <- function(answer) {
 classification_Server <- function(id, is_module_active, login_token, championship_id, user_team_id,
                                   user_teams_RV, refresh_trigger = NULL, league_settings_source = NULL) {
   moduleServer(id, function(input, output, session) {
-    bind_factual_reads(c("get_classification_round_catalog","get_classification_round_ranking","get_user_team_rounds","get_user_team_info","get_round_dreamteam"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
+    bind_factual_reads(c("get_classification_round_catalog","get_classification_round_ranking","get_user_team_rounds","get_user_team_info","get_round_dreamteam","get_round_lineup_snapshot"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
 
     mvp_snapshot <- shared_mvp_source(session,login_token,championship_id,is_module_active,refresh_trigger)
     finances_RV <- shared_rival_finance_source(session,login_token,championship_id,
@@ -238,18 +238,17 @@ classification_Server <- function(id, is_module_active, login_token, championshi
       numbers
     })
     selection_mode <- reactiveVal("latest")
+    single_round_RV <- reactive(classification_single_round(input$round_range_slider))
     sent_selection <- NULL
     send_selection <- function(numbers,mode) {
       window <- if(mode=="latest")rep(max(numbers),2)else range(numbers)
-      sent_selection <<- list(window=as.numeric(window),single="all")
+      sent_selection <<- list(window=as.numeric(window))
       updateSliderInput(session,"round_range_slider",value=window)
-      updateSelectInput(session,"single_round_select",selected="all")
     }
     observeEvent(round_numbers_RV(), {
       numbers <- round_numbers_RV()
       if (!length(numbers)) return()
       updateSliderInput(session, "round_range_slider", min = min(numbers), max = max(c(numbers, min(numbers) + 1)))
-      updateSelectInput(session, "single_round_select", choices = c("All rounds" = "all", stats::setNames(as.character(numbers), paste("Round", numbers))))
       mode <- isolate(selection_mode())
       if(mode%in%c("latest","general"))send_selection(numbers,mode)
     })
@@ -267,16 +266,12 @@ classification_Server <- function(id, is_module_active, login_token, championshi
       if(!is.null(sent_selection)&&identical(as.numeric(input$round_range_slider),sent_selection$window))return()
       selection_mode("manual")
     },ignoreInit=TRUE,priority=-1)
-    observeEvent(input$single_round_select, {
-      if(!is.null(sent_selection)&&identical(input$single_round_select,sent_selection$single))return()
-      selection_mode("manual")
-    },ignoreInit=TRUE,priority=-1)
     filtered_rows_RV <- reactive({
-      classification_window_table(round_rows_RV(), input$round_range_slider, input$single_round_select,round_numbers_RV())
+      classification_window_table(round_rows_RV(), input$round_range_slider, single_round_RV(),round_numbers_RV())
     })
     general_selection_RV <- reactive({
       numbers <- round_numbers_RV();window <- input$round_range_slider
-      (is.null(input$single_round_select)||input$single_round_select=="all")&&
+      (is.null(single_round_RV())||single_round_RV()=="all")&&
         !identical(selection_mode(),"latest")&&(!length(numbers)||length(window)!=2L||
           (window[1]<=min(numbers)&&window[2]>=max(numbers)))
     })
@@ -294,7 +289,7 @@ classification_Server <- function(id, is_module_active, login_token, championshi
           rank=rank(-suppressWarnings(as.numeric(teams$points)),ties.method="min",na.last="keep"))
       }
       if (!nrow(rows)) return(rows)
-      classification_bonus_table(rows, round_rows_RV(), finance_data_RV(), input$round_range_slider, input$single_round_select,round_numbers_RV())
+      classification_bonus_table(rows, round_rows_RV(), finance_data_RV(), input$round_range_slider, single_round_RV(),round_numbers_RV())
     })
     empty_standings_message_RV <- reactive({
       teams <- teams_state_RV()
@@ -316,11 +311,12 @@ classification_Server <- function(id, is_module_active, login_token, championshi
       bonus_columns <- c("points_bonus", "mvp_bonus", "best_xi_bonus", "position_bonus")
       missing_bonus <- any(!is.finite(as.matrix(rows[, bonus_columns, drop = FALSE])))
       selected <- round_rows_RV()
-      if(length(input$single_round_select)==1L&&input$single_round_select!="all")selected<-selected[selected$round==as.numeric(input$single_round_select),,drop=FALSE]
+      if(length(single_round_RV())==1L&&single_round_RV()!="all")selected<-selected[selected$round==as.numeric(single_round_RV()),,drop=FALSE]
       else if(length(input$round_range_slider)==2L)selected<-selected[selected$round>=input$round_range_slider[1]&selected$round<=input$round_range_slider[2],,drop=FALSE]
       live <- nrow(selected)&&"score_status"%in%names(selected)&&any(selected$score_status%in%c("provisional","unavailable"))
       stale <- identical(attr(active_ranking_RV(),"fetch_status"),"stale")
       tagList(p("Points and reconstructed bonus totals for the selected rounds."),
+        p(if(single_round_RV()!="all")"Click a team to see its formation and ordered substitutes for this round."else "Select one round with the range slider to open a team lineup."),
         if(live)p("Live round points are provisional. Rewards remain unavailable until the round and its payments are confirmed."),
         if(length(failures))p(resource_failure_message(failures[[1]])),
         if(isTRUE(history$loading))p("Historical round scores are loading; available live scores are shown."),
@@ -329,12 +325,51 @@ classification_Server <- function(id, is_module_active, login_token, championshi
         if (missing_bonus) p(if (isTRUE(finance_data_RV()$loading)) "Bonus totals are loading."
           else "Some bonus totals lack complete round or award records and are shown as Unavailable."))
     })
+    lineup_context_RV <- reactive({
+      round <- single_round_RV();catalog <- rounds_RV()
+      index <- match(suppressWarnings(as.numeric(round)),catalog$round_number)
+      auth <- login_token()
+      paste(if(valid_login(auth))auth[["userid"]]else "",championship_id(),round,
+        if(length(index)==1L&&!is.na(index))catalog$round_id[index]else "",sep=":")
+    })
+    selected_lineup_RV <- reactiveVal(NULL)
+    observeEvent(lineup_context_RV(), {
+      if(!is.null(selected_lineup_RV())){selected_lineup_RV(NULL);removeModal(session=session)}
+    },ignoreInit=TRUE)
+    observeEvent(input$lineup_team_click, {
+      click <- input$lineup_team_click
+      if(!is.list(click)||single_round_RV()=="all"||!identical(mvp_text(click$context),lineup_context_RV()))return()
+      rows <- standings_RV();i <- match(mvp_text(click$id),as.character(rows$team_id))
+      catalog <- rounds_RV();r <- match(as.numeric(single_round_RV()),catalog$round_number)
+      if(is.na(i)||is.na(r)||!nzchar(mvp_text(catalog$round_id[r])))return()
+      selected_lineup_RV(list(team_id=as.character(rows$team_id[i]),team_name=rows$team_name[i],
+        round_id=as.character(catalog$round_id[r]),round_number=single_round_RV(),context=lineup_context_RV()))
+      showModal(modalDialog(title=paste(rows$team_name[i],"· Round",single_round_RV()),
+        uiOutput(session$ns("round_lineup_ui")),size="l",easyClose=TRUE,
+        footer=modalButton("Close")),session=session)
+    })
+    output$round_lineup_ui <- renderUI({
+      selected <- selected_lineup_RV()
+      req(!is.null(selected),identical(selected$context,lineup_context_RV()),is_module_active()==TRUE)
+      result <- round_lineup_read_state(function()get_round_lineup_snapshot(login_token(),championship_id(),selected$team_id,selected$round_id))
+      if(is.null(result$data))return(p(if(isTRUE(result$loading))"Loading the official round lineup…"else resource_failure_message(result$error)))
+      tagList(if(identical(attr(result$data,"fetch_status"),"stale"))p("Showing the saved lineup while the latest source is being checked or is unavailable."),
+        round_lineup_pitch_ui(result$data$answer))
+    })
     output$classification_table <- renderReactable({
       rows <- standings_RV()
       if (!nrow(rows)) return(reactable(data.frame(Message = empty_standings_message_RV())))
+      ids <- as.character(rows$team_id)
+      click <- if(single_round_RV()!="all")htmlwidgets::JS(paste0("function(rowInfo){if(!rowInfo)return;var ids=",jsonlite::toJSON(ids),";Shiny.setInputValue(",jsonlite::toJSON(session$ns("lineup_team_click"),auto_unbox=TRUE),",{id:ids[rowInfo.index],context:",jsonlite::toJSON(lineup_context_RV(),auto_unbox=TRUE),",nonce:Date.now()},{priority:'event'});}"))else NULL
       rows <- rows[, intersect(c("rank", "team_name", "points", "rounds", "points_bonus", "mvp_bonus", "best_xi_bonus", "position_bonus"), names(rows)), drop = FALSE]
-      reactable(rows, compact = TRUE, striped = TRUE, defaultSorted = "rank", defaultColDef = colDef(na = "Unavailable"),
-                columns = list(rank = colDef(name = "Rank", minWidth = 65), team_name = colDef(name = "Team", minWidth = 150), points = colDef(name = "Points"),
+      reactable(rows, compact = TRUE, striped = TRUE, highlight = single_round_RV()!="all", onClick = click, defaultSorted = "rank", defaultColDef = colDef(na = "Unavailable"),
+                columns = list(rank = colDef(name = "Rank", minWidth = 65), team_name = colDef(name = "Team", minWidth = 150, cell = function(value,index){
+                    if(single_round_RV()=="all")return(value)
+                    tags$button(type="button",class="btn btn-link fm-lineup-open",title=paste("Open round lineup for",value),
+                      onclick=paste0("event.stopPropagation();Shiny.setInputValue(",jsonlite::toJSON(session$ns("lineup_team_click"),auto_unbox=TRUE),
+                        ",{id:",jsonlite::toJSON(ids[index],auto_unbox=TRUE),",context:",jsonlite::toJSON(lineup_context_RV(),auto_unbox=TRUE),
+                        ",nonce:Date.now()},{priority:'event'});"),value)
+                  }), points = colDef(name = "Points"),
                   points_bonus = colDef(name = "Points bonus (€)", minWidth = 140, format = colFormat(separators = TRUE, digits = 0)),
                   mvp_bonus = colDef(name = "MVP bonus (€)", minWidth = 140, format = colFormat(separators = TRUE, digits = 0)),
                   best_xi_bonus = colDef(name = "Best XI bonus (€)", minWidth = 140, format = colFormat(separators = TRUE, digits = 0)),
@@ -349,7 +384,7 @@ classification_Server <- function(id, is_module_active, login_token, championshi
       }))
       range <- input$round_range_slider
       if (length(range) == 2L) history <- history[history$round >= range[1] & history$round <= range[2], , drop = FALSE]
-      if (!is.null(input$single_round_select) && input$single_round_select != "all") history <- history[history$round == as.numeric(input$single_round_select), , drop = FALSE]
+      if (!is.null(single_round_RV()) && single_round_RV() != "all") history <- history[history$round == as.numeric(single_round_RV()), , drop = FALSE]
       plot_ly(history, x = ~round, y = ~rank, color = ~team_name, type = "scatter", mode = "lines+markers") %>%
         fm_plot_layout(xaxis = list(title = "Round", dtick = 1), yaxis = list(title = "Cumulative rank", autorange = "reversed", dtick = 1))
     })
@@ -383,8 +418,8 @@ classification_Server <- function(id, is_module_active, login_token, championshi
     output$dreamteam_box_ui <- renderUI({
       req(is_module_active() == TRUE, login_token(), championship_id())
       if (!is.null(refresh_trigger)) refresh_trigger()
-      if (is.null(input$single_round_select) || input$single_round_select == "all") return(p("Select one round to see its published dream team and MVP."))
-      catalog <- rounds_RV(); index <- match(as.numeric(input$single_round_select), catalog$round_number)
+      if (is.null(single_round_RV()) || single_round_RV() == "all") return(p("Select one round to see its published dream team and MVP."))
+      catalog <- rounds_RV(); index <- match(as.numeric(single_round_RV()), catalog$round_number)
       if (is.na(index)) return(p("Round identity unavailable."))
       dreamteam <- classification_read_state(function() get_round_dreamteam(login_token(), championship_id(), catalog$round_id[index]))
       if(is.null(dreamteam$data))return(p(if(isTRUE(dreamteam$loading))"Loading the published dream team…" else resource_failure_message(dreamteam$error)))

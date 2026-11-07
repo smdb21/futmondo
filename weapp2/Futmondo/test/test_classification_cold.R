@@ -8,7 +8,7 @@ shiny::testServer(fixture_server,{
   root$sendInputMessage <- function(inputId,message)messages[[sub('^classification-','',inputId)]] <<- message
   html <- function(name)output[[paste0('classification-',name)]]$html
   table <- function()output[['classification-classification_table']]
-  session$setInputs('classification-single_round_select'='all','classification-round_range_slider'=c(1,38))
+  session$setInputs('classification-round_range_slider'=c(1,38))
   fixture_settle(session)
   stopifnot(grepl('Loading official round standings',html('classification_status'),fixed=TRUE),
     grepl('Loading league settings',html('configured_rewards_ui'),fixed=TRUE))
@@ -19,8 +19,7 @@ shiny::testServer(fixture_server,{
   fixture_reply('https://api.futmondo.com/2/league/list',fixture$leagues);fixture_settle(session)
   fixture_reply('https://api.futmondo.com/2/league/matches',fixture$calendar);fixture_settle(session)
   stopifnot(identical(as.numeric(messages$round_range_slider$value),c(12,12)),
-    grepl('Round 12',messages$single_round_select$options,fixed=TRUE),
-    !grepl('Round 13',messages$single_round_select$options,fixed=TRUE),
+    messages$round_range_slider$max==12,
     fixture_reads('https://api.futmondo.com/1/ranking/round')==1L,
     tail(fixture$requests,1)[[1]]$query$roundNumber==12)
   session$setInputs('classification-round_range_slider'=c(12,12))
@@ -51,7 +50,7 @@ cat('PASS real bound cold path: native catalog initializes12 before directory; l
 # A new consuming session reuses process catalog/ranking snapshots. Recovering the
 # directory starts only its team histories; pending history cannot hide live rows.
 shiny::testServer(fixture_server,{
-  session$setInputs('classification-single_round_select'='all','classification-round_range_slider'=c(12,12))
+  session$setInputs('classification-round_range_slider'=c(12,12))
   fixture_settle(session)
   fixture_reply(TEAMS_URL,list(teams=list(list(id='a',name='Alpha',points=100),list(id='b',name='Beta',points=90))))
   fixture_reply('https://api.futmondo.com/1/userteam/information',list(configuration=list(moneyPerPoint=70000,mvpPlayer=0)))
@@ -89,7 +88,7 @@ invisible(resource_store(api_cache_key('award_round_metadata_league',context=res
 fixture$saved[[1]]$payload <- jsonlite::fromJSON(jsonlite::toJSON(fixture$saved[[1]]$payload,auto_unbox=TRUE,null='null',na='null'))
 shiny::testServer(fixture_server,{
   messages<-list();root<-session$rootScope();root$sendInputMessage<-function(inputId,message)messages[[sub('^classification-','',inputId)]]<<-message
-  session$setInputs('classification-single_round_select'='all','classification-round_range_slider'=c(12,12))
+  session$setInputs('classification-round_range_slider'=c(12,12))
   fixture_settle(session)
   stopifnot(identical(as.numeric(messages$round_range_slider$value),c(12,12)),
     grepl('26',output[['classification-classification_table']],fixed=TRUE),
@@ -102,7 +101,7 @@ cat('PASS legacy catalog/calendar and persisted JSON ranking: recovered playing1
 shiny::testServer(classification_Server,args=list(is_module_active=function()TRUE,
   login_token=function()fixture$auth,championship_id=function()'league',user_team_id=function()'a',
   user_teams_RV=function()data.frame(teamid='a',teamname='Alpha')) ,{
-  session$setInputs(single_round_select='all',round_range_slider=c(1,12),general_classification=1)
+  session$setInputs(round_range_slider=c(1,12),general_classification=1)
   fixture_settle(session)
   stopifnot(grepl('unavailable',output$classification_status$html,fixed=TRUE),
     !grepl('26',output$classification_table,fixed=TRUE))
@@ -113,7 +112,7 @@ cat('PASS legacy directory without cumulative points never labels live-only scor
 # requests remain pending; their loading states must not conceal that failure.
 clear_api_cache()
 shiny::testServer(fixture_server,{
-  session$setInputs('classification-single_round_select'='all','classification-round_range_slider'=c(1,38))
+  session$setInputs('classification-round_range_slider'=c(1,38))
   fixture_settle(session)
   fixture_reply(ACTIVE_CHAMPIONSHIPS_URL,error=resource_failure(category='schema'))
   fixture_settle(session)

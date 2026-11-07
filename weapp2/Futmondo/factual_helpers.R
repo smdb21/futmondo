@@ -364,7 +364,12 @@ factual_read_adapter<-function(session,handler,login_token,championship_id=NULL,
   })
   entry<-registry[[entry_key]];attr(entry,"last_access")<-as.numeric(Sys.time());registry[[entry_key]]<-entry;state<-entry()
   stamp<-state$fetched_at;age<-if(length(stamp)==1L&&!is.na(stamp))as.numeric(difftime(Sys.time(),stamp,units="secs"))else 0
-  if(!is.null(state$data)&&is.finite(age)&&age>resource_policy(handler)$ttl&&
+  lineup_expired<-FALSE
+  if(identical(handler,"get_round_lineup_snapshot")&&!is.null(state$data)){
+   deadline<-state$data$valid_until
+   lineup_expired<-!is.numeric(deadline)||length(deadline)!=1L||!is.finite(deadline)||as.numeric(Sys.time())>=deadline
+  }
+  if(!is.null(state$data)&&((is.finite(age)&&age>resource_policy(handler)$ttl)||lineup_expired)&&
      !identical(state$status,"loading")&&!identical(state$freshness,"stale")){
    bump<-attr(entry,"demand_refresh");if(is.function(bump))shiny::isolate(bump(bump()+1L))
    state<-resource_state(observed_data(state$data,status="stale"),status="loading",source=state$source)

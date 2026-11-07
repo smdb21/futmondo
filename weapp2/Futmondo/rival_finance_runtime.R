@@ -531,7 +531,8 @@ rival_lineup_evidence <- function(result,account_id,championship_id,season) {
   bench<-unique(vapply(mvp_records(answer$bench$players),function(x)if(is.list(x))mvp_text(x$id)else"",character(1)))
   if(!any(nzchar(players)))return(list())
   payload<-list(team_id=result$team_id,round_id=result$round_id,status=mvp_text(answer$status),negative=rival_flag(answer$negative),
-    players=as.list(players[nzchar(players)]),bench=as.list(bench[nzchar(bench)]),signature=result$signature)
+    players=as.list(players[nzchar(players)]),bench=as.list(bench[nzchar(bench)]),signature=result$signature,
+    raw_lineup=answer)
   list(rival_finance_evidence(account_id,championship_id,season,"round_lineup",paste(result$team_id,result$round_id,sep=":"),payload,
     attr(result,"observed_at") %||% Sys.time()))
 }

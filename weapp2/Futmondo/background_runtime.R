@@ -217,7 +217,10 @@ record_acquired_resource<-function(resource,data,context){
   if(!nzchar(league))return(invisible(TRUE))
   if(grepl("^roster_bids_|^roster_",resource)&&!grepl("^roster_(facts|payload)_",resource)&&
      exists("persist_roster_offers",mode="function"))persist_roster_offers(data,context)
-  if(startsWith(resource,"classification_ranking_")&&is.list(data)){
+  if(startsWith(resource,"round_lineup_snapshot_")&&is.list(data)&&
+     exists("persist_round_lineup_snapshot",mode="function")){
+    persist_round_lineup_snapshot(data,context)
+  }else if(startsWith(resource,"classification_ranking_")&&is.list(data)){
     stamp<-attr(data,"observed_at")
     if(!isTRUE(data$from_saved)&&length(stamp)==1L&&!is.na(fm_time(stamp))&&
        nrow(classification_ranking_rows(data$answer,data$round_id,data$round_number))){

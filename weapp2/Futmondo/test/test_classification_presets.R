@@ -36,23 +36,21 @@ shiny::testServer(classification_Server, args = list(
   root$sendInputMessage <- function(inputId, message) {
     messages[[sub("^.*-", "", inputId)]] <<- message
   }
-  session$setInputs(round_range_slider = c(1, 4), single_round_select = "3")
+  session$setInputs(round_range_slider = c(1, 4))
   before <- calls
   # The latest history round can arrive before the catalog includes it.
   session$setInputs(latest_round = 1)
   stopifnot(identical(as.numeric(messages$round_range_slider$value), c(4, 4)),
-            identical(messages$single_round_select$value, "all"),
             identical(calls, before))
-  session$setInputs(round_range_slider = c(4, 4), single_round_select = "all")
+  session$setInputs(round_range_slider = c(4, 4))
   stopifnot(filtered_rows_RV()$points == 12, filtered_rows_RV()$rounds == 1)
-  # General classification must clear a prior single-round override too.
-  session$setInputs(single_round_select = "1")
+  # General classification must restore the full range after a one-round selection.
+  session$setInputs(round_range_slider = c(1, 1))
   before <- calls
   session$setInputs(general_classification = 1)
   stopifnot(identical(as.numeric(messages$round_range_slider$value), c(1, 4)),
-            identical(messages$single_round_select$value, "all"),
             identical(calls, before))
-  session$setInputs(round_range_slider = c(1, 4), single_round_select = "all")
+  session$setInputs(round_range_slider = c(1, 4))
   stopifnot(filtered_rows_RV()$points == 25, filtered_rows_RV()$rounds == 3)
   session$setInputs(round_range_slider = c(1, 3))
   stopifnot(filtered_rows_RV()$points == 13)
@@ -71,4 +69,4 @@ shiny::testServer(classification_Server, args = list(
   session$setInputs(latest_round = 3, general_classification = 3)
   stopifnot(length(messages) == 0L)
 })
-cat("PASS classification presets: latest/general ranges, override reset, manual filters, edge cases, no extra reads\n")
+cat("PASS classification presets: latest/general ranges, single-range reset, manual filters, edge cases, no extra reads\n")
