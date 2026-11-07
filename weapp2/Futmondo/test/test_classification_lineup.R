@@ -28,18 +28,21 @@ check('unrated pitch and bench points use the official scoring mode and chosen r
   stats<-raw;stats$pointSystem<-'stats'
   stopifnot(grepl('title="Provisional points">99\\*</div>',htmltools::renderTags(round_lineup_pitch_ui(stats))$html))
 })
-check('position labels follow pitch slots and only the main bench role, including saved JSON',{
+check('position underlines follow pitch slots and only the main bench role, including saved JSON',{
   answer<-raw
   answer$players[[3]]$role<-'defensa';answer$players[[3]]$role2<-'delantero'
   answer$bench$players[[1]]$role<-'defensa';answer$bench$players[[1]]$role2<-'delantero'
   answer$bench$players[[2]]$role<-'centrocampista';answer$bench$players[[2]]$role2<-'defensa'
-  position<-function(id)xml2::xml_text(xml2::xml_find_first(nodes,paste0('//*[@data-player-id="',id,'"]/*[@class="fm-lineup-position"]')))
+  position<-function(id)xml2::xml_attr(xml2::xml_find_first(nodes,paste0('//*[@data-player-id="',id,'"]/*[@class="fm-lineup-name"]')),'data-position')
   for(value in list(answer,jsonlite::fromJSON(jsonlite::toJSON(round_lineup_clean_answer(answer),auto_unbox=TRUE),simplifyVector=FALSE))){
     html<-htmltools::renderTags(round_lineup_pitch_ui(value))$html
     nodes<-xml2::read_html(html)
     stopifnot(position('striker')=='FWD',position('incoming')=='MID',position('lastdef')=='DEF',position('keeper')=='GK',
-      position('fourth')=='DEF',position('outgoing')=='MID',position('first')=='Position unavailable',
-      length(xml2::xml_find_all(nodes,'//*[contains(@class,"fm-lineup-empty")]/*[@class="fm-lineup-position"]'))==0L,
+      position('fourth')=='DEF',position('outgoing')=='MID',position('first')=='',
+      length(xml2::xml_find_all(nodes,'//*[contains(@class,"fm-lineup-empty")]/*[@data-position!=""]'))==0L,
+      length(xml2::xml_find_all(nodes,'//*[@class="fm-lineup-position"]'))==0L,
+      xml2::xml_text(xml2::xml_find_first(nodes,'//*[@data-player-id="striker"]/*[@class="fm-lineup-name"]'))=='Player striker',
+      xml2::xml_attr(xml2::xml_find_first(nodes,'//*[@data-player-id="outgoing"]/*[@class="fm-lineup-name"]'),'title')=='Main position for substitutions: Midfielder',
       grepl('Substitutes can only cover their main position; secondary positions do not count.',html,fixed=TRUE))
   }
   for(strategy in c('4-3-3','4-6-0')){

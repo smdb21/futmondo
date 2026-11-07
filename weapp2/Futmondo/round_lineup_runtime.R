@@ -172,10 +172,10 @@ round_lineup_player_ui <- function(player,bench=FALSE,index,point_system="press"
       if(safe_image(logo))shiny::tags$img(class="fm-lineup-crest",src=logo,alt="",loading="lazy",onerror="this.style.display='none'"),
       if(changed)shiny::span(class="fm-lineup-change",title=if(bench)"Substituted out"else"Substituted in",
         `aria-label`=if(bench)"Substituted out"else"Substituted in",if(bench)"↓"else"↑")),
-    shiny::div(class="fm-lineup-name",label),
-    if(occupied)shiny::div(class="fm-lineup-position",
-      title=if(bench)"Main position for substitutions"else"Lineup position",
-      if(nzchar(position))position else "Position unavailable"))
+    shiny::div(class="fm-lineup-name",`data-position`=if(occupied)position else "",
+      title=if(occupied)paste0(if(bench)"Main position for substitutions: "else"Lineup position: ",
+        if(nzchar(position))switch(position,GK="Goalkeeper",DEF="Defender",MID="Midfielder",FWD="Forward")else"unavailable"),
+      label))
 }
 round_lineup_pitch_ui <- function(answer) {
   lineup<-normalize_round_lineup(answer)
