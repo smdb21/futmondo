@@ -71,4 +71,17 @@ shiny::testServer(lineup_Server,args=args,{
  stopifnot(identical(draft(),saved),!loading())
  cat('PASS returning to a context restarts its pending source load and discards obsolete completion\n')
 })
-cat('LINEUP MODULE: 5 groups passed / 0 failed\n')
+reset()
+partial<-rounds;attr(partial,'catalog_complete')<-FALSE
+attr(partial,'catalog_reason')<-'Numbered calendar read failed.'
+catalog<-shiny::reactiveVal(partial);args$round_catalog<-catalog
+shiny::testServer(lineup_Server,args=args,{
+ settle(session);before<-draft();session$setInputs(best=1);settle(session)
+ stopifnot(identical(draft(),before),all(is.na(scores()$average)),!length(wanted()),
+  grepl('not verified',output$status$html),!grepl('0 completed rounds',output$status$html),state$submits==0L)
+ catalog(rounds);settle(session);session$setInputs(best=2);settle(session)
+ stopifnot(all(is.finite(scores()$average)),identical(wanted(),as.numeric(2:6)),
+  all(nzchar(draft()$starters)),!grepl('not verified',output$status$html),state$submits==0L)
+ cat('PASS partial calendar blocks estimates without changing the draft and verified publication recovers\n')
+})
+cat('LINEUP MODULE: 6 groups passed / 0 failed\n')

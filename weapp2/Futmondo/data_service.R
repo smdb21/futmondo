@@ -141,8 +141,11 @@ resource_store <- function(key,data,context,resource,ttl=NULL) {
 # A composite snapshot may expire before the ordinary resource TTL. Its source
 # deadline survives outer caches; parsing or reopening cannot extend it.
 resource_snapshot_unexpired <- function(data,now=Sys.time()) {
-  if(!is.list(data)||!"valid_until"%in%names(data))return(TRUE)
-  deadline<-data[["valid_until"]]
+  deadline<-attr(data,"valid_until")
+  if(is.null(deadline)){
+    if(!is.list(data)||!"valid_until"%in%names(data))return(TRUE)
+    deadline<-data[["valid_until"]]
+  }
   is.numeric(deadline)&&length(deadline)==1L&&is.finite(deadline)&&
     as.numeric(now)<deadline
 }

@@ -102,12 +102,20 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
     shiny::observeEvent(input$reload,{reload(shiny::isolate(reload())+1L)})
     roster<-shiny::reactive(lineup_roster_frame(source()))
     n_rounds<-shiny::reactive({n<-suppressWarnings(as.integer(input$recent_n));if(length(n)!=1L||is.na(n))5L else max(1L,min(20L,n))})
-    wanted<-shiny::reactive({catalog<-round_catalog();if(!is.data.frame(catalog)||!all(c('round_number','is_finished')%in%names(catalog)))return(numeric());tail(sort(unique(as.numeric(catalog$round_number[catalog$is_finished%in%TRUE]))),n_rounds())})
+    catalog_issue<-shiny::reactive({
+      catalog<-round_catalog()
+      if(!is.data.frame(catalog)||!nrow(catalog))return('Round schedule is unavailable or still loading.')
+      if(acquisition_data_unverified(catalog))return('Round schedule could not be verified from Futmondo.')
+      if(identical(attr(catalog,'catalog_complete'),FALSE))return(paste('Completed-round schedule is not verified.',fm_scalar(attr(catalog,'catalog_reason'),'')))
+      ''
+    })
+    scoring_catalog<-shiny::reactive({catalog<-round_catalog();if(nzchar(catalog_issue()))data.frame()else catalog})
+    wanted<-shiny::reactive({catalog<-scoring_catalog();if(!is.data.frame(catalog)||!all(c('round_number','is_finished')%in%names(catalog)))return(numeric());tail(sort(unique(as.numeric(catalog$round_number[catalog$is_finished%in%TRUE]))),n_rounds())})
     history<-recent_player_points_source(session,login_token,championship_id,user_team_id,roster,
-      is_active=function()isTRUE(is_module_active())&&!is.null(source()),
+      is_active=function()isTRUE(is_module_active())&&!is.null(source())&&length(wanted())>0L,
       refresh_trigger=if(is.function(history_refresh_trigger))history_refresh_trigger else round_history_refresh_trigger(session),
       required_rounds=function()max(6L,n_rounds()),catalog_scope=FALSE,required_window=wanted)
-    scores<-shiny::reactive(lineup_average_scores(roster(),history$history(),round_catalog(),n_rounds()))
+    scores<-shiny::reactive(lineup_average_scores(roster(),history$history(),scoring_catalog(),n_rounds()))
     dirty<-shiny::reactive(!is.null(draft())&&!is.null(source())&&!identical(lineup_identity(draft()),lineup_identity(source()$official)))
     edit<-function(value){draft(value);best_note('')}
     shiny::observeEvent(input$clear,{shiny::req(draft(),!saving());edit(lineup_clear(draft()));notice('Lineup cleared. Select players or use Best XI + bench to start over.')})
@@ -119,6 +127,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
     },ignoreInit=TRUE)
     shiny::observeEvent(input$best,{
       shiny::req(source(),draft(),!saving());score<-scores()
+      if(nzchar(catalog_issue()))return()
       if(!length(attr(score,'rounds'))){notice('No completed rounds are available for this calculation.');return()}
       result<-lineup_optimize(roster(),score,unlist(source()$rules$allowed),draft(),isTRUE(input$include_unavailable),
         source()$rules$bench_enabled,source()$rules$multiposition)
@@ -174,7 +183,8 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       shiny::tagList(shiny::div(role='status',`aria-live`='polite',notice()),
         if(nzchar(best_note()))shiny::div(class='fm-lineup-note',best_note()),
         if(nzchar(cache_issue()))shiny::div(class='fm-lineup-warning',cache_issue()),
-        if(nrow(score))shiny::div(class='fm-lineup-note',paste(sum(is.finite(score$average)),'of',nrow(score),'players have complete scores for',length(wanted()),'completed rounds.'),
+        if(nzchar(catalog_issue()))shiny::div(class='fm-lineup-warning',catalog_issue())else
+          if(nrow(score))shiny::div(class='fm-lineup-note',paste(sum(is.finite(score$average)),'of',nrow(score),'players have complete scores for',length(wanted()),'completed rounds.'),
           if((status$pending %||% 0L)+(status$remaining %||% 0L)>0L)' Loading missing history…',
           if((status$failed %||% 0L)>0L)' Some history reads failed; use Refresh to retry.',
           if((status$saving %||% 0L)>0L)' Saving acquired history…',if(!is.null(status$save_error))status$save_error))

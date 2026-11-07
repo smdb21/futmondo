@@ -173,7 +173,16 @@ round_reference <- function(round_id, round_number=NA_real_) {
 }
 empty_round_catalog <- function(status="unavailable") list(status=status, rounds=empty_finished_rounds())
 
-get_finished_rounds <- function(login, championship_id) get_finished_round_catalog(login, championship_id)$rounds
+get_finished_rounds <- function(login, championship_id) {
+  catalog <- get_award_round_catalog(login, championship_id)
+  rounds <- catalog$rounds
+  attr(rounds,"catalog_status") <- catalog$status
+  attr(rounds,"catalog_complete") <- isTRUE(catalog$complete)
+  attr(rounds,"catalog_reason") <- catalog$reason %||% ""
+  attr(rounds,"observed_at") <- attr(catalog,"observed_at")
+  attr(rounds,"valid_until") <- attr(catalog,"valid_until")
+  rounds
+}
 
 acquisition_data_unverified <- function(data) {
   isTRUE(any(attr(data,"fetch_status")%in%c("stale","partial","unavailable")))

@@ -56,4 +56,14 @@ check('synchronous cache reuse preserves the same composite source deadline',{
  first<-read();stopifnot(read()$revision==first$revision,calls==1L)
  fixture_now<-fixture_now+15;stopifnot(read()$revision==2L,calls==2L)
 })
+check('calendar frames retain their source deadline across outer cache reuse',{
+ clear_api_cache();calls<-0L
+ fetch<-function(){calls<<-calls+1L;rows<-data.frame(round_number=calls,is_finished=TRUE);attr(rows,'valid_until')<-as.numeric(Sys.time())+15;rows}
+ first<-await(get_cached_resource_async('get_finished_rounds',ctx,fetch))
+ stopifnot(await(get_cached_resource_async('get_finished_rounds',ctx,fetch))$data$round_number==1L,calls==1L)
+ fixture_now<-fixture_now+15
+ second<-await(get_cached_resource_async('get_finished_rounds',ctx,fetch))
+ stopifnot(calls==2L,second$data$round_number==2L,
+  identical(names(second$data),c('round_number','is_finished')),!resource_snapshot_unexpired(first$data))
+})
 cat(sprintf('RESOURCE SOURCE EXPIRY: %d groups passed; warm requests unchanged, one coalesced read on source expiry\n',checks))

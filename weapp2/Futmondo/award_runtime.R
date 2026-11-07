@@ -275,7 +275,7 @@ shared_mvp_source <- function(session,login,championship,active,refresh=NULL) {
       auth<-shiny::isolate(login());cid<-shiny::isolate(championship());g<-state$generation;k<-state$key
       ctx<-resource_context(auth,cid,season=state$season,session_id=root$token)
       invalidate_resources(resource_context(auth,cid),resources=paste0(c("mvp_catalog_","award_round_metadata_"),cid));state$loading<-TRUE;publish()
-      promises::then(async_adapter_fetch("get_award_round_catalog",list(login=auth,championship_id=cid,saved=state$rows),ctx,is_current=function()current(g,k)),function(catalog){
+      promises::then(async_adapter_fetch("get_award_round_catalog",list(login=auth,championship_id=cid,saved=state$rows,refresh=TRUE),ctx,is_current=function()current(g,k)),function(catalog){
         if(!current(g,k))return(NULL)
         state$loading<-FALSE
         if(is.data.frame(catalog$rounds)&&nrow(catalog$rounds)){
