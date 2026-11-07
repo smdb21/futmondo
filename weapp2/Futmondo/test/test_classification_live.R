@@ -5,7 +5,7 @@ suppressPackageStartupMessages(source('global.R'))
 auth<-c(userid='classification-test',token='synthetic');cid<-'league'
 ctx<-resource_context(auth,cid,'a',season='unknown',session_id='live-test')
 answer<-list(metadata=list(status='playing'),ranking=lapply(seq_along(c(26,18,15,9,8,6,2,0,0)),function(i)
-  list(id=letters[i],name=paste('Team',i),points=c(26,18,15,9,8,6,2,0,0)[i],live=9,bench=2)))
+  list(id=letters[i],name=paste('Team',i),points=c(26,18,15,9,8,6,2,0,0)[i],live=c(9,7,5,3,1,0,2,4,6)[i],bench=2,starting=11)))
 requests<-0L;writes<-list();saved<-list(evidence=list(),complete=TRUE)
 read_rival_finance_evidence<-function(...)saved
 persist_rival_finance_evidence<-function(evidence,context){writes<<-c(writes,evidence);TRUE}
@@ -19,7 +19,7 @@ fm_async_read_http<-function(url,method='GET',body=NULL,...){
 await<-function(p){done<-FALSE;out<-err<-NULL;promises::then(p,function(x){out<<-x;done<<-TRUE},function(e){err<<-e;done<<-TRUE});deadline<-Sys.time()+3;while(!done&&Sys.time()<deadline)later::run_now(.001);stopifnot(done);if(!is.null(err))stop(err);out}
 args<-list(login=auth,championship_id=cid,user_team_id='a',round_id='r12',round_number=12)
 clear_api_cache();live<-await(async_adapter_fetch('get_classification_round_ranking',args,ctx))
-stopifnot(identical(live$rows$points,c(26,18,15,9,8,6,2,0,0)),all(live$rows$score_status=='provisional'),requests==1L,length(writes)==1L)
+stopifnot(identical(live$rows$points,c(26,18,15,9,8,6,2,0,0)),all(live$rows$score_status=='provisional'),identical(live$rows$players_left,c(9,7,5,3,1,0,2,4,6)),requests==1L,length(writes)==1L)
 e<-writes[[1]]
 stopifnot(e$evidence_type=='eligibility',e$source_id=='classification:r12',e$payload$kind=='classification_round_ranking',
   length(rival_evidence_rows(list(e),'round_ranking'))==0L,length(rival_evidence_rows(list(e),'team_rounds'))==0L,
@@ -29,6 +29,14 @@ invisible(await(async_adapter_fetch('get_classification_round_ranking',args,ctx)
 saved$evidence<-list(e);clear_api_cache();again<-await(async_adapter_fetch('get_classification_round_ranking',args,ctx))
 stopifnot(identical(again$rows,live$rows),requests==1L,length(writes)==1L,
   identical(as.numeric(attr(again,'observed_at')),as.numeric(fm_time(e$observed_at))))
+# Remaining values survive database-shaped JSON and a cleared process cache.
+saved$evidence[[1]]$payload <- jsonlite::fromJSON(jsonlite::toJSON(e$payload,auto_unbox=TRUE,null='null',na='null'))
+clear_api_cache();json_reopen<-await(async_adapter_fetch('get_classification_round_ranking',args,ctx))
+stopifnot(identical(json_reopen$rows$players_left,live$rows$players_left),requests==1L,length(writes)==1L)
+invalid <- answer
+bad <- list(NULL,-1,2.5,Inf,TRUE,list(3),'unknown')
+for(i in seq_along(bad))invalid$ranking[[i]]$live <- bad[[i]]
+stopifnot(all(is.na(classification_ranking_rows(invalid,'r12',12)$players_left[seq_along(bad)])))
 missing<-answer;missing$ranking[[1]]$points<-NULL;missing$ranking[[2]]$points<--2
 rows<-classification_ranking_rows(missing,'r12',12)
 stopifnot(is.na(rows$points[1]),rows$points[2]==-2,rows$points[8]==0)
@@ -46,6 +54,21 @@ ledger<-data.frame();attr(ledger,'round_bonus_totals')<-data.frame(round_number=
 bonus<-classification_bonus_table(data.frame(team_id='a'),live$rows,list(cash_ledgers=list(a=ledger)),c(12,12))
 stopifnot(all(is.na(bonus[,c('points_bonus','mvp_bonus','best_xi_bonus','position_bonus')])))
 cat('PASS live request/parser: 26/18/15 known answers, missing/negative/zero, one cold and zero warm/reopen HTTP reads, display-only persistence\n')
+# Team identity, rather than current rank/order, controls the remaining count.
+projection <- data.frame(team_id=c('b','absent','a'))
+observed <- data.frame(team_id=c('a','b'),round=12,score_status='provisional',players_left=c(3,0))
+calendar <- data.frame(round_number=12,is_finished=FALSE,status='playing')
+projected <- classification_remaining_table(projection,observed,'12',calendar)
+stopifnot(identical(projected$players_left,c(0,NA_real_,3)),
+  !'players_left'%in%names(classification_remaining_table(projection,observed,'all',calendar)))
+closed <- calendar;closed$is_finished <- TRUE
+stopifnot(!'players_left'%in%names(classification_remaining_table(projection,observed,'12',closed)))
+final <- observed;final$score_status <- 'final'
+stopifnot(!'players_left'%in%names(classification_remaining_table(projection,final,'12',calendar)))
+old <- observed;old$players_left <- NULL
+stopifnot(all(is.na(classification_remaining_table(projection,old,'12',calendar)$players_left)))
+cat('PASS remaining-player projection: ID mapping, zero, absent teams/legacy snapshots unknown, hidden for completed rounds and partial ranges\n')
+
 # Delayed catalog/live publications exercise real preset observers and totals.
 bind_factual_reads<-function(...)invisible(NULL)
 shared_mvp_source<-function(...)reactive(list())
@@ -78,10 +101,12 @@ shiny::testServer(classification_Server,args=list(is_module_active=reactive(TRUE
   stopifnot(selected_round_RV()==12,max(round_numbers_RV())==12)
   session$setInputs(round_range_slider=c(12,12))
   stopifnot(identical(standings_RV()$points,c(26,18,15,9,8,6,2,0,0)),all(is.na(standings_RV()$points_bonus)),
-    grepl('provisional',output$classification_status$html,fixed=TRUE),is.null(picked_round_RV()))
+    grepl('provisional',output$classification_status$html,fixed=TRUE),is.null(picked_round_RV()),
+    identical(standings_RV()$players_left,c(9,7,5,3,1,0,2,4,6)),
+    grepl('Players left',output$classification_table,fixed=TRUE))
   # Empty history is not permission to call current-only points General.
   session$setInputs(classification_view='partial',round_range_slider=c(11,12))
-  stopifnot(identical(standings_RV()$points,as.numeric(100:108)),identical(as.numeric(standings_RV()$rank),as.numeric(9:1)))
+  stopifnot(!'players_left'%in%names(standings_RV()),!grepl('Players left',output$classification_table,fixed=TRUE),identical(standings_RV()$points,as.numeric(100:108)),identical(as.numeric(standings_RV()$rank),as.numeric(9:1)))
   session$setInputs(round_range_slider=c(11,11));stopifnot(all(is.na(standings_RV()$points)),partial_view_RV())
   # A background publication cannot override a deliberate manual selection.
   history(list(list(round=11,points=7)));session$flushReact()
@@ -96,7 +121,7 @@ shiny::testServer(classification_Server,args=list(is_module_active=reactive(TRUE
   catalog(list(current_round_id='r12',current_round_number=12,rounds=data.frame(round_id=paste0('r',11:13),
     round_number=11:13,is_finished=c(TRUE,FALSE,FALSE),status=c('closed','playing','next'))))
   session$flushReact()
-  stopifnot(max(round_numbers_RV())==12,all(is.na(standings_RV()$points)),
+  stopifnot(max(round_numbers_RV())==12,all(is.na(standings_RV()$points)),all(is.na(standings_RV()$players_left)),
     grepl('unavailable',output$classification_status$html,fixed=TRUE))
 })
 cat('PASS known-live failure retains12/unavailable; active12/future13, delayed Latest convergence, General cumulative100, missing whole-round coverage, manual selection, no live double count\n')

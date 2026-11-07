@@ -2934,15 +2934,20 @@ classification_ranking_not_started <- function(answer) {
 
 classification_ranking_rows <- function(answer, round_id, round_number) {
   empty <- data.frame(team_id=character(),team_name=character(),round_id=character(),
-    round=numeric(),points=numeric(),score_status=character(),stringsAsFactors=FALSE)
+    round=numeric(),points=numeric(),players_left=numeric(),score_status=character(),stringsAsFactors=FALSE)
   if(!is.list(answer)||isTRUE(answer$error)||!is.null(answer$code)||!is.list(answer$ranking)||classification_ranking_not_started(answer))return(empty)
   records <- mvp_records(answer$ranking)
   if(!length(records)||length(records)>500L)return(empty)
   status <- if(round_is_finished(answer$metadata %||% list()))"final"else"provisional"
   rows <- dplyr::bind_rows(lapply(records,function(row){
     if(!is.list(row))return(NULL)
+    # The official ranking card displays live directly; starting and bench
+    # are separate fields. Missing/invalid counts are never inferred from points.
+    remaining <- if(is.list(row$live) || is.logical(row$live))NA_real_ else fm_number(row$live)
+    if(is.finite(remaining) && (remaining<0 || remaining!=floor(remaining)))remaining <- NA_real_
     data.frame(team_id=mvp_text(row$id),team_name=mvp_text(row$name),round_id=as.character(round_id),
-      round=as.numeric(round_number),points=fm_number(row$points),score_status=status,stringsAsFactors=FALSE)
+      round=as.numeric(round_number),points=fm_number(row$points),players_left=remaining,
+      score_status=status,stringsAsFactors=FALSE)
   }))
   if(nrow(rows)!=length(records)||any(!nzchar(rows$team_id))||anyDuplicated(rows$team_id))return(empty)
   rows
@@ -2990,7 +2995,8 @@ get_classification_round_ranking <- function(login, championship_id, user_team_i
     if(!nrow(rows))stop("Round standings unavailable")
     # Retain only score fields, excluding profile/contact/actor payloads.
     answer <- list(metadata=list(status=mvp_text(body$answer$metadata$status)),
-      ranking=lapply(seq_len(nrow(rows)),function(i)list(id=rows$team_id[i],name=rows$team_name[i],points=rows$points[i])))
+      ranking=lapply(seq_len(nrow(rows)),function(i)list(id=rows$team_id[i],name=rows$team_name[i],
+        points=rows$points[i],live=rows$players_left[i])))
     stamp <- Sys.time()
     result <- list(rows=rows,round_id=round_id,round_number=round_number,answer=answer,valid_until=as.numeric(stamp)+60)
     attr(result,"observed_at") <- stamp

@@ -119,6 +119,21 @@ classification_window_table <- function(rows, window = NULL, single = "all", exp
            rank = rank(-points, ties.method = "min", na.last = "keep")) %>% arrange(rank, team_name)
 }
 
+# Remaining players apply only to one unfinished round, never to a range.
+classification_remaining_table <- function(standings, history, single, rounds) {
+  if(length(single)!=1L || single=="all")return(standings)
+  selected <- history[history$round==as.numeric(single),,drop=FALSE]
+  statuses <- selected$score_status
+  catalog <- rounds[rounds$round_number%in%as.numeric(single),,drop=FALSE]
+  finished <- any(statuses%in%"final") || any(catalog$is_finished%in%TRUE)
+  unfinished <- any(statuses%in%"provisional") || any(catalog$is_finished%in%FALSE) ||
+    any(tolower(catalog$status)%in%c("active","playing","in_progress"))
+  if(finished || !unfinished)return(standings)
+  standings$players_left <- if("players_left"%in%names(selected))
+    selected$players_left[match(standings$team_id,selected$team_id)] else rep(NA_real_,nrow(standings))
+  standings
+}
+
 # Project the shared ledger's coverage-aware round totals without I/O.
 classification_bonus_table <- function(standings, history, finances, window=NULL, single="all",expected_rounds=NULL) {
   kinds<-c(points_bonus="points",mvp_bonus="mvp",best_xi_bonus="dreamteam",position_bonus="ranking")
@@ -315,7 +330,8 @@ classification_Server <- function(id, is_module_active, login_token, championshi
           rank=rank(-suppressWarnings(as.numeric(teams$points)),ties.method="min",na.last="keep"))
       }
       if (!nrow(rows)) return(rows)
-      classification_bonus_table(rows, round_rows_RV(), finance_data_RV(), round_window_RV(), single_round_RV(),round_numbers_RV())
+      rows <- classification_bonus_table(rows, round_rows_RV(), finance_data_RV(), round_window_RV(), single_round_RV(),round_numbers_RV())
+      classification_remaining_table(rows, round_rows_RV(), single_round_RV(), rounds_RV())
     })
     empty_standings_message_RV <- reactive({
       teams <- teams_state_RV()
@@ -392,9 +408,10 @@ classification_Server <- function(id, is_module_active, login_token, championshi
       if (!nrow(rows)) return(reactable(data.frame(Message = empty_standings_message_RV())))
       ids <- as.character(rows$team_id)
       click <- if(single_round_RV()!="all")htmlwidgets::JS(paste0("function(rowInfo){if(!rowInfo)return;var ids=",jsonlite::toJSON(ids),";Shiny.setInputValue(",jsonlite::toJSON(session$ns("lineup_team_click"),auto_unbox=TRUE),",{id:ids[rowInfo.index],context:",jsonlite::toJSON(lineup_context_RV(),auto_unbox=TRUE),",nonce:Date.now()},{priority:'event'});}"))else NULL
-      rows <- rows[, intersect(c("rank", "team_name", "points", "rounds", "points_bonus", "mvp_bonus", "best_xi_bonus", "position_bonus"), names(rows)), drop = FALSE]
+      rows <- rows[, intersect(c("rank", "team_name", "points", "players_left", "rounds", "points_bonus", "mvp_bonus", "best_xi_bonus", "position_bonus"), names(rows)), drop = FALSE]
       reactable(rows, compact = TRUE, striped = TRUE, highlight = single_round_RV()!="all", onClick = click, defaultSorted = "rank", defaultColDef = colDef(na = "Unavailable"),
-                columns = list(rank = colDef(name = "Rank", minWidth = 65), team_name = colDef(name = "Team", minWidth = 150, cell = function(value,index){
+                columns = c(if("players_left"%in%names(rows))list(players_left = colDef(name = "Players left", minWidth = 110)),
+                  list(rank = colDef(name = "Rank", minWidth = 65), team_name = colDef(name = "Team", minWidth = 150, cell = function(value,index){
                     if(single_round_RV()=="all")return(value)
                     tags$button(type="button",class="btn btn-link fm-lineup-open",title=paste("Open round lineup for",value),
                       onclick=paste0("event.stopPropagation();Shiny.setInputValue(",jsonlite::toJSON(session$ns("lineup_team_click"),auto_unbox=TRUE),
@@ -404,7 +421,7 @@ classification_Server <- function(id, is_module_active, login_token, championshi
                   points_bonus = colDef(name = "Points bonus (€)", minWidth = 140, format = colFormat(separators = TRUE, digits = 0)),
                   mvp_bonus = colDef(name = "MVP bonus (€)", minWidth = 140, format = colFormat(separators = TRUE, digits = 0)),
                   best_xi_bonus = colDef(name = "Best XI bonus (€)", minWidth = 140, format = colFormat(separators = TRUE, digits = 0)),
-                  position_bonus = colDef(name = "Position bonus (€)", minWidth = 140, format = colFormat(separators = TRUE, digits = 0))))
+                  position_bonus = colDef(name = "Position bonus (€)", minWidth = 140, format = colFormat(separators = TRUE, digits = 0)))))
     })
     output$rank_evolution_plot <- renderPlotly({
       rows <- round_rows_RV()
