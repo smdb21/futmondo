@@ -727,3 +727,9 @@ Status: **implemented and verified locally; hosted schema installed; signed-in h
 - [x] Pass focused isolation/race/retry/REST checks, the required offline lifecycle, desktop/mobile browser restoration and deployment contract; verify hosted SQL upsert/order/privilege behavior using rolled-back synthetic data.
 
 No dependency, environment variable, worker, source acquisition or transaction behavior is added. Commit/push delivery is recorded in the final task report.
+
+## My Team asking prices and received offers — 2026-11-07
+
+Implemented locally: one numeric Selling by asking-price column, separate received Offer, and a responsive top offers panel beside Incoming players. Complete rival/system offer lists survive highest-offer projection; explicit icons/text identify rival offers, and links select the exact bid in the existing player card. Loading/stale/partial states remain distinct from verified empty results. Existing scoped roster acquisition is shared without extra Futmondo reads or polling.
+
+Complete normalized offer observations now persist in the existing server-only evidence store under an accounting-excluded cache namespace, with account/league/team/season/scoring isolation, source timestamps, completeness and a 15-second source freshness deadline. Fresh database observations are reused before bid acquisition; manual actions/Refresh invalidate earlier saved observations, and failed saves stay retryable. No migration/dependency change. Focused parsing/UI/persistence checks, the mandatory offline lifecycle and desktop/mobile browser checks passed; details and performance limits are in data_review_results.md. Production database round trips, authenticated offers and hosted deployment remain unverified.

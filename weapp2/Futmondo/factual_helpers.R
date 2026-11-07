@@ -381,8 +381,98 @@ bind_factual_reads<-function(handlers,session,login_token,championship_id=NULL,u
 }
 invalidate_manual_resources<-function(login,championship_id,user_team_id,player_id=NULL){
  if(!valid_login(login))return(invisible(FALSE))
+ invalidate_saved_roster_offers(resource_context(login,championship_id,user_team_id))
  invalidate_resources(resource_context(login,championship_id,user_team_id),pattern="market|roster|bid|capacity|financial|user_team_info|team_info|teams|pressroom")
  invalidate_resources(resource_context(login,championship_id),pattern="championshipplayers|championship_players|catalog|teams|pressroom")
  invalidate_resources(resource_context(login,championship_id,user_team_id,player_id),pattern="summary|player_card")
  invisible(TRUE)
+}
+
+# Private, bounded offer snapshots use the existing cache namespace, which is
+# excluded from rival accounting. Authentication never enters the payload.
+.roster_offer_invalidated <- new.env(parent=emptyenv())
+roster_offer_scope <- function(context) {
+  fields<-c("account_id","championship_id","user_team_id","season","scoring_version")
+  values<-lapply(fields,function(field)fm_scalar(context[[field]],if(field%in%c("season","scoring_version"))"unknown"else ""))
+  names(values)<-fields
+  if(any(!vapply(values,function(x)nzchar(x)&&nchar(x,type="bytes")<=256L,logical(1))))return(NULL)
+  values
+}
+roster_offer_snapshot_id <- function(scope,origin="combined") paste0("rival-cache:received-offers-v1:",origin,":",
+  as.character(openssl::sha256(serialize(scope[c("user_team_id","scoring_version")],NULL,version=2))))
+invalidate_saved_roster_offers <- function(context) {
+  scope<-roster_offer_scope(context);if(is.null(scope))return(invisible(FALSE))
+  key<-as.character(openssl::sha256(serialize(scope[c("account_id","championship_id","user_team_id")],NULL,version=2)))
+  .roster_offer_invalidated[[key]]<-Sys.time()
+  keys<-ls(.roster_offer_invalidated)
+  if(length(keys)>256L){stamps<-vapply(mget(keys,.roster_offer_invalidated),as.numeric,numeric(1));rm(list=keys[which.min(stamps)],envir=.roster_offer_invalidated)}
+  invisible(TRUE)
+}
+roster_offer_rows_valid <- function(rows) {
+  fields<-names(received_offers_empty())
+  is.data.frame(rows)&&identical(names(rows),fields)&&nrow(rows)<=5000L&&
+    all(vapply(rows[setdiff(fields,"bid_price")],is.character,logical(1)))&&is.numeric(rows$bid_price)&&
+    all(!is.na(rows$id)&nzchar(rows$id))&&all(rows$bid_source%in%c("rival","system","unknown"))&&
+    all(is.na(rows$bid_price)|is.finite(rows$bid_price))
+}
+persist_roster_offers <- function(data,context) {
+  scope<-roster_offer_scope(context)
+  if(is.null(scope)||isTRUE(attr(data,"offers_from_saved"))||!is.null(attr(data,"fetch_error"))||
+     !fm_scalar(attr(data,"fetch_status"),"")%in%c("ok","empty"))return(invisible(FALSE))
+  status<-attr(data,"received_offers_status")
+  if(!is.null(status)&&!status%in%c("ok","empty"))return(invisible(FALSE))
+  rows<-attr(data,"received_offers")
+  if(!roster_offer_rows_valid(rows))return(invisible(FALSE))
+  stamp<-fm_time(attr(data,"received_offers_observed_at") %||% attr(data,"observed_at"))
+  if(length(stamp)!=1L||is.na(stamp))return(invisible(FALSE))
+  # Separate keys prevent a raw empty endpoint response replacing the complete
+  # roster+endpoint observation captured in the same composite request.
+  origin<-if(is.null(status))"endpoint"else "combined"
+  payload<-list(kind="received_offers_snapshot",version=1L,scope=scope,status="complete",
+    source="futmondo",origin=origin,source_observed_at=rival_finance_stamp(stamp),
+    valid_until=rival_finance_stamp(stamp+15),rows=lapply(seq_len(nrow(rows)),function(i)as.list(rows[i,,drop=FALSE])))
+  if(as.numeric(object.size(payload))>256*1024L)return(invisible(FALSE))
+  record<-rival_finance_evidence(scope$account_id,scope$championship_id,scope$season,"eligibility",
+    roster_offer_snapshot_id(scope,origin),payload,stamp)
+  defer_persistence("supabase_post_direct",list("rival_finance_evidence",list(record),
+    "account_id,championship_id,season,evidence_type,source_id,observed_at",TRUE),context=context)
+}
+read_saved_roster_offers <- function(context,now=Sys.time()) {
+  scope<-roster_offer_scope(context);if(is.null(scope))return(NULL)
+  ids<-vapply(c("combined","endpoint"),function(origin)roster_offer_snapshot_id(scope,origin),character(1))
+  query<-list(account_id=paste0("eq.",scope$account_id),championship_id=paste0("eq.",scope$championship_id),
+    season=paste0("eq.",scope$season),evidence_type="eq.eligibility",source_id=paste0("in.(",paste(ids,collapse=","),")"),
+    select="account_id,championship_id,season,evidence_type,source_id,observed_at,payload",limit=2L)
+  # The async adapter intercepts this read; awaiting its response must propagate.
+  saved<-tryCatch(supabase_get("rival_finance_evidence_latest",query),error=function(e)NULL)
+  if(!is.data.frame(saved)||!nrow(saved)||nrow(saved)>2L)return(NULL)
+  key<-as.character(openssl::sha256(serialize(scope[c("account_id","championship_id","user_team_id")],NULL,version=2)))
+  invalidated<-.roster_offer_invalidated[[key]] %||% as.POSIXct(0,origin="1970-01-01",tz="UTC")
+  records<-tryCatch(rival_evidence_decode(saved),error=function(e)list())
+  # A combined snapshot retains raw roster offers that the bid endpoint omits.
+  records<-records[order(vapply(records,function(r)match(fm_scalar(r$source_id),ids),integer(1)),na.last=TRUE)]
+  for(record in records){
+    result<-tryCatch({
+      p<-record$payload;stamp<-fm_time(p$source_observed_at);until<-fm_time(p$valid_until)
+      if(!all(vapply(c("account_id","championship_id","season"),function(field)identical(fm_scalar(record[[field]]),scope[[field]]),logical(1)))||
+         !identical(record$evidence_type,"eligibility")||!record$source_id%in%ids||
+         !is.list(p)||!identical(p$kind,"received_offers_snapshot")||!identical(as.integer(p$version),1L)||
+         !is.list(p$scope)||!setequal(names(p$scope),names(scope))||
+         !all(vapply(names(scope),function(field)identical(p$scope[[field]],scope[[field]]),logical(1)))||!identical(p$status,"complete")||!identical(p$source,"futmondo")||
+         !p$origin%in%c("combined","endpoint")||!identical(record$source_id,roster_offer_snapshot_id(scope,p$origin))||
+         length(stamp)!=1L||is.na(stamp)||!identical(as.numeric(fm_time(record$observed_at)),as.numeric(stamp))||length(until)!=1L||is.na(until)||stamp>now||stamp<invalidated||
+         abs(as.numeric(difftime(until,stamp,units="secs"))-15)>0.01||now>=until||
+         !is.list(p$rows)||(if(is.data.frame(p$rows))nrow(p$rows)else length(p$rows))>5000L||as.numeric(object.size(p))>256*1024L)NULL else {
+        rows<-if(is.data.frame(p$rows))dplyr::bind_rows(received_offers_empty(),p$rows)else
+          dplyr::bind_rows(c(list(received_offers_empty()),p$rows))
+        if(!roster_offer_rows_valid(rows))NULL else {
+          out<-highest_received_offers(rows);attr(out,"received_offers")<-rows
+          attr(out,"observed_at")<-stamp;attr(out,"fetch_status")<-if(nrow(out))"ok"else "empty"
+          attr(out,"offers_from_saved")<-TRUE;out
+        }
+      }
+    },error=function(e)NULL)
+    if(!is.null(result))return(result)
+  }
+  NULL
 }

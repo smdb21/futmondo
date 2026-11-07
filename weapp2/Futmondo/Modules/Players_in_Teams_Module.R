@@ -1,8 +1,9 @@
 library(reactable)
 players_in_teams_UI <- function(id) {
   ns <- NS(id)
-  tagList(tags$style(HTML(".fm-incoming-panel{border:1px solid var(--fm-border,#315540);border-radius:8px;padding:16px;margin-bottom:20px}.fm-incoming-panel h3{margin-top:0}.fm-incoming-player{display:flex;gap:16px;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid var(--fm-border,#315540)}.fm-incoming-identity{display:flex;gap:10px;align-items:center;flex-wrap:wrap;min-width:0}.fm-incoming-identity a{overflow-wrap:anywhere}.fm-incoming-arrival{display:flex;flex-direction:column;gap:4px;text-align:right;min-width:0}.fm-incoming-round{font-weight:600}.fm-incoming-schedule{color:var(--fm-muted)}.fm-incoming-error{color:var(--fm-warning,#f0c75e);overflow-wrap:anywhere}@media(max-width:600px){.fm-incoming-player{display:flex;flex-direction:column;align-items:stretch;gap:8px}.fm-incoming-arrival{text-align:left}.fm-incoming-panel{padding:12px}}")),
-    uiOutput(ns("incoming_players")),uiOutput(ns("team_value_box")),
+  tagList(tags$style(HTML(".fm-team-panels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-bottom:20px}.fm-team-panels>div{min-width:0}.fm-team-panels .fm-incoming-panel{height:100%;margin-bottom:0}.fm-offer-source{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--fm-border,#315540);border-radius:6px;padding:3px 7px;overflow-wrap:anywhere}.fm-offer-rival{color:var(--fm-warning,#f0c75e);border-color:currentColor;font-weight:600}.fm-team-offer{display:flex;flex-direction:column;gap:7px;padding:12px 0;border-top:1px solid var(--fm-border,#315540)}.fm-team-offer-heading{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}.fm-team-offer-heading a{overflow-wrap:anywhere}@media(max-width:767px){.fm-team-panels{grid-template-columns:minmax(0,1fr);gap:12px}}.fm-incoming-panel{border:1px solid var(--fm-border,#315540);border-radius:8px;padding:16px;margin-bottom:20px}.fm-incoming-panel h3{margin-top:0}.fm-incoming-player{display:flex;gap:16px;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid var(--fm-border,#315540)}.fm-incoming-identity{display:flex;gap:10px;align-items:center;flex-wrap:wrap;min-width:0}.fm-incoming-identity a{overflow-wrap:anywhere}.fm-incoming-arrival{display:flex;flex-direction:column;gap:4px;text-align:right;min-width:0}.fm-incoming-round{font-weight:600}.fm-incoming-schedule{color:var(--fm-muted)}.fm-incoming-error{color:var(--fm-warning,#f0c75e);overflow-wrap:anywhere}@media(max-width:600px){.fm-incoming-player{display:flex;flex-direction:column;align-items:stretch;gap:8px}.fm-incoming-arrival{text-align:left}.fm-incoming-panel{padding:12px}}")),
+    tags$div(class="fm-team-panels",uiOutput(ns("incoming_players")),uiOutput(ns("received_offers"))),
+    uiOutput(ns("team_value_box")),
     actionButton(ns("btn_put_all_on_market"), "Put All Players on Market", icon=icon("tags")),
     players_table_UI(ns("players_table_in_teams"), box_title="Players in Team",
       filter_by_team=FALSE, filter_by_value=FALSE, filter_by_change_value=FALSE,
@@ -13,6 +14,21 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
   moduleServer(id, function(input, output, session) {
     bind_factual_reads(c("get_players_from_team","get_my_market_players"),session,login_token,championship_id,user_team_id,
       is_active=is_module_active,refresh_trigger=refresh_trigger)
+
+    if(is.function(refresh_trigger))observeEvent(refresh_trigger(), {
+      auth<-login_token();req(valid_login(auth),championship_id(),user_team_id())
+      invalidate_saved_roster_offers(resource_context(auth,championship_id(),user_team_id()))
+    },ignoreInit=TRUE,priority=110)
+
+    roster_state_reader <- factual_read_adapter(session,"get_players_from_team",login_token,championship_id,user_team_id,
+      is_active=is_module_active,refresh_trigger=refresh_trigger,state_only=TRUE)
+    roster_state <- reactive({
+      roster_state_reader(login=login_token(),championship_id=championship_id(),user_team_id=user_team_id(),teams=NULL)
+    })
+    offers_state <- reactive(team_received_offers_state(roster_state()))
+    output$received_offers <- renderUI({
+      req(is_module_active());team_received_offers_panel(offers_state(),session$ns)
+    })
 
     ns <- session$ns
     get_reactive_val <- function(x) if (is.function(x)) x() else x
@@ -47,6 +63,30 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
             footer=modalButton("Close"),easyClose=TRUE,size="l"))
           session$onFlushed(function(){
             if(identical(isolate(current_context()),isolate(incoming_context()))&&identical(isolate(incoming_requested()),player_id))
+              incoming_selected(card_row)
+          },once=TRUE)
+        },ignoreInit=TRUE)
+      })
+    })
+    offer_handlers <- list()
+    observe({
+      req(is_module_active());rows<-offers_state()$records
+      for(handler in offer_handlers)handler$destroy()
+      offer_handlers<<-lapply(seq_len(nrow(rows)),function(i) {
+        row<-rows[i,,drop=FALSE];key<-team_received_offer_input(row)
+        observeEvent(input[[key]],{
+          current<-offers_state()$records
+          record<-current[vapply(seq_len(nrow(current)),function(j)identical(team_received_offer_input(current[j,,drop=FALSE]),key),logical(1)),,drop=FALSE]
+          req(nrow(record)==1L)
+          roster<-roster_state()$data
+          card_row<-roster[as.character(roster$id)%in%record$id,,drop=FALSE];req(nrow(card_row)==1L)
+          for(field in c("bid_price","bid_user","bid_id","bidder_team_id","bid_source"))card_row[[field]]<-record[[field]]
+          incoming_requested(key);incoming_context(current_context());incoming_selected(NULL)
+          showModal(modalDialog(selected_player_UI(ns("incoming_card")),
+            tags$script(HTML(paste0("$(document).off('hidden.bs.modal.fmIncoming','#shiny-modal').on('hidden.bs.modal.fmIncoming','#shiny-modal',function(){Shiny.setInputValue('",ns("incoming_closed"),"',Math.random(),{priority:'event'});});"))),
+            footer=modalButton("Close"),easyClose=TRUE,size="l"))
+          session$onFlushed(function(){
+            if(identical(isolate(current_context()),isolate(incoming_context()))&&identical(isolate(incoming_requested()),key))
               incoming_selected(card_row)
           },once=TRUE)
         },ignoreInit=TRUE)
@@ -98,11 +138,13 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
         print(paste0("[Market check] Fetch warning: ", e$message))
         NULL
       })
-      if (!is.null(my_mkt_df) && "id" %in% colnames(my_mkt_df)) {
+      if (!is.null(my_mkt_df) && "id" %in% colnames(my_mkt_df) &&
+          is.null(attr(my_mkt_df,"fetch_error")) && fm_scalar(attr(my_mkt_df,"fetch_status"),"ok")%in%c("ok","empty")) {
         mkt_ids <- as.character(my_mkt_df$id)
         players_table$market_inMarket <- as.character(players_table$id) %in% mkt_ids
       }
 
+      players_table <- team_selling_prices(players_table,my_mkt_df)
       players_table <- preserve_observation_time(players_table)
 
       return(players_table)
@@ -202,6 +244,71 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
     return(selected)
   })
 }
+# One numeric asking price for My Team; raw fields remain player-card metadata.
+team_selling_prices <- function(roster,listings=NULL) {
+  prices <- rep(NA_real_,nrow(roster))
+  for(field in intersect(c("market_asking_price","effective_market_price","market_price","price"),names(roster))) {
+    candidate<-suppressWarnings(as.numeric(as.character(roster[[field]])))
+    use<-!is.finite(prices)&is.finite(candidate)&candidate>0;prices[use]<-candidate[use]
+  }
+  listed<-if("market_inMarket"%in%names(roster))as.logical(roster$market_inMarket)else rep(NA,nrow(roster))
+  listings_verified<-is.data.frame(listings)&&is.null(attr(listings,"fetch_error"))&&
+    fm_scalar(attr(listings,"fetch_status"),"ok")%in%c("ok","empty")
+  if(isTRUE(listings_verified)&&!nrow(listings))listed[]<-FALSE
+  if(isTRUE(listings_verified)&&"id"%in%names(listings)) {
+    index<-match(as.character(roster$id),as.character(listings$id));listed<-!is.na(index)
+    listing_prices<-rep(NA_real_,nrow(roster))
+    for(field in intersect(c("price","market_price","effective_market_price"),names(listings))) {
+      candidate<-suppressWarnings(as.numeric(as.character(listings[[field]][index])))
+      use<-!is.finite(listing_prices)&is.finite(candidate)&candidate>0;listing_prices[use]<-candidate[use]
+    }
+    use<-is.finite(listing_prices);prices[use]<-listing_prices[use]
+  }
+  prices[is.na(listed)|!listed]<-NA_real_;roster$selling_by<-prices;roster
+}
+
+team_received_offer_input <- function(row) paste0("offer_open_",digest::digest(
+  as.list(row[1,intersect(c("id","bid_id","bid_user","bidder_team_id"),names(row)),drop=FALSE]),algo="xxhash64"))
+
+team_received_offers_state <- function(roster_state) {
+  roster<-roster_state$data
+  rows<-attr(roster,"received_offers") %||% received_offers_empty()
+  # Resolve names from the same roster; an old-context player is never displayed.
+  if(is.data.frame(roster)&&"id"%in%names(roster)) {
+    rows<-rows[rows$id%in%as.character(roster$id),,drop=FALSE]
+    index<-match(rows$id,as.character(roster$id))
+    rows$player_name<-if("name"%in%names(roster))as.character(roster$name[index])else rows$id
+    missing<-is.na(rows$player_name)|!nzchar(rows$player_name);rows$player_name[missing]<-rows$id[missing]
+  }else rows$player_name<-character(nrow(rows))
+  status<-roster_state$status %||% "unavailable"
+  error<-roster_state$error %||% attr(roster,"received_offers_error")
+  if(status%in%c("ok","empty"))status<-attr(roster,"received_offers_status") %||% "ok"
+  if(!is.null(error)&&status%in%c("ok","empty"))status<-"partial"
+  list(records=rows,status=status,error=error,observed_at=attr(roster,"received_offers_observed_at") %||% roster_state$observed_at)
+}
+
+team_received_offers_panel <- function(state,ns) {
+  rows<-state$records;verified<-state$status%in%c("ok","empty")
+  rival_count<-sum(rows$bid_source%in%"rival")
+  shiny::tags$section(class="fm-incoming-panel fm-offers-panel",`aria-labelledby`=ns("offers_heading"),
+    shiny::tags$h3(id=ns("offers_heading"),if(verified)paste0("Offers for your players (",nrow(rows),")")else "Offers for your players"),
+    if(rival_count)shiny::tags$p(class="fm-offer-rival",shiny::icon("user"),paste0(" ",rival_count," rival offer",if(rival_count==1L)""else "s")),
+    if(identical(state$status,"loading"))shiny::tags$p(role="status",shiny::icon("spinner",class="fa-spin")," Checking received offers…"),
+    if(!verified&&!identical(state$status,"loading"))shiny::tags$p(role="alert",class="fm-incoming-error",
+      if(identical(state$status,"stale"))"Showing previously observed offers; current offers could not be verified. "else "Received offers could not be fully verified. ",
+      if(!is.null(state$error))resource_failure_message(state$error)else "Refresh to retry."),
+    if(verified&&!nrow(rows))shiny::tags$p("No offers for your players."),
+    lapply(seq_len(nrow(rows)),function(i) {
+      row<-rows[i,,drop=FALSE];rival<-identical(row$bid_source,"rival");system<-identical(row$bid_source,"system")
+      amount<-if(is.finite(row$bid_price))format_table_currency(row$bid_price)else "Amount unavailable"
+      shiny::tags$div(class="fm-team-offer",
+        shiny::tags$div(class="fm-team-offer-heading",if(nzchar(row$bid_id))shiny::actionLink(ns(team_received_offer_input(row)),row$player_name)else shiny::tags$span(row$player_name),shiny::tags$strong(amount)),
+        shiny::tags$div(shiny::tags$span(class=paste("fm-offer-source",if(rival)"fm-offer-rival"else ""),
+          shiny::icon(if(rival)"user"else if(system)"robot"else "circle-question"),
+          if(rival)paste0("Rival · ",row$bid_user)else if(system)"Futmondo system"else "Unknown bidder")))
+    }))
+}
+
 bulk_market_listing_plan <- function(roster, mode = c("value", "closed_clause"), clause_premium_pct = 5, now = Sys.time()) {
   mode <- match.arg(mode)
   empty <- data.frame(player_id = character(), price = numeric(), already_listed = logical(), stringsAsFactors = FALSE)
