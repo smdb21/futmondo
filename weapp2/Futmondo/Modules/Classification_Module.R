@@ -360,7 +360,11 @@ classification_Server <- function(id, is_module_active, login_token, championshi
     })
     selected_lineup_RV <- reactiveVal(NULL)
     observeEvent(lineup_context_RV(), {
-      if(!is.null(selected_lineup_RV())){selected_lineup_RV(NULL);removeModal(session=session)}
+      # Background publications can invalidate this reactive with the same ID.
+      selected<-selected_lineup_RV()
+      if(!is.null(selected)&&!identical(selected$context,lineup_context_RV())){
+        selected_lineup_RV(NULL);removeModal(session=session)
+      }
     },ignoreInit=TRUE)
     observeEvent(input$lineup_team_click, {
       click <- input$lineup_team_click
