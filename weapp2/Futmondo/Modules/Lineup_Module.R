@@ -234,7 +234,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
           shiny::tags$img(src=paste0(PHOTO_URL,'/',row$photo),alt='',loading='lazy',onerror="this.style.display='none'")else shiny::span(class='fm-lineup-silhouette',if(occupied)'●'else'+'),
           if(nzchar(crest_url))shiny::tags$img(class='fm-lineup-crest',src=crest_url,alt=row$club,title=row$club,
             width=22,height=22,loading='lazy',decoding='async',onerror="this.style.display='none'")),
-        shiny::div(class='fm-lineup-name',`data-position`=position,if(occupied)row$name else'Empty position'),
+        shiny::div(class='fm-lineup-name',`data-position`=position,if(occupied)lineup_player_label(row$name)else'Empty position'),
         if(occupied&&analytics_known_unavailable(row))shiny::span(class='fm-lineup-warning','⚠')),
         class=paste('fm-lineup-player',if(!occupied)'fm-lineup-empty'),disabled=saving(),
         title=if(occupied)paste('Change',row$name)else paste('Select',role))

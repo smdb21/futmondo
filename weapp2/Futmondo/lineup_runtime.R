@@ -1,4 +1,8 @@
 # Pure next-round lineup rules and exact historical-score selection.
+lineup_player_label <- function(name) {
+  name<-trimws(gsub("[[:space:]]+"," ",as.character(name)))
+  sub("^([^[:space:]])[^[:space:]]* (.+)$","\\1. \\2",name)
+}
 lineup_formations <- function() c('4-4-2','4-3-3','4-5-1','3-4-3','3-5-2','5-4-1','5-3-2','3-6-1','4-2-4','3-3-4','4-6-0','5-2-3')
 lineup_slot_roles <- function(strategy) {
   if(!strategy%in%lineup_formations())stop('Unsupported formation')

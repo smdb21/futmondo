@@ -175,7 +175,7 @@ round_lineup_player_ui <- function(player,bench=FALSE,index,point_system="press"
     shiny::div(class="fm-lineup-name",`data-position`=if(occupied)position else "",
       title=if(occupied)paste0(if(bench)"Main position for substitutions: "else"Lineup position: ",
         if(nzchar(position))switch(position,GK="Goalkeeper",DEF="Defender",MID="Midfielder",FWD="Forward")else"unavailable"),
-      label))
+      if(occupied)lineup_player_label(label)else label))
 }
 round_lineup_pitch_ui <- function(answer) {
   lineup<-normalize_round_lineup(answer)
