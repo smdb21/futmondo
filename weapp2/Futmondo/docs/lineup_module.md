@@ -37,4 +37,14 @@ Existing databases require `scripts/migrations/20261107191054_lineup_snapshots.s
 - `test/test_lineup_schema.cjs`: three groups covering fresh/repeatable schema, newer-write retention, bounded complete payloads, page constraint and server-only access.
 - Independent exhaustive small-fixture validation covers optimizer/bench correctness and multiposition cases. Actual browser fixtures cover clearing, best XI + bench, position selection, one verified synthetic save, reset and viewport width. Warm picker interaction measured 111 ms at mobile width and 101 ms at desktop width after removing the picker-specific modal fade.
 
-These are local, synthetic/offline checks. No authenticated live lineup mutation, hosted migration or deployment is claimed. Source/API failures remain visible; the code does not invent unavailable facts or infer unsupported lock windows.
+These implementation checks are local and synthetic/offline. No authenticated live lineup mutation or application deployment is claimed. Source/API failures remain visible; the code does not invent unavailable facts or infer unsupported lock windows.
+
+## Hosted migration — 2026-11-07
+
+Applied `20261107191054_lineup_snapshots.sql` to Supabase project `ozhnextrcxxksswpnglt` at the user's request. Migration history records version `20261107191054`, name `lineup_snapshots`; its source SQL matches the committed file exactly (MD5 `60aaa1675b7f92ebc5193d85a286aa48`). A quoting error confined to the stored migration-history text was corrected after comparing it with the source; the applied database objects and their checks were unaffected.
+
+The connector's migration-confirmation flow expired twice without executing or recording a migration, as verified by subsequent database reads. The connector's SQL interface then applied the reviewed source and its migration-history record in one transaction, with five-second lock and sixty-second statement limits.
+
+Live verification confirmed the six-column primary key, enabled RLS, exactly one stale-write trigger, SECURITY INVOKER execution, all four table operations for `service_role`, and no table or trigger-function access for `anon` or `authenticated`. The page constraint accepts `lineup`; the existing preference-row count remained one. Server-role fixtures verified upsert behavior, rejection of older snapshots, independent scoring contexts and saving the Lineup page. Every fixture was rolled back, with zero fixture rows remaining.
+
+The security advisor added only the expected informational RLS-without-client-policies notice for this server-only table; no new warning or error concerned the migration. Existing unrelated warnings were unchanged. The change adds one indexed snapshot table and validates the small page-preference constraint without rewriting application history or introducing recurring requests. No delegation was used for the rollout; runtime regressions were not repeated for this documentation-only update. Application deployment and an authenticated live lineup submission remain separate from this verified database rollout.
