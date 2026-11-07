@@ -371,6 +371,7 @@ classification_Server <- function(id, is_module_active, login_token, championshi
       selected_lineup_RV(list(team_id=as.character(rows$team_id[i]),team_name=rows$team_name[i],
         round_id=as.character(catalog$round_id[r]),round_number=single_round_RV(),context=lineup_context_RV()))
       showModal(modalDialog(title=paste(rows$team_name[i],"· Round",single_round_RV()),
+        div(class="player-card-close-shortcut fm-lineup-close-shortcut",modalButton("Close lineup")),
         uiOutput(session$ns("round_lineup_ui")),size="l",easyClose=TRUE,
         footer=modalButton("Close")),session=session)
     })
