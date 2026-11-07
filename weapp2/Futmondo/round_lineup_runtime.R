@@ -140,9 +140,13 @@ round_lineup_player_score <- function(player,point_system="press",status="") {
   }
   list(points=points,provisional=is.finite(points)&&(provisional||status%in%c("running","playing")))
 }
-round_lineup_player_ui <- function(player,bench=FALSE,index,point_system="press",status="") {
+round_lineup_player_ui <- function(player,bench=FALSE,index,point_system="press",status="",pitch_role="") {
   occupied<-is.list(player)&&nzchar(mvp_text(player$id))
   changed<-occupied&&isTRUE(player$changed)
+  # Pitch slots identify the assigned role, including secondary-position starts.
+  # Bench role is the historical main position; never use role2 or bench order.
+  position<-if(bench&&occupied)analytics_player_positions(data.frame(role=mvp_text(player$role)))[[1]]else pitch_role
+  position<-if(length(position)&&nzchar(position[1]))position[1]else ""
   label<-if(occupied)mvp_text(player$name,paste("Player",mvp_text(player$id)))else "Empty position"
   score<-round_lineup_player_score(if(occupied)player else NULL,point_system,status)
   points<-score$points
@@ -168,7 +172,10 @@ round_lineup_player_ui <- function(player,bench=FALSE,index,point_system="press"
       if(safe_image(logo))shiny::tags$img(class="fm-lineup-crest",src=logo,alt="",loading="lazy",onerror="this.style.display='none'"),
       if(changed)shiny::span(class="fm-lineup-change",title=if(bench)"Substituted out"else"Substituted in",
         `aria-label`=if(bench)"Substituted out"else"Substituted in",if(bench)"↓"else"↑")),
-    shiny::div(class="fm-lineup-name",label))
+    shiny::div(class="fm-lineup-name",label),
+    if(occupied)shiny::div(class="fm-lineup-position",
+      title=if(bench)"Main position for substitutions"else"Lineup position",
+      if(nzchar(position))position else "Position unavailable"))
 }
 round_lineup_pitch_ui <- function(answer) {
   lineup<-normalize_round_lineup(answer)
@@ -179,9 +186,9 @@ round_lineup_pitch_ui <- function(answer) {
       shiny::div(class="fm-lineup-markings",`aria-hidden`="true",shiny::div(class="fm-lineup-circle"),shiny::div(class="fm-lineup-goal-top"),shiny::div(class="fm-lineup-goal-bottom")),
       lapply(which(lineup$rows>0),function(row)shiny::div(class="fm-lineup-row",style=paste0("--lineup-count:",lineup$rows[row]),
         lapply(seq.int(starts[row],ends[row]),function(i)round_lineup_player_ui(lineup$players[[i]],index=i,
-          point_system=lineup$pointSystem,status=lineup$status))))),
+          point_system=lineup$pointSystem,status=lineup$status,pitch_role=c("FWD","MID","DEF","GK")[row]))))),
     shiny::div(class="fm-lineup-bench",shiny::h4("Substitutes"),shiny::div(class="fm-lineup-bench-row",
       lapply(seq_len(4L),function(i)round_lineup_player_ui(lineup$bench[[i]],bench=TRUE,index=i,
         point_system=lineup$pointSystem,status=lineup$status)))),
-    shiny::p(class="fm-lineup-legend","* Provisional points · ↑ Substituted in · ↓ Substituted out · — Points unavailable. Bench order is 1–4."))
+    shiny::p(class="fm-lineup-legend","* Provisional points · ↑ Substituted in · ↓ Substituted out · — Points unavailable. Bench order is 1–4. Substitutes can only cover their main position; secondary positions do not count."))
 }

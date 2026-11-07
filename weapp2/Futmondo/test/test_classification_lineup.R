@@ -28,6 +28,26 @@ check('unrated pitch and bench points use the official scoring mode and chosen r
   stats<-raw;stats$pointSystem<-'stats'
   stopifnot(grepl('title="Provisional points">99\\*</div>',htmltools::renderTags(round_lineup_pitch_ui(stats))$html))
 })
+check('position labels follow pitch slots and only the main bench role, including saved JSON',{
+  answer<-raw
+  answer$players[[3]]$role<-'defensa';answer$players[[3]]$role2<-'delantero'
+  answer$bench$players[[1]]$role<-'defensa';answer$bench$players[[1]]$role2<-'delantero'
+  answer$bench$players[[2]]$role<-'centrocampista';answer$bench$players[[2]]$role2<-'defensa'
+  position<-function(id)xml2::xml_text(xml2::xml_find_first(nodes,paste0('//*[@data-player-id="',id,'"]/*[@class="fm-lineup-position"]')))
+  for(value in list(answer,jsonlite::fromJSON(jsonlite::toJSON(round_lineup_clean_answer(answer),auto_unbox=TRUE),simplifyVector=FALSE))){
+    html<-htmltools::renderTags(round_lineup_pitch_ui(value))$html
+    nodes<-xml2::read_html(html)
+    stopifnot(position('striker')=='FWD',position('incoming')=='MID',position('lastdef')=='DEF',position('keeper')=='GK',
+      position('fourth')=='DEF',position('outgoing')=='MID',position('first')=='Position unavailable',
+      length(xml2::xml_find_all(nodes,'//*[contains(@class,"fm-lineup-empty")]/*[@class="fm-lineup-position"]'))==0L,
+      grepl('Substitutes can only cover their main position; secondary positions do not count.',html,fixed=TRUE))
+  }
+  for(strategy in c('4-3-3','4-6-0')){
+    answer$strategy<-strategy
+    nodes<-xml2::read_html(htmltools::renderTags(round_lineup_pitch_ui(answer))$html)
+    stopifnot(position('incoming')=='MID',position('lastdef')=='DEF',position('keeper')=='GK')
+  }
+})
 check('rated, reasoned zero, provisional zero and unavailable points remain distinct',{
   p<-live_player;p$rated<-TRUE;p$points<- -2
   stopifnot(round_lineup_player_score(p)$points== -2,!round_lineup_player_score(p)$provisional,
