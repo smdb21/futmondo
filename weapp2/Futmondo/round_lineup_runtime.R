@@ -119,6 +119,11 @@ round_lineup_player_score <- function(player,point_system="press",status="") {
   points<-NA_real_;provisional<-FALSE
   if(is.list(player)){
     if(nzchar(mvp_text(player$zeroPointsReason)))points<-0
+    else if(identical(point_system,"custom")){
+      # Custom leagues report their score separately, even for rated players.
+      points<-fm_number(player$customPoints)
+      provisional<-is.finite(points)&&identical(player$rated,FALSE)
+    }
     else if(isTRUE(player$rated))points<-fm_number(player$points)
     else if(is.list(player$detailedPoints)){
       # Official RoundLineUp._getPlayerPoints selects the mode AND chosen role.

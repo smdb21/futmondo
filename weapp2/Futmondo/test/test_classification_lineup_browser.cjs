@@ -42,7 +42,7 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
       assert.deepEqual(await modal.locator('.fm-lineup-bench-row .fm-lineup-player').evaluateAll(nodes=>nodes.map(n=>n.dataset.playerId)),['bench-0','','bench-2','bench-3']);
       assert.equal(await modal.locator('.fm-lineup-pitch .fm-lineup-in').count(),1);
       assert.equal(await modal.locator('.fm-lineup-bench-row .fm-lineup-out').count(),1);
-      assert.equal(await modal.locator('[data-player-id="own-3"] .fm-lineup-points').innerText(),'7*');
+      assert.equal(await modal.locator('[data-player-id="own-3"] .fm-lineup-points').innerText(),'8*');
       assert.equal(await modal.locator('[data-player-id="bench-3"] .fm-lineup-points').innerText(),'-4*');
       assert.match(await modal.locator('.fm-lineup-legend').innerText(),/Provisional points/);
       const pitch = await modal.locator('.fm-lineup-pitch').boundingBox();
@@ -82,7 +82,7 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
       await modal.getByText('Formation 3-6-1',{exact:true}).waitFor();
       assert.match(await modal.locator('.modal-title').innerText(),/Rival Team/);
       await modal.locator('.fm-lineup-pitch [data-player-id="rival-0"]').waitFor();
-      assert.equal(await modal.locator('[data-player-id="rival-3"] .fm-lineup-points').innerText(),'7*');
+      assert.equal(await modal.locator('[data-player-id="rival-3"] .fm-lineup-points').innerText(),'8*');
       await modal.getByRole('button',{name:'Close',exact:true}).click();
       await page.getByRole('tab',{name:'Partial classifications',exact:true}).click();
       await page.locator('#classification-round_range_slider').waitFor({state:'visible'});
@@ -99,6 +99,8 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
       await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
       await table.getByRole('button',{name:'Your Team',exact:true}).click();
       await modal.getByText('Formation 4-3-3',{exact:true}).waitFor();
+      assert.equal(await modal.locator('[data-player-id="own-3"] .fm-lineup-points').innerText(),'8');
+      assert.equal(await modal.locator('[data-player-id="bench-3"] .fm-lineup-points').innerText(),'-4');
       assert.deepEqual(await modal.locator('.fm-lineup-row').evaluateAll(nodes=>nodes.map(n=>n.querySelectorAll('.fm-lineup-player').length)),[3,3,4,1]);
       assert.equal(await page.locator('.shiny-output-error:visible').count(),0);
       assert.deepEqual(errors,[]);

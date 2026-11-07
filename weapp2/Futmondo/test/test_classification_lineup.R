@@ -13,6 +13,8 @@ live_player$rated<-FALSE;live_player$role<-'centrocampista'
 live_player$detailedPoints<-list(po=list(list(mode='stats',r='centrocampista',p=99),
   list(mode='press',r='defensa',p=11),list(mode='press',r='centrocampista',p=7,private='discard')),private='discard')
 raw$pointSystem<-'press';raw$players<-c(raw$players,list(live_player))
+raw$players[[4]]$rated<-TRUE;raw$players[[4]]$customPoints<-8
+raw$bench$players[[2]]$customPoints<- -4
 raw$bench$players[[1]]$rated<-FALSE;raw$bench$players[[1]]$role<-'delantero'
 raw$bench$players[[1]]$detailedPoints<-list(po=list(list(mode='press',r='delantero',p=-4)))
 auth<-c(userid='u',token='synthetic-private-token');ctx<-resource_context(auth,'league','a',season=league_season_context('league'))
@@ -38,6 +40,28 @@ check('rated, reasoned zero, provisional zero and unavailable points remain dist
   p<-live_player;p$detailedPoints$po[[3]]$p<-NULL;stopifnot(is.na(round_lineup_player_score(p)$points))
   p<-live_player;p$detailedPoints$po[[4]]<-p$detailedPoints$po[[3]]
   stopifnot(is.na(round_lineup_player_score(p)$points))
+})
+check('custom league scores override raw points for live and past rounds without using other scoring modes',{
+  p<-live_player;p$rated<-TRUE;p$points<-0;p$customPoints<-8
+  stopifnot(round_lineup_player_score(p,'custom','running')$points==8,
+    round_lineup_player_score(p,'custom','running')$provisional,
+    round_lineup_player_score(p,'custom','done')$points==8,
+    !round_lineup_player_score(p,'custom','done')$provisional,
+    round_lineup_player_score(p,'press','done')$points==0)
+  p$rated<-FALSE
+  stopifnot(round_lineup_player_score(p,'custom','done')$points==8,round_lineup_player_score(p,'custom','done')$provisional)
+  for(value in c(0,-4)){
+    p$customPoints<-value;stopifnot(round_lineup_player_score(p,'custom')$points==value)
+  }
+  p$points<-99;p$customPoints<-NULL
+  stopifnot(is.na(round_lineup_player_score(p,'custom')$points))
+  p$zeroPointsReason<-'notPlayed';stopifnot(round_lineup_player_score(p,'custom')$points==0)
+  custom<-raw;custom$pointSystem<-'custom';custom$status<-'running'
+  html<-htmltools::renderTags(round_lineup_pitch_ui(custom))$html
+  stopifnot(grepl('title="Provisional points">8\\*</div>',html),grepl('title="Provisional points">-4\\*</div>',html))
+  custom$status<-'done'
+  html<-htmltools::renderTags(round_lineup_pitch_ui(custom))$html
+  stopifnot(grepl('title="Round points">8</div>',html),grepl('title="Round points">-4</div>',html))
 })
 check('official positions retain eleven places, 3-6-1 rows, holes and four ordered bench positions',{
   got<-normalize_round_lineup(raw)
@@ -125,6 +149,16 @@ check('memory reuse and persisted JSON reuse avoid repeat API calls after memory
     normalize_round_lineup(got$answer)$players[[5]]$team$logo=='club.png')
   html<-htmltools::renderTags(round_lineup_pitch_ui(got$answer))$html
   stopifnot(grepl('title="Provisional points">7\\*</div>',html),grepl('title="Provisional points">-4\\*</div>',html))
+})
+check('existing version-2 custom snapshots render eight points after memory clears with no source request or rewrite',{
+  original<-saved
+  saved[[1]]$payload$answer$pointSystem<-'custom';saved[[1]]$payload$answer$status<-'running'
+  custom_saved<-saved;clear_api_cache()
+  got<-get_round_lineup_snapshot(auth,'league','a','opaque-round')
+  html<-htmltools::renderTags(round_lineup_pitch_ui(got$answer))$html
+  stopifnot(isTRUE(got$from_saved),got$answer$pointSystem=='custom',calls==1L,identical(saved,custom_saved),
+    grepl('title="Provisional points">8\\*</div>',html),grepl('title="Provisional points">-4\\*</div>',html))
+  saved<-original
 })
 check('wrong scope and expired snapshots refetch; failures preserve truthful stale data',{
   original<-saved;saved[[1]]$payload$scope$user_team_id<-'other'
