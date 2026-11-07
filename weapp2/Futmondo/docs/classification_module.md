@@ -1,5 +1,7 @@
 # Classification and matchday results
 
+Classification opens with **Latest round** selected by default, and follows the latest confirmed round as scores load. This changes only the initial filter and adds no source requests or persistence.
+
 `classification_UI(id)` displays round-window and single-round controls, standings, rank progression, published dream-team players and configured league rewards.
 
 The **Latest round** button sets both round-range handles to the latest available round. **General classification** restores the full available range. Both clear the single-round override to **All rounds**, so standings and bonus totals follow the slider. These shortcuts reuse the loaded round catalog and team histories without additional requests. Manual round filtering remains available. Offline regression: `Rscript test/test_classification_presets.R`.

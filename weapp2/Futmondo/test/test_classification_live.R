@@ -68,7 +68,8 @@ teams<-data.frame(teamid=letters[1:9],teamname=paste('Team',1:9),points=100:108)
 shiny::testServer(classification_Server,args=list(is_module_active=reactive(TRUE),login_token=reactive(auth),
   championship_id=reactive(cid),user_team_id=reactive('a'),user_teams_RV=reactive(teams)),{
   messages<-list();root<-session$rootScope();root$sendInputMessage<-function(inputId,message)messages[[sub('^.*-','',inputId)]]<<-message
-  session$setInputs(single_round_select='all',round_range_slider=c(1,38),latest_round=1)
+  session$setInputs(single_round_select='all',round_range_slider=c(1,38))
+  stopifnot(selection_mode()=='latest')
   catalog(list(current_round_id='r13',current_round_number=13,rounds=data.frame(round_id=paste0('r',11:13),round_number=11:13,is_finished=c(TRUE,FALSE,FALSE),status=c('closed','next','future'))))
   session$flushReact()
   stopifnot(max(round_numbers_RV())==11,selection_mode()=='latest')

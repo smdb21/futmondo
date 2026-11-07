@@ -198,7 +198,7 @@ classification_Server <- function(id, is_module_active, login_token, championshi
       if(!is.null(ranking)&&nrow(ranking$rows))numbers<-numbers[numbers<=ranking$round_number]
       numbers
     })
-    selection_mode <- reactiveVal("general")
+    selection_mode <- reactiveVal("latest")
     sent_selection <- NULL
     send_selection <- function(numbers,mode) {
       window <- if(mode=="latest")rep(max(numbers),2)else range(numbers)
