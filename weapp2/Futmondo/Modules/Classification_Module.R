@@ -136,7 +136,8 @@ classification_remaining_table <- function(standings, history, single, rounds) {
 
 # Keep points numeric for sorting; add the remaining count only when rendering.
 classification_points_cell <- function(points, left = NULL) {
-  label <- if(is.finite(points))as.character(points)else "Unavailable"
+  if(!is.finite(points))return("-")
+  label <- as.character(points)
   if(is.null(left))return(label)
   if(is.finite(left))return(paste0(label," (",left,")"))
   tags$span(title="Players left unavailable: the round ranking source has not supplied a valid count.",
@@ -360,12 +361,10 @@ classification_Server <- function(id, is_module_active, login_token, championshi
       rows <- standings_RV()
       if (!nrow(rows)) return(p(empty_standings_message_RV()))
       stale <- identical(attr(active_ranking_RV(),"fetch_status"),"stale")
-      tagList(p("Points and reconstructed bonus totals for the selected rounds."),
-        p(if(single_round_RV()!="all")"Click a team to see its formation and ordered substitutes for this round."else "Partial classification for the selected range of rounds."),
+      tagList(p(if(single_round_RV()!="all")"Click a team to see its formation and ordered substitutes for this round."else "Partial classification for the selected range of rounds."),
         if(length(failures))p(resource_failure_message(failures[[1]])),
         if(isTRUE(history$loading))p("Historical round scores are loading; available live scores are shown."),
-        if(stale)p("Showing saved round standings while the latest source request is unavailable."),
-        if (any(!is.finite(rows$points))) p("Some selected round scores are missing; affected point totals are unavailable."))
+        if(stale)p("Showing saved round standings while the latest source request is unavailable."))
     })
     lineup_context_RV <- reactive({
       round <- single_round_RV();catalog <- rounds_RV()
@@ -406,12 +405,18 @@ classification_Server <- function(id, is_module_active, login_token, championshi
     output$classification_table <- renderReactable({
       rows <- standings_RV()
       if (!nrow(rows)) return(reactable(data.frame(Message = empty_standings_message_RV())))
+      rows <- rows[order(!is.finite(rows$points),rows$rank,rows$team_name,na.last=TRUE),,drop=FALSE]
+      bonus_columns <- c("points_bonus","mvp_bonus","best_xi_bonus","position_bonus")
+      latest <- single_round_RV()!="all" && as.numeric(single_round_RV())==max(round_numbers_RV())
+      hide_bonuses <- latest && !any(vapply(rows[,intersect(bonus_columns,names(rows)),drop=FALSE],
+        function(values)any(is.finite(values)),logical(1)))
       ids <- as.character(rows$team_id)
       click <- if(single_round_RV()!="all")htmlwidgets::JS(paste0("function(rowInfo){if(!rowInfo)return;var ids=",jsonlite::toJSON(ids),";Shiny.setInputValue(",jsonlite::toJSON(session$ns("lineup_team_click"),auto_unbox=TRUE),",{id:ids[rowInfo.index],context:",jsonlite::toJSON(lineup_context_RV(),auto_unbox=TRUE),",nonce:Date.now()},{priority:'event'});}"))else NULL
       remaining <- rows$players_left
       rows <- rows[, intersect(c("rank", "team_name", "points", "rounds", "points_bonus", "mvp_bonus", "best_xi_bonus", "position_bonus"), names(rows)), drop = FALSE]
-      reactable(rows, compact = TRUE, striped = TRUE, highlight = single_round_RV()!="all", onClick = click, defaultSorted = "rank", defaultColDef = colDef(na = "Unavailable"),
-                columns = list(rank = colDef(name = "Rank", minWidth = 65), team_name = colDef(name = "Team", minWidth = 150, cell = function(value,index){
+      reactable(rows, compact = TRUE, striped = TRUE, highlight = single_round_RV()!="all", onClick = click, defaultSorted = "rank", defaultColDef = colDef(na = "Unavailable",sortNALast=TRUE),
+                columns = c(if("rounds"%in%names(rows))list(rounds=colDef(show=FALSE)),
+                  list(rank = colDef(name = "Rank", minWidth = 65,na="-"), team_name = colDef(name = "Team", minWidth = 150, cell = function(value,index){
                     if(single_round_RV()=="all")return(value)
                     tags$button(type="button",class="btn btn-link fm-lineup-open",title=paste("Open round lineup for",value),
                       onclick=paste0("event.stopPropagation();Shiny.setInputValue(",jsonlite::toJSON(session$ns("lineup_team_click"),auto_unbox=TRUE),
@@ -419,10 +424,10 @@ classification_Server <- function(id, is_module_active, login_token, championshi
                         ",nonce:Date.now()},{priority:'event'});"),value)
                   }), points = colDef(name = if(is.null(remaining))"Points"else"Points (left)",
                     cell = function(value,index)classification_points_cell(value,if(!is.null(remaining))remaining[index])),
-                  points_bonus = colDef(name = "Points bonus (€)", minWidth = 140, format = colFormat(separators = TRUE, digits = 0)),
-                  mvp_bonus = colDef(name = "MVP bonus (€)", minWidth = 140, format = colFormat(separators = TRUE, digits = 0)),
-                  best_xi_bonus = colDef(name = "Best XI bonus (€)", minWidth = 140, format = colFormat(separators = TRUE, digits = 0)),
-                  position_bonus = colDef(name = "Position bonus (€)", minWidth = 140, format = colFormat(separators = TRUE, digits = 0))))
+                  points_bonus = colDef(name = "Points bonus (€)", show=!hide_bonuses, minWidth = 140, format = colFormat(separators = TRUE, digits = 0)),
+                  mvp_bonus = colDef(name = "MVP bonus (€)", show=!hide_bonuses, minWidth = 140, format = colFormat(separators = TRUE, digits = 0)),
+                  best_xi_bonus = colDef(name = "Best XI bonus (€)", show=!hide_bonuses, minWidth = 140, format = colFormat(separators = TRUE, digits = 0)),
+                  position_bonus = colDef(name = "Position bonus (€)", show=!hide_bonuses, minWidth = 140, format = colFormat(separators = TRUE, digits = 0)))))
     })
     output$rank_evolution_plot <- renderPlotly({
       rows <- round_rows_RV()

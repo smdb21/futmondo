@@ -71,7 +71,7 @@ stopifnot(identical(classification_points_cell(72,3),'72 (3)'),
   identical(classification_points_cell(0,0),'0 (0)'),
   identical(classification_points_cell(-2,1),'-2 (1)'),
   identical(classification_points_cell(72),'72'),
-  identical(classification_points_cell(NA_real_,3),'Unavailable (3)'))
+  identical(classification_points_cell(NA_real_,3),'-'))
 unknown <- as.character(classification_points_cell(72,NA_real_))
 stopifnot(grepl('72 (?)',unknown,fixed=TRUE),grepl('players left unavailable',unknown,fixed=TRUE))
 cat('PASS remaining-player projection: ID mapping, zero, absent teams/legacy snapshots unknown, hidden for completed rounds and partial ranges\n')
@@ -79,7 +79,8 @@ cat('PASS remaining-player projection: ID mapping, zero, absent teams/legacy sna
 # Delayed catalog/live publications exercise real preset observers and totals.
 bind_factual_reads<-function(...)invisible(NULL)
 shared_mvp_source<-function(...)reactive(list())
-shared_rival_finance_source<-function(...)reactive(list())
+display_finances <- reactiveVal(list())
+shared_rival_finance_source<-function(...)display_finances
 fail_live<-reactiveVal(FALSE)
 catalog<-reactiveVal(list(rounds=data.frame()))
 ranking<-reactiveVal(NULL)
@@ -114,9 +115,34 @@ shiny::testServer(classification_Server,args=list(is_module_active=reactive(TRUE
     grepl('26 (9)',output$classification_table,fixed=TRUE),
     grepl('6 (0)',output$classification_table,fixed=TRUE),
     !grepl('\"players_left\"',output$classification_table,fixed=TRUE))
+  widget <- function()jsonlite::fromJSON(output$classification_table,simplifyVector=FALSE)$x$tag$attribs
+  column <- function(id)Filter(function(c)identical(c$id,id),widget()$columns)[[1]]
+  stopifnot(identical(column('rounds')$show,FALSE),
+    all(vapply(c('points_bonus','mvp_bonus','best_xi_bonus','position_bonus'),function(id)
+      identical(column(id)$show,FALSE),logical(1))),
+    !grepl('Points and reconstructed bonus totals|Some selected round scores are missing',output$classification_status$html))
+  # A settled latest round with genuine zero bonuses must reveal the columns.
+  settled <- live;settled$rows$score_status <- 'final'
+  settled_ledger <- data.frame();attr(settled_ledger,'round_bonus_totals') <- data.frame(
+    round_number=12,bonus_type=c('points','mvp','dreamteam','ranking'),amount=0)
+  display_finances(list(cash_ledgers=setNames(rep(list(settled_ledger),9),letters[1:9])))
+  ranking(settled);session$flushReact()
+  stopifnot(!identical(column('points_bonus')$show,FALSE),
+    all(standings_RV()$points_bonus==0),identical(column('rounds')$show,FALSE))
+  display_finances(list())
+  missing_live <- live;missing_live$rows$points[1] <- NA_real_
+  ranking(missing_live);session$flushReact()
+  shown <- widget()
+  stopifnot(tail(unlist(shown$data$team_name),1)=='Team 1',
+    !is.finite(suppressWarnings(as.numeric(tail(unlist(shown$data$points),1)))),
+    !is.finite(suppressWarnings(as.numeric(tail(unlist(shown$data$rank),1)))),
+    identical(column('rank')$na,'-'),isTRUE(column('rank')$sortNALast),isTRUE(column('points')$sortNALast),
+    !grepl('Some selected round scores are missing',output$classification_status$html))
+  ranking(live);session$flushReact()
   # Empty history is not permission to call current-only points General.
   session$setInputs(classification_view='partial',round_range_slider=c(11,12))
   stopifnot(!'players_left'%in%names(standings_RV()),!grepl('Points (left)',output$classification_table,fixed=TRUE),identical(standings_RV()$points,as.numeric(100:108)),identical(as.numeric(standings_RV()$rank),as.numeric(9:1)))
+  stopifnot(!identical(column('points_bonus')$show,FALSE),!any(vapply(widget()$columns,function(c)identical(c$id,'rounds')&&!identical(c$show,FALSE),logical(1))))
   session$setInputs(round_range_slider=c(11,11));stopifnot(all(is.na(standings_RV()$points)),partial_view_RV())
   # A background publication cannot override a deliberate manual selection.
   history(list(list(round=11,points=7)));session$flushReact()
