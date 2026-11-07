@@ -21,6 +21,29 @@ check('official positions retain eleven places, 3-6-1 rows, holes and four order
     grepl('https://static02.mondocore.com/futmondo/img/teams/48/club.png',html,fixed=TRUE),
     got$players[[5]]$changed,got$bench[[2]]$changed)
 })
+# Known-answer pitch rows from the twelve formations in the supplied app image.
+# Rows below are top-to-bottom (attack through goalkeeper), independent of roles.
+check('all twelve official formations preserve their exact pitch rows, including 4-6-0',{
+  expected<-list('4-4-2'=c(2L,4L,4L,1L),'4-3-3'=c(3L,3L,4L,1L),
+    '4-5-1'=c(1L,5L,4L,1L),'3-4-3'=c(3L,4L,3L,1L),
+    '3-5-2'=c(2L,5L,3L,1L),'5-4-1'=c(1L,4L,5L,1L),
+    '5-3-2'=c(2L,3L,5L,1L),'3-6-1'=c(1L,6L,3L,1L),
+    '4-2-4'=c(4L,2L,4L,1L),'3-3-4'=c(4L,3L,3L,1L),
+    '4-6-0'=c(6L,4L,1L),'5-2-3'=c(3L,2L,5L,1L))
+  for(strategy in names(expected)){
+    answer<-raw;answer$strategy<-strategy
+    html<-htmltools::renderTags(round_lineup_pitch_ui(answer))$html
+    counts<-regmatches(html,gregexpr('--lineup-count:[0-9]+',html))[[1]]
+    counts<-as.integer(sub('--lineup-count:','',counts,fixed=TRUE))
+    slots<-regmatches(html,gregexpr('data-slot="[0-9]+"',html))[[1]]
+    slots<-as.integer(gsub('[^0-9]','',slots))
+    stopifnot(identical(counts,expected[[strategy]]),identical(slots,c(1:11,1:4)),
+      normalize_round_lineup(answer)$players[[11]]$id=='keeper',
+      normalize_round_lineup(answer)$players[[5]]$id=='incoming',
+      normalize_round_lineup(answer)$bench[[2]]$id=='outgoing',
+      grepl(paste('Formation',strategy),html,fixed=TRUE))
+  }
+})
 check('empty lineups and zero-sized rows do not invent players; malformed slots fail',{
   blank<-list(strategy='5-5-0',players=list(),bench=list(players=list()))
   got<-normalize_round_lineup(blank)
