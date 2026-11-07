@@ -1,6 +1,6 @@
 # Shared visual tokens and widget adapters. See docs/terminal_theme.md.
 fm_theme_tokens <- function() list(bg="#050805", surface="#0B120D", text="#7CFF9B",
-  muted="#9BBFA7", border="#285238", warning="#F4C95D", danger="#FF6B6B",
+  muted="#9BBFA7", border="#285238", warning="#F4C95D", danger="#FF9494",
   font='ui-monospace, "Cascadia Code", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace')
 
 fm_theme_css <- function() {
