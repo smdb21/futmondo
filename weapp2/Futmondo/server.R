@@ -156,6 +156,7 @@ function(input, output, session) {
     get_teams(login_token_RV(), championship_id_RV())
   })
   is_admin_RV <- reactive(is_authorized_admin(login_token_RV()))
+  page_preferences <- fm_page_preferences(session, login_token_RV, reactive(input$tabs), is_admin_RV)
   notifications <- notifications_Server("notifications", reactive(input$tabs == "notifications"),
     login_token_RV, championship_id_RV, user_team_id_RV, user_teams_RV, refresh_trigger,
     on_market_event=function(...)refresh_trigger(isolate(refresh_trigger())+1L),startup_ready=startup_primary_ready)
@@ -282,7 +283,6 @@ observeEvent(login_token_RV(),
                     return()
                   }
                   session$userData$futmondo_user_id <- login_token_RV()[["userid"]]
-                  updateTabsetPanel(inputId = "tabs", selected = "today")
                 },
                 ignoreNULL = FALSE
    )
@@ -318,6 +318,6 @@ observeEvent(login_token_RV(),
       ))
     }
 
-    do.call(shinydashboard::sidebarMenu, c(list(id = "tabs"), menu_items))
+    do.call(shinydashboard::sidebarMenu, c(list(id = "tabs", selected = page_preferences$initial()), menu_items))
   })
 }

@@ -717,3 +717,13 @@ Status: **deployed; isolated cold-load/browser checks and public hosted startup/
 - [x] Pass the real-bound-adapter cold/failure regression and existing classification loading/live/preset/bonus checks; record the proportional performance review in the review results.
 
 This module-local change adds no API route, schema, dependency, persistence behavior, financial calculation or unattended work. Browser verification, integrated release review and delivery are recorded by the primary agent separately.
+
+## Saved page per account — 2026-11-06
+
+Status: **implemented and verified locally; hosted schema installed; signed-in hosted app behavior remains unverified**.
+
+- [x] Persist the authenticated account's last main page and restore it on normal/remembered login; exclude Login and recheck Admin authorization.
+- [x] Keep database reads/writes asynchronous, serialize/coalesce saves, preserve newer visits across sessions and retain truthful retry feedback for failures.
+- [x] Pass focused isolation/race/retry/REST checks, the required offline lifecycle, desktop/mobile browser restoration and deployment contract; verify hosted SQL upsert/order/privilege behavior using rolled-back synthetic data.
+
+No dependency, environment variable, worker, source acquisition or transaction behavior is added. Commit/push delivery is recorded in the final task report.

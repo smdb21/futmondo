@@ -2261,6 +2261,9 @@
     }
   },
   "files": {
+    "page_preferences.R": {
+      "checksum": "6b6984ffcc87cdd5d13e7b094a214a40"
+    },
     "async_transport.R": {
       "checksum": "c1635542064236c7c28eb15567568f72"
     },
@@ -2286,7 +2289,7 @@
       "checksum": "70cf464787ab043e688a1c24652a072c"
     },
     "global.R": {
-      "checksum": "a5477bbdb0b8ef630c95f32f8cefc574"
+      "checksum": "25d61b8cf63c6a161982aa7d667ca26c"
     },
     "history_baseline_store.R": {
       "checksum": "95296dd4ba7ecdcd93d861a8bf048851"
@@ -2355,7 +2358,7 @@
       "checksum": "515e468f7fe3d50cf8a69513cff610a5"
     },
     "server.R": {
-      "checksum": "f1c7ba3b2b7dc48aa4e6bd5743ac4cff"
+      "checksum": "e703c09195db9c2f45a77b081e047eb4"
     },
     "supabase_connector.R": {
       "checksum": "04b841cf63a9fe630c9f091071e29ffe"
@@ -2364,7 +2367,7 @@
       "checksum": "4787615df03516c7ab4673aa883799f4"
     },
     "ui.R": {
-      "checksum": "1ff00f0388d52ca4b38229e3618a8776"
+      "checksum": "92f00b4350f179b79221b71a0f1cf20a"
     },
     "utils.R": {
       "checksum": "6253d5e12d91ddef162c7e9e7624680a"

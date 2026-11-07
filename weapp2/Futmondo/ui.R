@@ -15,6 +15,7 @@ body <- shinydashboard::dashboardBody(
       "))
   ),
   uiOutput("startup_status"),
+  uiOutput("page_preference_status"),
   # Saved-access feedback must remain visible after navigation away from Login.
   uiOutput(shiny::NS("login", "remember_feedback")),
   uiOutput("round_countdown"),
