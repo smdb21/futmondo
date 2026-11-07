@@ -39,6 +39,12 @@ Existing databases require `scripts/migrations/20261107191054_lineup_snapshots.s
 
 These implementation checks are local and synthetic/offline. No authenticated live lineup mutation or application deployment is claimed. Source/API failures remain visible; the code does not invent unavailable facts or infer unsupported lock windows.
 
+## Lineup loading recovery — 2026-11-07
+
+Authenticated read-only reproduction received successful lineup, roster, information and formation responses, then failed with `Formation entitlement is unknown`. The live `/5/strategy/availables` response omits `pro` for its seven standard formations and sets it to `true` for paid formations. The official client's premium test is `pro === true`. The parser now accepts absent/null standard markers while rejecting malformed non-null markers; unpurchased paid formations remain locked. Normalization also removes the OpenSSL hash class from the scoring-version string so successful observations can serialize into database snapshots.
+
+`test/test_lineup_loading.R` exercises the real module, all four acquisition parsers and the snapshot store at an offline HTTP boundary. It verifies pitch rendering, one successful database write, fresh persisted reuse by a new session without extra Futmondo requests or writes, malformed-flag rejection and paid-formation locks. Exact live-response replay and fresh authenticated reads also verify normalization and snapshot JSON hydration. No Futmondo mutation or hosted snapshot write is used for verification. Acquisition still uses four parallel reads; the fixes add no requests, queries, polling or dependencies. Hosted application deployment remains separate.
+
 ## Hosted migration — 2026-11-07
 
 Applied `20261107191054_lineup_snapshots.sql` to Supabase project `ozhnextrcxxksswpnglt` at the user's request. Migration history records version `20261107191054`, name `lineup_snapshots`; its source SQL matches the committed file exactly (MD5 `60aaa1675b7f92ebc5193d85a286aa48`). A quoting error confined to the stored migration-history text was corrected after comparing it with the source; the applied database objects and their checks were unaffected.

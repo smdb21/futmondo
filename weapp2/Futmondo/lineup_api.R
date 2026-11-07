@@ -82,7 +82,7 @@ lineup_normalize_bundle <- function(answers,context,target) {
     source=list(wire=official$wire,locked=official$locked,status=official$status,block_delayed=isTRUE(cfg$blc),
       target_id=target$id %||% '',target_number=target$number %||% NA_real_,
       target_starts=if(is.null(target))''else format(target$starts_at,'%Y-%m-%dT%H:%M:%OSZ',tz='UTC')),
-    season=season,scoring_version=as.character(openssl::sha256(charToRaw(jsonlite::toJSON(scoring,auto_unbox=TRUE)))),
+    season=season,scoring_version=unclass(as.character(openssl::sha256(charToRaw(jsonlite::toJSON(scoring,auto_unbox=TRUE))))),
     observed_at=format(stamp,'%Y-%m-%dT%H:%M:%OSZ',tz='UTC'),
     expires_at=format(stamp+30,'%Y-%m-%dT%H:%M:%OSZ',tz='UTC'))
 }
@@ -91,8 +91,10 @@ lineup_available_formations <- function(answer,current,configuration=list()) {
   bought<-vapply(answer$bought %||% list(),function(x)fm_scalar(x$st,''),character(1))
   allowed<-vapply(answer$strategies,function(strategy){
     st<-fm_scalar(strategy$st,'');pro<-strategy$pro
-    if(!is.logical(pro)||length(pro)!=1L||is.na(pro))stop('Formation entitlement is unknown')
-    if(!pro||st%in%bought||identical(st,current))st else ''
+    # The source omits pro for standard formations; its client checks pro ===
+    # true for paid entries. Reject malformed values rather than guessing.
+    if(!is.null(pro)&&(!is.logical(pro)||length(pro)!=1L||is.na(pro)))stop('Formation entitlement is unknown')
+    if(!isTRUE(pro)||st%in%bought||identical(st,current))st else ''
   },character(1))
   intersect(lineup_formations(),allowed[nzchar(allowed)])
 }
