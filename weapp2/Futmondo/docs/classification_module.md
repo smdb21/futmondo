@@ -2,6 +2,8 @@
 
 `classification_UI(id)` displays round-window and single-round controls, standings, rank progression, published dream-team players and configured league rewards.
 
+The **Latest round** button sets both round-range handles to the latest available round. **General classification** restores the full available range. Both clear the single-round override to **All rounds**, so standings and bonus totals follow the slider. These shortcuts reuse the loaded round catalog and team histories without additional requests. Manual round filtering remains available. Offline regression: `Rscript test/test_classification_presets.R`.
+
 `classification_Server(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger = NULL)` fetches cached per-team round records. A single selected round overrides the inclusive window; a global refresh updates the data. Cumulative ranks are computed from observed round points. When round history is unavailable, the UI explicitly labels current cumulative API totals and does not fabricate filtered results.
 
 Dream-team requests use the selected round's immutable API ID, and MVP flags come from its published response. Reward configuration comes from `normalize_league_rules()`; no fixed reward amounts or calculated totals are presented as recorded earnings. Reconstructed totals are explicitly labelled separately in the standings.

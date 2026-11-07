@@ -9,6 +9,9 @@ classification_UI <- function(id) {
   ns <- NS(id)
   tagList(
     fluidRow(box(width = 12, title = "Matchday results", status = "primary", solidHeader = TRUE,
+      div(class = "form-group",
+          actionButton(ns("latest_round"), "Latest round"),
+          actionButton(ns("general_classification"), "General classification")),
       fluidRow(column(6, sliderInput(ns("round_range_slider"), "Points between rounds", min = 1, max = 38, value = c(1, 38))),
                column(6, selectInput(ns("single_round_select"), "Inspect one round", choices = c("All rounds" = "all")))))),
     fluidRow(box(width = 12, title = "Standings", uiOutput(ns("classification_status")), reactableOutput(ns("classification_table")))),
@@ -118,13 +121,26 @@ classification_Server <- function(id, is_module_active, login_token, championshi
         classification_round_rows(ans, teams$teamid[i], teams$teamname[i], rounds_RV())
       }))
     })
-    observeEvent(list(rounds_RV(), round_rows_RV()), {
+    round_numbers_RV <- reactive({
       catalog <- rounds_RV(); history <- round_rows_RV()
       numbers <- sort(unique(c(catalog$round_number, history$round)))
-      numbers <- numbers[is.finite(numbers)]
+      numbers[is.finite(numbers)]
+    })
+    observeEvent(round_numbers_RV(), {
+      numbers <- round_numbers_RV()
       if (!length(numbers)) return()
       updateSliderInput(session, "round_range_slider", min = min(numbers), max = max(c(numbers, min(numbers) + 1)), value = range(numbers))
       updateSelectInput(session, "single_round_select", choices = c("All rounds" = "all", stats::setNames(as.character(numbers), paste("Round", numbers))))
+    })
+    observeEvent(input$latest_round, {
+      numbers <- round_numbers_RV(); req(length(numbers) > 0L)
+      updateSliderInput(session, "round_range_slider", value = rep(max(numbers), 2))
+      updateSelectInput(session, "single_round_select", selected = "all")
+    })
+    observeEvent(input$general_classification, {
+      numbers <- round_numbers_RV(); req(length(numbers) > 0L)
+      updateSliderInput(session, "round_range_slider", value = range(numbers))
+      updateSelectInput(session, "single_round_select", selected = "all")
     })
     filtered_rows_RV <- reactive({
       classification_window_table(round_rows_RV(), input$round_range_slider, input$single_round_select)
