@@ -49,7 +49,15 @@ round_best_xi_rows <- function(rows, championship_id, round) {
   rows[order(match(rows$display_role, c("GK", "DEF", "MID", "FWD")), na.last = TRUE), , drop = FALSE]
 }
 
-round_award_card <- function(mvp, xi) {
+round_award_card <- function(mvp, xi, players = NULL) {
+  # Join by player identity, retaining the official award names and scores.
+  identities <- data.frame(name = xi$player_name, team = rep("", nrow(xi)), logo = rep("", nrow(xi)))
+  if (is.data.frame(players) && all(c("id", "team") %in% names(players))) {
+    index <- match(xi$player_id, as.character(players$id))
+    identities$team <- as.character(players$team[index])
+    if ("logo" %in% names(players)) identities$logo <- as.character(players$logo[index])
+  }
+  name_cell <- get_reactable_columns_for_players(identities)$name$cell
   position_classes <- c(GK = "badge-gk", DEF = "badge-df", MID = "badge-md", FWD = "badge-fw")
   tags$article(class = "round-mvp-card",
     tags$div(class = "round-mvp-round", if (is.finite(mvp$round_number))
@@ -66,7 +74,7 @@ round_award_card <- function(mvp, xi) {
           position_class <- unname(position_classes[position])
           tags$tr(class = if (xi$is_mvp[i]) "round-best-xi-mvp",
             tags$td(if (is.na(position_class)) position else tags$span(class = position_class, position)),
-            tags$td(xi$player_name[i], if (xi$is_mvp[i]) tagList(" ", tags$span(class = "round-mvp-badge", "MVP"))),
+            tags$td(name_cell(xi$player_name[i], i), if (xi$is_mvp[i]) tagList(" ", tags$span(class = "round-mvp-badge", "MVP"))),
             tags$td(if (is.finite(xi$points[i])) format(xi$points[i], trim = TRUE) else "Unavailable"))
         }))))
 }
@@ -80,6 +88,8 @@ round_mvps_UI <- function(id) {
 
 round_mvps_Server <- function(id, is_module_active, login_token, championship_id, refresh_trigger = NULL) {
   moduleServer(id, function(input, output, session) {
+    player_catalog_read <- factual_read_adapter(session, "get_championship_players", login_token,
+      championship_id, is_active = is_module_active, refresh_trigger = refresh_trigger, state_only = TRUE)
     mvp_snapshot <- shared_mvp_source(session,login_token,championship_id,is_module_active,refresh_trigger)
     output$mvp_cards <- renderUI({
       snapshot <- mvp_snapshot()
@@ -90,9 +100,13 @@ round_mvps_Server <- function(id, is_module_active, login_token, championship_id
           return(tags$p("No completed round awards yet."))
         return(notice %||% tags$p("Round awards are unavailable; the reason could not be determined."))
       }
-      tagList(notice,tags$div(class = "round-mvps-grid", lapply(seq_len(nrow(rows)), function(i) {
+      catalog <- if (valid_login(login_token())) player_catalog_read(login_token(), championship_id()) else NULL
+      crest_notice <- if (!is.null(catalog) && is.null(catalog$data)) tags$p(class = "round-mvps-empty",
+        if (identical(catalog$status, "loading")) "Loading player team crests…" else
+          paste("Player team crests:", resource_failure_message(catalog$error)))
+      tagList(notice, crest_notice, tags$div(class = "round-mvps-grid", lapply(seq_len(nrow(rows)), function(i) {
         row <- rows[i, , drop = FALSE]
-        round_award_card(row, round_best_xi_rows(snapshot$rows, championship_id(), row))
+        round_award_card(row, round_best_xi_rows(snapshot$rows, championship_id(), row), catalog$data)
       })))
     })
   })
