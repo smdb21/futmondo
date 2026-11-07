@@ -134,6 +134,15 @@ classification_remaining_table <- function(standings, history, single, rounds) {
   standings
 }
 
+# Keep points numeric for sorting; add the remaining count only when rendering.
+classification_points_cell <- function(points, left = NULL) {
+  label <- if(is.finite(points))as.character(points)else "Unavailable"
+  if(is.null(left))return(label)
+  if(is.finite(left))return(paste0(label," (",left,")"))
+  tags$span(title="Players left unavailable: the round ranking source has not supplied a valid count.",
+    `aria-label`=paste(label,"points; players left unavailable"),paste0(label," (?)"))
+}
+
 # Project the shared ledger's coverage-aware round totals without I/O.
 classification_bonus_table <- function(standings, history, finances, window=NULL, single="all",expected_rounds=NULL) {
   kinds<-c(points_bonus="points",mvp_bonus="mvp",best_xi_bonus="dreamteam",position_bonus="ranking")
@@ -399,20 +408,21 @@ classification_Server <- function(id, is_module_active, login_token, championshi
       if (!nrow(rows)) return(reactable(data.frame(Message = empty_standings_message_RV())))
       ids <- as.character(rows$team_id)
       click <- if(single_round_RV()!="all")htmlwidgets::JS(paste0("function(rowInfo){if(!rowInfo)return;var ids=",jsonlite::toJSON(ids),";Shiny.setInputValue(",jsonlite::toJSON(session$ns("lineup_team_click"),auto_unbox=TRUE),",{id:ids[rowInfo.index],context:",jsonlite::toJSON(lineup_context_RV(),auto_unbox=TRUE),",nonce:Date.now()},{priority:'event'});}"))else NULL
-      rows <- rows[, intersect(c("rank", "team_name", "points", "players_left", "rounds", "points_bonus", "mvp_bonus", "best_xi_bonus", "position_bonus"), names(rows)), drop = FALSE]
+      remaining <- rows$players_left
+      rows <- rows[, intersect(c("rank", "team_name", "points", "rounds", "points_bonus", "mvp_bonus", "best_xi_bonus", "position_bonus"), names(rows)), drop = FALSE]
       reactable(rows, compact = TRUE, striped = TRUE, highlight = single_round_RV()!="all", onClick = click, defaultSorted = "rank", defaultColDef = colDef(na = "Unavailable"),
-                columns = c(if("players_left"%in%names(rows))list(players_left = colDef(name = "Players left", minWidth = 110)),
-                  list(rank = colDef(name = "Rank", minWidth = 65), team_name = colDef(name = "Team", minWidth = 150, cell = function(value,index){
+                columns = list(rank = colDef(name = "Rank", minWidth = 65), team_name = colDef(name = "Team", minWidth = 150, cell = function(value,index){
                     if(single_round_RV()=="all")return(value)
                     tags$button(type="button",class="btn btn-link fm-lineup-open",title=paste("Open round lineup for",value),
                       onclick=paste0("event.stopPropagation();Shiny.setInputValue(",jsonlite::toJSON(session$ns("lineup_team_click"),auto_unbox=TRUE),
                         ",{id:",jsonlite::toJSON(ids[index],auto_unbox=TRUE),",context:",jsonlite::toJSON(lineup_context_RV(),auto_unbox=TRUE),
                         ",nonce:Date.now()},{priority:'event'});"),value)
-                  }), points = colDef(name = "Points"),
+                  }), points = colDef(name = if(is.null(remaining))"Points"else"Points (left)",
+                    cell = function(value,index)classification_points_cell(value,if(!is.null(remaining))remaining[index])),
                   points_bonus = colDef(name = "Points bonus (€)", minWidth = 140, format = colFormat(separators = TRUE, digits = 0)),
                   mvp_bonus = colDef(name = "MVP bonus (€)", minWidth = 140, format = colFormat(separators = TRUE, digits = 0)),
                   best_xi_bonus = colDef(name = "Best XI bonus (€)", minWidth = 140, format = colFormat(separators = TRUE, digits = 0)),
-                  position_bonus = colDef(name = "Position bonus (€)", minWidth = 140, format = colFormat(separators = TRUE, digits = 0)))))
+                  position_bonus = colDef(name = "Position bonus (€)", minWidth = 140, format = colFormat(separators = TRUE, digits = 0))))
     })
     output$rank_evolution_plot <- renderPlotly({
       rows <- round_rows_RV()
