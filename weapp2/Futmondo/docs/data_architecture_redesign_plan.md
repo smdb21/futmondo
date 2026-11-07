@@ -706,3 +706,14 @@ No migration, dependency or unattended worker is introduced. Oversized caches re
 ## Round Awards position pills — 2026-11-06
 
 Completed locally: Best XI positions reuse the established colored badges, retaining source roles and explicit unknown values. Focused rendering and 390px/1440px browser checks passed. No shared infrastructure, source, persistence or dependency changes; hosted deployment remains unverified.
+
+## Classification cold-read recovery — 2026-11-06
+
+Status: **implemented and verified in isolated synthetic fixtures; authenticated hosted behavior remains unverified**.
+
+- [x] Reproduce the actual bound-directory validation condition cancelling round-filter/status dependencies on a cold page.
+- [x] Initialize native calendar/playing-round controls and display bulk live points independently of directory, history, settings and finance completion; retain their reactive recovery and visible loading/failure states.
+- [x] Require official cumulative directory points for General, keep incomplete historical windows/bonuses unknown, and reuse legacy catalog plus persisted display snapshots without another ranking request/write.
+- [x] Pass the real-bound-adapter cold/failure regression and existing classification loading/live/preset/bonus checks; record the proportional performance review in the review results.
+
+This module-local change adds no API route, schema, dependency, persistence behavior, financial calculation or unattended work. Browser verification, integrated release review and delivery are recorded by the primary agent separately.

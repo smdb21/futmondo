@@ -30,7 +30,7 @@ stopifnot(grepl('id="classification-latest_round"', html, fixed = TRUE),
 shiny::testServer(classification_Server, args = list(
   is_module_active = reactive(TRUE), login_token = reactive("fixture"),
   championship_id = reactive("league"), user_team_id = reactive("a"),
-  user_teams_RV = reactive(data.frame(teamid = "a", teamname = "Alpha"))), {
+  user_teams_RV = reactive(data.frame(teamid = "a", teamname = "Alpha", points = 25))), {
   messages <- list()
   root <- session$rootScope()
   root$sendInputMessage <- function(inputId, message) {

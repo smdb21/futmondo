@@ -1,19 +1,22 @@
 {
-  "release": "clause-history-reuse-2026-11-05",
+  "release": "classification-loading-recovery-2026-11-06",
   "runtime_sha256": {
     "async_transport.R": "cd9e20b307643909f58c357ef051e344eda07b7b3073e80a628ee87bd1946a2e",
-    "background_runtime.R": "24fe816e01923d04ad6e2dbcf6139c0ae6031beac165708ab3576fa8ec639ff8",
+    "background_runtime.R": "4bdfc286228cd8f752995e7e2ad949c897d23b7a911c8ff95a6365abb155581a",
     "data_service.R": "017f5ab7243645c64a7e254c6308e572cec531a71c66346f87d272e594700cc2",
-    "futmondo_functions.R": "77830a364a0d1fc66b0eac2568cb3cf384bdd0bb86475d6ca4827d513e18e09f",
+    "futmondo_functions.R": "c7d0797fe16cc8417d3cf52416a9e36d5802fc760bf777156e94a84792d39e49",
     "global.R": "bac858749db05fb58f724d3318ac55a75cd72783d6777d9f5a23d54a60be9c17",
     "history_baseline_store.R": "c69c9a5a01fe079e5ee233b4289baba928b1d53a708cca2c0e804a6734a976f7",
     "history_repository.R": "4e1106f76950689cdb8108487d64392b4fb99f615ae9b1f4757ac3f9a63b54d1",
     "locker_transfers.R": "f90b4b3e18a40e471f6fe4d4a328e6eff57fa42e279fa79d282982b20bdc86b4",
     "Modules/Players_in_Teams_Module.R": "f3a9faa85510a98cf6da277fdf2b4587806fbd640096745accf1d0b4e70d84c7",
-    "Modules/Players_Table_Module.R": "a29d3bc70bda48bbc0328e7b898476a9036f0f974c1afa0ae82043e145f12833",
+    "Modules/Players_Table_Module.R": "29102552f74c8be8a8187f9429ceeeed3cb3de8831de0cac5c0dc99982547c94",
     "supabase_connector.R": "5627e8c85122fd9da3279733e369388a2aa21819ce46538d23f3cf72988b3bdd",
-    "Modules/Selected_Player_Module.R": "a33396a8c58142daef338b22a75e4b814e81f0e3ba6a2c3be3cf0f69ae989905",
+    "Modules/Selected_Player_Module.R": "f1f3cd098298bc6a9cf65bdb1b49df9a68486cdeff313c66478b2d5d263f4f7b",
     "factual_helpers.R": "8e4a8f5521f326a69189e9ff1263dd10d2bd7133a164ace04092d7d542a4dddc",
-    "server.R": "a3ae2fafb516c4d74e1b822e30737d0306a9508e49d2872c8ed258b6cd3c5534"
+    "server.R": "31d90744a0f6cda33cf88670bf46d2dded747f06815e47e95570ff7a482affde",
+    "Modules/Classification_Module.R": "7bbcfe8436c8da1bd6cfa95761ed97688a7228a93a1052125ad201200c8b0007",
+    "rival_finance_runtime.R": "75a9f28f1b376991b0a1aabf5c62f45a56ccf6a0d9b9dba219e50e786dc9969e",
+    "rival_calculation_store.R": "810c901742f35748ee7c6992f689400862318c670fc471dde6f7b625d70c4eb4"
   }
 }

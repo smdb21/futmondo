@@ -47,6 +47,18 @@ classification_round_rows <- function(answer, team_id, team_name, rounds = data.
   result[!duplicated(paste(result$team_id, result$round), fromLast = TRUE), , drop = FALSE]
 }
 
+# A pending bound read is a Shiny validation condition. Capture it as data so
+# one optional source cannot cancel every output or the round-filter observer.
+classification_read_state <- function(read) {
+  tryCatch(list(data=read(), loading=FALSE, error=NULL), error=function(error) {
+    pending <- inherits(error, "shiny.silent.error") &&
+      (!nzchar(conditionMessage(error)) || grepl("Loading|Refreshing", conditionMessage(error)))
+    list(data=NULL, loading=pending, error=if(pending)NULL else error)
+  })
+}
+classification_empty_rows <- function() data.frame(team_id=character(),team_name=character(),round=numeric(),points=numeric())
+classification_empty_teams <- function() data.frame(teamid=character(),teamname=character())
+
 # Scheduled catalog rows are identities, not evidence of published scores.
 classification_available_rounds <- function(catalog, history) {
   rounds <- catalog$rounds
@@ -145,25 +157,52 @@ classification_Server <- function(id, is_module_active, login_token, championshi
     finances_RV <- shared_rival_finance_source(session,login_token,championship_id,
       user_team_id,user_teams_RV,is_module_active,mvp_snapshot,refresh_trigger)
 
-    catalog_RV <- reactive({
+    catalog_state_RV <- reactive({
       req(is_module_active() == TRUE, login_token(), championship_id())
       if (!is.null(refresh_trigger)) refresh_trigger()
-      tryCatch(get_classification_round_catalog(login_token(), championship_id()), error = function(e) empty_round_catalog())
+      result <- classification_read_state(function() get_classification_round_catalog(login_token(), championship_id()))
+      catalog <- result$data
+      if(!is.null(catalog) && (!is.data.frame(catalog$rounds) || !nrow(catalog$rounds)))
+        result$error <- resource_failure(simpleError(mvp_text(catalog$reason,"Round catalog unavailable")),
+          resource="get_classification_round_catalog",category=if(identical(catalog$status,"connection"))"network"else"schema")
+      result
     })
+    catalog_RV <- reactive(catalog_state_RV()$data %||% empty_round_catalog())
     rounds_RV <- reactive(catalog_RV()$rounds)
-    historical_rows_RV <- reactive({
+    teams_state_RV <- reactive({
+      req(is_module_active() == TRUE, login_token(), championship_id())
+      classification_read_state(user_teams_RV)
+    })
+    teams_RV <- reactive({
+      teams <- teams_state_RV()$data
+      if(is.data.frame(teams) && all(c("teamid","teamname") %in% names(teams))) teams else classification_empty_teams()
+    })
+    historical_state_RV <- reactive({
       req(is_module_active() == TRUE, login_token(), championship_id())
       if (!is.null(refresh_trigger)) refresh_trigger()
-      teams <- user_teams_RV(); req(teams)
-      bind_rows(lapply(seq_len(nrow(teams)), function(i) {
-        ans <- tryCatch(get_user_team_rounds(login_token(), championship_id(), as.character(teams$teamid[i])), error = function(e) NULL)
-        classification_round_rows(ans, teams$teamid[i], teams$teamname[i], rounds_RV())
-      }))
+      teams <- teams_RV(); rounds <- rounds_RV()
+      reads <- lapply(seq_len(nrow(teams)), function(i) {
+        result <- classification_read_state(function() get_user_team_rounds(login_token(), championship_id(), as.character(teams$teamid[i])))
+        result$data <- classification_round_rows(result$data, teams$teamid[i], teams$teamname[i], rounds)
+        result
+      })
+      list(data=bind_rows(c(list(classification_empty_rows()), lapply(reads, `[[`, "data"))),
+        loading=isTRUE(teams_state_RV()$loading) || any(vapply(reads, function(x)isTRUE(x$loading), logical(1))),
+        errors=Filter(Negate(is.null), c(list(teams_state_RV()$error), lapply(reads, `[[`, "error"))))
     })
+    historical_rows_RV <- reactive(historical_state_RV()$data)
+    finances_state_RV <- reactive(classification_read_state(finances_RV))
+    finance_data_RV <- reactive(finances_state_RV()$data %||% list(loading=isTRUE(finances_state_RV()$loading)))
     active_ranking_RV <- reactive({
       catalog <- catalog_RV();rounds <- catalog$rounds
       number <- fm_number(catalog$current_round_number)
-      if(!is.data.frame(rounds)||!nrow(rounds)||!is.finite(number))return(NULL)
+      if(!is.data.frame(rounds)||!nrow(rounds))return(NULL)
+      # A numbered playing row is authoritative even when an older saved
+      # catalog has no lineup marker. Do not infer a current round from order.
+      playing <- if("status" %in% names(rounds)) rounds$round_number[tolower(rounds$status)%in%c("active","playing","in_progress")] else numeric()
+      playing <- unique(playing[is.finite(playing)])
+      if(!is.finite(number) && length(playing)==1L)number <- playing
+      if(!is.finite(number))return(NULL)
       # The lineup marker may already name next week's round. Only use explicit
       # calendar identities, and check at most that marker plus its predecessor.
       candidates <- rounds[is.finite(rounds$round_number)&rounds$round_number<=number,,drop=FALSE]
@@ -185,11 +224,11 @@ classification_Server <- function(id, is_module_active, login_token, championshi
       list(rows=data.frame(),loading=loading,error=failure)
     })
     round_rows_RV <- reactive({
-      history <- historical_rows_RV();catalog <- catalog_RV()
-      ranking <- active_ranking_RV()
+      catalog <- catalog_RV();ranking <- active_ranking_RV()
+      history <- historical_rows_RV()
       current <- if(!is.null(ranking)&&nrow(ranking$rows))ranking$round_number else fm_number(catalog$current_round_number)
       if(is.finite(current))history <- history[history$round<=current,,drop=FALSE]
-      classification_merge_ranking(history,ranking,user_teams_RV())
+      classification_merge_ranking(history,ranking,teams_RV())
     })
     round_numbers_RV <- reactive({
       catalog <- catalog_RV();ranking <- active_ranking_RV()
@@ -235,15 +274,19 @@ classification_Server <- function(id, is_module_active, login_token, championshi
     filtered_rows_RV <- reactive({
       classification_window_table(round_rows_RV(), input$round_range_slider, input$single_round_select,round_numbers_RV())
     })
+    general_selection_RV <- reactive({
+      numbers <- round_numbers_RV();window <- input$round_range_slider
+      (is.null(input$single_round_select)||input$single_round_select=="all")&&
+        !identical(selection_mode(),"latest")&&(!length(numbers)||length(window)!=2L||
+          (window[1]<=min(numbers)&&window[2]>=max(numbers)))
+    })
     standings_RV <- reactive({
       req(is_module_active() == TRUE)
       rows <- filtered_rows_RV()
-      numbers <- round_numbers_RV();window <- input$round_range_slider
-      general <- (is.null(input$single_round_select)||input$single_round_select=="all")&&
-        !identical(selection_mode(),"latest")&&(!length(numbers)||length(window)!=2L||
-          (window[1]<=min(numbers)&&window[2]>=max(numbers)))
-      if (general) {
-        teams <- user_teams_RV(); req(teams)
+      if (general_selection_RV()) {
+        teams <- teams_RV()
+        # Live-only rows cannot stand in for official cumulative standings.
+        if(!nrow(teams)||!"points"%in%names(teams))return(data.frame())
         # The official cumulative source remains authoritative when historical
         # team-round lists omit whole rounds; never label a partial sum General.
         if("points"%in%names(teams))rows <- data.frame(team_id=as.character(teams$teamid),team_name=teams$teamname,
@@ -251,17 +294,25 @@ classification_Server <- function(id, is_module_active, login_token, championshi
           rank=rank(-suppressWarnings(as.numeric(teams$points)),ties.method="min",na.last="keep"))
       }
       if (!nrow(rows)) return(rows)
-      classification_bonus_table(rows, round_rows_RV(), finances_RV(), input$round_range_slider, input$single_round_select,round_numbers_RV())
+      classification_bonus_table(rows, round_rows_RV(), finance_data_RV(), input$round_range_slider, input$single_round_select,round_numbers_RV())
+    })
+    empty_standings_message_RV <- reactive({
+      teams <- teams_state_RV()
+      if(general_selection_RV() && (!nrow(teams_RV())||!"points"%in%names(teams_RV())))return(
+        if(isTRUE(teams$loading))"Loading official cumulative standings…" else resource_failure_message(teams$error))
+      catalog <- catalog_state_RV();ranking <- active_ranking_RV();history <- historical_state_RV()
+      failures <- Filter(Negate(is.null), c(list(catalog$error,ranking$error),history$errors))
+      if(length(failures))return(resource_failure_message(failures[[1]]))
+      if(isTRUE(catalog$loading)||isTRUE(ranking$loading)||isTRUE(history$loading))return("Loading official round standings…")
+      "No published results in this selection."
     })
     output$classification_status <- renderUI({
-      ranking <- active_ranking_RV()
-      if (!nrow(round_rows_RV())) return(p(if(isTRUE(ranking$loading))"Loading official round standings…"
-        else if(!is.null(ranking$error))resource_failure_message(ranking$error)
-        else "Round scores are unavailable; General classification uses official cumulative totals."))
+      req(is_module_active() == TRUE, login_token(), championship_id())
+      catalog <- catalog_state_RV();ranking <- active_ranking_RV()
+      teams <- teams_state_RV();history <- historical_state_RV()
+      failures <- Filter(Negate(is.null), c(list(catalog$error, ranking$error, finances_state_RV()$error), history$errors))
       rows <- standings_RV()
-      if (!nrow(rows)) return(p(if(isTRUE(ranking$loading))"Loading official round standings…"
-        else if(!is.null(ranking$error))resource_failure_message(ranking$error)
-        else "No published results in this selection."))
+      if (!nrow(rows)) return(p(empty_standings_message_RV()))
       bonus_columns <- c("points_bonus", "mvp_bonus", "best_xi_bonus", "position_bonus")
       missing_bonus <- any(!is.finite(as.matrix(rows[, bonus_columns, drop = FALSE])))
       selected <- round_rows_RV()
@@ -271,15 +322,16 @@ classification_Server <- function(id, is_module_active, login_token, championshi
       stale <- identical(attr(active_ranking_RV(),"fetch_status"),"stale")
       tagList(p("Points and reconstructed bonus totals for the selected rounds."),
         if(live)p("Live round points are provisional. Rewards remain unavailable until the round and its payments are confirmed."),
-        if(!is.null(ranking$error))p(resource_failure_message(ranking$error)),
+        if(length(failures))p(resource_failure_message(failures[[1]])),
+        if(isTRUE(history$loading))p("Historical round scores are loading; available live scores are shown."),
         if(stale)p("Showing saved round standings while the latest source request is unavailable."),
         if (any(!is.finite(rows$points))) p("Some selected round scores are missing; affected point totals are unavailable."),
-        if (missing_bonus) p(if (isTRUE(finances_RV()$loading)) "Bonus totals are loading."
+        if (missing_bonus) p(if (isTRUE(finance_data_RV()$loading)) "Bonus totals are loading."
           else "Some bonus totals lack complete round or award records and are shown as Unavailable."))
     })
     output$classification_table <- renderReactable({
       rows <- standings_RV()
-      if (!nrow(rows)) return(reactable(data.frame(Message = "No results available.")))
+      if (!nrow(rows)) return(reactable(data.frame(Message = empty_standings_message_RV())))
       rows <- rows[, intersect(c("rank", "team_name", "points", "rounds", "points_bonus", "mvp_bonus", "best_xi_bonus", "position_bonus"), names(rows)), drop = FALSE]
       reactable(rows, compact = TRUE, striped = TRUE, defaultSorted = "rank", defaultColDef = colDef(na = "Unavailable"),
                 columns = list(rank = colDef(name = "Rank", minWidth = 65), team_name = colDef(name = "Team", minWidth = 150), points = colDef(name = "Points"),
@@ -307,15 +359,20 @@ classification_Server <- function(id, is_module_active, login_token, championshi
       # Reuse the configuration already loaded for League settings. Standalone
       # callers can still acquire it through the scoped team-information cache.
       snapshot <- NULL
+      settings <- classification_read_state(function() {
+        if(is.function(league_settings_source))league_settings_source()
+        else list(info=get_user_team_info(login_token(), championship_id(), user_team_id()))
+      })
+      if(is.null(settings$data))return(p(if(isTRUE(settings$loading))"Loading league settings…" else resource_failure_message(settings$error)))
+      snapshot <- settings$data
       if (is.function(league_settings_source)) {
-        snapshot <- league_settings_source()
         configuration <- utils::modifyList(snapshot$league$configuration %||% list(),
           snapshot$info$configuration %||% list())
-        if (!length(configuration)) validate(need(FALSE,
+        if (!length(configuration)) return(p(
           if (identical(snapshot$status, "loading")) "Loading league settings…"
           else resource_failure_message(snapshot$error)))
         info <- list(configuration = configuration)
-      } else info <- get_user_team_info(login_token(), championship_id(), user_team_id())
+      } else info <- snapshot$info
       rules <- normalize_league_rules(info)
       tagList(p("Configured rewards — points: ", ui_financial_amount(rules$money_per_point),
         "; ranking pool: ", ui_financial_amount(rules$ranking_pool),
@@ -329,8 +386,9 @@ classification_Server <- function(id, is_module_active, login_token, championshi
       if (is.null(input$single_round_select) || input$single_round_select == "all") return(p("Select one round to see its published dream team and MVP."))
       catalog <- rounds_RV(); index <- match(as.numeric(input$single_round_select), catalog$round_number)
       if (is.na(index)) return(p("Round identity unavailable."))
-      ans <- get_round_dreamteam(login_token(), championship_id(), catalog$round_id[index])
-      players <- classification_dreamteam_rows(ans)
+      dreamteam <- classification_read_state(function() get_round_dreamteam(login_token(), championship_id(), catalog$round_id[index]))
+      if(is.null(dreamteam$data))return(p(if(isTRUE(dreamteam$loading))"Loading the published dream team…" else resource_failure_message(dreamteam$error)))
+      players <- classification_dreamteam_rows(dreamteam$data)
       if (!nrow(players)) return(p("The dream team has not been published or is unavailable."))
       tags$ul(lapply(seq_len(nrow(players)), function(i) tags$li(
         players$player[i], " — ", if (is.finite(players$points[i])) players$points[i] else "Unavailable", " points",
