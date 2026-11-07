@@ -54,6 +54,11 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       for (const role of ['DEF', 'MID', 'FWD']) await page.locator('.fm-lineup-coverage').getByText(`${role} ✓`, { exact: true }).waitFor();
       assert.equal(await page.locator('#lineup-save').isDisabled(), false);
 
+      await page.locator('#lineup-recent_n').fill('2');
+      await page.locator('#lineup-recent_n').blur();
+      await page.locator('#lineup-status').getByText(/Best XI \+ bench.*rounds 4, 5/).waitFor();
+      assert.deepEqual((await page.locator('#fixture_counts').innerText()).split('/').map(Number), clearCounts);
+
       // Slot selection opens locally and filters out players in other roles.
       const starter = pitch.locator('.fm-lineup-player').first();
       const pickerStarted = performance.now();
@@ -73,6 +78,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       assert.equal(await page.locator('#lineup-save').isDisabled(), true);
       await page.locator('#lineup-clear').click();
       await page.waitForFunction(() => document.querySelectorAll('.fm-lineup-pitch .fm-lineup-empty').length === 11);
+      assert.equal(await page.locator('#lineup-reset').innerText(), 'Undo changes');
       await page.locator('#lineup-reset').click();
       await page.waitForFunction(() => document.querySelectorAll('.fm-lineup-pitch .fm-lineup-empty').length === 0);
       assert.equal(await page.locator('.fm-lineup-crest').count(), 15);
@@ -86,7 +92,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       assert.deepEqual(errors, []);
       await page.screenshot({ path: `/tmp/futmondo-lineup-editor-${width}.png`, fullPage: true });
       previousReads = Number((await page.locator('#fixture_counts').innerText()).split('/')[0]);
-      console.log(`PASS ${width}px: clear, defaults, disabled save, exact XI/bench, coverage, local picker (${pickerMs.toFixed(0)} ms), verified one-shot save, reset, viewport`);
+      console.log(`PASS ${width}px: clear, defaults, disabled save, exact XI/bench, changed N, coverage, local picker (${pickerMs.toFixed(0)} ms), verified one-shot save, undo latest saved, viewport`);
       await page.close();
     }
   } finally {

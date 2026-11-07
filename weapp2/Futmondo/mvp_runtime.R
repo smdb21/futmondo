@@ -68,7 +68,7 @@ normalize_mvp_catalog <- function(active, leagues, championship_id) {
     explicit_false <- any(vapply(flags,function(x) identical(x,FALSE) || identical(x,0L) || identical(x,0) || tolower(mvp_text(x)) %in% c("false","f","0"),logical(1)))
     # Compact league/list future/next statuses can be stale even for the
     # current round. They establish neither finality nor publication eligibility.
-    finished <- if(round_is_finished(r) || round_is_finished(detail) || identical(status,"done")) TRUE else if(explicit_false || status %in% c("active","playing","in_progress")) FALSE else NA
+    finished <- if(round_is_finished(r) || round_is_finished(detail) || identical(status,"done")) TRUE else if(explicit_false || status %in% c("active","playing","in_progress","running")) FALSE else NA
     begin <- mvp_text(r$beginProcess)
     if(!nzchar(begin) && length(matched)==1L) begin <- mvp_text(matched[[1]]$beginProcess)
     data.frame(round_id=id,round_number=number,begin_process=begin,is_finished=finished,status=status)
@@ -154,7 +154,7 @@ get_award_round_metadata <- function(login,championship_id,league_id,refresh=FAL
       unfinished<-any(vapply(flags,function(x)identical(x,FALSE)||identical(x,0L)||identical(x,0)||tolower(mvp_text(x))%in%c("false","f","0"),logical(1)))
       status<-tolower(mvp_text(round$status))
       data.frame(round_id=mvp_text(round$`_id` %||% round$id),round_number=number,
-        is_finished=if(round_is_finished(round))TRUE else if(unfinished||status%in%c("active","playing","in_progress"))FALSE else NA,
+        is_finished=if(round_is_finished(round))TRUE else if(unfinished||status%in%c("active","playing","in_progress","running"))FALSE else NA,
         status=status,stringsAsFactors=FALSE)
     }))
     stamp<-Sys.time();deadline<-as.numeric(stamp)+ttl
@@ -162,6 +162,12 @@ get_award_round_metadata <- function(login,championship_id,league_id,refresh=FAL
     attr(result,"observed_at")<-stamp
     result
   },context=context)
+  # Older persisted/process observations kept running as unknown. The saved
+  # authoritative status resolves it without refetching or renewing its expiry.
+  if(identical(result$status,"ok")&&award_calendar_rows_valid(result$rows)){
+    running<-is.na(result$rows$is_finished)&result$rows$status=="running"
+    result$rows$is_finished[running]<-FALSE
+  }
   # A changed source league/active round cannot reuse the old process entry.
   if(identical(result$status,"ok")&&!same_scope(result$scope)&&!isTRUE(refresh))
     return(get_award_round_metadata(login,championship_id,league_id,refresh=TRUE,current_round_id=current_round_id))

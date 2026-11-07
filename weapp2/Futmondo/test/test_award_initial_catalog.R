@@ -8,7 +8,7 @@ active<-list(championships=list(list(id=cid,league=lid,userteam=list(id='own-tea
   rounds=list(list(`_id`='r12',number=12,championshipId=lid)))
 leagues<-list(list(`_id`=lid,rounds=lapply(1:38,function(i)list(`_id`=paste0('r',i),status='future'))))
 calendar<-list(rounds=lapply(38:1,function(i)list(`_id`=paste0('r',i),number=i,
-  status=if(i<12)'done'else if(i==12)'playing'else 'future',matches=list(list(private='discarded')))))
+  status=if(i<12)'closed'else if(i==12)'running'else 'future',matches=list(list(private='discarded')))))
 check('captured league-ID marker survives while foreign league metadata is rejected',{
   catalog<-normalize_mvp_catalog(active,leagues,cid)
   stopifnot(catalog$current_round_number==12,catalog$current_round_id=='r12',catalog$league_id==lid)
@@ -86,8 +86,8 @@ check('saved awards and bulk metadata are reused on a new consuming session',{
 check('an explicit retrieval refreshes a warm calendar when the current round advances',{
   before_awards<-reads('dreamteam$');before_metadata<-reads('league/matches$')
   active$rounds[[1]]$`_id`<-'r13';active$rounds[[1]]$number<-13
-  calendar$rounds[[which(vapply(calendar$rounds,function(x)x$number==12,logical(1)))]]$status<-'done'
-  calendar$rounds[[which(vapply(calendar$rounds,function(x)x$number==13,logical(1)))]]$status<-'playing'
+  calendar$rounds[[which(vapply(calendar$rounds,function(x)x$number==12,logical(1)))]]$status<-'closed'
+  calendar$rounds[[which(vapply(calendar$rounds,function(x)x$number==13,logical(1)))]]$status<-'running'
   shiny::testServer(function(input,output,session){source<-shared_mvp_source(session,function()auth,function()cid,function()TRUE)},{
     settle(session,function()!source()$loading)
     stopifnot(sum(source()$coverage$required)==11L)

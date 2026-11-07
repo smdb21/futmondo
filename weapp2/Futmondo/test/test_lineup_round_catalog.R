@@ -7,7 +7,7 @@ active<-list(championships=list(list(id=cid,league=lid,userteam=list(id='own-tea
  rounds=list(list(`_id`='r12',number=12,championshipId=lid,beginProcess='2026-11-01T12:00:00Z')))
 leagues<-list(list(`_id`=lid,rounds=lapply(1:38,function(i)list(`_id`=paste0('r',i),status=if(i==12)'next'else'future'))))
 calendar<-list(rounds=lapply(38:1,function(i)list(`_id`=paste0('r',i),number=i,
- status=if(i<12)'done'else if(i==12)'playing'else'future',matches=list(list(private='discarded')))))
+ status=if(i<12)'closed'else if(i==12)'running'else'future',matches=list(list(private='discarded')))))
 fixture<-new.env(parent=emptyenv());fixture$stored<-list();fixture$writes<-0L;fixture$db_reads<-0L;fixture$calendar_reads<-0L;fixture$mode<-'ok'
 get_sb_url<-function()'https://database.fixture.invalid';get_sb_key<-function()'private-database-key'
 persist_rival_finance_evidence<-function(evidence,context){
@@ -74,7 +74,7 @@ refreshed<-await(async_adapter_fetch('get_award_round_catalog',list(login=auth,c
 stopifnot(refreshed$complete,fixture$calendar_reads==2L,fixture$writes==2L)
 # A new current-round anchor cannot hydrate a still-fresh older calendar.
 active$rounds[[1]]$`_id`<-'r13';active$rounds[[1]]$number<-13
-calendar$rounds[[which(vapply(calendar$rounds,function(x)x$number==12,logical(1)))]]$status<-'done'
+calendar$rounds[[which(vapply(calendar$rounds,function(x)x$number==12,logical(1)))]]$status<-'closed'
 clear_api_cache();advanced<-read_rounds()
 stopifnot(isTRUE(attr(advanced,'catalog_complete')),max(advanced$round_number[advanced$is_finished%in%TRUE])==12,
  fixture$calendar_reads==3L,fixture$writes==3L)
@@ -88,16 +88,42 @@ fixture$stored<-list();fixture$mode<-'conflict';clear_api_cache();conflicting<-r
 stopifnot(identical(attr(conflicting,'catalog_complete'),FALSE),is.na(conflicting$round_number[1]),
  grepl('conflicting',attr(conflicting,'catalog_reason'),fixed=TRUE),fixture$writes==3L)
 cat('PASS stale/unavailable and conflicting calendars stay partial, do not invent round ordinals and never replace persisted success\n')
+# Official /2/league/matches enum is closed/future/next/running. A running
+# previous round must not block known completed history when the next round
+# is the active championship anchor. Array order supplies no round numbers.
+active$rounds[[1]]$`_id`<-'r13';active$rounds[[1]]$number<-13
+fixture$mode<-'ok';fixture$stored<-list()
+calendar$rounds[[which(vapply(calendar$rounds,function(x)x$number==12,logical(1)))]]$status<-'running'
+clear_api_cache();live_window<-read_rounds()
+stopifnot(isTRUE(attr(live_window,'catalog_complete')),
+ identical(live_window$round_number[live_window$is_finished%in%TRUE],as.numeric(1:11)),
+ identical(live_window$is_finished[live_window$round_number==12],FALSE),
+ identical(attr(lineup_average_scores(roster,history,live_window,5L),'rounds'),as.numeric(7:11)),
+ identical(attr(lineup_average_scores(roster,history,live_window,2L),'rounds'),as.numeric(10:11)))
+# The compact-list parser also recognizes running as explicit unfinished data.
+compact_running<-leagues;compact_running[[1]]$rounds[[12]]$status<-'running'
+stopifnot(identical(normalize_mvp_catalog(active,compact_running,cid)$rounds$is_finished[12],FALSE))
+# A pre-fix persisted observation contains the authoritative running status
+# but an unknown derived flag. Reopen it without another source read or write.
+stored_rows<-fixture$stored[[1]]$payload$rows
+stopifnot(stored_rows$status[stored_rows$round_number==12]=='running')
+fixture$stored[[1]]$payload$rows$is_finished[stored_rows$round_number==12]<-NA
+reads_before<-fixture$calendar_reads;writes_before<-fixture$writes
+clear_api_cache();reopened_running<-read_rounds()
+stopifnot(isTRUE(attr(reopened_running,'catalog_complete')),
+ identical(reopened_running$is_finished[reopened_running$round_number==12],FALSE),
+ fixture$calendar_reads==reads_before,fixture$writes==writes_before)
+cat('PASS official running state before the next-round anchor is excluded from exact five/two-round windows; legacy durable observations recover with no HTTP read or write\n')
 # A malformed database payload falls through to source, and an explicitly
 # unfinished older round is excluded without making completed history unknown.
 fixture$mode<-'ok';fixture$stored<-list(rival_finance_evidence(auth[['userid']],cid,'unknown','eligibility',
  paste0('calendar:v1:',as.character(openssl::sha256(lid))),123,Sys.time()))
 active$rounds[[1]]$`_id`<-'r12';active$rounds[[1]]$number<-12
-for(number in c(10,12))calendar$rounds[[which(vapply(calendar$rounds,function(x)x$number==number,logical(1)))]]$status<-'playing'
+for(number in c(10,12))calendar$rounds[[which(vapply(calendar$rounds,function(x)x$number==number,logical(1)))]]$status<-'running'
 reads_before<-fixture$calendar_reads;writes_before<-fixture$writes
 clear_api_cache();postponed<-read_rounds()
 selected<-lineup_average_scores(data.frame(id='a'),data.frame(player_id='a',round=6:12,points=1),postponed,5L)
 stopifnot(isTRUE(attr(postponed,'catalog_complete')),identical(attr(selected,'rounds'),as.numeric(c(6:9,11))),
  selected$average==1,fixture$calendar_reads==reads_before+1L,fixture$writes==writes_before+1L)
 cat('PASS malformed database data falls back to acquisition; a confirmed unfinished older round is excluded from a complete five-round window\n')
-cat('LINEUP ROUND CATALOG: 5 groups passed / 0 failed\n')
+cat('LINEUP ROUND CATALOG: 6 groups passed / 0 failed\n')
