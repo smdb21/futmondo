@@ -709,7 +709,7 @@ Completed locally: Best XI positions reuse the established colored badges, retai
 
 ## Classification cold-read recovery — 2026-11-06
 
-Status: **implemented and verified in isolated synthetic fixtures; authenticated hosted behavior remains unverified**.
+Status: **deployed; isolated cold-load/browser checks and public hosted startup/release hashes verified; authenticated league data remains unverified**.
 
 - [x] Reproduce the actual bound-directory validation condition cancelling round-filter/status dependencies on a cold page.
 - [x] Initialize native calendar/playing-round controls and display bulk live points independently of directory, history, settings and finance completion; retain their reactive recovery and visible loading/failure states.
