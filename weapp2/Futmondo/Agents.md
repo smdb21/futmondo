@@ -14,6 +14,8 @@ Normal active-session loading, caching, and recording of already-fetched observa
 
 Follow `docs/data_architecture_redesign_plan.md` and the implemented contracts in the data-layer documentation. UI modules consume shared resource state. Pass account and league/team context explicitly, preserve source timestamps, bound caches and queues, and invalidate only affected resources.
 
+Whenever API results are described as cached, include database persistence in the design. Posit Connect Cloud server-session and process memory are temporary; results needed in later sessions or after a restart/redeployment must be stored in the database. Reuse valid persisted observations before refetching, retaining account/league/season/scoring context, source timestamps, freshness and completeness metadata. Memory caches are bounded accelerators only. A failed or unacknowledged database write must remain retryable rather than being treated as durable storage. This applies to factual API data, subject to the authentication restrictions below.
+
 A timer or `tryCatch()` does not make synchronous HTTP non-blocking. Verify responsiveness with delayed-request checks. Do not assume control of hosting processes, child processes, cron, or services: the app uses Posit Connect Cloud's free plan.
 
 Do not manufacture historical values, scores, dates, balances, or season identity. Keep unavailable values distinct from true zero; preserve negative points. Keep different leagues, seasons, and scoring versions separate. Retried persistence must not duplicate source observations.
