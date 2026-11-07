@@ -470,11 +470,11 @@ supabase_delete <- function(table_name, filter = "id=neq.00000000-0000-0000-0000
 
 supabase_primary_key <- function(table_name) {
   # A nonnullable identity component for count and delete filters.
-  if(table_name %in% c("auction_observations","bid_observations","market_observations","league_rule_snapshots","observation_revisions","complete_history_baselines")) "championship_id" else if(identical(table_name,"player_match_observations")) "player_id" else "id"
+  if(table_name %in% c("auction_observations","bid_observations","market_observations","league_rule_snapshots","observation_revisions","complete_history_baselines","team_lineup_snapshots")) "championship_id" else if(identical(table_name,"player_match_observations")) "player_id" else "id"
 }
 
 supabase_known_tables <- function() {
-  c("championships", "real_clubs", "players", "user_teams", "user_team_history", "player_history", "market_transactions", "round_dream_team", "player_daily_snapshots", "auction_observations", "bid_observations", "market_observations", "player_match_observations", "league_rule_snapshots", "observation_revisions", "complete_history_baselines")
+  c("championships", "real_clubs", "players", "user_teams", "user_team_history", "player_history", "market_transactions", "round_dream_team", "player_daily_snapshots", "auction_observations", "bid_observations", "market_observations", "player_match_observations", "league_rule_snapshots", "observation_revisions", "complete_history_baselines", "team_lineup_snapshots")
 }
 
 supabase_delete_all <- function(table_name) {
@@ -492,7 +492,7 @@ supabase_reset_database <- function(force = FALSE) {
   }
 
   reset_order <- c(
-    "complete_history_baselines", "observation_revisions", "bid_observations", "auction_observations", "market_observations", "player_match_observations", "league_rule_snapshots",
+    "team_lineup_snapshots", "complete_history_baselines", "observation_revisions", "bid_observations", "auction_observations", "market_observations", "player_match_observations", "league_rule_snapshots",
     "player_daily_snapshots",
     "round_dream_team",
     "market_transactions",

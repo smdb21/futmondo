@@ -1,0 +1,38 @@
+# Next-round lineup
+
+The **Lineup** sidebar page edits the selected league's current editable Futmondo lineup. Its heading names the next scheduled round; the source mutation API itself has no round parameter. The page never submits a historical or arbitrary future-round lineup. Saving is disabled without an identified next round and rechecks its identity/time immediately before submission.
+
+The pitch supports the twelve official 11-player formations, including 4-6-0. Available formations come from `/5/strategy/availables`; premium entries remain disabled unless the current source reports the relevant purchase or it is the existing formation. The app never buys formations. Player pickers use the squad's primary role and permitted alternative role, prevent duplicates across pitch/bench, and move/swap players only when the other position remains valid. Incoming clause transfers do not enter this squad before authoritative ownership arrives.
+
+**Clear lineup** empties starters, four substitutes and captain locally, preserving the selected formation, N and injury toggle. It makes no request and cannot submit an invalid empty XI. **Reset to official lineup** restores the last observed official selection. Drafts survive navigation during the session; official successful observations survive restarts through database snapshots. A direct account replacement discards prior private drafts.
+
+## Best XI and bench
+
+**Best XI + bench** compares arithmetic means over the same latest N source-confirmed completed rounds for all squad players, default five, selectable from one to twenty. Before N rounds exist, the actual completed count is displayed. Ongoing rounds and unanchored last-five vectors are excluded. Explicit zeroes and negative scores count normally; absent scores remain unknown. Missing histories are requested through the shared bounded controller and persisted through its existing score-first/check-last workflow. A result omitting unknown histories is explicitly labelled “Best among players with complete scores.”
+
+A vectorized positional-count dynamic program selects the maximum-total XI across every allowed formation with each player used at most once. Ties prefer the existing formation, then retaining existing starters, then stable formation/player order. The captain is retained if still starting; otherwise the highest-average starter is selected when captains are enabled.
+
+The bench is selected from the remaining players after fixing the best starting XI. A separate bounded dynamic program first maximizes distinct outfield positions covered by distinct substitutes, then their total historical averages. It fills up to four places and orders them by average descending. Goalkeeper-only players are excluded from automatic substitutes; manual bench selection may still include them where the official rules permit. Injury/suspension exclusion applies to both XI and bench by default and has an explicit override. Missing coverage and unfilled places stay visible. Coverage indicators use the same distinct-player matching as the optimizer, so one multiposition substitute cannot claim three simultaneous replacements.
+
+The lineup history client requests squad IDs and the exact completed-round window. It does not initialize the championship catalog until an ordinary player-table client requires it. New completed windows can request one bounded new acquisition despite an older successful same-N attempt. Existing table clients preserve their defaults and wider-window semantics.
+
+## Official save and durable observations
+
+The public Flutter client at <https://app.futmondo.com/main.dart.js> establishes the `/5/userteam/multichanges` request shape: `championshipId`, `userteamId`, `current`, `modified`, and ordered `changes`. Current/modified states contain `strategy` and player arrays with `_id`, zero-based `position`, `mp`, `pr`, `b`, and `cpt`. `pr` is purchase price (falling back to value), not a role code. Normal placement events use `multiposition=false`; the slot carries the assigned role. Source captain/lock fields are `cpt` and `locked`. Synthetic contract fixtures cover removal-before-placement swaps, formation events, captain events, purchase-price mapping and lock preservation.
+
+Save performs a fresh parallel read of lineup, roster, market-type information and formation entitlement. It validates ownership, every assigned role, bench/captain capabilities, current source locks, season/scoring context and the editing baseline. An external change is a conflict, with the draft retained. One explicit batch is followed by a fresh readback; timeouts and ambiguous responses never replay the mutation. A matching readback establishes success. Failed/mismatching readback leaves the draft and an actionable status. Context generations discard late results after account/league/round changes.
+
+`lineup_store.R` stores only normalized successful observations in `team_lineup_snapshots`, with account/league/team/target/season/scoring identity, observation time, 30-second expiry and completeness. The read enforces independently known active season/scoring dimensions; first-entry unknown dimensions remain the source snapshot's labelled context until live refresh/preflight. UTC timestamps compare as instants, and JSON assignment arrays normalize back to character vectors. Fresh hydration never writes the same observation back. Stale saved data can display while a live refresh runs. No token/password is stored. Missing storage configuration or persistence failure is visible separately from successful live retrieval.
+
+Existing databases require `scripts/migrations/20261107191054_lineup_snapshots.sql`; the fresh schema includes the table. The migration also adds `lineup` to the last-page preference constraint. RLS and grants restrict snapshots to the server role; stale concurrent writes cannot replace a newer snapshot. No new R package, environment variable, worker, scheduler or recurring poll is introduced.
+
+## Local verification
+
+- `test/test_lineup_runtime.R`: all formations, exact completed arithmetic, empty state, bench coverage/order, injury policy, source fields and batch events. The 100-player/all-formation XI + bench calculation averaged 41.8 ms over twenty local runs.
+- `test/test_lineup_history.R`: four groups covering squad-only saved reuse, exact-window acquisition, same-N window advance and lazy catalog handoff.
+- `test/test_lineup_module.R`: five groups covering conflict/no mutation, one-shot timeout reconciliation, failed readback settlement, changed-account invalidation and returning to a context while an obsolete load is pending.
+- `test/test_lineup_store.R`: normalized durable hydration, timestamp equivalence, context rejection and authentication exclusion.
+- `test/test_lineup_schema.cjs`: three groups covering fresh/repeatable schema, newer-write retention, bounded complete payloads, page constraint and server-only access.
+- Independent exhaustive small-fixture validation covers optimizer/bench correctness and multiposition cases. Actual browser fixtures cover clearing, best XI + bench, position selection, one verified synthetic save, reset and viewport width. Warm picker interaction measured 111 ms at mobile width and 101 ms at desktop width after removing the picker-specific modal fade.
+
+These are local, synthetic/offline checks. No authenticated live lineup mutation, hosted migration or deployment is claimed. Source/API failures remain visible; the code does not invent unavailable facts or infer unsupported lock windows.

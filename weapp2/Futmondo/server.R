@@ -176,6 +176,10 @@ selected_player_RV <- players_in_teams_Server(id = "players_in_teams",
                                                  refresh_trigger = refresh_trigger,
                                                  round_catalog = round_catalog_RV)
 
+  lineup <- lineup_Server("lineup", reactive(identical(input$tabs,"lineup")),
+    login_token_RV, championship_id_RV, user_team_id_RV, round_catalog_RV,
+    refresh_trigger, history_refresh_trigger)
+
   today <- today_Server(id = "today",
                is_module_active = reactive({
                  input$tabs == "today"
@@ -304,6 +308,7 @@ observeEvent(login_token_RV(),
       shinydashboard::menuItem("Notifications", tabName = "notifications", icon = icon("bell")),
       shinydashboard::menuItem("Today's market", tabName = "today", icon = icon("bolt")),
       shinydashboard::menuItem("My team", tabName = "yourteam", icon = icon("users")),
+      shinydashboard::menuItem("Lineup", tabName = "lineup", icon = icon("futbol")),
       shinydashboard::menuItem("Players", tabName = "players_in_championship", icon = icon("table")),
       shinydashboard::menuItem("Rivals", tabName = "rivals", icon = icon("users-viewfinder")),
       shinydashboard::menuItem("Plots", tabName = "plots", icon = icon("chart-column")),

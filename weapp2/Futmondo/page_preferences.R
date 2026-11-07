@@ -1,6 +1,6 @@
 # Account-wide navigation preferences. See docs/page_preferences.md.
 fm_saved_pages <- function(is_admin = FALSE) {
-  c("notifications", "today", "yourteam", "players_in_championship", "rivals",
+  c("notifications", "today", "yourteam", "lineup", "players_in_championship", "rivals",
     "plots", "classification", "round_mvps", if (isTRUE(is_admin)) "admin")
 }
 

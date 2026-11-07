@@ -18,6 +18,8 @@ The [data redesign plan](docs/data_architecture_redesign_plan.md) defines the cu
 
 The app retains observed data, historical accounting, descriptive statistics, official notifications, and manual roster/market actions. Predictions, Smart Bid, forecast-driven planners/optimizers, generated trading recommendations, automatic coaches, scheduled workers, and unattended trading are excluded from current and future development.
 
+The user-triggered **Lineup** page is an explicit exception: it compares observed recent-round averages to select a valid XI and outfield-covering bench. It makes no predictions or unattended changes; **Save to Futmondo** is a separate manual action. Existing databases need `scripts/migrations/20261107191054_lineup_snapshots.sql` for durable lineup snapshots and the saved navigation page. See [lineup behavior and verification](docs/lineup_module.md).
+
 The app runs on Posit Connect Cloud's free plan. It does not require a persistent worker, scheduler, child process, or server configuration. Session termination can interrupt pending history saves. The UI must distinguish pending saves from acknowledged persistence.
 
 ## Database configuration

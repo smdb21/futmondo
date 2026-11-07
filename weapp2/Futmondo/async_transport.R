@@ -202,7 +202,7 @@ fm_async_read_retry_allowed <- function(url,method) {
   route%in%c("information","activechampionships","teams","roster","rounds",
     "dreamteam","nightmareteam","roundlineup","lineup","championshipplayers","championshipteams",
     "players","summary","fullprofile","matches","pressroom","news","moneymovements",
-    "rosterbids","myplayers","list","unread","getdtconfig")||
+    "rosterbids","myplayers","list","unread","getdtconfig","availables")||
     identical(url,"https://api.futmondo.com/1/ranking/round")
 }
 fm_async_read_retryable <- function(error) {

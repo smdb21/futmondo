@@ -36,6 +36,7 @@ body <- shinydashboard::dashboardBody(
       tabName = "today",
       today_UI(id = "today")
     ),
+    shinydashboard::tabItem(tabName = "lineup", lineup_UI("lineup")),
     shinydashboard::tabItem(
       tabName = "yourteam",
       fluidRow(
