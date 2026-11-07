@@ -215,7 +215,16 @@ record_acquired_resource<-function(resource,data,context){
    return(invisible(TRUE))
   }
   if(!nzchar(league))return(invisible(TRUE))
-  if(grepl("^championshipplayers_",resource)&&is.data.frame(data)){
+  if(startsWith(resource,"classification_ranking_")&&is.list(data)){
+    stamp<-attr(data,"observed_at")
+    if(!isTRUE(data$from_saved)&&length(stamp)==1L&&!is.na(fm_time(stamp))&&
+       nrow(classification_ranking_rows(data$answer,data$round_id,data$round_number))){
+      payload<-list(kind="classification_round_ranking",round_id=data$round_id,round_number=data$round_number,answer=data$answer)
+      evidence<-rival_finance_evidence(context$account_id,league,context$season,"eligibility",
+        paste0("classification:",data$round_id),payload,stamp)
+      persist_rival_finance_evidence(list(evidence),context)
+    }
+  }else if(grepl("^championshipplayers_",resource)&&is.data.frame(data)){
     sync_real_clubs_to_supabase(data);sync_players_to_supabase(data);log_player_history(data,league);log_player_daily_snapshots(data,league)
   }else if(grepl("^teams_",resource)&&is.data.frame(data)){
     sync_user_teams_to_supabase(data,league);log_user_team_history(data,championship_id=league)

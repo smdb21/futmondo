@@ -47,18 +47,55 @@ classification_round_rows <- function(answer, team_id, team_name, rounds = data.
   result[!duplicated(paste(result$team_id, result$round), fromLast = TRUE), , drop = FALSE]
 }
 
-classification_window_table <- function(rows, window = NULL, single = "all") {
+# Scheduled catalog rows are identities, not evidence of published scores.
+classification_available_rounds <- function(catalog, history) {
+  rounds <- catalog$rounds
+  current <- fm_number(catalog$current_round_number)
+  observed <- history$round
+  if(is.finite(current))observed <- observed[observed<=current]
+  closed <- if(is.data.frame(rounds)&&all(c("round_number","is_finished")%in%names(rounds)))
+    rounds$round_number[rounds$is_finished%in%TRUE]else numeric()
+  playing <- if(is.data.frame(rounds)&&all(c("round_number","status")%in%names(rounds)))
+    rounds$round_number[tolower(rounds$status)%in%c("active","playing","in_progress")]else numeric()
+  numbers <- sort(unique(c(observed,closed,playing,if(isTRUE(catalog$current_verified)&&is.finite(current))current)))
+  # Numbered preceding rounds are required coverage even when their completion
+  # flags are missing. This is a filter domain, never financial finality.
+  if(length(numbers)&&is.data.frame(rounds)&&"round_number"%in%names(rounds))
+    numbers <- sort(unique(c(numbers,rounds$round_number[is.finite(rounds$round_number)&rounds$round_number<=max(numbers)])))
+  numbers[is.finite(numbers)&numbers>=1&numbers==floor(numbers)]
+}
+
+classification_merge_ranking <- function(history, ranking, teams) {
+  if(is.null(ranking)||!is.data.frame(ranking$rows)||!nrow(ranking$rows))return(history)
+  observed <- ranking$rows
+  # Keep absent source scores unknown even when the directory has cumulative
+  # points. Replacing by team/round also prevents counting live points twice.
+  directory <- data.frame(team_id=as.character(teams$teamid),team_name=as.character(teams$teamname))
+  names <- directory$team_name[match(observed$team_id,directory$team_id)]
+  observed$team_name[!is.na(names)] <- names[!is.na(names)]
+  absent <- !directory$team_id%in%observed$team_id
+  if(any(absent))observed <- bind_rows(observed,data.frame(team_id=directory$team_id[absent],
+    team_name=directory$team_name[absent],round_id=ranking$round_id,round=ranking$round_number,
+    points=NA_real_,score_status="unavailable"))
+  keys <- paste(observed$team_id,observed$round)
+  bind_rows(history[!paste(history$team_id,history$round)%in%keys,,drop=FALSE],observed)
+}
+
+classification_window_table <- function(rows, window = NULL, single = "all", expected_rounds = NULL) {
   if (is.null(rows) || !nrow(rows)) return(data.frame())
   teams <- unique(rows[, c("team_id", "team_name"), drop = FALSE])
+  expected <- expected_rounds %||% unique(rows$round)
   if (!is.null(single) && length(single) == 1L && single != "all") {
     rows <- rows[rows$round == suppressWarnings(as.numeric(single)), , drop = FALSE]
+    expected <- suppressWarnings(as.numeric(single))
   } else if (length(window) == 2L && all(is.finite(window))) {
     rows <- rows[rows$round >= window[1] & rows$round <= window[2], , drop = FALSE]
+    expected <- expected[expected>=window[1]&expected<=window[2]]
   }
-  if (!nrow(rows)) return(data.frame())
+  if (!length(expected)) return(data.frame())
   # Compare the same published rounds for every team. An absent record is
   # missing evidence, not a zero-point round or permission to sum fewer rounds.
-  expected <- length(unique(rows$round))
+  expected <- length(unique(expected))
   totals <- rows %>% group_by(team_id, team_name) %>%
     summarise(points = if (all(is.finite(points)) && n_distinct(round) == expected) sum(points) else NA_real_,
               rounds = n_distinct(round), .groups = "drop")
@@ -68,14 +105,15 @@ classification_window_table <- function(rows, window = NULL, single = "all") {
 }
 
 # Project the shared ledger's coverage-aware round totals without I/O.
-classification_bonus_table <- function(standings, history, finances, window=NULL, single="all") {
+classification_bonus_table <- function(standings, history, finances, window=NULL, single="all",expected_rounds=NULL) {
   kinds<-c(points_bonus="points",mvp_bonus="mvp",best_xi_bonus="dreamteam",position_bonus="ranking")
-  selected<-sort(unique(history$round))
+  selected<-sort(unique(expected_rounds %||% history$round))
   if(length(single)==1L && single!="all") selected<-selected[selected==as.numeric(single)]
   else if(length(window)==2L && all(is.finite(window))) selected<-selected[selected>=window[1]&selected<=window[2]]
+  provisional <- "score_status"%in%names(history)&&any(history$round%in%selected&history$score_status%in%c("provisional","unavailable"))
   for(column in names(kinds)) standings[[column]]<-vapply(as.character(standings$team_id),function(id){
     totals<-attr(finances$cash_ledgers[[id]],"round_bonus_totals")
-    if(!length(selected)||!is.data.frame(totals)||!nrow(totals))return(NA_real_)
+    if(provisional||!length(selected)||!is.data.frame(totals)||!nrow(totals))return(NA_real_)
     rows<-totals[totals$bonus_type%in%kinds[[column]] & totals$round_number%in%selected,,drop=FALSE]
     if(nrow(rows)!=length(selected)||!setequal(rows$round_number,selected)||any(!is.finite(rows$amount)))return(NA_real_)
     sum(rows$amount)
@@ -101,18 +139,19 @@ classification_dreamteam_rows <- function(answer) {
 classification_Server <- function(id, is_module_active, login_token, championship_id, user_team_id,
                                   user_teams_RV, refresh_trigger = NULL, league_settings_source = NULL) {
   moduleServer(id, function(input, output, session) {
-    bind_factual_reads(c("get_finished_rounds","get_user_team_rounds","get_user_team_info","get_round_dreamteam"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
+    bind_factual_reads(c("get_classification_round_catalog","get_classification_round_ranking","get_user_team_rounds","get_user_team_info","get_round_dreamteam"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
 
     mvp_snapshot <- shared_mvp_source(session,login_token,championship_id,is_module_active,refresh_trigger)
     finances_RV <- shared_rival_finance_source(session,login_token,championship_id,
       user_team_id,user_teams_RV,is_module_active,mvp_snapshot,refresh_trigger)
 
-    rounds_RV <- reactive({
+    catalog_RV <- reactive({
       req(is_module_active() == TRUE, login_token(), championship_id())
       if (!is.null(refresh_trigger)) refresh_trigger()
-      tryCatch(get_finished_rounds(login_token(), championship_id()), error = function(e) data.frame())
+      tryCatch(get_classification_round_catalog(login_token(), championship_id()), error = function(e) empty_round_catalog())
     })
-    round_rows_RV <- reactive({
+    rounds_RV <- reactive(catalog_RV()$rounds)
+    historical_rows_RV <- reactive({
       req(is_module_active() == TRUE, login_token(), championship_id())
       if (!is.null(refresh_trigger)) refresh_trigger()
       teams <- user_teams_RV(); req(teams)
@@ -121,49 +160,119 @@ classification_Server <- function(id, is_module_active, login_token, championshi
         classification_round_rows(ans, teams$teamid[i], teams$teamname[i], rounds_RV())
       }))
     })
-    round_numbers_RV <- reactive({
-      catalog <- rounds_RV(); history <- round_rows_RV()
-      numbers <- sort(unique(c(catalog$round_number, history$round)))
-      numbers[is.finite(numbers)]
+    active_ranking_RV <- reactive({
+      catalog <- catalog_RV();rounds <- catalog$rounds
+      number <- fm_number(catalog$current_round_number)
+      if(!is.data.frame(rounds)||!nrow(rounds)||!is.finite(number))return(NULL)
+      # The lineup marker may already name next week's round. Only use explicit
+      # calendar identities, and check at most that marker plus its predecessor.
+      candidates <- rounds[is.finite(rounds$round_number)&rounds$round_number<=number,,drop=FALSE]
+      candidates <- head(candidates[order(candidates$round_number,decreasing=TRUE),,drop=FALSE],2L)
+      if("status"%in%names(candidates))candidates <- candidates[order(!tolower(candidates$status)%in%c("active","playing","in_progress")),,drop=FALSE]
+      failure <- NULL;loading <- FALSE
+      for(i in seq_len(nrow(candidates))){
+        result <- tryCatch(get_classification_round_ranking(login_token(),championship_id(),user_team_id(),
+          candidates$round_id[i],candidates$round_number[i]),error=function(e){
+            if(inherits(e,"shiny.silent.error")&&grepl("Loading",conditionMessage(e),fixed=TRUE))loading<<-TRUE
+            else failure<<-e
+            NULL
+          })
+        if(!is.null(result)&&is.data.frame(result$rows)&&nrow(result$rows))return(result)
+        # A failed known live round remains unavailable. A completed prior
+        # round cannot silently replace it as the latest matchday.
+        if("status"%in%names(candidates)&&tolower(candidates$status[i])%in%c("active","playing","in_progress"))break
+      }
+      list(rows=data.frame(),loading=loading,error=failure)
     })
+    round_rows_RV <- reactive({
+      history <- historical_rows_RV();catalog <- catalog_RV()
+      ranking <- active_ranking_RV()
+      current <- if(!is.null(ranking)&&nrow(ranking$rows))ranking$round_number else fm_number(catalog$current_round_number)
+      if(is.finite(current))history <- history[history$round<=current,,drop=FALSE]
+      classification_merge_ranking(history,ranking,user_teams_RV())
+    })
+    round_numbers_RV <- reactive({
+      catalog <- catalog_RV();ranking <- active_ranking_RV()
+      if(!is.null(ranking)&&nrow(ranking$rows)){catalog$current_round_number<-ranking$round_number;catalog$current_verified<-TRUE}
+      numbers <- classification_available_rounds(catalog,round_rows_RV())
+      if(!is.null(ranking)&&nrow(ranking$rows))numbers<-numbers[numbers<=ranking$round_number]
+      numbers
+    })
+    selection_mode <- reactiveVal("general")
+    sent_selection <- NULL
+    send_selection <- function(numbers,mode) {
+      window <- if(mode=="latest")rep(max(numbers),2)else range(numbers)
+      sent_selection <<- list(window=as.numeric(window),single="all")
+      updateSliderInput(session,"round_range_slider",value=window)
+      updateSelectInput(session,"single_round_select",selected="all")
+    }
     observeEvent(round_numbers_RV(), {
       numbers <- round_numbers_RV()
       if (!length(numbers)) return()
-      updateSliderInput(session, "round_range_slider", min = min(numbers), max = max(c(numbers, min(numbers) + 1)), value = range(numbers))
+      updateSliderInput(session, "round_range_slider", min = min(numbers), max = max(c(numbers, min(numbers) + 1)))
       updateSelectInput(session, "single_round_select", choices = c("All rounds" = "all", stats::setNames(as.character(numbers), paste("Round", numbers))))
+      mode <- isolate(selection_mode())
+      if(mode%in%c("latest","general"))send_selection(numbers,mode)
     })
     observeEvent(input$latest_round, {
-      numbers <- round_numbers_RV(); req(length(numbers) > 0L)
-      updateSliderInput(session, "round_range_slider", value = rep(max(numbers), 2))
-      updateSelectInput(session, "single_round_select", selected = "all")
+      selection_mode("latest")
+      numbers <- round_numbers_RV()
+      if(length(numbers))send_selection(numbers,"latest")
     })
     observeEvent(input$general_classification, {
-      numbers <- round_numbers_RV(); req(length(numbers) > 0L)
-      updateSliderInput(session, "round_range_slider", value = range(numbers))
-      updateSelectInput(session, "single_round_select", selected = "all")
+      selection_mode("general")
+      numbers <- round_numbers_RV()
+      if(length(numbers))send_selection(numbers,"general")
     })
+    observeEvent(input$round_range_slider, {
+      if(!is.null(sent_selection)&&identical(as.numeric(input$round_range_slider),sent_selection$window))return()
+      selection_mode("manual")
+    },ignoreInit=TRUE,priority=-1)
+    observeEvent(input$single_round_select, {
+      if(!is.null(sent_selection)&&identical(input$single_round_select,sent_selection$single))return()
+      selection_mode("manual")
+    },ignoreInit=TRUE,priority=-1)
     filtered_rows_RV <- reactive({
-      classification_window_table(round_rows_RV(), input$round_range_slider, input$single_round_select)
+      classification_window_table(round_rows_RV(), input$round_range_slider, input$single_round_select,round_numbers_RV())
     })
     standings_RV <- reactive({
       req(is_module_active() == TRUE)
       rows <- filtered_rows_RV()
-      if (!nrow(round_rows_RV())) {
+      numbers <- round_numbers_RV();window <- input$round_range_slider
+      general <- (is.null(input$single_round_select)||input$single_round_select=="all")&&
+        !identical(selection_mode(),"latest")&&(!length(numbers)||length(window)!=2L||
+          (window[1]<=min(numbers)&&window[2]>=max(numbers)))
+      if (general) {
         teams <- user_teams_RV(); req(teams)
-        rows <- data.frame(team_id = as.character(teams$teamid), team_name = teams$teamname,
-                           points = suppressWarnings(as.numeric(teams$points)),
-                           rank = suppressWarnings(as.numeric(teams$position)))
+        # The official cumulative source remains authoritative when historical
+        # team-round lists omit whole rounds; never label a partial sum General.
+        if("points"%in%names(teams))rows <- data.frame(team_id=as.character(teams$teamid),team_name=teams$teamname,
+          points=suppressWarnings(as.numeric(teams$points)),
+          rank=rank(-suppressWarnings(as.numeric(teams$points)),ties.method="min",na.last="keep"))
       }
       if (!nrow(rows)) return(rows)
-      classification_bonus_table(rows, round_rows_RV(), finances_RV(), input$round_range_slider, input$single_round_select)
+      classification_bonus_table(rows, round_rows_RV(), finances_RV(), input$round_range_slider, input$single_round_select,round_numbers_RV())
     })
     output$classification_status <- renderUI({
-      if (!nrow(round_rows_RV())) return(p("Round history is unavailable. Current official cumulative totals are shown below; round filters require published results."))
+      ranking <- active_ranking_RV()
+      if (!nrow(round_rows_RV())) return(p(if(isTRUE(ranking$loading))"Loading official round standings…"
+        else if(!is.null(ranking$error))resource_failure_message(ranking$error)
+        else "Round scores are unavailable; General classification uses official cumulative totals."))
       rows <- standings_RV()
-      if (!nrow(rows)) return(p("No published results in this selection."))
+      if (!nrow(rows)) return(p(if(isTRUE(ranking$loading))"Loading official round standings…"
+        else if(!is.null(ranking$error))resource_failure_message(ranking$error)
+        else "No published results in this selection."))
       bonus_columns <- c("points_bonus", "mvp_bonus", "best_xi_bonus", "position_bonus")
       missing_bonus <- any(!is.finite(as.matrix(rows[, bonus_columns, drop = FALSE])))
+      selected <- round_rows_RV()
+      if(length(input$single_round_select)==1L&&input$single_round_select!="all")selected<-selected[selected$round==as.numeric(input$single_round_select),,drop=FALSE]
+      else if(length(input$round_range_slider)==2L)selected<-selected[selected$round>=input$round_range_slider[1]&selected$round<=input$round_range_slider[2],,drop=FALSE]
+      live <- nrow(selected)&&"score_status"%in%names(selected)&&any(selected$score_status%in%c("provisional","unavailable"))
+      stale <- identical(attr(active_ranking_RV(),"fetch_status"),"stale")
       tagList(p("Points and reconstructed bonus totals for the selected rounds."),
+        if(live)p("Live round points are provisional. Rewards remain unavailable until the round and its payments are confirmed."),
+        if(!is.null(ranking$error))p(resource_failure_message(ranking$error)),
+        if(stale)p("Showing saved round standings while the latest source request is unavailable."),
         if (any(!is.finite(rows$points))) p("Some selected round scores are missing; affected point totals are unavailable."),
         if (missing_bonus) p(if (isTRUE(finances_RV()$loading)) "Bonus totals are loading."
           else "Some bonus totals lack complete round or award records and are shown as Unavailable."))

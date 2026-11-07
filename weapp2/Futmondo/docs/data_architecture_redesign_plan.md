@@ -679,3 +679,14 @@ Status: **implemented and verified locally; authenticated hosted evidence and de
 - [x] Complete known-answer, delayed-response, cache/persistence, desktop/mobile, performance and required offline lifecycle checks on the scoped release; deliver only this task's changes to current remote branch `2.0`.
 
 No dependency, migration, background worker or unattended action is introduced. Available historical lineups still cannot prove absent roster-only ownership or an unavailable historical cutoff; the presentation and local race fix do not establish complete authenticated account totals.
+
+## Live classification round acquisition — 2026-11-06
+
+Status: **implemented and verified locally; authenticated current-account behavior remains unverified**.
+
+- [x] Replace highest scheduled/lineup-round selection with at most two calendar-ID-backed native round-ranking candidates; prefer explicit playing metadata and exclude not-started rankings.
+- [x] Keep Latest/General presets through delayed source arrival and preserve manual filters; keep official cumulative General separate from per-round scores and incomplete custom windows.
+- [x] Record/reuse scoped display-only score snapshots without changing closed-round financial eligibility or unsettled reward treatment.
+- [x] Verify focused request/parser/cache/persistence/selection/coverage fixtures, existing classification regressions and required offline lifecycle. Primary-agent browser verification and integrated review are recorded separately before delivery.
+
+No migration, dependency, autonomous activity or external account/database mutation was performed for verification.

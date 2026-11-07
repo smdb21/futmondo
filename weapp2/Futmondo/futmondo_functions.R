@@ -2867,6 +2867,92 @@ get_user_team_rounds <- function(login, championship_id, user_team_id) {
   }, context=resource_context(login=login,championship_id=championship_id,user_team_id=user_team_id))
 }
 
+# Display observations have their own namespace: provisional ranking rows must
+# never become the closed-round eligibility evidence consumed by cash ledgers.
+get_classification_round_catalog <- function(login,championship_id) {
+  catalog <- get_award_round_catalog(login,championship_id)
+  if(nzchar(mvp_text(catalog$league_id))){
+    metadata <- get_award_round_metadata(login,championship_id,catalog$league_id)
+    if(identical(metadata$status,"ok")&&is.data.frame(metadata$rows)&&nrow(catalog$rounds)){
+      for(i in seq_len(nrow(catalog$rounds))){
+        detail <- metadata$rows[metadata$rows$round_id%in%catalog$rounds$round_id[i],,drop=FALSE]
+        if(nrow(detail)==1L&&nzchar(mvp_text(detail$status)))catalog$rounds$status[i]<-detail$status
+      }
+    }
+  }
+  catalog
+}
+
+classification_ranking_not_started <- function(answer) {
+  tolower(mvp_text(answer$metadata$status))%in%c("next","future","pending","scheduled","not_started","upcoming")
+}
+
+classification_ranking_rows <- function(answer, round_id, round_number) {
+  empty <- data.frame(team_id=character(),team_name=character(),round_id=character(),
+    round=numeric(),points=numeric(),score_status=character(),stringsAsFactors=FALSE)
+  if(!is.list(answer)||isTRUE(answer$error)||!is.null(answer$code)||!is.list(answer$ranking)||classification_ranking_not_started(answer))return(empty)
+  records <- mvp_records(answer$ranking)
+  if(!length(records)||length(records)>500L)return(empty)
+  status <- if(round_is_finished(answer$metadata %||% list()))"final"else"provisional"
+  rows <- dplyr::bind_rows(lapply(records,function(row){
+    if(!is.list(row))return(NULL)
+    data.frame(team_id=mvp_text(row$id),team_name=mvp_text(row$name),round_id=as.character(round_id),
+      round=as.numeric(round_number),points=fm_number(row$points),score_status=status,stringsAsFactors=FALSE)
+  }))
+  if(nrow(rows)!=length(records)||any(!nzchar(rows$team_id))||anyDuplicated(rows$team_id))return(empty)
+  rows
+}
+
+get_classification_round_ranking <- function(login, championship_id, user_team_id, round_id, round_number) {
+  if(!nzchar(mvp_text(round_id))||!is.finite(fm_number(round_number)))stop("Round identity unavailable")
+  context <- resource_context(login,championship_id,user_team_id,season=league_season_context(championship_id))
+  resource <- paste0("classification_ranking_",championship_id,"_",round_id)
+  get_cached_data(resource, {
+    saved <- tryCatch(read_rival_finance_evidence(context$account_id,championship_id,context$season),error=function(e)NULL)
+    snapshots <- Filter(function(row){
+      p <- row$payload
+      identical(row$evidence_type,"eligibility")&&is.list(p)&&
+        identical(p$kind,"classification_round_ranking")&&identical(mvp_text(p$round_id),as.character(round_id))&&
+        identical(fm_number(p$round_number),as.numeric(round_number))&&
+        identical(mvp_text(row$account_id),context$account_id)&&identical(mvp_text(row$championship_id),context$championship_id)&&
+        identical(mvp_text(row$season,"unknown"),context$season)
+    },saved$evidence %||% list())
+    if(length(snapshots)){
+      stamps <- vapply(snapshots,function(row)as.numeric(fm_time(row$observed_at)),numeric(1))
+      index <- order(stamps,na.last=NA,decreasing=TRUE)
+      if(length(index)){
+        snapshot <- snapshots[[index[1]]];p <- snapshot$payload
+        rows <- classification_ranking_rows(p$answer,round_id,round_number)
+        deadline <- stamps[index[1]]+60
+        if(nrow(rows)&&as.numeric(Sys.time())<deadline){
+          result <- list(rows=rows,round_id=round_id,round_number=round_number,answer=p$answer,valid_until=deadline,from_saved=TRUE)
+          attr(result,"observed_at") <- fm_time(snapshot$observed_at)
+          attr(result,"source") <- "saved Futmondo round ranking"
+          return(result)
+        }
+      }
+    }
+    payload <- list(header=list(token=login[["token"]],userid=login[["userid"]]),
+      query=list(championshipId=championship_id,roundNumber=as.numeric(round_number),userteamId=user_team_id),answer=list())
+    response <- futmondo_post("https://api.futmondo.com/1/ranking/round",body=toJSON(payload,auto_unbox=TRUE),
+      add_headers(.headers=c("Content-Type"="application/json; charset=utf-8")))
+    body <- httr::content(response)
+    if(httr::status_code(response)!=200L||!is.list(body)||isTRUE(body$error)||
+       (!is.null(body$code)&&!identical(body$code,API_CODE_OK)))stop("Round standings unavailable")
+    if(is.list(body$answer)&&classification_ranking_not_started(body$answer))
+      return(list(rows=data.frame(),round_id=round_id,round_number=round_number,not_started=TRUE,valid_until=as.numeric(Sys.time())+60))
+    rows <- classification_ranking_rows(body$answer,round_id,round_number)
+    if(!nrow(rows))stop("Round standings unavailable")
+    # Retain only score fields, excluding profile/contact/actor payloads.
+    answer <- list(metadata=list(status=mvp_text(body$answer$metadata$status)),
+      ranking=lapply(seq_len(nrow(rows)),function(i)list(id=rows$team_id[i],name=rows$team_name[i],points=rows$points[i])))
+    stamp <- Sys.time()
+    result <- list(rows=rows,round_id=round_id,round_number=round_number,answer=answer,valid_until=as.numeric(stamp)+60)
+    attr(result,"observed_at") <- stamp
+    result
+  },timeout_sec=60,context=context)
+}
+
 build_round_dreamteam_payload <- function(login, championship_id, reference) list(header=list(token=login[["token"]], userid=login[["userid"]]), query=list(championshipId=championship_id,type="dreamteam",round=reference$round_id),answer=list())
 get_round_dreamteam <- function(login, championship_id, reference) { ref<-if(is.list(reference)) round_reference(reference$round_id,reference$round_number) else round_reference(reference); if(is.null(ref)) return(NULL); get_cached_data(paste0("dreamteam_",championship_id,"_",ref$round_id), { ans<-httr::content(futmondo_post(DREAMTEAM_URL,body=toJSON(build_round_dreamteam_payload(login,championship_id,ref),auto_unbox=TRUE),add_headers(.headers=c("Content-Type"="application/json; charset=utf-8")))); if(is.list(ans$answer)) ans$answer else list() }, context=resource_context(login=login,championship_id=championship_id)) }
 official_round_mvp_row <- function(answer, championship_id, reference) {

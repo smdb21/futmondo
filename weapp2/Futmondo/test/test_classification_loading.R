@@ -35,7 +35,7 @@ shiny::testServer(classification_Server, args = list(
   rewards <- output$configured_rewards_ui$html
   stopifnot(grepl("70.000", rewards, fixed = TRUE), grepl("500.000", rewards, fixed = TRUE),
     !grepl("Unavailable", rewards, fixed = TRUE), isTRUE(finance()$loading))
-  pending$get_finished_rounds$resolve(data.frame(round_id = "r1", round_number = 1))
+  pending$get_classification_round_catalog$resolve(list(rounds=data.frame(round_id = "r1", round_number = 1)))
   pending$get_user_team_rounds$resolve(list(list(round = "r1", points = 5)))
   settle(session)
   stopifnot(grepl("Bonus totals are loading", output$classification_status$html, fixed = TRUE))

@@ -10,9 +10,9 @@ available <- reactiveVal(list(
   catalog = data.frame(round_id = c("r3", "r1"), round_number = c(3, 1)),
   history = list(list(round = 1, points = 5), list(round = 4, points = 12),
                  list(round = 3, points = 8))))
-get_finished_rounds <- function(...) {
+get_classification_round_catalog <- function(...) {
   calls <<- c(calls, "catalog")
-  available()$catalog
+  list(rounds=available()$catalog)
 }
 get_user_team_rounds <- function(...) {
   calls <<- c(calls, "history")
