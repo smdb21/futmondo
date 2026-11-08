@@ -756,3 +756,8 @@ Implemented and independently verified locally: round-filtered MVP coverage is i
 ## Round 11 unowned-player clarification — 2026-11-07
 
 Completed: persist the user's explicit confirmation that the four previously unresolved round-11 award players were unowned; verify database readback through the existing ledger. This resolves round 11 Best XI coverage without a calculation change or assumptions about other absent owners. Added regression coverage for explicit no-owner persistence, correct rewards, missing evidence, scope isolation and conflicting ownership. No schema, dependency, production runtime or deployment-bundle change. See `rival_cash_accounting.md` and executed results.
+
+
+## Full-width lineup availability checkbox — 2026-11-07
+
+Completed locally: the injured/suspended players checkbox occupies its own full-width row beneath formation and recent rounds. Offline browser layout and interaction checks passed at 320, 390 and 1440px. See `lineup_module.md` and `data_review_results.md`. Hosted deployment remains separate.

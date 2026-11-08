@@ -1232,3 +1232,10 @@ The user clarified that De Frutos, Bartra, Cabrera and Fortuño were owned by no
 Executed `Rscript test/test_classification_bonuses.R`: inherited ledger/selection checks and new known-answer fixture with seven owned and four unowned award players passed; serialized evidence reuse, account/league/round isolation, missing confirmation and conflicting ownership checks passed. Independent Luna known-answer checks of the award estimator passed; its separate full standings fixture was inconclusive, so complete-path verification comes from the primary regression and persisted-data replay. No production calculation/interface changed, so the lifecycle, browser, deployment and unrelated suites were deliberately not rerun. Hosted UI display was not inspected.
 
 Performance review: four compact durable evidence records; no application code, network acquisition, timer, concurrency, dependency or rendering change. Existing evidence hashes invalidate derived calculations when the new records are loaded, and existing snapshot persistence reuses the result. The focused table projection benchmark took 0.309s for 100 selections over ten teams and 38 rounds. Documentation/tests have no deployed runtime cost.
+
+
+## Full-width lineup availability checkbox — 2026-11-07
+
+Verified the offline lineup browser fixture at 320, 390 and 1440px: the checkbox wrapper spans the controls width, starts below both other inputs, fits the viewport and remains interactive. Scoped `git diff --check` passed. No new tests were added for this localized layout change; broader lifecycle/data suites were deliberately skipped. Hosted deployment was not run. No delegation.
+
+Performance review: one static wrapper and a scoped flex rule, with the checkbox input explicitly using 100% width. No API/database requests, cache changes, timers, reactive work or meaningful memory/rendering cost are added.
