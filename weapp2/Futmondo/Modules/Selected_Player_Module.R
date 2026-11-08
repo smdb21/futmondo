@@ -235,10 +235,11 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     modal_bid_info_RV <- reactiveVal(list())
 
 
-    # Records whether the regular market-offer modal was opened by the shared
-    # helper (TRUE) or blocked by preflight / missing player (FALSE). Exposed
-    # so the open_action routing can be asserted in tests without a live UI.
+    # Includes the immediately shown verification shell. It cannot submit until
+    # the shared capacity read verifies this exact opening's context.
     offer_modal_opened_RV <- reactiveVal(FALSE)
+    market_offer_dialog_RV <- reactiveVal(NULL)
+    market_offer_generation <- 0L
 
     # Records whether the release-clause buyout confirmation modal was opened
     # by the shared helper (TRUE) or blocked by the open-state recheck /
@@ -274,6 +275,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       current_context <- player_action_context_RV()
       previous_context <- isolate(previous_player_action_context_RV())
       active_bid_info_RV(NULL);modal_context_RV(list());modal_bid_info_RV(list())
+      market_offer_dialog_RV(NULL)
       offer_modal_opened_RV(FALSE);clause_modal_opened_RV(FALSE);modify_modal_opened_RV(FALSE)
       if (player_card_context_changed(previous_context, current_context)) removeModal()
       previous_player_action_context_RV(current_context)
@@ -942,46 +944,77 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     # ---- Shared helper: open the regular market-offer modal ----
     # Single code path for the "Make Market Offer" button and for external
     # "market_bid" action events from another player view.
-    # Honors the same run_acquisition_preflight behavior as the button path.
+    # Opening reuses verified card facts locally; submission independently runs
+    # the existing current-state preflight. Never block this click on network I/O.
+    market_offer_preflight <- function(sp, state) {
+      capacity <- state$data
+      deadline <- capacity$valid_until
+      if (!identical(state$status,"ok") || identical(state$freshness,"stale") ||
+          !is.numeric(deadline) || length(deadline)!=1L || !is.finite(deadline) ||
+          deadline<=as.numeric(Sys.time())) {
+        return(list(ok=FALSE,reason="unavailable",message=if(!is.null(state$error))
+          resource_failure_message(state$error) else acquisition_unavailable_message(capacity)))
+      }
+      minimum <- market_bid_minimum(sp,capacity$rules$minimum_bid_at_value)
+      result <- evaluate_acquisition_preflight(capacity,"bid",minimum_bid=minimum)
+      result$minimum_bid <- minimum
+      result
+    }
+    output$market_offer_body <- renderUI({
+      dialog <- market_offer_dialog_RV();req(dialog)
+      if (isTRUE(dialog$pending)) return(div(role="status",icon("spinner",class="fa-spin")," Checking availability…"))
+      if (!isTRUE(dialog$preflight$ok)) return(div(role="alert",dialog$preflight$message))
+      market_price <- dialog$preflight$minimum_bid
+      tagList(p("Minimum market bid: ",strong(player_card_money(market_price))),
+        numericInput(ns("bid_amount"),label="Your offer amount (EUR):",value=market_price,min=market_price,step=10000),
+        uiOutput(ns("bid_amount_preview")))
+    })
+    output$market_offer_submit <- renderUI({
+      dialog <- market_offer_dialog_RV();req(dialog)
+      actionButton(ns("submit_bid"),"Submit Market Offer",class="btn btn-buy-market",
+        disabled=isTRUE(dialog$pending)||!isTRUE(dialog$preflight$ok))
+    })
+    observeEvent(input$market_offer_closed,{
+      dialog <- market_offer_dialog_RV()
+      if (!is.null(dialog) && identical(fm_scalar(input$market_offer_closed,""),as.character(dialog$generation))) {
+        market_offer_dialog_RV(NULL);offer_modal_opened_RV(FALSE)
+        values <- modal_context_RV();values$bid <- NULL;modal_context_RV(values)
+      }
+    })
     open_market_offer_modal <- function() {
       sp <- selected_player()
-      req(sp)
-
-      # Preflight: a new offer must have roster capacity available. The open
-      # decision is routed through the pure market_offer_decision helper (the
-      # single decision point shared with the external "market_bid" event).
-      pf <- run_acquisition_preflight(sp, "bid", amount = NULL)
-      decision <- market_offer_decision(sp, pf)
-      if (!isTRUE(decision$open)) {
-        if (!identical(decision$reason, "no_player")) {
-          show_preflight_failure(pf)
-        }
+      context <- player_action_context_RV();req(sp,!is.null(context))
+      state <- card_states$capacity();deadline <- state$data$valid_until
+      pending <- identical(state$status,"loading") || is.null(state$data) ||
+        identical(state$freshness,"stale") || !is.numeric(deadline) || length(deadline)!=1L ||
+        !is.finite(deadline) || deadline<=as.numeric(Sys.time())
+      pf <- if (!pending) market_offer_preflight(sp,state) else NULL
+      if (!pending && !isTRUE(market_offer_decision(sp,pf)$open)) {
+        show_preflight_failure(pf)
         offer_modal_opened_RV(FALSE)
         return(invisible(FALSE))
       }
-
-      market_price <- pf$minimum_bid
-
-      remember_action_context("bid")
+      values <- modal_context_RV();values$bid <- NULL;modal_context_RV(values)
+      market_offer_generation <<- market_offer_generation+1L
+      generation <- market_offer_generation
+      market_offer_dialog_RV(list(context=context,player=sp,generation=generation,pending=pending,preflight=pf))
+      if (!pending) remember_action_context("bid")
       offer_modal_opened_RV(TRUE)
       showModal(modalDialog(
         title = tagList(icon("hand-holding-dollar"), " Place Market Offer"),
-        p(strong(sp$name)),
-        p("Minimum market bid: ", strong(player_card_money(market_price))),
-        numericInput(
-          ns("bid_amount"),
-          label = "Your offer amount (EUR):",
-          value = market_price,
-          min = market_price,
-          step = 10000
-        ),
-        uiOutput(ns("bid_amount_preview")),
+        div(id=ns("market_offer_marker"),p(strong(sp$name)),uiOutput(ns("market_offer_body"))),
+        tags$script(HTML(paste0("(function(){var marker=document.getElementById('",ns("market_offer_marker"),
+          "');var modal=marker&&marker.closest('.modal');if(modal)$(modal).one('hidden.bs.modal',function(){Shiny.setInputValue('",
+          ns("market_offer_closed"),"','",generation,"',{priority:'event'});});})();"))),
         footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
                       modalButton("Cancel"),
-                      actionButton(ns("submit_bid"), "Submit Market Offer", class = "btn btn-buy-market")),
+                      uiOutput(ns("market_offer_submit"),inline=TRUE)),
         easyClose = TRUE,
         size = "s"
       ))
+      # Join a pending read; otherwise refresh the same shared card resource.
+      # Its asynchronous completion updates only this modal's output bindings.
+      if (pending && !identical(state$status,"loading")) isolate(capacity_recheck(capacity_recheck()+1L))
       invisible(TRUE)
     }
 
@@ -1763,6 +1796,15 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     card_states$capacity<-card_read("card_capacity","get_team_acquisition_capacity",auth_args,context=capacity_context,
       active=function()!player_card_is_own_player(selected_player(),get_reactive_val(user_team_id)),
       refresh=function()paste(global_refresh(),capacity_recheck(),sep=":"))
+    observeEvent(card_states$capacity(),{
+      dialog <- isolate(market_offer_dialog_RV());state <- card_states$capacity()
+      if (is.null(dialog) || !isTRUE(dialog$pending) || identical(state$status,"loading") ||
+          !identical(dialog$context,isolate(player_action_context_RV()))) return()
+      dialog$pending <- FALSE
+      dialog$preflight <- market_offer_preflight(dialog$player,state)
+      market_offer_dialog_RV(dialog)
+      if (isTRUE(dialog$preflight$ok)) remember_action_context("bid")
+    },ignoreInit=TRUE)
     card_states$listings<-card_read("card_listings","get_my_market_players",auth_args,context=team_card_context,
       active=function()player_card_is_own_player(selected_player(),get_reactive_val(user_team_id)),refresh=global_refresh)
     # A slow player summary can outlive otherwise successful team checks.
