@@ -15,7 +15,7 @@ setup<-function(age=600,wrong_scope=FALSE){
   clear_api_cache()
   stamp<-Sys.time()-age
   scope<-round_lineup_scope(ctx);if(wrong_scope)scope$user_team_id<-'another-team'
-  payload<-list(kind='classification_round_lineup',version=2L,scope=scope,round_id='r1',answer=answer(8),
+  payload<-list(kind='classification_round_lineup',version=3L,scope=scope,round_id='r1',answer=answer(8),
     source='futmondo',source_observed_at=rival_finance_stamp(stamp),valid_until=rival_finance_stamp(stamp+300),completeness='complete')
   fixture$saved<-list(rival_finance_evidence(ctx$account_id,ctx$championship_id,ctx$season,'eligibility',
     round_lineup_snapshot_id(ctx,'r1'),payload,stamp))

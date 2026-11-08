@@ -56,6 +56,8 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
       assert.equal(await modal.locator('.fm-lineup-pitch .fm-lineup-empty').count(),1);
       assert.equal(await modal.locator('.fm-lineup-bench-row .fm-lineup-player').count(),4);
       assert.equal(await modal.locator('.fm-lineup-name > .fm-lineup-crest').count(),13);
+      assert.ok(await modal.locator('.fm-lineup-crest').evaluateAll(nodes=>nodes.every(n=>
+        n.src==='https://static02.mondocore.com/futmondo/img/teams/64/fixture-club.png'&&n.alt==='Fixture Club')));
       assert.equal(await modal.locator('.fm-lineup-portrait > .fm-lineup-crest').count(),0);
       for(const crest of await modal.locator('.fm-lineup-crest').all()){
         await crest.scrollIntoViewIfNeeded();

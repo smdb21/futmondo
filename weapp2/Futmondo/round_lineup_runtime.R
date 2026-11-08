@@ -26,11 +26,12 @@ round_lineup_slots <- function(items,size) {
     if(!is.finite(position)||position!=floor(position)||position<0||position>=size||!is.null(slots[[position+1L]]))
       stop("Historical lineup position unavailable")
     # Only the public display fields cross the persistence boundary.
-    clean<-player[intersect(c("id","name","photo","position","role","points","changed","rated","zeroPointsReason","customPoints"),names(player))]
+    clean<-player[intersect(c("id","name","photo","teamId","logo","position","role","points","changed","rated","zeroPointsReason","customPoints"),names(player))]
     if(is.list(player$detailedPoints))clean$detailedPoints<-list(po=lapply(
       round_lineup_records(player$detailedPoints$po),function(score)
         if(is.list(score))score[intersect(c("mode","r","p"),names(score))]else list()))
     if(is.list(player$team))clean$team<-player$team[intersect(c("id","name","logo"),names(player$team))]
+    else if(nzchar(mvp_text(player$team)))clean$team<-mvp_text(player$team)
     slots[position+1L]<-list(clean)
   }
   slots
@@ -54,15 +55,15 @@ round_lineup_clean_answer <- function(answer) {
     pointSystem=normalized$pointSystem,negative=normalized$negative)
 }
 round_lineup_scope <- function(context) context[c("account_id","championship_id","user_team_id","season","scoring_version")]
-# v1 discarded provisional score inputs; it cannot hydrate a complete display.
-round_lineup_snapshot_id <- function(context,round_id) paste0("rival-cache:round-lineup-v2:",
+# v1 lost score inputs; v2 also discarded the official flat club/crest fields.
+round_lineup_snapshot_id <- function(context,round_id) paste0("rival-cache:round-lineup-v3:",
   as.character(openssl::sha256(serialize(list(team=context$user_team_id,round=round_id,scoring=context$scoring_version),NULL,version=2))))
 persist_round_lineup_snapshot <- function(data,context) {
   if(!is.list(data)||isTRUE(data$from_saved)||!is.null(attr(data,"fetch_error")))return(invisible(FALSE))
   answer<-tryCatch(round_lineup_clean_answer(data$answer),error=function(e)NULL)
   stamp<-fm_time(attr(data,"observed_at"))
   if(is.null(answer)||length(stamp)!=1L||is.na(stamp)||!nzchar(mvp_text(data$round_id)))return(invisible(FALSE))
-  payload<-list(kind="classification_round_lineup",version=2L,scope=round_lineup_scope(context),round_id=data$round_id,
+  payload<-list(kind="classification_round_lineup",version=3L,scope=round_lineup_scope(context),round_id=data$round_id,
     answer=answer,source="futmondo",source_observed_at=rival_finance_stamp(stamp),
     valid_until=rival_finance_stamp(stamp+300),completeness="complete")
   record<-rival_finance_evidence(context$account_id,context$championship_id,context$season,"eligibility",
@@ -78,7 +79,7 @@ read_saved_round_lineup <- function(context,round_id,now=Sys.time()) {
   tryCatch({
     record<-rival_evidence_decode(saved)[[1]];p<-record$payload;scope<-round_lineup_scope(context)
     stamp<-fm_time(p$source_observed_at);until<-fm_time(p$valid_until)
-    if(!is.list(p)||as.numeric(object.size(p))>256*1024L||!identical(record$evidence_type,"eligibility")||!identical(p$kind,"classification_round_lineup")||!identical(as.integer(p$version),2L)||
+    if(!is.list(p)||as.numeric(object.size(p))>256*1024L||!identical(record$evidence_type,"eligibility")||!identical(p$kind,"classification_round_lineup")||!identical(as.integer(p$version),3L)||
        !identical(p$completeness,"complete")||!identical(p$source,"futmondo")||!identical(mvp_text(p$round_id),as.character(round_id))||
        !is.list(p$scope)||!setequal(names(p$scope),names(scope))||
        !all(vapply(names(scope),function(k)identical(mvp_text(p$scope[[k]]),mvp_text(scope[[k]])),logical(1)))||
@@ -94,7 +95,7 @@ read_saved_round_lineup <- function(context,round_id,now=Sys.time()) {
 get_round_lineup_snapshot <- function(login,championship_id,user_team_id,round_id) {
   if(!nzchar(mvp_text(round_id))||!nzchar(mvp_text(user_team_id)))stop("Historical lineup identity unavailable")
   context<-resource_context(login,championship_id,user_team_id,season=league_season_context(championship_id))
-  get_cached_data(paste0("round_lineup_snapshot_",championship_id,"_",user_team_id,"_",round_id),{
+  get_cached_data(paste0("round_lineup_snapshot_v3_",championship_id,"_",user_team_id,"_",round_id),{
     saved<-read_saved_round_lineup(context,round_id)
     if(!is.null(saved)&&as.numeric(Sys.time())<saved$valid_until)return(saved)
     # A validated expired snapshot can paint while the source refresh runs.
@@ -151,14 +152,19 @@ round_lineup_player_ui <- function(player,bench=FALSE,index,point_system="press"
   score<-round_lineup_player_score(if(occupied)player else NULL,point_system,status)
   points<-score$points
   photo<-if(occupied)mvp_text(player$photo)else ""
-  logo<-if(occupied)mvp_text(player$team$logo)else ""
+  # The official player model uses flat team/teamId/logo fields. Keep support
+  # for nested public display records without assuming every team is a list.
+  team<-if(occupied)player$team else NULL
+  club<-if(is.list(team))mvp_text(team$name)else mvp_text(team)
+  logo<-if(occupied)mvp_text(player$logo)else ""
+  if(!nzchar(logo)&&is.list(team))logo<-mvp_text(team$logo)
   asset_url<-function(value,base){
     if(!nzchar(value))return("")
     if(grepl("^https://",value,ignore.case=TRUE))return(value)
     if(grepl("^[A-Za-z0-9_.-]+$",value))paste0(base,value)else ""
   }
   photo<-asset_url(photo,"https://static01.mondocore.com/futmondo/img/faces/64/")
-  logo<-asset_url(logo,"https://static02.mondocore.com/futmondo/img/teams/48/")
+  logo<-asset_url(logo,TEAM_LOGO_URL)
   # Photos come from the official response; do not synthesize current-roster data.
   safe_image<-function(url)grepl("^https://",url,ignore.case=TRUE)
   shiny::div(class=paste("fm-lineup-player",if(!occupied)"fm-lineup-empty",if(changed)if(bench)"fm-lineup-out"else"fm-lineup-in"),
@@ -174,7 +180,7 @@ round_lineup_player_ui <- function(player,bench=FALSE,index,point_system="press"
     shiny::div(class="fm-lineup-name",`data-position`=if(occupied)position else "",
       title=if(occupied)paste0(if(bench)"Main position for substitutions: "else"Lineup position: ",
         if(nzchar(position))switch(position,GK="Goalkeeper",DEF="Defender",MID="Midfielder",FWD="Forward")else"unavailable"),
-      if(safe_image(logo))shiny::tags$img(class="fm-lineup-crest",src=logo,alt=mvp_text(player$team$name),
+      if(safe_image(logo))shiny::tags$img(class="fm-lineup-crest",src=logo,alt=club,title=club,
         width=14,height=14,loading="lazy",decoding="async",onerror="this.style.display='none'"),
       shiny::span(class="fm-lineup-label",if(occupied)lineup_player_label(label)else label)))
 }

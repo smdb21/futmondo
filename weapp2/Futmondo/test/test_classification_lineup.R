@@ -4,7 +4,7 @@ suppressPackageStartupMessages(source('global.R'))
 n<-0L
 check<-function(name,expr){force(expr);n<<-n+1L;cat('PASS',name,'\n')}
 player<-function(id,position,changed=FALSE,points=5)list(id=id,name=paste('Player',id),position=position,
-  photo=paste0(id,'.png'),team=list(id='club',logo='club.png'),points=points,changed=changed)
+  photo=paste0(id,'.png'),teamId='club',team='Fixture Club',logo='club.png',points=points,changed=changed)
 raw<-list(strategy='3-6-1',status='done',negative=FALSE,
   players=list(player('keeper',10),player('incoming',4,TRUE),player('striker',0,points=0),player('lastdef',9,points=-2)),
   bench=list(players=list(player('fourth',3),player('outgoing',1,TRUE),player('first',0,points=NA_real_))))
@@ -55,10 +55,20 @@ check('source crests render beside names on the pitch and bench, including saved
   for(answer in list(raw,jsonlite::fromJSON(jsonlite::toJSON(round_lineup_clean_answer(raw),auto_unbox=TRUE),simplifyVector=FALSE))){
     nodes<-xml2::read_html(htmltools::renderTags(round_lineup_pitch_ui(answer))$html)
     crests<-xml2::xml_find_all(nodes,'//*[@class="fm-lineup-name"]/img[@class="fm-lineup-crest"]')
-    stopifnot(length(crests)==8L,all(xml2::xml_attr(crests,'src')=='https://static02.mondocore.com/futmondo/img/teams/48/club.png'),
+    stopifnot(length(crests)==8L,all(xml2::xml_attr(crests,'src')=='https://static02.mondocore.com/futmondo/img/teams/64/club.png'),
+      all(xml2::xml_attr(crests,'alt')=='Fixture Club'),
       length(xml2::xml_find_all(nodes,'//*[@class="fm-lineup-portrait"]/img[@class="fm-lineup-crest"]'))==0L,
       length(xml2::xml_find_all(nodes,'//*[contains(@class,"fm-lineup-empty")]//img[@class="fm-lineup-crest"]'))==0L)
   }
+})
+check('nested display records and absolute source crest URLs remain compatible',{
+  p<-player('nested',0);p$team<-list(id='club',name='Nested Club',logo='club.png');p$logo<-NULL
+  clean<-round_lineup_slots(list(p),11L)[[1]]
+  html<-htmltools::renderTags(round_lineup_player_ui(clean,index=1))$html
+  stopifnot(grepl('/teams/64/club.png',html,fixed=TRUE),grepl('alt="Nested Club"',html,fixed=TRUE))
+  p<-player('absolute',0);p$logo<-'https://static02.mondocore.com/futmondo/img/teams/64/club.png'
+  html<-htmltools::renderTags(round_lineup_player_ui(p,index=1))$html
+  stopifnot(grepl(p$logo,html,fixed=TRUE))
 })
 check('rated, reasoned zero, provisional zero and unavailable points remain distinct',{
   p<-live_player;p$rated<-TRUE;p$points<- -2
@@ -104,7 +114,7 @@ check('official positions retain eleven places, 3-6-1 rows, holes and four order
   html<-htmltools::renderTags(round_lineup_pitch_ui(raw))$html
   stopifnot(grepl('fm-lineup-in',html),grepl('fm-lineup-out',html),grepl('Empty position',html),
     grepl('https://static01.mondocore.com/futmondo/img/faces/64/incoming.png',html,fixed=TRUE),
-    grepl('https://static02.mondocore.com/futmondo/img/teams/48/club.png',html,fixed=TRUE),
+    grepl('https://static02.mondocore.com/futmondo/img/teams/64/club.png',html,fixed=TRUE),
     got$players[[5]]$changed,got$bench[[2]]$changed)
 })
 # Known-answer pitch rows from the twelve formations in the supplied app image.
@@ -171,18 +181,19 @@ futmondo_post<-function(url,...){
 check('first retrieval uses opaque round ID and persists full success without authentication',{
   clear_api_cache();got<-get_round_lineup_snapshot(auth,'league','a','opaque-round')
   stopifnot(calls==1L,db_reads==1L,length(saved)==1L,saved[[1]]$payload$completeness=='complete',
-    saved[[1]]$payload$version==2L,grepl('round-lineup-v2:',saved[[1]]$source_id,fixed=TRUE),
+    saved[[1]]$payload$version==3L,grepl('round-lineup-v3:',saved[[1]]$source_id,fixed=TRUE),
     !grepl('synthetic-private-token',jsonlite::toJSON(saved,auto_unbox=TRUE)),normalize_round_lineup(got$answer)$players[[5]]$id=='incoming')
 })
 check('memory reuse and persisted JSON reuse avoid repeat API calls after memory clears',{
   got<-get_round_lineup_snapshot(auth,'league','a','opaque-round');stopifnot(calls==1L,db_reads==1L)
   clear_api_cache();got<-get_round_lineup_snapshot(auth,'league','a','opaque-round')
   stopifnot(calls==1L,db_reads==2L,isTRUE(got$from_saved),normalize_round_lineup(got$answer)$bench[[2]]$id=='outgoing',
-    normalize_round_lineup(got$answer)$players[[5]]$team$logo=='club.png')
+    normalize_round_lineup(got$answer)$players[[5]]$logo=='club.png',
+    normalize_round_lineup(got$answer)$players[[5]]$teamId=='club',normalize_round_lineup(got$answer)$players[[5]]$team=='Fixture Club')
   html<-htmltools::renderTags(round_lineup_pitch_ui(got$answer))$html
   stopifnot(grepl('title="Provisional points">7\\*</div>',html),grepl('title="Provisional points">-4\\*</div>',html))
 })
-check('existing version-2 custom snapshots render eight points after memory clears with no source request or rewrite',{
+check('version-3 custom snapshots render eight points after memory clears with no source request or rewrite',{
   original<-saved
   saved[[1]]$payload$answer$pointSystem<-'custom';saved[[1]]$payload$answer$status<-'running'
   custom_saved<-saved;clear_api_cache()
@@ -192,13 +203,22 @@ check('existing version-2 custom snapshots render eight points after memory clea
     grepl('title="Provisional points">8\\*</div>',html),grepl('title="Provisional points">-4\\*</div>',html))
   saved<-original
 })
+check('lossy version-2 snapshots are replaced with flat crest fields and reused durably',{
+  saved[[1]]$payload$version<-2L
+  saved[[1]]$source_id<-sub('round-lineup-v3:','round-lineup-v2:',saved[[1]]$source_id,fixed=TRUE)
+  clear_api_cache();got<-get_round_lineup_snapshot(auth,'league','a','opaque-round')
+  stopifnot(calls==2L,!isTRUE(got$from_saved),saved[[1]]$payload$version==3L,
+    saved[[1]]$payload$answer$players[[1]]$logo=='club.png')
+  clear_api_cache();got<-get_round_lineup_snapshot(auth,'league','a','opaque-round')
+  stopifnot(calls==2L,isTRUE(got$from_saved),got$answer$players[[1]]$logo=='club.png')
+})
 check('wrong scope and expired snapshots refetch; failures preserve truthful stale data',{
   original<-saved;saved[[1]]$payload$scope$user_team_id<-'other'
-  clear_api_cache();got<-get_round_lineup_snapshot(auth,'league','a','opaque-round');stopifnot(calls==2L,!isTRUE(got$from_saved))
+  clear_api_cache();got<-get_round_lineup_snapshot(auth,'league','a','opaque-round');stopifnot(calls==3L,!isTRUE(got$from_saved))
   saved<-original;old<-Sys.time()-600
   saved[[1]]$observed_at<-saved[[1]]$payload$source_observed_at<-rival_finance_stamp(old)
   saved[[1]]$payload$valid_until<-rival_finance_stamp(old+300)
-  clear_api_cache();got<-get_round_lineup_snapshot(auth,'league','a','opaque-round');stopifnot(calls==3L)
+  clear_api_cache();got<-get_round_lineup_snapshot(auth,'league','a','opaque-round');stopifnot(calls==4L)
   saved[[1]]$observed_at<-saved[[1]]$payload$source_observed_at<-rival_finance_stamp(old)
   saved[[1]]$payload$valid_until<-rival_finance_stamp(old+300)
   futmondo_post<-function(...)stop('Connection failed')
