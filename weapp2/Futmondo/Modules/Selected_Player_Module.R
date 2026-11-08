@@ -119,15 +119,24 @@ player_card_location_label <- function(player, current_team_id = NULL) {
 selected_player_UI <- function(id) {
   ns <- NS(id)
   tagList(
-    # Delay widget construction until actual identity content has painted. The
-    # event fires before the value applies, so two animation frames follow it.
+    # renderUI can insert HTML asynchronously after shiny:value. Observe only
+    # the identity output and acknowledge each painted generation, including
+    # replacements after reopening; a one-shot event can strand the chart.
     tags$script(HTML(paste0(
-      "(function(){var sent=false,id='",ns("player_identity_summary"),"';",
-      "function painted(){if(sent)return;var root=document.getElementById(id);",
-      "var identity=root&&root.querySelector('.player-card-identity');if(!identity)return;",
-      "sent=true;var player=identity.getAttribute('data-player-id'),generation=identity.getAttribute('data-paint-generation');",
+      "(function(){var id='",ns("player_identity_summary"),"',key='fmCardPaint",gsub("[^a-zA-Z0-9]","",ns("")),"';",
+      "var previous=$.data(document,key);if(previous)previous();",
+      "var sent='',scheduled=false,disposed=false,root=null,observer=null;",
+      "$.data(document,key,function(){disposed=true;if(observer)observer.disconnect();});",
+      "function identityKey(identity){return JSON.stringify([identity.getAttribute('data-player-id'),identity.getAttribute('data-paint-generation')]);}",
+      "function painted(){if(disposed)return;var current=document.getElementById(id);",
+      "if(current!==root){if(observer)observer.disconnect();root=current;",
+      "if(root){observer=new MutationObserver(painted);observer.observe(root,{childList:true,subtree:true,attributes:true,attributeFilter:['data-player-id','data-paint-generation']});}}",
+      "var identity=root&&root.querySelector('.player-card-identity');if(!identity||scheduled)return;",
+      "var signature=identityKey(identity);if(signature===sent)return;scheduled=true;",
       "requestAnimationFrame(function(){requestAnimationFrame(function(){",
-      "Shiny.setInputValue('",ns("identity_painted"),"',{player:player,generation:generation,nonce:Math.random()},{priority:'event'});});});}",
+      "scheduled=false;if(disposed)return;",
+      "if(!identity.isConnected||document.getElementById(id)!==root||root.querySelector('.player-card-identity')!==identity||identityKey(identity)!==signature){painted();return;}",
+      "Shiny.setInputValue('",ns("identity_painted"),"',{player:identity.getAttribute('data-player-id'),generation:identity.getAttribute('data-paint-generation'),nonce:Math.random()},{priority:'event'});sent=signature;});});}",
       "$(document).off('shiny:value.fmCardPaint",gsub("[^a-zA-Z0-9]","",ns("")),"')",
       ".on('shiny:value.fmCardPaint",gsub("[^a-zA-Z0-9]","",ns("")),"',function(event){if(event.name===id)setTimeout(painted,0);});",
       "setTimeout(painted,0);})();"
