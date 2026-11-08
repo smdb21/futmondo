@@ -751,3 +751,8 @@ Implemented locally: preserve original structured read failures across Shiny val
 ## Previous-round award component coverage — 2026-11-07
 
 Implemented and independently verified locally: round-filtered MVP coverage is independent of unrelated Best XI ownership gaps, and combined-payment attribution requires complete round-specific recipient evidence. The durable calculation version was advanced; recorded cash and shared source evidence are retained. Read-only hosted evidence confirmed that round 11's final XI/MVP is saved, but four award players lack verified historical ownership in the saved lineup/bench records. MVP coverage is corrected; complete Best XI attribution remains unresolved pending authoritative historical ownership evidence. No missing owners were invented, and hosted application deployment is unverified. See `rival_cash_accounting.md` and the executed results.
+
+
+## Round 11 unowned-player clarification — 2026-11-07
+
+Completed: persist the user's explicit confirmation that the four previously unresolved round-11 award players were unowned; verify database readback through the existing ledger. This resolves round 11 Best XI coverage without a calculation change or assumptions about other absent owners. Added regression coverage for explicit no-owner persistence, correct rewards, missing evidence, scope isolation and conflicting ownership. No schema, dependency, production runtime or deployment-bundle change. See `rival_cash_accounting.md` and executed results.

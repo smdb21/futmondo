@@ -81,3 +81,36 @@ stopifnot(all(allocation$status=='unresolved'),is.na(projection(combined)$mvp_bo
   sum(combined$cash_ledgers$a$amount[combined$cash_ledgers$a$source_type=='dreamTeam'])==15,
   combined$team_finances$estimated_cash==125)
 cat('PASS partial recipients cannot validate combined payment attribution; actual cash retained\n')
+
+# Explicitly confirmed unowned players are different from missing evidence.
+# Persisted confirmations close coverage without assigning a bonus to a team.
+local({
+  directory<-data.frame(teamid=c('a','b'),teamname=c('A','B'))
+  histories<-lapply(directory$teamid,function(id)e('team_rounds',id,
+    list(team_id=id,rounds=list(list(id='r1',number=1,points=5,status='closed',negative=FALSE)))))
+  owners<-data.frame(round_id='r1',player_id=full_xi$player_id[1:7],
+    team_id=c(rep('a',3),rep('b',4)),eligible=TRUE,verified=TRUE)
+  confirmations<-lapply(full_xi$player_id[8:11],function(player)e('eligibility',paste('unowned','r1',player,sep=':'),
+    list(round_id='r1',player_id=player,team_id='',eligible=FALSE,verified=TRUE,
+      ownership_status='unowned',source='user_confirmed_unowned')))
+  decoded<-rival_evidence_decode(jsonlite::fromJSON(jsonlite::toJSON(confirmations,auto_unbox=TRUE,null='null')))
+  build_confirmed<-function(records)build_rival_cash_dataset(directory,cid,c(histories,records),full_xi,
+    rules=rules,eligibility=owners,coverage_complete=FALSE,account_id='u')
+  scores<-data.frame(team_id=c('a','b'),team_name=c('A','B'),round=1,points=5)
+  project<-function(value)classification_bonus_table(classification_window_table(scores),scores,value,c(1,1))
+  value<-build_confirmed(decoded);result<-project(value)
+  stopifnot(identical(result$best_xi_bonus,c(15,20)),identical(result$mvp_bonus,c(10,0)),
+    sum(result$best_xi_bonus)==35,identical(value$team_finances$estimated_cash,c(135,130)))
+  for(kind in c('missing','round','account','league')){
+    invalid<-decoded
+    if(kind=='missing')invalid<-invalid[-1]
+    if(kind=='round')invalid[[1]]$payload$round_id<-'r2'
+    if(kind=='account')invalid[[1]]$account_id<-'other'
+    if(kind=='league')invalid[[1]]$championship_id<-'other'
+    stopifnot(all(is.na(project(build_confirmed(invalid))$best_xi_bonus)))
+  }
+  conflicting<-e('eligibility','other-owner',list(round_id='r1',player_id=full_xi$player_id[8],
+    team_id='a',eligible=TRUE,verified=TRUE))
+  stopifnot(all(is.na(project(build_confirmed(c(decoded,list(conflicting))))$best_xi_bonus)))
+  cat('PASS explicit unowned confirmations persist and close XI coverage; absent, foreign or conflicting evidence stays unknown\n')
+})
