@@ -45,8 +45,17 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       assert.equal(Number((await page.locator('#fixture_counts').innerText()).split('/')[1]), initialCounts[1]);
 
       const clearCounts = (await page.locator('#fixture_counts').innerText()).split('/').map(Number);
+      await page.evaluate(() => {
+        window.lineupProgress = [];
+        new MutationObserver(() => {
+          const status = document.querySelector('#lineup-status [role="status"]');
+          if (status) window.lineupProgress.push({ busy: status.getAttribute('aria-busy'), text: status.textContent });
+        }).observe(document.querySelector('#lineup-status'), { childList: true, subtree: true, attributes: true });
+      });
       await page.locator('#lineup-best').click();
       await page.waitForFunction(() => document.querySelectorAll('.fm-lineup-pitch .fm-lineup-empty').length === 0);
+      assert.ok(await page.evaluate(() => window.lineupProgress.some(s => s.busy === 'true' && s.text.includes('Calculating Best XI'))));
+      assert.equal(await page.locator('#lineup-best').innerText(), 'Best XI + bench');
       assert.equal(await page.locator('.fm-lineup-bench-row .fm-lineup-empty').count(), 0);
       const bench = await page.locator('.fm-lineup-bench-row .fm-lineup-points').allTextContents();
       assert.deepEqual(bench.map(Number), bench.map(Number).sort((a, b) => b - a));
@@ -54,9 +63,26 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       for (const role of ['DEF', 'MID', 'FWD']) await page.locator('.fm-lineup-coverage').getByText(`${role} ✓`, { exact: true }).waitFor();
       assert.equal(await page.locator('#lineup-save').isDisabled(), false);
 
+      const selections = async () => page.locator('.fm-lineup-player').evaluateAll(nodes => nodes.map(n => n.title));
+      const fiveRoundSelections = await selections();
+      assert.equal(fiveRoundSelections[10], 'Change Player 1');
+      assert.equal(await pitch.locator('.fm-lineup-points').nth(10).innerText(), '60');
       await page.locator('#lineup-recent_n').fill('2');
       await page.locator('#lineup-recent_n').blur();
+      await page.locator('.fm-lineup-best-warning').getByText(/current settings \(last 2/).waitFor();
+      assert.deepEqual(await selections(), fiveRoundSelections);
+      assert.equal(await pitch.locator('.fm-lineup-points').nth(10).innerText(), '0');
+      await page.locator('#lineup-recent_n').fill('5');
+      await page.locator('#lineup-recent_n').blur();
+      await page.locator('.fm-lineup-best-warning').waitFor({ state: 'detached' });
+      assert.deepEqual(await selections(), fiveRoundSelections);
+      await page.locator('#lineup-recent_n').fill('2');
+      await page.locator('#lineup-recent_n').blur();
+      await page.locator('.fm-lineup-best-warning').waitFor();
+      await page.locator('#lineup-best').click();
       await page.locator('#lineup-status').getByText(/Best XI \+ bench.*rounds 4, 5/).waitFor();
+      assert.equal((await selections())[10], 'Change Player 2');
+      assert.equal(await page.locator('.fm-lineup-best-warning').count(), 0);
       assert.deepEqual((await page.locator('#fixture_counts').innerText()).split('/').map(Number), clearCounts);
 
       // The picker shows live metrics and applies one row click immediately.

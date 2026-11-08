@@ -15,6 +15,8 @@ fixture_rounds <- data.frame(round_id = paste0('r', 1:6), round_number = 1:6,
   begin_process = format(Sys.time() + c(-5:-1 * 86400, 3600), '%Y-%m-%dT%H:%M:%SZ', tz = 'UTC'))
 fixture_history <- expand.grid(player_id = fixture_roster$id, round = 1:5, stringsAsFactors = FALSE)
 fixture_history$points <- as.numeric(sub('p', '', fixture_history$player_id))
+fixture_history$points[fixture_history$player_id == 'p1'] <- c(100, 100, 100, 0, 0)
+fixture_history$points[fixture_history$player_id == 'p2'] <- c(0, 0, 0, 50, 50)
 fixture_official <- list(strategy = '4-4-2',
   starters = c('p17', 'p18', 'p9', 'p10', 'p11', 'p12', 'p3', 'p4', 'p5', 'p6', 'p1'),
   bench = c('p7', 'p13', 'p14', 'p19'), captain = 'p18')

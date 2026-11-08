@@ -36,7 +36,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
     source<-shiny::reactiveVal(NULL);draft<-shiny::reactiveVal(NULL);loading<-shiny::reactiveVal(FALSE)
     saving<-shiny::reactiveVal(FALSE);notice<-shiny::reactiveVal('');cache_issue<-shiny::reactiveVal('')
     selected<-shiny::reactiveVal(NULL);picker_notice<-shiny::reactiveVal('');picker_sequence<-0L;best_note<-shiny::reactiveVal('');reload<-shiny::reactiveVal(0L)
-    best_request<-shiny::reactiveVal(NULL);best_sequence<-0L;best_applied<-NULL
+    best_request<-shiny::reactiveVal(NULL);best_sequence<-0L;best_scheduled<-NULL;best_basis<-shiny::reactiveVal(NULL)
     owner<-paste0('lineup:',session$token);generation<-0L;closed<-FALSE;loaded_key<-NULL;requests<-list();request_sequence<-0L;retained<-list();retained_account<-NULL
     identity<-shiny::reactive({
       auth<-login_token();if(!valid_login(auth))return(NULL)
@@ -103,11 +103,11 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       if(!identical(retained_account,who$account)){retained<<-list();loaded_key<<-NULL;source(NULL);draft(NULL);retained_account<<-who$account}
       shiny::req(is_module_active());next_round<-target();key<-key_for(who,next_round)
       if(!identical(key,loaded_key)){
-        if(!is.null(loaded_key))retained[[loaded_key]]<<-list(source=shiny::isolate(source()),draft=shiny::isolate(draft()))
+        if(!is.null(loaded_key))retained[[loaded_key]]<<-list(source=shiny::isolate(source()),draft=shiny::isolate(draft()),best_basis=shiny::isolate(best_basis()))
         # Keep only this account's two most recently visited league-round drafts.
         retained<<-tail(Filter(function(x)!is.null(x$source),retained),2L)
         generation<<-generation+1L;loaded_key<<-key;saving(FALSE);loading(FALSE);selected(NULL);best_request(NULL);notice('');best_note('');cache_issue('')
-        prior<-retained[[key]];source(prior$source);draft(prior$draft)
+        prior<-retained[[key]];source(prior$source);draft(prior$draft);best_basis(prior$best_basis)
         if(!is.null(prior$draft))shiny::updateSelectInput(session,'formation',selected=prior$draft$strategy)
         fetch(FALSE)
       }
@@ -145,24 +145,33 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       if(saving()){notice('Wait for the lineup save to finish before calculating Best XI.');return()}
       shiny::req(identity(),is_module_active())
       best_sequence<<-best_sequence+1L
-      best_request(list(generation=generation,key=loaded_key,sequence=best_sequence));best_note('')
+      best_request(list(generation=generation,key=loaded_key,sequence=best_sequence,n=n_rounds(),include=isTRUE(input$include_unavailable)));best_note('')
       notice('Preparing Best XI + bench…')
     })
-    # Retain an explicit request while its exact window is being acquired. The
-    # same request follows N/availability changes until a manual edit or save.
+    shiny::observe({
+      busy<-!is.null(best_request())
+      shiny::updateActionButton(session,'best',label=if(busy)'Calculating…'else'Best XI + bench',
+        icon=shiny::icon(if(busy)'spinner'else'wand-magic-sparkles',class=if(busy)'fa-spin'))
+    })
+    # One click waits for complete history, then calculates once. Changing the
+    # settings cancels a pending request and never replaces the displayed XI.
     shiny::observe({
       request<-best_request();if(is.null(request))return()
       if(!current(request$generation,request$key)||saving()||!isTRUE(is_module_active()))return()
+      n<-n_rounds();include<-isTRUE(input$include_unavailable)
+      if(!identical(request$n,n)||!identical(request$include,include)){
+        best_request(NULL);notice('Best XI calculation cancelled because the settings changed. Press Best XI + bench to calculate again.');return()
+      }
       data<-source()
-      if(is.null(data)){best_applied<<-NULL;best_note('');notice('Best XI is waiting for the current squad and lineup to load.');return()}
+      if(is.null(data)){notice('Best XI is waiting for the current squad and lineup to load.');return()}
       issue<-catalog_issue()
-      if(nzchar(issue)){best_applied<<-NULL;best_note('');notice(paste('Best XI is waiting for the completed-round schedule.',issue));return()}
-      score<-scores();n<-n_rounds();include<-isTRUE(input$include_unavailable);rows<-roster()
-      if(!length(attr(score,'rounds'))){best_applied<<-NULL;best_note('');notice('No completed rounds are available for this calculation.');return()}
+      if(nzchar(issue)){notice(paste('Best XI is waiting for the completed-round schedule.',issue));return()}
+      score<-scores();rows<-roster()
+      if(!length(attr(score,'rounds'))){best_request(NULL);notice('No completed rounds are available for this calculation.');return()}
       eligible<-if(include)rep(TRUE,nrow(rows))else !analytics_known_unavailable(rows)
       missing<-sum(eligible&!is.finite(score$average[match(rows$id,score$id)]))
       if(missing){
-        best_applied<<-NULL;best_note('');status<-history$status()
+        status<-history$status()
         active<-(status$pending %||% 0L)+(status$remaining %||% 0L)>0L
         notice(paste0('Best XI is waiting for complete scores for ',missing,' eligible player',if(missing!=1L)'s'else'',
           ' over rounds ',paste(attr(score,'rounds'),collapse=', '),'. ',
@@ -170,18 +179,27 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
             'Some history reads failed; refresh the data to retry.'else 'Missing history has not been confirmed yet.'))
         return()
       }
-      signature<-list(request=request,rounds=n,include=include,roster=rows,scores=score,rules=data$rules)
-      if(identical(signature,best_applied))return()
-      result<-lineup_optimize(rows,score,unlist(data$rules$allowed),shiny::isolate(draft()),include,
-        data$rules$bench_enabled,data$rules$multiposition)
-      best_applied<<-signature
-      if(is.null(result)){notice('No eligible XI can be formed from the current squad and allowed formations. Your draft is retained.');return()}
-      value<-result$draft;if(!data$rules$captain_enabled)value$captain<-''
-      draft(value);shiny::updateSelectInput(session,'formation',selected=value$strategy)
-      best_note(paste0('Best XI + bench',
-        ' · starters ',format(round(result$total,2),trim=TRUE),' average points · rounds ',paste(result$rounds,collapse=', '),
-        ' · bench coverage ',if(length(result$coverage))paste(result$coverage,collapse=' / ')else'none'))
-      notice('Review your selections, then Save to Futmondo.')
+      if(identical(best_scheduled,request))return()
+      best_scheduled<<-request;notice('Calculating Best XI + bench…')
+      # Flush the busy state before doing the synchronous optimizer work.
+      session$onFlushed(function(){later::later(function(){shiny::isolate({
+        if(identical(best_scheduled,request))best_scheduled<<-NULL
+        if(!current(request$generation,request$key)||!identical(best_request(),request)||saving()||
+          !isTRUE(is_module_active())||!identical(n_rounds(),n)||!identical(isTRUE(input$include_unavailable),include))return()
+        best_request(NULL)
+        tryCatch({
+          result<-lineup_optimize(rows,score,unlist(data$rules$allowed),draft(),include,
+            data$rules$bench_enabled,data$rules$multiposition)
+          if(is.null(result)){notice('No eligible XI can be formed from the current squad and allowed formations. Your draft is retained.');return()}
+          value<-result$draft;if(!data$rules$captain_enabled)value$captain<-''
+          draft(value);shiny::updateSelectInput(session,'formation',selected=value$strategy)
+          best_basis(list(n=n,include=include,rounds=result$rounds,lineup=lineup_identity(value)))
+          best_note(paste0('Best XI + bench',
+            ' · starters ',format(round(result$total,2),trim=TRUE),' average points · rounds ',paste(result$rounds,collapse=', '),
+            ' · bench coverage ',if(length(result$coverage))paste(result$coverage,collapse=' / ')else'none'))
+          notice('Review your selections, then Save to Futmondo.')
+        },error=function(error)notice(paste('Best XI calculation failed. Your draft is retained.',conditionMessage(error))))
+      })},delay=0)},once=TRUE)
     })
     crest_url<-function(row){
       logo<-fm_scalar(row$logo,'');image<-get_team_image_name(row$club,logo=logo)
@@ -264,7 +282,15 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
     })
     output$status<-shiny::renderUI({
       shiny::req(is_module_active());status<-history$status();score<-scores()
-      shiny::tagList(shiny::div(role='status',`aria-live`='polite',notice()),
+      basis<-best_basis()
+      mismatch<-!is.null(basis)&&!is.null(draft())&&identical(basis$lineup,lineup_identity(draft()))&&
+        (!identical(basis$n,n_rounds())||!identical(basis$include,isTRUE(input$include_unavailable))||!identical(basis$rounds,wanted()))
+      shiny::tagList(shiny::div(role='status',`aria-live`='polite',`aria-busy`=if(!is.null(best_request()))'true'else'false',notice()),
+        if(mismatch)shiny::div(role='alert',class='fm-lineup-warning fm-lineup-best-warning',
+          paste0('The current lineup was calculated for the last ',basis$n,' completed rounds',
+            if(basis$include)' including injured/suspended players'else' excluding injured/suspended players',
+            '. It does not correspond to Best XI for the current settings (last ',n_rounds(),
+            ' completed rounds). Press Best XI + bench to recalculate.')),
         if(nzchar(best_note()))shiny::div(class='fm-lineup-note',best_note()),
         if(nzchar(cache_issue()))shiny::div(class='fm-lineup-warning',cache_issue()),
         if(nzchar(catalog_issue()))shiny::div(class='fm-lineup-warning',catalog_issue())else

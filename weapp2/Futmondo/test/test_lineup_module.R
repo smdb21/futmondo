@@ -16,7 +16,13 @@ default_status<-list(pending=0L,remaining=0L,saving=0L,failed=0L)
 history_status<-shiny::reactiveVal(default_status)
 recent_player_points_source<-function(...)list(history=shiny::reactive(history_data()),status=shiny::reactive(history_status()))
 lineup_snapshot_store<-function(context,target_round,payload=NULL,owner='')promises::promise_resolve(if(is.null(payload))NULL else TRUE)
-state<-new.env();reset<-function(mode='success'){state$mode<-mode;state$reads<-0L;state$submits<-0L;state$official<-fixture();state$pending<-NULL;history_data(history);history_status(default_status)}
+state<-new.env();reset<-function(mode='success'){state$mode<-mode;state$reads<-0L;state$submits<-0L;state$optimizes<-0L;state$official<-fixture();state$pending<-NULL;history_data(history);history_status(default_status)}
+optimize_impl<-lineup_optimize
+lineup_optimize<-function(...){
+ state$optimizes<-state$optimizes+1L
+ if(state$mode=='optimize-error')stop('synthetic optimizer error')
+ optimize_impl(...)
+}
 lineup_fetch_bundle<-function(auth,context,target,owner){
  state$reads<-state$reads+1L
  if(state$mode=='conflict'&&state$reads==2L){state$official$official$starters[11]<-'p1';state$official$source$wire$players<-list(list(`_id`='p1',position=10L,mp=FALSE,pr=1,b=FALSE,cpt=FALSE))}
@@ -45,7 +51,7 @@ shiny::testServer(lineup_Server,args=args,{
   grepl('<option value="3-3-4" selected="selected">',output$formation_control$html,fixed=TRUE))
  settle(session);stopifnot(identical(draft(),optimized))
  session$setInputs(formation='3-3-4');settle(session)
- stopifnot(identical(draft(),optimized),!is.null(best_request()),state$reads==1L,state$submits==0L,
+ stopifnot(identical(draft(),optimized),is.null(best_request()),state$optimizes==1L,state$reads==1L,state$submits==0L,
   grepl('<option value="3-3-4" selected="selected">',output$formation_control$html,fixed=TRUE))
  cat('PASS Best XI changes formation, renders its selection, and retains the draft on reactive flush and input acknowledgement\n')
 })
@@ -124,21 +130,38 @@ window_history$points[window_history$player_id=='p1']<-c(0,100,100,100,0,0)
 window_history$points[window_history$player_id=='p2']<-c(0,0,0,0,50,50)
 history_data(window_history)
 shiny::testServer(lineup_Server,args=args,{
- settle(session);session$setInputs(best=1,recent_n=5);settle(session)
+ settle(session);before<-draft();session$setInputs(recent_n=2);settle(session)
+ stopifnot(identical(draft(),before),state$optimizes==0L,!grepl('fm-lineup-best-warning',output$status$html))
+ busy_flushed<-FALSE
+ session$onFlushed(function(){shiny::isolate({
+  if(!is.null(best_request())&&grepl('Calculating Best XI',notice()))busy_flushed<<-TRUE
+ })},once=FALSE)
+ session$setInputs(best=1,recent_n=5)
+ settle(session)
  stopifnot(draft()$starters[11]=='p1',scores()$average[scores()$id=='p1']==60,
-  grepl('rounds 2, 3, 4, 5, 6',best_note(),fixed=TRUE))
+  grepl('rounds 2, 3, 4, 5, 6',best_note(),fixed=TRUE),is.null(best_request()),busy_flushed)
+ five_round_draft<-draft()
  session$setInputs(recent_n=2);settle(session)
- stopifnot(draft()$starters[11]=='p2',scores()$average[scores()$id=='p2']==50,
-  identical(wanted(),as.numeric(5:6)),grepl('rounds 5, 6',best_note(),fixed=TRUE))
- # Returning to a previously calculated window clears a wider-window wait.
- history_data(window_history[window_history$round>=5,]);session$setInputs(recent_n=5);settle(session)
- stopifnot(grepl('waiting for complete scores',notice()),!nzchar(best_note()))
+ stopifnot(identical(draft(),five_round_draft),state$optimizes==1L,scores()$average[scores()$id=='p2']==50,
+  identical(wanted(),as.numeric(5:6)),grepl('fm-lineup-best-warning',output$status$html),
+  grepl('last 5 completed rounds',output$status$html,fixed=TRUE),grepl('current settings (last 2',output$status$html,fixed=TRUE))
+ session$setInputs(recent_n=5);settle(session)
+ stopifnot(identical(draft(),five_round_draft),state$optimizes==1L,!grepl('fm-lineup-best-warning',output$status$html))
  session$setInputs(recent_n=2);settle(session)
- stopifnot(grepl('rounds 5, 6',best_note(),fixed=TRUE),!grepl('waiting',notice()))
- # Manual edits stop automatic regeneration when the scoring window changes.
+ session$setInputs(best=2);settle(session)
+ stopifnot(draft()$starters[11]=='p2',state$optimizes==2L,grepl('rounds 5, 6',best_note(),fixed=TRUE),
+  !grepl('fm-lineup-best-warning',output$status$html),grepl('aria-busy="false"',output$status$html,fixed=TRUE))
+ two_round_draft<-draft()
+ session$setInputs(include_unavailable=TRUE);settle(session)
+ stopifnot(identical(draft(),two_round_draft),state$optimizes==2L,grepl('fm-lineup-best-warning',output$status$html))
+ session$setInputs(include_unavailable=FALSE);settle(session)
+ stopifnot(!grepl('fm-lineup-best-warning',output$status$html))
+ # Later history publication also updates only averages, without an optimizer run.
+ revised<-window_history;revised$points[revised$player_id=='p1']<-1000;history_data(revised);settle(session)
+ stopifnot(identical(draft(),two_round_draft),state$optimizes==2L)
  session$setInputs(clear=1);settle(session);session$setInputs(recent_n=5);settle(session)
- stopifnot(all(!nzchar(draft()$starters)),is.null(best_request()),state$reads==1L,state$submits==0L)
- cat('PASS changing five to two rounds updates the known-answer goalkeeper; manual edits cancel regeneration without source requests\n')
+ stopifnot(all(!nzchar(draft()$starters)),is.null(best_request()),!grepl('fm-lineup-best-warning',output$status$html),state$reads==1L,state$submits==0L)
+ cat('PASS N changes update only averages and warn; one explicit click flushes progress then changes the known-answer goalkeeper once\n')
 })
 reset()
 partial_history<-history[history$player_id!='p20',]
@@ -161,9 +184,25 @@ shiny::testServer(lineup_Server,args=args,{
  cat('PASS Undo changes cancels a queued calculation before late histories can overwrite the restored lineup\n')
 })
 reset()
+history_data(partial_history);history_status(list(pending=1L,remaining=0L,saving=0L,failed=0L))
+shiny::testServer(lineup_Server,args=args,{
+ settle(session);before<-draft();session$setInputs(best=1);settle(session)
+ stopifnot(!is.null(best_request()),grepl('aria-busy="true"',output$status$html,fixed=TRUE))
+ session$setInputs(recent_n=2);settle(session)
+ stopifnot(is.null(best_request()),grepl('cancelled because the settings changed',notice()))
+ history_data(full_history);history_status(default_status);settle(session)
+ stopifnot(identical(draft(),before),state$optimizes==0L,grepl('aria-busy="false"',output$status$html,fixed=TRUE))
+ session$onFlushed(function(){shiny::isolate(edit(lineup_clear(draft())))},once=TRUE)
+ session$setInputs(best=2);settle(session)
+ stopifnot(all(!nzchar(draft()$starters)),state$optimizes==0L,is.null(best_request()))
+ cat('PASS changed settings and manual edits cancel pending/deferred work before late history or optimizer publication\n')
+})
+reset()
 shiny::testServer(lineup_Server,args=args,{
  settle(session);session$setInputs(best=1);settle(session);session$setInputs(save=1);settle(session)
  saved<-draft();stopifnot(state$submits==1L,all(nzchar(saved$starters)),is.null(best_request()))
+ session$setInputs(recent_n=2);settle(session)
+ stopifnot(identical(draft(),saved),grepl('fm-lineup-best-warning',output$status$html),state$optimizes==1L)
  session$setInputs(clear=1);settle(session);session$setInputs(reset=1);settle(session)
  stopifnot(identical(draft(),saved),!dirty(),grepl('successfully saved to Futmondo',notice()),
   grepl('Undo changes',as.character(lineup_UI('fixture')),fixed=TRUE))
@@ -201,4 +240,15 @@ shiny::testServer(lineup_Server,args=args,{
   !anyDuplicated(c(draft()$starters,draft()$bench)),state$reads==1L,state$submits==0L)
  cat('PASS obsolete picker clicks are ignored; invalid roles retain the draft; eligible selections swap immediately\n')
 })
-cat('LINEUP MODULE: 14 groups passed / 0 failed\n')
+for(mode in c('optimize-error','no-xi')){
+ reset(mode)
+ if(mode=='no-xi')state$official$rules$allowed<-character()
+ shiny::testServer(lineup_Server,args=args,{
+  settle(session);before<-draft();session$setInputs(best=1);settle(session)
+  stopifnot(identical(draft(),before),is.null(best_request()),state$optimizes==1L,
+   grepl(if(mode=='no-xi')'No eligible XI'else'calculation failed',notice()),
+   grepl('aria-busy="false"',output$status$html,fixed=TRUE),state$reads==1L,state$submits==0L)
+  cat('PASS',mode,'retains the lineup and clears calculation feedback\n')
+ })
+}
+cat('LINEUP MODULE: 17 groups passed / 0 failed\n')
