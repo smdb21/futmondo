@@ -414,7 +414,7 @@ classification_Server <- function(id, is_module_active, login_token, championshi
       click <- if(single_round_RV()!="all")htmlwidgets::JS(paste0("function(rowInfo){if(!rowInfo)return;var ids=",jsonlite::toJSON(ids),";Shiny.setInputValue(",jsonlite::toJSON(session$ns("lineup_team_click"),auto_unbox=TRUE),",{id:ids[rowInfo.index],context:",jsonlite::toJSON(lineup_context_RV(),auto_unbox=TRUE),",nonce:Date.now()},{priority:'event'});}"))else NULL
       remaining <- rows$players_left
       rows <- rows[, intersect(c("rank", "team_name", "points", "rounds", "points_bonus", "mvp_bonus", "best_xi_bonus", "position_bonus"), names(rows)), drop = FALSE]
-      reactable(rows, compact = TRUE, striped = TRUE, highlight = single_round_RV()!="all", onClick = click, defaultSorted = "rank", defaultColDef = colDef(na = "Unavailable",sortNALast=TRUE),
+      reactable(rows, compact = TRUE, striped = TRUE, highlight = single_round_RV()!="all", onClick = click, defaultSorted = "rank", defaultColDef = colDef(na = "Unavailable",sortNALast=TRUE,vAlign="center",headerVAlign="center"),
                 columns = c(if("rounds"%in%names(rows))list(rounds=colDef(show=FALSE)),
                   list(rank = colDef(name = "Rank", minWidth = 65,na="-"), team_name = colDef(name = "Team", minWidth = 150, cell = function(value,index){
                     if(single_round_RV()=="all")return(value)
