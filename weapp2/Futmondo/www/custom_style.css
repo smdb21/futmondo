@@ -150,6 +150,12 @@ body, .content-wrapper, .right-side {
 .rt-tbody .rt-tr-group:hover {
     background-color: var(--fm-surface) !important; /* Soft row-hover */
 }
+/* Identify the signed-in team independently of scouting selection and sort order. */
+.reactable .rt-tbody .fm-own-team-row,
+.reactable .rt-tbody .fm-own-team-row .rt-tr {
+    background-color: var(--fm-highlight) !important;
+    background-color: color-mix(in srgb, var(--fm-text) 8%, var(--fm-surface)) !important;
+}
 .rt-td {
     padding: 6px 8px !important;
     color: var(--fm-text) !important;

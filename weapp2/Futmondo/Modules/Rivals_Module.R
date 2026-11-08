@@ -532,10 +532,12 @@ rivals_calculation_details <- function(summary,ledger,metric=c("wealth","trading
 }
 
 # Keep observed team fields selectable even if financial audit details fail.
-rivals_finance_table_widget <- function(finances_data,on_error=function(error)NULL,timezone="UTC",selected_id=NULL,selection_input=NULL,selection_context=NULL,table_id=NULL) {
+rivals_finance_table_widget <- function(finances_data,on_error=function(error)NULL,timezone="UTC",selected_id=NULL,selection_input=NULL,selection_context=NULL,table_id=NULL,own_team_id=NULL) {
   timezone<-rivals_display_timezone(timezone)
   df<-finances_data$team_finances
   if(!is.data.frame(df)||!nrow(df))return(NULL)
+  own_id<-fm_scalar(own_team_id,"")
+  own_row_class<-function(ids)function(index)if(nzchar(own_id)&&ids[index]%in%own_id)"fm-own-team-row"else NULL
   transaction_counts<-if("player_transactions"%in%names(df))as.numeric(df$player_transactions)else rep(NA_real_,nrow(df))
   selected<-match(selected_id,as.character(df$teamid));selected<-selected[!is.na(selected)]
   click<-"select"
@@ -575,6 +577,7 @@ rivals_finance_table_widget <- function(finances_data,on_error=function(error)NU
     rows$`Player transactions`<-transaction_counts[match(directory$teamid,as.character(df$teamid))]
     rows$team_id_hidden<-directory$teamid
     reactable::reactable(rows,compact=TRUE,striped=TRUE,highlight=TRUE,selection="single",onClick=click,defaultSelected=selected,defaultPageSize=10,
+      rowClass=own_row_class(as.character(rows$team_id_hidden)),
       defaultColDef=colDef(sortNALast=TRUE),columns=public_columns(rows))
   }
   widget<-tryCatch({
@@ -588,6 +591,7 @@ rivals_finance_table_widget <- function(finances_data,on_error=function(error)NU
     df_display$team_id_hidden<-df$teamid
     df_display$`Last Access`<-as.numeric(fm_time(df_display$`Last Access`))
     reactable::reactable(df_display,compact=TRUE,striped=TRUE,highlight=TRUE,bordered=FALSE,
+      rowClass=own_row_class(as.character(df_display$team_id_hidden)),
       selection="single",onClick=click,defaultSelected=selected,defaultPageSize=10,defaultSorted=list(`Balance`="desc"),
       defaultColDef=colDef(sortNALast=TRUE),
       columns=c(public_columns(df_display),list(
@@ -931,7 +935,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
         failure<<-isolate(table_failure_RV())
         if(is.null(failure))failure<<-resource_log_failure(resource_failure(error,resource="league_finances_calc",category="schema"))
       },timezone=display_timezone(),selected_id=isolate(selected_rival_id_RV()),
-        selection_input=session$ns("rival_team_selection"),selection_context=rival_context_RV(),table_id=session$ns("league_finances_table"))
+        selection_input=session$ns("rival_team_selection"),selection_context=rival_context_RV(),table_id=session$ns("league_finances_table"),own_team_id=user_team_id())
       table_failure_RV(failure)
       widget
     })

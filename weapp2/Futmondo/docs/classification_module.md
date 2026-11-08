@@ -4,6 +4,8 @@ Classification opens with **Latest round** selected by default, and follows the 
 
 `classification_UI(id)` displays the round-range slider, standings, rank progression, published dream-team players and configured league rewards.
 
+The signed-in team's row keeps a subtle, theme-aware background in round and partial standings, matched by team ID after sorting. It shares the [rival finance table's highlight](rivals_module.md), without additional data requests.
+
 The round view initially selects the latest played or playing round and follows new rounds while that latest selection remains active. Choosing an older round keeps that selection. The partial view retains its own range when switching tabs. Full-range partial standings use official cumulative points; shorter windows require complete selected-round history. These controls reuse the loaded catalog and team histories without additional source requests. Offline regression: `Rscript test/test_classification_presets.R`.
 
 `classification_Server(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger = NULL)` combines cached per-team history with native bulk round standings. The lineup marker can already name the next round: numbered calendar identities and playing status guide at most two ranking candidates, and explicitly not-started rankings are excluded. A failed known playing round stays unavailable rather than falling back to an older completed round. Equal range endpoints select one round; a global refresh updates the data. Latest follows asynchronous score arrival until the user changes a filter. General uses official cumulative team points; custom windows require every expected round and never present a partial sum as a complete total.

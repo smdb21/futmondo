@@ -3,6 +3,10 @@
 
 ## Current directory display — 2026-11-02
 
+The signed-in team's row has a subtle background tint in both the rival finance table (including its fallback directory) and all standings views. Matching uses the active team ID, independently of scouting selection, names and sorting. The shared CSS adapts to light/dark themes and leaves the selected-row indicator intact. Each table assigns one class per existing row; no API/database reads, caches, timers or additional calculations are introduced.
+
+Focused verification: `test_rival_summary_layout.R` covers normal/fallback rendering, duplicate names, missing IDs and selection independence. The rival summary and classification lineup browser checks cover phone/desktop widths, theme changes, sorting and round/partial views. Live hosted testing and the broader suite are deliberately skipped for this presentation change.
+
 The **Player transactions** column counts included purchases and sales, including clause transfers, once per reconciled ledger entry. Bonuses, fees, opening cash and excluded entries are omitted. The numeric count is sortable and covers retrieved history; unavailable history stays unavailable, while a known history containing only bonuses gives zero. Counts are cached with the existing per-team ledger calculation and projected into the table without new requests, persistence or trade matching.
 
 The selectable financial standings table now retains public **Squad Value**, **Last Access (UTC)** and **Points** even when financial details are unavailable. Raw monetary/score values and numeric timestamps remain sortable. `rivals_last_access_cell()` formats UTC dates with a precise timestamp tooltip. `rivals_points_pills()` precomputes one league-wide background-to-red scale; negative/zero scores remain numeric, missing scores remain unavailable, and equal scores use the background color. Text switches between black/white for readable contrast. Sorting and pagination preserve the color domain.

@@ -15,6 +15,14 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
       await page.goto(`http://127.0.0.1:${process.env.FUTMONDO_LINEUP_TEST_PORT || '8501'}`);
       const table = page.locator('#classification-classification_table');
       await table.getByRole('row').filter({hasText:'Your Team'}).waitFor();
+      const ownRow=table.locator('.fm-own-team-row');
+      assert.equal(await ownRow.count(),1);
+      assert.match(await ownRow.innerText(),/Your Team/);
+      const darkOwn=await ownRow.evaluate(n=>getComputedStyle(n).backgroundColor);
+      assert.notEqual(darkOwn,await table.getByRole('row').filter({hasText:'Rival Team'}).evaluate(n=>getComputedStyle(n).backgroundColor));
+      await page.evaluate(()=>document.documentElement.dataset.fmTheme='light');
+      assert.notEqual(await ownRow.evaluate(n=>getComputedStyle(n).backgroundColor),darkOwn);
+      await page.evaluate(()=>delete document.documentElement.dataset.fmTheme);
       assert.equal(await page.locator('#classification-single_round_select').count(),0);
       const rounds = page.locator('.fm-classification-rounds');
       await rounds.getByRole('button',{name:'Round 11',exact:true}).waitFor();
@@ -88,6 +96,7 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
       await modal.waitFor({state:'detached'});
       // Sorting must preserve team identity; the keyboard path opens the rival.
       await table.getByRole('columnheader',{name:'Sort Team',exact:true}).click();
+      assert.match(await ownRow.innerText(),/Your Team/);
       const rival = table.getByRole('button',{name:'Rival Team',exact:true});
       await rival.focus(); await page.keyboard.press('Enter');
       await modal.getByText('Formation 3-6-1',{exact:true}).waitFor();
@@ -96,6 +105,8 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
       assert.equal(await modal.locator('[data-player-id="rival-3"] .fm-lineup-points').innerText(),'8*');
       await modal.getByRole('button',{name:'Close',exact:true}).click();
       await page.getByRole('tab',{name:'Partial classifications',exact:true}).click();
+      assert.equal(await ownRow.count(),1);
+      assert.match(await ownRow.innerText(),/Your Team/);
       await page.locator('#classification-round_range_slider').waitFor({state:'visible'});
       assert.equal(await page.locator('#classification-dreamteam_box_ui').isVisible(),false);
       await page.evaluate(()=>Shiny.setInputValue('classification-round_range_slider',[9,9],{priority:'event'}));

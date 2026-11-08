@@ -65,6 +65,18 @@ check('fallback directory keeps both metric columns truthfully unavailable',{
     all(is.na(data$`Player transactions`)),
     identical(attrs$selection,'single'))
 })
+check('own team shading follows IDs in full and fallback tables, independently of selection',{
+  same_names<-rows[c(2,1,3,4),];same_names$teamname[1:2]<-'Same name'
+  for(data in list(same_names,same_names[,c('teamid','teamname','team_value','points')])){
+    for(own in c('a','b','','missing')){
+      widget<-rivals_finance_table_widget(list(team_finances=data),own_team_id=own,selected_id='c')
+      attrs<-widget$x$tag$attribs
+      ids<-jsonlite::fromJSON(attrs$data)$team_id_hidden
+      marked<-vapply(attrs$rowClass,function(x)identical(x,'fm-own-team-row'),logical(1))
+      stopifnot(identical(unname(marked),ids%in%own))
+    }
+  }
+})
 summary<-rivals_summary_values(list(),NULL,rows,'a')
 check('wealth details show a numeric equation and group raw evidence without IDs',{
   summary$wealth_gain_notes<-paste('A changed round is waiting for its historical lineup to refresh.',
