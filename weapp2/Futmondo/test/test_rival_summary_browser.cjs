@@ -22,9 +22,15 @@ const tableId = 'rivals-league_finances_table';
       assert.equal(await ownRow.count(),1);
       assert.match(await ownRow.innerText(),/Alpha/);
       const darkOwn=await ownRow.evaluate(n=>getComputedStyle(n).backgroundColor);
+      const cellsRevealTint=()=>ownRow.getByRole('cell').evaluateAll(cells=>cells.every(cell=>{
+        const color=getComputedStyle(cell).backgroundColor;
+        return color==='rgba(0, 0, 0, 0)'||color===getComputedStyle(cell.parentElement).backgroundColor;
+      }));
+      assert.ok(await cellsRevealTint(),'Cell backgrounds must reveal the own-team row tint');
       assert.notEqual(darkOwn,await table.getByRole('row').filter({hasText:'Beta'}).evaluate(n=>getComputedStyle(n).backgroundColor));
       await page.evaluate(()=>document.documentElement.dataset.fmTheme='light');
       assert.notEqual(await ownRow.evaluate(n=>getComputedStyle(n).backgroundColor),darkOwn);
+      assert.ok(await cellsRevealTint(),'Light-theme cells must reveal the own-team row tint');
       await page.evaluate(()=>delete document.documentElement.dataset.fmTheme);
       await table.getByRole('row').filter({hasText:'Beta'}).getByRole('radio').click();
       assert.match(await ownRow.innerText(),/Alpha/,'Scouting another team preserves your team highlight');

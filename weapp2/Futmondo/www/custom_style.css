@@ -156,6 +156,10 @@ body, .content-wrapper, .right-side {
     background-color: var(--fm-highlight) !important;
     background-color: color-mix(in srgb, var(--fm-text) 8%, var(--fm-surface)) !important;
 }
+.reactable .rt-tbody .fm-own-team-row .rt-td {
+    /* The table theme otherwise paints opaque cells over the row tint. */
+    background-color: transparent !important;
+}
 .rt-td {
     padding: 6px 8px !important;
     color: var(--fm-text) !important;
