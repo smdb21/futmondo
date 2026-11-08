@@ -761,3 +761,8 @@ Completed: persist the user's explicit confirmation that the four previously unr
 ## Full-width lineup availability checkbox — 2026-11-07
 
 Completed locally: the injured/suspended players checkbox occupies its own full-width row beneath formation and recent rounds. Offline browser layout and interaction checks passed at 320, 390 and 1440px. See `lineup_module.md` and `data_review_results.md`. Hosted deployment remains separate.
+
+
+## Best XI formation and dual-position priority — 2026-11-07
+
+Completed locally: Best XI jointly searches every entitled formation and player assignment. Equal observed-score totals now prefer MID/FWD players assigned to MID before current-formation/current-starter ties; higher historical totals remain primary, with legal forward fallback and multiposition/entitlement rules preserved. Focused optimizer/module and mobile/desktop checks passed; independent exhaustive verification covered 24 synthetic cases. See `lineup_module.md` and `data_review_results.md`. Hosted deployment remains separate.

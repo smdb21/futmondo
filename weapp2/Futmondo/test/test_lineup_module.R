@@ -35,6 +35,20 @@ lineup_submit<-function(auth,championship_id,user_team_id,current,modified,owner
 }
 settle<-function(session){for(i in seq_len(30)){later::run_now(0);session$flushReact()}}
 args<-list(is_module_active=function()TRUE,login_token=function()c(userid='fixture',token='synthetic'),championship_id=function()'league',user_team_id=function()'team',round_catalog=function()rounds)
+reset()
+shiny::testServer(lineup_Server,args=args,{
+ settle(session);session$setInputs(formation='4-4-2');settle(session)
+ session$setInputs(best=1);settle(session);optimized<-draft()
+ # Four forwards have the largest observed averages in this fixture, so the
+ # unrestricted optimum is 3-3-4 rather than the currently selected 4-4-2.
+ stopifnot(optimized$strategy=='3-3-4',
+  grepl('<option value="3-3-4" selected="selected">',output$formation_control$html,fixed=TRUE))
+ settle(session);stopifnot(identical(draft(),optimized))
+ session$setInputs(formation='3-3-4');settle(session)
+ stopifnot(identical(draft(),optimized),!is.null(best_request()),state$reads==1L,state$submits==0L,
+  grepl('<option value="3-3-4" selected="selected">',output$formation_control$html,fixed=TRUE))
+ cat('PASS Best XI changes formation, renders its selection, and retains the draft on reactive flush and input acknowledgement\n')
+})
 reset('conflict')
 shiny::testServer(lineup_Server,args=args,{
  settle(session);session$setInputs(best=1);settle(session);wanted<-draft();session$setInputs(save=1);settle(session)
@@ -187,4 +201,4 @@ shiny::testServer(lineup_Server,args=args,{
   !anyDuplicated(c(draft()$starters,draft()$bench)),state$reads==1L,state$submits==0L)
  cat('PASS obsolete picker clicks are ignored; invalid roles retain the draft; eligible selections swap immediately\n')
 })
-cat('LINEUP MODULE: 13 groups passed / 0 failed\n')
+cat('LINEUP MODULE: 14 groups passed / 0 failed\n')

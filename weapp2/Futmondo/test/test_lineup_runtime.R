@@ -16,6 +16,44 @@ check('every official formation has eleven role-eligible places',{
     !length(lineup_validate(result$draft,roster,list(allowed=formation,multiposition=TRUE,bench_enabled=TRUE,captain_enabled=TRUE))))
  }
 })
+# Eleven equal-scoring players can form 4-3-3 with the dual player up front,
+# or 4-4-2 with that same player in midfield. No selection/point tradeoff exists.
+preferred_roster<-data.frame(id=c('g',paste0('d',1:4),paste0('m',1:3),'f1','f2','dual'),
+ role=c('portero',rep('defensa',4),rep('centrocampista',3),rep('delantero',3)),
+ role2=c(rep('',10),'centrocampista'),status='ok',stringsAsFactors=FALSE)
+preferred_scores<-data.frame(id=preferred_roster$id,average=1)
+assigned_role<-function(draft,id)lineup_slot_roles(draft$strategy)[match(id,draft$starters)]
+check('equal-total optimization changes formation to place a dual MID/FWD in midfield',{
+ current<-lineup_optimize(preferred_roster,preferred_scores,'4-3-3')$draft
+ got<-lineup_optimize(preferred_roster,preferred_scores,c('4-3-3','4-4-2'),current)
+ stopifnot(current$strategy=='4-3-3',assigned_role(current,'dual')=='FWD',
+  got$draft$strategy=='4-4-2',assigned_role(got$draft,'dual')=='MID',got$total==11,
+  setequal(got$draft$starters,current$starters),!anyDuplicated(got$draft$starters))
+ shuffled<-lineup_optimize(preferred_roster[11:1,],preferred_scores[11:1,],c('4-4-2','4-3-3'),current)
+ stopifnot(identical(got$draft,shuffled$draft))
+})
+check('midfield priority is optimized within a formation before retaining current starters',{
+ rows<-rbind(preferred_roster,data.frame(id='m4',role='centrocampista',role2='',status='ok'))
+ values<-data.frame(id=rows$id,average=1)
+ current<-lineup_optimize(rows,values,'4-4-2',multiposition=FALSE)$draft
+ stopifnot(assigned_role(current,'dual')=='FWD','m4'%in%current$starters)
+ got<-lineup_optimize(rows,values,'4-4-2',current)
+ stopifnot(got$total==11,assigned_role(got$draft,'dual')=='MID',
+  all(c('f1','f2')%in%got$draft$starters),!identical(got$draft$starters,current$starters))
+})
+check('higher observed total and legal forward fallback outrank midfield preference',{
+ rows<-rbind(preferred_roster,data.frame(id='m4',role='centrocampista',role2='',status='ok'))
+ values<-data.frame(id=rows$id,average=10);values$average[values$id=='f2']<-0
+ got<-lineup_optimize(rows,values,'4-4-2')
+ stopifnot(got$total==110,assigned_role(got$draft,'dual')=='FWD',!'f2'%in%got$draft$starters)
+})
+check('midfield preference respects multiposition capability and formation entitlement',{
+ no_multi<-lineup_optimize(preferred_roster,preferred_scores,c('4-4-2','4-3-3'),multiposition=FALSE)
+ locked<-lineup_optimize(preferred_roster,preferred_scores,'4-3-3')
+ stopifnot(no_multi$draft$strategy=='4-3-3',assigned_role(no_multi$draft,'dual')=='FWD',
+  locked$draft$strategy=='4-3-3',assigned_role(locked$draft,'dual')=='FWD',
+  is.null(lineup_optimize(preferred_roster,preferred_scores,'4-4-2',multiposition=FALSE)))
+})
 check('bench covers all three outfield roles before maximizing average and sorts best first',{
  result<-lineup_optimize(roster,score,'4-4-2')
  stopifnot(setequal(result$coverage,c('DEF','MID','FWD')),!any(result$draft$bench%in%roster$id[roster$role=='portero']),

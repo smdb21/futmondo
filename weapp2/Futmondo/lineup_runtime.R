@@ -57,22 +57,27 @@ lineup_optimize <- function(roster,scores,allowed,current=NULL,include_unavailab
   counts<-t(vapply(allowed,function(x)c(1L,as.integer(strsplit(x,'-',fixed=TRUE)[[1]])),integer(4)))
   maxima<-apply(counts,2,max);dims<-maxima+1L;stride<-c(1L,cumprod(dims)[1:3]);size<-prod(dims)
   lattice<-as.matrix(expand.grid(lapply(maxima,function(x)0:x)));valid<-rowSums(lattice)<=11L
-  best<-rep(-Inf,size);best[1]<-0;retained<-integer(size)
+  # Equal observed totals favor dual MID/FWD players in midfield; no bonus
+  # points are invented. Track this in every state before retention ties.
+  midfield_eligible<-vapply(positions,function(p)all(c('MID','FWD')%in%p),logical(1))
+  best<-rep(-Inf,size);best[1]<-0;midfield<-integer(size);retained<-integer(size)
   prev<-matrix(0L,nrow=nrow(roster),ncol=size);chosen<-matrix(0L,nrow=nrow(roster),ncol=size)
   current_ids<-if(is.list(current))current$starters else character();role_names<-c('GK','DEF','MID','FWD')
   for(i in seq_len(nrow(roster))){
-    old<-best;old_kept<-retained;next_best<-best;next_kept<-retained;prev[i,]<-seq_len(size)
+    old<-best;old_midfield<-midfield;old_kept<-retained;next_best<-best;next_midfield<-midfield;next_kept<-retained;prev[i,]<-seq_len(size)
     for(role in which(role_names%in%positions[[i]])){
       from<-which(is.finite(old)&valid&lattice[,role]<maxima[role]&rowSums(lattice)<11L);if(!length(from))next
       to<-from+stride[role];candidate<-old[from]+values[i];kept<-old_kept[from]+as.integer(roster$id[i]%in%current_ids)
-      better<-candidate>next_best[to]+1e-9|(abs(candidate-next_best[to])<=1e-9&kept>next_kept[to])
+      mids<-old_midfield[from]+as.integer(role_names[role]=='MID'&&midfield_eligible[i])
+      better<-candidate>next_best[to]+1e-9|(abs(candidate-next_best[to])<=1e-9&
+        (mids>next_midfield[to]|(mids==next_midfield[to]&kept>next_kept[to])))
       hit<-which(better);if(!length(hit))next
-      dest<-to[hit];next_best[dest]<-candidate[hit];next_kept[dest]<-kept[hit];prev[i,dest]<-from[hit];chosen[i,dest]<-role
+      dest<-to[hit];next_best[dest]<-candidate[hit];next_midfield[dest]<-mids[hit];next_kept[dest]<-kept[hit];prev[i,dest]<-from[hit];chosen[i,dest]<-role
     }
-    best<-next_best;retained<-next_kept
+    best<-next_best;midfield<-next_midfield;retained<-next_kept
   }
   ends<-1L+as.vector(counts%*%stride);viable<-which(is.finite(best[ends]));if(!length(viable))return(NULL)
-  rank<-order(-best[ends[viable]],allowed[viable]!=(current$strategy %||% ''),-retained[ends[viable]],match(allowed[viable],lineup_formations()))
+  rank<-order(-best[ends[viable]],-midfield[ends[viable]],allowed[viable]!=(current$strategy %||% ''),-retained[ends[viable]],match(allowed[viable],lineup_formations()))
   pick<-viable[rank[1]];state<-ends[pick];assignment<-setNames(vector('list',4L),role_names)
   for(i in rev(seq_len(nrow(roster)))){
     role<-chosen[i,state];if(role)assignment[[role]]<-c(as.character(roster$id[i]),assignment[[role]])
