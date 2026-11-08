@@ -308,10 +308,11 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
         if(bench)shiny::span(class='fm-lineup-order',paste('Bench',index)),
         shiny::div(class='fm-lineup-points',if(length(average)&&is.finite(average))format(round(average,2),trim=TRUE)else'—'),
         shiny::div(class='fm-lineup-portrait',if(occupied&&nzchar(row$photo)&&grepl('^[A-Za-z0-9_.-]+$',row$photo))
-          shiny::tags$img(src=paste0(PHOTO_URL,'/',row$photo),alt='',loading='lazy',onerror="this.style.display='none'")else shiny::span(class='fm-lineup-silhouette',if(occupied)'●'else'+'),
+          shiny::tags$img(src=paste0(PHOTO_URL,'/',row$photo),alt='',loading='lazy',onerror="this.style.display='none'")else shiny::span(class='fm-lineup-silhouette',if(occupied)'●'else'+')),
+        shiny::div(class='fm-lineup-name',`data-position`=position,
           if(nzchar(crest))shiny::tags$img(class='fm-lineup-crest',src=crest,alt=row$club,title=row$club,
-            width=22,height=22,loading='lazy',decoding='async',onerror="this.style.display='none'")),
-        shiny::div(class='fm-lineup-name',`data-position`=position,if(occupied)lineup_player_label(row$name)else'Empty position'),
+            width=14,height=14,loading='lazy',decoding='async',onerror="this.style.display='none'"),
+          shiny::span(class='fm-lineup-label',if(occupied)lineup_player_label(row$name)else'Empty position')),
         if(occupied&&analytics_known_unavailable(row))shiny::span(class='fm-lineup-warning','⚠')),
         class=paste('fm-lineup-player',if(!occupied)'fm-lineup-empty'),disabled=saving(),
         title=if(occupied)paste('Change',row$name)else paste('Select',role))

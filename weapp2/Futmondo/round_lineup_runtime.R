@@ -169,13 +169,14 @@ round_lineup_player_ui <- function(player,bench=FALSE,index,point_system="press"
     shiny::div(class="fm-lineup-portrait",
       if(safe_image(photo))shiny::tags$img(src=photo,alt="",loading="lazy",onerror="this.style.display='none'")
       else shiny::span(class="fm-lineup-silhouette",if(occupied)"●"else "+",`aria-hidden`="true"),
-      if(safe_image(logo))shiny::tags$img(class="fm-lineup-crest",src=logo,alt="",loading="lazy",onerror="this.style.display='none'"),
       if(changed)shiny::span(class="fm-lineup-change",title=if(bench)"Substituted out"else"Substituted in",
         `aria-label`=if(bench)"Substituted out"else"Substituted in",if(bench)"↓"else"↑")),
     shiny::div(class="fm-lineup-name",`data-position`=if(occupied)position else "",
       title=if(occupied)paste0(if(bench)"Main position for substitutions: "else"Lineup position: ",
         if(nzchar(position))switch(position,GK="Goalkeeper",DEF="Defender",MID="Midfielder",FWD="Forward")else"unavailable"),
-      if(occupied)lineup_player_label(label)else label))
+      if(safe_image(logo))shiny::tags$img(class="fm-lineup-crest",src=logo,alt=mvp_text(player$team$name),
+        width=14,height=14,loading="lazy",decoding="async",onerror="this.style.display='none'"),
+      shiny::span(class="fm-lineup-label",if(occupied)lineup_player_label(label)else label)))
 }
 round_lineup_pitch_ui <- function(answer) {
   lineup<-normalize_round_lineup(answer)

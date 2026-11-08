@@ -21,6 +21,8 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       assert.equal(await pitch.locator('.fm-lineup-empty').count(), 0);
       assert.equal(await page.locator('.fm-lineup-bench-row .fm-lineup-player').count(), 4);
       assert.equal(await page.locator('.fm-lineup-crest').count(), 15);
+      assert.equal(await page.locator('.fm-lineup-name > .fm-lineup-crest').count(), 15);
+      assert.equal(await page.locator('.fm-lineup-portrait > .fm-lineup-crest').count(), 0);
       assert.ok((await page.locator('.fm-lineup-crest').evaluateAll(nodes => nodes.map(n=>({src:n.src,alt:n.alt}))))
         .every(n=>n.src.endsWith('/teams/64/fixture-club.png') && n.alt==='Fixture Club'));
       assert.equal(await page.locator('.fm-lineup-role').count(), 0);
@@ -147,7 +149,9 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       assert.equal(await page.locator('.fm-lineup-crest').count(), 15);
       for (const crest of await page.locator('.fm-lineup-crest').all()) {
         const size=await crest.boundingBox();
-        assert.ok(size && size.width===22 && size.height===22, 'Crests remain visible and compact');
+        assert.ok(size && size.width===14 && size.height===14, 'Crests remain visible and compact');
+        const label=await crest.locator('..').locator('.fm-lineup-label').boundingBox();
+        assert.ok(size.x+size.width<=label.x+1, 'Crest sits beside the player name');
       }
       const box = await pitch.boundingBox();
       assert.ok(box.x >= 0 && box.x + box.width <= width + 1, 'Pitch must fit the viewport');

@@ -41,7 +41,7 @@ check('position underlines follow pitch slots and only the main bench role, incl
       position('fourth')=='DEF',position('outgoing')=='MID',position('first')=='',
       length(xml2::xml_find_all(nodes,'//*[contains(@class,"fm-lineup-empty")]/*[@data-position!=""]'))==0L,
       length(xml2::xml_find_all(nodes,'//*[@class="fm-lineup-position"]'))==0L,
-      xml2::xml_text(xml2::xml_find_first(nodes,'//*[@data-player-id="striker"]/*[@class="fm-lineup-name"]'))=='Player striker',
+      xml2::xml_text(xml2::xml_find_first(nodes,'//*[@data-player-id="striker"]//*[@class="fm-lineup-label"]'))=='P. striker',
       xml2::xml_attr(xml2::xml_find_first(nodes,'//*[@data-player-id="outgoing"]/*[@class="fm-lineup-name"]'),'title')=='Main position for substitutions: Midfielder',
       grepl('Substitutes can only cover their main position; secondary positions do not count.',html,fixed=TRUE))
   }
@@ -49,6 +49,15 @@ check('position underlines follow pitch slots and only the main bench role, incl
     answer$strategy<-strategy
     nodes<-xml2::read_html(htmltools::renderTags(round_lineup_pitch_ui(answer))$html)
     stopifnot(position('incoming')=='MID',position('lastdef')=='DEF',position('keeper')=='GK')
+  }
+})
+check('source crests render beside names on the pitch and bench, including saved JSON',{
+  for(answer in list(raw,jsonlite::fromJSON(jsonlite::toJSON(round_lineup_clean_answer(raw),auto_unbox=TRUE),simplifyVector=FALSE))){
+    nodes<-xml2::read_html(htmltools::renderTags(round_lineup_pitch_ui(answer))$html)
+    crests<-xml2::xml_find_all(nodes,'//*[@class="fm-lineup-name"]/img[@class="fm-lineup-crest"]')
+    stopifnot(length(crests)==8L,all(xml2::xml_attr(crests,'src')=='https://static02.mondocore.com/futmondo/img/teams/48/club.png'),
+      length(xml2::xml_find_all(nodes,'//*[@class="fm-lineup-portrait"]/img[@class="fm-lineup-crest"]'))==0L,
+      length(xml2::xml_find_all(nodes,'//*[contains(@class,"fm-lineup-empty")]//img[@class="fm-lineup-crest"]'))==0L)
   }
 })
 check('rated, reasoned zero, provisional zero and unavailable points remain distinct',{

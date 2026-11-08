@@ -1339,9 +1339,10 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 .fm-lineup-points { display: inline-block; min-width: 28px; background: #10271fe8; border: 1px solid #a6c7a7; border-radius: 4px; font-size: 13px; line-height: 20px; padding: 0 5px; }
 .fm-lineup-portrait { height: 66px; position: relative; display: flex; align-items: end; justify-content: center; }
 .fm-lineup-portrait > img { width: 64px; height: 64px; object-fit: contain; max-width: 100%; }
-.fm-lineup-portrait > img.fm-lineup-crest { position: absolute; right: 0; bottom: 2px; width: 22px; height: 22px; }
+.fm-lineup-name > img.fm-lineup-crest { flex: 0 0 14px; width: 14px; height: 14px; object-fit: contain; }
 .fm-lineup-silhouette { font-size: 44px; color: #d7e6d1; opacity: .75; line-height: 1.2; }
-.fm-lineup-name { background: #152d28ed; border-bottom: 2px solid #ccdebe; padding: 4px 2px; font-size: 11px; line-height: 1.2; min-height: 30px; overflow-wrap: anywhere; }
+.fm-lineup-name { display: flex; align-items: center; justify-content: center; gap: 3px; background: #152d28ed; border-bottom: 2px solid #ccdebe; padding: 4px 2px; font-size: 11px; line-height: 1.2; min-height: 30px; overflow-wrap: anywhere; }
+.fm-lineup-label { min-width: 0; }
 /* Match the position badge palette; substitution arrows keep their own colors. */
 .fm-lineup-name[data-position="GK"] { border-bottom-color: #7CFF9B; }
 .fm-lineup-name[data-position="DEF"] { border-bottom-color: #FFB366; }

@@ -9,7 +9,9 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
       const phone=width<600;
       const page = await browser.newPage({viewport:{width,height},isMobile:phone,hasTouch:phone}), errors=[];
       page.on('pageerror', e => errors.push(e.message));
-      await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
+      await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() :
+        route.request().url().endsWith('/fixture-club.png') ? route.fulfill({contentType:'image/svg+xml',
+          body:'<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"><path d="M1 1h12v8l-6 4-6-4z" fill="orange"/></svg>'}) : route.abort());
       await page.goto(`http://127.0.0.1:${process.env.FUTMONDO_LINEUP_TEST_PORT || '8501'}`);
       const table = page.locator('#classification-classification_table');
       await table.getByRole('row').filter({hasText:'Your Team'}).waitFor();
@@ -39,6 +41,15 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
       assert.equal(await modal.locator('.fm-lineup-row').nth(1).locator('.fm-lineup-player').count(),6);
       assert.equal(await modal.locator('.fm-lineup-pitch .fm-lineup-empty').count(),1);
       assert.equal(await modal.locator('.fm-lineup-bench-row .fm-lineup-player').count(),4);
+      assert.equal(await modal.locator('.fm-lineup-name > .fm-lineup-crest').count(),13);
+      assert.equal(await modal.locator('.fm-lineup-portrait > .fm-lineup-crest').count(),0);
+      for(const crest of await modal.locator('.fm-lineup-crest').all()){
+        await crest.scrollIntoViewIfNeeded();
+        await crest.evaluate(n=>n.decode());
+        const badge=await crest.boundingBox(),label=await crest.locator('..').locator('.fm-lineup-label').boundingBox();
+        assert.ok(badge&&badge.width===14&&badge.height===14,'Crests remain visible and compact');
+        assert.ok(badge.x+badge.width<=label.x+1,'Crest sits beside the player name');
+      }
       assert.deepEqual(await modal.locator('.fm-lineup-bench-row .fm-lineup-player').evaluateAll(nodes=>nodes.map(n=>n.dataset.playerId)),['bench-0','','bench-2','bench-3']);
       assert.equal(await modal.locator('.fm-lineup-pitch .fm-lineup-in').count(),1);
       assert.equal(await modal.locator('.fm-lineup-bench-row .fm-lineup-out').count(),1);
