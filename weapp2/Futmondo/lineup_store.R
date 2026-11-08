@@ -55,5 +55,5 @@ lineup_validate_snapshot <- function(data) {
   data
 }
 lineup_snapshot_fresh <- function(data,now=Sys.time()) {
-  !is.null(data)&&isTRUE(fm_time(data$expires_at)>now)&&isTRUE(fm_time(data$observed_at)<=now+60)
+  !is.null(data)&&all(vapply(data$roster,function(row)'points'%in%names(row),logical(1)))&&isTRUE(fm_time(data$expires_at)>now)&&isTRUE(fm_time(data$observed_at)<=now+60)
 }

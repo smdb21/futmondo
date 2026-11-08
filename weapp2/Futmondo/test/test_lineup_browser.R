@@ -7,7 +7,7 @@ fixture_roster <- data.frame(
   id = paste0('p', 1:24), name = paste('Player', 1:24),
   role = c(rep('portero', 2), rep('defensa', 6), rep('centrocampista', 8), rep('delantero', 8)),
   role2 = '', status = 'ok', photo = '', club = 'Fixture Club', logo = 'fixture-club.png',
-  buyPrice = 1000000, value = 2000000, stringsAsFactors = FALSE)
+  points = 100 + 1:24, buyPrice = 1000000, value = 2000000, stringsAsFactors = FALSE)
 fixture_roster$role2[8] <- 'centrocampista'
 fixture_roster$status[24] <- 'injured'
 fixture_rounds <- data.frame(round_id = paste0('r', 1:6), round_number = 1:6,

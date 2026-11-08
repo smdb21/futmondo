@@ -14,7 +14,7 @@ answers<-list(
  lineup=list(strategy='3-5-2',multiposition=FALSE,pointSystem='fixture',
   players=list(list(id='p1',position=10,buyPrice=100,role='portero')),
   bench=list(enabled=TRUE,players=list())),
- roster=list(list(id='p1',name='Keeper',role='portero',team='Fixture Club',buyPrice=100,value=200)),
+ roster=list(list(id='p1',name='Keeper',points=0,role='portero',team='Fixture Club',buyPrice=100,value=200)),
  information=list(configuration=list(cpt=FALSE),season='fixture-season'),
  availables=strategies)
 api_reads<-db_reads<-db_writes<-0L;stored<-NULL
@@ -49,7 +49,7 @@ shiny::testServer(lineup_Server,args=args,{
   draft()$strategy=='3-5-2',draft()$starters[11]=='p1',
   !is.object(source()$scoring_version),
   identical(source()$rules$allowed,lineup_formations()[1:7]),
-  api_reads==4L,db_reads==1L,db_writes==1L,
+  lineup_roster_frame(source())$points==0,api_reads==4L,db_reads==1L,db_writes==1L,
   grepl('Keeper',as.character(output$pitch$html),fixed=TRUE))
 })
 cat('PASS omitted premium flags load the pitch through all four real read/parser boundaries and save one snapshot\n')
@@ -57,7 +57,7 @@ observation<-jsonlite::fromJSON(stored,simplifyVector=FALSE)$payload$observed_at
 shiny::testServer(lineup_Server,args=args,{
  settle(session)
  stopifnot(!loading(),notice()=='',cache_issue()=='',draft()$starters[11]=='p1',
-  identical(source()$observed_at,observation),api_reads==4L,db_reads==2L,db_writes==1L)
+  lineup_roster_frame(source())$points==0,identical(source()$observed_at,observation),api_reads==4L,db_reads==2L,db_writes==1L)
 })
 cat('PASS a new session reuses the persisted fresh snapshot with zero additional Futmondo reads or writes\n')
 # Omission/null has source-defined meaning; malformed non-null flags still fail.

@@ -2,11 +2,11 @@
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages(source('global.R'))
 ctx<-resource_context(c(userid='account',token='private-fixture'),'league','team',season='S1',scoring_version='score')
-players<-list(list(id='p1',name='Player',role='portero',team=list(name='Real Madrid',logo='source-club.png')),
- list(id='p2',name='Other player',role='defensa',team='Barcelona',logo='other-club.png'))
+players<-list(list(id='p1',name='Player',points=0,role='portero',team=list(name='Real Madrid',logo='source-club.png')),
+ list(id='p2',name='Other player',points=-5,role='defensa',team='Barcelona',logo='other-club.png'))
 parsed_roster<-lineup_roster_records(players)
 stopifnot(parsed_roster[[1]]$logo=='source-club.png',parsed_roster[[1]]$club=='Real Madrid',
- parsed_roster[[2]]$logo=='other-club.png',parsed_roster[[2]]$club=='Barcelona')
+ parsed_roster[[1]]$points==0,parsed_roster[[2]]$points== -5,parsed_roster[[2]]$logo=='other-club.png',parsed_roster[[2]]$club=='Barcelona')
 snapshot<-list(version=1L,roster=parsed_roster,official=lineup_empty(),
  rules=list(allowed='4-4-2',multiposition=FALSE,bench_enabled=TRUE,captain_enabled=FALSE),
  source=list(wire=list(strategy='4-4-2',players=list()),locked=list()),season='S1',scoring_version='score',
@@ -31,9 +31,11 @@ settle(lineup_snapshot_store(ctx,'r7',snapshot))
 stopifnot(isTRUE(value),length(writes)==1L,!grepl('private-fixture|private-database-fixture|token',writes[[1]]$body),
  grepl('"complete":true',writes[[1]]$body,fixed=TRUE))
 stored<-jsonlite::fromJSON(writes[[1]]$body,simplifyVector=FALSE)
-stopifnot(stored$payload$roster[[1]]$logo=='source-club.png')
-legacy<-snapshot;legacy$roster<-lapply(legacy$roster,function(player){player$logo<-NULL;player})
-stopifnot(all(lineup_roster_frame(legacy)$logo==''),nrow(lineup_roster_frame(NULL))==0L)
+stopifnot(stored$payload$roster[[1]]$logo=='source-club.png',stored$payload$roster[[1]]$points==0,
+ stored$payload$roster[[2]]$points== -5)
+legacy<-snapshot;legacy$roster<-lapply(legacy$roster,function(player){player$logo<-NULL;player$points<-NULL;player})
+stopifnot(all(lineup_roster_frame(legacy)$logo==''),nrow(lineup_roster_frame(NULL))==0L,all(is.na(lineup_roster_frame(legacy)$points)),
+ !lineup_snapshot_fresh(legacy,now=fm_time(legacy$observed_at)))
 cat('PASS normalized successful snapshot writes exclude authentication material; logos persist and older snapshots remain readable\n')
 row$payload$rules$bench_enabled<-'unknown';settle(lineup_snapshot_store(ctx,'r7'));stopifnot(!is.null(failure))
 cat('PASS malformed cached capability state is rejected\nLINEUP STORE: 4 groups passed / 0 failed\n')

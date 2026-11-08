@@ -155,4 +155,36 @@ shiny::testServer(lineup_Server,args=args,{
   grepl('Undo changes',as.character(lineup_UI('fixture')),fixed=TRUE))
  cat('PASS Undo changes restores the latest successfully saved and verified lineup\n')
 })
-cat('LINEUP MODULE: 11 groups passed / 0 failed\n')
+# Local picker edits must not trigger source reads or write an incomplete XI.
+reset()
+shiny::testServer(lineup_Server,args=args,{
+ settle(session);session$setInputs(best=1);settle(session)
+ original<-draft();value<-original;value$captain<-value$starters[1];draft(value)
+ session$setInputs(starter_1=1);settle(session);pick<-selected()
+ session$setInputs(player_choice=list(id='',picker=pick$sequence));settle(session)
+ stopifnot(draft()$starters[1]=='',draft()$captain=='',is.null(selected()),is.null(best_request()),
+  identical(draft()$starters[-1],original$starters[-1]),identical(draft()$bench,original$bench),
+  grepl('Select all eleven starters',output$save_control$html),state$reads==1L,state$submits==0L)
+ session$setInputs(starter_1=2);settle(session);pick<-selected()
+ session$setInputs(player_choice=list(id=original$starters[1],picker=pick$sequence));settle(session)
+ stopifnot(identical(draft()$starters,original$starters),is.null(selected()))
+ session$setInputs(bench_1=1);settle(session);pick<-selected()
+ session$setInputs(player_choice=list(id='',picker=pick$sequence));settle(session)
+ stopifnot(draft()$bench[1]=='',identical(draft()$bench[-1],original$bench[-1]),state$reads==1L,state$submits==0L)
+ cat('PASS one-click starter/bench edits and removal leave other slots intact, clear removed captain, and make no source requests\n')
+})
+reset()
+shiny::testServer(lineup_Server,args=args,{
+ settle(session);session$setInputs(best=1);settle(session);original<-draft()
+ session$setInputs(starter_1=1);settle(session);old<-selected()
+ session$setInputs(starter_2=1);settle(session);pick<-selected()
+ session$setInputs(player_choice=list(id='',picker=old$sequence));settle(session)
+ stopifnot(identical(draft(),original),identical(selected(),pick))
+ session$setInputs(player_choice=list(id='p1',picker=pick$sequence));settle(session)
+ stopifnot(identical(draft(),original),!is.null(selected()),grepl('cannot play',output$picker_error$html))
+ session$setInputs(player_choice=list(id=original$starters[1],picker=pick$sequence));settle(session)
+ stopifnot(identical(draft()$starters[1:2],rev(original$starters[1:2])),is.null(selected()),
+  !anyDuplicated(c(draft()$starters,draft()$bench)),state$reads==1L,state$submits==0L)
+ cat('PASS obsolete picker clicks are ignored; invalid roles retain the draft; eligible selections swap immediately\n')
+})
+cat('LINEUP MODULE: 13 groups passed / 0 failed\n')

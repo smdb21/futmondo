@@ -59,16 +59,53 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       await page.locator('#lineup-status').getByText(/Best XI \+ bench.*rounds 4, 5/).waitFor();
       assert.deepEqual((await page.locator('#fixture_counts').innerText()).split('/').map(Number), clearCounts);
 
-      // Slot selection opens locally and filters out players in other roles.
+      // The picker shows live metrics and applies one row click immediately.
       const starter = pitch.locator('.fm-lineup-player').first();
       const pickerStarted = performance.now();
       await starter.click();
       const modal = page.locator('.modal');
-      await modal.getByRole('button', { name: 'Select player', exact: true }).waitFor();
+      await modal.locator('.fm-lineup-choice').first().waitFor();
       const pickerMs = performance.now() - pickerStarted;
-      const available = await modal.locator('#lineup-player_choice option').allTextContents();
-      assert.ok(available.every(text => text === 'Empty position' || text.includes('FWD')));
-      await modal.getByRole('button', { name: 'Cancel', exact: true }).click();
+      const choices = modal.locator('.fm-lineup-choice');
+      assert.equal(await choices.count(), 8);
+      assert.ok((await choices.evaluateAll(nodes => nodes.map(n => n.dataset.position))).every(role => role === 'FWD'));
+      const player17 = modal.locator('.fm-lineup-choice[data-player-id="p17"]');
+      assert.equal(await player17.locator('.fm-lineup-choice-name').innerText(), 'P. 17\nFWD');
+      assert.equal(await player17.getAttribute('title'), 'Player 17');
+      assert.equal(await player17.locator('.fm-lineup-choice-total').innerText(), '117');
+      assert.equal(await player17.locator('.fm-lineup-choice-average').innerText(), '17');
+      assert.ok((await player17.locator('img').getAttribute('src')).endsWith('/fixture-club.png'));
+      for (const row of await choices.all()) {
+        const box = await row.boundingBox();
+        assert.ok(box.x >= 0 && box.x + box.width <= width, 'Picker rows fit the viewport');
+      }
+      await page.screenshot({ path: `/tmp/futmondo-lineup-picker-${width}.png`, fullPage: true });
+      await player17.click();
+      await modal.waitFor({ state: 'detached' });
+      await starter.getByText('P. 17', { exact: true }).waitFor();
+      // Removing a starter leaves just that position empty until another click.
+      await starter.click();
+      await modal.locator('.fm-lineup-remove').click();
+      await modal.waitFor({ state: 'detached' });
+      await starter.getByText('Empty position', { exact: true }).waitFor();
+      assert.equal(await pitch.locator('.fm-lineup-empty').count(), 1);
+      assert.equal(await page.locator('#lineup-save').isDisabled(), true);
+      await starter.click();
+      await modal.locator('.fm-lineup-choice[data-player-id="p17"]').waitFor();
+      assert.equal(await modal.locator('.fm-lineup-remove').count(), 0);
+      await modal.locator('.fm-lineup-choice[data-player-id="p17"]').click();
+      await modal.waitFor({ state: 'detached' });
+      await starter.getByText('P. 17', { exact: true }).waitFor();
+      const benchSlot = page.locator('.fm-lineup-bench-row .fm-lineup-player').first();
+      await benchSlot.click();
+      await modal.locator('.fm-lineup-choice[aria-pressed="true"]').waitFor();
+      const benchId = await modal.locator('.fm-lineup-choice[aria-pressed="true"]').getAttribute('data-player-id');
+      assert.equal(await modal.locator('.fm-lineup-choice').count(), 24);
+      await modal.locator('.fm-lineup-remove').click();
+      await modal.waitFor({ state: 'detached' });
+      await benchSlot.getByText('Empty position', { exact: true }).waitFor();
+      await benchSlot.click();
+      await modal.locator(`.fm-lineup-choice[data-player-id="${benchId}"]`).click();
       await modal.waitFor({ state: 'detached' });
       assert.deepEqual((await page.locator('#fixture_counts').innerText()).split('/').map(Number), clearCounts);
 
@@ -92,7 +129,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       assert.deepEqual(errors, []);
       await page.screenshot({ path: `/tmp/futmondo-lineup-editor-${width}.png`, fullPage: true });
       previousReads = Number((await page.locator('#fixture_counts').innerText()).split('/')[0]);
-      console.log(`PASS ${width}px: clear, defaults, disabled save, exact XI/bench, changed N, coverage, local picker (${pickerMs.toFixed(0)} ms), verified one-shot save, undo latest saved, viewport`);
+      console.log(`PASS ${width}px: clear, defaults, disabled save, exact XI/bench, changed N, coverage, one-click picker (${pickerMs.toFixed(0)} ms), starter/bench removal and refill, verified one-shot save, undo latest saved, viewport`);
       await page.close();
     }
   } finally {

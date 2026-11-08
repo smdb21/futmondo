@@ -20,7 +20,7 @@ lineup_roster_records <- function(raw) {
     id<-fm_scalar(player$id %||% player$`_id`,'');if(!nzchar(id))stop('Squad player identity missing')
     team<-player$team
     list(id=id,name=fm_scalar(player$name,id),role=fm_scalar(player$role,''),role2=fm_scalar(player$role2,''),
-      status=fm_scalar(player$status,''),photo=fm_scalar(player$photo,''),buyPrice=fm_number(player$buyPrice),value=fm_number(player$value),
+      status=fm_scalar(player$status,''),points=fm_number(player$points),photo=fm_scalar(player$photo,''),buyPrice=fm_number(player$buyPrice),value=fm_number(player$value),
       club=if(is.list(team))fm_scalar(team$name,'')else fm_scalar(team,''),
       logo=fm_scalar(if(is.list(team))team$logo %||% player$logo else player$logo,''))
   })
@@ -29,9 +29,10 @@ lineup_roster_records <- function(raw) {
 }
 lineup_roster_frame <- function(data) {
   rows<-data$roster %||% list()
-  if(!length(rows))return(data.frame(id=character(),name=character(),role=character(),role2=character(),status=character(),photo=character(),club=character(),logo=character()))
+  if(!length(rows))return(data.frame(id=character(),name=character(),role=character(),role2=character(),status=character(),photo=character(),club=character(),logo=character(),points=numeric()))
   result<-dplyr::bind_rows(rows)
   if(!'logo'%in%names(result))result$logo<-''
+  if(!'points'%in%names(result))result$points<-rep(NA_real_,nrow(result))
   attr(result,'observed_at')<-fm_time(data$observed_at)
   result
 }

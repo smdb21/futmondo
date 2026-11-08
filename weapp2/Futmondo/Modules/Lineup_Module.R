@@ -1,6 +1,19 @@
 lineup_UI <- function(id) {
   ns<-shiny::NS(id)
   shiny::tagList(shiny::tags$style(shiny::HTML(".fm-lineup-controls{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:16px}.fm-lineup-controls .form-group{margin:0}.fm-lineup-availability{flex:0 0 100%;min-width:0}.fm-lineup-controls .shiny-input-container{width:180px}.fm-lineup-editor{max-width:900px;margin:auto}.fm-lineup-editor .fm-lineup-player{background:transparent;border:0;color:var(--fm-text,#eef6f0);cursor:pointer;padding:6px;min-width:0}.fm-lineup-editor .fm-lineup-player:focus{outline:2px solid var(--fm-warning,#f0c75e)}.fm-lineup-editor .fm-lineup-portrait{margin:auto}.fm-lineup-editor .fm-lineup-name{white-space:normal}.fm-lineup-editor .fm-lineup-portrait img{max-width:48px;max-height:48px}.fm-lineup-note{padding:10px 0;color:var(--fm-muted,#acbdb0)}.fm-lineup-warning{color:var(--fm-warning,#f0c75e)}.fm-lineup-actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.fm-lineup-coverage{display:flex;gap:12px;flex-wrap:wrap}.fm-lineup-editor .fm-lineup-row{display:grid;grid-template-columns:repeat(var(--lineup-count),minmax(0,1fr))}@media(max-width:600px){.fm-lineup-controls .shiny-input-container{width:140px}.fm-lineup-editor .fm-lineup-name{font-size:10px}.fm-lineup-editor .fm-lineup-player{padding:2px}.fm-lineup-editor .fm-lineup-portrait img{max-width:34px;max-height:34px}}")),
+    shiny::tags$style(shiny::HTML("
+      .fm-lineup-picker-list{max-height:60vh;overflow-y:auto}
+      .fm-lineup-choice,.fm-lineup-picker-heading{display:grid;grid-template-columns:26px minmax(0,1fr) 58px 78px;gap:8px;align-items:center;padding:10px 8px}
+      .fm-lineup-picker-heading{font-size:12px;color:var(--fm-muted,#647067)}
+      .fm-lineup-picker-heading span:nth-last-child(-n+2){text-align:right}
+      .fm-lineup-choice{width:100%;border:0;border-bottom:1px solid var(--fm-border,#d8e2da);border-radius:0;background:transparent;color:var(--fm-text,#24382a);text-align:left;cursor:pointer}
+      .fm-lineup-choice:hover,.fm-lineup-choice[aria-pressed=true]{background:var(--fm-surface-hover,rgba(128,160,140,.15))}
+      .fm-lineup-choice:focus-visible{outline:2px solid var(--fm-warning,#bd8d1e);outline-offset:-2px}
+      .fm-lineup-choice-name{min-width:0;overflow-wrap:anywhere}
+      .fm-lineup-choice-name small{display:block;color:var(--fm-muted,#647067)}
+      .fm-lineup-choice-total,.fm-lineup-choice-average{text-align:right;font-variant-numeric:tabular-nums}
+      .fm-lineup-choice-crest{width:24px;height:24px;object-fit:contain}
+    ")),
     shiny::div(class='fm-lineup-editor',
       shiny::h2('Lineup'),shiny::uiOutput(ns('heading')),
       shiny::div(class='fm-lineup-controls',
@@ -22,7 +35,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
   shiny::moduleServer(id,function(input,output,session){
     source<-shiny::reactiveVal(NULL);draft<-shiny::reactiveVal(NULL);loading<-shiny::reactiveVal(FALSE)
     saving<-shiny::reactiveVal(FALSE);notice<-shiny::reactiveVal('');cache_issue<-shiny::reactiveVal('')
-    selected<-shiny::reactiveVal(NULL);best_note<-shiny::reactiveVal('');reload<-shiny::reactiveVal(0L)
+    selected<-shiny::reactiveVal(NULL);picker_notice<-shiny::reactiveVal('');picker_sequence<-0L;best_note<-shiny::reactiveVal('');reload<-shiny::reactiveVal(0L)
     best_request<-shiny::reactiveVal(NULL);best_sequence<-0L;best_applied<-NULL
     owner<-paste0('lineup:',session$token);generation<-0L;closed<-FALSE;loaded_key<-NULL;requests<-list();request_sequence<-0L;retained<-list();retained_account<-NULL
     identity<-shiny::reactive({
@@ -170,27 +183,67 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
         ' · bench coverage ',if(length(result$coverage))paste(result$coverage,collapse=' / ')else'none'))
       notice('Review your selections, then Save to Futmondo.')
     })
+    crest_url<-function(row){
+      logo<-fm_scalar(row$logo,'');image<-get_team_image_name(row$club,logo=logo)
+      if(grepl('^https://',logo,ignore.case=TRUE))logo else
+        if(nzchar(image)&&grepl('^[A-Za-z0-9_.-]+$',image))paste0(TEAM_LOGO_URL,image,'.png')else''
+    }
+    picker_click<-function(id,pick)paste0('Shiny.setInputValue(',
+      jsonlite::toJSON(session$ns('player_choice'),auto_unbox=TRUE),',',
+      jsonlite::toJSON(list(id=id,picker=pick$sequence),auto_unbox=TRUE),",{priority:'event'});")
     open_picker<-function(bench,index){
-      shiny::req(source(),draft(),!saving());selected(list(bench=bench,index=index))
-      rows<-roster();positions<-lineup_positions(rows,source()$rules$multiposition)
-      eligible<-if(bench)rep(TRUE,nrow(rows))else vapply(positions,function(p)lineup_slot_roles(draft()$strategy)[index]%in%p,logical(1))
-      rows<-rows[eligible,,drop=FALSE];averages<-scores()$average[match(rows$id,scores()$id)];positions<-positions[eligible]
-      order_rows<-order(-averages,rows$name,rows$id,na.last=TRUE);rows<-rows[order_rows,,drop=FALSE];averages<-averages[order_rows];positions<-positions[order_rows]
-      labels<-paste0(rows$name,' · ',vapply(positions,paste,character(1),collapse='/'),' · ',ifelse(is.finite(averages),format(round(averages,2),trim=TRUE),'scores loading'),
-        ifelse(analytics_known_unavailable(rows),' · injured/suspended',''))
-      old<-if(bench)draft()$bench[index]else draft()$starters[index]
+      shiny::req(source(),draft(),!saving())
+      picker_sequence<<-picker_sequence+1L;picker_notice('')
+      pick<-list(bench=bench,index=index,generation=generation,key=loaded_key,
+        strategy=draft()$strategy,sequence=picker_sequence)
+      selected(pick);old<-if(bench)draft()$bench[index]else draft()$starters[index]
       dialog<-shiny::modalDialog(title=if(bench)paste('Substitute',index)else paste('Select',lineup_slot_roles(draft()$strategy)[index]),
-        shiny::selectizeInput(session$ns('player_choice'),'Player',choices=c('Empty position'='',setNames(as.character(rows$id),labels)),selected=old),
-        footer=shiny::tagList(shiny::modalButton('Cancel'),shiny::actionButton(session$ns('assign'),'Select player')),easyClose=TRUE,fade=FALSE)
-      # Only this frequent picker opens without Bootstrap's 300ms fade.
+        shiny::uiOutput(session$ns('picker_error')),shiny::uiOutput(session$ns('picker_players')),
+        footer=shiny::tagList(
+          if(nzchar(old))shiny::tags$button(type='button',class='btn btn-warning fm-lineup-remove',
+            onclick=picker_click('',pick),'Remove player'),shiny::modalButton('Cancel')),
+        easyClose=TRUE,fade=FALSE)
       shiny::showModal(dialog)
     }
+    output$picker_error<-shiny::renderUI({
+      if(nzchar(picker_notice()))shiny::div(role='alert',class='fm-lineup-warning',picker_notice())
+    })
+    output$picker_players<-shiny::renderUI({
+      pick<-selected();shiny::req(pick,source(),draft())
+      shiny::req(current(pick$generation,pick$key),identical(pick$strategy,draft()$strategy))
+      rows<-roster();positions<-lineup_positions(rows,source()$rules$multiposition)
+      eligible<-if(pick$bench)rep(TRUE,nrow(rows))else vapply(positions,function(p)lineup_slot_roles(draft()$strategy)[pick$index]%in%p,logical(1))
+      rows<-rows[eligible,,drop=FALSE];score<-scores();averages<-score$average[match(rows$id,score$id)];positions<-positions[eligible]
+      order_rows<-order(-averages,rows$name,rows$id,na.last=TRUE);rows<-rows[order_rows,,drop=FALSE];averages<-averages[order_rows];positions<-positions[order_rows]
+      old<-if(pick$bench)draft()$bench[pick$index]else draft()$starters[pick$index]
+      number<-function(value)if(length(value)==1L&&is.finite(value))format(round(value,2),trim=TRUE)else'—'
+      shiny::tagList(
+        shiny::div(class='fm-lineup-note',paste0('Select a player to switch. Average uses the last ',length(attr(score,'rounds')),
+          ' completed rounds (requested ',n_rounds(),'). Missing scores are shown as —.')),
+        shiny::div(class='fm-lineup-picker-heading',`aria-hidden`='true',shiny::span(),shiny::span('Player'),shiny::span('Total pts'),shiny::span(paste0('Avg (',n_rounds(),')'))),
+        shiny::div(class='fm-lineup-picker-list',role='group',`aria-label`='Eligible players',
+          if(!nrow(rows))shiny::div(class='fm-lineup-note','No squad players can play in this position.'),
+          lapply(seq_len(nrow(rows)),function(i){
+            row<-rows[i,,drop=FALSE];url<-crest_url(row);unavailable<-analytics_known_unavailable(row)
+            shiny::tags$button(type='button',class='fm-lineup-choice',`data-player-id`=row$id,
+              `data-position`=paste(positions[[i]],collapse='/'),`aria-pressed`=if(identical(row$id,old))'true'else'false',
+              title=row$name,disabled=if(saving())'disabled',onclick=picker_click(as.character(row$id),pick),
+              if(nzchar(url))shiny::tags$img(class='fm-lineup-choice-crest',src=url,alt=row$club,width=24,height=24,
+                loading='lazy',decoding='async',onerror="this.style.visibility='hidden'")else shiny::span(),
+              shiny::span(class='fm-lineup-choice-name',lineup_player_label(row$name),
+                shiny::tags$small(paste0(paste(positions[[i]],collapse='/'),if(identical(row$id,old))' · Current'else'',if(unavailable)' · injured/suspended'else''))),
+              shiny::span(class='fm-lineup-choice-total',`aria-label`='Total points',number(row$points)),
+              shiny::span(class='fm-lineup-choice-average',`aria-label`=paste('Average points over',n_rounds(),'completed rounds'),number(averages[i])))
+          })))
+    })
     for(i in seq_len(11L))local({slot<-i;shiny::observeEvent(input[[paste0('starter_',slot)]],open_picker(FALSE,slot),ignoreInit=TRUE)})
     for(i in seq_len(4L))local({slot<-i;shiny::observeEvent(input[[paste0('bench_',slot)]],open_picker(TRUE,slot),ignoreInit=TRUE)})
-    shiny::observeEvent(input$assign,{
-      shiny::req(selected(),draft(),source(),!saving())
-      tryCatch({pick<-selected();edit(lineup_assign(draft(),roster(),source()$rules,pick$bench,pick$index,input$player_choice %||% ''));shiny::removeModal();selected(NULL)},
-        error=function(error)notice(conditionMessage(error)))
+    shiny::observeEvent(input$player_choice,{
+      shiny::req(selected(),draft(),source(),!saving(),is_module_active())
+      pick<-selected();choice<-input$player_choice
+      shiny::req(is.list(choice),identical(choice$picker,pick$sequence),current(pick$generation,pick$key),identical(pick$strategy,draft()$strategy))
+      tryCatch({edit(lineup_assign(draft(),roster(),source()$rules,pick$bench,pick$index,choice$id));shiny::removeModal();selected(NULL)},
+        error=function(error)picker_notice(conditionMessage(error)))
     })
     shiny::observeEvent(input$captain,{shiny::req(draft(),source(),!saving());captain<-input$captain
       if(captain%in%draft()$starters&&!identical(captain,draft()$captain)){value<-draft();value$captain<-captain;edit(value)}
@@ -223,17 +276,14 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
     tile<-function(id,role,index,bench=FALSE){
       rows<-roster();row<-rows[match(id,rows$id),,drop=FALSE];occupied<-nzchar(id)&&id%in%rows$id
       average<-scores()$average[match(id,scores()$id)]
-      logo<-if(occupied)fm_scalar(row$logo,'')else''
-      image<-if(occupied)get_team_image_name(row$club,logo=logo)else''
-      crest_url<-if(grepl('^https://',logo,ignore.case=TRUE))logo else
-        if(nzchar(image)&&grepl('^[A-Za-z0-9_.-]+$',image))paste0(TEAM_LOGO_URL,image,'.png')else''
+      crest<-if(occupied)crest_url(row)else''
       position<-if(!occupied)''else if(bench)fm_scalar(lineup_positions(row,FALSE)[[1]],'')else role
       shiny::actionButton(session$ns(paste0(if(bench)'bench_'else'starter_',index)),label=shiny::tagList(
         if(bench)shiny::span(class='fm-lineup-order',paste('Bench',index)),
         shiny::div(class='fm-lineup-points',if(length(average)&&is.finite(average))format(round(average,2),trim=TRUE)else'—'),
         shiny::div(class='fm-lineup-portrait',if(occupied&&nzchar(row$photo)&&grepl('^[A-Za-z0-9_.-]+$',row$photo))
           shiny::tags$img(src=paste0(PHOTO_URL,'/',row$photo),alt='',loading='lazy',onerror="this.style.display='none'")else shiny::span(class='fm-lineup-silhouette',if(occupied)'●'else'+'),
-          if(nzchar(crest_url))shiny::tags$img(class='fm-lineup-crest',src=crest_url,alt=row$club,title=row$club,
+          if(nzchar(crest))shiny::tags$img(class='fm-lineup-crest',src=crest,alt=row$club,title=row$club,
             width=22,height=22,loading='lazy',decoding='async',onerror="this.style.display='none'")),
         shiny::div(class='fm-lineup-name',`data-position`=position,if(occupied)lineup_player_label(row$name)else'Empty position'),
         if(occupied&&analytics_known_unavailable(row))shiny::span(class='fm-lineup-warning','⚠')),
