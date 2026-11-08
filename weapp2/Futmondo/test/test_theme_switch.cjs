@@ -1,7 +1,14 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/futmondo-review-tools/node_modules', 'playwright'));
+async function openSidebar(page) {
+  if (await page.locator('body').evaluate(el => innerWidth < 768 && !el.classList.contains('sidebar-open'))) {
+    await page.locator('.sidebar-toggle').click();
+  }
+  await page.locator('#fm-theme-toggle').scrollIntoViewIfNeeded();
+}
 async function choose(page, mode) {
+  await openSidebar(page);
   await page.locator('#fm-theme-toggle').click();
   await page.locator('#fm-theme-options [data-theme="' + mode + '"]').click();
   assert.equal(await page.locator('#fm-theme-options').isHidden(), true);
@@ -18,6 +25,7 @@ async function choose(page, mode) {
       await page.route('**/*', route => route.request().url().startsWith('http://127.0.0.1:38766/') ? route.continue() : route.abort());
       await page.goto('http://127.0.0.1:38766/');
       const toggle = page.locator('#fm-theme-toggle');
+      await openSidebar(page);
       await toggle.waitFor();
       async function theme(mode) {
         await page.waitForFunction(mode => document.documentElement.dataset.fmTheme === mode, mode);
@@ -49,14 +57,24 @@ async function choose(page, mode) {
       await page.emulateMedia({colorScheme: 'dark'});
       await theme('light'); // Explicit choice takes precedence over the system.
       await page.reload();
+      await openSidebar(page);
       await toggle.waitFor();
       assert.equal(await toggle.getAttribute('data-theme-choice'), 'light');
       await theme('light');
+      if (width < 768) await page.locator('.sidebar-toggle').click();
       await page.locator('#login-user_name').fill('offline@example.invalid');
       await page.locator('#login-password').fill('fixture');
       await page.locator('#login-login_button').click();
       // Wait for initial saved-page restoration before navigating.
       await page.locator('#today-market_players-players_table .rt-td').first().waitFor();
+      await page.locator('.sidebar-menu a[data-value="admin"]').waitFor({state: 'attached'});
+      assert.equal(await page.locator('.main-header #fm-theme-toggle').count(), 0);
+      assert.equal(await toggle.evaluate(el => {
+        const control = el.closest('.fm-theme-control');
+        const menu = control.previousElementSibling;
+        const lastItem = Array.from(menu.children).filter(child => child.tagName === 'LI').pop();
+        return menu.id === 'menu' && lastItem.querySelector('a[data-value="admin"]') !== null && control.nextElementSibling === null;
+      }), true, 'Theme is the final sidebar item directly after the menu ending in Admin');
       await page.locator('.sidebar-menu a[data-value="yourteam"]').evaluate(el => el.click());
       const table = page.locator('#players_in_teams-players_table_in_teams-players_table');
       await table.locator('.rt-td').first().waitFor();
@@ -87,6 +105,7 @@ async function choose(page, mode) {
       await choose(page, 'light');
       assert.equal(await table.locator('.rt-td').first().evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(255, 255, 255)');
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2), false);
+      await openSidebar(page);
       const bounds = await toggle.boundingBox();
       assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width);
       assert.ok(bounds.width <= 40, 'Collapsed theme trigger uses only 40px');

@@ -1366,10 +1366,10 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 .fm-classification-rounds > .shiny-html-output { display:flex; flex:0 0 auto; gap:8px; }
 
 /* One compact trigger; reveal the three theme icons only when requested. */
-.main-header .navbar .fm-theme-control { position: relative; display: flex; align-items: center; min-height: 50px; padding: 3px 2px; }
+.main-sidebar .fm-theme-control { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 6px 20px; }
 .fm-theme-control .fm-theme-button { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 40px; width: 40px; min-height: 40px; height: 40px; padding: 0; color: var(--fm-text); }
 .fm-theme-button > i { margin: 0; pointer-events: none; }
-.fm-theme-options { position: absolute; top: 100%; right: 0; z-index: 1050; display: flex; gap: 4px; padding: 6px; border: 1px solid var(--fm-border); border-radius: 3px; background: var(--fm-surface); box-shadow: 0 3px 8px #0002; }
+.fm-theme-options { display: flex; flex: 0 0 auto; gap: 4px; padding: 4px; border: 1px solid var(--fm-border); border-radius: 3px; background: var(--fm-surface); box-shadow: 0 3px 8px #0002; }
 .fm-theme-options[hidden] { display: none; }
 .fm-theme-options .fm-theme-button[aria-pressed="true"] { background: var(--fm-highlight) !important; border-color: var(--fm-text); }
 .fm-lineup-heading { color: var(--fm-text); }

@@ -1,6 +1,4 @@
-header <- shinydashboardPlus::dashboardHeader(
-  title = "Futmondo",
-  tags$li(class = "dropdown fm-theme-control",
+fm_theme_control <- tags$div(class = "fm-theme-control",
     tags$button(id = "fm-theme-toggle", type = "button", class = "btn fm-theme-button",
       `aria-label` = "Color theme: System", title = "Color theme: System",
       `aria-expanded` = "false", `aria-controls` = "fm-theme-options", icon("desktop")),
@@ -11,7 +9,10 @@ header <- shinydashboardPlus::dashboardHeader(
       tags$button(type = "button", class = "btn fm-theme-button", `data-theme` = "light",
         `aria-label` = "Light", title = "Light", `aria-pressed` = "false", icon("sun")),
       tags$button(type = "button", class = "btn fm-theme-button", `data-theme` = "dark",
-        `aria-label` = "Dark", title = "Dark", `aria-pressed` = "false", icon("moon")))),
+        `aria-label` = "Dark", title = "Dark", `aria-pressed` = "false", icon("moon"))))
+
+header <- shinydashboardPlus::dashboardHeader(
+  title = "Futmondo",
   tags$li(class = "dropdown", uiOutput("notification_bell"))
 )
 body <- shinydashboard::dashboardBody(
@@ -104,7 +105,8 @@ shinydashboardPlus::dashboardPage(
   header,
   shinydashboardPlus::dashboardSidebar(
     width = 180, # pixels; keeps navigation labels readable without changing mobile navigation
-    shinydashboard::sidebarMenuOutput(outputId = "menu")
+    shinydashboard::sidebarMenuOutput(outputId = "menu"),
+    fm_theme_control
   ),
   body
 )
