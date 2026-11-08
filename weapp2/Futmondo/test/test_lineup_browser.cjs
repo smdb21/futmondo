@@ -47,6 +47,8 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       assert.equal(Number((await page.locator('#fixture_counts').innerText()).split('/')[1]), initialCounts[1]);
 
       const clearCounts = (await page.locator('#fixture_counts').innerText()).split('/').map(Number);
+      await page.locator('#lineup-recent_n').fill('5');
+      await page.locator('#lineup-recent_n').blur();
       await page.evaluate(() => {
         window.lineupProgress = [];
         new MutationObserver(() => {
@@ -57,7 +59,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       await page.locator('#lineup-best').click();
       await page.waitForFunction(() => document.querySelectorAll('.fm-lineup-pitch .fm-lineup-empty').length === 0);
       assert.ok(await page.evaluate(() => window.lineupProgress.some(s => s.busy === 'true' && s.text.includes('Calculating Best XI'))));
-      assert.equal(await page.locator('#lineup-best').innerText(), 'Best XI + bench');
+      assert.equal(await page.locator('#lineup-best').innerText(), 'Optimize');
       assert.equal(await page.locator('.fm-lineup-bench-row .fm-lineup-empty').count(), 0);
       const bench = await page.locator('.fm-lineup-bench-row .fm-lineup-points').allTextContents();
       assert.deepEqual(bench.map(Number), bench.map(Number).sort((a, b) => b - a));

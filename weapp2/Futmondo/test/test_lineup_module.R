@@ -105,7 +105,7 @@ shiny::testServer(lineup_Server,args=args,{
   grepl('Numbered calendar read failed.',output$status$html,fixed=TRUE),!grepl('0 completed rounds',output$status$html),state$submits==0L)
  stopifnot(grepl('Best XI is waiting',notice()))
  catalog(rounds);settle(session)
- stopifnot(all(is.finite(scores()$average)),identical(wanted(),as.numeric(2:6)),
+ stopifnot(all(is.finite(scores()$average)),identical(wanted(),as.numeric(4:6)),
   all(nzchar(draft()$starters)),!grepl('not verified',output$status$html),state$submits==0L)
  cat('PASS a queued Best XI reports incomplete calendar and automatically recovers on verified publication\n')
 })
@@ -116,7 +116,7 @@ attr(partial,'catalog_complete')<-FALSE;attr(partial,'catalog_reason')<-''
 args$round_catalog<-function()partial
 shiny::testServer(lineup_Server,args=args,{
  settle(session);session$setInputs(best=1);settle(session)
- stopifnot(identical(wanted(),as.numeric(2:6)),all(is.finite(scores()$average)),
+ stopifnot(identical(wanted(),as.numeric(4:6)),all(is.finite(scores()$average)),
   all(nzchar(draft()$starters)),!nzchar(catalog_issue()),
   !grepl('not verified|waiting for the completed-round schedule',output$status$html),state$submits==0L)
  cat('PASS unknown finality does not block available completed rounds or display a warning\n')
