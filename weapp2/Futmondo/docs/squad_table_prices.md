@@ -1,6 +1,6 @@
 # My Team clause visibility and sale profit
 
-My Team passes the application's existing `league_settings_source` into its player table. `players_table_renewal_disabled(settings)` merges league and primary-team configuration with the primary values taking precedence, matching Admin. Only an explicit `configuration.ddt = true` (including boolean strings) hides **Suggested Clause**. Missing, pending or unrecognized values remain distinct from a prohibition; a subsequent configuration update changes the table schema. **Owner team ID** is omitted from this table's display, while the original row IDs remain available to player-card and transaction handlers.
+All player tables omit **Suggested Clause**, **Fav** and **Owner team ID** from display regardless of renewal configuration. Their original values and row IDs remain available to favourites/owner filters, player-card actions and transaction handlers. This global display policy supersedes the previous My Team-only conditional hiding of Suggested Clause.
 
 My Team opts into `get_reactable_columns_for_players(..., show_sale_profit = TRUE)`. **Selling by** and **Offer** retain sortable numeric amounts. Their cells show the prospective profit or loss on a separate line below the full euro price, for example `12.000.000 € (+2.50 M€)` or `12.000.000 € (-0.25 M€)`. The parenthetical uses millions, a decimal point and two decimals; a rounded zero is `0.00 M€`, never negative zero. A listing is only a potential result, not a completed sale.
 

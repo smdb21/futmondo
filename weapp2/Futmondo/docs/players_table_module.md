@@ -162,3 +162,9 @@ The existing check table does not store the requested N or a source revision tok
 ## My Team asking price — 2026-11-07
 
 My Team supplies a numeric `selling_by` projection using the authenticated manager’s listing price, with existing roster price aliases as fallbacks. `get_reactable_columns_for_players()` labels it **Selling by** and hides `market_inMarket`, `price`, `market_price`, `effective_market_price` and `market_asking_price` only when this projection is present. Raw values remain in row metadata for manual player-card actions. **Offer** continues to represent a received bid; the new My Team summary shows the full received set instead of only that highest-per-player value. Other table pages retain their existing listing-price display. Bid source/immutable bidder IDs are internal metadata. This projection adds no HTTP/database request or history work and preserves numeric sorting.
+
+## Shared display columns — 2026-11-09
+
+`table_display_data()` omits `clause_suggestedClause`, `fav` and `owner_team_id` for every player table. Filtering and player actions retain these fields in the full row source; hiding them never rewrites the source data. Renewal settings no longer govern whether Suggested Clause is displayed. The shared Reactable definition labels `average.fitness` as **Latest 5**, keeping the field key and values unchanged.
+
+Performance: fewer displayed/payload columns and no new requests, database work, persistence, observers or calculations. Removing the old conditional visibility branch also removes a settings dependency from display-schema rebuilding.

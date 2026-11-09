@@ -1155,6 +1155,10 @@ get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE) {
   }
 
   # Averages / Points Columns ----
+  if ("average.fitness" %in% names(table)) {
+    columns[["average.fitness"]] <- colDef(name="Latest 5",align="center")
+  }
+
   if ("average.average" %in% colnames(table)) {
     columns[["average.average"]] <- colDef(
       name = "Avg Points",

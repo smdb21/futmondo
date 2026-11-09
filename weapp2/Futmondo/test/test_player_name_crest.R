@@ -8,7 +8,8 @@ rows<-data.frame(id=paste0('p',1:4),name=c('Vivian','Kike Salas','Unknown club',
   role=c('Defender','Defender','Midfielder','Forward'),
   team=c('Athletic Club','Sevilla',NA,'Athletic Club'),
   logo=c('authoritative-club.png',NA,NA,NA),value=2e6,
-  average.fitness='2,5,12,12,6',average.averageLastFive=7.4)
+  average.fitness='2,5,12,12,6',average.averageLastFive=7.4,
+  fav=c(TRUE,FALSE,TRUE,FALSE),owner_team_id='mine',clause_suggestedClause=3e6)
 before<-rows
 columns<-get_reactable_columns_for_players(rows)
 html<-vapply(seq_len(nrow(rows)),function(i)as.character(columns$name$cell(rows$name[i],i)),character(1))
@@ -44,8 +45,19 @@ shiny::testServer(players_table_Server,args=list(players_table_RV=shiny::reactiv
   stopifnot(identical(names(display)[1:4],c('name','role','recent_points_avg','recent_points_ratio')),
    identical(head(visible,4),c('name','role','recent_points_avg','recent_points_ratio')),
    identical(definitions$role$name,'Position'),isFALSE(definitions$team$show),isFALSE(definitions$logo$show),
+   identical(definitions$average.fitness$name,'Latest 5'),
+   !any(c('clause_suggestedClause','fav','owner_team_id')%in%names(display)),
+   !any(c('clause_suggestedClause','fav','owner_team_id')%in%visible),
+   identical(display$average.fitness,rows$average.fitness),
    identical(display$name,rows$name),identical(display$team,rows$team),identical(display$logo,rows$logo),
    all(display$recent_points_avg==9),all(display$recent_points_ratio==4.5))
+ })
+ session$setInputs(is_favorite_filter=TRUE);settle(session)
+ check('hidden favourite and owner data remain available to filtering and actions',{
+  stopifnot(identical(players_table_filtered_RV()$id,c('p1','p3')),
+   all(players_table_filtered_RV()$owner_team_id=='mine'),
+   all(players_table_filtered_RV()$clause_suggestedClause==3e6),
+   identical(table_display_data()$name,rows$name[c(1,3)]))
  })
 })
 cat(sprintf('PLAYER NAME CREST: %d passed / 0 failed\n',checks))

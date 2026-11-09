@@ -45,7 +45,7 @@ check('received-offer panel joins each current roster cost by player ID',{
     has(html,'(P/L unavailable)'),!any(state$records$id=='outside'),
     identical(state$records$acquisition_cost,c(9.5e6,12.25e6,NA_real_)))
 })
-check('only explicit renewal prohibition hides the reference; primary settings take precedence',{
+check('renewal flag helper preserves explicit settings and primary precedence',{
   for(value in list(TRUE,'true','TRUE'))stopifnot(players_table_renewal_disabled(list(info=list(configuration=list(ddt=value)))))
   for(value in list(FALSE,'false',NA,1,'unknown',list(TRUE)))stopifnot(!players_table_renewal_disabled(list(info=list(configuration=list(ddt=value)))))
   stopifnot(!players_table_renewal_disabled(NULL),
@@ -63,20 +63,20 @@ settle<-function(session)for(i in seq_len(5L)){later::run_now(0);session$flushRe
 shiny::testServer(players_table_Server,args=list(players_table_RV=listed_source,
   user_teams_RV=shiny::reactive(NULL),own_squad=TRUE,league_settings_source=settings),{
   session$setInputs(recent_games_n=5L);settle(session)
-  check('own squad hides owner ID, retains action metadata and initially preserves unknown renewal',{
+  check('own squad hides internal columns and retains action metadata',{
     stopifnot(!'owner_team_id'%in%names(table_display_data()),
-      'clause_suggestedClause'%in%names(table_display_data()),
+      !'clause_suggestedClause'%in%names(table_display_data()),
       all(players_table_filtered_RV()$owner_team_id=='mine'),
       !'buyPrice'%in%names(table_display_data()),
       identical(table_display_data()$sale_acquisition_cost,c(9.5e6,12.25e6,NA_real_)),
       is.numeric(table_display_data()$selling_by),is.numeric(table_display_data()$bid_price))
   })
   settings(list(info=list(configuration=list(ddt=TRUE))));settle(session)
-  check('disabled renewal removes the column from the actual widget; context settings can restore it',{
+  check('suggested clause stays hidden regardless of renewal settings',{
     stopifnot(!'clause_suggestedClause'%in%names(table_display_data()),
       !has(output$players_table,'Suggested Clause'),has(output$players_table,'+2.50 M'))
     settings(list(info=list(configuration=list(ddt=FALSE))));settle(session)
-    stopifnot('clause_suggestedClause'%in%names(table_display_data()),has(output$players_table,'Suggested Clause'))
+    stopifnot(!'clause_suggestedClause'%in%names(table_display_data()),!has(output$players_table,'Suggested Clause'))
   })
   updated<-listed;updated$buyPrice[1]<-'11000000';listed_source(updated);settle(session)
   check('new acquisition costs update both formatted cells while numeric asking prices stay unchanged',{

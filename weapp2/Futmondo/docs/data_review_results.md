@@ -1290,3 +1290,12 @@ No delegation. Removed the requested phrase from the heading; reviewed the one-l
 ## Icon-only lineup refresh button — 2026-11-09
 
 No delegation. Rendered the actual Lineup UI and verified that the refresh button has no visible text, retains its rotate icon and tooltip, and exposes the accessible name Refresh lineup. Scoped whitespace check passed. Browser/full runtime suites and hosted testing deliberately skipped for this small presentation change. Performance review: only the static button label/ARIA attributes change; no new API/database work, persistence, observers, redraws, timers or dependencies.
+
+
+## Shared player-table hidden columns and Latest 5 heading — 2026-11-09
+
+No delegation. Shared table display filtering now omits Suggested Clause, Fav and Owner team ID on every page. Full source rows retain these fields for favourites filtering, owner selection and player-card actions. Renewal settings cannot restore the hidden Suggested Clause column. The shared `average.fitness` definition displays Latest 5 while preserving its key and values. Existing user edits to `player_columns_to_hide.txt` were preserved and excluded.
+
+Passed `test/test_player_name_crest.R` (5 groups, including the actual widget schema, Latest 5 heading, preserved fitness values and favourites/action metadata), `test/test_squad_table_prices.R` (7 groups, including visibility under different renewal settings), and mandatory `test/test_shiny_simulation.R` (13 checks plus 8 tabs; no HTTP/live database mutation attempts). The lifecycle emitted existing empty Plotly trace warnings. Scoped whitespace/diff review passed. Browser/hosted testing and unrelated suites were deliberately skipped for this display-only change.
+
+Performance review: omitted columns reduce widget payload/rendering work; removing configuration-dependent visibility removes an unnecessary settings dependency from schema updates. No new requests, database reads/writes, persistence/cache changes, timers, dependencies or score calculations. Existing database-backed observations and filtered row metadata are reused. No expensive path requires a separate benchmark.

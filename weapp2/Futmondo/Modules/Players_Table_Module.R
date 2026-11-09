@@ -567,13 +567,9 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       rows <- players_table_filtered_RV()
       if(is.null(rows))return(NULL)
       cols_to_hide <- c(cfg_player_columns_to_hide,players_table_duplicate_price_columns(players_table_enriched_RV()),attr(rows,"filter_added_fields"),"data_coverage","observed_at","is_free_agent",
-        "recent_points_count","recent_points_required","recent_points_status")
+        "recent_points_count","recent_points_required","recent_points_status",
+        "clause_suggestedClause","fav","owner_team_id")
       if(isTRUE(hide_bid_column))cols_to_hide<-c(cols_to_hide,"bid_price")
-      if(isTRUE(own_squad)) {
-        cols_to_hide<-c(cols_to_hide,"owner_team_id")
-        settings<-if(is.function(league_settings_source))tryCatch(league_settings_source(),error=function(e)NULL)else league_settings_source
-        if(players_table_renewal_disabled(settings))cols_to_hide<-c(cols_to_hide,"clause_suggestedClause")
-      }
       rows<-rows %>% reorder_player_table_columns() %>%
         dplyr::select(!any_of(setdiff(cols_to_hide,"logo"))) %>%
         dplyr::select(any_of(c("name","role","recent_points_avg","recent_points_ratio")),everything())
