@@ -163,7 +163,10 @@ function(input, output, session) {
     on_market_event=function(...)refresh_trigger(isolate(refresh_trigger())+1L),startup_ready=startup_primary_ready)
   output$notification_bell <- renderUI({
     n <- notifications$unread()
-    actionLink("open_notifications", label = paste0("Notifications", if (is.finite(n)) paste0(" (",n,")") else ""), icon = icon("bell"))
+    label <- paste0("Notifications",if(is.finite(n))paste0(" (",n," unread)")else "")
+    actionLink("open_notifications",label=if(is.finite(n)&&n>0)
+      tags$span(class="fm-notification-unread",`aria-hidden`="true")else NULL,
+      icon=icon("bell"),class="fm-notification-link",title=label,`aria-label`=label)
   })
   observeEvent(input$open_notifications, updateTabItems(session, "tabs", "notifications"))
 selected_player_RV <- players_in_teams_Server(id = "players_in_teams",

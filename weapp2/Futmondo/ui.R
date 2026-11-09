@@ -12,8 +12,8 @@ fm_theme_control <- tags$div(class = "fm-theme-control",
         `aria-label` = "Dark", title = "Dark", `aria-pressed` = "false", icon("moon"))))
 
 header <- shinydashboardPlus::dashboardHeader(
-  title = "Futmondo",
-  tags$li(class = "dropdown", uiOutput("notification_bell"))
+  title = tags$span(class="fm-header-brand",tags$span(class="fm-header-title","Futmondo"),
+    uiOutput("notification_bell",inline=TRUE))
 )
 body <- shinydashboard::dashboardBody(
   # Add custom CSS here

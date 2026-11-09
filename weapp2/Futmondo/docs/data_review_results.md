@@ -1304,3 +1304,12 @@ Performance review: omitted columns reduce widget payload/rendering work; removi
 ## Sum last 5 heading — 2026-11-09
 
 No delegation. Reviewed the one-line shared heading rename from Last 5 Points to Sum last 5 and passed scoped whitespace checks. Runtime/browser suites and hosted testing deliberately skipped for this static copy edit. Performance review: no changed requests, database/persistence work, reactive behavior, values or calculations.
+
+
+## Notifications icon beside the title — 2026-11-09
+
+No delegation. Relocated the existing header Notifications output beside the Futmondo title and removed its visible text. A dot indicates a positive unread count; tooltip/accessibility text retains the available count, while unknown counts remain unknown. Existing sidebar navigation and the notification-tab action handler remain intact.
+
+Passed the focused offline `test/test_header_notifications.cjs` browser check at 320, 390 and 1440px: icon-only markup, title/bell alignment, viewport fit, synthetic unread tooltip/dot, real tab navigation and collapsed desktop header interaction. The primary agent inspected the 320px screenshot. The existing `test/test_browser_app.R` supplied the HTTP-blocked application fixture. Mandatory `test/test_shiny_simulation.R` passed 13 checks plus 8 tabs with no HTTP/live database mutation attempts; existing empty Plotly trace warnings remain. Scoped whitespace and browser-script syntax checks passed. Unrelated suites and hosted testing/deployment were deliberately not run.
+
+Performance review: the same single UI output and unread reactive source are reused; no new API/database requests, polling, persistence, observers, dependencies or calculations. The previous text/count node becomes an existing bell with one small unread-dot span; layout uses small scoped flex rules. No expensive path changed, so a separate benchmark is unwarranted.

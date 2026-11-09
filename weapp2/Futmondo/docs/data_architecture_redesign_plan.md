@@ -808,3 +808,8 @@ Implemented locally: hide Suggested Clause, Fav and Owner team ID in every share
 ## Sum last 5 heading — 2026-11-09
 
 Renamed the shared `average.total` display heading from Last 5 Points to Sum last 5 at the user's request. Values and calculation behavior are unchanged. Verification/performance review: `data_review_results.md`.
+
+
+## Notifications icon beside the title — 2026-11-09
+
+Implemented locally: move the existing Notifications output into the Futmondo title row as an icon-only bell. Retain existing navigation and unread state through a dot, tooltip and accessible count; support phone widths and collapsed desktop navigation. Verification/performance review: `data_review_results.md`; behavior documented in `notifications_module.md`.
