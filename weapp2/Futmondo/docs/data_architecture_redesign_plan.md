@@ -778,3 +778,8 @@ Completed locally: Best XI jointly searches every entitled formation and player 
 ## Lineup picker after optimization and current-draft labels — 2026-11-09
 
 Implemented locally: player tiles send direct priority click events so newly optimized/redrawn tiles open their picker before Shiny input rebinding. Server validation retains account/league/round generation, formation, slot bounds and save guards. Picker rows label the current draft's Starting XI, numbered Bench and unselected players, including unsaved edits; the clicked slot is marked separately. Visible refresh help explains that official data is reloaded while preserving the draft, and saving remains explicit. No optimizer, scoring, acquisition or persistence policy changes. Verification and performance review are recorded in `data_review_results.md`; hosted deployment/testing remains separate.
+
+
+## Compact lineup picker marks — 2026-11-09
+
+Implemented locally: replace long per-row membership/current-slot text with inline icons, retaining accessible labels/tooltips and a compact shared legend. Current draft semantics and all manual actions remain unchanged. Verification/performance review: `data_review_results.md`. Hosted testing remains separate.

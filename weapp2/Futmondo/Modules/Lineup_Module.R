@@ -11,6 +11,8 @@ lineup_UI <- function(id) {
       .fm-lineup-choice:focus-visible{outline:2px solid var(--fm-warning,#bd8d1e);outline-offset:-2px}
       .fm-lineup-choice-name{min-width:0;overflow-wrap:anywhere}
       .fm-lineup-choice-name small{display:block;color:var(--fm-muted,#647067)}
+      .fm-lineup-choice-label{display:flex;align-items:center;gap:6px}
+      .fm-lineup-choice-membership{display:inline-flex;flex-shrink:0}
       .fm-lineup-choice-total,.fm-lineup-choice-average{text-align:right;font-variant-numeric:tabular-nums}
       .fm-lineup-choice-crest{width:24px;height:24px;object-fit:contain}
     ")),
@@ -238,11 +240,14 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       order_rows<-order(-averages,rows$name,rows$id,na.last=TRUE);rows<-rows[order_rows,,drop=FALSE];averages<-averages[order_rows];positions<-positions[order_rows]
       value<-draft();old<-if(pick$bench)value$bench[pick$index]else value$starters[pick$index]
       number<-function(value)if(length(value)==1L&&is.finite(value))format(round(value,2),trim=TRUE)else'—'
+      marker<-function(icon,label)shiny::span(class='fm-lineup-choice-membership',
+        title=label,role='img',`aria-label`=label,shiny::icon(icon))
       shiny::tagList(
         shiny::div(class='fm-lineup-note',paste0('Select a player to switch. Average uses the last ',length(attr(score,'rounds')),
           ' completed rounds (requested ',n_rounds(),'). Missing scores are shown as —.')),
         shiny::div(class='fm-lineup-note fm-lineup-picker-membership-note',
-          'Starting XI and Bench labels show your current lineup, including unsaved changes.'),
+          marker('circle-check','Starting XI'),' XI · ',marker('chair','Bench'),' Bench · ',
+          marker('crosshairs','Current slot'),' Current · including unsaved changes'),
         shiny::div(class='fm-lineup-picker-heading',`aria-hidden`='true',shiny::span(),shiny::span('Player'),shiny::span('Total pts'),shiny::span(paste0('Avg (',n_rounds(),')'))),
         shiny::div(class='fm-lineup-picker-list',role='group',`aria-label`='Eligible players',
           if(!nrow(rows))shiny::div(class='fm-lineup-note','No squad players can play in this position.'),
@@ -257,9 +262,11 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
               title=row$name,disabled=if(saving())'disabled',onclick=picker_click(as.character(row$id),pick),
               if(nzchar(url))shiny::tags$img(class='fm-lineup-choice-crest',src=url,alt=row$club,width=24,height=24,
                 loading='lazy',decoding='async',onerror="this.style.visibility='hidden'")else shiny::span(),
-              shiny::span(class='fm-lineup-choice-name',lineup_player_label(row$name),
-                shiny::tags$small(paste0(paste(positions[[i]],collapse='/'),if(identical(row$id,old))' · Current slot'else'',if(unavailable)' · injured/suspended'else'')),
-                shiny::tags$small(class='fm-lineup-choice-membership',membership_label)),
+              shiny::span(class='fm-lineup-choice-name',
+                shiny::span(class='fm-lineup-choice-label',lineup_player_label(row$name),
+                  if(membership!='none')marker(if(identical(row$id,old))'crosshairs'else if(membership=='starter')'circle-check'else'chair',
+                    paste0(if(identical(row$id,old))'Current slot · 'else'',membership_label))),
+                shiny::tags$small(paste0(paste(positions[[i]],collapse='/'),if(unavailable)' · injured/suspended'else''))),
               shiny::span(class='fm-lineup-choice-total',`aria-label`='Total points',number(row$points)),
               shiny::span(class='fm-lineup-choice-average',`aria-label`=paste('Average points over',n_rounds(),'completed rounds'),number(averages[i])))
           })))

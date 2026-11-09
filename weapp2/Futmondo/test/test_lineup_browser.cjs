@@ -31,11 +31,19 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
             node.id.includes('-starter_') ? 'starter' : 'bench'])));
         const rows = await modal.locator('.fm-lineup-choice').evaluateAll(nodes => nodes.map(node => ({
           id: node.dataset.playerId, membership: node.dataset.lineupMembership,
-          label: node.querySelector('.fm-lineup-choice-membership').textContent,
+          label: node.querySelector('.fm-lineup-choice-membership')?.getAttribute('aria-label'),
+          current: node.getAttribute('aria-pressed') === 'true',
+          icon: node.querySelector('.fm-lineup-choice-membership i')?.className,
+          visibleText: node.innerText,
         })));
         for (const row of rows) {
           assert.equal(row.membership, expected[row.id] || 'none', `Current draft membership for ${row.id}`);
-          assert.match(row.label, row.membership === 'starter' ? /^Starting XI$/ : row.membership === 'bench' ? /^Bench [1-4]$/ : /^Not selected$/);
+          if (row.membership === 'none') assert.equal(row.label, undefined);
+          else {
+            assert.match(row.label, row.membership === 'starter' ? /Starting XI$/ : /Bench [1-4]$/);
+            assert.ok(row.icon.includes(row.current ? 'fa-crosshairs' : row.membership === 'starter' ? 'fa-circle-check' : 'fa-chair'));
+          }
+          assert.doesNotMatch(row.visibleText, /Current slot|Starting XI|Bench [1-4]|Not selected/);
         }
         assert.match(await modal.locator('.fm-lineup-picker-membership-note').innerText(), /including unsaved changes/);
       };
@@ -141,7 +149,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       assert.equal(await choices.count(), 8);
       assert.ok((await choices.evaluateAll(nodes => nodes.map(n => n.dataset.position))).every(role => role === 'FWD'));
       const player17 = modal.locator('.fm-lineup-choice[data-player-id="p17"]');
-      assert.match(await player17.locator('.fm-lineup-choice-name').innerText(), /^P\. 17\nFWD\n/);
+      assert.match(await player17.locator('.fm-lineup-choice-name').innerText(), /^P\. 17\nFWD$/);
       assert.equal(await player17.getAttribute('title'), 'Player 17');
       assert.equal(await player17.locator('.fm-lineup-choice-total').innerText(), '117');
       assert.equal(await player17.locator('.fm-lineup-choice-average').innerText(), '17');

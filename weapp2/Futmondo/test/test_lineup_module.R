@@ -250,6 +250,10 @@ shiny::testServer(lineup_Server,args=args,{
  stopifnot(membership(optimized$starters[1])=='starter',membership(optimized$bench[1])=='bench',
   grepl('including unsaved changes',output$picker_players$html,fixed=TRUE),
   grepl('Current slot',output$picker_players$html,fixed=TRUE),all(!nzchar(source()$official$starters)))
+ markers<-xml2::xml_find_all(html,'//button//span[@class="fm-lineup-choice-membership"]')
+ stopifnot(length(markers)==15L,
+  all(nzchar(xml2::xml_attr(markers,'aria-label'))),all(trimws(xml2::xml_text(markers))==''),
+  length(xml2::xml_find_all(markers,'.//i[contains(@class,"fa-crosshairs")]'))==1L)
  # A new local assignment must immediately change membership without a source read.
  replacement<-setdiff(roster()$id,c(optimized$starters,optimized$bench))[1]
  session$setInputs(player_choice=list(id=replacement,picker=selected()$sequence));settle(session)
