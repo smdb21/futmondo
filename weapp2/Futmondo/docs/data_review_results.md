@@ -1299,3 +1299,8 @@ No delegation. Shared table display filtering now omits Suggested Clause, Fav an
 Passed `test/test_player_name_crest.R` (5 groups, including the actual widget schema, Latest 5 heading, preserved fitness values and favourites/action metadata), `test/test_squad_table_prices.R` (7 groups, including visibility under different renewal settings), and mandatory `test/test_shiny_simulation.R` (13 checks plus 8 tabs; no HTTP/live database mutation attempts). The lifecycle emitted existing empty Plotly trace warnings. Scoped whitespace/diff review passed. Browser/hosted testing and unrelated suites were deliberately skipped for this display-only change.
 
 Performance review: omitted columns reduce widget payload/rendering work; removing configuration-dependent visibility removes an unnecessary settings dependency from schema updates. No new requests, database reads/writes, persistence/cache changes, timers, dependencies or score calculations. Existing database-backed observations and filtered row metadata are reused. No expensive path requires a separate benchmark.
+
+
+## Sum last 5 heading — 2026-11-09
+
+No delegation. Reviewed the one-line shared heading rename from Last 5 Points to Sum last 5 and passed scoped whitespace checks. Runtime/browser suites and hosted testing deliberately skipped for this static copy edit. Performance review: no changed requests, database/persistence work, reactive behavior, values or calculations.

@@ -1212,7 +1212,7 @@ get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE) {
 
   if ("average.total" %in% colnames(table)) {
     columns[["average.total"]] <- colDef(
-      name = "Last 5 Points",
+      name = "Sum last 5",
       align = "center"
     )
   }

@@ -803,3 +803,8 @@ Implemented locally: remove the refresh button's visible text, retaining its rot
 ## Shared player-table hidden columns and Latest 5 heading — 2026-11-09
 
 Implemented locally: hide Suggested Clause, Fav and Owner team ID in every shared player table, regardless of renewal settings. Preserve full row metadata for filters/actions. Rename the `average.fitness` heading to Latest 5 without changing its field key or values. Verification/performance review: `data_review_results.md`; display contracts updated in `players_table_module.md` and `squad_table_prices.md`.
+
+
+## Sum last 5 heading — 2026-11-09
+
+Renamed the shared `average.total` display heading from Last 5 Points to Sum last 5 at the user's request. Values and calculation behavior are unchanged. Verification/performance review: `data_review_results.md`.
