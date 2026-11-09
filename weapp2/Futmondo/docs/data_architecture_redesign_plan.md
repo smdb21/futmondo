@@ -788,3 +788,8 @@ Implemented locally: replace long per-row membership/current-slot text with inli
 ## Lineup control placement — 2026-11-09
 
 Implemented locally: move the formation selector directly above the pitch in place of the static formation text; group Optimize and Last N rounds on one responsive row. Keep the injury toggle on its own row. Existing behavior and data acquisition remain unchanged. Verification/performance review: `data_review_results.md`.
+
+
+## Shorter lineup heading — 2026-11-09
+
+Removed the redundant “saves the current editable Futmondo lineup” phrase at the user's request. The next-round number and unsaved-changes indicator remain. See `data_review_results.md`.

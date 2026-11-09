@@ -305,7 +305,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
     output$heading<-shiny::renderUI({
       shiny::req(is_module_active());next_round<-target()
       shiny::div(class='fm-lineup-note',if(is.null(next_round))'Next-round schedule unavailable; saving is disabled.'else
-        paste0('Next scheduled round ',next_round$number,' · saves the current editable Futmondo lineup'),
+        paste0('Next scheduled round ',next_round$number),
         if(dirty())shiny::strong(' · Unsaved changes'))
     })
     output$status<-shiny::renderUI({

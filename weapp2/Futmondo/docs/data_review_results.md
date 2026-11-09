@@ -1280,3 +1280,8 @@ The existing module regression also passed all 18 groups, including icon accessi
 No delegation. The formation selector now directly precedes the pitch; Optimize and Last N rounds share a row. Existing offline browser regression passed at 390/1440px, including new geometry checks, formation edits, immediate picker opening, optimization, save/undo and unchanged local request/write counters. A targeted 320px browser check confirmed the same-row controls, selector placement and no page overflow; the primary agent inspected its screenshot. Scoped whitespace checks passed. Module/data/lifecycle suites and hosted testing were deliberately skipped for this layout-only change.
 
 Performance review: existing controls and reactive output IDs are relocated; one redundant static heading is removed. No API/database reads or writes, cache/persistence changes, dependencies, timers, observers or new calculations. The selector stays in a stable UI container outside pitch redraws. Small scoped flex rules preserve mobile fit with no expensive path requiring measurement.
+
+
+## Shorter lineup heading — 2026-11-09
+
+No delegation. Removed the requested phrase from the heading; reviewed the one-line diff and scoped whitespace check. Runtime/browser tests deliberately skipped for this static copy edit. Performance review: no changed requests, persistence, reactive behavior or calculations; only less heading text. Hosted testing not run.
