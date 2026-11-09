@@ -175,7 +175,8 @@ selected_player_RV <- players_in_teams_Server(id = "players_in_teams",
                                                  user_team_id = user_team_id_RV,
                                                  user_teams_RV = user_teams_RV,
                                                  refresh_trigger = refresh_trigger,
-                                                 round_catalog = round_catalog_RV)
+                                                 round_catalog = round_catalog_RV,
+                                                 league_settings_source = league_settings_source)
 
   lineup <- lineup_Server("lineup", reactive(identical(input$tabs,"lineup")),
     login_token_RV, championship_id_RV, user_team_id_RV, round_catalog_RV,

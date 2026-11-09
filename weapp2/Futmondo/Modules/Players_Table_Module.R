@@ -287,7 +287,15 @@ players_table_points_ratio <- function(rows, basis) {
   rows
 }
 
-players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL, available_funds_RV = NULL, hide_bid_column = FALSE, refresh_trigger = NULL, is_module_active = function() TRUE, optional_ready = function() TRUE, points_ratio_basis = NULL) {
+# Unknown configuration leaves the reference column visible; only an explicit
+# prohibition hides it. Primary team settings take precedence, as in Admin.
+players_table_renewal_disabled <- function(settings) {
+  cfg <- utils::modifyList(settings$league$configuration %||% list(),settings$info$configuration %||% list())
+  value <- cfg$ddt
+  length(value)==1L && is.atomic(value) && !is.na(value) && identical(tolower(as.character(value)),"true")
+}
+
+players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL, available_funds_RV = NULL, hide_bid_column = FALSE, refresh_trigger = NULL, is_module_active = function() TRUE, optional_ready = function() TRUE, points_ratio_basis = NULL, own_squad = FALSE, league_settings_source = NULL) {
   if (!is.null(points_ratio_basis)) points_ratio_basis <- match.arg(points_ratio_basis, c("value", "clause_price"))
   moduleServer(id, function(input, output, session) {
     bind_factual_reads(c("get_finished_rounds"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
@@ -423,6 +431,8 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       if (is.function(refresh_trigger)) refresh_trigger()
       players_table <- players_table_RV()
       if (!is.data.frame(players_table))return(NULL)
+      if(isTRUE(own_squad))players_table$sale_acquisition_cost<-vapply(seq_len(nrow(players_table)),
+        function(i)current_player_acquisition_cost(players_table[i,,drop=FALSE],NULL,NULL),numeric(1))
       source_columns<-names(players_table)
       players_table<-players_table_filter_fields(players_table)
       filter_added_fields<-setdiff(names(players_table),source_columns)
@@ -559,6 +569,11 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       cols_to_hide <- c(cfg_player_columns_to_hide,players_table_duplicate_price_columns(players_table_enriched_RV()),attr(rows,"filter_added_fields"),"data_coverage","observed_at","is_free_agent",
         "recent_points_count","recent_points_required","recent_points_status")
       if(isTRUE(hide_bid_column))cols_to_hide<-c(cols_to_hide,"bid_price")
+      if(isTRUE(own_squad)) {
+        cols_to_hide<-c(cols_to_hide,"owner_team_id")
+        settings<-if(is.function(league_settings_source))tryCatch(league_settings_source(),error=function(e)NULL)else league_settings_source
+        if(players_table_renewal_disabled(settings))cols_to_hide<-c(cols_to_hide,"clause_suggestedClause")
+      }
       rows<-rows %>% reorder_player_table_columns() %>%
         dplyr::select(!any_of(setdiff(cols_to_hide,"logo"))) %>%
         dplyr::select(any_of(c("name","role","recent_points_avg","recent_points_ratio")),everything())
@@ -597,7 +612,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       schema<-table_schema();req(schema)
       players_table<-isolate(table_display_data());req(players_table)
       rendered_schema<<-schema;rendered_data<<-players_table;rendered_ids<<-isolate(table_display_ids());rendered_meta<<-isolate(table_color_meta())
-      table_columns <- get_reactable_columns_for_players(players_table)
+      table_columns <- get_reactable_columns_for_players(players_table,show_sale_profit=own_squad)
       if("points" %in% names(players_table))table_columns[["points"]]<-reactable::colDef(
         name="Points",align="center",sortNALast=TRUE,
         style=players_table_metric_style(),cell=players_table_metric_cell(0L))

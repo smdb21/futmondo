@@ -10,7 +10,7 @@ players_in_teams_UI <- function(id) {
       filter_by_is_favorite=FALSE, filter_by_is_from_futmondo=FALSE,
       show_position_breakdown=TRUE, hide_bid_column=FALSE))
 }
-players_in_teams_Server <- function(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger=NULL, round_catalog=NULL) {
+players_in_teams_Server <- function(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger=NULL, round_catalog=NULL, league_settings_source=NULL) {
   moduleServer(id, function(input, output, session) {
     bind_factual_reads(c("get_players_from_team","get_my_market_players"),session,login_token,championship_id,user_team_id,
       is_active=is_module_active,refresh_trigger=refresh_trigger)
@@ -240,7 +240,7 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
 
     selected <- players_table_Server("players_table_in_teams", players_table_RV, user_teams_RV,
       login_token, championship_id, user_team_id, hide_bid_column=FALSE, refresh_trigger=refresh_trigger,
-      is_module_active=is_module_active)
+      is_module_active=is_module_active,own_squad=TRUE,league_settings_source=league_settings_source)
     return(selected)
   })
 }
@@ -279,7 +279,11 @@ team_received_offers_state <- function(roster_state) {
     index<-match(rows$id,as.character(roster$id))
     rows$player_name<-if("name"%in%names(roster))as.character(roster$name[index])else rows$id
     missing<-is.na(rows$player_name)|!nzchar(rows$player_name);rows$player_name[missing]<-rows$id[missing]
-  }else rows$player_name<-character(nrow(rows))
+    rows$acquisition_cost<-vapply(index,function(i)current_player_acquisition_cost(roster[i,,drop=FALSE],NULL,NULL),numeric(1))
+  }else {
+    rows$player_name<-character(nrow(rows))
+    rows$acquisition_cost<-rep(NA_real_,nrow(rows))
+  }
   status<-roster_state$status %||% "unavailable"
   error<-roster_state$error %||% attr(roster,"received_offers_error")
   if(status%in%c("ok","empty"))status<-attr(roster,"received_offers_status") %||% "ok"
@@ -300,7 +304,7 @@ team_received_offers_panel <- function(state,ns) {
     if(verified&&!nrow(rows))shiny::tags$p("No offers for your players."),
     lapply(seq_len(nrow(rows)),function(i) {
       row<-rows[i,,drop=FALSE];rival<-identical(row$bid_source,"rival");system<-identical(row$bid_source,"system")
-      amount<-if(is.finite(row$bid_price))format_table_currency(row$bid_price)else "Amount unavailable"
+      amount<-if(is.finite(row$bid_price))format_table_sale_price(row$bid_price,row$acquisition_cost)else "Amount unavailable"
       shiny::tags$div(class="fm-team-offer",
         shiny::tags$div(class="fm-team-offer-heading",if(nzchar(row$bid_id))shiny::actionLink(ns(team_received_offer_input(row)),row$player_name)else shiny::tags$span(row$player_name),shiny::tags$strong(amount)),
         shiny::tags$div(shiny::tags$span(class=paste("fm-offer-source",if(rival)"fm-offer-rival"else ""),

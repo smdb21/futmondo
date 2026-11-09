@@ -766,3 +766,10 @@ Completed locally: the injured/suspended players checkbox occupies its own full-
 ## Best XI formation and dual-position priority — 2026-11-07
 
 Completed locally: Best XI jointly searches every entitled formation and player assignment. Equal observed-score totals now prefer MID/FWD players assigned to MID before current-formation/current-starter ties; higher historical totals remain primary, with legal forward fallback and multiposition/entitlement rules preserved. Focused optimizer/module and mobile/desktop checks passed; independent exhaustive verification covered 24 synthetic cases. See `lineup_module.md` and `data_review_results.md`. Hosted deployment remains separate.
+
+
+### 2026-11-08 My Team clause visibility and sale profit — implemented locally
+
+- Hide Suggested Clause in My Team when the shared configuration explicitly prohibits renewal; hide Owner team ID while retaining canonical action metadata.
+- Append prospective profit/loss in signed millions with two decimals to listing and received-offer prices, including individual offer cards, using the observed current roster acquisition cost. Preserve numeric sorting and unknown-cost states.
+- Reuse existing shared configuration and database-backed roster observations with no extra API/database requests, timers or dependencies. Contracts and verification: [squad table prices](squad_table_prices.md). Hosted/browser/mobile verification was not run.

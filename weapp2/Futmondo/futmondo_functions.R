@@ -771,10 +771,28 @@ reorder_player_table_columns <- function(df) {
   return(res)
 }
 
-get_reactable_columns_for_players <- function(table) {
-  columns <- list()
+# Asking prices/offers stay numeric; this formatter adds a display-only P/L.
+format_table_sale_price <- function(value, acquisition_cost) {
+  amount <- suppressWarnings(as.numeric(as.character(value)))
+  cost <- suppressWarnings(as.numeric(as.character(acquisition_cost)))
+  if(length(amount)!=1L || !is.finite(amount) || amount<=0)return("")
+  price <- format_table_currency(amount)
+  if(length(cost)!=1L || !is.finite(cost) || cost<0)return(paste0(price," (P/L unavailable)"))
+  millions <- round((amount-cost)/1e6,2)
+  if(millions==0)millions<-0
+  paste0(price," (",if(millions>0)"+"else"",sprintf("%.2f",millions)," M\u20ac)")
+}
 
-  for(field in intersect(c("bid_source","bidder_team_id"),names(table)))columns[[field]]<-colDef(show=FALSE)
+get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE) {
+  columns <- list()
+  sale_price <- function(value,index) {
+    if(!isTRUE(show_sale_profit))return(format_table_currency(value))
+    cost <- if("sale_acquisition_cost"%in%names(table))table$sale_acquisition_cost[index]else
+      current_player_acquisition_cost(table[index,,drop=FALSE],NULL,NULL)
+    format_table_sale_price(value,cost)
+  }
+
+  for(field in intersect(c("bid_source","bidder_team_id","sale_acquisition_cost"),names(table)))columns[[field]]<-colDef(show=FALSE)
 
   # Keep names as plain sortable/filterable values and show the club crest beside them.
   # Club metadata stays in the payload for this formatter, without a separate Team column.
@@ -815,7 +833,7 @@ get_reactable_columns_for_players <- function(table) {
       cell = function(value, index) {
         if (is.na(value) || is.null(value) || value == "" || value == 0) return("")
         num_val <- suppressWarnings(as.numeric(value))
-        formatted <- format_table_currency(num_val)
+        formatted <- sale_price(num_val,index)
 
         bidder <- if ("bid_user" %in% colnames(table) && !is.na(table$bid_user[index]) && as.character(table$bid_user[index]) != "") {
           as.character(table$bid_user[index])
@@ -1203,7 +1221,7 @@ get_reactable_columns_for_players <- function(table) {
 
   if("selling_by"%in%names(table)) {
     columns[["selling_by"]]<-colDef(name="Selling by",align="right",minWidth=150,
-      cell=function(value)format_table_currency(value))
+      cell=function(value,index)sale_price(value,index))
     for(field in intersect(c("market_inMarket","price","market_price","effective_market_price","market_asking_price"),names(table)))
       columns[[field]]<-colDef(show=FALSE)
   }
