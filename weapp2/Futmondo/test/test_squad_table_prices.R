@@ -28,6 +28,9 @@ check('listing and offer cells use roster buyPrice, never valuation or asking pr
     has(columns$selling_by$cell(listed$selling_by[3],3),'(P/L unavailable)'),
     has(columns$bid_price$cell(listed$bid_price[3],3),'(P/L unavailable)'),
     has(columns$selling_by$cell(12e6,1),format_table_currency(12e6)),
+    has(columns$selling_by$cell(12e6,1),'class="fm-sale-price"'),
+    has(columns$bid_price$cell(12e6,1),'class="fm-sale-price"'),
+    !has(get_reactable_columns_for_players(listed)$bid_price$cell(12e6,1),'fm-sale-price'),
     !has(get_reactable_columns_for_players(listed)$bid_price$cell(12e6,1),'M€'))
 })
 offers<-dplyr::bind_rows(normalize_received_offer(list(id='profit',price=12e6),'p'),

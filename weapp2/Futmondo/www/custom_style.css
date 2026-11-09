@@ -1386,3 +1386,14 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 .fm-lineup-heading { color: var(--fm-text); }
 .fm-lineup-heading span, .fm-lineup-legend { color: var(--fm-muted); }
 .waiter-overlay { background-color: var(--fm-bg) !important; color: var(--fm-text) !important; }
+
+/* Keep squad sale P/L below its price, including inside received-offer badges. */
+.fm-sale-price {
+    display: inline-block;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.fm-sale-price > span {
+    display: block;
+}

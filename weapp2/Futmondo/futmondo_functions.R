@@ -772,15 +772,21 @@ reorder_player_table_columns <- function(df) {
 }
 
 # Asking prices/offers stay numeric; this formatter adds a display-only P/L.
-format_table_sale_price <- function(value, acquisition_cost) {
+format_table_sale_price <- function(value, acquisition_cost, multiline = FALSE) {
   amount <- suppressWarnings(as.numeric(as.character(value)))
   cost <- suppressWarnings(as.numeric(as.character(acquisition_cost)))
   if(length(amount)!=1L || !is.finite(amount) || amount<=0)return("")
   price <- format_table_currency(amount)
-  if(length(cost)!=1L || !is.finite(cost) || cost<0)return(paste0(price," (P/L unavailable)"))
-  millions <- round((amount-cost)/1e6,2)
-  if(millions==0)millions<-0
-  paste0(price," (",if(millions>0)"+"else"",sprintf("%.2f",millions)," M\u20ac)")
+  profit <- if(length(cost)!=1L || !is.finite(cost) || cost<0) {
+    "(P/L unavailable)"
+  } else {
+    millions <- round((amount-cost)/1e6,2)
+    if(millions==0)millions<-0
+    paste0("(",if(millions>0)"+"else"",sprintf("%.2f",millions)," M\u20ac)")
+  }
+  if(isTRUE(multiline))return(shiny::tags$span(class="fm-sale-price",
+    shiny::tags$span(price),shiny::tags$span(profit)))
+  paste(price,profit)
 }
 
 get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE) {
@@ -789,7 +795,7 @@ get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE) {
     if(!isTRUE(show_sale_profit))return(format_table_currency(value))
     cost <- if("sale_acquisition_cost"%in%names(table))table$sale_acquisition_cost[index]else
       current_player_acquisition_cost(table[index,,drop=FALSE],NULL,NULL)
-    format_table_sale_price(value,cost)
+    format_table_sale_price(value,cost,multiline=TRUE)
   }
 
   for(field in intersect(c("bid_source","bidder_team_id","sale_acquisition_cost"),names(table)))columns[[field]]<-colDef(show=FALSE)
