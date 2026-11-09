@@ -213,15 +213,15 @@ reset()
 shiny::testServer(lineup_Server,args=args,{
  settle(session);session$setInputs(best=1);settle(session)
  original<-draft();value<-original;value$captain<-value$starters[1];draft(value)
- session$setInputs(starter_1=1);settle(session);pick<-selected()
+ session$setInputs(slot_click=slot_event(FALSE,1L));settle(session);pick<-selected()
  session$setInputs(player_choice=list(id='',picker=pick$sequence));settle(session)
  stopifnot(draft()$starters[1]=='',draft()$captain=='',is.null(selected()),is.null(best_request()),
   identical(draft()$starters[-1],original$starters[-1]),identical(draft()$bench,original$bench),
   grepl('Select all eleven starters',output$save_control$html),state$reads==1L,state$submits==0L)
- session$setInputs(starter_1=2);settle(session);pick<-selected()
+ session$setInputs(slot_click=slot_event(FALSE,1L));settle(session);pick<-selected()
  session$setInputs(player_choice=list(id=original$starters[1],picker=pick$sequence));settle(session)
  stopifnot(identical(draft()$starters,original$starters),is.null(selected()))
- session$setInputs(bench_1=1);settle(session);pick<-selected()
+ session$setInputs(slot_click=slot_event(TRUE,1L));settle(session);pick<-selected()
  session$setInputs(player_choice=list(id='',picker=pick$sequence));settle(session)
  stopifnot(draft()$bench[1]=='',identical(draft()$bench[-1],original$bench[-1]),state$reads==1L,state$submits==0L)
  cat('PASS one-click starter/bench edits and removal leave other slots intact, clear removed captain, and make no source requests\n')
@@ -229,8 +229,8 @@ shiny::testServer(lineup_Server,args=args,{
 reset()
 shiny::testServer(lineup_Server,args=args,{
  settle(session);session$setInputs(best=1);settle(session);original<-draft()
- session$setInputs(starter_1=1);settle(session);old<-selected()
- session$setInputs(starter_2=1);settle(session);pick<-selected()
+ session$setInputs(slot_click=slot_event(FALSE,1L));settle(session);old<-selected()
+ session$setInputs(slot_click=slot_event(FALSE,2L));settle(session);pick<-selected()
  session$setInputs(player_choice=list(id='',picker=old$sequence));settle(session)
  stopifnot(identical(draft(),original),identical(selected(),pick))
  session$setInputs(player_choice=list(id='p1',picker=pick$sequence));settle(session)
@@ -239,6 +239,37 @@ shiny::testServer(lineup_Server,args=args,{
  stopifnot(identical(draft()$starters[1:2],rev(original$starters[1:2])),is.null(selected()),
   !anyDuplicated(c(draft()$starters,draft()$bench)),state$reads==1L,state$submits==0L)
  cat('PASS obsolete picker clicks are ignored; invalid roles retain the draft; eligible selections swap immediately\n')
+})
+reset()
+shiny::testServer(lineup_Server,args=args,{
+ settle(session);session$setInputs(best=1);settle(session)
+ optimized<-draft();event<-slot_event(TRUE,1L)
+ session$setInputs(slot_click=event);settle(session)
+ html<-xml2::read_html(output$picker_players$html)
+ membership<-function(id)xml2::xml_attr(xml2::xml_find_first(html,paste0('//button[@data-player-id="',id,'"]')),'data-lineup-membership')
+ stopifnot(membership(optimized$starters[1])=='starter',membership(optimized$bench[1])=='bench',
+  grepl('including unsaved changes',output$picker_players$html,fixed=TRUE),
+  grepl('Current slot',output$picker_players$html,fixed=TRUE),all(!nzchar(source()$official$starters)))
+ # A new local assignment must immediately change membership without a source read.
+ replacement<-setdiff(roster()$id,c(optimized$starters,optimized$bench))[1]
+ session$setInputs(player_choice=list(id=replacement,picker=selected()$sequence));settle(session)
+ session$setInputs(slot_click=event);settle(session)
+ html<-xml2::read_html(output$picker_players$html)
+ stopifnot(membership(replacement)=='bench',membership(optimized$bench[1])=='none',state$reads==1L,state$submits==0L)
+ previous<-selected()
+ session$setInputs(slot_click=utils::modifyList(event,list(generation=event$generation-1L)));settle(session)
+ stopifnot(identical(selected(),previous))
+ session$setInputs(slot_click=utils::modifyList(event,list(strategy='obsolete')));settle(session)
+ stopifnot(identical(selected(),previous))
+ session$setInputs(slot_click=utils::modifyList(event,list(index=99L)));settle(session)
+ stopifnot(identical(selected(),previous))
+ session$setInputs(reset=1);settle(session);session$setInputs(slot_click=event);settle(session)
+ # Undo restores the empty official fixture; a matching refreshed event opens it.
+ session$setInputs(slot_click=utils::modifyList(event,list(strategy=draft()$strategy)));settle(session)
+ html<-xml2::read_html(output$picker_players$html)
+ stopifnot(all(xml2::xml_attr(xml2::xml_find_all(html,'//button[@data-lineup-membership]'),'data-lineup-membership')=='none'),
+  state$reads==1L,state$submits==0L)
+ cat('PASS picker membership follows unsaved XI/bench edits and undo; obsolete and invalid slot events are ignored without source reads\n')
 })
 for(mode in c('optimize-error','no-xi')){
  reset(mode)
@@ -251,4 +282,4 @@ for(mode in c('optimize-error','no-xi')){
   cat('PASS',mode,'retains the lineup and clears calculation feedback\n')
  })
 }
-cat('LINEUP MODULE: 17 groups passed / 0 failed\n')
+cat('LINEUP MODULE: 18 groups passed / 0 failed\n')

@@ -26,7 +26,10 @@ lineup_UI <- function(id) {
         shiny::actionButton(ns('clear'),'Clear lineup',icon=shiny::icon('eraser')),
         shiny::actionButton(ns('reset'),'Undo changes',icon=shiny::icon('rotate-left'),
           title='Restore the latest lineup loaded from or successfully saved to Futmondo'),
-        shiny::actionButton(ns('reload'),'Refresh lineup',icon=shiny::icon('rotate'))),
+        shiny::actionButton(ns('reload'),'Refresh lineup',icon=shiny::icon('rotate'),
+          title='Reload the official lineup, squad and rules from Futmondo; keep your unsaved changes')),
+      shiny::div(class='fm-lineup-note fm-lineup-refresh-help',
+        'Refresh lineup reloads the official lineup, squad and rules from Futmondo. It keeps your unsaved changes and does not save them.'),
       shiny::uiOutput(ns('status')),shiny::uiOutput(ns('pitch')),shiny::uiOutput(ns('captain_control')),
       shiny::uiOutput(ns('save_control'))))
 }
@@ -233,29 +236,45 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       eligible<-if(pick$bench)rep(TRUE,nrow(rows))else vapply(positions,function(p)lineup_slot_roles(draft()$strategy)[pick$index]%in%p,logical(1))
       rows<-rows[eligible,,drop=FALSE];score<-scores();averages<-score$average[match(rows$id,score$id)];positions<-positions[eligible]
       order_rows<-order(-averages,rows$name,rows$id,na.last=TRUE);rows<-rows[order_rows,,drop=FALSE];averages<-averages[order_rows];positions<-positions[order_rows]
-      old<-if(pick$bench)draft()$bench[pick$index]else draft()$starters[pick$index]
+      value<-draft();old<-if(pick$bench)value$bench[pick$index]else value$starters[pick$index]
       number<-function(value)if(length(value)==1L&&is.finite(value))format(round(value,2),trim=TRUE)else'—'
       shiny::tagList(
         shiny::div(class='fm-lineup-note',paste0('Select a player to switch. Average uses the last ',length(attr(score,'rounds')),
           ' completed rounds (requested ',n_rounds(),'). Missing scores are shown as —.')),
+        shiny::div(class='fm-lineup-note fm-lineup-picker-membership-note',
+          'Starting XI and Bench labels show your current lineup, including unsaved changes.'),
         shiny::div(class='fm-lineup-picker-heading',`aria-hidden`='true',shiny::span(),shiny::span('Player'),shiny::span('Total pts'),shiny::span(paste0('Avg (',n_rounds(),')'))),
         shiny::div(class='fm-lineup-picker-list',role='group',`aria-label`='Eligible players',
           if(!nrow(rows))shiny::div(class='fm-lineup-note','No squad players can play in this position.'),
           lapply(seq_len(nrow(rows)),function(i){
             row<-rows[i,,drop=FALSE];url<-crest_url(row);unavailable<-analytics_known_unavailable(row)
+            starter_slot<-match(row$id,value$starters);bench_slot<-match(row$id,value$bench)
+            membership<-if(!is.na(starter_slot))'starter'else if(!is.na(bench_slot))'bench'else'none'
+            membership_label<-if(membership=='starter')'Starting XI'else if(membership=='bench')paste('Bench',bench_slot)else'Not selected'
             shiny::tags$button(type='button',class='fm-lineup-choice',`data-player-id`=row$id,
+              `data-lineup-membership`=membership,
               `data-position`=paste(positions[[i]],collapse='/'),`aria-pressed`=if(identical(row$id,old))'true'else'false',
               title=row$name,disabled=if(saving())'disabled',onclick=picker_click(as.character(row$id),pick),
               if(nzchar(url))shiny::tags$img(class='fm-lineup-choice-crest',src=url,alt=row$club,width=24,height=24,
                 loading='lazy',decoding='async',onerror="this.style.visibility='hidden'")else shiny::span(),
               shiny::span(class='fm-lineup-choice-name',lineup_player_label(row$name),
-                shiny::tags$small(paste0(paste(positions[[i]],collapse='/'),if(identical(row$id,old))' · Current'else'',if(unavailable)' · injured/suspended'else''))),
+                shiny::tags$small(paste0(paste(positions[[i]],collapse='/'),if(identical(row$id,old))' · Current slot'else'',if(unavailable)' · injured/suspended'else'')),
+                shiny::tags$small(class='fm-lineup-choice-membership',membership_label)),
               shiny::span(class='fm-lineup-choice-total',`aria-label`='Total points',number(row$points)),
               shiny::span(class='fm-lineup-choice-average',`aria-label`=paste('Average points over',n_rounds(),'completed rounds'),number(averages[i])))
           })))
     })
-    for(i in seq_len(11L))local({slot<-i;shiny::observeEvent(input[[paste0('starter_',slot)]],open_picker(FALSE,slot),ignoreInit=TRUE)})
-    for(i in seq_len(4L))local({slot<-i;shiny::observeEvent(input[[paste0('bench_',slot)]],open_picker(TRUE,slot),ignoreInit=TRUE)})
+    slot_event<-function(bench,index)list(bench=bench,index=index,generation=generation,strategy=draft()$strategy)
+    shiny::observeEvent(input$slot_click,{
+      shiny::req(source(),draft(),!saving(),is_module_active())
+      click<-input$slot_click
+      shiny::req(is.list(click),is.logical(click$bench),length(click$bench)==1L,!is.na(click$bench),
+        is.numeric(click$index),length(click$index)==1L,is.finite(click$index),
+        click$index%in%seq_len(if(click$bench)4L else 11L),
+        current(click$generation,loaded_key),identical(click$strategy,draft()$strategy))
+      if(click$bench&&!isTRUE(source()$rules$bench_enabled))return()
+      open_picker(click$bench,as.integer(click$index))
+    })
     shiny::observeEvent(input$player_choice,{
       shiny::req(selected(),draft(),source(),!saving(),is_module_active())
       pick<-selected();choice<-input$player_choice
@@ -304,7 +323,12 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       average<-scores()$average[match(id,scores()$id)]
       crest<-if(occupied)crest_url(row)else''
       position<-if(!occupied)''else if(bench)fm_scalar(lineup_positions(row,FALSE)[[1]],'')else role
-      shiny::actionButton(session$ns(paste0(if(bench)'bench_'else'starter_',index)),label=shiny::tagList(
+      # A direct event works as soon as a refreshed tile enters the DOM; dynamic
+      # actionButton counters/bindings may not be ready when the first click lands.
+      onclick<-paste0('Shiny.setInputValue(',jsonlite::toJSON(session$ns('slot_click'),auto_unbox=TRUE),',',
+        jsonlite::toJSON(slot_event(bench,index),auto_unbox=TRUE),
+        ",{priority:'event'});")
+      shiny::tags$button(id=session$ns(paste0(if(bench)'bench_'else'starter_',index)),type='button',onclick=onclick,`data-player-id`=if(occupied)id else'',shiny::tagList(
         if(bench)shiny::span(class='fm-lineup-order',paste('Bench',index)),
         shiny::div(class='fm-lineup-points',if(length(average)&&is.finite(average))format(round(average,2),trim=TRUE)else'—'),
         shiny::div(class='fm-lineup-portrait',if(occupied&&nzchar(row$photo)&&grepl('^[A-Za-z0-9_.-]+$',row$photo))
@@ -314,7 +338,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
             width=14,height=14,loading='lazy',decoding='async',onerror="this.style.display='none'"),
           shiny::span(class='fm-lineup-label',if(occupied)lineup_player_label(row$name)else'Empty position')),
         if(occupied&&analytics_known_unavailable(row))shiny::span(class='fm-lineup-warning','⚠')),
-        class=paste('fm-lineup-player',if(!occupied)'fm-lineup-empty'),disabled=saving(),
+        class=paste('fm-lineup-player',if(!occupied)'fm-lineup-empty'),disabled=if(saving())'disabled',
         title=if(occupied)paste('Change',row$name)else paste('Select',role))
     }
     output$pitch<-shiny::renderUI({

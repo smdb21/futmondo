@@ -773,3 +773,8 @@ Completed locally: Best XI jointly searches every entitled formation and player 
 - Hide Suggested Clause in My Team when the shared configuration explicitly prohibits renewal; hide Owner team ID while retaining canonical action metadata.
 - Append prospective profit/loss in signed millions with two decimals to listing and received-offer prices, including individual offer cards, using the observed current roster acquisition cost. Preserve numeric sorting and unknown-cost states.
 - Reuse existing shared configuration and database-backed roster observations with no extra API/database requests, timers or dependencies. Contracts and verification: [squad table prices](squad_table_prices.md). Hosted/browser/mobile verification was not run.
+
+
+## Lineup picker after optimization and current-draft labels — 2026-11-09
+
+Implemented locally: player tiles send direct priority click events so newly optimized/redrawn tiles open their picker before Shiny input rebinding. Server validation retains account/league/round generation, formation, slot bounds and save guards. Picker rows label the current draft's Starting XI, numbered Bench and unselected players, including unsaved edits; the clicked slot is marked separately. Visible refresh help explains that official data is reloaded while preserving the draft, and saving remains explicit. No optimizer, scoring, acquisition or persistence policy changes. Verification and performance review are recorded in `data_review_results.md`; hosted deployment/testing remains separate.

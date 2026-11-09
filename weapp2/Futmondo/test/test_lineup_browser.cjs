@@ -17,6 +17,32 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.request().url().endsWith('/fixture-club.png') ? route.fallback() : route.abort());
       await page.goto(`http://127.0.0.1:${process.env.FUTMONDO_EDITOR_TEST_PORT || '8542'}`);
       const pitch = page.locator('.fm-lineup-pitch');
+      const modal = page.locator('.modal');
+      const assertMembership = async () => {
+        // Reopening a renderUI modal may briefly contain its previous payload.
+        await page.waitForFunction(() => {
+          const expected = Object.fromEntries(Array.from(document.querySelectorAll('.fm-lineup-player'))
+            .filter(node => node.dataset.playerId).map(node => [node.dataset.playerId, node.id.includes('-starter_') ? 'starter' : 'bench']));
+          const rows = Array.from(document.querySelectorAll('.modal .fm-lineup-choice'));
+          return rows.length > 0 && rows.every(node => node.dataset.lineupMembership === (expected[node.dataset.playerId] || 'none'));
+        });
+        const expected = await page.locator('.fm-lineup-player').evaluateAll(nodes => Object.fromEntries(nodes
+          .filter(node => node.dataset.playerId).map(node => [node.dataset.playerId,
+            node.id.includes('-starter_') ? 'starter' : 'bench'])));
+        const rows = await modal.locator('.fm-lineup-choice').evaluateAll(nodes => nodes.map(node => ({
+          id: node.dataset.playerId, membership: node.dataset.lineupMembership,
+          label: node.querySelector('.fm-lineup-choice-membership').textContent,
+        })));
+        for (const row of rows) {
+          assert.equal(row.membership, expected[row.id] || 'none', `Current draft membership for ${row.id}`);
+          assert.match(row.label, row.membership === 'starter' ? /^Starting XI$/ : row.membership === 'bench' ? /^Bench [1-4]$/ : /^Not selected$/);
+        }
+        assert.match(await modal.locator('.fm-lineup-picker-membership-note').innerText(), /including unsaved changes/);
+      };
+      const closePicker = async () => {
+        await modal.locator('button[data-dismiss="modal"]').click();
+        await modal.waitFor({ state: 'detached' });
+      };
       await pitch.locator('.fm-lineup-player').nth(10).waitFor();
       assert.equal(await pitch.locator('.fm-lineup-empty').count(), 0);
       assert.equal(await page.locator('.fm-lineup-bench-row .fm-lineup-player').count(), 4);
@@ -55,6 +81,17 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
           const status = document.querySelector('#lineup-status [role="status"]');
           if (status) window.lineupProgress.push({ busy: status.getAttribute('aria-busy'), text: status.textContent });
         }).observe(document.querySelector('#lineup-status'), { childList: true, subtree: true, attributes: true });
+        // Click as soon as the optimized player enters the DOM, before dynamic
+        // Shiny input bindings can attach. The old actionButton lost this click.
+        const watcher = new MutationObserver(() => {
+          const button = document.querySelector('#lineup-starter_1:not(.fm-lineup-empty)');
+          if (button) {
+            window.lineupClickedBeforeBinding = !button.classList.contains('shiny-bound-input');
+            button.click();
+            watcher.disconnect();
+          }
+        });
+        watcher.observe(document.querySelector('#lineup-pitch'), { childList: true, subtree: true });
       });
       await page.locator('#lineup-best').click();
       await page.waitForFunction(() => document.querySelectorAll('.fm-lineup-pitch .fm-lineup-empty').length === 0);
@@ -66,6 +103,10 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       assert.equal(await page.locator('.fm-lineup-bench-row').innerText().then(text => text.includes('GK')), false);
       for (const role of ['DEF', 'MID', 'FWD']) await page.locator('.fm-lineup-coverage').getByText(`${role} ✓`, { exact: true }).waitFor();
       assert.equal(await page.locator('#lineup-save').isDisabled(), false);
+      await modal.locator('.fm-lineup-choice').first().waitFor();
+      assert.equal(await page.evaluate(() => window.lineupClickedBeforeBinding), true);
+      await assertMembership();
+      await closePicker();
 
       const selections = async () => page.locator('.fm-lineup-player').evaluateAll(nodes => nodes.map(n => n.title));
       const fiveRoundSelections = await selections();
@@ -93,21 +134,20 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       const starter = pitch.locator('.fm-lineup-player').first();
       const pickerStarted = performance.now();
       await starter.click();
-      const modal = page.locator('.modal');
       await modal.locator('.fm-lineup-choice').first().waitFor();
       const pickerMs = performance.now() - pickerStarted;
       const choices = modal.locator('.fm-lineup-choice');
+      await assertMembership();
       assert.equal(await choices.count(), 8);
       assert.ok((await choices.evaluateAll(nodes => nodes.map(n => n.dataset.position))).every(role => role === 'FWD'));
       const player17 = modal.locator('.fm-lineup-choice[data-player-id="p17"]');
-      assert.equal(await player17.locator('.fm-lineup-choice-name').innerText(), 'P. 17\nFWD');
+      assert.match(await player17.locator('.fm-lineup-choice-name').innerText(), /^P\. 17\nFWD\n/);
       assert.equal(await player17.getAttribute('title'), 'Player 17');
       assert.equal(await player17.locator('.fm-lineup-choice-total').innerText(), '117');
       assert.equal(await player17.locator('.fm-lineup-choice-average').innerText(), '17');
       assert.ok((await player17.locator('img').getAttribute('src')).endsWith('/fixture-club.png'));
-      for (const row of await choices.all()) {
-        const box = await row.boundingBox();
-        assert.ok(box.x >= 0 && box.x + box.width <= width, 'Picker rows fit the viewport');
+      for (const box of await choices.evaluateAll(nodes => nodes.map(node => { const r = node.getBoundingClientRect(); return { x: r.x, width: r.width }; }))) {
+        assert.ok(box.width > 0 && box.x >= 0 && box.x + box.width <= width, 'Picker rows fit the viewport');
       }
       await page.screenshot({ path: `/tmp/futmondo-lineup-picker-${width}.png`, fullPage: true });
       await player17.click();
@@ -115,6 +155,8 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       await starter.getByText('P. 17', { exact: true }).waitFor();
       // Removing a starter leaves just that position empty until another click.
       await starter.click();
+      await modal.locator('.fm-lineup-choice').first().waitFor();
+      await assertMembership();
       await modal.locator('.fm-lineup-remove').click();
       await modal.waitFor({ state: 'detached' });
       await starter.getByText('Empty position', { exact: true }).waitFor();
@@ -129,6 +171,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       const benchSlot = page.locator('.fm-lineup-bench-row .fm-lineup-player').first();
       await benchSlot.click();
       await modal.locator('.fm-lineup-choice[aria-pressed="true"]').waitFor();
+      await assertMembership();
       const benchId = await modal.locator('.fm-lineup-choice[aria-pressed="true"]').getAttribute('data-player-id');
       assert.equal(await modal.locator('.fm-lineup-choice').count(), 24);
       await modal.locator('.fm-lineup-remove').click();
@@ -138,7 +181,6 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       await modal.locator(`.fm-lineup-choice[data-player-id="${benchId}"]`).click();
       await modal.waitFor({ state: 'detached' });
       assert.deepEqual((await page.locator('#fixture_counts').innerText()).split('/').map(Number), clearCounts);
-
       await page.locator('#lineup-save').click();
       await page.getByText('Saved to Futmondo and verified.', { exact: true }).waitFor();
       await page.waitForFunction(n => Number(document.querySelector('#fixture_counts').textContent.split('/')[1]) === n + 1, clearCounts[1]);
@@ -155,13 +197,32 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
         const label=await crest.locator('..').locator('.fm-lineup-label').boundingBox();
         assert.ok(size.x+size.width<=label.x+1, 'Crest sits beside the player name');
       }
+      await benchSlot.click();
+      await modal.locator('.fm-lineup-choice').first().waitFor();
+      await assertMembership();
+      await closePicker();
+      // Formation changes redraw the tiles; the same bench slot still opens.
+      const savedCounts = (await page.locator('#fixture_counts').innerText()).split('/').map(Number);
+      await page.locator('#lineup-formation').selectOption('4-4-2');
+      await page.locator('.fm-lineup-heading').getByText('Formation 4-4-2', { exact: true }).waitFor();
+      await benchSlot.click();
+      await modal.locator('.fm-lineup-choice').first().waitFor();
+      await assertMembership();
+      await closePicker();
+      await page.locator('#lineup-reset').click();
+      await page.waitForFunction(() => document.querySelectorAll('.fm-lineup-pitch .fm-lineup-empty').length === 0);
+      await benchSlot.click();
+      await modal.locator('.fm-lineup-choice').first().waitFor();
+      await assertMembership();
+      await closePicker();
+      assert.deepEqual((await page.locator('#fixture_counts').innerText()).split('/').map(Number), savedCounts);
       const box = await pitch.boundingBox();
       assert.ok(box.x >= 0 && box.x + box.width <= width + 1, 'Pitch must fit the viewport');
       assert.equal(await page.locator('.shiny-output-error:visible').count(), 0);
       assert.deepEqual(errors, []);
       await page.screenshot({ path: `/tmp/futmondo-lineup-editor-${width}.png`, fullPage: true });
       previousReads = Number((await page.locator('#fixture_counts').innerText()).split('/')[0]);
-      console.log(`PASS ${width}px: clear, defaults, disabled save, exact XI/bench, changed N, coverage, one-click picker (${pickerMs.toFixed(0)} ms), starter/bench removal and refill, verified one-shot save, undo latest saved, viewport`);
+      console.log(`PASS ${width}px: clear, defaults, disabled save, exact XI/bench, changed N, coverage, immediate post-optimize click, current draft XI/bench labels, repeated/redrawn one-click picker (${pickerMs.toFixed(0)} ms), starter/bench removal and refill, verified one-shot save, undo latest saved, viewport`);
       await page.close();
     }
   } finally {
