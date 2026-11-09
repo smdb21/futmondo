@@ -1273,3 +1273,10 @@ No delegation. Replaced the per-row Starting XI/Bench/Current slot labels with c
 Performance review: no API/database, cache/persistence, observer, timer or calculation changes. Icon nodes replace status text in the same bounded squad list, use existing Font Awesome resources and reduce row height. Existing browser assertions confirmed unchanged request/write counters during local edits. No added dependency or expensive path warrants a benchmark.
 
 The existing module regression also passed all 18 groups, including icon accessibility and one current-slot mark.
+
+
+## Lineup control placement — 2026-11-09
+
+No delegation. The formation selector now directly precedes the pitch; Optimize and Last N rounds share a row. Existing offline browser regression passed at 390/1440px, including new geometry checks, formation edits, immediate picker opening, optimization, save/undo and unchanged local request/write counters. A targeted 320px browser check confirmed the same-row controls, selector placement and no page overflow; the primary agent inspected its screenshot. Scoped whitespace checks passed. Module/data/lifecycle suites and hosted testing were deliberately skipped for this layout-only change.
+
+Performance review: existing controls and reactive output IDs are relocated; one redundant static heading is removed. No API/database reads or writes, cache/persistence changes, dependencies, timers, observers or new calculations. The selector stays in a stable UI container outside pitch redraws. Small scoped flex rules preserve mobile fit with no expensive path requiring measurement.

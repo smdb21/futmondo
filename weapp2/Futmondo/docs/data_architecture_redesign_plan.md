@@ -783,3 +783,8 @@ Implemented locally: player tiles send direct priority click events so newly opt
 ## Compact lineup picker marks — 2026-11-09
 
 Implemented locally: replace long per-row membership/current-slot text with inline icons, retaining accessible labels/tooltips and a compact shared legend. Current draft semantics and all manual actions remain unchanged. Verification/performance review: `data_review_results.md`. Hosted testing remains separate.
+
+
+## Lineup control placement — 2026-11-09
+
+Implemented locally: move the formation selector directly above the pitch in place of the static formation text; group Optimize and Last N rounds on one responsive row. Keep the injury toggle on its own row. Existing behavior and data acquisition remain unchanged. Verification/performance review: `data_review_results.md`.

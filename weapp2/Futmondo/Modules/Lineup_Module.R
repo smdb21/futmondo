@@ -1,6 +1,6 @@
 lineup_UI <- function(id) {
   ns<-shiny::NS(id)
-  shiny::tagList(shiny::tags$style(shiny::HTML(".fm-lineup-controls{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:16px}.fm-lineup-controls .form-group{margin:0}.fm-lineup-availability{flex:0 0 100%;min-width:0}.fm-lineup-controls .shiny-input-container{width:180px}.fm-lineup-editor{max-width:900px;margin:auto}.fm-lineup-editor .fm-lineup-player{background:transparent;border:0;color:var(--fm-text,#eef6f0);cursor:pointer;padding:6px;min-width:0}.fm-lineup-editor .fm-lineup-player:focus{outline:2px solid var(--fm-warning,#f0c75e)}.fm-lineup-editor .fm-lineup-portrait{margin:auto}.fm-lineup-editor .fm-lineup-name{white-space:normal}.fm-lineup-editor .fm-lineup-portrait img{max-width:48px;max-height:48px}.fm-lineup-note{padding:10px 0;color:var(--fm-muted,#acbdb0)}.fm-lineup-warning{color:var(--fm-warning,#f0c75e)}.fm-lineup-actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.fm-lineup-coverage{display:flex;gap:12px;flex-wrap:wrap}.fm-lineup-editor .fm-lineup-row{display:grid;grid-template-columns:repeat(var(--lineup-count),minmax(0,1fr))}@media(max-width:600px){.fm-lineup-controls .shiny-input-container{width:140px}.fm-lineup-editor .fm-lineup-name{font-size:10px}.fm-lineup-editor .fm-lineup-player{padding:2px}.fm-lineup-editor .fm-lineup-portrait img{max-width:34px;max-height:34px}}")),
+  shiny::tagList(shiny::tags$style(shiny::HTML(".fm-lineup-controls{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:16px}.fm-lineup-controls .form-group{margin:0}.fm-lineup-optimize-controls{display:flex;gap:12px;align-items:flex-end;flex:0 0 100%;min-width:0}.fm-lineup-optimize-controls .shiny-input-container{flex:1;min-width:0;max-width:180px}.fm-lineup-optimize-controls .btn{flex-shrink:0}.fm-lineup-formation .shiny-input-container{width:180px;max-width:100%;margin-bottom:8px}.fm-lineup-availability{flex:0 0 100%;min-width:0}.fm-lineup-controls .shiny-input-container{width:180px}.fm-lineup-editor{max-width:900px;margin:auto}.fm-lineup-editor .fm-lineup-player{background:transparent;border:0;color:var(--fm-text,#eef6f0);cursor:pointer;padding:6px;min-width:0}.fm-lineup-editor .fm-lineup-player:focus{outline:2px solid var(--fm-warning,#f0c75e)}.fm-lineup-editor .fm-lineup-portrait{margin:auto}.fm-lineup-editor .fm-lineup-name{white-space:normal}.fm-lineup-editor .fm-lineup-portrait img{max-width:48px;max-height:48px}.fm-lineup-note{padding:10px 0;color:var(--fm-muted,#acbdb0)}.fm-lineup-warning{color:var(--fm-warning,#f0c75e)}.fm-lineup-actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.fm-lineup-coverage{display:flex;gap:12px;flex-wrap:wrap}.fm-lineup-editor .fm-lineup-row{display:grid;grid-template-columns:repeat(var(--lineup-count),minmax(0,1fr))}@media(max-width:600px){.fm-lineup-controls .shiny-input-container{width:140px}.fm-lineup-editor .fm-lineup-name{font-size:10px}.fm-lineup-editor .fm-lineup-player{padding:2px}.fm-lineup-editor .fm-lineup-portrait img{max-width:34px;max-height:34px}}")),
     shiny::tags$style(shiny::HTML("
       .fm-lineup-picker-list{max-height:60vh;overflow-y:auto}
       .fm-lineup-choice,.fm-lineup-picker-heading{display:grid;grid-template-columns:26px minmax(0,1fr) 58px 78px;gap:8px;align-items:center;padding:10px 8px}
@@ -19,12 +19,12 @@ lineup_UI <- function(id) {
     shiny::div(class='fm-lineup-editor',
       shiny::h2('Lineup'),shiny::uiOutput(ns('heading')),
       shiny::div(class='fm-lineup-controls',
-        shiny::uiOutput(ns('formation_control')),
-        shiny::numericInput(ns('recent_n'),'Last completed rounds',value=3,min=1,max=20,step=1),
+        shiny::div(class='fm-lineup-optimize-controls',
+          shiny::actionButton(ns('best'),'Optimize',icon=shiny::icon('wand-magic-sparkles')),
+          shiny::numericInput(ns('recent_n'),'Last N rounds',value=3,min=1,max=20,step=1)),
         shiny::div(class='fm-lineup-availability',
           shiny::checkboxInput(ns('include_unavailable'),'Include injured/suspended players',FALSE,width='100%'))),
       shiny::div(class='fm-lineup-actions',
-        shiny::actionButton(ns('best'),'Optimize',icon=shiny::icon('wand-magic-sparkles')),
         shiny::actionButton(ns('clear'),'Clear lineup',icon=shiny::icon('eraser')),
         shiny::actionButton(ns('reset'),'Undo changes',icon=shiny::icon('rotate-left'),
           title='Restore the latest lineup loaded from or successfully saved to Futmondo'),
@@ -32,7 +32,9 @@ lineup_UI <- function(id) {
           title='Reload the official lineup, squad and rules from Futmondo; keep your unsaved changes')),
       shiny::div(class='fm-lineup-note fm-lineup-refresh-help',
         'Refresh lineup reloads the official lineup, squad and rules from Futmondo. It keeps your unsaved changes and does not save them.'),
-      shiny::uiOutput(ns('status')),shiny::uiOutput(ns('pitch')),shiny::uiOutput(ns('captain_control')),
+      shiny::uiOutput(ns('status')),
+      shiny::div(class='fm-lineup-formation',shiny::uiOutput(ns('formation_control'))),
+      shiny::uiOutput(ns('pitch')),shiny::uiOutput(ns('captain_control')),
       shiny::uiOutput(ns('save_control'))))
 }
 lineup_Server <- function(id,is_module_active,login_token,championship_id,user_team_id,round_catalog,
@@ -350,7 +352,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
     }
     output$pitch<-shiny::renderUI({
       shiny::req(is_module_active(),draft(),source());value<-draft();roles<-lineup_slot_roles(value$strategy)
-      shiny::div(class='fm-round-lineup',shiny::div(class='fm-lineup-heading',shiny::strong(paste('Formation',value$strategy))),
+      shiny::div(class='fm-round-lineup',
         shiny::div(class='fm-lineup-pitch',role='group',`aria-label`=paste('Pitch, formation',value$strategy),
           shiny::div(class='fm-lineup-markings',`aria-hidden`='true',shiny::div(class='fm-lineup-circle'),shiny::div(class='fm-lineup-goal-top'),shiny::div(class='fm-lineup-goal-bottom')),
           lapply(unique(roles),function(role){indices<-which(roles==role);shiny::div(class='fm-lineup-row',style=paste0('--lineup-count:',length(indices)),lapply(indices,function(i)tile(value$starters[i],role,i)))})),

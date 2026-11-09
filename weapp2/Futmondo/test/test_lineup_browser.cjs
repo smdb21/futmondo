@@ -18,6 +18,17 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       await page.goto(`http://127.0.0.1:${process.env.FUTMONDO_EDITOR_TEST_PORT || '8542'}`);
       const pitch = page.locator('.fm-lineup-pitch');
       const modal = page.locator('.modal');
+      const assertControlsLayout = async () => {
+        const boxes = await page.evaluate(() => {
+          const rect = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return {top:r.top,bottom:r.bottom,left:r.left,right:r.right}; };
+          return {formation:rect('.fm-lineup-formation'), pitch:rect('.fm-lineup-pitch'),
+            optimize:rect('#lineup-best'), rounds:rect('#lineup-recent_n')};
+        });
+        assert.ok(boxes.formation.bottom <= boxes.pitch.top && boxes.pitch.top - boxes.formation.bottom < 30, 'Formation sits directly above pitch');
+        assert.ok(Math.abs(boxes.optimize.bottom - boxes.rounds.bottom) < 3, 'Rounds and Optimize share one row');
+        assert.ok(boxes.optimize.right <= boxes.rounds.left, 'Rounds sit next to Optimize');
+        assert.ok(boxes.rounds.right <= width && boxes.optimize.left >= 0, 'Controls fit viewport');
+      };
       const assertMembership = async () => {
         // Reopening a renderUI modal may briefly contain its previous payload.
         await page.waitForFunction(() => {
@@ -52,6 +63,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
         await modal.waitFor({ state: 'detached' });
       };
       await pitch.locator('.fm-lineup-player').nth(10).waitFor();
+      await assertControlsLayout();
       assert.equal(await pitch.locator('.fm-lineup-empty').count(), 0);
       assert.equal(await page.locator('.fm-lineup-bench-row .fm-lineup-player').count(), 4);
       assert.equal(await page.locator('.fm-lineup-crest').count(), 15);
@@ -212,7 +224,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       // Formation changes redraw the tiles; the same bench slot still opens.
       const savedCounts = (await page.locator('#fixture_counts').innerText()).split('/').map(Number);
       await page.locator('#lineup-formation').selectOption('4-4-2');
-      await page.locator('.fm-lineup-heading').getByText('Formation 4-4-2', { exact: true }).waitFor();
+      await page.locator('.fm-lineup-pitch[aria-label="Pitch, formation 4-4-2"]').waitFor();
       await benchSlot.click();
       await modal.locator('.fm-lineup-choice').first().waitFor();
       await assertMembership();

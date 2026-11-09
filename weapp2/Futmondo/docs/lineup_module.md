@@ -10,7 +10,7 @@ The pitch supports the twelve official 11-player formations, including 4-6-0. Av
 
 Player tiles display a compact club crest beside the name for both starters and substitutes, in the editor and historical round lineups. Names wrap within their slot on narrow screens. The roster parser retains the source `team.logo` (or flat `logo`) in the existing database snapshot; hydration reuses it without new API or database requests. Older snapshots use the existing club-name image lookup until the normal 30-second refresh supplies source metadata. Images load lazily and share browser caching by URL. Position colors underline names without a separate abbreviation; bench colors use the main role only.
 
-The **Include injured/suspended players** checkbox occupies its own full-width row below formation and recent-round controls on mobile and desktop. Its label uses the available row width and wraps naturally on narrow screens.
+The **Include injured/suspended players** checkbox occupies its own full-width row below Optimize and recent-round controls on mobile and desktop. Its label uses the available row width and wraps naturally on narrow screens.
 
 ## Best XI and bench
 
@@ -102,3 +102,7 @@ Verification: `Rscript test/test_lineup_module.R` passed all 18 groups. The offl
 ## Compact picker membership icons — 2026-11-09
 
 Picker rows now place a compact icon beside the name instead of the long membership/current-slot text: check-circle for a starter, chair for a substitute, and crosshairs for the clicked slot. Unselected players have no mark. Accessible labels and tooltips retain the full membership and numbered bench position; the current slot's tooltip includes both its slot status and membership. A short shared legend explains the marks and that unsaved selections are included. Membership still derives from the displayed draft. No selection, optimizer, save or acquisition behavior changes.
+
+## Lineup control placement — 2026-11-09
+
+The formation selector sits directly above the pitch, replacing its repeated static formation heading. Optimize and the **Last N rounds** input share a single row, including narrow phones; the input can shrink to fit. The injury toggle keeps its own full-width row. Input identities, formation entitlements, draft selection and optimization/save behavior are unchanged.
