@@ -1285,3 +1285,8 @@ Performance review: existing controls and reactive output IDs are relocated; one
 ## Shorter lineup heading — 2026-11-09
 
 No delegation. Removed the requested phrase from the heading; reviewed the one-line diff and scoped whitespace check. Runtime/browser tests deliberately skipped for this static copy edit. Performance review: no changed requests, persistence, reactive behavior or calculations; only less heading text. Hosted testing not run.
+
+
+## Icon-only lineup refresh button — 2026-11-09
+
+No delegation. Rendered the actual Lineup UI and verified that the refresh button has no visible text, retains its rotate icon and tooltip, and exposes the accessible name Refresh lineup. Scoped whitespace check passed. Browser/full runtime suites and hosted testing deliberately skipped for this small presentation change. Performance review: only the static button label/ARIA attributes change; no new API/database work, persistence, observers, redraws, timers or dependencies.

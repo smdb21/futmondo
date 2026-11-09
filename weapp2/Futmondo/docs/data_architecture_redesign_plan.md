@@ -793,3 +793,8 @@ Implemented locally: move the formation selector directly above the pitch in pla
 ## Shorter lineup heading — 2026-11-09
 
 Removed the redundant “saves the current editable Futmondo lineup” phrase at the user's request. The next-round number and unsaved-changes indicator remain. See `data_review_results.md`.
+
+
+## Icon-only lineup refresh button — 2026-11-09
+
+Implemented locally: remove the refresh button's visible text, retaining its rotate icon, explanatory tooltip and explicit accessible name. Refresh behavior remains unchanged. Verification/performance review: `data_review_results.md`.

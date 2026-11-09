@@ -28,7 +28,7 @@ lineup_UI <- function(id) {
         shiny::actionButton(ns('clear'),'Clear lineup',icon=shiny::icon('eraser')),
         shiny::actionButton(ns('reset'),'Undo changes',icon=shiny::icon('rotate-left'),
           title='Restore the latest lineup loaded from or successfully saved to Futmondo'),
-        shiny::actionButton(ns('reload'),'Refresh lineup',icon=shiny::icon('rotate'),
+        shiny::actionButton(ns('reload'),label=NULL,icon=shiny::icon('rotate'),`aria-label`='Refresh lineup',
           title='Reload the official lineup, squad and rules from Futmondo; keep your unsaved changes')),
       shiny::div(class='fm-lineup-note fm-lineup-refresh-help',
         'Refresh lineup reloads the official lineup, squad and rules from Futmondo. It keeps your unsaved changes and does not save them.'),
