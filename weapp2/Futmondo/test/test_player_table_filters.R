@@ -40,6 +40,16 @@ shiny::testServer(players_table_Server,args=list(players_table_RV=shiny::reactiv
   session$setInputs(max_value_filter=NA_real_);settle(session)
   stopifnot(nrow(players_table_filtered_RV())==2)
  })
+ check('obsolete minimum valuation inputs cannot hide players',{
+  session$setInputs(min_value_filter=3000);settle(session)
+  stopifnot(identical(players_table_filtered_RV()$id,c("low","high")))
+ })
+})
+check('both table layouts omit the minimum valuation control',{
+ for(breakdown in c(FALSE,TRUE)){
+  html<-htmltools::renderTags(players_table_UI('filters',show_position_breakdown=breakdown))$html
+  stopifnot(!grepl('min_value_filter',html,fixed=TRUE),grepl('max_value_filter',html,fixed=TRUE))
+ }
 })
 check('clause eligibility uses price, transfer state and UTC lock times',{
  now<-as.POSIXct('2026-11-01 12:00:00',tz='UTC')

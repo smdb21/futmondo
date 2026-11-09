@@ -168,3 +168,9 @@ My Team supplies a numeric `selling_by` projection using the authenticated manag
 `table_display_data()` omits `clause_suggestedClause`, `fav` and `owner_team_id` for every player table. Filtering and player actions retain these fields in the full row source; hiding them never rewrites the source data. Renewal settings no longer govern whether Suggested Clause is displayed. The shared Reactable definition labels `average.fitness` as **Latest 5**, keeping the field key and values unchanged.
 
 Performance: fewer displayed/payload columns and no new requests, database work, persistence, observers or calculations. Removing the old conditional visibility branch also removes a settings dependency from display-schema rebuilding.
+
+## Minimum valuation filter removed — 2026-11-09
+
+Both table layouts omit the minimum market valuation control. The server no longer resets or reads `min_value_filter`, so obsolete browser values cannot constrain the displayed players. The existing `filter_by_value` UI option now controls the Max Val input. This shared module serves Today, Market, My Team, Players and rival squad tables.
+
+Performance review: one fewer input/binding per table and one fewer valuation-filter pass, with no new requests, database/persistence work, observers, dependencies or timers. Existing row acquisition and other filters reuse their current state.

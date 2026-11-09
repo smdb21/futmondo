@@ -1313,3 +1313,12 @@ No delegation. Relocated the existing header Notifications output beside the Fut
 Passed the focused offline `test/test_header_notifications.cjs` browser check at 320, 390 and 1440px: icon-only markup, title/bell alignment, viewport fit, synthetic unread tooltip/dot, real tab navigation and collapsed desktop header interaction. The primary agent inspected the 320px screenshot. The existing `test/test_browser_app.R` supplied the HTTP-blocked application fixture. Mandatory `test/test_shiny_simulation.R` passed 13 checks plus 8 tabs with no HTTP/live database mutation attempts; existing empty Plotly trace warnings remain. Scoped whitespace and browser-script syntax checks passed. Unrelated suites and hosted testing/deployment were deliberately not run.
 
 Performance review: the same single UI output and unread reactive source are reused; no new API/database requests, polling, persistence, observers, dependencies or calculations. The previous text/count node becomes an existing bell with one small unread-dot span; layout uses small scoped flex rules. No expensive path changed, so a separate benchmark is unwarranted.
+
+
+## Remove minimum-value filtering app-wide — 2026-11-09
+
+No delegation. Removed both Min Val controls, the clear-filter reset entry and the minimum-value filter pass. An active application-code scan found no remaining references to the control/label/filter. Existing maximum-value and other filter checks still pass.
+
+Passed `test/test_player_table_filters.R` (9 groups), including rendered controls for both layouts, obsolete minimum-value input having no effect, and existing owner/clause/default/maximum filters. Its existing 524-row normalization/filter metric was 0.002s and 95.1 KiB. Mandatory `test/test_shiny_simulation.R` passed 13 checks plus 8 tabs with no HTTP/live database mutation attempts; existing empty Plotly trace warnings remain. Scoped diff/whitespace checks passed. Separate browser/hosted checks and unrelated suites were deliberately skipped for this shared control removal.
+
+Performance review: one fewer Shiny input/binding per table, no obsolete reset message or minimum-value reactive dependency, and one fewer local valuation-filter pass. No new API/database calls, acquisition/persistence/cache work, dependencies, observers or timers. Existing row data and pagination are reused. No expensive path requires a new benchmark.

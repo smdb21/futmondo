@@ -73,7 +73,6 @@ players_table_UI <- function(id, box_title = NULL,
                     },
                     if (filter_by_value) {
                       tagList(
-                        column(width = 4, div(title = "Filter players by minimum market valuation in millions of EUR", numericInput(inputId = ns("min_value_filter"), label = "Min Val (M)", min = 0, max = 1000, value = 0, step = 10, width = "100%"))),
                         column(width = 4, div(title = "Filter players by maximum market valuation in millions of EUR", numericInput(inputId = ns("max_value_filter"), label = "Max Val (M)", min = 0, value = NA_real_, step = 10, width = "100%")))
                       )
                     },
@@ -99,7 +98,6 @@ players_table_UI <- function(id, box_title = NULL,
           },
           if (filter_by_value) {
             tagList(
-              column(width = 2, div(title = "Filter players by minimum market valuation in millions of EUR", numericInput(inputId = ns("min_value_filter"), label = "Min Val (M)", min = 0, max = 1000, value = 0, step = 10, width = "100%"))),
               column(width = 2, div(title = "Filter players by maximum market valuation in millions of EUR", numericInput(inputId = ns("max_value_filter"), label = "Max Val (M)", min = 0, value = NA_real_, step = 10, width = "100%")))
             )
           },
@@ -345,7 +343,6 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       tryCatch({
         updateSelectInput(session, inputId = "position_filter", selected = "All")
         updateSelectInput(session, inputId = "team_filter", selected = "All")
-        updateNumericInput(session, inputId = "min_value_filter", value = 0)
         updateNumericInput(session, inputId = "max_value_filter", value = NA_real_)
         updateNumericInput(session, inputId = "change_value_filter", value = NA)
         updateCheckboxInput(session, inputId = "active_clause_filter", value = FALSE)
@@ -475,10 +472,6 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
               dplyr::filter(userTeam == input$team_filter)
           }
         }
-      }
-      if (!is.null(input$min_value_filter)) {
-        players_table <- players_table %>%
-          dplyr::filter(value >= input$min_value_filter * 1000000)
       }
       if (!is.null(input$max_value_filter) && is.finite(input$max_value_filter)) {
         players_table <- players_table %>%

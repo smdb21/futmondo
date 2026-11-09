@@ -813,3 +813,8 @@ Renamed the shared `average.total` display heading from Last 5 Points to Sum las
 ## Notifications icon beside the title — 2026-11-09
 
 Implemented locally: move the existing Notifications output into the Futmondo title row as an icon-only bell. Retain existing navigation and unread state through a dot, tooltip and accessible count; support phone widths and collapsed desktop navigation. Verification/performance review: `data_review_results.md`; behavior documented in `notifications_module.md`.
+
+
+## Remove minimum-value filtering app-wide — 2026-11-09
+
+Implemented locally: remove Min Val from both shared player-table layouts and remove its reset/read/filter logic. The shared module covers Today, Market, My Team, Players and rival squads. Obsolete client inputs cannot constrain the rows. Contracts and verification/performance review: `players_table_module.md` and `data_review_results.md`.
