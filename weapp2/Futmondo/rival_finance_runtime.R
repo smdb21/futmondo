@@ -916,7 +916,7 @@ rival_estimate_summary <- function(missing,assumptions=character(),difference=NA
 
 # Public pure accounting interface; every numeric subtotal has an evidence trail.
 # Versioned, context-bound calculation cache. Source records remain authoritative.
-rival_calculation_version <- "2026-11-07-award-components-v4"
+rival_calculation_version <- "2026-11-10-owner-history-v5"
 rival_calculation_hash <- function(x) unname(unclass(as.character(openssl::sha256(serialize(x,NULL,version=2)))))
 rival_calculation_evidence <- function(evidence) {
   rows<-Filter(function(x)!rival_snapshot_record(x)&&!x$evidence_type%in%c("team","coverage","rules"),evidence)
@@ -986,6 +986,10 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
     if(all(c("round_id","round_number")%in%names(official)))official[,c("round_id","round_number"),drop=FALSE]else data.frame()))
   all_movements<-dplyr::bind_rows(lapply(unique(vapply(rival_evidence_rows(evidence,"movements"),function(x)mvp_text(x$payload$team_id),character(1))),function(id)
     rival_normalize_movements(rival_cash_latest_movements(evidence,id),catalog)))
+  ownership<-rival_ownership_eligibility(evidence,teams,official,history$rounds,catalog,all_movements)
+  eligibility<-unique(dplyr::bind_rows(eligibility,ownership))
+  for(id in unique(ownership$team_id[nzchar(ownership$team_id)]))history$missing[[id]]<-unique(c(history$missing[[id]],
+    "Award ownership reconstructed from an unchanged player-summary owner throughout the official round-start to recorded final-settlement interval; historical reward-rule assumptions remain."))
   publications<-rival_round_publication_dates(evidence,catalog)
   anchors<-rival_payment_anchors(all_movements)
   reference_payments<-rival_reference_payments(all_movements,reference_team_id)
@@ -1381,7 +1385,9 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
     }
   }
   if(!is.null(cache))cache$teams<-cache$teams[intersect(names(cache$teams),as.character(teams$teamid))]
-  list(reference_payments=reference_payments,point_reconciliation=point_checks,team_finances=dplyr::bind_rows(result),breakdowns=breakdowns,cash_ledgers=ledgers,pressroom=pressroom,all_purchases=data.frame())
+  list(reference_payments=reference_payments,point_reconciliation=point_checks,
+    pending_bonus_rounds=rival_pending_settlement_rounds(evidence,catalog,all_movements,now),
+    team_finances=dplyr::bind_rows(result),breakdowns=breakdowns,cash_ledgers=ledgers,pressroom=pressroom,all_purchases=data.frame())
 }
 
 get_rival_finance_seed <- function(login,championship_id,user_team_id) {
@@ -1468,6 +1474,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
     state$calculation_cache<-rival_calculation_cache();state$snapshot<-NULL;state$snapshot_status<-"not_saved"
     state$generation<-0L;state$closed<-FALSE;state$queue<-list();state$busy<-0L;state$evidence<-list();state$seed<-list();state$defaults<-NULL;state$last_publish<-0
     state$notification_cursor<-"";state$notification_status<-"initial";state$scheduled_notification_cursors<-character();state$notification_pending<-FALSE
+    state$scheduled_owners<-character();state$ownership_pending<-0L;state$ownership_catalog_scheduled<-FALSE;state$ownership_unsaved<-list();state$ownership_write_attempts<-character()
     state$publish_timer<-NULL;state$teams<-data.frame();state$teams_status<-"loading";state$teams_reason<-""
     state$awards<-list(rows=data.frame(),complete=FALSE);state$finance_ready<-FALSE;state$seed_ready<-FALSE;state$scheduled_teams<-character();state$scheduled_lineups<-character();state$scheduled_rankings<-character();state$pending_team_ids<-character()
     root$onSessionEnded(function(){state$closed<-TRUE;state$generation<-state$generation+1L;if(!is.null(state$publish_timer))state$publish_timer()})
@@ -1504,6 +1511,9 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
         missing<-state$teams[!state$teams$teamid%in%rows$teamid,,drop=FALSE]
         rows<-dplyr::bind_rows(rows,rival_finance_directory(missing))
       }
+      calculated$pending_bonus_rounds<-state$snapshot$pending_bonus_rounds %||% numeric()
+      calculated$cash_ledgers<-state$snapshot$cash_ledgers %||% lapply(state$snapshot$cache$teams,`[[`,"ledger")
+      calculated$cash_ledgers<-calculated$cash_ledgers[intersect(names(calculated$cash_ledgers),as.character(rows$teamid))]
       calculated$team_finances<-dplyr::bind_rows(lapply(seq_len(nrow(rows)),function(i){
         team<-state$teams[state$teams$teamid%in%rows$teamid[i],,drop=FALSE]
         rival_refresh_finance_row(rows[i,,drop=FALSE],team)
@@ -1515,7 +1525,12 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
         if(!is.list(x$payload))return(FALSE)
         stamp<-fm_time(x$payload$observed_at);age<-as.numeric(difftime(Sys.time(),stamp,units="secs"));is.finite(age)&&age>=-60&&age<=300
       },logical(1)))
-    reuse<-state$finance_ready&&!is.null(state$calculated)&&identical(inputs,state$calculation_inputs)
+    # Owner responses arrive independently. Keep the last complete calculation
+    # usable while their evidence accumulates, then rebuild once at batch drain.
+    # Do not advance calculation_inputs for a retained value: the final response
+    # must still invalidate it and calculate from every accumulated observation.
+    retain_ownership_batch<-state$finance_ready&&state$ownership_pending>0L&&!is.null(state$calculated)
+    reuse<-retain_ownership_batch||(state$finance_ready&&!is.null(state$calculated)&&identical(inputs,state$calculation_inputs))
     if(reuse)calculated<-state$calculated
     if(state$finance_ready&&!reuse)calculated<-tryCatch(build_rival_cash_dataset(state$teams,state$championship,state$evidence,state$awards$rows,
       state$seed$pressroom %||% data.frame(),state$seed$rules %||% list(),state$defaults,
@@ -1525,7 +1540,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
         calculated$finance_error<-paste("Financial details could not be prepared.",resource_failure_message(state$build_failure))
         calculated
       })
-    if(is.null(calculated$finance_error)){state$build_failure<-NULL;if(state$finance_ready){state$calculated<-calculated;state$calculation_inputs<-inputs}}
+    if(is.null(calculated$finance_error)){state$build_failure<-NULL;if(state$finance_ready&&!retain_ownership_batch){state$calculated<-calculated;state$calculation_inputs<-inputs}}
     calculated$finance_loading<-state$busy>0L||length(state$queue)>0L
     calculated$finance_pending<-state$busy+length(state$queue)
     calculated$loading<-calculated$finance_loading||identical(state$teams_status,"loading")
@@ -1670,6 +1685,82 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
     state$queue<-c(state$queue,list(list(kind="notifications",cursor=cursor,missing=missing)))
     invisible(NULL)
   }
+  persist_ownership<-function(rows=list(),context=NULL){
+    for(row in rows)state$ownership_unsaved[[row$source_id]]<-row
+    if(is.null(context)||!length(state$ownership_unsaved))return(invisible(NULL))
+    candidates<-Filter(function(row)!paste(row$source_id,row$observed_at)%in%state$ownership_write_attempts,state$ownership_unsaved)
+    if(!length(candidates))return(invisible(NULL))
+    groups<-split(seq_along(candidates),ceiling(seq_along(candidates)/50L))
+    for(indices in groups)local({
+      batch<-unname(candidates[indices]);generation<-state$generation
+      keys<-vapply(batch,function(row)paste(row$source_id,row$observed_at),character(1))
+      state$ownership_write_attempts<-c(state$ownership_write_attempts,keys)
+      callback<-function(ok){
+        if(state$closed||generation!=state$generation)return(invisible(NULL))
+        if(isTRUE(ok)){
+          for(row in batch)if(identical(state$ownership_unsaved[[row$source_id]],row))state$ownership_unsaved[[row$source_id]]<-NULL
+          if(!length(state$ownership_unsaved)&&identical(state$reason,"Historical ownership was retrieved but could not be saved; Refresh retries saving."))state$reason<-""
+        }else state$reason<-"Historical ownership was retrieved but could not be saved; Refresh retries saving."
+        publish(FALSE);invisible(NULL)
+      }
+      queued<-defer_persistence("supabase_post_direct",list("rival_finance_evidence",batch,
+        "account_id,championship_id,season,evidence_type,source_id,observed_at",TRUE),context=context,on_complete=callback)
+      if(!isTRUE(queued))callback(FALSE)
+    })
+    invisible(NULL)
+  }
+  enqueue_ownership<-function(){
+    # Finish ordinary source reads first so an in-flight lineup is not a gap.
+    if(!state$seed_ready||length(state$pending_team_ids)||state$busy>0L||length(state$queue))return(invisible(NULL))
+    awards<-state$awards$rows
+    if(!is.data.frame(awards)||!nrow(awards)||!all(c("player_id","round_id","is_finished")%in%names(awards)))return(invisible(NULL))
+    awards<-awards[awards$is_finished%in%TRUE,,drop=FALSE]
+    if(!nrow(awards))return(invisible(NULL))
+    history<-rival_historical_components(state$evidence,state$teams,state$seed$rules %||% list(),awards)
+    explicit<-dplyr::bind_rows(lapply(rival_evidence_rows(state$evidence,"eligibility"),function(row){
+      p<-row$payload
+      if(!is.list(p)||!isTRUE(p$verified)||!all(c("round_id","player_id")%in%names(p)))return(NULL)
+      data.frame(round_id=mvp_text(p$round_id),player_id=mvp_text(p$player_id))
+    }))
+    verified<-dplyr::bind_rows(history$eligibility[,c("round_id","player_id"),drop=FALSE],explicit)
+    missing<-awards[!paste(awards$round_id,awards$player_id)%in%paste(verified$round_id,verified$player_id),,drop=FALSE]
+    if(!nrow(missing))return(invisible(NULL))
+    # Reuse returned historical transitions indefinitely for their observed interval;
+    # a later round outside that interval needs a new observation.
+    saved<-rival_ownership_evidence_rows(state$evidence,"player_ownership_history")
+    catalog<-unique(history$rounds[,c("round_id","round_number"),drop=FALSE])
+    movements<-dplyr::bind_rows(lapply(unique(vapply(rival_evidence_rows(state$evidence,"movements"),function(row)mvp_text(row$payload$team_id),character(1))),function(id)
+      rival_normalize_movements(rival_cash_latest_movements(state$evidence,id),catalog)))
+    intervals<-rival_ownership_round_intervals(state$evidence,catalog,movements)
+    if(!state$ownership_catalog_scheduled&&!all(unique(missing$round_id)%in%intervals$round_id)){
+      state$ownership_catalog_scheduled<-TRUE
+      state$queue<-c(state$queue,list(list(kind="ownership_catalog")))
+      return(invisible(NULL))
+    }
+    usable<-missing$round_id%in%intervals$round_id
+    if(any(!usable))state$reason<-"Some historical ownership intervals lack an official round start or final-category settlement; affected bonuses remain unknown."
+    missing<-missing[usable,,drop=FALSE]
+    if(!nrow(missing))return(invisible(NULL))
+    for(id in unique(as.character(missing$player_id))){
+      required<-missing$round_id[missing$player_id%in%id]
+      interval<-intervals[intervals$round_id%in%required,,drop=FALSE]
+      records<-Filter(function(row)identical(mvp_text(row$payload$player_id),id),saved)
+      reusable<-length(records)>0L&&length(required)>0L&&all(required%in%interval$round_id)&&any(vapply(records,function(row){
+        rows<-tryCatch(dplyr::bind_rows(mvp_records(row$payload$rows)),error=function(e)NULL)
+        # Unknown or ambiguous names remain unknown; their source need not be
+        # reacquired repeatedly when its dated transitions already cover this interval.
+        if(!is.data.frame(rows)||!all(c("changed_at","owner_name")%in%names(rows))||!nrow(rows))return(FALSE)
+        dates<-fm_time(rows$changed_at);stamp<-fm_time(row$observed_at)
+        !anyNA(dates)&&length(stamp)==1L&&!is.na(stamp)&&min(dates)<=min(fm_time(interval$begins_at))&&stamp>=max(fm_time(interval$settles_at))
+      },logical(1)))
+      if(reusable||id%in%state$scheduled_owners)next
+      if(length(state$scheduled_owners)>=120L){state$reason<-"Historical ownership batch limit reached; Refresh continues acquisition.";break}
+      state$scheduled_owners<-c(state$scheduled_owners,id)
+      state$ownership_pending<-state$ownership_pending+1L
+      state$queue<-c(state$queue,list(list(kind="ownership",id=id)))
+    }
+    invisible(NULL)
+  }
   enqueue_lineups<-function(){
     if(!state$seed_ready)return(invisible(NULL))
     rounds<-rival_saved_rounds(state$evidence,teams=state$teams$teamid)
@@ -1697,14 +1788,16 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
     while(state$busy<2L&&length(state$queue)){
       task<-state$queue[[1]];state$queue<-state$queue[-1];state$busy<-state$busy+1L
       local({task<-task
-        fn<-switch(task$kind,saved="get_rival_finance_saved",seed="get_rival_finance_seed",team="get_rival_team_finance_observation",lineup="get_rival_round_lineup_observation",ranking="get_rival_round_ranking_observation",notifications="get_rival_round_notification_page")
+        fn<-switch(task$kind,saved="get_rival_finance_saved",seed="get_rival_finance_seed",team="get_rival_team_finance_observation",lineup="get_rival_round_lineup_observation",ranking="get_rival_round_ranking_observation",notifications="get_rival_round_notification_page",ownership="get_rival_player_ownership_observation",ownership_catalog="get_rival_ownership_round_catalog")
         args<-if(task$kind=="saved")list(account_id=auth[["userid"]],championship_id=cid,season=state$season)else list(login=auth,championship_id=cid,user_team_id=if(task$kind%in%c("team","lineup"))task$id else tid)
+        if(task$kind=="ownership")args<-c(args,list(player_id=task$id))
         if(task$kind=="notifications")args<-c(args,list(cursor=task$cursor))
         if(task$kind=="lineup")args<-c(args,list(round_id=task$round,signature=task$signature))
         if(task$kind=="ranking")args<-c(args,list(round_id=task$id,round_number=task$number,signature=task$signature,source_teams=task$source_teams))
         promises::then(async_adapter_fetch(fn,args,ctx,is_current=function()!state$closed&&identical(generation,state$generation)),function(result){
           if(state$closed||generation!=state$generation)return(NULL)
           state$busy<-state$busy-1L
+          if(task$kind=="ownership")state$ownership_pending<-max(0L,state$ownership_pending-1L)
           if(task$kind=="team")state$pending_team_ids<-setdiff(state$pending_team_ids,task$id)
           if(task$kind=="notifications")state$notification_pending<-FALSE
           tryCatch({
@@ -1755,7 +1848,13 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
                 persist_rival_finance_evidence(observed,ctx)
               }
             }
-            state$finance_ready<-TRUE;state$seed_ready<-TRUE;enqueue_teams();enqueue_notifications();publish(TRUE)
+            state$finance_ready<-TRUE;state$seed_ready<-TRUE;persist_ownership(context=ctx);enqueue_teams();enqueue_notifications();publish(TRUE)
+          }else if(task$kind%in%c("ownership","ownership_catalog")){
+            rows<-rival_ownership_observation_evidence(result,auth[["userid"]],cid,state$season,catalog=task$kind=="ownership_catalog")
+            if(length(rows)){
+              state$evidence<-rival_merge_evidence(state$evidence,rows);persist_ownership(rows,ctx)
+            }else state$reason<-if(task$kind=="ownership_catalog")"Historical round start times could not be established; affected award ownership remains unknown."else
+              "A player ownership history could not be retrieved; affected bonuses remain unknown."
           }else if(task$kind=="notifications"){
             state$notification_status<-mvp_text(result$status,"unavailable")
             state$notification_cursor<-mvp_text(result$cursor,task$cursor)
@@ -1804,10 +1903,10 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
               state$queue<-c(list(list(kind="seed")),state$queue)
             if(task$kind=="seed"){state$seed_ready<-TRUE;enqueue_teams()}
           })
-          publish(!length(state$queue)&&state$busy==0L);run_next();NULL
+          enqueue_ownership();publish(!length(state$queue)&&state$busy==0L);run_next();NULL
         },function(error){
-          if(!state$closed&&generation==state$generation){state$busy<-state$busy-1L;if(task$kind=="notifications"){state$notification_pending<-FALSE;state$notification_status<-"unavailable"};if(task$kind=="team")state$pending_team_ids<-setdiff(state$pending_team_ids,task$id);state$reason<-"Some financial sources could not be refreshed; saved evidence remains available.";if(task$kind=="saved")state$queue<-list(list(kind="seed"))
-            if(task$kind=="seed"){state$seed_ready<-TRUE;enqueue_teams()};enqueue_point_repair();enqueue_rankings();publish(TRUE);run_next()};NULL
+          if(!state$closed&&generation==state$generation){state$busy<-state$busy-1L;if(task$kind=="ownership")state$ownership_pending<-max(0L,state$ownership_pending-1L);if(task$kind=="notifications"){state$notification_pending<-FALSE;state$notification_status<-"unavailable"};if(task$kind=="team")state$pending_team_ids<-setdiff(state$pending_team_ids,task$id);state$reason<-"Some financial sources could not be refreshed; saved evidence remains available.";if(task$kind=="saved")state$queue<-list(list(kind="seed"))
+            if(task$kind=="seed"){state$seed_ready<-TRUE;enqueue_teams()};enqueue_point_repair();enqueue_rankings();enqueue_ownership();publish(TRUE);run_next()};NULL
         })
       })
     }
@@ -1816,7 +1915,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
   shiny::observe({
     auth<-login()
     if(!valid_login(auth)){
-      if(!is.null(state$key)){state$generation<-state$generation+1L;state$key<-NULL;state$evidence<-list();state$queue<-list();state$busy<-0L
+      if(!is.null(state$key)){state$generation<-state$generation+1L;state$key<-NULL;state$evidence<-list();state$queue<-list();state$busy<-0L;state$ownership_pending<-0L
         if(!is.null(state$publish_timer)){state$publish_timer();state$publish_timer<-NULL}
         state$identity<-NULL;state$snapshot<-NULL;state$snapshot_status<-"not_saved";state$calculation_cache<-rival_calculation_cache();state$calculated<-NULL;state$calculation_inputs<-NULL;state$transfers(data.frame());state$teams<-data.frame();state$finance_ready<-FALSE;state$seed_ready<-FALSE
         state$value(list(team_finances=data.frame(),breakdowns=list(),loading=FALSE))};return()
@@ -1829,6 +1928,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
       same<-identical(state$identity,paste(auth[["userid"]],cid,tid,sep="|"));state$identity<-paste(auth[["userid"]],cid,tid,sep="|")
       state$key<-key;state$generation<-state$generation+1L;state$busy<-0L;state$season<-league_season_context(cid);state$reason<-"";state$build_failure<-NULL
       if(!is.null(state$publish_timer)){state$publish_timer();state$publish_timer<-NULL}
+      state$scheduled_owners<-character();state$ownership_pending<-0L;state$ownership_catalog_scheduled<-FALSE;state$ownership_write_attempts<-character();if(!same)state$ownership_unsaved<-list()
       state$account<-auth[["userid"]];state$championship<-cid;state$snapshot_attempted_signature<-NULL;state$snapshot_pending<-NULL;state$seed_ready<-FALSE;state$point_repair_done<-FALSE;state$notification_cursor<-"";state$notification_status<-"initial";state$scheduled_notification_cursors<-character();state$notification_pending<-FALSE;state$scheduled_teams<-character();state$scheduled_lineups<-character();state$scheduled_rankings<-character();state$pending_team_ids<-character()
       if(!same){state$calculation_cache<-rival_calculation_cache();state$snapshot<-NULL;state$snapshot_status<-"not_saved";state$snapshot_signature<-NULL;state$snapshot_pending<-NULL;state$shared_cache_signature<-NULL
         ctx<-resource_context(account_id=state$account,championship_id=cid,user_team_id=tid,season=state$season)
@@ -1866,7 +1966,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
     shiny::req(isTRUE(active()),valid_login(login()),!is.null(state$key))
     awards<-tryCatch(official(),error=function(error)NULL)
     if(is.list(awards))state$awards<-awards
-    enqueue_rankings();enqueue_lineups();enqueue_notifications();publish(isTRUE(state$awards$complete));run_next()
+    enqueue_rankings();enqueue_lineups();enqueue_notifications();enqueue_ownership();publish(isTRUE(state$awards$complete));run_next()
   })
   shiny::observe({
     transfer_publication_revision();state$value()

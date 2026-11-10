@@ -870,3 +870,19 @@ focused implementation and independent validation against the official server
 package. Offline lifecycle and deployment contracts pass. Documentation records
 extended buffer/timer costs. A full Docker build and phone/Dokploy verification
 remain pending; redeployment is required and has not been performed here.
+
+
+## Historical bonus recovery and postponed settlement — 2026-11-10 UTC
+
+Status: **implemented; stored-data verification passed; authenticated full Best XI
+backfill and hosted rollout remain separate verification steps**.
+
+- Retain source fixture dates; acquire and persist missing player ownership through
+  the existing bounded finance queue, with conservative interval/name eligibility.
+- Record the user's round-8 postponement confirmation and exclude unsettled rounds
+  from settled bonus totals while retaining all standings points and cash.
+- Preserve per-round bonus metadata and pending identity in compact durable snapshots.
+- Stored production evidence replay restores all nine historical participants'
+  position totals and eight MVP totals; Best XI still requires source backfill.
+- Independent targeted financial/source validation passed. Focused source, pending,
+  classification and persistence checks passed; final release checks recorded below.

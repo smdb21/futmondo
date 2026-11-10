@@ -299,3 +299,57 @@ Source investigation also corrected the earlier incomplete API inventory:
 those histories. Neither completeness, unique historical name-to-team mapping,
 nor the exact reward-ownership cutoff is established by that array alone; no
 broad automatic ownership inference was added in this repair.
+
+
+## Historical award acquisition and unsettled rounds — 2026-11-10 UTC
+
+`rival_ownership_runtime.R` connects the already-supported player-summary `owners`
+array to historical award eligibility. Presence is recorded independently from an
+empty array. Owner rows use `n` (name), `d` (transition timestamp), `p` (price),
+and the observed `l=false` shape; unsupported flags, malformed or future times,
+duplicate timestamps, missing history, unknown/renamed names and nonunique team
+matches remain unresolved. `futmondo` denotes the System/Market. Source IDs bind
+each stored history to its player; the enclosing ledger filters account, league
+and season. Positive lineup/manual evidence remains independent, so conflicting
+owners do not become a credit.
+
+The official client's `/2/league/matches` consumer reads
+`answer.rounds[].matches[].info.date`. The former metadata parser discarded those
+dates; it now retains `fixture_rounds` with each round ID, dated fixtures and the
+earliest kickoff only when every returned fixture is dated. The compact four-field
+round catalog stays compatible. Calendar payload version 2 persists these dates;
+version 1 is readable, and an ownership request upgrades a legacy calendar once.
+Malformed saved fixture data is reacquired. No date is inferred from an ObjectId,
+round ordinal, point payment or observation time.
+
+`rival_resolve_owner_interval()` accepts an owner only if unchanged throughout the
+interval from the evidenced round start through a recorded final-category payment.
+A transition on either boundary or within the interval is unresolved. This avoids
+choosing an unsupported prize cutoff. Known historical negative cash prevents
+eligibility. `rival_ownership_eligibility()` joins these facts into the existing
+cash ledger, retaining current-rule assumptions and all combined-payment guards.
+
+The existing two-request finance queue acquires a dated calendar before requesting
+only missing award players whose rounds have usable intervals. At most 120 unique
+players are attempted per generation. Successful histories are stored as scoped
+`eligibility` evidence with kind `player_ownership_history`, stable
+`player-owners:PLAYER` IDs, source timestamps and `returned_transitions_only`
+coverage; calendars use `award_ownership_calendar` and `award-ownership-calendar`.
+Valid saved intervals are reused. Failed writes remain unacknowledged and retry
+on refresh without refetching the same history. No authentication data is stored.
+
+The user confirmed round 8's position payment had not happened because a fixture
+was postponed to 9 December. The idempotent repair
+`scripts/repairs/20261110_confirm_round8_postponement.sql` records a scoped
+`round_settlement_status` pending fact, not a zero payment. The generic
+`rival_pending_settlement_rounds()` also reads future fixtures from the saved
+calendar. A later positive recorded position/MVP/Best XI payment can establish
+settlement; points, zero movements and elapsed time cannot. Classification omits
+unsettled rounds from all four bonus totals while retaining all standings scores
+and the unchanged cash ledger.
+
+Compact calculation snapshots now retain the ledger's small per-round numeric
+projection, including zeros, unknowns and pending-round flags, when detailed cache
+size exceeds its storage budget. Snapshot reads validate component/round identity
+and reconstruct the saved projection without a second reward calculation. The
+calculation version is `2026-11-10-owner-history-v5`.

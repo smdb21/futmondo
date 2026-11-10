@@ -96,3 +96,22 @@ The current calendar's explicit playing status also identifies pending rounds af
 Run `Rscript test/test_classification_partial_bonuses.R` from the app directory. It includes the existing accounting fixtures and tests known-answer totals, JSON ledger restoration, missing completed evidence, stale calendar flags, real partial-range controls, pending/loading presentation, failed live reads and zero extra reads during range changes. The existing live regression and deployment bundle contract passed. The cold regression has an existing expectation for a removed `missing` warning and fails identically against the unchanged baseline; its first cold-source group passed. Full browser, full suite and authenticated production checks were not run.
 
 Performance: the projection adds bounded scans of the already loaded round catalog/history; 100 projections of 10 teams × 38 rounds took about 0.33 seconds locally. No additional API/database calls, persistence writes, timers or background tasks are introduced. R sources were formatted with `styler` and explicit control-body braces. Primary implemented and reviewed; Luna independently checked aggregation and source-status precedence.
+
+
+## Settled bonus selection and recovery — 2026-11-10 UTC
+
+Bonus selection combines explicit playing/provisional rounds with the shared
+finance source's `pending_bonus_rounds`. A delayed round is excluded from settled
+bonus totals even if compact team-round scores say closed. Standings points still
+include that round. The status lists unsettled rounds, component-specific missing
+completed rounds, the actual finance acquisition reason and any calculation error.
+Unknown component totals remain numeric NA; no missing reward is converted to zero.
+`classification_bonus_gaps()` uses existing ledger metadata and adds no source read.
+Saved compact snapshots retain numeric bonus coverage and pending-round identity.
+
+The shared finance loader now retrieves and persists source ownership transitions
+for missing award recipients when a dated round interval exists. See
+`rival_cash_accounting.md` for scope, name/interval validation, request bounds and
+persistence acknowledgement. Ambiguous transitions or unsupported source evidence
+can still leave individual totals unavailable. Full authenticated Best XI backfill
+is distinct from the verified stored-data replay.

@@ -34,6 +34,8 @@ library(jsonlite)
 library(data.table)
 source("mvp_runtime.R")
 source("rival_finance_runtime.R")
+source("rival_ownership_runtime.R")
+source("round_settlement_runtime.R")
 
 source("data_service.R")
 source("async_transport.R")
@@ -2779,6 +2781,7 @@ get_player_summary <- function(login, championship_id, user_team_id = NULL, play
         championship = ans_data$championship %||% list(),
         history_complete = isTRUE(ans_data$historyComplete),
         owners = ans_data$owners %||% list(),
+        owners_received = "owners" %in% names(ans_data),
         market = ans_data$market %||% list(),
         numberOfBids = ans_data$numberOfBids %||% NA_integer_,
         bids = bids_arr,

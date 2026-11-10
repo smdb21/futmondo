@@ -59,9 +59,14 @@ shiny::testServer(classification_Server, args = list(
     identical(output$configured_rewards_ui$html, rewards))
   # A real coverage gap stays visible and never becomes a zero.
   attr(ledger, "round_bonus_totals")$amount[2] <- NA_real_
-  finance(list(loading = FALSE, cash_ledgers = list(a = ledger)))
+  finance(list(loading = FALSE, cash_ledgers = list(a = ledger),
+    reason = "Historical round start times could not be established.",
+    finance_error = "Synthetic finance source failure."))
   settle(session)
   stopifnot(grepl("Some bonus totals lack complete", output$classification_status$html, fixed = TRUE),
+    grepl("MVP (rounds 1)", output$classification_status$html, fixed = TRUE),
+    grepl("Historical round start times could not be established.", output$classification_status$html, fixed = TRUE),
+    grepl("Synthetic finance source failure.", output$classification_status$html, fixed = TRUE),
     is.na(standings_RV()$mvp_bonus))
   session$setInputs(classification_view="partial", round_range_slider = c(1, 2))
   settle(session)

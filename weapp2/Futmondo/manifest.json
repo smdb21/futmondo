@@ -2265,7 +2265,7 @@
       "checksum": "35285acf91d616a999b87ba74bb25a1f"
     },
     "round_lineup_runtime.R": {
-      "checksum": "3dd581c256faf55d6836561435d485e5"
+      "checksum": "5f5e92f21cb9c1fdd196e2dfb7540e84"
     },
     "page_preferences.R": {
       "checksum": "e71aa64f6f5b2262927395b22afef9ff"
@@ -2274,7 +2274,7 @@
       "checksum": "37cdcce751978bd93b312284127403fe"
     },
     "award_runtime.R": {
-      "checksum": "302fb5ab523700c4fe7862b1ca4bbd5a"
+      "checksum": "058228e3e200493b5886b557494dd2de"
     },
     "background_runtime.R": {
       "checksum": "e24425839370144780005435a28f317b"
@@ -2292,7 +2292,7 @@
       "checksum": "03dfe6d69a334237b5772b92c99ce569"
     },
     "futmondo_functions.R": {
-      "checksum": "931c3be4a6f5d901e9832a11d20844ee"
+      "checksum": "ee57494ff2e3f1934fa1322b40be1c4b"
     },
     "global.R": {
       "checksum": "7053ae7bf6c2e4d54bc7026b981f3545"
@@ -2310,10 +2310,10 @@
       "checksum": "fbfca04b271427fdff60410f9b393f30"
     },
     "Modules/Classification_Module.R": {
-      "checksum": "3cc98b235d5f1d81ab64319b72cd6eb4"
+      "checksum": "53e4b33acc788ea4127b396af3479975"
     },
     "Modules/Login_Module.R": {
-      "checksum": "233dc811244db59b16c9dfab42a67abd"
+      "checksum": "a7c71f8b9967c3bccd533e57b19a1d90"
     },
     "Modules/Market_Module.R": {
       "checksum": "676429892e2008352ddce0a3a4a2e32b"
@@ -2325,19 +2325,19 @@
       "checksum": "0c220663de1f047b20b843e3998a1f8b"
     },
     "Modules/Players_in_Teams_Module.R": {
-      "checksum": "75e6f7d05ba457990b4dcd7d59adffe5"
+      "checksum": "dc863256aba563fd3912154f72f44eff"
     },
     "Modules/Players_Table_Module.R": {
-      "checksum": "416eb97daeb1402a627f17f03f6d3e72"
+      "checksum": "554a4562174c6aeee58c467a16426ff9"
     },
     "Modules/Plots_Module.R": {
       "checksum": "d28b6843516e7a88406119bf287000c2"
     },
     "Modules/Rivals_Module.R": {
-      "checksum": "f9ce49029cb19cd5f63050885629714b"
+      "checksum": "88b1fef0bca69f1f48ab376ad1bbf785"
     },
     "Modules/Round_MVPs_Module.R": {
-      "checksum": "4dc78a51101ff53d0c565736840f1e3b"
+      "checksum": "84c7480b9122d0597df1606f59e6fcbf"
     },
     "Modules/Selected_Player_Module.R": {
       "checksum": "497eeb989cb6070470211ac1da72fb15"
@@ -2346,25 +2346,25 @@
       "checksum": "3e5572af3bb7154be89f8678acb9d94b"
     },
     "mvp_runtime.R": {
-      "checksum": "ddae7455a9ae24f29793856e79adfc73"
+      "checksum": "fb863377e5e44a0cecc3ebe53cbbc69d"
     },
     "player_columns_to_hide.txt": {
       "checksum": "569487c234e0b4a28c0027249faecc8b"
     },
     "README.md": {
-      "checksum": "cc8f23955dfe3ecd418eefdb3547b8c6"
+      "checksum": "d22ec3bb9aaf399eee2ce8caabdf0500"
     },
     "remember_login.R": {
       "checksum": "bf22ac53858d8d735951c8b001e1a691"
     },
     "rival_calculation_store.R": {
-      "checksum": "7e8ba27e8188220995297b76414cacec"
+      "checksum": "25017f2e868529ce02e6369124847d96"
     },
     "rival_finance_runtime.R": {
-      "checksum": "74d6aa2a3dda24404d5243cc861b891b"
+      "checksum": "871ec20a27560c87b5ee279f21dea9d5"
     },
     "server.R": {
-      "checksum": "88caa4e0e20d790eacadb7ca5334fba0"
+      "checksum": "bc992196fdf97e76218a19a8154a5c46"
     },
     "supabase_connector.R": {
       "checksum": "3f6ff4dc8b4e3adc8dccc720740378e6"
@@ -2373,34 +2373,40 @@
       "checksum": "a1e1d838c6dcce0a85e626a48ad799e9"
     },
     "ui.R": {
-      "checksum": "94ea117527e0dc826b395d7142d9e3f1"
+      "checksum": "16b925e250c8656ea2d831aeab0d965d"
     },
     "utils.R": {
       "checksum": "6253d5e12d91ddef162c7e9e7624680a"
     },
     "www/custom_style.css": {
-      "checksum": "6ef0f94ec80c1c2b10b4263403d248e0"
+      "checksum": "1b21e334e521a58d646ceaa353194386"
     },
     "www/theme-switch.js": {
       "checksum": "616593ba18b7d3bb585da89e204c0cf4"
     },
     "www/release-info.json": {
-      "checksum": "11153803616c437d45dea26e1f080b1e"
+      "checksum": "6cad6c9be4fa53032e8a6dc04e73a847"
     },
     "www/remember-login.js": {
       "checksum": "2b037334f8088f5b4a270acbaea52e91"
     },
     "lineup_runtime.R": {
-      "checksum": "50cf573d7cbb2f667e827dbc69369cc9"
+      "checksum": "e2495476453b96b61864aaf97855963f"
     },
     "lineup_store.R": {
-      "checksum": "8cad0856f3815874548ed0bccd3f1894"
+      "checksum": "ec8071963598b26be7310554db7344dc"
     },
     "lineup_api.R": {
-      "checksum": "37e3603ce78933ec8bac0e22b0c22a97"
+      "checksum": "24499829491f727a5fe32113e3e641af"
     },
     "Modules/Lineup_Module.R": {
-      "checksum": "a0bfcfb913b6e0c9191b026935b6f251"
+      "checksum": "923eb47dd6516821e2cdc88db4a7c5fa"
+    },
+    "rival_ownership_runtime.R": {
+      "checksum": "96cca294a78fbe0f49f81900b0d56fe9"
+    },
+    "round_settlement_runtime.R": {
+      "checksum": "6941ec3d550551d6c41a20b6a4d2ff3e"
     }
   },
   "users": null

@@ -109,6 +109,46 @@ award_calendar_rows_valid <- function(rows) {
     is.numeric(rows$round_number)&&all(is.finite(rows$round_number)&rows$round_number>=1&rows$round_number==floor(rows$round_number))&&
     !anyDuplicated(rows$round_number)&&is.logical(rows$is_finished)&&is.character(rows$status)&&!anyNA(rows$status)
 }
+# The official match-calendar consumer groups rounds[].matches[].info.date.
+# Retain every valid fixture timestamp; a start needs all returned fixtures dated.
+award_fixture_calendar <- function(records) {
+  empty<-data.frame(round_id=character(),begin_process=character(),stringsAsFactors=FALSE)
+  empty$fixture_dates<-I(vector("list",0L));empty$all_fixtures_dated<-logical()
+  dplyr::bind_rows(c(list(empty),lapply(mvp_records(records),function(round){
+    if(!is.list(round)||!nzchar(mvp_text(round$`_id` %||% round$id)))return(NULL)
+    fixtures<-mvp_records(round$matches)
+    if(!length(fixtures)||length(fixtures)>50L)return(NULL)
+    dates<-vapply(fixtures,function(match)if(is.list(match)&&is.list(match$info))mvp_text(match$info$date)else "",character(1))
+    valid<-!is.na(fm_time(dates));complete<-all(valid)
+    if(!any(valid))return(NULL)
+    values<-unique(dates[valid]);values<-values[order(fm_time(values))]
+    row<-data.frame(round_id=mvp_text(round$`_id` %||% round$id),begin_process=if(complete)values[1]else "",stringsAsFactors=FALSE)
+    row$fixture_dates<-I(list(values));row$all_fixtures_dated<-complete
+    row
+  })))
+}
+award_fixture_calendar_decode <- function(value) {
+  records<-mvp_records(value)
+  if(!length(records))return(award_fixture_calendar(list()))
+  rows<-dplyr::bind_rows(lapply(records,function(record){
+    if(!is.list(record))return(NULL)
+    row<-data.frame(round_id=mvp_text(record$round_id),begin_process=mvp_text(record$begin_process),stringsAsFactors=FALSE)
+    row$fixture_dates<-I(list(unlist(record$fixture_dates,use.names=FALSE)))
+    row$all_fixtures_dated<-identical(record$all_fixtures_dated,TRUE)
+    row
+  }))
+  rows
+}
+award_fixture_calendar_valid <- function(rows) {
+  is.data.frame(rows)&&nrow(rows)<=120L&&identical(names(rows),c("round_id","begin_process","fixture_dates","all_fixtures_dated"))&&
+    is.character(rows$round_id)&&!anyNA(rows$round_id)&&all(nzchar(rows$round_id))&&!anyDuplicated(rows$round_id)&&
+    is.character(rows$begin_process)&&!anyNA(rows$begin_process)&&is.list(rows$fixture_dates)&&
+    is.logical(rows$all_fixtures_dated)&&!anyNA(rows$all_fixtures_dated)&&all(vapply(seq_len(nrow(rows)),function(i){
+      dates<-unlist(rows$fixture_dates[[i]],use.names=FALSE);begin<-rows$begin_process[i]
+      is.character(dates)&&length(dates)>0L&&length(dates)<=50L&&!anyNA(fm_time(dates))&&
+        if(rows$all_fixtures_dated[i])nzchar(begin)&&!is.na(fm_time(begin))&&fm_time(begin)==min(fm_time(dates))else !nzchar(begin)
+    },logical(1)))
+}
 get_award_round_metadata <- function(login,championship_id,league_id,refresh=FALSE,current_round_id="") {
   context<-resource_context(login,championship_id,season=league_season_context(championship_id))
   scope<-c(context[c("account_id","championship_id","season")],list(league_id=as.character(league_id),current_round_id=mvp_text(current_round_id)))
@@ -130,15 +170,23 @@ get_award_round_metadata <- function(login,championship_id,league_id,refresh=FAL
         if(!is.list(payload))payload<-list()
         restored<-tryCatch(dplyr::bind_rows(mvp_records(payload$rows)),error=function(e)NULL)
         stamp<-fm_time(row$observed_at);deadline<-fm_number(payload$valid_until);now<-as.numeric(Sys.time())
-        if(is.list(payload)&&identical(payload$kind,"league_round_calendar")&&identical(fm_number(payload$version),1)&&
+        if(is.list(payload)&&identical(payload$kind,"league_round_calendar")&&fm_number(payload$version)%in%c(1,2)&&
            same_scope(payload$scope)&&identical(payload$completeness,"complete")&&
            all(vapply(c("account_id","championship_id","season"),function(field)identical(mvp_text(row[[field]]),context[[field]]),logical(1)))&&
            identical(mvp_text(row$source_id),source_id)&&identical(row$evidence_type,"eligibility")&&
            length(stamp)==1L&&!is.na(stamp)&&as.numeric(stamp)<=now+5&&is.finite(deadline)&&
            deadline<=as.numeric(stamp)+ttl+0.001&&now<deadline&&award_calendar_rows_valid(restored)){
           result<-list(status="ok",rows=restored,scope=payload$scope,complete=TRUE,valid_until=deadline,from_saved=TRUE)
-          attr(result,"observed_at")<-stamp
-          return(result)
+          valid_fixtures<-TRUE
+          if(identical(fm_number(payload$version),2)){
+            fixtures<-tryCatch(award_fixture_calendar_decode(payload$fixture_rounds),error=function(e)NULL)
+            valid_fixtures<-award_fixture_calendar_valid(fixtures)
+            if(valid_fixtures)result$fixture_rounds<-fixtures
+          }
+          if(valid_fixtures){
+            attr(result,"observed_at")<-stamp
+            return(result)
+          }
         }
       }
     }
@@ -158,7 +206,7 @@ get_award_round_metadata <- function(login,championship_id,league_id,refresh=FAL
         status=status,stringsAsFactors=FALSE)
     }))
     stamp<-Sys.time();deadline<-as.numeric(stamp)+ttl
-    result<-list(status="ok",rows=rows,scope=scope,complete=length(records)==nrow(rows)&&award_calendar_rows_valid(rows),valid_until=deadline)
+    result<-list(status="ok",rows=rows,fixture_rounds=award_fixture_calendar(records),scope=scope,complete=length(records)==nrow(rows)&&award_calendar_rows_valid(rows),valid_until=deadline)
     attr(result,"observed_at")<-stamp
     result
   },context=context)
@@ -185,6 +233,11 @@ persist_award_calendar_snapshot <- function(data,context) {
      length(stamp)!=1L||is.na(fm_time(stamp))||!is.finite(fm_number(data$valid_until)))return(invisible(FALSE))
   payload<-list(kind="league_round_calendar",version=1L,scope=scope,rows=data$rows,
     completeness="complete",valid_until=data$valid_until)
+  if(award_fixture_calendar_valid(data$fixture_rounds)){
+    payload$version<-2L;payload$fixture_rounds<-lapply(seq_len(nrow(data$fixture_rounds)),function(i){
+      row<-as.list(data$fixture_rounds[i,,drop=FALSE]);row$fixture_dates<-as.list(unlist(row$fixture_dates,use.names=FALSE));row
+    })
+  }
   source_id<-paste0("calendar:v1:",as.character(openssl::sha256(scope$league_id)))
   evidence<-rival_finance_evidence(context$account_id,context$championship_id,context$season,"eligibility",source_id,payload,stamp)
   persist_rival_finance_evidence(list(evidence),context)

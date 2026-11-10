@@ -265,9 +265,9 @@ classification_bonus_table <- function(standings, history, finances, window = NU
       selected <- selected[selected >= window[1] & selected <= window[2]]
     }
   }
-  pending <- numeric()
+  pending <- finances$pending_bonus_rounds %||% numeric()
   if ("score_status" %in% names(history)) {
-    pending <- history$round[history$score_status %in% "provisional"]
+    pending <- c(pending, history$round[history$score_status %in% "provisional"])
   }
   if (all(c("round_number", "status") %in% names(rounds))) {
     playing <- tolower(rounds$status) %in% c("active", "playing", "in_progress", "running")
@@ -275,7 +275,7 @@ classification_bonus_table <- function(standings, history, finances, window = NU
     # compact catalog's is_finished flag must not override explicit playing.
     pending <- c(pending, rounds$round_number[playing])
   }
-  pending <- intersect(selected, pending)
+  pending <- selected[selected %in% pending]
   selected <- setdiff(selected, pending)
   for (column in names(kinds)) {
     standings[[column]] <- vapply(as.character(standings$team_id), function(id) {
@@ -293,6 +293,30 @@ classification_bonus_table <- function(standings, history, finances, window = NU
   attr(standings, "bonus_pending_rounds") <- pending
   attr(standings, "bonus_completed_rounds") <- selected
   standings
+}
+
+#' Explain missing completed-round coverage using the same saved ledger
+#' @param finances Shared finance result with per-team cash ledgers.
+#' @param rounds Completed round numbers in the displayed selection.
+#' @param team_ids Displayed team identities.
+#' @return Named list of missing round numbers per bonus component.
+#' @keywords internal
+classification_bonus_gaps <- function(finances, rounds, team_ids) {
+  kinds <- c("points", "mvp", "dreamteam", "ranking")
+  result <- setNames(rep(list(numeric()), length(kinds)), kinds)
+  for (id in intersect(as.character(team_ids), names(finances$cash_ledgers))) {
+    totals <- attr(finances$cash_ledgers[[id]], "round_bonus_totals")
+    # A ledger without round metadata cannot identify component-specific gaps.
+    # Keep that absence separate from the observed participants' coverage.
+    if (!is.data.frame(totals) || !nrow(totals)) next
+    for (kind in kinds) {
+      rows <- totals[totals$bonus_type %in% kind, , drop = FALSE]
+      known <- rows$round_number[is.finite(rows$amount) &
+        !duplicated(rows$round_number) & !duplicated(rows$round_number, fromLast = TRUE)]
+      result[[kind]] <- sort(unique(c(result[[kind]], setdiff(rounds, known))))
+    }
+  }
+  result
 }
 
 classification_dreamteam_rows <- function(answer) {
@@ -641,6 +665,14 @@ classification_Server <- function(id, is_module_active, login_token, championshi
         return(p(empty_standings_message_RV()))
       }
       stale <- identical(attr(active_ranking_RV(), "fetch_status"), "stale")
+      finances <- finance_data_RV()
+      bonus_loading <- isTRUE(finances$loading) || isTRUE(finances$finance_loading)
+      gaps <- classification_bonus_gaps(finances, attr(rows, "bonus_completed_rounds"), rows$team_id)
+      labels <- c(points = "Points", mvp = "MVP", dreamteam = "Best XI", ranking = "Position")
+      gap_labels <- vapply(names(gaps)[lengths(gaps) > 0L], function(kind) {
+        paste0(labels[[kind]], " (rounds ", paste(gaps[[kind]], collapse = ", "), ")")
+      }, character(1))
+      missing_bonus <- any(vapply(rows[, intersect(c("points_bonus", "mvp_bonus", "best_xi_bonus", "position_bonus"), names(rows)), drop = FALSE], anyNA, logical(1)))
       tagList(
         p(if (single_round_RV() != "all") {
           "Click a team to see its formation and ordered substitutes for this round."
@@ -650,11 +682,19 @@ classification_Server <- function(id, is_module_active, login_token, championshi
         if (partial_view_RV() && length(attr(rows, "bonus_pending_rounds"))) {
           pending <- paste(attr(rows, "bonus_pending_rounds"), collapse = ", ")
           if (length(attr(rows, "bonus_completed_rounds"))) {
-            p(paste0("Bonus totals cover completed rounds only. In-progress rounds excluded: ", pending, "."))
+            p(paste0("Bonus totals cover completed rounds only. Unsettled rounds excluded: ", pending, "."))
           } else {
-            p(paste0("Bonus totals are pending for in-progress rounds: ", pending, "."))
+            p(paste0("Bonus totals are pending for unsettled rounds: ", pending, "."))
           }
         },
+        if (bonus_loading && missing_bonus) {
+          p("Bonus totals are loading; available standings remain visible.")
+        } else if (missing_bonus && length(attr(rows, "bonus_completed_rounds"))) {
+          p(paste0("Some bonus totals lack complete historical evidence",
+            if (length(gap_labels)) paste0(": ", paste(gap_labels, collapse = "; ")) else "", "."))
+        },
+        if (nzchar(mvp_text(finances$finance_error))) p(finances$finance_error),
+        if (nzchar(mvp_text(finances$reason))) p(finances$reason),
         if (length(failures)) {
           p(resource_failure_message(failures[[1]]))
         },

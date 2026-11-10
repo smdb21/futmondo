@@ -83,6 +83,27 @@ rival_snapshot_decode <- function(node,depth=0L) {
 }
 rival_snapshot_signature <- function(cache) rival_calculation_hash(list(preparation=cache$dependency_key,
   teams=lapply(cache$teams[sort(names(cache$teams))],function(x)x$key)))
+#' Validate the bounded ledger projection retained by compact snapshots
+#' @param totals Named list of per-team round_bonus_totals data frames.
+#' @param team_ids Team identities permitted by the enclosing snapshot.
+#' @return TRUE only for scoped, unique, numeric round/component observations.
+#' @keywords internal
+rival_snapshot_bonus_valid <- function(totals,team_ids) {
+  if(!is.list(totals)||is.data.frame(totals)||length(totals)>.rival_snapshot_limits$teams)return(FALSE)
+  if(!length(totals))return(TRUE)
+  ids<-names(totals)
+  if(is.null(ids)||anyNA(ids)||any(!nzchar(ids))||anyDuplicated(ids)||!all(ids%in%team_ids))return(FALSE)
+  all(vapply(totals,function(rows){
+    is.data.frame(rows)&&nrow(rows)<=480L&&
+      all(c("round_number","bonus_type","amount")%in%names(rows))&&
+      is.numeric(rows$round_number)&&all(is.finite(rows$round_number))&&
+      all(rows$round_number>=1&rows$round_number==floor(rows$round_number))&&
+      is.character(rows$bonus_type)&&all(rows$bonus_type%in%c("points","ranking","mvp","dreamteam"))&&
+      is.numeric(rows$amount)&&all(is.na(rows$amount)|is.finite(rows$amount))&&
+      (!"settlement_pending"%in%names(rows)||(is.logical(rows$settlement_pending)&&!anyNA(rows$settlement_pending)))&&
+      !anyDuplicated(paste(rows$round_number,rows$bonus_type,sep="|"))
+  },logical(1)))
+}
 rival_snapshot_payload <- function(cache,calculated,context) {
   scope<-rival_snapshot_scope(context)
   if(is.null(scope)||!is.data.frame(calculated$team_finances)||!nrow(calculated$team_finances)||
@@ -90,6 +111,17 @@ rival_snapshot_payload <- function(cache,calculated,context) {
   saved_cache<-as.list(cache)[intersect(c('preparation_key','dependency_key','prepared','teams'),names(as.list(cache)))]
   if(as.numeric(object.size(saved_cache))>.rival_snapshot_limits$json)saved_cache<-NULL
   summary<-calculated$team_finances
+  # Retain the small numeric ledger projection even when the detailed cache
+  # exceeds the snapshot budget. Never recalculate rewards from summary income.
+  ledgers<-calculated$cash_ledgers %||% list()
+  totals<-lapply(ledgers[intersect(names(ledgers),summary$teamid)],function(ledger)attr(ledger,"round_bonus_totals"))
+  totals<-Filter(function(rows)is.data.frame(rows)&&nrow(rows)>0L,totals)
+  if(length(calculated$pending_bonus_rounds))totals<-lapply(totals,function(rows){
+    rows$settlement_pending<-rows$round_number%in%calculated$pending_bonus_rounds
+    rows
+  })
+  if(!rival_snapshot_bonus_valid(totals,summary$teamid))return(NULL)
+  if(length(totals))attr(summary,"round_bonus_totals")<-totals
   make<-function(value){
     wire<-list(format=1L,scope=scope,signature=rival_snapshot_signature(cache),summary=rival_snapshot_encode(summary),cache=rival_snapshot_encode(value))
     json<-charToRaw(as.character(jsonlite::toJSON(wire,auto_unbox=TRUE,na='null',null='null',digits=NA)))
@@ -128,6 +160,9 @@ read_rival_calculation_snapshot <- function(account_id,championship_id,season,us
        !identical(wire$format,1L)||!identical(wire$scope,scope)||!is.character(wire$signature)||length(wire$signature)!=1L||
        !grepl('^[0-9a-f]{64}$',wire$signature))return(NULL)
     summary<-rival_snapshot_decode(wire$summary);cache<-rival_snapshot_decode(wire$cache)
+    totals<-attr(summary,"round_bonus_totals") %||% list()
+    attr(summary,"round_bonus_totals")<-NULL
+    if(!rival_snapshot_bonus_valid(totals,summary$teamid))return(NULL)
     if(!is.data.frame(summary)||!nrow(summary)||nrow(summary)>.rival_snapshot_limits$teams||
        !all(c('teamid','teamname','estimated_cash','observed_cash','observed_cash_at','observed_cash_fresh','as_of')%in%names(summary))||
        !is.character(summary$teamid)||anyNA(summary$teamid)||any(!nzchar(summary$teamid))||anyDuplicated(summary$teamid))return(NULL)
@@ -146,7 +181,17 @@ read_rival_calculation_snapshot <- function(account_id,championship_id,season,us
         is.character(x$missing)&&is.character(x$assumptions)&&is.logical(x$estimated_movements)&&length(x$estimated_movements)==1L&&!is.na(x$estimated_movements)
       },logical(1))))return(NULL)
     }
-    list(scope=scope,signature=wire$signature,team_finances=summary,cache=cache,saved_at=row$observed_at)
+    ledgers<-if(is.list(cache))lapply(cache$teams,function(team)team$ledger)else list()
+    for(id in setdiff(names(totals),names(ledgers))){
+      ledger<-data.frame()
+      attr(ledger,"round_bonus_totals")<-totals[[id]]
+      ledgers[[id]]<-ledger
+    }
+    pending<-sort(unique(unlist(lapply(totals,function(rows){
+      if("settlement_pending"%in%names(rows))rows$round_number[rows$settlement_pending]else numeric()
+    }),use.names=FALSE)))
+    list(scope=scope,signature=wire$signature,team_finances=summary,cash_ledgers=ledgers,
+      pending_bonus_rounds=pending,cache=cache,saved_at=row$observed_at)
   },error=function(e)NULL)
 }
 persist_rival_calculation_snapshot <- function(cache,calculated,context,on_complete=NULL) {

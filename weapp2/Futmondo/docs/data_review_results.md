@@ -1439,3 +1439,58 @@ source bytes). Existing `/init`, app root routing, auth and manual actions remai
   30-minute test, live phone sleep/return, or deployed Dokploy checks. Tab discard,
   page reload, container/R-process restart or the deadline can still end live
   state. No production deployment or prevention of browser suspension is claimed.
+
+
+## Missing full-range bonus columns — 2026-11-10 UTC
+
+Root causes: the ledger did not acquire player-summary ownership histories; the
+bulk match-calendar parser discarded the dates needed to bound those histories;
+compact calculation snapshots discarded per-round bonus metadata when detailed
+cache size exceeded its budget; and postponed round 8 was treated as a completed
+round despite no final payment. The user confirmed its game is postponed to
+9 December. Applied and read back the scoped pending-status repair in the hosted
+evidence store; no payment, date of payment or zero income was invented.
+
+Readback replay with the real saved source records and earlier two ownership
+corrections restores position totals for 9/9 historical participants and MVP totals
+for 8/9, with identical cash balances. Full-range Best XI remains unknown until
+missing source histories are retrieved; the reference team's combined-payment
+allocation also remains guarded. Diagnostic ledger build took 4.909 seconds locally.
+This is observed stored-data behavior, not an authenticated hosted backfill claim.
+
+Sol implemented the source/queue path; Luna investigated the official contract and
+independently checked owner boundaries, unknown/duplicate names, System/Market,
+negative eligibility, source-ID/round/player isolation, explicit ownership conflicts,
+future timestamps and pending status. Independent hand calculation matched one
+ledger: 100 opening + 10 position + 55 Best XI + 10 MVP = 175. Pending annotations
+left cash and ledger amounts unchanged. No live account request or financial
+transaction was used in validation.
+
+Focused checks passed: ownership recovery (10 groups), fixture calendar (5), initial
+award catalog (6), reference bonus gates (7), compact bonus snapshots (4), pending
+settlement (3), classification loading/status and durable calculation reuse. Local
+ownership derivation for 50 histories, 11 rounds and 121 memberships took 0.345 s
+and retained 223.4 KiB; these are synthetic/local measurements. Calendar and owner
+reads share the existing two-request cap, skip players without usable timing,
+reuse persisted observations and retry failed writes without repeating successful
+acquisition. No new dependency, schema, polling worker or authentication storage.
+Final release/lifecycle results and verification limits follow below.
+
+Final isolated release verification passed ownership/batching 10 groups, fixture
+calendar 5, pending settlement 3, compact snapshots 4, partial bonus accounting,
+classification loading/status, durable reuse 6, initial award catalog 6 and
+reference bonus gates 7. The mandatory offline lifecycle passed 13 checks plus
+8 tabs with no HTTP or live database mutation attempts. The final type-preserving
+pending projection and reserved-name collision guard passed their focused checks.
+An existing strict fixture caught a round-number type regression, corrected without
+changing selection membership or reward amounts. Existing synthetic Plotly warnings
+remain. Deployment checks passed all 3 groups, all 49 bundle checksums and all 21
+runtime release hashes. Pre-existing stale release hashes were reconciled against
+the isolated committed source; unrelated working-tree edits remain separate.
+
+The delayed two-owner fixture confirms zero intermediate ledger rebuilds while
+responses arrive and exactly one rebuild at batch drain; the previous ledger stays
+available and loading remains truthful. This prevents a costly full reconstruction
+for each returned owner. No browser/authenticated hosted backfill was run. The new
+release must be served by the hosting deployment before phone behavior is verified;
+remaining unsupported histories still produce honest incomplete totals.
