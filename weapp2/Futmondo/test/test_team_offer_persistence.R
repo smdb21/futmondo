@@ -31,7 +31,7 @@ check('complete snapshots use existing private queue and exclude unrelated field
     queued[[1]]$fn=='supabase_post_direct',queued[[1]]$args[[1]]=='rival_finance_evidence',
     queued[[1]]$args[[4]],!grepl('must-not-persist',jsonlite::toJSON(queued[[1]]$args)))
   record<-queued[[1]]$args[[2]][[1]]
-  stopifnot(record$evidence_type=='eligibility',startsWith(record$source_id,'rival-cache:received-offers-v1:'),
+  stopifnot(record$evidence_type=='eligibility',startsWith(record$source_id,'rival-cache:received-offers-v2:'),
     length(record$payload$rows)==4L)
   saved<-wire(record)
 })
@@ -44,7 +44,7 @@ check('fresh durable reads restore every offer and original source time',{
 })
 check('expiry and account, league, team, scoring and season isolation reject stale or foreign snapshots',{
   stopifnot(is.null(read_saved_roster_offers(context,now+15)),is.null(read_saved_roster_offers(context,now-1)))
-  for(field in c('account_id','championship_id','user_team_id','season','scoring_version')){
+  for(field in c('account_id','championship_id','user_team_id','competition_id','season','scoring_version')){
     wrong<-context;wrong[[field]]<-'different'
     # This stub returns the same row regardless of requested scope; decoding must reject it.
     old_get<-supabase_get;supabase_get<-function(...)saved

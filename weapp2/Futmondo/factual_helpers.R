@@ -342,8 +342,14 @@ factual_read_adapter<-function(session,handler,login_token,championship_id=NULL,
  if(is.null(session$userData$factual_read_registry))session$userData$factual_read_registry<-new.env(parent=emptyenv())
  registry<-session$userData$factual_read_registry
  value<-function(x)if(is.function(x))x()else x
- owner_context<-function(){auth<-value(login_token);list(account=if(valid_login(auth))fm_scalar(auth[["userid"]])else "",league=fm_scalar(value(championship_id)),team=fm_scalar(value(user_team_id)))}
+ owner_context<-function(){
+   league_context_revision();auth<-value(login_token)
+   if(!valid_login(auth))return(list(account="",league="",team="",competition="unknown",season="unknown",scoring="unknown"))
+   ctx<-resource_context(auth,value(championship_id),value(user_team_id))
+   list(account=ctx$account_id,league=ctx$championship_id,team=ctx$user_team_id,competition=ctx$competition_id,season=ctx$season,scoring=ctx$scoring_version)
+ }
  function(...){
+  league_context_revision()
   shiny::req(isTRUE(is_active()));args<-list(...);auth<-value(login_token);shiny::req(valid_login(auth))
   original<-get(handler,envir=.GlobalEnv,mode="function");formal_names<-names(formals(original));argument_names<-names(args)
   if(is.null(argument_names))argument_names<-rep("",length(args));position<-1L
@@ -354,7 +360,8 @@ factual_read_adapter<-function(session,handler,login_token,championship_id=NULL,
   names(args)<-argument_names;requested_auth<-args$login %||% auth
   ctx<-resource_context(requested_auth,args$championship_id %||% value(championship_id),args$user_team_id %||% value(user_team_id),args$player_id,session_id=session$token)
   resource<-paste0(handler,":",as.character(openssl::sha256(serialize(args,NULL))))
-  entry_key<-paste0(session$ns(""),resource)
+  for(field in intersect(c("season","scoring_version","competition_id"),names(args)))ctx[[field]]<-args[[field]]
+  entry_key<-paste0(session$ns(""),api_cache_key(resource,context=ctx))
   if(!exists(entry_key,registry,inherits=FALSE))shiny::isolate({
    keys<-ls(registry)
    if(length(keys)>=128L){times<-vapply(keys,function(k)attr(registry[[k]],"last_access") %||% 0,numeric(1));victim<-keys[which.min(times)];dispose<-attr(registry[[victim]],"dispose");if(is.function(dispose))dispose();rm(list=victim,envir=registry)}
@@ -418,17 +425,17 @@ invalidate_manual_resources<-function(login,championship_id,user_team_id,player_
 # excluded from rival accounting. Authentication never enters the payload.
 .roster_offer_invalidated <- new.env(parent=emptyenv())
 roster_offer_scope <- function(context) {
-  fields<-c("account_id","championship_id","user_team_id","season","scoring_version")
-  values<-lapply(fields,function(field)fm_scalar(context[[field]],if(field%in%c("season","scoring_version"))"unknown"else ""))
+  fields<-c("account_id","championship_id","user_team_id","competition_id","season","scoring_version")
+  values<-lapply(fields,function(field)fm_scalar(context[[field]],if(field%in%c("competition_id","season","scoring_version"))"unknown"else ""))
   names(values)<-fields
   if(any(!vapply(values,function(x)nzchar(x)&&nchar(x,type="bytes")<=256L,logical(1))))return(NULL)
   values
 }
-roster_offer_snapshot_id <- function(scope,origin="combined") paste0("rival-cache:received-offers-v1:",origin,":",
-  as.character(openssl::sha256(serialize(scope[c("user_team_id","scoring_version")],NULL,version=2))))
+roster_offer_snapshot_id <- function(scope,origin="combined") paste0("rival-cache:received-offers-v2:",origin,":",
+  as.character(openssl::sha256(serialize(scope[c("user_team_id","competition_id","season","scoring_version")],NULL,version=2))))
 invalidate_saved_roster_offers <- function(context) {
   scope<-roster_offer_scope(context);if(is.null(scope))return(invisible(FALSE))
-  key<-as.character(openssl::sha256(serialize(scope[c("account_id","championship_id","user_team_id")],NULL,version=2)))
+  key<-as.character(openssl::sha256(serialize(scope[c("account_id","championship_id","user_team_id","competition_id","season","scoring_version")],NULL,version=2)))
   .roster_offer_invalidated[[key]]<-Sys.time()
   keys<-ls(.roster_offer_invalidated)
   if(length(keys)>256L){stamps<-vapply(mget(keys,.roster_offer_invalidated),as.numeric,numeric(1));rm(list=keys[which.min(stamps)],envir=.roster_offer_invalidated)}
@@ -454,25 +461,25 @@ persist_roster_offers <- function(data,context) {
   # Separate keys prevent a raw empty endpoint response replacing the complete
   # roster+endpoint observation captured in the same composite request.
   origin<-if(is.null(status))"endpoint"else "combined"
-  payload<-list(kind="received_offers_snapshot",version=1L,scope=scope,status="complete",
+  payload<-list(kind="received_offers_snapshot",version=2L,scope=scope,status="complete",
     source="futmondo",origin=origin,source_observed_at=rival_finance_stamp(stamp),
     valid_until=rival_finance_stamp(stamp+15),rows=lapply(seq_len(nrow(rows)),function(i)as.list(rows[i,,drop=FALSE])))
   if(as.numeric(object.size(payload))>256*1024L)return(invisible(FALSE))
   record<-rival_finance_evidence(scope$account_id,scope$championship_id,scope$season,"eligibility",
-    roster_offer_snapshot_id(scope,origin),payload,stamp)
+    roster_offer_snapshot_id(scope,origin),payload,stamp,competition_id=scope$competition_id)
   defer_persistence("supabase_post_direct",list("rival_finance_evidence",list(record),
-    "account_id,championship_id,season,evidence_type,source_id,observed_at",TRUE),context=context)
+    "account_id,championship_id,competition_id,season,evidence_type,source_id,observed_at",TRUE),context=context)
 }
 read_saved_roster_offers <- function(context,now=Sys.time()) {
   scope<-roster_offer_scope(context);if(is.null(scope))return(NULL)
   ids<-vapply(c("combined","endpoint"),function(origin)roster_offer_snapshot_id(scope,origin),character(1))
   query<-list(account_id=paste0("eq.",scope$account_id),championship_id=paste0("eq.",scope$championship_id),
-    season=paste0("eq.",scope$season),evidence_type="eq.eligibility",source_id=paste0("in.(",paste(ids,collapse=","),")"),
-    select="account_id,championship_id,season,evidence_type,source_id,observed_at,payload",limit=2L)
+    competition_id=paste0("eq.",scope$competition_id),season=paste0("eq.",scope$season),evidence_type="eq.eligibility",source_id=paste0("in.(",paste(ids,collapse=","),")"),
+    select="account_id,championship_id,competition_id,season,evidence_type,source_id,observed_at,payload",limit=2L)
   # The async adapter intercepts this read; awaiting its response must propagate.
   saved<-tryCatch(supabase_get("rival_finance_evidence_latest",query),error=function(e)NULL)
   if(!is.data.frame(saved)||!nrow(saved)||nrow(saved)>2L)return(NULL)
-  key<-as.character(openssl::sha256(serialize(scope[c("account_id","championship_id","user_team_id")],NULL,version=2)))
+  key<-as.character(openssl::sha256(serialize(scope[c("account_id","championship_id","user_team_id","competition_id","season","scoring_version")],NULL,version=2)))
   invalidated<-.roster_offer_invalidated[[key]] %||% as.POSIXct(0,origin="1970-01-01",tz="UTC")
   records<-tryCatch(rival_evidence_decode(saved),error=function(e)list())
   # A combined snapshot retains raw roster offers that the bid endpoint omits.
@@ -480,9 +487,9 @@ read_saved_roster_offers <- function(context,now=Sys.time()) {
   for(record in records){
     result<-tryCatch({
       p<-record$payload;stamp<-fm_time(p$source_observed_at);until<-fm_time(p$valid_until)
-      if(!all(vapply(c("account_id","championship_id","season"),function(field)identical(fm_scalar(record[[field]]),scope[[field]]),logical(1)))||
+      if(!all(vapply(c("account_id","championship_id","competition_id","season"),function(field)identical(fm_scalar(record[[field]]),scope[[field]]),logical(1)))||
          !identical(record$evidence_type,"eligibility")||!record$source_id%in%ids||
-         !is.list(p)||!identical(p$kind,"received_offers_snapshot")||!identical(as.integer(p$version),1L)||
+         !is.list(p)||!identical(p$kind,"received_offers_snapshot")||!identical(as.integer(p$version),2L)||
          !is.list(p$scope)||!setequal(names(p$scope),names(scope))||
          !all(vapply(names(scope),function(field)identical(p$scope[[field]],scope[[field]]),logical(1)))||!identical(p$status,"complete")||!identical(p$source,"futmondo")||
          !p$origin%in%c("combined","endpoint")||!identical(record$source_id,roster_offer_snapshot_id(scope,p$origin))||

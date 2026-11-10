@@ -944,3 +944,19 @@ performance review and verification limits are in `data_review_results.md`.
 Status: **implemented and verified locally; hosted rollout remains unverified**.
 
 Extend the bulk listing dialog's premium to both current market value and closed clauses, with an editable percentage, +0.5/+1/+2/+4/+5/+10% buttons and exact per-player/total increase previews. Use one pricing helper for previews and manual submission; preserve eligibility, invalid-value and one-use account/league/team confirmation guards. Correct floating-point over-rounding for preset and custom percentages. Reuse the existing roster without new acquisition, persistence, timers or dependencies. Focused known-answer/manual-action checks, responsive Chromium coverage and the required offline lifecycle pass. Performance review, the unrelated baseline classification assertion, and hosted limits are recorded in `data_review_results.md`.
+
+
+## General competition context and real-world transfers — 2026-11-10
+
+Local implementation follows [the competition/transfer contract](general_competition_context.md). Source player IDs remain opaque; histories stay separate across competitions. No aliases are inferred from historical-row IDs or player similarity.
+
+- [x] Resolve authenticated championship membership, real competition and source season; use one canonical scoring identity.
+- [x] Persist normalized context and append-only club observations with source freshness and server-only access.
+- [x] Scope historical reads before limits and include complete context in caches, controller generations, snapshots and manual selections.
+- [x] Preserve unknown legacy observations and supplied official round/match identities; reacquire demanded verified history without fabricated backfill.
+- [x] Prepare additive repeatable migration, fresh-schema retry correction, incoming league-ownership guards and isolated rollback tests.
+- [x] Add focused synthetic transfer, rollover, expiry, persistence, cache and delayed-response coverage; execute results recorded in the review log.
+- [ ] Apply an authorized production database migration and deploy the compatible application; verify hosted behavior separately.
+- [ ] Obtain sanitized Premier League/Champions League player-response evidence before certifying those integrations end to end. Midseason ID continuity remains unverified; both outcomes are covered without merging source records.
+
+The local implementation does not alter the admin-only admission setting or introduce unattended acquisition.

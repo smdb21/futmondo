@@ -7,6 +7,7 @@ for (method in c('GET','POST','PUT','PATCH','DELETE')) {
 }
 app_checks <- 0L
 app_check <- function(name, code) {
+  if(exists(".fm_league_contexts",inherits=TRUE)){owners<-unique(vapply(.fm_league_contexts$items,function(x)x$account_id,character(1)));for(owner in owners)clear_league_contexts(owner)}
   force(code); app_checks <<- app_checks + 1L; cat('[PASS]', name, '\n')
 }
 app_check('actual application startup', {
@@ -39,13 +40,16 @@ app_cfg <- list(budget=30e6,moneyPerPoint=123,moneyPerRanking=456,rankingMode='f
 app_financial <- list(status='ok',cash=0,withheld=0,spendable_budget=0,legal_bid_limit=10e6,
   roster_count=17,roster_cap=20,observed_at=Sys.time(),configuration=app_cfg,commitments=list(),
   lineup_rules=list(roster_cap=20))
-app_champ <- list(id='champ',name='Offline League',userteam=list(id='team1',name='Your Team'))
+app_champ <- list(id='champ',name='Offline League',league='fixture-competition',ps='fixture',userteam=list(id='team1',name='Your Team'))
 app_rounds <- data.frame(round_id=c('r1','r2'),round_number=1:2,begin_process=c('2026-08-15T00:00:00Z','2026-08-22T00:00:00Z'),is_finished=TRUE)
 login <- function(...) app_auth
 fm_async_login <- function(...) promises::promise_resolve(app_auth)
 fm_access_store <- function(...) promises::promise_resolve(FALSE) # explicit open-policy fixture
 get_championships <- function(...) unlist(app_champ)
-get_active_championships <- function(...) list(championships=list(app_champ))
+get_active_championships <- function(...) {
+ answer<-list(championships=list(app_champ),leagues=list(list(`_id`='fixture-competition',name='Fixture competition',season='fixture-season')))
+ publish_active_league_contexts(app_auth,answer);answer
+}
 get_teams <- function(...) app_teams
 get_players_from_team <- function(login,championship_id,user_team_id,...) {
   d<-app_roster
@@ -58,7 +62,7 @@ get_my_market_players <- function(...) app_roster[FALSE,,drop=FALSE]
 get_championship_players <- function(...) dplyr::bind_rows(app_roster,app_market)
 get_financial_snapshot <- function(...) app_financial
 get_user_team_info <- function(...) list(budget=0,withheld=0,maxBid=10e6,teamValue=34e6,configuration=app_cfg)
-get_lineup_from_team <- function(...) list(players=app_roster[c(1,3:6,8:10,14:16),,drop=FALSE],bench=list(players=app_roster[c(2,7,11:13,17),,drop=FALSE]),lineup_config=list(),budget=0)
+get_lineup_from_team <- function(...) list(pointSystem="fixture",players=app_roster[c(1,3:6,8:10,14:16),,drop=FALSE],bench=list(players=app_roster[c(2,7,11:13,17),,drop=FALSE]),lineup_config=list(),budget=0)
 get_finished_rounds <- function(...) app_rounds
 get_user_team_rounds <- function(login,championship_id,user_team_id,...) {
   if(as.character(user_team_id)=='team1') list(list(round='r1',points=10),list(round='r2',points=20)) else list(list(round='r1',points=20),list(round='r2',points=5))
@@ -125,6 +129,7 @@ app_check('full server login, navigation, refresh and logout',{
   session$setInputs(`login-logout_button`=1);session$elapse(100);app_settle(session);stopifnot(is.null(login_token_RV()))
  })
 })
+clear_league_contexts(app_auth[['userid']])
 app_check('rendered login never embeds server credentials',{
  previous<-Sys.getenv(c('user_name','password'));Sys.setenv(user_name='SENTINEL-UI-USER',password='SENTINEL-UI-PASSWORD')
  stopifnot(!grepl('SENTINEL-UI-',as.character(login_UI('login')),fixed=TRUE));do.call(Sys.setenv,as.list(previous))

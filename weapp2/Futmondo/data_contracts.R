@@ -265,7 +265,7 @@ player_points_finality <- function(point) {
 
 normalize_player_match_observations <- function(summary, player_id, championship_id,
                                                  scoring_version = "unknown",
-                                                 season = "unknown", observed_at = Sys.time(), rounds = NULL) {
+                                                 season = "unknown", observed_at = Sys.time(), rounds = NULL, competition_id = "unknown") {
   points <- summary$points
   if (is.null(points) || !length(points)) return(data.frame())
   if (is.data.frame(points)) points <- split(points, seq_len(nrow(points)))
@@ -281,10 +281,11 @@ normalize_player_match_observations <- function(summary, player_id, championship
     # minutesPlayed/initialLineUp semantics are not yet verified: retain raw
     # observations but do not manufacture participation or calibrated minutes.
     data.frame(player_id = as.character(player_id), championship_id = as.character(championship_id),
-      season = season, scoring_version = scoring_version, round = round, points = pts,
+      season = season, scoring_version = scoring_version, round = round, source_round_number=fm_number(p$source_round_number %||% p$round), points = pts,
       match_id=fm_scalar(p$matchId %||% source_match$id %||% source_match$`_id`,""),
       round_id=fm_scalar(p$roundId,""),
-      competition_id=fm_scalar(p$competitionId %||% summary$championship$competitionId,""),
+      competition_id=fm_scalar(p$competitionId %||% summary$championship$competitionId,competition_id),
+      source_round_key=if(nzchar(fm_scalar(p$roundId,"")))paste0("id:",fm_scalar(p$roundId,""))else paste0("number:",round),
       score_status = if (!is.finite(pts)) "unavailable" else player_points_finality(p),
       is_home = if (is.logical(p$isHomeTeam)) p$isHomeTeam else NA,
       minutes_raw = fm_number(p$minutesPlayed),
@@ -295,20 +296,40 @@ normalize_player_match_observations <- function(summary, player_id, championship
   }))
 }
 
+# Object order is not scoring; preserve arrays, NULLs, and exact values.
+fm_canonical_scoring <- function(value) {
+  if(is.data.frame(value))value<-lapply(seq_len(nrow(value)),function(i)lapply(value,function(column)if(is.data.frame(column))as.list(column[i,,drop=FALSE])else if(is.list(column))column[[i]]else column[i]))
+  if(!is.list(value))return(value)
+  value<-lapply(value,fm_canonical_scoring);keys<-names(value)
+  if(!is.null(keys)&&!anyNA(keys)&&all(nzchar(keys))&&!anyDuplicated(keys))value<-value[order(keys,method="radix")]
+  value
+}
+fm_scoring_version <- function(point_system=NULL,custom=NULL) {
+  if(!is.atomic(point_system)||length(point_system)!=1L||is.na(point_system)||!nzchar(as.character(point_system))||
+     (identical(as.character(point_system),"custom")&&is.null(custom)))return("unknown")
+  value<-fm_canonical_scoring(list(point_system=point_system,custom=custom))
+  unclass(as.character(openssl::sha256(charToRaw(jsonlite::toJSON(value,auto_unbox=TRUE,null="null",digits=NA)))))
+}
 league_season_context <- function(championship_id, observed_season=NULL,
-                                  configured=Sys.getenv("FUTMONDO_SEASON_CONTEXTS","{}")) {
-  observed <- fm_scalar(observed_season,"")
-  if(nzchar(observed)) return(observed)
-  mapping <- tryCatch(jsonlite::fromJSON(configured,simplifyVector=FALSE),error=function(e)list())
-  id <- fm_scalar(championship_id,"")
-  if(!nzchar(id) || !is.list(mapping)) return("unknown")
+                                  configured=Sys.getenv("FUTMONDO_SEASON_CONTEXTS","{}"),account_id=NULL) {
+  observed<-fm_scalar(observed_season,"")
+  metadata<-if(exists("league_context_metadata",mode="function"))league_context_metadata(championship_id,account_id)else NULL
+  season<-fm_scalar(metadata$season,"unknown")
+  if(nzchar(observed)&&observed!="unknown"){
+    if(season!="unknown"&&!identical(observed,season))stop("Conflicting authoritative season metadata")
+    return(observed)
+  }
+  if(season!="unknown")return(season)
+  mapping<-tryCatch(jsonlite::fromJSON(configured,simplifyVector=FALSE),error=function(e)list())
+  id<-fm_scalar(championship_id,"")
+  if(!nzchar(id)||!is.list(mapping))return("unknown")
   fm_scalar(mapping[[id]],"unknown")
 }
 
 normalize_league_rules <- function(info, lineup = NULL, championship_id=NULL) {
   cfg <- info$configuration %||% list()
   scoring <- list(point_system=lineup$pointSystem,custom=lineup$custom)
-  version <- as.character(openssl::sha256(charToRaw(jsonlite::toJSON(scoring,auto_unbox=TRUE))))
+  version <- fm_scoring_version(lineup$pointSystem,lineup$custom)
   list(championship_id=fm_scalar(championship_id %||% info$championshipId),
     season=league_season_context(championship_id %||% info$championshipId,info$season %||% info$seasonId),
     scoring_version=if(is.null(lineup)) "unknown" else version,
@@ -330,3 +351,5 @@ normalize_league_rules <- function(info, lineup = NULL, championship_id=NULL) {
     # Unknown deadline/solvency boundary must block unattended mutations.
     deadline = NA_character_, solvency_verified = FALSE)
 }
+
+source("competition_context.R")

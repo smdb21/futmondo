@@ -190,8 +190,17 @@ shiny::testServer(server,{
  stopifnot(source$status()$completed==3L,source$status()$failed==0L,source$status()$pending==0L,
   source$status()$remaining==0L,all(add_recent_points_average(players,source$history(),4)$recent_points_avg==8.75))
  n(8L);settle(session)
+ # The probe established only five numbered rounds. A wider visible request
+ # is allowed one full-source upgrade for each successful probe, but cannot
+ # retry the exhausted first player.
+ stopifnot(source$status()$completed==0L,source$status()$failed==1L,source$status()$pending==2L,
+  calls[[ids[1]]]==3L,calls[[ids[2]]]==3L,calls[[ids[3]]]==2L)
+ for(id in ids[2:3]){pending[[id]]$resolve(payload(id,3:10,c(0,-2,3,2,5,12,12,6)));settle(session)}
  stopifnot(source$status()$completed==2L,source$status()$failed==1L,source$status()$remaining==0L,
-  calls[[ids[1]]]==3L,is.na(add_recent_points_average(players,source$history(),8)$recent_points_avg[1]))
+  source$status()$pending==0L,calls[[ids[1]]]==3L,
+  is.na(add_recent_points_average(players,source$history(),8)$recent_points_avg[1]))
+ before<-calls;active(FALSE);settle(session);active(TRUE);settle(session)
+ stopifnot(identical(calls,before),source$status()$completed==2L,source$status()$failed==1L)
 })
 cat('PASS a later eligible fitness anchor retries after the first exhausts; reconstruction recovers N4 for all three but retains failed N8 missing history.\n')
 # Season discovery must make previous unknown-season success eligible again.
@@ -236,7 +245,7 @@ shiny::testServer(server,{
  lineup_failure<<-FALSE;before<-initial_calls;refresh(1L);settle(session)
  stopifnot(length(source$pending())==2L,!length(source$status()$initial_errors),
   initial_calls[['get_lineup_from_team']]==before[['get_lineup_from_team']]+1L,
-  identical(initial_calls[['read_league_round_dataset']],before[['read_league_round_dataset']]),
+  initial_calls[['read_league_round_dataset']]==(before[['read_league_round_dataset']] %||% 0L)+1L,
   identical(initial_calls[['get_championship_players']],before[['get_championship_players']]))
  for(id in ids)pending[[id]]$resolve(payload(id));settle(session)
  stopifnot(source$status()$completed==2L,source$status()$failed==0L)

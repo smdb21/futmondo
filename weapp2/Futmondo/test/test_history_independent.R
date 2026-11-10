@@ -18,13 +18,16 @@ new<-new.env(parent=globalenv());sys.source(file.path(app,"data_contracts.R"),ne
 load_fn(file.path(app,"Modules/Selected_Player_Module.R"),"player_match_points_trace",new)
 load_fn(file.path(app,"Modules/Players_Table_Module.R"),"add_recent_points_average",new)
 bind<-function(name,fn){environment(fn)<-new;assign(name,fn,envir=new)}
-bind("resource_context",function(login,championship_id,user_team_id,player_id=NULL,season="unknown",scoring_version="unknown",...)list(championship_id=as.character(championship_id),player_id=if(is.null(player_id))""else as.character(player_id),season=as.character(season),scoring_version=as.character(scoring_version)))
+bind("resource_context",function(login,championship_id,user_team_id,player_id=NULL,season="unknown",scoring_version="unknown",...)list(account_id="synthetic-review",championship_id=as.character(championship_id),player_id=if(is.null(player_id))""else as.character(player_id),competition_id="C1",season=as.character(season),scoring_version=as.character(scoring_version)))
 bind("league_season_context",function(championship_id,observed_season=NULL,...)if(!is.null(observed_season))as.character(observed_season)else "unknown")
 bind("get_lineup_from_team",function(...)list());bind("normalize_league_rules",function(...)list(scoring_version="V1"))
 new$summary_fixture<-list(championship=list(season="S1"),points=list(list(round=3,points=8,isFinished=TRUE),list(round=4,points=-2,isFinished=TRUE),list(round=5,points=3,isFinished=FALSE)),history_complete=FALSE)
 attr(new$summary_fixture,"observed_at")<-as.POSIXct("2026-08-10 12:00:00",tz="UTC")
 bind("get_player_summary",function(...)summary_fixture)
 new$stored<-data.frame(championship_id=c("L","L","L","L","L2","L","L"),player_id="P",season=c("S1","S1","S1","S1","S1","S2","S1"),scoring_version=c("V1","V1","V1","V1","V1","V1","V2"),round=c(1,2,3,5,9,8,7),points=c(0,-4,6,10,900,800,700),score_status="final",occurred_at=NA_character_,observed_at=c(NA,NA,"2026-08-02T12:00:00Z","2026-08-02T12:00:00Z",NA,NA,NA))
+new$stored$competition_id<-"C1"
+foreign_competition<-new$stored[1,,drop=FALSE];foreign_competition$competition_id<-"C2";foreign_competition$round<-9;foreign_competition$points<-600
+new$stored<-dplyr::bind_rows(new$stored,foreign_competition)
 bind("read_card_round_history",function(context,max_rows=5000L){x<-stored;attr(x,"complete")<-FALSE;x})
 bind("read_card_price_history",function(...){x<-data.frame(recorded_at=character(),value=numeric());attr(x,"complete")<-TRUE;x})
 bind("get_cached_data",function(name,expr,context)eval(substitute(expr),parent.frame()))
@@ -35,4 +38,4 @@ trace<-new$player_match_points_trace(data.frame(round=fin$round_number,points=fi
 stopifnot(trace$has_points,identical(as.numeric(trace$points_df$points),c(0,-4,8,-2)),sum(is.na(trace$points_df$date))>=2L)
 table<-new$add_recent_points_average(data.frame(id="P"),transform(fin,player_id="P",round=round_number),n=4L)
 stopifnot(isTRUE(all.equal(table$recent_points_avg,0.5)))
-cat("PASS independent context isolation, partial merge, corrections, undated scores, provisional status and mean 0.5.\n")
+cat("PASS independent competition/context isolation, partial merge, corrections, undated scores, provisional status and mean 0.5.\n")

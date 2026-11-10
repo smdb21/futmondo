@@ -3,7 +3,7 @@ suppressPackageStartupMessages(source("global.R"))
 source("history_baseline_store.R")
 checks <- 0L
 check <- function(name,expr){force(expr);checks<<-checks+1L;cat("PASS",name,"\n")}
-ctx <- resource_context(account_id="fixture-account",championship_id="fixture-league",season="season-A",scoring_version="score-A",session_id="fixture-session")
+ctx <- resource_context(account_id="fixture-account",championship_id="fixture-league",season="season-A",scoring_version="score-A",session_id="fixture-session",competition_id="competition-A")
 resource <- "pressroom_fixture-league"
 stamp <- as.POSIXct("2026-10-01 12:00:00",tz="UTC")
 data <- data.frame(id=c("event-a","event-b"),created=c("2026-10-01T11:00:00Z","2026-09-01T10:00:00Z"),
@@ -33,7 +33,7 @@ check("missing snapshots return a cache miss, with one scoped read",{
 check("complete source snapshot is one atomic queued upsert",{
   stopifnot(isTRUE(persist_completed_history_baseline(resource,data,ctx)),length(queued)==1L,
     identical(queued[[1]]$fn,"supabase_post_direct"),identical(queued[[1]]$args[[1]],"complete_history_baselines"),
-    identical(queued[[1]]$args[[3]],"account_id,championship_id,season,scoring_version,resource"))
+    identical(queued[[1]]$args[[3]],"account_id,championship_id,competition_id,season,scoring_version,resource"))
   payload <- queued[[1]]$args[[2]]
   json <- rawToChar(memDecompress(openssl::base64_decode(payload$payload),"gzip"))
   stopifnot(!grepl("synthetic-secret|fixture-session|token",json),nchar(payload$payload,type="bytes")<=900L*1024L)
@@ -92,7 +92,7 @@ check("empty locker baseline retains non-clause source watermark",{
 })
 check("account, league, season, scoring and resource mismatches cannot restore",{
   database<-as.data.frame(queued[[2]]$args[[2]],stringsAsFactors=FALSE)
-  for(field in c("account_id","championship_id","season","scoring_version")){
+  for(field in c("account_id","championship_id","competition_id","season","scoring_version")){
     wrong<-ctx;wrong[[field]]<-"other"
     stopifnot(is.null(read_persisted_history_baseline(resource,wrong)))
   }

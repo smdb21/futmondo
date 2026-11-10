@@ -127,6 +127,7 @@ async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is
     object<-get(nm,.GlobalEnv)
     if(is.function(object)&&identical(environment(object),.GlobalEnv)){environment(object)<-adapter_env;assign(nm,object,adapter_env)}
   }
+  adapter_env$.futmondo_request_context<-context
   # Replaying a composite read may encounter the same optional failure again.
   # Keep at most one safe diagnostic per source/category, capped by the read budget.
   failures<-new.env(parent=emptyenv());log_failure<-resource_log_failure

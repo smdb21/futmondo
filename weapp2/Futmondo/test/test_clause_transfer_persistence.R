@@ -25,7 +25,7 @@ check('complete safe subset persists with scoped source timestamp and no authent
   stopifnot(persist_clause_transfer_summary(summary,context),length(queued)==1L,
     queued[[1]]$fn=='supabase_post_direct',queued[[1]]$args[[1]]=='rival_finance_evidence',queued[[1]]$args[[4]])
   record<-queued[[1]]$args[[2]][[1]]
-  stopifnot(startsWith(record$source_id,'rival-cache:clause-transfer-v1:'),record$evidence_type=='eligibility',
+  stopifnot(startsWith(record$source_id,'rival-cache:clause-transfer-v2:'),record$evidence_type=='eligibility',
     !grepl('must-not-persist|password|token|secret|points',jsonlite::toJSON(record)),
     record$payload$completeness=='complete',fm_time(record$payload$valid_until)==now+60)
   saved<-wire(record)
@@ -40,7 +40,7 @@ check('JSONB replay preserves authoritative owner, schedule and original observa
 check('expiry, future timestamps and every context dimension reject foreign snapshots',{
   stopifnot(is.null(read_saved_clause_transfer_summary(context,now+60)),is.null(read_saved_clause_transfer_summary(context,now-1)))
   original_get<-supabase_get;supabase_get<-function(...)saved
-  for(field in c('account_id','championship_id','user_team_id','player_id','season','scoring_version')){
+  for(field in c('account_id','championship_id','user_team_id','player_id','competition_id','season','scoring_version')){
     wrong<-context;wrong[[field]]<-'different';stopifnot(is.null(read_saved_clause_transfer_summary(wrong,now+1)))
   }
   supabase_get<-original_get

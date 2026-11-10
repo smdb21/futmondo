@@ -151,7 +151,7 @@ award_fixture_calendar_valid <- function(rows) {
 }
 get_award_round_metadata <- function(login,championship_id,league_id,refresh=FALSE,current_round_id="") {
   context<-resource_context(login,championship_id,season=league_season_context(championship_id))
-  scope<-c(context[c("account_id","championship_id","season")],list(league_id=as.character(league_id),current_round_id=mvp_text(current_round_id)))
+  scope<-c(context[c("account_id","championship_id","competition_id","season")],list(league_id=as.character(league_id),current_round_id=mvp_text(current_round_id)))
   same_scope<-function(value)is.list(value)&&identical(names(value),names(scope))&&
     identical(value[names(scope)!="current_round_id"],scope[names(scope)!="current_round_id"])&&
     (!nzchar(scope$current_round_id)||identical(value$current_round_id,scope$current_round_id))
@@ -162,8 +162,8 @@ get_award_round_metadata <- function(login,championship_id,league_id,refresh=FAL
   result<-get_cached_data(resource,{
     if(!isTRUE(refresh)&&nzchar(get_sb_url())&&nzchar(get_sb_key())){
       query<-list(account_id=paste0("eq.",context$account_id),championship_id=paste0("eq.",championship_id),
-        season=paste0("eq.",context$season),evidence_type="eq.eligibility",source_id=paste0("eq.",source_id),
-        select="account_id,championship_id,season,evidence_type,source_id,observed_at,payload",limit=1L)
+        competition_id=paste0("eq.",context$competition_id),season=paste0("eq.",context$season),evidence_type="eq.eligibility",source_id=paste0("eq.",source_id),
+        select="account_id,championship_id,competition_id,season,evidence_type,source_id,observed_at,payload",limit=1L)
       saved<-tryCatch(rival_evidence_decode(supabase_get("rival_finance_evidence_latest",query)),error=function(e)list())
       if(length(saved)==1L){
         row<-saved[[1]];payload<-row$payload
@@ -172,7 +172,7 @@ get_award_round_metadata <- function(login,championship_id,league_id,refresh=FAL
         stamp<-fm_time(row$observed_at);deadline<-fm_number(payload$valid_until);now<-as.numeric(Sys.time())
         if(is.list(payload)&&identical(payload$kind,"league_round_calendar")&&fm_number(payload$version)%in%c(1,2)&&
            same_scope(payload$scope)&&identical(payload$completeness,"complete")&&
-           all(vapply(c("account_id","championship_id","season"),function(field)identical(mvp_text(row[[field]]),context[[field]]),logical(1)))&&
+           all(vapply(c("account_id","championship_id","competition_id","season"),function(field)identical(mvp_text(row[[field]]),context[[field]]),logical(1)))&&
            identical(mvp_text(row$source_id),source_id)&&identical(row$evidence_type,"eligibility")&&
            length(stamp)==1L&&!is.na(stamp)&&as.numeric(stamp)<=now+5&&is.finite(deadline)&&
            deadline<=as.numeric(stamp)+ttl+0.001&&now<deadline&&award_calendar_rows_valid(restored)){
@@ -227,8 +227,8 @@ get_award_round_metadata <- function(login,championship_id,league_id,refresh=FAL
 persist_award_calendar_snapshot <- function(data,context) {
   scope<-data$scope;stamp<-attr(data,"observed_at")
   if(!identical(data$status,"ok")||!isTRUE(data$complete)||isTRUE(data$from_saved)||!is.list(scope)||
-     !all(c("account_id","championship_id","season","league_id","current_round_id")%in%names(scope))||
-     !all(vapply(c("account_id","championship_id","season"),function(field)identical(scope[[field]],context[[field]]),logical(1)))||
+     !all(c("account_id","championship_id","competition_id","season","league_id","current_round_id")%in%names(scope))||
+     !all(vapply(c("account_id","championship_id","competition_id","season"),function(field)identical(scope[[field]],context[[field]]),logical(1)))||
      !nzchar(mvp_text(scope$league_id))||!award_calendar_rows_valid(data$rows)||
      length(stamp)!=1L||is.na(fm_time(stamp))||!is.finite(fm_number(data$valid_until)))return(invisible(FALSE))
   payload<-list(kind="league_round_calendar",version=1L,scope=scope,rows=data$rows,

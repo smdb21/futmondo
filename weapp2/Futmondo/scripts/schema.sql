@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS championships (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. Real Clubs Table (Spanish clubs in the league)
+-- 2. Real Clubs Table (source club identities across football competitions)
 CREATE TABLE IF NOT EXISTS real_clubs (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -51,6 +51,8 @@ CREATE TABLE IF NOT EXISTS user_team_history (
     id BIGSERIAL PRIMARY KEY,
     user_team_id TEXT REFERENCES user_teams(id) ON DELETE CASCADE,
     championship_id TEXT NOT NULL REFERENCES championships(id),
+    competition_id TEXT NOT NULL DEFAULT 'unknown',
+    season TEXT NOT NULL DEFAULT 'unknown',
     points INTEGER NOT NULL,
     budget BIGINT,
     position INTEGER,
@@ -66,6 +68,8 @@ CREATE TABLE IF NOT EXISTS player_history (
     id BIGSERIAL PRIMARY KEY,
     player_id TEXT REFERENCES players(id) ON DELETE CASCADE,
     championship_id TEXT REFERENCES championships(id) ON DELETE CASCADE,
+    competition_id TEXT NOT NULL DEFAULT 'unknown',
+    season TEXT NOT NULL DEFAULT 'unknown',
     value BIGINT NOT NULL,
     change BIGINT DEFAULT 0,
     points INTEGER DEFAULT 0,
@@ -81,6 +85,8 @@ CREATE TABLE IF NOT EXISTS market_transactions (
     id BIGSERIAL PRIMARY KEY,
     player_id TEXT REFERENCES players(id) ON DELETE CASCADE,
     championship_id TEXT REFERENCES championships(id) ON DELETE CASCADE,
+    competition_id TEXT NOT NULL DEFAULT 'unknown',
+    season TEXT NOT NULL DEFAULT 'unknown',
     buyer_team_id TEXT REFERENCES user_teams(id) ON DELETE SET NULL,
     seller_team_id TEXT REFERENCES user_teams(id) ON DELETE SET NULL,
     price BIGINT NOT NULL,
@@ -94,6 +100,9 @@ CREATE TABLE IF NOT EXISTS market_transactions (
 CREATE TABLE IF NOT EXISTS round_dream_team (
     id BIGSERIAL PRIMARY KEY,
     championship_id TEXT REFERENCES championships(id) ON DELETE CASCADE,
+    competition_id TEXT NOT NULL DEFAULT 'unknown',
+    season TEXT NOT NULL DEFAULT 'unknown',
+    scoring_version TEXT NOT NULL DEFAULT 'unknown',
     round_id TEXT NOT NULL,
     round_number NUMERIC NOT NULL,
     player_id TEXT REFERENCES players(id) ON DELETE CASCADE,
@@ -103,7 +112,7 @@ CREATE TABLE IF NOT EXISTS round_dream_team (
     is_mvp BOOLEAN DEFAULT FALSE,
     is_finished BOOLEAN DEFAULT TRUE,
     updated_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(championship_id, round_number, player_id)
+    CONSTRAINT round_dream_team_context_round_key UNIQUE(championship_id, competition_id, season, scoring_version, round_id, player_id)
 );
 
 -- ============================================================
@@ -134,6 +143,8 @@ CREATE TABLE IF NOT EXISTS player_daily_snapshots (
     id BIGSERIAL PRIMARY KEY,
     player_id TEXT REFERENCES players(id) ON DELETE CASCADE,
     championship_id TEXT REFERENCES championships(id) ON DELETE CASCADE,
+    competition_id TEXT NOT NULL DEFAULT 'unknown',
+    season TEXT NOT NULL DEFAULT 'unknown',
     value BIGINT NOT NULL,
     daily_change BIGINT DEFAULT 0,
     points INTEGER DEFAULT 0,
@@ -145,7 +156,7 @@ CREATE TABLE IF NOT EXISTS player_daily_snapshots (
     snapshot_date DATE DEFAULT CURRENT_DATE,
     observed_at TIMESTAMPTZ,
     recorded_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(player_id, championship_id, snapshot_date)
+    CONSTRAINT player_daily_snapshots_context_date_key UNIQUE(player_id, championship_id, competition_id, season, snapshot_date)
 );
 
 
@@ -177,14 +188,18 @@ CREATE TABLE IF NOT EXISTS player_match_observations (
   scoring_version TEXT NOT NULL, round NUMERIC NOT NULL, points NUMERIC,
   score_status TEXT NOT NULL, is_home BOOLEAN, minutes_raw NUMERIC, start_raw BOOLEAN,
   participation BOOLEAN, observed_at TIMESTAMPTZ NOT NULL,
-  PRIMARY KEY(player_id,championship_id,season,scoring_version,round,observed_at)
+  competition_id TEXT NOT NULL DEFAULT 'unknown',
+  source_round_key TEXT NOT NULL DEFAULT '', round_id TEXT, match_id TEXT,
+  PRIMARY KEY(player_id,championship_id,competition_id,season,scoring_version,round,source_round_key,observed_at)
 );
 CREATE TABLE IF NOT EXISTS league_rule_snapshots (
   championship_id TEXT NOT NULL, scoring_version TEXT NOT NULL,
   season TEXT NOT NULL, observed_at TIMESTAMPTZ NOT NULL, configuration JSONB NOT NULL,
-  PRIMARY KEY(championship_id,scoring_version,observed_at)
+  competition_id TEXT NOT NULL DEFAULT 'unknown',
+  PRIMARY KEY(championship_id,competition_id,season,scoring_version,observed_at)
 );
 
+ALTER TABLE player_match_observations ADD COLUMN IF NOT EXISTS source_round_number NUMERIC;
 ALTER TABLE player_match_observations ADD COLUMN IF NOT EXISTS occurred_at TIMESTAMPTZ;
 ALTER TABLE player_match_observations ADD COLUMN IF NOT EXISTS round_start_at TIMESTAMPTZ;
 
@@ -360,8 +375,8 @@ GRANT SELECT ON auction_observation_history,bid_observation_history TO service_r
 
 
 CREATE UNIQUE INDEX IF NOT EXISTS transactions_source_event ON market_transactions(championship_id,source_event_id);
-CREATE UNIQUE INDEX IF NOT EXISTS player_history_source_time ON player_history(player_id,championship_id,observed_at);
-CREATE UNIQUE INDEX IF NOT EXISTS user_team_history_source_time ON user_team_history(user_team_id,championship_id,observed_at);
+CREATE UNIQUE INDEX IF NOT EXISTS player_history_source_time ON player_history(player_id,championship_id,competition_id,season,observed_at);
+CREATE UNIQUE INDEX IF NOT EXISTS user_team_history_source_time ON user_team_history(user_team_id,championship_id,competition_id,season,observed_at);
 
 CREATE INDEX IF NOT EXISTS player_history_context_page ON public.player_history(championship_id,player_id,recorded_at,id);
 CREATE INDEX IF NOT EXISTS team_history_context_page ON public.user_team_history(championship_id,recorded_at,id);
@@ -396,11 +411,12 @@ COMMIT;
 -- Uses player_round_context_revision; no duplicate covering index is needed.
 CREATE OR REPLACE VIEW public.player_round_points_latest
 WITH (security_invoker = true) AS
-SELECT DISTINCT ON (championship_id, player_id, season, scoring_version, round)
+SELECT DISTINCT ON (championship_id, competition_id, player_id, season, scoring_version, round, source_round_key)
   championship_id, player_id, season, scoring_version, round, points,
-  score_status, observed_at, occurred_at, round_start_at
+  score_status, observed_at, occurred_at, round_start_at,
+  competition_id, source_round_key, round_id, match_id, source_round_number
 FROM public.player_match_observations
-ORDER BY championship_id, player_id, season, scoring_version, round, observed_at DESC;
+ORDER BY championship_id, competition_id, player_id, season, scoring_version, round, source_round_key, observed_at DESC;
 REVOKE ALL ON public.player_round_points_latest FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.player_round_points_latest TO service_role;
 COMMENT ON VIEW public.player_round_points_latest IS
@@ -417,7 +433,8 @@ CREATE TABLE IF NOT EXISTS public.player_round_history_checks (
  checked_at timestamptz NOT NULL,
  result_status text NOT NULL CHECK (result_status IN ('scores','empty')),
  point_count integer NOT NULL CHECK (point_count BETWEEN 0 AND 500),
- PRIMARY KEY (championship_id, player_id, season, scoring_version, checked_at),
+ competition_id text NOT NULL DEFAULT 'unknown',
+ PRIMARY KEY (championship_id, competition_id, player_id, season, scoring_version, checked_at),
  CHECK ((result_status = 'empty' AND point_count = 0) OR (result_status = 'scores' AND point_count > 0))
 );
 ALTER TABLE public.player_round_history_checks ENABLE ROW LEVEL SECURITY;
@@ -428,19 +445,21 @@ WITH (security_invoker = true) AS
 SELECT 'point'::text AS row_kind,
  championship_id, player_id, season, scoring_version, round, points,
  score_status, observed_at, occurred_at, round_start_at,
- NULL::timestamptz AS checked_at, NULL::text AS result_status, NULL::integer AS point_count
+ NULL::timestamptz AS checked_at, NULL::text AS result_status, NULL::integer AS point_count,
+ competition_id, source_round_key, round_id, match_id, source_round_number
 FROM public.player_round_points_latest
 UNION ALL
 SELECT 'check'::text AS row_kind,
  championship_id, player_id, season, scoring_version, NULL::integer AS round, NULL::numeric AS points,
  NULL::text AS score_status, NULL::timestamptz AS observed_at,
  NULL::timestamptz AS occurred_at, NULL::timestamptz AS round_start_at,
- checked_at, result_status, point_count
+ checked_at, result_status, point_count,
+ competition_id, NULL::text AS source_round_key, NULL::text AS round_id, NULL::text AS match_id, NULL::numeric AS source_round_number
 FROM (
- SELECT DISTINCT ON (championship_id, player_id, season, scoring_version)
- championship_id, player_id, season, scoring_version, checked_at, result_status, point_count
+ SELECT DISTINCT ON (championship_id, competition_id, player_id, season, scoring_version)
+ championship_id, player_id, season, scoring_version, checked_at, result_status, point_count, competition_id
  FROM public.player_round_history_checks
- ORDER BY championship_id, player_id, season, scoring_version, checked_at DESC
+ ORDER BY championship_id, competition_id, player_id, season, scoring_version, checked_at DESC
 ) checks;
 REVOKE ALL ON public.player_round_dataset FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.player_round_dataset TO service_role;
@@ -451,38 +470,39 @@ COMMENT ON VIEW public.player_round_dataset IS
 NOTIFY pgrst, 'reload schema';
 
 -- Immutable, account-scoped evidence; corrections preserve earlier observations.
-CREATE TABLE public.league_cash_defaults (
+CREATE TABLE IF NOT EXISTS public.league_cash_defaults (
  championship_id text PRIMARY KEY CHECK (length(btrim(championship_id)) > 0),
  amount numeric NOT NULL CHECK (amount >= 0 AND amount < 'Infinity'::numeric),
  source text NOT NULL CHECK (length(btrim(source)) > 0),
  observed_at timestamptz NOT NULL DEFAULT now() CHECK (isfinite(observed_at))
 );
-CREATE TABLE public.rival_finance_evidence (
+CREATE TABLE IF NOT EXISTS public.rival_finance_evidence (
  account_id text NOT NULL CHECK (length(btrim(account_id)) > 0),
  championship_id text NOT NULL CHECK (length(btrim(championship_id)) > 0),
+ competition_id text NOT NULL DEFAULT 'unknown',
  season text NOT NULL CHECK (length(btrim(season)) > 0),
  evidence_type text NOT NULL CHECK (evidence_type IN ('awards','rules','movements','team','coverage','eligibility','notifications')),
  source_id text NOT NULL CHECK (length(btrim(source_id)) > 0),
  observed_at timestamptz NOT NULL CHECK (isfinite(observed_at)),
  payload jsonb NOT NULL CHECK (jsonb_typeof(payload) = 'object' AND octet_length(payload::text) <= 1048576),
- PRIMARY KEY (account_id, championship_id, season, evidence_type, source_id, observed_at)
+ PRIMARY KEY (account_id, championship_id, competition_id, season, evidence_type, source_id, observed_at)
 );
-CREATE VIEW public.rival_finance_evidence_latest WITH (security_invoker = true) AS
- SELECT DISTINCT ON (account_id, championship_id, season, evidence_type, source_id)
- account_id, championship_id, season, evidence_type, source_id, observed_at, payload
+CREATE OR REPLACE VIEW public.rival_finance_evidence_latest WITH (security_invoker = true) AS
+ SELECT DISTINCT ON (account_id, championship_id, competition_id, season, evidence_type, source_id)
+ account_id, championship_id, season, evidence_type, source_id, observed_at, payload, competition_id
  FROM public.rival_finance_evidence
- ORDER BY account_id, championship_id, season, evidence_type, source_id, observed_at DESC;
+ ORDER BY account_id, championship_id, competition_id, season, evidence_type, source_id, observed_at DESC;
 ALTER TABLE public.league_cash_defaults ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.rival_finance_evidence ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.league_cash_defaults, public.rival_finance_evidence, public.rival_finance_evidence_latest FROM PUBLIC, anon, authenticated, service_role;
 GRANT SELECT, INSERT, UPDATE ON public.league_cash_defaults, public.rival_finance_evidence TO service_role;
 GRANT SELECT ON public.rival_finance_evidence_latest TO service_role;
 INSERT INTO public.league_cash_defaults(championship_id, amount, source)
- VALUES ('5b55f9d767214483120b87cf', 300000000, 'user_confirmed');
+ VALUES ('5b55f9d767214483120b87cf', 300000000, 'user_confirmed') ON CONFLICT (championship_id) DO NOTHING;
 COMMENT ON TABLE public.rival_finance_evidence IS 'Server-only account/league/season-scoped observed accounting revisions. Award payloads replace the whole source selection; notifications are not payments.';
 NOTIFY pgrst, 'reload schema';
 -- Browser credentials are opaque. Only encrypted Futmondo tokens are retained.
-CREATE TABLE public.remembered_logins (
+CREATE TABLE IF NOT EXISTS public.remembered_logins (
  browser_hash text PRIMARY KEY CHECK (browser_hash ~ '^[a-f0-9]{64}$'),
  encrypted_payload text NOT NULL CHECK (length(encrypted_payload) BETWEEN 56 AND 16384),
  created_at timestamptz NOT NULL DEFAULT now() CHECK (isfinite(created_at)),
@@ -490,7 +510,7 @@ CREATE TABLE public.remembered_logins (
  revoked_at timestamptz CHECK (revoked_at IS NULL OR isfinite(revoked_at)),
  CHECK (expires_at > created_at AND expires_at <= created_at + interval '7 days')
 );
-CREATE INDEX remembered_logins_expiry_idx ON public.remembered_logins (expires_at);
+CREATE INDEX IF NOT EXISTS remembered_logins_expiry_idx ON public.remembered_logins (expires_at);
 ALTER TABLE public.remembered_logins ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.remembered_logins FROM PUBLIC, anon, authenticated, service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.remembered_logins TO service_role;
@@ -503,6 +523,7 @@ BEGIN;
 CREATE TABLE IF NOT EXISTS public.complete_history_baselines (
  account_id text NOT NULL CHECK (length(account_id) BETWEEN 1 AND 256),
  championship_id text NOT NULL CHECK (length(championship_id) BETWEEN 1 AND 256),
+ competition_id text NOT NULL DEFAULT 'unknown',
  season text NOT NULL CHECK (length(season) BETWEEN 1 AND 256),
  scoring_version text NOT NULL CHECK (length(scoring_version) BETWEEN 1 AND 256),
  resource text NOT NULL,
@@ -513,7 +534,7 @@ CREATE TABLE IF NOT EXISTS public.complete_history_baselines (
  snapshot_hash text NOT NULL CHECK (snapshot_hash ~ '^[0-9a-f]{64}$'),
  observed_at timestamptz NOT NULL,
  recorded_at timestamptz NOT NULL DEFAULT now(),
- PRIMARY KEY (account_id,championship_id,season,scoring_version,resource),
+ PRIMARY KEY (account_id,championship_id,competition_id,season,scoring_version,resource),
  CHECK (resource = 'pressroom_' || championship_id OR
         resource = 'pressroom_locker_payments_' || championship_id)
 );
@@ -541,7 +562,7 @@ COMMENT ON TABLE public.complete_history_baselines IS
 NOTIFY pgrst, 'reload schema';
 COMMIT;
 BEGIN;
-CREATE TABLE public.user_page_preferences (
+CREATE TABLE IF NOT EXISTS public.user_page_preferences (
  user_id text PRIMARY KEY CHECK (length(user_id) BETWEEN 1 AND 256 AND user_id ~ '^[A-Za-z0-9_-]+$'),
  page text NOT NULL CHECK (page IN ('notifications','today','yourteam','lineup','players_in_championship','rivals','plots','classification','round_mvps','admin')),
  visited_at timestamptz NOT NULL,
@@ -550,7 +571,7 @@ CREATE TABLE public.user_page_preferences (
 ALTER TABLE public.user_page_preferences ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.user_page_preferences FROM PUBLIC, anon, authenticated, service_role;
 GRANT SELECT, INSERT, UPDATE ON public.user_page_preferences TO service_role;
-CREATE FUNCTION public.keep_latest_user_page()
+CREATE OR REPLACE FUNCTION public.keep_latest_user_page()
 RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
 BEGIN
  IF NEW.visited_at < OLD.visited_at THEN RETURN OLD; END IF;
@@ -560,6 +581,7 @@ END;
 $$;
 REVOKE ALL ON FUNCTION public.keep_latest_user_page() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.keep_latest_user_page() TO service_role;
+DROP TRIGGER IF EXISTS keep_latest_user_page ON public.user_page_preferences;
 CREATE TRIGGER keep_latest_user_page BEFORE UPDATE ON public.user_page_preferences
 FOR EACH ROW EXECUTE FUNCTION public.keep_latest_user_page();
 COMMENT ON TABLE public.user_page_preferences IS 'Server-only last visited application page per Futmondo account. No credentials. Login is excluded; authorization is checked before restoring Admin.';
@@ -567,7 +589,7 @@ NOTIFY pgrst, 'reload schema';
 COMMIT;
 
 -- Server-only admission policy. Application admins are verified on the R server.
-CREATE TABLE public.application_access (
+CREATE TABLE IF NOT EXISTS public.application_access (
   id TEXT PRIMARY KEY DEFAULT 'main' CHECK (id = 'main'),
   admin_only BOOLEAN NOT NULL DEFAULT TRUE,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -575,13 +597,14 @@ CREATE TABLE public.application_access (
 ALTER TABLE public.application_access ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.application_access FROM PUBLIC, anon, authenticated, service_role;
 GRANT SELECT, INSERT, UPDATE ON public.application_access TO service_role;
-INSERT INTO public.application_access (id, admin_only) VALUES ('main', TRUE);
+INSERT INTO public.application_access (id, admin_only) VALUES ('main', TRUE) ON CONFLICT (id) DO NOTHING;
 COMMENT ON TABLE public.application_access IS 'Server-only application access switch. Default blocks non-admins. No browser policies; app server verifies administrator identity before writes. Excluded from factual-data reset.';
 
 BEGIN;
 CREATE TABLE IF NOT EXISTS public.team_lineup_snapshots (
  account_id text NOT NULL CHECK (length(account_id) BETWEEN 1 AND 256),
  championship_id text NOT NULL CHECK (length(championship_id) BETWEEN 1 AND 256),
+ competition_id text NOT NULL DEFAULT 'unknown',
  user_team_id text NOT NULL CHECK (length(user_team_id) BETWEEN 1 AND 256),
  target_round text NOT NULL CHECK (length(target_round) <= 256),
  season text NOT NULL,
@@ -590,7 +613,7 @@ CREATE TABLE IF NOT EXISTS public.team_lineup_snapshots (
  observed_at timestamptz NOT NULL,
  expires_at timestamptz NOT NULL CHECK (expires_at >= observed_at),
  complete boolean NOT NULL CHECK (complete),
- PRIMARY KEY (account_id, championship_id, user_team_id, target_round, season, scoring_version)
+ PRIMARY KEY (account_id, championship_id, competition_id, user_team_id, target_round, season, scoring_version)
 );
 ALTER TABLE public.team_lineup_snapshots ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.team_lineup_snapshots FROM PUBLIC, anon, authenticated, service_role;
@@ -608,6 +631,121 @@ DROP TRIGGER IF EXISTS keep_latest_team_lineup_snapshot ON public.team_lineup_sn
 CREATE TRIGGER keep_latest_team_lineup_snapshot BEFORE UPDATE ON public.team_lineup_snapshots
  FOR EACH ROW EXECUTE FUNCTION public.keep_latest_team_lineup_snapshot();
 COMMENT ON TABLE public.team_lineup_snapshots IS 'Server-only normalized editable lineup, roster eligibility and formation entitlement snapshots. Exact account/team/round scope; no credentials. Incomplete acquisitions are never saved.';
+
+NOTIFY pgrst, 'reload schema';
+COMMIT;
+
+-- Shared competition contracts for a fresh installation.
+BEGIN;
+
+-- Normalized, account-scoped source context. This is metadata, not permission
+-- to access a championship: the R server verifies current account membership.
+CREATE TABLE IF NOT EXISTS public.league_context_observations (
+ account_id text NOT NULL CHECK (length(account_id) BETWEEN 1 AND 256),
+ championship_id text NOT NULL CHECK (length(championship_id) BETWEEN 1 AND 256),
+ competition_id text NOT NULL CHECK (length(competition_id) BETWEEN 1 AND 256),
+ season text NOT NULL CHECK (length(season) BETWEEN 1 AND 256),
+ scoring_version text NOT NULL CHECK (length(scoring_version) BETWEEN 1 AND 256),
+ observed_at timestamptz NOT NULL CHECK (isfinite(observed_at)),
+ expires_at timestamptz NOT NULL CHECK (isfinite(expires_at) AND expires_at >= observed_at),
+ complete boolean NOT NULL,
+ payload jsonb NOT NULL CHECK (jsonb_typeof(payload) = 'object' AND octet_length(payload::text) <= 1048576),
+ PRIMARY KEY (account_id, championship_id, competition_id, season, scoring_version, observed_at)
+);
+CREATE INDEX IF NOT EXISTS league_context_latest
+ ON public.league_context_observations(account_id, championship_id, observed_at DESC);
+
+-- Source player IDs are opaque records, not permanent people. Multiple real
+-- competitions may observe the same source player simultaneously. Source
+-- effective dates are optional; first observation is never a transfer date.
+CREATE TABLE IF NOT EXISTS public.player_membership_observations (
+ player_id text NOT NULL CHECK (length(player_id) BETWEEN 1 AND 256),
+ competition_id text NOT NULL CHECK (length(competition_id) BETWEEN 1 AND 256),
+ season text NOT NULL CHECK (length(season) BETWEEN 1 AND 256),
+ real_club_id text CHECK (real_club_id IS NULL OR length(real_club_id) BETWEEN 1 AND 256),
+ observed_at timestamptz NOT NULL CHECK (isfinite(observed_at)),
+ effective_at timestamptz CHECK (effective_at IS NULL OR isfinite(effective_at)),
+ source text NOT NULL CHECK (length(source) BETWEEN 1 AND 128),
+ UNIQUE NULLS NOT DISTINCT (player_id, competition_id, season, observed_at, real_club_id)
+);
+CREATE INDEX IF NOT EXISTS player_membership_context_time
+ ON public.player_membership_observations(competition_id, season, player_id, observed_at DESC);
+
+DO $$ DECLARE tbl text;
+BEGIN
+ FOREACH tbl IN ARRAY ARRAY['league_context_observations','player_membership_observations'] LOOP
+  EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY',tbl);
+  EXECUTE format('REVOKE ALL ON public.%I FROM PUBLIC, anon, authenticated, service_role',tbl);
+  EXECUTE format('GRANT SELECT, INSERT ON public.%I TO service_role',tbl);
+ END LOOP;
+END $$;
+COMMENT ON TABLE public.league_context_observations IS
+ 'Immutable normalized context/configuration evidence. No authentication material. Cached metadata never authorizes league membership.';
+COMMENT ON TABLE public.player_membership_observations IS
+ 'Append-only source player/competition/season club observations. No inferred person aliases, transfer dates, or retirement from catalog disappearance.';
+
+CREATE INDEX IF NOT EXISTS player_round_league_context_revision
+ ON public.player_match_observations(championship_id,competition_id,season,scoring_version,player_id,round,source_round_key,observed_at DESC);
+CREATE INDEX IF NOT EXISTS player_round_checks_league_context
+ ON public.player_round_history_checks(championship_id,competition_id,season,scoring_version,player_id,checked_at DESC);
+CREATE INDEX IF NOT EXISTS player_history_full_context_page
+ ON public.player_history(championship_id,competition_id,season,player_id,recorded_at,id);
+CREATE INDEX IF NOT EXISTS team_history_full_context_page
+ ON public.user_team_history(championship_id,competition_id,season,recorded_at,id);
+
+-- Validate only incoming writes. Existing rows are neither deleted nor
+-- relabeled; any legacy inconsistency remains available for reconciliation.
+CREATE OR REPLACE FUNCTION public.guard_team_linked_league()
+RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
+DECLARE ids text[]; tid text; owner_championship text;
+BEGIN
+ IF NEW.championship_id IS NULL OR btrim(NEW.championship_id) = '' THEN
+  RAISE EXCEPTION 'Team-linked observations require a championship' USING ERRCODE='23514';
+ END IF;
+ IF TG_TABLE_NAME = 'market_transactions' THEN
+  -- The Futmondo System/Market has no team ID. Empty IDs have this same meaning.
+  NEW.buyer_team_id := NULLIF(btrim(NEW.buyer_team_id),'');
+  NEW.seller_team_id := NULLIF(btrim(NEW.seller_team_id),'');
+  ids := ARRAY[NEW.buyer_team_id,NEW.seller_team_id];
+ ELSIF TG_TABLE_NAME = 'player_daily_snapshots' THEN
+  NEW.owner_team_id := NULLIF(btrim(NEW.owner_team_id),'');
+  ids := ARRAY[NEW.owner_team_id];
+ ELSE
+  RAISE EXCEPTION 'Unsupported league ownership guard' USING ERRCODE='23514';
+ END IF;
+ FOREACH tid IN ARRAY ids LOOP
+  IF tid IS NULL THEN CONTINUE; END IF;
+  SELECT championship_id INTO owner_championship FROM public.user_teams WHERE id=tid;
+  IF owner_championship IS NULL OR owner_championship IS DISTINCT FROM NEW.championship_id THEN
+   RAISE EXCEPTION 'Counterparty does not belong to observation championship' USING ERRCODE='23514';
+  END IF;
+ END LOOP;
+ RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.guard_team_linked_league() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.guard_team_linked_league() TO service_role;
+DROP TRIGGER IF EXISTS guard_market_transaction_league ON public.market_transactions;
+CREATE TRIGGER guard_market_transaction_league BEFORE INSERT OR UPDATE ON public.market_transactions
+ FOR EACH ROW EXECUTE FUNCTION public.guard_team_linked_league();
+DROP TRIGGER IF EXISTS guard_daily_snapshot_league ON public.player_daily_snapshots;
+CREATE TRIGGER guard_daily_snapshot_league BEFORE INSERT OR UPDATE ON public.player_daily_snapshots
+ FOR EACH ROW EXECUTE FUNCTION public.guard_team_linked_league();
+
+CREATE OR REPLACE FUNCTION public.keep_user_team_league_identity()
+RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
+BEGIN
+ IF OLD.championship_id IS NOT NULL AND NEW.championship_id IS DISTINCT FROM OLD.championship_id THEN
+  RAISE EXCEPTION 'An existing source team cannot change championship ownership' USING ERRCODE='23514';
+ END IF;
+ RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.keep_user_team_league_identity() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.keep_user_team_league_identity() TO service_role;
+DROP TRIGGER IF EXISTS keep_user_team_league_identity ON public.user_teams;
+CREATE TRIGGER keep_user_team_league_identity BEFORE UPDATE ON public.user_teams
+ FOR EACH ROW EXECUTE FUNCTION public.keep_user_team_league_identity();
 
 NOTIFY pgrst, 'reload schema';
 COMMIT;

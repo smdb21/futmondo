@@ -2,15 +2,22 @@
 # the Shiny event loop; cached source age is not reset by database hydration.
 lineup_snapshot_store <- function(context,target_round,payload=NULL,owner='') {
   if(!nzchar(get_sb_url())||!nzchar(get_sb_key()))return(promises::promise_resolve(NULL))
-  scope<-list(account_id=context$account_id,championship_id=context$championship_id,user_team_id=context$user_team_id,target_round=target_round)
+  scope<-list(account_id=context$account_id,championship_id=context$championship_id,user_team_id=context$user_team_id,target_round=target_round,
+    competition_id=fm_scalar(context$competition_id,'unknown'),season=fm_scalar(context$season,'unknown'),scoring_version=fm_scalar(context$scoring_version,'unknown'))
   requested<-scope
-  for(field in c('season','scoring_version'))if(nzchar(context[[field]])&&!identical(context[[field]],'unknown'))requested[[field]]<-context[[field]]
   query<-if(is.null(payload))c(lapply(requested,function(x)paste0('eq.',x)),list(select='*',order='observed_at.desc',limit='1'))else
-    list(on_conflict='account_id,championship_id,user_team_id,target_round,season,scoring_version')
+    list(on_conflict='account_id,championship_id,user_team_id,target_round,competition_id,season,scoring_version')
   headers<-c(apikey=get_sb_key(),Authorization=paste('Bearer',get_sb_key()),`Content-Type`='application/json',Prefer='resolution=merge-duplicates,return=minimal')
   url<-httr::modify_url(paste0(sub('/$','',get_sb_url()),'/rest/v1/team_lineup_snapshots'),query=query)
   if(!is.null(payload)){
-    row<-c(scope,list(season=payload$season,scoring_version=payload$scoring_version,payload=payload,
+    payload<-tryCatch(lineup_validate_snapshot(payload),error=function(error)error)
+    if(inherits(payload,'error'))return(promises::promise_reject(payload))
+    for(field in c('competition_id','season','scoring_version')){
+      expected<-scope[[field]]
+      if(expected!='unknown'&&!identical(payload[[field]],expected))return(promises::promise_reject(simpleError('Lineup snapshot context mismatch')))
+      scope[[field]]<-payload[[field]]
+    }
+    row<-c(scope,list(payload=payload,
       observed_at=payload$observed_at,expires_at=payload$expires_at,complete=TRUE))
     body<-jsonlite::toJSON(row,auto_unbox=TRUE,null='null',na='null')
     if(nchar(body,type='bytes')>524288)return(promises::promise_reject(simpleError('Lineup snapshot exceeds storage limit')))
@@ -24,14 +31,14 @@ lineup_snapshot_store <- function(context,target_round,payload=NULL,owner='') {
     row<-rows[[1]]
     if(!all(vapply(names(requested),function(key)identical(fm_scalar(row[[key]]),requested[[key]]),logical(1)))||!isTRUE(row$complete))stop('Saved lineup context mismatch')
     data<-lineup_validate_snapshot(row$payload)
-    if(!identical(row$season,data$season)||!identical(row$scoring_version,data$scoring_version)||
+    if(!identical(row$competition_id,data$competition_id)||!identical(row$season,data$season)||!identical(row$scoring_version,data$scoring_version)||
        !isTRUE(as.numeric(fm_time(row$observed_at))==as.numeric(fm_time(data$observed_at)))||!isTRUE(as.numeric(fm_time(row$expires_at))==as.numeric(fm_time(data$expires_at))))stop('Saved lineup metadata mismatch')
     data
   })
 }
 lineup_validate_snapshot <- function(data) {
-  if(!is.list(data)||!identical(as.integer(data$version),1L)||!is.list(data$roster)||!is.list(data$official)||
-     !is.list(data$rules)||!is.list(data$source)||!nzchar(fm_scalar(data$season))||!nzchar(fm_scalar(data$scoring_version)))stop('Saved lineup is incomplete')
+  if(!is.list(data)||!identical(as.integer(data$version),2L)||!is.list(data$roster)||!is.list(data$official)||
+     !is.list(data$rules)||!is.list(data$source)||!nzchar(fm_scalar(data$competition_id,''))||!nzchar(fm_scalar(data$season,''))||!nzchar(fm_scalar(data$scoring_version,'')))stop('Saved lineup is incomplete')
   stamp<-fm_time(data$observed_at);until<-fm_time(data$expires_at)
   if(length(stamp)!=1L||is.na(stamp)||length(until)!=1L||is.na(until)||until<stamp||stamp>Sys.time()+60)stop('Saved lineup timestamps invalid')
   official<-data$official
@@ -51,7 +58,7 @@ lineup_validate_snapshot <- function(data) {
     fm_scalar(row$id,'')
   },character(1))
   if(anyDuplicated(ids))stop('Saved roster has duplicate identities')
-  data<-data[intersect(names(data),c('version','roster','official','rules','source','season','scoring_version','observed_at','expires_at'))]
+  data<-data[intersect(names(data),c('version','roster','official','rules','source','competition_id','season','scoring_version','observed_at','expires_at'))]
   data
 }
 lineup_snapshot_fresh <- function(data,now=Sys.time()) {

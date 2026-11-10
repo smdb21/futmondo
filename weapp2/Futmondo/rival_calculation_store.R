@@ -2,13 +2,17 @@
 # server-only evidence table supplies revision ordering and the bounded queue.
 .rival_snapshot_limits <- list(json=8L*1024L^2L,payload=220L*1024L,teams=100L,rows=20000L)
 rival_snapshot_scope <- function(context) {
-  fields<-c('account_id','championship_id','season','user_team_id')
+  if(!is.list(context))return(NULL)
+  metadata<-if(exists('league_context_metadata',mode='function'))league_context_metadata(context$championship_id,context$account_id)else NULL
+  context$competition_id<-fm_scalar(context$competition_id,fm_scalar(metadata$competition_id,'unknown'))
+  context$scoring_version<-fm_scalar(context$scoring_version,fm_scalar(metadata$scoring_version,'unknown'))
+  fields<-c('account_id','championship_id','competition_id','season','scoring_version','user_team_id')
   if(!is.list(context)||!all(fields%in%names(context)))return(NULL)
   values<-lapply(context[fields],function(x)fm_scalar(x,''))
   if(any(!vapply(values,function(x)nzchar(x)&&nchar(x,type='bytes')<=256L,logical(1))))return(NULL)
-  c(values,list(version=rival_calculation_version))
+  c(values,list(version=paste0(rival_calculation_version,':context-v2')))
 }
-rival_snapshot_id <- function(scope) paste0('rival-cache:',scope$version,':',rival_calculation_hash(scope$user_team_id))
+rival_snapshot_id <- function(scope) paste0('rival-cache:',scope$version,':',rival_calculation_hash(scope[c('user_team_id','competition_id','season','scoring_version')]))
 rival_snapshot_record <- function(row) is.list(row)&&startsWith(mvp_text(row$source_id),'rival-cache:')
 # Only primitive vectors, lists and data frames have a wire representation. No
 # arbitrary R classes, expressions, environments or serialized objects are read.
@@ -123,7 +127,7 @@ rival_snapshot_payload <- function(cache,calculated,context) {
   if(!rival_snapshot_bonus_valid(totals,summary$teamid))return(NULL)
   if(length(totals))attr(summary,"round_bonus_totals")<-totals
   make<-function(value){
-    wire<-list(format=1L,scope=scope,signature=rival_snapshot_signature(cache),summary=rival_snapshot_encode(summary),cache=rival_snapshot_encode(value))
+    wire<-list(format=2L,scope=scope,signature=rival_snapshot_signature(cache),summary=rival_snapshot_encode(summary),cache=rival_snapshot_encode(value))
     json<-charToRaw(as.character(jsonlite::toJSON(wire,auto_unbox=TRUE,na='null',null='null',digits=NA)))
     if(length(json)>.rival_snapshot_limits$json)return(NULL)
     compressed<-history_baseline_compress(json)
@@ -133,17 +137,17 @@ rival_snapshot_payload <- function(cache,calculated,context) {
   }
   tryCatch(make(saved_cache),error=function(e)NULL) %||% tryCatch(make(NULL),error=function(e)NULL)
 }
-read_rival_calculation_snapshot <- function(account_id,championship_id,season,user_team_id) {
-  scope<-rival_snapshot_scope(list(account_id=account_id,championship_id=championship_id,season=season,user_team_id=user_team_id))
+read_rival_calculation_snapshot <- function(account_id,championship_id,season,user_team_id,competition_id=NULL,scoring_version=NULL) {
+  scope<-rival_snapshot_scope(list(account_id=account_id,championship_id=championship_id,competition_id=competition_id,season=season,scoring_version=scoring_version,user_team_id=user_team_id))
   if(is.null(scope))return(NULL)
-  query<-list(account_id=paste0('eq.',account_id),championship_id=paste0('eq.',championship_id),season=paste0('eq.',season),
+  query<-list(account_id=paste0('eq.',account_id),championship_id=paste0('eq.',championship_id),competition_id=paste0('eq.',scope$competition_id),season=paste0('eq.',season),
     evidence_type='eq.eligibility',source_id=paste0('eq.',rival_snapshot_id(scope)),
-    select='account_id,championship_id,season,evidence_type,source_id,observed_at,payload',limit=1L)
+    select='account_id,championship_id,competition_id,season,evidence_type,source_id,observed_at,payload',limit=1L)
   rows<-tryCatch(supabase_get('rival_finance_evidence_latest',query),error=function(e)NULL)
   tryCatch({
     if(!is.data.frame(rows)||nrow(rows)!=1L)return(NULL)
     row<-rival_evidence_decode(rows)[[1]]
-    if(!all(vapply(c('account_id','championship_id','season'),function(field)identical(mvp_text(row[[field]]),scope[[field]]),logical(1)))||
+    if(!all(vapply(c('account_id','championship_id','competition_id','season'),function(field)identical(mvp_text(row[[field]]),scope[[field]]),logical(1)))||
        !identical(mvp_text(row$source_id),rival_snapshot_id(scope))||!identical(mvp_text(row$evidence_type),'eligibility')||
        is.na(history_baseline_stamp(row$observed_at)))return(NULL)
     payload<-row$payload
@@ -157,7 +161,7 @@ read_rival_calculation_snapshot <- function(account_id,championship_id,season,us
     if(length(raw)!=payload$json_bytes)return(NULL)
     wire<-jsonlite::fromJSON(rawToChar(raw),simplifyVector=FALSE)
     if(!is.list(wire)||!identical(names(wire),c('format','scope','signature','summary','cache'))||
-       !identical(wire$format,1L)||!identical(wire$scope,scope)||!is.character(wire$signature)||length(wire$signature)!=1L||
+       !identical(wire$format,2L)||!identical(wire$scope,scope)||!is.character(wire$signature)||length(wire$signature)!=1L||
        !grepl('^[0-9a-f]{64}$',wire$signature))return(NULL)
     summary<-rival_snapshot_decode(wire$summary);cache<-rival_snapshot_decode(wire$cache)
     totals<-attr(summary,"round_bonus_totals") %||% list()
@@ -197,8 +201,8 @@ read_rival_calculation_snapshot <- function(account_id,championship_id,season,us
 persist_rival_calculation_snapshot <- function(cache,calculated,context,on_complete=NULL) {
   payload<-rival_snapshot_payload(cache,calculated,context);scope<-rival_snapshot_scope(context)
   if(is.null(payload)||is.null(scope)){if(is.function(on_complete))on_complete(FALSE);return(FALSE)}
-  row<-rival_finance_evidence(scope$account_id,scope$championship_id,scope$season,'eligibility',rival_snapshot_id(scope),payload)
+  row<-rival_finance_evidence(scope$account_id,scope$championship_id,scope$season,'eligibility',rival_snapshot_id(scope),payload,competition_id=scope$competition_id)
   if(as.numeric(object.size(row))>256L*1024L){if(is.function(on_complete))on_complete(FALSE);return(FALSE)}
   defer_persistence('supabase_post_direct',list('rival_finance_evidence',list(row),
-    'account_id,championship_id,season,evidence_type,source_id,observed_at',TRUE),context,on_complete)
+    'account_id,championship_id,competition_id,season,evidence_type,source_id,observed_at',TRUE),context,on_complete)
 }

@@ -63,27 +63,41 @@ lineup_parse_official <- function(raw) {
     enabled=isTRUE(raw$bench$enabled),multiposition=isTRUE(raw$multiposition),
     status=fm_scalar(raw$status,''),pointSystem=raw$pointSystem,custom=raw$custom)
 }
-lineup_fetch_bundle <- function(auth,context,target,owner) {
+lineup_fetch_bundle <- function(auth,context,target,owner,is_current=function()TRUE) {
   calls<-list(lineup=lineup_api_read('/1/userteam/lineup',auth,context,owner),
     roster=lineup_api_read('/1/userteam/roster',auth,context,owner),
     info=lineup_api_read('/1/userteam/information',auth,context,owner,list(type='market')),
     strategies=lineup_api_read('/5/strategy/availables',auth,context,owner))
   promises::then(do.call(promises::promise_all,calls),function(answers){
-    lineup_normalize_bundle(answers,context,target)
+    if(!isTRUE(is_current()))stop(structure(list(message='Session request cancelled',call=NULL),class=c('fm_async_cancelled','error','condition')))
+    data<-lineup_normalize_bundle(answers,context,target)
+    # This direct async bundle does not cross record_acquired_resource. Publish
+    # verified scoring only after every component succeeds in its own generation.
+    if(exists('remember_league_scoring',mode='function')){
+      row<-remember_league_scoring(context,answers$lineup,fm_time(data$observed_at))
+      if(!is.null(row))persist_league_context(row,context)
+    }
+    data
   })
 }
 lineup_normalize_bundle <- function(answers,context,target) {
   official<-lineup_parse_official(answers$lineup);cfg<-answers$info$configuration %||% list()
   available<-lineup_available_formations(answers$strategies,official$draft$strategy,cfg)
-  scoring<-list(point_system=official$pointSystem,custom=official$custom)
-  stamp<-Sys.time();season<-league_season_context(context$championship_id,answers$info$season %||% answers$info$seasonId)
-  list(version=1L,roster=lineup_roster_records(answers$roster),official=official$draft,
+  source_league<-if(is.list(answers$info$league))answers$info$league else list()
+  competition<-fm_scalar(source_league$id %||% source_league$`_id`,fm_scalar(context$competition_id,'unknown'))
+  season<-fm_scalar(answers$info$season %||% answers$info$seasonId %||% source_league$season,fm_scalar(context$season,'unknown'))
+  for(field in c('competition_id','season')){
+    expected<-fm_scalar(context[[field]],'unknown');actual<-if(field=='competition_id')competition else season
+    if(expected!='unknown'&&actual!='unknown'&&!identical(expected,actual))stop('Lineup source context changed')
+  }
+  stamp<-Sys.time()
+  list(version=2L,roster=lineup_roster_records(answers$roster),official=official$draft,
     rules=list(allowed=available,multiposition=official$multiposition,
       bench_enabled=official$enabled,captain_enabled=isTRUE(cfg$cpt)),
     source=list(wire=official$wire,locked=official$locked,status=official$status,block_delayed=isTRUE(cfg$blc),
       target_id=target$id %||% '',target_number=target$number %||% NA_real_,
       target_starts=if(is.null(target))''else format(target$starts_at,'%Y-%m-%dT%H:%M:%OSZ',tz='UTC')),
-    season=season,scoring_version=unclass(as.character(openssl::sha256(charToRaw(jsonlite::toJSON(scoring,auto_unbox=TRUE))))),
+    competition_id=competition,season=season,scoring_version=fm_scoring_version(official$pointSystem,official$custom),
     observed_at=format(stamp,'%Y-%m-%dT%H:%M:%OSZ',tz='UTC'),
     expires_at=format(stamp+30,'%Y-%m-%dT%H:%M:%OSZ',tz='UTC'))
 }

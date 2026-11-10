@@ -1,6 +1,7 @@
 
 
 function(input, output, session) {
+  session$userData$league_context_enabled<-TRUE
   login_token_RV <- login_Server(id = "login")
   refresh_trigger <- reactiveVal(0)
   history_refresh_trigger <- round_history_refresh_trigger(session)
@@ -49,25 +50,32 @@ function(input, output, session) {
   })
   observe({
     ch <- championships_RV()
+    metadata<-league_context_revision()
     ids <- vapply(ch, function(c) fm_scalar(c$id %||% c$`_id`, ""), character(1))
     labels <- vapply(ch, function(c) fm_scalar(c$name, "League"), character(1))
+    repeated<-duplicated(labels)|duplicated(labels,fromLast=TRUE)
+    for(i in which(repeated)){ctx<-league_context_metadata(ids[i],login_token_RV()[["userid"]]);suffix<-fm_scalar(ctx$payload$competition_name,"");if(!nzchar(suffix))suffix<-ids[i];labels[i]<-paste0(labels[i]," (",suffix,")")}
     current <- isolate(input$selected_league)
     selected <- if (!is.null(current) && current %in% ids) current else if (length(ids)) ids[1] else character()
     updateSelectInput(session, "selected_league", choices = setNames(ids, labels), selected = selected)
   })
   championship_RV <- reactive({
-    ch <- championships_RV(); req(length(ch))
+    ch <- championships_RV(); validate(need(length(ch)>0L,"No active leagues are available for this account."))
+    league_context_revision()
     ids <- vapply(ch, function(c) fm_scalar(c$id %||% c$`_id`, ""), character(1))
     selected <- input$selected_league
     if (is.null(selected) || !selected %in% ids) selected <- ids[1]
     context <- ch[[match(selected,ids)]]
     context$id <- context$id %||% context$`_id`
     context$userteam$id <- context$userteam$id %||% context$userteam$`_id`
+    validate(need(nzchar(fm_scalar(context$userteam$id,"")),"This league has no playable team for this account."))
     unlist(context)
   })
   championship_id_RV <- reactive({ req(championship_RV()); unname(championship_RV()["id"]) })
   user_team_id_RV <- reactive({ req(championship_RV()); unname(championship_RV()["userteam.id"]) })
   user_team_name_RV <- reactive({ req(championship_RV()); unname(championship_RV()["userteam.name"]) })
+  session$userData$league_context_source<-league_context_demand_source(session,login_token_RV,championship_id_RV,user_team_id_RV,refresh_trigger)
+  observe({input$tabs;if(valid_login(login_token_RV()))session$userData$league_context_source()})
   bind_factual_reads(c("get_teams","get_finished_rounds"),session,
     login_token_RV,championship_id_RV,user_team_id_RV,is_active=function()valid_login(login_token_RV())&&isTRUE(startup_primary_ready()),refresh_trigger=refresh_trigger)
   # Today and the banner consume the exact same account/league/team states.

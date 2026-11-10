@@ -7,3 +7,5 @@ Cache identity includes the dimensions affecting a resource's content or access.
 Player cards, official notifications, and manual confirmations use the same active context. A saved player row from a different league must not become an actionable current selection.
 
 Cross-context fixtures use overlapping player/round IDs to verify that identical identifiers do not transfer points, cash, or action state between leagues.
+
+Resource owners, controller entries and manual confirmations also include real competition, season and canonical scoring. Demand-driven metadata renewal works on the same page, and late earlier-context completions cannot publish. Persisted context establishes metadata only; current authenticated membership remains required. See [the complete context contract](general_competition_context.md).

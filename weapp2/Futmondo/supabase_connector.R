@@ -310,7 +310,8 @@ supabase_get <- function(table_name, query_params = list()) {
 
 # Retrieve saved MVP selections for a league. The query is cached because the
 # data changes only when the dream-team synchronisation writes a completed round.
-get_round_mvps <- function(championship_id) {
+get_round_mvps <- function(championship_id,context=NULL) {
+  if(is.null(context))context<-c(list(account_id="database",championship_id=as.character(championship_id)),league_persistence_scope(championship_id))
   empty <- data.frame(
     championship_id = character(), round_id = character(), round_number = numeric(),
     player_id = character(), player_name = character(), player_role = character(),
@@ -323,12 +324,13 @@ get_round_mvps <- function(championship_id) {
     rows <- supabase_read_all("round_dream_team", list(
       championship_id = paste0("eq.", as.character(championship_id[1])),
       is_finished = "is.true",
-      select = "championship_id,round_id,round_number,player_id,player_name,player_role,points,is_mvp,is_finished",
+      competition_id=paste0("eq.",context$competition_id),season=paste0("eq.",context$season),scoring_version=paste0("eq.",context$scoring_version),
+      select = "championship_id,competition_id,season,scoring_version,round_id,round_number,player_id,player_name,player_role,points,is_mvp,is_finished",
       order = "round_number.desc,player_id.asc"
     ))
     if (is.null(rows)) stop("Round MVP data is unavailable.")
     rows
-  }, context=resource_context(account_id="database",championship_id=championship_id))
+  }, context=resource_context(account_id=context$account_id,championship_id=championship_id,season=context$season,scoring_version=context$scoring_version,competition_id=context$competition_id))
 }
 
 # Read finalized per-round points for one player. This is separate from daily
@@ -346,6 +348,8 @@ get_league_standings_history <- function(championship_id) {
     select = "points,budget,position,team_value,recorded_at,user_teams!inner(name,championship_id)",
     championship_id = paste0("eq.", championship_id),
     "user_teams.championship_id" = paste0("eq.", championship_id),
+    competition_id=paste0("eq.",league_competition_context(championship_id)),
+    season=paste0("eq.",league_season_context(championship_id)),
     order = "recorded_at.asc,id.asc"
   )
   
@@ -374,6 +378,8 @@ get_league_finances_history <- function(championship_id) {
     select = "budget,team_value,points,position,recorded_at,user_teams!inner(name,championship_id)",
     championship_id = paste0("eq.", championship_id),
     "user_teams.championship_id" = paste0("eq.", championship_id),
+    competition_id=paste0("eq.",league_competition_context(championship_id)),
+    season=paste0("eq.",league_season_context(championship_id)),
     order = "recorded_at.asc,id.asc"
   )
 
@@ -406,7 +412,7 @@ sync_pressroom_transactions_to_supabase<-function(pressroom_df,championship_id,d
  d<-pressroom_df;labels<-as.character(d$player_name %||% d$player_id);unknown<-is.na(labels)|!nzchar(trimws(labels));labels[unknown]<-ids[unknown]
  parents<-data.frame(id=ids,name=labels,slug="",stringsAsFactors=FALSE);parents<-parents[order(unknown),,drop=FALSE];parents<-parents[!duplicated(parents$id),,drop=FALSE]
  buyer<-as.character(d$buyer_team_id);seller<-as.character(d$seller_team_id);buyer[is.na(buyer)|!nzchar(buyer)]<-NA_character_;seller[is.na(seller)|!nzchar(seller)]<-NA_character_
- payload<-data.frame(player_id=ids,championship_id=as.character(championship_id),buyer_team_id=buyer,seller_team_id=seller,price=suppressWarnings(as.numeric(d$price)),is_clause=if("is_clause"%in%names(d))as.logical(d$is_clause)else ifelse(is.na(buyer)|is.na(seller),FALSE,NA),source_event_id=as.character(d$id),provenance="futmondo_pressroom",transaction_date=as.character(d$created))
+ payload<-data.frame(player_id=ids,championship_id=as.character(championship_id),competition_id=league_persistence_scope(championship_id)$competition_id,buyer_team_id=buyer,seller_team_id=seller,price=suppressWarnings(as.numeric(d$price)),is_clause=if("is_clause"%in%names(d))as.logical(d$is_clause)else ifelse(is.na(buyer)|is.na(seller),FALSE,NA),source_event_id=as.character(d$id),provenance="futmondo_pressroom",transaction_date=as.character(d$created))
  payload<-payload[!duplicated(payload$source_event_id),,drop=FALSE]
  domain<-if(requireNamespace("shiny",quietly=TRUE))shiny::getDefaultReactiveDomain()else NULL
  queued<-(!is.null(domain)||!is.null(getOption("futmondo.persistence_context")))&&exists("defer_persistence",mode="function")
@@ -474,11 +480,13 @@ supabase_delete <- function(table_name, filter = "id=neq.00000000-0000-0000-0000
 
 supabase_primary_key <- function(table_name) {
   # A nonnullable identity component for count and delete filters.
+  if(identical(table_name,"player_membership_observations"))return("player_id")
+  if(identical(table_name,"league_context_observations"))return("championship_id")
   if(table_name %in% c("auction_observations","bid_observations","market_observations","league_rule_snapshots","observation_revisions","complete_history_baselines","team_lineup_snapshots")) "championship_id" else if(identical(table_name,"player_match_observations")) "player_id" else "id"
 }
 
 supabase_known_tables <- function() {
-  c("championships", "real_clubs", "players", "user_teams", "user_team_history", "player_history", "market_transactions", "round_dream_team", "player_daily_snapshots", "auction_observations", "bid_observations", "market_observations", "player_match_observations", "league_rule_snapshots", "observation_revisions", "complete_history_baselines", "team_lineup_snapshots")
+  c("championships", "real_clubs", "players", "user_teams", "user_team_history", "player_history", "market_transactions", "round_dream_team", "player_daily_snapshots", "auction_observations", "bid_observations", "market_observations", "player_match_observations", "league_rule_snapshots", "observation_revisions", "complete_history_baselines", "team_lineup_snapshots", "league_context_observations", "player_membership_observations")
 }
 
 supabase_delete_all <- function(table_name) {
@@ -709,16 +717,16 @@ log_player_daily_snapshots <- function(players_df, championship_id) {
 }
 
 supabase_conflict_key <- function(table_name) {
-  keys <- c(user_team_history="user_team_id,championship_id,observed_at",
-    player_history = "player_id,championship_id,observed_at",
-    player_daily_snapshots = "player_id,championship_id,snapshot_date",
-    round_dream_team = "championship_id,round_number,player_id",
+  keys <- c(user_team_history="user_team_id,championship_id,competition_id,season,observed_at",
+    player_history = "player_id,championship_id,competition_id,season,observed_at",
+    player_daily_snapshots = "player_id,championship_id,competition_id,season,snapshot_date",
+    round_dream_team = "championship_id,competition_id,season,scoring_version,round_id,player_id",
     market_transactions = "championship_id,source_event_id",
     auction_observations = "championship_id,auction_id",
     bid_observations = "championship_id,auction_id,bidder_id",
     market_observations = "championship_id,listing_id,observed_at",
-    player_match_observations = "player_id,championship_id,season,scoring_version,round,observed_at",
-    league_rule_snapshots = "championship_id,scoring_version,observed_at",
+    player_match_observations = "player_id,championship_id,competition_id,season,scoring_version,round,source_round_key,observed_at",
+    league_rule_snapshots = "championship_id,competition_id,season,scoring_version,observed_at",
     sale_observations="user_id,championship_id,offer_id,observed_at",
     fixture_observations="championship_id,season,scoring_version,player_id,round,observed_at",
     auction_opportunities="championship_id,listing_id,observed_at")
@@ -727,6 +735,15 @@ supabase_conflict_key <- function(table_name) {
 
 supabase_post<-function(table_name,payload,conflict=supabase_conflict_key(table_name),ignore_duplicates=FALSE){
  if(is.null(payload)||(is.data.frame(payload)&&!nrow(payload)))return(invisible(204L))
+ contextual<-c("player_history","user_team_history","player_daily_snapshots","round_dream_team","market_transactions","league_rule_snapshots")
+ if(table_name%in%contextual){
+   cid<-if(is.data.frame(payload))unique(as.character(payload$championship_id))else payload$championship_id
+   if(length(cid)==1L){
+     scope<-league_persistence_scope(cid)
+     fields<-if(table_name=="market_transactions")"competition_id"else if(table_name%in%c("round_dream_team","league_rule_snapshots"))names(scope)else c("competition_id","season")
+     for(field in setdiff(fields,names(payload)))payload[[field]]<-if(is.data.frame(payload))rep(scope[[field]],nrow(payload))else scope[[field]]
+   }
+ }
  if(isTRUE(getOption("futmondo.offline",FALSE)))return(invisible(204L))
  if(is.data.frame(payload)&&nrow(payload)>100L){
   results<-lapply(seq.int(1L,nrow(payload),by=100L),function(i)supabase_post(table_name,payload[i:min(i+99L,nrow(payload)),,drop=FALSE],conflict,ignore_duplicates))
@@ -742,9 +759,11 @@ supabase_read_all<-function(table_name,query=list(),max_rows=20000L){
  history_read_pages(table_name,query,max_rows=max_rows)
 }
 
-read_player_price_history <- function(championship_id, player_ids = NULL) {
+read_player_price_history <- function(championship_id, player_ids = NULL,context=NULL) {
+  if(is.null(context))context<-league_persistence_scope(championship_id)
   q <- list(championship_id = paste0("eq.", championship_id),
-    select = "player_id,value,observed_at,recorded_at", observed_at="not.is.null", order = "observed_at.asc")
+    competition_id=paste0("eq.",context$competition_id),season=paste0("eq.",context$season),
+    select = "player_id,competition_id,season,value,observed_at,recorded_at", observed_at="not.is.null", order = "observed_at.asc,id.asc")
   if (length(player_ids)) q$player_id <- paste0("in.(", paste(player_ids, collapse = ","), ")")
   d <- tryCatch(supabase_read_all("player_history", q), error = function(e) NULL)
   if (!is.null(d) && "recorded_at" %in% names(d)) names(d)[names(d) == "recorded_at"] <- "captured_at"
@@ -790,7 +809,8 @@ pressroom_history_fingerprints <- function(rows) {
   },character(1))
   stats::setNames(hashes,as.character(rows$id))
 }
-pressroom_history_batch_operations <- function(d,championship_id,stamp) {
+pressroom_history_batch_operations <- function(d,championship_id,stamp,context=NULL) {
+  competition<-fm_scalar(context$competition_id,league_persistence_scope(championship_id)$competition_id)
   stamp<-as.POSIXct(as.numeric(fm_time(stamp)),origin="1970-01-01",tz="UTC")
   ids<-as.character(d$player_id)
   if(anyNA(ids)||any(!nzchar(trimws(ids))))stop("Transfer player identity unavailable")
@@ -799,7 +819,7 @@ pressroom_history_batch_operations <- function(d,championship_id,stamp) {
   parents<-parents[order(unknown),,drop=FALSE];parents<-parents[!duplicated(parents$id),,drop=FALSE]
   buyer<-as.character(d$buyer_team_id);seller<-as.character(d$seller_team_id)
   buyer[is.na(buyer)|!nzchar(buyer)]<-NA_character_;seller[is.na(seller)|!nzchar(seller)]<-NA_character_
-  facts<-data.frame(player_id=ids,championship_id=as.character(championship_id),buyer_team_id=buyer,seller_team_id=seller,
+  facts<-data.frame(player_id=ids,championship_id=as.character(championship_id),competition_id=competition,buyer_team_id=buyer,seller_team_id=seller,
     price=suppressWarnings(as.numeric(d$price)),is_clause=if("is_clause"%in%names(d))as.logical(d$is_clause)else ifelse(is.na(buyer)|is.na(seller),FALSE,NA),
     source_event_id=as.character(d$id),provenance="futmondo_pressroom",transaction_date=as.character(d$created))
   rows<-list(players=parents,market_transactions=facts,
@@ -847,7 +867,7 @@ pressroom_history_next_batch <- function(state) {
   if(!is.data.frame(state$rows)||!nrow(state$rows))return(invisible(TRUE))
   indices<-seq_len(min(100L,nrow(state$rows)));hashes<-state$signatures[indices]
   operations<-tryCatch(pressroom_history_batch_operations(state$rows[indices,,drop=FALSE],
-    state$championship_id,state$stamp),error=function(e)NULL)
+    state$championship_id,state$stamp,state$context),error=function(e)NULL)
   if(is.null(operations)){state$rows<-NULL;state$signatures<-NULL;return(invisible(FALSE))}
   # Count the continuation in the shared queue budget as well as this batch's
   # HTTP payload. Recompute after each acknowledgement drops the saved rows.
@@ -882,19 +902,22 @@ persist_auction_history <- function(pressroom_df, championship_id) {
   isTRUE(pressroom_history_next_batch(state))
 }
 
-read_player_match_history<-function(championship_id,cutoff=Sys.time(),final_only=TRUE,season="unknown",scoring_version="unknown",player_ids=NULL,round_min=NULL,round_max=NULL,max_rows=5000L){
- q<-list(championship_id=paste0("eq.",championship_id),season=paste0("eq.",season),scoring_version=paste0("eq.",scoring_version),observed_at=paste0("lte.",format(fm_time(cutoff),"%Y-%m-%dT%H:%M:%OSZ",tz="UTC")),order="player_id.asc,round.asc,observed_at.asc")
- q$select<-"player_id,championship_id,season,scoring_version,round,points,score_status,observed_at"
+read_player_match_history<-function(championship_id,cutoff=Sys.time(),final_only=TRUE,season="unknown",scoring_version="unknown",player_ids=NULL,round_min=NULL,round_max=NULL,max_rows=5000L,competition_id=NULL){
+ competition_id<-fm_scalar(competition_id,league_competition_context(championship_id))
+ q<-list(championship_id=paste0("eq.",championship_id),competition_id=paste0("eq.",competition_id),season=paste0("eq.",season),scoring_version=paste0("eq.",scoring_version),observed_at=paste0("lte.",format(fm_time(cutoff),"%Y-%m-%dT%H:%M:%OSZ",tz="UTC")),order="player_id.asc,round.asc,observed_at.asc")
+ q$select<-"player_id,championship_id,competition_id,season,scoring_version,round,source_round_number,source_round_key,round_id,match_id,points,score_status,observed_at"
  if(!is.null(round_min))q$round<-paste0("gte.",round_min)
  if(!is.null(round_max))q$and<-paste0("(round.lte.",round_max,")")
  if(length(player_ids))q$player_id<-paste0("in.(",paste(unique(player_ids),collapse=","),")")
  if(final_only)q$score_status<-"eq.final"
  d<-supabase_read_all("player_match_observations",q,max_rows=max_rows);if(!is.data.frame(d)||!nrow(d))return(d)
- keep<-d$championship_id==championship_id & d$season==season & d$scoring_version==scoring_version & !is.na(fm_time(d$observed_at)) & fm_time(d$observed_at)<=fm_time(cutoff)
+ if(!"competition_id"%in%names(d))d$competition_id<-"unknown"
+ keep<-d$championship_id==championship_id & d$competition_id==competition_id & d$season==season & d$scoring_version==scoring_version & !is.na(fm_time(d$observed_at)) & fm_time(d$observed_at)<=fm_time(cutoff)
  if(final_only)keep<-keep & d$score_status=="final"
  d<-d[keep%in%TRUE,,drop=FALSE];d<-d[order(d$player_id,d$round,fm_time(d$observed_at)),,drop=FALSE]
- d$is_final<-d$score_status=="final";d$round_id<-paste(d$season,d$scoring_version,d$round,sep=":")
- d[!duplicated(d[c("player_id","season","scoring_version","round")],fromLast=TRUE),,drop=FALSE]
+ d$is_final<-d$score_status=="final"
+ if(!"source_round_key"%in%names(d))d$source_round_key<-""
+ d[!duplicated(d[c("player_id","competition_id","season","scoring_version","round","source_round_key")],fromLast=TRUE),,drop=FALSE]
 }
 source("history_repository.R")
 
@@ -906,12 +929,13 @@ read_league_round_points <- function(championship_id,max_rows=50000L,context=NUL
   if(!nzchar(championship_id))stop("A league is required for round history")
   if(!is.null(context)&&!identical(context$championship_id,championship_id))stop("History context does not match the league")
   reader<-if(is.null(context))history_read_pages else function(table,query,...)read_history_incremental(
-    table,query,context=context,identity_fields=c("championship_id","player_id","season","scoring_version","round"),
+    table,query,context=context,identity_fields=c("championship_id","competition_id","player_id","season","scoring_version","round","source_round_key"),
     watermark_fields="observed_at",...)
   reader("player_round_points_latest",list(
     championship_id=paste0("eq.",championship_id),
-    select="championship_id,player_id,season,scoring_version,round,points,score_status,observed_at,occurred_at,round_start_at",
-    order="player_id.asc,season.asc,scoring_version.asc,round.asc"),
+    competition_id=paste0("eq.",context$competition_id %||% "unknown"),season=paste0("eq.",context$season %||% "unknown"),scoring_version=paste0("eq.",context$scoring_version %||% "unknown"),
+    select="championship_id,competition_id,player_id,season,scoring_version,round,source_round_number,source_round_key,round_id,match_id,points,score_status,observed_at,occurred_at,round_start_at",
+    order="player_id.asc,round.asc,source_round_key.asc"),
     max_rows=max_rows,page_size=1000L)
 }
 
@@ -922,12 +946,13 @@ read_league_round_dataset <- function(championship_id,max_rows=50000L,context=NU
   if(!nzchar(championship_id))stop("A league is required for round history")
   if(!is.null(context)&&!identical(context$championship_id,championship_id))stop("History context does not match the league")
   reader<-if(is.null(context))history_read_pages else function(table,query,...)read_history_incremental(
-    table,query,context=context,identity_fields=c("row_kind","championship_id","player_id","season","scoring_version","round"),
+    table,query,context=context,identity_fields=c("row_kind","championship_id","competition_id","player_id","season","scoring_version","round","source_round_key"),
     watermark_fields=c("observed_at","checked_at"),...)
   rows <- reader("player_round_dataset",list(
     championship_id=paste0("eq.",championship_id),
-    select="row_kind,championship_id,player_id,season,scoring_version,round,points,score_status,observed_at,occurred_at,round_start_at,checked_at,result_status,point_count",
-    order="player_id.asc,season.asc,scoring_version.asc,row_kind.asc,round.asc"),
+    competition_id=paste0("eq.",context$competition_id %||% "unknown"),season=paste0("eq.",context$season %||% "unknown"),scoring_version=paste0("eq.",context$scoring_version %||% "unknown"),
+    select="row_kind,championship_id,competition_id,player_id,season,scoring_version,round,source_round_number,source_round_key,round_id,match_id,points,score_status,observed_at,occurred_at,round_start_at,checked_at,result_status,point_count",
+    order="player_id.asc,row_kind.asc,round.asc,source_round_key.asc"),
     max_rows=as.integer(max_rows)+2000L,page_size=1000L)
   if(is.null(rows))stop("Saved round history unavailable")
   points <- if("row_kind"%in%names(rows))rows[rows$row_kind=="point",,drop=FALSE]else data.frame()

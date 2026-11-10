@@ -35,12 +35,8 @@ award_canonical_scoring <- function(value) {
   if(!is.null(keys)&&!anyNA(keys)&&all(nzchar(keys))&&!anyDuplicated(keys))value<-value[order(keys,method="radix")]
   value
 }
-award_scoring_version <- function(point_system=NULL,custom=NULL) {
-  if(!is.atomic(point_system)||length(point_system)!=1L||is.na(point_system)||!nzchar(as.character(point_system)))return("unknown")
-  if(identical(mvp_text(point_system),"custom")&&is.null(custom))return("unknown")
-  scoring<-award_canonical_scoring(list(point_system=point_system,custom=custom))
-  mvp_text(as.character(openssl::sha256(charToRaw(jsonlite::toJSON(scoring,auto_unbox=TRUE,null="null",digits=NA)))))
-}
+award_scoring_version <- function(point_system=NULL,custom=NULL) fm_scoring_version(point_system,custom)
+
 award_expected_scoring <- function(login,championship_id) {
   active<-tryCatch(get_active_championships(login),error=function(e)NULL)
   championships<-Filter(function(x)is.list(x)&&identical(mvp_text(x$id %||% x$`_id`),as.character(championship_id)),mvp_records(active$championships))
@@ -53,6 +49,7 @@ award_saved_rows <- function(snapshots,championship_id,season,expected_scoring="
   snapshots<-Filter(function(snapshot){
     identical(mvp_text(snapshot$account_id),as.character(account_id))&&
       identical(mvp_text(snapshot$championship_id),as.character(championship_id))&&
+      identical(fm_scalar(snapshot$competition_id,"unknown"),league_competition_context(championship_id,account_id))&&
       identical(mvp_text(snapshot$season,"unknown"),as.character(season))
   },snapshots)
   dplyr::bind_rows(lapply(snapshots,function(snapshot){
@@ -116,7 +113,7 @@ persist_official_award_snapshot <- function(result,login,championship_id,referen
   row<-award_snapshot_evidence(result,login,championship_id,reference,context)
   if(is.null(row)){if(is.function(on_complete))on_complete(FALSE);return(FALSE)}
   defer_persistence("supabase_post_direct",list("rival_finance_evidence",list(row),
-    "account_id,championship_id,season,evidence_type,source_id,observed_at",TRUE),context,on_complete)
+    "account_id,championship_id,competition_id,season,evidence_type,source_id,observed_at",TRUE),context,on_complete)
 }
 # Eligibility for retrieval is separate from finality/credited rewards. A known
 # current or later round is not due unless the source explicitly confirms closure.
@@ -155,7 +152,7 @@ shared_mvp_source <- function(session,login,championship,active,refresh=NULL) {
   }
   state<-root$userData$mvp_shared;state$consumers[[session$ns("mvp_consumer")]]<-active
   enabled<-function()shiny::isolate(any(vapply(state$consumers,function(f)isTRUE(f()),logical(1))))
-  identity<-function(){auth<-login();if(!valid_login(auth))return("");paste(auth[["userid"]],championship(),league_season_context(championship()),sep="|")}
+  identity<-function(){league_context_revision();auth<-login();if(!valid_login(auth))return("");ctx<-resource_context(auth,championship());paste(ctx$account_id,ctx$championship_id,ctx$competition_id,ctx$season,ctx$scoring_version,sep="|")}
   current<-function(generation,key) !state$closed&&identical(generation,state$generation)&&identical(key,state$key)&&identical(shiny::isolate(identity()),key)
   publish<-function(){
     coverage<-award_coverage(state$rounds,state$rows,state$failures,state$current_round_number,state$current_round_id)
@@ -302,6 +299,7 @@ shared_mvp_source <- function(session,login,championship,active,refresh=NULL) {
       state$catalog_complete<-state$catalog_identity_complete<-state$saved_complete<-FALSE;state$catalog_reason<-"";state$needs_recheck<-FALSE;publish()
     }
     if(!nzchar(key)||!isTRUE(active()))return()
+    if(!league_context_ready(root,login(),championship()))return()
     publication<-root$userData$round_publication_revision();version<-if(is.function(refresh))refresh()else 0
     if(!identical(state$key,key)||(!state$running&&!identical(state$refresh,version))){
       state$key<-key;state$refresh<-version;state$generation<-state$generation+1L;g<-state$generation

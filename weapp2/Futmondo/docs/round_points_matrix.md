@@ -4,7 +4,7 @@ The canonical observations remain in `player_match_observations`. Every row iden
 
 `player_round_points_latest` projects the latest revision for each complete identity key. A latest NULL score stays unknown; the view does not resurrect an older numeric value. It uses the existing `player_round_context_revision` index. A second index or a physically wide table is unnecessary. The view is `security_invoker=true`, has no PUBLIC/anon/authenticated grants, and grants SELECT only to the server service role. Credentials remain on the R server. This follows the [Supabase view/RLS guidance](https://supabase.com/docs/guides/database/postgres/row-level-security#views).
 
-`read_league_round_points(championship_id, max_rows=50000L)` loads the league's latest observations as one logical batch. REST pagination uses deterministic player/season/scoring/round order, 1,000-row requested pages, and actual returned row counts. Short server pages are followed until an empty page; the maximum-row cap produces explicit partial coverage. N is not a query parameter. Callers must preserve the season and scoring scopes when calculating averages. The result is a long-form matrix that can be indexed or pivoted locally without additional database queries.
+`read_league_round_points(championship_id, max_rows=50000L, context=NULL)` loads one competition/season/scoring scope as a logical batch. The explicit resolved context is applied in SQL before pagination; an omitted context reads only the explicit unknown archive, never all seasons. REST pagination uses deterministic player/season/scoring/round order, 1,000-row requested pages, and actual returned row counts. Short server pages are followed until an empty page; the maximum-row cap produces explicit partial coverage. N is not a query parameter. Callers must preserve the season and scoring scopes when calculating averages. The result is a long-form matrix that can be indexed or pivoted locally without additional database queries.
 
 ## Applied database change
 
@@ -18,7 +18,7 @@ Rollback: restore the preceding application reader, then drop only `public.playe
 
 ## Shared database-first acquisition — 2026-10-30
 
-The current table path is `read_league_round_dataset(championship_id, max_rows=50000L)`. It reads `player_round_dataset` once per retained root-session league/team dataset, with deterministic REST pagination. The view combines latest score revisions with latest successful acquisition checks, including players whose returned history was explicitly empty. `read_league_round_points()` remains available for compatibility and the focused score-reader checks. N never enters either query.
+The current table path is `read_league_round_dataset(championship_id, max_rows=50000L, context=NULL)`. It reads `player_round_dataset` once per retained root-session league/team dataset, with deterministic REST pagination. The view combines latest score revisions with latest successful acquisition checks, including players whose returned history was explicitly empty. `read_league_round_points()` remains available for compatibility and the focused score-reader checks. N never enters either query.
 
 `new_shared_round_points_controller()` is owned by the root Shiny session. The Today, My Team, All Players, and other table module namespaces register their active context and visible IDs with this controller; they do not create separate league loaders. Each table selects its players from a shared published matrix and calculates its requested N locally. An inactive page does not initiate player reads. At most two retained league/team entries share a 50,000-row stored/live score budget; old inactive entries are evicted when asynchronous reads or live observations reach that budget. Catalog acquisition is capped at 2,000 IDs; only normalized observations are retained. Logout and account replacement clear private state before reading dependent league/team reactives.
 
@@ -121,3 +121,10 @@ project base URL and restart the hosted R process; existing failed requests do n
 become successful merely because the source code changed. Hosted recovery requires
 an active history load to retrieve and persist anything that was not previously
 saved. No unattended backfill is introduced.
+
+
+## General competition context — 2026-11-10
+
+Production history demand resolves authenticated membership and source competition/season before lineup/scoring and the matrix. Database filters include competition, season and canonical scoring before limits. Controller/cache identities and successful checks carry the same dimensions. Metadata expiry on the same page starts a demand refresh; it cannot fall back to unknown archives. Explicit unknown records are preserved separately.
+
+Official round/match IDs and a source round key survive persistence and latest-revision views. Distinct official round IDs sharing a number remain stored separately; ambiguous display ordinals are surfaced rather than silently collapsed. Same/different source player IDs after a club move never merge histories across competitions. See [context, migration and transfer contracts](general_competition_context.md).

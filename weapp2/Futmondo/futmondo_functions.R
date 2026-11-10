@@ -2335,7 +2335,7 @@ transaction_history_prune <- function(now=Sys.time()) {
 }
 transaction_history_context <- function(context) {
   if(identical(fm_scalar(context$season,"unknown"),"unknown"))
-    context$season <- league_season_context(context$championship_id)
+    context$season <- league_season_context(context$championship_id,account_id=context$account_id)
   context
 }
 read_completed_history_baseline <- function(resource,context) {
@@ -2840,7 +2840,7 @@ get_player_summary <- function(login, championship_id, user_team_id = NULL, play
         }
       }
       
-      return(list(
+      result<-list(
         data = if ("data" %in% names(ans_data)) ans_data$data else NULL,
         prices = if ("prices" %in% names(ans_data)) ans_data$prices else list(),
         points = ans_data$points %||% list(),
@@ -2855,7 +2855,8 @@ get_player_summary <- function(login, championship_id, user_team_id = NULL, play
         bids = bids_arr,
         my_bid_id = my_bid_id,
         my_bid_price = my_bid_price
-      ))
+      )
+      return(resolve_summary_round_labels(login,championship_id,result))
     }
     return(NULL)
   }, timeout_sec = 60, context=resource_context(login=login,championship_id=championship_id,user_team_id=user_team_id,player_id=player_id))
@@ -2880,6 +2881,8 @@ get_player_profile_endpoint <- function(login, player_id, endpoint, cache_prefix
     decoded <- tryCatch(jsonlite::fromJSON(raw_body, simplifyVector = FALSE), error = function(e) NULL)
     answer <- if (is.list(decoded)) decoded$answer else NULL
     if (is.null(answer) || !is.list(answer)) stop("Player profile data is unavailable.")
+    returned_id<-fm_scalar(answer$player$id %||% answer$player$`_id`,"")
+    if(nzchar(returned_id)&&!identical(returned_id,as.character(player_id)[1]))stop("Player profile identity mismatch")
     answer
   }, timeout_sec = 300, context=resource_context(login=login,player_id=player_id))
 }
@@ -2935,8 +2938,8 @@ normalize_player_matches <- function(answer) {
       status=fm_scalar(match$st, ""),
        match_id=fm_scalar(match$id %||% match$`_id` %||% match$matchId, ""),
        round_id=fm_scalar(match$roundId, ""),
-       season=fm_scalar(match$season %||% match$seasonId %||% answer$season %||% answer$seasonId,"unknown"),
-       competition_id=fm_scalar(match$competitionId %||% answer$competitionId,""),stringsAsFactors=FALSE)
+       season=fm_scalar(match$season %||% match$seasonId %||% answer$season %||% answer$seasonId %||% answer$league$season,"unknown"),
+       competition_id=fm_scalar(match$competitionId %||% answer$competitionId %||% answer$league$`_id` %||% answer$league$id,"unknown"),stringsAsFactors=FALSE)
   })
   out <- Filter(Negate(is.null), out)
   if (!length(out)) return(empty)
@@ -3499,14 +3502,15 @@ get_financial_snapshot <- function(login, championship_id, user_team_id) {
 }
 
 get_active_championships <- function(login) {
-  get_cached_data("active_championship_objects", {
+  result<-get_cached_data("active_championship_objects", {
     payload <- list(header = list(token = login[["token"]], userid = login[["userid"]]),
       query = list(excludeGeneral = FALSE, includeProphets = TRUE), answer = list())
     response <- futmondo_post(ACTIVE_CHAMPIONSHIPS_URL,
       body = jsonlite::toJSON(payload, auto_unbox = TRUE),
       httr::content_type_json())
     answer <- httr::content(response)$answer
-    if (!is.list(answer$championships)) stop("Championships unavailable")
+    if(!is.list(answer)||!"championships"%in%names(answer)||(!is.null(answer$championships)&&!is.list(answer$championships)))stop("Championships unavailable")
+    if(is.null(answer$championships))answer$championships<-list()
     answer$championships <- lapply(answer$championships,function(champ) {
       champ$id <- champ$id %||% champ$`_id`
       if(is.list(champ$userteam)) champ$userteam$id <- champ$userteam$id %||% champ$userteam$`_id`
@@ -3514,6 +3518,8 @@ get_active_championships <- function(login) {
     })
     answer
   }, timeout_sec = 60, context=resource_context(login=login))
+  publish_active_league_contexts(login,result)
+  result
 }
 
 notification_request <- function(login, action, query = "") {

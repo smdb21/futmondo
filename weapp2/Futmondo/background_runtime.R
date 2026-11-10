@@ -194,7 +194,24 @@ record_acquired_resource<-function(resource,data,context){
   if(is.null(data)||identical(attr(data,"fetch_status"),"stale"))return(invisible(FALSE))
   old<-getOption("futmondo.persistence_context");options(futmondo.persistence_context=context)
   on.exit(options(futmondo.persistence_context=old),add=TRUE)
+  if(identical(resource,"active_championship_objects")&&is.list(data)){
+    rows<-normalize_active_league_contexts(data,context$account_id,attr(data,"observed_at") %||% Sys.time())
+    for(row in rows){remember_league_context(row);persist_league_context(row,context)}
+  }
+  if(startsWith(resource,"lineup_")&&is.list(data)){
+    row<-remember_league_scoring(context,data,attr(data,"observed_at") %||% Sys.time())
+    if(!is.null(row)){
+      persist_league_context(row,context)
+      supabase_post("league_rule_snapshots",list(championship_id=row$championship_id,competition_id=row$competition_id,
+        season=row$season,scoring_version=row$scoring_version,observed_at=row$observed_at,configuration=row$payload))
+    }
+  }
   league<-context$championship_id
+  if(is.data.frame(data)&&grepl("^championshipplayers_|^roster_|^market_",resource)&&!grepl("^roster_(facts|payload)_",resource)){
+    memberships<-normalize_player_memberships(data,context)
+    if(nrow(memberships))supabase_post("player_membership_observations",memberships,
+      conflict="player_id,competition_id,season,observed_at,real_club_id",ignore_duplicates=TRUE)
+  }
   if(resource%in%c(paste0("pressroom_",league),paste0("pressroom_locker_payments_",league))&&
      exists("persist_completed_history_baseline",mode="function"))persist_completed_history_baseline(resource,data,context)
   # Raw parsed locker rows are cached; only resolved merged payment facts persist.
@@ -263,7 +280,7 @@ record_acquired_resource<-function(resource,data,context){
      changed<-is.na(index)|score_changed|points$score_status!=previous$score_status[index]|(!is.na(new_date)&(is.na(old_date)|new_date!=old_date))
      points<-points[changed%in%TRUE,,drop=FALSE]
     }
-    if(nrow(points))supabase_post("player_match_observations",data.frame(player_id=ctx$player_id,championship_id=ctx$championship_id,season=ctx$season,scoring_version=ctx$scoring_version,round=points$round_number,points=points$points,score_status=points$score_status,occurred_at=points$date,observed_at=points$observed_at))
+    if(nrow(points)){rows<-data.frame(player_id=ctx$player_id,championship_id=ctx$championship_id,competition_id=ctx$competition_id,season=ctx$season,scoring_version=ctx$scoring_version,round=points$round_number,points=points$points,score_status=points$score_status,occurred_at=points$date,observed_at=points$observed_at);for(k in intersect(c("round_id","match_id","source_round_key","source_round_number"),names(points)))rows[[k]]<-points[[k]];supabase_post("player_match_observations",complete_point_identity(rows,ctx))}
   };invisible(TRUE)
 }
 
@@ -271,26 +288,27 @@ record_acquired_resource<-function(resource,data,context){
 persist_recent_points_snapshot <- function(payload,context,on_complete=NULL) {
   points <- payload$observations
   if(!is.data.frame(points)||nrow(points)>500L)return(FALSE)
+  points<-complete_point_identity(points,context)
   checked_at <- fm_time(payload$checked_at)
   if(length(checked_at)!=1L||is.na(checked_at))return(FALSE)
-  dimensions <- c("championship_id","player_id","season","scoring_version")
+  dimensions <- c("championship_id","player_id","competition_id","season","scoring_version")
   if(!is.list(context)||!all(dimensions%in%names(context))||
      any(!vapply(context[dimensions],function(value)is.character(value)&&length(value)==1L&&!is.na(value)&&nzchar(value),logical(1))))return(FALSE)
   if(nrow(points)&&(!all(dimensions%in%names(points))||
      !all(vapply(dimensions,function(field)all(!is.na(points[[field]])&points[[field]]==context[[field]]),logical(1)))))return(FALSE)
   operations <- list()
   if(nrow(points)){
-    columns <- c("player_id","championship_id","season","scoring_version","round","points","score_status","observed_at","occurred_at","round_start_at")
+    columns <- c("player_id","championship_id","competition_id","season","scoring_version","round","source_round_number","source_round_key","round_id","match_id","points","score_status","observed_at","occurred_at","round_start_at")
     if(!all(columns%in%names(points)))return(FALSE)
     for(i in seq.int(1L,nrow(points),by=100L))operations[[length(operations)+1L]] <- list(
       "player_match_observations",points[i:min(i+99L,nrow(points)),columns,drop=FALSE],
-      "player_id,championship_id,season,scoring_version,round,observed_at",FALSE)
+      "player_id,championship_id,competition_id,season,scoring_version,round,source_round_key,observed_at",FALSE)
   }
-  marker <- data.frame(championship_id=context$championship_id,player_id=context$player_id,
+  marker <- data.frame(championship_id=context$championship_id,competition_id=context$competition_id,player_id=context$player_id,
     season=context$season,scoring_version=context$scoring_version,
     checked_at=format(checked_at,"%Y-%m-%dT%H:%M:%OSZ",tz="UTC"),
     result_status=if(nrow(points))"scores"else "empty",point_count=nrow(points))
   operations[[length(operations)+1L]] <- list("player_round_history_checks",marker,
-    "championship_id,player_id,season,scoring_version,checked_at",TRUE)
+    "championship_id,competition_id,player_id,season,scoring_version,checked_at",TRUE)
   defer_persistence("supabase_round_history_batch_direct",list(operations),context,on_complete=on_complete)
 }

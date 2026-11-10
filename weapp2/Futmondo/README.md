@@ -128,3 +128,10 @@ is required. The same retained tab can resume its existing session, but page
 discard/reload, container restart or expiry still ends that session. Retained
 sessions use memory and can continue their existing timers; see the deployment
 guide for build validation and resource limits.
+
+
+## Multiple competitions and player transfers
+
+Football competitions use their source competition and season identities. Existing databases must apply `scripts/migrations/20261110225848_general_competition_context.sql` before deploying this version; fresh databases use the updated schema. No new environment variables or R packages are required. Database migration and application deployment remain separate rollout steps, and the admission setting is unchanged.
+
+Player IDs remain opaque source identities. An unchanged ID can accumulate club observations across competitions; a changed ID stays separate without inferred person merges. Existing unknown historical contexts remain intact and are not assigned to a season by date. See [competition context and transfer behavior](docs/general_competition_context.md) for durable metadata, history repair, exact scope, migration and source-evidence limitations.

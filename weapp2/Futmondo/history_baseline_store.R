@@ -6,7 +6,8 @@
 
 history_baseline_scope <- function(resource,context) {
   if(exists("transaction_history_context",mode="function"))context<-transaction_history_context(context)
-  fields <- c("account_id","championship_id","season","scoring_version")
+  context$competition_id <- fm_scalar(context$competition_id,"unknown")
+  fields <- c("account_id","championship_id","competition_id","season","scoring_version")
   if(!is.list(context)||!all(fields%in%names(context)))return(NULL)
   values <- lapply(context[fields],function(x)fm_scalar(x,""))
   if(any(!vapply(values,function(x)nzchar(x)&&nchar(x,type="bytes")<=256L,logical(1))))return(NULL)
@@ -118,10 +119,10 @@ history_baseline_snapshot <- function(resource,data,context) {
   # A nonempty pressroom must retain its raw source high watermark. Locker
   # payments may be empty while non-clause source news supplies this timestamp.
   if(nrow(frame)&&is.null(latest))return(NULL)
-  semantic <- list(scope=scope,frame=frame,full_history_at=full,source_latest_at=latest)
+  semantic <- list(format=2L,scope=scope,frame=frame,full_history_at=full,source_latest_at=latest)
   json <- history_baseline_json(semantic)
   fingerprint <- history_baseline_hash(charToRaw(json))
-  snapshot <- list(scope=scope,frame=frame,full_history_at=full,source_latest_at=latest,
+  snapshot <- list(format=2L,scope=scope,frame=frame,full_history_at=full,source_latest_at=latest,
     observed_at=observed,fingerprint=fingerprint)
   attr(snapshot,"semantic_json") <- json
   snapshot
@@ -157,7 +158,7 @@ read_persisted_history_baseline <- function(resource,context) {
   # This ordinary supabase_get call is intercepted by async_adapter_fetch.
   # An absent schema/row is an optimization miss, never proof of empty history.
   query <- lapply(scope,function(value)paste0("eq.",value))
-  query$select <- "account_id,championship_id,season,scoring_version,resource,encoding,payload,payload_sha256,json_bytes,snapshot_hash,observed_at"
+  query$select <- "account_id,championship_id,competition_id,season,scoring_version,resource,encoding,payload,payload_sha256,json_bytes,snapshot_hash,observed_at"
   query$limit <- 1L
   rows <- tryCatch(supabase_get("complete_history_baselines",query),error=function(e)NULL)
   if(!is.data.frame(rows)||nrow(rows)!=1L||!all(c(names(scope),"encoding","payload","payload_sha256","json_bytes","snapshot_hash","observed_at")%in%names(rows)))return(NULL)
@@ -172,7 +173,8 @@ read_persisted_history_baseline <- function(resource,context) {
     raw <- history_baseline_decompress(compressed,size)
     if(length(raw)!=size||length(raw)>.history_baseline_limits$json_bytes)return(NULL)
     snapshot <- jsonlite::fromJSON(rawToChar(raw),simplifyVector=FALSE)
-    if(!is.list(snapshot)||!identical(names(snapshot),c("scope","frame","full_history_at","source_latest_at","observed_at","fingerprint"))||
+    if(!is.list(snapshot)||!identical(names(snapshot),c("format","scope","frame","full_history_at","source_latest_at","observed_at","fingerprint"))||
+       !identical(as.integer(snapshot$format),2L)||
        !identical(snapshot$scope,scope))return(NULL)
     data <- history_baseline_restore_frame(snapshot$frame)
     if(!is.data.frame(data))return(NULL)
@@ -211,7 +213,7 @@ persist_completed_history_baseline <- function(resource,data,context) {
   # One atomic upsert contains both the complete data and its completion marker.
   # Only successful acknowledgement suppresses a later identical save attempt.
   args <- list("complete_history_baselines",payload,
-    "account_id,championship_id,season,scoring_version,resource",FALSE)
+    "account_id,championship_id,competition_id,season,scoring_version,resource",FALSE)
   if(as.numeric(object.size(args))>1024L^2L)return(invisible(FALSE))
   defer_persistence("supabase_post_direct",args,context,
     on_complete=history_baseline_ack_callback(key,snapshot$fingerprint))

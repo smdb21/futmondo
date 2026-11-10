@@ -54,36 +54,41 @@ round_lineup_clean_answer <- function(answer) {
     bench=list(players=Filter(Negate(is.null),normalized$bench)),status=normalized$status,
     pointSystem=normalized$pointSystem,negative=normalized$negative)
 }
-round_lineup_scope <- function(context) context[c("account_id","championship_id","user_team_id","season","scoring_version")]
+round_lineup_scope <- function(context) {
+  context$competition_id<-fm_scalar(context$competition_id,"unknown")
+  context[c("account_id","championship_id","user_team_id","competition_id","season","scoring_version")]
+}
 # v1 lost score inputs; v2 also discarded the official flat club/crest fields.
-round_lineup_snapshot_id <- function(context,round_id) paste0("rival-cache:round-lineup-v3:",
-  as.character(openssl::sha256(serialize(list(team=context$user_team_id,round=round_id,scoring=context$scoring_version),NULL,version=2))))
+round_lineup_snapshot_id <- function(context,round_id) paste0("rival-cache:round-lineup-v4:",
+  as.character(openssl::sha256(serialize(list(team=context$user_team_id,round=round_id,competition=fm_scalar(context$competition_id,"unknown"),season=context$season,scoring=context$scoring_version),NULL,version=2))))
 persist_round_lineup_snapshot <- function(data,context) {
+  context$competition_id<-fm_scalar(context$competition_id,"unknown")
   if(!is.list(data)||isTRUE(data$from_saved)||!is.null(attr(data,"fetch_error")))return(invisible(FALSE))
   answer<-tryCatch(round_lineup_clean_answer(data$answer),error=function(e)NULL)
   stamp<-fm_time(attr(data,"observed_at"))
   if(is.null(answer)||length(stamp)!=1L||is.na(stamp)||!nzchar(mvp_text(data$round_id)))return(invisible(FALSE))
-  payload<-list(kind="classification_round_lineup",version=3L,scope=round_lineup_scope(context),round_id=data$round_id,
+  payload<-list(kind="classification_round_lineup",version=4L,scope=round_lineup_scope(context),round_id=data$round_id,
     answer=answer,source="futmondo",source_observed_at=rival_finance_stamp(stamp),
     valid_until=rival_finance_stamp(stamp+300),completeness="complete")
   record<-rival_finance_evidence(context$account_id,context$championship_id,context$season,"eligibility",
-    round_lineup_snapshot_id(context,data$round_id),payload,stamp)
+    round_lineup_snapshot_id(context,data$round_id),payload,stamp,competition_id=fm_scalar(context$competition_id,"unknown"))
   persist_rival_finance_evidence(list(record),context)
 }
 read_saved_round_lineup <- function(context,round_id,now=Sys.time()) {
+  context$competition_id<-fm_scalar(context$competition_id,"unknown")
   query<-list(account_id=paste0("eq.",context$account_id),championship_id=paste0("eq.",context$championship_id),
-    season=paste0("eq.",context$season),evidence_type="eq.eligibility",source_id=paste0("eq.",round_lineup_snapshot_id(context,round_id)),
-    select="account_id,championship_id,season,evidence_type,source_id,observed_at,payload",limit=1L)
+    competition_id=paste0("eq.",fm_scalar(context$competition_id,"unknown")),season=paste0("eq.",context$season),evidence_type="eq.eligibility",source_id=paste0("eq.",round_lineup_snapshot_id(context,round_id)),
+    select="account_id,championship_id,competition_id,season,evidence_type,source_id,observed_at,payload",limit=1L)
   saved<-tryCatch(supabase_get("rival_finance_evidence_latest",query),error=function(e)NULL)
   if(!is.data.frame(saved)||nrow(saved)!=1L)return(NULL)
   tryCatch({
     record<-rival_evidence_decode(saved)[[1]];p<-record$payload;scope<-round_lineup_scope(context)
     stamp<-fm_time(p$source_observed_at);until<-fm_time(p$valid_until)
-    if(!is.list(p)||as.numeric(object.size(p))>256*1024L||!identical(record$evidence_type,"eligibility")||!identical(p$kind,"classification_round_lineup")||!identical(as.integer(p$version),3L)||
+    if(!is.list(p)||as.numeric(object.size(p))>256*1024L||!identical(record$evidence_type,"eligibility")||!identical(p$kind,"classification_round_lineup")||!identical(as.integer(p$version),4L)||
        !identical(p$completeness,"complete")||!identical(p$source,"futmondo")||!identical(mvp_text(p$round_id),as.character(round_id))||
        !is.list(p$scope)||!setequal(names(p$scope),names(scope))||
        !all(vapply(names(scope),function(k)identical(mvp_text(p$scope[[k]]),mvp_text(scope[[k]])),logical(1)))||
-       !all(vapply(c("account_id","championship_id","season"),function(k)identical(mvp_text(record[[k]]),mvp_text(context[[k]])),logical(1)))||
+       !all(vapply(c("account_id","championship_id","competition_id","season"),function(k)identical(mvp_text(record[[k]]),mvp_text(context[[k]])),logical(1)))||
        !identical(mvp_text(record$source_id),round_lineup_snapshot_id(context,round_id))||
        length(stamp)!=1L||is.na(stamp)||stamp>now||length(until)!=1L||is.na(until)||
        abs(as.numeric(difftime(until,stamp,units="secs"))-300)>0.01||
@@ -95,7 +100,7 @@ read_saved_round_lineup <- function(context,round_id,now=Sys.time()) {
 get_round_lineup_snapshot <- function(login,championship_id,user_team_id,round_id) {
   if(!nzchar(mvp_text(round_id))||!nzchar(mvp_text(user_team_id)))stop("Historical lineup identity unavailable")
   context<-resource_context(login,championship_id,user_team_id,season=league_season_context(championship_id))
-  get_cached_data(paste0("round_lineup_snapshot_v3_",championship_id,"_",user_team_id,"_",round_id),{
+  get_cached_data(paste0("round_lineup_snapshot_v4_",championship_id,"_",user_team_id,"_",round_id),{
     saved<-read_saved_round_lineup(context,round_id)
     if(!is.null(saved)&&as.numeric(Sys.time())<saved$valid_until)return(saved)
     # A validated expired snapshot can paint while the source refresh runs.

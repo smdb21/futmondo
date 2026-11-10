@@ -36,3 +36,8 @@ The authorized rollout applied this migration to the configured production datab
 ## Application admission policy
 
 `application_access` is a server-only singleton (`id = main`) with `admin_only BOOLEAN NOT NULL DEFAULT TRUE` and `updated_at TIMESTAMPTZ`. The migration seeds TRUE; RLS and revoked browser grants protect reads/writes. Only service_role can select/insert/update; deletion is not granted and factual-data resets exclude this table. See [app_access.md](app_access.md).
+
+
+## Competition context and club observations
+
+The general-competition migration `20261110225848_general_competition_context.sql` adds competition dimensions to historical identities and caches, source round/match identities to score observations, immutable `league_context_observations` and `player_membership_observations`, and scoped bulk indexes. Source metadata never grants account membership. New tables have server SELECT/INSERT only with duplicate-safe writes; historical facts remain unchanged under explicit unknown context. Fresh-schema retries preserve admission and navigation settings. See [the full context/transfer and rollout contract](general_competition_context.md).

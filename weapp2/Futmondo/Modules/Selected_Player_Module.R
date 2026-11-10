@@ -267,8 +267,10 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       auth <- get_reactive_val(login_token)
       sp <- tryCatch(selected_player(),error=function(e)NULL)
       if(!valid_login(auth) || is.null(sp) || !nzchar(fm_scalar(sp$id,""))) return(NULL)
-      list(user=fm_scalar(auth[["userid"]]),championship=fm_scalar(get_reactive_val(championship_id)),
-        team=fm_scalar(get_reactive_val(user_team_id)),player=fm_scalar(sp$id))
+      league_context_revision()
+      ctx<-resource_context(auth,get_reactive_val(championship_id),get_reactive_val(user_team_id),sp$id)
+      list(user=ctx$account_id,championship=ctx$championship_id,team=ctx$user_team_id,player=ctx$player_id,
+        competition=ctx$competition_id,season=ctx$season,scoring=ctx$scoring_version)
     })
     previous_player_action_context_RV <- reactiveVal(NULL)
     observeEvent(player_action_context_RV(), {
@@ -1754,15 +1756,19 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       invalidate_resources(resource_context(auth,player_id=sp$id),pattern="^player_matches_")
     },ignoreInit=TRUE,priority=120)
     card_context <- reactive({
+      league_context_revision()
       sp<-selected_player();if(is.null(sp)||!valid_login(get_reactive_val(login_token)))return(NULL)
       resource_context(get_reactive_val(login_token),get_reactive_val(championship_id),get_reactive_val(user_team_id),sp$id,session_id=session$token)
     })
     history_context <- reactive({
       ctx<-card_context();if(is.null(ctx))return(NULL)
+      if(isTRUE(session$rootScope()$userData$league_context_enabled)){resolved<-card_states$resolved()$data;req(!is.null(resolved),resolved$competition_id!="unknown",resolved$season!="unknown")}
       summary<-card_states$summary()$data;lineup<-card_states$lineup()$data
       ctx$season<-league_season_context(ctx$championship_id,summary$championship$season %||% summary$championship$seasonId)
       ctx$scoring_version<-normalize_league_rules(list(),lineup,ctx$championship_id)$scoring_version
-      ctx$competition_id<-fm_scalar(summary$championship$competitionId %||% summary$championship$competition$id,"")
+      supplied_competition<-fm_scalar(summary$championship$competitionId %||% summary$championship$competition$id,"")
+      if(nzchar(supplied_competition)&&ctx$competition_id!="unknown"&&!identical(supplied_competition,ctx$competition_id))stop("Player summary competition mismatch")
+      if(nzchar(supplied_competition))ctx$competition_id<-supplied_competition
       ctx
     })
     card_read <- function(resource,handler,args,context=card_context,active=function()TRUE,refresh=history_refresh) {
@@ -1782,6 +1788,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     # read while navigating cards, with account/league/team/session isolation.
     team_card_context<-reactive({ctx<-card_context();if(!is.null(ctx))ctx$player_id<-"";ctx})
     card_states<-list()
+    card_states$resolved<-card_read("card_resolved_context","get_resolved_league_context",auth_args,context=team_card_context,active=function()isTRUE(session$rootScope()$userData$league_context_enabled))
     card_states$summary<-card_read("card_summary","get_player_summary",player_args,
       refresh=function()paste(global_refresh(),history_refresh(),sep=":"))
     card_states$lineup<-card_read("card_lineup","get_lineup_from_team",auth_args,context=team_card_context)

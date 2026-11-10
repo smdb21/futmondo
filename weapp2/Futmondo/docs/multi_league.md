@@ -7,3 +7,5 @@ Every private cache resource carries explicit account and relevant championship/
 Database reads are scoped to the selected league and required entity/window. Team-history writes validate ownership against the team row. Source timestamps and uncertainty remain attached to observations.
 
 Unknown season/scoring context must not be inferred from another league. See [session state](multileague_state.md) and [database schema](database_schema.md).
+
+Real competition and source season are resolved through the authenticated championship-to-league mapping and persisted as normalized observations. A player may participate in domestic and European competitions simultaneously. Club changes append membership evidence; changed source IDs are never inferred to be the same person. See [competition and transfer behavior](general_competition_context.md).

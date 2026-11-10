@@ -181,7 +181,7 @@ futmondo_post<-function(url,...){
 check('first retrieval uses opaque round ID and persists full success without authentication',{
   clear_api_cache();got<-get_round_lineup_snapshot(auth,'league','a','opaque-round')
   stopifnot(calls==1L,db_reads==1L,length(saved)==1L,saved[[1]]$payload$completeness=='complete',
-    saved[[1]]$payload$version==3L,grepl('round-lineup-v3:',saved[[1]]$source_id,fixed=TRUE),
+    saved[[1]]$payload$version==4L,grepl('round-lineup-v4:',saved[[1]]$source_id,fixed=TRUE),
     !grepl('synthetic-private-token',jsonlite::toJSON(saved,auto_unbox=TRUE)),normalize_round_lineup(got$answer)$players[[5]]$id=='incoming')
 })
 check('memory reuse and persisted JSON reuse avoid repeat API calls after memory clears',{
@@ -193,7 +193,7 @@ check('memory reuse and persisted JSON reuse avoid repeat API calls after memory
   html<-htmltools::renderTags(round_lineup_pitch_ui(got$answer))$html
   stopifnot(grepl('title="Provisional points">7\\*</div>',html),grepl('title="Provisional points">-4\\*</div>',html))
 })
-check('version-3 custom snapshots render eight points after memory clears with no source request or rewrite',{
+check('version-4 custom snapshots render eight points after memory clears with no source request or rewrite',{
   original<-saved
   saved[[1]]$payload$answer$pointSystem<-'custom';saved[[1]]$payload$answer$status<-'running'
   custom_saved<-saved;clear_api_cache()
@@ -205,9 +205,9 @@ check('version-3 custom snapshots render eight points after memory clears with n
 })
 check('lossy version-2 snapshots are replaced with flat crest fields and reused durably',{
   saved[[1]]$payload$version<-2L
-  saved[[1]]$source_id<-sub('round-lineup-v3:','round-lineup-v2:',saved[[1]]$source_id,fixed=TRUE)
+  saved[[1]]$source_id<-sub('round-lineup-v4:','round-lineup-v2:',saved[[1]]$source_id,fixed=TRUE)
   clear_api_cache();got<-get_round_lineup_snapshot(auth,'league','a','opaque-round')
-  stopifnot(calls==2L,!isTRUE(got$from_saved),saved[[1]]$payload$version==3L,
+  stopifnot(calls==2L,!isTRUE(got$from_saved),saved[[1]]$payload$version==4L,
     saved[[1]]$payload$answer$players[[1]]$logo=='club.png')
   clear_api_cache();got<-get_round_lineup_snapshot(auth,'league','a','opaque-round')
   stopifnot(calls==2L,isTRUE(got$from_saved),got$answer$players[[1]]$logo=='club.png')

@@ -1,6 +1,10 @@
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages(source('global.R'))
 args<-commandArgs(trailingOnly=TRUE)
+# Establish the same independently scoped source metadata in both processes.
+remember_league_context(list(account_id='u',championship_id='l',competition_id='competition',season='s',
+ scoring_version=fm_scoring_version('press'),observed_at=rival_finance_stamp(),expires_at=rival_finance_stamp(Sys.time()+300),
+ complete=TRUE,payload=list(version=2L,point_system='press',custom=NULL,source='synthetic_fixture')))
 fixture<-function(){
  teams<-data.frame(teamid=c('a','b','c'),teamname=c('A','B','C'),teamValue=c(10,20,30),points=1:3,lastAccess='2026-11-01T00:00:00Z')
  rules<-list(initial_budget=100,money_per_point=0,ranking_pool=0)
@@ -8,7 +12,7 @@ fixture<-function(){
  evidence<-list(rival_finance_evidence('u','l','s','movements','a:one',list(id='one',team_id='a',type='buy',category='market',money=-10,date='2026-11-03T10:00:00Z',player_id='pone',source_event_id='one'),as.POSIXct('2026-11-03',tz='UTC')))
  list(teams=teams,championship_id='l',evidence=evidence,pressroom=tx('one','a',10),rules=rules,account_id='u',season='s',reference_team_id='a')
 }
-ctx<-list(account_id='u',championship_id='l',season='s',user_team_id='a')
+ctx<-resource_context(account_id='u',championship_id='l',season='s',user_team_id='a')
 row_frame<-function(payload){
  row<-rival_finance_evidence('u','l','s','eligibility',rival_snapshot_id(rival_snapshot_scope(ctx)),payload)
  jsonlite::fromJSON(as.character(jsonlite::toJSON(list(row),auto_unbox=TRUE,na='null',null='null',digits=NA)))
@@ -85,10 +89,10 @@ cat('PASS enqueue is pending until callback, failed writes remain retryable\n')
 
 # Deliberately malformed scope/version/shape/size and self-evidence all miss safely.
 original_payload<-payload
-for(field in c('account_id','championship_id','season','user_team_id')){
+for(field in c('account_id','championship_id','competition_id','season','scoring_version','user_team_id')){
  wrong<-ctx;wrong[[field]]<-'other'
  supabase_get<-function(...)row_frame(payload)
- stopifnot(is.null(do.call(read_rival_calculation_snapshot,wrong)))
+ stopifnot(is.null(do.call(read_rival_calculation_snapshot,wrong[c('account_id','championship_id','season','user_team_id','competition_id','scoring_version')])))
 }
 mutate_wire<-function(fn){
  raw<-history_baseline_decompress(openssl::base64_decode(original_payload$data),original_payload$json_bytes)
@@ -112,7 +116,6 @@ cat('PASS scope/version/shape/size rejection and snapshots excluded from their o
 # The first saved table must not wait for evidence/history or pretend it is fresh.
 clear_api_cache();saved$team_finances$as_of<-'2020-01-01T00:00:00Z';saved$team_finances$observed_cash_fresh<-TRUE
 pending<-list();requests<-character();snapshot_callbacks<-list()
-league_season_context<-function(...)'s'
 persist_rival_finance_evidence<-function(...)TRUE
 defer_persistence<-function(fn,args,context,on_complete=NULL,...){snapshot_callbacks[[length(snapshot_callbacks)+1L]]<<-on_complete;TRUE}
 async_adapter_fetch<-function(fn,args,context,...){

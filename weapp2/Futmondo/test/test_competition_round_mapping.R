@@ -1,0 +1,30 @@
+#!/usr/bin/env Rscript
+options(futmondo.offline=TRUE)
+suppressPackageStartupMessages({source('futmondo_functions.R');source('history_repository.R')})
+auth<-c(userid='round-mapping-fixture',token='synthetic')
+summary<-list(points=list(list(round=1,roundId='league-phase',points=0),list(round=1,roundId='knockout',points=-2)))
+reads<-0L
+get_finished_rounds<-function(...) {reads<<-reads+1L;data.frame(round_id=c('league-phase','knockout'),round_number=c(1,9))}
+resolved<-resolve_summary_round_labels(auth,'game',summary)
+stopifnot(reads==1L,identical(vapply(resolved$points,function(p)p$round,numeric(1)),c(1,9)),
+ identical(vapply(resolved$points,function(p)p$source_round_number,numeric(1)),c(1,1)))
+observed<-normalize_player_match_observations(resolved,'player','game',season='source-season',scoring_version='rules',competition_id='europe')
+ctx<-list(championship_id='game',player_id='player',season='source-season',scoring_version='rules',competition_id='europe')
+reconciled<-reconcile_player_points(data.frame(),observed,ctx)
+stopifnot(identical(reconciled$points,c(0,-2)),identical(reconciled$round_number,c(1,9)),all(observed$source_round_number==1),all(reconciled$source_round_number==1))
+cat('PASS ambiguous source labels use unique official round-ID mappings; original labels, zero and negative scores survive.\n')
+ordinary<-list(points=list(list(round=1,roundId='r1',points=4),list(round=2,roundId='r2',points=5)))
+before<-reads;stopifnot(identical(resolve_summary_round_labels(auth,'game',ordinary),ordinary),reads==before)
+cat('PASS ordinary score histories add zero schedule reads.\n')
+get_finished_rounds<-function(...)data.frame(round_id=c('league-phase','knockout'),round_number=c(1,1))
+unresolved<-resolve_summary_round_labels(auth,'game',summary)
+stopifnot(identical(unresolved,summary),inherits(try(reconcile_player_points(data.frame(),normalize_player_match_observations(unresolved,'player','game',season='source-season',scoring_version='rules',competition_id='europe'),ctx),silent=TRUE),'try-error'))
+cat('PASS an ambiguous authoritative schedule is preserved and remains explicit rather than inventing a round.\n')
+get_finished_rounds<-function(...)stop('synthetic source unavailable')
+stopifnot(identical(resolve_summary_round_labels(auth,'game',summary),summary))
+cat('PASS a failed optional schedule cannot discard usable player identity or manual-action source fields.\n')
+
+malformed<-list(data=list(id='player'),points=list(7),owners=list(list(id='owner')))
+stopifnot(identical(resolve_summary_round_labels(auth,'game',malformed),malformed))
+unknown_label<-complete_point_identity(data.frame(round=1,points=4),list(competition_id='europe'))
+stopifnot(is.na(unknown_label$source_round_number))

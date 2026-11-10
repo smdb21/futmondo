@@ -8,12 +8,13 @@ clause_transfer_scope <- function(context) {
   scope<-roster_offer_scope(context)
   player<-fm_scalar(context$player_id,"")
   if(is.null(scope)||!nzchar(player)||nchar(player,type="bytes")>256L)return(NULL)
+  scope$competition_id<-fm_scalar(context$competition_id,"unknown")
   c(scope,list(player_id=player))
 }
-clause_transfer_snapshot_id <- function(scope) paste0("rival-cache:clause-transfer-v1:",
-  as.character(openssl::sha256(serialize(scope[c("user_team_id","scoring_version","player_id")],NULL,version=2))))
+clause_transfer_snapshot_id <- function(scope) paste0("rival-cache:clause-transfer-v2:",
+  as.character(openssl::sha256(serialize(scope[c("user_team_id","competition_id","season","scoring_version","player_id")],NULL,version=2))))
 clause_transfer_epoch_key <- function(context) as.character(openssl::sha256(serialize(
-  context[c("account_id","championship_id","user_team_id")],NULL,version=2)))
+  context[c("account_id","championship_id","user_team_id","competition_id","season","scoring_version")],NULL,version=2)))
 invalidate_saved_clause_transfers <- function(context) {
   if(is.null(roster_offer_scope(context)))return(invisible(FALSE))
   .clause_transfer_invalidated[[clause_transfer_epoch_key(context)]]<-Sys.time()
@@ -53,20 +54,20 @@ persist_clause_transfer_summary <- function(data,context,on_complete=NULL) {
   if(is.null(scope)||isTRUE(attr(data,"clause_from_saved")))return(invisible(FALSE))
   clean<-clause_transfer_clean_summary(data,scope);stamp<-fm_time(attr(data,"observed_at"))
   if(is.null(clean)||length(stamp)!=1L||is.na(stamp))return(invisible(FALSE))
-  payload<-list(kind="clause_transfer_summary",version=1L,scope=scope,summary=clean,
+  payload<-list(kind="clause_transfer_summary",version=2L,scope=scope,summary=clean,
     completeness="complete",source="futmondo",source_observed_at=rival_finance_stamp(stamp),valid_until=rival_finance_stamp(stamp+60))
   if(as.numeric(object.size(payload))>32*1024L)return(invisible(FALSE))
-  record<-rival_finance_evidence(scope$account_id,scope$championship_id,scope$season,"eligibility",clause_transfer_snapshot_id(scope),payload,stamp)
+  record<-rival_finance_evidence(scope$account_id,scope$championship_id,scope$season,"eligibility",clause_transfer_snapshot_id(scope),payload,stamp,competition_id=scope$competition_id)
   # The shared queue deduplicates acknowledgements and retains failed writes as
   # retryable. A memory hit is never treated as an acknowledged database write.
   defer_persistence("supabase_post_direct",list("rival_finance_evidence",list(record),
-    "account_id,championship_id,season,evidence_type,source_id,observed_at",TRUE),context=context,on_complete=on_complete)
+    "account_id,championship_id,competition_id,season,evidence_type,source_id,observed_at",TRUE),context=context,on_complete=on_complete)
 }
 read_saved_clause_transfer_summary <- function(context,now=clause_transfer_now()) {
   scope<-clause_transfer_scope(context);if(is.null(scope))return(NULL)
   query<-list(account_id=paste0("eq.",scope$account_id),championship_id=paste0("eq.",scope$championship_id),
-    season=paste0("eq.",scope$season),evidence_type="eq.eligibility",source_id=paste0("eq.",clause_transfer_snapshot_id(scope)),
-    select="account_id,championship_id,season,evidence_type,source_id,observed_at,payload",limit=1L)
+    competition_id=paste0("eq.",scope$competition_id),season=paste0("eq.",scope$season),evidence_type="eq.eligibility",source_id=paste0("eq.",clause_transfer_snapshot_id(scope)),
+    select="account_id,championship_id,competition_id,season,evidence_type,source_id,observed_at,payload",limit=1L)
   # Cooperative pending-read conditions must propagate to async_adapter_fetch.
   saved<-tryCatch(supabase_get("rival_finance_evidence_latest",query),error=function(e)NULL)
   if(!is.data.frame(saved)||nrow(saved)!=1L)return(NULL)
@@ -75,9 +76,9 @@ read_saved_clause_transfer_summary <- function(context,now=clause_transfer_now()
     stamp<-fm_time(p$source_observed_at);until<-fm_time(p$valid_until)
     invalidated<-.clause_transfer_invalidated[[clause_transfer_epoch_key(context)]]
     if(!is.list(p)||as.numeric(object.size(p))>32*1024L||!identical(p$kind,"clause_transfer_summary")||
-       !identical(as.integer(p$version),1L)||!identical(p$completeness,"complete")||!identical(p$source,"futmondo")||
+       !identical(as.integer(p$version),2L)||!identical(p$completeness,"complete")||!identical(p$source,"futmondo")||
        !identical(record$evidence_type,"eligibility")||!identical(record$source_id,clause_transfer_snapshot_id(scope))||
-       !all(vapply(c("account_id","championship_id","season"),function(field)identical(fm_scalar(record[[field]]),scope[[field]]),logical(1)))||
+       !all(vapply(c("account_id","championship_id","competition_id","season"),function(field)identical(fm_scalar(record[[field]]),scope[[field]]),logical(1)))||
        !is.list(p$scope)||!setequal(names(p$scope),names(scope))||!all(vapply(names(scope),function(field)identical(p$scope[[field]],scope[[field]]),logical(1)))||
        length(stamp)!=1L||is.na(stamp)||stamp>now||length(until)!=1L||is.na(until)||now>=until||
        abs(as.numeric(difftime(until,stamp,units="secs"))-60)>0.01||

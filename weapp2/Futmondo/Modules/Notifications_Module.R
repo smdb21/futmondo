@@ -48,7 +48,8 @@ notifications_Server <- function(id, is_module_active, login_token, championship
     pending_player <- shiny::reactiveVal(NULL)
     request_context <- shiny::reactive({
       auth<-login_token();if(!valid_login(auth))return(NULL)
-      list(user=fm_scalar(auth[["userid"]]),league=fm_scalar(championship_id()),team=fm_scalar(user_team_id()))
+      league_context_revision();ctx<-resource_context(auth,championship_id(),user_team_id())
+      list(user=ctx$account_id,league=ctx$championship_id,team=ctx$user_team_id,competition=ctx$competition_id,season=ctx$season,scoring=ctx$scoring_version)
     })
     if (exists("selected_player_Server", mode="function")) {
       # Player links route through a dedicated module, preserving existing behavior.

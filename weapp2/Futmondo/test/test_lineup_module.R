@@ -5,10 +5,10 @@ suppressPackageStartupMessages(source('global.R'))
 roster<-data.frame(id=paste0('p',1:20),name=paste('Player',1:20),role=c(rep('portero',2),rep('defensa',6),rep('centrocampista',7),rep('delantero',5)),role2='',status='ok',buyPrice=1:20,value=21:40,photo='',club='Club')
 rounds<-data.frame(round_id=paste0('r',1:7),round_number=1:7,begin_process=format(Sys.time()+c(-6:-1*86400,86400),'%Y-%m-%dT%H:%M:%OSZ',tz='UTC'),is_finished=c(rep(TRUE,6),FALSE))
 records<-lapply(seq_len(nrow(roster)),function(i)as.list(roster[i,,drop=FALSE]))
-fixture<-function(){list(version=1L,roster=records,official=lineup_empty('4-4-2'),
+fixture<-function(){list(version=2L,roster=records,official=lineup_empty('4-4-2'),
  rules=list(allowed=lineup_formations(),multiposition=TRUE,bench_enabled=TRUE,captain_enabled=TRUE),
  source=list(wire=list(strategy='4-4-2',players=list()),locked=list(),status='',block_delayed=FALSE,target_id='r7',target_number=7),
- season='unknown',scoring_version='fixture',observed_at=format(Sys.time(),'%Y-%m-%dT%H:%M:%OSZ',tz='UTC'),expires_at=format(Sys.time()+30,'%Y-%m-%dT%H:%M:%OSZ',tz='UTC'))}
+ competition_id='unknown',season='unknown',scoring_version='fixture',observed_at=format(Sys.time(),'%Y-%m-%dT%H:%M:%OSZ',tz='UTC'),expires_at=format(Sys.time()+30,'%Y-%m-%dT%H:%M:%OSZ',tz='UTC'))}
 history<-data.frame(player_id=rep(roster$id,each=6),round=rep(1:6,nrow(roster)),points=rep(1:20,each=6))
 full_history<-history
 history_data<-shiny::reactiveVal(history)
@@ -23,7 +23,7 @@ lineup_optimize<-function(...){
  if(state$mode=='optimize-error')stop('synthetic optimizer error')
  optimize_impl(...)
 }
-lineup_fetch_bundle<-function(auth,context,target,owner){
+lineup_fetch_bundle<-function(auth,context,target,owner,is_current=function()TRUE){
  state$reads<-state$reads+1L
  if(state$mode=='conflict'&&state$reads==2L){state$official$official$starters[11]<-'p1';state$official$source$wire$players<-list(list(`_id`='p1',position=10L,mp=FALSE,pr=1,b=FALSE,cpt=FALSE))}
  if(state$mode=='initial-delay'&&state$reads==1L)return(promises::promise(function(resolve,reject)state$pending<-resolve))

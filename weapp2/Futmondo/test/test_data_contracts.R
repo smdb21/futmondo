@@ -92,7 +92,7 @@ check("admin authority uses verified login and matches only configured account",
 check("natural conflict targets cover factual observations",{
   stopifnot(supabase_conflict_key("bid_observations")=="championship_id,auction_id,bidder_id",
     supabase_conflict_key("market_transactions")=="championship_id,source_event_id",
-    supabase_conflict_key("player_daily_snapshots")=="player_id,championship_id,snapshot_date")
+    supabase_conflict_key("player_daily_snapshots")=="player_id,championship_id,competition_id,season,snapshot_date")
 })
 check("financial snapshot preserves zero and debt",{
   saved_info<-get_user_team_info;saved_capacity<-get_acquisition_capacity

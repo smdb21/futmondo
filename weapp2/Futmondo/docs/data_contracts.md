@@ -9,3 +9,5 @@ Player-round observations carry `player_id`, `championship_id`, `season`, `scori
 Auction/bid/transfer normalization preserves actual event identities and counterparties. Empty buyer/seller IDs mean Futmondo System/Market. Observation time records when evidence was obtained, not a reconstructed transaction time.
 
 The shared repository reconciles revisions and source coverage within a single context. Existing raw normalization helpers are reused where their factual contracts remain valid. See [database schema](database_schema.md) and [player card](selected_player_module.md).
+
+Authoritative active-league metadata now supplies source competition/season through `competition_context.R`. `fm_scoring_version()` canonicalizes object ordering for awards, points and lineups. Source round/match IDs are preserved; explicit unknown archives remain unknown. See [general competition contracts](general_competition_context.md).

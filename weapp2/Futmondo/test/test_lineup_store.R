@@ -1,17 +1,17 @@
 #!/usr/bin/env Rscript
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages(source('global.R'))
-ctx<-resource_context(c(userid='account',token='private-fixture'),'league','team',season='S1',scoring_version='score')
+ctx<-resource_context(c(userid='account',token='private-fixture'),'league','team',season='S1',scoring_version='score',competition_id='competition')
 players<-list(list(id='p1',name='Player',points=0,role='portero',team=list(name='Real Madrid',logo='source-club.png')),
  list(id='p2',name='Other player',points=-5,role='defensa',team='Barcelona',logo='other-club.png'))
 parsed_roster<-lineup_roster_records(players)
 stopifnot(parsed_roster[[1]]$logo=='source-club.png',parsed_roster[[1]]$club=='Real Madrid',
  parsed_roster[[1]]$points==0,parsed_roster[[2]]$points== -5,parsed_roster[[2]]$logo=='other-club.png',parsed_roster[[2]]$club=='Barcelona')
-snapshot<-list(version=1L,roster=parsed_roster,official=lineup_empty(),
+snapshot<-list(version=2L,roster=parsed_roster,official=lineup_empty(),
  rules=list(allowed='4-4-2',multiposition=FALSE,bench_enabled=TRUE,captain_enabled=FALSE),
- source=list(wire=list(strategy='4-4-2',players=list()),locked=list()),season='S1',scoring_version='score',
+ source=list(wire=list(strategy='4-4-2',players=list()),locked=list()),competition_id='competition',season='S1',scoring_version='score',
  observed_at='2026-11-07T00:00:00Z',expires_at='2026-11-07T00:00:30Z')
-row<-list(account_id='account',championship_id='league',user_team_id='team',target_round='r7',season='S1',scoring_version='score',
+row<-list(account_id='account',championship_id='league',user_team_id='team',target_round='r7',competition_id='competition',season='S1',scoring_version='score',
  payload=snapshot,observed_at='2026-11-07T00:00:00+00:00',expires_at='2026-11-07T00:00:30+00:00',complete=TRUE)
 get_sb_url<-function()'https://fixture.invalid';get_sb_key<-function()'private-database-fixture'
 requests<-list();writes<-list();failure<-NULL;value<-NULL
@@ -20,7 +20,7 @@ fm_async_http<-function(url,method,body,headers,...){writes[[length(writes)+1L]]
 settle<-function(p){failure<<-NULL;value<<-NULL;promises::then(p,function(x){value<<-x;NULL},function(e){failure<<-e;NULL});for(i in 1:20)later::run_now(0)}
 settle(lineup_snapshot_store(ctx,'r7'))
 stopifnot(is.null(failure),is.character(value$official$starters),length(value$official$starters)==11L,
- !length(writes),grepl('season=eq.S1',requests[[1]],fixed=TRUE),grepl('scoring_version=eq.score',requests[[1]],fixed=TRUE))
+ !length(writes),grepl('competition_id=eq.competition',requests[[1]],fixed=TRUE),grepl('season=eq.S1',requests[[1]],fixed=TRUE),grepl('scoring_version=eq.score',requests[[1]],fixed=TRUE))
 stopifnot(lineup_roster_frame(value)$logo[1]=='source-club.png',lineup_roster_frame(value)$club[1]=='Real Madrid')
 cat('PASS source crests survive normalized roster parsing and persisted JSON hydration\n')
 cat('PASS source arrays normalize on hydration, UTC representations compare equally, known context filters and reads do not write\n')

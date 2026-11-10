@@ -28,7 +28,7 @@ check('canonical scoring ignores recursive object order and preserves arrays, nu
 })
 check('legacy fingerprints are recomputed from stored metadata after the actual JSON read roundtrip',{
   legacy<-snapshot
-  legacy$payload$scoring_version<-mvp_text(normalize_league_rules(list(),list(pointSystem='custom',custom=reordered))$scoring_version)
+  legacy$payload$scoring_version<-mvp_text(as.character(openssl::sha256(charToRaw(jsonlite::toJSON(list(point_system='custom',custom=reordered),auto_unbox=TRUE)))))
   stopifnot(!identical(legacy$payload$scoring_version,version))
   decoded<-roundtrip(list(legacy));stopifnot(is.data.frame(decoded[[1]]$payload$custom$media))
   saved<-award_saved_rows(decoded,cid,'unknown',version,auth[['userid']])

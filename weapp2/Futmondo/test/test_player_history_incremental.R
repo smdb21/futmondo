@@ -6,15 +6,18 @@ stamp<-function(x)format(as.POSIXct(x,origin='1970-01-01',tz='UTC'),'%Y-%m-%dT%H
 prices<-data.frame(id=1:1200,player_id='P',championship_id='L',value=seq_len(1200)*100,
  observed_at=stamp(as.numeric(as.POSIXct('2026-08-01',tz='UTC'))+seq_len(1200)*3600),stringsAsFactors=FALSE)
 prices$recorded_at<-prices$observed_at
+prices$competition_id<-'unknown';prices$season<-'2026'
 rounds<-data.frame(player_id='P',championship_id='L',season='2026',scoring_version='score',round=c(1,2,3),
  points=c(0,-4,8),score_status='final',round_start_at=NA_character_,occurred_at=NA_character_,observed_at=prices$observed_at[c(1,600,1200)])
+rounds$competition_id<-'unknown';rounds$source_round_key<-paste0('number:',rounds$round)
+rounds$round_id<-rounds$match_id<-NA_character_
 calls<-list();server_cap<-500L;fail_request<-Inf
 compare<-function(x)if(inherits(x,'POSIXt'))as.numeric(x)else if(is.numeric(x))x else as.character(x)
 supabase_get<-function(table_name,query_params=list()){
  calls[[length(calls)+1L]]<<-list(table=table_name,query=query_params,rows=0L)
  if(length(calls)==fail_request)return(NULL)
  q<-query_params;rows<-switch(table_name,player_history=prices,player_match_observations=rounds,stop('Unexpected table'))
- for(field in intersect(c('championship_id','player_id','season','scoring_version'),names(q))){
+ for(field in intersect(c('championship_id','player_id','competition_id','season','scoring_version'),names(q))){
    wanted<-sub('^eq\\.','',q[[field]]);rows<-rows[rows[[field]]==wanted,,drop=FALSE]
  }
  if(!is.null(q$and)){
@@ -27,12 +30,15 @@ supabase_get<-function(table_name,query_params=list()){
  order_fields<-sub('\\.asc$','',strsplit(q$order,',',fixed=TRUE)[[1]])
  if(nrow(rows))rows<-rows[do.call(order,lapply(rows[order_fields],compare)),,drop=FALSE]
  if(!is.null(q[['or']])){
-   fields<-if(table_name=='player_history')c('recorded_at','id')else c('round','observed_at')
-   a<-fields[1];b<-fields[2]
-   av<-sub(paste0('^\\(',a,'\\.gt\\.([^,]+),.*$'),'\\1',q[['or']])
-   bv<-sub(paste0('^.*',b,'\\.gt\\.([^,)]+)\\)\\)$'),'\\1',q[['or']])
-   ac<-if(is.numeric(rows[[a]]))as.numeric(av)else av;bc<-if(is.numeric(rows[[b]]))as.numeric(bv)else bv
-   rows<-rows[rows[[a]]>ac|(rows[[a]]==ac&rows[[b]]>bc),,drop=FALSE]
+   clauses<-regmatches(q[['or']],gregexpr('[a-z_]+\\.gt\\.[^,)]+',q[['or']]))[[1]]
+   keep<-rep(FALSE,nrow(rows));equal<-rep(TRUE,nrow(rows))
+   for(field in order_fields){
+     clause<-clauses[startsWith(clauses,paste0(field,'.gt.'))];stopifnot(length(clause)==1L)
+     value<-substring(clause,nchar(field)+5L)
+     if(is.numeric(rows[[field]]))value<-as.numeric(value)
+     keep<-keep|(equal&rows[[field]]>value);equal<-equal&rows[[field]]==value
+   }
+   rows<-rows[keep,,drop=FALSE]
  }
  rows<-head(rows,min(server_cap,q$limit));calls[[length(calls)]]$rows<<-nrow(rows);rows
 }
@@ -66,11 +72,11 @@ stopifnot(attr(partial,'fetch_status')=='partial',!attr(partial,'complete'),nrow
 reset_calls();server_cap<-500L;retry<-read_card_price_history(ctx)
 stopifnot(isTRUE(attr(retry,'complete')),identical(calls[[1]]$query$and,partial_boundary))
 cat('PASS failed/partial reads keep the complete baseline and do not advance the retry boundary.\n')
-for(field in c('account_id','championship_id','user_team_id','player_id','season','scoring_version')){
+for(field in c('account_id','championship_id','user_team_id','player_id','competition_id','season','scoring_version')){
  other<-ctx;other[[field]]<-paste0(other[[field]],'-other');reset_calls();read_card_price_history(other)
  stopifnot(is.null(calls[[1]]$query$and))
 }
-cat('PASS account, league, team, player, season and scoring contexts use separate baselines.\n')
+cat('PASS account, league, team, player, competition, season and scoring contexts use separate baselines.\n')
 reset_calls();limited<-read_card_price_history(ctx,max_rows=10L)
 reset_calls();limited_again<-read_card_price_history(ctx,max_rows=10L)
 stopifnot(nrow(limited)==10L,!attr(limited,'complete'),!attr(limited_again,'history_incremental'),is.null(calls[[1]]$query$and))

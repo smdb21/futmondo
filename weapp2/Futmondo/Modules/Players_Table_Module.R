@@ -310,10 +310,18 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
     table_context_RV <- reactive({
       value <- function(x) tryCatch(if(is.function(x)) x() else x,error=function(e)NULL)
       auth <- value(login_token)
+      if(exists("league_context_revision",mode="function"))league_context_revision()
+      champ<-fm_scalar(value(championship_id),"");team<-fm_scalar(value(user_team_id),"")
+      context<-if(valid_login(auth))resource_context(auth,champ,team)else list()
       list(user=if(valid_login(auth))fm_scalar(auth[["userid"]],"") else "",
-        championship=fm_scalar(value(championship_id),""),team=fm_scalar(value(user_team_id),""))
+        championship=champ,team=team,competition=fm_scalar(context$competition_id,"unknown"),
+        season=fm_scalar(context$season,"unknown"),scoring=fm_scalar(context$scoring_version,"unknown"))
     })
+    selection_scope<-NULL
     observeEvent(table_context_RV(), {
+      next_scope<-table_context_RV()
+      if(identical(selection_scope,next_scope))return()
+      selection_scope<<-next_scope
       selected_player_ready_RV(FALSE)
       selected_player_id_RV(NULL);selected_player_snapshot_RV(NULL);selected_player_context_RV(NULL)
       tryCatch(updateReactable("players_table",selected=NA_integer_,session=session),error=function(e)NULL)
@@ -762,12 +770,17 @@ get_player_recent_points <- function(login,championship_id,user_team_id,player_i
   summary <- get_player_summary(login,championship_id,user_team_id,player_id)
   if(!recent_points_summary_valid(summary))stop(attr(summary,"fetch_error") %||%
     resource_failure(resource="get_player_recent_points",category="schema"))
-  season <- league_season_context(championship_id,summary$championship$season %||% summary$championship$seasonId)
+  season <- league_season_context(championship_id,summary$championship$season %||% summary$championship$seasonId,account_id=login[["userid"]])
   ctx <- resource_context(login,championship_id,user_team_id,player_id,season,scoring_version)
   checked_at <- attr(summary,"observed_at") %||% Sys.time()
   observed <- normalize_player_match_observations(summary,player_id,championship_id,
-    season=season,scoring_version=scoring_version,observed_at=checked_at)
-  if(nrow(observed))observed<-observed[!duplicated(observed$round,fromLast=TRUE),,drop=FALSE]
+    season=season,scoring_version=scoring_version,observed_at=checked_at,competition_id=ctx$competition_id)
+  if(nrow(observed)){
+    # Numeric ordinals alone cannot disambiguate distinct cup-stage rounds.
+    reconcile_player_points(data.frame(),observed,ctx)
+    keys<-intersect(c("round","source_round_key"),names(observed))
+    observed<-observed[!duplicated(observed[keys],fromLast=TRUE),,drop=FALSE]
+  }
   list(context=ctx,observations=observed,checked_at=checked_at,
     points=reconcile_player_points(data.frame(),observed,ctx),
     previous_points=data.frame(),status=if(nrow(observed))"partial"else "empty")
@@ -831,8 +844,8 @@ recent_points_fitness_rows <- function(players) {
   field <- function(name)if(name%in%names(players))as.character(players[[name]])else rep("",nrow(players))
   result <- data.frame(player_id=as.character(players$id),fitness=as.character(players$average.fitness),
     observed_at=format(stamp,"%Y-%m-%dT%H:%M:%OS6Z",tz="UTC"),
-    championship_id=field("championship_id"),season=field("season"),scoring_version=field("scoring_version"))
-  result$snapshot <- paste(result$observed_at,result$season,result$scoring_version,sep="\034")
+    championship_id=field("championship_id"),competition_id=field("competition_id"),season=field("season"),scoring_version=field("scoring_version"))
+  result$snapshot <- paste(result$observed_at,result$competition_id,result$season,result$scoring_version,sep="\034")
   keep <- !is.na(result$player_id)&nzchar(result$player_id)&!is.na(stamp)&
     vapply(result$fitness,function(x)length(recent_points_fitness_values(x))>0L,logical(1))
   result[keep,,drop=FALSE]
@@ -884,11 +897,11 @@ recent_points_fitness_superseded <- function(rows,points,checks,context) {
 
 recent_points_fitness_anchor <- function(row,payload,context) {
   if(!is.data.frame(row)||nrow(row)!=1L||is.null(payload$context))return(NULL)
-  for(field in c("account_id","championship_id","user_team_id","season","scoring_version"))
-    if(!identical(payload$context[[field]],context[[field]]))return(NULL)
+  for(field in c("account_id","championship_id","user_team_id","competition_id","season","scoring_version"))
+    if(!identical(fm_scalar(payload$context[[field]],"unknown"),fm_scalar(context[[field]],"unknown")))return(NULL)
   if(!identical(as.character(payload$context$player_id),as.character(row$player_id)))return(NULL)
-  for(field in c("championship_id","season","scoring_version"))
-    if(!is.na(row[[field]])&&nzchar(row[[field]])&&row[[field]]!=context[[field]])return(NULL)
+  for(field in c("championship_id","competition_id","season","scoring_version"))
+    if(field%in%names(row)&&!is.na(row[[field]])&&nzchar(row[[field]])&&row[[field]]!=context[[field]])return(NULL)
   checked <- fm_time(payload$checked_at)
   if(length(checked)!=1L||is.na(checked)||checked<fm_time(row$observed_at))return(NULL)
   values <- recent_points_fitness_values(row$fitness)
@@ -914,8 +927,8 @@ recent_points_fitness_observations <- function(rows,anchor) {
   if(is.null(anchor)||!nrow(rows))return(data.frame())
   ctx <- anchor$context
   rows <- rows[rows$snapshot==anchor$snapshot,,drop=FALSE]
-  for(field in c("championship_id","season","scoring_version"))
-    rows <- rows[is.na(rows[[field]])|!nzchar(rows[[field]])|rows[[field]]==ctx[[field]],,drop=FALSE]
+  for(field in c("championship_id","competition_id","season","scoring_version"))
+    if(field%in%names(rows))rows <- rows[is.na(rows[[field]])|!nzchar(rows[[field]])|rows[[field]]==ctx[[field]],,drop=FALSE]
   values <- lapply(rows$fitness,recent_points_fitness_values)
   size <- min(5L,anchor$round)
   keep <- lengths(values)==size
@@ -923,15 +936,17 @@ recent_points_fitness_observations <- function(rows,anchor) {
   if(!nrow(rows))return(data.frame())
   points <- unlist(values,use.names=FALSE)
   data.frame(player_id=rep(rows$player_id,each=size),championship_id=ctx$championship_id,
-    season=ctx$season,scoring_version=ctx$scoring_version,
-    round=rep(seq.int(anchor$round-size+1L,anchor$round),nrow(rows)),points=points,
+    competition_id=fm_scalar(ctx$competition_id,"unknown"),season=ctx$season,scoring_version=ctx$scoring_version,
+    round=rep(seq.int(anchor$round-size+1L,anchor$round),nrow(rows)),
+    source_round_key=paste0("number:",rep(seq.int(anchor$round-size+1L,anchor$round),nrow(rows))),points=points,
     score_status=ifelse(is.finite(points),"unknown","unavailable"),
     observed_at=rep(rows$observed_at,each=size),occurred_at=NA_character_,round_start_at=NA_character_)
 }
 
 recent_points_fitness_changes <- function(observations,existing) {
   if(!nrow(observations)||!is.data.frame(existing)||!nrow(existing))return(observations)
-  keys <- c("player_id","championship_id","season","scoring_version","round")
+  observations<-recent_points_identity_rows(observations);existing<-recent_points_identity_rows(existing)
+  keys <- c("player_id","championship_id","competition_id","season","scoring_version","round","source_round_key")
   stamp <- as.numeric(fm_time(existing$observed_at));stamp[is.na(stamp)] <- -Inf
   existing <- existing[order(stamp),,drop=FALSE];stamp <- sort(stamp)
   keep <- !duplicated(existing[keys],fromLast=TRUE)
@@ -948,8 +963,31 @@ recent_points_fitness_changes <- function(observations,existing) {
 # Bound queued retries independently from the retained score matrix.
 recent_points_fitness_buffer <- function(rows) {
   if(!nrow(rows))return(rows)
+  rows<-recent_points_identity_rows(rows)
   rows <- rows[order(fm_time(rows$observed_at),decreasing=TRUE),,drop=FALSE]
-  head(rows[!duplicated(rows[c("player_id","championship_id","season","scoring_version","round")]),,drop=FALSE],10000L)
+  head(rows[!duplicated(rows[c("player_id","championship_id","competition_id","season","scoring_version","round","source_round_key")]),,drop=FALSE],10000L)
+}
+
+recent_points_identity_rows <- function(rows) {
+  if(!is.data.frame(rows)||!nrow(rows))return(rows)
+  if(!"competition_id"%in%names(rows))rows$competition_id<-"unknown"
+  rows$competition_id[is.na(rows$competition_id)|!nzchar(rows$competition_id)]<-"unknown"
+  if(!"source_round_key"%in%names(rows)){
+    id<-as.character(rows$round_id %||% rep("",nrow(rows)))
+    rows$source_round_key<-ifelse(!is.na(id)&nzchar(id),paste0("id:",id),paste0("number:",rows$round))
+  }
+  rows
+}
+
+round_points_client_context <- function(client) {
+  context<-if(is.list(client$context))client$context else resource_context(client$auth,client$league,client$team)
+  context$competition_id<-fm_scalar(context$competition_id,"unknown")
+  context
+}
+round_points_client_key <- function(client) {
+  context<-round_points_client_context(client)
+  paste(vapply(c("account_id","championship_id","user_team_id","competition_id","season","scoring_version"),
+    function(field)fm_scalar(context[[field]],"unknown"),character(1)),collapse="\034")
 }
 
 # A single root-session controller owns the league read and API acquisition.
@@ -965,7 +1003,7 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
   touch <- function()shiny::isolate(revision(revision()+1L))
   active_clients <- function()Filter(function(x)isTRUE(x$active)&&valid_login(x$auth)&&
     nzchar(x$league)&&nzchar(x$team),shiny::isolate(clients()))
-  key_for <- function(client)paste(client$auth[["userid"]],client$league,client$team,sep="\034")
+  key_for <- round_points_client_key
   current_clients <- function(){all<-active_clients();Filter(function(x)identical(key_for(x),current_key),all)}
   current_entry <- function()if(is.null(current_key))NULL else entries[[current_key]]
   trim_entries <- function(){
@@ -1006,13 +1044,19 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
       entry$fitness_probe_attempted[[snapshot]]<-NULL
     entry$fitness_dirty<-TRUE
     entry$pending<-list()
+    # Cancel bootstrap continuations as well as player reads. A late lineup
+    # response must not start a matrix request for a context left behind.
+    for(type in names(entry$initial_pending)){
+      entry$initial_pending[[type]]<-NULL;entry$loading[[type]]<-FALSE
+      entry$initial_errors[[type]]<-resource_failure(resource="database",category="network")
+    }
   }
   context_for <- function(entry){ctx<-entry$context;ctx$season<-entry$season;ctx$scoring_version<-entry$scoring;ctx}
   visible_ids <- function()unique(unlist(lapply(current_clients(),`[[`,"ids"),use.names=FALSE))
   catalog_requested <- function()any(vapply(current_clients(),function(client)!identical(client$catalog_scope,FALSE),logical(1)))
   ids_for <- function(entry)head(unique(c(visible_ids(),if(catalog_requested())entry$catalog_ids)),2000L)
   saved_ids_for <- function(entry){
-    ctx<-context_for(entry);scope<-ctx[c("championship_id","season","scoring_version")];scope$players<-sort(ids_for(entry));now<-as.numeric(Sys.time())
+    ctx<-context_for(entry);scope<-ctx[c("championship_id","competition_id","season","scoring_version")];scope$players<-sort(ids_for(entry));now<-as.numeric(Sys.time())
     cache<-entry$saved_ids_cache
     if(is.null(cache)||!identical(cache$scope,scope)||now>=cache$valid_until){
       rows<-history_context_filter(entry$points,ctx);ids<-character();valid_until<-Inf
@@ -1028,7 +1072,7 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
     entry$saved_ids_cache$ids
   }
   latest_round_for <- function(entry){
-    ctx<-context_for(entry);scope<-ctx[c("championship_id","season","scoring_version")]
+    ctx<-context_for(entry);scope<-ctx[c("championship_id","competition_id","season","scoring_version")]
     if(is.null(entry$latest_round_cache)||!identical(entry$latest_round_cache$scope,scope)){
       rounds<-unlist(lapply(c(list(entry$points),entry$live),function(rows)history_context_filter(rows,ctx)$round),use.names=FALSE)
       rounds<-suppressWarnings(as.numeric(rounds));rounds<-rounds[is.finite(rounds)&rounds>=1]
@@ -1037,7 +1081,7 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
     entry$latest_round_cache$value
   }
   covered_for <- function(entry,n){
-    scope<-context_for(entry)[c("championship_id","season","scoring_version")];scope$players<-sort(ids_for(entry))
+    scope<-context_for(entry)[c("championship_id","competition_id","season","scoring_version")];scope$players<-sort(ids_for(entry))
     if(is.null(entry$coverage_cache)||!identical(entry$coverage_cache$scope,scope))
       entry$coverage_cache<-list(scope=scope,by_n=list())
     key<-as.character(n);cached<-entry$coverage_cache$by_n[[key]]
@@ -1069,12 +1113,13 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
         entry$fitness_dirty<-TRUE
       }
     }
+    observations<-recent_points_identity_rows(observations)
     groups <- split(observations,as.character(observations$player_id))
     for(player in names(groups)){
       rows <- dplyr::bind_rows(entry$live[[player]],groups[[player]])
       stamp <- as.numeric(fm_time(rows$observed_at));stamp[is.na(stamp)] <- -Inf
       rows <- rows[order(stamp,rows$score_status=="final"),,drop=FALSE]
-      entry$live[[player]] <- rows[!duplicated(rows[c("championship_id","season","scoring_version","round")],fromLast=TRUE),,drop=FALSE]
+      entry$live[[player]] <- rows[!duplicated(rows[c("championship_id","competition_id","season","scoring_version","round","source_round_key")],fromLast=TRUE),,drop=FALSE]
     }
   }
   prepare_fitness <- function(entry){
@@ -1083,8 +1128,8 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
     rows <- entry$fitness;ctx <- context_for(entry)
     entry$fitness_probes <- list();entry$fitness_holding <- character();entry$fitness_ready <- character();entry$fitness_changed <- character()
     if(!nrow(rows))return()
-    for(field in c("championship_id","season","scoring_version"))
-      rows <- rows[is.na(rows[[field]])|!nzchar(rows[[field]])|rows[[field]]==ctx[[field]],,drop=FALSE]
+    for(field in c("championship_id","competition_id","season","scoring_version"))
+      if(field%in%names(rows))rows <- rows[is.na(rows[[field]])|!nzchar(rows[[field]])|rows[[field]]==ctx[[field]],,drop=FALSE]
     existing <- dplyr::bind_rows(c(list(entry$points),entry$live))
     entry$fitness_ready <- unique(c(recent_points_fitness_agrees(rows,existing,ctx),
       recent_points_fitness_superseded(rows,existing,entry$checks,ctx)))
@@ -1126,7 +1171,7 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
       queued <- c(.persistence_state$queue,if(!is.null(.persistence_state$active))list(.persistence_state$active)else list())
       bytes <- sum(vapply(queued,function(job)as.numeric(job$bytes %||% 0),numeric(1)))
       if(length(queued)>=190L||bytes+as.numeric(object.size(head(entry$fitness_unsaved,100L)))>=14*1024^2)return()
-      chunk <- head(entry$fitness_unsaved,100L)
+      chunk <- complete_point_identity(head(entry$fitness_unsaved,100L),context_for(entry))
       entry$fitness_unsaved <- entry$fitness_unsaved[-seq_len(nrow(chunk)),,drop=FALSE]
       entry$saving <- entry$saving+1L;did_ack <- FALSE
       acknowledged <- function(ok){
@@ -1141,7 +1186,7 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
         touch();NULL
       }
       ok <- tryCatch(defer_persistence("supabase_post_direct",list("player_match_observations",chunk,
-        "player_id,championship_id,season,scoring_version,round,observed_at",FALSE),
+        "player_id,championship_id,competition_id,season,scoring_version,round,source_round_key,observed_at",FALSE),
         context_for(entry),on_complete=acknowledged),error=function(e)FALSE)
       if(!isTRUE(ok))acknowledged(FALSE)
     })
@@ -1188,10 +1233,10 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
   }
   needed_for <- function(entry)availability_for(entry)$needed
   completed_for <- function(entry){
-    if(!is.null(entry$initial_errors$lineup))return(character())
+    if(!is.null(entry$initial_errors$lineup)||!is.null(entry$initial_errors$context))return(character())
     available<-availability_for(entry)
     good<-names(entry$attempted)[vapply(entry$attempted,function(x)isTRUE(x$ok)&&
-      identical(x$season,entry$season)&&identical(x$scoring_version,entry$scoring),logical(1))]
+      identical(x$season,entry$season)&&identical(fm_scalar(x$competition_id,"unknown"),fm_scalar(entry$context$competition_id,"unknown"))&&identical(x$scoring_version,entry$scoring),logical(1))]
     setdiff(unique(c(setdiff(good,available$needed),available$reused)),names(entry$pending))
   }
   failed_for <- function(entry,completed=completed_for(entry)){
@@ -1208,7 +1253,8 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
       pts<-reconcile_player_points(by_player[[player]],live[[player]],player_ctx)
       if(!nrow(pts))return(NULL)
       data.frame(player_id=player,round=pts$round_number,points=pts$points,
-        season=rep(paste0(ctx$season),nrow(pts)),scoring_version=rep(paste0(ctx$scoring_version),nrow(pts)))
+        competition_id=rep(fm_scalar(ctx$competition_id,"unknown"),nrow(pts)),season=rep(paste0(ctx$season),nrow(pts)),scoring_version=rep(paste0(ctx$scoring_version),nrow(pts)),
+        source_round_key=pts$source_round_key,round_id=pts$round_id,match_id=pts$match_id,source_round_number=pts$source_round_number)
     })
     result<-head(dplyr::bind_rows(rows),50000L)
     rounds<-suppressWarnings(as.numeric(result$round));rounds<-rounds[is.finite(rounds)&rounds>=1]
@@ -1222,7 +1268,7 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
     completed<-completed_for(entry)
     finished<-all(visible%in%c(completed,failed_for(entry,completed)))&&
       !any(visible%in%entry$fitness_holding)
-    signature<-list(ids=visible,context=context_for(entry)[c("season","scoring_version")])
+    signature<-list(ids=visible,context=context_for(entry)[c("competition_id","season","scoring_version")])
     just_finished<-finished&&!identical(signature,entry$finished_signature)
     if(!finished)entry$finished_signature<-NULL
     if(!force&&!just_finished&&elapsed<publish_interval){
@@ -1239,14 +1285,38 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
     cancel_timer();last_publish<<-as.numeric(Sys.time())
     if(finished)entry$finished_signature<-signature
     entry$published_ids<-visible
-    snapshot<-list(key=entry$key,points=assemble(entry),context=context_for(entry))
+    assembled<-tryCatch(assemble(entry),error=function(error){
+      entry$initial_errors$matrix<-resource_log_failure(error,"database")
+      NULL
+    })
+    if(is.null(assembled))return(invisible(FALSE))
+    snapshot<-list(key=entry$key,points=assembled,context=context_for(entry))
     if(!identical(shiny::isolate(published()),snapshot))published(snapshot)
+  }
+  adopt_resolved_context <- function(entry,resolved){
+    resolved$session_id<-root$token
+    old_key<-entry$key;new_key<-round_points_client_key(list(context=resolved))
+    entry$context<-resolved;entry$season<-resolved$season;entry$scoring<-resolved$scoring_version
+    if(identical(new_key,old_key))return(entry)
+    all<-shiny::isolate(clients())
+    for(id in names(all))if(valid_login(all[[id]]$auth)&&identical(key_for(all[[id]]),old_key)){
+      all[[id]]$context<-resolved;all[[id]]$context$session_id<-""
+    }
+    prior<-entries[[new_key]]
+    entries[[old_key]]<<-NULL
+    if(is.null(prior)){entry$key<-new_key;entries[[new_key]]<<-entry;prior<-entry}
+    if(identical(current_key,old_key))current_key<<-new_key
+    clients(all)
+    prior
   }
   load_initial <- function(entry,client,types=c("matrix","lineup","catalog")){
     key<-entry$key
-    calls<-list(matrix=list("read_league_round_dataset",list(championship_id=client$league,context=entry$context)),
+    calls<-list(context=list("get_resolved_league_context",list(login=client$auth,championship_id=client$league,user_team_id=client$team)),
+      matrix=list("read_league_round_dataset",list(championship_id=client$league,context=context_for(entry))),
       lineup=list("get_lineup_from_team",list(login=client$auth,championship_id=client$league,user_team_id=client$team)),
       catalog=list("get_championship_players",list(login=client$auth,championship_id=client$league)))
+    if("context"%in%types)types<-"context"
+    if("lineup"%in%types)types<-setdiff(types,"matrix")
     if(!catalog_requested())types<-setdiff(types,"catalog")
     for(kind in intersect(types,names(calls)))local({
       if(isTRUE(entry$loading[[kind]])&&!is.null(entry$initial_pending[[kind]]))return()
@@ -1254,8 +1324,9 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
       entry$loading[[type]]<-TRUE
       entry$initial_sequence<-entry$initial_sequence+1L;request_token<-entry$initial_sequence
       entry$initial_pending[[type]]<-request_token
-      current<-function()!closed&&identical(entries[[key]],entry)&&identical(entry$initial_pending[[type]],request_token)
-      promise<-tryCatch(async_adapter_fetch(call[[1]],call[[2]],context=entry$context,is_current=current),
+      current<-function()!closed&&identical(current_key,key)&&length(current_clients())>0L&&
+        identical(entries[[key]],entry)&&identical(entry$initial_pending[[type]],request_token)
+      promise<-tryCatch(async_adapter_fetch(call[[1]],call[[2]],context=context_for(entry),is_current=current),
         error=function(error)promises::promise_reject(error))
       finish<-function(data,error=NULL){
         if(!current())return(NULL)
@@ -1265,14 +1336,46 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
         if(is.null(error)&&identical(attr(data,"fetch_status"),"stale"))error<-resource_failure(resource=call[[1]],category="unknown")
         entry$initial_errors[[type]]<-if(is.null(error))NULL else resource_log_failure(error,call[[1]])
         tryCatch({
+        if(type=="context"){
+          valid<-is.null(error)&&is.list(data)&&identical(data$account_id,entry$context$account_id)&&
+            identical(data$championship_id,client$league)&&identical(data$user_team_id,client$team)&&
+            all(vapply(data[c("competition_id","season")],fm_context_known,logical(1)))&&
+            all(c("competition_id","season")%in%names(data))
+          if(!isTRUE(valid)){
+            entry$initial_errors$context<-resource_log_failure(error %||% simpleError("Competition and season are not established"),"database")
+            entry$loading[c("matrix","lineup","catalog")]<-FALSE
+          }else{
+            selected<-adopt_resolved_context(entry,data)
+            if(!identical(selected,entry)){
+              if(length(selected$initial_errors))load_initial(selected,client,names(selected$initial_errors))
+              publish(selected,TRUE)
+            }else if(fm_context_known(entry$scoring)){
+              # Authenticated source metadata or a still-valid saved context
+              # already establishes scoring. Reuse it before acquisition.
+              entry$loading[["lineup"]]<-FALSE
+              entry$initial_errors$lineup<-NULL
+              load_initial(entry,client,c("matrix","catalog"))
+            }else load_initial(entry,client,c("lineup","catalog"))
+          }
+        }
         if(type=="matrix"&&is.list(data)){
-          entry$points<-head(data$points %||% data.frame(),50000L)
+          entry$points<-head(recent_points_identity_rows(data$points %||% data.frame()),50000L)
           entry$saved_ids_cache<-NULL;entry$coverage_cache<-NULL;entry$latest_round_cache<-NULL;entry$fitness_dirty<-TRUE
           entry$checks<-head(data$checks %||% data.frame(),2000L)
           entry$matrix_complete<-isTRUE(data$complete)
           trim_entries()
         }
-        if(type=="lineup"&&!is.null(data))entry$scoring<-paste0(normalize_league_rules(list(),data,client$league)$scoring_version)
+        if(type=="lineup"){
+          if(is.null(error)&&!is.null(data)){
+            entry$scoring<-paste0(normalize_league_rules(list(),data,client$league)$scoring_version)
+            # The first matrix read must carry resolved scoring, never bootstrap
+            # unknown values that can fill the row budget with another context.
+            if(isTRUE(entry$requires_context)&&!fm_context_known(entry$scoring)){
+              entry$initial_errors$lineup<-resource_log_failure(simpleError("Scoring configuration is not established"),"get_lineup_from_team")
+              entry$loading[["matrix"]]<-FALSE
+            }else load_initial(entry,client,"matrix")
+          }else entry$loading[["matrix"]]<-FALSE
+        }
         if(type=="catalog"&&is.null(error))entry$catalog_loaded<-TRUE
         if(type=="catalog"&&is.data.frame(data)&&"id"%in%names(data)){
           entry$catalog_loaded<-TRUE
@@ -1292,19 +1395,20 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
   }
   load_entry <- function(client,key){
     entry<-new.env(parent=emptyenv());entry$key<-key
-    entry$context<-resource_context(client$auth,client$league,client$team,session_id=root$token)
-    entry$season<-league_season_context(client$league);entry$scoring<-"unknown"
+    entry$context<-round_points_client_context(client);entry$context$session_id<-root$token
+    entry$season<-entry$context$season;entry$scoring<-entry$context$scoring_version
     entry$points<-data.frame();entry$checks<-data.frame();entry$catalog_ids<-character();entry$catalog_loaded<-FALSE
     entry$saved_ids_cache<-NULL;entry$coverage_cache<-NULL;entry$latest_round_cache<-NULL
     entry$live<-list();entry$attempted<-list();entry$pending<-list();entry$forced<-character();entry$retry_reads<-0L;entry$request_sequence<-0L
-    entry$loading<-c(matrix=TRUE,lineup=TRUE,catalog=catalog_requested());entry$matrix_complete<-FALSE;entry$initial_errors<-list();entry$initial_pending<-list();entry$initial_sequence<-0L
+    entry$requires_context<-isTRUE(root$userData$league_context_enabled)
+    entry$loading<-c(context=entry$requires_context,matrix=TRUE,lineup=TRUE,catalog=catalog_requested());entry$matrix_complete<-FALSE;entry$initial_errors<-list();entry$initial_pending<-list();entry$initial_sequence<-0L
     entry$save_errors<-character();entry$saving<-0L;entry$overflow<-FALSE
     entry$finished_signature<-NULL;entry$published_ids<-character()
     entry$catalog_fitness<-data.frame();entry$fitness<-data.frame();entry$fitness_dirty<-TRUE
     entry$fitness_anchors<-list();entry$fitness_probe_attempted<-list();entry$fitness_probes<-list()
     entry$fitness_ready<-character();entry$fitness_changed<-character();entry$fitness_holding<-character();entry$fitness_unsaved<-data.frame();entry$fitness_failed<-data.frame()
     entries[[key]]<<-entry
-    load_initial(entry,client)
+    load_initial(entry,client,if(entry$requires_context)"context"else c("lineup","catalog"))
     entry
   }
   root$onSessionEnded(function(){closed<<-TRUE;generation<<-generation+1L;cancel_timer();cancel_retry();entries<<-list()})
@@ -1322,7 +1426,11 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
       clear_pending(current_entry());generation<<-generation+1L;cancel_timer();cancel_retry();current_key<<-next_key
       if(is.null(next_key)){touch();return()}
       if(is.null(entries[[next_key]]))load_entry(active[[1]],next_key)
-      else publish(entries[[next_key]],TRUE)
+      else {
+        retained<-entries[[next_key]]
+        if(length(retained$initial_errors))load_initial(retained,active[[1]],names(retained$initial_errors))
+        publish(retained,TRUE)
+      }
       # Enforce the shared row budget again whenever an async load completes.
       trim_entries()
     }
@@ -1359,7 +1467,7 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
   shiny::observe({
     revision();clients()
     if(closed||!length(current_clients()))return()
-    entry<-current_entry();if(is.null(entry)||any(entry$loading)||entry$overflow||!is.null(entry$initial_errors$lineup))return()
+    entry<-current_entry();if(is.null(entry)||any(entry$loading)||entry$overflow||!is.null(entry$initial_errors$lineup)||!is.null(entry$initial_errors$context))return()
     .persistence_state$revision()
     saving<-background_sync_status(entry$context$account_id)
     queued<-c(.persistence_state$queue,if(!is.null(.persistence_state$active))list(.persistence_state$active)else list())
@@ -1423,6 +1531,7 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
           nrow(payload$observations)<=500L&&identical(payload$context$player_id,player_id)&&
           identical(payload$context$championship_id,ctx$championship_id)&&
           identical(payload$context$account_id,ctx$account_id)&&identical(payload$context$user_team_id,ctx$user_team_id)&&
+          identical(fm_scalar(payload$context$competition_id,"unknown"),fm_scalar(ctx$competition_id,"unknown"))&&
           identical(payload$context$scoring_version,ctx$scoring_version)&&identical(payload$context$scoring_version,entry$scoring)&&
           length(payload$context$season)==1L&&!is.na(payload$context$season)&&nzchar(payload$context$season)&&
           (identical(entry$season,"unknown")||identical(payload$context$season,entry$season))&&
@@ -1430,6 +1539,7 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
         if(isTRUE(valid)&&nrow(payload$observations)){
           observed<-payload$observations
           valid<-all(c("player_id","championship_id","season","scoring_version","round","points","score_status","observed_at")%in%names(observed))&&
+            all(history_context_filter(observed,payload$context)$player_id==player_id)&&nrow(history_context_filter(observed,payload$context))==nrow(observed)&&
             all(observed$player_id==player_id&observed$championship_id==ctx$championship_id&
               observed$season==payload$context$season&observed$scoring_version==ctx$scoring_version)
         }
@@ -1466,11 +1576,11 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
               entry$saving<-max(0L,entry$saving-1L)
               if(isTRUE(ok)){
                 marker<-data.frame(championship_id=payload$context$championship_id,player_id=player_id,
-                  season=payload$context$season,scoring_version=payload$context$scoring_version,
+                  competition_id=fm_scalar(payload$context$competition_id,"unknown"),season=payload$context$season,scoring_version=payload$context$scoring_version,
                   checked_at=format(fm_time(payload$checked_at),"%Y-%m-%dT%H:%M:%OSZ",tz="UTC"),
                   result_status=if(nrow(payload$observations))"scores"else "empty",point_count=nrow(payload$observations))
                 entry$checks<-dplyr::bind_rows(entry$checks,marker)
-                entry$checks<-tail(entry$checks[!duplicated(entry$checks[c("championship_id","player_id","season","scoring_version")],fromLast=TRUE),,drop=FALSE],2000L)
+                entry$checks<-tail(entry$checks[!duplicated(entry$checks[c("championship_id","player_id","competition_id","season","scoring_version")],fromLast=TRUE),,drop=FALSE],2000L)
                 entry$save_errors<-setdiff(entry$save_errors,player_id)
                 # A saved marker only changes fitness eligibility when this
                 # player still needs it; already resolved vectors stay valid.
@@ -1484,7 +1594,7 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
         }
         settled<<-TRUE;entry$pending[[player_id]]<-NULL
         entry$attempted[[player_id]]<-list(ok=TRUE,attempts=attempt_number,season=season,
-          scoring_version=ctx$scoring_version,required_rounds=requested_n,window=requested_window)
+          competition_id=fm_scalar(ctx$competition_id,"unknown"),scoring_version=ctx$scoring_version,required_rounds=requested_n,window=requested_window)
         if(length(probe_snapshots))entry$fitness_dirty<-TRUE
         prepare_fitness(entry)
         touch();publish(entry);NULL
@@ -1528,11 +1638,14 @@ recent_player_points_source <- function(session,login_token,championship_id,user
   owner<-shiny::reactive({
     auth<-value(login_token)
     if(!valid_login(auth))return(list(auth=auth,league="",team="",active=FALSE,ids=character(),fitness=data.frame(),n=5L,refresh=0L))
+    if(exists("league_context_revision",mode="function"))league_context_revision()
     active<-isTRUE(is_active())
     # Hidden table clients must not demand a source read or restart acquisition.
     rows<-if(active)tryCatch(players_RV(),error=function(e)NULL)else NULL
     ids<-if(is.data.frame(rows)&&"id"%in%names(rows))as.character(rows$id)else character()
-    list(auth=auth,league=tryCatch(fm_scalar(value(championship_id),""),error=function(e)""),team=tryCatch(fm_scalar(value(user_team_id),""),error=function(e)""),
+    league<-tryCatch(fm_scalar(value(championship_id),""),error=function(e)"")
+    team<-tryCatch(fm_scalar(value(user_team_id),""),error=function(e)"")
+    list(auth=auth,league=league,team=team,context=resource_context(auth,league,team),
       active=active,ids=head(unique(ids[!is.na(ids)&nzchar(ids)]),2000L),
       fitness=recent_points_fitness_rows(rows),n=max(1L,min(20L,fm_number(value(required_rounds),5L))),
       catalog_scope=isTRUE(catalog_scope),window=if(is.function(required_window))sort(unique(as.numeric(required_window())))else numeric(),
@@ -1545,7 +1658,7 @@ recent_player_points_source <- function(session,login_token,championship_id,user
   history<-shiny::reactiveVal(data.frame())
   shiny::observe({
     client<-owner();snapshot<-shared$dataset()
-    key<-if(valid_login(client$auth))paste(client$auth[["userid"]],client$league,client$team,sep="\034")else NULL
+    key<-if(valid_login(client$auth))round_points_client_key(client)else NULL
     rows<-if(identical(key,snapshot$key))snapshot$points else data.frame()
     latest<-attr(rows,"latest_round")
     if(nrow(rows))rows<-rows[rows$player_id%in%client$ids,,drop=FALSE]

@@ -47,22 +47,24 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
     owner<-paste0('lineup:',session$token);generation<-0L;closed<-FALSE;loaded_key<-NULL;requests<-list();request_sequence<-0L;retained<-list();retained_account<-NULL
     identity<-shiny::reactive({
       auth<-login_token();if(!valid_login(auth))return(NULL)
-      list(account=fm_scalar(auth[['userid']]),championship=fm_scalar(championship_id()),team=fm_scalar(user_team_id()))
+      if(exists('league_context_revision',mode='function'))league_context_revision()
+      ctx<-resource_context(auth,championship_id(),user_team_id())
+      list(account=ctx$account_id,championship=ctx$championship_id,team=ctx$user_team_id,
+        competition=ctx$competition_id,season=ctx$season,scoring=ctx$scoring_version)
     })
     target<-shiny::reactive(lineup_target(round_catalog()))
     context<-function(){
-      who<-shiny::isolate(identity());season<-league_season_context(who$championship);scoring<-'unknown'
+      who<-shiny::isolate(identity());season<-who$season;scoring<-who$scoring
       shared<-session$rootScope()$userData$shared_round_points
       entry<-if(!is.null(shared))tryCatch(shiny::isolate(shared$entry()),error=function(e)NULL)else NULL
-      if(!is.null(entry)&&identical(entry$context$account_id,who$account)&&identical(entry$context$championship_id,who$championship)&&identical(entry$context$user_team_id,who$team)){
+      if(!is.null(entry)&&identical(entry$context$account_id,who$account)&&identical(entry$context$championship_id,who$championship)&&identical(entry$context$user_team_id,who$team)&&
+         identical(fm_scalar(entry$context$competition_id,'unknown'),who$competition)&&identical(entry$season,who$season)){
         if(!identical(entry$season,'unknown'))season<-entry$season
         scoring<-entry$scoring
       }
-      saved<-shiny::isolate(source())
-      if(!is.null(saved)){if(identical(season,'unknown')&&!identical(saved$season,'unknown'))season<-saved$season;if(identical(scoring,'unknown'))scoring<-saved$scoring_version}
-      resource_context(shiny::isolate(login_token()),who$championship,who$team,season=season,scoring_version=scoring,session_id=session$token)
+      resource_context(shiny::isolate(login_token()),who$championship,who$team,season=season,scoring_version=scoring,session_id=session$token,competition_id=who$competition)
     }
-    key_for<-function(who,next_round)paste(who$account,who$championship,who$team,next_round$id %||% '',sep='\034')
+    key_for<-function(who,next_round)paste(who$account,who$championship,who$team,who$competition,who$season,who$scoring,next_round$id %||% '',sep='\034')
     current<-function(g,key)!closed&&identical(g,generation)&&identical(shiny::isolate(key_for(identity(),target())),key)
     persist<-function(data,ctx,round_id,g,key){
       promises::then(lineup_snapshot_store(ctx,round_id,data,owner),function(ok){
@@ -89,7 +91,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       }
       live<-function(){
         if(!current(g,key)){if(identical(requests[[key]],token))requests[[key]]<<-NULL;return(invisible(NULL))}
-        promise<-tryCatch(lineup_fetch_bundle(auth,ctx,next_round,owner),error=function(e)promises::promise_reject(e))
+        promise<-tryCatch(lineup_fetch_bundle(auth,ctx,next_round,owner,is_current=function()current(g,key)),error=function(e)promises::promise_reject(e))
         promises::then(promise,function(data)finish(data),function(error)finish(NULL,error));invisible(NULL)
       }
       if(force){live();return(invisible(NULL))}
@@ -382,7 +384,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       verify<-function(){
         if(!current(g,key))return(NULL)
         notice('Verifying saved lineup…')
-        promises::then(lineup_fetch_bundle(auth,ctx,next_round,owner),function(result)tryCatch({
+        promises::then(lineup_fetch_bundle(auth,ctx,next_round,owner,is_current=function()current(g,key)),function(result)tryCatch({
           if(!current(g,key))return(NULL)
           saving(FALSE);source(result);persist(result,ctx,next_round$id,g,key)
           if(identical(lineup_identity(result$official),lineup_identity(value))){draft(result$official);notice('Saved to Futmondo and verified.');best_note('')}
@@ -391,11 +393,11 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
         },error=function(error)fail('Saved lineup could not be validated. Your draft is retained.')),function(error)fail('The save response is uncertain and readback failed. Your draft is retained. Check Futmondo before saving again.'))
         NULL
       }
-      promises::then(lineup_fetch_bundle(auth,ctx,next_round,owner),function(fresh)tryCatch({
+      promises::then(lineup_fetch_bundle(auth,ctx,next_round,owner,is_current=function()current(g,key)),function(fresh)tryCatch({
         if(!current(g,key))return(NULL)
         if(!identical(lineup_identity(fresh$official),lineup_identity(baseline$official))){source(fresh);return(fail('The official lineup changed in another session. Your draft is retained. Undo changes or review it before saving again.'))}
         if(is.null(shiny::isolate(target()))||!identical(shiny::isolate(target())$id,next_round$id)||next_round$starts_at<=Sys.time())return(fail('The round context changed before saving. Refresh the lineup.'))
-        if(!identical(fresh$season,baseline$season)||!identical(fresh$scoring_version,baseline$scoring_version))return(fail('The league season or scoring rules changed. Refresh before saving.'))
+        if(!identical(fresh$competition_id,baseline$competition_id)||!identical(fresh$season,baseline$season)||!identical(fresh$scoring_version,baseline$scoring_version))return(fail('The competition, season or scoring rules changed. Refresh before saving.'))
         rows<-lineup_roster_frame(fresh);issues<-lineup_validate(value,rows,fresh$rules)
         if(length(issues))return(fail(paste(issues,collapse=' · ')))
         locked<-lineup_locked_changes(fresh,value)

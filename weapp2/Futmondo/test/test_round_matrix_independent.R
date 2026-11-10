@@ -20,14 +20,18 @@ load_assignment(file.path(app, "history_repository.R"), "history_read_pages", re
 load_assignment(file.path(app, "history_repository.R"), "history_context_filter", reader_env)
 load_assignment(file.path(app, "history_repository.R"), "reconcile_player_points", reader_env)
 load_assignment(file.path(app, "background_runtime.R"), "record_acquired_resource", reader_env)
+load_assignment(file.path(app, "competition_context.R"), "complete_point_identity", reader_env)
+reader_env$read_history_incremental<-function(table,query,context,identity_fields,watermark_fields,...)reader_env$history_read_pages(table,query,...)
 load_assignment(file.path(app, "supabase_connector.R"), "read_league_round_points", reader_env)
 load_assignment(file.path(app, "Modules/Players_Table_Module.R"), "add_recent_points_average", reader_env)
 
 players <- sprintf("p%03d", 1:151)
 rounds <- expand.grid(player_id = players, season = c("2025", "2026"),
-  scoring_version = c("A", "B"), round = 1:5,
+  scoring_version = c("A", "B"), round = 1:20,
   KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE)
 rounds$championship_id <- "league-A"
+rounds$competition_id<-"competition-A";rounds$source_round_key<-paste0("number:",rounds$round);rounds$round_id<-NA_character_;rounds$match_id<-NA_character_
+scope<-list(championship_id="league-A",competition_id="competition-A",season="2026",scoring_version="A")
 rounds$points <- as.numeric((seq_len(nrow(rounds)) %% 13L) - 6L)
 rounds$score_status <- "unknown"
 rounds$observed_at <- "2026-10-30T12:00:00Z"
@@ -46,12 +50,12 @@ reader_env$supabase_get <- function(table_name, query_params = list()) {
   calls[[length(calls) + 1L]] <<- list(table = table_name, query = query_params)
   stopifnot(identical(table_name, "player_round_points_latest"),
     identical(query_params$championship_id, "eq.league-A"),
-    identical(query_params$order, "player_id.asc,season.asc,scoring_version.asc,round.asc"),
+    identical(query_params$order, "player_id.asc,round.asc,source_round_key.asc"),
     identical(query_params$select,
-      "championship_id,player_id,season,scoring_version,round,points,score_status,observed_at,occurred_at,round_start_at"),
-    is.null(query_params$season), is.null(query_params$scoring_version),
+      "championship_id,competition_id,player_id,season,scoring_version,round,source_round_number,source_round_key,round_id,match_id,points,score_status,observed_at,occurred_at,round_start_at"),
+    query_params$competition_id=="eq.competition-A",query_params$season=="eq.2026",query_params$scoring_version=="eq.A",
     is.null(query_params$player_id))
-  selected <- fixture[fixture$championship_id == "league-A", , drop = FALSE]
+  selected <- fixture[fixture$championship_id == "league-A" & fixture$competition_id=="competition-A" & fixture$season=="2026" & fixture$scoring_version=="A", , drop = FALSE]
   offset <- as.integer(query_params$offset %||% 0L)
   limit <- min(as.integer(query_params$limit), server_cap)
   start <- offset + 1L
@@ -61,8 +65,8 @@ reader_env$supabase_get <- function(table_name, query_params = list()) {
 
 `%||%` <- function(x, y) if (is.null(x)) y else x
 
-all_rows <- reader_env$read_league_round_points("league-A", max_rows = 50000L)
-expected <- fixture[fixture$championship_id == "league-A", , drop = FALSE]
+all_rows <- reader_env$read_league_round_points("league-A", max_rows = 50000L,context=scope)
+expected <- fixture[fixture$championship_id == "league-A" & fixture$competition_id=="competition-A" & fixture$season=="2026" & fixture$scoring_version=="A", , drop = FALSE]
 stopifnot(is.data.frame(all_rows), nrow(all_rows) == nrow(expected),
   isTRUE(attr(all_rows, "complete")), identical(attr(all_rows, "fetch_status"), "ok"),
   identical(all_rows$player_id, expected$player_id),
@@ -73,17 +77,17 @@ stopifnot(is.data.frame(all_rows), nrow(all_rows) == nrow(expected),
   length(calls) == 6L,
   identical(vapply(calls, function(call) as.integer(call$query$offset), integer(1)),
     c(0L, 700L, 1400L, 2100L, 2800L, 3020L)))
-cat("PASS league-only read continues short server pages without gaps or duplicates across seasons/scoring versions.\n")
+cat("PASS scoped read filters other seasons/scoring versions before paging without gaps or duplicates.\n")
 
 calls <- list()
-capped <- reader_env$read_league_round_points("league-A", max_rows = 1500L)
+capped <- reader_env$read_league_round_points("league-A", max_rows = 1500L,context=scope)
 stopifnot(nrow(capped) == 1500L, identical(attr(capped, "complete"), FALSE),
   identical(attr(capped, "fetch_status"), "partial"), length(calls) == 3L)
 cat("PASS row cap is reported as partial coverage instead of complete.\n")
 
 calls <- list()
 fixture <- fixture[FALSE, , drop = FALSE]
-empty <- reader_env$read_league_round_points("league-A", max_rows = 50000L)
+empty <- reader_env$read_league_round_points("league-A", max_rows = 50000L,context=scope)
 stopifnot(is.data.frame(empty), nrow(empty) == 0L,
   isTRUE(attr(empty, "complete")), identical(attr(empty, "fetch_status"), "empty"))
 cat("PASS empty league history is a complete empty result.\n")
@@ -115,9 +119,9 @@ stopifnot(five$recent_points_avg[4] == 12,
   five$recent_points_status[4] == "reported")
 cat("PASS known-answer N=3 and N=8 means; zero/negative values count, gaps stay missing, and only N=5 uses the source-reported fallback.\n")
 
-context <- list(championship_id = "league-A", player_id = "p1",
+context <- list(competition_id="competition-A",championship_id = "league-A", player_id = "p1",
   season = "2026", scoring_version = "scoring-A")
-stored_revision <- data.frame(championship_id = "league-A", player_id = "p1",
+stored_revision <- data.frame(competition_id="competition-A",championship_id = "league-A", player_id = "p1",
   season = "2026", scoring_version = "scoring-A", round = 11,
   points = NA_real_, score_status = "unavailable", observed_at = "2026-10-30T12:00:00Z")
 older_live_revision <- transform(stored_revision, points = 8, score_status = "unknown",

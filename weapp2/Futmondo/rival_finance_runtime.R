@@ -39,11 +39,11 @@ normalize_money_movements <- function(answer) {
   attr(rows,"fetch_status")<-if(isTRUE(attr(rows,"complete")))if(nrow(rows))"ok"else"empty"else"partial"
   rows
 }
-rival_finance_evidence <- function(account_id,championship_id,season,type,id,payload,observed_at=Sys.time()) {
+rival_finance_evidence <- function(account_id,championship_id,season,type,id,payload,observed_at=Sys.time(),competition_id=NULL) {
   if(type%in%c("team_rounds","round_lineup","round_ranking")){
     payload$kind<-type;id<-paste0(switch(type,team_rounds="rounds:",round_lineup="lineup:",round_ranking="ranking:"),id);type<-"eligibility"
   }
-  list(account_id=as.character(account_id),championship_id=as.character(championship_id),season=mvp_text(season,"unknown"),
+  list(account_id=as.character(account_id),championship_id=as.character(championship_id),competition_id=fm_scalar(competition_id,league_competition_context(championship_id,account_id)),season=mvp_text(season,"unknown"),
     evidence_type=type,source_id=as.character(id),observed_at=rival_finance_stamp(observed_at),payload=payload)
 }
 rival_evidence_rows <- function(evidence,type) {
@@ -67,13 +67,14 @@ rival_evidence_decode <- function(rows) {
     row
   })
 }
-read_rival_finance_evidence <- function(account_id,championship_id,season="unknown",max_rows=20000L) {
+read_rival_finance_evidence <- function(account_id,championship_id,season="unknown",max_rows=20000L,competition_id=NULL) {
+  competition_id<-fm_scalar(competition_id,league_competition_context(championship_id,account_id))
   get_cached_data(paste0("rival_finance_evidence_",account_id,"_",championship_id,"_",season),{
     rows<-history_read_pages("rival_finance_evidence_latest",list(account_id=paste0("eq.",account_id),championship_id=paste0("eq.",championship_id),
-      season=paste0("eq.",season),select="account_id,championship_id,season,evidence_type,source_id,observed_at,payload",
+      competition_id=paste0("eq.",competition_id),season=paste0("eq.",season),select="account_id,championship_id,competition_id,season,evidence_type,source_id,observed_at,payload",
       source_id="not.like.rival-cache:*",order="evidence_type.asc,source_id.asc"),max_rows=max_rows,page_size=1000L)
     list(evidence=rival_evidence_decode(rows),complete=isTRUE(attr(rows,"complete")))
-  },timeout_sec=300,context=resource_context(account_id=account_id,championship_id=championship_id,season=season))
+  },timeout_sec=300,context=resource_context(account_id=account_id,championship_id=championship_id,season=season,competition_id=competition_id))
 }
 # Restore only source-identified transfers within the recorded opening/reset.
 # Legacy rows without an API identity must never be mixed into the cash ledger.
@@ -111,6 +112,8 @@ persist_rival_finance_evidence <- function(evidence,context) {
   evidence<-Filter(function(row){
     identical(mvp_text(row$account_id),mvp_text(context$account_id))&&
       identical(mvp_text(row$championship_id),mvp_text(context$championship_id))&&
+      identical(fm_scalar(row$competition_id,"unknown"),fm_scalar(context$competition_id,"unknown"))&&
+      identical(fm_scalar(row$season,"unknown"),fm_scalar(context$season,"unknown"))&&
       as.numeric(object.size(row))<=256*1024L
   },evidence)
   if(!length(evidence))return(invisible(FALSE))
@@ -121,14 +124,14 @@ persist_rival_finance_evidence <- function(evidence,context) {
     if(index>length(groups))return(invisible(TRUE))
     indices<-groups[[index]];index<<-index+1L
     defer_persistence("supabase_post_direct",list("rival_finance_evidence",unname(evidence[indices]),
-      "account_id,championship_id,season,evidence_type,source_id,observed_at",TRUE),context=context,
+      "account_id,championship_id,competition_id,season,evidence_type,source_id,observed_at",TRUE),context=context,
       on_complete=function(ok){if(isTRUE(ok))later::later(next_group,0)})
   }
   isTRUE(next_group())
 }
 rival_merge_evidence <- function(old,new,max_rows=20000L) {
   rows<-c(old,new);if(!length(rows))return(rows)
-  key<-vapply(rows,function(x)paste(x$account_id,x$championship_id,x$season,x$evidence_type,x$source_id,sep="|"),character(1))
+  key<-vapply(rows,function(x)paste(x$account_id,x$championship_id,fm_scalar(x$competition_id,"unknown"),x$season,x$evidence_type,x$source_id,sep="|"),character(1))
   stamp<-vapply(rows,function(x)as.numeric(fm_time(x$observed_at)),numeric(1));stamp[!is.finite(stamp)]<--Inf
   order<-order(stamp);rows<-rows[order];key<-key[order]
   tail(rows[!duplicated(key,fromLast=TRUE)],max_rows)
@@ -916,7 +919,7 @@ rival_estimate_summary <- function(missing,assumptions=character(),difference=NA
 
 # Public pure accounting interface; every numeric subtotal has an evidence trail.
 # Versioned, context-bound calculation cache. Source records remain authoritative.
-rival_calculation_version <- "2026-11-10-owner-history-v5"
+rival_calculation_version <- "2026-11-10-competition-v6"
 rival_calculation_hash <- function(x) unname(unclass(as.character(openssl::sha256(serialize(x,NULL,version=2)))))
 rival_calculation_evidence <- function(evidence) {
   rows<-Filter(function(x)!rival_snapshot_record(x)&&!x$evidence_type%in%c("team","coverage","rules"),evidence)
@@ -957,7 +960,7 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
   empty<-data.frame(teamid=character(),teamname=character(),estimated_cash=numeric(),confidence=character(),as_of=character(),stringsAsFactors=FALSE)
   if(!is.data.frame(teams)||!nrow(teams))return(list(team_finances=empty,breakdowns=list(),cash_ledgers=list(),all_purchases=data.frame()))
   if(!nzchar(mvp_text(account_id)))stop("An explicit account is required for rival finance evidence.")
-  evidence<-Filter(function(x)identical(mvp_text(x$championship_id),as.character(championship_id))&&identical(mvp_text(x$season,"unknown"),as.character(season))&&(is.null(account_id)||identical(mvp_text(x$account_id),as.character(account_id))),Filter(function(x)!rival_snapshot_record(x),rival_merge_evidence(list(),evidence)))
+  evidence<-Filter(function(x)identical(mvp_text(x$championship_id),as.character(championship_id))&&identical(fm_scalar(x$competition_id,"unknown"),league_competition_context(championship_id,account_id))&&identical(mvp_text(x$season,"unknown"),as.character(season))&&(is.null(account_id)||identical(mvp_text(x$account_id),as.character(account_id))),Filter(function(x)!rival_snapshot_record(x),rival_merge_evidence(list(),evidence)))
   scope_frame<-function(rows){
     if(!is.data.frame(rows))return(data.frame())
     expected<-list(championship_id=championship_id,season=season,account_id=account_id)
@@ -1704,7 +1707,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
         publish(FALSE);invisible(NULL)
       }
       queued<-defer_persistence("supabase_post_direct",list("rival_finance_evidence",batch,
-        "account_id,championship_id,season,evidence_type,source_id,observed_at",TRUE),context=context,on_complete=callback)
+        "account_id,championship_id,competition_id,season,evidence_type,source_id,observed_at",TRUE),context=context,on_complete=callback)
       if(!isTRUE(queued))callback(FALSE)
     })
     invisible(NULL)
@@ -1921,12 +1924,20 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
         state$value(list(team_finances=data.frame(),breakdowns=list(),loading=FALSE))};return()
     }
     if(!isTRUE(active()))return()
-    cid<-championship();tid<-user_team();shiny::req(cid,tid);version<-if(is.function(refresh))refresh()else 0
+    cid<-championship();tid<-user_team();shiny::req(cid,tid)
+    if(!league_context_ready(root,auth,cid)){
+      state$generation<-state$generation+1L;state$key<-NULL;state$identity<-NULL;state$queue<-list();state$busy<-0L
+      state$value(list(team_finances=data.frame(),breakdowns=list(),loading=TRUE,reason="Resolving competition and season metadata."));return()
+    }
+    version<-if(is.function(refresh))refresh()else 0
     publication<-if(is.function(root$userData$round_publication_revision))root$userData$round_publication_revision()else 0
-    key<-paste(auth[["userid"]],cid,tid,version,publication,sep="|")
+    league_context_revision()
+    resolved<-resource_context(auth,cid,tid)
+    identity<-paste(auth[["userid"]],cid,tid,resolved$competition_id,resolved$season,resolved$scoring_version,sep="|")
+    key<-paste(identity,version,publication,sep="|")
     if(!identical(state$key,key)){
-      same<-identical(state$identity,paste(auth[["userid"]],cid,tid,sep="|"));state$identity<-paste(auth[["userid"]],cid,tid,sep="|")
-      state$key<-key;state$generation<-state$generation+1L;state$busy<-0L;state$season<-league_season_context(cid);state$reason<-"";state$build_failure<-NULL
+      same<-identical(state$identity,identity);state$identity<-identity
+      state$key<-key;state$generation<-state$generation+1L;state$busy<-0L;state$season<-resolved$season;state$reason<-"";state$build_failure<-NULL
       if(!is.null(state$publish_timer)){state$publish_timer();state$publish_timer<-NULL}
       state$scheduled_owners<-character();state$ownership_pending<-0L;state$ownership_catalog_scheduled<-FALSE;state$ownership_write_attempts<-character();if(!same)state$ownership_unsaved<-list()
       state$account<-auth[["userid"]];state$championship<-cid;state$snapshot_attempted_signature<-NULL;state$snapshot_pending<-NULL;state$seed_ready<-FALSE;state$point_repair_done<-FALSE;state$notification_cursor<-"";state$notification_status<-"initial";state$scheduled_notification_cursors<-character();state$notification_pending<-FALSE;state$scheduled_teams<-character();state$scheduled_lineups<-character();state$scheduled_rankings<-character();state$pending_team_ids<-character()
@@ -1948,7 +1959,8 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
   shiny::observe({
     shiny::req(isTRUE(active()),valid_login(login()))
     cid<-championship();tid<-user_team()
-    shiny::req(identical(state$identity,paste(login()[["userid"]],cid,tid,sep="|")),!is.null(state$key))
+    ctx<-resource_context(login(),cid,tid)
+    shiny::req(identical(state$identity,paste(ctx$account_id,cid,tid,ctx$competition_id,ctx$season,ctx$scoring_version,sep="|")),!is.null(state$key))
     directory<-tryCatch(teams(),error=function(error)error)
     failed<-inherits(directory,"error")
     pending<-failed&&inherits(directory,"shiny.silent.error")&&

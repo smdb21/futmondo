@@ -23,8 +23,8 @@ async function counts(db) {
     assert.ok(!names.some(x=>/automation|forecast|model_evaluations|transfer_scenarios|manager_dna|decision_log|smart_alerts/.test(x)));
     pass('fresh schema is repeatable and creates no excluded feature tables');
     await fresh.exec("SET ROLE service_role; INSERT INTO championships(id,name) VALUES('c','League'); INSERT INTO players(id,name,slug) VALUES('p','Player','player'); INSERT INTO user_teams(id,championship_id,name) VALUES('t','c','Team');");
-    await fresh.exec("INSERT INTO player_history(player_id,championship_id,value,points,observed_at) VALUES('p','c',100,9,'2026-10-01') ON CONFLICT(player_id,championship_id,observed_at) DO NOTHING;");
-    await fresh.exec("INSERT INTO player_history(player_id,championship_id,value,points,observed_at) VALUES('p','c',100,9,'2026-10-01') ON CONFLICT(player_id,championship_id,observed_at) DO NOTHING;");
+    await fresh.exec("INSERT INTO player_history(player_id,championship_id,value,points,observed_at) VALUES('p','c',100,9,'2026-10-01') ON CONFLICT(player_id,championship_id,competition_id,season,observed_at) DO NOTHING;");
+    await fresh.exec("INSERT INTO player_history(player_id,championship_id,value,points,observed_at) VALUES('p','c',100,9,'2026-10-01') ON CONFLICT(player_id,championship_id,competition_id,season,observed_at) DO NOTHING;");
     assert.equal((await counts(fresh)).rows,1);
     pass('server role can persist replay-idempotent observed price history');
     await fresh.exec("INSERT INTO player_match_observations(player_id,championship_id,season,scoring_version,round,points,score_status,observed_at) VALUES('p','c','2026','s',1,0,'final','2026-10-01'),('p','c','2026','s',2,-2,'final','2026-10-02'),('p','c','2026','s',2,-1,'final','2026-10-03'),('p','c','2025','s',2,15,'final','2025-10-03');");

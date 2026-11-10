@@ -3,13 +3,17 @@
 transfer_publication_revision <- shiny::reactiveVal(0L)
 # Explicit bounded cache and session resource states.
 resource_context <- function(login=NULL, championship_id=NULL, user_team_id=NULL, player_id=NULL,
-  season="unknown", scoring_version="unknown", account_id=NULL, session_id=NULL) {
+  season="unknown", scoring_version="unknown", account_id=NULL, session_id=NULL, competition_id=NULL) {
   account <- fm_scalar(account_id %||% if(valid_login(login)) login[["userid"]] else NULL, "")
   if(!nzchar(account)) stop("An explicit account is required for private resources.")
+  metadata<-league_context_metadata(championship_id,account)
+  if(missing(season))season<-metadata$season %||% season
+  if(missing(scoring_version))scoring_version<-metadata$scoring_version %||% scoring_version
+  competition_id<-competition_id %||% metadata$competition_id %||% "unknown"
   structure(list(account_id=account,championship_id=fm_scalar(championship_id,""),
     user_team_id=fm_scalar(user_team_id,""),player_id=fm_scalar(player_id,""),
     season=fm_scalar(season,"unknown"),scoring_version=fm_scalar(scoring_version,"unknown"),
-    session_id=fm_scalar(session_id,"")),class="futmondo_context")
+    session_id=fm_scalar(session_id,""),competition_id=fm_scalar(competition_id,"unknown")),class="futmondo_context")
 }
 resource_policy<-function(resource){
  ttl<-if(grepl("financial|capacity|market|bid|money|user_team_info|team_info",resource,ignore.case=TRUE))20 else
