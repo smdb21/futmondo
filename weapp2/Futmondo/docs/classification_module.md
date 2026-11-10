@@ -1,5 +1,7 @@
 # Classification and matchday results
 
+The range tab is named **General** and shows “Change slider to see partial classifications.” above the slider (2026-11-09).
+
 Classification opens with **Latest round** selected by default, and follows the latest confirmed round as scores load. This changes only the initial filter and adds no source requests or persistence.
 
 `classification_UI(id)` displays the round-range slider, standings, rank progression, published dream-team players and configured league rewards.

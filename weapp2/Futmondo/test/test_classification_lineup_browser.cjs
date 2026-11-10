@@ -112,7 +112,7 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
       await modal.locator('.fm-lineup-pitch [data-player-id="rival-0"]').waitFor();
       assert.equal(await modal.locator('[data-player-id="rival-3"] .fm-lineup-points').innerText(),'8*');
       await modal.getByRole('button',{name:'Close',exact:true}).click();
-      await page.getByRole('tab',{name:'Partial classifications',exact:true}).click();
+      await page.getByRole('tab',{name:'General',exact:true}).click();
       assert.equal(await ownRow.count(),1);
       assert.match(await ownRow.innerText(),/Your Team/);
       await page.locator('#classification-round_range_slider').waitFor({state:'visible'});
