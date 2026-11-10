@@ -907,3 +907,10 @@ Set shared player-table minimum/default widths to Position 112px, Bids 64px and 
 Status: **implemented and verified locally; hosted rollout remains unverified**.
 
 Add a native multiline tooltip to each shared player table's recent-average pill, listing the contributing round/score pairs newest first. Reuse the average's exact numbered window, preserve signed/zero values and expose truthful unlabelled/scalar fallback provenance. Hidden hover metadata refreshes in place alongside numeric averages, including corrections that leave the average equal. Focused known-answer, source, metric, browser and required offline lifecycle checks passed; performance and hosted limits are recorded in `data_review_results.md`.
+
+
+## Leaving clause players in My Team — 2026-11-10
+
+Status: **implemented and verified locally; hosted rollout remains unverified**.
+
+Add a matching Leaving players panel beside Incoming players, with source-confirmed departure time, next-round timing and shared player-card navigation. Retain confirmed departures across partial/stale/overdue observations; remove them only on verified departure, cancellation or a newer repurchase. Both directions share the existing two-read queue and actual roster counts/value. Safe clause observations persist in the existing private database evidence store, preserving context and the original 60-second deadline; failed writes remain retryable. No dependency, environment variable, migration, timer or unattended worker is added. Focused data/persistence, responsive browser and offline lifecycle verification and performance limits are recorded in `data_review_results.md`.

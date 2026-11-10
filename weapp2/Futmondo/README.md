@@ -34,6 +34,8 @@ admin=YOUR_ADMIN_LOGIN_EMAIL
 
 The optional `admin` value identifies the account authorized for administrative actions. Database credentials remain server-side. Missing database configuration leaves live factual inspection available but prevents historical persistence.
 
+Use the project base URL for `supabase_project_url`, without `/rest/v1`. The shared URL getter also accepts a copied REST base URL and removes its trailing `/rest/v1` and slashes before callers add the endpoint. A duplicated `/rest/v1/rest/v1/` returns HTTP 404 and prevents both reading and saving history. After correcting a hosted environment value, restart or redeploy the app so R receives it.
+
 When the API cannot establish a season, an independently verified per-league mapping may be supplied:
 
 ```text
@@ -95,6 +97,8 @@ HTTPS and same-origin cookie requests are required. Posit Connect Cloud may omit
 
 
 Locker clause payments are read from Futmondo's authenticated `/2/locker/news` endpoint during active-session transfer loading. The `xml2` package parses the observed HTML payment template with network access disabled. Its dependency is included in the deployment manifest. No additional environment variables, saved authentication, scheduled worker, or database migration is needed.
+
+My Team's incoming and leaving clause panels reuse safe, scoped player-clause observations from the existing private database evidence store within their original 60-second source deadline. `clause_transfer_store.R` adds no environment variables, packages or migration; existing server-side database configuration is required for durable reuse. Missing database access falls back to active-session source acquisition, while unsuccessful persistence remains retryable. No authentication secrets are included in these observations.
 
 
 ## Incremental transaction and player history

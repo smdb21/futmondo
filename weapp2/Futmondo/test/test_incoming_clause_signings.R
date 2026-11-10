@@ -10,6 +10,7 @@ summary<-function(owner='rival',date='2026-09-19T22:00:00.000Z',transferred=TRUE
  data=list(id='in',name='Incoming',role='centrocampista',team='Barcelona',logo='barcelona.png'),
  championship=list(owner=list(`_id`=owner),clause=list(transferred=transferred,transferDate=date))),observed_at=now)
 summaries<-list(`in`=summary(),out=summary('mine'))
+summaries$out$data$id<-'out'
 result<-reconcile_pending_clause_transfers(roster,tx,summaries,'mine',now)
 check('incoming/outgoing reservations deduplicate and retain authoritative arrival',{
  stopifnot(result$status=='ok',result$pending_inbound_count==1L,result$pending_outbound_count==1L,
@@ -103,6 +104,7 @@ settle<-function(session){for(i in seq_len(12L)){later::run_now(0);session$flush
 complete<-function(fail=FALSE){job<-pending[[1]];pending<<-pending[-1]
  if(fail)job$reject(simpleError('synthetic failure'))else {
   value<-summary();value$data$id<-job$args$player_id
+  attr(value,'observed_at')<-Sys.time()
   context<-resource_context(job$args$login,job$args$championship_id,job$args$user_team_id,job$args$player_id)
   key<-api_cache_key(paste0('player_summary_',job$args$login[['userid']],'_',job$args$championship_id,'_',job$args$user_team_id,'_',job$args$player_id),context=context)
   if(job$current())resource_store(key,value,context,'player_summary')
