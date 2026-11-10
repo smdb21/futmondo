@@ -104,3 +104,14 @@ Active refreshes reuse verified history and query a 24-hour overlap behind the l
 For transfer reuse across app restarts, apply `scripts/migrations/20261105201845_complete_history_baselines.sql` before deploying the updated app. New databases include it in `scripts/schema.sql`. The new server-only cache contains normalized factual records and completion metadata, never login tokens or passwords. Missing schema or an invalid snapshot safely falls back to source acquisition. The configured hosted database received this migration on 2026-11-05 (recorded version `20261105220658`). Release verification and performance limits are recorded in `docs/data_review_results.md`.
 
 The last application page is saved per Futmondo account and restored on normal or remembered login, across devices and app restarts. Existing databases need `scripts/migrations/20261107050308_user_page_preferences.sql` (already applied to the configured hosted database on 2026-11-06); new databases include it in `scripts/schema.sql`. No new environment variables or dependencies are needed. See [saved page behavior and verification](docs/page_preferences.md).
+
+
+## Docker / Dokploy hosting
+
+For deployment on your own VPS, use [the Dokploy guide](docs/docker_deployment.md).
+The production Dockerfile is `weapp2/Futmondo/Dockerfile`, with build context
+`weapp2/Futmondo`. It uses R 4.6.1 and serves the app directly at `/` on container
+port 3838. Enter the main domain in Dokploy's Domains settings and configure
+HTTPS there; DNS contains only the server IP. Set existing server-only credentials
+in Dokploy's runtime Environment tab, keeping the database as the durable store.
+The development settings under `weapp2/docker` are separate from this image.

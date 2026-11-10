@@ -1,0 +1,21 @@
+# Allow only the production application and server configuration into the build.
+**
+!/*.R
+!/Modules/
+!/Modules/*.R
+!/www/
+!/www/**
+!/player_columns_to_hide.txt
+!/shiny-server.conf
+
+# Never bundle credentials, captures, local state, or obsolete source backups.
+**/.env*
+**/.Renviron*
+**/.Rprofile
+**/.Rhistory
+**/.RData*
+**/*.har
+**/*.orig
+**/*.pem
+**/*.key
+**/*credentials*.json

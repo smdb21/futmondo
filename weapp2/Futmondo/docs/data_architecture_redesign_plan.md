@@ -818,3 +818,15 @@ Implemented locally: move the existing Notifications output into the Futmondo ti
 ## Remove minimum-value filtering app-wide — 2026-11-09
 
 Implemented locally: remove Min Val from both shared player-table layouts and remove its reset/read/filter logic. The shared module covers Today, Market, My Team, Players and rival squads. Obsolete client inputs cannot constrain the rows. Contracts and verification/performance review: `players_table_module.md` and `data_review_results.md`.
+
+
+## 2026-11-09: Dokploy image for the main domain (implemented locally)
+
+Added a production Dockerfile, a restricted build context, and Shiny Server
+`app_dir` configuration to serve the current app at `/` on port 3838. Runtime
+secrets are configured through Dokploy; existing database persistence and factual
+behavior are unchanged. Setup is documented in `docs/docker_deployment.md`.
+Offline lifecycle and deployment checks pass. Docker image build, public HTTPS,
+WebSocket/cookie behavior, and target-server sizing remain unverified because no
+Docker daemon or target-server connection is available in this session. This is
+local packaging work, not a completed production deployment.

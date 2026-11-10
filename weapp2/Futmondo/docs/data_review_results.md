@@ -1322,3 +1322,28 @@ No delegation. Removed both Min Val controls, the clear-filter reset entry and t
 Passed `test/test_player_table_filters.R` (9 groups), including rendered controls for both layouts, obsolete minimum-value input having no effect, and existing owner/clause/default/maximum filters. Its existing 524-row normalization/filter metric was 0.002s and 95.1 KiB. Mandatory `test/test_shiny_simulation.R` passed 13 checks plus 8 tabs with no HTTP/live database mutation attempts; existing empty Plotly trace warnings remain. Scoped diff/whitespace checks passed. Separate browser/hosted checks and unrelated suites were deliberately skipped for this shared control removal.
 
 Performance review: one fewer Shiny input/binding per table, no obsolete reset message or minimum-value reactive dependency, and one fewer local valuation-filter pass. No new API/database calls, acquisition/persistence/cache work, dependencies, observers or timers. Existing row data and pagination are reused. No expensive path requires a new benchmark.
+
+
+## 2026-11-09: Dokploy root-path deployment packaging
+
+- Added `Dockerfile` (R 4.6.1), `.dockerignore`, and `shiny-server.conf`; the app is
+  served directly at `/` on internal port 3838. The repository previously had
+  development-container settings under `weapp2/docker` but no Dockerfile.
+- PASS: `Rscript test/test_shiny_simulation.R`: 13 offline lifecycle checks plus
+  all 8 tabs; no HTTP or live database mutation attempts. Plotly emitted warnings
+  about inferred trace types/modes; no test failed.
+- PASS: `Rscript test/test_deployment_contract.R`: 3 checks, 0 failures.
+- PASS: focused static context/route review: all 46 manifest runtime files plus
+  the Shiny configuration are included (1,215,535 bytes); README excluded as
+  documentation. Sensitive/development fixture paths are excluded. R version,
+  port, root application route, inherited startup, and dependency layer ordering
+  agree. This static check does not replace a Docker image build.
+- Performance review: package installation is cached before source copying and
+  defaults to two build jobs (configurable with `NCPUS`). App data/API/database
+  paths are unchanged; no polling, additional reads, timers, or redraws are added.
+  Runtime observations still use the existing durable database, with no new
+  in-memory-only cache. No app dependency or statistical calculation changed.
+- Not run: Docker build/container smoke test (`docker info` reports no running
+  daemon), target-server resource measurements, public DNS/HTTPS/WebSockets, and
+  hosted remembered-login checks. Package versions resolve from the image's CRAN
+  repository during build rather than restoring the manifest exactly.
