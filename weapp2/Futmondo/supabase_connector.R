@@ -10,7 +10,11 @@ SB_KEY <- Sys.getenv("supabase_secret_key")
 # a later readRenviron() in global.R is respected.
 get_sb_url <- function() {
   url <- Sys.getenv("supabase_project_url")
-  if (is.null(url) || url == "") SB_URL else url
+  if (is.null(url) || url == "") url <- SB_URL
+  # Callers append /rest/v1/<table>; accept a copied REST base as well as the
+  # project URL so both reads and durable writes use exactly one API prefix.
+  url <- sub("/+$", "", trimws(url))
+  sub("(/rest/v1)+$", "", url)
 }
 get_sb_key <- function() {
   key <- Sys.getenv("supabase_secret_key")

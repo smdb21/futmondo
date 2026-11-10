@@ -1548,3 +1548,52 @@ Verification: `Rscript test/test_classification_lineup.R` passed 17 groups and `
 Independent review: isolated Chromium checks at 992px with a 230px sidebar passed for 3-6-1 and 4-6-0 with and without a bench, including long player names, card nonoverlap and viewport fit. Dense long-name columns can reach about 820px high and use normal vertical scrolling. No further runtime issue was found.
 
 Performance review: one static wrapper per lineup and CSS layout rules; unchanged bounded 11+4 player tiles, API/database request volume, persistence/cache reuse, invalidation, reactive work, timers and acquisition behavior. Browser resize only relayouts existing elements, with no new source or storage work. Six-player columns can require vertical scrolling; no fixed height clips content. No runtime dependency, environment variable, schema or manifest dependency change. Verification used offline synthetic data; no authenticated transaction or hosted deployment was performed. Unrelated working-tree and staged edits are preserved.
+
+
+## Round history HTTP404 from a duplicated database API path — 2026-11-10
+
+Root cause established with live database log metadata: eight GETs to
+`/rest/v1/rest/v1/player_round_dataset` and 245 POSTs to
+`/rest/v1/rest/v1/player_match_observations` returned HTTP404 / `PGRST125` in the
+inspected 24-hour window. Other database resources had the same duplicated prefix.
+Correctly addressed requests succeeded; the dataset/check/observation objects and
+service-role privileges exist. Stored observations/checks remain present. No raw
+private response bodies, keys or Futmondo account requests were used for diagnosis.
+
+Normalize `get_sb_url()` after dynamic environment/fallback selection so copied
+REST bases and project roots reach the same endpoint. All runtime database URL
+builders use this getter. The fix preserves server-side credentials, context
+isolation, successful-write acknowledgements, bounded acquisition and durable
+reuse. README and the round-matrix contract describe configuration and recovery.
+
+Verification: the new synthetic regression first failed on the original getter
+before starting its local HTTP fixture, then passed all four groups. Both URL
+forms used exactly seven requests: empty matrix read, score write, success-check
+write, paginated readback, and a fresh controller read after clearing process
+caches. The controller made zero player-summary requests. Scores 0, -2 and NULL
+survived; the check was acknowledged only after scores. A heartbeat executed while
+the database response was delayed. Independent source review confirmed every
+caller is covered. Focused reader checks passed 4 groups; persistence recovery
+passed 11; final isolated offline lifecycle passed 13 checks plus eight tabs with
+no HTTP or live database mutation attempts. Existing synthetic Plotly warnings
+remain. Fixture JavaScript syntax and deployment-contract checks passed. Bundle
+metadata was reconciled against the isolated committed source plus this change,
+including pre-existing stale tooltip hashes; no unrelated source edits are bundled.
+
+An additional broader recovery run stopped at an existing wider-window fixture
+assertion: it expects two completed N8 histories while both new wider requests are
+still pending. Independent replay with the original and normalized getters failed
+identically, with zero calls to either getter. This unrelated fixture was left
+unchanged; the complete broader suite is not claimed to pass.
+
+Performance review: bounded string normalization adds no API/database requests,
+cache entries, polling, reactive redraws or UI elements. Both fixture variants
+have identical seven-request paths and reuse persisted history after memory is
+cleared. Initial adapter dispatch was 0.175s and the subsequent setup 0.007s in
+the isolated run; these are local measurements of existing adapter setup, not
+hosted latency guarantees. Delayed-response responsiveness passed. Mobile layout,
+manual actions, source timestamps and persistence retry budgets are unchanged. No
+dependency, environment-variable name, schema migration or authentication storage
+was added. The hosting environment is not accessible here; the user will correct
+its URL. Hosted restart/deployment, subsequent successful history acquisition and
+complete recovery of previously unsaved observations remain unverified.

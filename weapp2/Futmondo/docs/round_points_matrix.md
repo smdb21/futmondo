@@ -92,3 +92,32 @@ A durable `scores` or `empty` check proves that a source request succeeded at it
 `recent_points_covered_players()` now requires the league's latest labelled round to be at least N; a seven-round season cannot report complete eight-round coverage. Pending wider demand no longer counts as a completed player. The visible completion signature resets when the targeted request starts so newly retrieved scores publish immediately when all affected visible requests settle. Source observations still persist before the success check; a fresh session reuses all eight recorded rounds without a source replay. Explicit Refresh remains available for later corrections.
 
 The existing check table does not store the requested N or a source revision token. A fresh session may recheck an old sparse/empty marker when it asks for a wider missing window; bounded in-session acquisition and completed-window reuse prevent a request loop. Current captures establish that player summary responses can return seven labelled rounds without an N parameter, but they do not prove any specific user's current source has eight. If the authoritative response has fewer than eight recorded scores, the cell stays blank.
+
+
+## Database base URL normalization — 2026-11-10
+
+`get_sb_url()` selects the current `supabase_project_url`, retaining the existing
+`SB_URL` fallback when the environment value is empty. It trims surrounding
+whitespace and trailing slashes, then removes terminal `/rest/v1` segments. The
+result is the project base URL; existing synchronous reads/writes, asynchronous
+reads and queued score/check writes append `/rest/v1/<table>` exactly once. Custom
+gateway prefixes, HTTP loopback fixtures and dynamic environment lookup remain
+supported. The getter neither logs configuration nor changes the server-side key.
+
+Live database logs established HTTP 404 with `PGRST125` for
+`GET /rest/v1/rest/v1/player_round_dataset` and
+`POST /rest/v1/rest/v1/player_match_observations`. The required view/tables and
+server-role privileges exist; correctly addressed reads/writes have successful
+responses. The duplicated API prefix prevents the initial matrix load and the
+score writes that must precede a success marker, explaining the combined source,
+saving and incomplete-history warning. `FM-HTTP-000003` is a process-local failure
+reference, not a stable HTTP status or a missing-round identifier.
+
+This corrects acquisition and persistence addressing without manufacturing missing
+rounds or acknowledging failed writes. Existing context, source timestamp,
+completeness, bounded active-session acquisition, durable database reuse and
+score-first/check-last contracts remain in force. Deploy the code or configure the
+project base URL and restart the hosted R process; existing failed requests do not
+become successful merely because the source code changed. Hosted recovery requires
+an active history load to retrieve and persist anything that was not previously
+saved. No unattended backfill is introduced.

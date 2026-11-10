@@ -2265,7 +2265,7 @@
       "checksum": "35285acf91d616a999b87ba74bb25a1f"
     },
     "round_lineup_runtime.R": {
-      "checksum": "5f5e92f21cb9c1fdd196e2dfb7540e84"
+      "checksum": "5b3b519b6c8d5d563dd9da2e72516068"
     },
     "page_preferences.R": {
       "checksum": "e71aa64f6f5b2262927395b22afef9ff"
@@ -2370,7 +2370,7 @@
       "checksum": "689b8f49078c04c58eba294f52bf0269"
     },
     "supabase_connector.R": {
-      "checksum": "3f6ff4dc8b4e3adc8dccc720740378e6"
+      "checksum": "25fd926333c1bff5b9002862e4084514"
     },
     "theme.R": {
       "checksum": "a1e1d838c6dcce0a85e626a48ad799e9"
@@ -2382,13 +2382,13 @@
       "checksum": "6253d5e12d91ddef162c7e9e7624680a"
     },
     "www/custom_style.css": {
-      "checksum": "eea239f7020d593e1be8725b837a4207"
+      "checksum": "f482c74c3a934467571c3fbbe2494ae7"
     },
     "www/theme-switch.js": {
       "checksum": "616593ba18b7d3bb585da89e204c0cf4"
     },
     "www/release-info.json": {
-      "checksum": "6cad6c9be4fa53032e8a6dc04e73a847"
+      "checksum": "a16b170268e346f98ad00c6fe287228c"
     },
     "www/remember-login.js": {
       "checksum": "2b037334f8088f5b4a270acbaea52e91"
@@ -2403,7 +2403,7 @@
       "checksum": "24499829491f727a5fe32113e3e641af"
     },
     "Modules/Lineup_Module.R": {
-      "checksum": "923eb47dd6516821e2cdc88db4a7c5fa"
+      "checksum": "c696c67e3ff78369b388691cd21e29a5"
     },
     "rival_ownership_runtime.R": {
       "checksum": "96cca294a78fbe0f49f81900b0d56fe9"

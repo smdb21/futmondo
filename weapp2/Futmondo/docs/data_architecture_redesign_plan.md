@@ -921,3 +921,19 @@ Add a matching Leaving players panel beside Incoming players, with source-confir
 Status: **implemented and verified locally; hosted rollout remains unverified**.
 
 Use a shared responsive pitch/bench wrapper in the editor and historical lineup modal. At desktop widths, place substitutes far left, then goalkeeper, defenders, midfielders and forwards in vertical columns, with matching field markings. Preserve the existing narrow-screen layout, source slot identity and manual actions. Focused geometry, dense/no-forward formation, resize reuse, player editing, phone dismissal and mandatory offline lifecycle checks passed. Performance review and verification limits are recorded in `data_review_results.md`.
+
+
+## Round history database URL correction — 2026-11-10
+
+Status: **implemented and verified locally; hosted configuration/recovery remains unverified**.
+
+Live database logs show duplicated `/rest/v1/rest/v1/` requests returning HTTP404
+for the saved round dataset and score writes. Normalize the shared database base
+URL before all callers append the REST path; accept project roots and copied REST
+base URLs without changing keys, context, persistence acknowledgements or bounded
+active-session acquisition. Synthetic real-HTTP checks verify ordered score/check
+saves, readback after clearing process caches, a fresh controller reusing saved
+history without source requests, and responsiveness during delayed reads. The
+required offline lifecycle passes. Correct the hosted environment value and restart,
+or deploy the code, then confirm active-session history recovery. Actual checks,
+performance review and verification limits are in `data_review_results.md`.
