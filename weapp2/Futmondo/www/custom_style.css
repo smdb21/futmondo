@@ -1407,3 +1407,8 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
   .sidebar-mini.sidebar-collapse .fm-header-title { display: none; }
   .sidebar-mini.sidebar-collapse .fm-header-brand { gap: 0; }
 }
+
+/* Keep round-range handles clear of phone edge-navigation gestures. */
+@media (max-width: 767px) {
+  .fm-classification-range { padding-inline: 20px; }
+}

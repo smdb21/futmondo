@@ -23,7 +23,10 @@ classification_UI <- function(id) {
         tabPanel("General",
           value = "partial",
           p("Change slider to see partial classifications."),
-          sliderInput(ns("round_range_slider"), "Points between rounds", min = 1, max = 38, value = c(1, 38))
+          div(
+            class = "fm-classification-range",
+            sliderInput(ns("round_range_slider"), "Points between rounds", min = 1, max = 38, value = c(1, 38))
+          )
         )
       )
     )),
