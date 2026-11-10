@@ -106,3 +106,10 @@ Picker rows now place a compact icon beside the name instead of the long members
 ## Lineup control placement — 2026-11-09
 
 The formation selector sits directly above the pitch, replacing its repeated static formation heading. Optimize and the **Last N rounds** input share a single row, including narrow phones; the input can shrink to fit. The injury toggle keeps its own full-width row. Input identities, formation entitlements, draft selection and optimization/save behavior are unchanged.
+
+
+## Horizontal desktop lineups — 2026-11-10
+
+At viewport widths of at least 992px, the shared `fm-lineup-layout` wrapper places the bench on the far left and the pitch beside it. Position groups form vertical columns ordered visually as goalkeeper, defenders, midfielders and forwards; the original slot identities and source order remain intact. The field markings and stripes follow the horizontal orientation. Groups with zero players, such as forwards in 4-6-0, do not reserve a blank column. Below 992px the existing vertical pitch and bench underneath remain unchanged.
+
+Both the editable lineup and `round_lineup_pitch_ui()` use this wrapper. Desktop cards use 48px portraits and content-driven column height so six midfielders and four ordered substitutes stay visible without overlap. This is responsive presentation only: resizing does not fetch, recalculate or save a lineup. Existing acquisition, durable database snapshots, draft validation, player selection and explicit save behavior are unchanged.

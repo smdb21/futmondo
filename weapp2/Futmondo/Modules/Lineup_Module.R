@@ -353,6 +353,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
     output$pitch<-shiny::renderUI({
       shiny::req(is_module_active(),draft(),source());value<-draft();roles<-lineup_slot_roles(value$strategy)
       shiny::div(class='fm-round-lineup',
+        shiny::div(class='fm-lineup-layout',
         shiny::div(class='fm-lineup-pitch',role='group',`aria-label`=paste('Pitch, formation',value$strategy),
           shiny::div(class='fm-lineup-markings',`aria-hidden`='true',shiny::div(class='fm-lineup-circle'),shiny::div(class='fm-lineup-goal-top'),shiny::div(class='fm-lineup-goal-bottom')),
           lapply(unique(roles),function(role){indices<-which(roles==role);shiny::div(class='fm-lineup-row',style=paste0('--lineup-count:',length(indices)),lapply(indices,function(i)tile(value$starters[i],role,i)))})),
@@ -360,7 +361,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
           shiny::div(class='fm-lineup-bench-row',lapply(seq_len(4L),function(i)tile(value$bench[i],'Substitute',i,TRUE))),
           shiny::div(class='fm-lineup-coverage',lapply(c('DEF','MID','FWD'),function(role){
             covered<-lineup_bench_coverage(roster(),value$bench,source()$rules$multiposition)
-            shiny::span(class=if(!role%in%covered)'fm-lineup-warning',paste(role,if(role%in%covered)'✓'else'—'))}))))
+            shiny::span(class=if(!role%in%covered)'fm-lineup-warning',paste(role,if(role%in%covered)'✓'else'—'))})))))
     })
     output$captain_control<-shiny::renderUI({
       shiny::req(is_module_active(),draft(),source());if(!source()$rules$captain_enabled)return(NULL)

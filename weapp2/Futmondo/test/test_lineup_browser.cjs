@@ -1,6 +1,7 @@
 // Start Rscript test/test_lineup_browser.R from the application directory first.
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const { assertLineupLayout } = require('./lineup_layout_helpers.cjs');
 const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/futmondo-review-tools/node_modules', 'playwright'));
 
 (async () => {
@@ -64,6 +65,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       };
       await pitch.locator('.fm-lineup-player').nth(10).waitFor();
       await assertControlsLayout();
+      await assertLineupLayout(page, page.locator('.fm-lineup-layout'));
       assert.equal(await pitch.locator('.fm-lineup-empty').count(), 0);
       assert.equal(await page.locator('.fm-lineup-bench-row .fm-lineup-player').count(), 4);
       assert.equal(await page.locator('.fm-lineup-crest').count(), 15);
@@ -241,8 +243,26 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       assert.equal(await page.locator('.shiny-output-error:visible').count(), 0);
       assert.deepEqual(errors, []);
       await page.screenshot({ path: `/tmp/futmondo-lineup-editor-${width}.png`, fullPage: true });
+      // Dense midfield columns and formations without forwards must retain all
+      // slots through layout-only resizing, without new reads or submissions.
+      for (const formation of ['3-6-1', '4-6-0']) {
+        await page.locator('#lineup-formation').selectOption(formation);
+        await page.locator(`.fm-lineup-pitch[aria-label="Pitch, formation ${formation}"]`).waitFor();
+        await assertLineupLayout(page, page.locator('.fm-lineup-layout'));
+        await page.screenshot({ path: `/tmp/futmondo-lineup-editor-${formation}-${width}.png`, fullPage: true });
+        if (width >= 992 && formation === '3-6-1') {
+          const resizeCounts = await page.locator('#fixture_counts').innerText();
+          for (const resizeWidth of [991, 992, 390, width]) {
+            await page.setViewportSize({ width: resizeWidth, height: 1000 });
+            await assertLineupLayout(page, page.locator('.fm-lineup-layout'));
+          }
+          await page.waitForTimeout(350); // Allow a fixture counter publication after resize.
+          assert.equal(await page.locator('#fixture_counts').innerText(), resizeCounts, 'Resizing never reads or saves lineup data');
+        }
+      }
+      assert.deepEqual((await page.locator('#fixture_counts').innerText()).split('/').map(Number), savedCounts);
       previousReads = Number((await page.locator('#fixture_counts').innerText()).split('/')[0]);
-      console.log(`PASS ${width}px: clear, defaults, disabled save, exact XI/bench, changed N, coverage, immediate post-optimize click, current draft XI/bench labels, repeated/redrawn one-click picker (${pickerMs.toFixed(0)} ms), starter/bench removal and refill, verified one-shot save, undo latest saved, viewport`);
+      console.log(`PASS ${width}px: clear, defaults, disabled save, exact XI/bench, changed N, coverage, immediate post-optimize click, current draft XI/bench labels, repeated/redrawn one-click picker (${pickerMs.toFixed(0)} ms), starter/bench removal and refill, verified one-shot save, undo latest saved, viewport, dense/no-forward formations and responsive lineup geometry`);
       await page.close();
     }
   } finally {

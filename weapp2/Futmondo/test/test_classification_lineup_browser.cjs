@@ -1,6 +1,7 @@
 // Start: Rscript test/test_classification_lineup_browser.R (from app directory).
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const { assertLineupLayout } = require('./lineup_layout_helpers.cjs');
 const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/futmondo-review-tools/node_modules', 'playwright'));
 (async () => {
   const browser = await chromium.launch({headless:true,args:['--no-sandbox']});
@@ -74,9 +75,19 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
       assert.match(await modal.locator('.fm-lineup-legend').innerText(),/Provisional points/);
       const pitch = await modal.locator('.fm-lineup-pitch').boundingBox();
       assert.ok(pitch.width <= width && pitch.x>=0 && pitch.x+pitch.width<=width);
+      await assertLineupLayout(page, modal.locator('.fm-lineup-layout'));
       const overflow = await modal.locator('.fm-lineup-player').evaluateAll(nodes => nodes.some(n=>n.scrollWidth>n.clientWidth+1));
       assert.equal(overflow,false);
       await page.screenshot({path:`/tmp/futmondo-round-roster-${width}.png`,fullPage:true});
+      if(width>=992){
+        const resizeReads=await page.locator('#requests').innerText();
+        for(const resizeWidth of [991,992,390,width]){
+          await page.setViewportSize({width:resizeWidth,height});
+          await assertLineupLayout(page,modal.locator('.fm-lineup-layout'));
+        }
+        await page.waitForTimeout(350); // Allow a fixture counter publication after resize.
+        assert.equal(await page.locator('#requests').innerText(),resizeReads,'Resizing reuses the displayed lineup without another read');
+      }
       if(phone){
         const close=modal.getByRole('button',{name:'Close lineup',exact:true});
         const reachable=async()=>{
@@ -132,9 +143,10 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
       assert.equal(await modal.locator('[data-player-id="own-3"] .fm-lineup-points').innerText(),'8');
       assert.equal(await modal.locator('[data-player-id="bench-3"] .fm-lineup-points').innerText(),'-4');
       assert.deepEqual(await modal.locator('.fm-lineup-row').evaluateAll(nodes=>nodes.map(n=>n.querySelectorAll('.fm-lineup-player').length)),[3,3,4,1]);
+      await assertLineupLayout(page,modal.locator('.fm-lineup-layout'));
       assert.equal(await page.locator('.shiny-output-error:visible').count(),0);
       assert.deepEqual(errors,[]);
-      console.log(`PASS ${width}x${height}: ${phone?'touch close before/after scroll':'desktop footer close'}, own/rival click, sorted identity, keyboard, 11+4 slots, holes, substitutions, 6 midfielders, selected formation and range guard`);
+      console.log(`PASS ${width}x${height}: ${phone?'touch close before/after scroll':'desktop footer close'}, own/rival click, sorted identity, keyboard, 11+4 slots, holes, substitutions, 6 midfielders, selected formation, responsive lineup geometry, resize reuse and range guard`);
       await page.close();
     }
   } finally {await browser.close();}

@@ -914,3 +914,10 @@ Add a native multiline tooltip to each shared player table's recent-average pill
 Status: **implemented and verified locally; hosted rollout remains unverified**.
 
 Add a matching Leaving players panel beside Incoming players, with source-confirmed departure time, next-round timing and shared player-card navigation. Retain confirmed departures across partial/stale/overdue observations; remove them only on verified departure, cancellation or a newer repurchase. Both directions share the existing two-read queue and actual roster counts/value. Safe clause observations persist in the existing private database evidence store, preserving context and the original 60-second deadline; failed writes remain retryable. No dependency, environment variable, migration, timer or unattended worker is added. Focused data/persistence, responsive browser and offline lifecycle verification and performance limits are recorded in `data_review_results.md`.
+
+
+## Horizontal desktop lineups — 2026-11-10
+
+Status: **implemented and verified locally; hosted rollout remains unverified**.
+
+Use a shared responsive pitch/bench wrapper in the editor and historical lineup modal. At desktop widths, place substitutes far left, then goalkeeper, defenders, midfielders and forwards in vertical columns, with matching field markings. Preserve the existing narrow-screen layout, source slot identity and manual actions. Focused geometry, dense/no-forward formation, resize reuse, player editing, phone dismissal and mandatory offline lifecycle checks passed. Performance review and verification limits are recorded in `data_review_results.md`.

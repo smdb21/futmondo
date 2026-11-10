@@ -189,13 +189,14 @@ round_lineup_pitch_ui <- function(answer) {
   ends<-cumsum(lineup$rows);starts<-c(1L,head(ends,-1L)+1L)
   shiny::div(class="fm-round-lineup",
     shiny::div(class="fm-lineup-heading",shiny::strong(paste("Formation",lineup$strategy)),shiny::span("Official round lineup")),
-    shiny::div(class="fm-lineup-pitch",role="group",`aria-label`=paste("Pitch, formation",lineup$strategy),
+    shiny::div(class="fm-lineup-layout",
+      shiny::div(class="fm-lineup-pitch",role="group",`aria-label`=paste("Pitch, formation",lineup$strategy),
       shiny::div(class="fm-lineup-markings",`aria-hidden`="true",shiny::div(class="fm-lineup-circle"),shiny::div(class="fm-lineup-goal-top"),shiny::div(class="fm-lineup-goal-bottom")),
       lapply(which(lineup$rows>0),function(row)shiny::div(class="fm-lineup-row",style=paste0("--lineup-count:",lineup$rows[row]),
         lapply(seq.int(starts[row],ends[row]),function(i)round_lineup_player_ui(lineup$players[[i]],index=i,
           point_system=lineup$pointSystem,status=lineup$status,pitch_role=c("FWD","MID","DEF","GK")[row]))))),
     shiny::div(class="fm-lineup-bench",shiny::h4("Substitutes"),shiny::div(class="fm-lineup-bench-row",
       lapply(seq_len(4L),function(i)round_lineup_player_ui(lineup$bench[[i]],bench=TRUE,index=i,
-        point_system=lineup$pointSystem,status=lineup$status)))),
+        point_system=lineup$pointSystem,status=lineup$status))))),
     shiny::p(class="fm-lineup-legend","* Provisional points · ↑ Substituted in · ↓ Substituted out · — Points unavailable. Bench order is 1–4. Substitutes can only cover their main position; secondary positions do not count."))
 }

@@ -115,3 +115,6 @@ for missing award recipients when a dated round interval exists. See
 persistence acknowledgement. Ambiguous transitions or unsupported source evidence
 can still leave individual totals unavailable. Full authenticated Best XI backfill
 is distinct from the verified stored-data replay.
+
+
+Desktop lineup presentation (2026-11-10): the historical modal shares the editor's `fm-lineup-layout` wrapper. At 992px and above, substitutes sit left of the pitch and the position columns run goalkeeper → defenders → midfielders → forwards. Pitch markings rotate with the layout; empty official slots and numbered bench order remain visible. Narrower screens retain their vertical pitch and bench below, including the sticky Close lineup action. See `lineup_module.md` for the shared layout contract and `data_review_results.md` for verification.

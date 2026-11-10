@@ -1368,6 +1368,40 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 .fm-lineup-legend { font-size: 11px; color: #b9cbbb; margin-top: 10px; }
 @media(max-width: 480px) { .fm-lineup-pitch { padding: 12px 3px; } .fm-lineup-row { min-height: 118px; gap: 2px; } .fm-lineup-portrait { height: 50px; } .fm-lineup-portrait > img { height: 50px; } .fm-lineup-name { font-size: 9px; } .fm-lineup-points { font-size: 11px; min-width: 24px; padding: 0 3px; } .fm-lineup-bench { padding: 8px 4px; } .fm-lineup-bench-row { gap: 4px; } .fm-lineup-change { width: 19px; height: 19px; font-size: 16px; line-height: 19px; } }
 
+/* Desktop: bench, goalkeeper, defence, midfield, attack from left to right.
+   Keep source slot order and let each formation determine its column count. */
+@media (min-width: 992px) {
+  .fm-round-lineup, .fm-lineup-editor { max-width: 1100px; }
+  .fm-lineup-layout { display: flex; align-items: stretch; gap: 12px; }
+  .fm-lineup-layout > .fm-lineup-pitch {
+    display: flex; flex: 1 1 0; flex-direction: row-reverse; min-width: 0;
+    min-height: 520px; padding: 16px 8px;
+    background: repeating-linear-gradient(90deg,#116331 0%,#116331 12.5%,#0c592b 12.5%,#0c592b 25%);
+  }
+  .fm-lineup-layout .fm-lineup-row, .fm-lineup-editor .fm-lineup-layout .fm-lineup-row {
+    display: flex; flex: 1 1 0; flex-direction: column; align-items: center;
+    justify-content: center; gap: 10px; min-width: 0; min-height: 0; padding: 0 4px;
+  }
+  .fm-lineup-layout .fm-lineup-player { flex: 0 0 auto; }
+  .fm-lineup-layout .fm-lineup-portrait { height: 48px; }
+  .fm-lineup-layout .fm-lineup-portrait > img { width: 48px; height: 48px; }
+  .fm-lineup-layout > .fm-lineup-bench {
+    order: -1; flex: 0 0 124px; min-width: 0; margin-top: 0;
+    display: flex; flex-direction: column; justify-content: center; padding: 10px 6px;
+  }
+  .fm-lineup-layout .fm-lineup-bench h4 { font-size: 14px; overflow-wrap: anywhere; }
+  .fm-lineup-layout .fm-lineup-bench-row { grid-template-columns: minmax(0,1fr); gap: 14px; }
+  .fm-lineup-layout .fm-lineup-coverage { justify-content: center; gap: 4px 8px; margin-top: 12px; }
+  .fm-lineup-layout .fm-lineup-markings::before {
+    top: 0; bottom: 0; left: 50%; right: auto; border-top: 0; border-left: 1px solid #c6e0bd88;
+  }
+  .fm-lineup-layout .fm-lineup-goal-top, .fm-lineup-layout .fm-lineup-goal-bottom {
+    top: 29%; bottom: auto; width: 14%; height: 42%; border: 1px solid #c6e0bd88;
+  }
+  .fm-lineup-layout .fm-lineup-goal-top { left: 0; border-left: 0; }
+  .fm-lineup-layout .fm-lineup-goal-bottom { left: auto; right: 0; border-right: 0; }
+}
+
 /* Newest-first round navigation stays in one horizontally scrollable row. */
 .fm-classification-rounds { display:flex; flex-wrap:nowrap; gap:8px; overflow-x:auto; padding:14px 2px 12px; overscroll-behavior-x:contain; }
 .fm-round-button { flex:0 0 auto; min-width:88px; border:1px solid var(--fm-border,#547064); background:var(--fm-surface,#162e2a); color:var(--fm-text,#f0f6ef); }
