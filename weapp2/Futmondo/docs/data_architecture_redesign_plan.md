@@ -886,3 +886,10 @@ backfill and hosted rollout remain separate verification steps**.
   position totals and eight MVP totals; Best XI still requires source backfill.
 - Independent targeted financial/source validation passed. Focused source, pending,
   classification and persistence checks passed; final release checks recorded below.
+
+
+## Unread notification card layout — 2026-11-10
+
+Status: **implemented and verified locally; hosted rollout remains unverified**.
+
+Separate the header's unread-dot class from unread notification cards and scope the dot style beneath its bell link. Inbox messages and actions retain normal full-width flow on phones and desktop. The focused browser check first reproduced the original absolute-position failure, then passed at 320, 390 and 1440px; the offline lifecycle passed 13 checks plus eight tabs. Verification, performance review and deployment limits are recorded in `data_review_results.md`.

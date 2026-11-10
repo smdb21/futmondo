@@ -165,7 +165,7 @@ function(input, output, session) {
     n <- notifications$unread()
     label <- paste0("Notifications",if(is.finite(n))paste0(" (",n," unread)")else "")
     actionLink("open_notifications",label=if(is.finite(n)&&n>0)
-      tags$span(class="fm-notification-unread",`aria-hidden`="true")else NULL,
+      tags$span(class="fm-notification-unread-dot",`aria-hidden`="true")else NULL,
       icon=icon("bell"),class="fm-notification-link",title=label,`aria-label`=label)
   })
   observeEvent(input$open_notifications, updateTabItems(session, "tabs", "notifications"))

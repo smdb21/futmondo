@@ -24,11 +24,31 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
       await page.locator('#login-password').fill('fixture');
       await page.locator('#login-login_button').click();
       await page.waitForFunction(() => document.querySelector('#open_notifications')?.getAttribute('aria-label') === 'Notifications (1 unread)', null, {timeout:15000});
-      assert.equal(await bell.locator('.fm-notification-unread').count(), 1);
+      const dot = bell.locator('.fm-notification-unread-dot');
+      assert.equal(await dot.count(), 1);
+      const dotBounds = await dot.boundingBox();
+      assert.ok(dotBounds && dotBounds.width === 7 && dotBounds.height === 7, 'Unread header dot stays compact');
       assert.equal(await bell.getAttribute('title'), 'Notifications (1 unread)');
       await bell.click();
       await page.locator('#shiny-tab-notifications.active').waitFor();
       assert.equal(await page.locator('#open_notifications').count(), 1);
+      const card = page.locator('#notifications-items .fm-notification-unread');
+      await card.waitFor();
+      const inbox = await page.locator('#notifications-items').boundingBox();
+      const bounds = await card.boundingBox();
+      assert.equal(await card.evaluate(el => getComputedStyle(el).position), 'static', 'Unread cards remain in normal document flow');
+      assert.ok(inbox && bounds && bounds.width >= inbox.width - 2, `${width}px unread card fills the inbox`);
+      assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width, `${width}px unread card fits viewport`);
+      assert.ok(await card.locator('strong').innerText(), 'Unread message remains visible');
+      assert.match(await card.innerText(), /Player 1/);
+      assert.equal(await card.evaluate(el => el.scrollWidth > el.clientWidth + 2), false, `${width}px unread card has no horizontal overflow`);
+      for (const label of ['Player details', 'Mark read']) {
+        const button = card.getByRole('button', {name:label,exact:true});
+        assert.ok(await button.isVisible(), `${width}px ${label} is visible`);
+        const action = await button.boundingBox();
+        assert.ok(action && action.x >= bounds.x && action.x + action.width <= bounds.x + bounds.width && action.y >= bounds.y && action.y + action.height <= bounds.y + bounds.height, `${width}px ${label} fits inside unread card`);
+      }
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2), false, `${width}px notifications page has no horizontal overflow`);
       if (width > 767) {
         await page.locator('.sidebar-toggle').click();
         await page.waitForFunction(() => document.body.classList.contains('sidebar-collapse'), null, {timeout:15000});
@@ -38,7 +58,7 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
       }
       assert.deepEqual(errors, []);
       await page.screenshot({path:`/tmp/futmondo-header-notifications-${width}.png`});
-      console.log(`PASS ${width}px: icon-only bell beside title, unread tooltip/dot, notification navigation and header fit`);
+      console.log(`PASS ${width}px: header bell/dot, navigation, full-width unread card, visible message/actions and no horizontal overflow`);
       await page.close();
     }
   } finally { await browser.close(); }

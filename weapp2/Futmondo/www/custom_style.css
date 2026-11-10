@@ -1402,7 +1402,7 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 .fm-header-brand { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 100%; max-width: 100%; vertical-align: top; white-space: nowrap; }
 .fm-header-brand #notification_bell { display: inline-flex; align-items: center; }
 .fm-notification-link { position: relative; display: inline-flex; align-items: center; justify-content: center; min-width: 36px; min-height: 40px; font-size: 16px; line-height: 1; }
-.fm-notification-unread { position: absolute; top: 7px; right: 4px; width: 7px; height: 7px; border-radius: 50%; background: var(--fm-warning); }
+.fm-notification-link .fm-notification-unread-dot { position: absolute; top: 7px; right: 4px; width: 7px; height: 7px; border-radius: 50%; background: var(--fm-warning); }
 @media (min-width: 768px) {
   .sidebar-mini.sidebar-collapse .fm-header-title { display: none; }
   .sidebar-mini.sidebar-collapse .fm-header-brand { gap: 0; }

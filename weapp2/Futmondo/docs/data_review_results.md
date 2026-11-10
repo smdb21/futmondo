@@ -1494,3 +1494,12 @@ available and loading remains truthful. This prevents a costly full reconstructi
 for each returned owner. No browser/authenticated hosted backfill was run. The new
 release must be served by the hosting deployment before phone behavior is verified;
 remaining unsupported histories still produce honest incomplete totals.
+
+
+## Unread notification cards collapsed against the right edge — 2026-11-10
+
+The header bell reused the inbox's `fm-notification-unread` class for its 7px absolutely positioned dot, applying the dot's geometry to entire unread cards. Rename the header indicator to `fm-notification-unread-dot` and scope its CSS beneath `fm-notification-link`; retain the original inbox card class. Shiny wraps the action-link label in `span.action-label`, so the scoped selector matches descendants rather than requiring a direct child.
+
+Verification: the expanded `node test/test_header_notifications.cjs` first failed on the original regression (expected static card positioning, received absolute). After the fix, Chromium checks passed at 320, 390 and 1440px: full inbox width, visible message and both actions, contained action bounds, no horizontal overflow, compact 7px header dot, accessible unread count, navigation and collapsed desktop header. Inspected phone and desktop screenshots. Run with `PLAYWRIGHT_BROWSERS_PATH=/tmp/futmondo-playwright-browsers` against the existing synthetic `Rscript test/test_browser_app.R` fixture. The required `Rscript test/test_shiny_simulation.R` passed 13 checks plus eight tabs with no HTTP or live database mutation attempts; existing Plotly fixture warnings remain. Notification player-details guards passed 5/5; deployment contract checks passed 3/3; JavaScript syntax and scoped whitespace checks passed. Independent source review found the same class collision and no further correctness issues.
+
+Performance review: one class rename and one scoped CSS selector; unchanged element count, requests, database work, persisted observations, reactive updates, timers and memory. Restoring normal flow removes the character-per-line overflow without adding loading work. No dependency or environment change. Tests used synthetic local data; hosted deployment and authenticated production behavior have not been verified. Unrelated working-tree and documentation edits are preserved.
