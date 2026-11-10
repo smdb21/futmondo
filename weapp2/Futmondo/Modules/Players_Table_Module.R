@@ -603,7 +603,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       rendered_schema<<-schema;rendered_data<<-players_table;rendered_ids<<-isolate(table_display_ids());rendered_meta<<-isolate(table_color_meta())
       table_columns <- get_reactable_columns_for_players(players_table,show_sale_profit=own_squad)
       if("points" %in% names(players_table))table_columns[["points"]]<-reactable::colDef(
-        name="Points",align="center",sortNALast=TRUE,
+        name="Points",align="center",sortNALast=TRUE,minWidth=84,resizable=TRUE,
         style=players_table_metric_style(),cell=players_table_metric_cell(0L))
       recent_n <- suppressWarnings(as.integer(input$recent_games_n)[1])
       if (!is.finite(recent_n)) recent_n <- 5L

@@ -174,3 +174,8 @@ Performance: fewer displayed/payload columns and no new requests, database work,
 Both table layouts omit the minimum market valuation control. The server no longer resets or reads `min_value_filter`, so obsolete browser values cannot constrain the displayed players. The existing `filter_by_value` UI option now controls the Max Val input. This shared module serves Today, Market, My Team, Players and rival squad tables.
 
 Performance review: one fewer input/binding per table and one fewer valuation-filter pass, with no new requests, database/persistence work, observers, dependencies or timers. Existing row acquisition and other filters reuse their current state.
+
+
+## Compact Position, Bids and Points columns - 2026-11-10
+
+Shared player-table defaults are 112px for Position (including primary/secondary position columns), 64px for Bids and 84px for Points. Each starts at its minimum width, with explicit column-level resizing enabled and no fixed-width setting or maximum-width cap, so users can widen columns with the existing resize handles. Position still accommodates two abbreviated badges on one line. The Points metric override retains the same width as the base definition; numeric values, badges, sorting and filtering are unchanged. These presentation settings add no data requests, persistence, reactive work or timers.

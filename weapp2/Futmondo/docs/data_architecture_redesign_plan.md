@@ -893,3 +893,10 @@ backfill and hosted rollout remain separate verification steps**.
 Status: **implemented and verified locally; hosted rollout remains unverified**.
 
 Separate the header's unread-dot class from unread notification cards and scope the dot style beneath its bell link. Inbox messages and actions retain normal full-width flow on phones and desktop. The focused browser check first reproduced the original absolute-position failure, then passed at 320, 390 and 1440px; the offline lifecycle passed 13 checks plus eight tabs. Verification, performance review and deployment limits are recorded in `data_review_results.md`.
+
+
+## Compact Position, Bids and Points columns — 2026-11-10
+
+Status: **implemented and verified locally; hosted rollout remains unverified**.
+
+Set shared player-table minimum/default widths to Position 112px, Bids 64px and Points 84px, including the Points metric override. Preserve column resizing, sorting, numeric values and dual-position badges. Focused identity/metric checks, offline lifecycle and independent phone/desktop browser checks passed. Performance and verification limits are recorded in `data_review_results.md`.

@@ -828,7 +828,8 @@ get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE) {
   if ("numberOfBids" %in% colnames(table)) {
     columns[["numberOfBids"]] <- colDef(
       name = "Bids",
-      align = "center"
+      align = "center",
+      minWidth = 64, resizable = TRUE
     )
   }
 
@@ -910,7 +911,8 @@ get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE) {
   if ("points" %in% colnames(table)) {
     columns[["points"]] <- colDef(
       name = "Points",
-      align = "center"
+      align = "center",
+      minWidth = 84, resizable = TRUE
     )
   }
 
@@ -1051,7 +1053,7 @@ get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE) {
     columns[[position_column]] <- colDef(
       name = switch(position_column, primary_role="Primary position", secondary_role="Secondary position", "Position"),
       align = "center",
-      minWidth = 170,
+      minWidth = 112, resizable = TRUE,
       cell = function(value) {
         if (is.null(value) || is.na(value) || value == "" || value == "NA") return("")
 
