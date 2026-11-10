@@ -900,3 +900,10 @@ Separate the header's unread-dot class from unread notification cards and scope 
 Status: **implemented and verified locally; hosted rollout remains unverified**.
 
 Set shared player-table minimum/default widths to Position 112px, Bids 64px and Points 84px, including the Points metric override. Preserve column resizing, sorting, numeric values and dual-position badges. Focused identity/metric checks, offline lifecycle and independent phone/desktop browser checks passed. Performance and verification limits are recorded in `data_review_results.md`.
+
+
+## Desktop Avg Last N score hover — 2026-11-10
+
+Status: **implemented and verified locally; hosted rollout remains unverified**.
+
+Add a native multiline tooltip to each shared player table's recent-average pill, listing the contributing round/score pairs newest first. Reuse the average's exact numbered window, preserve signed/zero values and expose truthful unlabelled/scalar fallback provenance. Hidden hover metadata refreshes in place alongside numeric averages, including corrections that leave the average equal. Focused known-answer, source, metric, browser and required offline lifecycle checks passed; performance and hosted limits are recorded in `data_review_results.md`.

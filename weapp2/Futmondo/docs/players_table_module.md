@@ -179,3 +179,14 @@ Performance review: one fewer input/binding per table and one fewer valuation-fi
 ## Compact Position, Bids and Points columns - 2026-11-10
 
 Shared player-table defaults are 112px for Position (including primary/secondary position columns), 64px for Bids and 84px for Points. Each starts at its minimum width, with explicit column-level resizing enabled and no fixed-width setting or maximum-width cap, so users can widen columns with the existing resize handles. Position still accommodates two abbreviated badges on one line. The Points metric override retains the same width as the base definition; numeric values, badges, sorting and filtering are unchanged. These presentation settings add no data requests, persistence, reactive work or timers.
+
+
+## Desktop recent-average hover — 2026-11-10
+
+Hovering an **Avg Last N** numeric pill shows a native multiline tooltip, one `- round 13: 5` entry per contributing score, newest round first. `add_recent_points_average()` produces the hidden `recent_points_details` text from the exact deduplicated N-round window used for the average; zero, negative and decimal scores keep their source values. The tooltip follows N, source corrections and the history's latest-round anchor. Missing averages remain empty.
+
+The unlabelled `average.fitness` fallback lists its contributing scores newest first and explicitly says round numbers are unavailable; it never derives round labels from an unresolved anchor. The scalar-only five-round fallback explains that individual scores are unavailable. Complete numbered history replaces both fallback average and details together when acquired through the existing shared, durably persisted history path.
+
+`players_table_metric_cell(digits=1L, title_column=NULL)` optionally reads a row field into the pill's React `title` property. Only the recent-average column opts in with `recent_points_details`. This field is hidden, unsearchable and unfilterable; its changes are excluded from the R-formatted schema signature so `updateReactable()` refreshes details even when the average stays equal. Native browser tooltips avoid clipping in the horizontally scrolling table; phones retain their existing layout.
+
+Performance: at most 20 detail entries per player, prepared only with the existing source/history/N enrichment. Filters reuse those rows, the browser reads one string per average cell and hovering issues no requests. Existing database persistence/reuse and source acquisition are unchanged; no new cache, timer, dependency or browser asset.

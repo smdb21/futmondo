@@ -255,10 +255,12 @@ players_table_metric_style <- function() htmlwidgets::JS("function(rowInfo, colu
 }")
 
 # Color belongs to a child badge, not the cell; numeric source values stay intact.
-players_table_metric_cell <- function(digits=1L) htmlwidgets::JS(paste0("function(cellInfo) {
+players_table_metric_cell <- function(digits=1L, title_column=NULL) htmlwidgets::JS(paste0("function(cellInfo) {
   var value = cellInfo.value;
   if (typeof value !== 'number' || !Number.isFinite(value)) return '';
-  return React.createElement('span', {className: 'fm-metric-badge'}, String(Number(value.toFixed(",as.integer(digits),"))));
+  return React.createElement('span', {className: 'fm-metric-badge'",
+    if(!is.null(title_column))paste0(", title: cellInfo.row && cellInfo.row[",jsonlite::toJSON(title_column,auto_unbox=TRUE),"]"),
+    "}, String(Number(value.toFixed(",as.integer(digits),"))));
 }"))
 
 # Keep the data numeric for sorting; missing averages have an empty cell.
@@ -267,7 +269,7 @@ players_table_recent_average_column <- function(n=5L) {
   reactable::colDef(name=paste0("Avg Last ",max(1L,min(20L,n))),align="center",sortNALast=TRUE,
     minWidth=110, headerClass="fm-metric-header",
     header=htmltools::span("Avg last",htmltools::tags$br(),max(1L,min(20L,n))),
-    style=players_table_metric_style(), cell=players_table_metric_cell(1L)
+    style=players_table_metric_style(), cell=players_table_metric_cell(1L,"recent_points_details")
   )
 }
 
@@ -582,7 +584,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       if(!is.finite(recent_n))recent_n<-5L
       schema<-list(context=table_context_RV(),columns=names(rows),
         types=lapply(rows,function(column)if(is.numeric(column))"numeric"else class(column)),recent_n=recent_n,
-        formatted=digest::digest(lapply(rows[setdiff(names(rows),c("recent_points_avg","recent_points_ratio"))],
+        formatted=digest::digest(lapply(rows[setdiff(names(rows),c("recent_points_avg","recent_points_ratio","recent_points_details"))],
           function(column)if(is.numeric(column))as.numeric(column)else column)),ids=ids)
       if(!identical(isolate(table_schema()),schema)){table_schema(schema);return()}
       if(identical(rendered_schema,schema)&&(!identical(rendered_data,rows)||!identical(rendered_ids,ids)||!identical(rendered_meta,meta))){
@@ -608,6 +610,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       recent_n <- suppressWarnings(as.integer(input$recent_games_n)[1])
       if (!is.finite(recent_n)) recent_n <- 5L
       table_columns[["recent_points_avg"]] <- players_table_recent_average_column(recent_n)
+      table_columns[["recent_points_details"]] <- reactable::colDef(show=FALSE,searchable=FALSE,filterable=FALSE)
       if(!is.null(points_ratio_basis))table_columns[["recent_points_ratio"]]<-reactable::colDef(
         name=paste0("Avg Last ",recent_n," / ",if(points_ratio_basis=="value")"Value"else"Clause"," (€M)"),
         align="center",sortNALast=TRUE,minWidth=145,headerClass="fm-metric-header",
@@ -686,6 +689,7 @@ add_recent_points_average <- function(players_df,history_df,n=5L) {
   players_df$recent_points_count <- integer(count)
   players_df$recent_points_required <- rep(n,count)
   players_df$recent_points_status <- rep("missing",count)
+  players_df$recent_points_details <- rep("",count)
   if(count&&"id"%in%names(players_df)&&is.data.frame(history_df)&&nrow(history_df)&&
       all(c("player_id","round","points")%in%names(history_df))){
     source_latest_round <- attr(history_df,"latest_round")
@@ -702,7 +706,10 @@ add_recent_points_average <- function(players_df,history_df,n=5L) {
         rows <- rows[!duplicated(rows$round,fromLast=TRUE),,drop=FALSE]
         values <- rows$points[match(wanted,rows$round)]
         coverage <- sum(is.finite(values));players_df$recent_points_count[i] <- coverage
-        if(coverage==n){players_df$recent_points_avg[i] <- mean(values);players_df$recent_points_status[i] <- "complete"}
+        if(coverage==n){
+          players_df$recent_points_avg[i] <- mean(values);players_df$recent_points_status[i] <- "complete"
+          players_df$recent_points_details[i] <- paste0("- round ",rev(wanted),": ",rev(values),collapse="\n")
+        }
         else if(coverage)players_df$recent_points_status[i] <- "partial"
       }
     }
@@ -720,12 +727,15 @@ add_recent_points_average <- function(players_df,history_df,n=5L) {
       players_df$recent_points_avg[i] <- mean(values)
       players_df$recent_points_count[i] <- n
       players_df$recent_points_status[i] <- "reported"
+      players_df$recent_points_details[i] <- paste0("Round numbers unavailable; latest scores first:\n",
+        paste0("- score: ",rev(values),collapse="\n"))
     }
   }
   if(n==5L&&"average.averageLastFive"%in%names(players_df)){
     fallback <- suppressWarnings(as.numeric(as.character(players_df$average.averageLastFive)))
     use <- !is.finite(players_df$recent_points_avg)&is.finite(fallback)
     players_df$recent_points_avg[use] <- fallback[use];players_df$recent_points_status[use] <- "reported"
+    players_df$recent_points_details[use] <- "Individual round scores are unavailable in the reported average."
   }
   players_df
 }
