@@ -1347,3 +1347,36 @@ Performance review: one fewer Shiny input/binding per table, no obsolete reset m
   daemon), target-server resource measurements, public DNS/HTTPS/WebSockets, and
   hosted remembered-login checks. Package versions resolve from the image's CRAN
   repository during build rather than restoring the manifest exactly.
+
+
+## Screenshot-supported historical award ownership — 2026-11-09
+
+Applied the scoped, idempotent two-record repair in
+`scripts/repairs/20261109_confirm_award_ownership.sql` to the hosted evidence store
+and read back both records from `rival_finance_evidence_latest`. Independent Luna
+review checked screenshot intervals, player/round/team identities, Hala's saved
+eligibility and the System/Market interpretation. A validator initially mistook
+`futmondo` for a user; the explicit domain rule and absent transfer counterpart IDs
+corrected that interpretation before any production write.
+
+Executed offline preflight and fresh database-readback replay through the existing
+ledger: Hala's cash rises 1,500,000 EUR (1,000,000 MVP plus 500,000 Best XI), all
+other cash balances are unchanged, round-8 MVP is confirmed zero for all nine
+historical participants, and incomplete Best XI totals remain unknown. The
+reference team's round-4 MVP component remains unavailable because its separate
+combined-payment allocation is unresolved. The database readback produced exactly
+the preflight cash ledgers and team summaries. Existing
+`test/test_classification_bonuses.R` passed its inherited 13 ledger checks,
+component/round isolation, combined-payment safeguards, persisted reuse and
+confirmed-unowned/missing/conflicting-evidence regressions.
+
+Performance review: two small evidence records are reused by the existing durable
+read/cache and signature invalidation paths. No new application requests, timers,
+reactive subscriptions, redraws, dependencies, schema or runtime code. The focused
+fixture measured 100 selections for 10 teams x 38 rounds at 0.330 seconds and the
+1,000-transfer ledger at 0.196 seconds; these are local synthetic measurements.
+The actual evidence replay took 6.171 seconds offline and is diagnostic work, not
+a new interactive path. Broader lifecycle/browser suites were deliberately skipped
+because runtime behavior is unchanged. Authenticated hosted UI rendering and
+complete historical bonus recovery remain unverified; no financial transaction
+was submitted.

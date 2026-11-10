@@ -270,3 +270,32 @@ The calculation version is `2026-11-07-award-components-v4`, preventing old pers
 The user confirmed that De Frutos, Bartra, Cabrera and Fortuño were owned by no league user in round 11. Four explicit account/championship/season/round/player-scoped confirmations were appended to the existing hosted `rival_finance_evidence` store, using `evidence_type="eligibility"`, a stable `user-confirmed-unowned:<round>:<player>` source ID, and payload fields `team_id=""`, `eligible=false`, `verified=true`, `ownership_status="unowned"`, `source="user_confirmed_unowned"`. Observation time records the confirmation time; the round ID identifies the historical fact. This is user-provided evidence, not an API ownership claim. The idempotent insert preserves all earlier source records and rejects conflicting saved positive ownership.
 
 The existing decoder and ledger already consume these explicit no-owner records without crediting a team. Unconfirmed absence remains unknown; no other round/player is inferred to be unowned. A later contradictory owner produces a conflict instead of silently overriding the confirmation. A fresh database readback and offline calculation establish round 11 Best XI totals of 3,500,000 EUR across seven owned recipients and an independent MVP total of 1,000,000 EUR. Nine historical participants have known totals; the directory's nonparticipant is not assigned an invented round record. Existing cash balances are unchanged because the confirmed no-owner players generate no income. Successful evidence is reused through existing database-backed acquisition and derived-calculation invalidation.
+
+
+## Screenshot-confirmed award ownership — 2026-11-09
+
+The user supplied official-app Historial screenshots for the missing MVP players.
+Boyé's screenshot records Hala Modric ownership from 3 September to 22 October;
+the stored round-4 history is closed and Hala's negative flag is false. Isco's
+screenshot records `futmondo` from 9 to 15 October, covering the round-8 settlement
+on 13 October. Stored transfers corroborate the System/Market interval: HOPE sold
+to an absent buyer ID on 9 October and Hala later bought from an absent seller ID.
+Screenshot dates are retained at day precision with unspecified timezone, rather
+than being converted to invented UTC instants.
+
+`scripts/repairs/20261109_confirm_award_ownership.sql` appends two scoped,
+provenance-labelled eligibility facts using stable source IDs and skips already
+recorded confirmations. The existing ledger consumes them without a runtime or
+schema change. Boyé earns Hala 1,000,000 EUR MVP plus 500,000 EUR Best XI income;
+Isco earns no league team an award for round 8. All other cash balances and source
+records are preserved. This does not complete the round-4 Best XI, the other
+historical Best XI selections, or the missing round-8 position payment. The
+reference team's unresolved combined award-payment allocation can still make its
+component subtotal unknown even after an individual MVP owner is established.
+
+Source investigation also corrected the earlier incomplete API inventory:
+`/1/player/summary` includes `owners` transition records (`n`, `d`, `p`, `l`) and
+`get_player_summary()` already exposes them. The ledger does not currently use
+those histories. Neither completeness, unique historical name-to-team mapping,
+nor the exact reward-ownership cutoff is established by that array alone; no
+broad automatic ownership inference was added in this repair.

@@ -726,6 +726,20 @@ Returns detailed summary information for a specific player, including current st
 | answer.prices | array | Historical price records |
 | answer.prices[].price | integer | Price at given date |
 | answer.prices[].date | string | ISO 8601 timestamp |
+| answer.owners | array, when returned | Fantasy ownership transition history shown by the official app's Historial tab |
+| answer.owners[].n | string | Owner display name; `futmondo` denotes the System/Market, not a league user |
+| answer.owners[].d | string | ISO 8601 transition timestamp |
+| answer.owners[].p | number | Price shown for the transition |
+| answer.owners[].l | boolean | Observed field; semantics not established |
+
+Ownership-history correction (2026-11-09): captured summary responses include
+`owners` in addition to `data` and `prices`; `get_player_summary()` already returns
+that array. `history_complete` describes scoring history and does not establish
+ownership-history completeness. An absent/empty owner array cannot prove a player
+was historically unowned. Owner names require a unique historical team mapping;
+current roster ownership cannot fill a historical gap. Round-specific reward
+eligibility and the ownership cutoff still need separate evidence.
+
 
 ---
 

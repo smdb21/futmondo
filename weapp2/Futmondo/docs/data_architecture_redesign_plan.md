@@ -830,3 +830,18 @@ Offline lifecycle and deployment checks pass. Docker image build, public HTTPS,
 WebSocket/cookie behavior, and target-server sizing remain unverified because no
 Docker daemon or target-server connection is available in this session. This is
 local packaging work, not a completed production deployment.
+
+
+## Supplied MVP ownership histories — 2026-11-09
+
+Status: **two account/league/season/round/player facts persisted and replayed;
+complete historical bonus totals remain unresolved**.
+
+- Recorded Boyé round 4 as owned by Hala Modric and Isco round 8 as held by the
+  System/Market, using the supplied Historial screenshots and saved source evidence.
+- Verified the database readback through the real ledger; Hala gains 1,500,000 EUR
+  across MVP/Best XI components and every other cash balance is unchanged.
+- Corrected the source inventory: player-summary responses expose ownership
+  transitions; completeness, historical name mapping and reward cutoff need further
+  evidence before automatic attribution. Other Best XI owners, combined-payment
+  attribution and the round-8 position payment remain unresolved.
