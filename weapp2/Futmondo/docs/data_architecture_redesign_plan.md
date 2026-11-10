@@ -855,3 +855,18 @@ Path `/weapp2/Futmondo`, local Dockerfile Path `Dockerfile`, Context `.`, and di
 Create Environment File. The previous guide omitted the provider path and was
 ambiguous when a subdirectory was selected there. Server-side settings still need
 applying and redeployment; no hosted success is claimed.
+
+
+## 2026-11-09: 30-minute mobile session reconnection (implemented locally)
+
+User requested keeping the exact live session for 30 minutes after switching tabs
+or locking a phone. The Docker image applies a guarded upstream-source patch to
+Shiny Server's existing-session retention (1,800 seconds) and browser retry option
+(1,800,000 milliseconds), then tests the installed implementation during build.
+No new-session input replay, login/authentication change, environment variable,
+database migration or application timeout directive is introduced. Same-session
+resume, deadline expiry, protocol buffers and upstream mismatch guards passed
+focused implementation and independent validation against the official server
+package. Offline lifecycle and deployment contracts pass. Documentation records
+extended buffer/timer costs. A full Docker build and phone/Dokploy verification
+remain pending; redeployment is required and has not been performed here.

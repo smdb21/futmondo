@@ -1395,3 +1395,47 @@ whitespace check passed. Documentation-only; no runtime, requests, cache, databa
 reactivity, memory, or performance behavior changes. Tests were deliberately not
 rerun. Target-server settings and redeployment are not accessible here and remain
 unverified; image build and hosted operation are not declared fixed.
+
+
+## 2026-11-09: 30-minute exact-session reconnection on mobile
+
+Participants: Sol 6.1 implemented Dockerfile/.dockerignore plus the build-only
+`patch-shiny-reconnect.cjs` helper and `test_shiny_reconnect.cjs`; Luna independently
+validated a fresh official-package extraction; primary reviewed the integrated
+source changes, ran app checks, and documented the result.
+
+The installed server's robust connection constructor now receives 1,800 seconds
+and its R adapter injects a browser `reconnectTimeout` of 1,800,000 milliseconds.
+All source guards run before either patch target is written. Docker build runs
+the actual installed registry/client tests and parses the patched R adapter.
+App files are copied explicitly; build checks are removed from the merged runtime
+filesystem (their earlier Docker COPY layers still contain their non-secret
+source bytes). Existing `/init`, app root routing, auth and manual actions remain.
+
+- PASS: implementation and independent focused runs each passed 5/5 groups against
+  official Shiny Server 1.5.25.1051, with its bundled Node v24.22.1. Package SHA256:
+  `bc298a0213817372b369375d41666b83fa7bd1d6f9f95859e0d0082cb8aca4ac`.
+- PASS: virtual-clock checks resume the same logical session at 16 and 1,799
+  seconds; CONTINUE replays pending output and ACK discards it; expiry at exactly
+  1,800 seconds emits close/end once, cancels retention, removes registry ownership
+  and rejects a late old session ID. Changed upstream shape fails before writes.
+  Independent source tracing confirms old-ID resumption returns before creating a
+  new application worker/channel, so it does not run a fresh app login flow.
+- PASS: JavaScript syntax checks and patched R adapter parse; scoped whitespace
+  check. No additional runtime dependency or app manifest regeneration needed.
+- PASS: `Rscript test/test_shiny_simulation.R`: 13 offline checks plus 8 tabs, no
+  HTTP/live database mutation attempts; existing Plotly trace warnings remain.
+  `Rscript test/test_deployment_contract.R`: 3 checks, 0 failures.
+- Performance: build checks take about 0.3 seconds on the extracted package and
+  are cached before app COPY. Existing browser retry backoff, R session data and
+  reactive work can continue longer. Upstream output buffers have no byte cap:
+  the focused fixture accumulates 1,799 countdown messages; ACK frees entries,
+  expiry removes registry ownership, and unreachable buffers rely on normal GC.
+  Existing notification refreshes may also continue. No new app polling or source
+  query is introduced, but total lifetime memory/requests can increase. Durable
+  factual observations still use the existing database; this grace buffer is not
+  a reusable API cache. Target-VM memory/concurrency costs are not measured.
+- Not run: complete Docker image build (daemon unavailable), real elapsed
+  30-minute test, live phone sleep/return, or deployed Dokploy checks. Tab discard,
+  page reload, container/R-process restart or the deadline can still end live
+  state. No production deployment or prevention of browser suspension is claimed.

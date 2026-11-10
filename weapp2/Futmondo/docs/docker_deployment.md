@@ -63,6 +63,44 @@ not durable caches. This deployment does not migrate or reset the database,
 install scheduled workers, or alter factual calculations. Apply any required
 existing database migrations separately as documented in the README.
 
+## Mobile reconnection: retain the live session for 30 minutes
+
+The Docker build customizes Shiny Server's existing-session reconnect window to
+1,800 seconds, with a matching 1,800,000 ms browser retry window. No environment
+variable or database migration is needed. Redeploy the application in Dokploy to
+build the updated image; restarting the old image does not install this change.
+The deploy itself closes sessions running in the old container.
+
+When switching tabs or locking a phone breaks its connection, Shiny Server keeps
+the same R session for up to 30 minutes after detecting the disconnection. If the
+same page reconnects within the window, its login, selections and reactive state
+can continue. If the phone discards/reloads the page, the container restarts, the
+R process fails, or the window expires, that live state is lost. Remembered login
+is a separate feature for restoring access to a new session.
+
+This is a narrowly guarded upstream-source customization, not an
+`app_idle_timeout` change. That directive only keeps an R process with no
+connections warm and does not extend a disconnected session. The build helper
+`scripts/patch-shiny-reconnect.cjs` patches the installed server's robust-connection
+constructor and browser options in `R/SockJSAdapter.R`. The build runs
+`test/test_shiny_reconnect.cjs` against the installed upstream code and fails if
+its expected source contracts change. Build helpers/tests are removed from their
+temporary location before application files are copied into the image. Keep this
+check when updating the Rocker image or Shiny Server. See Posit's
+[existing-session reconnection explanation](https://shiny.posit.co/r/articles/improve/reconnecting/).
+
+Retaining a disconnected session retains its in-memory data and existing reactive
+work. Shiny Server buffers unacknowledged outputs until reconnect acknowledgement
+or expiry; it has no built-in byte cap on that buffer. The existing one-second
+round countdown can queue approximately 1,800 updates in this window, and existing
+notification timers can continue. This adds no new polling schedule but can
+increase total CPU, requests and memory compared with releasing a session after
+15 seconds. Existing browser reconnect attempts also continue longer, using the
+upstream retry backoff while the browser is awake. Monitor memory and concurrent
+sessions on the VM, especially with multiple disconnected phones. Successful
+reusable API observations still belong
+in the existing durable database; reconnection memory is not a persistent cache.
+
 ## Build and verify
 
 From the repository root:
@@ -82,12 +120,14 @@ R is pinned to 4.6.1 to match the current manifest. Runtime packages are install
 from the base image's configured CRAN repository at build time; this is not an
 exact restoration of every manifest package version. No application dependency
 has been added. The `.dockerignore` allowlist excludes legacy projects, secrets,
-HAR captures, source backups, tests, internal documentation, and development
-scripts from the build context and deployed app.
+HAR captures, source backups, internal documentation, and development files from
+the deployed app. Only the named reconnect build helper and its focused test are
+also permitted in the build context; they are not deployed application files.
 
 Dependency installation precedes the code copy so normal source updates reuse
 the dependency layer. Build concurrency defaults to two jobs; set `NCPUS=1` as a
-non-secret build argument if the VM has limited RAM. This configuration adds no
-API requests, polling, database queries, or reactive redraws. Actual image build
-cost, server memory, concurrent-session behavior, and hosted cookie flow must be
-measured on the target server.
+non-secret build argument if the VM has limited RAM. The reconnection change adds
+no new reactive timers or polling but extends the lifetime of existing session
+work and buffered outputs, as described above. Actual image build cost, server
+memory, concurrent-session behavior, and hosted cookie flow must be measured on
+the target server.

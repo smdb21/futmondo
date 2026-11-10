@@ -1,4 +1,4 @@
-# Allow only the production application and server configuration into the build.
+# Allow production files and the two explicitly copied build checks only.
 **
 !/*.R
 !/Modules/
@@ -7,6 +7,12 @@
 !/www/**
 !/player_columns_to_hide.txt
 !/shiny-server.conf
+!/scripts/
+/scripts/**
+!/scripts/patch-shiny-reconnect.cjs
+!/test/
+/test/**
+!/test/test_shiny_reconnect.cjs
 
 # Never bundle credentials, captures, local state, or obsolete source backups.
 **/.env*

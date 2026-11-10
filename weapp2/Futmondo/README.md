@@ -116,3 +116,11 @@ port 3838. Enter the main domain in Dokploy's Domains settings and configure
 HTTPS there; DNS contains only the server IP. Set existing server-only credentials
 in Dokploy's runtime Environment tab, keeping the database as the durable store.
 The development settings under `weapp2/docker` are separate from this image.
+
+The Docker image retains an interrupted live Shiny session for up to **30 minutes**
+after the server detects disconnection, with a matching browser reconnect window.
+Redeploy in Dokploy to build/apply this customization; no new environment variable
+is required. The same retained tab can resume its existing session, but page
+discard/reload, container restart or expiry still ends that session. Retained
+sessions use memory and can continue their existing timers; see the deployment
+guide for build validation and resource limits.
