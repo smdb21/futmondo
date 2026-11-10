@@ -196,6 +196,14 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       shinydashboard::valueBox(total, paste0(nrow(roster)," players in your squad · ",incoming_text), icon=icon("users"), color="green", width=12)
     })
     # ---- Put All Players on Market Modal ----
+    output$bulk_listing_preview <- renderUI({
+      req(!is.null(bulk_context()), identical(bulk_context(), current_context()))
+      mode <- if (identical(input$bulk_listing_price_mode, "closed_clause")) "closed_clause" else "value"
+      roster <- players_table_RV()
+      plan <- bulk_market_listing_plan(roster, mode,
+        premium_pct = input$bulk_listing_clause_premium)
+      bulk_market_listing_preview(plan, roster)
+    })
     observeEvent(input$btn_put_all_on_market, {
       bulk_context(current_context())
       showModal(modalDialog(
@@ -205,23 +213,29 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
           "Current market value" = "value",
           "Closed clause plus premium" = "closed_clause"
         ), selected = "value"),
-        conditionalPanel(
-          condition = sprintf("input['%s'] === 'closed_clause'", ns("bulk_listing_price_mode")),
-          numericInput(ns("bulk_listing_clause_premium"), "Premium above closed clause (%)", value = 5, min = 0, max = 1000, step = 1)
-        ),
+        numericInput(ns("bulk_listing_clause_premium"), "Premium above selected price (%)",
+          value = 0, min = 0, max = 1000, step = "any", width = "100%"),
+        tags$div(style = "display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;",
+          `aria-label` = "Choose a premium",
+          lapply(c(0.5, 1, 2, 4, 5, 10), function(pct) tags$button(
+            type = "button", class = "btn btn-default", paste0("+", pct, "%"),
+            `data-target-input` = ns("bulk_listing_clause_premium"), `data-premium` = pct,
+            onclick = "var field=document.getElementById(this.dataset.targetInput);field.value=this.dataset.premium;field.dispatchEvent(new Event('change',{bubbles:true}));"))),
+        p("Choose a button or type a percentage. Use 0% to list at the selected price. Prices are rounded up to whole euros."),
+        uiOutput(ns("bulk_listing_preview"), `aria-live` = "polite"),
         p(style = "color: var(--fm-muted); font-size: 12px;", "The clause option skips players without a valid closed clause. Other users and Futmondo can bid on listed players."),
         footer = tagList(
           modalButton("Cancel"),
           actionButton(ns("submit_put_all_on_market"), "Confirm Market Listing", class = "btn btn-offer-money")
         ),
         easyClose = TRUE,
-        size = "s"
+        size = "m"
       ))
     })
 
     # ---- Submit Put All Players on Market ----
     observeEvent(input$submit_put_all_on_market, {
-      expected <- isolate(bulk_context()); bulk_context(NULL)
+      expected <- isolate(bulk_context())
       if (is.null(expected) || !identical(expected, current_context())) {
         showNotification("Team context changed. Open the listing confirmation again.", type="warning")
         return()
@@ -232,15 +246,15 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       req(login, champ_id, team_id)
 
       mode <- if (identical(as.character(input$bulk_listing_price_mode), "closed_clause")) "closed_clause" else "value"
-      premium <- suppressWarnings(as.numeric(input$bulk_listing_clause_premium))
-      if (!is.finite(premium)) premium <- 5
       roster <- tryCatch(players_table_RV(), error = function(e) NULL)
-      plan <- bulk_market_listing_plan(roster, mode = mode, clause_premium_pct = premium)
+      plan <- bulk_market_listing_plan(roster, mode = mode,
+        premium_pct = input$bulk_listing_clause_premium)
       if (!nrow(plan$entries)) {
         shiny::showNotification(plan$message, type = "warning", duration = 6)
         return()
       }
 
+      bulk_context(NULL) # Consume the confirmation only after valid pricing; block duplicate submissions.
       outcomes <- lapply(seq_len(nrow(plan$entries)), function(i) {
         player <- plan$entries[i, , drop = FALSE]
         tryCatch({
@@ -346,18 +360,21 @@ team_received_offers_panel <- function(state,ns) {
     }))
 }
 
-bulk_market_listing_plan <- function(roster, mode = c("value", "closed_clause"), clause_premium_pct = 5, now = Sys.time()) {
+bulk_market_listing_plan <- function(roster, mode = c("value", "closed_clause"), clause_premium_pct = 5,
+                                     now = Sys.time(), premium_pct = if (mode == "closed_clause") clause_premium_pct else 0) {
   mode <- match.arg(mode)
-  empty <- data.frame(player_id = character(), price = numeric(), already_listed = logical(), stringsAsFactors = FALSE)
+  empty <- data.frame(player_id = character(), price = numeric(), already_listed = logical(),
+    base_price = numeric(), increase = numeric(), stringsAsFactors = FALSE)
+  premium <- suppressWarnings(as.numeric(premium_pct))
+  if (length(premium) != 1L || !is.finite(premium) || premium < 0 || premium > 1000)
+    return(list(entries = empty, skipped = 0L, message = "Enter a premium between 0 and 1000%."))
   if (!is.data.frame(roster) || !nrow(roster) || !"id" %in% names(roster))
     return(list(entries = empty, skipped = 0L, message = "Your squad is unavailable. Refresh before listing players."))
   ids <- trimws(as.character(roster$id))
   listed <- if ("market_inMarket" %in% names(roster)) as.logical(roster$market_inMarket) else rep(FALSE, nrow(roster))
   listed[is.na(listed)] <- FALSE
-  premium <- suppressWarnings(as.numeric(clause_premium_pct)[1])
-  if (!is.finite(premium) || premium < 0) premium <- 5
   if (mode == "value") {
-    prices <- if ("value" %in% names(roster)) suppressWarnings(as.numeric(as.character(roster$value))) else rep(NA_real_, nrow(roster))
+    base <- if ("value" %in% names(roster)) suppressWarnings(as.numeric(as.character(roster$value))) else rep(NA_real_, nrow(roster))
     message <- "No players have a valid market value to list."
   } else {
     clauses <- if ("clause_price" %in% names(roster)) suppressWarnings(as.numeric(as.character(roster$clause_price))) else rep(NA_real_, nrow(roster))
@@ -365,12 +382,43 @@ bulk_market_listing_plan <- function(roster, mode = c("value", "closed_clause"),
     dates <- if ("clause_date" %in% names(roster)) as.character(roster$clause_date) else rep(NA_character_, nrow(roster))
     parsed <- suppressWarnings(as.POSIXct(gsub("Z$", "", gsub("T", " ", dates)), tz = "UTC"))
     closed <- is.finite(clauses) & clauses > 0 & !is.na(transferred) & !transferred & !is.na(parsed) & parsed > now
-    prices <- ifelse(closed, ceiling(clauses * (1 + premium / 100)), NA_real_)
+    base <- ifelse(closed, clauses, NA_real_)
     message <- "No players have a valid closed clause to use for this listing method."
   }
-  keep <- !is.na(ids) & nzchar(ids) & is.finite(prices) & prices > 0
-  entries <- data.frame(player_id = ids[keep], price = prices[keep], already_listed = listed[keep], stringsAsFactors = FALSE)
+  # Source prices are whole euros. Avoid multiplying by 1.10, which can turn
+  # an exact 110 EUR into 110.000000000000014 and incorrectly round to 111.
+  extra <- base * premium / 100
+  # Decimal custom percentages can also land a few floating-point units above
+  # an integer (10,000 * 0.07 / 100). Snap only machine-precision differences.
+  nearest <- round(extra)
+  exact <- is.finite(extra) & abs(extra - nearest) <= 4 * .Machine$double.eps * abs(extra)
+  extra[exact] <- nearest[exact]
+  prices <- ceiling(base) + ceiling(extra)
+  keep <- !is.na(ids) & nzchar(ids) & is.finite(base) & base > 0 & is.finite(prices) & prices > 0
+  entries <- data.frame(player_id = ids[keep], price = prices[keep], already_listed = listed[keep],
+    base_price = base[keep], increase = prices[keep] - base[keep], stringsAsFactors = FALSE)
   list(entries = entries, skipped = as.integer(sum(!keep)), message = message)
+}
+
+bulk_market_listing_preview <- function(plan, roster) {
+  entries <- plan$entries
+  if (!nrow(entries)) return(shiny::tags$p(role = "alert", plan$message))
+  names <- if ("name" %in% names(roster)) as.character(roster$name[match(entries$player_id, as.character(roster$id))]) else entries$player_id
+  missing <- is.na(names) | !nzchar(trimws(names)); names[missing] <- entries$player_id[missing]
+  amounts <- function(base, increase, price) shiny::tags$div(
+    style = "display:flex;flex-wrap:wrap;gap:6px 20px;overflow-wrap:anywhere;",
+    shiny::tags$span(paste0("Base: ", player_card_money(base))),
+    shiny::tags$strong(paste0("Extra: +", player_card_money(increase))),
+    shiny::tags$span(paste0("Listing: ", player_card_money(price))))
+  shiny::tagList(
+    shiny::tags$p(shiny::tags$strong(paste0(nrow(entries), " player(s) · Total increase: +", player_card_money(sum(entries$increase))))),
+    amounts(sum(entries$base_price), sum(entries$increase), sum(entries$price)),
+    if (plan$skipped > 0L) shiny::tags$p(paste0(plan$skipped, " player(s) skipped: no eligible price available.")),
+    shiny::tags$div(style = "max-height:280px;overflow-y:auto;margin:12px 0;",
+      lapply(seq_len(nrow(entries)), function(i) shiny::tags$div(
+        style = "padding:8px 0;border-top:1px solid var(--fm-border,#315540);overflow-wrap:anywhere;",
+        shiny::tags$strong(names[i]),
+        amounts(entries$base_price[i], entries$increase[i], entries$price[i])))))
 }
 
 get_ordinal_position <- function(position) {

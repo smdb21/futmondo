@@ -937,3 +937,10 @@ history without source requests, and responsiveness during delayed reads. The
 required offline lifecycle passes. Correct the hosted environment value and restart,
 or deploy the code, then confirm active-session history recovery. Actual checks,
 performance review and verification limits are in `data_review_results.md`.
+
+
+## Bulk market listing premiums — 2026-11-10
+
+Status: **implemented and verified locally; hosted rollout remains unverified**.
+
+Extend the bulk listing dialog's premium to both current market value and closed clauses, with an editable percentage, +0.5/+1/+2/+4/+5/+10% buttons and exact per-player/total increase previews. Use one pricing helper for previews and manual submission; preserve eligibility, invalid-value and one-use account/league/team confirmation guards. Correct floating-point over-rounding for preset and custom percentages. Reuse the existing roster without new acquisition, persistence, timers or dependencies. Focused known-answer/manual-action checks, responsive Chromium coverage and the required offline lifecycle pass. Performance review, the unrelated baseline classification assertion, and hosted limits are recorded in `data_review_results.md`.

@@ -1597,3 +1597,18 @@ dependency, environment-variable name, schema migration or authentication storag
 was added. The hosting environment is not accessible here; the user will correct
 its URL. Hosted restart/deployment, subsequent successful history acquisition and
 complete recovery of previously unsaved observations remain unverified.
+
+
+## Bulk market listing premiums — 2026-11-10
+
+The bulk listing dialog now accepts a premium for either current market value or a closed clause, with a custom percentage and all six requested quick buttons. Its 0% default preserves an unmarked market-value listing. Preview and submission share the same plan, with explicit base/increase/final amounts and totals over eligible players only. Missing values, ineligible clauses and invalid percentages remain distinct from zero. Whole-euro calculation corrects binary over-rounding for both 100 at 10% and 10,000 at 0.07%, while retaining genuinely fractional increases. Valid confirmation remains single-use and account/league/team scoped; invalid pricing can be corrected in the same dialog.
+
+Verification: the new `Rscript test/test_bulk_market_premium.R` passed nine groups covering all six presets on both bases, custom/zero/tiny percentages, independent rounding fixtures, invalid and missing data, escaped preview names/totals, exact submitted prices for both modes, correction, duplicate/stale confirmation and bounded rendering. Existing market listing checks passed 4/4. Required `Rscript test/test_shiny_simulation.R` passed 13 checks plus eight tabs with no HTTP or live database mutation attempts; existing synthetic Plotly warnings remain. Deployment contract passed 3/3. Independent source review passed.
+
+The new `node test/test_bulk_market_premium.cjs` passed at 320, 390 and 1440px against the existing HTTP-blocked synthetic browser fixture: six buttons, 17 exact per-player increases/final prices and total, custom 1.25%, clause-mode eligibility and percentage retention, negative/over-limit/blank validation, recovery, cancel/reopen reset, no horizontal overflow and no JavaScript errors. Phone and desktop screenshots were inspected. Buttons and amounts wrap; small phones use normal vertical modal scrolling to reach the footer. No browser confirmation or real transaction was submitted.
+
+The broader existing UI reliability script passes its bulk-action regression and then fails its final unrelated classification assertion for `class-single_round_select`. Independent replay using the pre-task module produces the identical failure; that classification fixture is left unchanged. The full broader script is not claimed to pass.
+
+Performance review: premium/mode changes only invalidate the new preview, using the existing roster reactive; no additional API/database reads, writes, durable results, invalidation, timers or acquisition queue are added. One local pass computes and renders the squad; a synthetic 30-player fixture rendered 100 previews in 3.778s total (about 38ms each), with 10.6 KiB HTML per preview. The player list scrolls within 280px. The existing synchronous confirmation loop and its per-player request count are unchanged; this task does not establish hosted transaction latency. Existing database-backed roster reuse remains intact. No dependency, environment, migration or authentication change. Hosted deployment and authenticated production behavior remain unverified. Unrelated working-tree/staged edits are preserved.
+
+Final verification of the isolated staged application passed premium 9/9, listing 4/4, deployment 3/3 and the mandatory offline lifecycle (13 checks plus eight tabs). All 50 staged bundle checksums match; only this task’s module checksum is changed.
