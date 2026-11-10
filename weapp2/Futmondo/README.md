@@ -109,8 +109,9 @@ The last application page is saved per Futmondo account and restored on normal o
 ## Docker / Dokploy hosting
 
 For deployment on your own VPS, use [the Dokploy guide](docs/docker_deployment.md).
-The production Dockerfile is `weapp2/Futmondo/Dockerfile`, with build context
-`weapp2/Futmondo`. It uses R 4.6.1 and serves the app directly at `/` on container
+The production Dockerfile is `weapp2/Futmondo/Dockerfile`. In Dokploy set Provider
+Build Path to `/weapp2/Futmondo`, Dockerfile Path to `Dockerfile`, and Docker Context
+Path to `.`; disable Create Environment File. It uses R 4.6.1 and serves the app directly at `/` on container
 port 3838. Enter the main domain in Dokploy's Domains settings and configure
 HTTPS there; DNS contains only the server IP. Set existing server-only credentials
 in Dokploy's runtime Environment tab, keeping the database as the durable store.

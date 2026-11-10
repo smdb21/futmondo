@@ -1380,3 +1380,18 @@ a new interactive path. Broader lifecycle/browser suites were deliberately skipp
 because runtime behavior is unchanged. Authenticated hosted UI rendering and
 complete historical bonus recovery remain unverified; no financial transaction
 was submitted.
+
+
+## 2026-11-09: Dokploy generated-env path failure
+
+No delegation. The deployment log establishes successful cloning followed by a
+pre-build `.env` write to `code/weapp2/Futmondo/weapp2/docker/.env`, a non-existent
+combination of app and old development-container paths. Corrected the guide and
+README to explicitly set Provider Build Path `/weapp2/Futmondo`, Dockerfile Path
+`Dockerfile`, Context `.`, and disable Create Environment File while retaining
+runtime variables. Checked against Dokploy's official subdirectory example and
+verified that the resulting local Dockerfile and context exist. Scoped staged
+whitespace check passed. Documentation-only; no runtime, requests, cache, database,
+reactivity, memory, or performance behavior changes. Tests were deliberately not
+rerun. Target-server settings and redeployment are not accessible here and remain
+unverified; image build and hosted operation are not declared fixed.

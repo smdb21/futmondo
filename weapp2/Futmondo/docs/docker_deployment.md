@@ -6,13 +6,31 @@ Dockerfile in this checkout.
 
 ## Dokploy application settings
 
-Connect this repository and its intended branch, then choose the Dockerfile build
-type with these paths relative to the repository root:
+Connect this repository and select branch `2.0` (or another branch containing
+this Dockerfile). Configure both sections of the General tab, saving each:
 
-- Dockerfile Path: `weapp2/Futmondo/Dockerfile`
-- Docker Context Path: `weapp2/Futmondo`
+- Provider Build Path: `/weapp2/Futmondo`.
+- Build Type: Dockerfile.
+- Dockerfile Path: `Dockerfile`.
+- Docker Context Path: `.`.
 - Docker Build Stage: leave empty.
 - Replicas: start with one; scaling needs a separate session-routing review.
+
+Dockerfile Path and Docker Context Path are relative to the Provider Build Path,
+not always to the repository root. With the settings above, do not repeat
+`weapp2/Futmondo` or use the old `weapp2/docker` directory in either field.
+In the Environment tab, turn off **Create Environment File** (if offered), save,
+and keep the application runtime environment variables configured there. This app
+uses runtime variables and does not need a generated build-time `.env` file.
+
+If cloning succeeds but deployment reports `cannot create .../.env: Directory
+nonexistent`, the failure is before the Docker image build. A path such as
+`code/weapp2/Futmondo/weapp2/docker/.env` indicates that the provider build directory
+has been combined with a Dockerfile path for the old development directory.
+Correct the paths above and redeploy; creating the missing nested directory would
+leave the incorrect Dockerfile selection in place. Official examples use the
+same subdirectory Build Path plus local Dockerfile convention:
+https://docs.dokploy.com/docs/core/deno
 
 In the application's Domains tab, set Host to your actual main domain (for example
 `yourdomain.com`), Path to `/`, Container Port to `3838`, HTTPS enabled, and

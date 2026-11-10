@@ -845,3 +845,13 @@ complete historical bonus totals remain unresolved**.
   transitions; completeness, historical name mapping and reward cutoff need further
   evidence before automatic attribution. Other Best XI owners, combined-payment
   attribution and the round-8 position payment remain unresolved.
+
+
+## 2026-11-09: Dokploy pre-build path correction (documented)
+
+The supplied deployment log clones successfully but cannot create
+`code/weapp2/Futmondo/weapp2/docker/.env`. Document the consistent Provider Build
+Path `/weapp2/Futmondo`, local Dockerfile Path `Dockerfile`, Context `.`, and disabled
+Create Environment File. The previous guide omitted the provider path and was
+ambiguous when a subdirectory was selected there. Server-side settings still need
+applying and redeployment; no hosted success is claimed.
