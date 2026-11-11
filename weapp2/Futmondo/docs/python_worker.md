@@ -1,6 +1,6 @@
 # Python background acquisition
 
-Status: implemented for local verification; production migration, Docker build/deployment and authenticated source acceptance are separate rollout checks. This is the explicit 2026-11-11 scope exception for opt-in unattended factual acquisition. Background trading, lineup writes, notification acknowledgements and coach actions remain prohibited.
+Status: implemented locally; production schema applied and verified on 2026-11-11 ([migration record](background_acquisition_migration_verification.md)). Docker build/deployment and authenticated source acceptance remain separate rollout checks. This is the explicit 2026-11-11 scope exception for opt-in unattended factual acquisition. Background trading, lineup writes, notification acknowledgements and coach actions remain prohibited.
 
 ## Ownership and process lifecycle
 

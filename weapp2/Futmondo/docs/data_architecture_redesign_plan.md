@@ -1028,3 +1028,8 @@ Explicitly approved opt-in unattended factual acquisition supersedes the earlier
 Implementation includes separate encrypted token authorization/generation and renewal, source-verified membership/context isolation, tiered full-catalog acquisition, midnight–07:00 local quiet hours, durable source checkpoints, lease/leader recovery, acknowledged factual/chunk/manifest writes, prepared balances/ledgers, snapshot reuse and bounded Shiny resource updates. See [setup, interfaces, limits and rollout](python_worker.md).
 
 Local source-contract, worker, database, known-answer finance, responsiveness, mobile and existing lifecycle checks are recorded in `data_review_results.md`. Production migration, actual Docker image build/start on the target host, authenticated source acceptance and Contabo sizing remain separate pending rollout checks; this milestone does not claim production deployment or a measured production speedup.
+
+
+### Python worker production schema — applied, 2026-11-11
+
+The approved background-acquisition SQL is applied to production project `ozhnextrcxxksswpnglt`, recorded by Supabase as `20261111231834_background_acquisition`. Eight worker tables, thirteen invoker functions, server-only grants, RLS, service-role read and indexed due-job lookup were verified. See [migration verification](background_acquisition_migration_verification.md). Docker deployment, key configuration, authenticated acceptance and VM sizing remain separate pending rollout checks.
