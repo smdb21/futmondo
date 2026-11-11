@@ -1033,3 +1033,8 @@ Local source-contract, worker, database, known-answer finance, responsiveness, m
 ### Python worker production schema — applied, 2026-11-11
 
 The approved background-acquisition SQL is applied to production project `ozhnextrcxxksswpnglt`, recorded by Supabase as `20261111231834_background_acquisition`. Eight worker tables, thirteen invoker functions, server-only grants, RLS, service-role read and indexed due-job lookup were verified. See [migration verification](background_acquisition_migration_verification.md). Docker deployment, key configuration, authenticated acceptance and VM sizing remain separate pending rollout checks.
+
+
+### Post-login empty squad exception — implemented locally, 2026-11-11
+
+Reproduced the reported `players_table_RV` data-frame assignment failure in the actual My Team module with a verified empty roster lacking the optional market flag. Initialize that flag with one value per existing row. The focused regression preserves pending/empty states and observation metadata; existing offer and offline lifecycle validation is recorded in `data_review_results.md`. Hosted redeployment and account-specific source acceptance remain separate.

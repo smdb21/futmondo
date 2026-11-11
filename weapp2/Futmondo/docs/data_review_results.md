@@ -1749,3 +1749,12 @@ Final isolated artifact checks passed the typed/provider/Python contracts, known
 ### Python worker production migration — verified, 2026-11-11
 
 Applied the approved acquisition SQL to production and verified hosted migration history, all eight RLS-protected worker tables, thirteen server-only invoker functions, a rolled-back service-role read and the indexed due-job query plan. No accounts or factual test records were created. Performance assessment and deployment limits are recorded in [migration verification](background_acquisition_migration_verification.md); production acquisition throughput remains unmeasured. Repository changes for this task are documentation only.
+
+
+### Post-login My Team empty roster — 2026-11-11
+
+The new actual-module regression reproduced the supplied production traceback before the fix: assigning scalar FALSE to missing `market_inMarket` on a zero-row roster raised `replacement has 1 row, data has 0`. Initializing a length-nrow logical vector resolves that exception without adding data. Two focused checks pass: delayed acquisition stays loading without invented empty data or listing demand; a verified empty result renders with source status/time intact and exactly one shared roster read plus one listing read. HTTP is blocked and acquisition uses synthetic resources only. No real account/source payload was supplied, so why this account received an empty roster is not established; this fix does not certify completeness of that account's squad.
+
+Performance review: linear vector initialization replaces scalar recycling, with zero elements for empty results; no added requests, persistence, invalidation, timers, redraw dependencies, DOM or layout changes. Existing offer regression passed eight checks, retaining three cold endpoint reads and zero extra offer-panel/warm reads. Full offline lifecycle validation is recorded below. No dependency change; only the changed module checksum is updated in the deployment manifest. Hosted redeployment/reproduction remains pending.
+
+Executed verification: `Rscript test/test_empty_squad_module.R` passed 2 checks; `Rscript test/test_team_received_offers.R` passed 8 checks; `Rscript test/test_shiny_simulation.R` passed 13 checks plus 8 rendered tabs with no HTTP/live database mutation attempts.

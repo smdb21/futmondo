@@ -158,7 +158,7 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
 
       # Ensure market_inMarket column is always present
       if (!"market_inMarket" %in% colnames(players_table)) {
-        players_table$market_inMarket <- FALSE
+        players_table$market_inMarket <- rep(FALSE, nrow(players_table))
       }
       # Reconcile only against the authenticated manager's own listings.
       my_mkt_df <- tryCatch({
