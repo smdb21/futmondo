@@ -5,6 +5,22 @@ for(expr in expressions){
  if(is.call(expr)&&identical(expr[[1]],as.name('app_check'))&&identical(expr[[2]],'full server login, navigation, refresh and logout'))break
  eval(expr,envir=.GlobalEnv)
 }
+# Keep jsonlite's same-named validator ahead of Shiny, as in hosted startup.
+stopifnot(identical(validate,jsonlite::validate))
+fixture_leagues<-get_active_championships;league_reads<-new.env(parent=emptyenv());league_reads$count<-0L
+get_active_championships<-function(...){league_reads$count<-league_reads$count+1L;fixture_leagues(...)}
+shiny::testServer(app_server,{
+ session$setInputs(tabs='login',`login-user_name`='offline@example.invalid',`login-password`='fixture',`login-login_button`=1L)
+ session$elapse(100);app_settle(session)
+ stopifnot(valid_login(login_token_RV()),championship_id_RV()=='champ',user_team_id_RV()=='team1',league_reads$count>0L)
+ cold_reads<-league_reads$count
+ for(i in seq_len(3L)){
+  session$setInputs(selected_league='champ');app_settle(session)
+  stopifnot(championship_id_RV()=='champ',user_team_id_RV()=='team1',league_reads$count==cold_reads)
+ }
+})
+cat('PASS hosted package order permits normal login and reuses the acquired league result.\n')
+clear_api_cache();clear_league_contexts(app_auth[['userid']])
 get_active_championships<-function(...)list(championships=list(),leagues=list())
 shiny::testServer(app_server,{
  session$setInputs(tabs='login',`login-user_name`='offline@example.invalid',`login-password`='fixture',`login-login_button`=1L)

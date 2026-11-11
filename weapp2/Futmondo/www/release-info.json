@@ -1,5 +1,5 @@
 {
-  "release": "database-base-url-2026-11-10",
+  "release": "login-validation-2026-11-10",
   "runtime_sha256": {
     "async_transport.R": "fadd58e2b5f9023c516e92da91443eca40d5b9ace8156fe90b03daf7357592d3",
     "background_runtime.R": "88b9bdfa79dad13398e6b48bff4a39ecc8ed5fabb6b67af085e72ea0f8498906",
@@ -14,7 +14,7 @@
     "supabase_connector.R": "d9181b6dfd143f20fae5c1ee6531bf1e32447b4a01e3143fd83b3901f8803c35",
     "Modules/Selected_Player_Module.R": "46f1a9fcfc74218dae196e0fc3ea2d10c7aba5ff59dab313a4f3b09c1f99ad09",
     "factual_helpers.R": "810ce0b2dfb2e2609171ea697b3fbcf0164a37261294cf3212d299e2d85eeff8",
-    "server.R": "be486b62f93d043b11ff04a714de73907c2ce4effd91d8ec13f401f91994ee91",
+    "server.R": "76f472d93b1d292964eacc7a232ac2d6b55b376985944b8b5f9a4a99e6c1c8f5",
     "Modules/Classification_Module.R": "0782c9e6f94c2a8dcc1c52d170cf8936af77ad3821756e4adfe6b0e257980272",
     "rival_finance_runtime.R": "fe223c11ff1cee474d3537f100af75acded5b682bd2d9af99422fe7c43f7bd92",
     "rival_calculation_store.R": "45cff5b04fb49db7f78918c565e54f5ec09d24aa1f9af7100424a3836cd91568",

@@ -2,6 +2,8 @@
 
 `login(user_name=NULL, password=NULL)` and the login module authenticate credentials directly against Futmondo. Passwords are cleared from the form after submission and never persisted. Downstream modules still receive the same three named character fields (`token`, `userid`, `user_name`). Logout clears account caches and pending session work.
 
+After authentication, `championship_RV()` in `server.R` selects the active league and checks for a playable team with explicit `shiny::validate(shiny::need(...))` calls. Hosting attaches Shiny before loading `global.R`, where JSON parsing imports can mask the unqualified `validate` name. Explicit namespaces keep successful league selection usable and preserve Shiny validation states for accounts with no leagues or no playable team. The offline lifecycle preloads Shiny to reproduce that hosting order; `test/test_competition_onboarding.R` covers all three outcomes and repeated league-result reuse without live I/O.
+
 ## Remembering a browser
 
 The optional **Remember me on this device for 7 days** checkbox starts unchecked. It is disabled until the server has opted in and has the configured encryption key, database credentials and `sodium` dependency. An unavailable persistence service never prevents ordinary login.

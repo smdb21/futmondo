@@ -60,7 +60,7 @@ function(input, output, session) {
     updateSelectInput(session, "selected_league", choices = setNames(ids, labels), selected = selected)
   })
   championship_RV <- reactive({
-    ch <- championships_RV(); validate(need(length(ch)>0L,"No active leagues are available for this account."))
+    ch <- championships_RV(); shiny::validate(shiny::need(length(ch)>0L,"No active leagues are available for this account."))
     league_context_revision()
     ids <- vapply(ch, function(c) fm_scalar(c$id %||% c$`_id`, ""), character(1))
     selected <- input$selected_league
@@ -68,7 +68,7 @@ function(input, output, session) {
     context <- ch[[match(selected,ids)]]
     context$id <- context$id %||% context$`_id`
     context$userteam$id <- context$userteam$id %||% context$userteam$`_id`
-    validate(need(nzchar(fm_scalar(context$userteam$id,"")),"This league has no playable team for this account."))
+    shiny::validate(shiny::need(nzchar(fm_scalar(context$userteam$id,"")),"This league has no playable team for this account."))
     unlist(context)
   })
   championship_id_RV <- reactive({ req(championship_RV()); unname(championship_RV()["id"]) })

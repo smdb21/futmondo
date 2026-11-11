@@ -11,6 +11,9 @@ app_check <- function(name, code) {
   force(code); app_checks <<- app_checks + 1L; cat('[PASS]', name, '\n')
 }
 app_check('actual application startup', {
+  # Shiny is already attached when the host loads global.R. Reproduce that
+  # order so later imports cannot hide validation namespace collisions.
+  suppressPackageStartupMessages(library(shiny))
   source('global.R',local=.GlobalEnv)
   source('ui.R',local=.GlobalEnv)
   app_server <- source('server.R',local=.GlobalEnv)$value

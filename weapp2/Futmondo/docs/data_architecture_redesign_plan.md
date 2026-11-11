@@ -960,3 +960,9 @@ Local implementation follows [the competition/transfer contract](general_competi
 - [ ] Obtain sanitized Premier League/Champions League player-response evidence before certifying those integrations end to end. Midseason ID continuity remains unverified; both outcomes are covered without merging source records.
 
 The local implementation does not alter the admin-only admission setting or introduce unattended acquisition.
+
+## Hosted login validation namespace — 2026-11-10
+
+Status: **implemented and verified locally; hosted rollout remains unverified**.
+
+Qualify both active-league/playable-team guards with `shiny::validate(shiny::need(...))`. Hosted startup attaches Shiny before `global.R`, allowing the later JSON import to mask the unqualified validator and crash even valid logins. Preload Shiny in the offline lifecycle to reproduce that order and cover successful league selection, repeated-result reuse, no active leagues and no playable team. This correction introduces no acquisition, storage, dependency or UI-layout changes. Executed checks and performance limits are recorded in `data_review_results.md`.

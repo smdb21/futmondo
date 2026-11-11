@@ -2370,7 +2370,7 @@
       "checksum": "c39def014303b7c175bb107764fc0c84"
     },
     "server.R": {
-      "checksum": "5d7ca357dc21118dde9b1337d50ca6e5"
+      "checksum": "832509508939fd59e57f87a1cb39a40c"
     },
     "supabase_connector.R": {
       "checksum": "f49117c4a21dd8d417a32070c206f2cf"
@@ -2391,7 +2391,7 @@
       "checksum": "616593ba18b7d3bb585da89e204c0cf4"
     },
     "www/release-info.json": {
-      "checksum": "a16b170268e346f98ad00c6fe287228c"
+      "checksum": "94a9e0ef704ee5c2f9de93c7055428b1"
     },
     "www/remember-login.js": {
       "checksum": "2b037334f8088f5b4a270acbaea52e91"
