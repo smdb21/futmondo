@@ -108,6 +108,68 @@ rival_snapshot_bonus_valid <- function(totals,team_ids) {
       !anyDuplicated(paste(rows$round_number,rows$bonus_type,sep="|"))
   },logical(1)))
 }
+# Full transaction ledgers accompany compact balance snapshots. Immutable chunks
+# are committed first; only the acknowledged manifest makes the balance visible.
+rival_snapshot_ledger_archive <- function(ledgers,scope) {
+  if(!is.list(ledgers)||is.null(names(ledgers))||anyDuplicated(names(ledgers)))return(NULL)
+  raw<-charToRaw(as.character(jsonlite::toJSON(rival_snapshot_encode(ledgers),auto_unbox=TRUE,na='null',null='null',digits=NA)))
+  if(length(raw)>.rival_snapshot_limits$json)return(NULL)
+  limit<-6L*1024L^2L
+  bytes<-history_baseline_compress(raw,max_bytes=limit)
+  if(length(bytes)>limit)return(NULL)
+  encoded<-openssl::base64_encode(bytes)
+  hash<-history_baseline_hash(bytes)
+  archive<-list(encoding='json-gzip-base64-v1',json_bytes=length(raw),sha256=hash,data=encoded)
+  archive
+}
+rival_snapshot_restore_ledgers <- function(payload,scope,team_ids) {
+  archive<-payload$ledger_archive
+  manifest<-payload$ledger_manifest
+  # PostgreSQL JSONB object key order is not a wire contract.
+  archive_fields<-c('encoding','json_bytes','sha256','data')
+  manifest_fields<-c('encoding','json_bytes','sha256','parts')
+  if(is.list(archive)&&!anyDuplicated(names(archive))&&setequal(names(archive),archive_fields))archive<-archive[archive_fields]
+  if(is.list(manifest)&&!anyDuplicated(names(manifest))&&setequal(names(manifest),manifest_fields))manifest<-manifest[manifest_fields]
+  if(is.null(archive)&&is.null(manifest))return(NULL)
+  if(!is.null(archive)&&!is.null(manifest))stop('Ambiguous ledger archive')
+  if(!is.null(manifest)){
+    if(!is.list(manifest)||!identical(names(manifest),c('encoding','json_bytes','sha256','parts'))||
+       !is.character(manifest$parts)||!length(manifest$parts)||length(manifest$parts)>64L||
+       anyNA(manifest$parts)||anyDuplicated(manifest$parts)||
+       !is.character(manifest$sha256)||length(manifest$sha256)!=1L||!grepl('^[0-9a-f]{64}$',manifest$sha256)||
+       !identical(manifest$parts,paste0('rival-cache:ledger:',rival_calculation_hash(list(scope=scope,sha256=manifest$sha256)),':',seq_along(manifest$parts))))stop('Invalid ledger manifest')
+    query<-list(account_id=paste0('eq.',scope$account_id),championship_id=paste0('eq.',scope$championship_id),
+      competition_id=paste0('eq.',scope$competition_id),season=paste0('eq.',scope$season),evidence_type='eq.eligibility',
+      source_id=paste0('in.(',paste(manifest$parts,collapse=','),')'),
+      select='account_id,championship_id,competition_id,season,evidence_type,source_id,observed_at,payload',limit=length(manifest$parts))
+    rows<-rival_evidence_decode(supabase_get('rival_finance_evidence_latest',query))
+    ids<-vapply(rows,function(row)mvp_text(row$source_id),character(1))
+    if(length(rows)!=length(manifest$parts)||anyDuplicated(ids)||!setequal(ids,manifest$parts))stop('Incomplete ledger archive')
+    rows<-rows[match(manifest$parts,ids)]
+    data<-vapply(rows,function(row){
+      if(!all(vapply(c('account_id','championship_id','competition_id','season'),function(field)identical(mvp_text(row[[field]]),scope[[field]]),logical(1)))||
+         !identical(row$evidence_type,'eligibility')||!is.list(row$payload)||
+         !identical(row$payload$kind,'rival_cash_ledger_chunk')||!is.list(row$payload$scope)||
+         !setequal(names(row$payload$scope),names(scope))||!identical(row$payload$scope[names(scope)],scope)||
+         !is.character(row$payload$data)||length(row$payload$data)!=1L||nchar(row$payload$data,type='bytes')>128L*1024L)stop('Invalid ledger chunk')
+      row$payload$data
+    },character(1))
+    archive<-manifest;archive$parts<-NULL;archive$data<-paste0(data,collapse='')
+  }
+  if(!is.list(archive)||!identical(names(archive),c('encoding','json_bytes','sha256','data'))||
+     !identical(archive$encoding,'json-gzip-base64-v1')||!is.numeric(archive$json_bytes)||length(archive$json_bytes)!=1L||
+     !is.finite(archive$json_bytes)||archive$json_bytes<1||archive$json_bytes!=floor(archive$json_bytes)||archive$json_bytes>.rival_snapshot_limits$json||
+     !is.character(archive$sha256)||length(archive$sha256)!=1L||!grepl('^[0-9a-f]{64}$',archive$sha256)||
+     !is.character(archive$data)||length(archive$data)!=1L||is.na(archive$data)||nchar(archive$data,type='bytes')>8L*1024L^2L)stop('Invalid ledger archive')
+  bytes<-openssl::base64_decode(archive$data)
+  if(!identical(history_baseline_hash(bytes),archive$sha256))stop('Corrupt ledger archive')
+  raw<-history_baseline_decompress(bytes,archive$json_bytes)
+  if(length(raw)!=archive$json_bytes)stop('Invalid ledger length')
+  ledgers<-rival_snapshot_decode(jsonlite::fromJSON(rawToChar(raw),simplifyVector=FALSE))
+  if(!is.list(ledgers)||is.null(names(ledgers))||anyDuplicated(names(ledgers))||!setequal(names(ledgers),team_ids)||
+     !all(vapply(ledgers,is.data.frame,logical(1))))stop('Invalid ledger teams')
+  ledgers
+}
 rival_snapshot_payload <- function(cache,calculated,context) {
   scope<-rival_snapshot_scope(context)
   if(is.null(scope)||!is.data.frame(calculated$team_finances)||!nrow(calculated$team_finances)||
@@ -135,7 +197,28 @@ rival_snapshot_payload <- function(cache,calculated,context) {
     if(nchar(encoded,type='bytes')>.rival_snapshot_limits$payload)return(NULL)
     list(kind='rival_calculation_cache',encoding='json-gzip-base64-v1',json_bytes=length(json),sha256=history_baseline_hash(compressed),data=encoded)
   }
-  tryCatch(make(saved_cache),error=function(e)NULL) %||% tryCatch(make(NULL),error=function(e)NULL)
+  full<-tryCatch(make(saved_cache),error=function(e)NULL)
+  if(!is.null(full)&&!is.null(saved_cache))return(full)
+  # Preserve every associated ledger even when shared preparation is too large.
+  if(!is.list(ledgers)||!setequal(names(ledgers),summary$teamid))return(NULL)
+  for(id in names(totals))attr(ledgers[[id]],"round_bonus_totals")<-totals[[id]]
+  compact<-tryCatch(make(NULL),error=function(e)NULL)
+  archive<-tryCatch(rival_snapshot_ledger_archive(ledgers,scope),error=function(e)NULL)
+  if(is.null(compact)||is.null(archive))return(NULL)
+  if(nchar(compact$data,type='bytes')+nchar(archive$data,type='bytes')<.rival_snapshot_limits$payload){
+    compact$ledger_archive<-archive
+  }else{
+    size<-128L*1024L
+    starts<-seq.int(1L,nchar(archive$data,type='bytes'),by=size)
+    parts<-paste0('rival-cache:ledger:',rival_calculation_hash(list(scope=scope,sha256=archive$sha256)),':',seq_along(starts))
+    if(length(parts)>64L)return(NULL)
+    chunks<-lapply(seq_along(starts),function(i)rival_finance_evidence(scope$account_id,scope$championship_id,scope$season,
+      'eligibility',parts[i],list(kind='rival_cash_ledger_chunk',scope=scope,data=substr(archive$data,starts[i],starts[i]+size-1L)),competition_id=scope$competition_id))
+    archive$data<-NULL;archive$parts<-parts
+    compact$ledger_manifest<-archive
+    attr(compact,'ledger_chunks')<-chunks
+  }
+  compact
 }
 read_rival_calculation_snapshot <- function(account_id,championship_id,season,user_team_id,competition_id=NULL,scoring_version=NULL) {
   scope<-rival_snapshot_scope(list(account_id=account_id,championship_id=championship_id,competition_id=competition_id,season=season,scoring_version=scoring_version,user_team_id=user_team_id))
@@ -185,7 +268,8 @@ read_rival_calculation_snapshot <- function(account_id,championship_id,season,us
         is.character(x$missing)&&is.character(x$assumptions)&&is.logical(x$estimated_movements)&&length(x$estimated_movements)==1L&&!is.na(x$estimated_movements)
       },logical(1))))return(NULL)
     }
-    ledgers<-if(is.list(cache))lapply(cache$teams,function(team)team$ledger)else list()
+    archived<-rival_snapshot_restore_ledgers(payload,scope,summary$teamid)
+    ledgers<-archived %||% if(is.list(cache))lapply(cache$teams,function(team)team$ledger)else list()
     for(id in setdiff(names(totals),names(ledgers))){
       ledger<-data.frame()
       attr(ledger,"round_bonus_totals")<-totals[[id]]
@@ -195,14 +279,32 @@ read_rival_calculation_snapshot <- function(account_id,championship_id,season,us
       if("settlement_pending"%in%names(rows))rows$round_number[rows$settlement_pending]else numeric()
     }),use.names=FALSE)))
     list(scope=scope,signature=wire$signature,team_finances=summary,cash_ledgers=ledgers,
-      pending_bonus_rounds=pending,cache=cache,saved_at=row$observed_at)
+      pending_bonus_rounds=pending,cache=cache,ledger_complete=is.list(cache)||!is.null(archived),saved_at=row$observed_at)
   },error=function(e)NULL)
 }
 persist_rival_calculation_snapshot <- function(cache,calculated,context,on_complete=NULL) {
   payload<-rival_snapshot_payload(cache,calculated,context);scope<-rival_snapshot_scope(context)
   if(is.null(payload)||is.null(scope)){if(is.function(on_complete))on_complete(FALSE);return(FALSE)}
+  chunks<-attr(payload,'ledger_chunks') %||% list();attr(payload,'ledger_chunks')<-NULL
   row<-rival_finance_evidence(scope$account_id,scope$championship_id,scope$season,'eligibility',rival_snapshot_id(scope),payload,competition_id=scope$competition_id)
-  if(as.numeric(object.size(row))>256L*1024L){if(is.function(on_complete))on_complete(FALSE);return(FALSE)}
-  defer_persistence('supabase_post_direct',list('rival_finance_evidence',list(row),
-    'account_id,championship_id,competition_id,season,evidence_type,source_id,observed_at',TRUE),context,on_complete)
+  rows<-c(chunks,list(row))
+  cache<-NULL;calculated<-NULL;payload<-NULL;chunks<-NULL;row<-NULL
+  if(any(vapply(rows,function(x)as.numeric(object.size(x))>256L*1024L,logical(1)))){
+    if(is.function(on_complete))on_complete(FALSE);return(FALSE)
+  }
+  index<-0L;finished<-FALSE
+  finish<-function(ok){if(!finished){finished<<-TRUE;if(is.function(on_complete))on_complete(ok)};invisible(ok)}
+  write_next<-function(){
+    if(finished)return(invisible(FALSE))
+    index<<-index+1L
+    if(index>length(rows))return(finish(TRUE))
+    # Immutable chunks precede the mutable latest balance manifest. An interrupted
+    # save cannot expose a balance whose transaction archive is absent.
+    accepted<-tryCatch(defer_persistence('supabase_post_direct',list('rival_finance_evidence',list(rows[[index]]),
+      'account_id,championship_id,competition_id,season,evidence_type,source_id,observed_at',TRUE),context,
+      function(ok){if(isTRUE(ok))write_next()else finish(FALSE)}),error=function(e)FALSE)
+    if(!isTRUE(accepted))finish(FALSE)
+    isTRUE(accepted)
+  }
+  write_next()
 }

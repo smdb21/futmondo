@@ -38,10 +38,12 @@ stopifnot(nrow(x)==1202L,!anyDuplicated(x$id),requests-before<full_reads,setequa
 # Ordinary Refresh invalidates display state, retaining the complete baseline.
 invalidate_resources(resource_context(auth,'c'),pattern='pressroom')
 before<-requests;x<-read();stopifnot(requests-before<full_reads,identical(attr(x,'history_delta_ids'),character()))
-# Full audits remain available weekly for revisions beyond the overlap.
+# Old durable baselines stay incremental; an explicit audit catches older revisions.
 news[[1]]$price<-91
 attr(.transaction_history_baselines[[key]]$data,'full_history_at')<-Sys.time()-8*86400
 expire();before<-requests;x<-read()
+stopifnot(requests-before<full_reads,x$price[x$id==news[[1]]$`_id`]!=91)
+before<-requests;x<-await(async_adapter_fetch('get_championship_pressroom',c(args,list(full_audit=TRUE)),ctx))
 stopifnot(requests-before>=full_reads,x$price[x$id==news[[1]]$`_id`]==91,identical(attr(x,'history_delta_ids'),news[[1]]$`_id`))
 # A saturated repeated cursor cannot advance the last successful baseline.
 previous<-read_completed_history_baseline('pressroom_c',resource_context(auth,'c'))
@@ -61,7 +63,7 @@ stopifnot(identical(attr(x,'fetch_status'),'stale'),identical(read_completed_his
 news[[1203]]$price<-9
 clear_completed_history_baselines('u','another-session')
 stopifnot(identical(read_completed_history_baseline('pressroom_c',resource_context(auth,'c')),previous))
-cat(sprintf('PASS complete baseline, warm reuse, one-day overlap revisions/late arrivals, refresh reuse, weekly audit and unchanged failure watermark; full_reads=%d overlap_reads=%d warm_reads=0\n',full_reads,overlap_reads))
+cat(sprintf('PASS complete baseline, warm reuse, one-day overlap revisions/late arrivals, refresh reuse, explicit full audit and unchanged failure watermark; full_reads=%d overlap_reads=%d warm_reads=0\n',full_reads,overlap_reads))
 # Recreate a process-cold read from an actual encoded database snapshot. Only
 # transport and the external database row are mocked; decoding and acquisition
 # use their real production functions through the cooperative async adapter.

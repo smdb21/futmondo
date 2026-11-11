@@ -16,12 +16,12 @@ locker_clause_rows <- function(news) {
   if(nrow(rows))rows<-rows[!duplicated(rows$id,fromLast=TRUE),,drop=FALSE]
   rows
 }
-get_locker_clause_payments <- function(login,championship_id) {
+get_locker_clause_payments <- function(login,championship_id,full_audit=FALSE) {
   resource <- paste0('pressroom_locker_payments_',championship_id)
   context <- resource_context(login=login,championship_id=championship_id)
   get_cached_data(resource,{
     previous <- read_completed_history_baseline(resource,context)
-    window <- transaction_history_window(previous)
+    window <- transaction_history_window(previous,full_audit)
     cursor<-'';seen<-character();all_news<-list();full_scan<-FALSE
     repeat {
       payload<-list(header=list(token=login[['token']],userid=login[['userid']]),query=list(championshipId=championship_id,from=cursor),answer=list())
@@ -49,7 +49,7 @@ get_locker_clause_payments <- function(login,championship_id) {
     rows<-observed_data(rows,status='ok')
     write_completed_history_baseline(resource,rows,context)
     rows
-  },timeout_sec=300,context=context)
+  },timeout_sec=if(isTRUE(full_audit))0 else 300,context=context)
 }
 locker_resolve_parties <- function(rows,pressroom,teams,players=data.frame(),previous=NULL) {
   if(!nrow(rows))return(rows)

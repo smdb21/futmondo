@@ -129,13 +129,13 @@ history_baseline_snapshot <- function(resource,data,context) {
 }
 # Base R's in-memory zlib decompressor cannot enforce an output bound. Emit
 # standard gzip once on changed saves, then read through a capped connection.
-history_baseline_compress <- function(bytes) {
+history_baseline_compress <- function(bytes,max_bytes=.history_baseline_limits$payload_bytes) {
   path <- tempfile("futmondo-history-baseline-")
   on.exit(unlink(path),add=TRUE)
   if(!file.create(path)||!Sys.chmod(path,"0600"))stop("History snapshot compression unavailable")
   connection <- gzfile(path,"wb",compression=6L)
   tryCatch(writeBin(bytes,connection),finally=close(connection))
-  readBin(path,"raw",n=.history_baseline_limits$payload_bytes+1L)
+  readBin(path,"raw",n=max_bytes+1L)
 }
 history_baseline_decompress <- function(bytes,size) {
   connection <- gzcon(rawConnection(bytes),allowNonCompressed=FALSE)

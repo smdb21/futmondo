@@ -25,7 +25,8 @@ row_frame<-function(payload){
 reads<-0L
 supabase_get<-function(table,query){reads<<-reads+1L;stopifnot(table=='rival_finance_evidence_latest',query$limit==1L);row_frame(payload)}
 restored<-do.call(read_rival_calculation_snapshot,ctx)
-stopifnot(reads==1L,is.null(restored$cache),identical(restored$team_finances,calculated$team_finances),
+stopifnot(isTRUE(restored$ledger_complete),reads==1L,is.null(restored$cache),identical(restored$team_finances,calculated$team_finances),
+  identical(restored$cash_ledgers,calculated$cash_ledgers),
   identical(lapply(restored$cash_ledgers,function(ledger)attr(ledger,'round_bonus_totals')),expected))
 rows<-data.frame(team_id=c('a','b'),team_name=c('Alpha','Beta'),round=1,points=c(5,10))
 before<-classification_bonus_table(classification_window_table(rows),rows,calculated,c(1,1))
@@ -54,6 +55,7 @@ wire$summary<-legacy_summary
 raw<-charToRaw(jsonlite::toJSON(wire,auto_unbox=TRUE,na='null',null='null',digits=NA))
 compressed<-history_baseline_compress(raw)
 payload$json_bytes<-length(raw);payload$data<-openssl::base64_encode(compressed);payload$sha256<-history_baseline_hash(compressed)
+payload$ledger_archive<-NULL;payload$ledger_manifest<-NULL
 legacy<-do.call(read_rival_calculation_snapshot,ctx)
-stopifnot(!is.null(legacy),!length(legacy$cash_ledgers),identical(legacy$team_finances,calculated$team_finances))
+stopifnot(!is.null(legacy),!legacy$ledger_complete,!length(legacy$cash_ledgers),identical(legacy$team_finances,calculated$team_finances))
 cat('PASS legacy summary-only snapshot remains readable without fabricated bonuses\n')

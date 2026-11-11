@@ -2372,12 +2372,11 @@ clear_completed_history_baselines <- function(user_id=NULL,session_id=NULL) {
   if(length(keys))rm(list=keys,envir=.transaction_history_baselines)
   invisible(TRUE)
 }
-transaction_history_window <- function(previous) {
+transaction_history_window <- function(previous,full_audit=FALSE) {
   audited <- fm_time(attr(previous,"full_history_at"))
   latest <- fm_time(attr(previous,"source_latest_at"))
-  incremental <- is.data.frame(previous)&&identical(attr(previous,"fetch_status"),"ok")&&
+  incremental <- !isTRUE(full_audit)&&is.data.frame(previous)&&identical(attr(previous,"fetch_status"),"ok")&&
     length(audited)==1L&&!is.na(audited)&&
-    as.numeric(difftime(Sys.time(),audited,units="days"))<7&&
     length(latest)==1L&&!is.na(latest)
   list(incremental=incremental,cutoff=if(incremental)latest-86400 else NULL,audited_at=audited)
 }
@@ -2415,7 +2414,7 @@ transaction_history_delta_ids <- function(data,previous) {
   as.character(data$id[changed])
 }
 
-get_championship_pressroom <- function(login, championship_id) {
+get_championship_pressroom <- function(login, championship_id, full_audit=FALSE) {
   if (is.null(login) || is.null(championship_id)) {
     return(data.frame(
       id = character(0), created = character(0), player_id = character(0),
@@ -2430,9 +2429,9 @@ get_championship_pressroom <- function(login, championship_id) {
   context <- resource_context(login=login,championship_id=championship_id)
   get_cached_data(cache_key, {
     previous <- read_completed_history_baseline(cache_key,context)
-    window <- transaction_history_window(previous)
+    window <- transaction_history_window(previous,full_audit)
     incremental <- window$incremental
-    locker<-get_locker_clause_payments(login,championship_id)
+    locker<-get_locker_clause_payments(login,championship_id,full_audit=full_audit)
     if(isTRUE(attr(locker,"fetch_status")%in%c("stale","partial","unavailable")))
       stop(resource_failure(attr(locker,"fetch_error"),"pressroom"))
     teams<-if(nrow(locker))get_teams(login,championship_id)else data.frame()
@@ -2605,7 +2604,7 @@ get_championship_pressroom <- function(login, championship_id) {
     }, error = function(e) {
       stop(resource_failure(e, "pressroom"))
     })
-  }, timeout_sec = 300, context=resource_context(login=login,championship_id=championship_id))
+  }, timeout_sec = if(isTRUE(full_audit))0 else 300, context=resource_context(login=login,championship_id=championship_id))
 }
 
 calculate_league_finances <- function(login, championship_id, user_teams_df, initial_budget = NA_real_) {

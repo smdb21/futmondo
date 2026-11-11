@@ -979,3 +979,12 @@ Qualify both active-league/playable-team guards with `shiny::validate(shiny::nee
 ### Financial-history date/name spacing — implemented locally, 2026-11-10
 
 Compact the date column and allow full player names to wrap in the selected-rival ledger. Existing offline transfer metadata/balance checks and actual-widget browser measurements at 360, 390, 576 and 1440 px passed. No data contract, storage or dependency change. Hosted deployment remains pending; verification and performance review are in `data_review_results.md`.
+
+
+### Durable balances and incremental transaction refresh — implemented locally, 2026-11-10
+
+- New saved balances retain all associated cash-ledger rows, including when shared calculation preparation is too large. Chunked archives are acknowledged before the balance manifest; legacy summary-only previews upgrade on refresh.
+- Saved finances reuse complete DB transfer baselines. Normal transfer refreshes query source head/one-day correction overlap and retain historical rows across restarts, without automatic weekly full rescans. Explicit full audits remain available.
+- Unchanged movements avoid duplicate DB revisions using DB-confirmed state; unacknowledged writes remain retryable. The captured movement endpoint has no verified delta cursor, so its current-list read remains necessary.
+- Fresh-process 5,001-entry restoration, interrupted/corrupt archive handling, isolated PostgreSQL queries/grants/idempotency, source incremental counts, movement-write retry, known-answer cash ledgers and required offline lifecycle are covered in `docs/data_review_results.md`.
+- Local implementation/isolated validation only; no hosted migration or deployment was performed. No new dependency or environment variable. Older source revisions outside the normal overlap require explicit audit.
