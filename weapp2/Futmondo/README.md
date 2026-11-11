@@ -20,7 +20,7 @@ The app retains observed data, historical accounting, descriptive statistics, of
 
 The user-triggered **Lineup** page is an explicit exception: it compares observed recent-round averages to select a valid XI and outfield-covering bench. It makes no predictions or unattended changes; **Save to Futmondo** is a separate manual action. Existing databases need `scripts/migrations/20261107191054_lineup_snapshots.sql` for durable lineup snapshots and the saved navigation page. See [lineup behavior and verification](docs/lineup_module.md).
 
-The app runs on Posit Connect Cloud's free plan. It does not require a persistent worker, scheduler, child process, or server configuration. Session termination can interrupt pending history saves. The UI must distinguish pending saves from acknowledged persistence.
+Production now runs on a Contabo VM using Docker/Dokploy, as reported by the owner. The current app still uses cooperative asynchronous HTTP and a session-owned persistence queue; no separate worker or scheduler is installed by this code. Session/container termination can interrupt pending history saves. The UI must distinguish pending saves from acknowledged database persistence. See the [Contabo performance review](docs/contabo_performance_review.md) for prioritized worker, timer, database and scaling options; these recommendations are not yet implemented.
 
 ## Database configuration
 

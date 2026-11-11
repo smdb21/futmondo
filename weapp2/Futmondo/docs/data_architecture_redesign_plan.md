@@ -1000,3 +1000,12 @@ Compact the date column and allow full player names to wrap in the selected-riva
 ### Chronological player points line — implemented locally, 2026-11-11
 
 Order the amber points trace by its actual displayed date (round number breaks ties), preserving complete score/hover rows. Postponed rounds no longer draw backward across the date axis; undated round-axis fallback remains intact. All 15 focused chart checks passed. Browser validation was attempted but Chromium is absent; hosted/screenshot-specific verification remains pending. Performance review and limitations are recorded in `data_review_results.md`. No acquisition, persistence or dependency change.
+
+
+### Contabo performance review — reviewed, 2026-11-11
+
+The owner reports production now runs on a Contabo VM with Docker/Dokploy. This supersedes this plan's historical Posit Connect Cloud restrictions on hosting processes, but preserves database durability, context isolation and manual-action requirements. See [the prioritized review](contabo_performance_review.md).
+
+Review complete; implementation and hosted validation have not begun. Recommended sequence: hosted baseline, bounded R compute worker for measured CPU-heavy factual work, browser countdown/optional-work lifecycle, durable accepted observation jobs, DB round-trip/derived-data optimization, then multi-process serving if justified. Python remains an optional implementation choice after workload/parity measurements. Unattended authenticated collection and trading are not selected or restored by this review.
+
+Exit criteria for subsequent implementation: measured cold/warm and concurrent-session improvements with truthful freshness/completeness, responsive held-work tests, acknowledged durable results/restart recovery, context/generation rejection, bounded request/memory use, and relevant mobile/lifecycle/deployment checks. Actual VM sizing and hosted evidence remain outstanding; no speedup is claimed.
