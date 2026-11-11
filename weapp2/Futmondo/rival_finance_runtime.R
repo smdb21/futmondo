@@ -1395,7 +1395,12 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
 
 get_rival_finance_seed <- function(login,championship_id,user_team_id) {
   info<-tryCatch(get_user_team_info(login,championship_id,user_team_id),error=function(e)NULL)
-  list(info=info,rules=normalize_league_rules(info,championship_id=championship_id),
+  rules<-normalize_league_rules(info,championship_id=championship_id)
+  # Release team reads after configuration, while transfer/notification history
+  # continues through the same asynchronous adapter. No additional requests.
+  if(exists("publish_resource_progress",mode="function"))
+    publish_resource_progress(list(info=info,rules=rules))
+  list(info=info,rules=rules,
     pressroom=tryCatch(get_championship_pressroom(login,championship_id),error=function(e)structure(data.frame(),fetch_status="unavailable")),
     notifications=tryCatch(get_notifications(login),error=function(e)NULL))
 }
@@ -1479,14 +1484,14 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
     state$notification_cursor<-"";state$notification_status<-"initial";state$scheduled_notification_cursors<-character();state$notification_pending<-FALSE
     state$scheduled_owners<-character();state$ownership_pending<-0L;state$ownership_catalog_scheduled<-FALSE;state$ownership_unsaved<-list();state$ownership_write_attempts<-character()
     state$publish_timer<-NULL;state$teams<-data.frame();state$teams_status<-"loading";state$teams_reason<-""
-    state$awards<-list(rows=data.frame(),complete=FALSE);state$finance_ready<-FALSE;state$seed_ready<-FALSE;state$scheduled_teams<-character();state$scheduled_lineups<-character();state$scheduled_rankings<-character();state$pending_team_ids<-character()
+    state$awards<-list(rows=data.frame(),complete=FALSE);state$finance_ready<-FALSE;state$seed_ready<-FALSE;state$seed_complete<-FALSE;state$scheduled_teams<-character();state$scheduled_lineups<-character();state$scheduled_rankings<-character();state$pending_team_ids<-character()
     root$onSessionEnded(function(){state$closed<-TRUE;state$generation<-state$generation+1L;if(!is.null(state$publish_timer))state$publish_timer()})
     root$userData$rival_finance_shared<-state
   }
   state<-root$userData$rival_finance_shared
   snapshot_status<-function(calculated){
     calculated$calculation_snapshot_status<-state$snapshot_status
-    calculated$calculation_snapshot_checking<-!is.null(state$snapshot)&&!state$finance_ready
+    calculated$calculation_snapshot_checking<-!is.null(state$snapshot)&&(!isTRUE(state$seed_complete)||length(state$pending_team_ids)>0L)
     calculated$reason<-paste(Filter(nzchar,c(state$reason %||% "",
       if(calculated$calculation_snapshot_checking)"Showing saved calculations while checking for updates."else "",
       if(identical(state$snapshot_status,"unavailable"))"Calculations could not be saved for next time; refresh retries saving."else "")),collapse=" ")
@@ -1507,7 +1512,9 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
     }
     if(!is.null(state$publish_timer)){state$publish_timer();state$publish_timer<-NULL}
     calculated<-list(team_finances=rival_finance_directory(state$teams),breakdowns=list(),all_purchases=data.frame())
-    if(!state$finance_ready&&!is.null(state$snapshot)){
+    snapshot_preview<-!is.null(state$snapshot)&&(!isTRUE(state$seed_complete)||length(state$pending_team_ids)>0L)
+    preview<-NULL
+    if(snapshot_preview){
       rows<-state$snapshot$team_finances
       if(nrow(state$teams)){
         rows<-rows[rows$teamid%in%state$teams$teamid,,drop=FALSE]
@@ -1522,6 +1529,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
         rival_refresh_finance_row(rows[i,,drop=FALSE],team)
       }))
     }
+    if(snapshot_preview)preview<-calculated
     inputs<-list(teams=state$teams,evidence=state$evidence,awards=state$awards,
       seed=state$seed,defaults=state$defaults,account=state$account,league=state$championship,season=state$season,
       reference=shiny::isolate(user_team()),fresh=vapply(rival_evidence_rows(state$evidence,"team"),function(x){
@@ -1535,7 +1543,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
     retain_ownership_batch<-state$finance_ready&&state$ownership_pending>0L&&!is.null(state$calculated)
     reuse<-retain_ownership_batch||(state$finance_ready&&!is.null(state$calculated)&&identical(inputs,state$calculation_inputs))
     if(reuse)calculated<-state$calculated
-    if(state$finance_ready&&!reuse)calculated<-tryCatch(build_rival_cash_dataset(state$teams,state$championship,state$evidence,state$awards$rows,
+    if(state$finance_ready&&!snapshot_preview&&!reuse)calculated<-tryCatch(build_rival_cash_dataset(state$teams,state$championship,state$evidence,state$awards$rows,
       state$seed$pressroom %||% data.frame(),state$seed$rules %||% list(),state$defaults,
       coverage_complete=isTRUE(state$awards$complete),account_id=state$account,season=state$season,reference_team_id=shiny::isolate(user_team()),cache=state$calculation_cache),error=function(error){
         if(is.null(state$build_failure))state$build_failure<-resource_log_failure(
@@ -1543,7 +1551,14 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
         calculated$finance_error<-paste("Financial details could not be prepared.",resource_failure_message(state$build_failure))
         calculated
       })
-    if(is.null(calculated$finance_error)){state$build_failure<-NULL;if(state$finance_ready&&!retain_ownership_batch){state$calculated<-calculated;state$calculation_inputs<-inputs}}
+    if(is.null(calculated$finance_error)){state$build_failure<-NULL;if(state$finance_ready&&!snapshot_preview&&!retain_ownership_batch){state$calculated<-calculated;state$calculation_inputs<-inputs}}
+    # The snapshot is a labelled display preview, never fresh accounting input.
+    # Keep it through history hydration and allow either request ordering.
+    if(!is.null(preview)){
+      calculated$team_finances<-preview$team_finances
+      calculated$cash_ledgers<-preview$cash_ledgers
+      calculated$pending_bonus_rounds<-preview$pending_bonus_rounds
+    }
     calculated$finance_loading<-state$busy>0L||length(state$queue)>0L
     calculated$finance_pending<-state$busy+length(state$queue)
     calculated$loading<-calculated$finance_loading||identical(state$teams_status,"loading")
@@ -1584,7 +1599,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
       is_current=function()!state$closed&&identical(generation,state$generation)),error=function(e)NULL)
     if(is.null(request))return(invisible(NULL))
     promises::then(request,function(snapshot){
-      if(state$closed||!identical(generation,state$generation)||!identical(state$season,ctx$season)||state$finance_ready||is.null(snapshot))return(NULL)
+      if(state$closed||!identical(generation,state$generation)||!identical(state$season,ctx$season)||(isTRUE(state$seed_complete)&&!length(state$pending_team_ids))||is.null(snapshot))return(NULL)
       if(!identical(snapshot$scope,rival_snapshot_scope(ctx)))return(NULL)
       state$snapshot<-snapshot;state$snapshot_signature<-snapshot$signature;state$snapshot_status<-"saved"
       if(is.list(snapshot$cache)){list2env(snapshot$cache,envir=state$calculation_cache);state$calculation_cache$durable_teams<-snapshot$cache$teams}
@@ -1797,7 +1812,15 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
         if(task$kind=="notifications")args<-c(args,list(cursor=task$cursor))
         if(task$kind=="lineup")args<-c(args,list(round_id=task$round,signature=task$signature))
         if(task$kind=="ranking")args<-c(args,list(round_id=task$id,round_number=task$number,signature=task$signature,source_teams=task$source_teams))
-        promises::then(async_adapter_fetch(fn,args,ctx,is_current=function()!state$closed&&identical(generation,state$generation)),function(result){
+        progress<-if(task$kind=="seed")function(result){
+          if(state$closed||generation!=state$generation||state$seed_ready)return(invisible(NULL))
+          inferred<-result$rules$season %||% "unknown"
+          if(!identical(inferred,state$season)&&inferred!="unknown")return(invisible(NULL))
+          if(!is.null(result$info))state$seed$rules<-result$rules
+          state$seed_ready<-TRUE
+          enqueue_teams();publish(TRUE);run_next()
+        }else NULL
+        promises::then(async_adapter_fetch(fn,args,ctx,is_current=function()!state$closed&&identical(generation,state$generation),on_progress=progress),function(result){
           if(state$closed||generation!=state$generation)return(NULL)
           state$busy<-state$busy-1L
           if(task$kind=="ownership")state$ownership_pending<-max(0L,state$ownership_pending-1L)
@@ -1835,7 +1858,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
             state$seed<-result
             inferred<-result$rules$season %||% "unknown"
             if(!identical(inferred,state$season)&&identical(state$season,"unknown")&&inferred!="unknown"){
-              state$season<-inferred;state$snapshot<-NULL;state$snapshot_signature<-NULL;state$snapshot_pending<-NULL;state$snapshot_status<-"not_saved";state$calculation_cache<-rival_calculation_cache();state$evidence<-list();state$finance_ready<-FALSE;state$seed_ready<-FALSE;state$point_repair_done<-FALSE
+              state$season<-inferred;state$snapshot<-NULL;state$snapshot_signature<-NULL;state$snapshot_pending<-NULL;state$snapshot_status<-"not_saved";state$calculation_cache<-rival_calculation_cache();state$evidence<-list();state$finance_ready<-FALSE;state$seed_ready<-FALSE;state$seed_complete<-FALSE;state$point_repair_done<-FALSE
               state$scheduled_teams<-character();state$scheduled_lineups<-character();state$scheduled_rankings<-character();state$pending_team_ids<-character();state$queue<-list(list(kind="saved"));hydrate_snapshot(auth,cid,tid);run_next();return(NULL)
             }
             current<-rival_team_evidence(list(team_id=tid,info=result$info,movements=NULL),auth[["userid"]],cid,state$season)
@@ -1851,7 +1874,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
                 persist_rival_finance_evidence(observed,ctx)
               }
             }
-            state$finance_ready<-TRUE;state$seed_ready<-TRUE;persist_ownership(context=ctx);enqueue_teams();enqueue_notifications();publish(TRUE)
+            state$finance_ready<-TRUE;state$seed_ready<-TRUE;state$seed_complete<-TRUE;persist_ownership(context=ctx);enqueue_teams();enqueue_notifications();publish(TRUE)
           }else if(task$kind%in%c("ownership","ownership_catalog")){
             rows<-rival_ownership_observation_evidence(result,auth[["userid"]],cid,state$season,catalog=task$kind=="ownership_catalog")
             if(length(rows)){
@@ -1904,12 +1927,12 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
             state$reason<-paste("Some financial data could not be prepared.",resource_failure_message(failure))
             if(task$kind=="saved"&&!any(vapply(state$queue,function(task)identical(task$kind,"seed"),logical(1))))
               state$queue<-c(list(list(kind="seed")),state$queue)
-            if(task$kind=="seed"){state$seed_ready<-TRUE;enqueue_teams()}
+            if(task$kind=="seed"){state$seed_ready<-TRUE;state$seed_complete<-TRUE;enqueue_teams()}
           })
           enqueue_ownership();publish(!length(state$queue)&&state$busy==0L);run_next();NULL
         },function(error){
           if(!state$closed&&generation==state$generation){state$busy<-state$busy-1L;if(task$kind=="ownership")state$ownership_pending<-max(0L,state$ownership_pending-1L);if(task$kind=="notifications"){state$notification_pending<-FALSE;state$notification_status<-"unavailable"};if(task$kind=="team")state$pending_team_ids<-setdiff(state$pending_team_ids,task$id);state$reason<-"Some financial sources could not be refreshed; saved evidence remains available.";if(task$kind=="saved")state$queue<-list(list(kind="seed"))
-            if(task$kind=="seed"){state$seed_ready<-TRUE;enqueue_teams()};enqueue_point_repair();enqueue_rankings();enqueue_ownership();publish(TRUE);run_next()};NULL
+            if(task$kind=="seed"){state$seed_ready<-TRUE;state$seed_complete<-TRUE;enqueue_teams()};enqueue_point_repair();enqueue_rankings();enqueue_ownership();publish(TRUE);run_next()};NULL
         })
       })
     }
@@ -1920,7 +1943,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
     if(!valid_login(auth)){
       if(!is.null(state$key)){state$generation<-state$generation+1L;state$key<-NULL;state$evidence<-list();state$queue<-list();state$busy<-0L;state$ownership_pending<-0L
         if(!is.null(state$publish_timer)){state$publish_timer();state$publish_timer<-NULL}
-        state$identity<-NULL;state$snapshot<-NULL;state$snapshot_status<-"not_saved";state$calculation_cache<-rival_calculation_cache();state$calculated<-NULL;state$calculation_inputs<-NULL;state$transfers(data.frame());state$teams<-data.frame();state$finance_ready<-FALSE;state$seed_ready<-FALSE
+        state$identity<-NULL;state$snapshot<-NULL;state$snapshot_status<-"not_saved";state$calculation_cache<-rival_calculation_cache();state$calculated<-NULL;state$calculation_inputs<-NULL;state$transfers(data.frame());state$teams<-data.frame();state$finance_ready<-FALSE;state$seed_ready<-FALSE;state$seed_complete<-FALSE
         state$value(list(team_finances=data.frame(),breakdowns=list(),loading=FALSE))};return()
     }
     if(!isTRUE(active()))return()
@@ -1940,7 +1963,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
       state$key<-key;state$generation<-state$generation+1L;state$busy<-0L;state$season<-resolved$season;state$reason<-"";state$build_failure<-NULL
       if(!is.null(state$publish_timer)){state$publish_timer();state$publish_timer<-NULL}
       state$scheduled_owners<-character();state$ownership_pending<-0L;state$ownership_catalog_scheduled<-FALSE;state$ownership_write_attempts<-character();if(!same)state$ownership_unsaved<-list()
-      state$account<-auth[["userid"]];state$championship<-cid;state$snapshot_attempted_signature<-NULL;state$snapshot_pending<-NULL;state$seed_ready<-FALSE;state$point_repair_done<-FALSE;state$notification_cursor<-"";state$notification_status<-"initial";state$scheduled_notification_cursors<-character();state$notification_pending<-FALSE;state$scheduled_teams<-character();state$scheduled_lineups<-character();state$scheduled_rankings<-character();state$pending_team_ids<-character()
+      state$account<-auth[["userid"]];state$championship<-cid;state$snapshot_attempted_signature<-NULL;state$snapshot_pending<-NULL;state$seed_ready<-FALSE;state$seed_complete<-FALSE;state$point_repair_done<-FALSE;state$notification_cursor<-"";state$notification_status<-"initial";state$scheduled_notification_cursors<-character();state$notification_pending<-FALSE;state$scheduled_teams<-character();state$scheduled_lineups<-character();state$scheduled_rankings<-character();state$pending_team_ids<-character()
       if(!same){state$calculation_cache<-rival_calculation_cache();state$snapshot<-NULL;state$snapshot_status<-"not_saved";state$snapshot_signature<-NULL;state$snapshot_pending<-NULL;state$shared_cache_signature<-NULL
         ctx<-resource_context(account_id=state$account,championship_id=cid,user_team_id=tid,season=state$season)
         saved_cache<-api_cache_env[[api_cache_key(paste0("rival_calculation_",rival_calculation_version),context=ctx)]]

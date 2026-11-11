@@ -966,3 +966,11 @@ The local implementation does not alter the admin-only admission setting or intr
 Status: **implemented and verified locally; hosted rollout remains unverified**.
 
 Qualify both active-league/playable-team guards with `shiny::validate(shiny::need(...))`. Hosted startup attaches Shiny before `global.R`, allowing the later JSON import to mask the unqualified validator and crash even valid logins. Preload Shiny in the offline lifecycle to reproduce that order and cover successful league selection, repeated-result reuse, no active leagues and no playable team. This correction introduces no acquisition, storage, dependency or UI-layout changes. Executed checks and performance limits are recorded in `data_review_results.md`.
+
+
+### Rival balance loading latency — implemented locally, 2026-11-10
+
+- Configuration progress now releases team observations before full transfer/notification history, within the existing async two-task queue.
+- Fixed both orders of the snapshot/history response race; the durable saved table remains labelled and visible until seed plus initial team acquisition completes. Reconstruction is deferred through that batch.
+- Focused delayed-loading regression, finance runtime (18 checks), finance reuse, cross-process persistent cache and required offline lifecycle (13 checks plus eight tabs) passed. Performance review is in `docs/data_review_results.md`.
+- Local implementation and isolated validation complete. Hosted deployment/authenticated latency remain unverified. First use without a durable snapshot still requires source acquisition.

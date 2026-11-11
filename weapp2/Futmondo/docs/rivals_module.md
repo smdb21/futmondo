@@ -558,3 +558,10 @@ The top financial standings table includes numeric **Overall wealth gained** and
 `rivals_calculation_coverage(note)` groups historical ownership/eligibility, transfer coverage, source availability, reward rules, point/position reconciliation, payment dates and reset-allocation limitations into readable messages. Explicit missing cash/valuation/opening inputs remain alongside these groups. Detailed round/player source diagnostics are retained in the shared dataset's `estimate_notes`; the card does not dump IDs. Trade-specific missing cost/date/fee notes remain readable, with internal keys replaced and repeated sentences deduplicated. This presentation does not certify missing historical ownership or complete source coverage.
 
 No new endpoint, source/database read, reactive subscription, timer, dependency or schema is added by the display. Sorting, selecting and expanding details reuse the published financial dataset.
+
+
+### Progressive balance loading (2026-11-10)
+
+`get_rival_finance_seed()` publishes `{info, rules}` through the async adapter's `on_progress` hook immediately after configuration, before pressroom/notification history. The shared source releases team observations at this point within the existing two-task queue, with generation and season checks. `seed_ready` permits acquisition; `seed_complete` records completion or failure of the whole seed. Both reset with context.
+
+A validated database snapshot remains a labelled preview until seed completion and initial team acquisition drain. Either snapshot/history response order is accepted. Reconstruction is deferred during this preview and consumes accumulated evidence at batch completion. Preview rows retain source timestamps and pass through `rival_refresh_finance_row()` to expire observed cash truthfully. Snapshots never become accounting evidence. Existing bounded database storage, write acknowledgement/retry and scope isolation remain unchanged; memory is only an accelerator. With no valid persisted snapshot, authoritative acquisition remains necessary and unknown values stay unknown.
