@@ -12,7 +12,7 @@ fm_theme_control <- tags$div(class = "fm-theme-control",
         `aria-label` = "Dark", title = "Dark", `aria-pressed` = "false", icon("moon"))))
 
 header <- shinydashboardPlus::dashboardHeader(
-  title = tags$span(class="fm-header-brand",tags$span(class="fm-header-title","Futmondo"),
+  title = tags$span(class="fm-header-brand",tags$span(class="fm-header-title","LigaRadar"),
     uiOutput("notification_bell",inline=TRUE))
 )
 body <- shinydashboard::dashboardBody(
@@ -101,6 +101,7 @@ body <- shinydashboard::dashboardBody(
 )
 
 shinydashboardPlus::dashboardPage(
+  title = "LigaRadar",
   preloader = list(html = tagList(waiter::spin_1(), "Loading ..."), color = fm_theme_tokens()$bg),
   header,
   shinydashboardPlus::dashboardSidebar(

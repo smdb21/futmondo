@@ -1009,3 +1009,8 @@ The owner reports production now runs on a Contabo VM with Docker/Dokploy. This 
 Review complete; implementation and hosted validation have not begun. Recommended sequence: hosted baseline, bounded R compute worker for measured CPU-heavy factual work, browser countdown/optional-work lifecycle, durable accepted observation jobs, DB round-trip/derived-data optimization, then multi-process serving if justified. Python remains an optional implementation choice after workload/parity measurements. Unattended authenticated collection and trading are not selected or restored by this review.
 
 Exit criteria for subsequent implementation: measured cold/warm and concurrent-session improvements with truthful freshness/completeness, responsive held-work tests, acknowledged durable results/restart recovery, context/generation rejection, bounded request/memory use, and relevant mobile/lifecycle/deployment checks. Actual VM sizing and hosted evidence remain outstanding; no speedup is claimed.
+
+
+### LigaRadar application title — implemented locally, 2026-11-11
+
+The dashboard header and explicit browser-tab title now read **LigaRadar**, matching the domain. Rendered HTML assertions and the offline lifecycle (13 checks plus eight tabs) passed. Static text only; no acquisition, persistence, dependency or environment changes. Performance review is recorded in `data_review_results.md`; production deployment remains separate.
