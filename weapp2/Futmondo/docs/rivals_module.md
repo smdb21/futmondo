@@ -565,3 +565,8 @@ No new endpoint, source/database read, reactive subscription, timer, dependency 
 `get_rival_finance_seed()` publishes `{info, rules}` through the async adapter's `on_progress` hook immediately after configuration, before pressroom/notification history. The shared source releases team observations at this point within the existing two-task queue, with generation and season checks. `seed_ready` permits acquisition; `seed_complete` records completion or failure of the whole seed. Both reset with context.
 
 A validated database snapshot remains a labelled preview until seed completion and initial team acquisition drain. Either snapshot/history response order is accepted. Reconstruction is deferred during this preview and consumes accumulated evidence at batch completion. Preview rows retain source timestamps and pass through `rival_refresh_finance_row()` to expire observed cash truthfully. Snapshots never become accounting evidence. Existing bounded database storage, write acknowledgement/retry and scope isolation remain unchanged; memory is only an accelerator. With no valid persisted snapshot, authoritative acquisition remains necessary and unknown values stay unknown.
+
+
+### Compact financial-history columns — 2026-11-10
+
+`rivals_cash_history_widget()` fixes Date at 112 px, with recorded calendar date and time on separate lines. Unknown/opening/payment-status labels wrap without changing their meaning; raw date values and sorting remain unchanged. Name has a 210 px minimum and wraps full player/bonus labels, including long unbroken words. Wider tables retain horizontal scrolling for remaining columns on narrow screens. Changes are limited to this widget; acquisition, persistence, balances and shared table styles are unchanged.

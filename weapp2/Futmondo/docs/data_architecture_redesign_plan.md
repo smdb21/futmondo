@@ -974,3 +974,8 @@ Qualify both active-league/playable-team guards with `shiny::validate(shiny::nee
 - Fixed both orders of the snapshot/history response race; the durable saved table remains labelled and visible until seed plus initial team acquisition completes. Reconstruction is deferred through that batch.
 - Focused delayed-loading regression, finance runtime (18 checks), finance reuse, cross-process persistent cache and required offline lifecycle (13 checks plus eight tabs) passed. Performance review is in `docs/data_review_results.md`.
 - Local implementation and isolated validation complete. Hosted deployment/authenticated latency remain unverified. First use without a durable snapshot still requires source acquisition.
+
+
+### Financial-history date/name spacing — implemented locally, 2026-11-10
+
+Compact the date column and allow full player names to wrap in the selected-rival ledger. Existing offline transfer metadata/balance checks and actual-widget browser measurements at 360, 390, 576 and 1440 px passed. No data contract, storage or dependency change. Hosted deployment remains pending; verification and performance review are in `data_review_results.md`.

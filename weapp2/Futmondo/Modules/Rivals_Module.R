@@ -402,7 +402,15 @@ rivals_cash_history_widget <- function(ledger,undated=NULL,timezone="UTC") {
   reactable::reactable(display,compact=TRUE,striped=TRUE,highlight=TRUE,bordered=FALSE,defaultPageSize=15,showPageSizeOptions=TRUE,pageSizeOptions=c(15,30,50),
     details=function(index){text<-display$calculation[index];if(!is.na(text)&&nzchar(text))tags$p(style="white-space:normal;overflow-wrap:anywhere",text)else NULL},
     defaultSorted=list(ledger_order=if(isTRUE(undated))"asc"else"desc"),columns=list(
-      date=colDef(name="Date",show=!isTRUE(undated),align="left"),type=colDef(name="Type",align="left",cell=function(value,index){
+      date=colDef(name="Date",show=!isTRUE(undated),align="left",width=112,
+        style=list(whiteSpace="normal",overflowWrap="anywhere"),cell=function(value){
+          if(grepl("^[0-9]{2}/[0-9]{2}/[0-9]{4} [0-9]{2}:[0-9]{2}$",value)){
+            parts<-strsplit(value," ",fixed=TRUE)[[1]]
+            return(tags$span(tags$span(style="display:block;white-space:nowrap",parts[1]),
+              tags$span(style="display:block",parts[2])))
+          }
+          value
+        }),type=colDef(name="Type",align="left",cell=function(value,index){
         if(display$payment_date_source[index]%in%c("reference_payment_pending","round_settlement_pending"))return(paste("Unconfirmed",c(ranking="position bonus",mvp="MVP bonus",dreamteam="Best XI bonus")[[display$bonus_type[index]]]))
         if(identical(display$payment_date_source[index],"league_point_payment"))return("Point bonus")
         if(value=="Recorded Best XI/MVP payment")return(value)
@@ -412,7 +420,8 @@ rivals_cash_history_widget <- function(ledger,undated=NULL,timezone="UTC") {
           c(ranking="Position bonus",mvp="MVP bonus",dreamteam="Best XI bonus",points="Point bonus")[[display$bonus_type[index]]]))
         value
       }),
-      player=colDef(name="Name",html=TRUE,align="left"),buyer=colDef(name="Buyer",align="left"),seller=colDef(name="Seller",align="left"),
+      player=colDef(name="Name",html=TRUE,align="left",minWidth=210,
+        style=list(whiteSpace="normal",overflowWrap="anywhere")),buyer=colDef(name="Buyer",align="left"),seller=colDef(name="Seller",align="left"),
       concept=colDef(show=FALSE,name="Concept / Description",align="left",cell=function(value,index){
         note<-paste(display$source[index],if(!display$included[index])"Not applied to balance."else"",
           if(display$unknown_amounts[index]>0)"Balance excludes unknown amounts."else"")
