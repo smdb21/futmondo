@@ -995,3 +995,8 @@ Compact the date column and allow full player names to wrap in the selected-riva
 - Login credentials remain hidden until the existing remembered-cookie probe completes. Successful restoration leaves the welcome card visible; absent/invalid cookies and recoverable failures expose ordinary login. Disabled remembered login exposes credentials immediately after server initialization.
 - The welcome card uses the available responsive width and retains authenticated Logout. Restore retry, expiry and access denial update the same visibility state. No authentication/storage contract or request counts change.
 - Focused visibility checks, 21 remembered-login checks and eight synthetic HTTPS browser checks passed, including delayed probing, zero credential-visible frames on successful restoration, failed transport/retry, server/browser restart and mobile overflow. Offline lifecycle results and performance assessment are recorded in `docs/data_review_results.md`. Local implementation only; hosted deployment remains separate.
+
+
+### Chronological player points line — implemented locally, 2026-11-11
+
+Order the amber points trace by its actual displayed date (round number breaks ties), preserving complete score/hover rows. Postponed rounds no longer draw backward across the date axis; undated round-axis fallback remains intact. All 15 focused chart checks passed. Browser validation was attempted but Chromium is absent; hosted/screenshot-specific verification remains pending. Performance review and limitations are recorded in `data_review_results.md`. No acquisition, persistence or dependency change.

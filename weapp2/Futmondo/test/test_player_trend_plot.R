@@ -43,6 +43,17 @@ check("both series have independent vertical scales and distinct styles",{
    all(c(99e6,100e6)>chart$layout$yaxis$range[1]),all(c(99e6,100e6)<chart$layout$yaxis$range[2]),
    all(c(-2,4)>chart$layout$yaxis2$range[1]),all(c(-2,4)<chart$layout$yaxis2$range[2]))
 })
+check("postponed rounds connect chronologically with score provenance intact",{
+ history<-combined
+ history$points$date<-as.POSIXct(c("2026-10-20","2026-10-01","2026-10-10","2026-10-10"),tz="UTC")
+ # Input order and round order both differ from chronological order.
+ history$points<-history$points[c(4,1,3,2),]
+ chart<-render_fixture(history);trace<-chart$data[[2]]
+ stopifnot(identical(as.numeric(trace$x),as.numeric(sort(history$points$date))),
+   identical(as.numeric(trace$y),c(0,-2,3,4)),
+   all(startsWith(trace$text,paste0("Round ",c(2,3,4,1),"<br>"))),
+   grepl("provisional",trace$text[3],fixed=TRUE),trace$line$dash=="dash")
+})
 check("dense histories use sparse automatic dates without an empty dtick",{
  history<-known
  history$valuation<-data.frame(recorded_at=format(as.POSIXct("2026-07-01",tz="UTC")+0:123*86400,"%Y-%m-%dT%H:%M:%SZ",tz="UTC"),value=22e6+sin(0:123/12)*1e6)

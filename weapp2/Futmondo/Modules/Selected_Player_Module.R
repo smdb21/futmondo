@@ -1917,6 +1917,10 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         points$label <- paste0("Round ",points$round_number,"<br>Points: ",points$points,
           if(dated_points)paste0("<br>",format(points_dates,"%d %b %Y",tz="UTC"))else "",
           if("score_status" %in% names(points))paste0("<br>",points$score_status)else "")
+        # Postponed fixtures can put round numbers out of date order. Plotly
+        # connects rows as supplied, so order the complete rows by the axis
+        # actually displayed, keeping scores and hover provenance together.
+        points <- points[order(points$plot_x,points$round_number),,drop=FALSE]
         chart <- chart %>% plotly::add_trace(data=points,type="scatter",mode="lines+markers",
           x=~plot_x,y=~points,text=~label,hoverinfo="text",name="Points",yaxis="y2",
           xaxis=if(separate_round_axis)"x2"else "x",
