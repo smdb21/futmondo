@@ -1158,6 +1158,11 @@ get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE) {
     )
   }
 
+  # Compact numeric columns; retain resize handles for wider user layouts.
+  if ("rating" %in% names(table)) {
+    columns[["rating"]] <- colDef(name="Rating", align="right", minWidth=72, resizable=TRUE)
+  }
+
   # Averages / Points Columns ----
   if ("average.fitness" %in% names(table)) {
     columns[["average.fitness"]] <- colDef(name="Latest 5",align="center")
@@ -1166,6 +1171,7 @@ get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE) {
   if ("average.average" %in% colnames(table)) {
     columns[["average.average"]] <- colDef(
       name = "Avg Points",
+      minWidth = 84, resizable = TRUE,
       align = "center",
       cell = function(value) {
         if (is.null(value) || is.na(value) || value == "NaN" || value == "") return("-")
@@ -1177,6 +1183,7 @@ get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE) {
   if ("average.homeAverage" %in% colnames(table)) {
     columns[["average.homeAverage"]] <- colDef(
       name = "Home Avg",
+      minWidth = 84, resizable = TRUE,
       align = "center",
       cell = function(value) {
         if (is.null(value) || is.na(value) || value == "NaN" || value == "") return("-")
@@ -1188,6 +1195,7 @@ get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE) {
   if ("average.awayAverage" %in% colnames(table)) {
     columns[["average.awayAverage"]] <- colDef(
       name = "Away Avg",
+      minWidth = 84, resizable = TRUE,
       align = "center",
       cell = function(value) {
         if (is.null(value) || is.na(value) || value == "NaN" || value == "") return("-")
@@ -1199,6 +1207,7 @@ get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE) {
   if ("average.averageLastFive" %in% colnames(table)) {
     columns[["average.averageLastFive"]] <- colDef(
       name = "Avg Last 5",
+      minWidth = 90, resizable = TRUE,
       align = "center",
       cell = function(value) {
         if (is.null(value) || is.na(value) || value == "NaN" || value == "") return("-")
@@ -1210,6 +1219,7 @@ get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE) {
   if ("average.matches" %in% colnames(table)) {
     columns[["average.matches"]] <- colDef(
       name = "Played",
+      minWidth = 72, resizable = TRUE,
       align = "center"
     )
   }
@@ -1217,6 +1227,7 @@ get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE) {
   if ("average.total" %in% colnames(table)) {
     columns[["average.total"]] <- colDef(
       name = "Sum last 5",
+      minWidth = 90, resizable = TRUE,
       align = "center"
     )
   }
@@ -1234,7 +1245,7 @@ get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE) {
   if("clause_ratio"%in%colnames(table))columns[["clause_ratio"]]<-colDef(name="Clause / market value",align="center",cell=function(value){number<-suppressWarnings(as.numeric(value));if(length(number)!=1L||!is.finite(number))"Unavailable"else sprintf("%.2fx",number)})
 
   if("selling_by"%in%names(table)) {
-    columns[["selling_by"]]<-colDef(name="Selling by",align="right",minWidth=150,
+    columns[["selling_by"]]<-colDef(name="Selling by",align="right",minWidth=125,resizable=TRUE,
       cell=function(value,index)sale_price(value,index))
     for(field in intersect(c("market_inMarket","price","market_price","effective_market_price","market_asking_price"),names(table)))
       columns[[field]]<-colDef(show=FALSE)

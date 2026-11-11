@@ -1014,3 +1014,8 @@ Exit criteria for subsequent implementation: measured cold/warm and concurrent-s
 ### LigaRadar application title — implemented locally, 2026-11-11
 
 The dashboard header and explicit browser-tab title now read **LigaRadar**, matching the domain. Rendered HTML assertions and the offline lifecycle (13 checks plus eight tabs) passed. Static text only; no acquisition, persistence, dependency or environment changes. Performance review is recorded in `data_review_results.md`; production deployment remains separate.
+
+
+### Compact player-table statistics — implemented locally, 2026-11-11
+
+Narrowed Selling by and the screenshot rating/statistics columns using resizable column minimums; Acquisition Price keeps its existing width. Effective column/widget assertions, seven squad-price checks and the offline lifecycle (13 checks plus eight tabs) passed. Presentation only; no acquisition, persistence or dependency change. Performance review and validation limits are recorded in `data_review_results.md`; production deployment remains separate.

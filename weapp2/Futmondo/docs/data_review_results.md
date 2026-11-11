@@ -1718,3 +1718,10 @@ Performance review: documentation-only delivery adds no runtime API/database req
 Updated `ui.R` to display **LigaRadar** in the header and set the dashboard page title explicitly. Generated HTML assertions verified both the head title and visible brand; R syntax/title-argument checks passed. `Rscript test/test_shiny_simulation.R` passed 13 checks plus eight tabs, with no HTTP or live database mutation attempts. No production deployment or browser viewport check was performed.
 
 Performance review: static text replacement and a scalar page-title argument add no API/database requests, cache changes, blocking work, reactive updates, timers or retained state. Existing responsive header styling is reused; the brand is one character longer. No material rendering cost, dependency or manifest change. Documentation adds no runtime cost.
+
+
+## Compact player-table statistics — 2026-11-11
+
+Reduced Selling by from 150px to 125px; Rating/Played use 72px, Avg Points/Home Avg/Away Avg use 84px, and Avg Last 5/Sum last 5 use 90px. All remain resizable without fixed widths or maximum caps. Acquisition Price is unchanged. Offline assertions verified effective definitions, widget construction, retained acquisition defaults and negative-average formatting. `Rscript test/test_squad_table_prices.R` passed 7/7; `Rscript test/test_shiny_simulation.R` passed 13 checks plus eight tabs with no HTTP/live database mutation attempts. No browser viewport or production deployment verification was performed.
+
+Performance review: constant column-definition metadata only; no additional API/database requests, cache invalidation, persistence changes, blocking work, reactive dependencies, timers, per-row rendering elements or growing memory. Narrower columns reduce horizontal table space on mobile; existing scrolling/header wrapping and resize handles are reused. No material runtime cost or dependency/manifest change. Documentation has no runtime effect.

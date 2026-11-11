@@ -190,3 +190,8 @@ The unlabelled `average.fitness` fallback lists its contributing scores newest f
 `players_table_metric_cell(digits=1L, title_column=NULL)` optionally reads a row field into the pill's React `title` property. Only the recent-average column opts in with `recent_points_details`. This field is hidden, unsearchable and unfilterable; its changes are excluded from the R-formatted schema signature so `updateReactable()` refreshes details even when the average stays equal. Native browser tooltips avoid clipping in the horizontally scrolling table; phones retain their existing layout.
 
 Performance: at most 20 detail entries per player, prepared only with the existing source/history/N enrichment. Filters reuse those rows, the browser reads one string per average cell and hovering issues no requests. Existing database persistence/reuse and source acquisition are unchanged; no new cache, timer, dependency or browser asset.
+
+
+### Compact rating, statistics and listing widths — 2026-11-11
+
+`get_reactable_columns_for_players()` now starts Rating and Played at 72px; Avg Points, Home Avg and Away Avg at 84px; Avg Last 5 and Sum last 5 at 90px; and Selling by at 125px (previously 150px). Acquisition Price retains its existing defaults. These are minimum/default widths with resizing enabled, without fixed widths or maximum caps. Numeric values, formatters and filters are retained.
