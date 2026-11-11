@@ -17,6 +17,8 @@ remember_login_store<-function(method="GET",hash=NULL,payload=NULL,owner="",expi
  promises::promise_resolve(value)
 }
 remember_login_validate<-function(...)promises::promise_resolve(TRUE)
+# Keep the real admission gate, with an explicitly open synthetic policy.
+fm_access_store<-function(...)promises::promise_resolve(FALSE)
 fm_async_login<-function(user_name,...){
  fixture_fail_write<<-identical(user_name,"remember-failure@example.invalid")
  promises::promise_resolve(c(token="synthetic-browser-token",userid="synthetic-browser-user",user_name="Fixture"))

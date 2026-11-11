@@ -1,8 +1,12 @@
 login_UI <- function(id) {
   ns <- NS(id)
-  tagList(
+  div(
+    style = "display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-start;",
+    conditionalPanel(
+      condition = "output.login_form_visible === 'TRUE'", ns = ns,
+      style = "flex: 1 1 300px; min-width: 0;",
     shinydashboardPlus::box(
-      width = 4,
+      width = 12,
       id = ns("login_box"),
       title = h4("Welcome"),
       solidHeader = TRUE,
@@ -17,7 +21,6 @@ login_UI <- function(id) {
       uiOutput(ns("remember_availability")),
       singleton(tags$script(src="remember-login.js")),
       actionButton(inputId = ns("login_button"), label = "Login"),
-      actionButton(inputId = ns("logout_button"), label = "Logout"),
       div(
         id = ns("login_progress"), class = "login-feedback", style = "display: none;",
         role = "status", `aria-live` = "polite",
@@ -59,12 +62,15 @@ login_UI <- function(id) {
           span("Your password is never saved or stored anywhere.")
         )
       )
-    ),
+    )),
+    div(style = "flex: 2 1 450px; min-width: 0;",
     shinydashboardPlus::box(
       id = ns("login_result_box"),
-      width = 8,
-      uiOutput(ns("text"))
-    )
+      width = 12,
+      uiOutput(ns("text")),
+      conditionalPanel(condition = "output.signed_in === 'TRUE'", ns = ns,
+        actionButton(inputId = ns("logout_button"), label = "Logout"))
+    ))
   )
 }
 
@@ -72,6 +78,13 @@ login_Server <- function(id, user = NULL, password = NULL) {
   moduleServer(id, function(input, output, session) {
     login_token_RV <- reactiveVal(NULL)
     login_pending_RV <- reactiveVal(FALSE)
+    # Keep credentials hidden from the first browser paint until cookie probing ends.
+    restore_checking <- reactiveVal(exists("remember_login_session", mode="function") &&
+      exists("remember_login_enabled", mode="function") && remember_login_enabled())
+    output$login_form_visible <- renderText(!restore_checking() && !valid_login(login_token_RV()))
+    output$signed_in <- renderText(valid_login(login_token_RV()))
+    outputOptions(output, "login_form_visible", suspendWhenHidden=FALSE)
+    outputOptions(output, "signed_in", suspendWhenHidden=FALSE)
     generation <- 0L
     closed <- FALSE
     if(is.null(session$userData$startup_stage))session$userData$startup_stage <- reactiveVal("signed_out")
@@ -103,6 +116,7 @@ login_Server <- function(id, user = NULL, password = NULL) {
         if(!is.null(remember_retry()))actionButton(session$ns("remember_retry"),"Retry saved access"))
     })
     signed_out <- function(){
+      restore_checking(FALSE)
       generation <<- generation+1L
       login_pending_RV(FALSE)
       fm_transport_cancel(session$token)
@@ -168,14 +182,20 @@ login_Server <- function(id, user = NULL, password = NULL) {
         })
       },
       on_status=function(kind,message,retry=NULL){remember_feedback(list(kind=kind,message=message));remember_retry(retry)},
-      on_begin=function(){login_pending_RV(TRUE);remember_feedback(NULL);remember_retry(NULL)
+      on_begin=function(){restore_checking(TRUE);login_pending_RV(TRUE);remember_feedback(NULL);remember_retry(NULL)
         session$userData$startup_stage("authenticating")
         session$sendCustomMessage(session$ns("login_state"),list(busy=TRUE,message="Restoring your session…"))
         login_feedback_RV(list(kind="success",message="Restoring your session…"))},
-      on_end=function(){login_pending_RV(FALSE);if(!valid_login(isolate(login_token_RV())))session$userData$startup_stage("signed_out")
+      on_end=function(){restore_checking(FALSE);login_pending_RV(FALSE);if(!valid_login(isolate(login_token_RV())))session$userData$startup_stage("signed_out")
         session$sendCustomMessage(session$ns("login_state"),list(busy=FALSE))},
       on_expire=function(){signed_out();remember_feedback(list(kind="error",message="Your remembered session expired after 7 days. Log in again."))})
-    observeEvent(input$remember_retry,{if(!is.null(remembered))remembered$retry(isolate(remember_retry()))})
+    observeEvent(input$remember_retry,{
+      if(!is.null(remembered)){
+        action <- isolate(remember_retry())
+        if(identical(action,"restore"))restore_checking(TRUE)
+        remembered$retry(action)
+      }
+    })
     observeEvent(input$remember_result,{if(!is.null(remembered))remembered$result(input$remember_result)})
     observeEvent(input$logout_button, {
       signed_out()
@@ -295,7 +315,7 @@ login_Server <- function(id, user = NULL, password = NULL) {
               title = h4("Authentication Status"),
               status = "danger",
               solidHeader = TRUE,
-              width = 8,
+              width = 12,
               background = NULL,
               closable = FALSE
             )
@@ -330,7 +350,7 @@ login_Server <- function(id, user = NULL, password = NULL) {
             title = h4("Authentication Status"),
             status = "success",
             solidHeader = TRUE,
-            width = 8,
+            width = 12,
             background = NULL,
             closable = FALSE
           )

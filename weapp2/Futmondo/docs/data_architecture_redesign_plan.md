@@ -988,3 +988,10 @@ Compact the date column and allow full player names to wrap in the selected-riva
 - Unchanged movements avoid duplicate DB revisions using DB-confirmed state; unacknowledged writes remain retryable. The captured movement endpoint has no verified delta cursor, so its current-list read remains necessary.
 - Fresh-process 5,001-entry restoration, interrupted/corrupt archive handling, isolated PostgreSQL queries/grants/idempotency, source incremental counts, movement-write retry, known-answer cash ledgers and required offline lifecycle are covered in `docs/data_review_results.md`.
 - Local implementation/isolated validation only; no hosted migration or deployment was performed. No new dependency or environment variable. Older source revisions outside the normal overlap require explicit audit.
+
+
+### Cookie-first login presentation — implemented locally, 2026-11-11
+
+- Login credentials remain hidden until the existing remembered-cookie probe completes. Successful restoration leaves the welcome card visible; absent/invalid cookies and recoverable failures expose ordinary login. Disabled remembered login exposes credentials immediately after server initialization.
+- The welcome card uses the available responsive width and retains authenticated Logout. Restore retry, expiry and access denial update the same visibility state. No authentication/storage contract or request counts change.
+- Focused visibility checks, 21 remembered-login checks and eight synthetic HTTPS browser checks passed, including delayed probing, zero credential-visible frames on successful restoration, failed transport/retry, server/browser restart and mobile overflow. Offline lifecycle results and performance assessment are recorded in `docs/data_review_results.md`. Local implementation only; hosted deployment remains separate.

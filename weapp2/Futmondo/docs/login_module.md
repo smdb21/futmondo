@@ -20,6 +20,8 @@ The cookie contains a random 256-bit browser credential. Its attributes are `Sec
 
 ## Restoration and expiry
 
+The login form is hidden in the initial HTML. `login_Server()` publishes unsuspended `login_form_visible` and `signed_in` text outputs (`TRUE`/`FALSE`) for namespaced conditional panels. When remembered login is configured, a session-local `restore_checking` flag keeps credentials hidden until the cookie endpoint or its browser result completes. Missing/invalid cookies, access denial, expiry and recoverable errors expose ordinary login; successful restoration keeps credentials hidden. A restore retry hides the form for the new attempt. Disabled remembered login exposes the form on the first server update. The welcome card remains visible, expands into the available width and contains Logout for authenticated users. Authentication and cookie requests are unchanged; the flag is presentation state, never persisted authentication.
+
 Restoration performs one indexed record lookup and one asynchronous Futmondo league-list validation. The validated league result seeds the existing account cache, so normal startup reuses it without a second league request. The coach preference still restores through the existing account/league preference handshake before hiring can run.
 
 Seven days is an absolute limit from the successful explicit login. Visits do not renew it. Both database metadata and the authenticated envelope must satisfy the bound. A one-shot session timer also signs out an already-open restored/remembered session at that deadline; it performs no polling or account harvesting. Server restarts preserve remembered access through Supabase, provided the same server encryption key is retained.

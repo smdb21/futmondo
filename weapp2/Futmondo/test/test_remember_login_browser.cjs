@@ -67,8 +67,22 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
     }
     observePage(page);
     const appUrl = `https://127.0.0.1:${proxy.address().port}/`;
+    // Hold the cookie probe before the server sees it: credentials must start hidden.
+    let releaseProbe;
+    await page.route('**/dataobj/**', async route => {
+      await new Promise(resolve => {releaseProbe = resolve;});
+      await route.continue();
+    });
     await page.goto(appUrl);
     await page.waitForFunction(() => window.Shiny && Shiny.shinyapp && Shiny.shinyapp.isConnected());
+    for (let i=0; i<100 && !releaseProbe; i++) await page.waitForTimeout(20);
+    assert.ok(releaseProbe, 'cookie probe started');
+    assert.equal(await page.locator('#login-user_name').isVisible(), false);
+    await page.locator('#login-text').getByText('Welcome to Futmondo', {exact:true}).waitFor();
+    releaseProbe();
+    await page.unrouteAll({behavior:'wait'});
+    await page.locator('#login-user_name').waitFor({state:'visible'});
+    console.log('PASS credentials stay hidden during cookie probe and appear after absent cookie');
     await page.locator('#login-user_name').fill('fixture@example.invalid');
     await page.locator('#login-password').fill('synthetic-password');
     await page.locator('#login-remember_login').check();
@@ -88,12 +102,49 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
     assert.ok(endpointStatuses.some(x => JSON.parse(x).status === 'confirmed'));
     assert.ok((await page.evaluate(() => document.baseURI)).includes(workerPrefix));
     console.log('PASS HTTPS login confirms the browser returned its protected cookie on Today at mobile width');
+    releaseProbe = null;
+    await page.route('**/dataobj/**', async route => {
+      await new Promise(resolve => {releaseProbe = resolve;});
+      await route.continue();
+    });
+    // Observe every rendered frame, including the first paint and restoration completion.
+    await page.addInitScript(() => {
+      window.credentialFrames = 0;
+      function inspect() {
+        const field = document.getElementById('login-user_name');
+        if (field && field.getClientRects().length) window.credentialFrames++;
+        requestAnimationFrame(inspect);
+      }
+      requestAnimationFrame(inspect);
+    });
     await page.reload();
+    for (let i=0; i<100 && !releaseProbe; i++) await page.waitForTimeout(20);
+    assert.ok(releaseProbe);
+    await page.waitForTimeout(250);
+    assert.equal(await page.locator('#login-user_name').isVisible(), false);
+    await page.locator('#login-text').getByText('Welcome to Futmondo', {exact:true}).waitFor();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2), false);
+    releaseProbe();
+    await page.unrouteAll({behavior:'wait'});
     await page.locator('#shiny-tab-today').waitFor({state: 'visible'});
     await page.locator('.sidebar-menu a[data-value="login"]').evaluate(el => el.click());
-    await page.waitForFunction(() => document.querySelector('#login-login_feedback').textContent.includes('Session restored'));
+    await page.locator('#login-text').getByText('Welcome back, Fixture!', {exact:true}).waitFor();
     assert.equal((await context.cookies()).find(c => c.name===cookie.name).expires, cookie.expires);
     assert.equal(await page.locator('#login-password').inputValue(), '');
+    assert.equal(await page.locator('#login-user_name').isVisible(), false);
+    assert.equal(await page.evaluate(() => window.credentialFrames), 0);
+    assert.equal(await page.locator('#login-logout_button').isVisible(), true);
+    console.log('PASS delayed restoration shows welcome only, with no credential flash on any frame');
+    // A transport failure must offer ordinary login and preserve the protected cookie.
+    await page.route('**/dataobj/**', route => route.abort('failed'));
+    await page.reload();
+    await page.locator('#login-user_name').waitFor({state:'visible'});
+    await page.locator('#login-remember_retry').waitFor({state:'visible'});
+    assert.ok((await context.cookies()).some(c => c.name === cookie.name));
+    await page.unrouteAll({behavior:'wait'});
+    await page.locator('#login-remember_retry').click();
+    await page.locator('#shiny-tab-today').waitFor({state:'visible'});
+    console.log('PASS restoration failure exposes login; retry restores the preserved cookie');
     console.log('PASS new Shiny session restores login without extending cookie expiry');
     // Close the browser and restart the R process, with persisted synthetic storage
     // and a different Posit-style worker URL. The public cookie path must stay '/'.
@@ -108,17 +159,18 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
     assert.ok((await page.evaluate(() => document.baseURI)).includes(workerPrefix));
     assert.equal((await context.cookies()).find(c => c.name===cookie.name).expires,cookie.expires);
     await page.locator('.sidebar-menu a[data-value="login"]').evaluate(el => el.click());
-    await page.waitForFunction(() => document.querySelector('#login-login_feedback').textContent.includes('Session restored'));
+    await page.locator('#login-text').getByText('Welcome back, Fixture!', {exact:true}).waitFor();
     console.log('PASS browser closure and server restart restore through a new worker path with the same expiry');
     await page.locator('#login-logout_button').click();
-    await page.waitForFunction(() => !document.querySelector('#login-login_feedback').textContent.includes('Session restored'));
+    await page.locator('#login-user_name').waitFor({state:'visible'});
     for(let i=0;i<100 && (await context.cookies()).some(c=>c.name===cookie.name);i++) await page.waitForTimeout(30);
     assert.equal((await context.cookies()).some(c=>c.name===cookie.name), false);
     await page.reload();
     await page.waitForFunction(() => window.Shiny && Shiny.shinyapp && Shiny.shinyapp.isConnected());
     await page.waitForTimeout(150);
     assert.equal(await page.locator('#login-login_feedback').textContent(), '');
-    console.log('PASS logout expires cookie and next page load remains signed out');
+    await page.locator('#login-user_name').waitFor({state:'visible'});
+    console.log('PASS logout expires cookie and next page load shows login');
     await page.locator('#login-user_name').fill('remember-failure@example.invalid');
     await page.locator('#login-password').fill('synthetic-password');
     await page.locator('#login-remember_login').check();
@@ -130,7 +182,7 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
     assert.equal(await page.locator('#login-login_button').isVisible(), false);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2), false);
     console.log('PASS failed persistence remains visible on Today without issuing a remembered cookie');
-    console.log(`REMEMBER LOGIN BROWSER (${proxyWithoutOrigin ? 'proxied without WebSocket Origin' : 'original WebSocket Origin'}${proxyRewritesHost ? ', rewritten Host' : ''}): 5 passed / 0 failed`);
+    console.log(`REMEMBER LOGIN BROWSER (${proxyWithoutOrigin ? 'proxied without WebSocket Origin' : 'original WebSocket Origin'}${proxyRewritesHost ? ', rewritten Host' : ''}): 8 passed / 0 failed`);
   } catch(error) {
     throw new Error(error.stack + '\nAPP LOG: ' + log);
   } finally {
