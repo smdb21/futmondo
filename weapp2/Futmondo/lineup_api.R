@@ -2,7 +2,11 @@
 lineup_api_payload <- function(auth,championship_id,user_team_id,extra=list()) list(
   header=list(token=auth[['token']],userid=auth[['userid']]),
   query=c(list(championshipId=championship_id,userteamId=user_team_id),extra),answer=list())
-lineup_api_read <- function(route,auth,context,owner,extra=list()) {
+lineup_api_read <- function(route,auth,context,owner,extra=list(),worker_live=FALSE) {
+  if(!worker_live&&exists("fm_worker_configured",mode="function")&&fm_worker_configured()&&!identical(fm_worker_mode(auth[['userid']]),FALSE)){
+    args<-list(route=route,query=c(list(championshipId=context$championship_id,userteamId=context$user_team_id),extra))
+    return(promises::then(fm_worker_fetch("get_worker_http_read",args,context,owner),function(value)value$answer))
+  }
   body<-jsonlite::toJSON(lineup_api_payload(auth,context$championship_id,context$user_team_id,extra),auto_unbox=TRUE,null='null')
   promises::then(fm_async_read_http(paste0('https://api.futmondo.com',route),'POST',body,
     c(`Content-Type`='application/json; charset=utf-8'),owner=owner,priority='interactive'),function(response){
@@ -63,11 +67,11 @@ lineup_parse_official <- function(raw) {
     enabled=isTRUE(raw$bench$enabled),multiposition=isTRUE(raw$multiposition),
     status=fm_scalar(raw$status,''),pointSystem=raw$pointSystem,custom=raw$custom)
 }
-lineup_fetch_bundle <- function(auth,context,target,owner,is_current=function()TRUE) {
-  calls<-list(lineup=lineup_api_read('/1/userteam/lineup',auth,context,owner),
-    roster=lineup_api_read('/1/userteam/roster',auth,context,owner),
-    info=lineup_api_read('/1/userteam/information',auth,context,owner,list(type='market')),
-    strategies=lineup_api_read('/5/strategy/availables',auth,context,owner))
+lineup_fetch_bundle <- function(auth,context,target,owner,is_current=function()TRUE,worker_live=FALSE) {
+  calls<-list(lineup=lineup_api_read('/1/userteam/lineup',auth,context,owner,worker_live=worker_live),
+    roster=lineup_api_read('/1/userteam/roster',auth,context,owner,worker_live=worker_live),
+    info=lineup_api_read('/1/userteam/information',auth,context,owner,list(type='market'),worker_live=worker_live),
+    strategies=lineup_api_read('/5/strategy/availables',auth,context,owner,worker_live=worker_live))
   promises::then(do.call(promises::promise_all,calls),function(answers){
     if(!isTRUE(is_current()))stop(structure(list(message='Session request cancelled',call=NULL),class=c('fm_async_cancelled','error','condition')))
     data<-lineup_normalize_bundle(answers,context,target)
@@ -182,4 +186,12 @@ lineup_changes <- function(current,modified) {
   if(length(new_captain)&&(!identical(old_captain,new_captain)||!same_formation||length(events)))
     events[[length(events)+1L]]<-event(NULL,new_captain[[1]],NULL,FALSE,TRUE)
   events
+}
+
+# Explicit manual-action preflight/readback, compatible with existing offline seams.
+lineup_fetch_live <- function(auth,context,target,owner,is_current=function()TRUE){
+ args<-list(auth=auth,context=context,target=target,owner=owner,is_current=is_current)
+ if('worker_live'%in%names(formals(lineup_fetch_bundle)))args$worker_live<-TRUE
+ else if(exists('fm_worker_configured',mode='function')&&fm_worker_configured()&&!identical(fm_worker_mode(auth[['userid']]),FALSE))stop('Live lineup verification is unavailable')
+ do.call(lineup_fetch_bundle,args)
 }

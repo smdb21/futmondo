@@ -1,0 +1,3 @@
+#!/bin/sh
+# s6 supervises restarts; bound retries after a hard interpreter/import failure.
+sleep 5

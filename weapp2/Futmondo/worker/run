@@ -1,0 +1,5 @@
+#!/usr/bin/with-contenv bash
+set -e
+export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1
+cd /srv/shiny-server/futmondo
+exec s6-setuidgid shiny /opt/futmondo-worker/bin/python -m worker.main

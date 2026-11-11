@@ -1,0 +1,224 @@
+#!/usr/bin/env Rscript
+# Private headless bridge. Real credentials and HTTP connections belong to Python.
+options(futmondo.worker_helper=TRUE)
+pipe_in<-file('stdin',open='r');pipe_out<-stdout()
+sink(stderr())
+suppressPackageStartupMessages(source('global.R'))
+source('history_repository.R')
+if(file.exists('worker_contract.R'))source('worker_contract.R')
+# Unexpected direct HTTP is a programming error, never an alternate acquisition path.
+for(verb in c('GET','POST','PUT','PATCH','DELETE','HEAD'))
+ assignInNamespace(verb,function(...)stop('Direct helper HTTP is disabled'),ns='httr')
+for(name in c('curl_fetch_memory','curl_fetch_disk','curl_fetch_stream','multi_add'))
+ assignInNamespace(name,function(...)stop('Direct helper HTTP is disabled'),ns='curl')
+fm_pipe_send<-function(value){writeLines(as.character(jsonlite::toJSON(value,auto_unbox=TRUE,null='null',na='null',digits=NA)),pipe_out);flush(pipe_out)}
+fm_pipe_exchange<-function(value){
+ fm_pipe_send(value);line<-readLines(pipe_in,n=1L,warn=FALSE)
+ if(!length(line))stop('Bridge closed')
+ answer<-jsonlite::fromJSON(line,simplifyVector=FALSE)
+ if(!is.null(answer$error))stop(structure(list(message='Worker operation failed',call=NULL,code=answer$error),class=c('fm_worker_bridge_error','error','condition')))
+ answer
+}
+fm_worker_discover<-function(handler,value,context,auth){
+ out<-list();add<-function(fn,args=list(),ctx=context,interval=fm_worker_interval(fn)){
+  d<-fm_worker_descriptor(fn,args,ctx);d$interval_seconds<-interval;out[[length(out)+1L]]<<-d
+ }
+ if(handler=='get_active_championships'&&is.list(value$championships)){
+  add('get_notifications',ctx=resource_context(auth));add('get_notification_unread',ctx=resource_context(auth))
+  for(ch in value$championships){
+   cid<-fm_scalar(ch$id %||% ch$`_id`,'');tid<-fm_scalar(ch$userteam$id %||% ch$userteam$`_id`,'')
+   if(!nzchar(cid)||!nzchar(tid))next
+   ctx<-resource_context(auth,cid,tid);args<-list(championship_id=cid,user_team_id=tid)
+   for(fn in c('get_teams','get_finished_rounds','get_championship_players','get_real_clubs','get_lineup_from_team','get_classification_round_catalog','get_award_round_catalog','get_mvp_saved_catalog'))
+    add(fn,args[intersect(names(args),names(formals(get(fn))))],ctx)
+   for(fn in c('get_market_players','get_players_from_team','get_user_team_info','get_financial_snapshot','get_my_market_players','get_roster_bids','get_user_team_rounds','fm_worker_finances'))add(fn,args,ctx)
+   add('get_championship_pressroom',list(championship_id=cid),ctx)
+   for(route in c('/1/userteam/lineup','/1/userteam/roster','/1/userteam/information','/5/strategy/availables')){
+    query<-list(championshipId=cid,userteamId=tid);if(route=='/1/userteam/information')query$type<-'market'
+    add('get_worker_http_read',list(route=route,query=query),ctx,60L)
+   }
+  }
+ }
+ if(handler%in%c('get_award_round_catalog','get_classification_round_catalog')&&is.data.frame(value$rounds)){
+  for(i in seq_len(nrow(value$rounds))){
+   row<-value$rounds[i,,drop=FALSE]
+   if(!nzchar(fm_scalar(row$round_id,''))||!is.finite(fm_number(row$round_number)))next
+   if(!isTRUE(row$is_finished)&&!identical(fm_scalar(row$round_id,''),fm_scalar(value$current_round_id,'')))next
+   args<-list(championship_id=context$championship_id,user_team_id=fm_scalar(value$user_team_id,context$user_team_id),round_id=as.character(row$round_id),round_number=as.numeric(row$round_number))
+   add('get_classification_round_ranking',args,context,if(isTRUE(row$is_finished))86400L else 60L)
+  }
+ }
+ if(handler=='get_championship_players'&&is.data.frame(value)&&'id'%in%names(value)){
+  for(id in unique(as.character(value$id))){
+   if(is.na(id)||!nzchar(id))next
+   ctx<-context;ctx$player_id<-id
+   args<-list(championship_id=ctx$championship_id,user_team_id=ctx$user_team_id,player_id=id)
+   add('get_player_summary',args,ctx,3600L)
+   add('get_player_card_history',args,ctx,3600L)
+   add('get_player_full_profile',list(player_id=id),ctx,21600L)
+   add('get_player_matches',list(player_id=id),ctx,21600L)
+  }
+ }
+ if(handler%in%c('get_players_from_team','get_market_players')&&is.data.frame(value)&&'id'%in%names(value)){
+  for(id in unique(as.character(value$id))){
+   if(is.na(id)||!nzchar(id))next
+   ctx<-context;ctx$player_id<-id
+   add('get_player_summary',list(championship_id=ctx$championship_id,user_team_id=ctx$user_team_id,player_id=id),ctx,300L)
+  }
+ }
+ out
+}
+fm_worker_headless_finances<-function(env,auth,ctx){
+ s<-shiny::MockShinySession$new();on.exit(s$close(),add=TRUE)
+ teams<-env$get_teams(auth,ctx$championship_id)
+ catalog<-env$get_mvp_saved_catalog(auth,ctx$championship_id)
+ rounds<-catalog$catalog$rounds;awards<-catalog$saved
+ complete<-isTRUE(catalog$catalog$complete)
+ if(is.data.frame(rounds)&&nrow(rounds))for(i in which(rounds$is_finished%in%TRUE)){
+  ref<-round_reference(rounds$round_id[i],rounds$round_number[i])
+  result<-env$get_official_dreamteam_result(auth,ctx$championship_id,ref)
+  if(identical(result$status,'ok')){
+   if(!isTRUE(env$persist_official_award_snapshot(result,auth,ctx$championship_id,ref,ctx)))stop('Award persistence failed')
+   awards<-dplyr::bind_rows(awards[!awards$round_id%in%ref$round_id,,drop=FALSE],result$rows)
+  }else complete<-FALSE
+ }
+ feed<-NULL
+ shiny::withReactiveDomain(s,{
+  feed<-env$shared_rival_finance_source(s,function()auth,function()ctx$championship_id,function()ctx$user_team_id,
+    function()teams,function()TRUE,function()list(rows=awards,complete=complete))
+ })
+ started<-Sys.time()
+ repeat{
+  later::run_now(0.02);s$flushReact()
+  state<-s$userData$rival_finance_shared
+  if(!is.null(state)&&isTRUE(state$seed_complete)&&state$busy==0L&&!length(state$queue)&&state$ownership_pending==0L){
+   result<-shiny::isolate(feed());if(!isTRUE(result$loading))break
+  }
+  if(as.numeric(difftime(Sys.time(),started,units='secs'))>600)stop('Finance preparation timeout')
+ }
+ if(!is.null(result$finance_error))stop('Finance preparation failed')
+ result
+}
+fm_worker_run<-function(descriptor){
+ ctx<-descriptor$context
+ if(!identical(descriptor$version,1L)&&!identical(descriptor$version,1))stop('Unsupported worker protocol')
+ auth<-c(userid=ctx$account_id,token='worker-placeholder')
+ env<-new.env(parent=.GlobalEnv)
+ for(nm in ls(.GlobalEnv,all.names=TRUE)){
+  f<-get(nm,.GlobalEnv)
+  if(is.function(f)&&identical(environment(f),.GlobalEnv)){environment(f)<-env;assign(nm,f,env)}
+ }
+ env$.futmondo_request_context<-ctx
+ produced<-list();produced_bytes<-0;source_clock<-NULL
+ env$Sys.time<-function()source_clock %||% Sys.time()
+ env$get_sb_url<-function()'https://worker-database.invalid'
+ env$get_sb_key<-function()'worker-placeholder'
+ env$futmondo_post<-function(url,...){
+  dots<-list(...);body<-dots$body
+  if(is.character(body))body<-jsonlite::fromJSON(body,simplifyVector=FALSE)
+  if(!is.list(body))stop('Invalid source payload')
+  body$header<-NULL
+  result<-fm_pipe_exchange(list(type='http',url=url,body=body))
+  source_time<-fm_time(result$observed_at)
+  if(length(source_time)!=1L||is.na(source_time))stop('Missing source observation time')
+  source_clock<<-if(is.null(source_clock))source_time else min(source_clock,source_time)
+  content<-charToRaw(as.character(jsonlite::toJSON(result$body,auto_unbox=TRUE,null='null',na='null',digits=NA)))
+  fm_httr_response(list(status_code=as.integer(result$status),content=content,times=c(total=0)),url)
+ }
+ env$get_worker_http_read<-function(route,query=list()){
+  httr::content(env$futmondo_post(paste0('https://api.futmondo.com',route),body=list(header=list(),query=query,answer=list())))
+ }
+ env$supabase_get<-function(table_name,query_params=list()){
+  result<-fm_pipe_exchange(list(type='database',table=table_name,query=query_params))
+  jsonlite::fromJSON(as.character(jsonlite::toJSON(result$rows,auto_unbox=TRUE,null='null',na='null',digits=NA)))
+ }
+ env$supabase_post_direct<-function(table_name,payload,conflict=NULL,ignore_duplicates=FALSE){
+  if(is.data.frame(payload)&&!nrow(payload)||is.list(payload)&&!length(payload))return(TRUE)
+  if(is.null(conflict))conflict<-supabase_conflict_key(table_name)
+  fm_pipe_exchange(list(type='persist',table=table_name,payload=payload,conflict=conflict,ignore=ignore_duplicates))$ok
+ }
+ env$supabase_post<-env$supabase_post_direct
+ env$defer_persistence<-function(fn,args=list(),context=NULL,on_complete=NULL,retained_bytes=0){
+  if(!fn%in%c('supabase_post_direct','supabase_fact_batch_direct','supabase_round_history_batch_direct','supabase_pressroom_history_batch_direct'))stop('Unsupported persistence')
+  ops<-if(fn=='supabase_post_direct')list(args)else args[[1]]
+  if(!all(vapply(ops,persistence_operation_valid,logical(1))))stop('Invalid persistence operations')
+  for(op in ops)if(!isTRUE(do.call(env$supabase_post_direct,op)))stop('Persistence was not acknowledged')
+  if(is.function(on_complete))on_complete(TRUE)
+  TRUE
+ }
+ # Controller promises run in this private process. No live Shiny session is shared.
+ env$async_adapter_fetch<-function(fn,args=list(),context=NULL,...){
+  tryCatch(promises::promise_resolve(do.call(get(fn,env),args)),error=function(e)promises::promise_reject(e))
+ }
+ # Preserve useful nested acquisitions as shared snapshots; do not refetch them
+ # merely because a different screen asks for the same normalized resource.
+ for(nm in ls(env)){
+  fn<-env[[nm]]
+  if(!is.function(fn)||!startsWith(nm,'get_')||endsWith(nm,'_async')||!'login'%in%names(formals(fn)))next
+  local({name<-nm;original<-fn
+   wrapper<-function(){
+    params<-lapply(as.list(match.call())[-1L],eval,envir=parent.frame())
+    childctx<-env$resource_context(params$login,params$championship_id,params$user_team_id %||% params$team_id,params$player_id)
+    child<-fm_worker_descriptor(name,params,childctx)
+    if(child$resource_key!=descriptor$resource_key){
+     existing<-produced[[child$resource_key]]
+     if(!is.null(existing))return(fm_worker_decode(existing$value))
+     saved<-fm_pipe_exchange(list(type='resource',descriptor=child))
+     if(!is.null(saved$value)){
+      stamp<-fm_time(saved$observed_at)
+      if(length(stamp)==1L&&!is.na(stamp))source_clock<<-if(is.null(source_clock))stamp else min(source_clock,stamp)
+      return(fm_worker_decode(saved$value))
+     }
+    }
+    value<-do.call(original,params)
+    tryCatch({
+     childctx<-env$resource_context(params$login,params$championship_id,params$user_team_id %||% params$team_id,params$player_id)
+     child<-fm_worker_descriptor(name,params,childctx);wire<-fm_worker_encode(value)
+     bytes<-as.numeric(object.size(wire))
+     if(!is.null(value)&&produced_bytes+bytes<=8*1024^2){
+      produced[[child$resource_key]]<<-list(descriptor=child,value=wire,
+       observed_at=rival_finance_stamp(attr(value,'observed_at') %||% Sys.time()),checked_at=rival_finance_stamp(),
+       status=if(is.list(value)&&!is.data.frame(value)&&!is.null(value$status)&&value$status%in%c('partial','unavailable','unsupported'))'partial'else if(identical(attr(value,'fetch_status'),'partial'))'partial'else'ok',
+       completeness=if(isTRUE(attr(value,'complete')))'complete'else'unknown')
+      produced_bytes<<-produced_bytes+bytes
+     }
+    },error=function(e)NULL)
+    value
+   }
+   formals(wrapper)<-formals(original);assign(name,wrapper,env)
+  })
+ }
+ handler<-descriptor$handler
+ if(!grepl('^(get_|read_|fm_worker_finances$)',handler))stop('Unsupported resource')
+ clear_api_cache()
+ args<-if(!is.null(descriptor$encoded_args))fm_worker_decode(descriptor$encoded_args)else descriptor$args
+ if(!length(args))args<-list()
+ if(handler=='fm_worker_finances')value<-fm_worker_headless_finances(env,auth,ctx)else{
+  if(!exists(handler,env,mode='function'))stop('Unknown resource')
+  f<-get(handler,env)
+  if('login'%in%names(formals(f)))args$login<-auth
+  if('context'%in%names(formals(f))&&is.null(args$context))args$context<-ctx
+  value<-do.call(f,args)
+ }
+ if(is.null(value))stop('Source did not return a resource')
+ # Drain callbacks such as acknowledged history chunks before certifying a snapshot.
+ for(i in seq_len(20L))later::run_now(0)
+ if(identical(attr(value,'fetch_status'),'unavailable')||!is.null(attr(value,'fetch_error')))stop('Incomplete source acquisition')
+ observed<-attr(value,'observed_at') %||% Sys.time()
+ status<-if(is.list(value)&&!is.data.frame(value))value$status %||% 'ok'else attr(value,'fetch_status') %||% 'ok'
+ if(!status%in%c('ok','empty','partial','unsupported'))status<-'partial'
+ completeness<-if(isTRUE(attr(value,'complete')))'complete'else if(is.list(value)&&identical(value$completeness,'complete'))'complete'else'unknown'
+ if(status=='partial')completeness<-'partial'
+ list(type='result',value=fm_worker_encode(value),observed_at=rival_finance_stamp(observed),checked_at=rival_finance_stamp(),
+  status=status,completeness=completeness,resources=unname(produced[setdiff(names(produced),descriptor$resource_key)]),discoveries=fm_worker_discover(handler,value,ctx,auth))
+}
+fm_pipe_send(list(type='ready',version=1L))
+repeat{
+ line<-readLines(pipe_in,n=1L,warn=FALSE)
+ if(!length(line))break
+ tryCatch({
+  command<-jsonlite::fromJSON(line,simplifyVector=FALSE)
+  if(command$type!='run')stop('Invalid command')
+  fm_pipe_send(fm_worker_run(command$descriptor))
+ },error=function(e)fm_pipe_send(list(type='failure',code='resource_parse')))
+}

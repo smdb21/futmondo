@@ -3,6 +3,7 @@
 function(input, output, session) {
   session$userData$league_context_enabled<-TRUE
   login_token_RV <- login_Server(id = "login")
+  fm_worker_session(session, login_token_RV, leagues=function()tryCatch(championships_RV(),error=function(e)list()))
   refresh_trigger <- reactiveVal(0)
   history_refresh_trigger <- round_history_refresh_trigger(session)
   startup_stage <- session$userData$startup_stage
@@ -118,7 +119,6 @@ function(input, output, session) {
   })
   output$round_countdown <- renderUI({
     if (!isTRUE(input$tabs %in% c("today", "players_in_championship", "yourteam"))) return(NULL)
-    invalidateLater(1000, session)
     if (!valid_login(login_token_RV())) {
       return(tags$div(class = "round-countdown-bar round-countdown-unavailable",
         icon("clock"), tags$span("Log in to see the next round countdown")))
@@ -128,7 +128,7 @@ function(input, output, session) {
     next_round <- next_round_context(rounds)
     round_heading <- if (isTRUE(next_round$available)) {
       tags$div(class="round-countdown-main",icon("clock"),
-        tags$strong(paste0("Round ",next_round$round_number)),tags$span(format_round_countdown(next_round$starts_at)))
+        tags$strong(paste0("Round ",next_round$round_number)),tags$span(class="fm-browser-countdown",`data-deadline`=as.numeric(fm_time(next_round$starts_at)),`data-server-now`=as.numeric(Sys.time()),format_round_countdown(next_round$starts_at)))
     } else {
       current_round <- current_round_context(rounds)
       if (isTRUE(current_round$available)) {

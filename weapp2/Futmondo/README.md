@@ -16,11 +16,11 @@ The [data redesign plan](docs/data_architecture_redesign_plan.md) defines the cu
 
 ## Product scope
 
-The app retains observed data, historical accounting, descriptive statistics, official notifications, and manual roster/market actions. Predictions, Smart Bid, forecast-driven planners/optimizers, generated trading recommendations, automatic coaches, scheduled workers, and unattended trading are excluded from current and future development.
+The app retains observed data, historical accounting, descriptive statistics, official notifications, and manual roster/market actions. Predictions, Smart Bid, forecast-driven planners/optimizers, generated trading recommendations and unattended trading remain excluded. Explicit exceptions cover login-time coach hiring and, from 2026-11-11, per-account opt-in background acquisition of factual data through the Python worker described below.
 
 The user-triggered **Lineup** page is an explicit exception: it compares observed recent-round averages to select a valid XI and outfield-covering bench. It makes no predictions or unattended changes; **Save to Futmondo** is a separate manual action. Existing databases need `scripts/migrations/20261107191054_lineup_snapshots.sql` for durable lineup snapshots and the saved navigation page. See [lineup behavior and verification](docs/lineup_module.md).
 
-Production now runs on a Contabo VM using Docker/Dokploy, as reported by the owner. The current app still uses cooperative asynchronous HTTP and a session-owned persistence queue; no separate worker or scheduler is installed by this code. Session/container termination can interrupt pending history saves. The UI must distinguish pending saves from acknowledged database persistence. See the [Contabo performance review](docs/contabo_performance_review.md) for prioritized worker, timer, database and scaling options; these recommendations are not yet implemented.
+Production runs on a Contabo VM using Docker/Dokploy. The Docker image starts Shiny and a supervised Python acquisition service. Accounts remain in interactive mode until they explicitly enable background sync. Opted-in browsing reads durable database snapshots, while the worker acquires source data and prepares finances independently of browser sessions. Pending work is distinct from acknowledged persistence. See [Python worker setup and contracts](docs/python_worker.md); production migration, deployment and authenticated acceptance are separate rollout steps.
 
 ## Database configuration
 
@@ -135,3 +135,16 @@ guide for build validation and resource limits.
 Football competitions use their source competition and season identities. Existing databases must apply `scripts/migrations/20261110225848_general_competition_context.sql` before deploying this version; fresh databases use the updated schema. No new environment variables or R packages are required. Database migration and application deployment remain separate rollout steps, and the admission setting is unchanged.
 
 Player IDs remain opaque source identities. An unchanged ID can accumulate club observations across competitions; a changed ID stays separate without inferred person merges. Existing unknown historical contexts remain intact and are not assigned to a season by date. See [competition context and transfer behavior](docs/general_competition_context.md) for durable metadata, history repair, exact scope, migration and source-evidence limitations.
+
+
+## Python background acquisition
+
+Before enabling the worker, apply `scripts/migrations/20261111214239_background_acquisition.sql` to an existing database; new installations include it in `scripts/schema.sql`. Configure a separate server-only `FUTMONDO_WORKER_KEY` (64 random hex characters) in Dokploy, retain existing database variables, and deploy the Docker image. Do not place this key in Git, Docker build arguments or browser settings, and do not reuse `FUTMONDO_REMEMBER_KEY`. Generate it privately with `openssl rand -hex 32`.
+
+`FUTMONDO_WORKER_ENABLED` defaults to `true`; missing key/configuration leaves the service idle and accounts in interactive mode. Optional capacity settings are `FUTMONDO_WORKER_LANES=2`, `FUTMONDO_WORKER_CONNECTIONS=2` and `FUTMONDO_WORKER_ACCOUNT_RPS=2`. Start with one lane if VM memory is constrained, then measure before increasing concurrency. Python and its pinned dependencies are installed from `worker/requirements.txt`; the image includes Python/venv and timezone data. No new R dependency is introduced.
+
+After login, use Welcome → Background sync to explicitly opt in, select included leagues and edit quiet hours/timezone. The default quiet window is midnight–07:00 in the detected user timezone, with hourly unattended checks; user activity can request immediate priority work. Tokens are encrypted separately from browser remembered login. Background access continues after logout until disabled or rejected by Futmondo; no password is saved and no automatic trade is performed.
+
+Existing interactive behavior remains for non-opted-in accounts. Opted-in accounts display stored data and acquisition progress rather than silently falling back to direct source reads. Manual-action preflights and readback remain live. See [worker behavior, failure recovery, limits and rollout](docs/python_worker.md). Container startup does not apply migrations or enroll users automatically.
+
+Focused offline checks: `Rscript test/test_worker_contract.R`, `Rscript test/test_worker_provider.R`, `node test/test_worker_schema.cjs`, then `python -m unittest discover -s test -p test_worker.py -v` from the application directory with the pinned Python requirements installed. The R contract check generates synthetic cross-language fixtures in `/tmp`; tests never use real accounts or transactions.

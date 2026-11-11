@@ -131,3 +131,8 @@ no new reactive timers or polling but extends the lifetime of existing session
 work and buffered outputs, as described above. Actual image build cost, server
 memory, concurrent-session behavior, and hosted cookie flow must be measured on
 the target server.
+
+
+## Opt-in Python acquisition service
+
+The updated Docker image also installs pinned Python dependencies and starts `/etc/services.d/futmondo-worker` under the existing `/init` supervisor as the unprivileged `shiny` user. No extra port, cron or Dokploy application is required. Apply the additive worker migration before setting the separate runtime encryption key and enabling accounts. The service starts automatically but never enrolls a user without consent. See [configuration, sizing, lifecycle and rollback](python_worker.md). A full Docker build/start remains a required target-host check; local interpreter/protocol tests do not replace it.

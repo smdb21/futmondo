@@ -1,0 +1,25 @@
+options(futmondo.offline=TRUE)
+suppressPackageStartupMessages(source('global.R'))
+fm_worker_configured<-function()TRUE
+account<-NULL
+fm_worker_rpc<-function(name,payload,owner=''){
+ if(name=='read')return(promises::promise_resolve(list(account=account,resources=list(),jobs=list(),health=list(heartbeat=rival_finance_stamp()))))
+ if(name=='renew'){account$generation<<-account$generation+1L;return(promises::promise_resolve(account))}
+ if(name=='authorize'){
+  account<<-list(account_id='browser-fixture',enabled=payload$p_enabled,auth_status='active',generation=(account$generation %||% 0L)+1L,timezone=payload$p_timezone,
+   quiet_start=payload$p_start,quiet_end=payload$p_end,excluded_leagues=payload$p_excluded)
+  return(promises::promise_resolve(account))
+ }
+ promises::promise_resolve(TRUE)
+}
+Sys.setenv(FUTMONDO_WORKER_KEY=paste(rep('ab',32),collapse=''))
+ui<-shiny::fluidPage(shiny::tags$head(shiny::includeScript('www/worker-state.js')),
+ shiny::uiOutput('worker_status'),shiny::uiOutput('worker_settings'),
+ shiny::actionButton('heartbeat','Heartbeat'),shiny::textOutput('heartbeat_value'),
+ shiny::tags$span(class='fm-browser-countdown',`data-deadline`=as.numeric(Sys.time())+600,`data-server-now`=as.numeric(Sys.time()),'10:00'))
+server<-function(input,output,session){
+ auth<-shiny::reactiveVal(c(userid='browser-fixture',token='synthetic',user_name='fixture@example.invalid'))
+ fm_worker_session(session,auth)
+ output$heartbeat_value<-shiny::renderText(input$heartbeat)
+}
+shiny::runApp(shiny::shinyApp(ui,server),host='127.0.0.1',port=as.integer(Sys.getenv('FUTMONDO_WORKER_TEST_PORT','3897')),launch.browser=FALSE)

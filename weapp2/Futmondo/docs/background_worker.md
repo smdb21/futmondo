@@ -22,3 +22,8 @@ Focused coverage: `test_background_sync.R`, `test_observation_recording.R`, `tes
 `persistence_error_issue()` retains sanitized structured HTTP status before classifying connection/transient HTTP failures versus authorization, schema and other failures. Eligible history jobs receive at most two additional attempts across the job, after cooperative 250/500 ms delays, resuming the failed operation only. Earlier acknowledged chunks are not replayed and later acquisition markers cannot run before score chunks succeed. Unrelated ready jobs can proceed during backoff. One retry timer shares the existing bounded queue, and logout cancels it together with the owned jobs.
 
 Serialization, operation extraction and synchronous transport exceptions release the active slot and notify completion listeners. Stable round-history failure identity uses league/player/season/scoring without `checked_at`, so a newer successful source check clears the prior save error for that identity. `persist_recent_points_snapshot()` rejects observations from a different player/context before preparing its marker. A failed save retains live data but never certifies durable acquisition. Healthy write counts, batch sizes and payload/memory bounds remain unchanged.
+
+
+## Explicit Python acquisition exception — 2026-11-11
+
+The cooperative queue above remains the interactive-mode recorder. The approved [Python service](python_worker.md) adds separately consented unattended factual acquisition, durable jobs, source checkpoints and prepared database snapshots for opted-in accounts. It starts under Docker s6 on deployment; it does not trade, reuse remembered-browser credentials or change the acknowledgement requirements above.

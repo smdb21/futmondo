@@ -30,3 +30,9 @@ hirecoach
 app.futmondo.com.clause_exercise.har
 app.futmondo.com.direct_sel.har
 app.futmondo.com.market_new.har
+
+worker
+
+Dockerfile
+.dockerignore
+shiny-server.conf

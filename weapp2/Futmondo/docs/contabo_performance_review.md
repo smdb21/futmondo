@@ -1,6 +1,6 @@
 # Contabo performance and background-processing review
 
-Date: 2026-11-11. Status: review complete; recommendations are not implemented or deployed.
+Date: 2026-11-11. Historical review: the owner subsequently selected Python acquisition before browsing. The approved implementation and rollout contract are in [Python background acquisition](python_worker.md); the earlier recommendation below is retained as review history.
 
 ## Recommendation
 

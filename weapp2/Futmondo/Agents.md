@@ -49,3 +49,6 @@ Keep database credentials on the R server. Maintain context isolation, restricte
 Use responsive Bootstrap structures and mobile-safe CSS; avoid fixed-width controls that overflow narrow screens.
 
 Explicit scope exception requested on 2026-11-01: optional seven-day remembered browser login may retain only encrypted Futmondo authentication tokens with server-side expiry/revocation and a protected HttpOnly cookie. This restores interactive access only; it does not authorize unattended API harvesting or stored-session workers.
+
+
+Explicit scope exception approved on 2026-11-11: implement a Docker-supervised Python service for per-account opt-in unattended factual acquisition, with durable DB snapshots and reuse of the R parsing/accounting engine. Consent is separate from browser remembered login; encrypted worker tokens persist until disabled or rejected. This does not authorize background transactions or coach/lineup automation. See `docs/python_worker.md`.

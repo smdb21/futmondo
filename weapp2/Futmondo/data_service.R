@@ -186,6 +186,7 @@ get_cached_data <- function(key,expr,timeout_sec=NULL,context=NULL) {
   })
 }
 invalidate_resources <- function(context,resources=NULL,pattern=NULL) {
+  if(exists("fm_worker_invalidate_pattern",mode="function")&&(!is.null(resources)||!is.null(pattern)))fm_worker_invalidate_pattern(context,resources,pattern)
   keys<-ls(api_cache_env);drop<-vapply(keys,function(k) {
     x<-api_cache_env[[k]];ctx<-x$context
     if(is.null(ctx))return(!nzchar(context$session_id %||% "")&&startsWith(k,paste0("account:",context$account_id,":"))&&is.null(resources)&&is.null(pattern))
@@ -207,7 +208,7 @@ resource_state <- function(data=NULL,status=NULL,error=NULL,source=NULL) {
   status<-status %||% if(is.null(data))"unavailable" else attr(data,"fetch_status") %||% if(is.data.frame(data)&&!nrow(data))"empty" else "ok"
   list(data=data,status=status,source=source %||% attr(data,"source") %||% "futmondo",
     observed_at=attr(data,"observed_at"),fetched_at=attr(data,"fetched_at"),freshness=if(status=="stale")"stale" else "fresh",
-    completeness=if(status%in%c("ok","empty"))"complete" else "partial",error=error)
+    completeness=attr(data,"worker_completeness") %||% if(status%in%c("ok","empty"))"complete" else "partial",error=error)
 }
 get_cached_resource_async <- function(resource,context,fetch,refresh=FALSE) {
   key<-api_cache_key(resource,context=context)

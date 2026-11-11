@@ -1,4 +1,4 @@
-if (!isTRUE(getOption("futmondo.offline", FALSE)) && file.exists(".Renviron")) {
+if (!isTRUE(getOption("futmondo.offline", FALSE)) && !isTRUE(getOption("futmondo.worker_helper", FALSE)) && file.exists(".Renviron")) {
   readRenviron(".Renviron")
 }
 
@@ -36,3 +36,11 @@ library(dplyr)
 
 
 cfg_player_columns_to_hide <- fread(file = "player_columns_to_hide.txt", header = FALSE)[[1]]
+
+source("worker_contract.R")
+source("worker_runtime.R")
+if (!isTRUE(getOption("futmondo.worker_helper", FALSE))) {
+  .fm_worker_finance_original <- shared_rival_finance_source
+  shared_rival_finance_source <- fm_worker_finance_source
+  fm_worker_wrap_reads()
+}

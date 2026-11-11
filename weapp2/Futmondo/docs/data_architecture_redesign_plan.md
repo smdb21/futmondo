@@ -1019,3 +1019,12 @@ The dashboard header and explicit browser-tab title now read **LigaRadar**, matc
 ### Compact player-table statistics — implemented locally, 2026-11-11
 
 Narrowed Selling by and the screenshot rating/statistics columns using resizable column minimums; Acquisition Price keeps its existing width. Effective column/widget assertions, seven squad-price checks and the offline lifecycle (13 checks plus eight tabs) passed. Presentation only; no acquisition, persistence or dependency change. Performance review and validation limits are recorded in `data_review_results.md`; production deployment remains separate.
+
+
+### Python background acquisition — implemented locally, 2026-11-11
+
+Explicitly approved opt-in unattended factual acquisition supersedes the earlier compute-only recommendation. Docker starts a supervised Python service alongside Shiny; private headless R helpers reuse source parsing and the single accounting engine. Opted-in browsing consumes durable snapshots and queues priority work, while accounts without consent retain interactive acquisition. Manual transactions, preflight and readback retain direct source behavior.
+
+Implementation includes separate encrypted token authorization/generation and renewal, source-verified membership/context isolation, tiered full-catalog acquisition, midnight–07:00 local quiet hours, durable source checkpoints, lease/leader recovery, acknowledged factual/chunk/manifest writes, prepared balances/ledgers, snapshot reuse and bounded Shiny resource updates. See [setup, interfaces, limits and rollout](python_worker.md).
+
+Local source-contract, worker, database, known-answer finance, responsiveness, mobile and existing lifecycle checks are recorded in `data_review_results.md`. Production migration, actual Docker image build/start on the target host, authenticated source acceptance and Contabo sizing remain separate pending rollout checks; this milestone does not claim production deployment or a measured production speedup.

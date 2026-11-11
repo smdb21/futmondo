@@ -22,6 +22,7 @@ body <- shinydashboard::dashboardBody(
     # Embed the current stylesheet: cached legacy CSS must not restore white surfaces.
     shiny::includeCSS("www/custom_style.css"),
     shiny::includeScript("www/theme-switch.js"),
+    shiny::includeScript("www/worker-state.js"),
     shiny::tags$style(shiny::HTML("
         .ReactTable .rt-thead {
           z-index: 1;
@@ -37,11 +38,13 @@ body <- shinydashboard::dashboardBody(
     uiOutput("round_countdown")
   ),
   uiOutput("background_sync"),
+  uiOutput("worker_status"),
   shinydashboard::tabItems(
     shinydashboard::tabItem(tabName="notifications", notifications_UI("notifications")),
     shinydashboard::tabItem(
       tabName = "login",
       selectInput("selected_league", "League", choices = character()),
+      uiOutput("worker_settings"),
       fluidRow(
         column(
           width = 12,

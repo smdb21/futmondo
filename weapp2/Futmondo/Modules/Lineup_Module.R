@@ -384,7 +384,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       verify<-function(){
         if(!current(g,key))return(NULL)
         notice('Verifying saved lineup…')
-        promises::then(lineup_fetch_bundle(auth,ctx,next_round,owner,is_current=function()current(g,key)),function(result)tryCatch({
+        promises::then(lineup_fetch_live(auth,ctx,next_round,owner,is_current=function()current(g,key)),function(result)tryCatch({
           if(!current(g,key))return(NULL)
           saving(FALSE);source(result);persist(result,ctx,next_round$id,g,key)
           if(identical(lineup_identity(result$official),lineup_identity(value))){draft(result$official);notice('Saved to Futmondo and verified.');best_note('')}
@@ -393,7 +393,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
         },error=function(error)fail('Saved lineup could not be validated. Your draft is retained.')),function(error)fail('The save response is uncertain and readback failed. Your draft is retained. Check Futmondo before saving again.'))
         NULL
       }
-      promises::then(lineup_fetch_bundle(auth,ctx,next_round,owner,is_current=function()current(g,key)),function(fresh)tryCatch({
+      promises::then(lineup_fetch_live(auth,ctx,next_round,owner,is_current=function()current(g,key)),function(fresh)tryCatch({
         if(!current(g,key))return(NULL)
         if(!identical(lineup_identity(fresh$official),lineup_identity(baseline$official))){source(fresh);return(fail('The official lineup changed in another session. Your draft is retained. Undo changes or review it before saving again.'))}
         if(is.null(shiny::isolate(target()))||!identical(shiny::isolate(target())$id,next_round$id)||next_round$starts_at<=Sys.time())return(fail('The round context changed before saving. Refresh the lineup.'))

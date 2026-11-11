@@ -1,8 +1,10 @@
-# Allow production files and the two explicitly copied build checks only.
+# Allow production app files, the worker service, and named build checks only.
 **
 !/*.R
 !/Modules/
 !/Modules/*.R
+!/worker/
+!/worker/**
 !/www/
 !/www/**
 !/player_columns_to_hide.txt
@@ -25,3 +27,7 @@
 **/*.pem
 **/*.key
 **/*credentials*.json
+
+**/__pycache__
+**/*.pyc
+**/.venv

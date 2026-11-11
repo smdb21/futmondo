@@ -114,9 +114,13 @@ fm_async_http<-function(url,method="GET",body=NULL,headers=character(),owner="",
 fm_httr_response<-function(response,url){
   structure(list(url=url,status_code=response$status_code,headers=httr::insensitive(list(`content-type`="application/json; charset=utf-8")),all_headers=list(),cookies=data.frame(),content=response$content,date=Sys.time(),times=c(total=response$times[["total"]] %||% 0),request=list(method="POST",url=url)),class="response")
 }
-async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is_current=function()TRUE,priority=NULL,on_progress=NULL){
+async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is_current=function()TRUE,priority=NULL,on_progress=NULL,worker_bypass=FALSE){
   name<-if(is.character(fn))fn else deparse(substitute(fn))
   if(length(name)!=1L||!grepl("^(get_|read_|calculate_league_finances$)",name))return(promises::promise_reject(simpleError("Only factual reads may use asynchronous adapters")))
+  if(!worker_bypass && exists("fm_worker_configured",mode="function") && fm_worker_configured() &&
+     startsWith(name,"get_") && !identical(fm_worker_mode(context$account_id),FALSE))
+    return(fm_worker_fetch(name,args,context,owner,is_current,direct=function()
+      async_adapter_fetch(name,args,context,owner,is_current,priority,on_progress,worker_bypass=TRUE)))
   if(is.null(priority))priority<-if(name%in%c("get_team_acquisition_capacity","get_acquisition_capacity",
     "get_player_summary","get_my_market_players","get_round_lineup_snapshot"))"interactive"else "normal"
   priority<-fm_transport_priority(priority)
@@ -125,9 +129,11 @@ async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is
   adapter_env<-new.env(parent=.GlobalEnv);completed<-new.env(parent=emptyenv());requests<-0L;page_requests<-0L;acquired<-list()
   for(nm in ls(.GlobalEnv,all.names=TRUE)){
     object<-get(nm,.GlobalEnv)
+    if(is.function(object)&&!is.null(attr(object,"worker_original")))object<-attr(object,"worker_original")
     if(is.function(object)&&identical(environment(object),.GlobalEnv)){environment(object)<-adapter_env;assign(nm,object,adapter_env)}
   }
   adapter_env$.futmondo_request_context<-context
+  adapter_env$fm_worker_mode<-function(...)FALSE
   # Replaying a composite read may encounter the same optional failure again.
   # Keep at most one safe diagnostic per source/category, capped by the read budget.
   failures<-new.env(parent=emptyenv());log_failure<-resource_log_failure

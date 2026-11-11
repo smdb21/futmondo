@@ -414,6 +414,7 @@ bind_factual_reads<-function(handlers,session,login_token,championship_id=NULL,u
 }
 invalidate_manual_resources<-function(login,championship_id,user_team_id,player_id=NULL){
  if(!valid_login(login))return(invisible(FALSE))
+ if(exists("fm_worker_invalidate",mode="function"))fm_worker_invalidate(login[["userid"]],championship_id,user_team_id,player_id)
  invalidate_saved_roster_offers(resource_context(login,championship_id,user_team_id))
  invalidate_resources(resource_context(login,championship_id,user_team_id),pattern="market|roster|bid|capacity|financial|user_team_info|team_info|teams|pressroom")
  invalidate_resources(resource_context(login,championship_id),pattern="championshipplayers|championship_players|catalog|teams|pressroom")
