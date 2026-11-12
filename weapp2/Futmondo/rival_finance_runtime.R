@@ -108,6 +108,25 @@ get_rival_finance_saved <- function(account_id,championship_id,season="unknown")
     tryCatch(get_rival_saved_transfers(championship_id,result$evidence),error=function(e)data.frame())
   result$pressroom<-merge_locker_transfers(saved,locker_saved_transfer_rows(result$evidence))
   if(nrow(result$pressroom))attr(result$pressroom,"fetch_status")<-"partial"
+  result$archive_lineups<-list()
+  # Unknown archives are candidates, never current accounting inputs. Only
+  # missing pairs from known authoritative team-round histories need a lookup.
+  if(fm_context_known(context$competition_id)&&fm_context_known(context$season)){
+    rounds<-rival_saved_rounds(result$evidence,include_ranking=FALSE)
+    known<-vapply(rival_evidence_rows(result$evidence,'round_lineup'),function(row)mvp_text(row$source_id),character(1))
+    needed<-if(nrow(rounds))setdiff(paste0('lineup:',rounds$team_id,':',rounds$round_id),known)else character()
+    if(length(needed)){
+      archive<-tryCatch(history_read_pages('rival_finance_evidence_latest',list(
+        account_id=paste0('eq.',account_id),championship_id=paste0('eq.',championship_id),
+        evidence_type='eq.eligibility',source_id='like.lineup:*',
+        or='(competition_id.eq.unknown,season.eq.unknown)',
+        select='account_id,championship_id,competition_id,season,evidence_type,source_id,observed_at,payload',
+        order='source_id.asc'),max_rows=600L,page_size=50L),error=function(e)NULL)
+      result$archive_lookup_status<-if(is.null(archive))'unavailable'else if(isTRUE(attr(archive,'complete')))'ok'else'partial'
+      candidates<-rival_evidence_decode(archive)
+      result$archive_lineups<-Filter(function(row)mvp_text(row$source_id)%in%needed,candidates)
+    }
+  }
   result
 }
 persist_rival_finance_evidence <- function(evidence,context) {
@@ -560,6 +579,44 @@ rival_round_signature <- function(row,awards) {
   selected<-if(is.data.frame(awards)&&all(c("round_id","player_id")%in%names(awards)))awards[awards$round_id%in%row$round_id,,drop=FALSE]else data.frame()
   if(nrow(selected))selected<-selected[order(selected$player_id),intersect(c("player_id","points","is_mvp","is_finished"),names(selected)),drop=FALSE]
   mvp_text(as.character(openssl::sha256(serialize(list(round=as.list(row[,intersect(c("round_id","points","status","negative"),names(row)),drop=FALSE]),awards=unname(lapply(seq_len(nrow(selected)),function(i)as.list(selected[i,,drop=FALSE])))),NULL))))
+}
+rival_resolve_archived_lineups <- function(candidates,context,rounds,awards,existing=list()) {
+  if(!fm_context_known(context$competition_id)||!fm_context_known(context$season)||
+    !is.data.frame(rounds)||!nrow(rounds)||!is.data.frame(awards)||!nrow(awards))return(list())
+  known<-vapply(rival_evidence_rows(existing,'round_lineup'),function(row)mvp_text(row$source_id),character(1))
+  out<-list();records<-rival_evidence_rows(candidates,'round_lineup')
+  stamps<-vapply(records,function(row)if(length(row$observed_at)==1L)as.numeric(fm_time(row$observed_at))else NA_real_,numeric(1))
+  records<-records[order(stamps,decreasing=TRUE,na.last=TRUE)]
+  stamp_groups<-split(records,vapply(records,function(row)paste(mvp_text(row$source_id),mvp_text(row$observed_at),sep='\034'),character(1)))
+  for(record in records){
+    p<-record$payload;source<-mvp_text(record$source_id)
+    if(source%in%known||!identical(mvp_text(record$account_id),context$account_id)||
+      !identical(mvp_text(record$championship_id),context$championship_id))next
+    old_competition<-fm_scalar(record$competition_id,'unknown');old_season<-fm_scalar(record$season,'unknown')
+    if(!old_competition%in%c('unknown',context$competition_id)||!old_season%in%c('unknown',context$season)||
+      !('unknown'%in%c(old_competition,old_season)))next
+    # A newer contradictory/revised observation must not expose an older
+    # matching archive merely because the newer revision fails validation.
+    known<-c(known,source)
+    same_stamp<-stamp_groups[[paste(source,mvp_text(record$observed_at),sep='\034')]]
+    if(length(unique(vapply(same_stamp,function(other)rival_calculation_hash(other$payload),character(1))))>1L)next
+    if(!identical(source,paste0('lineup:',mvp_text(p$team_id),':',mvp_text(p$round_id))))next
+    current<-rounds[rounds$team_id%in%mvp_text(p$team_id)&rounds$round_id%in%mvp_text(p$round_id),,drop=FALSE]
+    if(nrow(current)!=1L||!round_is_finished(as.list(current))||!mvp_text(p$round_id)%in%awards$round_id||
+      !identical(mvp_text(p$signature),rival_round_signature(current,awards)))next
+    players<-unlist(p$players,use.names=FALSE)
+    stamp<-fm_time(record$observed_at)
+    if(!is.character(players)||!length(players)||anyNA(players)||any(!nzchar(players))||
+      !is.logical(p$negative)||length(p$negative)!=1L||is.na(p$negative)||
+      !round_is_finished(list(status=p$status))||length(stamp)!=1L||is.na(stamp)||stamp>Sys.time()+60)next
+    # The authoritative current team-round identity and exact current revision
+    # establish this record's scope. Preserve the original source observation.
+    record$competition_id<-context$competition_id;record$season<-context$season
+    record$payload$context_resolution<-list(method='current_team_round_and_award_signature',
+      original_competition_id=old_competition,original_season=old_season)
+    out<-c(out,list(record))
+  }
+  out
 }
 rival_lineup_evidence <- function(result,account_id,championship_id,season) {
   answer<-result$answer
@@ -1512,7 +1569,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
   if(is.null(root$userData$rival_finance_shared)){
     state<-new.env(parent=emptyenv());state$transfers<-shiny::reactiveVal(data.frame());state$value<-shiny::reactiveVal(list(team_finances=data.frame(),breakdowns=list(),loading=TRUE));state$key<-NULL
     state$calculation_cache<-rival_calculation_cache();state$snapshot<-NULL;state$snapshot_status<-"not_saved"
-    state$generation<-0L;state$closed<-FALSE;state$queue<-list();state$busy<-0L;state$lineup_pending<-0L;state$evidence<-list();state$stored_movements<-list();state$seed<-list();state$defaults<-NULL;state$last_publish<-0
+    state$generation<-0L;state$closed<-FALSE;state$queue<-list();state$busy<-0L;state$lineup_pending<-0L;state$archive_lineups<-list();state$evidence<-list();state$stored_movements<-list();state$seed<-list();state$defaults<-NULL;state$last_publish<-0
     state$notification_cursor<-"";state$notification_status<-"initial";state$scheduled_notification_cursors<-character();state$notification_pending<-FALSE
     state$scheduled_owners<-character();state$ownership_pending<-0L;state$ownership_catalog_scheduled<-FALSE;state$ownership_unsaved<-list();state$ownership_write_attempts<-character()
     state$publish_timer<-NULL;state$teams<-data.frame();state$teams_status<-"loading";state$teams_reason<-""
@@ -1823,6 +1880,16 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
     rounds<-rival_saved_rounds(state$evidence,teams=state$teams$teamid)
     awards<-state$awards$rows
     if(!nrow(rounds)||!is.data.frame(awards)||!nrow(awards)||!"round_id"%in%names(awards))return(invisible(NULL))
+    ctx<-resource_context(account_id=state$account,championship_id=state$championship,season=state$season)
+    # Ranking supplements alone cannot establish an archived record's season.
+    resolved<-rival_resolve_archived_lineups(state$archive_lineups,ctx,
+      rival_saved_rounds(state$evidence,include_ranking=FALSE),awards,state$evidence)
+    if(length(resolved)){
+      state$evidence<-rival_merge_evidence(state$evidence,resolved)
+      persist_rival_finance_evidence(resolved,ctx)
+      key<-api_cache_key(paste0('rival_finance_evidence_',state$account,'_',state$championship,'_',state$season),context=ctx)
+      if(exists(key,envir=api_cache_env,inherits=FALSE))rm(list=key,envir=api_cache_env)
+    }
     snapshots<-rival_evidence_rows(state$evidence,"round_lineup")
     for(i in seq_len(nrow(rounds))){
       row<-rounds[i,,drop=FALSE]
@@ -1869,6 +1936,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
           if(task$kind=="notifications")state$notification_pending<-FALSE
           tryCatch({
           if(task$kind=="saved"){
+            state$archive_lineups<-result$archive_lineups %||% list()
             state$stored_movements<-rival_evidence_rows(result$evidence,"movements")
             state$evidence<-rival_merge_evidence(state$evidence,result$evidence);state$defaults<-result$defaults;state$finance_ready<-TRUE
             saved_rules<-rival_evidence_rows(state$evidence,"rules")
@@ -2002,7 +2070,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
     key<-paste(identity,version,publication,sep="|")
     if(!identical(state$key,key)){
       same<-identical(state$identity,identity);state$identity<-identity
-      state$key<-key;state$generation<-state$generation+1L;state$busy<-0L;state$lineup_pending<-0L;state$stored_movements<-list();state$season<-resolved$season;state$reason<-"";state$build_failure<-NULL
+      state$key<-key;state$generation<-state$generation+1L;state$busy<-0L;state$lineup_pending<-0L;state$archive_lineups<-list();state$stored_movements<-list();state$season<-resolved$season;state$reason<-"";state$build_failure<-NULL
       if(!is.null(state$publish_timer)){state$publish_timer();state$publish_timer<-NULL}
       state$scheduled_owners<-character();state$ownership_pending<-0L;state$ownership_catalog_scheduled<-FALSE;state$ownership_write_attempts<-character();if(!same)state$ownership_unsaved<-list()
       state$account<-auth[["userid"]];state$championship<-cid;state$snapshot_attempted_signature<-NULL;state$snapshot_pending<-NULL;state$seed_ready<-FALSE;state$seed_complete<-FALSE;state$point_repair_done<-FALSE;state$notification_cursor<-"";state$notification_status<-"initial";state$scheduled_notification_cursors<-character();state$notification_pending<-FALSE;state$scheduled_teams<-character();state$scheduled_lineups<-character();state$scheduled_rankings<-character();state$pending_team_ids<-character()
