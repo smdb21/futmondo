@@ -3074,6 +3074,38 @@ classification_ranking_rows <- function(answer, round_id, round_number) {
   rows
 }
 
+# A fully dated, fresh official calendar can prove that scores do not exist yet.
+# Compact league/list "next" labels alone cannot establish this state.
+classification_saved_future <- function(evidence,context,round_id,round_number,now=Sys.time()) {
+  fields<-c("account_id","championship_id","competition_id","season")
+  if(!all(vapply(context[fields],fm_context_known,logical(1))))return(NULL)
+  calendars<-Filter(function(row){
+    p<-row$payload
+    identical(row$evidence_type,"eligibility")&&is.list(p)&&identical(p$kind,"league_round_calendar")&&is.list(p$scope)&&
+      all(vapply(fields,function(f)identical(mvp_text(row[[f]]),context[[f]])&&identical(mvp_text(p$scope[[f]]),context[[f]]),logical(1)))
+  },evidence)
+  if(!length(calendars))return(NULL)
+  stamps<-vapply(calendars,function(row)as.numeric(fm_time(row$observed_at)),numeric(1))
+  index<-order(stamps,decreasing=TRUE,na.last=NA);if(!length(index))return(NULL)
+  row<-calendars[[index[1]]];p<-row$payload;stamp<-stamps[index[1]];time<-as.numeric(now)
+  deadline<-fm_number(p$valid_until);ttl<-resource_policy(paste0("award_round_metadata_",context$championship_id))$ttl
+  if(!identical(fm_number(p$version),2)||!identical(p$completeness,"complete")||
+     !nzchar(mvp_text(p$scope$league_id))||!identical(mvp_text(row$source_id),paste0("calendar:v1:",as.character(openssl::sha256(p$scope$league_id))))||
+     stamp>time+5||!is.finite(deadline)||time>=deadline||deadline>stamp+ttl+.001)return(NULL)
+  rows<-tryCatch(dplyr::bind_rows(mvp_records(p$rows)),error=function(e)NULL)
+  fixtures<-tryCatch(award_fixture_calendar_decode(p$fixture_rounds),error=function(e)NULL)
+  if(!award_calendar_rows_valid(rows)||!award_fixture_calendar_valid(fixtures))return(NULL)
+  target<-rows[rows$round_id==round_id&rows$round_number==round_number,,drop=FALSE]
+  dates<-fixtures[fixtures$round_id==round_id,,drop=FALSE]
+  if(nrow(target)!=1L||isTRUE(target$is_finished)||tolower(mvp_text(target$status))%in%c("active","playing","in_progress","running")||nrow(dates)!=1L||!isTRUE(dates$all_fixtures_dated)||
+     !nzchar(dates$begin_process)||as.numeric(fm_time(dates$begin_process))<=time)return(NULL)
+  result<-list(rows=data.frame(),round_id=round_id,round_number=round_number,not_started=TRUE,
+    starts_at=dates$begin_process,valid_until=min(deadline,time+60,as.numeric(fm_time(dates$begin_process))),from_saved=TRUE)
+  attr(result,"observed_at")<-fm_time(row$observed_at)
+  attr(result,"source")<-"saved Futmondo fixture calendar"
+  result
+}
+
 get_classification_round_ranking <- function(login, championship_id, user_team_id, round_id, round_number) {
   if(!nzchar(mvp_text(round_id))||!is.finite(fm_number(round_number)))stop("Round identity unavailable")
   context <- resource_context(login,championship_id,user_team_id,season=league_season_context(championship_id))
@@ -3104,6 +3136,8 @@ get_classification_round_ranking <- function(login, championship_id, user_team_i
         }
       }
     }
+    future<-classification_saved_future(saved$evidence %||% list(),context,round_id,round_number)
+    if(!is.null(future))return(future)
     payload <- list(header=list(token=login[["token"]],userid=login[["userid"]]),
       # The native client sends the opaque round ID under the misleading
       # roundNumber key. A calendar number returns answer="api.error.general".

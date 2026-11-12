@@ -1109,3 +1109,7 @@ R recovery/privacy/encode tests, actual-helper failed-cache recovery with durabl
 ### 2026-11-12 — Worker live view and rejection recovery (implemented locally)
 
 Added guarded per-view worker subscriptions that outlive the 120-second display wait, durable-version replay through shared resources/memory caches, browser-specific detach, and explicit HTTP-200 native error rejection/checkpoint bypass. Local regression and offline lifecycle checks pass; no source/authentication guard was removed. Production own-roster and round-ranking acquisition remains an open exit criterion pending successful post-deploy retrieval/persistence and correct live rendering. See the 2026-11-12 review entry for checks and performance limits.
+
+### 2026-11-12 — Future round standings evidence (implemented locally)
+
+The round-ranking getter can now reuse a fresh fully scoped official fixture calendar to return a truthful not-started state until kickoff, preserving the calendar's original timestamp and avoiding an invalid standings request. Regression coverage rejects stale/incomplete/conflicting and foreign calendars, generic future labels and running/final rounds. Production roster and finance source failures remain unresolved; the worker heartbeat alone does not satisfy the acquisition exit criteria.
