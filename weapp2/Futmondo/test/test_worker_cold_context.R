@@ -1,7 +1,7 @@
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages(source('global.R'))
 source('history_repository.R')
-for(expr in parse('worker/helper.R'))if(is.call(expr)&&identical(expr[[1]],as.name('<-'))&&as.character(expr[[2]])%in%c('fm_worker_run','fm_worker_discover'))eval(expr,.GlobalEnv)
+for(expr in parse('worker/helper.R'))if(is.call(expr)&&identical(expr[[1]],as.name('<-'))&&as.character(expr[[2]])%in%c('fm_worker_run','fm_worker_discover','fm_worker_database_rows'))eval(expr,.GlobalEnv)
 .fm_league_contexts$items<-list();.fm_league_contexts$publications<-list()
 queries<-list();getter_calls<-0L;bad_reply<-FALSE
 get_mvp_saved_catalog<-function(login,championship_id){getter_calls<<-getter_calls+1L;list(season='s',saved=data.frame(),catalog=list(rounds=data.frame(),complete=TRUE))}

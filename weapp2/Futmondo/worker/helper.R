@@ -68,6 +68,31 @@ fm_worker_discover<-function(handler,value,context,auth){
  }
  out
 }
+fm_worker_database_rows<-function(table,rows){
+ if(!is.list(rows)||!is.null(names(rows)))stop('Invalid database bridge response')
+ if(!length(rows))return(data.frame())
+ # The finance view has text identity/time columns and one JSON object column.
+ # Preserve nested payloads as list columns instead of serializing the entire
+ # history a second time and expanding heterogeneous JSON into nested frames.
+ if(identical(table,'rival_finance_evidence_latest')){
+  fields<-names(rows[[1]])
+  allowed<-c('account_id','championship_id','competition_id','season','evidence_type','source_id','observed_at','payload')
+  valid<-length(fields)>0L&&all(fields%in%allowed)&&all(vapply(rows,function(row)
+    is.list(row)&&setequal(names(row),fields)&&all(vapply(fields,function(field){
+      value<-row[[field]]
+      if(field=='payload')is.list(value)else is.null(value)||is.character(value)&&length(value)==1L
+    },logical(1))),logical(1)))
+  if(valid){
+   columns<-setNames(lapply(fields,function(field){
+    if(field=='payload')lapply(rows,`[[`,field)else vapply(rows,function(row)row[[field]] %||% NA_character_,character(1))
+   }),fields)
+   return(structure(columns,class='data.frame',row.names=.set_row_names(length(rows))))
+  }
+ }
+ result<-jsonlite::fromJSON(as.character(jsonlite::toJSON(rows,auto_unbox=TRUE,null='null',na='null',digits=NA)))
+ if(!is.data.frame(result))stop('Invalid database bridge rows')
+ result
+}
 fm_worker_finance_timeout_code<-function(state){
  count<-function(x){if(length(x)!=1L||!is.numeric(x)||!is.finite(x)||x<0)return(0L);as.integer(min(9999,floor(x)))}
  queue<-state$queue %||% list()
@@ -188,10 +213,7 @@ fm_worker_run<-function(descriptor){
  env$supabase_get<-function(table_name,query_params=list()){
   result<-fm_pipe_exchange(list(type='database',table=table_name,query=query_params))
   if(!'rows'%in%names(result)||!is.list(result$rows)||!is.null(names(result$rows)))stop('Invalid database bridge response')
-  if(!length(result$rows))return(data.frame())
-  rows<-jsonlite::fromJSON(as.character(jsonlite::toJSON(result$rows,auto_unbox=TRUE,null='null',na='null',digits=NA)))
-  if(!is.data.frame(rows))stop('Invalid database bridge rows')
-  rows
+  fm_worker_database_rows(table_name,result$rows)
  }
  env$supabase_post_direct<-function(table_name,payload,conflict=NULL,ignore_duplicates=FALSE){
   if(is.data.frame(payload)&&!nrow(payload)||is.list(payload)&&!length(payload))return(TRUE)
