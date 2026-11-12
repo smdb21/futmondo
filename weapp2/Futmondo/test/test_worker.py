@@ -155,6 +155,37 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
         chunks=[i for i,x in enumerate(self.store.calls) if x[0]=='worker_chunks']
         publish=[i for i,x in enumerate(self.store.calls) if x[0]=='publish']
         self.assertLess(max(chunks),min(publish))
+    async def test_empty_named_args_bootstrap_and_notifications(self):
+        # R strips login from named calls, leaving an empty named list. JSONB
+        # retains names=[] and args={}, unlike the unnamed enrollment args=[].
+        for handler in ('get_active_championships', 'get_notification_unread'):
+            with self.subTest(handler=handler):
+                d = dict(version=1, handler=handler, args={},
+                         context=dict(CONTEXT, championship_id=''),
+                         encoded_args=dict(kind='list', names=[], values=[], context=False, meta=[]))
+                d['resource_key'] = hashlib.sha256(canonical(d).encode()).hexdigest()
+                job = dict(self.job, descriptor=d, resource_key=d['resource_key'])
+                answer = {'championships': [{'id': 'l', 'name': 'League', 'league': 'premier',
+                           'ps': 'stats', 'userteam': {'id': 't'}}],
+                          'leagues': [{'_id': 'premier', 'season': 'S-current'}]} if handler == 'get_active_championships' else 3
+                async def transport(request):
+                    self.requests.append(request)
+                    return httpx.Response(200, json={'answer': answer})
+                self.client._transport = httpx.MockTransport(transport)
+                before = len(self.requests)
+                result = await self.worker.helpers[0].run(d, lambda m: self.worker.exchange(job, 'owner', m))
+                self.assertEqual(len(self.requests) - before, 1)
+                decoded = plain(result['value'])
+                if handler == 'get_active_championships':
+                    self.assertEqual(decoded['championships'][0]['id'], 'l')
+                    self.assertTrue(any(x['handler'] == 'get_teams' for x in result['discoveries']))
+                else:
+                    self.assertEqual(decoded, 3)
+                await self.worker.publish(job, 'owner', result)
+                manifest = self.store.snapshots[d['resource_key']]
+                restored = unpack_snapshot(manifest, self.store.chunks[manifest['version']])
+                self.assertEqual(plain(restored), decoded)
+
     async def test_replayed_response_does_not_renew_R_observation_time(self):
         async def old_response(message):
             if message['type']=='http':

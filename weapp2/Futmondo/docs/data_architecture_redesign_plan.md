@@ -1038,3 +1038,10 @@ The approved background-acquisition SQL is applied to production project `ozhnex
 ### Post-login empty squad exception — implemented locally, 2026-11-11
 
 Reproduced the reported `players_table_RV` data-frame assignment failure in the actual My Team module with a verified empty roster lacking the optional market flag. Initialize that flag with one value per existing row. The focused regression preserves pending/empty states and observation metadata; existing offer and offline lifecycle validation is recorded in `data_review_results.md`. Hosted redeployment and account-specific source acceptance remain separate.
+
+
+### Background parser bootstrap repair — implemented locally, 2026-11-11
+
+Fixed the worker decoder rejecting empty named argument lists after authentication removal. Existing encoded descriptors/resource keys remain compatible. Real Python/R helper tests now cover league bootstrap/discovery and unread notifications through durable publication; codec, snapshot reuse, finance, performance and offline lifecycle results are recorded in `data_review_results.md`.
+
+Production diagnostics also confirmed the prerequisite `20261110225848_general_competition_context.sql` schema is absent: metadata persistence/read paths return 404, both metadata tables are missing and eleven factual tables lack competition columns. The later worker schema alone is insufficient. The existing prerequisite migration passed its isolated upgrade/rollback/security/index rehearsal (11 groups); production application approval, application redeployment and authenticated acceptance remain pending. The production incident is not marked resolved.

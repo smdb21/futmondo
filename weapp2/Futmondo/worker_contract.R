@@ -32,7 +32,8 @@ fm_worker_decode <- function(x,depth=0L) {
   }else if(x$kind=='list'){
     if(!is.list(x$values))stop('Invalid worker list')
     result<-lapply(x$values,fm_worker_decode,depth=depth+1L)
-    if(!is.null(x$names)){n<-unlist(x$names,use.names=FALSE);if(!is.character(n)||length(n)!=length(result)||anyNA(n)||any(fm_worker_secret_name(n)))stop('Invalid worker names');names(result)<-n}
+    # JSON [] decodes to list(); unlist() must retain a typed empty name vector.
+    if(!is.null(x$names)){n<-unlist(x$names,use.names=FALSE) %||% character();if(!is.character(n)||length(n)!=length(result)||anyNA(n)||any(fm_worker_secret_name(n)))stop('Invalid worker names');names(result)<-n}
     if(isTRUE(x$context)){if(!all(fm_worker_fields%in%names(result)))stop('Invalid worker context');class(result)<-'futmondo_context'}
   }else{
     if(!x$kind%in%c('character','logical','integer','double')||!(is.list(x$values)||is.atomic(x$values)))stop('Invalid worker primitive')
@@ -47,7 +48,7 @@ fm_worker_decode <- function(x,depth=0L) {
       if(length(v)!=1L||!switch(x$kind,character=is.character(v),logical=is.logical(v),integer=is.numeric(v)&&is.finite(v)&&v==floor(v),double=is.numeric(v)&&is.finite(v)))stop('Invalid worker scalar')
       switch(x$kind,character=v,logical=v,integer=as.integer(v),double=as.numeric(v))
     },default)
-    if(!is.null(x$names)){n<-unlist(x$names,use.names=FALSE);if(length(n)!=length(result)||anyNA(n)||any(fm_worker_secret_name(n)))stop('Invalid worker names');names(result)<-n}
+    if(!is.null(x$names)){n<-unlist(x$names,use.names=FALSE) %||% character();if(length(n)!=length(result)||anyNA(n)||any(fm_worker_secret_name(n)))stop('Invalid worker names');names(result)<-n}
     if(!is.null(x$time)){if(!is.double(result))stop('Invalid worker time');class(result)<-switch(x$time,datetime=c('POSIXct','POSIXt'),date='Date',stop('Invalid worker time class'))}
   }
   if(length(x$meta)){

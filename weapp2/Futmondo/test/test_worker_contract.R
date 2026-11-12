@@ -40,4 +40,16 @@ node$columns<-node$columns[rev(names(node$columns))]
 check(identical(fm_worker_decode(node),x),'JSONB/Python object-key order cannot reorder dataframe columns')
 typed<-fm_worker_descriptor('get_rival_round_ranking_observation',list(source_teams=c('a','b'),round_number=1),ctx)
 check(identical(fm_worker_decode(jsonlite::fromJSON(as.character(jsonlite::toJSON(typed$encoded_args,auto_unbox=TRUE,null='null',na='null',digits=NA)),simplifyVector=FALSE))$source_teams,c('a','b')),'source argument vectors retain their types across the Python bridge')
-cat('WORKER CONTRACT: 13 groups passed\n')
+# Removing the only named argument leaves names=character(0), serialized as [].
+empty_named<-list(login=a)[FALSE]
+check(identical(roundtrip(empty_named),empty_named),'empty named lists survive the JSON bridge')
+empty_vector<-setNames(character(),character())
+check(identical(roundtrip(empty_vector),empty_vector),'empty named primitive vectors survive the JSON bridge')
+for(handler in c('get_active_championships','get_notification_unread')){
+ d<-fm_worker_descriptor(handler,list(login=a),resource_context(a))
+ decoded<-jsonlite::fromJSON(fm_worker_json(d),simplifyVector=FALSE)
+ check(identical(fm_worker_decode(decoded$encoded_args),empty_named),paste(handler,'decodes arguments after authentication removal'))
+}
+bad<-fm_worker_encode(list(a=1));bad$names<-list()
+check(inherits(try(fm_worker_decode(bad),silent=TRUE),'try-error'),'empty names cannot label nonempty values')
+cat('WORKER CONTRACT: 18 groups passed\n')
