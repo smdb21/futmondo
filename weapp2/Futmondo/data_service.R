@@ -94,6 +94,14 @@ resource_failure_message <- function(error) {
     read_budget="Read limit", unknown="Data")[[failure$category]]
   paste0(label, " unavailable (", failure$reference, "). Refresh to retry.")
 }
+resource_optional_cache_read <- function(read) {
+  # A failed optional cache lookup is a miss. Its safe warning stays logged,
+  # but it must not poison a later independently validated source result.
+  # Awaiting async reads are control conditions and continue to propagate.
+  withRestarts(withCallingHandlers(tryCatch(read(),error=function(error)NULL),
+    fm_fetch_diagnostic=function(note)invokeRestart("fm_optional_cache_miss")),
+    fm_optional_cache_miss=function()NULL)
+}
 api_cache_env <- new.env(parent=emptyenv())
 .resource_metrics <- new.env(parent=emptyenv())
 resource_metrics <- function(reset=FALSE) {

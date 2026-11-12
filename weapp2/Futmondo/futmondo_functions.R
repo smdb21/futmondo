@@ -3079,7 +3079,8 @@ get_classification_round_ranking <- function(login, championship_id, user_team_i
   context <- resource_context(login,championship_id,user_team_id,season=league_season_context(championship_id))
   resource <- paste0("classification_ranking_",championship_id,"_",round_id)
   get_cached_data(resource, {
-    saved <- tryCatch(read_rival_finance_evidence(context$account_id,championship_id,context$season),error=function(e)NULL)
+    saved <- resource_optional_cache_read(function()
+      read_rival_finance_evidence(context$account_id,championship_id,context$season))
     snapshots <- Filter(function(row){
       p <- row$payload
       identical(row$evidence_type,"eligibility")&&is.list(p)&&

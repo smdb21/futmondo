@@ -235,7 +235,25 @@ class Helper:
                         + ''.join('_' + kind + r'\d{1,4}' for kind in
                             ('saved', 'seed', 'team', 'lineup', 'ranking', 'notifications', 'ownership', 'ownership_catalog')))
                     safe_timeout = isinstance(code, str) and (code == 'finance_timeout' or re.fullmatch(timeout_pattern, code, flags=re.ASCII))
-                    raise WorkerFailure(code if safe_timeout else 'resource_parse')
+                    diagnostic_codes = {'resource_parse_codec_class', 'resource_parse_codec_value',
+                        'resource_parse_codec_secret', 'resource_parse_incomplete', 'resource_parse_database_shape'}
+                    resources = ('get_financial_snapshot|get_acquisition_capacity|get_team_acquisition_capacity|'
+                        'get_players_from_team|get_market_players|get_real_clubs|get_user_team_info|get_championships|'
+                        'get_championship_players|get_teams|get_lineup_from_team|get_roster_bids|get_my_market_players|'
+                        'get_player_summary|get_player_full_profile|get_player_matches|get_player_card_history|'
+                        'get_resolved_league_context|get_classification_round_catalog|get_classification_round_ranking|'
+                        'get_user_team_rounds|get_round_lineup_snapshot|classification_ranking|league_finances_calc|'
+                        'get_notifications|get_notification_unread|information|activechampionships|teams|roster|rounds|'
+                        'dreamteam|nightmareteam|roundlineup|lineup|championshipplayers|championshipteams|players|summary|'
+                        'fullprofile|matches|pressroom|news|moneymovements|rosterbids|myplayers|getdtconfig|unread|list|database|read|'
+                        'get_player_recent_points|get_championship_pressroom|get_money_movements|get_finished_rounds|'
+                        'get_finished_round_catalog|get_round_dreamteam|get_active_championships|read_player_points_history|'
+                        'calculate_league_finances|market|real_clubs|championships|team_info|user_team_info|roster_bids|'
+                        'my_market_players|acq_capacity|financial_snapshot|player_summary|player_summary_points|'
+                        'player_profile|player_matches|notifications_list|notifications_unread')
+                    safe_diagnostic = isinstance(code, str) and (code in diagnostic_codes or re.fullmatch(
+                        r'resource_parse_(?:http|network|parser|schema|read_budget|unknown)_(?:' + resources + r')(?:_[1-5][0-9]{2})?', code, flags=re.ASCII))
+                    raise WorkerFailure(code if safe_timeout or safe_diagnostic else 'resource_parse')
                 if message.get('type') not in ('http', 'database', 'persist', 'resource', 'progress'):
                     raise WorkerFailure('helper_protocol')
                 try:

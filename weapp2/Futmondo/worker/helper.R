@@ -16,7 +16,13 @@ fm_pipe_exchange<-function(value){
  fm_pipe_send(value);line<-readLines(pipe_in,n=1L,warn=FALSE)
  if(!length(line))stop('Bridge closed')
  answer<-jsonlite::fromJSON(line,simplifyVector=FALSE)
- if(!is.null(answer$error))stop(structure(list(message='Worker operation failed',call=NULL,code=answer$error),class=c('fm_worker_bridge_error','error','condition')))
+ if(!is.null(answer$error)){
+  code<-fm_scalar(answer$error,'')
+  status<-if(grepl('^(database|source)_[1-5][0-9]{2}$',code))as.integer(sub('^.*_','',code))else NULL
+  category<-if(!is.null(status))'http'else if(code%in%c('database_connection','source_transient'))'network'else'unknown'
+  resource<-if(startsWith(code,'database_'))'database'else resource_diagnostic_name(value$url %||% '')
+  stop(structure(list(message='Worker operation failed',call=NULL,code=code,category=category,http_status=status,resource=resource),class=c('fm_worker_bridge_error','error','condition')))
+ }
  answer
 }
 fm_worker_discover<-function(handler,value,context,auth){
@@ -92,6 +98,26 @@ fm_worker_database_rows<-function(table,rows){
  result<-jsonlite::fromJSON(as.character(jsonlite::toJSON(rows,auto_unbox=TRUE,null='null',na='null',digits=NA)))
  if(!is.data.frame(result))stop('Invalid database bridge rows')
  result
+}
+fm_worker_failure_code<-function(error){
+ if(inherits(error,'fm_finance_timeout'))return(error$code %||% 'finance_timeout')
+ if(inherits(error,'futmondo_unavailable')){
+  category<-fm_scalar(error$category,'unknown')
+  if(!category%in%c('http','network','parser','schema','read_budget','unknown'))category<-'unknown'
+  code<-paste('resource_parse',category,resource_diagnostic_name(error$resource),sep='_')
+  status<-error$http_status
+  if(is.numeric(status)&&length(status)==1L&&!is.na(status)&&status>=100&&status<=599&&status==floor(status))code<-paste(code,status,sep='_')
+  return(code)
+ }
+ text<-fm_scalar(conditionMessage(error),'')
+ fixed<-c('Unsupported worker class'='resource_parse_codec_class',
+   'Unsupported worker value'='resource_parse_codec_value',
+   'Unsupported worker primitive'='resource_parse_codec_value',
+   'Credential in worker value'='resource_parse_codec_secret',
+   'Incomplete source acquisition'='resource_parse_incomplete',
+   'Invalid database bridge response'='resource_parse_database_shape',
+   'Invalid database bridge rows'='resource_parse_database_shape')
+ if(text%in%names(fixed))unname(fixed[[text]])else'resource_parse'
 }
 fm_worker_finance_timeout_code<-function(state){
  count<-function(x){if(length(x)!=1L||!is.numeric(x)||!is.finite(x)||x<0)return(0L);as.integer(min(9999,floor(x)))}
@@ -266,9 +292,13 @@ fm_worker_run<-function(descriptor){
      }
     }
     value<-do.call(original,params)
+    # The top-level result is encoded below once. It is excluded from child
+    # publication, so constructing another full typed copy here is wasted work.
+    childctx<-env$resource_context(params$login,params$championship_id,params$user_team_id %||% params$team_id,params$player_id)
+    child<-fm_worker_descriptor(name,params,childctx)
+    if(identical(child$resource_key,descriptor$resource_key))return(value)
     tryCatch({
-     childctx<-env$resource_context(params$login,params$championship_id,params$user_team_id %||% params$team_id,params$player_id)
-     child<-fm_worker_descriptor(name,params,childctx);wire<-fm_worker_encode(value)
+     wire<-fm_worker_encode(value)
      bytes<-as.numeric(object.size(wire))
      if(!is.null(value)&&produced_bytes+bytes<=8*1024^2){
       produced[[child$resource_key]]<<-list(descriptor=child,value=wire,
@@ -314,7 +344,9 @@ fm_worker_run<-function(descriptor){
  if(is.null(value))stop('Source did not return a resource')
  # Drain callbacks such as acknowledged history chunks before certifying a snapshot.
  for(i in seq_len(20L))later::run_now(0)
- if(identical(attr(value,'fetch_status'),'unavailable')||!is.null(attr(value,'fetch_error')))stop('Incomplete source acquisition')
+ failure<-attr(value,'fetch_error')
+ if(inherits(failure,'condition'))stop(failure)
+ if(identical(attr(value,'fetch_status'),'unavailable')||!is.null(failure))stop('Incomplete source acquisition')
  observed<-attr(value,'observed_at') %||% Sys.time()
  status<-if(is.list(value)&&!is.data.frame(value))value$status %||% 'ok'else attr(value,'fetch_status') %||% 'ok'
  if(!status%in%c('ok','empty','partial','unsupported'))status<-'partial'
@@ -331,5 +363,5 @@ repeat{
   command<-jsonlite::fromJSON(line,simplifyVector=FALSE)
   if(command$type!='run')stop('Invalid command')
   fm_pipe_send(fm_worker_run(command$descriptor))
- },error=function(e)fm_pipe_send(list(type='failure',code=if(inherits(e,'fm_finance_timeout'))e$code %||% 'finance_timeout'else'resource_parse')))
+ },error=function(e)fm_pipe_send(list(type='failure',code=fm_worker_failure_code(e))))
 }

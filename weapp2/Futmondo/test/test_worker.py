@@ -317,4 +317,40 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(WorkerFailure):
             await self.worker.exchange(self.job,'owner',dict(type='persist',table='players',payload={'id':'p','name':'Player'},conflict='id'))
 
+    async def test_classification_recovers_cache_error_and_persists_source(self):
+        d=descriptor('get_classification_round_ranking',dict(championship_id='l',user_team_id='t',round_id='r1',round_number=1))
+        d['context']=dict(CONTEXT,user_team_id='t')
+        job=dict(self.job,descriptor=d,resource_key=d['resource_key'])
+        async def transport(request):
+            self.requests.append(request)
+            self.assertEqual(json.loads(request.content)['query']['roundNumber'],'r1')
+            return httpx.Response(200,json={'answer':{'metadata':{'status':'closed'},
+                'ranking':[{'id':'t','name':'Fixture','points':-2,'live':0}]}})
+        self.client._transport=httpx.MockTransport(transport)
+        async def exchange(message):
+            if message['type']=='database':raise WorkerFailure('database_400')
+            return await self.worker.exchange(job,'owner',message)
+        result=await self.worker.helpers[0].run(d,exchange)
+        self.assertEqual(plain(result['value'])['rows'][0]['points'],-2)
+        await self.worker.publish(job,'owner',result)
+        manifest=self.store.snapshots[d['resource_key']]
+        self.assertEqual(plain(unpack_snapshot(manifest,self.store.chunks[manifest['version']]))['rows'][0]['points'],-2)
+        await self.worker.helpers[0].close()
+        replay=await self.worker.helpers[0].run(d,exchange)
+        self.assertEqual(plain(replay['value'])['rows'][0]['points'],-2)
+        self.assertEqual(len(self.requests),1)
+
+    async def test_source_failure_codes_are_strictly_allowlisted(self):
+        for code,expected in (('resource_parse_http_database_400','resource_parse_http_database_400'),
+                ('resource_parse_schema_roster_bids','resource_parse_schema_roster_bids'),
+                ('resource_parse_codec_class','resource_parse_codec_class'),
+                ('resource_parse_http_private_account_400','resource_parse'),
+                ('resource_parse_http_database_400_private','resource_parse')):
+            helper=Helper(Path.cwd())
+            helper.process=SimpleNamespace(returncode=None,
+                stdout=SimpleNamespace(readline=AsyncMock(return_value=(canonical(dict(type='failure',code=code))+'\n').encode())),
+                stdin=SimpleNamespace(write=lambda _:None,drain=AsyncMock()))
+            with self.assertRaises(WorkerFailure) as caught:await helper.run(descriptor(),AsyncMock())
+            self.assertEqual(caught.exception.code,expected)
+
 if __name__=='__main__':unittest.main(verbosity=2)
