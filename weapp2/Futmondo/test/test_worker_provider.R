@@ -36,4 +36,15 @@ cat('PASS abandoned generation cannot publish a late result\n')
 attr(value,'worker_completeness')<-'unknown'
 stopifnot(resource_state(value)$completeness=='unknown')
 cat('PASS source coverage is not promoted to complete by a successful DB read\n')
-cat('WORKER PROVIDER: 6 groups passed; source HTTP attempts=0\n')
+# A recovered job can retain the same payload version; its old error must clear.
+attr(value,'valid_until')<-as.numeric(Sys.time())+60;m$valid_until<-rival_finance_stamp(Sys.time()+60)
+fm_worker_put('u',d$resource_key,list(data=value,manifest=m))
+s$errors[[d$resource_key]]<-'Background access is paused or this league is excluded.'
+fm_worker_rpc<-function(name,payload,owner=''){
+ if(name=='read')return(promises::promise_resolve(list(account=list(enabled=TRUE,auth_status='active'),health=NULL,resources=list(),jobs=list(list(key=d$resource_key,error=NULL,pending=FALSE,running=FALSE)))))
+ promises::promise_resolve(TRUE)
+}
+fm_worker_poll('u',force=TRUE);for(i in 1:20)later::run_now(.005)
+stopifnot(is.null(s$errors[[d$resource_key]]),!length(.fm_transport$tasks))
+cat('PASS recovered job clears a stale paused/failure message without downloading its payload again\n')
+cat('WORKER PROVIDER: 7 groups passed; source HTTP attempts=0\n')

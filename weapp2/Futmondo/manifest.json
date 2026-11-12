@@ -2280,7 +2280,7 @@
       "checksum": "433720fcc832cc6e18669e887fce264d"
     },
     "competition_context.R": {
-      "checksum": "4483cb4d1c789491eb58ff822e7df440"
+      "checksum": "da040a3b0c28d53ab589b4c523e3bcb7"
     },
     "data_contracts.R": {
       "checksum": "106b903f4ef9a42d4b455a98c2685bd6"
@@ -2292,10 +2292,10 @@
       "checksum": "be7a0d73ba657a83c33197e9f431d741"
     },
     "futmondo_functions.R": {
-      "checksum": "479aa202d273c36d93b12a2114814d9c"
+      "checksum": "671a0e97bac59931d9d9077794610223"
     },
     "global.R": {
-      "checksum": "9cbaa3936c6022241bb73ff73e65149a"
+      "checksum": "8a46e15758ec050d6df75700a8846134"
     },
     "history_baseline_store.R": {
       "checksum": "fae2bbeb23335fe69729f675970cc655"
@@ -2388,7 +2388,7 @@
       "checksum": "6941ec3d550551d6c41a20b6a4d2ff3e"
     },
     "server.R": {
-      "checksum": "f083ad2a9dba1406966f1f2e81f6a568"
+      "checksum": "189a82cee8a0c880ddf671f3e6ab852d"
     },
     "supabase_connector.R": {
       "checksum": "f49117c4a21dd8d417a32070c206f2cf"
@@ -2397,16 +2397,16 @@
       "checksum": "a1e1d838c6dcce0a85e626a48ad799e9"
     },
     "ui.R": {
-      "checksum": "c33d484d24673a921e3c0ac79dbf0e51"
+      "checksum": "8a6b86bb1951931a8a0685eb16333c07"
     },
     "utils.R": {
       "checksum": "6253d5e12d91ddef162c7e9e7624680a"
     },
     "worker_contract.R": {
-      "checksum": "4a9bca3cb2e0ef8b802d622be8914c97"
+      "checksum": "767c79704fb40aef1a0b75a20ab56a5a"
     },
     "worker_runtime.R": {
-      "checksum": "b0141a33850d7bb68fab4cc128d8b220"
+      "checksum": "d28510504bf1f54f7d1956df65a2fd25"
     },
     "www/custom_style.css": {
       "checksum": "f482c74c3a934467571c3fbbe2494ae7"
@@ -2422,6 +2422,9 @@
     },
     "www/worker-state.js": {
       "checksum": "b10b7de3116ea570896dc88b821cb104"
+    },
+    "league_preferences.R": {
+      "checksum": "06016d4c2d0221f8e10a7a4807278c02"
     }
   },
   "users": null

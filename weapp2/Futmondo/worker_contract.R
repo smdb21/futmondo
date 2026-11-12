@@ -5,6 +5,11 @@ fm_worker_secret_name <- function(x) grepl('(^|_)(token|password|pwd|authorizati
 fm_worker_encode <- function(x,depth=0L) {
   if(depth>24L||is.environment(x)||is.function(x)||is.language(x))stop('Unsupported worker value')
   if(is.null(x))return(list(kind='null'))
+  # Transport data.table results as factual frames, without process-local pointers.
+  if(inherits(x,'data.table')){
+    if(!identical(class(x),c('data.table','data.frame')))stop('Unsupported worker class')
+    x<-as.data.frame(x)
+  }
   attrs<-attributes(x);classes<-class(x)
   if(!is.null(attrs$class)&&!all(classes%in%c('data.frame','tbl_df','tbl','AsIs','POSIXct','POSIXt','Date','futmondo_context')))stop('Unsupported worker class')
   if(!is.null(names(x))&&any(fm_worker_secret_name(names(x))))stop('Credential in worker value')

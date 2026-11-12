@@ -79,6 +79,7 @@ fm_worker_restore<-function(resource,account){
  raw<-readBin(con,'raw',n=as.integer(m$json_bytes)+1L)
  if(length(raw)!=m$json_bytes)stop('Worker snapshot length differs')
  value<-fm_worker_decode(jsonlite::fromJSON(rawToChar(raw),simplifyVector=TRUE,simplifyDataFrame=FALSE,simplifyMatrix=FALSE))
+ if(identical(m$handler,'get_active_championships'))value<-fm_filter_league_answer(value)
  attr(value,'observed_at')<-fm_time(m$observed_at);attr(value,'fetched_at')<-fm_time(m$checked_at)
  attr(value,'worker_completeness')<-m$completeness
  existing<-attr(value,'valid_until') %||% if(is.list(value))value$valid_until else NULL
@@ -167,7 +168,7 @@ fm_worker_poll<-function(account,owner='',force=FALSE){
     fm_worker_put(account,resource$key,item);rev<-fm_worker_resource_revision(s,resource$key);rev(shiny::isolate(rev())+1L);s$queued[[resource$key]]<-NULL;s$errors[[resource$key]]<-NULL}
    else s$errors[[resource$key]]<-'Stored snapshot failed integrity checks; acquisition is required.'
   }
-  for(job in result$jobs)if(!is.null(job$error))s$errors[[job$key]]<-paste('Background acquisition failed:',job$error)
+  for(job in result$jobs)s$errors[[job$key]]<-if(!is.null(job$error))paste('Background acquisition failed:',job$error)else NULL
   if(isTRUE(s$account$enabled))for(k in keys){
    saved<-fm_worker_get(account,k)
    if(is.null(saved)||!resource_snapshot_unexpired(saved$data))fm_worker_enqueue(s$descriptors[[k]]$descriptor,owner)

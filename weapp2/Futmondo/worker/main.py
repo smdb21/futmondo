@@ -86,6 +86,24 @@ def assert_factual(value, depth=0):
             assert_factual(item, depth + 1)
 
 
+BASKETBALL_SPORTS = frozenset(('basket', 'basketball', 'baloncesto'))
+
+
+def filter_football_leagues(body):
+    """Remove source-identified basketball; do not guess sport from names."""
+    answer = body.get('answer') if isinstance(body, dict) else None
+    if not isinstance(answer, dict) or not isinstance(answer.get('championships'), list):
+        return body
+    leagues = {str(x.get('id') or x.get('_id') or ''): x for x in answer.get('leagues', []) if isinstance(x, dict)}
+    def supported(champ):
+        league = champ.get('league', '')
+        lid = str(league.get('id') or league.get('_id') or '') if isinstance(league, dict) else str(league)
+        return all(str(sport or '').strip().lower() not in BASKETBALL_SPORTS
+                   for sport in (champ.get('sport'), leagues.get(lid, {}).get('sport')))
+    answer['championships'] = [x for x in answer['championships'] if isinstance(x, dict) and supported(x)]
+    return body
+
+
 def encrypt_access(auth, account, generation, key):
     payload = canonical(dict(version=1, account_id=account, generation=str(generation), auth=auth))
     return base64.b64encode(SecretBox(bytes.fromhex(key)).encrypt(payload.encode())).decode()
@@ -293,6 +311,8 @@ class Worker:
             p_owner=owner, p_generation=job['generation'], p_request=request_key)
         if cached:
             response = unpack_snapshot(cached['manifest'], cached['chunks'])
+            if url.path == '/2/user/activechampionships':
+                response['body'] = filter_football_leagues(response['body'])
             self.source_stamps.setdefault(owner, []).append(response['observed_at'])
             return response
         lock = self.account_locks.setdefault(job['account_id'], asyncio.Lock())
@@ -345,6 +365,8 @@ class Worker:
                         raise WorkerFailure('source_schema')
                     parsed.pop('header', None)
                     parsed.pop('query', None)
+                    if url.path == '/2/user/activechampionships':
+                        parsed = filter_football_leagues(parsed)
                     assert_factual(parsed)
                     answer = {'status': response.status_code, 'body': parsed, 'observed_at': stamp()}
                     parts, size, digest = pack_snapshot(answer)

@@ -1,3 +1,22 @@
+# Basketball is outside this application's football data scope. Unknown sports
+# remain unknown; names and competition labels are never used to infer sport.
+fm_basketball_sport <- function(sport) {
+  tolower(trimws(fm_scalar(sport,""))) %in% c("basket","basketball","baloncesto")
+}
+fm_supported_leagues <- function(championships,leagues=list()) {
+  Filter(function(champ){
+    if(!is.list(champ))return(FALSE)
+    if(fm_basketball_sport(champ$sport))return(FALSE)
+    lid<-if(is.list(champ$league))fm_scalar(champ$league$id %||% champ$league$`_id`,"")else fm_scalar(champ$league,"")
+    matched<-Filter(function(x)is.list(x)&&identical(fm_scalar(x$id %||% x$`_id`,""),lid),leagues)
+    !any(vapply(matched,function(x)fm_basketball_sport(x$sport),logical(1)))
+  },championships)
+}
+fm_filter_league_answer <- function(answer) {
+  if(is.list(answer)&&is.list(answer$championships))answer$championships<-fm_supported_leagues(answer$championships,answer$leagues %||% list())
+  answer
+}
+
 # Authoritative, account-scoped competition metadata and observed club membership.
 # No authentication or private response bodies are retained in this store.
 .fm_league_contexts <- new.env(parent=emptyenv())
@@ -66,6 +85,7 @@ clear_league_contexts <- function(account_id) {
 }
 normalize_active_league_contexts <- function(answer,account_id,observed_at=Sys.time()) {
   records<-function(x)if(is.data.frame(x))lapply(seq_len(nrow(x)),function(i)as.list(x[i,,drop=FALSE]))else if(is.list(x))x else list()
+  answer<-fm_filter_league_answer(answer)
   leagues<-records(answer$leagues)
   Filter(Negate(is.null),lapply(records(answer$championships),function(champ){
     if(!is.list(champ))return(NULL)

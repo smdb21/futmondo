@@ -52,4 +52,9 @@ for(handler in c('get_active_championships','get_notification_unread')){
 }
 bad<-fm_worker_encode(list(a=1));bad$names<-list()
 check(inherits(try(fm_worker_decode(bad),silent=TRUE),'try-error'),'empty names cannot label nonempty values')
-cat('WORKER CONTRACT: 18 groups passed\n')
+market<-data.table::data.table(id='p',points=-2,change=1)
+attr(market,'observed_at')<-as.POSIXct('2026-11-11',tz='UTC')
+check(identical(roundtrip(market),as.data.frame(market)),'data.table market rows transport as factual frames without internal pointers')
+unsupported<-market;class(unsupported)<-c('unsupported',class(unsupported))
+check(inherits(try(fm_worker_encode(unsupported),silent=TRUE),'try-error'),'unknown subclasses cannot bypass the worker class allowlist')
+cat('WORKER CONTRACT: 20 groups passed\n')

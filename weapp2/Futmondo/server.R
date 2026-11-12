@@ -47,8 +47,9 @@ function(input, output, session) {
     refresh_trigger()
     state<-championship_state()
     if(is.null(state$data))shiny::validate(shiny::need(FALSE,if(identical(state$status,"loading"))"Loading leagues…"else resource_failure_message(state$error)))
-    state$data$championships
+    fm_filter_league_answer(state$data)$championships
   })
+  league_preferences<-fm_league_preferences(session,login_token_RV,championships_RV)
   observe({
     ch <- championships_RV()
     metadata<-league_context_revision()
@@ -56,16 +57,16 @@ function(input, output, session) {
     labels <- vapply(ch, function(c) fm_scalar(c$name, "League"), character(1))
     repeated<-duplicated(labels)|duplicated(labels,fromLast=TRUE)
     for(i in which(repeated)){ctx<-league_context_metadata(ids[i],login_token_RV()[["userid"]]);suffix<-fm_scalar(ctx$payload$competition_name,"");if(!nzchar(suffix))suffix<-ids[i];labels[i]<-paste0(labels[i]," (",suffix,")")}
-    current <- isolate(input$selected_league)
-    selected <- if (!is.null(current) && current %in% ids) current else if (length(ids)) ids[1] else character()
+    selected <- league_preferences$selected()
+    req(!is.null(selected))
     updateSelectInput(session, "selected_league", choices = setNames(ids, labels), selected = selected)
   })
   championship_RV <- reactive({
-    ch <- championships_RV(); shiny::validate(shiny::need(length(ch)>0L,"No active leagues are available for this account."))
+    ch <- championships_RV(); shiny::validate(shiny::need(length(ch)>0L,"No supported leagues are available for this account."))
     league_context_revision()
     ids <- vapply(ch, function(c) fm_scalar(c$id %||% c$`_id`, ""), character(1))
-    selected <- input$selected_league
-    if (is.null(selected) || !selected %in% ids) selected <- ids[1]
+    selected <- league_preferences$selected()
+    req(length(selected)==1L,selected %in% ids)
     context <- ch[[match(selected,ids)]]
     context$id <- context$id %||% context$`_id`
     context$userteam$id <- context$userteam$id %||% context$userteam$`_id`
@@ -261,7 +262,7 @@ players_in_championship_Server(id = "players_in_championship",
     if(!identical(state$status,"loading")&&identical(isolate(startup_stage()),"loading_leagues"))resource_timing("leagues",isolate(startup_started()))
     if(identical(state$status,"loading")){startup_stage("loading_leagues");return()}
     if(is.null(state$data)){startup_stage("failed");return()}
-    if(!length(state$data$championships)){startup_stage("empty");return()}
+    if(!length(fm_filter_league_answer(state$data)$championships)){startup_stage("empty");return()}
     if(!isTRUE(startup_primary_ready())){startup_stage("loading_today");return()}
     stage<-if(identical(input$tabs,"today"))today$primary_status()else "ready"
     if(!identical(isolate(startup_stage()),stage))resource_timing("today_primary",isolate(startup_started()))
@@ -273,7 +274,7 @@ players_in_championship_Server(id = "players_in_championship",
     if(stage %in% c("signed_out","ready","authenticating"))return(NULL)
     loading<-stage %in% c("loading_leagues","loading_today")
     message<-switch(stage,loading_leagues="Signed in. Loading your leagues…",loading_today="Loading today's market…",
-      empty="Signed in. No active leagues were returned.",partial="Some sections could not load. Retry the affected data.",
+      empty="Signed in. No supported leagues are available.",partial="Some sections could not load. Retry the affected data.",
       failed="The first page could not load. Refresh to retry.","")
     if(identical(stage,"failed")){state<-tryCatch(championship_state(),error=function(e)NULL);if(!is.null(state$error))message<-resource_failure_message(state$error)}
     if(loading&&isTRUE(startup_slow()))message<-paste(message,"Still loading data from Futmondo…")

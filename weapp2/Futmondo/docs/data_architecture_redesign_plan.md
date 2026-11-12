@@ -1052,3 +1052,12 @@ Production diagnostics also confirmed the prerequisite `20261110225848_general_c
 Applied the missing competition-context migration and a focused default-catalog-upsert repair. Production now has the required tables, context columns, indexes, guarded views and server-only access. Both league-discovery jobs and the previously failing team-directory, pressroom and financial-snapshot jobs completed; durable snapshots and metadata were observed. See `competition_context_migration_verification.md` for exact migrations and `data_review_results.md` for isolated/live checks and performance limits.
 
 This completes the missing-schema 404 and implicit catalog conflict repair. Full worker acceptance remains open: prepared finance rejects a cross-league fact with `fact_league`, and market acquisition has a helper `resource_parse` failure. Do not mark balance reconciliation or complete acquisition accepted until those distinct paths are traced and verified.
+
+
+### Football league boundary, saved selection and market worker — 2026-11-11
+
+Implemented source-based basketball exclusion across live reads, persisted checkpoint replay, resource hydration and league selection. Production block/preference schema is applied as `20261112030711_football_leagues_and_selection`; after explicit user approval, the separate fixed-table cleanup removed basketball league records/jobs/snapshots/context while preserving football and shared catalogs. Minimal blocked identifiers prevent reinsertion. See `league_preferences.md` for storage, cleanup and isolation contracts.
+
+The account's last selected available league is now stored durably and restored before dependent league reads. The initial valid choice and later changes are saved; removed/blocked leagues use a valid fallback without inventing data, and delayed/error cases remain isolated/retryable. Fixed the football market worker's rejection of canonical `data.table` results rather than treating basketball removal as the market fix. Actual helper persistence/replay, source sport filtering, preference races, SQL policy/security, deployment packaging, performance and offline lifecycle checks pass as recorded in `data_review_results.md`.
+
+Local implementation and live database policy/cleanup are verified. The R/Python/UI changes still require application/worker rebuild and restart; hosted market acquisition and browser restore across sessions remain acceptance checks. No source membership change, trading automation, credential change or background transaction was introduced.

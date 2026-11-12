@@ -3521,6 +3521,7 @@ get_active_championships <- function(login) {
     answer <- httr::content(response)$answer
     if(!is.list(answer)||!"championships"%in%names(answer)||(!is.null(answer$championships)&&!is.list(answer$championships)))stop("Championships unavailable")
     if(is.null(answer$championships))answer$championships<-list()
+    answer<-fm_filter_league_answer(answer)
     answer$championships <- lapply(answer$championships,function(champ) {
       champ$id <- champ$id %||% champ$`_id`
       if(is.list(champ$userteam)) champ$userteam$id <- champ$userteam$id %||% champ$userteam$`_id`
@@ -3528,6 +3529,7 @@ get_active_championships <- function(login) {
     })
     answer
   }, timeout_sec = 60, context=resource_context(login=login))
+  result<-fm_filter_league_answer(result)
   publish_active_league_contexts(login,result)
   result
 }

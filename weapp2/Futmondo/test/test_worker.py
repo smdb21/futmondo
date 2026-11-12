@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock
 import httpx
 from worker.main import (Worker, WorkerFailure, Helper, canonical, decrypt_access, encrypt_access,
-                         pack_snapshot, unpack_snapshot, plain, quiet_interval)
+                         pack_snapshot, unpack_snapshot, plain, quiet_interval, filter_football_leagues)
 
 KEY = 'ab' * 32
 AUTH = dict(userid='fixture', token='synthetic', user_name='fixture@example.invalid')
@@ -74,6 +74,14 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(quiet_interval(account,21600,datetime(2026,11,1,9,tzinfo=timezone.utc)),21600)
         account.update(quiet_start=22,quiet_end=6)
         self.assertEqual(quiet_interval(account,60,datetime(2026,11,1,8,tzinfo=timezone.utc)),3600)
+    def test_basketball_is_source_filtered(self):
+        body = {'answer': {'championships': [
+            {'id': 'soccer', 'sport': 'soccer'}, {'id': 'hoops', 'sport': 'basket'},
+            {'id': 'via-league', 'league': 'nba'}, {'id': 'unknown', 'name': 'Basketball fans'}],
+            'leagues': [{'_id': 'nba', 'sport': 'basketball'}]}}
+        filtered = filter_football_leagues(body)
+        self.assertEqual([x['id'] for x in filtered['answer']['championships']], ['soccer', 'unknown'])
+
     def test_R_contracts(self):
         value=json.loads(Path('/tmp/futmondo-worker-descriptor.json').read_text())
         resource=value.pop('resource_key')
@@ -103,6 +111,26 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
         second_worker=Worker(self.store,self.client,KEY,Path.cwd());second_worker.admission_blocked=False
         again=await second_worker.source(self.job,'owner',self.message())
         self.assertEqual(first,again);self.assertEqual(len(self.requests),1)
+    async def test_active_league_http_and_legacy_checkpoints_exclude_basketball(self):
+        raw = {'answer': {'championships': [{'id':'l','sport':'soccer'}, {'id':'b','sport':'basket'}]}}
+        async def transport(request):
+            self.requests.append(request)
+            return httpx.Response(200, json=raw)
+        self.client._transport = httpx.MockTransport(transport)
+        job = dict(self.job, descriptor=descriptor('get_active_championships'))
+        job['descriptor']['context'] = dict(CONTEXT, championship_id='')
+        message = lambda: dict(type='http',url='https://api.futmondo.com/2/user/activechampionships',body={'query':{}})
+        live = await self.worker.source(job, 'owner', message())
+        self.assertEqual([x['id'] for x in live['body']['answer']['championships']], ['l'])
+        legacy = dict(status=200,body=raw,observed_at='2020-01-01T00:00:00Z')
+        chunks,size,digest = pack_snapshot(legacy)
+        key = next(iter(self.store.checkpoints))
+        self.store.checkpoints[key] = dict(manifest=dict(parts=len(chunks),json_bytes=size,sha256=digest),chunks=chunks)
+        replay = await self.worker.source(job, 'owner', message())
+        self.assertEqual([x['id'] for x in replay['body']['answer']['championships']], ['l'])
+        self.assertEqual(replay['observed_at'], legacy['observed_at'])
+        self.assertEqual(len(self.requests), 1)
+
     async def test_no_mutations_or_ssrf(self):
         for route in ('https://api.futmondo.com/1/market/bid','https://api.futmondo.com/1/notification/markreaded',
                       'https://api.futmondo.com.evil.invalid/1/league/championshipteams',
@@ -185,6 +213,28 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
                 manifest = self.store.snapshots[d['resource_key']]
                 restored = unpack_snapshot(manifest, self.store.chunks[manifest['version']])
                 self.assertEqual(plain(restored), decoded)
+
+    async def test_real_market_frame_persists_and_reuses_checkpoint(self):
+        d = descriptor('get_market_players', dict(championship_id='l', user_team_id='t'))
+        d['context'] = dict(CONTEXT, user_team_id='t')
+        d['resource_key'] = hashlib.sha256(canonical({k:v for k,v in d.items() if k != 'resource_key'}).encode()).hexdigest()
+        job = dict(self.job, descriptor=d, resource_key=d['resource_key'])
+        async def transport(request):
+            self.requests.append(request)
+            return httpx.Response(200, json={'answer': [{'id':'p','name':'Player','slug':'player',
+                                  'value':100,'change':1,'points':-2}]})
+        self.client._transport = httpx.MockTransport(transport)
+        result = await self.worker.helpers[0].run(d, lambda m: self.worker.exchange(job, 'owner', m))
+        self.assertEqual(plain(result['value'])[0]['points'], -2)
+        await self.worker.publish(job, 'owner', result)
+        manifest = self.store.snapshots[d['resource_key']]
+        restored = unpack_snapshot(manifest, self.store.chunks[manifest['version']])
+        self.assertEqual(plain(restored)[0]['id'], 'p')
+        self.assertEqual(len(self.requests), 1)
+        await self.worker.helpers[0].close()
+        replay = await self.worker.helpers[0].run(d, lambda m: self.worker.exchange(job, 'owner', m))
+        self.assertEqual(plain(replay['value'])[0]['points'], -2)
+        self.assertEqual(len(self.requests), 1)
 
     async def test_replayed_response_does_not_renew_R_observation_time(self):
         async def old_response(message):

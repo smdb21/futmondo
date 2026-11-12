@@ -44,7 +44,7 @@ FUTMONDO_SEASON_CONTEXTS='{"league-id":"2026-27"}'
 
 Do not infer a season from the calendar or borrow another league's scoring configuration.
 
-For new databases, use `scripts/schema.sql`, which creates factual tables and explicit server-role privileges. Existing databases use the forward migrations described in [database migration and rollback](docs/database_migration.md). Do not replay old feature migrations after installing the factual schema.
+For new databases, use `scripts/schema.sql`, which creates factual tables and explicit server-role privileges. Existing databases use the forward migrations described in [database migration and rollback](docs/database_migration.md). Football-only league blocking and account-wide last-league restoration require `scripts/migrations/20261112024500_football_leagues_and_selection.sql`; it installs durable blocking without deleting existing records. The separately approved `scripts/purge_basketball_leagues.sql` removes source-identified basketball league data. See [league selection and sport policy](docs/league_preferences.md). Do not replay old feature migrations after installing the factual schema.
 
 ## Data behavior
 

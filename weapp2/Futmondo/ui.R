@@ -44,6 +44,7 @@ body <- shinydashboard::dashboardBody(
     shinydashboard::tabItem(
       tabName = "login",
       selectInput("selected_league", "League", choices = character()),
+      uiOutput("league_preference_status"),
       uiOutput("worker_settings"),
       fluidRow(
         column(

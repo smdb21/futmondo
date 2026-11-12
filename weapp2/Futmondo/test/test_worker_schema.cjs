@@ -12,6 +12,7 @@ const migration = fs.readdirSync('scripts/migrations').find(x => x.endsWith('_ba
   await db.exec(fs.readFileSync('scripts/schema.sql','utf8'));
   await db.exec(fs.readFileSync('scripts/migrations/'+migration,'utf8'));
   await db.exec(fs.readFileSync('scripts/migrations/20261112021500_worker_catalog_upserts.sql','utf8'));
+  await db.exec(fs.readFileSync('scripts/migrations/20261112024500_football_leagues_and_selection.sql','utf8'));
   await db.exec('set role service_role');
   assert.equal(await rpc('elect',['leader']),true);
   assert.equal(await rpc('elect',['other']),false);
