@@ -227,7 +227,15 @@ class Helper:
                 if message.get('type') == 'result':
                     return message
                 if message.get('type') == 'failure':
-                    raise WorkerFailure('finance_timeout' if message.get('code') == 'finance_timeout' else 'resource_parse')
+                    code = message.get('code')
+                    # Only bounded counters and enumerated queue/status labels
+                    # may reach logs/database errors; never exception messages.
+                    timeout_pattern = (r'finance_timeout_s[01]_b\d{1,4}_q\d{1,4}_o\d{1,4}_t\d{1,4}'
+                        r'_ts(?:ready|empty|loading|unavailable|unknown)'
+                        + ''.join('_' + kind + r'\d{1,4}' for kind in
+                            ('saved', 'seed', 'team', 'lineup', 'ranking', 'notifications', 'ownership', 'ownership_catalog')))
+                    safe_timeout = isinstance(code, str) and (code == 'finance_timeout' or re.fullmatch(timeout_pattern, code, flags=re.ASCII))
+                    raise WorkerFailure(code if safe_timeout else 'resource_parse')
                 if message.get('type') not in ('http', 'database', 'persist', 'resource', 'progress'):
                     raise WorkerFailure('helper_protocol')
                 try:

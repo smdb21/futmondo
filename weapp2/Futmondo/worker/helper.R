@@ -68,6 +68,19 @@ fm_worker_discover<-function(handler,value,context,auth){
  }
  out
 }
+fm_worker_finance_timeout_code<-function(state){
+ count<-function(x){if(length(x)!=1L||!is.numeric(x)||!is.finite(x)||x<0)return(0L);as.integer(min(9999,floor(x)))}
+ queue<-state$queue %||% list()
+ kinds<-vapply(queue,function(task)if(is.list(task))fm_scalar(task$kind,'')else'',character(1))
+ status<-state$teams_status %||% 'unknown'
+ if(!status%in%c('ready','empty','loading','unavailable'))status<-'unknown'
+ parts<-c(paste0('s',as.integer(isTRUE(state$seed_complete))),paste0('b',count(state$busy)),
+   paste0('q',count(length(queue))),paste0('o',count(state$ownership_pending)),
+   paste0('t',count(if(is.data.frame(state$teams))nrow(state$teams)else 0)),paste0('ts',status))
+ for(kind in c('saved','seed','team','lineup','ranking','notifications','ownership','ownership_catalog'))
+   parts<-c(parts,paste0(kind,count(sum(kinds==kind))))
+ paste(c('finance_timeout',parts),collapse='_')
+}
 fm_worker_headless_finances<-function(env,auth,ctx,on_update=NULL){
  s<-shiny::MockShinySession$new();on.exit(s$close(),add=TRUE)
  teams<-env$get_teams(auth,ctx$championship_id)
@@ -104,7 +117,8 @@ fm_worker_headless_finances<-function(env,auth,ctx,on_update=NULL){
   if(!is.null(state)&&isTRUE(state$seed_complete)&&state$busy==0L&&!length(state$queue)&&state$ownership_pending==0L){
    result<-shiny::isolate(feed());if(!isTRUE(result$loading))break
   }
-  if(as.numeric(difftime(Sys.time(),started,units='secs'))>600)stop(structure(list(message='Finance preparation timeout',call=NULL),class=c('fm_finance_timeout','error','condition')))
+  if(as.numeric(difftime(Sys.time(),started,units='secs'))>600)stop(structure(list(message='Finance preparation timeout',call=NULL,
+    code=fm_worker_finance_timeout_code(state)),class=c('fm_finance_timeout','error','condition')))
  }
  if(!is.null(result$finance_error))stop('Finance preparation failed')
  result
@@ -288,5 +302,5 @@ repeat{
   command<-jsonlite::fromJSON(line,simplifyVector=FALSE)
   if(command$type!='run')stop('Invalid command')
   fm_pipe_send(fm_worker_run(command$descriptor))
- },error=function(e)fm_pipe_send(list(type='failure',code=if(inherits(e,'fm_finance_timeout'))'finance_timeout'else'resource_parse')))
+ },error=function(e)fm_pipe_send(list(type='failure',code=if(inherits(e,'fm_finance_timeout'))e$code %||% 'finance_timeout'else'resource_parse')))
 }

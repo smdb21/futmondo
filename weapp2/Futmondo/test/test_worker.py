@@ -298,6 +298,20 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await helper.run(descriptor('fm_worker_finances'),exchange),final)
         exchange.assert_awaited_once_with(progress)
 
+    async def test_timeout_diagnostics_are_strictly_allowlisted(self):
+        valid = 'finance_timeout_s1_b2_q3_o1_t10_tsready_saved0_seed0_team0_lineup1_ranking0_notifications0_ownership1_ownership_catalog0'
+        for code, expected in ((valid, valid), ('finance_timeout', 'finance_timeout'),
+                (valid + '_private', 'resource_parse'), (valid.replace('tsready', 'tsprivate'), 'resource_parse'),
+                (valid.replace('_b2_', '_b10000_'), 'resource_parse'), (None, 'resource_parse'),
+                ('private exception body', 'resource_parse')):
+            helper = Helper(Path.cwd())
+            helper.process = SimpleNamespace(returncode=None,
+                stdout=SimpleNamespace(readline=AsyncMock(return_value=(canonical(dict(type='failure',code=code))+'\n').encode())),
+                stdin=SimpleNamespace(write=lambda _:None,drain=AsyncMock()))
+            with self.assertRaises(WorkerFailure) as caught:
+                await helper.run(descriptor('fm_worker_finances'), AsyncMock())
+            self.assertEqual(caught.exception.code, expected)
+
     async def test_failed_fact_ack_is_never_success(self):
         self.store.allowed=False
         with self.assertRaises(WorkerFailure):
