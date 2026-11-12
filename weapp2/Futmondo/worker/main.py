@@ -58,6 +58,19 @@ def stamp(epoch=None):
     return datetime.fromtimestamp(time.time() if epoch is None else epoch, timezone.utc).isoformat()
 
 
+def source_response_rejected(body):
+    """Explicit Futmondo application errors are not successful observations."""
+    def rejected(value):
+        if isinstance(value, str):
+            return value.startswith('api.error.')
+        if isinstance(value, dict):
+            code = value.get('code')
+            error = value.get('error')
+            return error is True or (isinstance(error, str) and error.startswith('api.error.')) or (isinstance(code, str) and code.startswith('api.error.'))
+        return False
+    return rejected(body) or (isinstance(body, dict) and rejected(body.get('answer')))
+
+
 def plain(node):
     """Decode safe R nodes for discovery, never executable R serialization."""
     kind = node['kind']
@@ -260,7 +273,10 @@ class Helper:
                     response = await exchange(message)
                 except WorkerFailure as error:
                     # Send fixed codes only; do not convert auth/revocation into optional-source success.
-                    if error.code in ('access_revoked', 'source_authentication', 'source_rate_limited') or message['type'] in ('persist', 'progress'):
+                    if error.code in ('access_revoked', 'source_authentication', 'source_rate_limited',
+                            'context_superseded', 'league_membership_unverified', 'source_context',
+                            'source_route_denied', 'source_rejected', 'credential_in_fact',
+                            'snapshot_corrupt', 'snapshot_size', 'snapshot_incomplete') or message['type'] in ('persist', 'progress'):
                         raise
                     response = {'error': error.code}
                 await self.send(response)
@@ -341,8 +357,12 @@ class Worker:
             response = unpack_snapshot(cached['manifest'], cached['chunks'])
             if url.path == '/2/user/activechampionships':
                 response['body'] = filter_football_leagues(response['body'])
-            self.source_stamps.setdefault(owner, []).append(response['observed_at'])
-            return response
+            if not source_response_rejected(response['body']):
+                self.source_stamps.setdefault(owner, []).append(response['observed_at'])
+                return response
+            # Older workers checkpointed HTTP-200 application errors. Retain
+            # that diagnostic record, but acquire a new source response rather
+            # than replaying the same rejection forever after a parser failure.
         lock = self.account_locks.setdefault(job['account_id'], asyncio.Lock())
         async with lock, self.connections:
             for attempt in range(3):
@@ -396,6 +416,8 @@ class Worker:
                     if url.path == '/2/user/activechampionships':
                         parsed = filter_football_leagues(parsed)
                     assert_factual(parsed)
+                    if source_response_rejected(parsed):
+                        raise WorkerFailure('source_rejected')
                     answer = {'status': response.status_code, 'body': parsed, 'observed_at': stamp()}
                     parts, size, digest = pack_snapshot(answer)
                     await self.store.rpc('checkpoint', p_account=job['account_id'], p_key=job['resource_key'],

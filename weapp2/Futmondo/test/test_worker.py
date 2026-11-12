@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock
 from types import SimpleNamespace
 import httpx
 from worker.main import (Worker, WorkerFailure, Helper, canonical, decrypt_access, encrypt_access,
-                         pack_snapshot, unpack_snapshot, plain, quiet_interval, filter_football_leagues)
+                         pack_snapshot, unpack_snapshot, plain, quiet_interval, filter_football_leagues, source_response_rejected)
 
 KEY = 'ab' * 32
 AUTH = dict(userid='fixture', token='synthetic', user_name='fixture@example.invalid')
@@ -53,6 +53,13 @@ class FakeStore:
         return []
 
 class ContractTests(unittest.TestCase):
+    def test_native_rejections_are_not_empty_successes(self):
+        for body in ({'answer':'api.error.general'},{'answer':{'error':'api.error.general'}},
+                {'answer':{'code':'api.error.general'}},{'error':True}):
+            self.assertTrue(source_response_rejected(body))
+        for body in ({'answer':[]},{'answer':0},{'code':'api.general.ok','answer':[]},
+                {'answer':{'error':False,'players':[]}}):
+            self.assertFalse(source_response_rejected(body))
     def test_credential_binding_and_tampering(self):
         row = FakeStore().row
         self.assertEqual(decrypt_access(row, KEY), AUTH)
@@ -352,5 +359,38 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
                 stdin=SimpleNamespace(write=lambda _:None,drain=AsyncMock()))
             with self.assertRaises(WorkerFailure) as caught:await helper.run(descriptor(),AsyncMock())
             self.assertEqual(caught.exception.code,expected)
+
+    async def test_native_error_is_not_checkpointed(self):
+        async def rejected(request):
+            self.requests.append(request)
+            return httpx.Response(200,json={'answer':{'error':'api.error.general'}})
+        self.client._transport=httpx.MockTransport(rejected)
+        with self.assertRaisesRegex(WorkerFailure,'source_rejected'):
+            await self.worker.source(self.job,'owner',self.message())
+        self.assertFalse(self.store.checkpoints)
+        self.assertFalse(self.worker.source_stamps.get('owner'))
+
+    async def test_legacy_native_error_checkpoint_reacquires(self):
+        message=self.message()
+        request_key=hashlib.sha256(canonical(dict(path='/1/league/championshipteams',body=message['body'])).encode()).hexdigest()
+        old=dict(status=200,body={'answer':{'error':'api.error.general'}},observed_at='2001-01-01T00:00:00+00:00')
+        parts,size,digest=pack_snapshot(old)
+        self.store.checkpoints[request_key]={'manifest':dict(parts=len(parts),json_bytes=size,sha256=digest),'chunks':parts}
+        result=await self.worker.source(self.job,'owner',message)
+        self.assertEqual(result['body']['answer'][0]['id'],'club')
+        self.assertNotEqual(result['observed_at'],old['observed_at'])
+        self.assertEqual(len(self.requests),1)
+        self.assertNotIn(old['observed_at'],self.worker.source_stamps['owner'])
+
+    async def test_context_and_native_failures_reach_worker_owner(self):
+        for code in ('context_superseded','league_membership_unverified','source_context','source_rejected','credential_in_fact'):
+            helper=Helper(Path.cwd())
+            message=dict(type='http',url='https://api.futmondo.com/1/userteam/roster',body={})
+            helper.process=SimpleNamespace(returncode=None,
+                stdout=SimpleNamespace(readline=AsyncMock(return_value=(canonical(message)+'\n').encode())),
+                stdin=SimpleNamespace(write=lambda _:None,drain=AsyncMock()))
+            with self.assertRaises(WorkerFailure) as caught:
+                await helper.run(descriptor(),AsyncMock(side_effect=WorkerFailure(code)))
+            self.assertEqual(caught.exception.code,code)
 
 if __name__=='__main__':unittest.main(verbosity=2)

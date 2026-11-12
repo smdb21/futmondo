@@ -218,12 +218,12 @@ resource_state <- function(data=NULL,status=NULL,error=NULL,source=NULL) {
     observed_at=attr(data,"observed_at"),fetched_at=attr(data,"fetched_at"),freshness=if(status=="stale")"stale" else "fresh",
     completeness=attr(data,"worker_completeness") %||% if(status%in%c("ok","empty"))"complete" else "partial",error=error)
 }
-get_cached_resource_async <- function(resource,context,fetch,refresh=FALSE) {
+get_cached_resource_async <- function(resource,context,fetch,refresh=FALSE,cache_revision=NULL) {
   key<-api_cache_key(resource,context=context)
   if(nzchar(fm_scalar(context$session_id,"")))key<-paste0(key,":session:",as.character(openssl::sha256(serialize(context$session_id,NULL))))
   resource_cache_prune();item<-api_cache_env[[key]];policy<-resource_policy(resource)
   if(!is.null(item$pending)){resource_metric("coalesced");return(item$pending)}
-  if(!refresh&&!is.null(item$data)&&as.numeric(difftime(Sys.time(),item$time,units="secs"))<policy$ttl&&resource_snapshot_unexpired(item$data)){resource_metric("hits");return(promises::promise_resolve(resource_state(item$data)))}
+  if(!refresh&&!is.null(item$data)&&(is.null(cache_revision)||identical(item$cache_revision,cache_revision))&&as.numeric(difftime(Sys.time(),item$time,units="secs"))<policy$ttl&&resource_snapshot_unexpired(item$data)){resource_metric("hits");return(promises::promise_resolve(resource_state(item$data)))}
   if(refresh)invalidate_resources(context,resources=resource)
   if(is.null(item)&&length(ls(api_cache_env))>=policy$max_entries){
     keys<-ls(api_cache_env);entries<-mget(keys,api_cache_env)
@@ -251,14 +251,16 @@ get_cached_resource_async <- function(resource,context,fetch,refresh=FALSE) {
     if(!identical(current$generation,generation))return(resource_state(status="unavailable",error="Context changed"))
     if(is.null(data))return(fail(resource_failure(resource=resource,category="schema")))
     if(as.numeric(object.size(data))>policy$max_bytes)return(fail(resource_failure(resource=resource,category="read_budget")))
-    value<-resource_store(key,data,context,resource);resource_state(value)
+    value<-resource_store(key,data,context,resource)
+    if(!is.null(api_cache_env[[key]]))api_cache_env[[key]]$cache_revision<-cache_revision
+    resource_state(value)
   })
   pending<-promises::catch(pending,fail)
   api_cache_env[[key]]<-list(pending=pending,generation=generation,context=context,resource=resource,time=Sys.time(),bytes=0)
   pending
 }
-shared_resource<-function(session,resource,context,fetch,active=function()TRUE,refresh=function()0,progressive=FALSE){
- value<-shiny::reactiveVal(resource_state(status="loading"));last<-NULL;version<-NULL;closed<-FALSE;generation<-0L;was_active<-FALSE;cancel_end<-NULL;progress_relay<-NULL
+shared_resource<-function(session,resource,context,fetch,active=function()TRUE,refresh=function()0,progressive=FALSE,replay=function()NULL){
+ value<-shiny::reactiveVal(resource_state(status="loading"));last<-NULL;version<-NULL;last_replay<-NULL;closed<-FALSE;generation<-0L;was_active<-FALSE;cancel_end<-NULL;progress_relay<-NULL
  dispose<-function(){closed<<-TRUE;generation<<-generation+1L;observer$destroy();if(is.function(cancel_end))cancel_end()}
  cancel_end<-session$onSessionEnded(function(){dispose();fm_transport_cancel(session$token)})
  observer<-shiny::observe({
@@ -267,12 +269,12 @@ shared_resource<-function(session,resource,context,fetch,active=function()TRUE,r
   ctx<-context()
   if(is.null(ctx)){generation<<-generation+1L;was_active<<-FALSE;value(resource_state(status="loading"));return()}
   if(!nzchar(ctx$session_id))ctx$session_id<-session$token
-  key<-api_cache_key(resource,context=ctx);next_version<-refresh();resumed<-!was_active;was_active<<-TRUE
-  if(identical(last,key)&&identical(version,next_version)&&!resumed)return()
+  key<-api_cache_key(resource,context=ctx);next_version<-refresh();next_replay<-replay();resumed<-!was_active;was_active<<-TRUE
+  if(identical(last,key)&&identical(version,next_version)&&identical(last_replay,next_replay)&&!resumed)return()
   same_context<-identical(last,key)
   force_refresh<-same_context&&!identical(version,next_version)
   previous<-if(same_context)shiny::isolate(value())else NULL
-  last<<-key;version<<-next_version;generation<<-generation+1L;current_generation<-generation
+  last<<-key;version<<-next_version;last_replay<<-next_replay;generation<<-generation+1L;current_generation<-generation
   stale_data<-function(data){if(!is.null(data))attr(data,"fetch_status")<-"stale";data}
   loading<-resource_state(stale_data(previous$data),status="loading")
   if(!is.null(loading$data))loading$freshness<-"stale"
@@ -301,7 +303,7 @@ shared_resource<-function(session,resource,context,fetch,active=function()TRUE,r
     if(isTRUE(relay$active)&&identical(progress_relay,relay))relay$publish(data)else invisible(FALSE)
    })
   }
-  pending<-get_cached_resource_async(resource,ctx,acquire,force_refresh)
+  pending<-get_cached_resource_async(resource,ctx,acquire,force_refresh,cache_revision=next_replay)
   relay<-progress_relay
   # A refresh may join the same unfinished read before its saved GET returns.
   # Route that read's preview to the current generation, preserving its guards.
@@ -324,7 +326,7 @@ shared_resource<-function(session,resource,context,fetch,active=function()TRUE,r
   # Do not return the pending promise: Shiny must flush loading UI immediately.
   invisible(NULL)
  })
- out<-shiny::reactive(value());attr(out,"dispose")<-dispose;out
+ out<-shiny::reactive(value());attr(out,"dispose")<-dispose;attr(out,"is_current")<-function()!closed&&isTRUE(shiny::isolate(active()));out
 }
 
 # Fixed labels and a bounded sample ring; no account/player identifiers or bodies.

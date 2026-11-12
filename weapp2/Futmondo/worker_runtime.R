@@ -100,13 +100,32 @@ fm_worker_enqueue<-function(descriptor,owner='',force=FALSE){
   function(error){state$queued[[key]]<-NULL;state$errors[[key]]<-'Could not queue background refresh; database access failed.';fm_worker_notify();NULL})
  invisible(NULL)
 }
-fm_worker_demand<-function(descriptor,owner=''){
+fm_worker_demand<-function(descriptor,owner='',is_current=NULL){
  s<-fm_worker_account_state(descriptor$context$account_id);key<-descriptor$resource_key
- s$descriptors[[key]]<-list(descriptor=descriptor,at=as.numeric(Sys.time()),owner=owner)
+ watchers<-s$descriptors[[key]]$watchers %||% list();now<-as.numeric(Sys.time())
+ interest<-if(is.function(is_current))attr(is_current,'fm_worker_interest') %||% paste0('live:',owner)else paste0('legacy:',owner)
+ watchers[[interest]]<-list(owner=owner,current=is_current,at=now)
+ if(length(watchers)>128L){old<-order(vapply(watchers,`[[`,numeric(1),'at'));watchers[old[seq_len(length(watchers)-128L)]]<-NULL}
+ s$descriptors[[key]]<-list(descriptor=descriptor,at=now,owner=owner,watchers=watchers)
  if(length(s$descriptors)>128L){times<-vapply(s$descriptors,function(x)x$at,numeric(1));victims<-names(sort(times))[seq_len(length(times)-128L)];s$descriptors[victims]<-NULL;s$queued[victims]<-NULL;s$errors[victims]<-NULL
   for(v in victims)if(exists(v,s$resource_revisions,inherits=FALSE))rm(list=v,envir=s$resource_revisions)
  }
  invisible(NULL)
+}
+fm_worker_live_keys<-function(state,now=as.numeric(Sys.time())){
+ keys<-character()
+ for(key in names(state$descriptors)){
+  d<-state$descriptors[[key]];watchers<-d$watchers
+  if(!length(watchers)){if(now-d$at<=120)keys<-c(keys,key);next}
+  live<-vapply(watchers,function(w)if(is.function(w$current))
+    isTRUE(tryCatch(shiny::isolate(w$current()),error=function(e)FALSE))else now-w$at<=120,logical(1))
+  if(any(live)){
+   chosen<-watchers[[which(live)[1L]]];d$owner<-chosen$owner
+   if(any(vapply(watchers[live],function(w)is.function(w$current),logical(1))))d$at<-now
+   state$descriptors[[key]]<-d;keys<-c(keys,key)
+  }
+ }
+ keys
 }
 fm_worker_fetch<-function(handler,args,context,owner=context$session_id %||% '',is_current=function()TRUE,direct=NULL){
  mode<-fm_worker_mode(context$account_id)
@@ -114,7 +133,7 @@ fm_worker_fetch<-function(handler,args,context,owner=context$session_id %||% '',
   if(is.function(direct))return(direct())
   return(promises::promise_reject(simpleError('Background access is not enabled')))
  }
- d<-fm_worker_descriptor(handler,args,context);fm_worker_demand(d,owner)
+ d<-fm_worker_descriptor(handler,args,context);fm_worker_demand(d,owner,is_current)
  s<-fm_worker_account_state(context$account_id);try(fm_worker_resource_revision(s,d$resource_key)(),silent=TRUE);saved<-fm_worker_get(context$account_id,d$resource_key)
  if(!is.null(saved)){
   if(!resource_snapshot_unexpired(saved$data)){
@@ -150,12 +169,13 @@ fm_worker_poll<-function(account,owner='',force=FALSE){
  s<-fm_worker_account_state(account)
  if(s$busy||!force&&as.numeric(Sys.time())-s$last_poll<4)return(invisible(NULL))
  s$busy<-TRUE;s$last_poll<-as.numeric(Sys.time())
- keys<-names(s$descriptors);keys<-keys[vapply(s$descriptors,function(x)as.numeric(Sys.time())-x$at<=120,logical(1))]
+ keys<-fm_worker_live_keys(s)
  versions<-setNames(lapply(keys,function(k)fm_worker_get(account,k)$manifest$version %||% ''),keys)
  if(!length(versions))versions<-structure(list(),names=character())
  p<-fm_worker_rpc('read',list(p_account=account,p_versions=versions),owner)
  promises::then(p,function(result){
   s$busy<-FALSE;fm_worker_set_policy(s,result$account);s$health<-result$health;s$jobs<-result$jobs;s$service_error<-NULL
+  s$errors<-s$errors[intersect(names(s$errors),keys)]
   for(resource in result$resources){
    d<-s$descriptors[[resource$key]]$descriptor
    if(is.null(d)||!identical(fm_worker_json(resource$manifest$context),fm_worker_json(d$context)))next
@@ -178,10 +198,10 @@ fm_worker_poll<-function(account,owner='',force=FALSE){
  },function(error){s$busy<-FALSE;s$service_error<-'Background status could not be read from the database.';fm_worker_notify();NULL})
  invisible(NULL)
 }
-fm_worker_peek<-function(handler,args,context,direct){
+fm_worker_peek<-function(handler,args,context,direct,is_current=NULL){
  mode<-fm_worker_mode(context$account_id)
  if(identical(mode,FALSE))return(direct())
- d<-fm_worker_descriptor(handler,args,context);fm_worker_demand(d,context$session_id %||% '')
+ d<-fm_worker_descriptor(handler,args,context);fm_worker_demand(d,context$session_id %||% '',is_current)
  s<-fm_worker_account_state(context$account_id);try(fm_worker_resource_revision(s,d$resource_key)(),silent=TRUE)
  item<-fm_worker_get(context$account_id,d$resource_key)
  if(isTRUE(mode)&&(is.null(item)||!resource_snapshot_unexpired(item$data)))fm_worker_enqueue(d,context$session_id %||% '')
@@ -223,12 +243,15 @@ fm_worker_finance_source<-function(session,login,championship,user_team,teams,ac
  shiny::reactive({
   auth<-login();shiny::req(valid_login(auth));mode<-fm_worker_mode(auth[['userid']])
   if(identical(mode,FALSE))return(direct())
-  ctx<-resource_context(auth,championship(),user_team())
+  ctx<-resource_context(auth,championship(),user_team(),session_id=session$token)
   if(!fm_context_known(ctx$competition_id)||!fm_context_known(ctx$season))return(list(
     team_finances=rival_finance_directory(tryCatch(teams(),error=function(e)data.frame())),breakdowns=list(),loading=TRUE,
     finance_loading=TRUE,reason='Resolving league context before preparing finances.'))
   value<-tryCatch(fm_worker_peek('fm_worker_finances',
-   list(championship_id=ctx$championship_id,user_team_id=ctx$user_team_id),ctx,function()NULL),error=function(e)NULL)
+   list(championship_id=ctx$championship_id,user_team_id=ctx$user_team_id),ctx,function()NULL,
+   is_current=function()shiny::isolate(isTRUE(active())&&valid_login(login())&&
+     identical(login()[['userid']],ctx$account_id)&&identical(as.character(championship()),ctx$championship_id)&&
+     identical(as.character(user_team()),ctx$user_team_id))),error=function(e)NULL)
   value %||% list(team_finances=rival_finance_directory(tryCatch(teams(),error=function(e)data.frame())),breakdowns=list(),loading=TRUE,
    finance_loading=TRUE,reason='Preparing financial data in background sync.')
  })
@@ -236,6 +259,16 @@ fm_worker_finance_source<-function(session,login,championship,user_team,teams,ac
 fm_worker_detach<-function(account,owner){
  s<-.fm_worker$accounts[[account]];if(is.null(s))return(invisible(NULL))
  s$sessions<-setdiff(s$sessions,owner)
+ for(key in names(s$descriptors)){
+  d<-s$descriptors[[key]]
+  if(length(d$watchers)){
+   keep<-!vapply(d$watchers,function(w)identical(w$owner,owner),logical(1));d$watchers<-d$watchers[keep]
+   if(!length(d$watchers)){
+    s$descriptors[[key]]<-NULL;s$queued[[key]]<-NULL;s$errors[[key]]<-NULL
+    if(exists(key,s$resource_revisions,inherits=FALSE))rm(list=key,envir=s$resource_revisions)
+   }else s$descriptors[[key]]<-d
+  }
+ }
  for(id in names(s$waiters))if(identical(s$waiters[[id]]$owner,owner)){
   w<-s$waiters[[id]];s$waiters[[id]]<-NULL;if(is.function(w$cancel))w$cancel();w$reject(simpleError('Session request cancelled'))
  }

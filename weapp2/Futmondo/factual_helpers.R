@@ -368,15 +368,28 @@ factual_read_adapter<-function(session,handler,login_token,championship_id=NULL,
    captured_args<-args;captured_context<-ctx;captured_owner<-owner_context();demand_refresh<-shiny::reactiveVal(0L)
    progressive<-identical(handler,"get_round_lineup_snapshot")
    fetch<-function(context,publish=NULL){
+    current<-function()shiny::isolate({
+      alive<-attr(registry[[entry_key]],"is_current")
+      is.function(alive)&&alive()&&isTRUE(is_active())&&identical(owner_context(),captured_owner)
+    })
+    attr(current,"fm_worker_interest")<-paste(session$token,entry_key,sep="\034")
     request<-list(handler,captured_args,context=context,
-      is_current=function()shiny::isolate(isTRUE(is_active())&&identical(owner_context(),captured_owner)))
+      is_current=current)
     if(progressive)request$on_progress<-publish
     do.call(async_adapter_fetch,request)
+   }
+   worker_replay<-function(){
+    if(!fm_worker_configured())return(NULL)
+    mode<-fm_worker_mode(captured_context$account_id)
+    if(identical(mode,FALSE))return(list(enabled=FALSE))
+    descriptor<-fm_worker_descriptor(handler,captured_args,captured_context)
+    state<-fm_worker_account_state(captured_context$account_id)
+    list(enabled=mode,revision=fm_worker_resource_revision(state,descriptor$resource_key)())
    }
    registry[[entry_key]]<-shared_resource(session,resource,context=function()captured_context,fetch=fetch,
      active=function()isTRUE(is_active())&&identical(owner_context(),captured_owner),
      refresh=function()paste(if(is.function(refresh_trigger))refresh_trigger()else 0L,demand_refresh(),sep=":"),
-     progressive=progressive)
+     progressive=progressive,replay=worker_replay)
    attr(registry[[entry_key]],"demand_refresh")<-demand_refresh
   })
   entry<-registry[[entry_key]];attr(entry,"last_access")<-as.numeric(Sys.time());registry[[entry_key]]<-entry;state<-entry()
