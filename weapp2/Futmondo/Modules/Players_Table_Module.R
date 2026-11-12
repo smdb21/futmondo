@@ -1309,6 +1309,22 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
     clients(all)
     prior
   }
+  # Retain bounded interests after promise settlement so worker publications can
+  # repair an initial failure or revise an acquired history without page reload.
+  track_worker_read <- function(entry,handler,args,context,type,player=NULL){
+    if(!fm_worker_configured()||!startsWith(handler,"get_")||identical(fm_worker_mode(context$account_id),FALSE))return(NULL)
+    descriptor<-fm_worker_descriptor(handler,args,context)
+    state<-fm_worker_account_state(context$account_id)
+    id<-if(is.null(player))paste0("initial:",type)else paste0("player:",player)
+    entry$worker_reads[[id]]<-list(descriptor=descriptor,type=type,player=player,
+      revision=shiny::isolate(fm_worker_resource_revision(state,descriptor$resource_key)()))
+    # Match the worker's 128-resource demand budget; keep bootstrap interests.
+    players<-grep("^player:",names(entry$worker_reads),value=TRUE)
+    if(length(entry$worker_reads)>128L)entry$worker_reads[head(players,length(entry$worker_reads)-128L)]<-NULL
+    live<-function()isTRUE(shiny::isolate(!closed&&identical(current_entry(),entry)&&length(current_clients())>0L))
+    attr(live,"fm_worker_interest")<-paste(root$token,"round-points",id,sep=":")
+    live
+  }
   load_initial <- function(entry,client,types=c("matrix","lineup","catalog")){
     key<-entry$key
     calls<-list(context=list("get_resolved_league_context",list(login=client$auth,championship_id=client$league,user_team_id=client$team)),
@@ -1326,14 +1342,32 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
       entry$initial_pending[[type]]<-request_token
       current<-function()!closed&&identical(current_key,key)&&length(current_clients())>0L&&
         identical(entries[[key]],entry)&&identical(entry$initial_pending[[type]],request_token)
-      promise<-tryCatch(async_adapter_fetch(call[[1]],call[[2]],context=context_for(entry),is_current=current),
+      live<-track_worker_read(entry,call[[1]],call[[2]],context_for(entry),type)
+      promise<-tryCatch(async_adapter_fetch(call[[1]],call[[2]],context=context_for(entry),is_current=live %||% current),
         error=function(error)promises::promise_reject(error))
       finish<-function(data,error=NULL){
         if(!current())return(NULL)
         entry$loading[[type]]<-FALSE
         entry$initial_pending[[type]]<-NULL
         if(is.null(error))error<-attr(data,"fetch_error")
-        if(is.null(error)&&identical(attr(data,"fetch_status"),"stale"))error<-resource_failure(resource=call[[1]],category="unknown")
+        # Expired successful snapshots remain source evidence. A captured source
+        # failure is still an error; expiry alone must not block every player.
+        if(is.null(error)&&isTRUE(attr(data,"worker_completeness")%in%c("partial","unavailable")))
+          error<-resource_failure(resource=call[[1]],category="schema")
+        if(is.null(error)&&identical(attr(data,"fetch_status"),"stale")){
+          # Old bootstrap metadata cannot establish a new season or contradict
+          # scoring already resolved for the active source context.
+          expected<-context_for(entry)
+          if(type=="context"){
+            fields<-c("competition_id","season")
+            known<-all(vapply(expected[fields],fm_context_known,logical(1)))
+            if(!known||!identical(unclass(data)[fields],unclass(expected)[fields]))
+              error<-resource_failure(resource=call[[1]],category="schema")
+          }
+          if(type=="lineup"&&fm_context_known(entry$scoring)&&
+             !isTRUE(tryCatch(identical(paste0(normalize_league_rules(list(),data,client$league)$scoring_version),entry$scoring),error=function(e)FALSE)))
+            error<-resource_failure(resource=call[[1]],category="schema")
+        }
         entry$initial_errors[[type]]<-if(is.null(error))NULL else resource_log_failure(error,call[[1]])
         tryCatch({
         if(type=="context"){
@@ -1401,7 +1435,7 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
     entry$saved_ids_cache<-NULL;entry$coverage_cache<-NULL;entry$latest_round_cache<-NULL
     entry$live<-list();entry$attempted<-list();entry$pending<-list();entry$forced<-character();entry$retry_reads<-0L;entry$request_sequence<-0L
     entry$requires_context<-isTRUE(root$userData$league_context_enabled)
-    entry$loading<-c(context=entry$requires_context,matrix=TRUE,lineup=TRUE,catalog=catalog_requested());entry$matrix_complete<-FALSE;entry$initial_errors<-list();entry$initial_pending<-list();entry$initial_sequence<-0L
+    entry$loading<-c(context=entry$requires_context,matrix=TRUE,lineup=TRUE,catalog=catalog_requested());entry$matrix_complete<-FALSE;entry$initial_errors<-list();entry$initial_pending<-list();entry$initial_sequence<-0L;entry$worker_reads<-list()
     entry$save_errors<-character();entry$saving<-0L;entry$overflow<-FALSE
     entry$finished_signature<-NULL;entry$published_ids<-character()
     entry$catalog_fitness<-data.frame();entry$fitness<-data.frame();entry$fitness_dirty<-TRUE
@@ -1467,6 +1501,43 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
   shiny::observe({
     revision();clients()
     if(closed||!length(current_clients()))return()
+    entry<-current_entry();if(is.null(entry)||!length(entry$worker_reads))return()
+    state<-fm_worker_account_state(entry$context$account_id)
+    initial<-character();changed<-FALSE
+    for(id in names(entry$worker_reads)){
+      read<-entry$worker_reads[[id]]
+      version<-fm_worker_resource_revision(state,read$descriptor$resource_key)()
+      if(identical(version,read$revision))next
+      if(is.null(read$player)){
+        if(isTRUE(entry$loading[[read$type]]))next
+        saved<-fm_worker_get(entry$context$account_id,read$descriptor$resource_key)$data
+        reusable<-is.null(entry$initial_errors[[read$type]])&&!is.null(saved)&&
+          is.null(attr(saved,"fetch_error"))&&
+          !isTRUE(attr(saved,"worker_completeness")%in%c("partial","unavailable"))
+        unchanged<-reusable&&isTRUE(tryCatch(switch(read$type,
+          lineup=identical(paste0(normalize_league_rules(list(),saved,entry$context$championship_id)$scoring_version),entry$scoring),
+          context=identical(unclass(saved)[fm_worker_fields],unclass(context_for(entry))[fm_worker_fields]),
+          catalog=identical(head(unique(as.character(saved$id)),2000L),entry$catalog_ids)&&
+            identical(recent_points_fitness_rows(saved),entry$catalog_fitness),FALSE),error=function(e)FALSE))
+        if(unchanged){entry$worker_reads[[id]]$revision<-version;next}
+        initial<-c(initial,read$type)
+      }else{
+        player<-read$player
+        if(!is.null(entry$pending[[player]]))next
+        if(!player%in%ids_for(entry))next
+        entry$attempted[[player]]<-NULL
+        entry$forced<-unique(c(entry$forced,player))
+        ctx<-context_for(entry);ctx$player_id<-player;ctx$session_id<-""
+        invalidate_resources(ctx,pattern="^player_summary_points$|^player_summary_")
+      }
+      entry$worker_reads[[id]]$revision<-version;changed<-TRUE
+    }
+    if(length(initial))load_initial(entry,current_clients()[[1]],unique(initial))
+    if(changed){entry$fitness_dirty<-TRUE;touch()}
+  })
+  shiny::observe({
+    revision();clients()
+    if(closed||!length(current_clients()))return()
     entry<-current_entry();if(is.null(entry)||any(entry$loading)||entry$overflow||!is.null(entry$initial_errors$lineup)||!is.null(entry$initial_errors$context))return()
     .persistence_state$revision()
     saving<-background_sync_status(entry$context$account_id)
@@ -1524,7 +1595,11 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
       finish<-function(result){
         if(settled||!current()||!identical(entry$pending[[player_id]],request_token))return(NULL)
         tryCatch({
-        good<-!is.null(result$data)&&!identical(result$freshness,"stale")
+        # A successful summary can have partial historical coverage. Its
+        # labelled rows/check time are validated below; expiry is not a failed
+        # acquisition and must not renew those original source timestamps.
+        good<-!is.null(result$data)&&is.null(result$error)&&is.null(attr(result$data,"fetch_error"))&&
+          isTRUE(result$status%in%c("ok","empty","stale","partial"))
         if(!good)return(failed(result$error %||% resource_failure(resource="get_player_recent_points",category="schema")))
         payload<-result$data
         valid<-is.list(payload)&&is.list(payload$context)&&is.data.frame(payload$observations)&&
@@ -1600,8 +1675,9 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
         touch();publish(entry);NULL
         },error=function(error)failed(error,processing=settled))
       }
+      worker_live<-track_worker_read(entry,"get_player_recent_points",args,ctx,"player",player_id)
       promise<-tryCatch(get_cached_resource_async("player_summary_points",ctx,function()
-        async_adapter_fetch("get_player_recent_points",args,context=ctx,is_current=current)),error=function(error)promises::promise_reject(error))
+        async_adapter_fetch("get_player_recent_points",args,context=ctx,is_current=worker_live %||% current)),error=function(error)promises::promise_reject(error))
       promises::then(promise,finish,failed)
     })
     touch()
