@@ -11,6 +11,7 @@ const migration = fs.readdirSync('scripts/migrations').find(x => x.endsWith('_ba
   await db.exec('create role anon;create role authenticated;create role service_role bypassrls;');
   await db.exec(fs.readFileSync('scripts/schema.sql','utf8'));
   await db.exec(fs.readFileSync('scripts/migrations/'+migration,'utf8'));
+  await db.exec(fs.readFileSync('scripts/migrations/20261112021500_worker_catalog_upserts.sql','utf8'));
   await db.exec('set role service_role');
   assert.equal(await rpc('elect',['leader']),true);
   assert.equal(await rpc('elect',['other']),false);
@@ -51,6 +52,24 @@ const migration = fs.readdirSync('scripts/migrations').find(x => x.endsWith('_ba
   assert.equal((await q("select name from players where id='worker-player'"))[0].name,'New name');
   await assert.rejects(rpc('write_fact',['u',descriptor.resource_key,'leader:facts',factJob.generation,'worker_accounts',{},'account_id',false,'2026-11-10T12:00:00Z']));
   pass('guarded fact writes reject stale mutable metadata and non-factual tables');
+  // A missing conflict target means PostgREST's default primary-key merge,
+  // not INSERT. These catalogs are already seeded before most worker reads.
+  await q("insert into championships(id,name) values('l','League')");
+  for (const [table,first,second] of [
+   ['user_teams',{id:'catalog-team',championship_id:'l',name:'Before'},{id:'catalog-team',championship_id:'l',name:'After'}],
+   ['championships',{id:'catalog-league',name:'Before'},{id:'catalog-league',name:'After'}],
+   ['real_clubs',{id:'catalog-club',name:'Before'},{id:'catalog-club',name:'After'}],
+   ['players',{id:'catalog-player',name:'Before',slug:'catalog-player'},{id:'catalog-player',name:'After',slug:'catalog-player'}]
+  ]) {
+   const save=(payload,when)=>rpc('write_fact',['u',descriptor.resource_key,'leader:facts',factJob.generation,table,payload,null,false,when]);
+   assert.equal(await save(first,'2026-11-09T12:00:00Z'),true);
+   assert.equal(await save(second,'2026-11-10T12:00:00Z'),true);
+   assert.equal(await save(first,'2026-11-09T12:00:00Z'),true);
+   const rows=await q(`select name from ${table} where id=$1`,[first.id]);
+   assert.deepEqual(rows,[{name:'After'}]);
+  }
+  pass('default catalog writes merge by ID, remain unique and reject older observations');
+
   const checkpoint={fixture:true};
   await rpc('checkpoint',['u',descriptor.resource_key,'leader:facts',factJob.generation,'request-1',checkpoint]);
   assert.deepEqual(await rpc('checkpoint',['u',descriptor.resource_key,'leader:facts',factJob.generation,'request-1',null]),checkpoint);

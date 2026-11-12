@@ -1045,3 +1045,10 @@ Reproduced the reported `players_table_RV` data-frame assignment failure in the 
 Fixed the worker decoder rejecting empty named argument lists after authentication removal. Existing encoded descriptors/resource keys remain compatible. Real Python/R helper tests now cover league bootstrap/discovery and unread notifications through durable publication; codec, snapshot reuse, finance, performance and offline lifecycle results are recorded in `data_review_results.md`.
 
 Production diagnostics also confirmed the prerequisite `20261110225848_general_competition_context.sql` schema is absent: metadata persistence/read paths return 404, both metadata tables are missing and eleven factual tables lack competition columns. The later worker schema alone is insufficient. The existing prerequisite migration passed its isolated upgrade/rollback/security/index rehearsal (11 groups); production application approval, application redeployment and authenticated acceptance remain pending. The production incident is not marked resolved.
+
+
+### Production context prerequisite and catalog persistence — applied and verified, 2026-11-11
+
+Applied the missing competition-context migration and a focused default-catalog-upsert repair. Production now has the required tables, context columns, indexes, guarded views and server-only access. Both league-discovery jobs and the previously failing team-directory, pressroom and financial-snapshot jobs completed; durable snapshots and metadata were observed. See `competition_context_migration_verification.md` for exact migrations and `data_review_results.md` for isolated/live checks and performance limits.
+
+This completes the missing-schema 404 and implicit catalog conflict repair. Full worker acceptance remains open: prepared finance rejects a cross-league fact with `fact_league`, and market acquisition has a helper `resource_parse` failure. Do not mark balance reconciliation or complete acquisition accepted until those distinct paths are traced and verified.

@@ -994,6 +994,10 @@ BEGIN
  'market_transactions','round_dream_team','player_daily_snapshots','auction_observations','bid_observations',
  'market_observations','player_match_observations','league_rule_snapshots','player_round_history_checks',
  'rival_finance_evidence','complete_history_baselines','league_context_observations','player_membership_observations']) THEN RAISE EXCEPTION 'Invalid fact table'; END IF;
+ -- Match PostgREST's default merge identity for mutable source catalogs.
+ IF p_conflict IS NULL AND p_table=ANY(ARRAY['championships','real_clubs','players','user_teams']) THEN
+  p_conflict:='id';
+ END IF;
  IF p_observed IS NULL OR p_observed>now()+interval '60 seconds' THEN RAISE EXCEPTION 'Invalid source time'; END IF;
  FOR row_data IN SELECT value FROM jsonb_array_elements(CASE WHEN jsonb_typeof(p_payload)='array' THEN p_payload ELSE jsonb_build_array(p_payload) END) LOOP
   IF jsonb_typeof(row_data)<>'object' OR octet_length(row_data::text)>1048576 THEN RAISE EXCEPTION 'Invalid fact row'; END IF;
