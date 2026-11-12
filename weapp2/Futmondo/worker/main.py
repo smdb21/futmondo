@@ -567,7 +567,10 @@ class Worker:
                 raise
             except Exception as error:
                 code = error.code if isinstance(error, WorkerFailure) else 'worker_internal'
-                LOG.warning('worker_job code=%s lane=%d', code, index)
+                handler = job.get('descriptor', {}).get('handler') if job else None
+                if not isinstance(handler, str) or not re.fullmatch(r'(?:get_|read_)[a-z][a-z0-9_]{0,79}|fm_worker_finances', handler, flags=re.ASCII):
+                    handler = 'unknown'
+                LOG.warning('worker_job code=%s handler=%s lane=%d', code, handler, index)
                 await self.helpers[index].close()
                 if job:
                     with contextlib.suppress(Exception):

@@ -213,9 +213,16 @@ fm_worker_run<-function(descriptor){
  }
  # Preserve useful nested acquisitions as shared snapshots; do not refetch them
  # merely because a different screen asks for the same normalized resource.
+ # Finance task envelopes are controller-private. Their successful source reads
+ # have HTTP checkpoints and their normalized evidence is persisted by the
+ # controller. Encoding another typed copy of a detailed raw lineup is expensive
+ # and has no display consumer; it also duplicates the durable evidence.
+ finance_tasks<-c('get_rival_finance_seed','get_rival_team_finance_observation',
+   'get_rival_round_lineup_observation','get_rival_round_ranking_observation',
+   'get_rival_round_notification_page','get_rival_player_ownership_observation','get_rival_ownership_round_catalog')
  for(nm in ls(env)){
   fn<-env[[nm]]
-  if(!is.function(fn)||!startsWith(nm,'get_')||endsWith(nm,'_async')||!'login'%in%names(formals(fn)))next
+  if(!is.function(fn)||!startsWith(nm,'get_')||nm%in%finance_tasks||endsWith(nm,'_async')||!'login'%in%names(formals(fn)))next
   local({name<-nm;original<-fn
    wrapper<-function(){
     params<-lapply(as.list(match.call())[-1L],eval,envir=parent.frame())
