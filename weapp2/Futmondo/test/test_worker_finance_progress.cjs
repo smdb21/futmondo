@@ -1,0 +1,60 @@
+const fs=require('fs'),assert=require('node:assert/strict');
+const {PGlite}=require('/tmp/futmondo-review-tools/node_modules/@electric-sql/pglite');
+const migration=fs.readFileSync('scripts/migrations/20261112035000_resolved_finance_jobs.sql','utf8');
+const base=fs.readFileSync('scripts/schema.sql','utf8').split('-- Active finance preparation must match verified current league context.')[0];
+(async()=>{
+ const db=new PGlite();let checks=0;const pass=x=>{checks++;console.log('PASS '+x)};
+ const q=async(s,p=[]) => (await db.query(s,p)).rows;
+ try {
+  await db.exec('create role anon;create role authenticated;create role service_role bypassrls;');await db.exec(base);
+  await db.exec("set role service_role;select worker_authorize('u',true,'synthetic','UTC',0,7,'[]','credential');select worker_elect('leader');update worker_accounts set verified_leagues='{\"l\":{\"competition_id\":\"c\",\"season\":\"s\",\"scoring_version\":\"v\"}}';");
+  const unresolved={version:1,handler:'fm_worker_finances',args:{championship_id:'l',user_team_id:'t'},context:{account_id:'u',championship_id:'l',user_team_id:'t',competition_id:'unknown',season:'unknown',scoring_version:'unknown'},resource_key:'a'.repeat(64)};
+  const current={...unresolved,context:{...unresolved.context,competition_id:'c',season:'s',scoring_version:'v'},resource_key:'b'.repeat(64)};
+  const gen=(await q('select generation from worker_accounts'))[0].generation;
+  await q("insert into worker_jobs(account_id,resource_key,descriptor,generation,owner,lease_until) values('u',$1,$2,$3,'leader:old',now()+interval '1 minute')",[unresolved.resource_key,unresolved,gen]);
+  await q("insert into worker_checkpoints(account_id,resource_key,run_id,request_key,response) select account_id,resource_key,run_id,'preserved','{}'::jsonb from worker_jobs");
+  await db.exec("insert into rival_finance_evidence(account_id,championship_id,competition_id,season,evidence_type,source_id,observed_at,payload) values('u','l','unknown','unknown','team','t',now(),'{\"budget\":90}');reset role;");
+  await db.exec(migration);await db.exec(fs.readFileSync('scripts/migrations/20261112035500_finance_progress_publication.sql','utf8'));await db.exec('set role service_role');
+  const old=(await q('select owner,last_error,due_at>now() as retired from worker_jobs'))[0];
+  assert.equal(old.owner,null);assert.equal(old.last_error,'context_unresolved');assert.equal(old.retired,true);
+  assert.equal((await q('select count(*)::int n from worker_checkpoints'))[0].n,1);
+  assert.equal((await q('select count(*)::int n from rival_finance_evidence'))[0].n,1);
+  assert.equal((await q('select worker_enqueue($1,$2,60,10) ok',['u',unresolved]))[0].ok,false);
+  assert.equal((await q('select worker_enqueue($1,$2,60,10) ok',['u',current]))[0].ok,true);
+  pass('unresolved duplicate jobs retire without deleting or recontextualizing source checkpoints/history; current context is admitted');
+  const claimed=(await q("select worker_claim('leader:current',false) job"))[0].job;
+  assert.equal(claimed.resource_key,current.resource_key);
+  assert.equal((await q('select worker_guard($1,$2,$3,$4) ok',['u',unresolved.resource_key,'leader:old',gen]))[0].ok,false);
+  pass('only the resolved job can run or retain its lease');
+  const manifest={context:current.context,version:'33333333-3333-4333-8333-333333333333',parts:1,json_bytes:1,sha256:'c'.repeat(64),observed_at:'2026-11-11T12:00:00Z',checked_at:'2026-11-11T12:00:00Z',valid_until:'2026-11-11T12:01:00Z',status:'partial',completeness:'partial'};
+  await assert.rejects(q('select worker_publish_child($1,$2,$3,$4,$5,$6)',['u',current.resource_key,'leader:current',gen,current,manifest]));
+  await q('insert into worker_chunks(account_id,resource_key,version,part,data) values($1,$2,$3,0,$4)',['u',current.resource_key,manifest.version,'Zg==']);
+  assert.equal((await q('select worker_publish_child($1,$2,$3,$4,$5,$6) ok',['u',current.resource_key,'leader:current',gen,current,manifest]))[0].ok,true);
+  const running=(await q('select owner,checked_at from worker_jobs where resource_key=$1',[current.resource_key]))[0];
+  assert.equal(running.owner,'leader:current');assert.equal(running.checked_at,null);
+  const preview=(await q('select status,completeness from worker_snapshots'))[0];assert.deepEqual(preview,{status:'partial',completeness:'partial'});
+  pass('acknowledged partial snapshot is visible while the original job remains running; missing chunks cannot claim durability');
+  manifest.status='ok';manifest.completeness='unknown';manifest.checked_at='2026-11-11T11:00:00Z';manifest.observed_at='2026-11-11T11:00:00Z';
+  assert.equal((await q('select worker_publish($1,$2,$3,$4,$5) ok',['u',current.resource_key,'leader:current',gen,manifest]))[0].ok,true);
+  assert.equal((await q('select owner from worker_jobs where resource_key=$1',[current.resource_key]))[0].owner,null);
+  const completed=(await q('select status,checked_at::text as checked_at from worker_snapshots'))[0];
+  assert.equal(completed.status,'ok');assert.equal(completed.checked_at,'2026-11-11 11:00:00+00');
+  pass('a final calculation supersedes its own preview when older input is discovered, retaining truthful source time');
+  // Independent child observations still retain their source-time ordering.
+  const child={...current,handler:'get_teams',resource_key:'d'.repeat(64)};
+  const foreignVersion='44444444-4444-4444-8444-444444444444';
+  await q("insert into worker_snapshots(account_id,resource_key,context,handler,version,observed_at,checked_at,valid_until,completeness,status,json_bytes,sha256,parts,run_id) values('u',$1,$2,'get_teams',$3,'2026-11-11T13:00:00Z','2026-11-11T13:00:00Z','2026-11-11T13:01:00Z','unknown','ok',1,$4,1,$5)",[child.resource_key,child.context,foreignVersion,'e'.repeat(64),'55555555-5555-4555-8555-555555555555']);
+  await q('select worker_enqueue($1,$2,60,10)',['u',current]);
+  const next=(await q("select worker_claim('leader:next',false) job"))[0].job;
+  const oldChild={...manifest,context:child.context,version:'66666666-6666-4666-8666-666666666666',status:'ok'};
+  await q('insert into worker_chunks(account_id,resource_key,version,part,data) values($1,$2,$3,0,$4)',['u',child.resource_key,oldChild.version,'Zg==']);
+  await q('select worker_publish_child($1,$2,$3,$4,$5,$6)',['u',current.resource_key,'leader:next',next.generation,child,oldChild]);
+  assert.equal((await q('select version::text from worker_snapshots where resource_key=$1',[child.resource_key]))[0].version,foreignVersion);
+  pass('an older child observation from another run cannot overwrite newer source evidence');
+  await q('select worker_publish($1,$2,$3,$4,$5)',['u',current.resource_key,'leader:next',next.generation,manifest]);
+
+  await db.exec('reset role;set role anon');await assert.rejects(q('select worker_finance_context_matches($1,$2)',[current,{}]));
+  pass('only final publication settles the job and browser roles cannot invoke the context gate');
+  console.log(`FINANCE PROGRESS SQL: ${checks} groups passed`);
+ } finally {await db.close()}
+})().catch(e=>{console.error(e);process.exitCode=1});

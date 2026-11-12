@@ -50,6 +50,8 @@ Default normal targets are 60 seconds for transactions, market, squads, offers, 
 
 Per-account quiet hours default to 00:00–07:00 in the detected IANA timezone, editable in settings. Unattended tasks have at least an hourly interval during that window; slower tasks retain their slower cadence. Database timezone rules handle DST. Foreground demand and explicit Refresh take priority regardless of quiet hours. New enrollment performs a bounded initial bootstrap; the entire player universe is not promised to be immediately warm. Request limits and fair account scheduling can delay targets, so source ages and failures remain explicit.
 
+Finance preparation requires source-verified current context and publishes acknowledged partial ledger snapshots while its history scan continues. It reuses valid saved final awards and retains explicit correction/settlement rechecks. See [finance progress and context contracts](finance_worker_progress.md).
+
 Nested successful acquisitions also publish reusable child snapshots, avoiding another source retrieval when a second screen needs data already acquired by finance/history work. Child snapshot preparation is bounded to 8 MiB per job. Immutable source checkpoints retain credential-free factual response envelopes, compressed and hashed, under the job's run identity; retries resume the same observation instead of renewing its source time. Checkpoint storage is bounded to 16 MiB per account; beyond that bound acquisition can continue but additional responses are not checkpointed. New cycles receive new run identities. Old checkpoints/orphan chunks are cleaned hourly, while every chunk referenced by a current snapshot is retained.
 
 ## Database interfaces and correctness

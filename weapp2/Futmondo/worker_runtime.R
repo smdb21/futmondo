@@ -91,6 +91,7 @@ fm_worker_restore<-function(resource,account){
 }
 fm_worker_enqueue<-function(descriptor,owner='',force=FALSE){
  state<-fm_worker_account_state(descriptor$context$account_id);key<-descriptor$resource_key
+ if(!force&&any(vapply(state$jobs,function(job)identical(job$key,key)&&isTRUE(job$running),logical(1))))return(invisible(NULL))
  if(!is.null(state$queued[[key]])&&as.numeric(Sys.time())-state$queued[[key]]<30&&!force)return(invisible(NULL))
  state$queued[[key]]<-as.numeric(Sys.time())
  p<-fm_worker_rpc('enqueue',list(p_account=descriptor$context$account_id,p_descriptor=descriptor,
@@ -222,7 +223,11 @@ fm_worker_finance_source<-function(session,login,championship,user_team,teams,ac
  shiny::reactive({
   auth<-login();shiny::req(valid_login(auth));mode<-fm_worker_mode(auth[['userid']])
   if(identical(mode,FALSE))return(direct())
-  ctx<-resource_context(auth,championship(),user_team());value<-tryCatch(fm_worker_peek('fm_worker_finances',
+  ctx<-resource_context(auth,championship(),user_team())
+  if(!fm_context_known(ctx$competition_id)||!fm_context_known(ctx$season))return(list(
+    team_finances=rival_finance_directory(tryCatch(teams(),error=function(e)data.frame())),breakdowns=list(),loading=TRUE,
+    finance_loading=TRUE,reason='Resolving league context before preparing finances.'))
+  value<-tryCatch(fm_worker_peek('fm_worker_finances',
    list(championship_id=ctx$championship_id,user_team_id=ctx$user_team_id),ctx,function()NULL),error=function(e)NULL)
   value %||% list(team_finances=rival_finance_directory(tryCatch(teams(),error=function(e)data.frame())),breakdowns=list(),loading=TRUE,
    finance_loading=TRUE,reason='Preparing financial data in background sync.')

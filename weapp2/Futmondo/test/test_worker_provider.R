@@ -47,4 +47,10 @@ fm_worker_rpc<-function(name,payload,owner=''){
 fm_worker_poll('u',force=TRUE);for(i in 1:20)later::run_now(.005)
 stopifnot(is.null(s$errors[[d$resource_key]]),!length(.fm_transport$tasks))
 cat('PASS recovered job clears a stale paused/failure message without downloading its payload again\n')
-cat('WORKER PROVIDER: 7 groups passed; source HTTP attempts=0\n')
+enqueues<-0L
+fm_worker_rpc<-function(name,payload,owner=''){if(name=='enqueue')enqueues<<-enqueues+1L;promises::promise_resolve(TRUE)}
+s$jobs<-list(list(key=d$resource_key,running=TRUE,pending=TRUE));s$queued<-list()
+fm_worker_enqueue(d);stopifnot(enqueues==0L)
+fm_worker_enqueue(d,force=TRUE);stopifnot(enqueues==1L)
+cat('PASS a stale running resource is not requeued; an explicit manual refresh remains queued\n')
+cat('WORKER PROVIDER: 8 groups passed; source HTTP attempts=0\n')

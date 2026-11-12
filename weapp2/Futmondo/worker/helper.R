@@ -68,14 +68,24 @@ fm_worker_discover<-function(handler,value,context,auth){
  }
  out
 }
-fm_worker_headless_finances<-function(env,auth,ctx){
+fm_worker_headless_finances<-function(env,auth,ctx,on_update=NULL){
  s<-shiny::MockShinySession$new();on.exit(s$close(),add=TRUE)
  teams<-env$get_teams(auth,ctx$championship_id)
  catalog<-env$get_mvp_saved_catalog(auth,ctx$championship_id)
  rounds<-catalog$catalog$rounds;awards<-catalog$saved
  complete<-isTRUE(catalog$catalog$complete)
  if(is.data.frame(rounds)&&nrow(rounds))for(i in which(rounds$is_finished%in%TRUE)){
-  ref<-round_reference(rounds$round_id[i],rounds$round_number[i])
+  ref<-round_reference(rounds$round_id[i],rounds$round_number[i]);ref$is_finished<-TRUE
+  saved<-if(is.data.frame(awards)&&'round_id'%in%names(awards))awards[awards$round_id%in%ref$round_id,,drop=FALSE]else data.frame()
+  checked<-if('checked_at'%in%names(saved))fm_time(saved$checked_at)else as.POSIXct(character())
+  age<-if(length(checked))as.numeric(difftime(Sys.time(),min(checked),units='secs'))else Inf
+  reusable<-award_selection_valid(saved)&&'championship_id'%in%names(saved)&&all(saved$championship_id%in%ctx$championship_id)&&
+    (!fm_context_known(ctx$season)||'season'%in%names(saved)&&all(saved$season%in%ctx$season))&&
+    (!fm_context_known(ctx$scoring_version)||'scoring_version'%in%names(saved)&&all(saved$scoring_version%in%ctx$scoring_version))&&
+    'is_finished'%in%names(saved)&&all(saved$is_finished%in%TRUE)&&
+    'persistence'%in%names(saved)&&all(saved$persistence%in%'Saved')&&is.finite(age)&&age>=0&&age<86400&&
+    !ref$round_id%in%(catalog$settlement_rechecks %||% character())
+  if(isTRUE(reusable))next
   result<-env$get_official_dreamteam_result(auth,ctx$championship_id,ref)
   if(identical(result$status,'ok')){
    if(!isTRUE(env$persist_official_award_snapshot(result,auth,ctx$championship_id,ref,ctx)))stop('Award persistence failed')
@@ -85,7 +95,7 @@ fm_worker_headless_finances<-function(env,auth,ctx){
  feed<-NULL
  shiny::withReactiveDomain(s,{
   feed<-env$shared_rival_finance_source(s,function()auth,function()ctx$championship_id,function()ctx$user_team_id,
-    function()teams,function()TRUE,function()list(rows=awards,complete=complete))
+    function()teams,function()TRUE,function()list(rows=awards,complete=complete),on_update=on_update)
  })
  started<-Sys.time()
  repeat{
@@ -94,7 +104,7 @@ fm_worker_headless_finances<-function(env,auth,ctx){
   if(!is.null(state)&&isTRUE(state$seed_complete)&&state$busy==0L&&!length(state$queue)&&state$ownership_pending==0L){
    result<-shiny::isolate(feed());if(!isTRUE(result$loading))break
   }
-  if(as.numeric(difftime(Sys.time(),started,units='secs'))>600)stop('Finance preparation timeout')
+  if(as.numeric(difftime(Sys.time(),started,units='secs'))>600)stop(structure(list(message='Finance preparation timeout',call=NULL),class=c('fm_finance_timeout','error','condition')))
  }
  if(!is.null(result$finance_error))stop('Finance preparation failed')
  result
@@ -193,7 +203,23 @@ fm_worker_run<-function(descriptor){
  clear_api_cache()
  args<-if(!is.null(descriptor$encoded_args))fm_worker_decode(descriptor$encoded_args)else descriptor$args
  if(!length(args))args<-list()
- if(handler=='fm_worker_finances')value<-fm_worker_headless_finances(env,auth,ctx)else{
+ last_progress<- -Inf;progress_signature<-NULL
+ progress<-function(value){
+  rows<-value$team_finances
+  if(!is.null(value$finance_error)||!is.data.frame(rows)||!'estimated_cash'%in%names(rows)||!any(is.finite(rows$estimated_cash)))return(invisible(NULL))
+  now<-proc.time()[['elapsed']]
+  if(isTRUE(value$loading)&&now-last_progress<15)return(invisible(NULL))
+  signature<-paste0(openssl::sha256(serialize(value[c('team_finances','cash_ledgers','breakdowns','finance_loading','finance_pending')],NULL)))
+  if(identical(signature,progress_signature))return(invisible(NULL))
+  preview<-value;preview$loading<-TRUE;preview$finance_loading<-TRUE
+  preview$reason<-trimws(paste(value$reason %||% '',if(isTRUE(value$loading))'Preparing remaining financial evidence.'else'Saving prepared finance resources.'))
+  result<-list(value=fm_worker_encode(preview),observed_at=rival_finance_stamp(source_clock %||% Sys.time()),
+    checked_at=rival_finance_stamp(),status='partial',completeness='partial',ready=!isTRUE(value$loading))
+  if(!isTRUE(fm_pipe_exchange(list(type='progress',result=result))$ok))stop('Finance progress was not acknowledged')
+  last_progress<<-now;progress_signature<<-signature
+  invisible(NULL)
+ }
+ if(handler=='fm_worker_finances')value<-fm_worker_headless_finances(env,auth,ctx,on_update=progress)else{
   if(!exists(handler,env,mode='function'))stop('Unknown resource')
   f<-get(handler,env)
   if('login'%in%names(formals(f)))args$login<-auth
@@ -220,5 +246,5 @@ repeat{
   command<-jsonlite::fromJSON(line,simplifyVector=FALSE)
   if(command$type!='run')stop('Invalid command')
   fm_pipe_send(fm_worker_run(command$descriptor))
- },error=function(e)fm_pipe_send(list(type='failure',code='resource_parse')))
+ },error=function(e)fm_pipe_send(list(type='failure',code=if(inherits(e,'fm_finance_timeout'))'finance_timeout'else'resource_parse')))
 }

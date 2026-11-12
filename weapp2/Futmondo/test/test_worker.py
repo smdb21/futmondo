@@ -8,6 +8,7 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock
+from types import SimpleNamespace
 import httpx
 from worker.main import (Worker, WorkerFailure, Helper, canonical, decrypt_access, encrypt_access,
                          pack_snapshot, unpack_snapshot, plain, quiet_interval, filter_football_leagues)
@@ -245,6 +246,57 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
             return {'ok':True}
         result=await self.worker.helpers[0].run(self.job['descriptor'],old_response)
         self.assertTrue(result['observed_at'].startswith('2020-01-01'),result['observed_at'])
+
+    async def test_finance_progress_is_durable_partial_and_rate_limited(self):
+        d = descriptor('fm_worker_finances')
+        job = dict(self.job, descriptor=d, resource_key=d['resource_key'])
+        message = dict(type='progress',result=dict(value={'kind':'double','values':[90]},
+                       observed_at='2026-11-11T12:00:00Z',checked_at='2026-11-11T12:00:00Z',
+                       status='ok',completeness='complete'))
+        result = await self.worker.exchange(job,'owner',message)
+        self.assertTrue(result['published'])
+        manifest = self.store.snapshots[job['resource_key']]
+        self.assertEqual((manifest['status'],manifest['completeness']),('partial','partial'))
+        self.assertEqual(plain(unpack_snapshot(manifest,self.store.chunks[manifest['version']])),90)
+        again = await self.worker.exchange(job,'owner',message)
+        self.assertFalse(again['published'])
+        self.assertEqual(sum(name=='publish_child' for name,_ in self.store.calls),1)
+        message['result']['ready'] = True
+        self.assertTrue((await self.worker.exchange(job,'owner',message))['published'])
+        self.assertFalse((await self.worker.exchange(job,'owner',message))['published'])
+        self.assertEqual(sum(name=='publish_child' for name,_ in self.store.calls),2)
+        self.assertFalse(any(name=='publish' for name,_ in self.store.calls))
+        self.assertEqual(self.worker.job_count,0)
+        with self.assertRaisesRegex(WorkerFailure,'helper_protocol'):
+            await self.worker.exchange(self.job,'other',message)
+
+    async def test_finance_progress_ack_failure_remains_retryable(self):
+        d = descriptor('fm_worker_finances')
+        job = dict(self.job, descriptor=d, resource_key=d['resource_key'])
+        original = self.store.rpc
+        async def failing(name,**params):
+            if name=='publish_child':raise WorkerFailure('database_connection')
+            return await original(name,**params)
+        self.store.rpc = failing
+        message = dict(type='progress',result=dict(value={'kind':'double','values':[90]},
+                       observed_at='2026-11-11T12:00:00Z',checked_at='2026-11-11T12:00:00Z'))
+        with self.assertRaisesRegex(WorkerFailure,'database_connection'):
+            await self.worker.exchange(job,'owner',message)
+        self.assertNotIn('owner',self.worker.progress_times)
+        self.assertFalse(self.store.snapshots)
+        self.store.rpc = original
+        self.assertTrue((await self.worker.exchange(job,'owner',message))['published'])
+
+    async def test_helper_acknowledges_progress_then_waits_for_final_result(self):
+        helper=Helper(Path.cwd())
+        progress={'type':'progress','result':{'value':{'kind':'double','values':[90]}}}
+        final={'type':'result','value':{'kind':'double','values':[90]}}
+        helper.process=SimpleNamespace(returncode=None,
+            stdout=SimpleNamespace(readline=AsyncMock(side_effect=[(canonical(progress)+'\n').encode(),(canonical(final)+'\n').encode()])),
+            stdin=SimpleNamespace(write=lambda _:None,drain=AsyncMock()))
+        exchange=AsyncMock(return_value={'ok':True})
+        self.assertEqual(await helper.run(descriptor('fm_worker_finances'),exchange),final)
+        exchange.assert_awaited_once_with(progress)
 
     async def test_failed_fact_ack_is_never_success(self):
         self.store.allowed=False

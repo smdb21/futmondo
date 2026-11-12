@@ -227,14 +227,14 @@ class Helper:
                 if message.get('type') == 'result':
                     return message
                 if message.get('type') == 'failure':
-                    raise WorkerFailure('resource_parse')
-                if message.get('type') not in ('http', 'database', 'persist', 'resource'):
+                    raise WorkerFailure('finance_timeout' if message.get('code') == 'finance_timeout' else 'resource_parse')
+                if message.get('type') not in ('http', 'database', 'persist', 'resource', 'progress'):
                     raise WorkerFailure('helper_protocol')
                 try:
                     response = await exchange(message)
                 except WorkerFailure as error:
                     # Send fixed codes only; do not convert auth/revocation into optional-source success.
-                    if error.code in ('access_revoked', 'source_authentication', 'source_rate_limited') or message['type'] == 'persist':
+                    if error.code in ('access_revoked', 'source_authentication', 'source_rate_limited') or message['type'] in ('persist', 'progress'):
                         raise
                     response = {'error': error.code}
                 await self.send(response)
@@ -267,6 +267,8 @@ class Worker:
         self.request_count = self.job_count = 0
         self.source_stamps = {}
         self.source_errors = {}
+        self.progress_times = {}
+        self.progress_ready = set()
 
     async def guard(self, job, owner, checkpoint=None):
         valid = await self.store.rpc('guard', p_account=job['account_id'], p_key=job['resource_key'],
@@ -389,6 +391,22 @@ class Worker:
 
     async def exchange(self, job, owner, message):
         await self.guard(job, owner)
+        if message['type'] == 'progress':
+            if job['descriptor']['handler'] != 'fm_worker_finances':
+                raise WorkerFailure('helper_protocol')
+            now = time.monotonic()
+            ready = message['result'].get('ready') is True
+            final_preview = ready and owner not in self.progress_ready
+            if not final_preview and now - self.progress_times.get(owner, float('-inf')) < 15:
+                return {'ok': True, 'published': False}
+            result = dict(message['result'], status='partial', completeness='partial')
+            # The same scoped descriptor publishes a preview without settling
+            # its parent lease; final publication still certifies completion.
+            await self.publish(job, owner, result, child=job['descriptor'])
+            self.progress_times[owner] = now
+            if ready:
+                self.progress_ready.add(owner)
+            return {'ok': True, 'published': True}
         if message['type'] == 'http':
             try:
                 return await self.source(job, owner, message)
@@ -505,6 +523,8 @@ class Worker:
                 await self.guard(job, owner)
                 self.source_stamps[owner] = []
                 self.source_errors[owner] = set()
+                self.progress_times.pop(owner, None)
+                self.progress_ready.discard(owner)
                 async def renew():
                     while True:
                         await asyncio.sleep(15)

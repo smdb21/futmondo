@@ -1500,7 +1500,7 @@ rival_finance_directory <- function(teams) {
   rows
 }
 # One shared root-session ledger, rendered in bounded batches rather than per write.
-shared_rival_finance_source <- function(session,login,championship,user_team,teams,active,official,refresh=NULL) {
+shared_rival_finance_source <- function(session,login,championship,user_team,teams,active,official,refresh=NULL,on_update=NULL) {
   root<-session$rootScope()
   if(is.null(root$userData$rival_finance_shared)){
     state<-new.env(parent=emptyenv());state$transfers<-shiny::reactiveVal(data.frame());state$value<-shiny::reactiveVal(list(team_finances=data.frame(),breakdowns=list(),loading=TRUE));state$key<-NULL
@@ -1591,6 +1591,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
     calculated$reason<-state$reason %||% ""
     calculated<-snapshot_status(calculated)
     state$last_publish<-as.numeric(Sys.time());state$transfers(calculated$pressroom %||% data.frame());state$value(calculated)
+    if(is.function(on_update))on_update(calculated)
     cache_signature<-rival_snapshot_signature(state$calculation_cache)
     if(state$finance_ready&&!calculated$loading&&is.null(calculated$finance_error)&&!identical(cache_signature,state$shared_cache_signature)){
       # Reuse in this process immediately; durability is acknowledged separately.
