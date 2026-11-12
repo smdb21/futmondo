@@ -1113,3 +1113,9 @@ Added guarded per-view worker subscriptions that outlive the 120-second display 
 ### 2026-11-12 — Future round standings evidence (implemented locally)
 
 The round-ranking getter can now reuse a fresh fully scoped official fixture calendar to return a truthful not-started state until kickoff, preserving the calendar's original timestamp and avoiding an invalid standings request. Regression coverage rejects stale/incomplete/conflicting and foreign calendars, generic future labels and running/final rounds. Production roster and finance source failures remain unresolved; the worker heartbeat alone does not satisfy the acquisition exit criteria.
+
+### Cached primary finance display — 2026-11-12 (implemented locally)
+
+- Fixed expiry-only loss of banner offer totals, committed balance and configured spending allowance. Complete persisted team/market observations remain usable as explicitly cached display evidence; fresh observations still govern solvency verification and all manual-action preflights remain unchanged.
+- Existing context-scoped database snapshots, source timestamps, expiry and worker update subscriptions are reused. No acquisition, schema, dependency or timer changes. Partial/malformed/missing evidence remains unavailable.
+- Exit checks: known-answer reservation/debt tests, compressed database-snapshot restoration through the real banner, shared-read/clock/navigation request checks, worker live updates and offline Shiny lifecycle. See `docs/debt_and_round_countdown.md` and `docs/data_review_results.md`. Deployment and confirmation of actual production payload completeness are pending.

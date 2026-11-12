@@ -15,13 +15,13 @@ check("league selection lives only on Welcome", {
 })
 original_async <- async_adapter_fetch
 calls <- character(); pending <- new.env(parent=emptyenv())
-async_adapter_fetch <- function(fn,args=list(),context,owner=context$session_id,is_current=function()TRUE) {
+async_adapter_fetch <- function(fn,args=list(),context,owner=context$session_id,is_current=function()TRUE,on_progress=NULL) {
   calls <<- c(calls,fn)
   if (fn %in% c("get_user_team_info","get_market_players")) {
     key <- paste(fn,context$championship_id,context$user_team_id,sep=":")
     return(promises::promise(function(resolve,reject)pending[[key]]<-list(resolve=resolve,reject=reject,current=is_current)))
   }
-  original_async(fn,args,context,owner,is_current)
+  original_async(fn,args,context,owner,is_current,on_progress=on_progress)
 }
 # The banner must never depend on this failing composite path.
 get_financial_snapshot <- function(...) stop("Composite finance is deliberately unavailable")
@@ -88,10 +88,37 @@ shiny::testServer(app_server,{
     html <- output$round_countdown$html
     stopifnot(grepl("round-countdown-warning",html,fixed=TRUE),grepl("Restore at least 11 EUR",html,fixed=TRUE))
   })
+  # Replay typed database snapshots, preserving their original source time.
+  restore_saved <- function(value, handler) {
+    descriptor <- fm_worker_descriptor(handler,list(championship_id="champ",user_team_id="team1"),resource_context(app_auth,"champ","team1"))
+    wire <- charToRaw(fm_worker_json(fm_worker_encode(value)))
+    compressed <- history_baseline_compress(wire)
+    saved <- list(key=descriptor$resource_key,manifest=list(account_id=app_auth[["userid"]],
+      resource_key=descriptor$resource_key,handler=handler,json_bytes=length(wire),parts=1L,
+      sha256=paste0(openssl::sha256(compressed)),observed_at="2026-10-01T12:00:00Z",
+      checked_at="2026-10-01T12:00:01Z",valid_until="2026-10-01T12:01:00Z",status="ok"),
+      chunks=list(jsonlite::base64_enc(compressed)))
+    fm_worker_restore(saved,app_auth[["userid"]])$data
+  }
+  session$setInputs(refresh_all=2);app_settle(session)
+  saved_team <- restore_saved(list(budget=1000,withheld=300,teamValue=10000,
+    configuration=list(mnmp=.5),maxBid=5500),"get_user_team_info")
+  market_fixture <- app_market[1,,drop=FALSE];market_fixture$bid_id <- "own";market_fixture$bid_price <- 200
+  saved_market <- restore_saved(market_fixture,"get_market_players")
+  pending[[team_key]]$resolve(saved_team);pending[[market_key]]$resolve(saved_market);app_settle(session)
+  check("expired database snapshots render financial figures as cached with original source time", {
+    html <- output$round_countdown$html
+    stopifnot(grepl("Balance: 1.000 EUR (cached)",html,fixed=TRUE),
+      grepl("Active offers: 200 EUR (cached) (1)",html,fixed=TRUE),
+      grepl("After offers: 700 EUR (cached)",html,fixed=TRUE),
+      grepl("Can spend: 5.500 EUR (cached)",html,fixed=TRUE),
+      !grepl("Unavailable",html,fixed=TRUE),!grepl("round-countdown-solvent",html,fixed=TRUE),
+      identical(as.numeric(primary_team_state()$observed_at),as.numeric(fm_time("2026-10-01T12:00:00Z"))))
+  })
   # Superseding a context must discard known old balance before new data arrives.
   .GlobalEnv$app_champ <- list(id="different-league",name="Other League",userteam=list(id="different-team",name="Other Team"))
   invalidate_resources(resource_context(app_auth),pattern="active_championship")
-  session$setInputs(tabs="login",refresh_all=2);app_settle(session)
+  session$setInputs(tabs="login",refresh_all=3);app_settle(session)
   check("Welcome updates league context without displaying the banner", {
     session$setInputs(selected_league="different-league");app_settle(session)
     stopifnot(identical(championship_id_RV(),"different-league"),is.null(output$round_countdown))

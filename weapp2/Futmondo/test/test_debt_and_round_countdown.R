@@ -93,7 +93,7 @@ check("banner uses greater reservation once and retains exact confirmed boundari
   stopifnot(zero$class=="round-countdown-warning",grepl("1 EUR before kickoff",zero$message,fixed=TRUE),
     debt$class=="round-countdown-warning",grepl("active offers still need verification",debt$message,fixed=TRUE))
 })
-check("missing withheld and malformed or stale market never imply zero reservation", {
+check("missing withheld and malformed market never imply zero reservation", {
   no_withheld <- round_finance_display(resource_state(list(budget=1000,teamValue=10000)),resource_state(data.frame()))
   malformed <- round_finance_display(resource_state(list(budget=1000,withheld=0)),resource_state(data.frame(id="listing")))
   invalid <- round_finance_display(resource_state(list(budget=1000,withheld=0)),resource_state(data.frame(bid_id="own",bid_price=NA_real_)))
@@ -102,7 +102,27 @@ check("missing withheld and malformed or stale market never imply zero reservati
   stopifnot(is.na(no_withheld$projected_committed_balance),no_withheld$class=="round-countdown-unavailable",
     is.na(malformed$commitments),is.na(invalid$commitments),stale$cash_stale,
     stale$class=="round-countdown-unavailable",stale_debt$class=="round-countdown-unavailable",
-    is.na(stale$projected_committed_balance),grepl("Cached",stale$message))
+    stale$projected_committed_balance==1000,stale$calculations_stale,grepl("Cached",stale$message))
+})
+check("cached complete observations retain known amounts without verifying solvency", {
+  team <- resource_state(observed_data(list(budget=1000,withheld=300,teamValue=10000,
+    configuration=list(mnmp=.5),maxBid=5500),status="stale"))
+  market <- resource_state(observed_data(data.frame(bid_id=c("own","own"),bid_price=c(200,200)),status="stale"))
+  x <- round_finance_display(team,market)
+  stopifnot(x$cash==1000,x$commitments==200,x$active_offer_count==1L,
+    x$projected_committed_balance==700,x$spendable_budget==5500,
+    x$cash_stale,x$offers_stale,x$calculations_stale,x$class=="round-countdown-unavailable")
+  empty <- round_finance_display(team,resource_state(observed_data(data.frame(),status="stale")))
+  stopifnot(empty$commitments==0,empty$offers_stale,empty$projected_committed_balance==700)
+  partial <- round_finance_display(team,resource_state(observed_data(data.frame(),status="partial")))
+  stopifnot(is.na(partial$commitments),is.na(partial$spendable_budget))
+  incomplete <- market;attr(incomplete$data,"worker_completeness") <- "partial"
+  stopifnot(is.na(round_finance_display(team,incomplete)$commitments))
+  pending <- market;pending$status <- "loading"
+  stopifnot(round_finance_display(team,pending)$commitments==200)
+  fresh_debt <- resource_state(list(budget=100,withheld=0,teamValue=1000,configuration=list(mnmp=.5)))
+  old_offers <- resource_state(observed_data(data.frame(bid_id="old",bid_price=200),status="stale"))
+  stopifnot(round_finance_display(fresh_debt,old_offers)$class=="round-countdown-unavailable")
 })
 check("real market loader marks valid absent-own-bid fields and reuses the result", {
   saved_post <- futmondo_post; reads <- 0L
@@ -140,7 +160,9 @@ check("countdown clock does not periodically reload primary finances", {
   stopifnot(countdown_start>0,
     !grepl("round_finance_version <- reactive",server,fixed=TRUE),
     !grepl("invalidateLater(60000, session)",server,fixed=TRUE),
-    grepl("invalidateLater(1000, session)",substr(server,countdown_start,nchar(server)),fixed=TRUE))
+    !grepl("invalidateLater(1000, session)",substr(server,countdown_start,nchar(server)),fixed=TRUE),
+    grepl("fm-browser-countdown",server,fixed=TRUE),
+    grepl("fm-browser-countdown",paste(readLines("www/worker-state.js",warn=FALSE),collapse="\n"),fixed=TRUE))
 })
 
 cat(sprintf("DEBT AND ROUND COUNTDOWN: %d passed / 0 failed\n",passed))

@@ -144,11 +144,11 @@ function(input, output, session) {
     active_offer_count <- finance$active_offer_count
     final_balance <- finance$projected_committed_balance
     spendable <- finance$spendable_budget
-    money_text <- function(x, loading=FALSE) if (is.finite(x)) paste0(format(round(x), big.mark=".", decimal.mark=",", scientific=FALSE), " EUR") else if (loading) "Loading…" else "Unavailable"
+    money_text <- function(x, loading=FALSE, cached=FALSE) if (is.finite(x)) paste0(format(round(x), big.mark=".", decimal.mark=",", scientific=FALSE), " EUR", if (cached) " (cached)" else "") else if (loading) "Loading…" else "Unavailable"
     cash_text <- paste0(money_text(cash,finance$cash_loading),if (finance$cash_stale) " (cached)" else if (finance$cash_unverified) " (unverified)" else "")
     offers_text <- if (is.finite(commitments)) {
       suffix <- if (is.finite(active_offer_count)) paste0(" (", as.integer(active_offer_count), ")") else ""
-      paste0(money_text(commitments), suffix)
+      paste0(money_text(commitments, cached=finance$offers_stale), suffix)
     } else if (finance$offers_loading) "Loading…" else "Unavailable"
     solvency_class <- finance$class
     solvency_text <- finance$message
@@ -157,8 +157,8 @@ function(input, output, session) {
       tags$div(class = "round-countdown-finance",
         tags$span(class = "round-countdown-finance-item", paste0("Balance: ", cash_text)),
         tags$span(class = "round-countdown-finance-item", paste0("Active offers: ", offers_text)),
-        tags$span(class = "round-countdown-finance-item", paste0("After offers: ", money_text(final_balance,finance$cash_loading || finance$offers_loading))),
-        tags$span(class = "round-countdown-finance-item", paste0("Can spend: ", money_text(spendable,finance$cash_loading || finance$offers_loading))),
+        tags$span(class = "round-countdown-finance-item", paste0("After offers: ", money_text(final_balance,finance$cash_loading || finance$offers_loading,finance$calculations_stale))),
+        tags$span(class = "round-countdown-finance-item", paste0("Can spend: ", money_text(spendable,finance$cash_loading || finance$offers_loading,finance$calculations_stale))),
         if (!is.null(solvency_text)) tags$span(class = "round-countdown-solvency", solvency_text)))
   })
   user_teams_RV <- reactive({

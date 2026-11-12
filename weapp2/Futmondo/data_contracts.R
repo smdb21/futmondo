@@ -65,15 +65,23 @@ round_finance_display <- function(team_state, market_state) {
   fresh <- function(state) is.list(state) && isTRUE(state$status %in% c("ok", "empty")) &&
     !identical(state$freshness, "stale") && !identical(attr(state$data, "fetch_status"), "stale")
   loading <- function(state) is.list(state) && identical(state$status, "loading")
+  stale_state <- function(state) identical(state$freshness, "stale") || identical(state$status, "stale") ||
+    identical(attr(state$data, "fetch_status"), "stale")
+  # Expiry changes freshness, not the factual contents of a successful snapshot.
+  # Partial/failed acquisitions are never evidence of a complete offer total.
+  usable <- function(state) !is.null(state$data) &&
+    isTRUE(state$status %in% c("ok", "empty", "stale", "loading")) &&
+    isTRUE((attr(state$data, "fetch_status") %||% "ok") %in% c("ok", "empty", "stale")) &&
+    !isTRUE(attr(state$data, "worker_completeness") %in% c("partial", "unavailable"))
   team <- team_state$data
   cash <- fm_number(team$budget)
   withheld <- fm_number(team$withheld)
   team_value <- fm_number(team$teamValue %||% team$team_value)
   market <- market_state$data
   commitments <- NA_real_; offer_count <- NA_integer_
-  # A successful empty market proves zero outgoing offers. Missing/failed/stale
-  # responses do not. bid_id identifies own outgoing bids in the market contract.
-  if (fresh(market_state) && is.data.frame(market) && (!nrow(market) || "bid_id" %in% names(market))) {
+  # A successful empty market records zero outgoing offers at its source time.
+  # Missing/failed responses do not. bid_id identifies own outgoing bids.
+  if (usable(market_state) && is.data.frame(market) && (!nrow(market) || "bid_id" %in% names(market))) {
     own <- if ("bid_id" %in% names(market)) which(!is.na(market$bid_id) & nzchar(as.character(market$bid_id))) else integer()
     bids <- market[own, , drop=FALSE]
     if (nrow(bids)) bids <- bids[!duplicated(bids$bid_id), , drop=FALSE]
@@ -83,7 +91,7 @@ round_finance_display <- function(team_state, market_state) {
     }
   }
   projected_committed_balance <- spendable <- NA_real_
-  if (fresh(team_state) && is.finite(cash) && is.finite(withheld) && withheld >= 0 && is.finite(commitments)) {
+  if (usable(team_state) && is.finite(cash) && is.finite(withheld) && withheld >= 0 && is.finite(commitments)) {
     projected_committed_balance <- cash - max(withheld, commitments)
     spendable <- acquisition_headroom(cash, team_value, withheld, commitments,
       debt_fraction=fm_number(team$configuration$mnmp))$spendable_budget
@@ -91,17 +99,16 @@ round_finance_display <- function(team_state, market_state) {
     if(is.finite(spendable)&&is.finite(api_limit))spendable<-min(spendable,max(0,api_limit))
   }
   confirmed_problem <- fresh(team_state) &&
-    ((is.finite(cash) && cash <= 0) || (is.finite(projected_committed_balance) && projected_committed_balance <= 0))
+    ((is.finite(cash) && cash <= 0) || (fresh(market_state) && is.finite(projected_committed_balance) && projected_committed_balance <= 0))
   class <- if (confirmed_problem) "round-countdown-warning" else
-    if (is.finite(projected_committed_balance) && projected_committed_balance > 0) "round-countdown-solvent" else "round-countdown-unavailable"
-  team_stale <- identical(team_state$freshness, "stale") || identical(team_state$status, "stale") ||
-    identical(attr(team_state$data, "fetch_status"), "stale")
-  stale <- team_stale || identical(market_state$freshness, "stale") || identical(market_state$status, "stale") ||
-    identical(attr(market_state$data, "fetch_status"), "stale")
+    if (fresh(team_state) && fresh(market_state) && is.finite(projected_committed_balance) && projected_committed_balance > 0) "round-countdown-solvent" else "round-countdown-unavailable"
+  team_stale <- stale_state(team_state)
+  market_stale <- stale_state(market_state)
+  stale <- team_stale || market_stale
   message <- if (confirmed_problem) {
-    balance <- if (is.finite(projected_committed_balance)) projected_committed_balance else cash
+    balance <- if (fresh(market_state) && is.finite(projected_committed_balance)) projected_committed_balance else cash
     paste0("Restore at least ", format(round(abs(balance) + 1), big.mark=".", decimal.mark=",", scientific=FALSE),
-      " EUR before kickoff to score points", if (!is.finite(projected_committed_balance)) "; active offers still need verification" else "")
+      " EUR before kickoff to score points", if (!fresh(market_state) || !is.finite(projected_committed_balance)) "; active offers still need verification" else "")
   } else if (loading(team_state)) "Loading balance…" else if (loading(market_state)) "Loading active offers…" else
     if (stale) "Cached financial data — refresh to verify before kickoff" else
     if (!is.null(team_state$error) || !is.null(market_state$error)) "Financial data could not load — refresh to retry" else
@@ -112,6 +119,8 @@ round_finance_display <- function(team_state, market_state) {
   list(cash=cash, cash_loading=loading(team_state), cash_stale=team_stale && is.finite(cash),
     cash_unverified=!fresh(team_state) && !team_stale && is.finite(cash),
     commitments=commitments, active_offer_count=offer_count, offers_loading=loading(market_state),
+    offers_stale=market_stale && is.finite(commitments),
+    calculations_stale=stale && is.finite(projected_committed_balance),
     projected_committed_balance=projected_committed_balance, spendable_budget=spendable,
     class=class, message=message)
 }
