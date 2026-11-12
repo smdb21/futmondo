@@ -119,6 +119,39 @@ fm_worker_run<-function(descriptor){
   if(is.function(f)&&identical(environment(f),.GlobalEnv)){environment(f)<-env;assign(nm,f,env)}
  }
  env$.futmondo_request_context<-ctx
+ # Bind default identity to this verified job without inventing observed
+ # metadata, borrowing another league, or changing explicit archive arguments.
+ original_context<-env$resource_context
+ context_wrapper<-function(){
+  args<-lapply(as.list(match.call())[-1L],eval,envir=parent.frame())
+  value<-do.call(original_context,args)
+  if(identical(value$account_id,ctx$account_id)&&identical(value$championship_id,ctx$championship_id)&&nzchar(value$championship_id)){
+   if(!'season'%in%names(args)&&!fm_context_known(value$season))value$season<-ctx$season
+   if(!'scoring_version'%in%names(args)&&!fm_context_known(value$scoring_version))value$scoring_version<-ctx$scoring_version
+   if(is.null(args$competition_id)&&!fm_context_known(value$competition_id))value$competition_id<-ctx$competition_id
+  }
+  value
+ }
+ formals(context_wrapper)<-formals(original_context);env$resource_context<-context_wrapper
+ same_scope<-function(championship_id,account_id=NULL)identical(env$fm_context_account(account_id),ctx$account_id)&&
+   nzchar(fm_scalar(ctx$championship_id,''))&&identical(fm_scalar(championship_id,''),ctx$championship_id)
+ original_competition<-env$league_competition_context
+ env$league_competition_context<-function(championship_id,account_id=NULL){
+  value<-original_competition(championship_id,account_id)
+  if(!fm_context_known(value)&&same_scope(championship_id,account_id))ctx$competition_id else value
+ }
+ original_season<-env$league_season_context
+ season_wrapper<-function(){
+  args<-lapply(as.list(match.call())[-1L],eval,envir=parent.frame())
+  value<-do.call(original_season,args)
+  if(same_scope(args$championship_id,args$account_id)){
+   if(fm_context_known(value)&&fm_context_known(ctx$season)&&!identical(value,ctx$season))stop('Conflicting authoritative season metadata')
+   if(!fm_context_known(value))value<-ctx$season
+  }
+  value
+ }
+ formals(season_wrapper)<-formals(original_season);env$league_season_context<-season_wrapper
+
  produced<-list();produced_bytes<-0;source_clock<-NULL
  env$Sys.time<-function()source_clock %||% Sys.time()
  env$get_sb_url<-function()'https://worker-database.invalid'
@@ -140,7 +173,11 @@ fm_worker_run<-function(descriptor){
  }
  env$supabase_get<-function(table_name,query_params=list()){
   result<-fm_pipe_exchange(list(type='database',table=table_name,query=query_params))
-  jsonlite::fromJSON(as.character(jsonlite::toJSON(result$rows,auto_unbox=TRUE,null='null',na='null',digits=NA)))
+  if(!'rows'%in%names(result)||!is.list(result$rows)||!is.null(names(result$rows)))stop('Invalid database bridge response')
+  if(!length(result$rows))return(data.frame())
+  rows<-jsonlite::fromJSON(as.character(jsonlite::toJSON(result$rows,auto_unbox=TRUE,null='null',na='null',digits=NA)))
+  if(!is.data.frame(rows))stop('Invalid database bridge rows')
+  rows
  }
  env$supabase_post_direct<-function(table_name,payload,conflict=NULL,ignore_duplicates=FALSE){
   if(is.data.frame(payload)&&!nrow(payload)||is.list(payload)&&!length(payload))return(TRUE)
@@ -175,9 +212,14 @@ fm_worker_run<-function(descriptor){
      if(!is.null(existing))return(fm_worker_decode(existing$value))
      saved<-fm_pipe_exchange(list(type='resource',descriptor=child))
      if(!is.null(saved$value)){
-      stamp<-fm_time(saved$observed_at)
-      if(length(stamp)==1L&&!is.na(stamp))source_clock<<-if(is.null(source_clock))stamp else min(source_clock,stamp)
-      return(fm_worker_decode(saved$value))
+      restored<-fm_worker_decode(saved$value)
+      valid_scope<-name!='get_mvp_saved_catalog'||!fm_context_known(childctx$season)||
+        identical(fm_scalar(restored$season,'unknown'),childctx$season)
+      if(valid_scope){
+       stamp<-fm_time(saved$observed_at)
+       if(length(stamp)==1L&&!is.na(stamp))source_clock<<-if(is.null(source_clock))stamp else min(source_clock,stamp)
+       return(restored)
+      }
      }
     }
     value<-do.call(original,params)
