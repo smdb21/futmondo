@@ -1,0 +1,41 @@
+const fs=require('fs');const assert=require('assert/strict');
+const {PGlite}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo-review-tools/node_modules')+'/@electric-sql/pglite');
+(async()=>{const db=new PGlite();try{
+ await db.exec('create role anon;create role authenticated;create role service_role bypassrls;');
+ await db.exec(fs.readFileSync('scripts/schema.sql','utf8'));
+ const migration=fs.readFileSync('scripts/migrations/20261113060230_worker_core_prefetch.sql','utf8');await db.exec(migration);await db.exec(migration);
+ const q=async(sql,args=[]) => (await db.query(sql,args)).rows;
+ const rpc=async(name,args)=>(await q(`select worker_${name}(${args.map((_,i)=>'$'+(i+1)).join(',')}) result`,args))[0].result;
+ const now='2026-11-13T00:00:20Z';
+ const due=async(handler,interval,valid,started)=>Date.parse((await q('select worker_next_refresh_due($1,$2,$3,$4,$5) due',[handler,interval,valid,started,now]))[0].due);
+ assert.equal(await due('get_championship_pressroom',60,'2026-11-13T00:01:00Z','2026-11-13T00:00:00Z'),Date.parse('2026-11-13T00:00:35Z'));
+ // A second 20-second request completes at :55, before the prior :60 expiry.
+ assert.ok(Date.parse('2026-11-13T00:00:35Z')+20000 < Date.parse('2026-11-13T00:01:00Z'));
+ assert.equal(await due('get_players_from_team',60,'2026-11-13T00:00:19Z','2026-11-13T00:00:00Z'),Date.parse(now)+15000);
+ assert.equal(await due('fm_worker_finances',60,'2026-11-13T00:01:00Z','2026-11-13T00:00:00Z'),Date.parse(now)+60000);
+ console.log('PASS delayed core acquisition is due before source expiry; expired work has bounded retry and finance cadence is unchanged');
+ await db.exec('set role service_role');await rpc('elect',['leader']);const a=await rpc('authorize',['u',true,'synthetic','UTC',0,0,[],'fixture']);
+ const d={version:1,handler:'get_championship_pressroom',resource_key:'a'.repeat(64),args:{championship_id:'l'},context:{account_id:'u',championship_id:'l'}};
+ await rpc('enqueue',['u',d,60,0]);let job=await rpc('claim',['leader:one',true]);assert.ok(job);
+ await q("update worker_jobs set started_at=now()-interval '20 seconds',requested_at=now()-interval '30 seconds'");
+ const t=(await q("select now() as now,now()-interval '20 seconds' as source,now()+interval '40 seconds' as expires"))[0];
+ const manifest={version:'11111111-1111-4111-8111-111111111111',context:d.context,parts:1,json_bytes:1,sha256:'b'.repeat(64),observed_at:t.source,checked_at:t.source,valid_until:t.expires,status:'ok',completeness:'complete'};
+ await q('insert into worker_chunks(account_id,resource_key,version,part,data) values($1,$2,$3,0,$4)',['u',d.resource_key,manifest.version,'fixture']);
+ assert.equal(await rpc('publish',['u',d.resource_key,'leader:one',job.generation,manifest]),true);
+ const saved=(await q('select checked_at,valid_until from worker_snapshots'))[0];assert.equal(Date.parse(saved.checked_at),Date.parse(t.source));assert.equal(Date.parse(saved.valid_until),Date.parse(t.expires));
+ const queued=(await q('select due_at from worker_jobs'))[0];assert.ok(Date.parse(queued.due_at)<Date.parse(t.expires));
+ console.log('PASS actual publication advances only scheduling, preserving original source check and validity timestamps');
+ await q("update worker_jobs set due_at=now()-interval '1 second',checked_at=now(),priority=4");
+ assert.ok(await rpc('claim',['leader:early',true]));
+ await q('update worker_jobs set owner=null,lease_until=null');
+ await q("update worker_accounts set quiet_start=extract(hour from now() at time zone 'UTC')::integer,quiet_end=(extract(hour from now() at time zone 'UTC')::integer+1)%24");
+ assert.equal(await rpc('claim',['leader:quiet',true]),null);
+ await rpc('enqueue',['u',d,60,10]);assert.ok(await rpc('claim',['leader:manual',true]));
+ console.log('PASS early due work is claimable outside quiet hours; quiet-hour budget and explicit Refresh overrides remain');
+ // Refresh during that run still forces stale output and leaves immediate demand.
+ await q("update worker_jobs set started_at=now()-interval '5 seconds',requested_at=now()-interval '1 second'");
+ assert.equal(await rpc('publish',['u',d.resource_key,'leader:manual',a.generation,manifest]),true);
+ const pending=(await q('select priority,due_at<=now() due from worker_jobs'))[0];assert.equal(pending.priority,10);assert.equal(pending.due,true);
+ assert.equal((await q('select valid_until<now() stale from worker_snapshots'))[0].stale,true);
+ console.log('PASS genuine manual refresh during acquisition remains queued and cannot publish fresh success');
+}finally{await db.close()}})().catch(e=>{console.error(e);process.exitCode=1});

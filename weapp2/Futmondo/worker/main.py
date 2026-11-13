@@ -533,10 +533,13 @@ class Worker:
             await self.store.request('POST', 'worker_chunks', json=dict(account_id=job['account_id'], resource_key=resource_key,
                 version=version, part=i, data=part), headers={'Prefer': 'resolution=ignore-duplicates'})
         checked = result.get('checked_at', stamp())
-        observed = result.get('observed_at', checked)
-        if self.source_stamps.get(owner):
-            checked = min(self.source_stamps[owner], key=lambda x: datetime.fromisoformat(x.replace('Z', '+00:00')))
-            observed = min((observed, checked), key=lambda x: datetime.fromisoformat(x.replace('Z', '+00:00')))
+        observed = result.get('observed_at')
+        if observed is None:
+            observed = min(self.source_stamps.get(owner, [checked]),
+                key=lambda x: datetime.fromisoformat(x.replace('Z', '+00:00')))
+        # The R result carries this resource's source time. Unrelated older
+        # children in the same composite must not backdate a fresh sibling.
+        checked = min((observed, checked), key=lambda x: datetime.fromisoformat(x.replace('Z', '+00:00')))
         # Refresh cadence and manual-action validity are separate; a snapshot never authorizes a trade.
         manifest = dict(context=descriptor['context'], version=version, parts=len(parts), json_bytes=size, sha256=digest,
             checked_at=checked, observed_at=observed, valid_until=stamp(datetime.fromisoformat(checked.replace('Z', '+00:00')).timestamp() + (60 if child else job['interval_seconds'])),

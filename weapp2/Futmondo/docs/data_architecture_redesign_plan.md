@@ -1201,3 +1201,17 @@ regression groups pass, including no-browser core claims and bulk exclusion.
 Production immediately resumed ordinary roster acquisition in the protected
 lane. Sustained source freshness remains under observation, not certified by
 one newly started job. See `worker_freshness_recovery.md`.
+
+### Close completion-versus-source scheduling gaps — 2026-11-13
+
+Production warm pressroom runs improved to 12.52/22.59 seconds after durable
+acknowledgement reuse, but snapshots still had gaps: next due was completion+60
+while validity was source+60. Added bounded duration-aware prefetch for successful
+short core resources and removed the redundant completion+interval claim gate
+outside quiet hours. Source timestamps/validity remain unchanged; quiet hours,
+manual refresh races and failure/partial cadence retain their existing guards.
+Also isolated publication source time per resource, preserving earliest actual
+source/checkpoint fallback for composites instead of allowing an unrelated old
+child to backdate a fresh sibling. The forward migration is applied; local SQL,
+Python, finance and lifecycle results are in `data_review_results.md`. Sustained
+live freshness remains an acceptance check until repeated cycles are observed.

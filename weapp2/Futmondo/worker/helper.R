@@ -330,7 +330,7 @@ fm_worker_run<-function(descriptor){
      bytes<-as.numeric(object.size(wire))
      if(!is.null(value)&&produced_bytes+bytes<=8*1024^2){
       produced[[child$resource_key]]<<-list(descriptor=child,value=wire,
-       observed_at=rival_finance_stamp(attr(value,'observed_at') %||% Sys.time()),checked_at=rival_finance_stamp(),
+       observed_at=rival_finance_stamp(attr(value,'observed_at') %||% source_clock %||% Sys.time()),checked_at=rival_finance_stamp(),
        status=if(is.list(value)&&!is.data.frame(value)&&!is.null(value$status)&&value$status%in%c('partial','unavailable','unsupported'))'partial'else if(acquisition_data_unverified(value)||!is.null(attr(value,'fetch_error')))'partial'else'ok',
        completeness=if(isTRUE(attr(value,'complete')))'complete'else'unknown')
       produced_bytes<<-produced_bytes+bytes
@@ -388,7 +388,7 @@ fm_worker_run<-function(descriptor){
  failure<-attr(value,'fetch_error')
  if(inherits(failure,'condition'))stop(failure)
  if(identical(attr(value,'fetch_status'),'unavailable')||!is.null(failure))stop('Incomplete source acquisition')
- observed<-attr(value,'observed_at') %||% Sys.time()
+ observed<-attr(value,'observed_at') %||% source_clock %||% Sys.time()
  status<-if(is.list(value)&&!is.data.frame(value))value$status %||% 'ok'else attr(value,'fetch_status') %||% 'ok'
  if(!status%in%c('ok','empty','partial','unsupported'))status<-'partial'
  completeness<-if(isTRUE(attr(value,'complete')))'complete'else if(is.list(value)&&identical(value$completeness,'complete'))'complete'else'unknown'

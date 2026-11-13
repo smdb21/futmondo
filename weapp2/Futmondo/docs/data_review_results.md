@@ -2090,3 +2090,40 @@ Post-deploy check for commit 68d1493: worker heartbeat is live, but the own-rost
   service due core observations, reducing waiting at the cost of using its
   already-configured capacity. Long/bulk jobs remain in the routine lane;
   source/DB pressure stays within the existing shared account/connection limits.
+
+### Prefetch timing and per-resource source publication — 2026-11-13
+
+- At 05:59:55 UTC the warm pressroom jobs completed in 12.52 and 22.59 seconds
+  (versus earlier 44.76/49.75 cold runs), but completion+interval scheduling still
+  left expired source snapshots between cycles. Source publication also used
+  the oldest source anywhere in a composite, even for an independently fresh
+  child. Fixed timing and attribution without extending or inventing a source
+  timestamp/deadline.
+- `node test/test_worker_core_prefetch.cjs`: 4 groups passed. Independent known-
+  answer delayed acquisitions complete before the prior expiry; expired output
+  has bounded retry, finance timing stays unchanged, actual publication preserves
+  source timestamps, early claims obey due time outside quiet hours, quiet-hour
+  budgets remain, and a genuine manual refresh during a run still publishes
+  stale output with immediate follow-up demand. Repeated migration is safe.
+- Python worker suite: 29 tests passed. Added unrelated-old-source/fresh-child
+  publication known answer and rich nested-bid restart acknowledgement coverage;
+  original checkpoint observation time remains unchanged. Actual finance/award/
+  progress fixture and expiry-versus-manual demand checks also passed.
+- Performance review: lead time is last core-job duration+5 seconds, capped at
+  half a 15–300-second interval, with a five-second scheduling floor. Expired
+  output gets a bounded 7–15-second retry. Successful short core acquisition may
+  approach twice its prior interval frequency; existing process/source RPS and
+  connection caps remain. No extra source queries are introduced per cycle.
+  Historical points and long finance/partial failures are excluded from this
+  prefetch policy. Quiet-hour and explicit-demand behavior are preserved. The
+  increase is offset by source-aligned points cadence and durable unchanged-fact
+  reuse; hosted load and continuous UI freshness still require measurement.
+- Production migration applied after one tool confirmation expired without any
+  database change; the exact tested retry succeeded. The underlying external
+  rejection reasons remain unverified; optional finance read isolation does not
+  claim those API requests now succeed. No broad private snapshot export was used.
+
+- Final offline lifecycle after source-time isolation: 13 checks plus eight tabs
+  passed. Production recorded the prefetch migration as
+  `20261113061754_worker_core_prefetch`; a preliminary expired confirmation made
+  no change before the successful retry. Source-data validity was not extended.

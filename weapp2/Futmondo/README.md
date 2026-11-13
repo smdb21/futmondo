@@ -171,3 +171,8 @@ The follow-up `scripts/migrations/20261113055439_worker_core_read_lane.sql`
 keeps due short core reads eligible for the reserved lane without a live browser,
 while long finance/bulk work remains excluded. Applied in production as
 `20261113055513_worker_core_read_lane`; no new collection scope or runtime setting.
+
+Also apply `scripts/migrations/20261113060230_worker_core_prefetch.sql` before the
+source-timestamp/prefetch image. It schedules short core reads before their true
+expiry while preserving quiet hours, manual refresh and source deadlines; no
+new package or environment setting is required.

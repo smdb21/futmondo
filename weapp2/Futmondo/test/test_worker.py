@@ -202,7 +202,8 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
     async def test_expired_history_snapshot_reuses_only_acknowledged_fact_hashes(self):
         paths = []
         news = dict(_id='tx-one', created='2026-11-01T12:00:00Z', price=120,
-            _player=dict(_id='p', name='Fixture player'), _buyer=dict(_id='t', name='Team'))
+            _player=dict(_id='p', name='Fixture player'), _buyer=dict(_id='t', name='Team'),
+            bids=[dict(_id='bid-one', u=dict(_id='t', name='Team'), bid=110)])
         def transport(request):
             paths.append(request.url.path)
             query = json.loads(request.content).get('query', {})
@@ -246,6 +247,19 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
             else:
                 with self.assertRaisesRegex(WorkerFailure, code):
                     await helper.run(descriptor('fm_worker_finances'), AsyncMock(side_effect=WorkerFailure(code)))
+
+    async def test_unrelated_old_source_cannot_backdate_new_child_snapshot(self):
+        d = descriptor('fm_worker_finances')
+        job = dict(self.job, descriptor=d, resource_key=d['resource_key'])
+        self.worker.source_stamps['owner'] = ['2001-01-01T00:00:00Z', '2026-11-13T00:00:00Z']
+        result = dict(value={'kind':'double','values':[1]}, observed_at='2026-11-13T00:00:00Z',
+            checked_at='2026-11-13T00:00:05Z')
+        await self.worker.publish(job, 'owner', result, child=descriptor())
+        manifest = self.store.snapshots[descriptor()['resource_key']]
+        self.assertEqual(manifest['checked_at'], result['observed_at'])
+        self.assertEqual(manifest['observed_at'], result['observed_at'])
+        self.assertEqual(datetime.fromisoformat(manifest['valid_until']).timestamp(),
+            datetime.fromisoformat(result['observed_at'].replace('Z','+00:00')).timestamp()+60)
 
     async def test_optional_finance_failure_cannot_poison_unrelated_successful_child(self):
         d = descriptor('fm_worker_finances')

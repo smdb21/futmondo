@@ -106,3 +106,36 @@ unavailable states are deliberately preserved. The source pipeline must still
 retrieve and acknowledge current inputs; a transient outage can therefore show
 stale data. Two successful snapshots seen once do not establish sustained mobile
 acceptance, so deployed repeated-cycle verification remains necessary.
+
+## Core prefetch and source timestamp isolation
+
+The further `scripts/migrations/20261113060230_worker_core_prefetch.sql` repairs
+completion-based scheduling: a snapshot's source validity starts at acquisition,
+while old queue timing added the entire interval after processing completed.
+A 20-second acquisition therefore had an unavoidable stale gap even with an
+empty queue. `worker_next_refresh_due(handler, interval, valid_until, started,
+now)` schedules successful short core resources before their real deadline,
+using the last duration plus five seconds, capped at half their interval. It
+never changes the source check or validity. Next work is at least five seconds
+away; already-expired output receives a bounded 7–15-second retry. Non-core and
+partial/failing job cadence/backoff remain. Quiet hours still impose their
+hourly floor, and explicit Refresh during a run still invalidates its output
+and stays immediately queued. Early due claims outside quiet hours now obey
+`due_at` without the old second completion-plus-interval gate.
+
+Python publication now uses the result's own observed timestamp, bounded by its
+check timestamp. Another older child in the same composite cannot backdate a
+fresh roster sibling. Helper results without an explicit observation retain
+the earliest actual source/checkpoint time; they do not become fresh merely
+because parsing completed. Legacy results lacking observation metadata retain
+the previous conservative source-stamp fallback.
+
+The change can increase short core acquisition frequency, at most approximately
+two cycles per configured source interval, using the existing two lanes and
+account/connection/RPS bounds. That is an explicit freshness/performance tradeoff,
+offset by five-minute points demand and avoiding unchanged history writes. It
+does not guarantee freshness through a slow/outage cycle longer than the budget;
+such data remains truthfully stale. Production rollout checks must examine
+multiple cycles rather than one successful pair.
+
+Production recorded the prefetch migration as `20261113061754_worker_core_prefetch`.
