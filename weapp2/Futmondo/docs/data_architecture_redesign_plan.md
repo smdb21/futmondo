@@ -1125,3 +1125,18 @@ The round-ranking getter can now reuse a fresh fully scoped official fixture cal
 - Reproduced the screenshot's zero-of-527 stall and two unknown initial-source errors with the baseline controller and successful expired typed worker snapshots. Reuse factual history without renewing source age; preserve genuine failures, sparse/unknown scores and strict season/scoring isolation.
 - Retain bounded active worker interests after initial promise settlement and consume affected resource versions automatically. Skip identical metadata so repeated scoring publications do not reread the full matrix. Use the existing two-slot acquisition and acknowledged durable score/check persistence.
 - Local exit checks: 527-player stored replay, failed-waiter recovery, source timestamp preservation, partial-coverage payloads, acknowledgement failures, idle request counts, context guards, existing recovery/async/missing-score/competition tests and offline Shiny lifecycle. See `docs/round_points_matrix.md` and `docs/data_review_results.md`. Production deployment and the user's live 527-player coverage remain separate acceptance checks.
+
+### Nested listing bids blocked roster freshness — 2026-11-13
+
+Implemented locally and verified against explicitly authorized failing worker
+checkpoints: nested own-listing bids expanded into extra data-frame columns;
+positional renaming corrupted player identity/price/score fields and caused
+`resource_parse_unknown_roster` on the roster/listings join. Preserve one player
+row, retain nested facts as list columns, and protect opaque identities from
+numeric conversion. All 20 roster/15 listing rows now match source fields in
+offline replay. Synthetic actual-worker publication/restart reuse, clause
+reconciliation and offline lifecycle pass. No source payload is committed.
+See `player_data_availability.md` and `data_review_results.md` for contracts,
+performance and checks. Production image rollout and a successful fresh stored
+roster/transaction version in the affected browser remain acceptance checks;
+separate `source_rejected` failures are not declared fixed by this parser repair.

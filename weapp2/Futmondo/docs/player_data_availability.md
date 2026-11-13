@@ -129,3 +129,36 @@ perform no additional fetching or parsing. The short UI text uses existing
 validation containers; no new browser/mobile layout check was run. Central integration checks and transport
 heartbeat measurements are recorded separately by the primary review. No live
 accounts, transactions, or hosted network timings were exercised here.
+
+## Nested market bid mapping repair (2026-11-13)
+
+`parse_player_json(player)` returns exactly one row per source player. Scalar
+fields retain their names/types; residual nested objects and arrays (including
+own-listing `bids`) occupy one list-column cell instead of expanding into
+additional columns. Existing `average.*`, `clause_*` and `bid_*` scalar
+normalizations remain. `normalize_player_fields()` retains player/club IDs as
+text, and roster/catalog numeric conversion excludes identity columns and
+catalog list columns. Numeric-looking and leading-zero IDs remain opaque.
+
+The authorized failing worker checkpoints reproduced a positional mapping bug:
+`data.frame(value=player)` expanded nested bid fields, then assigning
+`names(player)` by position shifted identities, names, prices and scores.
+The roster join failed because the mislabeled listing ID held an integer.
+The corrected parser recovers all 20 roster and 15 own-listing rows offline,
+with IDs/names/prices/points checked against the source. Private response files
+are kept outside the repository and never used as committed fixtures.
+
+Successful results continue through existing acknowledged worker snapshot
+publication and factual persistence. Typed list columns survive compression,
+DB transport and restart reuse without a new source call or renewed source
+clock. Failed acquisition/persistence remains unavailable/retryable. No schema,
+dependency, polling, queue or manual transaction contract changes.
+
+Synthetic checks: `test/test_player_nested_fields.R` covers nested bid counts,
+field order, unknown/zero/negative values, opaque IDs, exact listing joins,
+warm reuse and typed durable hydration. The new `test/test_worker.py` scenario
+runs the real R helper through Python checkpointing, acknowledged snapshot
+publication and a new helper/process using the saved checkpoints (four initial
+source reads, zero additional restart reads). Existing availability, rating,
+request-contract, clause-transfer, manual listing, capture and offline app
+lifecycle checks are recorded in `data_review_results.md`.

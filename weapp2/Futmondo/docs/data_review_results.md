@@ -1907,3 +1907,36 @@ Post-deploy check for commit 68d1493: worker heartbeat is live, but the own-rost
 - `Rscript test/test_recent_points_missing_score.R`: all 3 groups passed, including real mocked HTTP normalization and ordered observation-before-marker persistence for 0/-2/unknown. `Rscript test/test_competition_history.R`: 15 checks passed. `Rscript test/test_shiny_simulation.R`: 13 checks plus 8 tabs passed, without HTTP or live database mutation attempts.
 - Performance review: replay observes at most 128 retained resource interests per controller entry (within the existing two-entry/50,000-score bounds), uses existing worker polling, and preserves the two acquisition slots, save backpressure and publication throttle. An affected source version may add a targeted stored-result replay and normalized persistence; unchanged bootstrap metadata avoids a full-matrix DB reread. No new timers, polling loops, autonomous transactions, dependencies or migration. Existing worker-wide bounds still limit active subscriptions; this is not an unbounded subscription to every historical player. The visible data remains available while asynchronous replay settles; rendering/CSS structure is unchanged on mobile.
 - Limits: no live private responses or production database contents were accessed. The screenshot's exact reference numbers are session-specific; the matching baseline failure is established locally, not attributed to a captured production response. Deployment and live round-history completeness must still be confirmed after the commit deploys.
+
+### Authorized roster checkpoint repair — 2026-11-13
+
+- After explicit owner authorization, privately inspected the failing factual
+  checkpoints and reproduced `resource_parse_unknown_roster` offline. Root cause:
+  nested listing bids expanded into multiple columns before positional renaming,
+  so an integer bid field became `id`. The actual join then rejected character
+  roster IDs against integer listing IDs. Corrected the field mapping itself;
+  no error suppression, fabricated values or acquisition bypass.
+- Independent offline source comparison recovers 20 roster/15 listing rows with
+  exact source IDs, names, values/prices and points. Private captures are outside
+  Git; committed regression fixtures are entirely synthetic. No live Futmondo
+  requests, real accounts or transactions were used in tests.
+- `Rscript test/test_player_nested_fields.R`: 5 groups passed, including zero/one/
+  multiple nested bids, sorted JSON fields, unknown/zero/-2 points, leading-zero
+  IDs, real roster/listing joins and compressed typed snapshot reuse after
+  clearing ordinary caches. Four cold roster reads, zero warm/restart source
+  reads. Synthetic 527-player parser: 0.054 s, 736,136 retained bytes locally.
+- Python `test_worker.WorkerTests`: 22 tests passed. New test uses the real R
+  helper to acquire, acknowledge durable publication and restart with saved
+  source checkpoints, preserving exact rows with no additional source requests.
+- Existing R checks passed: player availability (11), rating inputs (4), request
+  contracts (4), incoming source recovery (6), incoming clauses (20), outgoing
+  clauses (24), HAR response contracts (5), manual market listing actions (4),
+  and `test/test_shiny_simulation.R` (13 checks plus eight rendered tabs).
+- Performance review: bounded per-player field traversal replaces expanding
+  data-frame construction; retains nested facts once per row. No added source/
+  database requests, timers, queues, subscriptions or redraw triggers. Existing
+  bounded caches and acknowledged database snapshot persistence/reuse remain;
+  source age and partial/stale states are preserved. No dependencies/schema or
+  UI/CSS changes. Mobile uses the existing layout; hosted browser timing was
+  not measured. Production deployment/fresh roster and transaction acceptance,
+  plus the independent source-rejection failures, remain separate checks.

@@ -191,6 +191,41 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
         chunks=[i for i,x in enumerate(self.store.calls) if x[0]=='worker_chunks']
         publish=[i for i,x in enumerate(self.store.calls) if x[0]=='publish']
         self.assertLess(max(chunks),min(publish))
+    async def test_nested_listing_bids_preserve_roster_identity_and_durable_reuse(self):
+        player = dict(id='000123', name='Fixture player', role='defensa', teamId='club',
+            value=1000, change=0, points=-2, price=1200,
+            average=dict(average=0, matches=2, fitness=[0, -2]),
+            bids=[dict(id='offer', price=700, userteam=dict(id='rival', name='Rival'))])
+        routes = {
+            '/1/userteam/roster': [player, dict(player, id='other-player')],
+            '/1/league/championshipteams': [], '/1/market/rosterbids': [],
+            '/1/market/myplayers': [player]}
+        paths = []
+        def transport(request):
+            paths.append(request.url.path)
+            return httpx.Response(200, json={'answer': routes[request.url.path]})
+        self.client._transport = httpx.MockTransport(transport)
+        d = descriptor('get_players_from_team', dict(championship_id='l', user_team_id='t'))
+        job = dict(self.job, descriptor=d, resource_key=d['resource_key'], interval_seconds=60)
+        result = await self.worker.helpers[0].run(d, lambda m: self.worker.exchange(job, 'owner', m))
+        rows = plain(result['value'])
+        self.assertEqual([r['id'] for r in rows], ['000123', 'other-player'])
+        self.assertEqual(rows[0]['market_asking_price'], 1200)
+        self.assertEqual(rows[0]['points'], -2)
+        self.assertEqual([r['market_inMarket'] for r in rows], [True, False])
+        await self.worker.publish(job, 'owner', result)
+        manifest = self.store.snapshots[job['resource_key']]
+        self.assertEqual(plain(unpack_snapshot(manifest, self.store.chunks[manifest['version']])), rows)
+        # A fresh helper/process reuses the same durable source checkpoints.
+        restarted = Worker(self.store, self.client, KEY, Path.cwd())
+        restarted.admission_blocked = False
+        try:
+            again = await restarted.helpers[0].run(d, lambda m: restarted.exchange(job, 'restarted', m))
+            self.assertEqual(plain(again['value']), rows)
+            self.assertEqual(len(paths), 4)
+        finally:
+            await asyncio.gather(*(h.close() for h in restarted.helpers))
+
     async def test_empty_named_args_bootstrap_and_notifications(self):
         # R strips login from named calls, leaving an empty named list. JSONB
         # retains names=[] and args={}, unlike the unnamed enrollment args=[].

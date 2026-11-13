@@ -354,7 +354,9 @@ get_players_from_team <- function(login, championship_id, user_team_id, teams = 
     # any column that can be transformed to numeric, do it
     roster <- roster %>% as.data.frame()
     # make numbers as numbers
-    roster <- type.convert(roster, as.is = TRUE)
+    # IDs are opaque source strings, including numeric-looking/leading-zero IDs.
+    numeric_fields <- names(roster)[!grepl("(^id$|[_.]id$|Id$)", names(roster))]
+    roster[numeric_fields] <- type.convert(roster[numeric_fields], as.is = TRUE)
     for (field in c("value", "change", "points")) {
       if (all(is.na(roster[[field]]))) roster[[field]] <- rep(NA_real_, nrow(roster))
     }
@@ -506,9 +508,10 @@ get_championship_players <- function(login, championship_id) {
     }) %>% rbindlist(fill = T)
     # any column that can be transformed to numeric, do it
     ret <- ret %>% as.data.frame()
-    numeric_cols <- sapply(ret, FUN = function(col) {
-      all(!is.na(as.numeric(as.character(col))))
-    })
+    numeric_cols <- vapply(ret, FUN = function(col) {
+      !is.list(col) && all(!is.na(as.numeric(as.character(col))))
+    }, logical(1))
+    numeric_cols[grepl("(^id$|[_.]id$|Id$)", names(ret))] <- FALSE
     ret[, numeric_cols] <- lapply(ret[, numeric_cols], FUN = function(col) {
       as.numeric(as.character(col))
     })
@@ -532,6 +535,8 @@ normalize_player_fields <- function(player) {
     fields[lengths(fields) > 0L]
   }
   player <- compact(player)
+  for (field in intersect(c("id", "teamId"), names(player)))
+    player[[field]] <- as.character(player[[field]])
   for (field in c("value", "change", "points")) {
     if (!length(player[[field]])) player[[field]] <- NA_real_
   }
@@ -596,10 +601,13 @@ parse_player_json <- function(player) {
     player <- c(player, bid)
   }
   player <- player[!is.na(names(player)) & names(player) != ""]
-  ret <- data.frame(value = player)
-  colnames(ret) <- names(player)
-
-  return(ret)
+  # data.frame(value=player) expands nested objects/arrays into several
+  # columns. Renaming those columns by position corrupts every later field.
+  # Keep one source player per row and retain nested facts in list columns.
+  columns <- lapply(player, function(value) {
+    if (is.list(value) || length(value) != 1L) list(value) else value
+  })
+  structure(columns, class = "data.frame", row.names = 1L)
 }
 
 
