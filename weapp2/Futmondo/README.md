@@ -202,3 +202,10 @@ the container fixes implicit R `_row` fields in database writes and retries
 failed history saves without reacquiring their retained source payloads.
 No new settings or dependencies. See `docs/worker_resolved_recovery.md` for the
 contracts, measured checks and remaining production acceptance work.
+
+Dokploy is configured to auto-deploy after a push (owner confirmation2026-11-13).
+The follow-up `20261113142221_worker_clause_fairness.sql` prevents ordinary core
+reads starving overdue clause jobs; production version is20261113142423. Cold
+transfer panels now distinguish last-observed stored schedules from current
+roster verification, retaining stale warnings and rejecting capacity use of
+historical observations. Details: `docs/worker_resolved_recovery.md`.

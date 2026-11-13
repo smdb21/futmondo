@@ -109,3 +109,70 @@ The production policy check also found the enabled account inside its configured
 quiet hours during rollout. Ordinary jobs therefore retain their hourly quiet
 floor; explicit interactive demand can still bypass it. Quiet-hour settings were
 not changed to manufacture a successful freshness measurement.
+
+## Auto deployment, dispatch aging and cold stale pages — 2026-11-13
+
+The owner confirmed that Dokploy auto-deploys pushes. A push is the normal rollout
+trigger; lack of a local Docker daemon does not imply that a manual deployment
+is needed. Public static artifacts had a Last-Modified time immediately after
+`c1f9dd3` was pushed and the production worker heartbeat was current. That is
+consistent with automatic deployment, but is not an exact deployed-commit hash.
+No completion-marker POSTs appeared in the inspected12:25–14:20UTC window, so
+absence of errors in that window is not evidence of successful marker writes.
+
+Production checks found normal core reads continuously outranking autonomous
+clause jobs. `20261113142221_worker_clause_fairness.sql` promotes a clause job
+from effective urgency8 to9 after its due time is at least60 seconds old in the
+reserved lane. It then competes with ordinary core reads by oldest due time;
+explicit priority10 demand stays ahead. This prevents starvation under continuous
+normal core demand without changing stored priority3,300-second cadence, leases,
+quiet-hour eligibility, source rate limits or worker count. It is an aging rule,
+not a guarantee that dispatch occurs within60 seconds under all loads. Production
+SQL version is `20261113142423_worker_clause_fairness`. The previously stalled
+three active clause jobs all refreshed at14:24:48–14:25:03UTC, then again at
+14:32:03–14:32:18UTC. At14:33:09 all three snapshots were fresh with no job errors.
+
+A new screenshot still showed empty panels because a cold page required roster
+and history to be fresh simultaneously before displaying anything, even when
+successful durable observations and clause summaries already existed.
+`fm_worker_restore()` now retains the original manifest acquisition status in
+`worker_acquisition_status`, separately from current expiry. This metadata already
+exists durably in the manifest; it is not a new success assertion.
+
+`reconcile_pending_clause_transfers(..., observed_only=FALSE)` preserves the
+strict default contract. The explicit display-only mode can derive observed
+schedules from successful stored roster/history acquisitions, including expired
+ones, in matching account/league/competition/season/scoring contexts. Summaries
+must identify the requested player and either be currently usable or carry
+successful worker acquisition proof with a valid original observation time and
+no source failure. Expired successful summaries remain historical facts, not
+fresh ownership claims. Partial, unavailable, malformed or foreign observations
+cannot provide successful timing. Source flags, observation times and deadlines
+are never cleared or renewed.
+
+That mode always returns overall status `unavailable`, outbound/inbound counts
+`NA`, no capacity-adjustment IDs, and partial outgoing verification. It only
+supplies last-observed display rows. The cold-page path keeps stale prerequisite
+warnings, adds an explicit last-observed label and reads existing snapshots
+through passive interests. It does not start source acquisition. The optional
+`allow_observed=FALSE` cache-reader flag is enabled only there; ordinary reads,
+financial calculations and manual preflights still enforce their freshness rules.
+
+Checks: four SQL groups reproduce the prior starvation, verify idempotent replay,
+aging boundary, normal core precedence, quiet hours and explicit Refresh; existing
+cadence/prefetch groups pass. Four observed-display groups cover strict capacity
+rejection, partial/expired-source validation, preserved historical timestamps and
+two cold sessions with zero source reads. Four passive-worker groups ensure
+historical reuse is explicit and never renews a deadline. Incoming24/outgoing24
+and required lifecycle13/eight tabs pass. Performance: aging changes order only;
+observed rendering uses a small candidate set and bounded existing snapshot
+polling, with no new timer, worker, database table or source request. Full mobile
+production screen verification and successful completion-marker POST evidence
+remain separate acceptance work.
+
+A subsequent production log check starting14:20UTC confirmed three score POSTs
+and three completion-marker POSTs, all HTTP201, with no PGRST204 in that window.
+This confirms the earlier marker serialization repair is active in production.
+The observed-panel change additionally displays original UTC observation times in
+both panels; it still needs to be seen on the user's page after auto deployment.
+Manual capacity recheck4 and durable clause persistence11 checks also pass.

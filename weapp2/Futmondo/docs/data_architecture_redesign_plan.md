@@ -1252,3 +1252,16 @@ See `docs/worker_resolved_recovery.md` for exact checks, performance and limits.
 Required lifecycle13/eight tabs passed. Production container deployment and two
 five-minute end-to-end acceptance cycles remain open; no production recovery
 milestone is closed solely by local tests or SQL rollout.
+
+### 2026-11-13 — Auto rollout, clause aging and observed cold-page transfers
+
+Owner confirmed push-triggered Dokploy deployment. Production checks exposed
+starvation behind continuous normal core reads; aging SQL deployed as20261113142423
+and all three active clause jobs refreshed twice afterward. Cadence remains300
+seconds with consent, quiet hours and source deadlines unchanged. Cold transfer
+panels can display successful stored observations while roster/history is stale,
+with original times, explicit observed labels and warnings. This explicit mode
+returns no usable capacity counts/IDs and cannot certify current membership.
+Source acquisition is not started by the observed display path. Local regressions
+and required lifecycle pass; mobile screen recovery and completion-marker POST
+success still require production confirmation. See `docs/worker_resolved_recovery.md`.

@@ -2196,3 +2196,32 @@ no Docker daemon or Dokploy deployment tool is connected here. See
 `docs/worker_resolved_recovery.md`; no claim of production recovery yet.
 Production policy inspection found the enabled account in configured quiet hours;
 normal hourly floor remains respected. No settings were altered to force a test.
+
+### 2026-11-13 — Independent clause fairness and stale cold-page display
+
+Production normal core demand starved clause jobs; new SQL aging promotes due
+clauses to ordinary core urgency after60s, then orders by oldest deadline.
+Four SQL groups reproduce the old starvation and verify aging boundary, migration
+replay, quiet-hour eligibility and explicit demand. Cadence and prefetch tests
+also pass. SQL20261113142423 is live. All three active clause jobs refreshed at
+14:24:48–14:25:03 and again14:32:03–14:32:18UTC; all were fresh at14:33:09, no errors.
+
+Observed-only transfer mode restores dates/rows from successful durable worker
+observations on cold stale pages. Capacity remains unavailable/NA with no IDs;
+partial/foreign source proof fails closed. Four display groups cover two cold
+sessions, preserved timestamps and zero source acquisition; four passive groups
+verify expired reuse is explicit and never renews freshness. Incoming24/outgoing24
+and required lifecycle13/eight tabs pass. Performance: order changes only, bounded
+existing passive snapshots/small candidate set, no new timer, table, workers or
+HTTP acquisition. Ordinary manual-action freshness remains unchanged.
+
+Auto deploy after push is now documented as the standing rollout mechanism.
+Static artifact modification time shortly after prior push and current heartbeat
+support deployment; no exact deployed SHA was exposed. No marker POSTs in the
+12:25–14:20 log window, so successful marker writes are not yet demonstrated.
+Observed mobile screen recovery remains unverified until the new auto deployment.
+Later production log check since14:20UTC: three score POSTs and three completion
+marker POSTs all201, no PGRST204 in that window. Marker serialization recovery is
+now confirmed live. Observed panels include original UTC source times; manual
+capacity recheck4 and durable clause persistence11 passed. User-page rendering
+still requires confirmation after the push-triggered deployment.

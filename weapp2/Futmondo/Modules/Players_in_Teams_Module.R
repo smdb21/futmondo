@@ -49,7 +49,7 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       transfers<-incoming()
       rounds<-if(is.function(round_catalog))tryCatch(round_catalog(),error=function(e)data.frame())else data.frame()
       outgoing_clause_panel(list(status=transfers$outgoing_status %||% transfers$status,
-        records=transfers$outgoing_records %||% outgoing_clause_empty(),error=transfers$outgoing_error %||% transfers$error),next_round_context(rounds),ns)
+        records=transfers$outgoing_records %||% outgoing_clause_empty(),error=transfers$outgoing_error %||% transfers$error,observations_only=isTRUE(transfers$observations_only)),next_round_context(rounds),ns)
     })
     # Register click handlers once per row identity; remove handlers for old rows.
     incoming_handlers<-list()
@@ -433,7 +433,7 @@ get_ordinal_position <- function(position) {
 
 # Page-scoped queue: at most two summary reads, with the same account-scoped
 # raw cache used by cards/preflight. Navigation never starts whole-league work.
-incoming_clause_cached_summary <- function(login,championship_id,user_team_id,player_id,is_current=NULL,owner='',context=NULL) {
+incoming_clause_cached_summary <- function(login,championship_id,user_team_id,player_id,is_current=NULL,owner='',context=NULL,allow_observed=FALSE) {
   context<-context %||% resource_context(login,championship_id,user_team_id,player_id)
   key<-api_cache_key(paste0("player_summary_",login[["userid"]],"_",championship_id,"_",user_team_id,"_",player_id),context=context)
   item<-api_cache_env[[key]]
@@ -449,7 +449,8 @@ incoming_clause_cached_summary <- function(login,championship_id,user_team_id,pl
     try(fm_worker_resource_revision(s,d$resource_key)(),silent=TRUE)
     saved<-fm_worker_get(context$account_id,d$resource_key)$data
     stamp<-fm_time(attr(saved,"observed_at"));previous<-fm_time(attr(value,"observed_at"))
-    if(!is.null(saved)&&resource_snapshot_unexpired(saved,now)&&!acquisition_data_unverified(saved)&&
+    historical<-isTRUE(allow_observed)&&isTRUE(attr(saved,"worker_acquisition_status")%in%c("ok","empty"))&&is.null(attr(saved,"fetch_error"))
+    if(!is.null(saved)&&((resource_snapshot_unexpired(saved,now)&&!acquisition_data_unverified(saved))||historical)&&
        length(stamp)==1L&&!is.na(stamp)&&stamp<=now&&
        (is.null(value)||length(previous)!=1L||is.na(previous)||stamp>=previous))value<-saved
   }
@@ -461,6 +462,11 @@ incoming_clause_context_matches<-function(roster,history){
   if(!is.list(roster$context)||!is.list(history$context))return(TRUE)
   fields<-c("account_id","championship_id","competition_id","season","scoring_version")
   identical(fm_worker_json(roster$context[fields]),fm_worker_json(history$context[fields]))
+}
+
+incoming_clause_observed_source<-function(state){
+  is.data.frame(state$data)&&is.null(state$error)&&is.null(attr(state$data,"fetch_error"))&&
+    isTRUE(attr(state$data,"worker_acquisition_status")%in%c("ok","empty"))
 }
 
 incoming_clause_source_unverified <- function(state) {
@@ -505,11 +511,11 @@ incoming_clause_source <- function(session,login_token,championship_id,user_team
     if(is.null(snapshot))return(invisible(NULL))
     prior<-shiny::isolate(state())
     result<-reconcile_pending_clause_transfers(snapshot$roster,snapshot$history,summaries,snapshot$team,
-      previous_records=prior$records,previous_outgoing_records=prior$outgoing_records)
+      previous_records=prior$records,previous_outgoing_records=prior$outgoing_records,observed_only=isTRUE(snapshot$observed_only))
     rows<-result$incoming_records;leaving<-result$outgoing_records
     if(!is.null(prerequisite_problem)) {
       state(list(status="partial",records=rows,outgoing_status="partial",outgoing_records=leaving,
-        error=prerequisite_problem$message,source_errors=prerequisite_problem$failures))
+        error=prerequisite_problem$message,source_errors=prerequisite_problem$failures,observations_only=isTRUE(snapshot$observed_only)))
       return(invisible(NULL))
     }
     state(list(status=if(loading)"loading"else if(any(nzchar(rows$timing_error)))"partial"else "ok",
@@ -589,6 +595,26 @@ incoming_clause_source <- function(session,login_token,championship_id,user_team
       loading<-roster$status%in%c("loading","refreshing")||history$status%in%c("loading","refreshing")
       problem<-if(context_mismatch)list(message="Transfer sources use different account, league or scoring contexts; waiting for matching observations.",failures=list())else incoming_clause_prerequisite_failure(roster,history)
       prerequisite_problem<<-problem
+      # Cold pages can consume successful stored observations without certifying
+      # current roster membership. No source request starts from this path.
+      observed_scope<-is.list(roster$context)&&is.list(history$context)&&
+        identical(roster$context$account_id,context$account)&&identical(roster$context$championship_id,context$league)&&
+        identical(roster$context$user_team_id,context$team)
+      if(observed_scope&&!context_mismatch&&incoming_clause_observed_source(roster)&&incoming_clause_observed_source(history)&&
+         (is.null(snapshot)||isTRUE(snapshot$observed_only))) {
+        observed_candidates<-pending_clause_candidates(roster$data,history$data,context$team,previous$records,previous$outgoing_records)
+        if(!is.null(observed_candidates)) {
+          captured<-list(login=auth,league=context$league,team=context$team,scope=context$scope,
+            roster=roster$data,history=history$data,observed_only=TRUE)
+          display_live<-local({version<-generation;function()!closed&&was_active&&identical(generation,version)})
+          attr(display_live,"fm_worker_interest")<-"clause-display"
+          for(pid in unique(as.character(observed_candidates$player_id))){
+            cached<-incoming_clause_cached_summary(auth,context$league,context$team,pid,display_live,session$token,summary_context(captured,pid),allow_observed=TRUE)
+            if(!is.null(cached))summaries[[pid]]<<-cached
+          }
+          snapshot<<-captured;publish(FALSE);return()
+        }
+      }
       initial_loading<-loading&&is.null(snapshot)
       state(list(status=if(initial_loading)"loading"else "partial",records=previous$records,
         outgoing_status=if(initial_loading)"loading"else "partial",outgoing_records=previous$outgoing_records,
@@ -654,6 +680,7 @@ clause_transfer_panel <- function(state,next_round,ns,outgoing=FALSE) {
     if(identical(state$status,"loading"))shiny::tags$p(role="status",shiny::icon("spinner",class="fa-spin"),
       if(outgoing)" Checking clause departures…"else" Checking incoming signings…"),
     if(!is.null(state$error))shiny::tags$p(role="alert",class="fm-incoming-error",state$error),
+    if(isTRUE(state$observations_only))shiny::tags$p(class="fm-incoming-schedule","Last observed transfer details; current roster verification is pending."),
     if(!nrow(rows)&&identical(state$status,"ok"))shiny::tags$p(if(outgoing)"No players leaving through a release clause."else"No incoming clause signings."),
     lapply(seq_len(nrow(rows)),function(i) {
       row<-rows[i,,drop=FALSE];at<-if(outgoing)row$leaves_at else row$joins_at
@@ -672,6 +699,8 @@ clause_transfer_panel <- function(state,next_round,ns,outgoing=FALSE) {
             if(identical(state$status,"loading"))paste0("Confirming ",if(outgoing)"departure"else"arrival"," time…")else
               paste0(if(outgoing)"Departure"else"Arrival"," time could not be verified")),
           if(nzchar(label))shiny::tags$span(class="fm-incoming-round",label),
+          if(isTRUE(state$observations_only)&&"observed_at"%in%names(row)&&!is.na(row$observed_at))
+            shiny::tags$small(class="fm-incoming-schedule",paste("Observed:",format(fm_time(row$observed_at),"%d %b %Y, %H:%M UTC",tz="UTC"))),
           if(isTRUE(row$overdue))shiny::tags$span(paste0("Scheduled time has passed; ",if(outgoing)"departure"else"arrival"," is awaiting source confirmation.")),
           if(nzchar(row$timing_error)&&!identical(state$status,"loading"))shiny::tags$span(class="fm-incoming-error",row$timing_error)))
     }))

@@ -82,6 +82,7 @@ fm_worker_restore<-function(resource,account){
  if(identical(m$handler,'get_active_championships'))value<-fm_filter_league_answer(value)
  attr(value,'observed_at')<-fm_time(m$observed_at);attr(value,'fetched_at')<-fm_time(m$checked_at)
  attr(value,'worker_completeness')<-m$completeness
+ attr(value,'worker_acquisition_status')<-m$status
  existing<-attr(value,'valid_until') %||% if(is.list(value))value$valid_until else NULL
  deadline<-as.numeric(fm_time(m$valid_until))
  if(is.numeric(existing)&&length(existing)==1L&&is.finite(existing))deadline<-min(deadline,existing)

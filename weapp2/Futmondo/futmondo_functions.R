@@ -1563,16 +1563,18 @@ outgoing_clause_empty <- function() {
     timing_error=character(),overdue=logical(),stringsAsFactors=FALSE)
 }
 
-reconcile_pending_clause_transfers <- function(roster_df,pressroom_df,summaries,user_team_id,now=Sys.time(),previous_records=NULL,previous_outgoing_records=NULL) {
+reconcile_pending_clause_transfers <- function(roster_df,pressroom_df,summaries,user_team_id,now=Sys.time(),previous_records=NULL,previous_outgoing_records=NULL,observed_only=FALSE) {
   records<-incoming_clause_empty();outgoing_records<-outgoing_clause_empty();outgoing_verified<-FALSE
-  result <- function(status="unavailable",outbound=character(),incoming=character()) list(status=status,
-    pending_outbound_ids=unique(outbound),pending_inbound_ids=unique(incoming),
-    pending_outbound_count=if(status=="ok")length(unique(outbound))else NA_integer_,
-    pending_inbound_count=if(status=="ok")length(unique(incoming))else NA_integer_,
+  result <- function(status="unavailable",outbound=character(),incoming=character()) list(status=if(observed_only)"unavailable"else status,
+    pending_outbound_ids=if(observed_only)character()else unique(outbound),pending_inbound_ids=if(observed_only)character()else unique(incoming),
+    pending_outbound_count=if(!observed_only&&status=="ok")length(unique(outbound))else NA_integer_,
+    pending_inbound_count=if(!observed_only&&status=="ok")length(unique(incoming))else NA_integer_,
     incoming_records=records,outgoing_records=outgoing_records,
-    outgoing_status=if(outgoing_verified)"ok"else"partial")
+    outgoing_status=if(outgoing_verified&&!observed_only)"ok"else"partial")
   team<-fm_scalar(user_team_id,"");if(!nzchar(team))return(result())
-  candidate<-if(acquisition_data_unverified(roster_df)||acquisition_data_unverified(pressroom_df))NULL else pending_clause_candidates(roster_df,pressroom_df,team,previous_records,previous_outgoing_records)
+  historical_ok<-isTRUE(observed_only)&&all(vapply(list(roster_df,pressroom_df),function(data)
+    is.data.frame(data)&&isTRUE(attr(data,"worker_acquisition_status")%in%c("ok","empty"))&&is.null(attr(data,"fetch_error")),logical(1)))
+  candidate<-if((observed_only&&!historical_ok)||(!observed_only&&(acquisition_data_unverified(roster_df)||acquisition_data_unverified(pressroom_df))))NULL else pending_clause_candidates(roster_df,pressroom_df,team,previous_records,previous_outgoing_records)
   if(is.null(candidate)) {
     if(is.data.frame(previous_records))records<-previous_records
     if(is.data.frame(previous_outgoing_records))outgoing_records<-previous_outgoing_records
@@ -1588,6 +1590,12 @@ reconcile_pending_clause_transfers <- function(roster_df,pressroom_df,summaries,
     source_id<-if(is.list(summary)&&is.list(summary$data))fm_scalar(summary$data$id %||% summary$data$`_id`,"")else ""
     summary_matches<-!nzchar(source_id)||identical(source_id,pid)
     fresh<-is.list(summary)&&length(summary)>0L&&!acquisition_data_unverified(summary)&&summary_matches
+    if(observed_only){
+      checked<-fm_time(attr(summary,"observed_at"))
+      source_ok<-isTRUE(attr(summary,"worker_acquisition_status")%in%c("ok","empty"))&&is.null(attr(summary,"fetch_error"))
+      recent_ok<-fresh&&resource_snapshot_unexpired(summary,now)&&length(checked)==1L&&!is.na(checked)&&as.numeric(difftime(now,checked,units="secs"))<300
+      fresh<-is.list(summary)&&identical(source_id,pid)&&(source_ok||recent_ok)&&length(checked)==1L&&!is.na(checked)&&checked<=now
+    }
     championship<-if(fresh&&is.list(summary$championship))summary$championship else list()
     clause<-championship$clause
     owner<-if(is.list(championship$owner))

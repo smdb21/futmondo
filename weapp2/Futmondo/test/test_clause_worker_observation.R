@@ -8,7 +8,7 @@ s<-fm_worker_account_state(ctx$account_id);s$known<-TRUE;s$account<-list(enabled
 active<-TRUE;live<-function()active;attr(live,'fm_worker_interest')<-'clause-display'
 fm_worker_demand(d,'fixture',live)
 value<-observed_data(list(data=list(id='player'),championship=list(owner=list(id='seller'),clause=list(transferred=TRUE,transferDate='2026-11-20T10:00:00Z'))),observed_at=Sys.time()-310)
-attr(value,'valid_until')<-as.numeric(Sys.time())-10
+attr(value,'valid_until')<-as.numeric(Sys.time())-10;attr(value,'fetch_status')<-'stale';attr(value,'worker_acquisition_status')<-'ok'
 fm_worker_put(ctx$account_id,d$resource_key,list(data=value,manifest=list(version='old')))
 calls<-character()
 fm_worker_rpc<-function(name,payload,owner=''){
@@ -18,7 +18,11 @@ fm_worker_rpc<-function(name,payload,owner=''){
 fm_worker_poll(ctx$account_id,force=TRUE);for(i in 1:20)later::run_now(0)
 stopifnot(identical(calls,'read'),d$resource_key%in%fm_worker_live_keys(s))
 cat('PASS passive clause expiry reads worker status without enqueueing another acquisition\n')
-stamp<-Sys.time()-5;attr(value,'observed_at')<-stamp;attr(value,'valid_until')<-as.numeric(stamp)+300
+stopifnot(is.null(incoming_clause_cached_summary(auth,'league','mine','player')))
+last_seen<-incoming_clause_cached_summary(auth,'league','mine','player',allow_observed=TRUE)
+stopifnot(identical(last_seen,value),!resource_snapshot_unexpired(last_seen),identical(calls,'read'))
+cat('PASS historical cache reuse is explicit; normal callers still reject expired observations and no source deadline is renewed\n')
+stamp<-Sys.time()-5;attr(value,'fetch_status')<-'ok';attr(value,'observed_at')<-stamp;attr(value,'valid_until')<-as.numeric(stamp)+300
 fm_worker_put(ctx$account_id,d$resource_key,list(data=value,manifest=list(version='new')))
 persist_clause_transfer_summary<-function(...)TRUE
 restored<-incoming_clause_cached_summary(auth,'league','mine','player',live,'fixture')

@@ -136,3 +136,12 @@ the target server.
 ## Opt-in Python acquisition service
 
 The updated Docker image also installs pinned Python dependencies and starts `/etc/services.d/futmondo-worker` under the existing `/init` supervisor as the unprivileged `shiny` user. No extra port, cron or Dokploy application is required. Apply the additive worker migration before setting the separate runtime encryption key and enabling accounts. The service starts automatically but never enrolls a user without consent. See [configuration, sizing, lifecycle and rollback](python_worker.md). A full Docker build/start remains a required target-host check; local interpreter/protocol tests do not replace it.
+
+## Automatic rollout
+
+The owner confirmed on2026-11-13 that Dokploy automatically deploys this
+application after a push. Use commit/push as the normal trigger and verify the
+resulting deployment; do not routinely require a separate manual deploy. A
+missing Docker connection in a development session does not disable Dokploy's
+remote auto deployment. If a pushed revision does not become available, inspect
+the automatic build/deployment result before choosing a recovery action.
