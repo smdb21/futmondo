@@ -37,6 +37,13 @@ class FakeStore:
         return self.row
     async def rpc(self, name, **p):
         self.calls.append((name, copy.deepcopy(p)))
+        if name == 'read':
+            resources = []
+            for key in p.get('p_versions', {}):
+                if key in self.snapshots:
+                    manifest = self.snapshots[key]
+                    resources.append(dict(manifest=manifest, chunks=self.chunks[manifest['version']]))
+            return dict(resources=resources)
         if name == 'guard': return self.allowed
         if name == 'enqueue_batch': return len(p['p_descriptors']) if self.allowed else None
         if name == 'checkpoint':
@@ -192,6 +199,68 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
         chunks=[i for i,x in enumerate(self.store.calls) if x[0]=='worker_chunks']
         publish=[i for i,x in enumerate(self.store.calls) if x[0]=='publish']
         self.assertLess(max(chunks),min(publish))
+    async def test_expired_history_snapshot_reuses_only_acknowledged_fact_hashes(self):
+        paths = []
+        news = dict(_id='tx-one', created='2026-11-01T12:00:00Z', price=120,
+            _player=dict(_id='p', name='Fixture player'), _buyer=dict(_id='t', name='Team'))
+        def transport(request):
+            paths.append(request.url.path)
+            query = json.loads(request.content).get('query', {})
+            items = [news] if request.url.path == '/1/locker/pressroom' and not query.get('from') else []
+            return httpx.Response(200, json={'answer': {'news': items}})
+        self.client._transport = httpx.MockTransport(transport)
+        d = descriptor('get_championship_pressroom')
+        job = dict(self.job, descriptor=d, resource_key=d['resource_key'], interval_seconds=60)
+        result = await self.worker.helpers[0].run(d, lambda m: self.worker.exchange(job, 'owner', m))
+        self.assertIn('history_write_ack', result['value']['meta'])
+        await self.worker.publish(job, 'owner', result)
+        for manifest in self.store.snapshots.values():
+            manifest['valid_until'] = '2001-01-01T00:00:00Z'
+        before = len(self.store.calls)
+        restarted = Worker(self.store, self.client, KEY, Path.cwd())
+        restarted.admission_blocked = False
+        try:
+            again = await restarted.helpers[0].run(d, lambda m: restarted.exchange(job, 'restart', m))
+            self.assertEqual(plain(again['value']), plain(result['value']))
+            self.assertEqual(again['observed_at'], result['observed_at'])
+            native_writes = [p for name, p in self.store.calls[before:] if name == 'write_fact'
+                and p['p_table'] in ('players', 'market_transactions', 'auction_observations', 'bid_observations')]
+            self.assertFalse(native_writes)
+            self.assertEqual(len(paths), 3)
+        finally:
+            await asyncio.gather(*(h.close() for h in restarted.helpers))
+
+    async def test_finance_optional_rejection_reaches_R_but_auth_still_aborts(self):
+        for code in ('source_rejected', 'source_authentication', 'access_revoked'):
+            helper = Helper(Path.cwd())
+            message = dict(type='http', url='https://api.futmondo.com/1/userteam/information', body={})
+            result = dict(type='result', value={'kind':'double', 'values':[1]})
+            writes = []
+            helper.process = SimpleNamespace(returncode=None,
+                stdout=SimpleNamespace(readline=AsyncMock(side_effect=[(canonical(message)+'\n').encode(), (canonical(result)+'\n').encode()])),
+                stdin=SimpleNamespace(write=lambda raw: writes.append(json.loads(raw)), drain=AsyncMock()))
+            if code == 'source_rejected':
+                answer = await helper.run(descriptor('fm_worker_finances'), AsyncMock(side_effect=WorkerFailure(code)))
+                self.assertEqual(answer, result)
+                self.assertEqual(writes[-1], {'error':'source_rejected'})
+            else:
+                with self.assertRaisesRegex(WorkerFailure, code):
+                    await helper.run(descriptor('fm_worker_finances'), AsyncMock(side_effect=WorkerFailure(code)))
+
+    async def test_optional_finance_failure_cannot_poison_unrelated_successful_child(self):
+        d = descriptor('fm_worker_finances')
+        job = dict(self.job, descriptor=d, resource_key=d['resource_key'])
+        self.worker.source_errors['owner'] = {'source_rejected_1_userteam_information'}
+        self.worker.source_stamps['owner'] = ['2026-11-13T00:00:00Z']
+        result = dict(value={'kind':'double','values':[1]},status='ok',completeness='complete')
+        await self.worker.publish(job, 'owner', result, child=descriptor())
+        self.assertEqual(self.store.snapshots[descriptor()['resource_key']]['status'], 'ok')
+        await self.worker.publish(job, 'owner', result)
+        manifest = self.store.snapshots[job['resource_key']]
+        self.assertEqual(manifest['status'], 'partial')
+        self.assertEqual(manifest['completeness'], 'partial')
+        self.assertIn('source_rejected', manifest['error'])
+
     async def test_discovery_failure_does_not_count_as_completed_and_can_retry(self):
         result = dict(value={'kind':'double', 'values':[1]},
             discoveries=[dict(descriptor(), interval_seconds=300)])

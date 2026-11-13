@@ -129,32 +129,43 @@ get_rival_finance_saved <- function(account_id,championship_id,season="unknown")
   }
   result
 }
-persist_rival_finance_evidence <- function(evidence,context) {
-  if(!length(evidence))return(invisible(TRUE))
+persist_rival_finance_evidence <- function(evidence,context,on_complete=NULL) {
+  if(!length(evidence)){if(is.function(on_complete))on_complete(TRUE);return(invisible(TRUE))}
+  requested_count<-length(evidence)
   evidence<-Filter(function(row){
     identical(mvp_text(row$account_id),mvp_text(context$account_id))&&
       identical(mvp_text(row$championship_id),mvp_text(context$championship_id))&&
       identical(fm_scalar(row$competition_id,"unknown"),fm_scalar(context$competition_id,"unknown"))&&
       identical(fm_scalar(row$season,"unknown"),fm_scalar(context$season,"unknown"))
   },evidence)
+  if(length(evidence)!=requested_count&&is.function(on_complete)){
+    on_complete(FALSE);on_complete<-NULL
+  }
   if(!length(evidence))return(invisible(FALSE))
   # Small immutable revisions, passed through the existing bounded asynchronous queue.
   groups<-split(seq_along(evidence),ceiling(seq_along(evidence)/50L))
   index<-1L
   next_group<-function(){
-    if(index>length(groups))return(invisible(TRUE))
+    if(index>length(groups)){
+      if(is.function(on_complete))on_complete(TRUE)
+      return(invisible(TRUE))
+    }
     indices<-groups[[index]];index<<-index+1L
     # Validate only the current acknowledged batch, not thousands of records
     # synchronously on the serving process. R's expanded list size is not the
     # stored JSON size: an 80 KiB detailed lineup can occupy >700 KiB in R.
     batch<-Filter(function(row)nchar(jsonlite::toJSON(row,auto_unbox=TRUE,null='null',na='null',digits=NA),type='bytes')<=256*1024L,evidence[indices])
+    if(length(batch)!=length(indices)){
+      if(is.function(on_complete))on_complete(FALSE)
+      on_complete<<-NULL
+    }
     if(!length(batch)){
       if(index>length(groups))return(invisible(FALSE))
       later::later(next_group,0);return(invisible(TRUE))
     }
     defer_persistence("supabase_post_direct",list("rival_finance_evidence",unname(batch),
       "account_id,championship_id,competition_id,season,evidence_type,source_id,observed_at",TRUE),context=context,
-      on_complete=function(ok){if(isTRUE(ok))later::later(next_group,0)})
+      on_complete=function(ok){if(isTRUE(ok))later::later(next_group,0)else if(is.function(on_complete))on_complete(FALSE)})
   }
   isTRUE(next_group())
 }

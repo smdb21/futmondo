@@ -259,7 +259,7 @@ get_cached_resource_async <- function(resource,context,fetch,refresh=FALSE,cache
   api_cache_env[[key]]<-list(pending=pending,generation=generation,context=context,resource=resource,time=Sys.time(),bytes=0)
   pending
 }
-shared_resource<-function(session,resource,context,fetch,active=function()TRUE,refresh=function()0,progressive=FALSE,replay=function()NULL){
+shared_resource<-function(session,resource,context,fetch,active=function()TRUE,refresh=function()0,progressive=FALSE,replay=function()NULL,invalidate_refresh=function(previous,next_version)TRUE){
  value<-shiny::reactiveVal(resource_state(status="loading"));last<-NULL;version<-NULL;last_replay<-NULL;closed<-FALSE;generation<-0L;was_active<-FALSE;cancel_end<-NULL;progress_relay<-NULL
  dispose<-function(){closed<<-TRUE;generation<<-generation+1L;observer$destroy();if(is.function(cancel_end))cancel_end()}
  cancel_end<-session$onSessionEnded(function(){dispose();fm_transport_cancel(session$token)})
@@ -272,7 +272,7 @@ shared_resource<-function(session,resource,context,fetch,active=function()TRUE,r
   key<-api_cache_key(resource,context=ctx);next_version<-refresh();next_replay<-replay();resumed<-!was_active;was_active<<-TRUE
   if(identical(last,key)&&identical(version,next_version)&&identical(last_replay,next_replay)&&!resumed)return()
   same_context<-identical(last,key)
-  force_refresh<-same_context&&!identical(version,next_version)
+  force_refresh<-same_context&&!identical(version,next_version)&&isTRUE(invalidate_refresh(version,next_version))
   previous<-if(same_context)shiny::isolate(value())else NULL
   last<<-key;version<<-next_version;last_replay<<-next_replay;generation<<-generation+1L;current_generation<-generation
   stale_data<-function(data){if(!is.null(data))attr(data,"fetch_status")<-"stale";data}

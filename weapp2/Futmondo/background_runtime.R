@@ -190,6 +190,19 @@ persistence_tick<-function(){
   },error=failed)
   invisible(TRUE)
 }
+# Immutable event fingerprints are acknowledged only after all fact writes.
+pressroom_locker_ack_callback<-function(context,hashes){
+ force(context);force(hashes)
+ resource<-"history_write_ack_locker";key<-api_cache_key(resource,context=context)
+ function(ok){
+  if(!isTRUE(ok))return(invisible(FALSE))
+  known<-api_cache_env[[key]]$data$hashes %||% character();known[names(hashes)]<-hashes
+  resource_store(key,list(hashes=known),context,resource)
+  if(!is.null(api_cache_env[[key]]))api_cache_env[[key]]$expires_at<-as.numeric(Sys.time())+7*86400
+  invisible(TRUE)
+ }
+}
+
 record_acquired_resource<-function(resource,data,context){
   if(is.null(data)||identical(attr(data,"fetch_status"),"stale"))return(invisible(FALSE))
   old<-getOption("futmondo.persistence_context");options(futmondo.persistence_context=context)
@@ -259,6 +272,10 @@ record_acquired_resource<-function(resource,data,context){
   }else if(grepl("pressroom",resource)&&is.data.frame(data)){
     if("locker_event_id"%in%names(data)){
       locker<-data[!is.na(data$locker_event_id)&nzchar(data$locker_event_id),,drop=FALSE]
+      hashes<-pressroom_history_fingerprints(locker)
+      saved<-api_cache_env[[api_cache_key("history_write_ack_locker",context=context)]]$data$hashes %||% character()
+      prior<-saved[names(hashes)];changed<-is.na(prior)|prior!=hashes
+      locker<-locker[unname(changed),,drop=FALSE];hashes<-hashes[changed]
       season<-league_season_context(league)
       evidence<-lapply(seq_len(nrow(locker)),function(i){
         # Store normalized payment facts; never authentication or actor profiles.
@@ -266,7 +283,8 @@ record_acquired_resource<-function(resource,data,context){
         payload<-list(kind="locker_transfer",transfer=as.list(locker[i,fields,drop=FALSE]))
         rival_finance_evidence(context$account_id,league,season,"notifications",paste0("locker_transfer:",locker$locker_event_id[i]),payload,attr(data,"observed_at") %||% Sys.time())
       })
-      persist_rival_finance_evidence(evidence,context)
+      if(length(evidence))persist_rival_finance_evidence(evidence,context,
+        on_complete=pressroom_locker_ack_callback(context,hashes))
     }
     persist_auction_history(if("id"%in%names(data))data[!startsWith(as.character(data$id),"locker:"),,drop=FALSE]else data,league)
   }else if(grepl("^player_card_history$",resource)&&is.list(data)&&nrow(data$points)){

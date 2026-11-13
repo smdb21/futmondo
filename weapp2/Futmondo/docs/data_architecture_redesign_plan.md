@@ -1170,3 +1170,21 @@ context; remaining queued contexts were still acquiring. This demonstrates
 recovery of the acquisition path, not live mobile-browser acceptance or repair
 of the independent source-rejection/schema diagnostics. No source timestamps
 or source facts were manually rewritten.
+
+### Continuing stale clause panels and optional finance rejection — 2026-11-13
+
+The owner's 05:23 screenshot disproved sustained availability after the earlier
+isolated successful snapshots. Investigated ongoing request scheduling and
+repeat persistence. Implemented separate expiry/manual invalidation, protected
+foreground claims and resource urgency, consistent five-minute recent-point
+cadence, acknowledged native/payment fingerprint persistence/reuse across helper
+restarts, and finance-only optional rejection delivery to the R engine with
+truthful partial results. No freshness gate or acquisition preflight is bypassed.
+
+SQL scheduling migrations were applied and checked. Local worker, accounting,
+source expiry, manual clause refresh, persistence/restart and offline lifecycle
+checks pass. The exact cause of the external source rejections is not declared
+fixed; broad snapshot export was rejected by automatic review and was not
+retried indirectly. Production sustained freshness/mobile acceptance remain
+separate from these implementation checks. Contracts and limits are in
+`worker_freshness_recovery.md`; executed results are in `data_review_results.md`.

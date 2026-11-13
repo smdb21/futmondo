@@ -34,7 +34,7 @@ cat('PASS bonus icon dimensions and plain local payment dates\n')
 # Existing evidence storage preserves normalized source facts, not HTML/actor data.
 old_persist<-persist_rival_finance_evidence;old_sync<-sync_pressroom_transactions_to_supabase
 saved<-NULL;writes<-0L
-persist_rival_finance_evidence<-function(evidence,context){saved<<-evidence;TRUE}
+persist_rival_finance_evidence<-function(evidence,context,on_complete=NULL){saved<<-evidence;TRUE}
 sync_pressroom_transactions_to_supabase<-function(...){writes<<-writes+1L;TRUE}
 record_acquired_resource('pressroom_c',observed_data(merged),resource_context(account_id='u',championship_id='c'))
 stopifnot(length(saved)==1,saved[[1]]$payload$kind=='locker_transfer',!any(c('txt','u','token')%in%names(saved[[1]]$payload$transfer)),writes==1)

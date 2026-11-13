@@ -388,7 +388,8 @@ factual_read_adapter<-function(session,handler,login_token,championship_id=NULL,
    }
    registry[[entry_key]]<-shared_resource(session,resource,context=function()captured_context,fetch=fetch,
      active=function()isTRUE(is_active())&&identical(owner_context(),captured_owner),
-     refresh=function()paste(if(is.function(refresh_trigger))refresh_trigger()else 0L,demand_refresh(),sep=":"),
+     refresh=function()list(manual=if(is.function(refresh_trigger))refresh_trigger()else 0L,expiry=demand_refresh()),
+     invalidate_refresh=function(previous,next_version)!identical(previous$manual,next_version$manual),
      progressive=progressive,replay=worker_replay)
    attr(registry[[entry_key]],"demand_refresh")<-demand_refresh
   })

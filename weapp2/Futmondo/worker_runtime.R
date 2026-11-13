@@ -95,7 +95,7 @@ fm_worker_enqueue<-function(descriptor,owner='',force=FALSE){
  if(!is.null(state$queued[[key]])&&as.numeric(Sys.time())-state$queued[[key]]<30&&!force)return(invisible(NULL))
  state$queued[[key]]<-as.numeric(Sys.time())
  p<-fm_worker_rpc('enqueue',list(p_account=descriptor$context$account_id,p_descriptor=descriptor,
-  p_interval=fm_worker_interval(descriptor$handler),p_priority=10L),owner)
+  p_interval=fm_worker_interval(descriptor$handler),p_priority=if(force)10L else fm_worker_priority(descriptor$handler)),owner)
  promises::then(p,function(ok){if(!isTRUE(ok)){state$queued[[key]]<-NULL;state$errors[[key]]<-'Background access is paused or this league is excluded.'};fm_worker_notify();NULL},
   function(error){state$queued[[key]]<-NULL;state$errors[[key]]<-'Could not queue background refresh; database access failed.';fm_worker_notify();NULL})
  invisible(NULL)

@@ -218,6 +218,33 @@ fm_worker_run<-function(descriptor){
  formals(season_wrapper)<-formals(original_season);env$league_season_context<-season_wrapper
 
  produced<-list();produced_bytes<-0;source_clock<-NULL
+ ack_scopes<-character()
+ history_ack_restore<-function(child,context){
+  if(child$resource_key%in%ack_scopes)return(invisible(NULL))
+  ack_scopes<<-c(ack_scopes,child$resource_key)
+  saved<-tryCatch(fm_pipe_exchange(list(type='history_ack',descriptor=child)),error=function(e)NULL)
+  for(field in c('history_write_ack','locker_write_ack')){
+   node<-saved[[field]]
+   if(is.null(node))next
+   hashes<-tryCatch(fm_worker_decode(node),error=function(e)NULL)
+   if(!is.character(hashes)||is.null(names(hashes))||length(hashes)>20000L||anyNA(hashes)||
+      anyNA(names(hashes))||any(!nzchar(names(hashes)))||anyDuplicated(names(hashes))||
+      any(!grepl('^[a-f0-9]{64}$',hashes)))next
+   resource<-if(field=='history_write_ack')'history_write_ack_pressroom'else'history_write_ack_locker'
+   key<-api_cache_key(resource,context=context)
+   env$resource_store(key,list(hashes=hashes),context,resource)
+   if(!is.null(api_cache_env[[key]]))api_cache_env[[key]]$expires_at<-as.numeric(Sys.time())+7*86400
+  }
+  invisible(NULL)
+ }
+ history_ack_attach<-function(value,context){
+  for(field in c('history_write_ack','locker_write_ack')){
+   resource<-if(field=='history_write_ack')'history_write_ack_pressroom'else'history_write_ack_locker'
+   hashes<-api_cache_env[[api_cache_key(resource,context=context)]]$data$hashes
+   if(is.character(hashes)&&length(hashes)<=20000L)attr(value,field)<-hashes
+  }
+  value
+ }
  env$Sys.time<-function()source_clock %||% Sys.time()
  env$get_sb_url<-function()'https://worker-database.invalid'
  env$get_sb_key<-function()'worker-placeholder'
@@ -291,6 +318,7 @@ fm_worker_run<-function(descriptor){
       }
      }
     }
+    if(name=='get_championship_pressroom')history_ack_restore(child,childctx)
     value<-do.call(original,params)
     # The top-level result is encoded below once. It is excluded from child
     # publication, so constructing another full typed copy here is wasted work.
@@ -303,7 +331,7 @@ fm_worker_run<-function(descriptor){
      if(!is.null(value)&&produced_bytes+bytes<=8*1024^2){
       produced[[child$resource_key]]<<-list(descriptor=child,value=wire,
        observed_at=rival_finance_stamp(attr(value,'observed_at') %||% Sys.time()),checked_at=rival_finance_stamp(),
-       status=if(is.list(value)&&!is.data.frame(value)&&!is.null(value$status)&&value$status%in%c('partial','unavailable','unsupported'))'partial'else if(identical(attr(value,'fetch_status'),'partial'))'partial'else'ok',
+       status=if(is.list(value)&&!is.data.frame(value)&&!is.null(value$status)&&value$status%in%c('partial','unavailable','unsupported'))'partial'else if(acquisition_data_unverified(value)||!is.null(attr(value,'fetch_error')))'partial'else'ok',
        completeness=if(isTRUE(attr(value,'complete')))'complete'else'unknown')
       produced_bytes<<-produced_bytes+bytes
      }
@@ -344,6 +372,19 @@ fm_worker_run<-function(descriptor){
  if(is.null(value))stop('Source did not return a resource')
  # Drain callbacks such as acknowledged history chunks before certifying a snapshot.
  for(i in seq_len(20L))later::run_now(0)
+ if(handler=='get_championship_pressroom'){
+  history_context<-env$resource_context(auth,ctx$championship_id)
+  value<-history_ack_attach(value,history_context)
+ }
+ for(key in names(produced))if(produced[[key]]$descriptor$handler=='get_championship_pressroom'){
+  child_context<-env$resource_context(auth,produced[[key]]$descriptor$context$championship_id)
+  decoded<-history_ack_attach(fm_worker_decode(produced[[key]]$value),child_context)
+  wire<-fm_worker_encode(decoded);bytes<-as.numeric(object.size(wire))
+  prior_bytes<-as.numeric(object.size(produced[[key]]$value))
+  if(produced_bytes-prior_bytes+bytes<=8*1024^2){
+   produced[[key]]$value<-wire;produced_bytes<-produced_bytes-prior_bytes+bytes
+  }
+ }
  failure<-attr(value,'fetch_error')
  if(inherits(failure,'condition'))stop(failure)
  if(identical(attr(value,'fetch_status'),'unavailable')||!is.null(failure))stop('Incomplete source acquisition')

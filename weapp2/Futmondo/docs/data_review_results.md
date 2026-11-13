@@ -2003,3 +2003,64 @@ Post-deploy check for commit 68d1493: worker heartbeat is live, but the own-rost
   unrelated `source_rejected`/schema messages. Private source responses were
   not retrieved for this follow-up. Verification notes only; no runtime effect
   and no further performance tests required for this documentation update.
+
+### Continuing freshness failure: scheduling and durable fact acknowledgements — 2026-11-13
+
+- The owner's 05:23 screenshot remained stale after isolated prior successes.
+  Production metadata showed finance occupying acquisition capacity, historical
+  points repeatedly demanding one-minute work from a five-minute summary source,
+  and repeated immutable payment persistence: 93,307 revisions for 138 clause
+  source events, including 3,486 revisions in the preceding hour. Historical
+  records were preserved; no cleanup, fabricated balance or timestamp rewrite.
+- `test/test_worker_expiry_demand.R`: 4 groups passed. Real adapter expiry joins
+  a running worker without invalidating it, manual Refresh still invalidates and
+  queues priority work, and a later durable version restores fresh display with
+  no extra source HTTP. `test/test_worker_display_priority.cjs`: 4 groups passed,
+  including foreground demand, lease/demand/deadline retention,
+  long-job exclusion from the foreground lane, routine finance progress, five-
+  minute normalization including legacy requests, and server-only privileges.
+- `test/test_worker_payment_ack.R`: 5 groups passed. Unacknowledged writes retry,
+  unchanged acknowledged payments skip revisions, typed hashes survive cleared
+  caches, revised facts write/retry, and foreign/oversized facts cannot certify
+  success. The real R-helper restart Python test reuses acknowledgement metadata
+  from an expired stored snapshot, acquires the factual source path normally via
+  existing checkpoints, retains its original source time, and performs zero
+  repeat native player/transaction/auction/bid writes. Stale source rows are not
+  returned by the acknowledgement-only path.
+- Python `test_worker.WorkerTests`: 28 passed. New finance error tests retain
+  fixed rejection conditions for R, keep authentication/revocation fatal, mark
+  the finance parent partial, and isolate unrelated successful child resources.
+  `test/test_worker_optional_finance.R` passes: actual optional getter creates no
+  fake team evidence and actual accounting completes ledgers 90/110 while the
+  missing private rival balance remains unknown/unreconciled.
+- Existing checks passed: source expiry (7 groups), worker provider (8), live
+  version replay (4), manual clause refresh (11, including the 527-player matrix),
+  finance/award/progress controller, detailed lineup/evidence batching, complete/
+  incremental/persisted pressroom history, locker transfers, and offline Shiny
+  lifecycle (13 checks plus eight tabs). Tests used synthetic accounts and no
+  real source calls or transactions. Earlier source-response captures were not
+  exported for this follow-up: automatic approval review rejected the broader
+  snapshot query; safe aggregate metadata and offline fixtures were used instead.
+- Production scheduling migrations recorded as
+  `20261113054456_worker_display_priority` and
+  `20261113054649_worker_points_cadence_guard`. Verified recent-point jobs use
+  300 seconds and finance demand normalizes to priority 8. These are not proof
+  of sustained browser rendering or repair of rejected external endpoints.
+- Performance review: adds one scoped acknowledgement metadata read on a cold
+  pressroom acquisition, then suppresses acknowledged unchanged native/payment
+  writes across sessions/restarts. Hashes stay within existing 20,000-row and
+  worker payload/cache limits; child re-encoding is bounded by 8 MiB. No new
+  timers/processes, source fan-out, VM sizing assumption or dependency. Historical
+  point polling demand drops to the existing upstream five-minute cadence;
+  explicit Refresh remains immediate. Existing source deadlines, stale/partial
+  states, account/context guards and transaction preflights are unchanged. UI
+  markup/CSS is unchanged on mobile; real hosted end-to-end latency and repeated
+  freshness still require acceptance after rollout.
+
+- Additional performance/ownership checks: a 5,001-row ledger hydrated in 0.107 s
+  locally; 1,203 acknowledgement hashes used 91,587 JSON bytes / 87,000 retained
+  bytes and decoded in 0.063 s. Session ownership/cancellation (3 groups) and
+  deployment exclusions/dependency contract (3 groups) passed. Production
+  `worker_claim`, `worker_enqueue` and priority helper are invoker functions with
+  no anon/authenticated execution grants. No dependency/manifest regeneration
+  was required; existing unrelated manifest edits were preserved.

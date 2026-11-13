@@ -157,3 +157,12 @@ and reuses unchanged durable jobs without rewriting them. It was applied to the
 configured production database as `20261113043948_worker_discovery_batches`.
 No new package or environment variable is required; see
 [worker discovery behavior](docs/python_worker.md#bounded-durable-discovery-writes-2026-11-13).
+
+For the worker freshness/history-write repair, apply
+`scripts/migrations/20261113053241_worker_display_priority.sql` followed by
+`scripts/migrations/20261113054538_worker_points_cadence_guard.sql` before the
+matching image. Both are applied to the configured production database. No new
+package or environment variable is required. See
+[worker freshness and durable acknowledgement reuse](docs/worker_freshness_recovery.md)
+for foreground lane behavior, five-minute recent-point cadence, mixed-version
+rollout safety, partial finance results and validation limits.

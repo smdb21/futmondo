@@ -125,3 +125,15 @@ previous worker image remains compatible with the additive function.
 
 Checks and rollout limits are recorded in `data_review_results.md`. Synthetic
 SQL performance is not hosted end-to-end freshness or VM capacity acceptance.
+
+### Sustained freshness and immutable history reuse (2026-11-13)
+
+The follow-up repair separates expiry demand from explicit invalidation, gives
+critical display resources priority over history, reserves the foreground lane
+from long finance aggregates, and aligns recent-point jobs with their summary
+source's five-minute validity. It reuses only acknowledged immutable event
+fingerprints from existing durable snapshots, avoiding unchanged native/payment
+fact writes across helper restarts. Optional finance source rejections now reach
+the R engine's existing error handling and remain partial/unreconciled instead
+of terminating all independent progress. Hard authentication/context/persistence
+failures still abort. See [contracts, migrations and limits](worker_freshness_recovery.md).

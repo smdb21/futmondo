@@ -267,7 +267,7 @@ class Helper:
                     safe_diagnostic = isinstance(code, str) and (code in diagnostic_codes or re.fullmatch(
                         r'resource_parse_(?:http|network|parser|schema|read_budget|unknown)_(?:' + resources + r')(?:_[1-5][0-9]{2})?', code, flags=re.ASCII))
                     raise WorkerFailure(code if safe_timeout or safe_diagnostic else 'resource_parse')
-                if message.get('type') not in ('http', 'database', 'persist', 'resource', 'progress'):
+                if message.get('type') not in ('http', 'database', 'persist', 'resource', 'progress', 'history_ack'):
                     raise WorkerFailure('helper_protocol')
                 try:
                     response = await exchange(message)
@@ -275,8 +275,8 @@ class Helper:
                     # Send fixed codes only; do not convert auth/revocation into optional-source success.
                     if error.code in ('access_revoked', 'source_authentication', 'source_rate_limited',
                             'context_superseded', 'league_membership_unverified', 'source_context',
-                            'source_route_denied', 'source_rejected', 'credential_in_fact',
-                            'snapshot_corrupt', 'snapshot_size', 'snapshot_incomplete') or message['type'] in ('persist', 'progress'):
+                            'source_route_denied', 'credential_in_fact',
+                            'snapshot_corrupt', 'snapshot_size', 'snapshot_incomplete') or (error.code == 'source_rejected' and descriptor['handler'] != 'fm_worker_finances') or message['type'] in ('persist', 'progress'):
                         raise
                     response = {'error': error.code}
                 await self.send(response)
@@ -417,7 +417,9 @@ class Worker:
                         parsed = filter_football_leagues(parsed)
                     assert_factual(parsed)
                     if source_response_rejected(parsed):
-                        raise WorkerFailure('source_rejected')
+                        failure = WorkerFailure('source_rejected')
+                        failure.source_route = url.path
+                        raise failure
                     answer = {'status': response.status_code, 'body': parsed, 'observed_at': stamp()}
                     parts, size, digest = pack_snapshot(answer)
                     await self.store.rpc('checkpoint', p_account=job['account_id'], p_key=job['resource_key'],
@@ -459,10 +461,14 @@ class Worker:
             try:
                 return await self.source(job, owner, message)
             except WorkerFailure as error:
-                self.source_errors.setdefault(owner, set()).add(error.code)
+                route = getattr(error, 'source_route', '')
+                suffix = '_' + route.strip('/').replace('/', '_') if route in READ_PATHS else ''
+                self.source_errors.setdefault(owner, set()).add(error.code + suffix)
                 raise
-        if message['type'] == 'resource':
+        if message['type'] in ('resource', 'history_ack'):
             descriptor = message['descriptor']
+            if message['type'] == 'history_ack' and descriptor.get('handler') != 'get_championship_pressroom':
+                raise WorkerFailure('resource_context')
             scope = descriptor['context']
             if scope['account_id'] != job['account_id'] or (scope.get('championship_id') and
                     scope['championship_id'] != job['descriptor']['context'].get('championship_id')):
@@ -472,7 +478,15 @@ class Worker:
             if isinstance(result, dict):
                 for item in result.get('resources', []):
                     manifest = item['manifest']
-                    if canonical(manifest['context']) != canonical(scope) or manifest['status'] not in ('ok', 'empty'):
+                    if canonical(manifest['context']) != canonical(scope):
+                        continue
+                    if message['type'] == 'history_ack':
+                        # Only acknowledged immutable fact fingerprints may be
+                        # reused from expired data; no stale source rows escape.
+                        value = unpack_snapshot(manifest, item['chunks'])
+                        metadata = value.get('meta', {})
+                        return {k: metadata[k] for k in ('history_write_ack', 'locker_write_ack') if k in metadata}
+                    if manifest['status'] not in ('ok', 'empty'):
                         continue
                     if datetime.fromisoformat(manifest['valid_until'].replace('Z', '+00:00')).timestamp() <= time.time():
                         continue
@@ -527,7 +541,7 @@ class Worker:
         manifest = dict(context=descriptor['context'], version=version, parts=len(parts), json_bytes=size, sha256=digest,
             checked_at=checked, observed_at=observed, valid_until=stamp(datetime.fromisoformat(checked.replace('Z', '+00:00')).timestamp() + (60 if child else job['interval_seconds'])),
             completeness=result.get('completeness', 'unknown'), status=result.get('status', 'ok'))
-        if self.source_errors.get(owner):
+        if self.source_errors.get(owner) and (not child or resource_key == job['resource_key']):
             manifest.update(status='partial', completeness='partial', error=','.join(sorted(self.source_errors[owner])))
         if not child and job['descriptor']['handler'] == 'get_active_championships':
             value = plain(result['value'])
@@ -630,7 +644,9 @@ class Worker:
                 handler = job.get('descriptor', {}).get('handler') if job else None
                 if not isinstance(handler, str) or not re.fullmatch(r'(?:get_|read_)[a-z][a-z0-9_]{0,79}|fm_worker_finances', handler, flags=re.ASCII):
                     handler = 'unknown'
-                LOG.warning('worker_job code=%s handler=%s lane=%d', code, handler, index)
+                route = getattr(error, 'source_route', '')
+                route = route if route in READ_PATHS else 'unknown'
+                LOG.warning('worker_job code=%s handler=%s lane=%d route=%s', code, handler, index, route)
                 await self.helpers[index].close()
                 if job:
                     with contextlib.suppress(Exception):
