@@ -1981,3 +1981,25 @@ Post-deploy check for commit 68d1493: worker heartbeat is live, but the own-rost
   environments or UI/CSS changed; mobile layout and browser rendering are
   unchanged. Actual hosted freshness and source capacity still need acceptance
   after the image rolls out; pending stale data remains explicitly unverified.
+
+### Discovery repair production acceptance evidence — 2026-11-13 04:46 UTC
+
+- The new image restarted the worker; the new RPC appeared in production SQL
+  statistics, 22 calls across five normalized statement forms (including the
+  empty validation statement). Maximum recorded server execution was 120.309 ms;
+  this excludes network latency and is not a full source-refresh benchmark.
+- The parser repair is also confirmed on the formerly failing acquisition path:
+  production roster jobs now complete with `last_error=NULL` and publish `ok`
+  source snapshots. Source timestamps retain their actual check times.
+- Queued existing full-roster and pressroom descriptors through `worker_enqueue`
+  at foreground priority for the already-enabled active account. These are
+  factual acquisition requests, not trades, new consent or fabricated cache
+  writes. The worker performed normal source retrieval and persistence.
+- At 04:46:37 UTC one roster/transaction pair was simultaneously fresh and `ok`:
+  source checks 04:45:49 / 04:45:52, acknowledged job completion 04:46:00 /
+  04:46:35, both job errors cleared. Other queued contexts were still acquiring.
+  This confirms recovered durable prerequisites; it does not certify the live
+  authenticated browser's final rendering, continuous freshness under load or
+  unrelated `source_rejected`/schema messages. Private source responses were
+  not retrieved for this follow-up. Verification notes only; no runtime effect
+  and no further performance tests required for this documentation update.

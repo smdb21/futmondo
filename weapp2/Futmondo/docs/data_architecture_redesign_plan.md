@@ -1158,3 +1158,15 @@ and fresh stored roster/transaction versions remain the production acceptance
 criteria. See `python_worker.md` and `data_review_results.md`. The screenshot's
 independent source-rejection and schema diagnostics are not declared repaired
 without their own source/persistence evidence.
+
+### Discovery batch rollout evidence — 2026-11-13 04:46 UTC
+
+The restarted production worker invoked the new batch RPC (22 recorded calls
+across normalized statement forms; maximum server execution 120.309 ms). After
+targeted requests through the existing opted-in queue, a roster job completed
+at 04:46:00 UTC and its transaction job at 04:46:35 UTC. At 04:46:37 UTC both
+persisted snapshots were simultaneously `ok`, fresh and error-free for one
+context; remaining queued contexts were still acquiring. This demonstrates
+recovery of the acquisition path, not live mobile-browser acceptance or repair
+of the independent source-rejection/schema diagnostics. No source timestamps
+or source facts were manually rewritten.
