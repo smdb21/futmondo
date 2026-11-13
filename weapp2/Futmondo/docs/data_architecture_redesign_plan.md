@@ -1238,3 +1238,17 @@ at 300/base 3). Container redeploy and production end-to-end confirmation remain
 Separate history marker HTTP400/PGRST204 remains unresolved; safe missing-column
 diagnostics added to obtain the specific failing field after redeploy. See
 `docs/worker_freshness_recovery.md`; no milestone for production recovery is closed.
+
+### 2026-11-13 — Root repair: marker row names and unresolved GUI resources
+
+Implemented locally and SQL deployed (`20261113121612_worker_resolved_handoff`):
+remove implicit R `_row` serialization from DB writes, retain marker source
+microseconds, retry bounded failed payloads without source reacquisition, and
+hand unresolved consumers to canonical resources through additive verified RPC
+redirects. Clause progress remains independent of GUI scheduling, at300 seconds,
+with short-lane ordering that avoids bulk-history starvation. Context mismatch
+and obsolete callbacks remain rejected; historical rows are never relabelled.
+See `docs/worker_resolved_recovery.md` for exact checks, performance and limits.
+Required lifecycle13/eight tabs passed. Production container deployment and two
+five-minute end-to-end acceptance cycles remain open; no production recovery
+milestone is closed solely by local tests or SQL rollout.

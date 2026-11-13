@@ -2164,3 +2164,35 @@ returned400/PGRST204. All expected DB columns/indexes exist; the offending REST
 column is not exposed by available logs. Local REST schema probe was blocked by
 absent server credentials. New route-specific sanitized missing-column diagnostic
 will identify it after app deployment; source history is not falsely acknowledged.
+
+### 2026-11-13 — Marker `_row` and canonical-worker handoff
+
+Reproduced the marker defect with actual `fm_time(ISO)` output: its vector name
+becomes a frame row name and jsonlite adds `_row`. Literal JSON-key regression
+covers queued/direct/bridge serializers, fractional source time, negative points,
+failed acknowledgement and identical source-free replay. Added actual async
+adapter + compressed durable snapshot handoff, cancelled obsolete waiter,
+canonical-only cache, account/season/hash rejection and route-switch checks.
+SQL tests cover idempotent migration, authoritative membership/argument isolation,
+version and status deduplication, bootstrap, and clause dispatch ahead of527 bulk
+jobs with finance already running. Failed save Refresh retains/replays up to25
+payloads/8MiB per entry and clears errors only on successful acknowledgement.
+
+Passed Python worker30, incoming24/outgoing24, provider9, live updates4, clause
+refresh11, persistence recovery11, session ownership3, deployment3 and required
+lifecycle13/eight tabs. Existing527 durable replay reused526 plus one snapshot,
+zero source HTTP. Seven ACKs for527x38 histories:0.234s total/0.119s worst heartbeat
+gap; zero matrix rescans, fitness recalculations, extra reads or publications.
+Performance: no new timers/lanes/dependencies; bounded hints and write retention;
+indexed peer lookup returns at most two candidates; canonical versions avoid
+repeat chunk transfer. Priority adjustment changes dispatch, not cadence.
+
+Additional cache-boundary fixture fails future-ID eligibility on both HEAD and
+changed code (verified by substituting the unchanged table implementation);
+preceding acquisition/save assertions pass. This pre-existing failure is not
+claimed resolved or passed. SQL deployed as20261113121612. Container deployment
+and multi-cycle production transfer/history acceptance remain outstanding because
+no Docker daemon or Dokploy deployment tool is connected here. See
+`docs/worker_resolved_recovery.md`; no claim of production recovery yet.
+Production policy inspection found the enabled account in configured quiet hours;
+normal hourly floor remains respected. No settings were altered to force a test.

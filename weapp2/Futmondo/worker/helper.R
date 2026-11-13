@@ -11,7 +11,7 @@ for(verb in c('GET','POST','PUT','PATCH','DELETE','HEAD'))
  assignInNamespace(verb,function(...)stop('Direct helper HTTP is disabled'),ns='httr')
 for(name in c('curl_fetch_memory','curl_fetch_disk','curl_fetch_stream','multi_add'))
  assignInNamespace(name,function(...)stop('Direct helper HTTP is disabled'),ns='curl')
-fm_pipe_send<-function(value){writeLines(as.character(jsonlite::toJSON(value,auto_unbox=TRUE,null='null',na='null',digits=NA)),pipe_out);flush(pipe_out)}
+fm_pipe_send<-function(value){writeLines(as.character(jsonlite::toJSON(value,auto_unbox=TRUE,null='null',na='null',digits=NA,rownames=FALSE)),pipe_out);flush(pipe_out)}
 fm_pipe_exchange<-function(value){
  fm_pipe_send(value);line<-readLines(pipe_in,n=1L,warn=FALSE)
  if(!length(line))stop('Bridge closed')

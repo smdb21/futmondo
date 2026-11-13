@@ -342,10 +342,12 @@ factual_read_adapter<-function(session,handler,login_token,championship_id=NULL,
  if(is.null(session$userData$factual_read_registry))session$userData$factual_read_registry<-new.env(parent=emptyenv())
  registry<-session$userData$factual_read_registry
  value<-function(x)if(is.function(x))x()else x
- owner_context<-function(){
+ owner_context<-function(args=list()){
    league_context_revision();auth<-value(login_token)
    if(!valid_login(auth))return(list(account="",league="",team="",competition="unknown",season="unknown",scoring="unknown"))
-   ctx<-resource_context(auth,value(championship_id),value(user_team_id))
+   ctx<-resource_context(auth,value(championship_id) %||% args$championship_id,value(user_team_id) %||% args$user_team_id,args$player_id)
+   for(field in intersect(c("season","scoring_version","competition_id"),names(args)))ctx[[field]]<-args[[field]]
+   ctx<-fm_worker_resolve_context(handler,args,ctx)
    list(account=ctx$account_id,league=ctx$championship_id,team=ctx$user_team_id,competition=ctx$competition_id,season=ctx$season,scoring=ctx$scoring_version)
  }
  function(...){
@@ -361,16 +363,17 @@ factual_read_adapter<-function(session,handler,login_token,championship_id=NULL,
   ctx<-resource_context(requested_auth,args$championship_id %||% value(championship_id),args$user_team_id %||% value(user_team_id),args$player_id,session_id=session$token)
   resource<-paste0(handler,":",as.character(openssl::sha256(serialize(args,NULL))))
   for(field in intersect(c("season","scoring_version","competition_id"),names(args)))ctx[[field]]<-args[[field]]
+  ctx<-fm_worker_resolve_context(handler,args,ctx)
   entry_key<-paste0(session$ns(""),api_cache_key(resource,context=ctx))
   if(!exists(entry_key,registry,inherits=FALSE))shiny::isolate({
    keys<-ls(registry)
    if(length(keys)>=128L){times<-vapply(keys,function(k)attr(registry[[k]],"last_access") %||% 0,numeric(1));victim<-keys[which.min(times)];dispose<-attr(registry[[victim]],"dispose");if(is.function(dispose))dispose();rm(list=victim,envir=registry)}
-   captured_args<-args;captured_context<-ctx;captured_owner<-owner_context();demand_refresh<-shiny::reactiveVal(0L)
+   captured_args<-args;captured_context<-ctx;captured_owner<-owner_context(args);demand_refresh<-shiny::reactiveVal(0L)
    progressive<-identical(handler,"get_round_lineup_snapshot")
    fetch<-function(context,publish=NULL){
     current<-function()shiny::isolate({
       alive<-attr(registry[[entry_key]],"is_current")
-      is.function(alive)&&alive()&&isTRUE(is_active())&&identical(owner_context(),captured_owner)
+      is.function(alive)&&alive()&&isTRUE(is_active())&&identical(owner_context(captured_args),captured_owner)
     })
     attr(current,"fm_worker_interest")<-paste(session$token,entry_key,sep="\034")
     request<-list(handler,captured_args,context=context,
@@ -387,7 +390,7 @@ factual_read_adapter<-function(session,handler,login_token,championship_id=NULL,
     list(enabled=mode,revision=fm_worker_resource_revision(state,descriptor$resource_key)())
    }
    registry[[entry_key]]<-shared_resource(session,resource,context=function()captured_context,fetch=fetch,
-     active=function()isTRUE(is_active())&&identical(owner_context(),captured_owner),
+     active=function()isTRUE(is_active())&&identical(owner_context(captured_args),captured_owner),
      refresh=function()list(manual=if(is.function(refresh_trigger))refresh_trigger()else 0L,expiry=demand_refresh()),
      invalidate_refresh=function(previous,next_version)!identical(previous$manual,next_version$manual),
      progressive=progressive,replay=worker_replay)
@@ -407,6 +410,7 @@ factual_read_adapter<-function(session,handler,login_token,championship_id=NULL,
    state<-resource_state(observed_data(state$data,status="stale"),status="loading",source=state$source)
    state$freshness<-"stale"
   }
+  state$context<-ctx
   if(isTRUE(state_only))return(state)
   if(is.null(state$data)){
    if(identical(state$status,"loading"))shiny::validate(shiny::need(FALSE,"Loading data…"))

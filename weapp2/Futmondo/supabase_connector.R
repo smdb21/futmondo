@@ -41,6 +41,9 @@ record_persistence_failure <- function(table_name, http_status = NULL, error_cod
   invisible(issue)
 }
 
+# Database row names are R implementation metadata, never factual columns.
+supabase_payload_json <- function(payload) jsonlite::toJSON(payload,auto_unbox=TRUE,na="null",rownames=FALSE)
+
 supabase_post_direct <- function(table_name, payload, conflict = NULL, ignore_duplicates = FALSE) {
   if (isTRUE(getOption("futmondo.offline", FALSE))) return(NULL)
   if (is.null(payload) || (is.data.frame(payload) && nrow(payload) == 0) || (is.list(payload) && length(payload) == 0)) {
@@ -66,7 +69,7 @@ supabase_post_direct <- function(table_name, payload, conflict = NULL, ignore_du
   
   # Perform request defensively
   tryCatch({
-    response <- POST(url, query = if (!is.null(conflict)) list(on_conflict = conflict) else NULL, body = toJSON(payload, auto_unbox = TRUE, na = "null"), add_headers(.headers = headers), httr::timeout(15), httr::config(connecttimeout = 5))
+    response <- POST(url, query = if (!is.null(conflict)) list(on_conflict = conflict) else NULL, body = supabase_payload_json(payload), add_headers(.headers = headers), httr::timeout(15), httr::config(connecttimeout = 5))
     code <- status_code(response)
     if (code >= 200 && code < 300) {
       if(identical(table_name,"round_dream_team")) invalidate_mvp_saved_cache()
@@ -791,7 +794,7 @@ supabase_patch <- function(table_name, payload, filters) {
   if (isTRUE(getOption("futmondo.offline", FALSE))) return(FALSE)
   tryCatch({
     r <- httr::PATCH(paste0(get_sb_url(), "/rest/v1/", table_name), query = filters,
-      body = jsonlite::toJSON(payload, auto_unbox = TRUE, na = "null"),
+      body = supabase_payload_json(payload),
       httr::add_headers(apikey = get_sb_key(), Authorization = paste("Bearer", get_sb_key()),
         `Content-Type` = "application/json"), httr::timeout(15))
     httr::status_code(r) %in% 200:299

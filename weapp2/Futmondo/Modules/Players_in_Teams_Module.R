@@ -433,8 +433,8 @@ get_ordinal_position <- function(position) {
 
 # Page-scoped queue: at most two summary reads, with the same account-scoped
 # raw cache used by cards/preflight. Navigation never starts whole-league work.
-incoming_clause_cached_summary <- function(login,championship_id,user_team_id,player_id,is_current=NULL,owner='') {
-  context<-resource_context(login,championship_id,user_team_id,player_id)
+incoming_clause_cached_summary <- function(login,championship_id,user_team_id,player_id,is_current=NULL,owner='',context=NULL) {
+  context<-context %||% resource_context(login,championship_id,user_team_id,player_id)
   key<-api_cache_key(paste0("player_summary_",login[["userid"]],"_",championship_id,"_",user_team_id,"_",player_id),context=context)
   item<-api_cache_env[[key]]
   now<-Sys.time();stamp<-fm_time(attr(item$data,"observed_at"))
@@ -455,6 +455,12 @@ incoming_clause_cached_summary <- function(login,championship_id,user_team_id,pl
   }
   if(!is.null(value))persist_clause_transfer_summary(value,context)
   value
+}
+
+incoming_clause_context_matches<-function(roster,history){
+  if(!is.list(roster$context)||!is.list(history$context))return(TRUE)
+  fields<-c("account_id","championship_id","competition_id","season","scoring_version")
+  identical(fm_worker_json(roster$context[fields]),fm_worker_json(history$context[fields]))
 }
 
 incoming_clause_source_unverified <- function(state) {
@@ -492,6 +498,9 @@ incoming_clause_source <- function(session,login_token,championship_id,user_team
     is_active=is_active,refresh_trigger=refresh_trigger,state_only=TRUE)
   generation<-0L;closed<-FALSE;was_active<-FALSE;signature<-NULL;owner<-NULL
   jobs<-list();queue<-character();summaries<-list();snapshot<-NULL;job_sequence<-0L;prerequisite_problem<-NULL
+  summary_context<-function(ctx,pid)resource_context(ctx$login,ctx$league,ctx$team,pid,
+    season=ctx$scope$season %||% "unknown",scoring_version=ctx$scope$scoring_version %||% "unknown",
+    competition_id=ctx$scope$competition_id %||% "unknown",session_id=session$token)
   publish<-function(loading=FALSE) {
     if(is.null(snapshot))return(invisible(NULL))
     prior<-shiny::isolate(state())
@@ -516,7 +525,7 @@ incoming_clause_source <- function(session,login_token,championship_id,user_team
       job_id<-as.character(job_sequence);job_generation<-generation;captured<-snapshot
       jobs[[job_id]]<<-TRUE
       # A fresh cache read can settle synchronously without another request.
-      cached<-incoming_clause_cached_summary(captured$login,captured$league,captured$team,pid)
+      cached<-incoming_clause_cached_summary(captured$login,captured$league,captured$team,pid,context=summary_context(captured,pid))
       if(!is.null(cached)) {summaries[[pid]]<<-cached;jobs[[job_id]]<<-NULL;next}
       local({
         id<-job_id;player_id<-pid;version<-job_generation;ctx<-captured
@@ -532,7 +541,7 @@ incoming_clause_source <- function(session,login_token,championship_id,user_team
           }
           jobs[[id]]<<-NULL
           if(current()) {
-            if(!is.null(value))persist_clause_transfer_summary(value,resource_context(ctx$login,ctx$league,ctx$team,player_id,session_id=session$token))
+            if(!is.null(value))persist_clause_transfer_summary(value,summary_context(ctx,player_id))
             summaries[player_id]<<-list(value);publish(length(queue)>0L||length(jobs)>0L)
           }
           pump();invisible(NULL)
@@ -543,7 +552,7 @@ incoming_clause_source <- function(session,login_token,championship_id,user_team
           attr(live,"fm_worker_interest")<-paste0("clause:",id,":",handler)
           request<-tryCatch(async_adapter_fetch(handler,list(login=ctx$login,
             championship_id=ctx$league,user_team_id=ctx$team,player_id=player_id),
-            context=resource_context(ctx$login,ctx$league,ctx$team,player_id,session_id=session$token),
+            context=summary_context(ctx,player_id),
             is_current=live,priority="interactive"),error=function(e)promises::promise_reject(e))
           promises::then(request,function(value){awaiting<<-FALSE;finish(value,rechecked)},
             function(error){awaiting<<-FALSE;finish()})
@@ -556,7 +565,10 @@ incoming_clause_source <- function(session,login_token,championship_id,user_team
   }
   observer<-shiny::observe({
     active<-isTRUE(is_active());auth<-login_token()
-    context<-if(valid_login(auth))list(account=fm_scalar(auth[["userid"]]),league=fm_scalar(championship_id()),team=fm_scalar(user_team_id()),scope=resource_context(auth,championship_id(),user_team_id())[fm_worker_fields])else NULL
+    context<-if(valid_login(auth)){
+      scope<-fm_worker_resolve_context("get_players_from_team",list(championship_id=championship_id(),user_team_id=user_team_id()),resource_context(auth,championship_id(),user_team_id()))
+      list(account=fm_scalar(auth[["userid"]]),league=fm_scalar(championship_id()),team=fm_scalar(user_team_id()),scope=scope[fm_worker_fields])
+    }else NULL
     if(!identical(owner,context)) {
       generation<<-generation+1L;owner<<-context;signature<<-NULL;snapshot<<-NULL;queue<<-character();summaries<<-list();prerequisite_problem<<-NULL
       state(empty_state())
@@ -569,12 +581,13 @@ incoming_clause_source <- function(session,login_token,championship_id,user_team
     roster<-roster_read(login=auth,championship_id=context$league,user_team_id=context$team,teams=NULL)
     history<-history_read(login=auth,championship_id=context$league)
     refresh<-if(is.function(refresh_trigger))refresh_trigger()else 0L
-    if(incoming_clause_source_unverified(roster)||incoming_clause_source_unverified(history)) {
+    context_mismatch<-!incoming_clause_context_matches(roster,history)
+    if(context_mismatch||incoming_clause_source_unverified(roster)||incoming_clause_source_unverified(history)) {
       # Keep a valid in-flight batch through transient source expiry. Its
       # observations remain historical and the displayed prerequisite warning stays.
       previous<-shiny::isolate(state())
       loading<-roster$status%in%c("loading","refreshing")||history$status%in%c("loading","refreshing")
-      problem<-incoming_clause_prerequisite_failure(roster,history)
+      problem<-if(context_mismatch)list(message="Transfer sources use different account, league or scoring contexts; waiting for matching observations.",failures=list())else incoming_clause_prerequisite_failure(roster,history)
       prerequisite_problem<<-problem
       initial_loading<-loading&&is.null(snapshot)
       state(list(status=if(initial_loading)"loading"else "partial",records=previous$records,
@@ -604,18 +617,18 @@ incoming_clause_source <- function(session,login_token,championship_id,user_team
     attr(display_live,"fm_worker_interest")<-"clause-display"
     if(identical(signature,next_signature)) {
       for(pid in unique(as.character(candidates$player_id))) {
-        cached<-incoming_clause_cached_summary(auth,context$league,context$team,pid,display_live,session$token)
+        cached<-incoming_clause_cached_summary(auth,context$league,context$team,pid,display_live,session$token,summary_context(list(login=auth,league=context$league,team=context$team,scope=context$scope),pid))
         if(!is.null(cached))summaries[[pid]]<<-cached
       }
-      snapshot<<-list(login=auth,league=context$league,team=context$team,roster=roster$data,history=history$data)
+      snapshot<<-list(login=auth,league=context$league,team=context$team,roster=roster$data,history=history$data,scope=context$scope)
       publish(length(queue)>0L||length(jobs)>0L);pump();return()
     }
     signature<<-next_signature;generation<<-generation+1L
-    snapshot<<-list(login=auth,league=context$league,team=context$team,roster=roster$data,history=history$data)
+    snapshot<<-list(login=auth,league=context$league,team=context$team,roster=roster$data,history=history$data,scope=context$scope)
     display_live<-local({version<-generation;function()!closed&&was_active&&identical(generation,version)})
     attr(display_live,"fm_worker_interest")<-"clause-display"
     ids<-unique(as.character(candidates$player_id));summaries<<-list()
-    for(pid in ids){cached<-incoming_clause_cached_summary(auth,context$league,context$team,pid,display_live,session$token);if(!is.null(cached))summaries[[pid]]<<-cached}
+    for(pid in ids){cached<-incoming_clause_cached_summary(auth,context$league,context$team,pid,display_live,session$token,summary_context(list(login=auth,league=context$league,team=context$team,scope=context$scope),pid));if(!is.null(cached))summaries[[pid]]<<-cached}
     queue<<-setdiff(ids,names(summaries));publish(length(queue)>0L||length(jobs)>0L);pump()
   })
   session$onSessionEnded(function(){closed<<-TRUE;generation<<-generation+1L;queue<<-character();snapshot<<-NULL;summaries<<-list();observer$destroy()})

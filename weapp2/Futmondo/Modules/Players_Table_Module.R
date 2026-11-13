@@ -1427,6 +1427,44 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
     })
     invisible(NULL)
   }
+  # Retain bounded failed factual payloads for source-free persistence retry.
+  save_round_snapshot<-function(entry,player_id,payload){
+    entry$saving<-entry$saving+1L
+    stamp<-as.numeric(fm_time(payload$checked_at))
+    entry$save_latest[[player_id]]<-max(stamp,entry$save_latest[[player_id]] %||% -Inf)
+    if(length(entry$save_latest)>2000L)entry$save_latest<-tail(entry$save_latest,2000L)
+    entry$save_retry[[player_id]]<-NULL
+    did_ack<-FALSE
+    acknowledged<-function(ok){
+      if(did_ack)return(NULL)
+      did_ack<<-TRUE
+      if(closed||!identical(entries[[entry$key]],entry))return(NULL)
+      entry$saving<-max(0L,entry$saving-1L)
+      if(stamp<(entry$save_latest[[player_id]] %||% stamp)){touch();return(NULL)}
+      if(isTRUE(ok)){
+        marker<-data.frame(championship_id=payload$context$championship_id,player_id=player_id,
+          competition_id=fm_scalar(payload$context$competition_id,"unknown"),season=payload$context$season,scoring_version=payload$context$scoring_version,
+          checked_at=format(fm_time(payload$checked_at),"%Y-%m-%dT%H:%M:%OS6Z",tz="UTC"),
+          result_status=if(nrow(payload$observations))"scores"else "empty",point_count=nrow(payload$observations),row.names=NULL)
+        entry$checks<-dplyr::bind_rows(entry$checks,marker)
+        entry$checks<-tail(entry$checks[!duplicated(entry$checks[c("championship_id","player_id","competition_id","season","scoring_version")],fromLast=TRUE),,drop=FALSE],2000L)
+        entry$save_errors<-setdiff(entry$save_errors,player_id)
+        entry$save_retry[[player_id]]<-NULL
+        # A saved marker only changes fitness eligibility when this
+        # player still needs it; already resolved vectors stay valid.
+        if(player_id%in%entry$fitness_changed)entry$fitness_dirty<-TRUE
+      }else {
+        entry$save_errors<-unique(c(entry$save_errors,player_id))
+        entry$save_retry[[player_id]]<-NULL;entry$save_retry[[player_id]]<-payload
+        while(length(entry$save_retry)>25L||sum(vapply(entry$save_retry,function(x)as.numeric(object.size(x)),numeric(1)))>8*1024^2)
+          entry$save_retry<-entry$save_retry[-1L]
+      }
+      touch();NULL
+    }
+    queued_ok<-tryCatch(persist_recent_points_snapshot(payload,payload$context,acknowledged),error=function(e)FALSE)
+    if(!isTRUE(queued_ok)&&entry$saving>0L)acknowledged(FALSE)
+    invisible(NULL)
+  }
   load_entry <- function(client,key){
     entry<-new.env(parent=emptyenv());entry$key<-key
     entry$context<-round_points_client_context(client);entry$context$session_id<-root$token
@@ -1436,7 +1474,7 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
     entry$live<-list();entry$attempted<-list();entry$pending<-list();entry$forced<-character();entry$retry_reads<-0L;entry$request_sequence<-0L
     entry$requires_context<-isTRUE(root$userData$league_context_enabled)
     entry$loading<-c(context=entry$requires_context,matrix=TRUE,lineup=TRUE,catalog=catalog_requested());entry$matrix_complete<-FALSE;entry$initial_errors<-list();entry$initial_pending<-list();entry$initial_sequence<-0L;entry$worker_reads<-list()
-    entry$save_errors<-character();entry$saving<-0L;entry$overflow<-FALSE
+    entry$save_errors<-character();entry$save_retry<-list();entry$save_latest<-list();entry$saving<-0L;entry$overflow<-FALSE
     entry$finished_signature<-NULL;entry$published_ids<-character()
     entry$catalog_fitness<-data.frame();entry$fitness<-data.frame();entry$fitness_dirty<-TRUE
     entry$fitness_anchors<-list();entry$fitness_probe_attempted<-list();entry$fitness_probes<-list()
@@ -1474,7 +1512,11 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
       if(!is.null(previous)&&!identical(previous,client$refresh))pending_refresh[[id]]<<-TRUE
       if(!is.null(entry)&&isTRUE(client$active)&&length(client$ids)&&
          identical(key_for(client),current_key)&&isTRUE(pending_refresh[[id]])){
-        wanted<-head(client$ids,2000L);entry$forced<-unique(c(entry$forced,wanted))
+        wanted<-head(client$ids,2000L)
+        replaying<-intersect(wanted,names(entry$save_retry))
+        for(player in replaying)save_round_snapshot(entry,player,entry$save_retry[[player]])
+        wanted<-setdiff(wanted,replaying)
+        entry$forced<-unique(c(entry$forced,wanted))
         if(nrow(entry$fitness_failed)){
           entry$fitness_unsaved<-recent_points_fitness_buffer(dplyr::bind_rows(entry$fitness_unsaved,entry$fitness_failed))
           entry$fitness_failed<-data.frame()
@@ -1642,29 +1684,7 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
           else{
             merge_live(entry,payload$observations)
             trim_entries()
-            entry$saving<-entry$saving+1L
-            did_ack<-FALSE
-            acknowledged<-function(ok){
-              if(did_ack)return(NULL)
-              did_ack<<-TRUE
-              if(closed||!identical(entries[[entry$key]],entry))return(NULL)
-              entry$saving<-max(0L,entry$saving-1L)
-              if(isTRUE(ok)){
-                marker<-data.frame(championship_id=payload$context$championship_id,player_id=player_id,
-                  competition_id=fm_scalar(payload$context$competition_id,"unknown"),season=payload$context$season,scoring_version=payload$context$scoring_version,
-                  checked_at=format(fm_time(payload$checked_at),"%Y-%m-%dT%H:%M:%OSZ",tz="UTC"),
-                  result_status=if(nrow(payload$observations))"scores"else "empty",point_count=nrow(payload$observations))
-                entry$checks<-dplyr::bind_rows(entry$checks,marker)
-                entry$checks<-tail(entry$checks[!duplicated(entry$checks[c("championship_id","player_id","competition_id","season","scoring_version")],fromLast=TRUE),,drop=FALSE],2000L)
-                entry$save_errors<-setdiff(entry$save_errors,player_id)
-                # A saved marker only changes fitness eligibility when this
-                # player still needs it; already resolved vectors stay valid.
-                if(player_id%in%entry$fitness_changed)entry$fitness_dirty<-TRUE
-              }else entry$save_errors<-unique(c(entry$save_errors,player_id))
-              touch();NULL
-            }
-            queued_ok<-tryCatch(persist_recent_points_snapshot(payload,payload$context,acknowledged),error=function(e)FALSE)
-            if(!isTRUE(queued_ok)&&entry$saving>0L)acknowledged(FALSE)
+            save_round_snapshot(entry,player_id,payload)
           }
         }
         settled<<-TRUE;entry$pending[[player_id]]<-NULL

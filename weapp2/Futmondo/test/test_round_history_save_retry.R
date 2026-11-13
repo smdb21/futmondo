@@ -1,0 +1,32 @@
+options(futmondo.offline=TRUE)
+suppressPackageStartupMessages(source('global.R'))
+auth<-c(userid='save-retry-fixture',token='synthetic');scoring<-normalize_league_rules(list(),list(pointSystem='fixture'),'league')$scoring_version
+players<-data.frame(id='p');stamp<-fm_time('2026-11-13T07:43:00Z')
+ctx<-resource_context(auth,'league','team','p',scoring_version=scoring)
+rows<-data.frame(player_id='p',championship_id='league',competition_id='unknown',season='unknown',scoring_version=scoring,
+ round=1:3,points=c(-2,0,5),score_status='unknown',observed_at='2026-11-13T07:43:00Z',occurred_at=NA_character_,round_start_at=NA_character_)
+payload<-list(context=ctx,observations=rows,checked_at=stamp,status='partial')
+read_league_round_dataset<-function(...)list(points=data.frame(),checks=data.frame(),complete=TRUE)
+get_lineup_from_team<-function(...)list(pointSystem='fixture');get_championship_players<-function(...)players
+reads<-0L;writes<-list()
+async_adapter_fetch<-function(fn,args=list(),context,...){
+ if(fn=='get_player_recent_points'){reads<<-reads+1L;return(promises::promise_resolve(payload))}
+ promises::promise_resolve(do.call(get(fn,.GlobalEnv),args))
+}
+persist_recent_points_snapshot<-function(payload,context,on_complete){writes[[length(writes)+1L]]<<-list(payload=payload,ack=on_complete);TRUE}
+defer_persistence<-function(...,on_complete=NULL){if(is.function(on_complete))on_complete(TRUE);TRUE}
+settle<-function(session)for(i in 1:25){later::run_now(0);session$flushReact()}
+shiny::testServer(function(input,output,session){
+ source<-recent_player_points_source(session,reactive(auth),reactive('league'),reactive('team'),reactive(players),function()TRUE,refresh_trigger=round_history_refresh_trigger(session),required_rounds=function()3L)
+},{
+ settle(session);stopifnot(reads==1L,length(writes)==1L,source$status()$saving==1L)
+ writes[[1L]]$ack(FALSE);settle(session)
+ entry<-session$userData$shared_round_points$entry()
+ stopifnot(nzchar(source$status()$save_error),'p'%in%names(entry$save_retry),entry$saving==0L)
+ refresh<-round_history_refresh_trigger(session);refresh(refresh()+1L);settle(session)
+ stopifnot(reads==1L,length(writes)==2L,identical(writes[[1L]]$payload,writes[[2L]]$payload),source$status()$saving==1L)
+ writes[[2L]]$ack(TRUE);settle(session)
+ stopifnot(reads==1L,is.null(source$status()$save_error),source$status()$saving==0L,!length(entry$save_retry),nrow(entry$checks)==1L,
+   identical(unname(as.numeric(fm_time(entry$checks$checked_at))),unname(as.numeric(stamp))),all(rows$points%in%source$history()$points))
+ cat('PASS failed completion-marker save replays its retained acquisition on Refresh with zero new source reads and clears errors only after acknowledgement\n')
+})

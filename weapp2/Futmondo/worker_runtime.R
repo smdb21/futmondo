@@ -14,7 +14,7 @@ fm_worker_account_state<-function(id){
  state<-.fm_worker$accounts[[id]]
  if(is.null(state)){
   state<-new.env(parent=emptyenv());state$account<-NULL;state$known<-FALSE;state$busy<-FALSE;state$last_poll<-0
-  state$descriptors<-list();state$waiters<-list();state$queued<-list();state$health<-NULL;state$jobs<-list();state$errors<-list();state$sessions<-character();state$policy_revision<-shiny::reactiveVal(0L);state$settings_revision<-shiny::reactiveVal(0L);state$resource_revisions<-new.env(parent=emptyenv())
+  state$redirects<-list();state$redirect_revision<-shiny::reactiveVal(0L);state$descriptors<-list();state$waiters<-list();state$queued<-list();state$health<-NULL;state$jobs<-list();state$errors<-list();state$sessions<-character();state$policy_revision<-shiny::reactiveVal(0L);state$settings_revision<-shiny::reactiveVal(0L);state$resource_revisions<-new.env(parent=emptyenv())
   .fm_worker$accounts[[id]]<-state
  }
  state
@@ -127,12 +127,56 @@ fm_worker_live_keys<-function(state,now=as.numeric(Sys.time())){
  }
  keys
 }
+# Only a server-verified peer can fill unknown dimensions. Never relabel data.
+fm_worker_accept_redirect<-function(state,redirect,account){
+ if(!is.list(redirect)||!is.character(redirect$requested_key)||length(redirect$requested_key)!=1L||
+    is.na(redirect$requested_key)||!grepl('^[a-f0-9]{64}$',redirect$requested_key))return(FALSE)
+ old_key<-redirect$requested_key;target<-redirect$descriptor
+ if(!is.list(target)||!is.list(target$context)||!is.list(target$args))return(FALSE)
+ previous<-state$descriptors[[old_key]]$descriptor
+ if(is.null(previous)||!previous$handler%in%c('get_players_from_team','get_championship_pressroom','get_clause_transfer_summary')||
+    !is.list(target)||!identical(previous$handler,target$handler)||
+    !identical(as.integer(previous$version),as.integer(target$version))||
+    !identical(fm_worker_json(previous$args),fm_worker_json(target$args))||
+    !identical(fm_scalar(target$context$account_id),account))return(FALSE)
+ dims<-c('competition_id','season','scoring_version');other<-setdiff(fm_worker_fields,dims)
+ if(!identical(fm_worker_json(previous$context[other]),fm_worker_json(target$context[other]))||
+    !all(vapply(target$context[dims],fm_context_known,logical(1)))||
+    any(vapply(dims,function(f)fm_context_known(previous$context[[f]])&&!identical(previous$context[[f]],target$context[[f]]),logical(1))))return(FALSE)
+ rebuilt<-tryCatch(fm_worker_descriptor(target$handler,target$args,target$context),error=function(e)NULL)
+ if(is.null(rebuilt)||!identical(rebuilt$resource_key,target$resource_key))return(FALSE)
+ changed<-!identical(state$redirects[[old_key]]$descriptor$resource_key,target$resource_key)
+ state$redirects[[old_key]]<-list(descriptor=rebuilt,at=as.numeric(Sys.time()))
+ if(length(state$redirects)>128L)state$redirects<-tail(state$redirects,128L)
+ # Register the target before decoding its chunks; old watchers are retired.
+ item<-state$descriptors[[old_key]];target_item<-state$descriptors[[target$resource_key]]
+ item$descriptor<-rebuilt;item$watchers<-c(target_item$watchers %||% list(),item$watchers)
+ item$watchers<-tail(item$watchers,128L);state$descriptors[[target$resource_key]]<-item
+ state$descriptors[[old_key]]<-NULL;state$queued[[old_key]]<-NULL;state$errors[[old_key]]<-NULL
+ for(id in names(state$waiters))if(identical(state$waiters[[id]]$key,old_key)){
+  waiter<-state$waiters[[id]];state$waiters[[id]]<-NULL;if(is.function(waiter$cancel))waiter$cancel()
+  waiter$reject(structure(list(message='Resource context resolved; retry with its canonical context',call=NULL),class=c('fm_async_cancelled','error','condition')))
+ }
+ if(changed)state$redirect_revision(shiny::isolate(state$redirect_revision())+1L)
+ TRUE
+}
+fm_worker_resolve_context<-function(handler,args,context){
+ if(!fm_worker_configured()||!handler%in%c('get_players_from_team','get_championship_pressroom','get_clause_transfer_summary'))return(context)
+ state<-fm_worker_account_state(context$account_id);try(state$redirect_revision(),silent=TRUE)
+ descriptor<-fm_worker_descriptor(handler,args,context);hint<-state$redirects[[descriptor$resource_key]]
+ if(!is.null(hint)&&as.numeric(Sys.time())-hint$at<300){
+  dims<-c('competition_id','season','scoring_version')
+  context[dims]<-hint$descriptor$context[dims]
+ }
+ context
+}
 fm_worker_fetch<-function(handler,args,context,owner=context$session_id %||% '',is_current=function()TRUE,direct=NULL){
  mode<-fm_worker_mode(context$account_id)
  if(identical(mode,FALSE)){
   if(is.function(direct))return(direct())
   return(promises::promise_reject(simpleError('Background access is not enabled')))
  }
+ context<-fm_worker_resolve_context(handler,args,context)
  d<-fm_worker_descriptor(handler,args,context);fm_worker_demand(d,owner,is_current)
  s<-fm_worker_account_state(context$account_id);try(fm_worker_resource_revision(s,d$resource_key)(),silent=TRUE);saved<-fm_worker_get(context$account_id,d$resource_key)
  if(!is.null(saved)){
@@ -178,6 +222,8 @@ fm_worker_poll<-function(account,owner='',force=FALSE){
  promises::then(p,function(result){
   s$busy<-FALSE;fm_worker_set_policy(s,result$account);s$health<-result$health;s$jobs<-result$jobs;s$service_error<-NULL
   s$errors<-s$errors[intersect(names(s$errors),keys)]
+  for(redirect in result$redirects)fm_worker_accept_redirect(s,redirect,account)
+  keys<-fm_worker_live_keys(s)
   for(resource in result$resources){
    d<-s$descriptors[[resource$key]]$descriptor
    if(is.null(d)||!identical(fm_worker_json(resource$manifest$context),fm_worker_json(d$context)))next
@@ -188,6 +234,12 @@ fm_worker_poll<-function(account,owner='',force=FALSE){
      for(row in rows)remember_league_context(row)
     }
     if(identical(d$handler,'get_lineup_from_team'))try(remember_league_scoring(d$context,item$data,attr(item$data,'observed_at')),silent=TRUE)
+    # A genuinely newer source publication confirms an existing context hint;
+    # rereading an old version never renews its identity lease or source time.
+    for(alias in names(s$redirects))if(identical(s$redirects[[alias]]$descriptor$resource_key,resource$key)){
+     checked<-as.numeric(fm_time(item$manifest$checked_at))
+     if(length(checked)==1L&&is.finite(checked)&&checked<=as.numeric(Sys.time()))s$redirects[[alias]]$at<-max(s$redirects[[alias]]$at,checked)
+    }
     fm_worker_put(account,resource$key,item);rev<-fm_worker_resource_revision(s,resource$key);rev(shiny::isolate(rev())+1L);s$queued[[resource$key]]<-NULL;s$errors[[resource$key]]<-NULL}
    else s$errors[[resource$key]]<-'Stored snapshot failed integrity checks; acquisition is required.'
   }
@@ -206,6 +258,7 @@ fm_worker_poll<-function(account,owner='',force=FALSE){
 fm_worker_peek<-function(handler,args,context,direct,is_current=NULL){
  mode<-fm_worker_mode(context$account_id)
  if(identical(mode,FALSE))return(direct())
+ context<-fm_worker_resolve_context(handler,args,context)
  d<-fm_worker_descriptor(handler,args,context);fm_worker_demand(d,context$session_id %||% '',is_current)
  s<-fm_worker_account_state(context$account_id);try(fm_worker_resource_revision(s,d$resource_key)(),silent=TRUE)
  item<-fm_worker_get(context$account_id,d$resource_key)
@@ -300,9 +353,11 @@ fm_worker_session<-function(session,login,leagues=function()list()){
   message<-if(!identical(s$account$auth_status,'active'))'Background access needs renewal. Log in again.'else
    if(length(health_age)!=1L||!is.finite(health_age)||health_age>60)'Background worker is not responding; saved data remains available.'else
     if(length(s$errors))paste(unique(unlist(s$errors)),collapse=' ')else 'Background sync is enabled. Screens use stored observations; stale data keeps its original source time.'
-  pending<-sum(vapply(s$jobs,function(j)isTRUE(j$pending),logical(1)));running<-sum(vapply(s$jobs,function(j)isTRUE(j$running),logical(1)))
+  live_keys<-fm_worker_live_keys(s)
+  jobs<-s$jobs[vapply(s$jobs,function(j)j$key%in%live_keys,logical(1))]
+  pending<-sum(vapply(jobs,function(j)isTRUE(j$pending),logical(1)));running<-sum(vapply(jobs,function(j)isTRUE(j$running),logical(1)))
   if(pending>0&&identical(s$account$auth_status,'active'))message<-paste(message,sprintf('Preparing %d requested resource(s), %d running.',pending,running))
-  checks<-vapply(names(s$descriptors),function(k){item<-fm_worker_get(auth[['userid']],k);if(is.null(item))NA_real_ else as.numeric(fm_time(item$manifest$checked_at))},numeric(1))
+  checks<-vapply(live_keys,function(k){item<-fm_worker_get(auth[['userid']],k);if(is.null(item))NA_real_ else as.numeric(fm_time(item$manifest$checked_at))},numeric(1))
   checks<-checks[is.finite(checks)]
   shiny::tags$div(class='alert alert-info',role='status',message,
    if(length(checks))shiny::tags$small(style='display:block',paste('Oldest saved check among recently displayed data:',format(as.POSIXct(min(checks),origin='1970-01-01',tz='UTC'),'%Y-%m-%d %H:%M:%S UTC'))))

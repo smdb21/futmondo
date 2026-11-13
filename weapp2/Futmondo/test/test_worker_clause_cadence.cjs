@@ -20,7 +20,8 @@ const {PGlite}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo-r
  assert.equal(await rpc('claim',['leader:minute',false]),null);
  console.log('PASS legacy requests normalize to five-minute acquisition and successful work cannot restart after one minute');
  await q("update worker_jobs set due_at=now()-interval '1 second',checked_at=now()-interval '301 seconds'");
- assert.equal(await rpc('claim',['leader:reserved',true]),null);
+ assert.ok(await rpc('claim',['leader:reserved',true]));
+ await q('update worker_jobs set owner=null,lease_until=null');
  assert.ok(await rpc('claim',['leader:background',false]));
  console.log('PASS due clause acquisition runs in routine background lane without a browser or page-navigation event');
 }finally{await db.close()}})().catch(e=>{console.error(e);process.exitCode=1});

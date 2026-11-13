@@ -182,7 +182,7 @@ persistence_tick<-function(){
     if(!nzchar(get_sb_url())||!nzchar(get_sb_key())){finish(FALSE,list(list(category="configuration")));return(invisible(FALSE))}
     url<-httr::modify_url(paste0(get_sb_url(),"/rest/v1/",table),query=if(!is.null(conflict))list(on_conflict=conflict)else NULL)
     headers<-c(apikey=get_sb_key(),Authorization=paste("Bearer",get_sb_key()),`Content-Type`="application/json",Prefer=if(length(op)>=4L&&isTRUE(op[[4]]))"resolution=ignore-duplicates" else "resolution=merge-duplicates")
-    request<-fm_async_http(url,"POST",jsonlite::toJSON(payload,auto_unbox=TRUE,na="null"),headers,owner=paste0("persistence:",job$session_id))
+    request<-fm_async_http(url,"POST",supabase_payload_json(payload),headers,owner=paste0("persistence:",job$session_id))
     promises::then(request,function(response){
       if(identical(table,"round_dream_team"))tryCatch(invalidate_mvp_saved_cache(),error=function(e)NULL)
       finish(TRUE)
@@ -324,8 +324,8 @@ persist_recent_points_snapshot <- function(payload,context,on_complete=NULL) {
   }
   marker <- data.frame(championship_id=context$championship_id,competition_id=context$competition_id,player_id=context$player_id,
     season=context$season,scoring_version=context$scoring_version,
-    checked_at=format(checked_at,"%Y-%m-%dT%H:%M:%OSZ",tz="UTC"),
-    result_status=if(nrow(points))"scores"else "empty",point_count=nrow(points))
+    checked_at=format(checked_at,"%Y-%m-%dT%H:%M:%OS6Z",tz="UTC"),
+    result_status=if(nrow(points))"scores"else "empty",point_count=nrow(points),row.names=NULL)
   operations[[length(operations)+1L]] <- list("player_round_history_checks",marker,
     "championship_id,competition_id,player_id,season,scoring_version,checked_at",TRUE)
   defer_persistence("supabase_round_history_batch_direct",list(operations),context,on_complete=on_complete)

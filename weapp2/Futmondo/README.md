@@ -192,3 +192,13 @@ of GUI navigation; source times remain original and transaction preflights keep
 their existing validity. Production migration is `20261113070822_worker_clause_cadence`.
 The app also contains a safe missing-column diagnostic for the still-unresolved
 history completion-marker REST failure. No new dependencies or settings.
+
+For history-marker and unresolved-worker recovery, apply
+`scripts/migrations/20261113115929_worker_resolved_handoff.sql`, then deploy the
+new app/worker container together. Production SQL version:
+`20261113121612_worker_resolved_handoff`. The migration adds bounded canonical
+resource redirects and preserves independent five-minute clause scheduling;
+the container fixes implicit R `_row` fields in database writes and retries
+failed history saves without reacquiring their retained source payloads.
+No new settings or dependencies. See `docs/worker_resolved_recovery.md` for the
+contracts, measured checks and remaining production acceptance work.

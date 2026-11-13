@@ -156,3 +156,14 @@ subsets valid until original source time + 300 seconds; manual-action preflights
 are unchanged. Passive GUI subscriptions read newer snapshots without enqueueing
 expired clauses on every poll. Full contracts, checks and the separate marker
 PGRST204 blocker are in `worker_freshness_recovery.md`.
+
+Resolved-resource handoff is additive to `worker_read`: `redirects` contains
+`requested_key` and a verified canonical descriptor. R consumers cancel old
+waiters and rebind instead of relabelling cached observations. The peer resolver
+requires exact arguments/account/context and current authoritative membership;
+unknown bootstrap remains available when no unique authoritative peer exists.
+Apply `20261113115929_worker_resolved_handoff.sql` and deploy the app/worker image.
+Clause jobs keep300 seconds and can use the reserved short lane ahead of bulk
+history demand; cadence does not depend on GUI behavior. Persistence serializers
+exclude implicit R row names. Details and verification limits:
+`worker_resolved_recovery.md`.
