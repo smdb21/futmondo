@@ -1225,3 +1225,16 @@ peers without deleting observations. See `docs/worker_freshness_recovery.md`.
 Production SQL version `20261113064338`; R/Python container redeploy and multiple
 successful production clause/history cycles remain outstanding. This is not a
 claim that the reported source rejections or transfer screen are resolved.
+
+### 2026-11-13 — Independent clause schedule and stable GUI verification
+
+Implemented locally: timestamp-only roster/history observations no longer restart
+transfer checks; brief prerequisite expiry pauses new queue starts without
+cancelling valid in-flight work. Passive clause subscriptions consume independent
+worker results without GUI expiry demands. Background clause cadence is 300
+seconds, durable display subset v3 expires at source +300; transaction preflights
+unchanged. SQL deployed as `20261113070822_worker_clause_cadence` (four jobs verified
+at 300/base 3). Container redeploy and production end-to-end confirmation remain.
+Separate history marker HTTP400/PGRST204 remains unresolved; safe missing-column
+diagnostics added to obtain the specific failing field after redeploy. See
+`docs/worker_freshness_recovery.md`; no milestone for production recovery is closed.

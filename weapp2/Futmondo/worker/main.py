@@ -490,10 +490,6 @@ class Worker:
                         continue
                     if datetime.fromisoformat(manifest['valid_until'].replace('Z', '+00:00')).timestamp() <= time.time():
                         continue
-                    if (job['descriptor']['handler'] == 'get_clause_transfer_summary' and
-                            descriptor['handler'] == 'get_player_summary' and
-                            time.time() - datetime.fromisoformat(manifest['observed_at'].replace('Z', '+00:00')).timestamp() >= 30):
-                        continue
                     value = unpack_snapshot(manifest, item['chunks'])
                     self.source_stamps.setdefault(owner, []).append(manifest['checked_at'])
                     return {'value': value, 'observed_at': manifest['observed_at']}

@@ -1,5 +1,5 @@
 # Safe current-clause observations share the private, durable evidence store.
-# Memory entries only accelerate the original sixty-second source deadline.
+# Memory entries only accelerate the original five-minute source deadline.
 .clause_transfer_invalidated <- new.env(parent=emptyenv())
 # Cooperative reads pin their ordinary Sys.time() for source consistency. Saved
 # observations must instead expire against the clock when each replay runs.
@@ -11,7 +11,7 @@ clause_transfer_scope <- function(context) {
   scope$competition_id<-fm_scalar(context$competition_id,"unknown")
   c(scope,list(player_id=player))
 }
-clause_transfer_snapshot_id <- function(scope) paste0("rival-cache:clause-transfer-v2:",
+clause_transfer_snapshot_id <- function(scope) paste0("rival-cache:clause-transfer-v3:",
   as.character(openssl::sha256(serialize(scope[c("user_team_id","competition_id","season","scoring_version","player_id")],NULL,version=2))))
 clause_transfer_epoch_key <- function(context) as.character(openssl::sha256(serialize(
   context[c("account_id","championship_id","user_team_id","competition_id","season","scoring_version")],NULL,version=2)))
@@ -45,7 +45,7 @@ cached_clause_transfer_summary <- function(context,now=clause_transfer_now()) {
   item<-api_cache_env[[clause_transfer_cache_key(context)]]
   if(is.null(item$data)||!resource_snapshot_unexpired(item$data,now)||acquisition_data_unverified(item$data))return(NULL)
   stamp<-fm_time(attr(item$data,"observed_at"));invalidated<-.clause_transfer_invalidated[[clause_transfer_epoch_key(context)]]
-  if(length(stamp)!=1L||is.na(stamp)||stamp>now||as.numeric(difftime(now,stamp,units="secs"))>=60||
+  if(length(stamp)!=1L||is.na(stamp)||stamp>now||as.numeric(difftime(now,stamp,units="secs"))>=300||
      (!is.null(invalidated)&&stamp<invalidated))return(NULL)
   item$data
 }
@@ -54,8 +54,8 @@ persist_clause_transfer_summary <- function(data,context,on_complete=NULL) {
   if(is.null(scope)||isTRUE(attr(data,"clause_from_saved")))return(invisible(FALSE))
   clean<-clause_transfer_clean_summary(data,scope);stamp<-fm_time(attr(data,"observed_at"))
   if(is.null(clean)||length(stamp)!=1L||is.na(stamp))return(invisible(FALSE))
-  payload<-list(kind="clause_transfer_summary",version=2L,scope=scope,summary=clean,
-    completeness="complete",source="futmondo",source_observed_at=rival_finance_stamp(stamp),valid_until=rival_finance_stamp(stamp+60))
+  payload<-list(kind="clause_transfer_summary",version=3L,scope=scope,summary=clean,
+    completeness="complete",source="futmondo",source_observed_at=rival_finance_stamp(stamp),valid_until=rival_finance_stamp(stamp+300))
   if(as.numeric(object.size(payload))>32*1024L)return(invisible(FALSE))
   record<-rival_finance_evidence(scope$account_id,scope$championship_id,scope$season,"eligibility",clause_transfer_snapshot_id(scope),payload,stamp,competition_id=scope$competition_id)
   # The shared queue deduplicates acknowledgements and retains failed writes as
@@ -76,12 +76,12 @@ read_saved_clause_transfer_summary <- function(context,now=clause_transfer_now()
     stamp<-fm_time(p$source_observed_at);until<-fm_time(p$valid_until)
     invalidated<-.clause_transfer_invalidated[[clause_transfer_epoch_key(context)]]
     if(!is.list(p)||as.numeric(object.size(p))>32*1024L||!identical(p$kind,"clause_transfer_summary")||
-       !identical(as.integer(p$version),2L)||!identical(p$completeness,"complete")||!identical(p$source,"futmondo")||
+       !identical(as.integer(p$version),3L)||!identical(p$completeness,"complete")||!identical(p$source,"futmondo")||
        !identical(record$evidence_type,"eligibility")||!identical(record$source_id,clause_transfer_snapshot_id(scope))||
        !all(vapply(c("account_id","championship_id","competition_id","season"),function(field)identical(fm_scalar(record[[field]]),scope[[field]]),logical(1)))||
        !is.list(p$scope)||!setequal(names(p$scope),names(scope))||!all(vapply(names(scope),function(field)identical(p$scope[[field]],scope[[field]]),logical(1)))||
        length(stamp)!=1L||is.na(stamp)||stamp>now||length(until)!=1L||is.na(until)||now>=until||
-       abs(as.numeric(difftime(until,stamp,units="secs"))-60)>0.01||
+       abs(as.numeric(difftime(until,stamp,units="secs"))-300)>0.01||
        !identical(as.numeric(fm_time(record$observed_at)),as.numeric(stamp))||(!is.null(invalidated)&&stamp<invalidated))return(NULL)
     clean<-clause_transfer_clean_summary(p$summary,scope);if(is.null(clean))return(NULL)
     result<-observed_data(clean,observed_at=stamp,status="ok")
@@ -94,13 +94,13 @@ get_clause_transfer_summary <- function(login,championship_id,user_team_id,playe
   now<-clause_transfer_now()
   saved<-cached_clause_transfer_summary(context,now)
   if(is.null(saved))saved<-read_saved_clause_transfer_summary(context,now)
-  # Prefetch must leave enough validity for persistence and visible verification.
-  # Interactive reads retain their full, original sixty-second source deadline.
-  if(!is.null(saved)&&isTRUE(getOption("futmondo.worker_helper",FALSE))&&
-     as.numeric(difftime(now,fm_time(attr(saved,"observed_at")),units="secs"))>=30)saved<-NULL
   if(!is.null(saved)) {
-    resource_store(clause_transfer_cache_key(context),saved,context,"clause_transfer_summary",ttl=60)
+    resource_store(clause_transfer_cache_key(context),saved,context,"clause_transfer_summary",ttl=300)
     return(saved)
   }
-  get_player_summary(login,championship_id,user_team_id,player_id)
+  value<-get_player_summary(login,championship_id,user_team_id,player_id)
+  stamp<-fm_time(attr(value,"observed_at"))
+  if(!is.null(value)&&length(stamp)==1L&&!is.na(stamp)&&!acquisition_data_unverified(value))
+    attr(value,"valid_until")<-as.numeric(stamp)+300
+  value
 }

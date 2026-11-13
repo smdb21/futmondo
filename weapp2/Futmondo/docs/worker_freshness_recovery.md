@@ -140,7 +140,7 @@ multiple cycles rather than one successful pair.
 
 Production recorded the prefetch migration as `20261113061754_worker_core_prefetch`.
 
-## Clause validity and resolved prerequisite scopes
+## Clause validity and resolved prerequisite scopes (initial policy superseded below)
 
 `get_clause_transfer_summary` now requests a sixty-second worker interval and
 priority 10. The previous generic summary policy used 300 seconds, exceeding
@@ -182,3 +182,78 @@ and 24 outgoing checks, six incoming-source recovery groups, three SQL scope
 and cadence groups, four prefetch groups, and the offline lifecycle harness
 (13 checks plus eight tabs). SQL migration replay was idempotent. Production
 recorded the migration as `20261113064338_worker_clause_scope_guards`.
+
+## Independent clause cadence and stable verification (current policy)
+
+The owner clarified that background acquisition must remain independent of GUI
+navigation. `20261113065753_worker_clause_cadence.sql` supersedes the one-minute
+clause acquisition policy above: successful clause jobs use 300 seconds and
+base priority 3; explicit read demand uses urgency 8, and explicit Refresh still
+uses 10. Routine claims continue with no browser or active page. This handler is
+outside short-core prefetch, so its successful completion is not scheduled again
+after half an interval. The enqueue RPC normalizes older 60-second requests to
+300. Existing source failures/backoff, consent, leases and account isolation stay
+in force. Production applied `20261113070822_worker_clause_cadence`; metadata
+confirmed all four existing clause jobs use interval 300 and base priority 3.
+
+`get_clause_transfer_summary()` is used by the transfer display, not transaction
+preflight. Its durable safe-subset payload is version 3, with a new source-ID
+namespace and an absolute source-observed-plus-300-second validity. Version 2
+observations remain stored separately. Worker and interactive reads reuse valid
+version 3 results across minute boundaries without renewing their observation
+time. The previous worker-only thirty-second renewal guards are removed. Raw
+player-summary and financial/manual-action policies are unchanged.
+
+`incoming_clause_source()` hashes sorted relevant roster membership/clause fields,
+transaction identities/parties/times/prices and full account/league/competition/
+season/scoring context. A new source timestamp alone does not cancel a batch or
+empty successful summaries. Transient stale prerequisites pause further queue
+starts while already-started requests settle; their original captured context
+and generation guards remain. Retained results stay accompanied by truthful
+prerequisite warnings. Refreshed unchanged prerequisites resume the same batch.
+Actual transfer evidence, manual refresh and context changes still trigger
+reconciliation. Routine prerequisite refresh does not advertise a new clause
+check when an existing snapshot is displayed.
+
+`incoming_clause_cached_summary(..., is_current=NULL, owner='')` can consume a
+newer fresh durable worker publication through the existing bounded snapshot
+cache and resource revision. Its optional interest is passive: `fm_worker_poll`
+does not enqueue expired clause subscriptions. Waiting clause reads, unlike
+ordinary stale-while-refresh reads, settle only with an unexpired publication;
+completion removes their acquisition interest. Passive subscriptions consume
+new source changes without altering the independent schedule. No new timer,
+HTTP lane, worker count, database table or dependency is added.
+
+Performance review: unchanged timestamp publications add zero summary
+acquisitions in the regression fixture, preserve the joint two-request cap and
+avoid repeated cancellations. Four production clause jobs now have a normal
+aggregate cadence of 0.8 job acquisitions/minute, rather than minute-based core
+prefetch. HTTP counts can differ with source reuse/failures. Hashing covers only
+the small relevant roster/candidate fields; passive reads reuse existing
+account-wide polling and fetch chunks only for changed versions. Existing
+bounded caches/watchers and durable database writes are reused. No synthetic
+benchmark is presented as measured production latency.
+
+Verification: 30 Python worker tests; 24 incoming checks (four new churn/expiry
+cases); 24 outgoing; 11 durable clause checks; nine worker-provider groups;
+three passive observation groups; two SQL cadence groups (idempotent replay,
+quiet independent background dispatch); four ordinary worker-expiry checks;
+11 history persistence recovery groups; offline lifecycle 13 checks/eight tabs.
+The narrow marker-schema diagnostic regression also verifies that private
+responses/queries are never logged and rejected writes stay failed.
+
+### Separate production history-save blocker
+
+Production logs in 06:40–06:55 UTC showed 22 marker POST failures with HTTP 400 /
+PGRST204, while 21 score POSTs returned 201 and one returned 200. Live metadata
+has every expected marker column and the expected context/check-time primary
+key. These facts do not identify the rejected column. Local server database
+credentials are absent, so a limit-zero REST schema probe could not run; log
+metadata did not expose the offending field. The defect is not declared fixed.
+`fm_transport_finish()` now emits only a validated missing-column identifier for
+a small, standard PGRST204 response on that exact marker route. It never logs raw
+body, payload, query, credential or source values. After the app redeploys, the
+next failed marker response can identify the field/schema-cache mismatch needed
+for a root fix. A failed marker remains failed and cannot certify durable
+history completion. Container rollout and successful production transfer/history
+cycles remain outstanding.

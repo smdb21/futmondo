@@ -25,20 +25,20 @@ check('complete safe subset persists with scoped source timestamp and no authent
   stopifnot(persist_clause_transfer_summary(summary,context),length(queued)==1L,
     queued[[1]]$fn=='supabase_post_direct',queued[[1]]$args[[1]]=='rival_finance_evidence',queued[[1]]$args[[4]])
   record<-queued[[1]]$args[[2]][[1]]
-  stopifnot(startsWith(record$source_id,'rival-cache:clause-transfer-v2:'),record$evidence_type=='eligibility',
+  stopifnot(startsWith(record$source_id,'rival-cache:clause-transfer-v3:'),record$evidence_type=='eligibility',
     !grepl('must-not-persist|password|token|secret|points',jsonlite::toJSON(record)),
-    record$payload$completeness=='complete',fm_time(record$payload$valid_until)==now+60)
+    record$payload$completeness=='complete',fm_time(record$payload$valid_until)==now+300)
   saved<-wire(record)
 })
 check('JSONB replay preserves authoritative owner, schedule and original observation deadline',{
   restored<-read_saved_clause_transfer_summary(context,now+1)
   stopifnot(restored$data$id=='p',restored$championship$owner$id=='mine',
     restored$championship$clause$transferred,restored$championship$clause$transferDate=='2026-11-13T22:00:00Z',
-    as.numeric(attr(restored,'observed_at'))==as.numeric(now),attr(restored,'valid_until')==as.numeric(now+60),attr(restored,'clause_from_saved'))
+    as.numeric(attr(restored,'observed_at'))==as.numeric(now),attr(restored,'valid_until')==as.numeric(now+300),attr(restored,'clause_from_saved'))
   count<-length(queued);stopifnot(!persist_clause_transfer_summary(restored,context),length(queued)==count)
 })
 check('expiry, future timestamps and every context dimension reject foreign snapshots',{
-  stopifnot(is.null(read_saved_clause_transfer_summary(context,now+60)),is.null(read_saved_clause_transfer_summary(context,now-1)))
+  stopifnot(is.null(read_saved_clause_transfer_summary(context,now+300)),is.null(read_saved_clause_transfer_summary(context,now-1)))
   original_get<-supabase_get;supabase_get<-function(...)saved
   for(field in c('account_id','championship_id','user_team_id','player_id','competition_id','season','scoring_version')){
     wrong<-context;wrong[[field]]<-'different';stopifnot(is.null(read_saved_clause_transfer_summary(wrong,now+1)))
@@ -66,8 +66,8 @@ check('fresh durable replay avoids API acquisition; warm navigation avoids anoth
   stopifnot(attr(restored,'clause_from_saved'),reads==before+1L,source_reads==0L)
   restored<-get_clause_transfer_summary(c(userid='clause-fixture',token='synthetic'),'league','mine','p')
   stopifnot(attr(restored,'clause_from_saved'),reads==before+1L,source_reads==0L)
-  Sys.time<-function()now+60
-  clause_clock<-now+60
+  Sys.time<-function()now+300
+  clause_clock<-now+300
   get_clause_transfer_summary(c(userid='clause-fixture',token='synthetic'),'league','mine','p')
   stopifnot(source_reads==1L,reads==before+2L)
   rm(Sys.time)
@@ -113,11 +113,11 @@ check('a delayed durable read yields cooperatively and preserves its original de
   stopifnot(is.function(pending),!completed,is.null(failure))
   pending(list(status_code=200L,content=charToRaw(jsonlite::toJSON(jsonlite::fromJSON(jsonlite::toJSON(saved,auto_unbox=TRUE,na='null',null='null'),simplifyVector=FALSE),auto_unbox=TRUE,na='null',null='null')),times=list(total=0)))
   for(i in seq_len(12L))later::run_now(0)
-  stopifnot(completed,is.null(failure),attr(value,'clause_from_saved'),attr(value,'valid_until')==as.numeric(now+60))
+  stopifnot(completed,is.null(failure),attr(value,'clause_from_saved'),attr(value,'valid_until')==as.numeric(now+300))
   get_sb_url<-original_url;get_sb_key<-original_key;fm_async_read_http<-original_http;rm(Sys.time)
 })
 check('a durable observation expiring during a delayed read acquires a fresh summary once',{
-  clear_api_cache();clause_clock<-now+59;Sys.time<-function()clause_clock
+  clear_api_cache();clause_clock<-now+299;Sys.time<-function()clause_clock
   original_url<-get_sb_url;original_key<-get_sb_key;original_http<-fm_async_read_http;original_summary<-get_player_summary
   get_sb_url<-function()'https://synthetic.invalid';get_sb_key<-function()'synthetic-key'
   get_player_summary<-function(...){source_reads<<-source_reads+1L;observed_data(summary,observed_at=clause_clock)}
@@ -131,25 +131,22 @@ check('a durable observation expiring during a delayed read acquires a fresh sum
   promises::then(promise,function(result){completed<<-TRUE;value<<-result},function(error){failure<<-error})
   for(i in seq_len(5L))later::run_now(0)
   stopifnot(is.function(pending),!completed,source_reads==before)
-  clause_clock<-now+61
+  clause_clock<-now+301
   pending(list(status_code=200L,content=charToRaw(jsonlite::toJSON(saved,auto_unbox=TRUE,na='null',null='null')),times=list(total=2)))
   for(i in seq_len(12L))later::run_now(0)
   stopifnot(completed,is.null(failure),!isTRUE(attr(value,'clause_from_saved')),source_reads==before+1L,database_reads==1L,
-    as.numeric(attr(value,'observed_at'))==as.numeric(now+61))
+    as.numeric(attr(value,'observed_at'))==as.numeric(now+301))
   get_sb_url<-original_url;get_sb_key<-original_key;fm_async_read_http<-original_http;get_player_summary<-original_summary;rm(Sys.time)
 })
-check('worker prefetch renews ageing clause data while interactive reads retain the source deadline',{
-  clear_api_cache();clause_clock<-now+35
+check('worker reuses durable clause details across minute boundaries without changing source time',{
+  clear_api_cache();clause_clock<-now+135
   original_summary<-get_player_summary;before<-source_reads
   get_player_summary<-function(...){source_reads<<-source_reads+1L;observed_data(summary,observed_at=clause_clock)}
-  options(futmondo.worker_helper=FALSE)
-  interactive<-get_clause_transfer_summary(c(userid='clause-fixture',token='synthetic'),'league','mine','p')
-  stopifnot(isTRUE(attr(interactive,'clause_from_saved')),source_reads==before,
-    as.numeric(attr(interactive,'observed_at'))==as.numeric(now))
   options(futmondo.worker_helper=TRUE)
-  fresh<-get_clause_transfer_summary(c(userid='clause-fixture',token='synthetic'),'league','mine','p')
-  stopifnot(source_reads==before+1L,as.numeric(attr(fresh,'observed_at'))==as.numeric(clause_clock),
-    fm_worker_interval('get_clause_transfer_summary')==60L,fm_worker_priority('get_clause_transfer_summary')==10L)
+  restored<-get_clause_transfer_summary(c(userid='clause-fixture',token='synthetic'),'league','mine','p')
+  stopifnot(isTRUE(attr(restored,'clause_from_saved')),source_reads==before,
+    as.numeric(attr(restored,'observed_at'))==as.numeric(now),attr(restored,'valid_until')==as.numeric(now+300),
+    fm_worker_interval('get_clause_transfer_summary')==300L,fm_worker_priority('get_clause_transfer_summary')==8L)
   options(futmondo.worker_helper=FALSE);get_player_summary<-original_summary
 })
 cat(sprintf('Clause transfer persistence: %d checks passed. Cold valid replay: one scoped DB read, zero API reads; warm replay: zero reads.\n',checks))

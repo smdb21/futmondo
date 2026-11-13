@@ -84,7 +84,7 @@ fm_worker_descriptor <- function(handler,args,context) {
   descriptor
 }
 fm_worker_interval <- function(handler){
-  if(identical(handler,'get_clause_transfer_summary'))60L else if(grepl('capacity',handler))15L else if(grepl('full_profile|matches',handler))21600L else if(grepl('summary|card_history|recent_points',handler))300L else
+  if(grepl('capacity',handler))15L else if(grepl('full_profile|matches',handler))21600L else if(grepl('summary|card_history|recent_points',handler))300L else
     if(grepl('catalog|championship_players|finished_rounds|real_clubs|active_championship',handler))300L else 60L
 }
 
@@ -92,7 +92,7 @@ fm_worker_interval <- function(handler){
 fm_worker_priority <- function(handler) {
  if(handler%in%c('get_players_from_team','get_championship_pressroom','get_market_players',
    'get_my_market_players','get_user_team_info','get_roster_bids','get_lineup_from_team',
-   'get_notifications','get_notification_unread','get_active_championships','get_clause_transfer_summary'))10L else
+   'get_notifications','get_notification_unread','get_active_championships'))10L else
  if(handler%in%c('get_resolved_league_context','get_finished_rounds'))9L else
- if(handler%in%c('fm_worker_finances','get_acquisition_capacity','get_team_acquisition_capacity','get_financial_snapshot'))8L else 6L
+ if(handler%in%c('get_clause_transfer_summary','fm_worker_finances','get_acquisition_capacity','get_team_acquisition_capacity','get_financial_snapshot'))8L else 6L
 }

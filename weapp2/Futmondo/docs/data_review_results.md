@@ -2142,3 +2142,25 @@ bound acquisition. Indexed exact peer matching avoids redundant roster/history
 work without new UI timers or memory growth. Full production latency, API source
 rejections and post-redeploy transfer verification remain unverified. Details in
 `docs/worker_freshness_recovery.md`.
+
+### 2026-11-13 — Independent clause acquisition / GUI churn
+
+Verified Python worker 30, incoming24/outgoing24, clause persistence11, worker
+provider9, passive observation3, SQL cadence2, ordinary expiry4, history write
+recovery11, and required lifecycle13/eight tabs. Targeted schema-diagnostic
+fixture checks failed writes stay failed and private bodies/queries stay unlogged.
+New delayed fixtures reproduce timestamp churn, stale prerequisites mid-request,
+resumption without restart and completed-result reuse with zero extra source
+requests; joint two-request cap remains. SQL idempotent replay confirms normal
+five-minute scheduling and background dispatch without a browser. Production SQL
+`20261113070822` confirmed four clause jobs at 300 seconds/base3. Performance:
+normal aggregate 0.8 clause jobs/minute for four jobs; unchanged observations add
+zero requests in fixture; no additional timer, lane, dependency or unbounded
+retained data. Existing revision-based bounded snapshot reuse and DB persistence
+remain. No claim of measured production latency or completed deployment.
+
+Unresolved: production score writes succeeded while 22 completion marker writes
+returned400/PGRST204. All expected DB columns/indexes exist; the offending REST
+column is not exposed by available logs. Local REST schema probe was blocked by
+absent server credentials. New route-specific sanitized missing-column diagnostic
+will identify it after app deployment; source history is not falsely acknowledged.

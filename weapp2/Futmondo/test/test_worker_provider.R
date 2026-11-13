@@ -54,3 +54,21 @@ fm_worker_enqueue(d);stopifnot(enqueues==0L)
 fm_worker_enqueue(d,force=TRUE);stopifnot(enqueues==1L)
 cat('PASS a stale running resource is not requeued; an explicit manual refresh remains queued\n')
 cat('WORKER PROVIDER: 8 groups passed; source HTTP attempts=0\n')
+# A clause waiter must not settle with the same expired stored observation.
+clause_ctx<-resource_context(auth,'l','t','p')
+clause_args<-list(championship_id='l',user_team_id='t',player_id='p')
+clause_d<-fm_worker_descriptor('get_clause_transfer_summary',clause_args,clause_ctx)
+old<-observed_data(list(data=list(id='p')),observed_at=Sys.time()-310)
+attr(old,'valid_until')<-as.numeric(Sys.time())-10
+fm_worker_put('u',clause_d$resource_key,list(data=old,manifest=list(version='old')))
+awaiting<-TRUE;live<-function()awaiting;resolved<-FALSE;result<-NULL
+p<-fm_worker_fetch('get_clause_transfer_summary',clause_args,clause_ctx,is_current=live)
+promises::then(p,function(value){awaiting<<-FALSE;resolved<<-TRUE;result<<-value})
+fm_worker_settle(s);for(i in 1:10)later::run_now(0)
+stopifnot(!resolved,length(s$waiters)==1L)
+fresh<-observed_data(list(data=list(id='p')),observed_at=Sys.time())
+attr(fresh,'valid_until')<-as.numeric(Sys.time())+300
+fm_worker_put('u',clause_d$resource_key,list(data=fresh,manifest=list(version='new')))
+fm_worker_settle(s);for(i in 1:10)later::run_now(0)
+stopifnot(resolved,identical(result,fresh),!length(s$waiters),!clause_d$resource_key%in%fm_worker_live_keys(s))
+cat('PASS clause demand waits for a fresh durable publication and releases its browser interest after settlement\n')

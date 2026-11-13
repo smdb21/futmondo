@@ -139,7 +139,8 @@ fm_worker_fetch<-function(handler,args,context,owner=context$session_id %||% '',
   if(!resource_snapshot_unexpired(saved$data)){
    attr(saved$data,'fetch_status')<-'stale';if(isTRUE(mode))fm_worker_enqueue(d,owner)
   }
-  return(promises::promise_resolve(saved$data))
+  if(handler!='get_clause_transfer_summary'||resource_snapshot_unexpired(saved$data))
+    return(promises::promise_resolve(saved$data))
  }
  if(isTRUE(mode))fm_worker_enqueue(d,owner)
  promises::promise(function(resolve,reject){
@@ -157,7 +158,8 @@ fm_worker_settle<-function(s){
   w<-s$waiters[[id]];saved<-fm_worker_get(w$descriptor$context$account_id,w$key)
   cancelled<-!isTRUE(tryCatch(w$current(),error=function(e)FALSE))
   disabled<-s$known&&!isTRUE(s$account$enabled)
-  if(cancelled||disabled||!is.null(saved)){
+  ready<-!is.null(saved)&&(w$descriptor$handler!='get_clause_transfer_summary'||resource_snapshot_unexpired(saved$data))
+  if(cancelled||disabled||ready){
    s$waiters[[id]]<-NULL;if(is.function(w$cancel))w$cancel()
    if(cancelled)w$reject(structure(list(message='Session request cancelled',call=NULL),class=c('fm_async_cancelled','error','condition')))
    else if(disabled&&is.function(w$direct))promises::then(w$direct(),w$resolve,w$reject)
@@ -192,7 +194,10 @@ fm_worker_poll<-function(account,owner='',force=FALSE){
   for(job in result$jobs)s$errors[[job$key]]<-if(!is.null(job$error))paste('Background acquisition failed:',job$error)else NULL
   if(isTRUE(s$account$enabled))for(k in keys){
    saved<-fm_worker_get(account,k)
-   if(is.null(saved)||!resource_snapshot_unexpired(saved$data))fm_worker_enqueue(s$descriptors[[k]]$descriptor,owner)
+   # Clause subscriptions observe autonomous worker publications. Their expiry
+   # must not turn every GUI poll into another priority acquisition.
+   if(s$descriptors[[k]]$descriptor$handler!='get_clause_transfer_summary'&&
+      (is.null(saved)||!resource_snapshot_unexpired(saved$data)))fm_worker_enqueue(s$descriptors[[k]]$descriptor,owner)
   }
   fm_worker_settle(s);fm_worker_notify();NULL
  },function(error){s$busy<-FALSE;s$service_error<-'Background status could not be read from the database.';fm_worker_notify();NULL})

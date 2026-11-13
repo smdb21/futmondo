@@ -175,7 +175,7 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.worker.source_stamps['owner'],[manifest['checked_at']])
         self.assertFalse(self.requests)
 
-    async def test_clause_rejects_old_general_summary_but_reuses_recent_source(self):
+    async def test_clause_reuses_valid_general_summary_with_original_source_time(self):
         value={'kind':'double','values':[1]}
         chunks,size,digest=pack_snapshot(value)
         manifest=dict(context=CONTEXT,parts=len(chunks),json_bytes=size,sha256=digest,status='ok',
@@ -187,7 +187,9 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
         self.store.rpc=rpc
         job=dict(self.job,descriptor=descriptor('get_clause_transfer_summary'))
         message=dict(type='resource',descriptor=descriptor('get_player_summary'))
-        self.assertIsNone((await self.worker.exchange(job,'owner',message))['value'])
+        reused=await self.worker.exchange(job,'owner',message)
+        self.assertEqual(reused['value'],value)
+        self.assertEqual(reused['observed_at'],manifest['observed_at'])
         manifest['observed_at']=stamp(time.time()-5)
         result=await self.worker.exchange(job,'owner',message)
         self.assertEqual(result['value'],value)

@@ -146,3 +146,13 @@ resolved-peer claim guard suppresses only equivalent unresolved roster/pressroom
 jobs; it preserves stored observations and historical/context isolation. Apply
 `20261113063652_worker_clause_scope_guards.sql` and redeploy the worker and app;
 see `worker_freshness_recovery.md` for rollout and verification limits.
+
+Current policy supersedes the earlier minute-based clause paragraph. Clause
+acquisition is autonomous at 300 seconds, default demand urgency 8 / completed
+base priority 3, with explicit Refresh 10. GUI navigation does not determine
+this schedule. Apply `20261113065753_worker_clause_cadence.sql`; production version
+`20261113070822_worker_clause_cadence`. The display uses version 3 durable clause
+subsets valid until original source time + 300 seconds; manual-action preflights
+are unchanged. Passive GUI subscriptions read newer snapshots without enqueueing
+expired clauses on every poll. Full contracts, checks and the separate marker
+PGRST204 blocker are in `worker_freshness_recovery.md`.

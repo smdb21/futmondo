@@ -1,0 +1,26 @@
+const fs=require('fs'),assert=require('assert/strict');
+const {PGlite}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo-review-tools/node_modules')+'/@electric-sql/pglite');
+(async()=>{const db=new PGlite();try{
+ await db.exec('create role anon;create role authenticated;create role service_role bypassrls;');
+ await db.exec(fs.readFileSync('scripts/schema.sql','utf8'));
+ const sql=fs.readFileSync('scripts/migrations/20261113065753_worker_clause_cadence.sql','utf8');await db.exec(sql);await db.exec(sql);
+ const q=async(s,a=[]) => (await db.query(s,a)).rows;
+ const rpc=async(n,a)=>(await q(`select worker_${n}(${a.map((_,i)=>'$'+(i+1)).join(',')}) result`,a))[0].result;
+ await db.exec('set role service_role');await rpc('elect',['leader']);const account=await rpc('authorize',['u',true,'synthetic','UTC',0,0,[],'fixture']);
+ const d={version:1,handler:'get_clause_transfer_summary',resource_key:'c'.repeat(64),args:{championship_id:'l'},context:{account_id:'u',championship_id:'l',user_team_id:'t'}};
+ await rpc('enqueue',['u',d,60,8]);const queued=(await q('select interval_seconds,base_priority from worker_jobs'))[0];assert.equal(queued.interval_seconds,300);assert.equal(queued.base_priority,3);
+ assert.equal((await q("select worker_request_priority('get_clause_transfer_summary') p"))[0].p,8);
+ const job=await rpc('claim',['leader:one',true]);assert.ok(job);
+ await q("update worker_jobs set started_at=now()-interval '1 second',requested_at=now()-interval '2 seconds'");
+ const t=(await q("select now() as source,now()+interval '300 seconds' as expires"))[0];
+ const m={version:'11111111-1111-4111-8111-111111111111',context:d.context,parts:1,json_bytes:1,sha256:'a'.repeat(64),observed_at:t.source,checked_at:t.source,valid_until:t.expires,status:'ok',completeness:'complete'};
+ await q('insert into worker_chunks(account_id,resource_key,version,part,data) values($1,$2,$3,0,$4)',['u',d.resource_key,m.version,'fixture']);
+ assert.equal(await rpc('publish',['u',d.resource_key,'leader:one',account.generation,m]),true);
+ const done=(await q('select due_at>=checked_at+interval \'299 seconds\' normal from worker_jobs'))[0];assert.equal(done.normal,true);
+ assert.equal(await rpc('claim',['leader:minute',false]),null);
+ console.log('PASS legacy requests normalize to five-minute acquisition and successful work cannot restart after one minute');
+ await q("update worker_jobs set due_at=now()-interval '1 second',checked_at=now()-interval '301 seconds'");
+ assert.equal(await rpc('claim',['leader:reserved',true]),null);
+ assert.ok(await rpc('claim',['leader:background',false]));
+ console.log('PASS due clause acquisition runs in routine background lane without a browser or page-navigation event');
+}finally{await db.close()}})().catch(e=>{console.error(e);process.exitCode=1});

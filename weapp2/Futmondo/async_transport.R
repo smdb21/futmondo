@@ -26,8 +26,19 @@ fm_transport_finish<-function(id,response=NULL,error=NULL){
   .fm_transport$tasks[[id]]<-NULL
   if(is.null(error)){
     resource_metric("bytes",length(response$content))
-    if(response$status_code<200L||response$status_code>=300L)
+    if(response$status_code<200L||response$status_code>=300L) {
+      # The marker failure needs its missing *column name*, never a raw body,
+      # request payload, URL query or database credential, for diagnosis.
+      if(response$status_code==400L&&length(response$content)<=8192L&&
+         identical(sub("[?].*$","",sub("^.*/rest/v1/","",task$url)),"player_round_history_checks")) {
+        diagnostic<-tryCatch(jsonlite::fromJSON(rawToChar(response$content),simplifyVector=FALSE),error=function(e)NULL)
+        if(is.list(diagnostic)&&identical(diagnostic$code,"PGRST204")&&is.character(diagnostic$message)&&length(diagnostic$message)==1L) {
+          field<-regmatches(diagnostic$message,regexec("^Could not find the '([a-z_][a-z0-9_]{0,62})' column of 'player_round_history_checks'",diagnostic$message))[[1]]
+          if(length(field)==2L)message("[Futmondo schema] resource=player_round_history_checks code=PGRST204 missing_column=",field[2])
+        }
+      }
       error<-resource_failure(resource=task$url,category="http",http_status=response$status_code)
+    }
   }
   if(is.null(error))task$resolve(response)else task$reject(error)
   invisible(NULL)

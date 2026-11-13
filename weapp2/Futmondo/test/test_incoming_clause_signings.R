@@ -119,12 +119,33 @@ clear_api_cache()
 shiny::testServer(source_test,{
  settle(session)
  check('queue starts at most two summary reads',{stopifnot(calls==2L,length(pending)==2L,maximum==2L)})
- complete();settle(session);complete(fail=TRUE);settle(session);complete();settle(session)
+ before<-calls
+ roster_state(resource_state(observed_data(data.frame(id='owned'),observed_at=Sys.time()+10)))
+ history_state(resource_state(observed_data(history_fixture,observed_at=Sys.time()+10)));settle(session)
+ check('timestamp-only worker publications preserve the original two in-flight checks',{
+   stopifnot(calls==before,length(pending)==2L,all(vapply(pending,function(job)job$current(),logical(1))))
+ })
+ roster_state(resource_state(observed_data(data.frame(id='owned'),status='stale')));settle(session)
+ complete();settle(session)
+ check('brief prerequisite expiry keeps pending verification alive and pauses additional requests',{
+   stopifnot(calls==before,length(pending)==1L,pending[[1]]$current(),incoming()$status=='partial',nzchar(incoming()$error))
+ })
+ roster_state(resource_state(observed_data(data.frame(id='owned'))));settle(session)
+ check('fresh unchanged prerequisites resume the same batch instead of starting it again',{
+   stopifnot(calls==before+1L,length(pending)==2L)
+ })
+ complete(fail=TRUE);settle(session);complete();settle(session)
  check('partial failure preserves successful rows',{x<-incoming();stopifnot(nrow(x$records)==3L,x$status=='partial',sum(nzchar(x$records$timing_error))==1L,maximum==2L)})
  before<-calls;active(FALSE);settle(session);active(TRUE);settle(session)
  check('cached navigation retries only failed summary',{stopifnot(calls==before+1L,length(pending)==1L)})
  complete();settle(session);before<-calls;active(FALSE);settle(session);active(TRUE);settle(session)
  check('warm navigation makes no summary requests',{stopifnot(calls==before,incoming()$status=='ok')})
+ before<-calls;verified<-incoming()$records
+ roster_state(resource_state(observed_data(data.frame(id='owned'),observed_at=Sys.time()+120)))
+ history_state(resource_state(observed_data(history_fixture,observed_at=Sys.time()+120)));settle(session)
+ check('later unchanged publications reuse completed verification without rereading summaries',{
+   stopifnot(calls==before,incoming()$status=='ok',identical(incoming()$records,verified))
+ })
  fresh_records<-incoming()$records;roster_state(resource_state(observed_data(data.frame(id=c('owned','in')),status='stale')));settle(session)
  check('stale source cannot remove pending entries',{stopifnot(nrow(incoming()$records)==nrow(fresh_records),incoming()$status=='partial')})
  roster_state(resource_state(observed_data(data.frame(id='owned'))));clear_api_cache();refresh(1L);settle(session)

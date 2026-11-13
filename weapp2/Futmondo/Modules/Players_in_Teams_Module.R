@@ -433,7 +433,7 @@ get_ordinal_position <- function(position) {
 
 # Page-scoped queue: at most two summary reads, with the same account-scoped
 # raw cache used by cards/preflight. Navigation never starts whole-league work.
-incoming_clause_cached_summary <- function(login,championship_id,user_team_id,player_id) {
+incoming_clause_cached_summary <- function(login,championship_id,user_team_id,player_id,is_current=NULL,owner='') {
   context<-resource_context(login,championship_id,user_team_id,player_id)
   key<-api_cache_key(paste0("player_summary_",login[["userid"]],"_",championship_id,"_",user_team_id,"_",player_id),context=context)
   item<-api_cache_env[[key]]
@@ -442,6 +442,17 @@ incoming_clause_cached_summary <- function(login,championship_id,user_team_id,pl
      length(stamp)==1L&&!is.na(stamp)&&stamp<=now&&
      as.numeric(difftime(now,stamp,units="secs"))<resource_policy("summary")$ttl)item$data else
        cached_clause_transfer_summary(context)
+  if(exists("fm_worker_configured",mode="function")&&fm_worker_configured()) {
+    d<-fm_worker_descriptor("get_clause_transfer_summary",list(championship_id=championship_id,user_team_id=user_team_id,player_id=player_id),context)
+    s<-fm_worker_account_state(context$account_id)
+    if(is.function(is_current))fm_worker_demand(d,owner,is_current)
+    try(fm_worker_resource_revision(s,d$resource_key)(),silent=TRUE)
+    saved<-fm_worker_get(context$account_id,d$resource_key)$data
+    stamp<-fm_time(attr(saved,"observed_at"));previous<-fm_time(attr(value,"observed_at"))
+    if(!is.null(saved)&&resource_snapshot_unexpired(saved,now)&&!acquisition_data_unverified(saved)&&
+       length(stamp)==1L&&!is.na(stamp)&&stamp<=now&&
+       (is.null(value)||length(previous)!=1L||is.na(previous)||stamp>=previous))value<-saved
+  }
   if(!is.null(value))persist_clause_transfer_summary(value,context)
   value
 }
@@ -463,9 +474,9 @@ incoming_clause_prerequisite_failure <- function(roster,history) {
       failures[[key]]<-failure
       messages<-c(messages,paste0(labels[[key]],": ",resource_failure_message(failure)))
     } else {
-      reason<-if(identical(state$freshness,"stale")||identical(state$status,"stale")||identical(attr(state$data,"fetch_status"),"stale"))"is stale"else
+      reason<-if(state$status%in%c("loading","refreshing"))"is refreshing"else if(identical(state$freshness,"stale")||identical(state$status,"stale")||identical(attr(state$data,"fetch_status"),"stale"))"is stale"else
         if(identical(state$status,"partial")||identical(attr(state$data,"fetch_status"),"partial"))"is incomplete"else"could not be loaded"
-      messages<-c(messages,paste0(labels[[key]]," ",reason,". Refresh to retry."))
+      messages<-c(messages,paste0(labels[[key]]," ",reason,if(reason=="is refreshing")"."else ". Refresh to retry."))
     }
   }
   list(message=paste("Clause transfers could not be verified.",paste(messages,collapse=" ")),failures=failures)
@@ -480,13 +491,18 @@ incoming_clause_source <- function(session,login_token,championship_id,user_team
   history_read<-factual_read_adapter(session,"get_championship_pressroom",login_token,championship_id,user_team_id,
     is_active=is_active,refresh_trigger=refresh_trigger,state_only=TRUE)
   generation<-0L;closed<-FALSE;was_active<-FALSE;signature<-NULL;owner<-NULL
-  jobs<-list();queue<-character();summaries<-list();snapshot<-NULL;job_sequence<-0L
+  jobs<-list();queue<-character();summaries<-list();snapshot<-NULL;job_sequence<-0L;prerequisite_problem<-NULL
   publish<-function(loading=FALSE) {
     if(is.null(snapshot))return(invisible(NULL))
     prior<-shiny::isolate(state())
     result<-reconcile_pending_clause_transfers(snapshot$roster,snapshot$history,summaries,snapshot$team,
       previous_records=prior$records,previous_outgoing_records=prior$outgoing_records)
     rows<-result$incoming_records;leaving<-result$outgoing_records
+    if(!is.null(prerequisite_problem)) {
+      state(list(status="partial",records=rows,outgoing_status="partial",outgoing_records=leaving,
+        error=prerequisite_problem$message,source_errors=prerequisite_problem$failures))
+      return(invisible(NULL))
+    }
     state(list(status=if(loading)"loading"else if(any(nzchar(rows$timing_error)))"partial"else "ok",
       records=rows,outgoing_status=if(loading)"loading"else result$outgoing_status,
       outgoing_records=leaving,outgoing_error=if(!loading&&identical(result$outgoing_status,"partial")&&!any(nzchar(leaving$timing_error)))
@@ -494,7 +510,7 @@ incoming_clause_source <- function(session,login_token,championship_id,user_team
     invisible(NULL)
   }
   pump<-function() {
-    if(closed||!was_active||is.null(snapshot))return(invisible(NULL))
+    if(closed||!was_active||is.null(snapshot)||!is.null(prerequisite_problem))return(invisible(NULL))
     while(length(jobs)<2L&&length(queue)) {
       pid<-queue[1];queue<<-queue[-1];job_sequence<<-job_sequence+1L
       job_id<-as.character(job_sequence);job_generation<-generation;captured<-snapshot
@@ -522,11 +538,15 @@ incoming_clause_source <- function(session,login_token,championship_id,user_team
           pump();invisible(NULL)
         }
         acquire<-function(handler,rechecked=FALSE) {
+          awaiting<-TRUE
+          live<-function()awaiting&&current()
+          attr(live,"fm_worker_interest")<-paste0("clause:",id,":",handler)
           request<-tryCatch(async_adapter_fetch(handler,list(login=ctx$login,
             championship_id=ctx$league,user_team_id=ctx$team,player_id=player_id),
             context=resource_context(ctx$login,ctx$league,ctx$team,player_id,session_id=session$token),
-            is_current=current,priority="interactive"),error=function(e)promises::promise_reject(e))
-          promises::then(request,function(value)finish(value,rechecked),function(error)finish())
+            is_current=live,priority="interactive"),error=function(e)promises::promise_reject(e))
+          promises::then(request,function(value){awaiting<<-FALSE;finish(value,rechecked)},
+            function(error){awaiting<<-FALSE;finish()})
         }
         acquire("get_clause_transfer_summary")
       })
@@ -536,9 +556,9 @@ incoming_clause_source <- function(session,login_token,championship_id,user_team
   }
   observer<-shiny::observe({
     active<-isTRUE(is_active());auth<-login_token()
-    context<-if(valid_login(auth))list(account=fm_scalar(auth[["userid"]]),league=fm_scalar(championship_id()),team=fm_scalar(user_team_id()))else NULL
+    context<-if(valid_login(auth))list(account=fm_scalar(auth[["userid"]]),league=fm_scalar(championship_id()),team=fm_scalar(user_team_id()),scope=resource_context(auth,championship_id(),user_team_id())[fm_worker_fields])else NULL
     if(!identical(owner,context)) {
-      generation<<-generation+1L;owner<<-context;signature<<-NULL;snapshot<<-NULL;queue<<-character();summaries<<-list()
+      generation<<-generation+1L;owner<<-context;signature<<-NULL;snapshot<<-NULL;queue<<-character();summaries<<-list();prerequisite_problem<<-NULL
       state(empty_state())
     }
     if(!active||is.null(context)) {
@@ -550,15 +570,19 @@ incoming_clause_source <- function(session,login_token,championship_id,user_team
     history<-history_read(login=auth,championship_id=context$league)
     refresh<-if(is.function(refresh_trigger))refresh_trigger()else 0L
     if(incoming_clause_source_unverified(roster)||incoming_clause_source_unverified(history)) {
-      generation<<-generation+1L;signature<<-NULL;queue<<-character();snapshot<<-NULL
+      # Keep a valid in-flight batch through transient source expiry. Its
+      # observations remain historical and the displayed prerequisite warning stays.
       previous<-shiny::isolate(state())
       loading<-roster$status%in%c("loading","refreshing")||history$status%in%c("loading","refreshing")
-      problem<-if(loading)NULL else incoming_clause_prerequisite_failure(roster,history)
-      state(list(status=if(loading)"loading"else "partial",records=previous$records,
-        outgoing_status=if(loading)"loading"else "partial",outgoing_records=previous$outgoing_records,
-        error=if(loading)NULL else problem$message,source_errors=if(loading)list()else problem$failures))
+      problem<-incoming_clause_prerequisite_failure(roster,history)
+      prerequisite_problem<<-problem
+      initial_loading<-loading&&is.null(snapshot)
+      state(list(status=if(initial_loading)"loading"else "partial",records=previous$records,
+        outgoing_status=if(initial_loading)"loading"else "partial",outgoing_records=previous$outgoing_records,
+        error=if(initial_loading)NULL else problem$message,source_errors=if(initial_loading)list()else problem$failures))
       return()
     }
+    prerequisite_problem<<-NULL
     previous<-shiny::isolate(state())
     candidates<-pending_clause_candidates(roster$data,history$data,context$team,previous$records,previous$outgoing_records)
     if(is.null(candidates)) {
@@ -567,13 +591,31 @@ incoming_clause_source <- function(session,login_token,championship_id,user_team
         outgoing_status="partial",outgoing_records=previous$outgoing_records,
         error="Clause transfers could not be verified: roster or transaction identities/timestamps are malformed. Use Refresh to retry."));return()
     }
-    next_signature<-as.character(openssl::sha256(serialize(list(context,roster$data$id,candidates,
-      attr(roster$data,"observed_at"),attr(history$data,"observed_at"),refresh),NULL)))
-    if(identical(signature,next_signature))return()
+    # Freshness timestamps are not a change to transfer evidence. Hash only the
+    # relevant source facts, in stable row order and without frame metadata.
+    roster_facts<-as.data.frame(roster$data)[,intersect(c("id","clause_transferred","clause_date","owner_teamid","user_team_id"),names(roster$data)),drop=FALSE]
+    roster_facts<-roster_facts[order(as.character(roster_facts$id)),,drop=FALSE];rownames(roster_facts)<-NULL
+    candidate_facts<-as.data.frame(candidates)[,intersect(c("id","player_id","buyer_team_id","seller_team_id","created","is_clause","price"),names(candidates)),drop=FALSE]
+    candidate_facts<-candidate_facts[order(as.character(candidate_facts$player_id)),,drop=FALSE];rownames(candidate_facts)<-NULL
+    for(field in setdiff(names(attributes(roster_facts)),c("names","row.names","class")))attr(roster_facts,field)<-NULL
+    for(field in setdiff(names(attributes(candidate_facts)),c("names","row.names","class")))attr(candidate_facts,field)<-NULL
+    next_signature<-as.character(openssl::sha256(serialize(list(context,roster_facts,candidate_facts,refresh),NULL)))
+    display_live<-local({version<-generation;function()!closed&&was_active&&identical(generation,version)})
+    attr(display_live,"fm_worker_interest")<-"clause-display"
+    if(identical(signature,next_signature)) {
+      for(pid in unique(as.character(candidates$player_id))) {
+        cached<-incoming_clause_cached_summary(auth,context$league,context$team,pid,display_live,session$token)
+        if(!is.null(cached))summaries[[pid]]<<-cached
+      }
+      snapshot<<-list(login=auth,league=context$league,team=context$team,roster=roster$data,history=history$data)
+      publish(length(queue)>0L||length(jobs)>0L);pump();return()
+    }
     signature<<-next_signature;generation<<-generation+1L
     snapshot<<-list(login=auth,league=context$league,team=context$team,roster=roster$data,history=history$data)
+    display_live<-local({version<-generation;function()!closed&&was_active&&identical(generation,version)})
+    attr(display_live,"fm_worker_interest")<-"clause-display"
     ids<-unique(as.character(candidates$player_id));summaries<<-list()
-    for(pid in ids){cached<-incoming_clause_cached_summary(auth,context$league,context$team,pid);if(!is.null(cached))summaries[[pid]]<<-cached}
+    for(pid in ids){cached<-incoming_clause_cached_summary(auth,context$league,context$team,pid,display_live,session$token);if(!is.null(cached))summaries[[pid]]<<-cached}
     queue<<-setdiff(ids,names(summaries));publish(length(queue)>0L||length(jobs)>0L);pump()
   })
   session$onSessionEnded(function(){closed<<-TRUE;generation<<-generation+1L;queue<<-character();snapshot<<-NULL;summaries<<-list();observer$destroy()})

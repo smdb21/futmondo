@@ -184,3 +184,11 @@ Production migration: `20261113064338_worker_clause_scope_guards`. Redeploy both
 R app and Python worker to activate the clause cache age guard. No dependency or
 environment-variable changes. See `docs/worker_freshness_recovery.md` for isolation,
 source-time and performance details.
+
+Current clause policy supersedes the preceding one-minute rule: apply
+`scripts/migrations/20261113065753_worker_clause_cadence.sql`, then redeploy the R
+app and Python worker. Background clause acquisition uses five minutes regardless
+of GUI navigation; source times remain original and transaction preflights keep
+their existing validity. Production migration is `20261113070822_worker_clause_cadence`.
+The app also contains a safe missing-column diagnostic for the still-unresolved
+history completion-marker REST failure. No new dependencies or settings.
