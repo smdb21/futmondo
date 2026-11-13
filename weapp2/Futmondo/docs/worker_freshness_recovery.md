@@ -28,7 +28,12 @@ With the existing two lanes, `worker_claim(..., p_foreground=true)` excludes
 `fm_worker_finances`, `get_acquisition_capacity`,
 `get_team_acquisition_capacity` and `get_financial_snapshot`. Those longer
 composites retain the routine lane, including when explicitly requested.
-A one-lane configuration has no separately reserved foreground lane. Source
+When no browser is open, the foreground lane can also claim due short core
+resources whose policy urgency is at least 9 (normal priority 3/4). This keeps
+opted-in roster/history/configuration observations warm instead of leaving the
+lane idle behind a long routine job. Low-priority bulk catalogs and long
+composites remain excluded. A one-lane configuration has no separately reserved
+foreground lane. Source
 connection/RPS limits, account admission and all existing lease/context checks
 remain. No worker/process count was increased.
 
@@ -87,10 +92,12 @@ truthful partial progress, not a claim that those endpoints now succeed.
 ## Setup, validation and limits
 
 Apply `scripts/migrations/20261113053241_worker_display_priority.sql`, then
-`scripts/migrations/20261113054538_worker_points_cadence_guard.sql` before the
-matching image. Production recorded these as
+`scripts/migrations/20261113054538_worker_points_cadence_guard.sql`, then
+`scripts/migrations/20261113055439_worker_core_read_lane.sql` before the matching
+image. Production recorded these as
 `20261113054456_worker_display_priority` and
-`20261113054649_worker_points_cadence_guard`. New databases use `scripts/schema.sql`.
+`20261113054649_worker_points_cadence_guard` and
+`20261113055513_worker_core_read_lane`. New databases use `scripts/schema.sql`.
 The functions are invoker/server-only; there are no new tables, runtime packages,
 environment variables, background services or transactions.
 

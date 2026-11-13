@@ -2064,3 +2064,29 @@ Post-deploy check for commit 68d1493: worker heartbeat is live, but the own-rost
   `worker_claim`, `worker_enqueue` and priority helper are invoker functions with
   no anon/authenticated execution grants. No dependency/manifest regeneration
   was required; existing unrelated manifest edits were preserved.
+
+### No-browser core lane correction — 2026-11-13
+
+- The newly deployed worker was healthy, but with no active browser promotion,
+  default priority-4 roster/history jobs could wait behind long routine work
+  while the reserved lane stayed idle. Extended its SQL eligibility to due
+  short core handlers (policy >=9, normal priority >=3), retaining all long-job
+  exclusions and existing consent/context/quiet-hours/lease guards. Old idle
+  recent-point priority-4 entries normalize to their new base priority 3 without
+  changing manual demand, leases or source timestamps.
+- `node test/test_worker_display_priority.cjs`: 5 groups passed. Ordinary
+  no-browser team-info reads are claimable in the protected lane; ordinary bulk
+  catalogs remain unclaimable there. Priority order, manual finance routing,
+  mixed-version 300-second cadence and restricted roles still pass. This is the
+  only runtime change since the previously passing full offline lifecycle;
+  isolated SQL tests exercise the changed branch directly.
+- Production applied `20261113055513_worker_core_read_lane` and immediately
+  showed an ordinary priority-4 roster acquisition alongside routine capacity
+  work (05:55:21 UTC). This is scheduling acceptance, not yet sustained freshness
+  or authenticated browser rendering. No source/secret payload was retrieved.
+- Performance review: one immutable urgency predicate per eligible claim,
+  indexed existing due-job selection, no added process/connection/RPS cap, and
+  no change to the approved collection scope. A previously idle lane can now
+  service due core observations, reducing waiting at the cost of using its
+  already-configured capacity. Long/bulk jobs remain in the routine lane;
+  source/DB pressure stays within the existing shared account/connection limits.

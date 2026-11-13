@@ -166,3 +166,8 @@ package or environment variable is required. See
 [worker freshness and durable acknowledgement reuse](docs/worker_freshness_recovery.md)
 for foreground lane behavior, five-minute recent-point cadence, mixed-version
 rollout safety, partial finance results and validation limits.
+
+The follow-up `scripts/migrations/20261113055439_worker_core_read_lane.sql`
+keeps due short core reads eligible for the reserved lane without a live browser,
+while long finance/bulk work remains excluded. Applied in production as
+`20261113055513_worker_core_read_lane`; no new collection scope or runtime setting.

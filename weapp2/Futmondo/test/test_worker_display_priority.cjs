@@ -11,7 +11,7 @@ const {PGlite}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo-r
  const finance=d('fm_worker_finances',1),points=d('get_player_recent_points',2),roster=d('get_players_from_team',3),history=d('get_championship_pressroom',4),capacity=d('get_team_acquisition_capacity',5);
  for(const x of [finance,points,roster,history,capacity])assert.equal(await rpc('enqueue',['u',x,60,10]),true);
  const before=await q('select resource_key,requested_at,due_at from worker_jobs order by resource_key');
- await db.exec('reset role');const migration=fs.readFileSync('scripts/migrations/20261113053241_worker_display_priority.sql','utf8');await db.exec(migration);await db.exec(migration);await db.exec('set role service_role');
+ await db.exec('reset role');const migration=fs.readFileSync('scripts/migrations/20261113053241_worker_display_priority.sql','utf8');await db.exec(migration);await db.exec(migration);await db.exec(fs.readFileSync('scripts/migrations/20261113055439_worker_core_read_lane.sql','utf8'));await db.exec('set role service_role');
  assert.deepEqual(await q('select resource_key,requested_at,due_at from worker_jobs order by resource_key'),before);
  const rows=await q('select descriptor->>\'handler\' handler,priority,interval_seconds from worker_jobs');
  const priorities=Object.fromEntries(rows.map(r=>[r.handler,r.priority]));
@@ -30,6 +30,12 @@ const {PGlite}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo-r
  const routine=await rpc('claim',['leader:routine',false]);assert.equal(routine.resource_key,finance.resource_key);
  assert.equal(await rpc('guard',['u',finance.resource_key,'leader:routine',a.generation,null]),true);
  console.log('PASS explicit finance refresh stays queued and runs in the routine lane with normal lease guards');
+ const core=d('get_user_team_info',6),bulk=d('get_championship_players',7);
+ await rpc('enqueue',['u',core,60,0]);await rpc('enqueue',['u',bulk,300,0]);
+ assert.equal((await rpc('claim',['leader:warm-core',true])).resource_key,core.resource_key);
+ assert.equal(await rpc('claim',['leader:warm-bulk',true]),null);
+ console.log('PASS ordinary core reads keep warm without browser demand while bulk catalog work stays in the routine lane');
+
  await db.exec('reset role');for(const role of ['anon','authenticated'])assert.equal((await q("select has_function_privilege($1,'worker_request_priority(text)','execute') allowed",[role]))[0].allowed,false);
  console.log('PASS scheduling helpers remain server-only; no facts or snapshots were fabricated');
 }finally{await db.close()}})().catch(e=>{console.error(e);process.exitCode=1});

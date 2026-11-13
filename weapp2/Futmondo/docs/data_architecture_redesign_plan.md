@@ -1188,3 +1188,16 @@ fixed; broad snapshot export was rejected by automatic review and was not
 retried indirectly. Production sustained freshness/mobile acceptance remain
 separate from these implementation checks. Contracts and limits are in
 `worker_freshness_recovery.md`; executed results are in `data_review_results.md`.
+
+### Keep core observations warm without a browser — 2026-11-13
+
+Rollout inspection identified an idle foreground lane when no browser demand
+was present, despite due core resources and long routine work. Extended the
+protected lane to normal due short core reads with policy urgency >=9; bulk
+catalogs/history and long finance remain excluded. Applied forward migration
+`20261113055513_worker_core_read_lane`. Source counts/concurrency/intervals,
+consent/context/quiet-hours checks and source deadlines are unchanged. Five SQL
+regression groups pass, including no-browser core claims and bulk exclusion.
+Production immediately resumed ordinary roster acquisition in the protected
+lane. Sustained source freshness remains under observation, not certified by
+one newly started job. See `worker_freshness_recovery.md`.
