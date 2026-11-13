@@ -139,3 +139,46 @@ such data remains truthfully stale. Production rollout checks must examine
 multiple cycles rather than one successful pair.
 
 Production recorded the prefetch migration as `20261113061754_worker_core_prefetch`.
+
+## Clause validity and resolved prerequisite scopes
+
+`get_clause_transfer_summary` now requests a sixty-second worker interval and
+priority 10. The previous generic summary policy used 300 seconds, exceeding
+the ownership check's existing sixty-second source deadline. The database enqueue
+RPC enforces sixty seconds even for an older browser image. The protected lane
+and existing prefetch schedule apply; publication retains original source times.
+Worker-only clause acquisition renews saved clause observations aged thirty
+seconds or more. The Python resource bridge applies that same age limit to a
+nested general player summary, whose five-minute validity is insufficient for
+this check. Younger persisted observations remain reusable; interactive reads
+retain the entire original sixty-second deadline. No unknown owner or transfer
+time is converted into a successful result.
+
+Migration `20261113063652_worker_clause_scope_guards.sql` adds
+`worker_has_resolved_peer(account, descriptor)`. Only unresolved roster and
+pressroom jobs yield to an existing current-generation, membership-compatible
+peer with identical wire arguments and logical context. Every already-known
+competition/season/scoring dimension must match. Other account, league, team,
+player and context fields must match exactly. Fully resolved and historical
+jobs remain eligible. No old snapshot, checkpoint or evidence is rewritten or
+deleted. An account/handler/argument-hash index bounds peer lookup, with exact
+JSON equality still required after the hash comparison. The helper is restricted
+to the server role, like the claim RPC.
+
+Performance review: two clause jobs existed during rollout. Their shorter
+interval adds up to approximately two acquisitions per minute each under core
+prefetch, sharing the existing two bounded lanes and source rate limits. This
+cost buys ownership verification within its existing source deadline. Production
+metadata previously identified one redundant roster and one redundant pressroom
+job; skipping those avoids duplicate source/parsing/persistence work. No UI timer,
+reactive redraw, per-row browser database query or unbounded memory cache is
+added. Old observations remain durably reusable under their original context.
+Large-account production latency and continued source rejections are not proven
+resolved by these local tests. A container redeploy is required for the R/Python
+age guard; the SQL migration alone cannot run new helper code.
+
+Verified with 30 Python worker tests, 11 clause persistence checks, 20 incoming
+and 24 outgoing checks, six incoming-source recovery groups, three SQL scope
+and cadence groups, four prefetch groups, and the offline lifecycle harness
+(13 checks plus eight tabs). SQL migration replay was idempotent. Production
+recorded the migration as `20261113064338_worker_clause_scope_guards`.

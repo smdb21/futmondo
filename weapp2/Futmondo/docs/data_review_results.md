@@ -2127,3 +2127,18 @@ Post-deploy check for commit 68d1493: worker heartbeat is live, but the own-rost
   passed. Production recorded the prefetch migration as
   `20261113061754_worker_core_prefetch`; a preliminary expired confirmation made
   no change before the successful retry. Source-data validity was not extended.
+
+### 2026-11-13 — Clause deadlines and resolved prerequisite peers
+
+Checks: Python worker 30; durable clause persistence 11; incoming 20; outgoing24;
+incoming source recovery six groups; SQL scope/cadence three groups; prefetch
+four groups; offline lifecycle 13 plus eight tabs. All passed. SQL applied twice
+offline and once in production (`20261113064338_worker_clause_scope_guards`).
+Fixtures verify exact account/team/season/argument isolation, unknown-context
+bootstrap, retained old jobs, mixed-version cadence enforcement, unchanged source
+timestamps, fresh durable reuse and worker renewal of ageing data. Performance:
+two production clause jobs have shorter cadence; existing two lanes/rate limits
+bound acquisition. Indexed exact peer matching avoids redundant roster/history
+work without new UI timers or memory growth. Full production latency, API source
+rejections and post-redeploy transfer verification remain unverified. Details in
+`docs/worker_freshness_recovery.md`.

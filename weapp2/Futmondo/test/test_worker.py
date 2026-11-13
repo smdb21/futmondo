@@ -4,6 +4,7 @@ import copy
 import hashlib
 import json
 import os
+import time
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
@@ -11,7 +12,7 @@ from unittest.mock import AsyncMock
 from types import SimpleNamespace
 import httpx
 from worker.main import (Worker, WorkerFailure, Helper, canonical, decrypt_access, encrypt_access,
-                         pack_snapshot, unpack_snapshot, plain, quiet_interval, filter_football_leagues, source_response_rejected)
+                         pack_snapshot, unpack_snapshot, plain, quiet_interval, filter_football_leagues, source_response_rejected, stamp)
 
 KEY = 'ab' * 32
 AUTH = dict(userid='fixture', token='synthetic', user_name='fixture@example.invalid')
@@ -172,6 +173,25 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
         result=await self.worker.exchange(self.job,'owner',dict(type='resource',descriptor=descriptor()))
         self.assertEqual(result['value'],value)
         self.assertEqual(self.worker.source_stamps['owner'],[manifest['checked_at']])
+        self.assertFalse(self.requests)
+
+    async def test_clause_rejects_old_general_summary_but_reuses_recent_source(self):
+        value={'kind':'double','values':[1]}
+        chunks,size,digest=pack_snapshot(value)
+        manifest=dict(context=CONTEXT,parts=len(chunks),json_bytes=size,sha256=digest,status='ok',
+            observed_at=stamp(time.time()-45),checked_at=stamp(),valid_until=stamp(time.time()+250))
+        original=self.store.rpc
+        async def rpc(name,**p):
+            if name=='read':return {'resources':[dict(manifest=manifest,chunks=chunks)]}
+            return await original(name,**p)
+        self.store.rpc=rpc
+        job=dict(self.job,descriptor=descriptor('get_clause_transfer_summary'))
+        message=dict(type='resource',descriptor=descriptor('get_player_summary'))
+        self.assertIsNone((await self.worker.exchange(job,'owner',message))['value'])
+        manifest['observed_at']=stamp(time.time()-5)
+        result=await self.worker.exchange(job,'owner',message)
+        self.assertEqual(result['value'],value)
+        self.assertEqual(result['observed_at'],manifest['observed_at'])
         self.assertFalse(self.requests)
 
     async def test_rate_limit_honors_retry_after(self):

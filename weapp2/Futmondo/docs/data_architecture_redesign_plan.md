@@ -1215,3 +1215,13 @@ source/checkpoint fallback for composites instead of allowing an unrelated old
 child to backdate a fresh sibling. The forward migration is applied; local SQL,
 Python, finance and lifecycle results are in `data_review_results.md`. Sustained
 live freshness remains an acceptance check until repeated cycles are observed.
+
+### 2026-11-13 — Clause worker deadline and duplicate prerequisite acquisition
+
+Implemented locally and SQL deployed: clause summaries use the required 60-second
+cadence/core priority, with worker-only renewal of observations aged 30 seconds;
+equivalent unresolved roster/pressroom jobs yield to resolved current-context
+peers without deleting observations. See `docs/worker_freshness_recovery.md`.
+Production SQL version `20261113064338`; R/Python container redeploy and multiple
+successful production clause/history cycles remain outstanding. This is not a
+claim that the reported source rejections or transfer screen are resolved.

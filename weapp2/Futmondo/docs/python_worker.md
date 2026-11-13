@@ -137,3 +137,12 @@ fact writes across helper restarts. Optional finance source rejections now reach
 the R engine's existing error handling and remain partial/unreconciled instead
 of terminating all independent progress. Hard authentication/context/persistence
 failures still abort. See [contracts, migrations and limits](worker_freshness_recovery.md).
+
+Clause verification uses priority 10 and a sixty-second acquisition interval.
+The helper and bridge reuse ownership summaries younger than thirty seconds,
+leaving time for durable publication before the original sixty-second deadline.
+Generic player-summary consumers retain their normal five-minute policy. The
+resolved-peer claim guard suppresses only equivalent unresolved roster/pressroom
+jobs; it preserves stored observations and historical/context isolation. Apply
+`20261113063652_worker_clause_scope_guards.sql` and redeploy the worker and app;
+see `worker_freshness_recovery.md` for rollout and verification limits.

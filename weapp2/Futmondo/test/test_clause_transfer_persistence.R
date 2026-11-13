@@ -138,4 +138,18 @@ check('a durable observation expiring during a delayed read acquires a fresh sum
     as.numeric(attr(value,'observed_at'))==as.numeric(now+61))
   get_sb_url<-original_url;get_sb_key<-original_key;fm_async_read_http<-original_http;get_player_summary<-original_summary;rm(Sys.time)
 })
+check('worker prefetch renews ageing clause data while interactive reads retain the source deadline',{
+  clear_api_cache();clause_clock<-now+35
+  original_summary<-get_player_summary;before<-source_reads
+  get_player_summary<-function(...){source_reads<<-source_reads+1L;observed_data(summary,observed_at=clause_clock)}
+  options(futmondo.worker_helper=FALSE)
+  interactive<-get_clause_transfer_summary(c(userid='clause-fixture',token='synthetic'),'league','mine','p')
+  stopifnot(isTRUE(attr(interactive,'clause_from_saved')),source_reads==before,
+    as.numeric(attr(interactive,'observed_at'))==as.numeric(now))
+  options(futmondo.worker_helper=TRUE)
+  fresh<-get_clause_transfer_summary(c(userid='clause-fixture',token='synthetic'),'league','mine','p')
+  stopifnot(source_reads==before+1L,as.numeric(attr(fresh,'observed_at'))==as.numeric(clause_clock),
+    fm_worker_interval('get_clause_transfer_summary')==60L,fm_worker_priority('get_clause_transfer_summary')==10L)
+  options(futmondo.worker_helper=FALSE);get_player_summary<-original_summary
+})
 cat(sprintf('Clause transfer persistence: %d checks passed. Cold valid replay: one scoped DB read, zero API reads; warm replay: zero reads.\n',checks))

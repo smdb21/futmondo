@@ -94,6 +94,10 @@ get_clause_transfer_summary <- function(login,championship_id,user_team_id,playe
   now<-clause_transfer_now()
   saved<-cached_clause_transfer_summary(context,now)
   if(is.null(saved))saved<-read_saved_clause_transfer_summary(context,now)
+  # Prefetch must leave enough validity for persistence and visible verification.
+  # Interactive reads retain their full, original sixty-second source deadline.
+  if(!is.null(saved)&&isTRUE(getOption("futmondo.worker_helper",FALSE))&&
+     as.numeric(difftime(now,fm_time(attr(saved,"observed_at")),units="secs"))>=30)saved<-NULL
   if(!is.null(saved)) {
     resource_store(clause_transfer_cache_key(context),saved,context,"clause_transfer_summary",ttl=60)
     return(saved)

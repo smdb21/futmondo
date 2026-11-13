@@ -176,3 +176,11 @@ Also apply `scripts/migrations/20261113060230_worker_core_prefetch.sql` before t
 source-timestamp/prefetch image. It schedules short core reads before their true
 expiry while preserving quiet hours, manual refresh and source deadlines; no
 new package or environment setting is required.
+
+Apply `scripts/migrations/20261113063652_worker_clause_scope_guards.sql` before
+redeploying the clause-freshness worker image. It enforces the existing one-minute
+ownership deadline and avoids duplicate unresolved roster/history acquisitions.
+Production migration: `20261113064338_worker_clause_scope_guards`. Redeploy both
+R app and Python worker to activate the clause cache age guard. No dependency or
+environment-variable changes. See `docs/worker_freshness_recovery.md` for isolation,
+source-time and performance details.

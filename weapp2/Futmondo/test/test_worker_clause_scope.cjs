@@ -1,0 +1,27 @@
+const fs=require('fs'),assert=require('assert/strict');
+const {PGlite}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo-review-tools/node_modules')+'/@electric-sql/pglite');
+(async()=>{const db=new PGlite();try{
+ await db.exec('create role anon;create role authenticated;create role service_role bypassrls;');
+ await db.exec(fs.readFileSync('scripts/schema.sql','utf8'));
+ const sql=fs.readFileSync('scripts/migrations/20261113063652_worker_clause_scope_guards.sql','utf8');await db.exec(sql);await db.exec(sql);
+ const q=async(s,a=[]) => (await db.query(s,a)).rows;
+ const rpc=async(n,a)=>(await q(`select worker_${n}(${a.map((_,i)=>'$'+(i+1)).join(',')}) result`,a))[0].result;
+ await db.exec('set role service_role');await rpc('elect',['leader']);await rpc('authorize',['u',true,'synthetic','UTC',0,0,[],'fixture']);
+ const context={account_id:'u',championship_id:'l',user_team_id:'t',competition_id:'unknown',season:'unknown',scoring_version:'unknown'};
+ const old={version:1,handler:'get_championship_pressroom',resource_key:'a'.repeat(64),args:{championship_id:'l'},context};
+ const resolved={...old,resource_key:'b'.repeat(64),context:{...context,competition_id:'c',season:'s',scoring_version:'v'}};
+ await rpc('enqueue',['u',old,60,10]);assert.equal(await rpc('has_resolved_peer',['u',old]),false);
+ assert.ok(await rpc('claim',['leader:bootstrap',true]));await q('update worker_jobs set owner=null,lease_until=null');
+ await rpc('enqueue',['u',resolved,60,10]);assert.equal(await rpc('has_resolved_peer',['u',old]),true);
+ assert.equal((await rpc('claim',['leader:resolved',true])).resource_key,resolved.resource_key);
+ assert.equal((await q('select count(*)::int n from worker_jobs'))[0].n,2);
+ console.log('PASS unknown-context bootstrap remains available; resolved peer exclusively acquires without deleting either job');
+ for(const d of [{...old,args:{championship_id:'other'}},{...old,context:{...context,season:'different'}},{...old,handler:'get_player_history'},{...old,context:{...context,user_team_id:'other'}}])assert.equal(await rpc('has_resolved_peer',['u',d]),false);
+ assert.equal(await rpc('has_resolved_peer',['other',old]),false);
+ console.log('PASS wire arguments, season, team, account and historical handlers remain isolated');
+ const clause={...resolved,handler:'get_clause_transfer_summary',resource_key:'c'.repeat(64)};
+ await rpc('enqueue',['u',clause,300,10]);const job=(await q('select interval_seconds,base_priority from worker_jobs where resource_key=$1',[clause.resource_key]))[0];
+ assert.equal(job.interval_seconds,60);assert.equal(job.base_priority,4);assert.equal((await q("select worker_request_priority('get_clause_transfer_summary') p"))[0].p,10);
+ assert.equal((await rpc('claim',['leader:clause',true])).resource_key,clause.resource_key);
+ console.log('PASS mixed-version requests cannot restore five-minute clause validity; clause checks use protected lane');
+}finally{await db.close()}})().catch(e=>{console.error(e);process.exitCode=1});
