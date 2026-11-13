@@ -87,3 +87,41 @@ Performance considerations: opting in increases unattended source/database work 
 Python `source_response_rejected()` recognizes explicit native `api.error.*`/boolean-error envelopes even under HTTP 200. These are failures (`source_rejected`), never successful observations or new checkpoints. Existing rejected checkpoints are retained but skipped on retry; their timestamps are not reused. Accepted live responses still go through context/authentication checks and acknowledged persistence. An immutable legacy checkpoint may remain until normal cleanup; normalized successful facts and final snapshots still persist. Empty arrays and genuine zero remain valid responses. Hard context, credential, revocation and source-rejection failures propagate to the owner lane instead of being relabeled as R parser failures. This does not relax source guards or make a rejected request successful.
 
 `classification_saved_future(evidence, context, round_id, round_number, now)` recognizes an upcoming round only from a fresh complete version-2 official fixture calendar already read from durable finance evidence. Account/league/competition/season, canonical calendar identity, numbered opaque round identity, all fixture dates and earliest start must agree; running/final rounds, stale/incomplete calendars and newer conflicting calendars cannot fall back to an older future record. The ranking getter first reuses a fresh saved ranking, then may return `not_started=TRUE` with empty score rows, original calendar timestamp and a deadline bounded by calendar expiry, 60 seconds and kickoff. It neither invents zero scores nor interprets a generic API rejection as a future round. No additional HTTP/DB read is introduced.
+
+### Bounded durable discovery writes (2026-11-13)
+
+`Worker.enqueue_discoveries(job, owner, discoveries)` sends at most 128
+credential-free descriptors/512 KiB of encoded descriptor content per
+`worker_enqueue_batch` RPC. A 527-player catalog's 2,108 discovered resources
+therefore needs 17 calls instead of 2,108 sequential calls occupying the
+acquisition lane after snapshot publication. Discovery descriptors are not
+mutated. Each batch must acknowledge a count; NULL, invalid acknowledgement
+or database failure propagates as failure. The successful-job statistic advances
+only after discovery acknowledgement. Previously acknowledged batches remain
+in the durable queue; routine catalog retries/rediscovery safely repeat them.
+Snapshot publication still certifies the factual result independently of its
+follow-up discovery work; discovery is not a transaction or source acquisition.
+
+`worker_enqueue_batch(p_account, p_owner, p_generation, p_descriptors)` accepts
+an array of descriptors with optional `interval_seconds` (default 300), returns
+the number accepted, and rejects arrays above 128 entries/1 MiB. It locks the
+account against concurrent consent/generation changes and checks current leader,
+auth, consent, context, descriptor IDs, intervals, excluded/blocked leagues and
+finance context. It is SECURITY INVOKER, executable only by `service_role`.
+Unchanged existing descriptors at an equal/faster interval retain their exact
+row, lease, pending refresh and priority. Tighter intervals or missing jobs use
+the existing `worker_enqueue(..., priority=0)` policy. No parallel DB request
+fan-out, source-rate increase, new queue, timer or process is introduced.
+
+Existing installations require
+`scripts/migrations/20261113043655_worker_discovery_batches.sql` before the new
+worker image; fresh databases include the function in `scripts/schema.sql`.
+Applied unchanged to the documented production project as migration
+`20261113043948_worker_discovery_batches`; invoker/server-only permissions and
+an empty guarded batch acknowledgement were verified. No factual records,
+source timestamps or credentials were rewritten by this migration. Python/R
+packages and runtime environment variables are unchanged. Rollback to the
+previous worker image remains compatible with the additive function.
+
+Checks and rollout limits are recorded in `data_review_results.md`. Synthetic
+SQL performance is not hosted end-to-end freshness or VM capacity acceptance.

@@ -1140,3 +1140,21 @@ See `player_data_availability.md` and `data_review_results.md` for contracts,
 performance and checks. Production image rollout and a successful fresh stored
 roster/transaction version in the affected browser remain acceptance checks;
 separate `source_rejected` failures are not declared fixed by this parser repair.
+
+### Healthy worker stalled after catalog publication — 2026-11-13
+
+The post-parser-rollout screenshot still showed stale prerequisites. Production
+metadata demonstrated a live heartbeat, both lanes without job leases, and no
+new acquisition while the Python `publish()` loop sequentially enqueued 2,108
+catalog discoveries per league. Implemented bounded acknowledged durable queue
+batches, reusing unchanged jobs without row rewrites and retaining existing
+account/leader/consent/exclusion/context guards. A 527-player catalog now needs
+17 RPCs instead of 2,108. No source-rate change or UI warning suppression.
+
+Local SQL/worker/lifecycle checks pass. The additive server-only function was
+applied to production as `20261113043948_worker_discovery_batches`; permissions
+and guarded empty acknowledgement were checked. Automatic worker image rollout
+and fresh stored roster/transaction versions remain the production acceptance
+criteria. See `python_worker.md` and `data_review_results.md`. The screenshot's
+independent source-rejection and schema diagnostics are not declared repaired
+without their own source/persistence evidence.

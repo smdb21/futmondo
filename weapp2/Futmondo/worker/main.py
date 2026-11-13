@@ -550,11 +550,31 @@ class Worker:
         if not await self.store.rpc('publish', p_account=job['account_id'], p_key=job['resource_key'], p_owner=owner,
                                     p_generation=job['generation'], p_manifest=manifest):
             raise WorkerFailure('access_revoked')
+        await self.enqueue_discoveries(job, owner, result.get('discoveries', []))
         self.job_count += 1
-        for descriptor in result.get('discoveries', []):
+
+    async def enqueue_discoveries(self, job, owner, discoveries):
+        # Thousands of sequential RPCs can occupy both acquisition lanes for
+        # minutes after their parent lease has ended. Keep each durable write
+        # bounded and acknowledged, without mutating helper descriptors.
+        batch, size = [], 0
+        async def flush():
+            acknowledged = await self.store.rpc('enqueue_batch', p_account=job['account_id'],
+                p_owner=owner, p_generation=job['generation'], p_descriptors=batch)
+            if type(acknowledged) is not int or not 0 <= acknowledged <= len(batch):
+                raise WorkerFailure('discovery_unacknowledged')
+        for descriptor in discoveries:
             assert_factual(descriptor)
-            await self.store.rpc('enqueue', p_account=job['account_id'], p_descriptor=descriptor,
-                p_interval=descriptor.pop('interval_seconds', 300), p_priority=0)
+            encoded_size = len(canonical(descriptor).encode())
+            if encoded_size > 262144:
+                raise WorkerFailure('discovery_size')
+            if batch and (len(batch) >= 128 or size + encoded_size > 512 * 1024):
+                await flush()
+                batch, size = [], 0
+            batch.append(descriptor)
+            size += encoded_size
+        if batch:
+            await flush()
 
     async def lane(self, index):
         owner = self.identity + ':' + str(index)

@@ -1940,3 +1940,44 @@ Post-deploy check for commit 68d1493: worker heartbeat is live, but the own-rost
   UI/CSS changes. Mobile uses the existing layout; hosted browser timing was
   not measured. Production deployment/fresh roster and transaction acceptance,
   plus the independent source-rejection failures, remain separate checks.
+
+### Catalog discovery blocked acquisition lanes — 2026-11-13
+
+- Read-only production metadata at 04:34–04:36 UTC: healthy worker, 14 completed
+  jobs, no live job leases, and catalog publication at 04:32:29 followed by no
+  further claims. Source inspection identified the post-publication loop issuing
+  one RPC for each of 2,108 discoveries per 527-player catalog. Both lanes can
+  enter this loop; pending roster/pressroom reads then expire or time out. These
+  are additional defects after the independently reproduced roster mapping fix.
+- Replaced the loop with acknowledged batches of 128 descriptors/512 KiB; the
+  SQL RPC enforces 128/1 MiB, leader/current generation, consent/authentication,
+  account context, interval bounds and existing league/finance checks. Unchanged
+  jobs are reused without row writes; foreground requests/leases are retained.
+  No acquisition check, factual timestamp or unknown value is bypassed.
+- `node test/test_worker_discovery_batches.cjs`: 5 groups passed, covering exact
+  durable identities, repeat batches with unchanged physical rows, preserved
+  priority/leases, tighter intervals, byte/count/shape limits, transactional
+  foreign-context rejection, generation/leader/consent/exclusion guards and
+  browser denial. 2,108 cold discoveries used 17 calls, 1,287.8 ms local PGlite
+  SQL; no hosted end-to-end speedup is inferred from that measurement.
+- Python `test_worker.WorkerTests`: 25 tests passed, including count/byte bounds,
+  descriptor immutability, acknowledged failure propagation and actual R-helper
+  acquisition/publication/restart reuse. Existing SQL queue suite: 10 groups
+  passed. Offline Shiny lifecycle: 13 checks plus eight rendered tabs passed,
+  with no live source requests or database mutations by tests.
+- Production applied the exact additive source migration as
+  `20261113043948_worker_discovery_batches`. Verified `SECURITY INVOKER`, only
+  service-role execution, and empty guarded acknowledgement 0 without queue
+  mutations. Health advisory returned no findings. Existing informational RLS
+  no-policy findings match the server-only model; unrelated pre-existing
+  GraphQL/function-exposure advisories were not changed by this task (see
+  https://supabase.com/docs/guides/database/database-linter?lint=0026_pg_graphql_anon_table_exposed
+  and https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable).
+- Performance: removes 2,091 remote round trips per catalog and avoids rewriting
+  unchanged rows; each batch retains references to at most 128 already-returned
+  descriptors. Existing R/UI polling, source RPS/connections, cache limits,
+  durable observations and manual actions are unchanged. Account locks last for
+  a bounded SQL batch rather than a whole catalog. No runtime dependencies,
+  environments or UI/CSS changed; mobile layout and browser rendering are
+  unchanged. Actual hosted freshness and source capacity still need acceptance
+  after the image rolls out; pending stale data remains explicitly unverified.

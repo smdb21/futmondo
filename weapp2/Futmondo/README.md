@@ -148,3 +148,12 @@ After login, use Welcome → Background sync to explicitly opt in, select includ
 Existing interactive behavior remains for non-opted-in accounts. Opted-in accounts display stored data and acquisition progress rather than silently falling back to direct source reads. Manual-action preflights and readback remain live. See [worker behavior, failure recovery, limits and rollout](docs/python_worker.md). Container startup does not apply migrations or enroll users automatically. Active finance context/progress improvements require `scripts/migrations/20261112035000_resolved_finance_jobs.sql` followed by `scripts/migrations/20261112035500_finance_progress_publication.sql` before the corresponding app image; source history is preserved. Dokploy auto-deploys pushes to the application branch, per the owner. See [finance worker progress](docs/finance_worker_progress.md).
 
 Focused offline checks: `Rscript test/test_worker_contract.R`, `Rscript test/test_worker_provider.R`, `node test/test_worker_schema.cjs`, then `python -m unittest discover -s test -p test_worker.py -v` from the application directory with the pinned Python requirements installed. The R contract check generates synthetic cross-language fixtures in `/tmp`; tests never use real accounts or transactions.
+
+Worker discovery queue repair: apply
+`scripts/migrations/20261113043655_worker_discovery_batches.sql` before deploying
+the corresponding worker image. The server-only batch RPC replaces thousands of
+sequential discovery queue calls, preserves existing queue context/consent guards,
+and reuses unchanged durable jobs without rewriting them. It was applied to the
+configured production database as `20261113043948_worker_discovery_batches`.
+No new package or environment variable is required; see
+[worker discovery behavior](docs/python_worker.md#bounded-durable-discovery-writes-2026-11-13).

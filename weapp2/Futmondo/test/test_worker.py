@@ -38,6 +38,7 @@ class FakeStore:
     async def rpc(self, name, **p):
         self.calls.append((name, copy.deepcopy(p)))
         if name == 'guard': return self.allowed
+        if name == 'enqueue_batch': return len(p['p_descriptors']) if self.allowed else None
         if name == 'checkpoint':
             key = p['p_request']
             if p.get('p_response') is not None: self.checkpoints[key] = copy.deepcopy(p['p_response'])
@@ -191,6 +192,53 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
         chunks=[i for i,x in enumerate(self.store.calls) if x[0]=='worker_chunks']
         publish=[i for i,x in enumerate(self.store.calls) if x[0]=='publish']
         self.assertLess(max(chunks),min(publish))
+    async def test_discovery_failure_does_not_count_as_completed_and_can_retry(self):
+        result = dict(value={'kind':'double', 'values':[1]},
+            discoveries=[dict(descriptor(), interval_seconds=300)])
+        original = self.store.rpc
+        async def fail(name, **params):
+            if name == 'enqueue_batch': return None
+            return await original(name, **params)
+        self.store.rpc = fail
+        with self.assertRaisesRegex(WorkerFailure, 'discovery_unacknowledged'):
+            await self.worker.publish(self.job, 'owner', result)
+        self.assertEqual(self.worker.job_count, 0)
+        self.store.rpc = original
+        await self.worker.publish(self.job, 'owner', result)
+        self.assertEqual(self.worker.job_count, 1)
+        self.assertFalse(self.requests)
+
+    async def test_catalog_discoveries_are_bounded_acknowledged_batches(self):
+        discoveries = []
+        for i in range(2108):
+            d = descriptor('get_player_summary', dict(player_id=str(i)))
+            d['interval_seconds'] = 3600
+            discoveries.append(d)
+        original = copy.deepcopy(discoveries)
+        await self.worker.enqueue_discoveries(self.job, 'owner', discoveries)
+        calls = [p for name, p in self.store.calls if name == 'enqueue_batch']
+        self.assertEqual(len(calls), 17)
+        self.assertTrue(all(len(p['p_descriptors']) <= 128 for p in calls))
+        self.assertEqual([d for p in calls for d in p['p_descriptors']], original)
+        self.assertEqual(discoveries, original)
+        self.assertFalse(self.requests)
+        self.store.allowed = False
+        with self.assertRaisesRegex(WorkerFailure, 'discovery_unacknowledged'):
+            await self.worker.enqueue_discoveries(self.job, 'owner', discoveries)
+
+    async def test_discovery_batches_respect_bytes_and_propagate_database_failure(self):
+        d = descriptor(args=dict(padding='x' * 200000))
+        await self.worker.enqueue_discoveries(self.job, 'owner', [d] * 3)
+        batches = [p['p_descriptors'] for name, p in self.store.calls if name == 'enqueue_batch']
+        self.assertEqual([len(b) for b in batches], [2, 1])
+        original = self.store.rpc
+        async def fail(name, **params):
+            if name == 'enqueue_batch': raise WorkerFailure('database_connection')
+            return await original(name, **params)
+        self.store.rpc = fail
+        with self.assertRaisesRegex(WorkerFailure, 'database_connection'):
+            await self.worker.enqueue_discoveries(self.job, 'owner', [d])
+
     async def test_nested_listing_bids_preserve_roster_identity_and_durable_reuse(self):
         player = dict(id='000123', name='Fixture player', role='defensa', teamId='club',
             value=1000, change=0, points=-2, price=1200,
