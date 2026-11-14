@@ -1338,3 +1338,8 @@ separate from these migration checks.
 Implemented locally: share the existing scoped clause-transfer source across My Team and Lineup; compare observed departure dates with the next kickoff; exclude departures at/before kickoff from Best XI and bench even when injury exclusion is overridden; reject selecting/saving known departures while retaining the official lineup/draft for correction. Missing departure evidence stays unresolved. My Team highlights those roster rows with a reddish background and an explanatory legend, preserving actual ownership/count/value.
 
 The existing database snapshots, original observation/completeness metadata and bounded queue remain the source of reusable transfer evidence. No new service, schema, dependency or timer. Focused offline, lifecycle and browser verification and performance limits are recorded in `data_review_results.md`; local verification does not claim authenticated hosted acceptance.
+
+
+## Lineup status duplication and expired schedule observations — 2026-11-14
+
+Implemented locally: remove the routine departure-exclusion paragraph, replace the long Best XI mismatch explanation with one reason-specific line, and distinguish unknown inputs from actual changed inputs. Fix worker schedule expiry clearing the verified completed-round window and falsely warning about unchanged Last N settings. Reuse the existing persisted worker observations with original timestamps, complete acquisition evidence and exact scope, retaining separate source read errors through the shared root adapter. No new source acquisition, storage, dependency or timer. Verification/performance and the separate snapshot-save investigation are recorded in `data_review_results.md`; hosted acceptance remains separate.

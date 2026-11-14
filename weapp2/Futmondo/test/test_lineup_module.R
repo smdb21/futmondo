@@ -15,7 +15,10 @@ history_data<-shiny::reactiveVal(history)
 default_status<-list(pending=0L,remaining=0L,saving=0L,failed=0L)
 history_status<-shiny::reactiveVal(default_status)
 recent_player_points_source<-function(...)list(history=shiny::reactive(history_data()),status=shiny::reactive(history_status()))
-lineup_snapshot_store<-function(context,target_round,payload=NULL,owner='')promises::promise_resolve(if(is.null(payload))NULL else TRUE)
+lineup_snapshot_store<-function(context,target_round,payload=NULL,owner=''){
+ if(!is.null(payload)&&identical(state$mode,'snapshot-fail'))return(promises::promise_reject(simpleError('Lineup snapshot context mismatch')))
+ promises::promise_resolve(if(is.null(payload))NULL else TRUE)
+}
 state<-new.env();reset<-function(mode='success'){state$mode<-mode;state$reads<-0L;state$submits<-0L;state$optimizes<-0L;state$official<-fixture();state$pending<-NULL;history_data(history);history_status(default_status)}
 optimize_impl<-lineup_optimize
 lineup_optimize<-function(...){
@@ -144,7 +147,9 @@ shiny::testServer(lineup_Server,args=args,{
  session$setInputs(recent_n=2);settle(session)
  stopifnot(identical(draft(),five_round_draft),state$optimizes==1L,scores()$average[scores()$id=='p2']==50,
   identical(wanted(),as.numeric(5:6)),grepl('fm-lineup-best-warning',output$status$html),
-  grepl('last 5 completed rounds',output$status$html,fixed=TRUE),grepl('current settings (last 2',output$status$html,fixed=TRUE))
+  grepl('Optimization inputs changed:',output$status$html,fixed=TRUE),
+  grepl('last N rounds',output$status$html,fixed=TRUE),grepl('Optimize to update this lineup.',output$status$html,fixed=TRUE),
+  !grepl('injury/suspension setting|completed-round window|player departures',output$status$html))
  session$setInputs(recent_n=5);settle(session)
  stopifnot(identical(draft(),five_round_draft),state$optimizes==1L,!grepl('fm-lineup-best-warning',output$status$html))
  session$setInputs(recent_n=2);settle(session)
@@ -153,7 +158,8 @@ shiny::testServer(lineup_Server,args=args,{
   !grepl('fm-lineup-best-warning',output$status$html),grepl('aria-busy="false"',output$status$html,fixed=TRUE))
  two_round_draft<-draft()
  session$setInputs(include_unavailable=TRUE);settle(session)
- stopifnot(identical(draft(),two_round_draft),state$optimizes==2L,grepl('fm-lineup-best-warning',output$status$html))
+ stopifnot(identical(draft(),two_round_draft),state$optimizes==2L,grepl('fm-lineup-best-warning',output$status$html),
+  grepl('Optimization inputs changed: injury/suspension setting.',output$status$html,fixed=TRUE))
  session$setInputs(include_unavailable=FALSE);settle(session)
  stopifnot(!grepl('fm-lineup-best-warning',output$status$html))
  # Later history publication also updates only averages, without an optimizer run.
@@ -287,6 +293,75 @@ for(mode in c('optimize-error','no-xi')){
  })
 }
 
+# A successful worker schedule is historical evidence after its action TTL.
+# Expiry cannot invent a changed completed window or clear useful score history.
+reset()
+base_calendar<-rounds;base_calendar$is_finished[6]<-FALSE
+worker_calendar<-function(rows=base_calendar,expired=FALSE){
+ at<-Sys.time()-if(expired)120 else 0
+ value<-observed_data(rows,observed_at=at,status=if(expired)'stale'else'ok')
+ attr(value,'worker_acquisition_status')<-'ok';attr(value,'worker_completeness')<-'complete'
+ attr(value,'valid_until')<-as.numeric(at)+60
+ value
+}
+# The optional shared state supplies scope and real acquisition failure proof.
+proof<-worker_calendar(expired=TRUE)
+proof_context<-resource_context(c(userid='fixture',token='synthetic'),'league','team',
+ competition_id='competition',season='2026-27',scoring_version='fixture')
+proof_state<-list(data=proof,status='stale',freshness='stale',context=proof_context,error=NULL)
+stopifnot(!nzchar(lineup_catalog_problem(proof,proof_state,proof_context)))
+for(field in c('account_id','championship_id','user_team_id','competition_id','season','scoring_version')){
+ wrong<-proof_state;wrong$context[[field]]<-paste0('other-',field)
+ stopifnot(nzchar(lineup_catalog_problem(proof,wrong,proof_context)))
+}
+for(kind in c('state_error','state_partial','missing_time','future_time','incomplete_catalog','missing_completeness','nonworker')){
+ altered<-proof;state_copy<-proof_state
+ if(kind=='state_error')state_copy$error<-resource_failure(category='network')
+ if(kind=='state_partial')state_copy$status<-'partial'
+ if(kind=='missing_time')attr(altered,'observed_at')<-NULL
+ if(kind=='future_time')attr(altered,'observed_at')<-Sys.time()+3600
+ if(kind=='incomplete_catalog'){attr(altered,'catalog_complete')<-FALSE;attr(altered,'catalog_reason')<-'Numbered calendar read failed.'}
+ if(kind=='missing_completeness')attr(altered,'worker_completeness')<-NULL
+ if(kind=='nonworker')attr(altered,'worker_acquisition_status')<-NULL
+ stopifnot(nzchar(lineup_catalog_problem(altered,state_copy,proof_context)))
+}
+known_finality<-proof;attr(known_finality,'catalog_complete')<-FALSE;attr(known_finality,'catalog_reason')<-''
+stopifnot(!nzchar(lineup_catalog_problem(known_finality,proof_state,proof_context)))
+cat('PASS observed calendar reuse rejects wrong account/league/team/competition/season/scoring scope, failed state and incomplete/malformed evidence\n')
+calendar<-shiny::reactiveVal(worker_calendar());args$round_catalog<-calendar
+shiny::testServer(lineup_Server,args=args,{
+ settle(session);session$setInputs(best=1);settle(session)
+ baseline_draft<-draft();averages<-scores();initial_note<-best_note()
+ stopifnot(identical(wanted(),as.numeric(3:5)),state$optimizes==1L,!nzchar(catalog_issue()))
+ expired<-worker_calendar(expired=TRUE);calendar(expired);settle(session)
+ stopifnot(identical(wanted(),as.numeric(3:5)),identical(scores(),averages),identical(draft(),baseline_draft),
+  identical(best_note(),initial_note),!nzchar(catalog_issue()),!grepl('fm-lineup-best-warning',output$status$html),
+  state$optimizes==1L,state$reads==1L,state$submits==0L,
+  attr(calendar(),'valid_until')<as.numeric(Sys.time()),identical(attr(calendar(),'observed_at'),attr(expired,'observed_at')))
+ cat('PASS expired successful worker calendar preserves known scores/window and creates no false optimization warning, source read or renewed timestamp\n')
+ for(kind in c('error','partial','incomplete')){
+  failed<-expired
+  if(kind=='error')attr(failed,'fetch_error')<-resource_failure(category='network')
+  if(kind=='partial')attr(failed,'worker_acquisition_status')<-'partial'
+  if(kind=='incomplete')attr(failed,'worker_completeness')<-'partial'
+  calendar(failed);settle(session);before_count<-state$optimizes
+  stopifnot(nzchar(catalog_issue()),!length(wanted()),all(is.na(scores()$average)),
+   !grepl('fm-lineup-best-warning',output$status$html),identical(draft(),baseline_draft))
+  session$setInputs(best=before_count+1L);settle(session)
+  stopifnot(state$optimizes==before_count,!is.null(best_request()),grepl('waiting for the completed-round schedule',notice(),fixed=TRUE))
+  calendar(expired);settle(session)
+  stopifnot(state$optimizes==before_count+1L,is.null(best_request()),identical(draft(),baseline_draft),
+   !grepl('fm-lineup-best-warning',output$status$html),state$reads==1L)
+ }
+ cat('PASS actual worker acquisition errors/partial evidence block calculation without inventing settings changes; verified publication resumes one requested calculation\n')
+ before_count<-state$optimizes;calendar(worker_calendar(rounds));settle(session)
+ stopifnot(identical(wanted(),as.numeric(4:6)),identical(draft(),baseline_draft),state$optimizes==before_count,
+  grepl('Optimization inputs changed: completed-round window.',output$status$html,fixed=TRUE),
+  grepl('Optimize to update this lineup.',output$status$html,fixed=TRUE),state$reads==1L,state$submits==0L)
+ cat('PASS a genuinely advanced verified completed-round window emits one compact actionable warning without overwriting the lineup\n')
+})
+args$round_catalog<-function()rounds
+
 # Shared, already-persisted outgoing schedules drive both XI and bench eligibility.
 transfer_state<-function(ids=character(),offset=numeric(),status='ok')list(outgoing_status=status,
  outgoing_records=data.frame(player_id=ids,leaves_at=if(length(offset))fm_time(rounds$begin_process[7])+offset else as.POSIXct(character(),tz='UTC')))
@@ -299,7 +374,8 @@ shiny::testServer(lineup_Server,args=args,{
  settle(session);session$setInputs(best=1,include_unavailable=TRUE);settle(session)
  stopifnot(state$optimizes==1L,is.null(best_request()),!any(c(draft()$starters,draft()$bench)%in%c('p20','p19')),
   'p18'%in%draft()$starters,state$reads==1L,state$submits==0L,
-  grepl('2 player(s) leave by the next round start',output$status$html,fixed=TRUE))
+  !grepl('fm-lineup-departures',output$status$html,fixed=TRUE),
+  !grepl('player(s) leave by the next round start',output$status$html,fixed=TRUE))
  session$setInputs(slot_click=slot_event(FALSE,1L));settle(session)
  html<-xml2::read_html(output$picker_players$html)
  disabled<-function(id)xml2::xml_attr(xml2::xml_find_first(html,paste0('//button[@data-player-id="',id,'"]')),'disabled')
@@ -321,8 +397,12 @@ shiny::testServer(lineup_Server,args=args,{
  stopifnot(state$optimizes==0L,!is.null(best_request()),!departures()$complete)
  transfers(transfer_state('p20',-1));settle(session)
  stopifnot(state$optimizes==1L,is.null(best_request()),!'p20'%in%c(draft()$starters,draft()$bench),state$reads==1L)
- before<-draft();transfers(transfer_state(c('p20','p19'),c(-1,-1)));settle(session)
- stopifnot(identical(draft(),before),state$optimizes==1L,grepl('fm-lineup-best-warning',output$status$html))
+ before<-draft();transfers(transfer_state(status='partial'));settle(session)
+ stopifnot(identical(draft(),before),state$optimizes==1L,!grepl('fm-lineup-best-warning',output$status$html),
+  grepl('Departure eligibility is not verified',output$status$html,fixed=TRUE))
+ transfers(transfer_state(c('p20','p19'),c(-1,-1)));settle(session)
+ stopifnot(identical(draft(),before),state$optimizes==1L,grepl('fm-lineup-best-warning',output$status$html),
+  grepl('Optimization inputs changed: player departures.',output$status$html,fixed=TRUE))
  cat('PASS pending/unknown departure times retain the draft; one verified publication completes one calculation, and later departures warn without overwriting selections\n')
 })
 reset('delay')
@@ -364,4 +444,12 @@ shiny::testServer(lineup_Server,args=args,{
  observer$destroy()
  cat('PASS explicit lineup refresh retries departure acquisition once and preserves the draft; ten timestamp-only publications cause no eligibility redraws or source reads\n')
 })
-cat('LINEUP MODULE: 23 groups passed / 0 failed\n')
+reset('snapshot-fail');transfers(transfer_state())
+shiny::testServer(lineup_Server,args=args,{
+ settle(session);session$setInputs(best=1);settle(session);session$setInputs(save=1);settle(session)
+ stopifnot(state$submits==1L,!saving(),!dirty(),grepl('Saved to Futmondo and verified',notice(),fixed=TRUE),
+  grepl('App copy not saved: context mismatch (FM-',cache_issue(),fixed=TRUE),
+  grepl('App copy not saved:',output$status$html,fixed=TRUE),!grepl('fm-lineup-best-warning',output$status$html,fixed=TRUE))
+ cat('PASS a verified Futmondo save remains distinct from a failed app snapshot with a safe diagnostic and no false recalculation warning\n')
+})
+cat('LINEUP MODULE: 28 groups passed / 0 failed\n')

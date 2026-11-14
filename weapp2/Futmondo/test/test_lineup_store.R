@@ -38,4 +38,11 @@ stopifnot(all(lineup_roster_frame(legacy)$logo==''),nrow(lineup_roster_frame(NUL
  !lineup_snapshot_fresh(legacy,now=fm_time(legacy$observed_at)))
 cat('PASS normalized successful snapshot writes exclude authentication material; logos persist and older snapshots remain readable\n')
 row$payload$rules$bench_enabled<-'unknown';settle(lineup_snapshot_store(ctx,'r7'));stopifnot(!is.null(failure))
-cat('PASS malformed cached capability state is rejected\nLINEUP STORE: 4 groups passed / 0 failed\n')
+cat('PASS malformed cached capability state is rejected\n')
+
+local_issue<-lineup_snapshot_failure(simpleError('Lineup snapshot context mismatch'))
+transport_issue<-lineup_snapshot_failure(simpleError('private-response-body private-token https://private.invalid'))
+stopifnot(grepl('App copy not saved: context mismatch (FM-',local_issue,fixed=TRUE),
+ grepl('App copy not saved:',transport_issue,fixed=TRUE),
+ !grepl('private-response-body|private-token|private.invalid',paste(local_issue,transport_issue)))
+cat('PASS snapshot failures distinguish safe validator reasons and never echo private messages\nLINEUP STORE: 5 groups passed / 0 failed\n')

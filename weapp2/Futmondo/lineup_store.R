@@ -64,3 +64,22 @@ lineup_validate_snapshot <- function(data) {
 lineup_snapshot_fresh <- function(data,now=Sys.time()) {
   !is.null(data)&&all(vapply(data$roster,function(row)'points'%in%names(row),logical(1)))&&isTRUE(fm_time(data$expires_at)>now)&&isTRUE(fm_time(data$observed_at)<=now+60)
 }
+
+# Only fixed validator labels and sanitized transport categories reach the UI.
+lineup_snapshot_failure <- function(error) {
+  reasons<-c('Lineup snapshot context mismatch'='context mismatch',
+    'Saved lineup is incomplete'='incomplete observation',
+    'Saved lineup timestamps invalid'='invalid observation time',
+    'Saved lineup assignments invalid'='invalid lineup positions',
+    'Saved lineup rules invalid'='invalid lineup rules',
+    'Saved lineup source contract invalid'='invalid source shape',
+    'Saved roster player invalid'='invalid player identity',
+    'Saved roster has duplicate identities'='duplicate player identities',
+    'Lineup snapshot exceeds storage limit'='snapshot size limit',
+    'Saved roster exceeds limits'='roster size limit')
+  message<-conditionMessage(error)
+  failure<-resource_log_failure(error,'database')
+  reason<-if(message%in%names(reasons))unname(reasons[[message]])else
+    paste0(failure$category,' error')
+  paste0('App copy not saved: ',reason,' (',failure$reference,').')
+}

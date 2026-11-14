@@ -25,6 +25,31 @@ lineup_target <- function(rounds,now=Sys.time()) {
   if(!nzchar(id)||!is.finite(number)||number<1||number!=floor(number))return(NULL)
   list(id=id,number=number,starts_at=times[i])
 }
+# Completed-round facts remain usable when a successful worker observation ages.
+# Actual read failures, incomplete catalogs and foreign scopes remain unverified.
+lineup_catalog_problem <- function(catalog,state=NULL,expected_context=NULL,now=Sys.time()) {
+  if(!is.data.frame(catalog)||!nrow(catalog))return('Round schedule is unavailable or still loading.')
+  if(!is.null(state)) {
+    if(!is.null(state$error)||isTRUE(state$status%in%c('partial','unavailable')))
+      return('Round schedule could not be refreshed.')
+    if(!is.null(expected_context)) {
+      fields<-c('account_id','championship_id','user_team_id','competition_id','season','scoring_version')
+      if(!is.list(state$context)||!all(vapply(fields,function(field)
+        identical(fm_scalar(state$context[[field]],''),fm_scalar(expected_context[[field]],'')),logical(1))))
+        return('Round schedule belongs to a different context; waiting for matching data.')
+    }
+  }
+  if(!is.null(attr(catalog,'fetch_error')))return('Round schedule could not be refreshed.')
+  stamp<-fm_time(attr(catalog,'observed_at'))
+  worker_status<-attr(catalog,'worker_acquisition_status')
+  observed<-isTRUE(worker_status%in%c('ok','empty'))&&identical(attr(catalog,'worker_completeness'),'complete')&&
+    isTRUE((attr(catalog,'fetch_status') %||% 'ok')%in%c('ok','empty','stale'))&&
+    length(stamp)==1L&&!is.na(stamp)&&stamp<=now
+  if(!is.null(worker_status)&&!observed)return('Round schedule observations are incomplete or invalid.')
+  if(acquisition_data_unverified(catalog)&&!observed)return('Round schedule is unavailable from Futmondo.')
+  if(identical(attr(catalog,'catalog_complete'),FALSE))return(fm_scalar(attr(catalog,'catalog_reason'),''))
+  ''
+}
 lineup_average_scores <- function(roster,history,rounds,n=5L) {
   n<-max(1L,min(20L,as.integer(n)));ids<-as.character(roster$id)
   result<-data.frame(id=ids,average=rep(NA_real_,length(ids)),coverage=integer(length(ids)),required=integer(length(ids)),status=rep('missing',length(ids)),stringsAsFactors=FALSE)

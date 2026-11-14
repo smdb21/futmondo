@@ -38,7 +38,7 @@ lineup_UI <- function(id) {
       shiny::uiOutput(ns('save_control'))))
 }
 lineup_Server <- function(id,is_module_active,login_token,championship_id,user_team_id,round_catalog,
-  refresh_trigger=NULL,history_refresh_trigger=NULL,clause_transfers_source=NULL,clause_transfers_refresh=NULL) {
+  refresh_trigger=NULL,history_refresh_trigger=NULL,clause_transfers_source=NULL,clause_transfers_refresh=NULL,round_catalog_state=NULL) {
   shiny::moduleServer(id,function(input,output,session){
     source<-shiny::reactiveVal(NULL);draft<-shiny::reactiveVal(NULL);loading<-shiny::reactiveVal(FALSE)
     saving<-shiny::reactiveVal(FALSE);notice<-shiny::reactiveVal('');cache_issue<-shiny::reactiveVal('')
@@ -82,7 +82,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
     persist<-function(data,ctx,round_id,g,key){
       promises::then(lineup_snapshot_store(ctx,round_id,data,owner),function(ok){
         if(current(g,key))cache_issue(if(isTRUE(ok))''else 'Database cache is not configured; this lineup is available in the current session.');NULL
-      },function(error){if(current(g,key))cache_issue('Lineup loaded, but its database snapshot could not be saved.');NULL})
+      },function(error){if(current(g,key))cache_issue(lineup_snapshot_failure(error));NULL})
       invisible(NULL)
     }
     accept<-function(data,replace=FALSE){
@@ -146,11 +146,10 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
     roster<-shiny::reactive(lineup_roster_frame(source()))
     n_rounds<-shiny::reactive({n<-suppressWarnings(as.integer(input$recent_n));if(length(n)!=1L||is.na(n))3L else max(1L,min(20L,n))})
     catalog_issue<-shiny::reactive({
-      catalog<-round_catalog()
-      if(!is.data.frame(catalog)||!nrow(catalog))return('Round schedule is unavailable or still loading.')
-      if(acquisition_data_unverified(catalog))return('Round schedule is unavailable from Futmondo.')
-      if(identical(attr(catalog,'catalog_complete'),FALSE))return(fm_scalar(attr(catalog,'catalog_reason'),''))
-      ''
+      state<-if(is.function(round_catalog_state))round_catalog_state()else NULL
+      expected<-if(!is.null(state))fm_worker_resolve_context('get_finished_rounds',
+        list(championship_id=championship_id()),resource_context(login_token(),championship_id(),user_team_id()))else NULL
+      lineup_catalog_problem(round_catalog(),state,expected)
     })
     scoring_catalog<-shiny::reactive({catalog<-round_catalog();if(nzchar(catalog_issue()))data.frame()else catalog})
     wanted<-shiny::reactive({catalog<-scoring_catalog();if(!is.data.frame(catalog)||!all(c('round_number','is_finished')%in%names(catalog)))return(numeric());tail(sort(unique(as.numeric(catalog$round_number[catalog$is_finished%in%TRUE]))),n_rounds())})
@@ -342,20 +341,16 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
     })
     output$status<-shiny::renderUI({
       shiny::req(is_module_active());status<-history$status();score<-scores()
-      basis<-best_basis();departure<-departures()
-      departure_mismatch<-!is.null(basis)&&!identical(basis$excluded_ids %||% character(),departure$excluded_ids)
-      mismatch<-!is.null(basis)&&!is.null(draft())&&identical(basis$lineup,lineup_identity(draft()))&&
-        (!identical(basis$n,n_rounds())||!identical(basis$include,isTRUE(input$include_unavailable))||!identical(basis$rounds,wanted())||
-          departure_mismatch)
+      basis<-best_basis();departure<-departures();changed<-character()
+      if(!is.null(basis)&&!is.null(draft())&&identical(basis$lineup,lineup_identity(draft()))) {
+        if(!identical(basis$n,n_rounds()))changed<-c(changed,'last N rounds')
+        if(!identical(basis$include,isTRUE(input$include_unavailable)))changed<-c(changed,'injury/suspension setting')
+        if(identical(basis$n,n_rounds())&&!nzchar(catalog_issue())&&length(wanted())&&!identical(basis$rounds,wanted()))changed<-c(changed,'completed-round window')
+        if(isTRUE(departure$complete)&&!identical(basis$excluded_ids %||% character(),departure$excluded_ids))changed<-c(changed,'player departures')
+      }
       shiny::tagList(shiny::div(role='status',`aria-live`='polite',`aria-busy`=if(!is.null(best_request()))'true'else'false',notice()),
-        if(mismatch)shiny::div(role='alert',class='fm-lineup-warning fm-lineup-best-warning',
-          paste0('The current lineup was calculated for the last ',basis$n,' completed rounds',
-            if(basis$include)' including injured/suspended players'else' excluding injured/suspended players',
-            '. It does not correspond to Best XI for the current settings (last ',n_rounds(),
-            ' completed rounds)',if(departure_mismatch)' or departure eligibility'else'',
-            '. Press Optimize to recalculate.')),
-        if(length(departure$excluded_ids))shiny::div(class='fm-lineup-warning fm-lineup-departures',
-          paste(length(departure$excluded_ids),'player(s) leave by the next round start and are excluded from Best XI and bench.')),
+        if(length(changed))shiny::div(role='alert',class='fm-lineup-warning fm-lineup-best-warning',
+          paste0('Optimization inputs changed: ',paste(changed,collapse=', '),'. Optimize to update this lineup.')),
         if(!isTRUE(departure$complete))shiny::div(class='fm-lineup-warning',
           paste('Departure eligibility is not verified.',departure$error %||% 'Waiting for clause departure details.')),
         if(nzchar(best_note()))shiny::div(class='fm-lineup-note',best_note()),

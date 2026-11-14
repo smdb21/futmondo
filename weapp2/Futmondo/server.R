@@ -125,6 +125,12 @@ function(input, output, session) {
     paste(text[nzchar(text)],collapse=" · ")
   })
   output$round_finance_checked<-renderText(round_finance_checked())
+  round_catalog_read <- factual_read_adapter(session,'get_finished_rounds',login_token_RV,championship_id_RV,user_team_id_RV,
+    is_active=function()valid_login(login_token_RV())&&isTRUE(startup_primary_ready()),refresh_trigger=refresh_trigger,state_only=TRUE)
+  round_catalog_state_RV <- reactive({
+    req(valid_login(login_token_RV()),startup_primary_ready(),championship_id_RV())
+    round_catalog_read(login=login_token_RV(),championship_id=championship_id_RV())
+  })
   round_catalog_RV <- reactive({
     req(valid_login(login_token_RV()), startup_primary_ready(), championship_id_RV())
     refresh_trigger()
@@ -225,7 +231,7 @@ selected_player_RV <- players_in_teams_Server(id = "players_in_teams",
   lineup <- lineup_Server("lineup", reactive(identical(input$tabs,"lineup")),
     login_token_RV, championship_id_RV, user_team_id_RV, round_catalog_RV,
     refresh_trigger, history_refresh_trigger, clause_transfers_source=clause_transfers_RV,
-    clause_transfers_refresh=refresh_clause_transfers)
+    clause_transfers_refresh=refresh_clause_transfers,round_catalog_state=round_catalog_state_RV)
 
   today <- today_Server(id = "today",
                is_module_active = reactive({
