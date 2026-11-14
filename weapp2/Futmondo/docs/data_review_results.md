@@ -2315,3 +2315,11 @@ metadata query verified descriptor column absent and old two-argument read still
 present. User confirmation requested through the connector. Hold the automatic
 push/deployment until both migrations are acknowledged. This is not a production
 completion claim. Exact original private responses were never exported.
+
+Production rollout update after owner approval: both migrations succeeded as
+`20261114053800` and `20261114053847`. Metadata verification confirms worker_read
+has3 arguments and STABLE/SECURITY INVOKER behavior; all new/changed RPCs deny
+anon execution and grant service_role. Redundant card-history jobs count0;
+existing team-capacity jobs both use300s. Commit `df6b8d9` pushed to branch2.0
+for the configured automatic deployment. This resolves the expired connector
+confirmation blocker above. No factual history or snapshot records were removed.

@@ -1296,3 +1296,11 @@ on Refresh. See `docs/worker_database_boundary.md`. Production migration must
 precede the auto-deploying push; Supabase confirmation expired twice and rollout
 is pending that connector confirmation. This milestone is implemented locally,
 not yet certified as production backlog recovery.
+
+Rollout update: owner approved the connector confirmation. Production migrations
+`20261114053800_worker_database_read_boundary` and
+`20261114053847_worker_autonomous_cadence` succeeded; server-only invoker privileges,
+three-argument stable read interface, retired-card job count0 and capacity300s
+were verified. Implementation commit `df6b8d9` pushed to the auto-deploy branch.
+Sustained hosted source progress and authenticated screen acceptance remain
+separate from these migration checks.
