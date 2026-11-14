@@ -63,6 +63,8 @@ acquisition_headroom <- function(cash, team_value, withheld = 0,
 # Today. Manual acquisitions still require the full capacity/preflight contract.
 round_finance_display <- function(team_state, market_state) {
   fresh <- function(state) is.list(state) && isTRUE(state$status %in% c("ok", "empty")) &&
+    is.null(state$error) && is.null(attr(state$data,"fetch_error")) &&
+    !isTRUE(attr(state$data,"worker_completeness")%in%c("partial","unavailable")) &&
     !identical(state$freshness, "stale") && !identical(attr(state$data, "fetch_status"), "stale")
   loading <- function(state) is.list(state) && identical(state$status, "loading")
   stale_state <- function(state) identical(state$freshness, "stale") || identical(state$status, "stale") ||
@@ -105,13 +107,14 @@ round_finance_display <- function(team_state, market_state) {
   team_stale <- stale_state(team_state)
   market_stale <- stale_state(market_state)
   stale <- team_stale || market_stale
+  saved_note<-"Cached means the last saved amounts; they may have changed since the last check."
   message <- if (confirmed_problem) {
     balance <- if (fresh(market_state) && is.finite(projected_committed_balance)) projected_committed_balance else cash
     paste0("Restore at least ", format(round(abs(balance) + 1), big.mark=".", decimal.mark=",", scientific=FALSE),
       " EUR before kickoff to score points", if (!fresh(market_state) || !is.finite(projected_committed_balance)) "; active offers still need verification" else "")
   } else if (loading(team_state)) "Loading balance…" else if (loading(market_state)) "Loading active offers…" else
-    if (stale) "Cached financial data — refresh to verify before kickoff" else
-    if (!is.null(team_state$error) || !is.null(market_state$error)) "Financial data could not load — refresh to retry" else
+    if (!is.null(team_state$error) || !is.null(market_state$error)) paste("Financial data could not load.",if(stale)saved_note else "Please try again.") else
+    if (stale) saved_note else
     if (!is.finite(cash)) "Balance unavailable — cannot verify kickoff balance" else
     if (!is.finite(commitments)) "Active offers unavailable — cannot verify kickoff balance" else
     if (!is.finite(withheld) || withheld < 0) "Held funds unavailable — cannot verify kickoff balance" else

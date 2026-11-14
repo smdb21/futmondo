@@ -113,6 +113,18 @@ function(input, output, session) {
   round_finance_RV <- resource_display_source(session,function(){
     round_finance_display(primary_team_state(), primary_market_state())
   })
+  # Update source times independently of the countdown/financial card DOM.
+  round_finance_checked<-resource_display_source(session,function(){
+    if(!valid_login(login_token_RV()))return("")
+    states<-list(balance=primary_team_state(),offers=primary_market_state())
+    text<-vapply(names(states),function(key){
+      stamp<-fm_time(states[[key]]$observed_at)
+      if(is.null(states[[key]]$data)||length(stamp)!=1L||is.na(stamp)||stamp>Sys.time())return("")
+      paste0(if(key=="balance")"Balance observed: "else"Offers observed: ",format(stamp,"%d %b, %H:%M:%S UTC",tz="UTC"))
+    },character(1))
+    paste(text[nzchar(text)],collapse=" · ")
+  })
+  output$round_finance_checked<-renderText(round_finance_checked())
   round_catalog_RV <- reactive({
     req(valid_login(login_token_RV()), startup_primary_ready(), championship_id_RV())
     refresh_trigger()
@@ -168,7 +180,8 @@ function(input, output, session) {
         tags$span(class = "round-countdown-finance-item", paste0("Active offers: ", offers_text)),
         tags$span(class = "round-countdown-finance-item", paste0("After offers: ", money_text(final_balance,finance$cash_loading || finance$offers_loading,finance$calculations_stale))),
         tags$span(class = "round-countdown-finance-item", paste0("Can spend: ", money_text(spendable,finance$cash_loading || finance$offers_loading,finance$calculations_stale))),
-        if (!is.null(solvency_text)) tags$span(class = "round-countdown-solvency", solvency_text)))
+        if (!is.null(solvency_text)) tags$span(class = "round-countdown-solvency", solvency_text),
+        tags$small(class="round-countdown-solvency",textOutput("round_finance_checked",inline=TRUE))))
   })
   user_teams_RV <- reactive({
     req(championship_id_RV()); refresh_trigger()

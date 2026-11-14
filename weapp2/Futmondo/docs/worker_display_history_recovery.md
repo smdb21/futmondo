@@ -25,3 +25,16 @@ The worker bridge has a separate `discovery_resource` message for a narrow allow
 No packages, environment variables, service lanes or source rate limits change. Verification results and production rollout status are recorded in `data_review_results.md`.
 
 The migration was applied as `20261114140350_worker_summary_job_retirement`: 1,326 obsolete jobs retired, 567 summary jobs retained, all 1,340 summary snapshots and 527 current-context history checks preserved. Local browser tests reproduce the old blinking and verify unchanged observations no longer replace those outputs; authenticated hosted acceptance remains separate.
+
+
+## Saved transfer observations and the cached financial label
+
+The later November 14 report showed successful incoming/leaving schedules alongside an orange roster-expired error. Production metadata confirmed successful own-roster and balance acquisitions; the observations were roughly 101–158 seconds old with a 60-second worker deadline. Recurrence is measured from completion and validity from source observation, so expiry alone is expected between runs and does not prove a failed acquisition. Source failures remain separate. No deadline or scheduling interval is extended to remove a warning.
+
+`incoming_clause_source()` consumes successful saved roster/history observations as an explicit display-only `observed` state, retaining original source times and exact account/league/team/competition/season/scoring isolation. Partial data, failed reads, malformed identities/timestamps and missing summaries remain incomplete or errors. `reconcile_pending_clause_transfers(observed_only=TRUE)` never grants current acquisition capacity: action IDs stay empty, counts unavailable and strict status unavailable. Its separate `observed_outgoing_status` describes only whether historical departure details can be displayed. A summary older than the transaction cannot resolve that later transfer; elapsed dates await newer source confirmation.
+
+The panels show roster/transaction observation times separately from the record display. Financial `(cached)` continues to mark amounts past their freshness deadline, with an explicit explanation that they are the last saved amounts and may have changed. Balance and offer observation times update in their own text output. Actual financial read failures take precedence over the routine saved-data explanation. Manual transaction preflights, source timestamps, numeric values and unknown-versus-zero behavior are unchanged. Successful worker projections are already durable and are not written back by the GUI.
+
+No database migration, environment variable or dependency is needed for this display change. See the appended review results for verification and deployment limits.
+
+The accompanying scheduling correction is `20261114144534_worker_shorter_cadence.sql`, applied in production as `20261114144934_worker_shorter_cadence`. A successful idle summary promoted from hourly to five-minute collection now receives a due time based on its previous completion and the new interval. Equal/slower rediscovery, failed/active work and source freshness remain unchanged. A guarded one-off repair covers already-promoted current own-team summaries with successful exact-scope market evidence. The generic display path still cannot schedule acquisition.

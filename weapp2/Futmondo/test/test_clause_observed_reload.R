@@ -23,9 +23,9 @@ expired<-summaries;attr(expired[['in']],'valid_until')<-as.numeric(now)-1
 stopifnot(nzchar(reconcile_pending_clause_transfers(roster,history,expired,'mine',now,observed_only=TRUE)$incoming_records$timing_error))
 cat('PASS partial acquisitions and expired summaries without successful-source proof cannot supply observed timing\n')
 last_seen<-summaries
-for(id in names(last_seen)){attr(last_seen[[id]],'observed_at')<-now-7200;attr(last_seen[[id]],'valid_until')<-as.numeric(now)-6900;attr(last_seen[[id]],'fetch_status')<-'stale';attr(last_seen[[id]],'worker_acquisition_status')<-'ok'}
+for(id in names(last_seen)){attr(last_seen[[id]],'observed_at')<-now-1800;attr(last_seen[[id]],'valid_until')<-as.numeric(now)-1500;attr(last_seen[[id]],'fetch_status')<-'stale';attr(last_seen[[id]],'worker_acquisition_status')<-'ok'}
 observed<-reconcile_pending_clause_transfers(roster,history,last_seen,'mine',now,observed_only=TRUE)
-stopifnot(all(!nzchar(observed$incoming_records$timing_error)),all(!nzchar(observed$outgoing_records$timing_error)),is.na(observed$pending_inbound_count),observed$status=='unavailable',observed$incoming_records$observed_at==now-7200)
+stopifnot(all(!nzchar(observed$incoming_records$timing_error)),all(!nzchar(observed$outgoing_records$timing_error)),is.na(observed$pending_inbound_count),observed$status=='unavailable',observed$incoming_records$observed_at==now-1800)
 cat('PASS expired successful worker summaries remain historical observations with original timestamps and unavailable capacity\n')
 roster_state<-resource_state(roster);roster_state$context<-scope
 history_state<-resource_state(history);history_state$context<-scope
@@ -37,11 +37,12 @@ for(reload in 1:2)shiny::testServer(function(input,output,session){
  state<-incoming_clause_source(session,function()auth,function()'league',function()'mine',function()TRUE)
 },{
  settle(session);s<-state()
- stopifnot(s$status=='partial',s$outgoing_status=='partial',isTRUE(s$observations_only),grepl('stale',s$error),
+ stopifnot(s$status=='observed',s$outgoing_status=='observed',isTRUE(s$observations_only),is.null(s$error),
   nrow(s$records)==1L,nrow(s$outgoing_records)==1L,all(!is.na(s$records$joins_at)),all(!is.na(s$outgoing_records$leaves_at)),source_reads==0L)
  html<-as.character(incoming_clause_panel(s,list(available=FALSE),session$ns))
- out_html<-as.character(outgoing_clause_panel(list(status=s$outgoing_status,records=s$outgoing_records,error=s$error,observations_only=s$observations_only),list(available=FALSE),session$ns))
+ out_html<-as.character(outgoing_clause_panel(list(status=s$outgoing_status,records=s$outgoing_records,error=s$error,observations_only=s$observations_only,source_times=s$source_times),list(available=FALSE),session$ns))
  stopifnot(grepl('Last observed transfer details',html,fixed=TRUE),grepl('Incoming',html,fixed=TRUE),grepl('Observed:',html,fixed=TRUE),
-   grepl('Last observed transfer details',out_html,fixed=TRUE),grepl('Leaving',out_html,fixed=TRUE),grepl('Observed:',out_html,fixed=TRUE))
+   grepl('Last observed transfer details',out_html,fixed=TRUE),grepl('Leaving',out_html,fixed=TRUE),grepl('Observed:',out_html,fixed=TRUE),grepl('Roster observed:',html,fixed=TRUE),
+   grepl('Transactions observed:',out_html,fixed=TRUE),!grepl('Refresh to retry',html,fixed=TRUE))
 })
-cat('PASS two cold page sessions restore stored transfer details with stale warnings, known dates and zero new source reads\n')
+cat('PASS two cold page sessions restore stored transfer details as dated observations without false failure warnings, known dates and zero new source reads\n')

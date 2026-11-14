@@ -28,7 +28,7 @@ shiny::testServer(function(input,output,session){
  stopifnot(output$cash=='200',stats$cash==before$cash+1L,stats$finance==before$finance+1L,stats$ready==before$ready)
  cat('PASS a real changed balance updates cash and finance once without reopening readiness\n')
  source(team(cash=200,at=stamp+22,stale=TRUE));settle(session)
- stopifnot(stats$cash==before$cash+1L,stats$finance==before$finance+2L,grepl('Cached financial data',output$finance,fixed=TRUE))
+ stopifnot(stats$cash==before$cash+1L,stats$finance==before$finance+2L,grepl('Cached means the last saved amounts',output$finance,fixed=TRUE))
  source(team(cash=200,at=stamp+23));settle(session)
  stopifnot(stats$cash==before$cash+1L,stats$finance==before$finance+3L,stats$ready==before$ready)
  cat('PASS actual stale/fresh transitions still update the financial warning without repainting unchanged money\n')

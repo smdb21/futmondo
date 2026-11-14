@@ -61,7 +61,7 @@ server<-function(input,output,session){
   primary_sources=list(team_state=primary_team_state,market_state=primary_market_state,retry_team=function()NULL,retry_market=function()NULL))
  round_catalog_RV<-shiny::reactive(data.frame(round_number=14,begin_process=format(Sys.time()+7*86400,'%Y-%m-%dT%H:%M:%SZ',tz='UTC'),is_finished=FALSE))
  # Execute the actual app header/readiness definitions, not a copied facsimile.
- wanted<-c('startup_primary_ready','round_finance_RV','round_heading_state','output$round_countdown')
+ wanted<-c('startup_primary_ready','round_finance_RV','round_finance_checked','output$round_finance_checked','round_heading_state','output$round_countdown')
  for(expr in as.list(parse('server.R')[[1]][[3]])[-1L])if(is.call(expr)&&identical(expr[[1]],as.name('<-'))&&
   paste(deparse(expr[[2]]),collapse='')%in%wanted)eval(expr,envir=environment())
  shiny::observeEvent(input$publish,{

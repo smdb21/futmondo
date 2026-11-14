@@ -1315,3 +1315,13 @@ separate from these migration checks.
 - Local verification and hosted aggregate evidence are recorded in `docs/data_review_results.md`; signed-in production acceptance remains separate from the offline/browser checks. See `docs/worker_display_history_recovery.md`.
 
 - Production job cleanup applied successfully as `20261114140350_worker_summary_job_retirement`; 1,326 obsolete jobs retired, all saved history retained. Code rollout follows the tested commit/push.
+
+
+### November 14: distinguish saved transfer observations from failed acquisitions
+
+- Follow-up to the remaining orange roster warning: successful worker observations now use an explicit observed display state with original source times; ordinary freshness expiry does not become a failed-fetch message. Missing/partial/failed/mismatched evidence remains incomplete.
+- Cached financial values retain their strict freshness status and now explain their meaning with separate balance/offer observation times. No scheduling interval or deadline is stretched. Strict capacity and manual-action checks remain unchanged.
+- Reconciliation rejects summaries older than their transactions and retains elapsed transfer schedules until newer evidence resolves them. The GUI does not duplicate already-persisted worker clause observations.
+- Local verification and hosted checks are documented in `docs/data_review_results.md`; authenticated production acceptance remains separate.
+
+- Also fixed the independently reproduced delayed cadence promotion: idle successful summaries shortened from hourly to five-minute collection now honor that next due time. Guarded repair/migration applied as `20261114144934_worker_shorter_cadence`; equal-interval rediscovery, source deadlines and failed/active jobs remain unchanged.

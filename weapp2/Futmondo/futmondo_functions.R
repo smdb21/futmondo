@@ -1570,10 +1570,16 @@ reconcile_pending_clause_transfers <- function(roster_df,pressroom_df,summaries,
     pending_outbound_count=if(!observed_only&&status=="ok")length(unique(outbound))else NA_integer_,
     pending_inbound_count=if(!observed_only&&status=="ok")length(unique(incoming))else NA_integer_,
     incoming_records=records,outgoing_records=outgoing_records,
-    outgoing_status=if(outgoing_verified&&!observed_only)"ok"else"partial")
+    outgoing_status=if(outgoing_verified&&!observed_only)"ok"else"partial",
+    observed_outgoing_status=if(outgoing_verified)"ok"else"partial")
   team<-fm_scalar(user_team_id,"");if(!nzchar(team))return(result())
-  historical_ok<-isTRUE(observed_only)&&all(vapply(list(roster_df,pressroom_df),function(data)
-    is.data.frame(data)&&isTRUE(attr(data,"worker_acquisition_status")%in%c("ok","empty"))&&is.null(attr(data,"fetch_error")),logical(1)))
+  historical_ok<-isTRUE(observed_only)&&all(vapply(list(roster_df,pressroom_df),function(data){
+    stamp<-fm_time(attr(data,"observed_at"))
+    is.data.frame(data)&&isTRUE(attr(data,"worker_acquisition_status")%in%c("ok","empty"))&&is.null(attr(data,"fetch_error"))&&
+      !isTRUE(attr(data,"worker_completeness")%in%c("partial","unavailable"))&&
+      isTRUE((attr(data,"fetch_status") %||% "ok")%in%c("ok","empty","stale"))&&
+      length(stamp)==1L&&!is.na(stamp)&&stamp<=now
+  },logical(1)))
   candidate<-if((observed_only&&!historical_ok)||(!observed_only&&(acquisition_data_unverified(roster_df)||acquisition_data_unverified(pressroom_df))))NULL else pending_clause_candidates(roster_df,pressroom_df,team,previous_records,previous_outgoing_records)
   if(is.null(candidate)) {
     if(is.data.frame(previous_records))records<-previous_records
@@ -1590,11 +1596,16 @@ reconcile_pending_clause_transfers <- function(roster_df,pressroom_df,summaries,
     source_id<-if(is.list(summary)&&is.list(summary$data))fm_scalar(summary$data$id %||% summary$data$`_id`,"")else ""
     summary_matches<-!nzchar(source_id)||identical(source_id,pid)
     fresh<-is.list(summary)&&length(summary)>0L&&!acquisition_data_unverified(summary)&&summary_matches
+    summary_precedes_transfer<-FALSE
     if(observed_only){
       checked<-fm_time(attr(summary,"observed_at"))
+      summary_precedes_transfer<-length(checked)==1L&&!is.na(checked)&&checked<fm_time(tx$created)
       source_ok<-isTRUE(attr(summary,"worker_acquisition_status")%in%c("ok","empty"))&&is.null(attr(summary,"fetch_error"))
       recent_ok<-fresh&&resource_snapshot_unexpired(summary,now)&&length(checked)==1L&&!is.na(checked)&&as.numeric(difftime(now,checked,units="secs"))<300
-      fresh<-is.list(summary)&&identical(source_id,pid)&&(source_ok||recent_ok)&&length(checked)==1L&&!is.na(checked)&&checked<=now
+      fresh<-is.list(summary)&&identical(source_id,pid)&&(source_ok||recent_ok)&&is.null(attr(summary,"fetch_error"))&&
+        (is.null(attr(summary,"worker_acquisition_status"))||isTRUE(attr(summary,"worker_acquisition_status")%in%c("ok","empty")))&&
+        !isTRUE(attr(summary,"worker_completeness")%in%c("partial","unavailable"))&&
+        length(checked)==1L&&!is.na(checked)&&checked<=now&&checked>=fm_time(tx$created)
     }
     championship<-if(fresh&&is.list(summary$championship))summary$championship else list()
     clause<-championship$clause
@@ -1621,13 +1632,14 @@ reconcile_pending_clause_transfers <- function(roster_df,pressroom_df,summaries,
       # cancellation or ownership change resolves even a previously confirmed row.
       resolved_out<-out_fresh&&((nzchar(owner)&&owner!=team)||
         (is.list(clause)&&identical(clause$transferred,FALSE)))
-      if(!resolved_out&&!(out_fresh&&nzchar(owner)&&owner==team&&out_transferred&&out_valid_time&&transfer_at>now))outgoing_verified<-FALSE
+      if(!resolved_out&&!(out_fresh&&nzchar(owner)&&owner==team&&out_transferred&&out_valid_time&&(observed_only||transfer_at>now)))outgoing_verified<-FALSE
       clause_evidence<-out_transferred||isTRUE(tx$is_clause)||nrow(old_out)>0L
       if(!resolved_out&&clause_evidence) {
         data<-if(out_fresh&&is.list(summary$data))summary$data else list()
         field<-function(name,fallback="")fm_scalar(data[[name]],fm_scalar(tx[[name]],fallback))
         stamp<-attr(summary,"observed_at") %||% as.POSIXct(NA,tz="UTC")
         issue<-if(!summary_matches)"Departure verification failed: the player summary identified a different player."else
+          if(summary_precedes_transfer)"Saved departure details predate this transfer; waiting for a newer player observation."else
           if(!out_fresh)"Departure verification failed: the player summary could not be retrieved."else
           if(!nzchar(owner))"Departure verification failed: the player summary omitted the current owner."else
           if(!transferred)"Departure verification failed: the player summary omitted the pending clause status."else
@@ -1652,7 +1664,8 @@ reconcile_pending_clause_transfers <- function(roster_df,pressroom_df,summaries,
     data<-if(fresh&&is.list(summary$data))summary$data else list()
     field<-function(name,fallback="")fm_scalar(data[[name]],fm_scalar(tx[[name]],fallback))
     stamp<-attr(summary,"observed_at") %||% as.POSIXct(NA,tz="UTC")
-    issue<-if(!fresh)"Arrival verification failed: the player summary could not be retrieved."else
+    issue<-if(summary_precedes_transfer)"Saved arrival details predate this transfer; waiting for a newer player observation."else
+      if(!fresh)"Arrival verification failed: the player summary could not be retrieved."else
       if(!nzchar(owner))"Arrival verification failed: the player summary omitted the current owner."else
       if(!transferred)"Arrival verification failed: the player summary omitted the pending clause status."else
       if(!valid_time)"Arrival time missing or malformed in Futmondo's transferDate."else ""

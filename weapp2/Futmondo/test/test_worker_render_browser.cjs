@@ -20,10 +20,12 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
     });
    });
    const checkedBefore=await page.locator('#worker_status_checked_at').innerText();
+   const financeCheckedBefore=await page.locator('#round_finance_checked').innerText();
    const countdownNode=await page.locator('.fm-browser-countdown').evaluate(el=>{el.dataset.fixtureIdentity='kept';return el.textContent;});
    // Two real polls deliver NEW versions/source times with unchanged facts.
    await page.waitForTimeout(11000);
    assert.notEqual(await page.locator('#worker_status_checked_at').innerText(),checkedBefore,'source-check text must stay current');
+   assert.notEqual(await page.locator('#round_finance_checked').innerText(),financeCheckedBefore,'financial source-check text must stay current');
    assert.equal(await page.locator('.fm-browser-countdown').getAttribute('data-fixture-identity'),'kept','clock node replaced');
    assert.notEqual(await page.locator('.fm-browser-countdown').innerText(),countdownNode,'browser clock must keep ticking');
    assert.deepEqual(await page.evaluate(()=>renderEvents),[],`${width}px metadata-only redraws`);
