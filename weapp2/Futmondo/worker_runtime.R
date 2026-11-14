@@ -369,11 +369,20 @@ fm_worker_session<-function(session,login,leagues=function()list()){
  },priority=1000)
  output<-session$output
  status<-fm_worker_status_source(session,login)
- output$worker_status<-shiny::renderUI({
-  view<-status();if(is.null(view))return(NULL)
-  shiny::tags$div(class='alert alert-info',role='status',view$message,
-   if(!is.null(view$checked_at))shiny::tags$small(style='display:block',paste('Oldest displayed data check:',view$checked_at)))
+ status_visible<-resource_display_source(session,function()!is.null(status()))
+ status_message<-resource_display_source(session,function()status()$message %||% '')
+ status_checked<-resource_display_source(session,function(){
+  checked<-status()$checked_at
+  if(is.null(checked))''else paste('Oldest displayed data check:',checked)
  })
+ output$worker_status<-shiny::renderUI({
+  if(!isTRUE(status_visible()))return(NULL)
+  shiny::tags$div(class='alert alert-info',role='status',
+   shiny::textOutput('worker_status_message',inline=TRUE),
+   shiny::tags$small(style='display:block',shiny::textOutput('worker_status_checked_at',inline=TRUE)))
+ })
+ output$worker_status_message<-shiny::renderText(status_message())
+ output$worker_status_checked_at<-shiny::renderText(status_checked())
  output$worker_settings<-shiny::renderUI({
   auth<-login();if(!valid_login(auth))return(NULL);s<-fm_worker_account_state(auth[['userid']]);s$settings_revision()
   if(!s$known)return(shiny::tags$p('Loading background sync settings…'))

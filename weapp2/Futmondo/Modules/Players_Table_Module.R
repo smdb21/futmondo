@@ -652,7 +652,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
     })
     
     # Position Breakdown UI Renderer
-    output$position_breakdown_ui <- renderUI({
+    position_breakdown_display<-resource_display_source(session,function(){
       df <- players_table_RV()
       if (is.null(df) || nrow(df) == 0) return(NULL)
 
@@ -682,6 +682,8 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
         )
       )
     })
+
+    output$position_breakdown_ui<-renderUI(position_breakdown_display())
 
     return(selected_player_RV)
   })
@@ -1135,6 +1137,10 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
     entry$fitness_dirty <- FALSE
     rows <- entry$fitness;ctx <- context_for(entry)
     entry$fitness_probes <- list();entry$fitness_holding <- character();entry$fitness_ready <- character();entry$fitness_changed <- character()
+    # Worker observations are already persisted with numbered round identity.
+    # A newer unlabelled last-five vector must not discard that history or start
+    # hundreds of individual snapshot reads in the browsing session.
+    if(worker_database_mode(entry))return()
     if(!nrow(rows))return()
     for(field in c("championship_id","competition_id","season","scoring_version"))
       if(field%in%names(rows))rows <- rows[is.na(rows[[field]])|!nzchar(rows[[field]])|rows[[field]]==ctx[[field]],,drop=FALSE]
@@ -1204,6 +1210,9 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
   availability_for <- function(entry){
     candidates<-ids_for(entry);ctx<-context_for(entry)
     checked<-recent_points_saved_players(data.frame(),ctx,entry$checks)
+    if(worker_database_mode(entry))return(list(
+      needed=setdiff(candidates,unique(c(saved_ids_for(entry),checked))),
+      reused=intersect(candidates,unique(c(saved_ids_for(entry),checked)))))
     # An old successful check proves a source read, not coverage for a newly
     # requested wider window. Probe only visible players missing numbered rows.
     requested_missing<-character();demanded<-integer();windows<-list()
@@ -1254,7 +1263,14 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
       !isTRUE(entry$attempted[[player]]$ok)&&!retry_waiting(entry,player)&&!player%in%names(entry$pending),logical(1))],completed)
   }
   assemble <- function(entry){
-    ctx<-context_for(entry);saved<-history_context_filter(entry$points,ctx)
+    ctx<-context_for(entry)
+    # Database envelope/check metadata changes do not alter numbered scores.
+    # Keep the expensive per-player reconciliation for changed factual columns.
+    # observed_at remains in this identity because it resolves score revisions.
+    signature<-digest::digest(list(context=ctx,points=lapply(entry$points,identity),
+      live=lapply(entry$live,function(rows)lapply(rows,identity))),algo="xxhash64")
+    if(identical(signature,entry$assembled_signature))return(entry$assembled_points)
+    saved<-history_context_filter(entry$points,ctx)
     live<-lapply(entry$live,function(x)history_context_filter(x,ctx))
     by_player<-if(nrow(saved))split(saved,as.character(saved$player_id))else list()
     ids<-unique(c(names(by_player),names(live)))
@@ -1269,6 +1285,7 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
     result<-head(dplyr::bind_rows(rows),50000L)
     rounds<-suppressWarnings(as.numeric(result$round));rounds<-rounds[is.finite(rounds)&rounds>=1]
     if(length(rounds))attr(result,"latest_round")<-max(rounds)
+    entry$assembled_signature<-signature;entry$assembled_points<-result
     result
   }
   publish <- function(entry,force=FALSE){
@@ -1348,6 +1365,7 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
       if(isTRUE(entry$loading[[kind]])&&!is.null(entry$initial_pending[[kind]]))return()
       type<-kind;call<-calls[[type]]
       entry$loading[[type]]<-TRUE
+      if(type=="matrix")entry$last_matrix_read<-as.numeric(Sys.time())
       entry$initial_sequence<-entry$initial_sequence+1L;request_token<-entry$initial_sequence
       entry$initial_pending[[type]]<-request_token
       current<-function()!closed&&identical(current_key,key)&&length(current_clients())>0L&&
@@ -1402,13 +1420,32 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
             }else load_initial(entry,client,c("lineup","catalog"))
           }
         }
-        if(type=="matrix"&&is.list(data)){
-          entry$points<-head(recent_points_identity_rows(data$points %||% data.frame()),50000L)
+        if(type=="matrix"&&is.list(data)&&is.null(error)){
+          points<-recent_points_identity_rows(data$points %||% data.frame())
+          checks<-data$checks %||% data.frame()
+          # An incomplete paginated read cannot erase already loaded facts.
+          # Complete reads can replace the baseline, including real deletions.
+          if(!isTRUE(data$complete)){
+            points<-dplyr::bind_rows(entry$points,points)
+            if(nrow(points)){
+              points<-points[order(fm_time(points$observed_at)),,drop=FALSE]
+              identity<-intersect(c("player_id","championship_id","competition_id","season","scoring_version","round","source_round_key"),names(points))
+              points<-points[!duplicated(points[identity],fromLast=TRUE),,drop=FALSE]
+            }
+            checks<-dplyr::bind_rows(entry$checks,checks)
+            if(nrow(checks)){
+              checks<-checks[order(fm_time(checks$checked_at)),,drop=FALSE]
+              identity<-intersect(c("player_id","championship_id","competition_id","season","scoring_version"),names(checks))
+              checks<-checks[!duplicated(checks[identity],fromLast=TRUE),,drop=FALSE]
+            }
+          }
+          entry$points<-head(points,50000L)
           entry$saved_ids_cache<-NULL;entry$coverage_cache<-NULL;entry$latest_round_cache<-NULL;entry$fitness_dirty<-TRUE
-          entry$checks<-head(data$checks %||% data.frame(),2000L)
+          entry$checks<-head(checks,2000L)
           entry$matrix_complete<-isTRUE(data$complete)
           trim_entries()
         }
+        if(type=="matrix"&&!is.null(error))entry$matrix_complete<-FALSE
         if(type=="lineup"){
           if(is.null(error)&&!is.null(data)){
             entry$scoring<-paste0(normalize_league_rules(list(),data,client$league)$scoring_version)
@@ -1489,6 +1526,7 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
     entry$context<-round_points_client_context(client);entry$context$session_id<-root$token
     entry$season<-entry$context$season;entry$scoring<-entry$context$scoring_version
     entry$points<-data.frame();entry$checks<-data.frame();entry$catalog_ids<-character();entry$catalog_loaded<-FALSE
+    entry$last_matrix_read<--Inf
     entry$saved_ids_cache<-NULL;entry$coverage_cache<-NULL;entry$latest_round_cache<-NULL
     entry$live<-list();entry$attempted<-list();entry$pending<-list();entry$forced<-character();entry$retry_reads<-0L;entry$request_sequence<-0L
     entry$requires_context<-isTRUE(root$userData$league_context_enabled)
@@ -1531,6 +1569,11 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
       if(!is.null(previous)&&!identical(previous,client$refresh))pending_refresh[[id]]<<-TRUE
       if(!is.null(entry)&&isTRUE(client$active)&&length(client$ids)&&
          identical(key_for(client),current_key)&&isTRUE(pending_refresh[[id]])){
+        if(worker_database_mode(entry)){
+          load_initial(entry,client,unique(c("matrix",names(entry$initial_errors))))
+          pending_refresh[[id]]<<-FALSE;previous_refresh[[id]]<<-client$refresh
+          next
+        }
         wanted<-head(client$ids,2000L)
         replaying<-intersect(wanted,names(entry$save_retry))
         for(player in replaying)save_round_snapshot(entry,player,entry$save_retry[[player]])
@@ -1559,6 +1602,20 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
     }
     touch()
   },priority=100)
+  # Reuse the existing worker heartbeat, without another timer. One bounded
+  # asynchronous league read per minute finds newly persisted missing histories;
+  # a settled dataset checks for corrections every five minutes. This includes
+  # players outside the 128-resource snapshot-interest budget.
+  shiny::observe({
+    revision();clients()
+    entry<-current_entry()
+    if(closed||is.null(entry)||!length(current_clients())||!worker_database_mode(entry))return()
+    fm_worker_account_state(entry$context$account_id)$status_revision()
+    if(any(entry$loading)||!is.null(entry$initial_errors$context)||!is.null(entry$initial_errors$lineup))return()
+    interval<-if(!isTRUE(entry$matrix_complete)||length(needed_for(entry)))60 else 300
+    if(as.numeric(Sys.time())-entry$last_matrix_read<interval)return()
+    load_initial(entry,current_clients()[[1]],"matrix")
+  })
   shiny::observe({
     revision();clients()
     if(closed||!length(current_clients()))return()
@@ -1600,6 +1657,7 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
     revision();clients()
     if(closed||!length(current_clients()))return()
     entry<-current_entry();if(is.null(entry)||any(entry$loading)||entry$overflow||!is.null(entry$initial_errors$lineup)||!is.null(entry$initial_errors$context))return()
+    if(worker_database_mode(entry))return()
     .persistence_state$revision()
     saving<-background_sync_status(entry$context$account_id)
     queued<-c(.persistence_state$queue,if(!is.null(.persistence_state$active))list(.persistence_state$active)else list())

@@ -6,7 +6,11 @@ resource_context <- function(login=NULL, championship_id=NULL, user_team_id=NULL
   season="unknown", scoring_version="unknown", account_id=NULL, session_id=NULL, competition_id=NULL) {
   account <- fm_scalar(account_id %||% if(valid_login(login)) login[["userid"]] else NULL, "")
   if(!nzchar(account)) stop("An explicit account is required for private resources.")
-  metadata<-league_context_metadata(championship_id,account)
+  # An observation's identity does not expire with its freshness. In database
+  # mode keep the last observed scope until newer evidence replaces it; live
+  # authorization/action checks continue to require fresh metadata separately.
+  stored_mode<-exists("fm_worker_mode",mode="function")&&isTRUE(fm_worker_mode(account))
+  metadata<-league_context_metadata(championship_id,account,allow_stale=stored_mode)
   if(missing(season))season<-metadata$season %||% season
   if(missing(scoring_version))scoring_version<-metadata$scoring_version %||% scoring_version
   competition_id<-competition_id %||% metadata$competition_id %||% "unknown"
@@ -332,6 +336,24 @@ shared_resource<-function(session,resource,context,fetch,active=function()TRUE,r
   invisible(NULL)
  })
  out<-shiny::reactive(value());attr(out,"dispose")<-dispose;attr(out,"is_current")<-function()!closed&&isTRUE(shiny::isolate(active()));out
+}
+
+# Presentation projections publish only changed visible values. Keep source
+# state/timestamps in the data layer; callers select the values they display.
+# Validation/context failures are published too, so old private UI cannot linger.
+resource_display_source<-function(session,read){
+ stopifnot(is.function(read))
+ value<-shiny::reactiveVal(list(ready=FALSE))
+ observer<-shiny::observe({
+  projected<-tryCatch(list(ready=TRUE,value=read()),error=function(error)list(ready=TRUE,error=error))
+  value(projected)
+ },domain=session)
+ session$onSessionEnded(function()observer$destroy())
+ shiny::reactive({
+  state<-value();shiny::req(isTRUE(state$ready))
+  if(!is.null(state$error))stop(state$error)
+  state$value
+ })
 }
 
 # Fixed labels and a bounded sample ring; no account/player identifiers or bodies.

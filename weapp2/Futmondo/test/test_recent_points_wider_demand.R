@@ -18,7 +18,7 @@ players<-data.frame(id=c('needs-older','already-covered'),average.fitness='7,19,
 catalog<-rbind(players,transform(players[1,,drop=FALSE],id='offscreen'))
 observations<-function(player,rounds=1:10,time=stamp){
  data.frame(player_id=rep(player,length(rounds)),championship_id=rep('league',length(rounds)),
-  season=rep('unknown',length(rounds)),scoring_version=rep(score,length(rounds)),round=rounds,points=scores[rounds],
+  competition_id=rep('unknown',length(rounds)),season=rep('unknown',length(rounds)),scoring_version=rep(score,length(rounds)),round=rounds,points=scores[rounds],
   score_status=rep('unknown',length(rounds)),observed_at=rep(format(time,'%Y-%m-%dT%H:%M:%OS6Z',tz='UTC'),length(rounds)),
   occurred_at=rep(NA_character_,length(rounds)),round_start_at=rep(NA_character_,length(rounds)))
 }
@@ -27,7 +27,7 @@ payload<-function(player='needs-older',rounds=1:10){
  list(context=context,checked_at=Sys.time(),observations=observations(player,rounds,Sys.time()))
 }
 marker<-function(player,count=5L,time=stamp){
- data.frame(player_id=player,championship_id='league',season='unknown',scoring_version=score,
+ data.frame(player_id=player,championship_id='league',competition_id='unknown',season='unknown',scoring_version=score,
   checked_at=format(time,'%Y-%m-%dT%H:%M:%OS6Z',tz='UTC'),result_status='scores',point_count=count)
 }
 original_points<-dplyr::bind_rows(observations('needs-older',6:10),observations('already-covered'),observations('offscreen',6:10))

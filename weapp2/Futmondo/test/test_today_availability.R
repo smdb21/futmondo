@@ -2,12 +2,9 @@
 # Offline regression: Today must use its primary team information for both KPIs.
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages({
-  library(shiny)
-  source('futmondo_functions.R')
-  source('factual_helpers.R')
-  source('Modules/Selected_Player_Module.R')
-  source('Modules/Today_Module.R')
+  source('global.R')
 })
+fm_worker_configured <- function() FALSE
 # The shared table has separate coverage; isolate the Today KPI dependency here.
 players_table_Server <- function(...) invisible(NULL)
 get_market_players <- function(...) data.frame()

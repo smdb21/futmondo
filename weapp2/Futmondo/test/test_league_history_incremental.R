@@ -7,7 +7,10 @@ ctx<-resource_context(account_id='fixture-account',championship_id='L',user_team
 stamp<-function(x)format(as.POSIXct(x,origin='1970-01-01',tz='UTC'),'%Y-%m-%dT%H:%M:%OSZ',tz='UTC')
 points<-data.frame(row_kind='point',championship_id='L',player_id=rep(paste0('p',1:3),each=500),season='2026',scoring_version='score',round=rep(1:500,3),points=rep(c(-2,0,NA_real_,8,5),300),score_status='final',
  observed_at=stamp(as.numeric(as.POSIXct('2026-07-01',tz='UTC'))+seq_len(1500)*3600),occurred_at=NA_character_,round_start_at=NA_character_,checked_at=NA_character_,result_status=NA_character_,point_count=NA_integer_,stringsAsFactors=FALSE)
+points$competition_id<-'unknown';points$source_round_key<-paste0('number:',points$round)
+points$source_round_number<-points$round;points$round_id<-'';points$match_id<-''
 checks<-points[1:4,,drop=FALSE];checks$row_kind<-'check';checks$player_id<-paste0('p',1:4);checks$round<-NA_integer_;checks$points<-NA_real_;checks$observed_at<-NA_character_
+checks$source_round_key<-NA_character_;checks$round_id<-NA_character_;checks$match_id<-NA_character_;checks$source_round_number<-NA_real_
 checks$checked_at<-tail(points$observed_at,4);checks$result_status<-c('scores','scores','scores','empty');checks$point_count<-c(500L,500L,500L,0L)
 fixture<-rbind(points,checks);calls<-list()
 supabase_get<-function(table_name,query_params){
@@ -63,3 +66,36 @@ recovered<-read_league_round_dataset('L',context=ctx)
 stopifnot(recovered$complete,identical(attr(recovered,'fetch_status'),'ok'),
  is.null(attr(recovered,'fetch_error')),nrow(recovered$points)==1500L,nrow(recovered$checks)==5L)
 cat('PASS failed incremental dataset retains saved rows and safe source diagnostics; recovery clears failure metadata.\n')
+
+# Production-size cost envelope:6134 numbered facts and527 acknowledged checks.
+# All were observed in the overlap window, the worst case for a delta read.
+league_players<-sprintf('p%04d',1:527)
+counts<-c(rep(12L,337),rep(11L,190))
+large<-points[rep(1L,sum(counts)),,drop=FALSE]
+large$player_id<-rep(league_players,counts);large$round<-unlist(lapply(counts,seq_len),use.names=FALSE)
+large$source_round_number<-large$round;large$source_round_key<-paste0('number:',large$round)
+large$points<-rep(c(-2,0,8,NA_real_),length.out=nrow(large));large$observed_at<-stamp(Sys.time()-3600)
+large_checks<-checks[rep(1L,527),,drop=FALSE];large_checks$player_id<-league_players
+large_checks$checked_at<-stamp(Sys.time()-1800);large_checks$point_count<-counts
+fixture<-rbind(large,large_checks)
+# PostgreSQL performs filtering/ordering, so prepare its synthetic result before
+# timing client-side pagination/merge. Re-parsing every row's timestamp in the
+# fake server on each page would measure the fixture instead of application CPU.
+fixture<-fixture[order(fixture$player_id,fixture$row_kind,fixture$round,fixture$source_round_key),,drop=FALSE]
+remote_oldest<-min(fm_time(c(large$observed_at,large_checks$checked_at)))
+supabase_get<-function(table_name,query_params){
+ stopifnot(table_name=='player_round_dataset');q<-query_params
+ if(!is.null(q$and)){
+  cutoff<-fm_time(sub('^\\(or\\(observed_at\\.gte\\.([^,]+),.*$','\\1',q$and))
+  stopifnot(cutoff<=remote_oldest)
+ }
+ offset<-q$offset %||% 0L;selected<-seq_len(nrow(fixture))>offset&seq_len(nrow(fixture))<=offset+q$limit
+ result<-fixture[selected,,drop=FALSE];calls[[length(calls)+1L]]<<-list(query=q,rows=nrow(result));result
+}
+clear_api_cache();calls<-list()
+full_time<-system.time(large_full<-read_league_round_dataset('L',context=ctx))
+stopifnot(large_full$complete,nrow(large_full$points)==6134L,nrow(large_full$checks)==527L,length(calls)==8L)
+calls<-list();delta_time<-system.time(large_delta<-read_league_round_dataset('L',context=ctx))
+stopifnot(large_delta$complete,nrow(large_delta$points)==6134L,nrow(large_delta$checks)==527L,length(calls)==8L,
+ identical(lapply(large_delta$points,identity),lapply(large_full$points,identity)),identical(lapply(large_delta$checks,identity),lapply(large_full$checks,identity)))
+cat(sprintf('PERF6134 facts/527 checks: full %.3fs, worst-overlap delta %.3fs,8 paginated DB requests, no source requests; settled controller polls at most every300s.\n',full_time[['elapsed']],delta_time[['elapsed']]))

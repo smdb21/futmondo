@@ -267,7 +267,7 @@ class Helper:
                     safe_diagnostic = isinstance(code, str) and (code in diagnostic_codes or re.fullmatch(
                         r'resource_parse_(?:http|network|parser|schema|read_budget|unknown)_(?:' + resources + r')(?:_[1-5][0-9]{2})?', code, flags=re.ASCII))
                     raise WorkerFailure(code if safe_timeout or safe_diagnostic else 'resource_parse')
-                if message.get('type') not in ('http', 'database', 'persist', 'resource', 'progress', 'history_ack'):
+                if message.get('type') not in ('http', 'database', 'persist', 'resource', 'discovery_resource', 'progress', 'history_ack'):
                     raise WorkerFailure('helper_protocol')
                 try:
                     response = await exchange(message)
@@ -465,9 +465,14 @@ class Worker:
                 suffix = '_' + route.strip('/').replace('/', '_') if route in READ_PATHS else ''
                 self.source_errors.setdefault(owner, set()).add(error.code + suffix)
                 raise
-        if message['type'] in ('resource', 'history_ack'):
+        if message['type'] in ('resource', 'history_ack', 'discovery_resource'):
             descriptor = message['descriptor']
             if message['type'] == 'history_ack' and descriptor.get('handler') != 'get_championship_pressroom':
+                raise WorkerFailure('resource_context')
+            discovery = message['type'] == 'discovery_resource'
+            if discovery and descriptor.get('handler') not in (
+                    'get_active_championships', 'get_classification_round_catalog',
+                    'get_players_from_team', 'get_championship_pressroom'):
                 raise WorkerFailure('resource_context')
             scope = descriptor['context']
             if scope['account_id'] != job['account_id'] or (scope.get('championship_id') and
@@ -488,6 +493,17 @@ class Worker:
                         return {k: metadata[k] for k in ('history_write_ack', 'locker_write_ack') if k in metadata}
                     if manifest['status'] not in ('ok', 'empty'):
                         continue
+                    if discovery:
+                        # A past successful roster/calendar still identifies
+                        # work to schedule. It is never a fresh acquisition or
+                        # authority for an action, and must not backdate a new
+                        # source response in the parent query.
+                        if (manifest.get('handler') != descriptor['handler'] or
+                                manifest.get('resource_key') != descriptor['resource_key'] or
+                                datetime.fromisoformat(manifest['observed_at'].replace('Z', '+00:00')).timestamp() > time.time()):
+                            continue
+                        return {'value': unpack_snapshot(manifest, item['chunks']),
+                                'observed_at': manifest['observed_at'], 'discovery_only': True}
                     if datetime.fromisoformat(manifest['valid_until'].replace('Z', '+00:00')).timestamp() <= time.time():
                         continue
                     value = unpack_snapshot(manifest, item['chunks'])

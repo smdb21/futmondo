@@ -300,8 +300,8 @@ fm_worker_run<-function(descriptor){
   child<-fm_worker_descriptor(handler,args,context)
   existing<-produced[[child$resource_key]]
   if(!is.null(existing))return(fm_worker_decode(existing$value))
-  saved<-fm_pipe_exchange(list(type='resource',descriptor=child))
-  if(is.null(saved$value))return(NULL)
+  saved<-fm_pipe_exchange(list(type='discovery_resource',descriptor=child))
+  if(is.null(saved$value)||!isTRUE(saved$discovery_only))return(NULL)
   fm_worker_decode(saved$value)
  }
  summary_views<-function(value,context){

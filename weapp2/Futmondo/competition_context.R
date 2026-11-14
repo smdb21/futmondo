@@ -43,7 +43,7 @@ league_context_metadata <- function(championship_id,account_id=NULL,allow_stale=
   item<-.fm_league_contexts$items[[fm_league_context_key(account,championship)]]
   if(is.null(item)||(!allow_stale&&as.numeric(fm_time(item$expires_at))<=as.numeric(Sys.time())))return(NULL)
   scoring_deadline<-fm_time(item$payload$scoring_expires_at %||% item$expires_at)
-  if(length(scoring_deadline)!=1L||is.na(scoring_deadline)||scoring_deadline<=Sys.time())item$scoring_version<-"unknown"
+  if(!allow_stale&&(length(scoring_deadline)!=1L||is.na(scoring_deadline)||scoring_deadline<=Sys.time()))item$scoring_version<-"unknown"
   item
 }
 league_competition_context <- function(championship_id,account_id=NULL) {
@@ -60,10 +60,11 @@ remember_league_context <- function(row) {
   key<-fm_league_context_key(row$account_id,row$championship_id)
   old<-.fm_league_contexts$items[[key]]
   if(!is.null(old)&&fm_time(old$observed_at)>stamp)return(FALSE)
-  # A compact unchanged metadata response must not erase known scoring settings.
+  # Keep the last observed scoring identity when compact membership metadata
+  # omits it. Its separate deadline still gates fresh callers; historical DB
+  # reads need the recorded identity even after that deadline has elapsed.
   if(!is.null(old)&&identical(row$competition_id,old$competition_id)&&identical(row$season,old$season)&&
-     !fm_context_known(row$scoring_version)&&fm_context_known(old$scoring_version)&&fm_time(old$expires_at)>Sys.time()&&
-     fm_time(old$payload$scoring_expires_at %||% old$expires_at)>Sys.time()){
+     !fm_context_known(row$scoring_version)&&fm_context_known(old$scoring_version)){
     row$scoring_version<-old$scoring_version
     row$payload$point_system<-old$payload$point_system;row$payload$custom<-old$payload$custom
     row$payload$scoring_observed_at<-old$payload$scoring_observed_at %||% old$observed_at

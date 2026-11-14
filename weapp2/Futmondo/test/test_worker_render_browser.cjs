@@ -9,17 +9,24 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
    await page.route('**/*',r=>new URL(r.request().url()).hostname==='127.0.0.1'?r.continue():r.abort());
    await page.goto('http://127.0.0.1:3898');
    await page.locator('#today-kpi_cash_box').getByText('Current balance',{exact:true}).waitFor();
+   await page.waitForFunction(()=>document.querySelector('#today-kpi_cash_box').textContent.includes('20.000.001'));
+   await page.locator('#today-recent_transfers').getByText('No completed transfers available.',{exact:true}).waitFor();
    await page.waitForTimeout(1000);
    await page.evaluate(()=>{
     window.renderEvents=[];
-    const ids=['worker_status','today-kpi_cash_box','today-kpi_valuation_box'];
+    const ids=['worker_status','today-kpi_cash_box','today-kpi_valuation_box','today-recent_transfers','round_countdown'];
     $(document).on('shiny:recalculating.fixture shiny:value.fixture',e=>{
      if(ids.includes(e.target.id))window.renderEvents.push({type:e.type,id:e.target.id});
     });
    });
-   // Two real five-second worker polls must leave stable outputs untouched.
+   const checkedBefore=await page.locator('#worker_status_checked_at').innerText();
+   const countdownNode=await page.locator('.fm-browser-countdown').evaluate(el=>{el.dataset.fixtureIdentity='kept';return el.textContent;});
+   // Two real polls deliver NEW versions/source times with unchanged facts.
    await page.waitForTimeout(11000);
-   assert.deepEqual(await page.evaluate(()=>renderEvents),[],`${width}px idle redraws`);
+   assert.notEqual(await page.locator('#worker_status_checked_at').innerText(),checkedBefore,'source-check text must stay current');
+   assert.equal(await page.locator('.fm-browser-countdown').getAttribute('data-fixture-identity'),'kept','clock node replaced');
+   assert.notEqual(await page.locator('.fm-browser-countdown').innerText(),countdownNode,'browser clock must keep ticking');
+   assert.deepEqual(await page.evaluate(()=>renderEvents),[],`${width}px metadata-only redraws`);
    await page.locator('#publish').click();
    await page.waitForFunction(()=>document.querySelector('#today-kpi_cash_box').textContent.includes('20.000.002'));
    await page.waitForTimeout(300);
@@ -35,7 +42,7 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
    const ms=Date.now()-start;assert.ok(ms<500,`heartbeat ${ms}ms`);
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
    assert.deepEqual(errors,[]);
-   console.log(`PASS ${width}px: two idle worker polls caused zero banner/card redraws; new balance painted once; refresh queued zero acquisitions; heartbeat ${ms}ms; no horizontal overflow`);
+   console.log(`PASS ${width}px: new snapshot versions/timestamps caused zero banner/card/header/transfer-widget redraws; saved-check text advanced; new balance painted once; refresh queued zero acquisitions; heartbeat ${ms}ms; no horizontal overflow`);
    await page.close();
   }
  }finally{await browser.close();}

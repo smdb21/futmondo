@@ -17,7 +17,7 @@ function(input, output, session) {
     startup_generation <<- startup_generation+1L
     if(is.function(startup_timer))startup_timer()
   })
-  startup_primary_ready <- reactive({
+  startup_primary_ready <- resource_display_source(session,function(){
     if(!valid_login(login_token_RV()))return(FALSE)
     if(is.null(input$tabs)||identical(input$tabs,"login"))return(FALSE)
     if(!identical(input$tabs,"today"))return(TRUE)
@@ -42,7 +42,7 @@ function(input, output, session) {
     history_refresh_trigger(isolate(history_refresh_trigger()) + 1L)
     refresh_trigger(refresh_trigger() + 1)
   })
-  championships_RV <- reactive({
+  championships_RV <- resource_display_source(session,function(){
     req(valid_login(login_token_RV()))
     refresh_trigger()
     state<-championship_state()
@@ -61,7 +61,7 @@ function(input, output, session) {
     req(!is.null(selected))
     updateSelectInput(session, "selected_league", choices = setNames(ids, labels), selected = selected)
   })
-  championship_RV <- reactive({
+  championship_RV <- resource_display_source(session,function(){
     ch <- championships_RV(); shiny::validate(shiny::need(length(ch)>0L,"No supported leagues are available for this account."))
     league_context_revision()
     ids <- vapply(ch, function(c) fm_scalar(c$id %||% c$`_id`, ""), character(1))
@@ -73,9 +73,9 @@ function(input, output, session) {
     shiny::validate(shiny::need(nzchar(fm_scalar(context$userteam$id,"")),"This league has no playable team for this account."))
     unlist(context)
   })
-  championship_id_RV <- reactive({ req(championship_RV()); unname(championship_RV()["id"]) })
-  user_team_id_RV <- reactive({ req(championship_RV()); unname(championship_RV()["userteam.id"]) })
-  user_team_name_RV <- reactive({ req(championship_RV()); unname(championship_RV()["userteam.name"]) })
+  championship_id_RV <- resource_display_source(session,function(){ req(championship_RV()); unname(championship_RV()["id"]) })
+  user_team_id_RV <- resource_display_source(session,function(){ req(championship_RV()); unname(championship_RV()["userteam.id"]) })
+  user_team_name_RV <- resource_display_source(session,function(){ req(championship_RV()); unname(championship_RV()["userteam.name"]) })
   session$userData$league_context_source<-league_context_demand_source(session,login_token_RV,championship_id_RV,user_team_id_RV,refresh_trigger)
   observe({input$tabs;if(valid_login(login_token_RV()))session$userData$league_context_source()})
   bind_factual_reads(c("get_teams","get_finished_rounds"),session,
@@ -110,7 +110,7 @@ function(input, output, session) {
     retry_team=function()team_retry(isolate(team_retry())+1L),
     retry_market=function()market_retry(isolate(market_retry())+1L))
   coach <- coach_on_login_source(session,login_token_RV,championship_id_RV,user_team_id_RV,primary_team_state,primary_sources$retry_team)
-  round_finance_RV <- reactive({
+  round_finance_RV <- resource_display_source(session,function(){
     round_finance_display(primary_team_state(), primary_market_state())
   })
   round_catalog_RV <- reactive({
@@ -118,20 +118,29 @@ function(input, output, session) {
     refresh_trigger()
     tryCatch(get_finished_rounds(login_token_RV(), championship_id_RV()), error=function(e) data.frame())
   })
+  round_heading_state<-resource_display_source(session,function(){
+    if(!isTRUE(input$tabs%in%c("today","players_in_championship","yourteam")))return(list(visible=FALSE))
+    if(!valid_login(login_token_RV()))return(list(visible=TRUE,logged_in=FALSE))
+    ready<-isTRUE(startup_primary_ready())
+    rounds<-if(ready)round_catalog_RV()else data.frame()
+    upcoming<-next_round_context(rounds)
+    list(visible=TRUE,logged_in=TRUE,ready=ready,next_round=upcoming,
+      current_round=if(!isTRUE(upcoming$available))current_round_context(rounds)else NULL)
+  })
   output$round_countdown <- renderUI({
-    if (!isTRUE(input$tabs %in% c("today", "players_in_championship", "yourteam"))) return(NULL)
-    if (!valid_login(login_token_RV())) {
+    heading<-round_heading_state()
+    if(!isTRUE(heading$visible))return(NULL)
+    if(!isTRUE(heading$logged_in)) {
       return(tags$div(class = "round-countdown-bar round-countdown-unavailable",
         icon("clock"), tags$span("Log in to see the next round countdown")))
     }
-    primary_ready <- isTRUE(startup_primary_ready())
-    rounds <- if (primary_ready) round_catalog_RV() else data.frame()
-    next_round <- next_round_context(rounds)
+    primary_ready<-heading$ready
+    next_round<-heading$next_round
     round_heading <- if (isTRUE(next_round$available)) {
       tags$div(class="round-countdown-main",icon("clock"),
         tags$strong(paste0("Round ",next_round$round_number)),tags$span(class="fm-browser-countdown",`data-deadline`=as.numeric(fm_time(next_round$starts_at)),`data-server-now`=as.numeric(Sys.time()),format_round_countdown(next_round$starts_at)))
     } else {
-      current_round <- current_round_context(rounds)
+      current_round<-heading$current_round
       if (isTRUE(current_round$available)) {
         tags$div(class="round-countdown-main",icon("futbol"),
           tags$strong(paste0("Round ",current_round$round_number)),tags$span("In progress"))

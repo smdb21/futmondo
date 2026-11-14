@@ -1,6 +1,7 @@
 #!/usr/bin/env Rscript
 options(futmondo.offline=TRUE)
-suppressPackageStartupMessages({source('futmondo_functions.R');source('supabase_connector.R');source('factual_helpers.R')})
+suppressPackageStartupMessages(source('global.R'))
+fm_worker_configured<-function()FALSE
 auth<-c(userid='adapter-context-account',token='synthetic')
 seed<-function(season,competition='competition-A'){
  answer<-list(championships=list(list(id='game',league=competition,ps='stats')),leagues=list(list(`_id`=competition,season=season)))

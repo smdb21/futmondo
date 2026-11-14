@@ -1304,3 +1304,14 @@ three-argument stable read interface, retired-card job count0 and capacity300s
 were verified. Implementation commit `df6b8d9` pushed to the auto-deploy branch.
 Sustained hosted source progress and authenticated screen acceptance remain
 separate from these migration checks.
+
+
+### November 14: stable stored-history display and unchanged-observation rendering
+
+- Implemented the follow-up to the reported 432/527→14/527 reset: worker-mode round history uses acknowledged league database rows/checks directly, without 527 individual snapshot readers or fitness-driven demotion. One shared asynchronous database reread runs at most every 60s while incomplete and 300s once settled; failures/partial reads preserve prior facts and corrections remain visible.
+- Historical database identity survives freshness expiry while fresh checks/manual actions retain strict deadlines. New actual context observations still replace old identities.
+- Presentation projections prevent new source timestamps with unchanged facts from rebuilding Today cards, the financial heading, transfer/position displays or readiness/league ID dependencies. The worker banner updates its inner text independently.
+- Discovery can reuse expired successful dependency identities only through its restricted bridge message. A guarded one-off migration retires redundant idle legacy summary jobs while preserving all factual history.
+- Local verification and hosted aggregate evidence are recorded in `docs/data_review_results.md`; signed-in production acceptance remains separate from the offline/browser checks. See `docs/worker_display_history_recovery.md`.
+
+- Production job cleanup applied successfully as `20261114140350_worker_summary_job_retirement`; 1,326 obsolete jobs retired, all saved history retained. Code rollout follows the tested commit/push.

@@ -109,7 +109,7 @@ today_Server <- function(id,is_module_active,login_token,championship_id,user_te
       auth<-login_token();if(!valid_login(auth))return(NULL)
       paste(auth[["userid"]],championship_id(),user_team_id(),sep="|")
     })
-    primary_settled <- reactive({
+    primary_settled <- resource_display_source(session,function(){
       context<-primary_context();if(is.null(context))return(FALSE)
       states <- list(team_state(),market_state())
       all(vapply(states,function(s)!identical(s$status,"loading"),logical(1)))||identical(settled_context(),context)
@@ -119,7 +119,7 @@ today_Server <- function(id,is_module_active,login_token,championship_id,user_te
       states<-list(team_state(),market_state())
       if(all(vapply(states,function(s)!identical(s$status,"loading"),logical(1)))&&!identical(isolate(settled_context()),context))settled_context(context)
     })
-    primary_status <- reactive({
+    primary_status <- resource_display_source(session,function(){
       if(!primary_settled())return("loading")
       states <- list(team_state(),market_state())
       if(all(vapply(states,function(s)is.null(s$data),logical(1))))"failed" else
@@ -143,21 +143,24 @@ today_Server <- function(id,is_module_active,login_token,championship_id,user_te
         if(identical(state$status,"loading"))div(role="status",icon("spinner",class="fa-spin")," Loading data…")else
           tagList(p(resource_failure_message(state$error)),actionButton(session$ns("retry_team"),"Retry balance"))))
     }
-    output$market_status<-renderUI({
+    market_status_display<-resource_display_source(session,function(){
       state<-market_state()
       if(!is.null(state$data)||identical(state$status,"loading"))return(NULL)
       div(role="status",span(resource_failure_message(state$error)),actionButton(session$ns("retry_market"),"Retry market"))
     })
-    output$kpi_cash_box <- renderUI({
+    cash_display<-resource_display_source(session,function(){
       state<-team_state();if(is.null(state$data))return(primary_placeholder(state,"Current balance"))
       info<-state$data
       shinydashboard::valueBox(player_card_money(fm_number(info$budget)),"Current balance",icon=icon("wallet"),color="green",width=6)
     })
-    output$kpi_valuation_box <- renderUI({
+    valuation_display<-resource_display_source(session,function(){
       state<-team_state();if(is.null(state$data))return(NULL)
       info<-state$data
       shinydashboard::valueBox(player_card_money(fm_number(info$teamValue %||% info$team_value)),"Observed team value",icon=icon("users"),color="blue",width=6)
     })
+    output$market_status<-renderUI(market_status_display())
+    output$kpi_cash_box<-renderUI(cash_display())
+    output$kpi_valuation_box<-renderUI(valuation_display())
     transfer_rows <- reactive({
       req(is_module_active(),valid_login(login_token()))
       shiny::validate(shiny::need(primary_settled(),"Loading recent transfers…"))
@@ -175,12 +178,15 @@ today_Server <- function(id,is_module_active,login_token,championship_id,user_te
       }
       rows
     })
-    output$transfer_coverage<-renderText({
+    transfer_coverage_display<-resource_display_source(session,function(){
       rows<-transfer_rows()
       if(identical(attr(rows,"fetch_status"),"partial"))"Some older transfers could not be loaded; the displayed history is incomplete."else "All available league transfers, newest first."
     })
+    output$transfer_coverage<-renderText(transfer_coverage_display())
+    transfer_display<-resource_display_source(session,function()
+      today_transfer_rows(transfer_rows(),user_teams_RV(),market_state()$data,input$browser_timezone))
     output$recent_transfers<-reactable::renderReactable({
-      rows<-today_transfer_rows(transfer_rows(),user_teams_RV(),market_state()$data,input$browser_timezone)
+      rows<-transfer_display()
       reactable::reactable(rows,compact=TRUE,striped=TRUE,highlight=TRUE,bordered=FALSE,
         defaultPageSize=15,showPageSizeOptions=TRUE,pageSizeOptions=c(15,30,50),
         defaultColDef=reactable::colDef(html=TRUE),columns=if("Price"%in%names(rows))list(Price=reactable::colDef(align="right"))else list())

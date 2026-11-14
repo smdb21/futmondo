@@ -184,6 +184,36 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
             await self.worker.publish(self.job,'owner',result,child=child)
         self.assertFalse(self.requests)
 
+    async def test_expired_discovery_identity_never_becomes_fresh_source_data(self):
+        d=descriptor('get_players_from_team')
+        value={'kind':'double','values':[0,-2,None]}
+        chunks,size,digest=pack_snapshot(value)
+        observed=stamp(time.time()-3600)
+        manifest=dict(context=CONTEXT,handler=d['handler'],resource_key=d['resource_key'],
+            parts=len(chunks),json_bytes=size,sha256=digest,status='ok',
+            observed_at=observed,checked_at=observed,valid_until=stamp(time.time()-3300))
+        original=self.store.rpc
+        async def rpc(name,**p):
+            if name=='read':return {'resources':[dict(manifest=manifest,chunks=chunks)]}
+            return await original(name,**p)
+        self.store.rpc=rpc
+        ordinary=await self.worker.exchange(self.job,'owner',dict(type='resource',descriptor=d))
+        self.assertIsNone(ordinary['value'])
+        discovered=await self.worker.exchange(self.job,'owner',dict(type='discovery_resource',descriptor=d))
+        self.assertEqual(discovered['value'],value)
+        self.assertEqual(discovered['observed_at'],observed)
+        self.assertTrue(discovered['discovery_only'])
+        self.assertFalse(self.worker.source_stamps.get('owner'))
+        self.assertFalse(self.requests)
+        manifest['status']='partial'
+        self.assertIsNone((await self.worker.exchange(self.job,'owner',dict(type='discovery_resource',descriptor=d)))['value'])
+        manifest['status']='ok';manifest['context']=dict(CONTEXT,season='foreign')
+        self.assertIsNone((await self.worker.exchange(self.job,'owner',dict(type='discovery_resource',descriptor=d)))['value'])
+        with self.assertRaisesRegex(WorkerFailure,'resource_context'):
+            await self.worker.exchange(self.job,'owner',dict(type='discovery_resource',descriptor=descriptor('get_player_summary')))
+        with self.assertRaisesRegex(WorkerFailure,'resource_context'):
+            await self.worker.exchange(self.job,'owner',dict(type='discovery_resource',descriptor=dict(d,context=dict(CONTEXT,account_id='foreign'))))
+
     async def test_fresh_persisted_child_resource_is_reused(self):
         value={'kind':'double','values':[0,-2,None]}
         chunks,size,digest=pack_snapshot(value)
