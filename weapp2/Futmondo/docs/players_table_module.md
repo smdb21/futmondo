@@ -195,3 +195,8 @@ Performance: at most 20 detail entries per player, prepared only with the existi
 ### Compact rating, statistics and listing widths — 2026-11-11
 
 `get_reactable_columns_for_players()` now starts Rating and Played at 72px; Avg Points, Home Avg and Away Avg at 84px; Avg Last 5 and Sum last 5 at 90px; and Selling by at 125px (previously 150px). Acquisition Price retains its existing defaults. These are minimum/default widths with resizing enabled, without fixed widths or maximum caps. Numeric values, formatters and filters are retained.
+
+
+## My Team departure tint — 2026-11-14
+
+`players_table_Server(..., departing_player_ids=NULL)` accepts an optional reactive of departure IDs for `own_squad=TRUE`. It maps those IDs to the filtered source row indexes in `meta$departingPlayerIndexes`; `players_table_departure_class()` applies `fm-departing-before-round` using Reactable's original row index, including after browser sorting and filtering. The shared CSS uses theme-aware reddish backgrounds in both themes, with a narrow accent and a My Team legend. Other player tables retain their prior appearance. Metadata updates reuse the mounted table and preserve selection/pagination; they do not invalidate roster/history enrichment, add columns or fetch data. The My Team projection suppresses timestamp-only updates.

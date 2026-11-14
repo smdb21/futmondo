@@ -295,7 +295,7 @@ players_table_renewal_disabled <- function(settings) {
   length(value)==1L && is.atomic(value) && !is.na(value) && identical(tolower(as.character(value)),"true")
 }
 
-players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL, available_funds_RV = NULL, hide_bid_column = FALSE, refresh_trigger = NULL, is_module_active = function() TRUE, optional_ready = function() TRUE, points_ratio_basis = NULL, own_squad = FALSE, league_settings_source = NULL) {
+players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL, available_funds_RV = NULL, hide_bid_column = FALSE, refresh_trigger = NULL, is_module_active = function() TRUE, optional_ready = function() TRUE, points_ratio_basis = NULL, own_squad = FALSE, league_settings_source = NULL, departing_player_ids = NULL) {
   if (!is.null(points_ratio_basis)) points_ratio_basis <- match.arg(points_ratio_basis, c("value", "clause_price"))
   moduleServer(id, function(input, output, session) {
     bind_factual_reads(c("get_finished_rounds"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
@@ -454,7 +454,12 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       attr(players_table,"filter_added_fields")<-filter_added_fields
       players_table
     })
-    table_color_meta <- reactive(list(playerMetricRanges=players_table_metric_ranges(players_table_enriched_RV())))
+    table_color_meta <- reactive({
+      meta<-list(playerMetricRanges=players_table_metric_ranges(players_table_enriched_RV()))
+      if(isTRUE(own_squad)&&is.function(departing_player_ids))
+        meta$departingPlayerIndexes<-as.list(which(table_display_ids()%in%departing_player_ids())-1L)
+      meta
+    })
 
     ## players_table_filtered_RV ----
     players_table_filtered_RV <- reactive({
@@ -628,6 +633,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       reactable(players_table,
                 columns = table_columns,
                 meta = rendered_meta,
+                rowClass = if(isTRUE(own_squad)&&is.function(departing_player_ids))players_table_departure_class()else NULL,
                 defaultSorted = list(recent_points_avg="desc"),
                 searchable = TRUE,
                 filterable = TRUE,
@@ -1848,3 +1854,10 @@ ui_financial_amount <- function(value) {
   if (length(amount) != 1L || !is.finite(amount)) return("Unavailable")
   format_table_currency(amount)
 }
+
+# rowInfo.index is the source row index even after client sorting/filtering.
+# Metadata changes update the tint in place, without enriching/rebuilding rows.
+players_table_departure_class <- function() htmlwidgets::JS("function(rowInfo, state) {
+  var indexes = (state.meta || {}).departingPlayerIndexes || [];
+  return rowInfo && indexes.indexOf(rowInfo.index) !== -1 ? 'fm-departing-before-round' : '';
+}")

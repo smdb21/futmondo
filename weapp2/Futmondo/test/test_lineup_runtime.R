@@ -103,6 +103,12 @@ check('injury exclusion applies to starters and bench and can be overridden',{
  stopifnot(!'p20'%in%c(got$draft$starters,got$draft$bench),
   'p20'%in%lineup_optimize(injured,score,lineup_formations(),include_unavailable=TRUE)$draft$starters)
 })
+check('departure exclusion always applies to XI and bench, including the injury override',{
+ departed<-c('p20','p15','p8');rows<-roster;rows$status[20]<-'injured'
+ got<-lineup_optimize(rows,score,lineup_formations(),include_unavailable=TRUE,excluded_ids=departed)
+ stopifnot(!any(c(got$draft$starters,got$draft$bench)%in%departed),
+  'p19'%in%got$draft$starters,all(c(got$draft$starters,got$draft$bench)%in%rows$id))
+})
 large<-roster[rep(seq_len(nrow(roster)),5),];large$id<-paste0('p',seq_len(nrow(large)))
 large_scores<-data.frame(id=large$id,average=seq_len(nrow(large)))
 time<-system.time(for(i in 1:20)lineup_optimize(large,large_scores,lineup_formations()))[['elapsed']]/20

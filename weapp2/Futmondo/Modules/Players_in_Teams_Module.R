@@ -5,13 +5,14 @@ players_in_teams_UI <- function(id) {
     tags$div(class="fm-team-panels",uiOutput(ns("incoming_players")),uiOutput(ns("outgoing_players")),
       tags$div(style="grid-column:1/-1",uiOutput(ns("received_offers")))),
     uiOutput(ns("team_value_box")),
+    uiOutput(ns("departure_legend")),
     actionButton(ns("btn_put_all_on_market"), "Put All Players on Market", icon=icon("tags")),
     players_table_UI(ns("players_table_in_teams"), box_title="Players in Team",
       filter_by_team=FALSE, filter_by_value=FALSE, filter_by_change_value=FALSE,
       filter_by_is_favorite=FALSE, filter_by_is_from_futmondo=FALSE,
       show_position_breakdown=TRUE, hide_bid_column=FALSE))
 }
-players_in_teams_Server <- function(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger=NULL, round_catalog=NULL, league_settings_source=NULL) {
+players_in_teams_Server <- function(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger=NULL, round_catalog=NULL, league_settings_source=NULL, clause_transfers_source=NULL) {
   moduleServer(id, function(input, output, session) {
     bind_factual_reads(c("get_players_from_team","get_my_market_players"),session,login_token,championship_id,user_team_id,
       is_active=is_module_active,refresh_trigger=refresh_trigger)
@@ -35,7 +36,20 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
     ns <- session$ns
     get_reactive_val <- function(x) if (is.function(x)) x() else x
     current_context <- reactive(list(user=fm_scalar(login_token()[["userid"]]), championship=fm_scalar(championship_id()), team=fm_scalar(user_team_id())))
-    incoming <- incoming_clause_source(session,login_token,championship_id,user_team_id,is_module_active,refresh_trigger)
+    incoming <- if(is.function(clause_transfers_source))clause_transfers_source else
+      incoming_clause_source(session,login_token,championship_id,user_team_id,is_module_active,refresh_trigger)
+    departure_state <- resource_display_source(session,function(){
+      req(is_module_active())
+      rounds<-if(is.function(round_catalog))tryCatch(round_catalog(),error=function(e)data.frame())else data.frame()
+      clause_departure_round_state(incoming(),next_round_context(rounds))
+    })
+    departing_ids <- reactive(departure_state()$excluded_ids)
+    output$departure_legend <- renderUI({
+      req(is_module_active())
+      if(!any(as.character(players_table_RV()$id)%in%departing_ids()))return(NULL)
+      tags$p(class="fm-departure-legend",icon("right-from-bracket"),
+        " Red rows: players scheduled to leave by the next round's kickoff.")
+    })
     incoming_selected <- reactiveVal(NULL)
     incoming_context <- reactiveVal(NULL)
     incoming_requested <- reactiveVal(NULL)
@@ -292,7 +306,8 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
 
     selected <- players_table_Server("players_table_in_teams", players_table_RV, user_teams_RV,
       login_token, championship_id, user_team_id, hide_bid_column=FALSE, refresh_trigger=refresh_trigger,
-      is_module_active=is_module_active,own_squad=TRUE,league_settings_source=league_settings_source)
+      is_module_active=is_module_active,own_squad=TRUE,league_settings_source=league_settings_source,
+      departing_player_ids=departing_ids)
     return(selected)
   })
 }
@@ -790,4 +805,25 @@ clause_transfer_card_snapshot <- function(record,summary=NULL) {
   clause<-championship$clause
   if(is.list(clause))for(field in names(clause))row[[paste0("clause_",field)]]<-clause[[field]]
   row
+}
+
+# Project source-confirmed schedules only; unknown is never an eligible zero.
+# Shared by My Team and Lineup, with no retrieval, persistence or clock timer.
+clause_departure_round_state <- function(transfers,next_round) {
+  rows<-transfers$outgoing_records
+  status<-fm_scalar(transfers$outgoing_status %||% transfers$status,"loading")
+  starts<-fm_time(next_round$starts_at)
+  schedule_known<-length(starts)==1L&&!is.na(starts)&&!identical(next_round$available,FALSE)
+  valid_rows<-is.data.frame(rows)&&all(c("player_id","leaves_at")%in%names(rows))
+  ids<-if(valid_rows)as.character(rows$player_id)else character()
+  times<-if(valid_rows)fm_time(rows$leaves_at)else fm_time(character())
+  valid_ids<-!is.na(ids)&nzchar(trimws(ids))
+  excluded<-if(schedule_known)unique(ids[valid_ids&!is.na(times)&times<=starts])else character()
+  unknown<-unique(ids[valid_ids&is.na(times)])
+  complete<-schedule_known&&valid_rows&&all(valid_ids)&&!length(unknown)&&status%in%c("ok","empty","observed")
+  error<-if(!schedule_known)"The next-round schedule is unavailable; departure timing cannot be checked."else
+    if(!complete)fm_scalar(transfers$outgoing_error %||% transfers$error,
+      if(status=="loading")"Checking departures before the next round…"else
+        "Departure checks are incomplete; player availability for the next round cannot be confirmed.")else NULL
+  list(excluded_ids=sort(excluded),unknown_ids=sort(unknown),complete=complete,status=status,error=error)
 }

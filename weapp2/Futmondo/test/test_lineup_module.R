@@ -40,7 +40,7 @@ lineup_submit<-function(auth,championship_id,user_team_id,current,modified,owner
  promises::promise_resolve(list(answer=list(code=API_CODE_OK)))
 }
 settle<-function(session){for(i in seq_len(30)){later::run_now(0);session$flushReact()}}
-args<-list(is_module_active=function()TRUE,login_token=function()c(userid='fixture',token='synthetic'),championship_id=function()'league',user_team_id=function()'team',round_catalog=function()rounds)
+args<-list(is_module_active=function()TRUE,login_token=function()c(userid='fixture',token='synthetic'),championship_id=function()'league',user_team_id=function()'team',round_catalog=function()rounds,clause_transfers_source=function()list(outgoing_status='ok',outgoing_records=outgoing_clause_empty()))
 reset()
 shiny::testServer(lineup_Server,args=args,{
  settle(session);session$setInputs(formation='4-4-2');settle(session)
@@ -286,4 +286,82 @@ for(mode in c('optimize-error','no-xi')){
   cat('PASS',mode,'retains the lineup and clears calculation feedback\n')
  })
 }
-cat('LINEUP MODULE: 18 groups passed / 0 failed\n')
+
+# Shared, already-persisted outgoing schedules drive both XI and bench eligibility.
+transfer_state<-function(ids=character(),offset=numeric(),status='ok')list(outgoing_status=status,
+ outgoing_records=data.frame(player_id=ids,leaves_at=if(length(offset))fm_time(rounds$begin_process[7])+offset else as.POSIXct(character(),tz='UTC')))
+transfers<-shiny::reactiveVal(transfer_state())
+args$clause_transfers_source<-transfers
+reset()
+transfers(transfer_state(c('p20','p19','p18'),c(-1,0,1)))
+history_data(full_history[!full_history$player_id%in%c('p20','p19'),])
+shiny::testServer(lineup_Server,args=args,{
+ settle(session);session$setInputs(best=1,include_unavailable=TRUE);settle(session)
+ stopifnot(state$optimizes==1L,is.null(best_request()),!any(c(draft()$starters,draft()$bench)%in%c('p20','p19')),
+  'p18'%in%draft()$starters,state$reads==1L,state$submits==0L,
+  grepl('2 player(s) leave by the next round start',output$status$html,fixed=TRUE))
+ session$setInputs(slot_click=slot_event(FALSE,1L));settle(session)
+ html<-xml2::read_html(output$picker_players$html)
+ disabled<-function(id)xml2::xml_attr(xml2::xml_find_first(html,paste0('//button[@data-player-id="',id,'"]')),'disabled')
+ stopifnot(disabled('p20')=='disabled',disabled('p19')=='disabled',is.na(disabled('p18')),
+  grepl('leaves by round start',output$picker_players$html,fixed=TRUE))
+ before<-draft();session$setInputs(player_choice=list(id='p20',picker=selected()$sequence));settle(session)
+ stopifnot(identical(draft(),before),grepl('leaves by the next round start',picker_notice(),fixed=TRUE),state$reads==1L)
+ # The server rejects a forged/obsolete save, including a departure on the bench.
+ bad<-draft();bad$bench[1]<-'p19';draft(bad);session$setInputs(save=1);settle(session)
+ stopifnot(state$submits==0L,state$reads==1L,grepl('replace them before saving',notice(),fixed=TRUE))
+ cat('PASS before/at kickoff departures are excluded despite missing histories and injury override; later departures remain eligible; picker and save reject departing players\n')
+})
+reset()
+transfers(transfer_state(status='loading'))
+shiny::testServer(lineup_Server,args=args,{
+ settle(session);before<-draft();session$setInputs(best=1);settle(session)
+ stopifnot(identical(draft(),before),state$optimizes==0L,!is.null(best_request()),grepl('waiting for verified clause',notice()))
+ transfers(transfer_state('p20',NA_real_,status='partial'));settle(session)
+ stopifnot(state$optimizes==0L,!is.null(best_request()),!departures()$complete)
+ transfers(transfer_state('p20',-1));settle(session)
+ stopifnot(state$optimizes==1L,is.null(best_request()),!'p20'%in%c(draft()$starters,draft()$bench),state$reads==1L)
+ before<-draft();transfers(transfer_state(c('p20','p19'),c(-1,-1)));settle(session)
+ stopifnot(identical(draft(),before),state$optimizes==1L,grepl('fm-lineup-best-warning',output$status$html))
+ cat('PASS pending/unknown departure times retain the draft; one verified publication completes one calculation, and later departures warn without overwriting selections\n')
+})
+reset('delay')
+transfers(transfer_state())
+shiny::testServer(lineup_Server,args=args,{
+ settle(session);session$setInputs(best=1);settle(session);session$setInputs(save=1);settle(session)
+ stopifnot(saving(),is.function(state$pending));held<-state$pending
+ departing<-draft()$starters[1];transfers(transfer_state(departing,-1))
+ stopifnot(length(departure_issues(draft(),current_departures()))>0L)
+ held(state$official);settle(session)
+ stopifnot(!saving(),state$submits==0L,state$reads==2L,grepl('replace them before saving',notice(),fixed=TRUE))
+ cat('PASS a departure discovered during save preflight prevents submission without mutation retry\n')
+})
+reset()
+transfers(transfer_state())
+shiny::testServer(lineup_Server,args=args,{
+ settle(session);session$setInputs(best=1);settle(session);transfers(transfer_state(status='partial'));settle(session)
+ session$setInputs(save=1);settle(session)
+ stopifnot(state$submits==0L,state$reads==1L,grepl('Departure eligibility is not verified',notice(),fixed=TRUE))
+ cat('PASS incomplete transfer evidence blocks saving without extra source requests\n')
+})
+
+reset()
+transfers(transfer_state(status='partial'));transfer_refreshes<-0L
+args$clause_transfers_refresh<-function(){transfer_refreshes<<-transfer_refreshes+1L}
+shiny::testServer(lineup_Server,args=args,{
+ settle(session);before<-draft();session$setInputs(best=1);settle(session)
+ stopifnot(!is.null(best_request()),state$optimizes==0L)
+ session$setInputs(reload=1);settle(session)
+ stopifnot(transfer_refreshes==1L,state$reads==2L,is.null(best_request()),identical(draft(),before))
+ session$setInputs(best=2);settle(session);transfers(transfer_state('p20',-1));settle(session)
+ stopifnot(state$optimizes==1L,!('p20'%in%c(draft()$starters,draft()$bench)),state$submits==0L)
+ # Timestamp-only transfer publications must not invalidate the projected state.
+ updates<-new.env();updates$n<-0L
+ observer<-shiny::observe({departures();updates$n<-updates$n+1L})
+ settle(session);initial<-updates$n
+ for(i in 1:10){fresh<-transfer_state('p20',-1);fresh$source_times<-list(summary=Sys.time()+i);transfers(fresh);session$flushReact()}
+ stopifnot(updates$n==initial,state$reads==2L,state$optimizes==1L,state$submits==0L)
+ observer$destroy()
+ cat('PASS explicit lineup refresh retries departure acquisition once and preserves the draft; ten timestamp-only publications cause no eligibility redraws or source reads\n')
+})
+cat('LINEUP MODULE: 23 groups passed / 0 failed\n')

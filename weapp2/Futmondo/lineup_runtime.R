@@ -47,11 +47,11 @@ lineup_average_scores <- function(roster,history,rounds,n=5L) {
 }
 # One player per pass, vectorized over a bounded positional count lattice.
 # Predecessors reconstruct exact distinct-player assignments (no greedy picks).
-lineup_optimize <- function(roster,scores,allowed,current=NULL,include_unavailable=FALSE,bench_enabled=TRUE,multiposition=TRUE) {
+lineup_optimize <- function(roster,scores,allowed,current=NULL,include_unavailable=FALSE,bench_enabled=TRUE,multiposition=TRUE,excluded_ids=character()) {
   allowed<-intersect(lineup_formations(),as.character(allowed));if(!length(allowed))return(NULL)
   roster<-roster[order(as.character(roster$id)),,drop=FALSE]
   values<-as.numeric(scores$average[match(as.character(roster$id),as.character(scores$id))])
-  keep<-is.finite(values)&!duplicated(as.character(roster$id))
+  keep<-is.finite(values)&!duplicated(as.character(roster$id))&!as.character(roster$id)%in%excluded_ids
   if(!include_unavailable)keep<-keep&!analytics_known_unavailable(roster)
   roster<-roster[keep,,drop=FALSE];values<-values[keep];positions<-lineup_positions(roster,multiposition)
   counts<-t(vapply(allowed,function(x)c(1L,as.integer(strsplit(x,'-',fixed=TRUE)[[1]])),integer(4)))

@@ -17,6 +17,13 @@ answers<-list(
  roster=list(list(id='p1',name='Keeper',points=0,role='portero',team='Fixture Club',buyPrice=100,value=200)),
  information=list(configuration=list(cpt=FALSE),season='fixture-season'),
  availables=strategies)
+# A new session knows its active season/scoring context independently. Unknown
+# context must not hydrate arbitrary known-context snapshots (covered separately).
+base_resource_context<-resource_context
+resource_context<-function(...){
+ value<-base_resource_context(...);value$season<-'fixture-season'
+ value$scoring_version<-fm_scoring_version('fixture',NULL);value
+}
 api_reads<-db_reads<-db_writes<-0L;stored<-NULL
 fm_async_read_http<-function(url,method='GET',body=NULL,headers=character(),...){
  if(grepl('/rest/v1/team_lineup_snapshots',url,fixed=TRUE)){
@@ -42,7 +49,7 @@ recent_player_points_source<-function(...)list(history=shiny::reactive(data.fram
  status=shiny::reactive(list(pending=0L,remaining=0L,saving=0L,failed=0L)))
 settle<-function(session){for(i in 1:35){later::run_now(0);session$flushReact()}}
 args<-list(is_module_active=function()TRUE,login_token=function()auth,
- championship_id=function()'fixture-league',user_team_id=function()'fixture-team',round_catalog=function()rounds)
+ championship_id=function()'fixture-league',user_team_id=function()'fixture-team',round_catalog=function()rounds,clause_transfers_source=function()list(outgoing_status='ok',outgoing_records=outgoing_clause_empty()))
 shiny::testServer(lineup_Server,args=args,{
  settle(session)
  stopifnot(!loading(),notice()=='',cache_issue()=='',!is.null(source()),!is.null(draft()),

@@ -200,6 +200,15 @@ function(input, output, session) {
       icon=icon("bell"),class="fm-notification-link",title=label,`aria-label`=label)
   })
   observeEvent(input$open_notifications, updateTabItems(session, "tabs", "notifications"))
+  clause_transfer_revision <- reactiveVal(0L)
+  refresh_clause_transfers <- function() {
+    auth<-isolate(login_token_RV());req(valid_login(auth))
+    invalidate_saved_clause_transfers(resource_context(auth,isolate(championship_id_RV()),isolate(user_team_id_RV())))
+    clause_transfer_revision(isolate(clause_transfer_revision())+1L)
+  }
+  clause_transfers_RV <- incoming_clause_source(session,login_token_RV,championship_id_RV,user_team_id_RV,
+    reactive(isTRUE(input$tabs%in%c("yourteam","lineup"))),
+    reactive(list(refresh_trigger(),clause_transfer_revision())))
 selected_player_RV <- players_in_teams_Server(id = "players_in_teams",
                                                  is_module_active = reactive({
                                                    input$tabs == "yourteam"
@@ -210,11 +219,13 @@ selected_player_RV <- players_in_teams_Server(id = "players_in_teams",
                                                  user_teams_RV = user_teams_RV,
                                                  refresh_trigger = refresh_trigger,
                                                  round_catalog = round_catalog_RV,
-                                                 league_settings_source = league_settings_source)
+                                                 league_settings_source = league_settings_source,
+                                                 clause_transfers_source = clause_transfers_RV)
 
   lineup <- lineup_Server("lineup", reactive(identical(input$tabs,"lineup")),
     login_token_RV, championship_id_RV, user_team_id_RV, round_catalog_RV,
-    refresh_trigger, history_refresh_trigger)
+    refresh_trigger, history_refresh_trigger, clause_transfers_source=clause_transfers_RV,
+    clause_transfers_refresh=refresh_clause_transfers)
 
   today <- today_Server(id = "today",
                is_module_active = reactive({

@@ -131,7 +131,8 @@ check('lineup generation and retained drafts change with the resolved competitio
  lineup_fetch_bundle<-function(...){bundle_reads<<-bundle_reads+1L;promises::promise(function(resolve,reject)pending[[bundle_reads]]<<-resolve)}
  rounds<-data.frame(round_id='round-1',round_number=1,begin_process=stamp(Sys.time()+86400),is_finished=FALSE)
  shiny::testServer(lineup_Server,args=list(is_module_active=function()TRUE,login_token=function()auth,
-  championship_id=function()'snapshot-league',user_team_id=function()'snapshot-team',round_catalog=function()rounds),{
+  championship_id=function()'snapshot-league',user_team_id=function()'snapshot-team',round_catalog=function()rounds,
+  clause_transfers_source=function()list(outgoing_status='ok',outgoing_records=outgoing_clause_empty())),{
   flush<-function(){for(i in 1:20){later::run_now(0);session$flushReact()}}
   flush();stopifnot(bundle_reads==1L,is.null(draft()));obsolete<-pending[[1]]
   metadata(list(competition='competition-B',season='2026-2027',scoring='scoring-A'));flush()

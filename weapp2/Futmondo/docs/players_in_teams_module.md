@@ -56,3 +56,10 @@ Local verification: `test/test_team_received_offers.R` covers complete lower riv
 ### Empty roster rendering
 
 My Team initializes a missing `market_inMarket` column with a logical vector sized to the observed roster. Explicitly empty source rosters remain zero rows through position/change/price transformations; source status and timestamps are retained. Pending roster acquisition continues through the existing shared-resource loading contract and is not converted into a successful empty response. No API, database, cache, timer or manual-action behavior changes. `test/test_empty_squad_module.R` exercises the actual module reactive and delayed resource completion.
+
+
+## Departure eligibility and roster highlights — 2026-11-14
+
+My Team gives roster players a reddish background when their observed clause departure is at or before the next scheduled round kickoff. The legend explains the tint; the Leaving players panel retains the exact departure time and source status. Later departures are not highlighted. Missing dates or a missing next-round schedule do not produce invented eligibility. Known dates remain visible while later verification is incomplete; confirmed cancellation, departure or reacquisition clears them through the existing reconciler. Actual roster counts/value and manual market actions retain their existing source-based behavior.
+
+`clause_departure_round_state(transfers, next_round)` projects `outgoing_records`/`outgoing_status` into sorted `excluded_ids`, `unknown_ids`, `complete`, `status` and `error`. It compares absolute timestamps inclusively at kickoff. Missing records, identities, dates or schedule and incomplete source states cannot certify completeness. The same helper serves Lineup and My Team. `players_in_teams_Server(..., clause_transfers_source=NULL)` accepts the root session's shared transfer source; standalone instances retain their existing source. The root activates one existing bounded queue while either My Team or Lineup is visible, preserving context isolation and the existing database-first clause snapshot reuse. No additional storage or acquisition is introduced for the row highlight.

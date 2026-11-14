@@ -1331,3 +1331,10 @@ separate from these migration checks.
 
 - Implemented and verified locally: My Team groups system offers under one **Futmondo system** heading with compact rows. Rival/unknown offers retain individual source labels above the system group; every bid, amount, gain/loss, exact-offer link and source-status message is preserved.
 - Existing received-offers checks pass; synthetic Chromium checks at 320/360/390/1440px confirm grouping, mixed/unknown bidders, wrapping and unchanged prices/links. Performance results and limits are recorded in `docs/data_review_results.md`. No dependency, schema, acquisition or persistence change; authenticated hosted appearance remains unverified.
+
+
+## Next-round clause departures in Lineup and My Team — 2026-11-14
+
+Implemented locally: share the existing scoped clause-transfer source across My Team and Lineup; compare observed departure dates with the next kickoff; exclude departures at/before kickoff from Best XI and bench even when injury exclusion is overridden; reject selecting/saving known departures while retaining the official lineup/draft for correction. Missing departure evidence stays unresolved. My Team highlights those roster rows with a reddish background and an explanatory legend, preserving actual ownership/count/value.
+
+The existing database snapshots, original observation/completeness metadata and bounded queue remain the source of reusable transfer evidence. No new service, schema, dependency or timer. Focused offline, lifecycle and browser verification and performance limits are recorded in `data_review_results.md`; local verification does not claim authenticated hosted acceptance.

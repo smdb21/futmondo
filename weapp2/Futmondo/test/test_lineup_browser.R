@@ -77,7 +77,8 @@ server <- function(input, output, session) {
   lineup_Server('lineup', shiny::reactive(TRUE),
     shiny::reactive(c(userid = 'fixture-account', token = 'fixture-token')),
     shiny::reactive('fixture-league'), shiny::reactive('fixture-team'),
-    shiny::reactive(fixture_rounds), history_refresh_trigger = shiny::reactive(0L))
+    shiny::reactive(fixture_rounds), history_refresh_trigger = shiny::reactive(0L),
+    clause_transfers_source = function()list(outgoing_status='ok',outgoing_records=outgoing_clause_empty()))
   output$fixture_counts <- shiny::renderText({
     shiny::invalidateLater(100, session)
     paste(fixture_reads, fixture_submissions, fixture_db_reads, fixture_db_writes, sep = '/')

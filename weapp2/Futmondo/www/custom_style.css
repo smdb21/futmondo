@@ -1446,3 +1446,17 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 @media (max-width: 767px) {
   .fm-classification-range { padding-inline: 20px; }
 }
+
+/* Players whose observed departure is no later than the next round kickoff. */
+.reactable .rt-tbody .fm-departing-before-round,
+.reactable .rt-tbody .fm-departing-before-round .rt-tr {
+    background-color: var(--fm-error, #24100f) !important;
+    background-color: color-mix(in srgb, var(--fm-danger) 14%, var(--fm-surface)) !important;
+}
+.reactable .rt-tbody .fm-departing-before-round .rt-td {
+    background-color: transparent !important;
+}
+.reactable .rt-tbody .fm-departing-before-round .rt-td:first-child {
+    box-shadow: inset 3px 0 0 var(--fm-danger);
+}
+.fm-departure-legend { color: var(--fm-danger); overflow-wrap: anywhere; }
