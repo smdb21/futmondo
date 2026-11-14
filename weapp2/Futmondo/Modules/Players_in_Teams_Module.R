@@ -1,7 +1,7 @@
 library(reactable)
 players_in_teams_UI <- function(id) {
   ns <- NS(id)
-  tagList(tags$style(HTML(".fm-team-panels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-bottom:20px}.fm-team-panels>div{min-width:0}.fm-team-panels .fm-incoming-panel{height:100%;margin-bottom:0}.fm-offer-source{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--fm-border,#315540);border-radius:6px;padding:3px 7px;overflow-wrap:anywhere}.fm-offer-rival{color:var(--fm-warning,#f0c75e);border-color:currentColor;font-weight:600}.fm-team-offer{display:flex;flex-direction:column;gap:7px;padding:12px 0;border-top:1px solid var(--fm-border,#315540)}.fm-team-offer-heading{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}.fm-team-offer-heading a{overflow-wrap:anywhere}@media(max-width:767px){.fm-team-panels{grid-template-columns:minmax(0,1fr);gap:12px}}.fm-incoming-panel{border:1px solid var(--fm-border,#315540);border-radius:8px;padding:16px;margin-bottom:20px}.fm-incoming-panel h3{margin-top:0}.fm-incoming-player{display:flex;gap:16px;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid var(--fm-border,#315540)}.fm-incoming-identity{display:flex;gap:10px;align-items:center;flex-wrap:wrap;min-width:0}.fm-incoming-identity a{overflow-wrap:anywhere}.fm-incoming-arrival{display:flex;flex-direction:column;gap:4px;text-align:right;min-width:0}.fm-incoming-round{font-weight:600}.fm-incoming-schedule{color:var(--fm-muted)}.fm-incoming-error{color:var(--fm-warning,#f0c75e);overflow-wrap:anywhere}@media(max-width:600px){.fm-incoming-player{display:flex;flex-direction:column;align-items:stretch;gap:8px}.fm-incoming-arrival{text-align:left}.fm-incoming-panel{padding:12px}}")),
+  tagList(tags$style(HTML(".fm-team-panels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-bottom:20px}.fm-team-panels>div{min-width:0}.fm-team-panels .fm-incoming-panel{height:100%;margin-bottom:0}.fm-offer-source{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--fm-border,#315540);border-radius:6px;padding:3px 7px;overflow-wrap:anywhere}.fm-offer-rival{color:var(--fm-warning,#f0c75e);border-color:currentColor;font-weight:600}.fm-team-offer{display:flex;flex-direction:column;gap:7px;padding:12px 0;border-top:1px solid var(--fm-border,#315540)}.fm-team-offer-heading{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}.fm-team-offer-heading>*{min-width:0;overflow-wrap:anywhere}.fm-offer-group-heading{font-size:inherit;margin:12px 0 8px}.fm-system-offers .fm-team-offer{padding:8px 0}.fm-system-offers .fm-team-offer-heading{align-items:center;min-height:28px}@media(max-width:767px){.fm-team-panels{grid-template-columns:minmax(0,1fr);gap:12px}}.fm-incoming-panel{border:1px solid var(--fm-border,#315540);border-radius:8px;padding:16px;margin-bottom:20px}.fm-incoming-panel h3{margin-top:0}.fm-incoming-player{display:flex;gap:16px;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid var(--fm-border,#315540)}.fm-incoming-identity{display:flex;gap:10px;align-items:center;flex-wrap:wrap;min-width:0}.fm-incoming-identity a{overflow-wrap:anywhere}.fm-incoming-arrival{display:flex;flex-direction:column;gap:4px;text-align:right;min-width:0}.fm-incoming-round{font-weight:600}.fm-incoming-schedule{color:var(--fm-muted)}.fm-incoming-error{color:var(--fm-warning,#f0c75e);overflow-wrap:anywhere}@media(max-width:600px){.fm-incoming-player{display:flex;flex-direction:column;align-items:stretch;gap:8px}.fm-incoming-arrival{text-align:left}.fm-incoming-panel{padding:12px}}")),
     tags$div(class="fm-team-panels",uiOutput(ns("incoming_players")),uiOutput(ns("outgoing_players")),
       tags$div(style="grid-column:1/-1",uiOutput(ns("received_offers")))),
     uiOutput(ns("team_value_box")),
@@ -346,6 +346,16 @@ team_received_offers_state <- function(roster_state) {
 team_received_offers_panel <- function(state,ns) {
   rows<-state$records;verified<-state$status%in%c("ok","empty")
   rival_count<-sum(rows$bid_source%in%"rival")
+  system_rows<-rows$bid_source%in%"system"
+  render_offer<-function(i) {
+    row<-rows[i,,drop=FALSE];rival<-identical(row$bid_source,"rival")
+    amount<-if(is.finite(row$bid_price))format_table_sale_price(row$bid_price,row$acquisition_cost)else "Amount unavailable"
+    shiny::tags$div(class="fm-team-offer",
+      shiny::tags$div(class="fm-team-offer-heading",if(nzchar(row$bid_id))shiny::actionLink(ns(team_received_offer_input(row)),row$player_name)else shiny::tags$span(row$player_name),shiny::tags$strong(amount)),
+      if(!system_rows[i])shiny::tags$div(shiny::tags$span(class=paste("fm-offer-source",if(rival)"fm-offer-rival"else ""),
+        shiny::icon(if(rival)"user"else "circle-question"),
+        if(rival)paste0("Rival · ",row$bid_user)else "Unknown bidder")))
+  }
   shiny::tags$section(class="fm-incoming-panel fm-offers-panel",`aria-labelledby`=ns("offers_heading"),
     shiny::tags$h3(id=ns("offers_heading"),if(verified)paste0("Offers for your players (",nrow(rows),")")else "Offers for your players"),
     if(rival_count)shiny::tags$p(class="fm-offer-rival",shiny::icon("user"),paste0(" ",rival_count," rival offer",if(rival_count==1L)""else "s")),
@@ -354,15 +364,11 @@ team_received_offers_panel <- function(state,ns) {
       if(identical(state$status,"stale"))"Showing previously observed offers; current offers could not be verified. "else "Received offers could not be fully verified. ",
       if(!is.null(state$error))resource_failure_message(state$error)else "Refresh to retry."),
     if(verified&&!nrow(rows))shiny::tags$p("No offers for your players."),
-    lapply(seq_len(nrow(rows)),function(i) {
-      row<-rows[i,,drop=FALSE];rival<-identical(row$bid_source,"rival");system<-identical(row$bid_source,"system")
-      amount<-if(is.finite(row$bid_price))format_table_sale_price(row$bid_price,row$acquisition_cost)else "Amount unavailable"
-      shiny::tags$div(class="fm-team-offer",
-        shiny::tags$div(class="fm-team-offer-heading",if(nzchar(row$bid_id))shiny::actionLink(ns(team_received_offer_input(row)),row$player_name)else shiny::tags$span(row$player_name),shiny::tags$strong(amount)),
-        shiny::tags$div(shiny::tags$span(class=paste("fm-offer-source",if(rival)"fm-offer-rival"else ""),
-          shiny::icon(if(rival)"user"else if(system)"robot"else "circle-question"),
-          if(rival)paste0("Rival · ",row$bid_user)else if(system)"Futmondo system"else "Unknown bidder")))
-    }))
+    lapply(which(!system_rows),render_offer),
+    if(any(system_rows))shiny::tags$section(class="fm-system-offers",`aria-labelledby`=ns("offers_system_heading"),
+      shiny::tags$h4(id=ns("offers_system_heading"),class="fm-offer-group-heading",
+        shiny::tags$span(class="fm-offer-source",shiny::icon("robot"),"Futmondo system")),
+      lapply(which(system_rows),render_offer)))
 }
 
 bulk_market_listing_plan <- function(roster, mode = c("value", "closed_clause"), clause_premium_pct = 5,

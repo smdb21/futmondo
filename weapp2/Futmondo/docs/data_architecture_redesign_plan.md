@@ -1325,3 +1325,9 @@ separate from these migration checks.
 - Local verification and hosted checks are documented in `docs/data_review_results.md`; authenticated production acceptance remains separate.
 
 - Also fixed the independently reproduced delayed cadence promotion: idle successful summaries shortened from hourly to five-minute collection now honor that next due time. Guarded repair/migration applied as `20261114144934_worker_shorter_cadence`; equal-interval rediscovery, source deadlines and failed/active jobs remain unchanged.
+
+
+### November 14: compact system offers
+
+- Implemented and verified locally: My Team groups system offers under one **Futmondo system** heading with compact rows. Rival/unknown offers retain individual source labels above the system group; every bid, amount, gain/loss, exact-offer link and source-status message is preserved.
+- Existing received-offers checks pass; synthetic Chromium checks at 320/360/390/1440px confirm grouping, mixed/unknown bidders, wrapping and unchanged prices/links. Performance results and limits are recorded in `docs/data_review_results.md`. No dependency, schema, acquisition or persistence change; authenticated hosted appearance remains unverified.
