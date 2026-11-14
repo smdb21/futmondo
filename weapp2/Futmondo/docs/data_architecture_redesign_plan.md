@@ -1265,3 +1265,16 @@ returns no usable capacity counts/IDs and cannot certify current membership.
 Source acquisition is not started by the observed display path. Local regressions
 and required lifecycle pass; mobile screen recovery and completion-marker POST
 success still require production confirmation. See `docs/worker_resolved_recovery.md`.
+
+### 2026-11-13 — Stable background rendering and saved-page recovery
+
+Implemented locally: account-scoped, change-only status publication and direct
+replay of already-arrived worker observations without an artificial loading
+state. Autonomous acquisition cadence stays independent of GUI behavior;
+manual refresh, real stale data and context boundaries retain their guards.
+Saved-page reads use bounded foreground recovery with safe failure diagnostics;
+the precise failure behind the reported production HTTP200 remains unconfirmed.
+Mobile360/desktop1440 fixtures show zero redraws during unchanged polls and one
+paint for a changed balance. Required offline lifecycle and focused regressions
+pass. See `docs/worker_render_stability.md`; authenticated production screen
+confirmation remains open after push-triggered rollout.

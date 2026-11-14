@@ -387,7 +387,13 @@ factual_read_adapter<-function(session,handler,login_token,championship_id=NULL,
     if(identical(mode,FALSE))return(list(enabled=FALSE))
     descriptor<-fm_worker_descriptor(handler,captured_args,captured_context)
     state<-fm_worker_account_state(captured_context$account_id)
-    list(enabled=mode,revision=fm_worker_resource_revision(state,descriptor$resource_key)())
+    revision<-fm_worker_resource_revision(state,descriptor$resource_key)()
+    stored<-fm_worker_get(captured_context$account_id,descriptor$resource_key)
+    # This revision is already decoded and scoped in the worker cache. Replaying
+    # it resolves locally; expired clause summaries still wait for verification.
+    ready<-isTRUE(mode)&&!is.null(stored)&&
+      (handler!="get_clause_transfer_summary"||resource_snapshot_unexpired(stored$data))
+    list(enabled=mode,revision=revision,ready=ready)
    }
    registry[[entry_key]]<-shared_resource(session,resource,context=function()captured_context,fetch=fetch,
      active=function()isTRUE(is_active())&&identical(owner_context(captured_args),captured_owner),

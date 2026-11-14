@@ -229,9 +229,10 @@ fm_async_read_retryable <- function(error) {
     (identical(failure$category,"network")||
        (identical(failure$category,"http")&&isTRUE(failure$http_status%in%c(408L,429L,500L,502L,503L,504L))))
 }
-fm_async_read_http<-function(url,method="GET",body=NULL,headers=character(),owner="",priority="normal"){
+fm_async_read_http<-function(url,method="GET",body=NULL,headers=character(),owner="",priority="normal",timeout=15){
   priority<-fm_transport_priority(priority)
-  key<-as.character(openssl::sha256(serialize(list(url,method,body,headers,owner),NULL)))
+  if(!is.numeric(timeout)||length(timeout)!=1L||!is.finite(timeout)||timeout<=0)stop("Invalid read timeout")
+  key<-as.character(openssl::sha256(serialize(list(url,method,body,headers,owner,timeout),NULL)))
   pending<-.fm_transport$reads[[key]]
   if(!is.null(pending)){
     if(identical(priority,"interactive")){
@@ -266,6 +267,7 @@ fm_async_read_http<-function(url,method="GET",body=NULL,headers=character(),owne
       previous_key<-.fm_transport$dispatch_read_key;.fm_transport$dispatch_read_key<-key
       on.exit(.fm_transport$dispatch_read_key<-previous_key,add=TRUE)
       http_args<-list(url,method,body,headers,owner)
+      if(!identical(as.numeric(timeout),15))http_args$timeout<-timeout
       if(identical(state$priority,"interactive"))http_args$priority<-state$priority
       request<-tryCatch(promises::promise_resolve(do.call(fm_async_http,http_args)),
         error=function(error)promises::promise_reject(error))

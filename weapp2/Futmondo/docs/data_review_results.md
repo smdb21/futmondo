@@ -2225,3 +2225,38 @@ marker POSTs all201, no PGRST204 in that window. Marker serialization recovery i
 now confirmed live. Observed panels include original UTC source times; manual
 capacity recheck4 and durable clause persistence11 passed. User-page rendering
 still requires confirmation after the push-triggered deployment.
+
+### 2026-11-13 — Background-rendering regression review
+
+Reproduced two publications/renders per durable worker update: shared state
+first emitted stale/loading despite the new observation already being local.
+Five updates now produce exactly five renders (0.272s), preserving manual
+Refresh loading/priority10 and original timestamps on expired records. Ten
+unrelated resource updates produce no primary render. Banner status now
+projects only changed visible content, scoped to its account:20 polls cause
+zero repeated renders/source reads/enqueues (0.380s), and other accounts cannot
+invalidate it. Queue errors and worker-read failures remain visible.
+
+Browser fixtures at360/1440px use real Today cards/adapters and encoded synthetic
+snapshots, with external requests blocked. Two five-second polls produce zero
+banner/card redraws; a changed balance paints once. Heartbeats46/56ms, no horizontal
+overflow. These measurements are local, not production latency guarantees.
+Performance review: same worker schedule and DB poll frequency; one bounded
+status value/session and one existing-cache lookup per replay; no new source
+requests, DB writes, timers or durable cache. Existing DB snapshots remain the
+cross-session authority; stale and context checks are not relaxed.
+
+Saved-page recovery uses the existing interactive safe-read coordinator with
+at most one transient retry and8s per attempt; POST remains single-attempt.
+Preference4+transport4, safe-read recovery7 and transport-priority10 pass.
+Foreground fixture42ms amid three400ms background requests; four-socket cap
+unchanged. Production aggregate logs show one preference200 at01:19:28UTC on
+Nov14, no HTTP rejection. Prior logs lack delivery/parser detail, so the exact
+original preference failure remains unconfirmed. New diagnostics emit only
+allowlisted resource/category/status/reference, never bodies or credentials.
+
+Worker status4, replay4, live4, context5, provider9, expiry4, progressive refresh2,
+lineup6 and clause-scope11 groups pass. Required offline lifecycle13/eight tabs
+and deployment contract3 pass. No new dependencies or schema changes. Push
+triggers the existing Dokploy deployment; authenticated production behavior
+is not inferred from local tests. See `docs/worker_render_stability.md`.

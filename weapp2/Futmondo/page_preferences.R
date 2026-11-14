@@ -20,13 +20,26 @@ fm_page_store <- function(user_id, page = NULL, visited_at = NULL, owner = "") {
     `Content-Type` = "application/json", Prefer = "resolution=merge-duplicates,return=minimal")
   body <- if (reading) NULL else jsonlite::toJSON(list(user_id = user_id, page = page,
     visited_at = visited_at), auto_unbox = TRUE)
-  promises::then(fm_async_http(url, if (reading) "GET" else "POST", body, headers,
-    owner = owner, timeout = 8), function(response) {
-      if (!reading) return(TRUE)
-      rows <- jsonlite::fromJSON(rawToChar(response$content), simplifyVector = FALSE)
-      if (!is.list(rows) || length(rows) > 1L) stop("Invalid page preference response")
+  # Navigation is needed before the page can load. Use the reserved foreground
+  # socket and the existing bounded retry for this idempotent read only.
+  request <- if (reading) fm_async_read_http(url, "GET", body, headers,
+    owner = owner, timeout = 8, priority = "interactive") else
+    fm_async_http(url, "POST", body, headers, owner = owner, timeout = 8)
+  parsed <- promises::then(request, function(response) {
+    if (!reading) return(TRUE)
+    tryCatch({
+      text <- rawToChar(response$content)
+      rows <- jsonlite::fromJSON(text, simplifyVector = FALSE)
+      if (!grepl("^[[:space:]]*\\[", text) || !is.list(rows) || length(rows) > 1L ||
+          (length(rows) && (!is.null(names(rows)) || !is.list(rows[[1L]]) ||
+            !is.character(rows[[1L]]$page) || length(rows[[1L]]$page) != 1L || is.na(rows[[1L]]$page))))
+        stop("Invalid page preference response")
       if (length(rows)) rows[[1L]] else NULL
-    })
+    }, error = function(error) stop(resource_failure(resource = "user_page_preferences", category = "parser")))
+  })
+  promises::then(parsed, identity, function(error) {
+    promises::promise_reject(resource_log_failure(error, "user_page_preferences"))
+  })
 }
 
 fm_page_preferences <- function(session, login_token, page, is_admin,

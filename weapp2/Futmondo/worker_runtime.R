@@ -1,7 +1,6 @@
 # Database-backed browsing for explicitly opted-in accounts. All transport is async.
 .fm_worker <- new.env(parent=emptyenv())
 .fm_worker$accounts<-new.env(parent=emptyenv());.fm_worker$values<-new.env(parent=emptyenv())
-.fm_worker$revision<-shiny::reactiveVal(0L)
 fm_worker_configured<-function() !isTRUE(getOption('futmondo.offline',FALSE))&&
  !isTRUE(getOption('futmondo.worker_helper',FALSE))&&identical(tolower(Sys.getenv('FUTMONDO_WORKER_ENABLED','true')),'true')&&
  grepl('^[a-fA-F0-9]{64}$',Sys.getenv('FUTMONDO_WORKER_KEY'))&&requireNamespace('sodium',quietly=TRUE)&&nzchar(get_sb_url())&&nzchar(get_sb_key())
@@ -9,12 +8,16 @@ fm_worker_resource_revision<-function(state,key){
  if(is.null(state$resource_revisions[[key]]))state$resource_revisions[[key]]<-shiny::reactiveVal(0L)
  state$resource_revisions[[key]]
 }
-fm_worker_notify<-function(){.fm_worker$revision(shiny::isolate(.fm_worker$revision())+1L);invisible(NULL)}
+fm_worker_notify<-function(account){
+ state<-.fm_worker$accounts[[account]]
+ if(!is.null(state))state$status_revision(shiny::isolate(state$status_revision())+1L)
+ invisible(NULL)
+}
 fm_worker_account_state<-function(id){
  state<-.fm_worker$accounts[[id]]
  if(is.null(state)){
   state<-new.env(parent=emptyenv());state$account<-NULL;state$known<-FALSE;state$busy<-FALSE;state$last_poll<-0
-  state$redirects<-list();state$redirect_revision<-shiny::reactiveVal(0L);state$descriptors<-list();state$waiters<-list();state$queued<-list();state$health<-NULL;state$jobs<-list();state$errors<-list();state$sessions<-character();state$policy_revision<-shiny::reactiveVal(0L);state$settings_revision<-shiny::reactiveVal(0L);state$resource_revisions<-new.env(parent=emptyenv())
+  state$status_revision<-shiny::reactiveVal(0L);state$redirects<-list();state$redirect_revision<-shiny::reactiveVal(0L);state$descriptors<-list();state$waiters<-list();state$queued<-list();state$health<-NULL;state$jobs<-list();state$errors<-list();state$sessions<-character();state$policy_revision<-shiny::reactiveVal(0L);state$settings_revision<-shiny::reactiveVal(0L);state$resource_revisions<-new.env(parent=emptyenv())
   .fm_worker$accounts[[id]]<-state
  }
  state
@@ -97,8 +100,8 @@ fm_worker_enqueue<-function(descriptor,owner='',force=FALSE){
  state$queued[[key]]<-as.numeric(Sys.time())
  p<-fm_worker_rpc('enqueue',list(p_account=descriptor$context$account_id,p_descriptor=descriptor,
   p_interval=fm_worker_interval(descriptor$handler),p_priority=if(force)10L else fm_worker_priority(descriptor$handler)),owner)
- promises::then(p,function(ok){if(!isTRUE(ok)){state$queued[[key]]<-NULL;state$errors[[key]]<-'Background access is paused or this league is excluded.'};fm_worker_notify();NULL},
-  function(error){state$queued[[key]]<-NULL;state$errors[[key]]<-'Could not queue background refresh; database access failed.';fm_worker_notify();NULL})
+ promises::then(p,function(ok){if(!isTRUE(ok)){state$queued[[key]]<-NULL;state$errors[[key]]<-'Background access is paused or this league is excluded.'};fm_worker_notify(descriptor$context$account_id);NULL},
+  function(error){state$queued[[key]]<-NULL;state$errors[[key]]<-'Could not queue background refresh; database access failed.';fm_worker_notify(descriptor$context$account_id);NULL})
  invisible(NULL)
 }
 fm_worker_demand<-function(descriptor,owner='',is_current=NULL){
@@ -252,8 +255,8 @@ fm_worker_poll<-function(account,owner='',force=FALSE){
    if(s$descriptors[[k]]$descriptor$handler!='get_clause_transfer_summary'&&
       (is.null(saved)||!resource_snapshot_unexpired(saved$data)))fm_worker_enqueue(s$descriptors[[k]]$descriptor,owner)
   }
-  fm_worker_settle(s);fm_worker_notify();NULL
- },function(error){s$busy<-FALSE;s$service_error<-'Background status could not be read from the database.';fm_worker_notify();NULL})
+  fm_worker_settle(s);fm_worker_notify(account);NULL
+ },function(error){s$busy<-FALSE;s$service_error<-'Background status could not be read from the database.';fm_worker_notify(account);NULL})
  invisible(NULL)
 }
 fm_worker_peek<-function(handler,args,context,direct,is_current=NULL){
@@ -334,6 +337,30 @@ fm_worker_detach<-function(account,owner){
  if(!length(s$sessions)&&!length(s$waiters))rm(list=account,envir=.fm_worker$accounts)
  invisible(NULL)
 }
+# Poll heartbeats and unrelated accounts are not visible page changes. Publish
+# a compact display projection only when its text or source timestamp changes.
+fm_worker_status_source<-function(session,login){
+ value<-shiny::reactiveVal(NULL)
+ observer<-shiny::observe({
+  auth<-login();if(!valid_login(auth)){value(NULL);return()}
+  account<-auth[['userid']];s<-fm_worker_account_state(account);s$status_revision()
+  if(!isTRUE(s$account$enabled)){value(NULL);return()}
+  health_age<-as.numeric(difftime(Sys.time(),fm_time(s$health$heartbeat),units='secs'))
+  message<-if(!identical(s$account$auth_status,'active'))'Background access needs renewal. Log in again.'else
+   if(length(health_age)!=1L||!is.finite(health_age)||health_age>60)'Background worker is not responding; saved data remains available.'else
+    if(!is.null(s$service_error))s$service_error else
+     if(length(s$errors))paste(unique(unlist(s$errors)),collapse=' ')else 'Background sync is enabled. Screens use stored observations; stale data keeps its original source time.'
+  live_keys<-fm_worker_live_keys(s)
+  jobs<-s$jobs[vapply(s$jobs,function(j)j$key%in%live_keys,logical(1))]
+  pending<-sum(vapply(jobs,function(j)isTRUE(j$pending),logical(1)));running<-sum(vapply(jobs,function(j)isTRUE(j$running),logical(1)))
+  if(pending>0&&identical(s$account$auth_status,'active'))message<-paste(message,sprintf('Preparing %d requested resource(s), %d running.',pending,running))
+  checks<-vapply(live_keys,function(k){item<-fm_worker_get(account,k);if(is.null(item))NA_real_ else as.numeric(fm_time(item$manifest$checked_at))},numeric(1))
+  checks<-checks[is.finite(checks)]
+  value(list(message=message,checked_at=if(length(checks))format(as.POSIXct(min(checks),origin='1970-01-01',tz='UTC'),'%Y-%m-%d %H:%M:%S UTC')else NULL))
+ },domain=session)
+ session$onSessionEnded(function()observer$destroy())
+ value
+}
 fm_worker_session<-function(session,login,leagues=function()list()){
  if(!fm_worker_configured())return(invisible(NULL))
  closed<-FALSE;last_account<-NULL;renewed<-NULL
@@ -347,21 +374,11 @@ fm_worker_session<-function(session,login,leagues=function()list()){
   }
  },priority=1000)
  output<-session$output
+ status<-fm_worker_status_source(session,login)
  output$worker_status<-shiny::renderUI({
-  auth<-login();if(!valid_login(auth))return(NULL);.fm_worker$revision();s<-fm_worker_account_state(auth[['userid']])
-  if(!isTRUE(s$account$enabled))return(NULL)
-  health_age<-as.numeric(difftime(Sys.time(),fm_time(s$health$heartbeat),units='secs'))
-  message<-if(!identical(s$account$auth_status,'active'))'Background access needs renewal. Log in again.'else
-   if(length(health_age)!=1L||!is.finite(health_age)||health_age>60)'Background worker is not responding; saved data remains available.'else
-    if(length(s$errors))paste(unique(unlist(s$errors)),collapse=' ')else 'Background sync is enabled. Screens use stored observations; stale data keeps its original source time.'
-  live_keys<-fm_worker_live_keys(s)
-  jobs<-s$jobs[vapply(s$jobs,function(j)j$key%in%live_keys,logical(1))]
-  pending<-sum(vapply(jobs,function(j)isTRUE(j$pending),logical(1)));running<-sum(vapply(jobs,function(j)isTRUE(j$running),logical(1)))
-  if(pending>0&&identical(s$account$auth_status,'active'))message<-paste(message,sprintf('Preparing %d requested resource(s), %d running.',pending,running))
-  checks<-vapply(live_keys,function(k){item<-fm_worker_get(auth[['userid']],k);if(is.null(item))NA_real_ else as.numeric(fm_time(item$manifest$checked_at))},numeric(1))
-  checks<-checks[is.finite(checks)]
-  shiny::tags$div(class='alert alert-info',role='status',message,
-   if(length(checks))shiny::tags$small(style='display:block',paste('Oldest saved check among recently displayed data:',format(as.POSIXct(min(checks),origin='1970-01-01',tz='UTC'),'%Y-%m-%d %H:%M:%S UTC'))))
+  view<-status();if(is.null(view))return(NULL)
+  shiny::tags$div(class='alert alert-info',role='status',view$message,
+   if(!is.null(view$checked_at))shiny::tags$small(style='display:block',paste('Oldest saved check among recently displayed data:',view$checked_at)))
  })
  output$worker_settings<-shiny::renderUI({
   auth<-login();if(!valid_login(auth))return(NULL);s<-fm_worker_account_state(auth[['userid']]);s$settings_revision()
@@ -389,7 +406,7 @@ fm_worker_session<-function(session,login,leagues=function()list()){
    if(enabled)renewed<<-paste0(openssl::sha256(charToRaw(auth[['token']])))
    s<-fm_worker_account_state(generation);fm_worker_set_policy(s,a);s$queued<-list();s$errors<-list();fm_worker_settle(s)
    if(enabled){d<-fm_worker_descriptor('get_active_championships',list(),resource_context(account_id=generation));fm_worker_enqueue(d,session$token,TRUE)}
-   if(!renew_only)feedback('Background sync settings saved.');fm_worker_notify();fm_worker_poll(generation,session$token,TRUE);NULL
+   if(!renew_only)feedback('Background sync settings saved.');fm_worker_notify(generation);fm_worker_poll(generation,session$token,TRUE);NULL
   },function(error){feedback('Could not save background sync settings. Database acknowledgement is required.');NULL})
  }
  shiny::observeEvent(session$input$worker_save,{
@@ -425,7 +442,7 @@ fm_worker_invalidate<-function(account,league,team=NULL,player=NULL){
    fm_worker_enqueue(d,s$descriptors[[k]]$owner,TRUE)
   }
  }
- fm_worker_notify();invisible(NULL)
+ fm_worker_notify(account);invisible(NULL)
 }
 
 fm_worker_invalidate_pattern<-function(context,resources=NULL,pattern=NULL){

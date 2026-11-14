@@ -1,6 +1,7 @@
 #!/usr/bin/env Rscript
 library(shiny)
 library(promises)
+suppressPackageStartupMessages(source('futmondo_functions.R'))
 source('page_preferences.R')
 valid_login <- function(x) !is.null(x)
 auth <- function(id) c(token='fixture',userid=id,user_name=paste0(id,'@example.invalid'))
@@ -101,15 +102,15 @@ cat('PASS at most one in-flight write; rapid navigation coalesces to latest page
 get_sb_url<-function()'https://fixture.invalid'
 get_sb_key<-function()'server-fixture-key'
 requests<-list()
-fm_async_http<-function(url,method,body,headers,owner,timeout) {
- requests[[length(requests)+1L]]<<-list(url=url,method=method,body=body,timeout=timeout)
+fm_async_http<-function(url,method,body,headers,owner,timeout,priority="normal") {
+ requests[[length(requests)+1L]]<<-list(url=url,method=method,body=body,timeout=timeout,priority=priority)
  promise_resolve(list(content=charToRaw(if(method=='GET') '[{"page":"rivals","visited_at":"2026-11-06T00:00:00Z"}]' else '')))
 }
 read<-NULL;written<-FALSE
 then(fm_page_store('account-1'),function(x)read<<-x);settle()
 then(fm_page_store('account-1','plots','2026-11-06T00:00:00Z'),function(x)written<<-x);settle()
 stopifnot(read$page=='rivals',written,grepl('user_id=eq.account-1',requests[[1]]$url,fixed=TRUE),
- requests[[1]]$timeout==8,requests[[2]]$method=='POST')
+ requests[[1]]$timeout==8,requests[[1]]$priority=='interactive',requests[[2]]$method=='POST')
 body<-jsonlite::fromJSON(requests[[2]]$body)
 stopifnot(identical(names(body),c('user_id','page','visited_at')),body$user_id=='account-1',body$page=='plots')
 cat('PASS real REST account filter, upsert payload, bounded timeout and credential-free data\n')

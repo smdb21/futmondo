@@ -40,7 +40,7 @@ resource_diagnostic_name <- function(resource) {
     "pressroom", "player_summary", "player_summary_points", "player_profile", "player_matches", "rounds", "dreamteam",
     "league_finances_calc", "notifications_list", "notifications_unread", "information",
     "activechampionships", "championshipteams", "players", "summary", "fullprofile", "matches",
-    "rosterbids", "myplayers", "getdtconfig", "unread", "list", "database")
+    "rosterbids", "myplayers", "getdtconfig", "unread", "list", "database", "user_page_preferences")
   matches <- allowed[candidate == allowed | startsWith(candidate, paste0(allowed, "_"))]
   if (!length(matches)) "read" else matches[which.max(nchar(matches))]
 }
@@ -274,11 +274,16 @@ shared_resource<-function(session,resource,context,fetch,active=function()TRUE,r
   same_context<-identical(last,key)
   force_refresh<-same_context&&!identical(version,next_version)&&isTRUE(invalidate_refresh(version,next_version))
   previous<-if(same_context)shiny::isolate(value())else NULL
+  # A worker publication has already arrived in the scoped snapshot store.
+  # Install that observation once without a fabricated acquisition state.
+  # Real refreshes, expiry and context changes retain loading UI.
+  local_replay<-same_context&&!resumed&&identical(version,next_version)&&
+    !identical(last_replay,next_replay)&&is.list(next_replay)&&isTRUE(next_replay$ready)
   last<<-key;version<<-next_version;last_replay<<-next_replay;generation<<-generation+1L;current_generation<-generation
   stale_data<-function(data){if(!is.null(data))attr(data,"fetch_status")<-"stale";data}
   loading<-resource_state(stale_data(previous$data),status="loading")
   if(!is.null(loading$data))loading$freshness<-"stale"
-  value(loading)
+  if(!local_replay)value(loading)
   fallback<-previous
   # Preview data belongs only to this read generation. It is neither a fresh
   # cache hit nor a successful acquisition, and must retain its original age.
