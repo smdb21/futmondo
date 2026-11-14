@@ -1278,3 +1278,21 @@ Mobile360/desktop1440 fixtures show zero redraws during unchanged polls and one
 paint for a changed balance. Required offline lifecycle and focused regressions
 pass. See `docs/worker_render_stability.md`; authenticated production screen
 confirmation remains open after push-triggered rollout.
+
+### 2026-11-14 UTC — Autonomous acquisition and database-only GUI
+
+Implemented and locally verified: opted-in display reads/polls/Refresh/login
+renewal/cache invalidation cannot enqueue acquisition; database enrollment seeds
+canonical discovery and the worker independently covers display queries. Fixed
+empty-argument/account-scope identities, materialized acknowledged points/clause
+views from summaries, and removed duplicate card-history acquisition. Fixed
+completion-based cadence and fair query-family scheduling replace validity
+chasing and UI priority demand. Manual offers retain explicit live verification.
+
+SQL read-only/seed/identity/fairness tests8, GUI boundary7, manualoffer4, card2,
+Python31, codec20, discovery7 and derivative4 pass, as does required lifecycle13
+plus8 tabs. Mobile360/desktop1440 tests show zero idle redraws and zero acquisition
+on Refresh. See `docs/worker_database_boundary.md`. Production migration must
+precede the auto-deploying push; Supabase confirmation expired twice and rollout
+is pending that connector confirmation. This milestone is implemented locally,
+not yet certified as production backlog recovery.

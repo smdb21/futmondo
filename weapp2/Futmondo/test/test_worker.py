@@ -160,6 +160,30 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
         self.store.allowed=True;self.store.row['verified_leagues']={}
         with self.assertRaises(WorkerFailure):await self.worker.source(self.job,'owner',self.message())
         self.assertFalse(self.requests)
+    async def test_child_deadline_preserves_source_policy_and_stricter_limit(self):
+        observed = '2026-11-01T00:00:00+00:00'
+        result = dict(value={'kind':'double','values':[0,-2,None]}, observed_at=observed,
+            checked_at='2026-11-01T00:01:00+00:00', interval_seconds=300,
+            valid_until='2026-11-01T00:05:00+00:00', status='ok')
+        child = descriptor('get_player_recent_points')
+        await self.worker.publish(self.job,'owner',result,child=child)
+        manifest = self.store.snapshots[child['resource_key']]
+        self.assertEqual(datetime.fromisoformat(manifest['valid_until']),datetime.fromisoformat(result['valid_until']))
+        self.assertEqual(manifest['observed_at'],observed)
+        self.assertEqual(manifest['checked_at'],observed)
+        result['valid_until']='2026-11-01T00:00:30+00:00'
+        await self.worker.publish(self.job,'owner',result,child=child)
+        self.assertEqual(datetime.fromisoformat(self.store.snapshots[child['resource_key']]['valid_until']),
+                         datetime.fromisoformat(result['valid_until']))
+        result['valid_until']='2099-01-01T00:00:00+00:00'
+        await self.worker.publish(self.job,'owner',result,child=child)
+        self.assertEqual(datetime.fromisoformat(self.store.snapshots[child['resource_key']]['valid_until']),
+                         datetime.fromisoformat('2026-11-01T00:05:00+00:00'))
+        result['interval_seconds']=True
+        with self.assertRaisesRegex(WorkerFailure,'snapshot_deadline'):
+            await self.worker.publish(self.job,'owner',result,child=child)
+        self.assertFalse(self.requests)
+
     async def test_fresh_persisted_child_resource_is_reused(self):
         value={'kind':'double','values':[0,-2,None]}
         chunks,size,digest=pack_snapshot(value)

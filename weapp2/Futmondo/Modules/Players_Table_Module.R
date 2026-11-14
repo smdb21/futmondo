@@ -766,15 +766,15 @@ recent_points_summary_valid <- function(summary) {
   },logical(1)))
 }
 
-get_player_recent_points <- function(login,championship_id,user_team_id,player_id,scoring_version="unknown") {
-  summary <- get_player_summary(login,championship_id,user_team_id,player_id)
+# Pure projection shared by interactive reads and autonomous summary publication.
+# It never acquires data and retains the summary's original observation time.
+recent_points_from_summary <- function(summary,context) {
   if(!recent_points_summary_valid(summary))stop(attr(summary,"fetch_error") %||%
     resource_failure(resource="get_player_recent_points",category="schema"))
-  season <- league_season_context(championship_id,summary$championship$season %||% summary$championship$seasonId,account_id=login[["userid"]])
-  ctx <- resource_context(login,championship_id,user_team_id,player_id,season,scoring_version)
+  ctx<-context
   checked_at <- attr(summary,"observed_at") %||% Sys.time()
-  observed <- normalize_player_match_observations(summary,player_id,championship_id,
-    season=season,scoring_version=scoring_version,observed_at=checked_at,competition_id=ctx$competition_id)
+  observed <- normalize_player_match_observations(summary,ctx$player_id,ctx$championship_id,
+    season=ctx$season,scoring_version=ctx$scoring_version,observed_at=checked_at,competition_id=ctx$competition_id)
   if(nrow(observed)){
     # Numeric ordinals alone cannot disambiguate distinct cup-stage rounds.
     reconcile_player_points(data.frame(),observed,ctx)
@@ -784,6 +784,14 @@ get_player_recent_points <- function(login,championship_id,user_team_id,player_i
   list(context=ctx,observations=observed,checked_at=checked_at,
     points=reconcile_player_points(data.frame(),observed,ctx),
     previous_points=data.frame(),status=if(nrow(observed))"partial"else "empty")
+}
+get_player_recent_points <- function(login,championship_id,user_team_id,player_id,scoring_version="unknown") {
+  summary <- get_player_summary(login,championship_id,user_team_id,player_id)
+  if(!recent_points_summary_valid(summary))stop(attr(summary,"fetch_error") %||%
+    resource_failure(resource="get_player_recent_points",category="schema"))
+  season <- league_season_context(championship_id,summary$championship$season %||% summary$championship$seasonId,account_id=login[["userid"]])
+  ctx <- resource_context(login,championship_id,user_team_id,player_id,season,scoring_version)
+  recent_points_from_summary(summary,ctx)
 }
 
 # Successful acquisition checks and score observations are durable facts. Their
@@ -1145,7 +1153,7 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
         if(projected>50000L){entry$overflow<-TRUE;next}
         if(nrow(changes)){
           merge_live(entry,changes)
-          entry$fitness_unsaved <- recent_points_fitness_buffer(dplyr::bind_rows(entry$fitness_unsaved,changes))
+          if(!worker_database_mode(entry))entry$fitness_unsaved <- recent_points_fitness_buffer(dplyr::bind_rows(entry$fitness_unsaved,changes))
           trim_entries()
         }
       }else if(!all(group$player_id%in%entry$fitness_ready)&&
@@ -1164,7 +1172,9 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
     }
     entry$fitness_changed <- setdiff(entry$fitness_changed,entry$fitness_ready)
   }
+  worker_database_mode<-function(entry)fm_worker_configured()&&isTRUE(fm_worker_mode(entry$context$account_id))
   save_fitness <- function(entry){
+    if(worker_database_mode(entry))return(invisible(NULL))
     if(!nrow(entry$fitness_unsaved))return()
     capacity <- max(0L,20L-background_sync_status(entry$context$account_id)$pending)
     for(i in seq_len(min(capacity,ceiling(nrow(entry$fitness_unsaved)/100L))))local({
@@ -1429,6 +1439,14 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
   }
   # Retain bounded failed factual payloads for source-free persistence retry.
   save_round_snapshot<-function(entry,player_id,payload){
+    database_only<-worker_database_mode(entry)
+    # Only a worker snapshot published after factual rows AND the completion
+    # marker were acknowledged can supply that marker locally. Older snapshots
+    # remain displayable, but the GUI never invents durability or writes them.
+    durable<-isTRUE(attr(payload,"worker_history_persisted"))&&
+      isTRUE(attr(payload,"worker_acquisition_status")%in%c("ok","empty","partial"))&&
+      is.null(attr(payload,"fetch_error"))
+    if(database_only&&!durable)return(invisible(NULL))
     entry$saving<-entry$saving+1L
     stamp<-as.numeric(fm_time(payload$checked_at))
     entry$save_latest[[player_id]]<-max(stamp,entry$save_latest[[player_id]] %||% -Inf)
@@ -1461,6 +1479,7 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
       }
       touch();NULL
     }
+    if(database_only){acknowledged(TRUE);return(invisible(NULL))}
     queued_ok<-tryCatch(persist_recent_points_snapshot(payload,payload$context,acknowledged),error=function(e)FALSE)
     if(!isTRUE(queued_ok)&&entry$saving>0L)acknowledged(FALSE)
     invisible(NULL)

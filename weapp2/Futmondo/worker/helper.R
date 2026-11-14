@@ -5,6 +5,7 @@ pipe_in<-file('stdin',open='r');pipe_out<-stdout()
 sink(stderr())
 suppressPackageStartupMessages(source('global.R'))
 source('history_repository.R')
+source('worker/summary_views.R')
 if(file.exists('worker_contract.R'))source('worker_contract.R')
 # Unexpected direct HTTP is a programming error, never an alternate acquisition path.
 for(verb in c('GET','POST','PUT','PATCH','DELETE','HEAD'))
@@ -26,53 +27,128 @@ fm_pipe_exchange<-function(value){
  answer
 }
 fm_worker_discover<-function(handler,value,context,auth){
- out<-list();add<-function(fn,args=list(),ctx=context,interval=fm_worker_interval(fn)){
-  d<-fm_worker_descriptor(fn,args,ctx);d$interval_seconds<-interval;out[[length(out)+1L]]<<-d
+ # Only the acquisition service creates this durable source plan. Display reads
+ # neither register jobs nor alter their recurrence or urgency.
+ out<-list()
+ saved<-function(fn,args,ctx=context){
+  read<-get0('fm_worker_saved_resource',mode='function',inherits=TRUE)
+  if(is.null(read))return(NULL)
+  read(fn,args,ctx)
+ }
+ add<-function(fn,args=list(),ctx=context,interval=fm_worker_interval(fn)){
+  d<-fm_worker_descriptor(fn,args,ctx);d$interval_seconds<-interval
+  previous<-out[[d$resource_key]]
+  if(!is.null(previous))d$interval_seconds<-min(previous$interval_seconds,interval)
+  out[[d$resource_key]]<<-d
+ }
+ own_team_value<-NULL
+ own_team<-function(){
+  if(!is.null(own_team_value))return(own_team_value)
+  own_team_value<<-''
+  active<-saved('get_active_championships',list(),resource_context(auth))
+  if(is.null(active))return('')
+  selected<-Filter(function(ch)identical(fm_scalar(ch$id %||% ch$`_id`,''),context$championship_id),active$championships)
+  if(length(selected)!=1L)return('')
+  own_team_value<<-fm_scalar(selected[[1]]$userteam$id %||% selected[[1]]$userteam$`_id`,'')
+  own_team_value
+ }
+ league_jobs<-function(ctx){
+  cid<-ctx$championship_id;tid<-ctx$user_team_id;args<-list(championship_id=cid,user_team_id=tid)
+  for(fn in c('get_teams','get_finished_rounds','get_championship_players','get_real_clubs','get_lineup_from_team',
+              'get_classification_round_catalog','get_award_round_catalog','get_mvp_saved_catalog','get_resolved_league_context'))
+   add(fn,args[intersect(names(args),names(formals(get(fn))))],ctx)
+  for(fn in c('get_market_players','get_players_from_team','get_user_team_info','get_financial_snapshot',
+              'get_my_market_players','get_roster_bids','get_user_team_rounds','get_user_team_moneymovements','fm_worker_finances'))add(fn,args,ctx)
+  add('get_team_acquisition_capacity',args,ctx,300L)
+  add('get_championship_pressroom',list(championship_id=cid),ctx)
+  for(route in c('/1/userteam/lineup','/1/userteam/roster','/1/userteam/information','/5/strategy/availables')){
+   query<-list(championshipId=cid,userteamId=tid);if(route=='/1/userteam/information')query$type<-'market'
+   add('get_worker_http_read',list(route=route,query=query),ctx,300L)
+  }
  }
  if(handler=='get_active_championships'&&is.list(value$championships)){
   add('get_notifications',ctx=resource_context(auth));add('get_notification_unread',ctx=resource_context(auth))
   for(ch in value$championships){
    cid<-fm_scalar(ch$id %||% ch$`_id`,'');tid<-fm_scalar(ch$userteam$id %||% ch$userteam$`_id`,'')
-   if(!nzchar(cid)||!nzchar(tid))next
-   ctx<-resource_context(auth,cid,tid);args<-list(championship_id=cid,user_team_id=tid)
-   for(fn in c('get_teams','get_finished_rounds','get_championship_players','get_real_clubs','get_lineup_from_team','get_classification_round_catalog','get_award_round_catalog','get_mvp_saved_catalog'))
-    add(fn,args[intersect(names(args),names(formals(get(fn))))],ctx)
-   for(fn in c('get_market_players','get_players_from_team','get_user_team_info','get_financial_snapshot','get_my_market_players','get_roster_bids','get_user_team_rounds','fm_worker_finances'))add(fn,args,ctx)
-   add('get_championship_pressroom',list(championship_id=cid),ctx)
-   for(route in c('/1/userteam/lineup','/1/userteam/roster','/1/userteam/information','/5/strategy/availables')){
-    query<-list(championshipId=cid,userteamId=tid);if(route=='/1/userteam/information')query$type<-'market'
-    add('get_worker_http_read',list(route=route,query=query),ctx,60L)
-   }
+   if(nzchar(cid)&&nzchar(tid))league_jobs(resource_context(auth,cid,tid))
+  }
+ }
+ # Resolving identity must independently replace the initial unknown plan. A
+ # browser is not needed to discover known season/scoring resource keys.
+ if(handler=='get_resolved_league_context'&&is.list(value)&&
+    identical(value$account_id,context$account_id)&&identical(value$championship_id,context$championship_id)&&
+    nzchar(fm_scalar(value$user_team_id,'')))league_jobs(value)
+ if(handler=='get_teams'&&is.data.frame(value)){
+  field<-intersect(c('teamid','id','_id'),names(value))[1]
+  if(!is.na(field))for(id in unique(as.character(value[[field]]))){
+   if(is.na(id)||!nzchar(id))next
+   ctx<-context;ctx$user_team_id<-id
+   for(fn in c('get_user_team_info','get_players_from_team','get_user_team_rounds','get_user_team_moneymovements'))
+    add(fn,list(championship_id=ctx$championship_id,user_team_id=id),ctx,300L)
   }
  }
  if(handler%in%c('get_award_round_catalog','get_classification_round_catalog')&&is.data.frame(value$rounds)){
+  tid<-fm_scalar(value$user_team_id,context$user_team_id)
+  if(!nzchar(tid))tid<-own_team()
   for(i in seq_len(nrow(value$rounds))){
    row<-value$rounds[i,,drop=FALSE]
    if(!nzchar(fm_scalar(row$round_id,''))||!is.finite(fm_number(row$round_number)))next
-   if(!isTRUE(row$is_finished)&&!identical(fm_scalar(row$round_id,''),fm_scalar(value$current_round_id,'')))next
-   args<-list(championship_id=context$championship_id,user_team_id=fm_scalar(value$user_team_id,context$user_team_id),round_id=as.character(row$round_id),round_number=as.numeric(row$round_number))
-   add('get_classification_round_ranking',args,context,if(isTRUE(row$is_finished))86400L else 60L)
+   finished<-isTRUE(row$is_finished)
+   if(!finished&&!identical(fm_scalar(row$round_id,''),fm_scalar(value$current_round_id,'')))next
+   interval<-if(finished)86400L else 300L
+   args<-list(championship_id=context$championship_id,user_team_id=tid,round_id=as.character(row$round_id),round_number=as.numeric(row$round_number))
+   if(nzchar(tid))add('get_classification_round_ranking',args,context,interval)
+   add('get_round_dreamteam',list(championship_id=context$championship_id,reference=as.character(row$round_id)),context,interval)
+   ref<-round_reference(as.character(row$round_id),as.numeric(row$round_number));ref$is_finished<-finished
+   if(finished)add('get_official_dreamteam_result',list(championship_id=context$championship_id,reference=ref),context,interval)
+  }
+ }
+ if(handler=='get_user_team_rounds'&&nzchar(context$user_team_id)){
+  catalog<-saved('get_classification_round_catalog',list(championship_id=context$championship_id))
+  if(is.data.frame(catalog$rounds))for(i in seq_len(nrow(catalog$rounds))){
+   row<-catalog$rounds[i,,drop=FALSE];id<-fm_scalar(row$round_id,'')
+   if(!nzchar(id)||(!isTRUE(row$is_finished)&&!identical(id,fm_scalar(catalog$current_round_id,''))))next
+   add('get_round_lineup_snapshot',list(championship_id=context$championship_id,
+    user_team_id=context$user_team_id,round_id=id),context,if(isTRUE(row$is_finished))86400L else 300L)
   }
  }
  if(handler=='get_championship_players'&&is.data.frame(value)&&'id'%in%names(value)){
-  for(id in unique(as.character(value$id))){
+  tid<-context$user_team_id;if(!nzchar(tid))tid<-own_team()
+  if(nzchar(tid))for(id in unique(as.character(value$id))){
    if(is.na(id)||!nzchar(id))next
-   ctx<-context;ctx$player_id<-id
-   args<-list(championship_id=ctx$championship_id,user_team_id=ctx$user_team_id,player_id=id)
+   ctx<-context;ctx$user_team_id<-tid;ctx$player_id<-id
+   args<-list(championship_id=ctx$championship_id,user_team_id=tid,player_id=id)
+   # The summary source also publishes recent-point and clause views. They are
+   # not independent source jobs competing with the same underlying request.
    add('get_player_summary',args,ctx,3600L)
-   add('get_player_card_history',args,ctx,3600L)
    add('get_player_full_profile',list(player_id=id),ctx,21600L)
    add('get_player_matches',list(player_id=id),ctx,21600L)
   }
  }
- if(handler%in%c('get_players_from_team','get_market_players')&&is.data.frame(value)&&'id'%in%names(value)){
+ if(handler%in%c('get_players_from_team','get_market_players')&&is.data.frame(value)&&'id'%in%names(value)&&
+    (handler=='get_market_players'||identical(context$user_team_id,own_team()))){
   for(id in unique(as.character(value$id))){
    if(is.na(id)||!nzchar(id))next
    ctx<-context;ctx$player_id<-id
    add('get_player_summary',list(championship_id=ctx$championship_id,user_team_id=ctx$user_team_id,player_id=id),ctx,300L)
   }
  }
- out
+ # Transfers can involve a player absent from the squad and market. Reuse the
+ # actual candidate rule rather than waiting for the transfer panel to request it.
+ if(handler%in%c('get_championship_pressroom','get_players_from_team')){
+  tid<-own_team()
+  if(nzchar(tid)&& (handler=='get_championship_pressroom'||identical(tid,context$user_team_id))){
+   roster<-if(handler=='get_players_from_team')value else saved('get_players_from_team',list(championship_id=context$championship_id,user_team_id=tid))
+   history<-if(handler=='get_championship_pressroom')value else saved('get_championship_pressroom',list(championship_id=context$championship_id))
+   candidates<-pending_clause_candidates(roster,history,tid)
+   if(is.data.frame(candidates))for(id in unique(as.character(candidates$player_id))){
+    if(is.na(id)||!nzchar(id))next
+    ctx<-context;ctx$user_team_id<-tid;ctx$player_id<-id
+    add('get_player_summary',list(championship_id=ctx$championship_id,user_team_id=tid,player_id=id),ctx,300L)
+   }
+  }
+ }
+ unname(out)
 }
 fm_worker_database_rows<-function(table,rows){
  if(!is.list(rows)||!is.null(names(rows)))stop('Invalid database bridge response')
@@ -218,6 +294,27 @@ fm_worker_run<-function(descriptor){
  formals(season_wrapper)<-formals(original_season);env$league_season_context<-season_wrapper
 
  produced<-list();produced_bytes<-0;source_clock<-NULL
+ # Discovery consumes existing source snapshots only. An unfinished dependency
+ # is picked up on the next autonomous cycle, never fetched on a browser's behalf.
+ env$fm_worker_saved_resource<-function(handler,args,context){
+  child<-fm_worker_descriptor(handler,args,context)
+  existing<-produced[[child$resource_key]]
+  if(!is.null(existing))return(fm_worker_decode(existing$value))
+  saved<-fm_pipe_exchange(list(type='resource',descriptor=child))
+  if(is.null(saved$value))return(NULL)
+  fm_worker_decode(saved$value)
+ }
+ summary_views<-function(value,context){
+  if(!exists('fm_worker_summary_views',env,mode='function'))return(invisible(NULL))
+  for(view in env$fm_worker_summary_views(value,context)){
+   bytes<-as.numeric(object.size(view$value));key<-view$descriptor$resource_key
+   prior<-if(!is.null(produced[[key]]))as.numeric(object.size(produced[[key]]$value))else 0
+   if(produced_bytes-prior+bytes<=8*1024^2){
+    produced[[key]]<<-view;produced_bytes<<-produced_bytes-prior+bytes
+   }
+  }
+  invisible(NULL)
+ }
  ack_scopes<-character()
  history_ack_restore<-function(child,context){
   if(child$resource_key%in%ack_scopes)return(invisible(NULL))
@@ -314,6 +411,7 @@ fm_worker_run<-function(descriptor){
       if(valid_scope){
        stamp<-fm_time(saved$observed_at)
        if(length(stamp)==1L&&!is.na(stamp))source_clock<<-if(is.null(source_clock))stamp else min(source_clock,stamp)
+       if(name=='get_player_summary')summary_views(restored,childctx)
        return(restored)
       }
      }
@@ -324,13 +422,19 @@ fm_worker_run<-function(descriptor){
     # publication, so constructing another full typed copy here is wasted work.
     childctx<-env$resource_context(params$login,params$championship_id,params$user_team_id %||% params$team_id,params$player_id)
     child<-fm_worker_descriptor(name,params,childctx)
+    if(name=='get_player_summary')summary_views(value,childctx)
     if(identical(child$resource_key,descriptor$resource_key))return(value)
     tryCatch({
      wire<-fm_worker_encode(value)
      bytes<-as.numeric(object.size(wire))
      if(!is.null(value)&&produced_bytes+bytes<=8*1024^2){
-      produced[[child$resource_key]]<<-list(descriptor=child,value=wire,
-       observed_at=rival_finance_stamp(attr(value,'observed_at') %||% source_clock %||% Sys.time()),checked_at=rival_finance_stamp(),
+      stamp<-attr(value,'observed_at') %||% source_clock %||% Sys.time()
+      deadline<-as.numeric(fm_time(stamp))+fm_worker_interval(name)
+      original_deadline<-attr(value,'valid_until') %||% if(is.list(value))value$valid_until else NULL
+      if(is.numeric(original_deadline)&&length(original_deadline)==1L&&is.finite(original_deadline))deadline<-min(deadline,original_deadline)
+      produced[[child$resource_key]]<<-list(descriptor=child,value=wire,interval_seconds=fm_worker_interval(name),
+       valid_until=rival_finance_stamp(as.POSIXct(deadline,origin='1970-01-01',tz='UTC')),
+       observed_at=rival_finance_stamp(stamp),checked_at=rival_finance_stamp(),
        status=if(is.list(value)&&!is.data.frame(value)&&!is.null(value$status)&&value$status%in%c('partial','unavailable','unsupported'))'partial'else if(acquisition_data_unverified(value)||!is.null(attr(value,'fetch_error')))'partial'else'ok',
        completeness=if(isTRUE(attr(value,'complete')))'complete'else'unknown')
       produced_bytes<<-produced_bytes+bytes
@@ -393,8 +497,11 @@ fm_worker_run<-function(descriptor){
  if(!status%in%c('ok','empty','partial','unsupported'))status<-'partial'
  completeness<-if(isTRUE(attr(value,'complete')))'complete'else if(is.list(value)&&identical(value$completeness,'complete'))'complete'else'unknown'
  if(status=='partial')completeness<-'partial'
- list(type='result',value=fm_worker_encode(value),observed_at=rival_finance_stamp(observed),checked_at=rival_finance_stamp(),
-  status=status,completeness=completeness,resources=unname(produced[setdiff(names(produced),descriptor$resource_key)]),discoveries=fm_worker_discover(handler,value,ctx,auth))
+ original_deadline<-attr(value,'valid_until') %||% if(is.list(value))value$valid_until else NULL
+ deadline<-if(is.numeric(original_deadline)&&length(original_deadline)==1L&&is.finite(original_deadline))
+  rival_finance_stamp(as.POSIXct(original_deadline,origin='1970-01-01',tz='UTC'))else NULL
+ list(type='result',value=fm_worker_encode(value),observed_at=rival_finance_stamp(observed),checked_at=rival_finance_stamp(),valid_until=deadline,
+  status=status,completeness=completeness,resources=unname(produced[setdiff(names(produced),descriptor$resource_key)]),discoveries=env$fm_worker_discover(handler,value,ctx,auth))
 }
 fm_pipe_send(list(type='ready',version=1L))
 repeat{

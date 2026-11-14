@@ -32,7 +32,7 @@ shiny::testServer(function(input,output,session){
  output$status<-shiny::renderText({metrics$renders<-metrics$renders+1L;view<-status();paste(view$message,view$checked_at)})
 },{
  flush(session);original<-output$status;before<-metrics$renders
- stopifnot(grepl('Preparing 1 requested resource',original,fixed=TRUE))
+ stopifnot(grepl('Updating 1 saved data source',original,fixed=TRUE))
  started<-proc.time()[['elapsed']]
  for(i in 1:20){now<<-now+5;fm_worker_poll(account,session$token,TRUE);flush(session)}
  elapsed<-proc.time()[['elapsed']]-started
@@ -41,8 +41,13 @@ shiny::testServer(function(input,output,session){
  for(i in 1:20){other$health<-list(heartbeat=rival_finance_stamp(now+i));fm_worker_notify(other_account);flush(session)}
  stopifnot(metrics$renders==before,identical(output$status,original))
  cat('PASS other-account status changes cause zero output invalidations\n')
+ # Recurring scheduled jobs are not a page loading queue.
+ s$jobs[[1]]$pending<-FALSE;fm_worker_notify(account);flush(session)
+ stopifnot(metrics$renders==before,identical(output$status,original))
+ s$jobs[[1]]$pending<-TRUE
+
  s$jobs[[1]]$running<-FALSE;fm_worker_notify(account);flush(session)
- updated<-output$status;stopifnot(grepl('0 running',updated,fixed=TRUE),metrics$renders==before+1L)
+ updated<-output$status;stopifnot(!grepl('Updating|Preparing|requested',updated),metrics$renders==before+1L)
  s$service_error<-'Background status could not be read from the database.';fm_worker_notify(account);flush(session)
  stopifnot(grepl('could not be read from the database',output$status,fixed=TRUE),metrics$renders==before+2L)
  s$service_error<-NULL;s$health$heartbeat<-rival_finance_stamp(now-61);fm_worker_notify(account);flush(session)
@@ -51,7 +56,7 @@ shiny::testServer(function(input,output,session){
  stopifnot(!grepl('not responding',output$status,fixed=TRUE),metrics$renders==before+4L)
  cat('PASS queue, database failure, heartbeat expiry and recovery each publish their visible change once\n')
  login(other_auth);flush(session)
- stopifnot(!grepl('Preparing',output$status,fixed=TRUE))
+ stopifnot(!grepl('Updating',output$status,fixed=TRUE))
  switched<-metrics$renders;fm_worker_notify(account);flush(session)
  stopifnot(metrics$renders==switched)
  login(NULL);flush(session);stopifnot(is.null(status()))

@@ -20,8 +20,8 @@ cat('PASS async adapter also reads the same snapshot without an API request\n')
 attr(value,'valid_until')<-as.numeric(Sys.time())-1;m$valid_until<-rival_finance_stamp(Sys.time()-1)
 fm_worker_put('u',d$resource_key,list(data=value,manifest=m))
 a<-get_real_clubs(auth,'l');b<-get_real_clubs(auth,'l')
-stopifnot(attr(a,'fetch_status')=='stale',attr(b,'fetch_status')=='stale',length(calls)==1L,calls[[1]]$name=='enqueue')
-cat('PASS stale reads retain their data and coalesce a priority acquisition\n')
+stopifnot(attr(a,'fetch_status')=='stale',attr(b,'fetch_status')=='stale',!length(calls))
+cat('PASS stale reads retain their original data without creating an acquisition\n')
 s$known<-FALSE;resolved<-FALSE;direct<-FALSE
 p<-fm_worker_fetch('get_user_team_info',list(championship_id='l',user_team_id='t'),ctx,direct=function(){direct<<-TRUE;promises::promise_resolve(list(fixture=TRUE))})
 stopifnot(!direct,length(s$waiters)==1L)
@@ -47,28 +47,15 @@ fm_worker_rpc<-function(name,payload,owner=''){
 fm_worker_poll('u',force=TRUE);for(i in 1:20)later::run_now(.005)
 stopifnot(is.null(s$errors[[d$resource_key]]),!length(.fm_transport$tasks))
 cat('PASS recovered job clears a stale paused/failure message without downloading its payload again\n')
-enqueues<-0L
-fm_worker_rpc<-function(name,payload,owner=''){if(name=='enqueue')enqueues<<-enqueues+1L;promises::promise_resolve(TRUE)}
-s$jobs<-list(list(key=d$resource_key,running=TRUE,pending=TRUE));s$queued<-list()
-fm_worker_enqueue(d);stopifnot(enqueues==0L)
-fm_worker_enqueue(d,force=TRUE);stopifnot(enqueues==1L)
-cat('PASS a stale running resource is not requeued; an explicit manual refresh remains queued\n')
-cat('WORKER PROVIDER: 8 groups passed; source HTTP attempts=0\n')
-# A clause waiter must not settle with the same expired stored observation.
+cat('WORKER PROVIDER: 7 groups passed; source HTTP attempts=0\n')
+# Expired stored clause evidence is displayable as stale, without a new waiter.
 clause_ctx<-resource_context(auth,'l','t','p')
 clause_args<-list(championship_id='l',user_team_id='t',player_id='p')
 clause_d<-fm_worker_descriptor('get_clause_transfer_summary',clause_args,clause_ctx)
 old<-observed_data(list(data=list(id='p')),observed_at=Sys.time()-310)
 attr(old,'valid_until')<-as.numeric(Sys.time())-10
 fm_worker_put('u',clause_d$resource_key,list(data=old,manifest=list(version='old')))
-awaiting<-TRUE;live<-function()awaiting;resolved<-FALSE;result<-NULL
-p<-fm_worker_fetch('get_clause_transfer_summary',clause_args,clause_ctx,is_current=live)
-promises::then(p,function(value){awaiting<<-FALSE;resolved<<-TRUE;result<<-value})
-fm_worker_settle(s);for(i in 1:10)later::run_now(0)
-stopifnot(!resolved,length(s$waiters)==1L)
-fresh<-observed_data(list(data=list(id='p')),observed_at=Sys.time())
-attr(fresh,'valid_until')<-as.numeric(Sys.time())+300
-fm_worker_put('u',clause_d$resource_key,list(data=fresh,manifest=list(version='new')))
-fm_worker_settle(s);for(i in 1:10)later::run_now(0)
-stopifnot(resolved,identical(result,fresh),!length(s$waiters),!clause_d$resource_key%in%fm_worker_live_keys(s))
-cat('PASS clause demand waits for a fresh durable publication and releases its browser interest after settlement\n')
+x<-settle(fm_worker_fetch('get_clause_transfer_summary',clause_args,clause_ctx))
+stopifnot(is.null(x$error),x$value$data$id=='p',attr(x$value,'fetch_status')=='stale',
+ identical(attr(x$value,'observed_at'),attr(old,'observed_at')),!length(s$waiters))
+cat('PASS stored expired clause observation returns immediately with original time and stale status\n')

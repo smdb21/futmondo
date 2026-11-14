@@ -17,11 +17,11 @@ checks<-data.frame(player_id=head(players$id,526),championship_id='league',seaso
 dataset<-list(points=rows(head(players$id,526)),checks=checks,complete=TRUE)
 source_payload<-function(points=c(0,-2,6),at=stamp){
  scope<-ctx;scope$player_id<-tail(players$id,1)
- list(context=scope,observations=rows(scope$player_id,points,at),checked_at=at,status='partial')
+ structure(list(context=scope,observations=rows(scope$player_id,points,at),checked_at=at,status='partial'),worker_history_persisted=TRUE)
 }
 fm_worker_configured<-function()TRUE
 account<-fm_worker_account_state(auth[['userid']]);account$known<-TRUE;account$account<-list(enabled=TRUE,auth_status='active')
-rpc<-character();fm_worker_rpc<-function(name,...){rpc<<-c(rpc,name);promises::promise_resolve(TRUE)}
+rpc<-character();fm_worker_rpc<-function(name,...){rpc<<-c(rpc,name);stopifnot(name=='read');promises::promise_resolve(list(account=account$account,health=NULL,jobs=list(),resources=list()))}
 restore<-function(handler,args,value,version='v1',expired=TRUE){
  descriptor<-fm_worker_descriptor(handler,args,ctx)
  wire<-charToRaw(fm_worker_json(fm_worker_encode(value)));compressed<-history_baseline_compress(wire)
@@ -60,15 +60,13 @@ time<-system.time(shiny::testServer(server,{
  heartbeat<-FALSE;later::later(function()heartbeat<<-TRUE,0);settle(session)
  state<-source$status()
  stopifnot(heartbeat,state$total==527L,state$completed==527L,state$remaining==0L,state$failed==0L,
-  !length(state$initial_errors),state$matrix_complete,state$saving==1L,db_reads==1L,
-  sum(reads=='get_player_recent_points')==1L,length(writes)==1L,
-  identical(as.numeric(writes[[1]]$payload$checked_at),as.numeric(stamp)),
+  !length(state$initial_errors),state$matrix_complete,state$saving==0L,db_reads==1L,
+  sum(reads=='get_player_recent_points')==1L,length(writes)==0L,
   all(c(lineup$resource_key,catalog$resource_key,player$resource_key)%in%fm_worker_live_keys(account)))
  average<-add_recent_points_average(players,source$history(),3)$recent_points_avg
  stopifnot(all(average==4/3),all(source$history()$points%in%c(0,-2,6)))
- writes[[1]]$ack(TRUE);settle(session)
  stopifnot(source$status()$saving==0L,nrow(session$userData$shared_round_points$entry()$checks)==527L)
- cat('PASS 527 histories complete from expired database evidence: 526 reused, 1 restored and saved with its original timestamp; source HTTP=0\n')
+ cat('PASS 527 histories complete from expired database evidence: 526 reused, 1 already persisted worker result reused with its original timestamp; zero GUI writes; source HTTP=0\n')
  before<-list(reads=reads,rpc=rpc)
  for(i in 1:4)settle(session)
  stopifnot(identical(reads,before$reads),identical(rpc,before$rpc))
@@ -77,12 +75,11 @@ time<-system.time(shiny::testServer(server,{
  restore('get_player_recent_points',player_args,source_payload(c(0,-2,12),stamp+30),'v2',FALSE)
  version<-fm_worker_resource_revision(account,player$resource_key);version(isolate(version())+1L)
  settle(session)
- stopifnot(sum(reads=='get_player_recent_points')==2L,length(writes)==2L,
+ stopifnot(sum(reads=='get_player_recent_points')==2L,length(writes)==0L,
   source$history()$points[source$history()$player_id==tail(players$id,1)&source$history()$round==3]==12,
-  writes[[2]]$payload$checked_at==stamp+30,source$status()$saving==1L,db_reads==1L)
- writes[[2]]$ack(FALSE);settle(session)
- stopifnot(grepl('could not be saved',source$status()$save_error),source$status()$saving==0L)
- cat('PASS a new stored player version repairs scores without manual refresh or source HTTP; failed writes remain visible\n')
+  source$status()$saving==0L,db_reads==1L)
+ stopifnot(is.null(source$status()$save_error),source$status()$saving==0L)
+ cat('PASS a new stored player version repairs scores without manual refresh, source HTTP or duplicate writes\n')
  restore('get_lineup_from_team',base_args,list(pointSystem='fixture'),'v2',FALSE)
  version<-fm_worker_resource_revision(account,lineup$resource_key);version(isolate(version())+1L)
  settle(session)
@@ -95,6 +92,19 @@ time<-system.time(shiny::testServer(server,{
  cat('PASS unchanged scoring publications avoid dataset rereads and inactive views release worker interests\n')
 }))
 cat(sprintf('PERF 527-player stored replay: CPU %.3fs / wall %.3fs; two targeted player reads, one dataset read, no source HTTP\n',sum(time[c('user.self','sys.self')]),time[['elapsed']]))
+# An older worker snapshot without the explicit factual-write proof is still
+# useful display evidence, but may not manufacture a completion marker.
+clear_api_cache();account$descriptors<-list();account$waiters<-list();account$resource_revisions<-new.env(parent=emptyenv())
+unproven<-source_payload();attr(unproven,'worker_history_persisted')<-NULL
+invisible(restore('get_player_recent_points',player_args,unproven,'legacy-no-proof'))
+writes<-list();reads<-character();db_reads<-0L
+shiny::testServer(server,{
+ settle(session)
+ stopifnot(source$status()$completed==527L,length(writes)==0L,source$status()$saving==0L,
+  nrow(session$userData$shared_round_points$entry()$checks)==526L)
+ cat('PASS legacy stored history stays displayable with zero GUI writes and cannot invent an acknowledged completion marker\n')
+})
+invisible(restore('get_player_recent_points',player_args,source_payload(),'persisted-proof'))
 # A real rejected initial worker waiter must recover when its stored version arrives.
 clear_api_cache();rm(list=fm_worker_key(auth[['userid']],lineup$resource_key),envir=.fm_worker$values)
 account$descriptors<-list();account$waiters<-list();account$resource_revisions<-new.env(parent=emptyenv())
@@ -110,8 +120,7 @@ shiny::testServer(server,{
  restore('get_lineup_from_team',base_args,list(pointSystem='fixture'),'recovered',FALSE)
  version<-fm_worker_resource_revision(account,lineup$resource_key);version(isolate(version())+1L);settle(session)
  stopifnot(!length(source$status()$initial_errors),source$status()$completed==527L,db_reads==1L,
-  length(writes)==1L,source$status()$saving==1L)
- writes[[1]]$ack(TRUE);settle(session)
+  length(writes)==0L,source$status()$saving==0L)
  stopifnot(source$status()$saving==0L)
  cat('PASS a real initial worker rejection stays truthful, then recovers automatically from a new database version without Refresh\n')
 })

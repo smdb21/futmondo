@@ -1916,7 +1916,7 @@ get_team_acquisition_capacity <- function(login, championship_id, user_team_id) 
 # Independent prerequisites run together; each source owns its actual read clock.
 # A slow history acquisition cannot renew an old balance or hide a changed roster.
 get_team_acquisition_capacity_async <- function(login,championship_id,user_team_id,context,
-  is_current=function()TRUE,on_progress=NULL,priority="interactive",owner=context$session_id) {
+  is_current=function()TRUE,on_progress=NULL,priority="interactive",owner=context$session_id,worker_bypass=FALSE) {
   base<-resource_context(login,championship_id,user_team_id)
   if(!identical(base$account_id,context$account_id)||!identical(base$championship_id,context$championship_id)||
      !identical(base$user_team_id,context$user_team_id))
@@ -1967,7 +1967,9 @@ get_team_acquisition_capacity_async <- function(login,championship_id,user_team_
             out[name]<<-list(list(data=data,error=if(is.null(error))attr(data,"fetch_error")else resource_failure(error,spec$fn)))
             active<<-active-1L;pump();NULL
           }
-          request<-tryCatch(async_adapter_fetch(spec$fn,spec$args,context=ctx,is_current=current,priority=priority,owner=owner),
+          request_args<-list(spec$fn,spec$args,context=ctx,is_current=current,priority=priority,owner=owner)
+          if(isTRUE(worker_bypass))request_args$worker_bypass<-TRUE
+          request<-tryCatch(do.call(async_adapter_fetch,request_args),
             error=function(error)promises::promise_reject(error))
           promises::then(request,function(data)finish(data),function(error)finish(error=error))
         })

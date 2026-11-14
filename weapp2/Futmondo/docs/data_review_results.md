@@ -2260,3 +2260,58 @@ lineup6 and clause-scope11 groups pass. Required offline lifecycle13/eight tabs
 and deployment contract3 pass. No new dependencies or schema changes. Push
 triggers the existing Dokploy deployment; authenticated production behavior
 is not inferred from local tests. See `docs/worker_render_stability.md`.
+
+### 2026-11-14 UTC — Database-only display / autonomous source plan
+
+Root causes established in code and live aggregate metadata: missing/stale GUI
+reads re-enqueued every30s; some families had no autonomous discovery; early
+prefetch rescheduled core within5–15s; priority-driven scheduling starved history
+and left the reserved slot idle despite short work. Named-empty argument lists
+and inherited league scope produced different keys for account-only endpoints.
+Before repair, aggregate jobs included1606 summaries,1054 redundant card-history
+jobs and527 each profiles/matches overdue, while core timestamps kept advancing.
+Counts span contexts and are not individual-player completion estimates.
+
+Implemented worker->DB->GUI boundary: no GUI acquisition enqueue function/call,
+Refresh is a coalesced stored-data reread, one expiry publication, passive card
+version subscriptions, no duplicate history writes without durable ACK proof.
+A database-only getter remains a DB reader. Explicit offer intent performs one
+async live preflight with every nested prerequisite bypassing snapshots; foreign
+context completions are rejected and uncertain mutations are not retried.
+
+Source plan uses saved dependencies for discovery (zero discovery HTTP), with
+summary-derived points/completion markers and clauses persisted before publishing.
+Three source families per catalog player replace four. SQL persists descriptors
+for read-only canonical lookup without jobs, transactionally seeds enrollment,
+retires obsolete idle jobs while preserving snapshots, and gives query families
+fair turns with fixed completion+interval scheduling. Short slot helps other
+short queries when core is caught up; existing source connection/rate limits,
+quiet hours, consent/context/lease guards and strict source deadlines remain.
+Legacy capacity interval becomes300s; its original15s action deadline stays.
+
+Verification: SQL8groups includes read-only transaction, exact R/SQL seed hash,
+cold no-job child lookup, foreign/oversized rejection, acknowledged duplicate
+retirement, expired source not accelerating schedule,527-backlog fairness and
+quiet hours. Seven claims measured0.189–0.327s locally after fixing an initial
+5.2s lookup regression with a known-context fast path. GUI7groups span two cold
+sessions,12polls/session across6simulated minutes, Refresh and20 invalidations:
+zero acquisition/source calls; five further expired polls cause zero redraws.
+527-history replay completes with zero GUI writes/source reads and rejects a
+legacy snapshot's missing durability proof. Manualoffer4/cardupdates2 pass;
+worker Python31, codec20, discovery7, derivedsummary4 and related history/lineup/
+finance suites pass. Required lifecycle13/eight tabs and deployment contract3
+pass. Browser360/1440: two real polls zero idle redraws, changed balance onepaint,
+Refresh zero acquisition jobs, heartbeat65/99ms, no horizontal overflow.
+
+Performance review: no additional service/lane/source-rate budget; bounded
+version polling and memory retained. Removes GUI-generated source/DB writes,
+validity-chasing and redundant jobs. Indexed canonical lookups and grouped job
+scheduling measured on synthetic queue; actual hosted latency/backlog drainage
+still needs observation. No dependency/environment change. Existing Supabase
+health advisories empty; unrelated legacy security/index advisories unchanged.
+
+Rollout: Supabase migration confirmation expired twice before application; a
+metadata query verified descriptor column absent and old two-argument read still
+present. User confirmation requested through the connector. Hold the automatic
+push/deployment until both migrations are acknowledged. This is not a production
+completion claim. Exact original private responses were never exported.

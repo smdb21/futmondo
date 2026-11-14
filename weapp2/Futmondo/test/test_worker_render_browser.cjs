@@ -26,12 +26,16 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
    const events=await page.evaluate(()=>renderEvents);
    assert.equal(events.filter(e=>e.id==='today-kpi_cash_box'&&e.type==='shiny:value').length,1,JSON.stringify(events));
    assert.equal(events.filter(e=>e.id==='today-kpi_cash_box'&&e.type==='shiny:recalculating').length,1,JSON.stringify(events));
+   await page.locator('#refresh_saved').click();
+   await page.evaluate(()=>{window.fixtureStats=null;Shiny.addCustomMessageHandler('fixture-stats',x=>window.fixtureStats=x);Shiny.setInputValue('fixture_stats',Math.random(),{priority:'event'});});
+   await page.waitForFunction(()=>window.fixtureStats!==null);
+   assert.equal((await page.evaluate(()=>fixtureStats)).enqueues,0,'read-only display must never enqueue acquisition');
    const start=Date.now();await page.locator('#heartbeat').click();
    await page.waitForFunction(()=>document.querySelector('#heartbeat_value').textContent==='1');
    const ms=Date.now()-start;assert.ok(ms<500,`heartbeat ${ms}ms`);
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
    assert.deepEqual(errors,[]);
-   console.log(`PASS ${width}px: two idle worker polls caused zero banner/card redraws; new balance painted once; heartbeat ${ms}ms; no horizontal overflow`);
+   console.log(`PASS ${width}px: two idle worker polls caused zero banner/card redraws; new balance painted once; refresh queued zero acquisitions; heartbeat ${ms}ms; no horizontal overflow`);
    await page.close();
   }
  }finally{await browser.close();}

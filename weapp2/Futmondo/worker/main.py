@@ -540,9 +540,21 @@ class Worker:
         # The R result carries this resource's source time. Unrelated older
         # children in the same composite must not backdate a fresh sibling.
         checked = min((observed, checked), key=lambda x: datetime.fromisoformat(x.replace('Z', '+00:00')))
+        # Child display projections carry the R resource policy and any stricter
+        # original deadline. Publication never renews the source observation.
+        interval = result.get('interval_seconds', 60) if child else job['interval_seconds']
+        if type(interval) not in (int, float) or not 0 < interval <= 86400:
+            raise WorkerFailure('snapshot_deadline')
+        deadline = datetime.fromisoformat(checked.replace('Z', '+00:00')).timestamp() + interval
+        if result.get('valid_until') is not None:
+            try:
+                declared = datetime.fromisoformat(result['valid_until'].replace('Z', '+00:00')).timestamp()
+            except (AttributeError, TypeError, ValueError):
+                raise WorkerFailure('snapshot_deadline')
+            deadline = min(deadline, declared)
         # Refresh cadence and manual-action validity are separate; a snapshot never authorizes a trade.
         manifest = dict(context=descriptor['context'], version=version, parts=len(parts), json_bytes=size, sha256=digest,
-            checked_at=checked, observed_at=observed, valid_until=stamp(datetime.fromisoformat(checked.replace('Z', '+00:00')).timestamp() + (60 if child else job['interval_seconds'])),
+            checked_at=checked, observed_at=observed, valid_until=stamp(deadline),
             completeness=result.get('completeness', 'unknown'), status=result.get('status', 'ok'))
         if self.source_errors.get(owner) and (not child or resource_key == job['resource_key']):
             manifest.update(status='partial', completeness='partial', error=','.join(sorted(self.source_errors[owner])))

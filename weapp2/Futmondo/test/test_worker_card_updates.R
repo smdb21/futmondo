@@ -1,0 +1,51 @@
+options(futmondo.offline=TRUE)
+suppressPackageStartupMessages(source('global.R'))
+fm_worker_configured<-function()TRUE
+auth<-c(userid='card-db-fixture',token='synthetic')
+account<-fm_worker_account_state(auth[['userid']]);account$known<-TRUE;account$account<-list(enabled=TRUE,auth_status='active')
+ctx<-resource_context(auth,'league','mine','p')
+common<-list(login=auth,championship_id='league',user_team_id='mine')
+team_ctx<-ctx;team_ctx$player_id<-''
+put<-function(handler,args,value,version='v1',scope=ctx){
+ descriptor<-fm_worker_descriptor(handler,args,scope)
+ value<-observed_data(value,observed_at=Sys.time()-5);attr(value,'valid_until')<-as.numeric(Sys.time())+300
+ fm_worker_put(auth[['userid']],descriptor$resource_key,list(data=value,manifest=list(version=version)))
+ revision<-fm_worker_resource_revision(account,descriptor$resource_key);revision(shiny::isolate(revision())+1L)
+ descriptor
+}
+summary<-list(championship=list(),points=list(),prices=list(),fixture_revision=1L)
+d<-put('get_player_summary',c(common,list(player_id='p')),summary)
+invisible(put('get_lineup_from_team',common,list(pointSystem='fixture'),scope=team_ctx))
+invisible(put('get_player_full_profile',list(login=auth,player_id='p'),list(profile=list())))
+invisible(put('get_player_matches',list(login=auth,player_id='p'),list(matches=list())))
+invisible(put('get_team_acquisition_capacity',common,list(status='ok',valid_until=as.numeric(Sys.time())+15,
+ roster=list(status='ok',count=10,effective_count=10,cap=20),funds=list(spendable_budget=1000),
+ outstanding=list(count=0),rules=list(minimum_bid_at_value=FALSE)),scope=team_ctx))
+real_async<-async_adapter_fetch;reads<-character();rpc<-character()
+fm_worker_rpc<-function(name,...){rpc<<-c(rpc,name);stop('No queue writes or source requests allowed')}
+async_adapter_fetch<-function(fn,args=list(),context,...){
+ reads<<-c(reads,fn)
+ if(startsWith(fn,'read_'))return(promises::promise_resolve(data.frame()))
+ real_async(fn,args,context,...)
+}
+selected<-reactiveVal(data.frame(id='p',name='Fixture',role='defensa',team='Club',value=200,
+ price=150,change=0,points=10,user_team_id='',market_inMarket=TRUE))
+settle<-function(session)for(i in 1:30){later::run_now(0);session$flushReact()}
+shiny::testServer(selected_player_Server,args=list(selected_player=selected,login_token=reactive(auth),
+ championship_id=reactive('league'),user_team_id=reactive('mine')),
+ {
+ settle(session);stopifnot(card_states$summary()$data$fixture_revision==1L,!length(rpc))
+ summary$fixture_revision<-2L;invisible(put('get_player_summary',c(common,list(player_id='p')),summary,'v2'))
+ settle(session);stopifnot(card_states$summary()$data$fixture_revision==2L,
+  sum(reads=='get_player_summary')==2L,!length(rpc))
+ cat('PASS open player card follows a new durable summary version exactly once without refresh, acquisition or queue writes\n')
+ next_player<-selected();next_player$id<-'p2';selected(next_player);settle(session)
+ stopifnot(is.null(card_states$summary()$data),card_states$summary()$status=='loading')
+ summary$fixture_revision<-3L;scope<-ctx;scope$player_id<-'p2'
+ invisible(put('get_player_summary',c(common,list(player_id='p2')),summary,'v3',scope));fm_worker_settle(account);settle(session)
+ stopifnot(card_states$summary()$data$fixture_revision==3L,!length(rpc))
+ before<-sum(reads=='get_player_summary')
+ summary$fixture_revision<-4L;invisible(put('get_player_summary',c(common,list(player_id='p')),summary,'v4'));settle(session)
+ stopifnot(card_states$summary()$data$fixture_revision==3L,sum(reads=='get_player_summary')==before,!length(rpc))
+ cat('PASS missing card waits for its stored observation; changing players isolates later publications from the previous card\n')
+ })

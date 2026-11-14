@@ -389,10 +389,9 @@ factual_read_adapter<-function(session,handler,login_token,championship_id=NULL,
     state<-fm_worker_account_state(captured_context$account_id)
     revision<-fm_worker_resource_revision(state,descriptor$resource_key)()
     stored<-fm_worker_get(captured_context$account_id,descriptor$resource_key)
-    # This revision is already decoded and scoped in the worker cache. Replaying
-    # it resolves locally; expired clause summaries still wait for verification.
-    ready<-isTRUE(mode)&&!is.null(stored)&&
-      (handler!="get_clause_transfer_summary"||resource_snapshot_unexpired(stored$data))
+    # This revision is already decoded and scoped in the worker cache. Saved
+    # observations, including stale clause summaries, remain displayable.
+    ready<-isTRUE(mode)&&!is.null(stored)
     list(enabled=mode,revision=revision,ready=ready)
    }
    registry[[entry_key]]<-shared_resource(session,resource,context=function()captured_context,fetch=fetch,
@@ -412,8 +411,11 @@ factual_read_adapter<-function(session,handler,login_token,championship_id=NULL,
   }
   if(!is.null(state$data)&&((is.finite(age)&&age>resource_policy(handler)$ttl)||lineup_expired||snapshot_expired)&&
      !identical(state$status,"loading")&&!identical(state$freshness,"stale")){
-   bump<-attr(entry,"demand_refresh");if(is.function(bump))shiny::isolate(bump(bump()+1L))
-   state<-resource_state(observed_data(state$data,status="stale"),status="loading",source=state$source)
+   worker<-fm_worker_configured()&&!identical(fm_worker_mode(ctx$account_id),FALSE)
+   if(!worker){
+    bump<-attr(entry,"demand_refresh");if(is.function(bump))shiny::isolate(bump(bump()+1L))
+   }
+   state<-resource_state(observed_data(state$data,status="stale"),status=if(worker)"stale"else"loading",source=state$source)
    state$freshness<-"stale"
   }
   state$context<-ctx

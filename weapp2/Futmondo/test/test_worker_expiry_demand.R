@@ -11,7 +11,8 @@ calls<-list();invalidations<-0L;original_invalidate<-fm_worker_invalidate_patter
 fm_worker_invalidate_pattern<-function(...){invalidations<<-invalidations+1L;original_invalidate(...)}
 fm_worker_rpc<-function(name,payload,owner=''){
  calls[[length(calls)+1L]]<<-list(name=name,payload=payload)
- promises::promise_resolve(TRUE)
+ stopifnot(name=='read')
+ promises::promise_resolve(list(account=s$account,health=NULL,jobs=list(),resources=list()))
 }
 settle<-function(session)for(i in 1:30){later::run_now(0);session$flushReact()}
 shiny::testServer(function(input,output,session){
@@ -24,10 +25,10 @@ shiny::testServer(function(input,output,session){
  s$jobs<-list(list(key=d$resource_key,running=TRUE,pending=TRUE))
  now<<-now+61;pulse(1L);settle(session)
  stopifnot(state()$freshness=='stale',invalidations==0L,!length(calls))
- cat('PASS automatic source expiry joins the running acquisition without invalidating it or queuing a second refresh\n')
+ cat('PASS automatic source expiry only marks stored data stale without queue changes\n')
  refresh(1L);settle(session)
- stopifnot(invalidations==1L,length(calls)==1L,calls[[1]]$name=='enqueue',calls[[1]]$payload$p_priority==10L)
- cat('PASS explicit Refresh during acquisition remains an invalidating priority request\n')
+ stopifnot(invalidations==1L,length(calls)==1L,calls[[1]]$name=='read')
+ cat('PASS explicit Refresh rereads the database without scheduling acquisition\n')
  value$budget<-200;attr(value,'observed_at')<-now;attr(value,'valid_until')<-as.numeric(now)+60
  fm_worker_put(ctx$account_id,d$resource_key,list(data=value,manifest=list(version='v2')))
  rev<-fm_worker_resource_revision(s,d$resource_key);rev(shiny::isolate(rev())+1L);settle(session)

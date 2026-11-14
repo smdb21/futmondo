@@ -67,6 +67,12 @@ fm_worker_json <- function(x) as.character(jsonlite::toJSON(fm_worker_sort(x),au
 fm_worker_descriptor <- function(handler,args,context) {
   # Optional display inputs never define the acquired source resource.
   args<-args[setdiff(names(args),c('login','teams','saved','refresh','full_audit','now'))]
+  if(!length(args))args<-list() # authentication removal must match an autonomous no-argument descriptor
+  # Closed official awards depend on the round identity/finality, not UI
+  # selection hints naming the current round or the account's team.
+  if(handler=='get_official_dreamteam_result'&&is.list(args$reference)&&isTRUE(args$reference$is_finished))
+    args$reference<-args$reference[intersect(c('round_id','round_number','is_finished'),names(args$reference))]
+  if(handler=='get_round_dreamteam'&&is.list(args$reference))args$reference<-args$reference$round_id
   if(any(fm_worker_secret_name(names(args))))stop('Credential in worker arguments')
   scope<-setNames(lapply(fm_worker_fields,function(n)fm_scalar(context[[n]],if(n%in%c('season','scoring_version','competition_id'))'unknown'else'')),fm_worker_fields)
   if(!nzchar(scope$account_id))stop('Missing worker account')
@@ -74,6 +80,11 @@ fm_worker_descriptor <- function(handler,args,context) {
   if(!is.null(args$player_id))scope$player_id<-as.character(args$player_id)
   if(!is.null(args$target_player_id))scope$player_id<-as.character(args$target_player_id)
   for(n in intersect(fm_worker_fields,names(args)))scope[[n]]<-fm_scalar(args[[n]],scope[[n]])
+  # Account-only endpoints cannot inherit the currently open league from a UI
+  # adapter. The service schedules one source identity for the whole account.
+  if(handler%in%c('get_active_championships','get_notifications','get_notification_unread')){
+    scope[c('championship_id','user_team_id','player_id','competition_id','season','scoring_version')]<-list('','','','unknown','unknown','unknown')
+  }
   # Player-only wire endpoints have no league source dependency, but remain account isolated.
   if(handler%in%c('get_player_full_profile','get_player_matches'))scope[c('championship_id','user_team_id','competition_id','season','scoring_version')]<-list('','','unknown','unknown','unknown')
   scope$user_team_id<-fm_scalar(args$user_team_id %||% args$team_id,'')

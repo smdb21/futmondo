@@ -999,7 +999,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       values <- modal_context_RV();values$bid <- NULL;modal_context_RV(values)
       market_offer_generation <<- market_offer_generation+1L
       generation <- market_offer_generation
-      market_offer_dialog_RV(list(context=context,player=sp,generation=generation,pending=pending,preflight=pf))
+      auth<-get_reactive_val(login_token)
+      live_check<-pending&&fm_worker_configured()&&isTRUE(fm_worker_mode(auth[["userid"]]))
+      market_offer_dialog_RV(list(context=context,player=sp,generation=generation,pending=pending,preflight=pf,live_check=live_check))
       if (!pending) remember_action_context("bid")
       offer_modal_opened_RV(TRUE)
       showModal(modalDialog(
@@ -1014,9 +1016,31 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         easyClose = TRUE,
         size = "s"
       ))
-      # Join a pending read; otherwise refresh the same shared card resource.
-      # Its asynchronous completion updates only this modal's output bindings.
-      if (pending && !identical(state$status,"loading")) isolate(capacity_recheck(capacity_recheck()+1L))
+      # Opening an offer is explicit manual intent. Stored capacity is usually
+      # older than its strict transaction deadline; verify live only for this
+      # dialog, without turning passive card display into source acquisition.
+      if(live_check){
+        ctx<-isolate(capacity_context())
+        current<-function()shiny::isolate({
+          dialog<-market_offer_dialog_RV()
+          !is.null(dialog)&&identical(dialog$generation,generation)&&
+            identical(dialog$context,player_action_context_RV())
+        })
+        finish<-function(data=NULL,error=NULL)shiny::isolate({
+          if(!isTRUE(current()))return(NULL)
+          dialog<-market_offer_dialog_RV();dialog$pending<-FALSE;dialog$live_check<-FALSE
+          checked<-resource_state(data,status=if(!is.null(error))"unavailable"else NULL,error=error)
+          dialog$preflight<-market_offer_preflight(dialog$player,checked)
+          market_offer_dialog_RV(dialog)
+          if(isTRUE(dialog$preflight$ok))remember_action_context("bid")
+          NULL
+        })
+        request<-tryCatch(async_adapter_fetch("get_team_acquisition_capacity",
+          list(login=auth,championship_id=ctx$championship_id,user_team_id=ctx$user_team_id),
+          context=ctx,is_current=current,priority="interactive",worker_bypass=TRUE),
+          error=function(error)promises::promise_reject(error))
+        promises::then(request,function(data)finish(data),function(error)finish(error=error))
+      }else if(pending&&!identical(state$status,"loading"))isolate(capacity_recheck(capacity_recheck()+1L))
       invisible(TRUE)
     }
 
@@ -1772,12 +1796,27 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       ctx
     })
     card_read <- function(resource,handler,args,context=card_context,active=function()TRUE,refresh=history_refresh) {
-      shared_resource(session,resource,context=context,
-        active=function()!is.null(card_context())&&isTRUE(active()),refresh=refresh,
+      resolved_context<-function(){
+        ctx<-context();if(is.null(ctx))return(NULL)
+        fm_worker_resolve_context(handler,args(ctx),ctx)
+      }
+      worker_replay<-function(){
+        source_fn<-get0(handler,envir=.GlobalEnv,mode="function")
+        if(!fm_worker_configured()||!startsWith(handler,"get_")||
+          !is.function(source_fn)||!"login"%in%names(formals(source_fn)))return(NULL)
+        ctx<-resolved_context();if(is.null(ctx))return(NULL)
+        mode<-fm_worker_mode(ctx$account_id);if(identical(mode,FALSE))return(list(enabled=FALSE))
+        descriptor<-fm_worker_descriptor(handler,args(ctx),ctx)
+        state<-fm_worker_account_state(ctx$account_id)
+        revision<-fm_worker_resource_revision(state,descriptor$resource_key)()
+        list(enabled=mode,revision=revision,ready=isTRUE(mode)&&!is.null(fm_worker_get(ctx$account_id,descriptor$resource_key)))
+      }
+      shared_resource(session,resource,context=resolved_context,
+        active=function()!is.null(card_context())&&isTRUE(active()),refresh=refresh,replay=worker_replay,
         fetch=function(ctx) {
           captured<-args(ctx)
           async_adapter_fetch(handler,captured,context=ctx,is_current=function()shiny::isolate({
-            current<-context();!is.null(current)&&identical(current,ctx)&&isTRUE(active())
+            current<-resolved_context();!is.null(current)&&identical(current,ctx)&&isTRUE(active())
           }))
         })
     }
@@ -1805,7 +1844,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       refresh=function()paste(global_refresh(),capacity_recheck(),sep=":"))
     observeEvent(card_states$capacity(),{
       dialog <- isolate(market_offer_dialog_RV());state <- card_states$capacity()
-      if (is.null(dialog) || !isTRUE(dialog$pending) || identical(state$status,"loading") ||
+      if (is.null(dialog) || isTRUE(dialog$live_check) || !isTRUE(dialog$pending) || identical(state$status,"loading") ||
           !identical(dialog$context,isolate(player_action_context_RV()))) return()
       dialog$pending <- FALSE
       dialog$preflight <- market_offer_preflight(dialog$player,state)
@@ -1822,6 +1861,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         capacity_recheck_context<<-scope;capacity_rechecks<<-0L
       }
       if(is.null(ctx)||player_card_is_own_player(selected_player(),get_reactive_val(user_team_id)))return()
+      if(fm_worker_configured()&&isTRUE(fm_worker_mode(ctx$account_id)))return()
       summary<-card_states$summary();capacity<-card_states$capacity()
       if(identical(summary$status,"loading")||is.null(summary$data)||
          identical(capacity$status,"loading")||is.null(capacity$data))return()

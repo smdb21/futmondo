@@ -93,17 +93,6 @@ fm_worker_restore<-function(resource,account){
  attr(value,'fetch_status')<-if(as.numeric(fm_time(m$valid_until))<=as.numeric(Sys.time()))'stale'else m$status
  list(data=value,manifest=m)
 }
-fm_worker_enqueue<-function(descriptor,owner='',force=FALSE){
- state<-fm_worker_account_state(descriptor$context$account_id);key<-descriptor$resource_key
- if(!force&&any(vapply(state$jobs,function(job)identical(job$key,key)&&isTRUE(job$running),logical(1))))return(invisible(NULL))
- if(!is.null(state$queued[[key]])&&as.numeric(Sys.time())-state$queued[[key]]<30&&!force)return(invisible(NULL))
- state$queued[[key]]<-as.numeric(Sys.time())
- p<-fm_worker_rpc('enqueue',list(p_account=descriptor$context$account_id,p_descriptor=descriptor,
-  p_interval=fm_worker_interval(descriptor$handler),p_priority=if(force)10L else fm_worker_priority(descriptor$handler)),owner)
- promises::then(p,function(ok){if(!isTRUE(ok)){state$queued[[key]]<-NULL;state$errors[[key]]<-'Background access is paused or this league is excluded.'};fm_worker_notify(descriptor$context$account_id);NULL},
-  function(error){state$queued[[key]]<-NULL;state$errors[[key]]<-'Could not queue background refresh; database access failed.';fm_worker_notify(descriptor$context$account_id);NULL})
- invisible(NULL)
-}
 fm_worker_demand<-function(descriptor,owner='',is_current=NULL){
  s<-fm_worker_account_state(descriptor$context$account_id);key<-descriptor$resource_key
  watchers<-s$descriptors[[key]]$watchers %||% list();now<-as.numeric(Sys.time())
@@ -138,7 +127,7 @@ fm_worker_accept_redirect<-function(state,redirect,account){
  old_key<-redirect$requested_key;target<-redirect$descriptor
  if(!is.list(target)||!is.list(target$context)||!is.list(target$args))return(FALSE)
  previous<-state$descriptors[[old_key]]$descriptor
- if(is.null(previous)||!previous$handler%in%c('get_players_from_team','get_championship_pressroom','get_clause_transfer_summary')||
+ if(is.null(previous)||!grepl('^(get_[a-z0-9_]+|fm_worker_finances)$',previous$handler)||
     !is.list(target)||!identical(previous$handler,target$handler)||
     !identical(as.integer(previous$version),as.integer(target$version))||
     !identical(fm_worker_json(previous$args),fm_worker_json(target$args))||
@@ -165,7 +154,7 @@ fm_worker_accept_redirect<-function(state,redirect,account){
  TRUE
 }
 fm_worker_resolve_context<-function(handler,args,context){
- if(!fm_worker_configured()||!handler%in%c('get_players_from_team','get_championship_pressroom','get_clause_transfer_summary'))return(context)
+ if(!fm_worker_configured()||!grepl('^(get_[a-z0-9_]+|fm_worker_finances)$',handler))return(context)
  state<-fm_worker_account_state(context$account_id);try(state$redirect_revision(),silent=TRUE)
  descriptor<-fm_worker_descriptor(handler,args,context);hint<-state$redirects[[descriptor$resource_key]]
  if(!is.null(hint)&&as.numeric(Sys.time())-hint$at<300){
@@ -185,12 +174,10 @@ fm_worker_fetch<-function(handler,args,context,owner=context$session_id %||% '',
  s<-fm_worker_account_state(context$account_id);try(fm_worker_resource_revision(s,d$resource_key)(),silent=TRUE);saved<-fm_worker_get(context$account_id,d$resource_key)
  if(!is.null(saved)){
   if(!resource_snapshot_unexpired(saved$data)){
-   attr(saved$data,'fetch_status')<-'stale';if(isTRUE(mode))fm_worker_enqueue(d,owner)
+   attr(saved$data,'fetch_status')<-'stale'
   }
-  if(handler!='get_clause_transfer_summary'||resource_snapshot_unexpired(saved$data))
-    return(promises::promise_resolve(saved$data))
+  return(promises::promise_resolve(saved$data))
  }
- if(isTRUE(mode))fm_worker_enqueue(d,owner)
  promises::promise(function(resolve,reject){
   if(length(s$waiters)>=128L){reject(simpleError('Background read capacity reached; existing requests are still pending.'));return(invisible(NULL))}
   id<-paste0('w',paste0(openssl::sha256(serialize(list(Sys.time(),runif(1)),NULL))))
@@ -206,12 +193,15 @@ fm_worker_settle<-function(s){
   w<-s$waiters[[id]];saved<-fm_worker_get(w$descriptor$context$account_id,w$key)
   cancelled<-!isTRUE(tryCatch(w$current(),error=function(e)FALSE))
   disabled<-s$known&&!isTRUE(s$account$enabled)
-  ready<-!is.null(saved)&&(w$descriptor$handler!='get_clause_transfer_summary'||resource_snapshot_unexpired(saved$data))
+  ready<-!is.null(saved)
   if(cancelled||disabled||ready){
    s$waiters[[id]]<-NULL;if(is.function(w$cancel))w$cancel()
    if(cancelled)w$reject(structure(list(message='Session request cancelled',call=NULL),class=c('fm_async_cancelled','error','condition')))
    else if(disabled&&is.function(w$direct))promises::then(w$direct(),w$resolve,w$reject)
-   else if(disabled)w$reject(simpleError('Background access disabled'))else w$resolve(saved$data)
+   else if(disabled)w$reject(simpleError('Background access disabled'))else {
+    if(!resource_snapshot_unexpired(saved$data))attr(saved$data,'fetch_status')<-'stale'
+    w$resolve(saved$data)
+   }
   }
  }
 }
@@ -222,7 +212,9 @@ fm_worker_poll<-function(account,owner='',force=FALSE){
  keys<-fm_worker_live_keys(s)
  versions<-setNames(lapply(keys,function(k)fm_worker_get(account,k)$manifest$version %||% ''),keys)
  if(!length(versions))versions<-structure(list(),names=character())
- p<-fm_worker_rpc('read',list(p_account=account,p_versions=versions),owner)
+ descriptors<-setNames(lapply(keys,function(k)s$descriptors[[k]]$descriptor),keys)
+ if(!length(descriptors))descriptors<-structure(list(),names=character())
+ p<-fm_worker_rpc('read',list(p_account=account,p_versions=versions,p_descriptors=descriptors),owner)
  promises::then(p,function(result){
   s$busy<-FALSE;fm_worker_set_policy(s,result$account);s$health<-result$health;s$jobs<-result$jobs;s$service_error<-NULL
   s$errors<-s$errors[intersect(names(s$errors),keys)]
@@ -248,13 +240,16 @@ fm_worker_poll<-function(account,owner='',force=FALSE){
    else s$errors[[resource$key]]<-'Stored snapshot failed integrity checks; acquisition is required.'
   }
   for(job in result$jobs)s$errors[[job$key]]<-if(!is.null(job$error))paste('Background acquisition failed:',job$error)else NULL
-  if(isTRUE(s$account$enabled))for(k in keys){
+  # Expiry changes presentation once, not acquisition. Preserve source times and
+  # notify only this resource when its local freshness crosses the deadline.
+  for(k in keys){
    saved<-fm_worker_get(account,k)
-   # Clause subscriptions observe autonomous worker publications. Their expiry
-   # must not turn every GUI poll into another priority acquisition.
-   if(s$descriptors[[k]]$descriptor$handler!='get_clause_transfer_summary'&&
-      (is.null(saved)||!resource_snapshot_unexpired(saved$data)))fm_worker_enqueue(s$descriptors[[k]]$descriptor,owner)
+   if(!is.null(saved)&&!resource_snapshot_unexpired(saved$data)&&!identical(attr(saved$data,'fetch_status'),'stale')){
+    attr(saved$data,'fetch_status')<-'stale';fm_worker_put(account,k,saved)
+    revision<-fm_worker_resource_revision(s,k);revision(shiny::isolate(revision())+1L)
+   }
   }
+  # Polling is read-only: stale/missing observations never alter worker jobs.
   fm_worker_settle(s);fm_worker_notify(account);NULL
  },function(error){s$busy<-FALSE;s$service_error<-'Background status could not be read from the database.';fm_worker_notify(account);NULL})
  invisible(NULL)
@@ -266,7 +261,6 @@ fm_worker_peek<-function(handler,args,context,direct,is_current=NULL){
  d<-fm_worker_descriptor(handler,args,context);fm_worker_demand(d,context$session_id %||% '',is_current)
  s<-fm_worker_account_state(context$account_id);try(fm_worker_resource_revision(s,d$resource_key)(),silent=TRUE)
  item<-fm_worker_get(context$account_id,d$resource_key)
- if(isTRUE(mode)&&(is.null(item)||!resource_snapshot_unexpired(item$data)))fm_worker_enqueue(d,context$session_id %||% '')
  if(is.null(item))stop(structure(list(message='Loading data from background sync…',call=NULL),class=c('shiny.silent.error','validation','error','condition')))
  if(!resource_snapshot_unexpired(item$data))attr(item$data,'fetch_status')<-'stale'
  item$data
@@ -349,11 +343,11 @@ fm_worker_status_source<-function(session,login){
   message<-if(!identical(s$account$auth_status,'active'))'Background access needs renewal. Log in again.'else
    if(length(health_age)!=1L||!is.finite(health_age)||health_age>60)'Background worker is not responding; saved data remains available.'else
     if(!is.null(s$service_error))s$service_error else
-     if(length(s$errors))paste(unique(unlist(s$errors)),collapse=' ')else 'Background sync is enabled. Screens use stored observations; stale data keeps its original source time.'
+     if(length(s$errors))paste(unique(unlist(s$errors)),collapse=' ')else 'Background sync is enabled.'
   live_keys<-fm_worker_live_keys(s)
   jobs<-s$jobs[vapply(s$jobs,function(j)j$key%in%live_keys,logical(1))]
-  pending<-sum(vapply(jobs,function(j)isTRUE(j$pending),logical(1)));running<-sum(vapply(jobs,function(j)isTRUE(j$running),logical(1)))
-  if(pending>0&&identical(s$account$auth_status,'active'))message<-paste(message,sprintf('Preparing %d requested resource(s), %d running.',pending,running))
+  running<-sum(vapply(jobs,function(j)isTRUE(j$running),logical(1)))
+  if(running>0&&identical(s$account$auth_status,'active'))message<-paste(message,sprintf('Updating %d saved data source(s).',running))
   checks<-vapply(live_keys,function(k){item<-fm_worker_get(account,k);if(is.null(item))NA_real_ else as.numeric(fm_time(item$manifest$checked_at))},numeric(1))
   checks<-checks[is.finite(checks)]
   value(list(message=message,checked_at=if(length(checks))format(as.POSIXct(min(checks),origin='1970-01-01',tz='UTC'),'%Y-%m-%d %H:%M:%S UTC')else NULL))
@@ -378,7 +372,7 @@ fm_worker_session<-function(session,login,leagues=function()list()){
  output$worker_status<-shiny::renderUI({
   view<-status();if(is.null(view))return(NULL)
   shiny::tags$div(class='alert alert-info',role='status',view$message,
-   if(!is.null(view$checked_at))shiny::tags$small(style='display:block',paste('Oldest saved check among recently displayed data:',view$checked_at)))
+   if(!is.null(view$checked_at))shiny::tags$small(style='display:block',paste('Oldest displayed data check:',view$checked_at)))
  })
  output$worker_settings<-shiny::renderUI({
   auth<-login();if(!valid_login(auth))return(NULL);s<-fm_worker_account_state(auth[['userid']]);s$settings_revision()
@@ -405,7 +399,6 @@ fm_worker_session<-function(session,login,leagues=function()list()){
    if(is.null(a)){fm_worker_poll(generation,session$token,TRUE);return(NULL)}
    if(enabled)renewed<<-paste0(openssl::sha256(charToRaw(auth[['token']])))
    s<-fm_worker_account_state(generation);fm_worker_set_policy(s,a);s$queued<-list();s$errors<-list();fm_worker_settle(s)
-   if(enabled){d<-fm_worker_descriptor('get_active_championships',list(),resource_context(account_id=generation));fm_worker_enqueue(d,session$token,TRUE)}
    if(!renew_only)feedback('Background sync settings saved.');fm_worker_notify(generation);fm_worker_poll(generation,session$token,TRUE);NULL
   },function(error){feedback('Could not save background sync settings. Database acknowledgement is required.');NULL})
  }
@@ -429,37 +422,18 @@ fm_worker_session<-function(session,login,leagues=function()list()){
  },priority=100)
  invisible(NULL)
 }
+# GUI refresh invalidates its local projections and reads durable observations.
+# Acquisition jobs belong exclusively to the autonomous worker schedule. Manual
+# transaction preflights still execute under the explicit live-read scope.
 fm_worker_invalidate<-function(account,league,team=NULL,player=NULL){
  if(!fm_worker_configured())return(invisible(NULL))
  s<-fm_worker_account_state(account)
- if(!isTRUE(s$account$enabled))return(invisible(NULL))
- for(k in names(s$descriptors)){
-  d<-s$descriptors[[k]]$descriptor
-  if(identical(d$context$championship_id,league)&&
-     (grepl('market|roster|players_from_team|info|financial|capacity|pressroom|finances|summary',d$handler))){
-   item<-fm_worker_get(account,k)
-   if(!is.null(item)){item$manifest$valid_until<-rival_finance_stamp(Sys.time()-1);attr(item$data,'fetch_status')<-'stale';fm_worker_put(account,k,item);rev<-fm_worker_resource_revision(s,k);rev(shiny::isolate(rev())+1L)}
-   fm_worker_enqueue(d,s$descriptors[[k]]$owner,TRUE)
-  }
- }
- fm_worker_notify(account);invisible(NULL)
+ if(isTRUE(s$account$enabled))fm_worker_poll(account,force=TRUE)
+ invisible(NULL)
 }
-
 fm_worker_invalidate_pattern<-function(context,resources=NULL,pattern=NULL){
  if(!fm_worker_configured())return(invisible(NULL))
- s<-fm_worker_account_state(context$account_id);if(!isTRUE(s$account$enabled))return(invisible(NULL))
- aliases<-c(get_players_from_team='roster',get_championship_players='championshipplayers',get_championship_pressroom='pressroom',get_lineup_from_team='lineup',get_user_team_info='team_info')
- for(k in names(s$descriptors)){
-  d<-s$descriptors[[k]]$descriptor
-  if(nzchar(context$championship_id %||% '')&&!identical(context$championship_id,d$context$championship_id))next
-  alias<-if(d$handler%in%names(aliases))aliases[[d$handler]]else sub('^get_','',d$handler)
-  candidates<-c(d$handler,paste(alias,d$context$championship_id,d$context$user_team_id,d$context$player_id,sep='_'))
-  matches<-if(!is.null(pattern))any(grepl(pattern,candidates))else any(vapply(resources,function(r)any(startsWith(candidates,r)|startsWith(r,candidates)),logical(1)))
-  if(matches){
-   item<-fm_worker_get(context$account_id,k)
-   if(!is.null(item)){attr(item$data,'valid_until')<-as.numeric(Sys.time())-1;attr(item$data,'fetch_status')<-'stale';fm_worker_put(context$account_id,k,item)}
-   fm_worker_enqueue(d,s$descriptors[[k]]$owner,TRUE)
-  }
- }
+ s<-fm_worker_account_state(context$account_id)
+ if(isTRUE(s$account$enabled))fm_worker_poll(context$account_id,context$session_id %||% '',force=TRUE)
  invisible(NULL)
 }

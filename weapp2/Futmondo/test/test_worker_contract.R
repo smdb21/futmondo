@@ -48,7 +48,7 @@ check(identical(roundtrip(empty_vector),empty_vector),'empty named primitive vec
 for(handler in c('get_active_championships','get_notification_unread')){
  d<-fm_worker_descriptor(handler,list(login=a),resource_context(a))
  decoded<-jsonlite::fromJSON(fm_worker_json(d),simplifyVector=FALSE)
- check(identical(fm_worker_decode(decoded$encoded_args),empty_named),paste(handler,'decodes arguments after authentication removal'))
+ check(identical(fm_worker_decode(decoded$encoded_args),list())&&identical(d,fm_worker_descriptor(handler,list(),resource_context(a))),paste(handler,'canonicalizes authenticated and autonomous empty arguments'))
 }
 bad<-fm_worker_encode(list(a=1));bad$names<-list()
 check(inherits(try(fm_worker_decode(bad),silent=TRUE),'try-error'),'empty names cannot label nonempty values')

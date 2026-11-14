@@ -17,7 +17,8 @@ store<-function(budget,age=0,valid=60){
 store(100)
 calls<-list();fm_worker_rpc<-function(name,payload,owner=''){
  calls[[length(calls)+1L]]<<-list(name=name,payload=payload)
- promises::promise_resolve(TRUE)
+ stopifnot(name=='read')
+ promises::promise_resolve(list(account=s$account,health=NULL,jobs=list(),resources=list()))
 }
 settle<-function(session)for(i in 1:30){later::run_now(0);session$flushReact()}
 stats<-new.env(parent=emptyenv());stats$publications<-list();stats$renders<-0L
@@ -48,12 +49,12 @@ shiny::testServer(function(input,output,session){
  }
  stopifnot(!length(stats$publications),stats$renders==0L,!length(calls))
  cat('PASS ten unrelated worker publications cause zero primary rerenders or acquisitions\n')
- # Explicit user refresh still marks existing observations stale immediately.
+ # Explicit user refresh reloads the database without scheduling a source read.
  refresh(1L);session$flushReact()
  stopifnot(state()$status=='loading',state()$freshness=='stale')
  settle(session)
- stopifnot(length(calls)==1L,calls[[1L]]$name=='enqueue',calls[[1L]]$payload$p_priority==10L)
- cat('PASS manual refresh keeps its visible stale/loading state and priority acquisition\n')
+ stopifnot(length(calls)==1L,calls[[1L]]$name=='read')
+ cat('PASS manual refresh keeps its visible stale/loading state and only rereads the database\n')
  # An expired stored publication remains stale, with the original source time.
  now<<-now+2;store(106,age=120,valid=-60);stamp<-now-120
  s$jobs<-list(list(key=d$resource_key,running=TRUE,pending=TRUE))

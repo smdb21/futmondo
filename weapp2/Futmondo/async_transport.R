@@ -128,15 +128,23 @@ fm_httr_response<-function(response,url){
 async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is_current=function()TRUE,priority=NULL,on_progress=NULL,worker_bypass=FALSE){
   name<-if(is.character(fn))fn else deparse(substitute(fn))
   if(length(name)!=1L||!grepl("^(get_|read_|calculate_league_finances$)",name))return(promises::promise_reject(simpleError("Only factual reads may use asynchronous adapters")))
+  source_fn<-if(is.character(fn))get0(name,envir=.GlobalEnv,mode="function")else fn
+  # Database-only getters do not need a Futmondo login. They remain asynchronous
+  # database reads in the GUI, rather than waiting for a nonexistent worker job.
+  source_getter<-is.function(source_fn)&&"login"%in%names(formals(source_fn))
   if(!worker_bypass && exists("fm_worker_configured",mode="function") && fm_worker_configured() &&
-     startsWith(name,"get_") && !identical(fm_worker_mode(context$account_id),FALSE))
+     startsWith(name,"get_") && source_getter && !identical(fm_worker_mode(context$account_id),FALSE))
     return(fm_worker_fetch(name,args,context,owner,is_current,direct=function()
       async_adapter_fetch(name,args,context,owner,is_current,priority,on_progress,worker_bypass=TRUE)))
   if(is.null(priority))priority<-if(name%in%c("get_team_acquisition_capacity","get_acquisition_capacity",
     "get_player_summary","get_my_market_players","get_round_lineup_snapshot"))"interactive"else "normal"
   priority<-fm_transport_priority(priority)
-  if(identical(name,"get_team_acquisition_capacity")&&exists("get_team_acquisition_capacity_async",mode="function"))
-    return(do.call(get_team_acquisition_capacity_async,c(args,list(context=context,is_current=is_current,priority=priority,owner=owner))))
+  if(identical(name,"get_team_acquisition_capacity")&&exists("get_team_acquisition_capacity_async",mode="function")){
+    capacity_args<-c(args,list(context=context,is_current=is_current,priority=priority,owner=owner))
+    if(isTRUE(worker_bypass))capacity_args$worker_bypass<-TRUE
+    capacity_fn<-attr(get_team_acquisition_capacity_async,"worker_original") %||% get_team_acquisition_capacity_async
+    return(do.call(capacity_fn,capacity_args))
+  }
   adapter_env<-new.env(parent=.GlobalEnv);completed<-new.env(parent=emptyenv());requests<-0L;page_requests<-0L;acquired<-list()
   for(nm in ls(.GlobalEnv,all.names=TRUE)){
     object<-get(nm,.GlobalEnv)

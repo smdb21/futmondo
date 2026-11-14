@@ -10,7 +10,7 @@ fixture_version<-1L;fixture_reads<-0L;fixture_enqueues<-0L;fixture_resources<-li
 fixture_stamp<-Sys.time()
 fm_worker_rpc<-function(name,payload,owner=''){
  if(name=='renew')return(promises::promise_resolve(fixture_account))
- if(name=='enqueue'){fixture_enqueues<<-fixture_enqueues+1L;return(promises::promise_resolve(TRUE))}
+ if(name=='enqueue'){fixture_enqueues<<-fixture_enqueues+1L;stop('GUI attempted acquisition')}
  stopifnot(name=='read');fixture_reads<<-fixture_reads+1L
  s<-fm_worker_account_state(fixture_auth[['userid']])
  resources<-list();jobs<-list()
@@ -42,7 +42,7 @@ players_table_UI<-function(...)NULL
 players_table_Server<-function(...)NULL
 ui<-shiny::fluidPage(shiny::tags$head(shiny::includeScript('www/worker-state.js')),
  shiny::uiOutput('worker_status'),today_UI('today'),
- shiny::actionButton('publish','Publish new balance'),shiny::actionButton('heartbeat','Heartbeat'),
+ shiny::actionButton('publish','Publish new balance'),shiny::actionButton('refresh_saved','Read saved data'),shiny::actionButton('heartbeat','Heartbeat'),
  shiny::textOutput('heartbeat_value'))
 server<-function(input,output,session){
  clear_api_cache();fixture_version<<-1L;fixture_stamp<<-Sys.time()
@@ -54,6 +54,8 @@ server<-function(input,output,session){
   fixture_version<<-fixture_version+1L;fixture_stamp<<-Sys.time()
   fm_worker_poll(fixture_auth[['userid']],session$token,TRUE)
  })
+ shiny::observeEvent(input$refresh_saved,fm_worker_invalidate_pattern(resource_context(fixture_auth,'league','team'),pattern='.*'))
+ shiny::observeEvent(input$fixture_stats,session$sendCustomMessage('fixture-stats',list(enqueues=fixture_enqueues,reads=fixture_reads)))
  output$heartbeat_value<-shiny::renderText(input$heartbeat)
 }
 shiny::runApp(shiny::shinyApp(ui,server),host='127.0.0.1',port=3898,launch.browser=FALSE)
