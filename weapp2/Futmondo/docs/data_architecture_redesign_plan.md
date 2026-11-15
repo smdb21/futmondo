@@ -1367,3 +1367,14 @@ Implemented locally: remove the routine departure-exclusion paragraph, replace t
 - Resolve omitted scoring only from complete exact-scope authoritative metadata and matching custom configuration. Preserve current identity over older shared history. Save and reuse successful validated snapshots through the existing database contract, retaining worker source clocks/deadlines and stale status.
 - Publish round completeness correctly for new worker snapshots and strictly reconstruct the missing envelope mapping from existing persisted parser proof. Real partial/error/context failures remain red disclosures. No data is invented or source freshness extended.
 - Focused persistence/calendar and browser regression checks, required lifecycle results and performance limits are recorded in `data_review_results.md`. Production evidence was inspected without mutations; authenticated hosted acceptance remains separate from the local implementation and branch rollout.
+
+
+### Collapsible player filter boxes — implemented locally (2026-11-15 UTC)
+
+- Both shared player-table filter layouts start collapsed behind **Filters** and a
+  directional arrow across Today, Market, Players, My Team and rival squads.
+  Native keyboard/touch expansion retains active selections, with the position
+  breakdown, recent-round average and tables still visible.
+- This is a presentation change with no acquisition, persistence, dependency or
+  schema change. Verification and performance results are recorded in
+  `data_review_results.md`; authenticated hosted appearance remains unverified.

@@ -2441,3 +2441,29 @@ confirmation blocker above. No factual history or snapshot records were removed.
 - Focused checks passed: new snapshot-context regression 10 groups, new calendar producer/encode/restore regression 8, worker observation identity 4, round catalog 6, Lineup module 28, loading/reuse 3, snapshot store 5, competition snapshots 9, runtime 14 and manual worker prerequisites 4. Independent review reran the context fixture and found no blocking issue. Known-answer checks retain zero and negative points and keep unknowns distinct. Required offline lifecycle passed 13 checks plus 8 tabs, with zero HTTP/live database mutation attempts; existing synthetic Plotly warnings remain. The broader worker contract suite stops at the local environment's missing `sodium` package, so it is not claimed as passing; this change adds no dependency.
 - Browser fixtures reproduce both exact screenshot errors using the previous source and verify the corrected real module at 390/1440px in light/dark themes. Successful data has no red error; deliberately incomplete data remains a closed red disclosure, expands on click and preserves the draft. Optimize retains a signed negative average and adds no acquisition/write. Reload reuses the saved snapshot with one database read, no repeated source reads/writes and unchanged observation time. Tests perform zero lineup submissions. Screenshots were inspected; no page overflow or JavaScript errors occurred. Authenticated hosted navigation and post-deployment acceptance remain unobserved.
 - Performance review: 100 small legacy snapshot hydrations took 0.134s with zero added source/database reads or writes. For a synthetic 100-player bundle over 100 runs, explicit-selector normalization averaged 2.880ms and verified missing-selector normalization 3.870ms. The extra work is bounded local validation/hashing, not acquisition. Mobile/desktop browser heartbeats measured 60–81ms with zero idle pitch mutations over each 500ms observation. The fix restores the previously suppressed initial snapshot POST; the acknowledged copy prevents duplicate component reads/writes in a fresh session. No additional timer, invalidation, worker job, cache, schema or dependency is introduced. Documentation has no runtime effect; measurements exclude production network latency.
+
+
+### 2026-11-15 UTC — Collapsible player filter boxes
+
+- Both shared filter-box layouts now start closed behind **Filters** and a
+  right/down arrow, using native browser disclosures. Input IDs, defaults and
+  active selections are retained; the position breakdown, recent-average input
+  and tables remain visible. Click, Enter and Space work without a server toggle.
+- Existing checks passed: `Rscript test/test_player_table_filters.R` (9 checks)
+  and `Rscript test/test_shiny_simulation.R` (13 checks plus 8 tabs), with zero
+  HTTP/live database mutations. Existing synthetic Plotly warnings remain.
+- An isolated actual-Shiny Chromium fixture passed both layouts at 320, 390 and
+  1440px in light/dark themes: initial collapse and bound defaults, arrow state,
+  keyboard activation, retained checkbox/select/numeric values, visible adjacent
+  controls, and no page overflow or JavaScript errors. Mobile screenshots were
+  inspected. The final centered SVG arrow has the same visible vertical center
+  as the label in both states/layouts at 390/1440px, verified from rendered pixels.
+  All source data was synthetic and external I/O was blocked; hosted
+  authenticated appearance and deployment completion remain unverified.
+- Performance review: opening/closing added zero HTTP requests, source reads,
+  enrichment runs, table renders or updates. A burst of 100 toggles with forced
+  layout took 11.3–12.9ms locally. The existing 524-row filter benchmark took
+  0.001s with 95.1 KiB of data. The change adds only
+  bounded static markup/CSS, no observers, timers, dependencies, cache or database
+  work. Existing durable database reuse and acquisition behavior are unchanged.
+  Documentation has no runtime effect; local measurements exclude hosted latency.

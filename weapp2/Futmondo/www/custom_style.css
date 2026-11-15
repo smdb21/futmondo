@@ -1232,6 +1232,41 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
   object-fit: contain;
 }
 
+/* Native filter disclosures keep inputs mounted and their selected values intact. */
+.player-filter-disclosure {
+  margin: 0 0 20px;
+  border: 1px solid var(--fm-border);
+  border-radius: 8px;
+  background: var(--fm-surface);
+  color: var(--fm-text);
+}
+.player-filter-disclosure > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 15px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+.player-filter-disclosure > summary::-webkit-details-marker { display: none; }
+.player-filter-disclosure > summary:focus-visible {
+  outline: 2px solid var(--fm-text);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+.player-filter-arrow {
+  display: block;
+  width: 1em;
+  height: 1em;
+  flex: 0 0 1em;
+  /* Center on the label's visible glyphs, keeping that center during rotation. */
+  transform: translateY(-0.25em);
+}
+.player-filter-disclosure[open] > summary .player-filter-arrow { transform: translateY(-0.25em) rotate(90deg); }
+.player-filter-panel { margin: 0; padding: 0 15px 15px; }
+
 /* Align filter labels and touch targets without Bootstrap checkbox offsets. */
 .player-checkbox-filters {
   display: flex;
@@ -1260,7 +1295,8 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 }
 .player-clear-filters { margin: 0; }
 @media (max-width: 767px) {
-  .player-filter-panel { padding: 12px !important; }
+  .player-filter-disclosure > summary { padding: 10px 12px; }
+  .player-filter-panel { padding: 0 12px 12px; }
   .player-filter-panel > [class*="col-"] { padding-left: 0; padding-right: 0; }
   .player-checkbox-filters {
     display: grid;

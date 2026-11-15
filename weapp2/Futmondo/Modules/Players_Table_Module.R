@@ -19,6 +19,18 @@ players_table_UI <- function(id, box_title = NULL,
                              default_active_clause = FALSE,
                              default_free_agents = FALSE) {
   ns <- NS(id)
+  filter_panel <- function(...) {
+    tags$details(
+      id = ns("filters"), class = "player-filter-disclosure",
+      tags$summary("Filters", tags$svg(
+        class = "player-filter-arrow", `aria-hidden` = "true", focusable = "false",
+        viewBox = "0 0 16 16", width = "12", height = "12",
+        tags$path(d = "M6 4l4 4-4 4", fill = "none", stroke = "currentColor",
+          `stroke-width` = "2", `stroke-linecap` = "round", `stroke-linejoin` = "round")
+      )),
+      fluidRow(class = "player-filter-panel", ...)
+    )
+  }
   checkbox_filters <-
       if (filter_by_active_clause || filter_by_max_clause_value || filter_by_clause_under_available_funds || filter_by_is_favorite || filter_by_is_from_futmondo || filter_by_players_with_bid) {
         fluidRow(
@@ -62,9 +74,7 @@ players_table_UI <- function(id, box_title = NULL,
       if (show_position_breakdown) {
         fluidRow(
           column(width = 7,
-                 fluidRow(
-                   class = "player-filter-panel",
-                   style = "background: var(--fm-surface); padding: 15px; border-radius: 8px; margin: 0 0 20px 0; border: 1px solid #e2e8f0;",
+                 filter_panel(
                     if (filter_by_position) {
                       column(width = if(!filter_by_team&&!filter_by_value&&!filter_by_change_value)12 else 4, div(title = "Filter players by primary or secondary position (Goalkeeper, Defender, Midfielder, Forward)", selectInput(inputId = ns("position_filter"), label = "Position", choices = c("All", "Goalkeeper", "Defender", "Midfielder", "Forward"), selected = "All", width = "100%")))
                     },
@@ -87,9 +97,7 @@ players_table_UI <- function(id, box_title = NULL,
           )
         )
       } else {
-        fluidRow(
-          class = "player-filter-panel",
-          style = "background: var(--fm-surface); padding: 15px; border-radius: 8px; margin: 0 0 20px 0; border: 1px solid #e2e8f0;",
+        filter_panel(
           if (filter_by_position) {
             column(width = 3, div(title = "Filter players by primary or secondary position (Goalkeeper, Defender, Midfielder, Forward)", selectInput(inputId = ns("position_filter"), label = "Position", choices = c("All", "Goalkeeper", "Defender", "Midfielder", "Forward"), selected = "All", width = "100%")))
           },
