@@ -226,16 +226,19 @@ data acquisition and durable database reuse are unchanged.
 ## Average points × euro trend — 2026-11-15 UTC
 
 Tables with `points_ratio_basis` enabled (Today and Players) now place **Avg N ×
-Trend (€)** directly after the existing average/price ratio.
+Trend (€M)** directly after the existing average/price ratio.
 `players_table_points_trend(rows)` adds numeric `recent_points_trend`, multiplying
 the exact `recent_points_avg` by the observed euro-valued `change` field. The
-calculation uses the unrounded average; the badge displays up to one decimal. This is
+calculation uses the unrounded average; the badge displays millions with exactly three decimal places. This is
 the displayed Trend amount, not its percentage or a forecast. For example, an
-average of 10 and trend of €250,000 produce 2,500,000. Zero and negative operands
+average of 10 and trend of €250,000 produce 2,500,000, displayed as `2.500`. Zero and negative operands
 retain normal multiplication semantics, including a positive result for two
 negative operands. Missing/nonfinite operands or an overflowing product remain
 blank; unknown trend is never treated as zero.
 
+`players_table_metric_cell(digits, title_column, divisor=1, fixed=FALSE)` scales
+only the display and optionally retains trailing zeros; this column uses
+`digits=3`, `divisor=1e6`, and `fixed=TRUE`. Other metric formatting is unchanged.
 The product reuses the existing metric badge and theme-aware background scaling,
 with its own finite min/max over all loaded source rows before filtering.
 Sorting remains numeric and the default average-descending order is unchanged.

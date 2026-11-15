@@ -1410,3 +1410,9 @@ Implemented locally: remove the routine departure-exclusion paragraph, replace t
 - Replace the launch spinner with a responsive pitch-to-murmuration-to-radar loop; show a compact scene and visible status while authenticated leagues and the first page load. Readiness dismisses the graphic immediately through the existing lifecycle.
 - Reuse light/dark tokens; provide static reduced-motion/canvas fallbacks and stop drawing when hidden, offscreen or removed. Bound particles, pixel density and frame rate with no new dependencies, data requests, server timers or persistence changes.
 - Visual, performance, startup and exact task-only verification results and limits are recorded in `data_review_results.md`. Production acceptance remains separate from local validation and the branch push.
+
+
+### Avg N × Trend in millions — implemented and verified locally
+
+- Today and Players display **Avg N × Trend (€M)** in millions with exactly three decimal places, including trailing zeros. Numeric products, sorting, missing values and color ranges remain intact.
+- Actual emitted callbacks, existing metric suites and the required offline lifecycle pass. The display adds constant work per visible cell and no acquisition or persistence work. Hosted appearance remains unverified; details are in `docs/data_review_results.md`.

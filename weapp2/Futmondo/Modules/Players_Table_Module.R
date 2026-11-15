@@ -262,12 +262,13 @@ players_table_metric_style <- function() htmlwidgets::JS("function(rowInfo, colu
 }")
 
 # Color belongs to a child badge, not the cell; numeric source values stay intact.
-players_table_metric_cell <- function(digits=1L, title_column=NULL) htmlwidgets::JS(paste0("function(cellInfo) {
+players_table_metric_cell <- function(digits=1L, title_column=NULL, divisor=1, fixed=FALSE) htmlwidgets::JS(paste0("function(cellInfo) {
   var value = cellInfo.value;
   if (typeof value !== 'number' || !Number.isFinite(value)) return '';
+  var text = (value / ",as.numeric(divisor),").toFixed(",as.integer(digits),");
   return React.createElement('span', {className: 'fm-metric-badge'",
     if(!is.null(title_column))paste0(", title: cellInfo.row && cellInfo.row[",jsonlite::toJSON(title_column,auto_unbox=TRUE),"]"),
-    "}, String(Number(value.toFixed(",as.integer(digits),"))));
+    "}, ",if(isTRUE(fixed))"text"else"String(Number(text))",");
 }"))
 
 # Keep the data numeric for sorting; missing averages have an empty cell.
@@ -657,10 +658,10 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
           paste0("/ ",if(points_ratio_basis=="value")"Value"else"Clause"," (€M)")),
         style=players_table_metric_style(),cell=players_table_metric_cell(3L))
       if(!is.null(points_ratio_basis))table_columns[["recent_points_trend"]]<-reactable::colDef(
-        name=paste0("Avg Last ",recent_n," × Trend (€)"),
+        name=paste0("Avg Last ",recent_n," × Trend (€M)"),
         align="center",sortNALast=TRUE,minWidth=145,headerClass="fm-metric-header",
-        header=htmltools::span(paste0("Avg ",recent_n),htmltools::tags$br(),"× Trend (€)"),
-        style=players_table_metric_style(),cell=players_table_metric_cell(1L))
+        header=htmltools::span(paste0("Avg ",recent_n),htmltools::tags$br(),"× Trend (€M)"),
+        style=players_table_metric_style(),cell=players_table_metric_cell(3L,divisor=1e6,fixed=TRUE))
       reactable(players_table,
                 columns = table_columns,
                 meta = rendered_meta,
