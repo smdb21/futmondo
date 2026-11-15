@@ -65,7 +65,7 @@ round_award_card <- function(mvp, xi, players = NULL) {
     tags$div(class = "round-mvp-meta", if (is.finite(mvp$points))
       paste(format(mvp$points, trim = TRUE), "points") else "Points unavailable"),
     tags$h4(class = "round-best-xi-title", "Best XI"),
-    if (!nrow(xi)) tags$p(class = "round-mvps-empty", "The official Best XI selection is incomplete.") else
+    if (!nrow(xi)) fm_info("The official Best XI selection is incomplete.", error = TRUE, class = "round-mvps-empty") else
       tags$table(class = "round-best-xi-table", `aria-label` = "Official Best XI",
         tags$thead(tags$tr(tags$th(scope = "col", "Role"), tags$th(scope = "col", "Player"), tags$th(scope = "col", "Points"))),
         tags$tbody(lapply(seq_len(nrow(xi)), function(i) {
@@ -81,7 +81,7 @@ round_award_card <- function(mvp, xi, players = NULL) {
 round_mvps_UI <- function(id) {
   ns <- NS(id)
   fluidRow(box(width = 12, title = "Round awards", status = "primary", solidHeader = TRUE,
-    p(class = "round-mvps-intro", "Published official MVPs and Best XI selections."),
+    fm_info("Published official MVPs and Best XI selections.", class = "round-mvps-intro"),
     uiOutput(ns("mvp_cards"))))
 }
 
@@ -93,14 +93,16 @@ round_mvps_Server <- function(id, is_module_active, login_token, championship_id
     output$mvp_cards <- renderUI({
       snapshot <- mvp_snapshot()
       rows <- round_mvp_rows(snapshot$rows, championship_id())
-      notice <- if(nzchar(snapshot$reason)) tags$p(class="round-mvps-empty",snapshot$reason)
+      notice <- if(nzchar(snapshot$reason)) fm_info(snapshot$reason,
+        error = !isTRUE(snapshot$loading) && !identical(snapshot$status, "loading"), class="round-mvps-empty")
       if (!nrow(rows)) {
         if (is.data.frame(snapshot$coverage) && nrow(snapshot$coverage) && !any(snapshot$coverage$required %in% TRUE) && is.null(notice))
-          return(tags$p("No completed round awards yet."))
-        return(notice %||% tags$p("Round awards are unavailable; the reason could not be determined."))
+          return(fm_info("No completed round awards yet."))
+        return(notice %||% fm_info("Round awards are unavailable; the reason could not be determined.", error = TRUE))
       }
       catalog <- if (valid_login(login_token())) player_catalog_read(login_token(), championship_id()) else NULL
-      crest_notice <- if (!is.null(catalog) && is.null(catalog$data)) tags$p(class = "round-mvps-empty",
+      crest_notice <- if (!is.null(catalog) && is.null(catalog$data)) fm_info(class = "round-mvps-empty",
+        error = !identical(catalog$status, "loading"),
         if (identical(catalog$status, "loading")) "Loading player team crests…" else
           paste("Player team crests:", resource_failure_message(catalog$error)))
       tagList(notice, crest_notice, tags$div(class = "round-mvps-grid", lapply(seq_len(nrow(rows)), function(i) {

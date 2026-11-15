@@ -212,7 +212,11 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       }else if(identical(arrivals$status,"partial")) {
         if(count)paste0(count," incoming · verification incomplete")else "incoming signings need verification"
       }else paste0(count," incoming")
-      shinydashboard::valueBox(total, paste0(nrow(roster)," players in your squad · ",incoming_text), icon=icon("users"), color="green", width=12)
+      pending<-arrivals$status%in%c("loading","partial")
+      subtitle<-paste0(nrow(roster)," players in your squad",
+        if(!pending||count>0L)paste0(" · ",count," incoming")else "")
+      box<-shinydashboard::valueBox(total,subtitle,icon=icon("users"),color="green",width=12)
+      if(pending)htmltools::tagAppendChild(box,fm_info(incoming_text,error=identical(arrivals$status,"partial")))else box
     })
     # ---- Put All Players on Market Modal ----
     output$bulk_listing_preview <- renderUI({
@@ -227,7 +231,7 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       bulk_context(current_context())
       showModal(modalDialog(
         title = tagList(icon("tags"), " Put All Players on Market"),
-        p("Choose how to price every player. Listings are sent one by one and only verified successes are refreshed."),
+        tagList(p("Choose how to price every player."),fm_info("Listings are sent one by one and only verified successes are refreshed.")),
         radioButtons(ns("bulk_listing_price_mode"), "Listing price", choices = c(
           "Current market value" = "value",
           "Closed clause plus premium" = "closed_clause"
@@ -374,8 +378,8 @@ team_received_offers_panel <- function(state,ns) {
   shiny::tags$section(class="fm-incoming-panel fm-offers-panel",`aria-labelledby`=ns("offers_heading"),
     shiny::tags$h3(id=ns("offers_heading"),if(verified)paste0("Offers for your players (",nrow(rows),")")else "Offers for your players"),
     if(rival_count)shiny::tags$p(class="fm-offer-rival",shiny::icon("user"),paste0(" ",rival_count," rival offer",if(rival_count==1L)""else "s")),
-    if(identical(state$status,"loading"))shiny::tags$p(role="status",shiny::icon("spinner",class="fa-spin")," Checking received offers…"),
-    if(!verified&&!identical(state$status,"loading"))shiny::tags$p(role="alert",class="fm-incoming-error",
+    if(identical(state$status,"loading"))fm_info("Checking received offers…"),
+    if(!verified&&!identical(state$status,"loading"))fm_info(error=TRUE,
       if(identical(state$status,"stale"))"Showing previously observed offers; current offers could not be verified. "else "Received offers could not be fully verified. ",
       if(!is.null(state$error))resource_failure_message(state$error)else "Refresh to retry."),
     if(verified&&!nrow(rows))shiny::tags$p("No offers for your players."),
@@ -428,7 +432,7 @@ bulk_market_listing_plan <- function(roster, mode = c("value", "closed_clause"),
 
 bulk_market_listing_preview <- function(plan, roster) {
   entries <- plan$entries
-  if (!nrow(entries)) return(shiny::tags$p(role = "alert", plan$message))
+  if (!nrow(entries)) return(fm_info(plan$message,error=TRUE))
   names <- if ("name" %in% names(roster)) as.character(roster$name[match(entries$player_id, as.character(roster$id))]) else entries$player_id
   missing <- is.na(names) | !nzchar(trimws(names)); names[missing] <- entries$player_id[missing]
   amounts <- function(base, increase, price) shiny::tags$div(
@@ -439,7 +443,7 @@ bulk_market_listing_preview <- function(plan, roster) {
   shiny::tagList(
     shiny::tags$p(shiny::tags$strong(paste0(nrow(entries), " player(s) · Total increase: +", player_card_money(sum(entries$increase))))),
     amounts(sum(entries$base_price), sum(entries$increase), sum(entries$price)),
-    if (plan$skipped > 0L) shiny::tags$p(paste0(plan$skipped, " player(s) skipped: no eligible price available.")),
+    if (plan$skipped > 0L) fm_info(paste0(plan$skipped, " player(s) skipped: no eligible price available."),error=TRUE),
     shiny::tags$div(style = "max-height:280px;overflow-y:auto;margin:12px 0;",
       lapply(seq_len(nrow(entries)), function(i) shiny::tags$div(
         style = "padding:8px 0;border-top:1px solid var(--fm-border,#315540);overflow-wrap:anywhere;",
@@ -739,16 +743,14 @@ clause_transfer_panel <- function(state,next_round,ns,outgoing=FALSE,source_note
   timing<-if(isTRUE(next_round$available))paste0("Round ",next_round$round_number," starts ",incoming_clause_time(next_round$starts_at)," (Spain)")else "Next round schedule is loading or could not be verified."
   shiny::tags$section(class=paste("fm-incoming-panel",if(outgoing)"fm-outgoing-panel"),`aria-labelledby`=ns(paste0(prefix,"_heading")),
     shiny::tags$h3(id=ns(paste0(prefix,"_heading")),if(!nrow(rows)&&!state$status%in%c("ok","observed"))title else paste0(title," (",nrow(rows),")")),
-    shiny::tags$p(class="fm-incoming-schedule",timing),
-    if(identical(state$status,"loading"))shiny::tags$p(role="status",shiny::icon("spinner",class="fa-spin"),
-      if(outgoing)" Checking clause departures…"else" Checking incoming signings…"),
-    if(!is.null(state$error))shiny::tags$p(role="alert",class="fm-incoming-error",state$error),
-    if(isTRUE(state$observations_only))shiny::tags$p(class="fm-incoming-schedule",
+    if(isTRUE(next_round$available))shiny::tags$p(class="fm-incoming-schedule",timing)else fm_info(timing,error=!identical(state$status,"loading")),
+    if(identical(state$status,"loading"))fm_info(if(outgoing)"Checking clause departures…"else"Checking incoming signings…"),
+    if(!is.null(state$error))fm_info(state$error,error=TRUE),
+    if(isTRUE(state$observations_only))fm_info(
       "Last observed transfer details. Saved observations update automatically; scheduled times do not confirm completion.",
       shiny::tags$small(style="display:block",source_note %||% incoming_clause_source_times(state$source_times))),
     if(!nrow(rows)&&state$status%in%c("ok","observed"))shiny::tags$p(
-      if(isTRUE(state$observations_only))if(outgoing)"No pending clause departures in the saved observations."else"No pending clause arrivals in the saved observations."else
-        if(outgoing)"No players leaving through a release clause."else"No incoming clause signings."),
+      if(outgoing)"No players leaving through a release clause."else"No incoming clause signings."),
     lapply(seq_len(nrow(rows)),function(i) {
       row<-rows[i,,drop=FALSE];at<-if(outgoing)row$leaves_at else row$joins_at
       label<-incoming_clause_round_label(at,next_round)
@@ -762,14 +764,14 @@ clause_transfer_panel <- function(state,next_round,ns,outgoing=FALSE,source_note
           if(nzchar(logo))shiny::tags$img(src=paste0(TEAM_LOGO_URL,logo,".png"),alt="",title=row$team,width=24,height=24,loading="lazy",onerror="this.style.display='none';"),
           shiny::actionLink(ns(paste0(prefix,"_open_",row$player_id)),row$player_name),position),
         shiny::tags$div(class="fm-incoming-arrival",
-          shiny::tags$strong(if(!is.na(at))paste0(if(outgoing)"Leaves: "else"Joins: ",incoming_clause_time(at)," (Spain)")else
-            if(identical(state$status,"loading"))paste0("Confirming ",if(outgoing)"departure"else"arrival"," time…")else
-              paste0(if(outgoing)"Departure"else"Arrival"," time could not be verified")),
+          if(!is.na(at))shiny::tags$strong(paste0(if(outgoing)"Leaves: "else"Joins: ",incoming_clause_time(at)," (Spain)"))else
+            fm_info(if(identical(state$status,"loading"))paste0("Confirming ",if(outgoing)"departure"else"arrival"," time…")else
+              paste0(if(outgoing)"Departure"else"Arrival"," time could not be verified"),error=!identical(state$status,"loading")),
           if(nzchar(label))shiny::tags$span(class="fm-incoming-round",label),
           if(isTRUE(state$observations_only)&&"observed_at"%in%names(row)&&!is.na(row$observed_at))
-            shiny::tags$small(class="fm-incoming-schedule",paste("Observed:",format(fm_time(row$observed_at),"%d %b %Y, %H:%M UTC",tz="UTC"))),
-          if(isTRUE(row$overdue))shiny::tags$span(paste0("Scheduled time has passed; ",if(outgoing)"departure"else"arrival"," is awaiting source confirmation.")),
-          if(nzchar(row$timing_error)&&!identical(state$status,"loading"))shiny::tags$span(class="fm-incoming-error",row$timing_error)))
+            fm_info(paste("Observed:",format(fm_time(row$observed_at),"%d %b %Y, %H:%M UTC",tz="UTC"))),
+          if(isTRUE(row$overdue))fm_info(paste0("Scheduled time has passed; ",if(outgoing)"departure"else"arrival"," is awaiting source confirmation.")),
+          if(nzchar(row$timing_error)&&!identical(state$status,"loading"))fm_info(row$timing_error,error=TRUE)))
     }))
 }
 

@@ -46,7 +46,7 @@ function(input, output, session) {
     req(valid_login(login_token_RV()))
     refresh_trigger()
     state<-championship_state()
-    if(is.null(state$data))shiny::validate(shiny::need(FALSE,if(identical(state$status,"loading"))"Loading leagues…"else resource_failure_message(state$error)))
+    if(is.null(state$data))shiny::validate(shiny::need(FALSE,if(identical(state$status,"loading"))"Loading leagues…"else resource_failure_message(state$error)), errorClass=if(identical(state$status,"loading"))"fm-loading"else character())
     fm_filter_league_answer(state$data)$championships
   })
   league_preferences<-fm_league_preferences(session,login_token_RV,championships_RV)
@@ -163,7 +163,7 @@ function(input, output, session) {
         tags$div(class="round-countdown-main",icon("futbol"),
           tags$strong(paste0("Round ",current_round$round_number)),tags$span("In progress"))
       } else tags$div(class="round-countdown-main",icon("clock"),
-        tags$span(if (primary_ready) "Round schedule unavailable" else "Loading round schedule…"))
+        fm_info(if (primary_ready) "Round schedule unavailable" else "Loading round schedule…", error = primary_ready))
     }
     finance <- round_finance_RV()
     cash <- finance$cash
@@ -171,8 +171,8 @@ function(input, output, session) {
     active_offer_count <- finance$active_offer_count
     final_balance <- finance$projected_committed_balance
     spendable <- finance$spendable_budget
-    money_text <- function(x, loading=FALSE, cached=FALSE) if (is.finite(x)) paste0(format(round(x), big.mark=".", decimal.mark=",", scientific=FALSE), " EUR", if (cached) " (cached)" else "") else if (loading) "Loading…" else "Unavailable"
-    cash_text <- paste0(money_text(cash,finance$cash_loading),if (finance$cash_stale) " (cached)" else if (finance$cash_unverified) " (unverified)" else "")
+    money_text <- function(x, loading=FALSE, cached=FALSE) if (is.finite(x)) paste0(format(round(x), big.mark=".", decimal.mark=",", scientific=FALSE), " EUR") else if (loading) "Loading…" else "Unavailable"
+    cash_text <- money_text(cash,finance$cash_loading)
     offers_text <- if (is.finite(commitments)) {
       suffix <- if (is.finite(active_offer_count)) paste0(" (", as.integer(active_offer_count), ")") else ""
       paste0(money_text(commitments, cached=finance$offers_stale), suffix)
@@ -186,8 +186,16 @@ function(input, output, session) {
         tags$span(class = "round-countdown-finance-item", paste0("Active offers: ", offers_text)),
         tags$span(class = "round-countdown-finance-item", paste0("After offers: ", money_text(final_balance,finance$cash_loading || finance$offers_loading,finance$calculations_stale))),
         tags$span(class = "round-countdown-finance-item", paste0("Can spend: ", money_text(spendable,finance$cash_loading || finance$offers_loading,finance$calculations_stale))),
-        if (!is.null(solvency_text)) tags$span(class = "round-countdown-solvency", solvency_text),
-        tags$small(class="round-countdown-solvency",textOutput("round_finance_checked",inline=TRUE))))
+        fm_info(
+          if (!is.null(solvency_text)) tags$p(solvency_text),
+          if (finance$cash_unverified) tags$p("Balance has not been verified by the latest check."),
+          if (finance$cash_stale || finance$offers_stale) tags$p("Displayed amounts are saved observations (cached)."),
+          textOutput("round_finance_checked",inline=TRUE),
+          error = identical(solvency_class, "round-countdown-warning") ||
+            (!finance$cash_loading && !finance$offers_loading &&
+              (!is.finite(cash) || !is.finite(commitments) || !is.finite(spendable))) ||
+            (!is.null(solvency_text) && grepl("could not load", solvency_text, fixed=TRUE)),
+          class = "round-countdown-solvency")))
   })
   user_teams_RV <- reactive({
     req(championship_id_RV()); refresh_trigger()
@@ -317,8 +325,7 @@ players_in_championship_Server(id = "players_in_championship",
       failed="The first page could not load. Refresh to retry.","")
     if(identical(stage,"failed")){state<-tryCatch(championship_state(),error=function(e)NULL);if(!is.null(state$error))message<-resource_failure_message(state$error)}
     if(loading&&isTRUE(startup_slow()))message<-paste(message,"Still loading data from Futmondo…")
-    div(class="startup-feedback",role="status",`aria-live`="polite",
-      if(loading)icon("spinner",class="fa-spin"),span(message),
+    fm_info(tags$p(message), error = stage %in% c("partial", "failed"), class = "startup-feedback",
       if(!loading&&stage %in% c("partial","failed"))actionButton("retry_startup","Retry"))
   })
   observeEvent(input$retry_startup,{

@@ -38,9 +38,10 @@ shiny::testServer(players_table_Server,args=list(players_table_RV=shiny::reactiv
  user_teams_RV=shiny::reactive(NULL),login_token=shiny::reactive(auth),
  championship_id=shiny::reactive('league'),user_team_id=shiny::reactive('mine')) ,{
  session$setInputs(recent_games_n=3L);settle(session)
- check('seven acquired histories remain visibly pending while their saves are held',{
+ check('seven acquired histories retain pending diagnostics while their saves are held',{
   stopifnot(length(writes)==7L,recent_points$status()$saving==7L,
-   grepl('Saving history: 7 pending.',output$recent_points_status,fixed=TRUE))
+   grepl('Saving history: 7 pending.',output$recent_points_status$html,fixed=TRUE),
+   grepl('fm-info',output$recent_points_status$html,fixed=TRUE))
  })
  session$setInputs(fixture_selected=1L);settle(session)
  check('table click opens the captured player and dispatches availability before any save completes',{

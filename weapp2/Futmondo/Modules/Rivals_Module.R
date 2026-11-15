@@ -533,8 +533,10 @@ rivals_calculation_details <- function(summary,ledger,metric=c("wealth","trading
     if(!isTRUE(summary$trading_profit_complete))notes<-c(notes,detail)
   }
   notes<-unique(notes[!is.na(notes)&nzchar(notes)])
-  tags$details(class="rivals-calculation-details",
-    tags$summary("Calculation details"),
+  fm_info(class="rivals-calculation-details", error=length(notes)>0L,
+    tags$p(if(metric=="wealth") "Cash plus squad value minus starting cash" else
+      "Retrieved completed sales minus their purchase costs and related fees"),
+    if(metric=="wealth" && isTRUE(summary$wealth_gain_estimated))tags$p("Estimate based on reconstructed cash"),
     tags$dl(class="rivals-calculation-breakdown",lapply(seq_along(labels),function(i)
       tagList(tags$dt(labels[i]),tags$dd(ui_financial_amount(values[i]))))),
     if(length(notes))tags$ul(class="rivals-calculation-notes",lapply(notes,tags$li)))
@@ -607,9 +609,7 @@ rivals_finance_table_widget <- function(finances_data,on_error=function(error)NU
         `Balance`=colDef(align="right",cell=function(value){
           value<-fm_number(value);if(!is.finite(value))return("")
           tags$span(style=if(value<0)"color: var(--fm-danger); font-weight:700;"else"font-weight:700;",currency(value))
-        }),`Last updated`=colDef(cell=function(value){
-          stamp<-fm_time(mvp_text(value));if(length(stamp)==1L&&!is.na(stamp))unname(format(stamp,"%d-%m %H:%M",tz=timezone))else""
-        }))))
+        }),`Last updated`=colDef(show=FALSE))))
   },error=function(error){on_error(error);fallback()})
   if(!is.null(selection_input))widget<-htmlwidgets::onRender(widget,
     "function(el,x,data){
@@ -709,13 +709,18 @@ rivals_summary_values <- function(info, teams, finances, team_id) {
     opening_cash=opening,wealth_missing=wealth_missing,wealth_gained=wealth_gained,wealth_gain_estimated=wealth_gain_estimated,wealth_gain_notes=wealth_gain_notes)
 }
 
-rivals_status_message <- function(message, loading=FALSE) {
-  if(!nzchar(message))return(NULL)
-  tags$div(role="status",`aria-live`="polite",`aria-atomic`="true",
-    class=if(loading)"rivals-loading-status"else NULL,
-    style=if(loading)"padding:12px; margin-bottom:12px; border:1px solid var(--fm-border); border-radius:7px; color:var(--fm-text);"else"color:var(--fm-muted); margin-bottom:12px;",
-    if(loading)icon("spinner",class="fa-spin",`aria-hidden`="true"),
-    " ",message)
+rivals_status_message <- function(message, loading=FALSE, error=FALSE, details=NULL) {
+  if(!nzchar(message) && is.null(details))return(NULL)
+  fm_info(message, details, error=error, class=if(loading)"rivals-loading-status"else NULL)
+}
+
+rivals_update_details <- function(rows, timezone="UTC") {
+  if(!is.data.frame(rows)||!nrow(rows)||!all(c("teamname","as_of")%in%names(rows)))return(NULL)
+  tags$div(tags$strong("Last updated"), tags$ul(lapply(seq_len(nrow(rows)),function(i){
+    stamp<-fm_time(mvp_text(rows$as_of[i]))
+    tags$li(rows$teamname[i], ": ", if(length(stamp)==1L&&!is.na(stamp))
+      unname(format(stamp,"%d-%m %H:%M",tz=timezone))else"Update time unavailable")
+  })))
 }
 
 rivals_UI <- function(id) {
@@ -932,7 +937,9 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       failure<-table_failure_RV()
       if(!is.null(failure))issues<-c(issues,paste("Rival table could not be displayed.",resource_failure_message(failure)))
       message<-trimws(paste(c(message,unique(issues)),collapse=" "))
-      rivals_status_message(message,loading=loading)
+      rivals_status_message(message,loading=loading, error=length(issues)>0L ||
+        (!loading && count==0L && nzchar(state$teams_reason %||% "")),
+        details=rivals_update_details(df, display_timezone()))
     })
 
     # The table is the single selection control for rival scouting.
@@ -998,7 +1005,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                    solidHeader = TRUE,
                    div(style = "text-align: center; padding: 10px;",
                        h3(style = "font-weight: 700; color: var(--fm-text); margin: 0; font-size: 20px;", cash),
-                       p(style = "color: var(--fm-muted); font-size: 11px; text-transform: uppercase; margin-top: 5px;", summary$label))
+                       fm_info(summary$label, error=!is.finite(summary$cash)))
                  )
           ),
           column(width = 2,
@@ -1009,7 +1016,6 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                    solidHeader = TRUE,
                    div(style = "text-align: center; padding: 10px;",
                        h3(style = paste0("font-weight: 700; color: ", metric_color(trading_profit), "; margin: 0; font-size: 20px;"), profit_fmt),
-                       p(style = "color: var(--fm-muted); font-size: 11px; margin-top: 5px;", "Retrieved completed sales minus their purchase costs and related fees"),
                        metric_details("trading"))
                  )
           ),
@@ -1047,8 +1053,6 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                    solidHeader = TRUE,
                    div(style = "text-align: center; padding: 10px;",
                        h3(style = paste0("font-weight: 700; color:",metric_color(summary$wealth_gained),"; margin: 0; font-size: 20px;"),wealth_fmt),
-                       p(style = "color: var(--fm-muted); font-size: 11px; margin-top: 5px;", "Cash plus squad value minus starting cash"),
-                       if(summary$wealth_gain_estimated)p(style="color:var(--fm-muted); font-size:11px;", "Estimate based on reconstructed cash"),
                        metric_details("wealth"))
                  )
           )
@@ -1280,9 +1284,9 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       final<-if(is.data.frame(ledger)&&nrow(ledger))tail(ledger$running_balance,1L)else NA_real_
       tagList(
         checkboxInput(ns("tx_pivot_by_player"),"Pivot by Player (Buy/Sell Ledger)",value=isTRUE(isolate(input$tx_pivot_by_player))),
-        p("Your balance includes starting cash, transfers and paid bonuses."),
+        fm_info("Your balance includes starting cash, transfers and paid bonuses."),
         if(is.data.frame(ledger)&&nrow(ledger)&&any(ledger$included&!is.finite(ledger$amount)))
-          p(class="alert alert-info","Some movement amounts are missing. Balances show the known-amount estimate and exclude those unknown amounts."),
+          fm_info("Some movement amounts are missing. Balances show the known-amount estimate and exclude those unknown amounts.", error=TRUE),
         div(class="well",strong("Balance: "),ui_financial_amount(final)),
         fluidRow(
         box(width=6,title="Total income",
@@ -1298,8 +1302,8 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
           if(isTRUE(is.finite(inflow$bonuses)&&inflow$bonuses!=inflow$points+inflow$ranking+inflow$mvp+inflow$dreamteam))
             tags$p("Other recorded bonuses: ",ui_financial_amount(inflow$bonuses-inflow$points-inflow$ranking-inflow$mvp-inflow$dreamteam)),
           if(is.finite(inflow$other)&&inflow$other!=0)tags$p("Other credits: ",ui_financial_amount(inflow$other)),
-          tags$small("Includes starting cash, player sales and paid bonuses.",
-            if(inflow$incomplete)" Pending or unresolved bonuses do not replace the known income shown here.")
+          fm_info("Includes starting cash, player sales and paid bonuses.",
+            if(inflow$incomplete)" Pending or unresolved bonuses do not replace the known income shown here.", error=isTRUE(inflow$incomplete))
         ),
         box(width=6,title="Total expenses",
           tags$p(strong(ui_financial_amount(outflow$total))),
@@ -1307,14 +1311,14 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
           tags$p("Ordinary purchases (identified): ",ui_financial_amount(outflow$market)),
           tags$p("Clause purchases (identified): ",ui_financial_amount(outflow$clauses)),
           if(is.finite(outflow$other)&&outflow$other!=0)tags$p("Other debits: ",ui_financial_amount(outflow$other)),
-          tags$small("Every purchase is included in the numeric total. Its method is identified from recorded transfer evidence.",
-            if(outflow$incomplete)" Some amounts are missing; only known expenses are included.")
+          fm_info("Every purchase is included in the numeric total. Its method is identified from recorded transfer evidence.",
+            if(outflow$incomplete)" Some amounts are missing; only known expenses are included.", error=isTRUE(outflow$incomplete))
         )),
         if(is.finite(inflow$unknown)&&is.finite(outflow$unknown)&&(inflow$unknown+outflow$unknown)>0)
-          p(class="alert alert-info",paste0("Transfer-method evidence still needed for ",format_table_currency(inflow$unknown)," of sales and ",format_table_currency(outflow$unknown)," of purchases. These amounts are already included in the totals.")),
+          fm_info(paste0("Transfer-method evidence still needed for ",format_table_currency(inflow$unknown)," of sales and ",format_table_currency(outflow$unknown)," of purchases. These amounts are already included in the totals."), error=TRUE),
         p(strong("Total income − total expenses = balance: "),ui_financial_amount(inflow$total-outflow$total)),
         h4("Financial history"),
-        p("Includes transfers and paid bonuses. Pending bonuses are not shown or added to your balance."),
+        fm_info("Includes transfers and paid bonuses. Pending bonuses are not shown or added to your balance."),
         reactable::reactableOutput(ns("rival_transactions_table"))
       )
     })

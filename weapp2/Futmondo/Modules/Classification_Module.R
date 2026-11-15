@@ -574,7 +574,7 @@ classification_Server <- function(id, is_module_active, login_token, championshi
     output$round_buttons <- renderUI({
       numbers <- sort(round_numbers_RV(), decreasing = TRUE)
       if (!length(numbers)) {
-        return(p("Loading played rounds…"))
+        return(fm_info("Loading played rounds…"))
       }
       tagList(lapply(numbers, function(number) {
         selected <- identical(as.numeric(number), as.numeric(selected_round_RV()))
@@ -662,7 +662,7 @@ classification_Server <- function(id, is_module_active, login_token, championshi
       failures <- Filter(Negate(is.null), c(list(catalog$error, ranking$error, finances_state_RV()$error), history$errors))
       rows <- standings_RV()
       if (!nrow(rows)) {
-        return(p(empty_standings_message_RV()))
+        return(fm_info(empty_standings_message_RV(), error = length(failures) > 0L))
       }
       stale <- identical(attr(active_ranking_RV(), "fetch_status"), "stale")
       finances <- finance_data_RV()
@@ -673,7 +673,7 @@ classification_Server <- function(id, is_module_active, login_token, championshi
         paste0(labels[[kind]], " (rounds ", paste(gaps[[kind]], collapse = ", "), ")")
       }, character(1))
       missing_bonus <- any(vapply(rows[, intersect(c("points_bonus", "mvp_bonus", "best_xi_bonus", "position_bonus"), names(rows)), drop = FALSE], anyNA, logical(1)))
-      tagList(
+      fm_info(
         p(if (single_round_RV() != "all") {
           "Click a team to see its formation and ordered substitutes for this round."
         } else {
@@ -703,7 +703,9 @@ classification_Server <- function(id, is_module_active, login_token, championshi
         },
         if (stale) {
           p("Showing saved round standings while the latest source request is unavailable.")
-        }
+        },
+        error = length(failures) > 0L || nzchar(mvp_text(finances$finance_error)) ||
+          (!bonus_loading && missing_bonus && length(attr(rows, "bonus_completed_rounds")) > 0L)
       )
     })
     lineup_context_RV <- reactive({
@@ -765,15 +767,15 @@ classification_Server <- function(id, is_module_active, login_token, championshi
       req(!is.null(selected), identical(selected$context, lineup_context_RV()), is_module_active() == TRUE)
       result <- round_lineup_read_state(function() get_round_lineup_snapshot(login_token(), championship_id(), selected$team_id, selected$round_id))
       if (is.null(result$data)) {
-        return(p(if (isTRUE(result$loading)) {
+        return(fm_info(if (isTRUE(result$loading)) {
           "Loading the official round lineup…"
         } else {
           resource_failure_message(result$error)
-        }))
+        }, error = !isTRUE(result$loading)))
       }
       tagList(
         if (identical(attr(result$data, "fetch_status"), "stale")) {
-          p("Showing the saved lineup while the latest source is being checked or is unavailable.")
+          fm_info("Showing the saved lineup while the latest source is being checked or is unavailable.", error = !is.null(result$error))
         },
         round_lineup_pitch_ui(result$data$answer)
       )
@@ -781,7 +783,7 @@ classification_Server <- function(id, is_module_active, login_token, championshi
     output$classification_table <- renderReactable({
       rows <- standings_RV()
       if (!nrow(rows)) {
-        return(reactable(data.frame(Message = empty_standings_message_RV())))
+        return(NULL) # The collapsed status above carries the full explanation.
       }
       rows <- rows[order(!is.finite(rows$points), rows$rank, rows$team_name, na.last = TRUE), , drop = FALSE]
       bonus_columns <- c("points_bonus", "mvp_bonus", "best_xi_bonus", "position_bonus")
@@ -891,11 +893,11 @@ classification_Server <- function(id, is_module_active, login_token, championshi
         }
       })
       if (is.null(settings$data)) {
-        return(p(if (isTRUE(settings$loading)) {
+        return(fm_info(if (isTRUE(settings$loading)) {
           "Loading league settings…"
         } else {
           resource_failure_message(settings$error)
-        }))
+        }, error = !isTRUE(settings$loading)))
       }
       snapshot <- settings$data
       if (is.function(league_settings_source)) {
@@ -904,12 +906,12 @@ classification_Server <- function(id, is_module_active, login_token, championshi
           snapshot$info$configuration %||% list()
         )
         if (!length(configuration)) {
-          return(p(
+          return(fm_info(
             if (identical(snapshot$status, "loading")) {
               "Loading league settings…"
             } else {
               resource_failure_message(snapshot$error)
-            }
+            }, error = !identical(snapshot$status, "loading")
           ))
         }
         info <- list(configuration = configuration)
@@ -929,7 +931,7 @@ classification_Server <- function(id, is_module_active, login_token, championshi
           "; MVP: ", ui_financial_amount(rules$mvp_reward), "; dream-team player: ", ui_financial_amount(rules$dreamteam_reward)
         ),
         if (isTRUE(snapshot$stale)) {
-          p("Showing saved league settings while the latest configuration is unavailable.")
+          fm_info("Showing saved league settings while the latest configuration is unavailable.", error = !is.null(snapshot$error))
         }
       )
     })
@@ -944,19 +946,19 @@ classification_Server <- function(id, is_module_active, login_token, championshi
       catalog <- rounds_RV()
       index <- match(as.numeric(single_round_RV()), catalog$round_number)
       if (is.na(index)) {
-        return(p("Round identity unavailable."))
+        return(fm_info("Round identity unavailable.", error = TRUE))
       }
       dreamteam <- classification_read_state(function() get_round_dreamteam(login_token(), championship_id(), catalog$round_id[index]))
       if (is.null(dreamteam$data)) {
-        return(p(if (isTRUE(dreamteam$loading)) {
+        return(fm_info(if (isTRUE(dreamteam$loading)) {
           "Loading the published dream team…"
         } else {
           resource_failure_message(dreamteam$error)
-        }))
+        }, error = !isTRUE(dreamteam$loading)))
       }
       players <- classification_dreamteam_rows(dreamteam$data)
       if (!nrow(players)) {
-        return(p("The dream team has not been published or is unavailable."))
+        return(fm_info("The dream team has not been published or is unavailable."))
       }
       tags$ul(lapply(seq_len(nrow(players)), function(i) {
         tags$li(

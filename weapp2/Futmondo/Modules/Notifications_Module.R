@@ -15,7 +15,7 @@ notifications_UI <- function(id) {
   ns <- shiny::NS(id)
   shiny::tagList(
     shiny::fluidRow(shiny::column(12, shiny::h2("Notifications"),
-      shiny::p("Official Futmondo events and their last refresh."))),
+      fm_info("Official Futmondo events and their last refresh."))),
     shiny::fluidRow(
       shiny::column(3, shiny::selectInput(ns("read_filter"), "Read status", c("Unread"="unread","All"="all"))),
       shiny::column(3, shiny::selectInput(ns("source_filter"), "Source", c("Futmondo"))),
@@ -63,7 +63,7 @@ notifications_Server <- function(id, is_module_active, login_token, championship
         })
     }
     shiny::observeEvent(request_context(),{pending_player(NULL);selected(NULL);detail_context(NULL)},ignoreNULL=FALSE,priority=100)
-    output$player_details <- shiny::renderUI({ if(!is.null(pending_player()))return(shiny::p("Loading player details…"));shiny::req(selected()); selected_player_UI(session$ns("player")) })
+    output$player_details <- shiny::renderUI({ if(!is.null(pending_player()))return(fm_info("Loading player details…"));shiny::req(selected()); selected_player_UI(session$ns("player")) })
     shiny::observeEvent(login_token(), {
       official(NULL);pending_player(NULL); selected(NULL); detail_context(NULL); last_success(NULL)
     }, ignoreNULL = FALSE)
@@ -101,9 +101,9 @@ notifications_Server <- function(id, is_module_active, login_token, championship
     })
     output$status <- shiny::renderUI({
       if (!valid_login(login_token())) return(shiny::p("Log in to see notifications."))
-      if (is.null(last_success())) return(shiny::p("Notifications unavailable. Refresh to retry."))
-      shiny::p(if (stale()) "Showing the last successful refresh. " else "Updated ",
-        format(last_success(),"%Y-%m-%d %H:%M UTC",tz="UTC"))
+      if (is.null(last_success())) return(fm_info("Notifications unavailable. Refresh to retry.",error=TRUE))
+      fm_info(if (stale()) "Showing the last successful refresh. " else "Updated ",
+        format(last_success(),"%Y-%m-%d %H:%M UTC",tz="UTC"),error=stale())
     })
     output$items <- shiny::renderUI({
       d <- filtered()

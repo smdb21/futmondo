@@ -2376,3 +2376,57 @@ confirmation blocker above. No factual history or snapshot records were removed.
 - Checks: Lineup module 28 groups, store diagnostics/JSON/isolation 5, runtime 14, persisted round catalog 6 and exact-window history 4 passed. Required offline lifecycle passed 13 checks plus 8 tabs, including no live HTTP/database mutation attempts; synthetic Plotly warnings remain. Actual Lineup browser checks at 390px/1440px confirmed the routine notice is absent, the departed player remains excluded, the compact N-only message fits, and there is no page overflow or JavaScript error. Screenshots were inspected.
 - Performance: the state-only and data-only readers use the same root registry/normalized request key, adding no source/database acquisition. Expiry preserves the known window/averages and draft with no optimization rerun, source read, write or timestamp renewal. Scope checks are six scalar comparisons; no new timer, dependency, cache or persistence schema. Runtime's existing 100-player/all-formation benchmark averaged 42.7ms across 20 runs. Documentation has no runtime cost. Hosted signed-in appearance remains unverified.
 - Separate snapshot-save investigation remains unresolved. Read-only production aggregates confirmed the table/key/grants, 12 successful GETs and zero POSTs in the sampled 24 hours, and current route contexts matching persisted competition/season/scoring. Synthetic validation/round-trip succeeds; this does not identify the actual failing stage. Automatic review rejected exporting private snapshots to temporary files; no export was written. A distinct approved in-memory, read-only replay emitted only a read/decode failure category and wrote no payload, credentials or database rows. The app now retains a safe validator/transport reason and reference while preserving verified Futmondo save status. The next failure's safe diagnostic is needed to distinguish local validation from transport admission; the persistence defect is not marked fixed or hidden.
+
+### 2026-11-15 UTC — Compact information and error icons
+
+- Availability, acquisition/source notes, saved-result/cache meaning, completeness,
+  latest-check timestamps and errors now use closed round `i` disclosures across
+  the application. Error icons are red; loading has an explicit neutral state.
+  Details retain existing diagnostics and Retry buttons. Cache labels moved out
+  of financial figures; no data, timestamps, missing-value semantics, permission
+  rules, manual preflights or persistence acknowledgements were changed.
+- Shared source clocks stay separate from their panel. Rivals' per-team timestamps
+  share the full-width status panel. Plot status and chart rendering share one
+  reactive result; player-chart notes moved out of Plotly annotations without
+  changing the known-answer traces/axes. Browser handling covers Shiny-generated
+  notifications and validation errors, including severity assigned after Shiny's
+  asynchronous content insertion. Opening a disclosure does not request refresh.
+- Focused checks passed: player disclosures 5, league disclosures 4, player trend
+  15, received offers 8, Today availability 3, incoming/outgoing clause signings
+  24 each, card-during-save 4, card loading 7, Lineup 28, login feedback 5 and
+  restore visibility, notification links 5, page preferences 4, league preferences
+  8, Admin settings 6, access control 9, round-lineup 17, finance header 14,
+  debt/countdown 14, worker status 4, classification loading/partial bonuses,
+  Best XI crests, round awards 6, rival summary 12 and plots 3. The required
+  offline lifecycle passed 13 checks plus 8 tabs, including zero HTTP/live database
+  mutation attempts; existing synthetic Plotly warnings remain.
+- Updated obsolete assertions for collapsed chart/login/header markup. The isolated
+  login fixture also needed its existing access-check mocks. The outgoing async
+  fixture's fixed November 14 departure had become past due; it now uses a future
+  synthetic departure while retaining fixed-date known-answer cases. An additional
+  `test_classification_cold.R` assertion expecting the word `missing` fails identically
+  with the pretask module; that unrelated existing fixture mismatch is not repaired
+  or counted as a passing check.
+- Performance: 100 offer-state renders took 0.016s with zero source/database reads.
+  Repeated paired chart/status reads added zero acquisitions. Twenty successful
+  worker polls/heartbeats produced zero repeated renders or source/enqueue calls
+  (0.645s). No new timer, source request, worker job, database query/write, cache,
+  dependency, environment setting or schema is introduced. Existing successful
+  results remain durably persisted and reused with their original context and
+  freshness/completeness; failed writes remain retryable. Documentation has no
+  runtime impact. Browser measurements and delivery status follow below.
+- Browser acceptance passed at 320/390/1440px in both light/dark themes using the
+  production stylesheet and JavaScript: native click/Enter/Space, initial collapse,
+  red errors versus neutral loading, long unbroken text, separate notification
+  info/close targets, Shiny validation and ordinary output errors without exposed
+  prefixes, explicit Retry, stable nested source-clock DOM and preserved expansion
+  after `renderUI` updates. Shiny heartbeat measured 69–108ms and browser task gaps
+  during a burst of DOM updates measured 11–16ms. No page overflow, JavaScript
+  error, extra HTTP request, backend I/O attempt or unintended Retry occurred.
+  Light/dark phone screenshots were inspected. No live account or transaction was
+  used; hosted authenticated appearance and deployment completion remain unverified.
+- Final isolation check exported the task-only staged source (excluding credentials,
+  captures and unrelated working edits) and passed the offline lifecycle again:
+  13 checks plus 8 tabs, zero HTTP/live database mutations. Player/league disclosure,
+  login feedback and deployment-bundle checks also passed on that exact source.
+  Existing unrelated source edits and manifest changes remain outside this commit.

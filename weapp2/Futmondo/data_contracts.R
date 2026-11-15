@@ -1,5 +1,17 @@
 # Shared, explicit contracts for observed data. See docs/data_contracts.md.
 source("theme.R")
+
+# Compact, client-only disclosure. Source/diagnostic text is retained verbatim;
+# native details handles keyboard access without a reactive input or request.
+fm_info <- function(..., error = FALSE, class = NULL) {
+  content <- list(...)
+  content <- Filter(function(x) !is.null(x) && !(is.character(x) && !any(nzchar(x))), content)
+  if (!length(content)) return(NULL)
+  shiny::tags$details(class = paste(c("fm-info", if (isTRUE(error)) "fm-info-error", class), collapse = " "),
+    shiny::tags$summary(`aria-label` = if (isTRUE(error)) "Error details" else "Information",
+      shiny::tags$span(class = "fm-info-icon", `aria-hidden` = "true", "i")),
+    shiny::tags$div(class = "fm-info-body", content))
+}
 preserve_observation_time <- function(data, source = data) {
   if (!is.data.frame(data)) return(data)
   stamp <- attr(source, "observed_at")

@@ -142,7 +142,7 @@ fm_page_preferences <- function(session, login_token, page, is_admin,
   session$output$page_preference_status <- shiny::renderUI({
     problem <- issue()
     if (is.null(problem)) return(NULL)
-    shiny::div(class = "startup-feedback", role = "status",
+    fm_info(error=TRUE, class = "startup-feedback",
       shiny::span(if (identical(problem, "load")) "Your saved page could not be loaded." else
         "Your last page has not been saved yet."),
       shiny::actionButton("retry_page_preference", "Retry"))

@@ -1,12 +1,15 @@
 #!/usr/bin/env Rscript
 # Fast server coverage; add --browser for real click/keyboard loading-state checks.
 suppressPackageStartupMessages(library(shiny))
+source("data_contracts.R")
 `%||%` <- function(x, y) if (is.null(x)) y else x
 valid_login <- function(x) is.character(x) && length(x) == 3L && all(c("token", "userid", "user_name") %in% names(x))
 clear_api_cache <- function(...) invisible(NULL)
 updateBox <- function(...) invisible(NULL)
 resource_timing <- function(...) invisible(TRUE)
 fm_transport_cancel <- function(...) invisible(TRUE)
+fm_app_access <- function(...) promises::promise_resolve(TRUE)
+is_authorized_admin <- function(...) FALSE
 source("Modules/Login_Module.R")
 
 login_markup <- as.character(login_UI("login"))
@@ -46,7 +49,7 @@ testServer(login_Server, args = list(id = "login"), session = mock_session, {
     grepl("Enter your username and password", output$login_feedback$html, fixed = TRUE),
     length(messages) == 1L, identical(messages[[1L]]$payload, list(busy = FALSE)))
 
-  # A failed first login remains visible even when NULL token does not change.
+  # A failed first login exposes a collapsed red disclosure even when the NULL token does not change.
   session$setInputs(user_name = "person@example.invalid", password = "wrong")
   session$setInputs(login_button = 2)
   settle(session)
@@ -54,7 +57,9 @@ testServer(login_Server, args = list(id = "login"), session = mock_session, {
   stopifnot(is.null(login_token_RV()), attempts == 1L,
     grepl("Could not authenticate with Futmondo", html, fixed = TRUE),
     !grepl("private transport detail", html, fixed = TRUE),
-    grepl('role="alert"', html, fixed = TRUE),
+    grepl('fm-info-error', html, fixed = TRUE),
+    grepl('aria-label="Error details"', html, fixed = TRUE),
+    !grepl('<details[^>]* open', html),
     length(messages) == 2L, identical(messages[[2L]]$payload, list(busy = FALSE)))
 
   # Invalid endpoint responses also release the browser button.
@@ -71,8 +76,9 @@ testServer(login_Server, args = list(id = "login"), session = mock_session, {
   settle(session)
   stopifnot(attempts == 3L, valid_login(login_token_RV()),
     identical(session$userData$futmondo_user_id, "offline-user"),
-    identical(login_feedback_RV()$kind, "success"), length(messages) == 4L,
-    all(vapply(messages, function(x) identical(x$type, session$ns("login_state")) && identical(x$payload, list(busy = FALSE)), logical(1))),
+    identical(login_feedback_RV()$kind, "success"), length(messages) == 6L,
+    all(vapply(messages[c(1:4,6)], function(x) identical(x$type, session$ns("login_state")) && identical(x$payload, list(busy = FALSE)), logical(1))),
+    identical(messages[[5]]$payload,list(busy=TRUE,message="Checking app access…")),
     length(cleared_passwords) == 4L,
     all(vapply(cleared_passwords, function(x) identical(x$value, ""), logical(1))))
 })

@@ -80,7 +80,7 @@ fm_league_preferences <- function(session,login_token,leagues,store=fm_league_st
   session$onSessionEnded(function(){closed<<-TRUE;generation<<-generation+1L})
   session$output$league_preference_status<-shiny::renderUI({
     problem<-issue();if(is.null(problem))return(NULL)
-    shiny::div(class='startup-feedback',role='status',shiny::span(if(identical(problem,'load'))'Your saved league could not be loaded.'else'Your last league has not been saved yet.'),
+    fm_info(error=TRUE,class='startup-feedback',shiny::span(if(identical(problem,'load'))'Your saved league could not be loaded.'else'Your last league has not been saved yet.'),
       shiny::actionButton('retry_league_preference','Retry'))
   })
   list(selected=selected)

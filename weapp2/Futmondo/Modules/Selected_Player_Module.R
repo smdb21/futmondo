@@ -181,6 +181,7 @@ selected_player_UI <- function(id) {
                    h4(style = "font-weight: 600; color: var(--fm-text); margin: 0;", "Historical Valuation & Performance"),
                    actionButton(ns("refresh_history"), "Refresh history", icon=icon("rotate"))
                  ),
+                 uiOutput(ns("player_chart_info")),
                  uiOutput(ns("player_chart_container"))
           )
         ),
@@ -382,11 +383,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     # ---- Live price preview helper ----
     render_input_price_preview <- function(val) {
       if (is.null(val) || is.na(val) || !is.numeric(val) || val <= 0) {
-        div(
-          style = "margin-top: 6px; color: var(--fm-danger); font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;",
-          shiny::tags$i(class = "fa-solid fa-circle-exclamation"),
-          "Please enter a valid numerical price greater than 0 €."
-        )
+        fm_info("Please enter a valid numerical price greater than 0 €.",error=TRUE)
       } else {
         div(
           style = "margin-top: 6px; color: var(--fm-text); font-size: 14px; font-weight: 700;",
@@ -403,8 +400,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     output$player_identity_summary <- renderUI({
       sp <- selected_player()
       if (is.null(sp)) {
-        return(div(class = "player-card-loading",
-          icon("spinner", class = "fa-spin"), span("Loading player details…")))
+        return(fm_info("Loading player details…",class="player-card-loading"))
       }
       player_name <- if ("name" %in% names(sp) && !is.na(sp$name)) as.character(sp$name) else "Player"
       role <- if ("role" %in% names(sp) && !is.na(sp$role)) as.character(sp$role) else "Position unavailable"
@@ -684,7 +680,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           clause_gate <- passive_acquisition_gate(sp,"clause")
           blocked_reason <- if(!isTRUE(bid_gate$ok)) bid_gate$message else if(!isTRUE(clause_gate$ok)) clause_gate$message else NULL
           if(!is.null(blocked_reason)&&!identical(bid_gate$reason,"loading")&&!identical(clause_gate$reason,"loading")) action_buttons <- tagList(action_buttons,
-            div(class="acquisition-capacity-warning",icon("triangle-exclamation")," ",blocked_reason))
+            fm_info(blocked_reason,error=TRUE))
 
           if (!is.na(eff_market_price) && eff_market_price > 0) {
             action_buttons <- tagList(
@@ -747,9 +743,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
             } else if(is.list(tag))tag<-lapply(tag,disable)
             tag
           }
-          action_buttons<-tagList(div(role="status",icon("spinner",class="fa-spin")," Checking availability…"),disable(action_buttons))
+          action_buttons<-tagList(fm_info("Checking availability…"),disable(action_buttons))
         } else if(is.null(readiness$data)) {
-          action_buttons<-tagList(div(class="acquisition-capacity-warning",resource_failure_message(readiness$error)))
+          action_buttons<-tagList(fm_info(resource_failure_message(readiness$error),error=TRUE))
         }
         output$action_buttons <- renderUI(action_buttons)
       }
@@ -964,8 +960,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     }
     output$market_offer_body <- renderUI({
       dialog <- market_offer_dialog_RV();req(dialog)
-      if (isTRUE(dialog$pending)) return(div(role="status",icon("spinner",class="fa-spin")," Checking availability…"))
-      if (!isTRUE(dialog$preflight$ok)) return(div(role="alert",dialog$preflight$message))
+      if (isTRUE(dialog$pending)) return(fm_info("Checking availability…"))
+      if (!isTRUE(dialog$preflight$ok)) return(fm_info(dialog$preflight$message,error=TRUE))
       market_price <- dialog$preflight$minimum_bid
       tagList(p("Minimum market bid: ",strong(player_card_money(market_price))),
         numericInput(ns("bid_amount"),label="Your offer amount (EUR):",value=market_price,min=market_price,step=10000),
@@ -1912,17 +1908,22 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     })
     output$player_chart_container <- renderUI({
       req(selected_player())
-      if(!isTRUE(card_chart_ready()))return(div(class="player-card-loading",role="status","Loading chart…"))
+      if(!isTRUE(card_chart_ready()))return(NULL)
       plotly::plotlyOutput(ns("player_trend_plot"),height="340px")
+    })
+    output$player_chart_info <- renderUI({
+      sp<-selected_player();req(sp)
+      if(!isTRUE(card_chart_ready()))return(fm_info("Loading chart…"))
+      player_trend_information(card_history(),sp,normalize_player_matches(card_states$matches()$data))
     })
     output$player_trend_plot <- plotly::renderPlotly({
       req(card_chart_ready())
       sp <- selected_player(); req(sp); history <- card_history()
-      empty_chart <- function(message) plotly::plot_ly() %>% fm_plot_layout(
+      empty_chart <- function() plotly::plot_ly() %>% fm_plot_layout(
         paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",
         xaxis=list(visible=FALSE),yaxis=list(visible=FALSE),
-        annotations=list(list(text=message,x=.5,y=.5,xref="paper",yref="paper",showarrow=FALSE)))
-      if (identical(history$status,"loading") && !nrow(history$points) && !nrow(history$valuation)) return(empty_chart("Loading player history…"))
+        annotations=list())
+      if (identical(history$status,"loading") && !nrow(history$points) && !nrow(history$valuation)) return(empty_chart())
       points <- history$points
       if (!is.data.frame(points) || !all(c("round_number","points") %in% names(points))) points <- data.frame()
       if (nrow(points)) {
@@ -1937,17 +1938,13 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         values <- values[!is.na(values$date)&is.finite(values$value),,drop=FALSE]
         values <- values[order(values$date),,drop=FALSE]
       }
-      notes <- character()
-      if (!nrow(values)) notes <- c(notes,paste0("Valuation history unavailable. Current value: ",player_card_money(sp$value)))
-      if (!nrow(points)) notes <- c(notes,recent_round_points_empty_text(sp$points))
-      if (!nrow(values) && !nrow(points)) return(empty_chart(paste(notes,collapse="<br>")))
+      if (!nrow(values) && !nrow(points)) return(empty_chart())
 
       # Reuse the already requested match details to date rounds; never use
       # observation/save timestamps as match dates or discard undated scores.
       points_dates <- player_trend_points_dates(points,normalize_player_matches(card_states$matches()$data),history$context %||% list())
       dated_points <- nrow(points)>0L && all(!is.na(points_dates))
       separate_round_axis <- nrow(values)>0L && nrow(points)>0L && !dated_points
-      if (separate_round_axis) notes <- c(notes,"Match dates unavailable:<br>round axis is not aligned with dates.")
       chart <- plotly::plot_ly()
       if (nrow(values)) chart <- chart %>% plotly::add_trace(data=values,type="scatter",mode="lines+markers",x=~date,y=~value,
         name="Valuation",yaxis="y",line=list(color="#00ff88",width=2.5,dash="solid"),marker=list(size=5),
@@ -1977,17 +1974,15 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       }
       chart %>% fm_plot_layout(
         xaxis=horizontal_axis,
-        xaxis2=if(separate_round_axis)list(title="Round (dates unavailable)",overlaying="x",side="top",
+        xaxis2=if(separate_round_axis)list(title="Round",overlaying="x",side="top",
           tickmode="linear",dtick=round_spacing,tickangle=0,showgrid=FALSE)else list(visible=FALSE),
         yaxis=list(title="Value (EUR)",visible=nrow(values)>0L,autorange=FALSE,
           range=player_trend_axis_range(values$value),tickformat=".3s",color="#00ff88"),
         yaxis2=list(title="Points",visible=nrow(points)>0L,overlaying="y",side="right",autorange=FALSE,
           range=player_trend_axis_range(points$points),showgrid=FALSE,color="#F4C95D",tickformat="~g"),
         showlegend=FALSE,
-        margin=list(l=55,r=50,b=if(length(notes))120 else 55,t=if(separate_round_axis)60 else 20),
-        annotations=if(length(notes))list(list(text=paste(unlist(lapply(notes,function(note)
-          strwrap(gsub("<br>","\n",note,fixed=TRUE),width=36))),collapse="<br>"),x=.5,y=0,yshift=-70,
-          xref="paper",yref="paper",showarrow=FALSE,xanchor="center",yanchor="top",font=list(size=10)))else list())
+        margin=list(l=55,r=50,b=55,t=if(separate_round_axis)60 else 20),
+        annotations=list())
     })
     render_match <- function(match) {
       score<-if(is.finite(match$home_score)&&is.finite(match$away_score))paste0(format(match$home_score,trim=TRUE),"–",format(match$away_score,trim=TRUE))else "Score unavailable"
@@ -2005,25 +2000,24 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
             div(class="player-round-heading",span(paste("Round",round$round_number)),
               strong(if(is.finite(round$points))paste0(round$points," pts")else "Points unavailable")),
             if(nrow(round$fixtures))lapply(seq_len(nrow(round$fixtures)),function(i)render_match(round$fixtures[i,,drop=FALSE]))else
-              span(class="player-match-date",if(identical(match_state$status,"loading"))"Loading match details…"else "Match association unavailable"))
+              fm_info(if(identical(match_state$status,"loading"))"Loading match details…"else "Match association unavailable",error=!identical(match_state$status,"loading")))
         })),
-        if(!length(rounds$rounds))span(class="player-recent-rounds-empty",if(identical(history$status,"loading"))"Loading round points…"else recent_round_points_empty_text(sp$points)),
-        if(is.null(card_states$summary()$data)&&!identical(card_states$summary()$status,"loading"))span(class="player-history-status",resource_failure_message(card_states$summary()$error)),
+        if(!length(rounds$rounds))fm_info(if(identical(history$status,"loading"))"Loading round points…"else recent_round_points_empty_text(sp$points),error=!identical(history$status,"loading")),
+        if(is.null(card_states$summary()$data)&&!identical(card_states$summary()$status,"loading"))fm_info(resource_failure_message(card_states$summary()$error),error=TRUE),
         if(nrow(rounds$unassociated))tagList(
-          p(class="player-history-status","Match records · points association unavailable"),
+          fm_info("Match records · points association unavailable",error=TRUE),
           div(class="player-round-boxes",lapply(seq_len(nrow(rounds$unassociated)),function(i){
             match<-rounds$unassociated[i,,drop=FALSE]
             div(class="player-match-card player-round-box",span(class="player-match-round",paste("Round",match$round)),render_match(match))
           }))),
-        if(is.null(match_state$data)&&!identical(match_state$status,"loading"))span(class="player-history-status",resource_failure_message(match_state$error)),
-        if(length(rounds$rounds))tags$details(class="player-points-explanation",
-          tags$summary("About these points"),p("Points are reported by Futmondo. Final confirmation is not provided for some rounds.")),
-        if(identical(history$freshness,"stale"))span(class="player-history-status","Showing saved history; refresh failed."))
+        if(is.null(match_state$data)&&!identical(match_state$status,"loading"))fm_info(resource_failure_message(match_state$error),error=TRUE),
+        if(length(rounds$rounds))fm_info(p("About these points"),p("Points are reported by Futmondo. Final confirmation is not provided for some rounds."),class="player-points-explanation"),
+        if(identical(history$freshness,"stale"))fm_info("Showing saved history; refresh failed.",error=TRUE))
     })
     output$player_external_details <- renderUI({
       req(selected_player());state<-card_states$profile();answer<-state$data
       if(is.null(answer))return(div(class="player-external-details",h4(icon("address-card")," Player profile"),
-        span(if(identical(state$status,"loading"))"Loading profile…"else resource_failure_message(state$error))))
+        fm_info(if(identical(state$status,"loading"))"Loading profile…"else resource_failure_message(state$error),error=!identical(state$status,"loading"))))
       data<-normalize_player_full_profile(answer);profile<-data$profile;bits<-character()
       if(nzchar(profile$nationality))bits<-c(bits,profile$nationality)
       if(is.finite(profile$height_cm)&&profile$height_cm>0)bits<-c(bits,paste0(format(profile$height_cm,trim=TRUE)," cm"))
@@ -2032,8 +2026,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       prices<-data$price_history;latest<-if(nrow(prices))tail(prices,1L)else NULL
       div(class="player-external-details",h4(icon("address-card")," Player profile"),
         div(class="player-profile-summary",if(length(bits))span(paste(bits,collapse=" · ")),
-          span(class="player-profile-price",if(!is.null(latest)&&is.finite(latest$social[1]))
-            paste0("Profile valuation: ",player_card_money(latest$social[1])," · ",nrow(prices)," saved values")else "Profile valuation history is unavailable.")))
+          if(!is.null(latest)&&is.finite(latest$social[1]))tagList(
+            span(class="player-profile-price",paste0("Profile valuation: ",player_card_money(latest$social[1]))),
+            fm_info(paste(nrow(prices),"saved values")))else fm_info("Profile valuation history is unavailable.",error=TRUE)))
     })
 
     ## render player_points_description_box ----
@@ -2274,3 +2269,22 @@ add_sign <- function(x) {
   }
 }
 # Preserve the selected player's score and shape; calculate only when absent.
+
+# Chart diagnostics use existing history/match state; expanding them never fetches.
+player_trend_information <- function(history, player, matches=data.frame()) {
+  if(identical(history$status,"loading"))return(fm_info("Loading player history…"))
+  points<-history$points;values<-history$valuation
+  if(!is.data.frame(points)||!all(c("round_number","points")%in%names(points)))points<-data.frame()
+  if(nrow(points))points<-points[is.finite(suppressWarnings(as.numeric(points$round_number)))&
+    is.finite(suppressWarnings(as.numeric(points$points))),,drop=FALSE]
+  if(!is.data.frame(values)||!all(c("recorded_at","value")%in%names(values)))values<-data.frame()
+  if(nrow(values))values<-values[!is.na(fm_time(values$recorded_at))&
+    is.finite(suppressWarnings(as.numeric(values$value))),,drop=FALSE]
+  notes<-character()
+  if(!nrow(values))notes<-c(notes,paste0("Valuation history unavailable. Current value: ",player_card_money(player$value)))
+  if(!nrow(points))notes<-c(notes,recent_round_points_empty_text(player$points))
+  if(nrow(points)&&nrow(values)&&anyNA(player_trend_points_dates(points,matches,history$context %||% list())))
+    notes<-c(notes,"Match dates unavailable: round axis is not aligned with dates.")
+  if(!length(notes))return(NULL)
+  fm_info(lapply(notes,shiny::tags$p),error=TRUE,class="player-history-status")
+}

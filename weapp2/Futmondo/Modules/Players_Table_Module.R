@@ -113,8 +113,7 @@ players_table_UI <- function(id, box_title = NULL,
         column(width=12,
           numericInput(ns("recent_games_n"),"Average points: latest rounds",
             min=1,max=20,value=5,step=1,width="180px"),
-          div(class="player-round-progress",role="status",`aria-live`="polite",`aria-atomic`="true",
-            textOutput(ns("recent_points_status")))
+          uiOutput(ns("recent_points_status"),class="player-round-progress")
         )
       ),
 
@@ -545,10 +544,10 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       return(players_table)
     })
     
-    output$recent_points_status <- renderText({
+    output$recent_points_status <- renderUI({
       req(is_module_active(),optional_ready())
       status <- tryCatch(recent_points$status(),error=function(e)NULL)
-      if(is.null(status))return("Loading round history…")
+      if(is.null(status))return(fm_info("Loading round history…"))
       messages <- character()
       if(status$remaining+status$pending>0L)messages <- c(messages,paste0("Loading round history: ",
         status$completed %||% (status$total-status$remaining-status$pending),"/",status$total," players."))
@@ -566,7 +565,9 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
         messages <- c(messages,paste0("History source unavailable (",paste(references,collapse=", "),")."))
       }
       if(!status$matrix_complete)messages <- c(messages,"Saved round history is incomplete.")
-      paste(messages,collapse=" ")
+      if(!length(messages))return(NULL)
+      fm_info(paste(messages,collapse=" "),error=!is.null(status$save_error)||status$failed>0L||length(status$initial_errors %||% list())>0L||
+        (!isTRUE(status$matrix_complete)&&status$remaining+status$pending==0L))
     })
 
     # History averages render in JavaScript and update in place. Other columns

@@ -1343,3 +1343,19 @@ The existing database snapshots, original observation/completeness metadata and 
 ## Lineup status duplication and expired schedule observations — 2026-11-14
 
 Implemented locally: remove the routine departure-exclusion paragraph, replace the long Best XI mismatch explanation with one reason-specific line, and distinguish unknown inputs from actual changed inputs. Fix worker schedule expiry clearing the verified completed-round window and falsely warning about unchanged Last N settings. Reuse the existing persisted worker observations with original timestamps, complete acquisition evidence and exact scope, retaining separate source read errors through the shared root adapter. No new source acquisition, storage, dependency or timer. Verification/performance and the separate snapshot-save investigation are recorded in `data_review_results.md`; hosted acceptance remains separate.
+
+### Information icons throughout the UI — implemented locally (2026-11-15 UTC)
+
+- Data/source/cache/update explanations now use a shared closed `i` disclosure.
+  Errors use red icons with details and existing Retry controls inside. Header,
+  worker status, cards, tables, Lineup, rankings, awards, plots, login and settings
+  retain their source evidence without displaying technical paragraphs by default.
+- Numerical values, missing-value semantics, durable database reuse, context
+  isolation and all manual-action checks remain unchanged. Normal loading is
+  distinct from a failure. Source-clock text updates independently; paired chart
+  and diagnostic consumers share existing reactive results.
+- Local exit criteria: keyboard/touch expansion, responsive light/dark rendering,
+  retained diagnostics/error severity, no acquisition from toggles, focused
+  regressions and the offline lifecycle harness. See `ui_information_disclosures.md`
+  and `data_review_results.md`. Production appearance is not established by local
+  checks; the standing branch push triggers the configured deployment.

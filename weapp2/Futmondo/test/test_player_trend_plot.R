@@ -30,8 +30,8 @@ check("unknown point finality is preserved in chart provenance",{
  history<-known;history$points$score_status[4]<-"unknown";chart<-render_fixture(history)
  stopifnot(grepl("unknown",tail(chart$data[[1]]$text,1),fixed=TRUE),identical(as.numeric(unlist(chart$data[[1]]$y)),c(4,0,-2,3)))
 })
-check("cumulative totals never become round scores",{chart<-render_fixture(total=37);stopifnot(grepl("Total points: 37",chart$layout$annotations[[1]]$text,fixed=TRUE));text<-paste(readLines("Modules/Selected_Player_Module.R"),collapse="\n");stopifnot(!grepl("build_player_points_trace|get_player_historical_data",text))})
-check("unknown valuation has no fabricated curve",{chart<-render_fixture(value=1234567);stopifnot(grepl("Valuation history unavailable",chart$layout$annotations[[1]]$text,fixed=TRUE),grepl("1.234.567",chart$layout$annotations[[1]]$text,fixed=TRUE))})
+check("cumulative totals stay in collapsed information and never become round scores",{chart<-render_fixture(total=37);info<-as.character(player_trend_information(empty(),data.frame(points=37,value=1000000)));stopifnot(!length(chart$layout$annotations),grepl("Total points: 37",info,fixed=TRUE),grepl("<details",info,fixed=TRUE));text<-paste(readLines("Modules/Selected_Player_Module.R"),collapse="\n");stopifnot(!grepl("build_player_points_trace|get_player_historical_data",text))})
+check("unknown valuation has no fabricated curve and diagnostics are collapsed",{chart<-render_fixture(value=1234567);info<-as.character(player_trend_information(empty(),data.frame(points=12,value=1234567)));stopifnot(!length(chart$layout$annotations),grepl("Valuation history unavailable",info,fixed=TRUE),grepl("1.234.567",info,fixed=TRUE),grepl("fm-info-error",info,fixed=TRUE),!grepl("<details[^>]* open",info))})
 combined<-known;combined$valuation<-data.frame(recorded_at=c("2026-10-01T00:00:00Z","2026-10-02T00:00:00Z","bad"),value=c(99e6,100e6,1))
 check("valuation keeps only actual finite dated observations",{chart<-render_fixture(combined);stopifnot(identical(as.numeric(unlist(chart$data[[1]]$y)),c(99e6,100e6)))})
 check("both series have independent vertical scales and distinct styles",{
@@ -67,7 +67,8 @@ check("dense histories use sparse automatic dates without an empty dtick",{
 check("undated scores stay visible with an explicitly independent round axis",{
  chart<-render_fixture(combined)
  stopifnot(chart$data[[2]]$xaxis=="x2",identical(as.numeric(chart$data[[2]]$x),as.numeric(1:4)),
-   chart$layout$xaxis2$overlaying=="x",grepl("not aligned with dates",chart$layout$annotations[[1]]$text,fixed=TRUE))
+   chart$layout$xaxis2$overlaying=="x",!length(chart$layout$annotations),
+   grepl("not aligned with dates",as.character(player_trend_information(combined,data.frame(points=5,value=100))),fixed=TRUE))
 })
 check("existing scoped match dates align points without a new read",{
  history<-combined;history$context<-list(player_id="p",season="2026",competition_id="league")

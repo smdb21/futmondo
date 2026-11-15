@@ -52,7 +52,7 @@ login_UI <- function(id) {
         "}if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',bindLogin,{once:true});}",
         "else{bindLogin();}})();"
       ))),
-      div(style = "color: var(--fm-text); font-size: 11px; margin-top: 15px; display: flex; flex-direction: column; gap: 6px;",
+      fm_info(
         div(style = "display: flex; align-items: flex-start; gap: 6px;",
           shiny::tags$i(class = "fa-solid fa-server", style = "color: var(--fm-text); margin-top: 2px;"),
           span("Log in with your Futmondo account to authenticate directly with the official Futmondo server.")
@@ -95,25 +95,22 @@ login_Server <- function(id, user = NULL, password = NULL) {
     output$login_feedback <- renderUI({
       feedback <- login_feedback_RV()
       if (is.null(feedback)) return(NULL)
-      div(
-        class = paste("login-feedback", paste0("login-feedback-", feedback$kind)),
-        role = "alert",
-        `aria-live` = "assertive",
-        icon(if (identical(feedback$kind, "error")) "triangle-exclamation" else "circle-check"),
-        span(feedback$message)
-      )
+      fm_info(feedback$message, error=identical(feedback$kind, "error"),
+        class=paste("login-feedback", paste0("login-feedback-", feedback$kind)))
     })
     remember_retry <- reactiveVal(NULL)
     remember_feedback <- reactiveVal(NULL)
     remembered <- NULL
     output$remember_availability <- renderUI({
       available <- exists("remember_login_enabled",mode="function") && remember_login_enabled()
-      if (!available) tags$small("Remembered login is not enabled on this deployment. You can log in normally.")
+      if (!available) fm_info("Remembered login is not enabled on this deployment. You can log in normally.")
     })
     output$remember_feedback <- renderUI({
       feedback<-remember_feedback();if(is.null(feedback))return(NULL)
-      tagList(div(class=paste("login-feedback",paste0("login-feedback-",feedback$kind)),role="status",feedback$message),
-        if(!is.null(remember_retry()))actionButton(session$ns("remember_retry"),"Retry saved access"))
+      fm_info(feedback$message,
+        if(!is.null(remember_retry()))actionButton(session$ns("remember_retry"),"Retry saved access"),
+        error=feedback$kind %in% c("error","warning"),
+        class=paste("login-feedback",paste0("login-feedback-",feedback$kind)))
     })
     signed_out <- function(){
       restore_checking(FALSE)
@@ -302,11 +299,8 @@ login_Server <- function(id, user = NULL, password = NULL) {
         # if login_token is null
         if (is.null(login_token) || length(login_token) != 3) {
           output$text <- renderUI({
-            div(
-              class = "login-result login-result-error",
-              h4(style = "margin-top: 0; font-weight: 700;", "Login Failed"),
-              p(style = "margin-bottom: 0;", login_feedback_RV()$message %||% "You are signed out.")
-            )
+            fm_info(login_feedback_RV()$message %||% "You are signed out.", error=TRUE,
+              class="login-result login-result-error")
           })
           updateBox(
             id = "login_result_box",
@@ -334,13 +328,7 @@ login_Server <- function(id, user = NULL, password = NULL) {
                 p(style = "color: var(--fm-text); margin: 2px 0 0 0; font-size: 13px;", "Signed in to Futmondo")
               )
             ),
-            div(
-              style = "background-color: var(--fm-surface); border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-top: 10px;",
-              p(style = "margin: 0; font-size: 13px; color: var(--fm-text);",
-                icon("shield-halved", style = "color: var(--fm-text); margin-right: 6px;"),
-                strong("Status: "), "Signed in. Loading your leagues…"
-              )
-            )
+            fm_info("Signed in. Loading your leagues…")
           )
         })
         updateBox(

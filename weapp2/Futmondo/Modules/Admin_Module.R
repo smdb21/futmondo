@@ -91,8 +91,8 @@ admin_league_settings_UI <- function(rows,stale=FALSE) {
  other<-rows[rows$group=="Other reported settings",,drop=FALSE]
  tagList(
   singleton(tags$style(HTML(".fm-admin-settings-card{margin-bottom:12px;padding:12px;border:1px solid var(--fm-border);border-radius:7px;background:var(--fm-surface);min-width:0}.fm-admin-settings-card h3{font-size:15px;margin:0 0 8px}.fm-admin-setting{border-top:1px solid var(--fm-border);padding:6px 0;min-width:0}.fm-admin-setting summary{display:flex;gap:8px;align-items:baseline;cursor:pointer;overflow-wrap:anywhere}.fm-admin-setting summary::before{content:'+';color:var(--fm-muted)}.fm-admin-setting[open] summary::before{content:'−'}.fm-admin-setting summary>span{flex:1;min-width:0}.fm-admin-setting summary>strong{text-align:right;max-width:55%;min-width:0}.fm-admin-setting p{color:var(--fm-muted);font-size:12px;margin:6px 0 2px;overflow-wrap:anywhere}.fm-admin-reported{margin:4px 0 16px}.fm-admin-reported>summary{cursor:pointer}.fm-admin-reported dl{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 12px;margin:8px 0;max-width:480px}.fm-admin-reported dt,.fm-admin-reported dd{overflow-wrap:anywhere}.fm-admin-reported dd{text-align:right;margin:0}"))),
-  tags$p("Current league settings · Read-only. Open a setting for details; change it in Futmondo."),
-  if(isTRUE(stale))tags$p(role="status","Showing saved settings while the latest configuration is unavailable."),
+  fm_info("Current league settings · Read-only. Open a setting for details; change it in Futmondo."),
+  if(isTRUE(stale))fm_info("Showing saved settings while the latest configuration is unavailable.",error=TRUE),
   fluidRow(class="fm-admin-settings-grid",lapply(split(groups,ceiling(seq_along(groups)/2)),function(pair){
    column(12,class="col-md-4",lapply(pair,function(group){
     part<-rows[rows$group==group,,drop=FALSE]
@@ -103,19 +103,19 @@ admin_league_settings_UI <- function(rows,stale=FALSE) {
   if(nrow(other))tags$details(class="fm-admin-reported",tags$summary(paste0("Other reported settings (",nrow(other),")")),
    tags$p("These additional settings retain their reported field names because their meanings and units have not been established."),
    tags$dl(lapply(seq_len(nrow(other)),function(i)tagList(tags$dt(other$setting[i]),tags$dd(other$value[i]))))),
-  tags$p(style="font-size:12px;color:var(--fm-muted);","Round rewards exclude teams that started the round in debt. These are current rules; past changes may affect reconstructed balances.")
+  fm_info("Round rewards exclude teams that started the round in debt. These are current rules; past changes may affect reconstructed balances.")
  )
 }
 
 admin_UI <- function(id) {
  ns<-NS(id)
- tagList(h2("App access"),uiOutput(ns("access_control")),h2("League settings"),uiOutput(ns("league_settings")),h2("Database administration"),p("Inspect retained factual tables. Changes require an authorized administrator."),
+ tagList(h2("App access"),uiOutput(ns("access_control")),h2("League settings"),uiOutput(ns("league_settings")),h2("Database administration"),fm_info("Inspect retained factual tables. Changes require an authorized administrator."),
   actionButton(ns("btn_refresh_stats"),"Refresh table counts"),reactable::reactableOutput(ns("tables_stats_table")),
   actionButton(ns("btn_verify_db"),"Verify database connection"),
-  h3("Round awards"),p("Saved selections improve reward estimates. Historical eligibility and payment coverage are checked separately."),
+  h3("Round awards"),fm_info("Saved selections improve reward estimates. Historical eligibility and payment coverage are checked separately."),
   uiOutput(ns("award_actions")),
   selectInput(ns("award_round"),"Round to refresh",choices=character()),actionButton(ns("btn_refresh_selected_award"),"Refresh selected round"),
-  textOutput(ns("awards_progress")),reactable::reactableOutput(ns("awards_coverage")),
+  uiOutput(ns("awards_progress")),reactable::reactableOutput(ns("awards_coverage")),
   actionButton(ns("btn_reset_db"),"Reset retained database tables",class="btn-danger"))
 }
 admin_Server <- function(id,is_module_active,login_token,championship_id,user_team_id,user_teams_RV,is_admin=NULL,refresh_trigger=NULL,league_settings_source=NULL) {
@@ -125,9 +125,9 @@ admin_Server <- function(id,is_module_active,login_token,championship_id,user_te
   fm_admin_access(session,login_token,reactive(isTRUE(is_module_active()) && isTRUE(authorized())))
   output$league_settings<-renderUI({
    req(is_module_active(),authorized())
-   if(!is.function(league_settings_source))return(tags$p("League settings are unavailable."))
+   if(!is.function(league_settings_source))return(fm_info("League settings are unavailable.",error=TRUE))
    snapshot<-league_settings_source()
-   if(!is.list(snapshot))return(tags$p("League settings are unavailable."))
+   if(!is.list(snapshot))return(fm_info("League settings are unavailable.",error=TRUE))
    rows<-admin_league_settings(snapshot$league %||% list(),snapshot$info %||% list(),championship_id())
    admin_league_settings_UI(rows,stale=isTRUE(snapshot$stale))
   })
@@ -168,14 +168,14 @@ admin_Server <- function(id,is_module_active,login_token,championship_id,user_te
     if(!nrow(rows))return(reactable::reactable(data.frame(Status="No completed rounds yet.")))
     reactable::reactable(rows,columns=list(round_id=reactable::colDef(show=FALSE),required=reactable::colDef(show=FALSE),round_number=reactable::colDef(name="Round",cell=function(value,index)award_round_labels(value,rows$round_id[index])),selection=reactable::colDef(name="Selection"),finality=reactable::colDef(name="Finality"),mvp=reactable::colDef(name="MVP"),last_fetched=reactable::colDef(name="Last fetched"),persistence=reactable::colDef(name="Saved status"),issue=reactable::colDef(name="Issue")),defaultSorted=list(round_number="desc"),compact=TRUE,wrap=TRUE)
   })
-  output$awards_progress<-renderText({req(is_module_active(),authorized());snapshot<-awards()
-    if(isTRUE(snapshot$loading))return("Loading round details…")
-    # Keep the actual failure visible above the table on narrow screens.
+  output$awards_progress<-renderUI({req(is_module_active(),authorized());snapshot<-awards()
+    if(isTRUE(snapshot$loading))return(fm_info("Loading round details…"))
+    # Keep failure details available through a compact disclosure above the table.
     issues<-if(is.data.frame(snapshot$coverage)&&all(c("issue","required")%in%names(snapshot$coverage)))snapshot$coverage$issue[snapshot$coverage$required%in%TRUE] else character()
     issues<-issues[!is.na(issues)&nzchar(trimws(issues))]
     counts<-sort(table(issues),decreasing=TRUE)
     details<-if(length(counts))paste0("Failures: ",paste(paste0(head(as.integer(counts),3L)," × ",head(names(counts),3L)),collapse="; "),". ")else ""
-    paste0(snapshot$fetched %||% 0," fetched; ",snapshot$saved %||% 0," confirmed saved; ",snapshot$failed %||% 0," failed; ",snapshot$pending %||% 0," pending. ",details,snapshot$reason)
+    fm_info(paste0(snapshot$fetched %||% 0," fetched; ",snapshot$saved %||% 0," confirmed saved; ",snapshot$failed %||% 0," failed; ",snapshot$pending %||% 0," pending. ",details,snapshot$reason),error=(snapshot$failed %||% 0)>0L||length(issues)>0L)
   })
   observeEvent(input$btn_sync_dreamteams,{req(is_module_active(),authorized());attr(awards,"retrieve")("missing")})
   observeEvent(input$btn_refresh_awards,{req(is_module_active(),authorized());attr(awards,"retrieve")("refresh")})

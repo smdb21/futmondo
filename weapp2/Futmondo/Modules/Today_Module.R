@@ -39,14 +39,14 @@ today_transfer_rows <- function(rows, teams=NULL, players=NULL,timezone="UTC") {
 # Primary factual content resolves independently of optional history/finances.
 today_UI <- function(id) {
   ns <- NS(id)
-  tagList(h2("Today's market"),p("Available market players and offers, current league balances and completed transfers."),
+  tagList(h2("Today's market"),fm_info("Available market players and offers, current league balances and completed transfers."),
     coach_preference_script(),checkboxInput(ns("automatically_hire_coach"),"Automatically hire coach",value=TRUE),
-    textOutput(ns("coach_status"),container=tags$p),
+    uiOutput(ns("coach_status")),
     fluidRow(uiOutput(ns("kpi_cash_box")),uiOutput(ns("kpi_valuation_box"))),
     uiOutput(ns("market_status")),
     players_table_UI(ns("market_players"),box_title="Current market listings",filter_by_is_from_futmondo=TRUE,default_free_agents=TRUE,filter_by_players_with_bid=TRUE),
     rivals_timezone_script(ns("browser_timezone")),
-    h3("League transfers"),textOutput(ns("transfer_coverage")),reactable::reactableOutput(ns("recent_transfers")))
+    h3("League transfers"),uiOutput(ns("transfer_coverage")),reactable::reactableOutput(ns("recent_transfers")))
 }
 today_Server <- function(id,is_module_active,login_token,championship_id,user_team_id,user_teams_RV,refresh_trigger=NULL,primary_sources=NULL,coach_source=NULL) {
   moduleServer(id,function(input,output,session) {
@@ -94,7 +94,10 @@ today_Server <- function(id,is_module_active,login_token,championship_id,user_te
         message<-input$coach_preference_saved;req(identical(message$key,coach_source$key()))
         preference_warning(if(isTRUE(message$ok))""else "Your choice applies to this login, but this browser could not remember it.")
       })
-      output$coach_status<-renderText(paste(coach_source$status(),preference_warning()))
+      output$coach_status<-renderUI({
+        message<-paste(coach_source$status(),preference_warning())
+        fm_info(message,error=nzchar(preference_warning())||grepl("could not|unavailable|unsupported",message,ignore.case=TRUE))
+      })
     }
     observeEvent(input$retry_team,retry_team())
     observeEvent(input$retry_market,retry_market())
@@ -130,7 +133,7 @@ today_Server <- function(id,is_module_active,login_token,championship_id,user_te
     bind_factual_reads("get_championship_pressroom",session,login_token,championship_id,user_team_id,
       is_active=function()isTRUE(is_module_active())&&isTRUE(primary_settled()),refresh_trigger=refresh_trigger)
     require_data <- function(state) {
-      if(is.null(state$data))shiny::validate(shiny::need(FALSE,if(identical(state$status,"loading"))"Loading data…"else resource_failure_message(state$error)))
+      if(is.null(state$data))shiny::validate(shiny::need(FALSE,if(identical(state$status,"loading"))"Loading data…"else resource_failure_message(state$error)), errorClass=if(identical(state$status,"loading"))"fm-loading"else character())
       state$data
     }
     market <- reactive({
@@ -140,13 +143,13 @@ today_Server <- function(id,is_module_active,login_token,championship_id,user_te
     })
     primary_placeholder<-function(state,label){
       div(class="col-sm-6",div(class="small-box",h4(label),
-        if(identical(state$status,"loading"))div(role="status",icon("spinner",class="fa-spin")," Loading data…")else
-          tagList(p(resource_failure_message(state$error)),actionButton(session$ns("retry_team"),"Retry balance"))))
+        if(identical(state$status,"loading"))fm_info("Loading data…")else
+          fm_info(resource_failure_message(state$error),actionButton(session$ns("retry_team"),"Retry balance"),error=TRUE)))
     }
     market_status_display<-resource_display_source(session,function(){
       state<-market_state()
       if(!is.null(state$data)||identical(state$status,"loading"))return(NULL)
-      div(role="status",span(resource_failure_message(state$error)),actionButton(session$ns("retry_market"),"Retry market"))
+      fm_info(resource_failure_message(state$error),actionButton(session$ns("retry_market"),"Retry market"),error=TRUE)
     })
     cash_display<-resource_display_source(session,function(){
       state<-team_state();if(is.null(state$data))return(primary_placeholder(state,"Current balance"))
@@ -156,14 +159,14 @@ today_Server <- function(id,is_module_active,login_token,championship_id,user_te
     valuation_display<-resource_display_source(session,function(){
       state<-team_state();if(is.null(state$data))return(NULL)
       info<-state$data
-      shinydashboard::valueBox(player_card_money(fm_number(info$teamValue %||% info$team_value)),"Observed team value",icon=icon("users"),color="blue",width=6)
+      shinydashboard::valueBox(player_card_money(fm_number(info$teamValue %||% info$team_value)),"Team value",icon=icon("users"),color="blue",width=6)
     })
     output$market_status<-renderUI(market_status_display())
     output$kpi_cash_box<-renderUI(cash_display())
     output$kpi_valuation_box<-renderUI(valuation_display())
     transfer_rows <- reactive({
       req(is_module_active(),valid_login(login_token()))
-      shiny::validate(shiny::need(primary_settled(),"Loading recent transfers…"))
+      shiny::validate(shiny::need(primary_settled(),"Loading recent transfers…"),errorClass="fm-loading")
       rows<-get_championship_pressroom(login_token(),championship_id())
       # Reuse classifications already established by the rival ledger, without
       # starting additional finance retrieval.
@@ -182,7 +185,7 @@ today_Server <- function(id,is_module_active,login_token,championship_id,user_te
       rows<-transfer_rows()
       if(identical(attr(rows,"fetch_status"),"partial"))"Some older transfers could not be loaded; the displayed history is incomplete."else "All available league transfers, newest first."
     })
-    output$transfer_coverage<-renderText(transfer_coverage_display())
+    output$transfer_coverage<-renderUI(fm_info(transfer_coverage_display(),error=identical(attr(transfer_rows(),"fetch_status"),"partial")))
     transfer_display<-resource_display_source(session,function()
       today_transfer_rows(transfer_rows(),user_teams_RV(),market_state()$data,input$browser_timezone))
     output$recent_transfers<-reactable::renderReactable({

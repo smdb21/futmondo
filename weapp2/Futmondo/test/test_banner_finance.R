@@ -106,12 +106,14 @@ shiny::testServer(app_server,{
   market_fixture <- app_market[1,,drop=FALSE];market_fixture$bid_id <- "own";market_fixture$bid_price <- 200
   saved_market <- restore_saved(market_fixture,"get_market_players")
   pending[[team_key]]$resolve(saved_team);pending[[market_key]]$resolve(saved_market);app_settle(session)
-  check("expired database snapshots render financial figures as cached with original source time", {
+  check("expired database snapshots retain source time and disclose cache metadata behind an icon", {
     html <- output$round_countdown$html
-    stopifnot(grepl("Balance: 1.000 EUR (cached)",html,fixed=TRUE),
-      grepl("Active offers: 200 EUR (cached) (1)",html,fixed=TRUE),
-      grepl("After offers: 700 EUR (cached)",html,fixed=TRUE),
-      grepl("Can spend: 5.500 EUR (cached)",html,fixed=TRUE),
+    stopifnot(grepl("Balance: 1.000 EUR",html,fixed=TRUE),
+      grepl("Active offers: 200 EUR (1)",html,fixed=TRUE),
+      grepl("After offers: 700 EUR",html,fixed=TRUE),
+      grepl("Can spend: 5.500 EUR",html,fixed=TRUE),
+      grepl('class="fm-info', html, fixed=TRUE), !grepl('<details[^>]* open', html),
+      grepl("Displayed amounts are saved observations (cached).", html, fixed=TRUE),
       !grepl("Unavailable",html,fixed=TRUE),!grepl("round-countdown-solvent",html,fixed=TRUE),
       identical(as.numeric(primary_team_state()$observed_at),as.numeric(fm_time("2026-10-01T12:00:00Z"))))
   })

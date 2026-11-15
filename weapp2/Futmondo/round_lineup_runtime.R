@@ -203,5 +203,5 @@ round_lineup_pitch_ui <- function(answer) {
     shiny::div(class="fm-lineup-bench",shiny::h4("Substitutes"),shiny::div(class="fm-lineup-bench-row",
       lapply(seq_len(4L),function(i)round_lineup_player_ui(lineup$bench[[i]],bench=TRUE,index=i,
         point_system=lineup$pointSystem,status=lineup$status))))),
-    shiny::p(class="fm-lineup-legend","* Provisional points · ↑ Substituted in · ↓ Substituted out · — Points unavailable. Bench order is 1–4. Substitutes can only cover their main position; secondary positions do not count."))
+    fm_info(class="fm-lineup-legend","* Provisional points · ↑ Substituted in · ↓ Substituted out · — Points unavailable. Bench order is 1–4. Substitutes can only cover their main position; secondary positions do not count."))
 }

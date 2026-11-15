@@ -2411,6 +2411,9 @@
     "www/custom_style.css": {
       "checksum": "f482c74c3a934467571c3fbbe2494ae7"
     },
+    "www/info-disclosures.js": {
+      "checksum": "951ec848b9ffc7768d0ece925cfa825a"
+    },
     "www/release-info.json": {
       "checksum": "94a9e0ef704ee5c2f9de93c7055428b1"
     },

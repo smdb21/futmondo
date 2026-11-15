@@ -340,6 +340,7 @@ fm_worker_status_source<-function(session,login){
   account<-auth[['userid']];s<-fm_worker_account_state(account);s$status_revision()
   if(!isTRUE(s$account$enabled)){value(NULL);return()}
   health_age<-as.numeric(difftime(Sys.time(),fm_time(s$health$heartbeat),units='secs'))
+  failed<-!identical(s$account$auth_status,'active')||length(health_age)!=1L||!is.finite(health_age)||health_age>60||!is.null(s$service_error)||length(s$errors)>0L
   message<-if(!identical(s$account$auth_status,'active'))'Background access needs renewal. Log in again.'else
    if(length(health_age)!=1L||!is.finite(health_age)||health_age>60)'Background worker is not responding; saved data remains available.'else
     if(!is.null(s$service_error))s$service_error else
@@ -350,7 +351,7 @@ fm_worker_status_source<-function(session,login){
   if(running>0&&identical(s$account$auth_status,'active'))message<-paste(message,sprintf('Updating %d saved data source(s).',running))
   checks<-vapply(live_keys,function(k){item<-fm_worker_get(account,k);if(is.null(item))NA_real_ else as.numeric(fm_time(item$manifest$checked_at))},numeric(1))
   checks<-checks[is.finite(checks)]
-  value(list(message=message,checked_at=if(length(checks))format(as.POSIXct(min(checks),origin='1970-01-01',tz='UTC'),'%Y-%m-%d %H:%M:%S UTC')else NULL))
+  value(list(message=message,error=failed,checked_at=if(length(checks))format(as.POSIXct(min(checks),origin='1970-01-01',tz='UTC'),'%Y-%m-%d %H:%M:%S UTC')else NULL))
  },domain=session)
  session$onSessionEnded(function()observer$destroy())
  value
@@ -371,13 +372,14 @@ fm_worker_session<-function(session,login,leagues=function()list()){
  status<-fm_worker_status_source(session,login)
  status_visible<-resource_display_source(session,function()!is.null(status()))
  status_message<-resource_display_source(session,function()status()$message %||% '')
+ status_error<-resource_display_source(session,function()isTRUE(status()$error))
  status_checked<-resource_display_source(session,function(){
   checked<-status()$checked_at
   if(is.null(checked))''else paste('Oldest displayed data check:',checked)
  })
  output$worker_status<-shiny::renderUI({
   if(!isTRUE(status_visible()))return(NULL)
-  shiny::tags$div(class='alert alert-info',role='status',
+  fm_info(error=status_error(),
    shiny::textOutput('worker_status_message',inline=TRUE),
    shiny::tags$small(style='display:block',shiny::textOutput('worker_status_checked_at',inline=TRUE)))
  })
@@ -385,7 +387,7 @@ fm_worker_session<-function(session,login,leagues=function()list()){
  output$worker_status_checked_at<-shiny::renderText(status_checked())
  output$worker_settings<-shiny::renderUI({
   auth<-login();if(!valid_login(auth))return(NULL);s<-fm_worker_account_state(auth[['userid']]);s$settings_revision()
-  if(!s$known)return(shiny::tags$p('Loading background sync settings…'))
+  if(!s$known)return(fm_info('Loading background sync settings…'))
   a<-s$account
   shiny::tags$details(id='worker_settings_details',open=if(isTRUE(shiny::isolate(session$input$worker_settings_open)))'open'else NULL,shiny::tags$summary('Background sync'),
    shiny::tags$p('Allow this server to retrieve factual Futmondo data while you are signed out. No password is saved. This continues until you disable it or Futmondo rejects access.'),
@@ -398,7 +400,10 @@ fm_worker_session<-function(session,login,leagues=function()list()){
     else shiny::tags$p('All active leagues are included. League choices appear when your league list is ready.')},
    shiny::actionButton('worker_save','Save background sync settings'),shiny::uiOutput('worker_setting_feedback'))
  })
- feedback<-shiny::reactiveVal(NULL);output$worker_setting_feedback<-shiny::renderUI(shiny::tags$p(feedback()))
+ feedback<-shiny::reactiveVal(NULL);output$worker_setting_feedback<-shiny::renderUI({
+  message<-feedback();if(is.null(message))return(NULL)
+  fm_info(message,error=!identical(message,'Background sync settings saved.'))
+ })
  authorize<-function(auth,enabled,settings=NULL,renew_only=FALSE){
   generation<-auth[['userid']]
   sealed<-if(enabled)fm_worker_encrypt(auth)else NULL

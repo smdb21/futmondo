@@ -23,6 +23,7 @@ body <- shinydashboard::dashboardBody(
     shiny::includeCSS("www/custom_style.css"),
     shiny::includeScript("www/theme-switch.js"),
     shiny::includeScript("www/worker-state.js"),
+    shiny::includeScript("www/info-disclosures.js"),
     shiny::tags$style(shiny::HTML("
         .ReactTable .rt-thead {
           z-index: 1;
@@ -100,7 +101,7 @@ body <- shinydashboard::dashboardBody(
     inputId = "refresh_all",
     label = icon("rotate"),
     class = "btn-refresh-floating",
-    title = "Clear Cache & Refresh Data"
+    title = "Refresh"
   )
 )
 

@@ -161,7 +161,10 @@ complete<-function(fail=FALSE,expired=FALSE){
   force(fail);force(expired)
   job<-pending[[1L]];pending<<-pending[-1L]
   if(fail)job$reject(simpleError('synthetic outgoing summary failure'))else {
-    pid<-job$args$player_id;value<-summary(pid,if(pid=='in')'rival'else job$args$user_team_id)
+    pid<-job$args$player_id
+    # Async source checks use the real clock; keep these synthetic departures future-dated.
+    value<-summary(pid,if(pid=='in')'rival'else job$args$user_team_id,
+      date=format(Sys.time()+86400,'%Y-%m-%dT%H:%M:%SZ',tz='UTC'))
     attr(value,'observed_at')<-Sys.time()
     if(expired)attr(value,'valid_until')<-as.numeric(Sys.time())-1
     context<-resource_context(job$args$login,job$args$championship_id,job$args$user_team_id,pid)
