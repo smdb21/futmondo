@@ -1403,3 +1403,10 @@ Implemented locally: remove the routine departure-exclusion paragraph, replace t
 - Reproduced the remaining expiry through the actual card, native parsers and live adapter: slow market/transfer checks outlived funds refreshed earlier in the same check. Repair long-lived dependencies/candidates before funds/offers; one final bounded repair handles sibling delays without extending source timestamps or retrying failed facts.
 - Preserve captured factual identity during live bypass and explicit submission scope. Exact database history baselines and a just-verified capacity are now reused instead of falling into unknown-context cold reads. Explicit archive/foreign contexts remain isolated and conflicting current identities are rejected.
 - Native delayed-source, actual-card, durable baseline/save/restart, submission-reuse and lifecycle verification are recorded in `docs/data_review_results.md`. No schema/dependency/cadence change or production mutation is needed. Authenticated hosted timing remains separate from local verification and the branch push.
+
+
+### LigaRadar loading animation — implemented locally (2026-11-15 UTC)
+
+- Replace the launch spinner with a responsive pitch-to-murmuration-to-radar loop; show a compact scene and visible status while authenticated leagues and the first page load. Readiness dismisses the graphic immediately through the existing lifecycle.
+- Reuse light/dark tokens; provide static reduced-motion/canvas fallbacks and stop drawing when hidden, offscreen or removed. Bound particles, pixel density and frame rate with no new dependencies, data requests, server timers or persistence changes.
+- Visual, performance, startup and exact task-only verification results and limits are recorded in `data_review_results.md`. Production acceptance remains separate from local validation and the branch push.

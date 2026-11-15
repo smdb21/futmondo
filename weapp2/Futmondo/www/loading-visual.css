@@ -1,0 +1,54 @@
+/* The loader is drawn locally; its SVG remains usable without canvas or motion. */
+.fm-loading-visual {
+  position: relative;
+  width: min(420px, 100%);
+  aspect-ratio: 3 / 2;
+  max-width: 100%;
+  flex: 0 1 420px;
+  color: var(--fm-text);
+  overflow: hidden;
+  pointer-events: none;
+}
+.fm-loading-visual--compact { width: 168px; flex-basis: 168px; }
+.fm-loading-canvas, .fm-loading-fallback {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.fm-loading-canvas { visibility: hidden; }
+.fm-loading-visual[data-fm-drawing="true"] .fm-loading-canvas { visibility: visible; }
+.fm-loading-visual[data-fm-drawing="true"] .fm-loading-fallback { visibility: hidden; }
+.fm-loading-fallback { color: var(--fm-text); }
+.fm-loading-launch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(460px, calc(100vw - 40px));
+  max-width: 100%;
+  margin: auto;
+  color: var(--fm-text);
+}
+.fm-loading-launch .fm-loading-visual { flex-basis: auto; }
+.fm-loading-brand { margin: 0 0 10px; font-size: 22px; font-weight: 600; letter-spacing: .12em; }
+.fm-loading-caption { margin: 0; color: var(--fm-muted); font-size: 13px; }
+.fm-loading-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  min-width: 0;
+  margin: 0 0 12px;
+}
+.fm-loading-status > [role="status"] {
+  flex: 1 1 180px;
+  min-width: 0;
+  margin: 0;
+  color: var(--fm-muted);
+  overflow-wrap: anywhere;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fm-loading-visual .fm-loading-canvas { visibility: hidden; }
+  .fm-loading-visual .fm-loading-fallback { visibility: visible; }
+}

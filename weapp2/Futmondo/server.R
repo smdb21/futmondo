@@ -325,6 +325,9 @@ players_in_championship_Server(id = "players_in_championship",
       failed="The first page could not load. Refresh to retry.","")
     if(identical(stage,"failed")){state<-tryCatch(championship_state(),error=function(e)NULL);if(!is.null(state$error))message<-resource_failure_message(state$error)}
     if(loading&&isTRUE(startup_slow()))message<-paste(message,"Still loading data from Futmondo…")
+    if(loading)return(tags$div(class="fm-loading-status startup-feedback",
+      fm_loading_visual("fm-startup-visual",compact=TRUE),
+      tags$p(class="fm-loading-caption",role="status",`aria-live`="polite",message)))
     fm_info(tags$p(message), error = stage %in% c("partial", "failed"), class = "startup-feedback",
       if(!loading&&stage %in% c("partial","failed"))actionButton("retry_startup","Retry"))
   })

@@ -22,6 +22,8 @@ body <- shinydashboard::dashboardBody(
     # Embed the current stylesheet: cached legacy CSS must not restore white surfaces.
     shiny::includeCSS("www/custom_style.css"),
     shiny::includeScript("www/theme-switch.js"),
+    shiny::includeCSS("www/loading-visual.css"),
+    shiny::includeScript("www/loading-visual.js"),
     shiny::includeScript("www/worker-state.js"),
     shiny::includeScript("www/info-disclosures.js"),
     shiny::tags$style(shiny::HTML("
@@ -107,7 +109,11 @@ body <- shinydashboard::dashboardBody(
 
 shinydashboardPlus::dashboardPage(
   title = "LigaRadar",
-  preloader = list(html = tagList(waiter::spin_1(), "Loading ..."), color = fm_theme_tokens()$bg),
+  preloader = list(html = tags$div(class = "fm-loading-launch",
+    fm_loading_visual("fm-launch-visual"),
+    tags$div(class = "fm-loading-brand", "LigaRadar"),
+    tags$p(class = "fm-loading-caption", role = "status", `aria-live` = "polite", "Loading…")),
+    color = fm_theme_tokens()$bg),
   header,
   shinydashboardPlus::dashboardSidebar(
     width = 180, # pixels; keeps navigation labels readable without changing mobile navigation

@@ -1,5 +1,42 @@
 # Progressive login, Today, and player cards
 
+## Pitch, murmuration, and radar loading visual
+
+`fm_loading_visual(id, compact = FALSE)` in `loading_visual.R` returns a decorative,
+theme-aware scene with a static SVG fallback and a browser canvas. The launch
+preloader uses the full scene (up to 420px); authenticated `loading_leagues` and
+`loading_today` states use its compact 168px variant with visible, accessible
+status text. Error, empty, partial, and retry feedback keep their existing
+behavior. The visual follows actual readiness and never delays completion to
+finish an animation. It does not represent real player positions or progress.
+
+The local `www/loading-visual.js` and `www/loading-visual.css` assets animate a
+12-second loop: pitch markings become a flowing flock, gather into radar rings,
+and reveal 22 moving player dots before returning to the pitch. The component
+uses the existing `--fm-*` colors and updates on light/dark changes. Its canvas is
+hidden from assistive technology; the separate text supplies the loading status.
+Reduced-motion preferences or unavailable canvas rendering retain the static
+pitch/radar illustration.
+
+Rendering is browser-only, with one shared animation scheduler capped at 30 FPS,
+bounded particle counts (320, or 180 on narrow screens), and pixel density capped
+at 1.5. Geometry and palette values are reused between frames. Hidden documents,
+hidden ancestors (including the retained waiter overlay), and removed components
+stop drawing; dynamic mounts cannot create duplicate animation instances. Lost
+canvas contexts restore the SVG until rendering is available again. Initial
+markup, direct insertion of a component, and the existing startup/waiter hosts
+are discovered automatically. A future container that inserts nested component
+markup should declare `data-fm-loading-host`; unrelated table subtrees are not
+rescanned. No server animation timer, reactive frame updates, source/DB request, persistence,
+new dependency, or configuration is introduced. Existing factual observations
+continue through the application's durable database-backed resource layer.
+
+The focused offline browser fixture and measured rendering results are recorded
+in `data_review_results.md`; production rendering remains a separate acceptance
+step.
+
+## Progressive resource loading
+
 Authentication uses `fm_async_login(user_name, password, owner)` and the existing cooperative curl pool. It makes one uncached request, never retries authentication, clears password references after dispatch, and ignores replies belonging to a logged-out or superseded attempt. Pending submissions are disabled in the browser and guarded on the server. Login and shared-resource observers attach asynchronous completion handlers, then return `NULL`; returning the pending promise would make Shiny hold the session output flush and hide progressive loading feedback.
 
 The session's `startup_stage` reactive records `signed_out`, `authenticating`, `loading_leagues`, `loading_today`, `ready`, `partial`, `empty`, or `failed`. Immediate browser feedback covers authentication. A global status covers authenticated loading, changing to a truthful slow-source notice after five seconds. Its single timer is cancelled on session end and superseding context/refresh; a closed-session guard prevents late writes. Navigation is available after league selection. Failed startup retries refresh only unavailable primary resources.
