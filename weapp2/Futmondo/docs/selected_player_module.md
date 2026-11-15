@@ -1,5 +1,16 @@
 # Player card
 
+## Successful saved availability and completeness — 2026-11-15 Pacific
+
+Opening a rival player could report **Availability checks expired before they completed** even though the saved check had completed successfully. The worker collector records `attr(value, "complete")`, but capacity calculations did not publish it. Both inspected stored capacity envelopes had `status=ok`, successful roster/funds/commitments, no diagnostics and an original 15-second action window, yet envelope completeness was `unknown`. The card's ordinary-expiry recovery path required proven completeness, so these valid historical results appeared as failed acquisitions.
+
+`acquisition_capacity_observation_complete(capacity)` validates the existing parser contract: successful overall/transfer status, finite deadline, consistent nonnegative integer roster/transfer counts, explicit unique disjoint transfer ID sets, all required finite cash/debt/spendable/API-limit fields, verified outstanding count/amount, and no source failure/diagnostics. Reported negative cash/API limits remain facts, not unknown/zero. `calculate_team_acquisition_capacity()` now publishes this boolean as `attr(result, "complete")` for the existing collector and database persistence path. Completeness remains independent of freshness and transaction eligibility.
+
+`fm_worker_restore()` also recognizes legacy **capacity only** envelopes with unknown completeness when the saved contract passes, the envelope acquisition succeeded, and its source timestamp is valid/nonfuture. It sets `worker_completeness=complete` and `worker_completeness_source=capacity_contract`; failed/partial/future or malformed evidence is never promoted. Existing immutable manifest metadata is retained and restored observations are not rewritten. The original source timestamps, payload deadline and more restrictive envelope deadline are preserved. Durable database observations remain the source of reuse across sessions/restarts; no new cache, schema or acquisition is introduced.
+
+The card's existing neutral **Verify availability** recovery now works for these restored successful results. Its disabled purchase-button tooltips use the same neutral recovery message, rather than retaining the misleading expiry failure. Expired observations still block purchases; explicit verification and independent submission preflights retain their freshness checks, context isolation, duplicate/cancellation protection and bounded retries. Real failed/partial acquisitions keep diagnostics. No background source acquisition or transaction is added by opening a card.
+
+
 The selected-player module displays actual player identity, current values and availability, profile/match data, price history, and round points. It preserves explicit manual bid, sale, offer, and release-clause handlers with their current-state checks.
 
 ## Shared history

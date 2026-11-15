@@ -18,12 +18,12 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
   settle(session)
   pending$get_team_acquisition_capacity$resolve(list(status='ok',valid_until=as.numeric(Sys.time())+15,roster=list(status='ok',count=1,cap=20,effective_count=1),funds=list(spendable_budget=10000),outstanding=list(count=0),rules=list(minimum_bid_at_value=TRUE)))
   settle(session)
-  stopifnot(grepl('Checking availability',output$action_buttons$html,fixed=TRUE))
+  stopifnot(identical(card_states$summary()$status,'loading'))
   fixture_time <<- fixture_time+16
   pending$get_player_summary$resolve(list(championship=list(),points=list(),prices=list()))
   settle(session)
   stopifnot(sum(calls=='get_team_acquisition_capacity')==2L,
-    grepl('Checking availability',output$action_buttons$html,fixed=TRUE))
+    identical(card_states$capacity()$status,'loading'))
   fresh<-function()list(status='ok',valid_until=as.numeric(Sys.time())+15,
     roster=list(status='ok',count=1,cap=20,effective_count=1),funds=list(spendable_budget=10000),
     outstanding=list(count=0),rules=list(minimum_bid_at_value=TRUE))
@@ -37,7 +37,7 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
   fixture_time <<- fixture_time+16
   selected(NULL);settle(session);selected(player);settle(session)
   stopifnot(sum(calls=='get_team_acquisition_capacity')==3L,
-    grepl('Checking availability',output$action_buttons$html,fixed=TRUE))
+    identical(card_states$capacity()$status,'loading'))
   pending$get_team_acquisition_capacity$resolve(fresh());settle(session)
   stopifnot(!grepl('Availability checks expired',output$action_buttons$html,fixed=TRUE))
   cat('PASS reopening after the source deadline refreshes inside the outer20s TTL.\n')

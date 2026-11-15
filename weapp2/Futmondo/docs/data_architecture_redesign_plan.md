@@ -1,5 +1,14 @@
 # Futmondo data architecture redesign plan
 
+## Successful saved player availability — 2026-11-15 Pacific
+
+- [x] Trace the opening-card expiry error through successful durable snapshots, the missing capacity completeness flag, codec restoration and card eligibility.
+- [x] Publish verified completeness on new capacity results and strictly reconstruct legacy unknown capacity metadata; preserve every source/action deadline and failed/partial state.
+- [x] Align ordinary-expiry button tooltips with existing explicit verification; check real codec/card recovery and production-record replay without transactions or database mutation.
+- [x] Focused regression, offline lifecycle and performance review; see [player-card contracts](selected_player_module.md) and [review results](data_review_results.md).
+- [ ] Hosted acceptance after deployment. No schema, dependency, cadence or purchase-policy change.
+
+
 ## Own-team filter and effective squad count — 2026-11-14 Pacific
 
 - [x] All Players **Show players in my team**, unchecked by default, combines with existing filters and resets off; other tables retain their defaults.

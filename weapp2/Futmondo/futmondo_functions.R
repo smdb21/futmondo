@@ -1723,6 +1723,33 @@ incoming_clause_round_label <- function(joins_at,next_round) {
   if(delta<0)"Before round starts"else if(delta>0)"After round starts"else "At round start"
 }
 
+# Completeness describes successfully acquired facts, separately from their age.
+# Strict legacy proof for capacity snapshots whose collector omitted `complete`.
+acquisition_capacity_observation_complete <- function(capacity) {
+  number<-function(x,min=-Inf,whole=FALSE) is.numeric(x)&&length(x)==1L&&is.finite(x)&&
+    x>=min&&(!whole||x==floor(x))
+  ids<-function(x) is.character(x)&&!anyNA(x)&&all(nzchar(trimws(x)))&&!anyDuplicated(x)
+  if(!is.list(capacity)||!identical(capacity$status,"ok")||length(capacity$diagnostics)||
+     !is.null(attr(capacity,"fetch_error"))||identical(attr(capacity,"complete"),FALSE)||
+     any(attr(capacity,"fetch_status")%in%c("partial","unavailable"))||
+     any(attr(capacity,"worker_completeness")%in%c("partial","unavailable","incomplete"))||
+     (!is.null(attr(capacity,"worker_acquisition_status"))&&!identical(attr(capacity,"worker_acquisition_status"),"ok")))return(FALSE)
+  roster<-capacity$roster;funds<-capacity$funds;bids<-capacity$outstanding
+  if(!is.list(roster)||!is.list(funds)||!is.list(bids)||!identical(roster$status,"ok")||
+     !identical(bids$completeness,"complete")||!number(capacity$valid_until))return(FALSE)
+  counts<-c("count","raw_count","cap","effective_count","pending_inbound_count","pending_outbound_count")
+  if(!all(vapply(counts,function(f)number(roster[[f]],0,TRUE),logical(1)))||
+     !ids(roster$pending_inbound_ids)||!ids(roster$pending_outbound_ids)||
+     length(intersect(roster$pending_inbound_ids,roster$pending_outbound_ids))||
+     roster$count!=roster$raw_count||roster$pending_outbound_count>roster$raw_count||
+     length(roster$pending_inbound_ids)!=roster$pending_inbound_count||
+     length(roster$pending_outbound_ids)!=roster$pending_outbound_count||
+     roster$effective_count!=roster$raw_count+roster$pending_inbound_count-roster$pending_outbound_count)return(FALSE)
+  all(vapply(c("reported_budget","team_value","withheld","debt_fraction","spendable_budget","api_bid_limit"),
+    function(f)number(funds[[f]],if(f%in%c("reported_budget","api_bid_limit"))-Inf else 0),logical(1)))&&
+    number(bids$count,0,TRUE)&&number(bids$total_amount,0)
+}
+
 # One identity-based count for purchase capacity and observed squad presentation.
 # NULL means unknown transfer identities; character(0) is a confirmed empty set.
 effective_squad_count <- function(roster, incoming_ids, outgoing_ids) {
@@ -1854,7 +1881,7 @@ calculate_team_acquisition_capacity <- function(info,roster_df,pressroom,market,
     remaining_slots <- if (!is.na(roster_count) && !is.na(cap_val)) as.integer(cap_val-roster_count) else NA_integer_
     effective_remaining <- if(!is.na(effective_count)&&!is.na(cap_val)) as.integer(cap_val-effective_count) else NA_integer_
 
-    list(
+    result<-list(
       status = status,
       roster = list(
         status=transfer_state$status,
@@ -1897,6 +1924,8 @@ calculate_team_acquisition_capacity <- function(info,roster_df,pressroom,market,
         min(as.numeric(now)+20, acquisition_source_deadline(market,20)) else NA_real_,
       diagnostics = unique(diagnostics)
     )
+    attr(result,"complete")<-acquisition_capacity_observation_complete(result)
+    result
 }
 
 # Computes a verified acquisition-capacity snapshot for the logged-in team:

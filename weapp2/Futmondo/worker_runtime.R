@@ -83,6 +83,8 @@ fm_worker_restore<-function(resource,account){
  if(length(raw)!=m$json_bytes)stop('Worker snapshot length differs')
  value<-fm_worker_decode(jsonlite::fromJSON(rawToChar(raw),simplifyVector=TRUE,simplifyDataFrame=FALSE,simplifyMatrix=FALSE))
  if(identical(m$handler,'get_active_championships'))value<-fm_filter_league_answer(value)
+ capacity_contract<-identical(m$handler,'get_team_acquisition_capacity')&&identical(m$completeness,'unknown')&&
+  identical(m$status,'ok')&&acquisition_capacity_observation_complete(value)
  attr(value,'observed_at')<-fm_time(m$observed_at);attr(value,'fetched_at')<-fm_time(m$checked_at)
  attr(value,'worker_completeness')<-m$completeness
  # Older round snapshots recorded 'unknown' because the collector read only
@@ -101,6 +103,17 @@ fm_worker_restore<-function(resource,account){
      length(observed)==1L&&!is.na(observed)&&observed<=Sys.time()){
    attr(value,'worker_completeness')<-'complete'
    attr(value,'worker_completeness_source')<-'catalog_complete'
+  }
+ }
+ # Historical capacity envelopes also omitted completeness although the
+ # parser stored an explicit verified roster/funds/commitments contract. Recover
+ # only that successful contract; its original action deadline stays unchanged.
+ if(capacity_contract){
+  observed<-attr(value,'observed_at')
+  if(length(observed)==1L&&!is.na(observed)&&observed<=Sys.time()){
+   attr(value,'complete')<-TRUE
+   attr(value,'worker_completeness')<-'complete'
+   attr(value,'worker_completeness_source')<-'capacity_contract'
   }
  }
  attr(value,'worker_acquisition_status')<-m$status

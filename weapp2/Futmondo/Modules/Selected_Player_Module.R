@@ -685,8 +685,13 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
               identical(attr(saved_state$data,"worker_acquisition_status") %||% "ok","ok") &&
               identical(attr(saved_state$data,"worker_completeness") %||% "complete","complete") &&
               !resource_snapshot_unexpired(saved_state$data)
+            recovery_message<-"Verify availability to check your current roster, funds and offers."
+            if(saved_expired){
+              bid_gate$message<-recovery_message
+              clause_gate$message<-recovery_message
+            }
             action_buttons <- tagList(action_buttons,fm_info(if(saved_expired)
-              "Verify availability to check your current roster, funds and offers." else blocked_reason,
+              recovery_message else blocked_reason,
               error=!saved_expired))
           }
 
