@@ -676,11 +676,25 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           is_clause_open <- (clause_price_val > 0) && !is_clause_transferred && !is_clause_date_locked
 
           # Option 1: "Make Market Offer" button when player is listed on market
-          bid_gate <- passive_acquisition_gate(sp,"bid")
+          # Off-market owner offers have no listing minimum to verify.
+          bid_gate <- passive_acquisition_gate(sp,if(!is.na(eff_market_price) && eff_market_price>0)"bid"else"offer")
           clause_gate <- passive_acquisition_gate(sp,"clause")
           blocked_reason <- if(!isTRUE(bid_gate$ok)) bid_gate$message else if(!isTRUE(clause_gate$ok)) clause_gate$message else NULL
-          if(!is.null(blocked_reason)&&!identical(bid_gate$reason,"loading")&&!identical(clause_gate$reason,"loading")) action_buttons <- tagList(action_buttons,
-            fm_info(blocked_reason,error=TRUE))
+          if(!is.null(blocked_reason)&&!identical(bid_gate$reason,"loading")&&!identical(clause_gate$reason,"loading")) {
+            # A saved worker observation normally outlives its action deadline.
+            # Offer an explicit live check instead of asking Refresh to reread it.
+            saved_state <- card_states$capacity()
+            saved_expired <- worker_capacity_verification_available() &&
+              is.null(manual_capacity_verification()) && is.null(saved_state$error) &&
+              identical(saved_state$data$status,"ok") &&
+              identical(saved_state$data$roster$status,"ok") &&
+              identical(attr(saved_state$data,"worker_acquisition_status") %||% "ok","ok") &&
+              identical(attr(saved_state$data,"worker_completeness") %||% "complete","complete") &&
+              !resource_snapshot_unexpired(saved_state$data)
+            action_buttons <- tagList(action_buttons,fm_info(if(saved_expired)
+              "Verify availability to check your current roster, funds and offers." else blocked_reason,
+              error=!saved_expired))
+          }
 
           if (!is.na(eff_market_price) && eff_market_price > 0) {
             action_buttons <- tagList(
@@ -746,6 +760,17 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           action_buttons<-tagList(fm_info("Checking availability…"),disable(action_buttons))
         } else if(is.null(readiness$data)) {
           action_buttons<-tagList(fm_info(resource_failure_message(readiness$error),error=TRUE))
+        }
+        # Keep recovery reachable even when the saved capacity is missing or
+        # loading: the ordinary readiness gate disables purchase controls only.
+        if(!is_own_player && !has_active_bid && worker_capacity_verification_available()) {
+          gate <- bid_gate
+          verification <- manual_capacity_verification()
+          pending <- !is.null(verification) && isTRUE(verification$pending)
+          if(pending || gate$reason %in% c("loading","unavailable"))
+            action_buttons <- tagList(action_buttons,actionButton(ns("btn_verify_availability"),
+              if(pending) "Checking availability…" else "Verify availability",
+              class="btn btn-default",disabled=pending))
         }
         output$action_buttons <- renderUI(action_buttons)
       }
@@ -1835,9 +1860,71 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     capacity_context<-team_card_context
     capacity_recheck<-reactiveVal(0L)
     capacity_recheck_context<-NULL;capacity_rechecks<-0L
-    card_states$capacity<-card_read("card_capacity","get_team_acquisition_capacity",auth_args,context=capacity_context,
+    stored_capacity<-card_read("card_capacity","get_team_acquisition_capacity",auth_args,context=capacity_context,
       active=function()!player_card_is_own_player(selected_player(),get_reactive_val(user_team_id)),
       refresh=function()paste(global_refresh(),capacity_recheck(),sep=":"))
+    capacity_verification_RV <- reactiveVal(NULL)
+    capacity_verification_generation <- 0L
+    capacity_verification_scope <- reactive({
+      ctx <- capacity_context()
+      list(context=player_action_context_RV(),refresh=global_refresh(),history=history_refresh(),
+        worker_mode=if(!is.null(ctx) && fm_worker_configured())fm_worker_mode(ctx$account_id)else FALSE)
+    })
+    manual_capacity_verification <- reactive({
+      value <- capacity_verification_RV()
+      if(!is.null(value) && identical(value$scope,capacity_verification_scope())) value else NULL
+    })
+    worker_capacity_verification_available <- function() {
+      ctx <- capacity_context()
+      !is.null(ctx) && fm_worker_configured() && isTRUE(fm_worker_mode(ctx$account_id))
+    }
+    observeEvent(capacity_verification_scope(),{
+      capacity_verification_generation <<- capacity_verification_generation+1L
+      capacity_verification_RV(NULL)
+    },ignoreNULL=FALSE,priority=105)
+    session$onSessionEnded(function(){capacity_verification_generation <<- capacity_verification_generation+1L})
+    card_states$capacity <- reactive({
+      saved <- stored_capacity();verified <- manual_capacity_verification()
+      if(is.null(verified))return(saved)
+      # Worker polls must not replace a just-verified result with an older
+      # database observation. A genuinely newer publication still takes over.
+      saved_at <- as.numeric(saved$observed_at %||% NA_real_)
+      checked_at <- as.numeric(verified$state$observed_at %||% verified$started_at)
+      if(!isTRUE(verified$pending) && length(saved_at)==1L && is.finite(saved_at) &&
+         length(checked_at)==1L && is.finite(checked_at) && saved_at>checked_at)return(saved)
+      verified$state
+    })
+    observeEvent(input$btn_verify_availability,{
+      req(worker_capacity_verification_available(),!is.null(selected_player()),
+        !player_card_is_own_player(selected_player(),get_reactive_val(user_team_id)))
+      previous <- manual_capacity_verification()
+      if(!is.null(previous) && isTRUE(previous$pending))return()
+      scope <- capacity_verification_scope();ctx <- capacity_context()
+      auth <- get_reactive_val(login_token)
+      capacity_verification_generation <<- capacity_verification_generation+1L
+      generation <- capacity_verification_generation
+      capacity_verification_RV(list(scope=scope,pending=TRUE,started_at=Sys.time(),
+        state=resource_state(status="loading")))
+      current <- function()shiny::isolate(identical(generation,capacity_verification_generation) &&
+        identical(scope,capacity_verification_scope()) && worker_capacity_verification_available())
+      finish <- function(data=NULL,error=NULL)shiny::isolate({
+        if(!isTRUE(current()))return(NULL)
+        value <- capacity_verification_RV();value$pending <- FALSE
+        deadline <- if(is.list(data))data$valid_until else NULL
+        if(is.null(error) && (!is.numeric(deadline) || length(deadline)!=1L || !is.finite(deadline)))
+          error <- resource_failure(resource="get_team_acquisition_capacity",category="schema")
+        value$state <- resource_state(if(is.null(error))data else NULL,
+          status=if(!is.null(error))"unavailable"else NULL,error=error)
+        capacity_verification_RV(value)
+        NULL
+      })
+      request <- tryCatch(async_adapter_fetch("get_team_acquisition_capacity",
+        list(login=auth,championship_id=ctx$championship_id,user_team_id=ctx$user_team_id),
+        context=ctx,is_current=current,priority="interactive",worker_bypass=TRUE),
+        error=function(error)promises::promise_reject(error))
+      promises::then(request,function(data)finish(data),function(error)finish(error=error))
+      invisible(NULL)
+    })
     observeEvent(card_states$capacity(),{
       dialog <- isolate(market_offer_dialog_RV());state <- card_states$capacity()
       if (is.null(dialog) || isTRUE(dialog$live_check) || !isTRUE(dialog$pending) || identical(state$status,"loading") ||

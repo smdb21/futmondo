@@ -1389,3 +1389,10 @@ Implemented locally: remove the routine departure-exclusion paragraph, replace t
   range and updates through the shared enrichment/widget paths. No acquisition,
   persistence, dependency or schema change. Verification and performance results
   are recorded in `data_review_results.md`; hosted acceptance remains separate.
+
+
+### Worker player-card availability recovery — implemented locally (2026-11-15 UTC)
+
+- Fixed the unreachable recovery path caused by 300-second stored capacity collection and the original 15-second action deadline: non-owned cards expose explicit **Verify availability** even while the saved capacity is missing or loading.
+- One asynchronous, context-guarded live verification enables the existing market/owner/clause controls only after success. Duplicate clicks coalesce; failed/partial/undated/expired results remain blocked and retryable. Independent submission preflights and database-backed factual observations remain intact.
+- Passive card visits and Refresh remain database-only. No schema, dependency, cadence or automatic transaction change. Local focused/browser/lifecycle checks and performance limits are recorded in `docs/data_review_results.md`; production acceptance remains separate from the branch rollout.
