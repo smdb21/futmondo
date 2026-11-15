@@ -2277,13 +2277,16 @@
       "checksum": "cf2cbb166cfb870bbe1c8c369af2c744"
     },
     "async_transport.R": {
-      "checksum": "95cbfefc3eb526f6b24de3a97bd11795"
+      "checksum": "6c771bbb084048923198fafc6b6a5427"
     },
     "award_runtime.R": {
       "checksum": "5de52cb56511fe490c8d55b4fb457134"
     },
     "background_runtime.R": {
       "checksum": "eccfe9a4a0874f08d925132b7b7f9df9"
+    },
+    "player_availability.R": {
+      "checksum": "6e259b3150337023b771123054dc6ee0"
     },
     "clause_transfer_store.R": {
       "checksum": "33cb8b7eee5164d1cd15c9ee4e3d7bda"
@@ -2298,16 +2301,16 @@
       "checksum": "f7f27d5a3c288189ece5080c24dda2f7"
     },
     "data_service.R": {
-      "checksum": "88a05e10c33417edb15bcf2bc5d5b461"
+      "checksum": "cac43ce1d75a5a1220e4d8f47540c3b4"
     },
     "factual_helpers.R": {
       "checksum": "e4f6244a5f5dedb3409c50e2d3ea1d5f"
     },
     "futmondo_functions.R": {
-      "checksum": "8e4dbe64435e14e67e316e16a02ccab4"
+      "checksum": "4f91582d668312c11c4bb0d9ea2ade06"
     },
     "global.R": {
-      "checksum": "243d35b97af894f18e0877de26133ed3"
+      "checksum": "94545e8856448da7240d6dbd18de3f18"
     },
     "history_baseline_store.R": {
       "checksum": "fae2bbeb23335fe69729f675970cc655"
@@ -2364,7 +2367,7 @@
       "checksum": "1a1dd575681a9df0bdfe04c72332e1f3"
     },
     "Modules/Selected_Player_Module.R": {
-      "checksum": "17246c896278d71348f824b8afd16941"
+      "checksum": "0d2e247665a938c65a22e4e3715ac7d2"
     },
     "Modules/Today_Module.R": {
       "checksum": "589e00cc033412df8a1cc0db1169dee2"
@@ -2418,7 +2421,7 @@
       "checksum": "cc269284c3d8e36bdbabc2c2d5a61d62"
     },
     "worker_runtime.R": {
-      "checksum": "5d2485e503106c4a20c6a7c5562346be"
+      "checksum": "898785d8029f8f24064877b2a160d06b"
     },
     "www/custom_style.css": {
       "checksum": "1810c04fc29ed5b3fb95bf9f9c83b9b7"

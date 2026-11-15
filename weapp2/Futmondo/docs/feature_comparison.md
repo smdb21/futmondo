@@ -100,3 +100,18 @@ Actions and transaction failures stay immediately visible. This refines existing
 presentation without adding a data, analysis or automation capability, so no
 new login-tier item or exclusivity claim is added. Contract:
 `ui_information_disclosures.md`.
+
+## Player-card availability latency — reviewed 2026-11-15
+
+The official [app feature guide](https://magazine.futmondo.com/novedades-en-la-nueva-app-de-futmondo/)
+(published 2021-12-23, rechecked on 2026-11-15 for the related UI work) describes
+player/market interaction and manual transactions. It does not establish current
+authenticated availability latency or the official app's internal caching.
+That UI and its timings were not measured; no comparative speed claim is made.
+
+LigaRadar reuses its existing team verification across player cards and directly
+retrieves a selected player's missing/expired summary during active browsing.
+It preserves the existing transaction capability, freshness requirements and
+manual confirmation/preflight behavior. This is a loading/persistence refinement,
+not a new analytical or automated feature, so no login-tier item is added.
+See `player_availability.md` and the measured limits in `data_review_results.md`.

@@ -47,6 +47,7 @@ fm_transport_start<-function(id){
   task<-.fm_transport$tasks[[id]]
   if(is.null(task)||isTRUE(task$active))return(invisible(NULL))
   tryCatch({
+    if(identical(task$priority,"interactive")&&!is.null(task$queued_at))resource_timing("availability_queue",task$queued_at)
     # libcurl counts its internal connection queue against both timeouts. Add a
     # handle only when a slot is free, so network timers start at dispatch.
     handle<-curl::new_handle();curl::handle_setopt(handle,url=task$url,customrequest=task$method,
@@ -116,7 +117,7 @@ fm_async_http<-function(url,method="GET",body=NULL,headers=character(),owner="",
   promises::promise(function(resolve,reject){
     id<-as.character(openssl::sha256(serialize(list(url,Sys.time(),runif(1)),NULL)))
     task<-new.env(parent=emptyenv());task$url<-url;task$method<-method;task$body<-body;task$headers<-headers
-    task$owner<-owner;task$timeout<-timeout;task$priority<-priority;task$read_key<-if(reserved)read_key else NULL
+    task$owner<-owner;task$timeout<-timeout;task$priority<-priority;task$queued_at<-Sys.time();task$read_key<-if(reserved)read_key else NULL
     task$active<-FALSE;task$handle<-NULL;task$resolve<-resolve;task$reject<-reject
     .fm_transport$tasks[[id]]<-task
     fm_transport_schedule()

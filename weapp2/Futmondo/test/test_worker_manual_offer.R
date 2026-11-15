@@ -34,14 +34,16 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
  stopifnot(!manual_capacity_verification()$pending)
  cat('PASS card opening performs the existing asynchronous availability check without synchronous acquisition\n')
  session$setInputs(btn_bid_market=1L);settle(session)
- stopifnot(length(jobs)==2L,market_offer_dialog_RV()$pending,market_offer_dialog_RV()$live_check,
+ stopifnot(length(jobs)==2L,market_offer_dialog_RV()$pending,!market_offer_dialog_RV()$live_check,
   grepl('disabled',output$market_offer_submit$html,fixed=TRUE),sync==0L)
  session$setInputs(submit_bid=1L,bid_amount=150);settle(session);stopifnot(writes==0L,sync==0L)
  jobs[[2L]]$resolve(capacity());settle(session)
  stopifnot(!market_offer_dialog_RV()$pending,market_offer_dialog_RV()$preflight$ok,
   !grepl('disabled',output$market_offer_submit$html,fixed=TRUE),length(jobs)==2L)
- cat('PASS explicit offer opens one async live check; pending submission stays blocked and verified result enables confirmation\n')
- session$setInputs(btn_bid_market=2L);settle(session);stopifnot(length(jobs)==3L)
+ cat('PASS explicit expired offer joins the shared async live check; pending submission stays blocked and verified result enables confirmation\n')
+ session$setInputs(btn_bid_market=2L);settle(session);stopifnot(length(jobs)==2L,!market_offer_dialog_RV()$pending)
+ attr(card_states$capacity,'retry')();settle(session)
+ session$setInputs(btn_bid_market=3L);settle(session);stopifnot(length(jobs)==3L,market_offer_dialog_RV()$pending)
  team('another');settle(session);stopifnot(!jobs[[3L]]$current())
  jobs[[3L]]$resolve(capacity());settle(session)
  stopifnot(is.null(market_offer_dialog_RV()),is.null(modal_context_RV()$bid),writes==0L)

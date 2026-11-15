@@ -2034,11 +2034,18 @@ get_team_acquisition_capacity_async <- function(login,championship_id,user_team_
     history=list(fn="get_championship_pressroom",args=args[c("login","championship_id")],ttl=300,resources=paste0("pressroom_",championship_id)),
     market=list(fn="get_market_players",args=args,ttl=20,resources=paste0("market_",championship_id,"_",user_team_id)))
   expired<-function(data,ttl,margin=0)is.null(data)||as.numeric(Sys.time())+margin>=acquisition_source_deadline(data,ttl)
-  progress<-function(stage){if(is.function(on_progress))tryCatch(on_progress(stage),error=function(e)NULL);invisible(NULL)}
+  stage_started<-Sys.time();previous_stage<-NULL
+  progress<-function(stage){
+    labels<-c(prerequisites="availability_prerequisites",pending_transfers="availability_transfers",refreshing_facts="availability_refresh")
+    if(!is.null(previous_stage)&&previous_stage%in%names(labels))resource_timing(unname(labels[[previous_stage]]),stage_started)
+    previous_stage<<-stage;stage_started<<-Sys.time()
+    if(is.function(on_progress))tryCatch(on_progress(stage),error=function(e)NULL)
+    invisible(NULL)
+  }
   invalidate<-function(spec){
     scope<-if(identical(spec$fn,"get_championship_pressroom"))resource_context(login,championship_id)else base
     if(!is.null(spec$args$player_id))scope$player_id<-spec$args$player_id
-    invalidate_resources(scope,resources=spec$resources)
+    invalidate_resources(scope,resources=spec$resources,notify_availability=FALSE)
   }
   # Every completion, including synchronous exceptions and cancellation, settles
   # one slot. Full source failures remain values for the existing truthful gate.

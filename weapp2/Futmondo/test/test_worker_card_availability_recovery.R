@@ -132,12 +132,11 @@ shiny::testServer(selected_player_Server,args=args,{
  stopifnot(enabled(output$action_buttons$html,'btn_bid_market'))
  owner_player<-player;owner_player$id<-'owner-only';owner_player$price<-0;owner_player$market_inMarket<-FALSE
  selected(owner_player);settle(session)
- stopifnot(length(jobs)==3L,!jobs[[2L]]$current(),blocked(output$action_buttons$html,'btn_offer_owner'))
- jobs[[3L]]$resolve(capacity());settle(session)
+ stopifnot(length(jobs)==2L,jobs[[2L]]$current())
  stopifnot(enabled(output$action_buttons$html,'btn_offer_owner'),enabled(output$action_buttons$html,'btn_pay_clause'))
  selected(NULL);settle(session)
- stopifnot(!jobs[[3L]]$current(),length(jobs)==3L,writes==0L)
- cat('PASS team/player changes automatically check the new context, reject late old results, enable owner/clause actions and release scope on close\n')
+ stopifnot(jobs[[2L]]$current(),length(jobs)==2L,writes==0L)
+ cat('PASS team changes reject old results; player switches and card closure preserve the verified team result without another check\n')
 })
 reset()
 shiny::testServer(selected_player_Server,args=args,{

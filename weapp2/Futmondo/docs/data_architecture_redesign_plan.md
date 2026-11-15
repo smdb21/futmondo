@@ -1805,3 +1805,18 @@ Production deployment and authenticated hosted acceptance remain separate.
 - Local exit checks and performance evidence are recorded in
   `data_review_results.md`; contract: `ui_information_disclosures.md`.
   Production deployment and authenticated hosted acceptance are not claimed.
+
+### Faster player-card availability across selections — implemented locally (2026-11-15)
+
+- Share pending and fresh team verification across cards and modules in one
+  interactive session; keep target summaries and confirmation context separate.
+  Missing/expired worker summaries and owned-listing gates use a live fallback.
+- Reuse valid worker/native observations and durable private availability
+  snapshots before acquisition. Persist original source clocks, completeness,
+  deadlines and independent invalidation markers; failed writes remain retryable.
+- Offer dialogs join card verification. History refresh and metadata-only redraws
+  do not restart team acquisition; expiry and explicit refresh still revalidate.
+  Keep source request/concurrency limits, bounded queues and final preflights.
+- Local exit checks, timings and limits are recorded in `data_review_results.md`;
+  implementation contract: `player_availability.md`. Production deployment,
+  real-account timing and authenticated hosted acceptance are not claimed.

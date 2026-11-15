@@ -153,3 +153,20 @@ observations, dates, chronology and neutral theme defaults.
 plot expression with synthetic combined, valuation-only, dated-points-only and
 undated-score histories. They verify tick geometry, rendered colors, theme/zoom
 retention and phone/desktop overflow; no authenticated collection is used.
+
+## Shared availability while browsing — 2026-11-15
+
+The former per-player automatic verification is now a shared root-session team
+provider. Switching cards joins its pending check or reuses its fresh result;
+chart-history refresh does not invalidate team capacity. Target summaries have
+an independent live fallback when a worker observation is missing/expired.
+Own-team listing availability follows the same shared fallback. Retry reacquires
+only failed/expired sources; valid worker snapshots avoid redundant encoding.
+New snapshot preparation follows the ready-output flush and yields during JSON
+emission. Offer editors join the existing verification instead of launching another one.
+Successful team/summary facts are stored and restored through the existing
+private evidence store with original context, completeness and deadlines.
+Manual confirmation generations and independent submission preflights remain
+unchanged. Full interfaces, bounds, payloads, invalidation and timing stages:
+[player availability](player_availability.md). Executed verification and limits:
+[data review results](data_review_results.md).

@@ -70,6 +70,8 @@ The isolated PostgreSQL checks use `@electric-sql/pglite`; browser checks use Pl
 node test/test_factual_schema.cjs
 node test/test_observation_migration.cjs
 Rscript test/test_page_information.R
+Rscript test/test_player_availability_reuse.R
+Rscript test/test_player_availability_store.R
 node test/test_page_information.cjs
 ```
 
@@ -236,3 +238,5 @@ The native closed-clause rejection code has not been captured. The worker's clos
 The scheduler uses existing Python/R dependencies. It performs at most one global idle claim per second per elected worker (about 86,400 lightweight RPCs/day), without polling distant players. It starts at most one additional headless R helper lazily near due work and closes it after 30 idle seconds. Existing source concurrency and account pacing remain shared with factual acquisition. Verify Contabo memory headroom, network latency, source-rate limits and opening-time lag before enabling production. Missed execution windows expire; timing and purchase success are not guaranteed.
 
 See [scheduling, security and state contracts](docs/scheduled_clauses.md). Synthetic checks: `Rscript test/test_scheduled_clauses.R`, `node test/test_scheduled_clause_schema.cjs`, and `PYTHONPATH=. <worker-venv>/bin/python test/test_scheduled_clauses.py`. No new dependency or manifest regeneration is required.
+
+Player-card availability shares current team checks across cards and restores successful observations from the existing private evidence store. No new environment variable, dependency or migration is required; the existing server database access must include `rival_finance_evidence` and its latest-observation view. See [the availability contract](docs/player_availability.md) for expiry, persistence and verification. For the isolated card browser check, start `Rscript test/test_worker_card_availability_browser_app.R`, then run `node test/test_worker_card_availability_browser.cjs`.

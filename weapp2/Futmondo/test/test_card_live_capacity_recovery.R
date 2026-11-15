@@ -106,7 +106,7 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
   enabled(output$market_offer_submit$html,'submit_bid'),identical(requests,before),live_calls==1L,writes==0L)
  cat('PASS immediately opening the verified market editor adds zero source reads and zero transactions\n')
  before<-requests;row<-selected();selected(NULL);settle(session);selected(row);settle(session)
- stopifnot(identical(requests,before),live_calls==2L,writes==0L,
+ stopifnot(identical(requests,before),live_calls==1L,writes==0L,
   evaluate_acquisition_preflight(card_states$capacity()$data,'bid',1000)$ok)
- cat('PASS automatic verification on warm reopening reuses the complete native team cache with zero additional source requests\n')
+ cat('PASS warm reopening reuses the completed shared verification with zero adapter dispatches or additional source requests\n')
 })

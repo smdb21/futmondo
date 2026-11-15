@@ -3681,3 +3681,99 @@ context/source/freshness/completeness metadata; memory is only an accelerator.
 No production deployment, real-account operation, live transaction, real-device
 Safari test or hosted acceptance is claimed. Existing unrelated working changes
 are preserved. Documentation changes have no runtime performance effect.
+
+## Faster player-card availability across selections — 2026-11-15
+
+Implemented locally for the reported wait on every card. Team verification now
+belongs to the root interactive session and is shared across player cards and
+offer dialogs. Selected-player summaries and own-team listings use the direct
+interactive fallback when worker evidence is missing or expired. History-only
+refreshes and metadata redraws do not repeat healthy team checks. Retry checks
+only missing/expired sources; transaction confirmations and final independent
+manual preflights retain their existing guards.
+
+The existing private evidence table/view stores reusable successful facts with
+exact account/league/team/competition/season/scoring/player context, original
+source times/deadlines, completeness and integrity metadata. Durable summaries
+require returned player identity; team observations require complete transfer
+and financial proof. Independent persisted invalidation markers survive process
+cache clearing. A failed save remains retryable and is never called durable.
+No schema, dependency, environment variable, worker schedule or deployment is
+changed. Contract: `player_availability.md`.
+
+Executed checks:
+
+- `Rscript test/test_player_availability_reuse.R`: held requests across player
+  switches, warm known-summary/team reuse, obsolete-context rejection, finite
+  completion after card closure, one explicit refresh, duplicate retry joining,
+  history-refresh isolation, strict expiry, summary-only retry and own-listing
+  retry/reuse/20-second expiry. No transactions. Local switch/flush was 0.333s.
+- `Rscript test/test_player_availability_store.R`: exact signed-point and asking-
+  price round trips; all seven context mismatches; original expiry; integrity,
+  secret-field, missing player identity and incomplete-transfer rejection;
+  invalidation after memory clearing; failed acknowledgement followed by retry;
+  verified empty listings distinct from missing data; session cleanup isolation.
+  Known-answer calculated funds retain the original 15-second deadline. A cold
+  provider restores through the real cooperative adapter with one synthetic
+  database GET and zero source calls. Deferred JSON prepares and restores a valid
+  snapshot, with acknowledgement required before marking it durable.
+- Actual `test/test_worker_card_availability_browser_app.R` and
+  `node test/test_worker_card_availability_browser.cjs` at 360/1440px: final warm
+  action readiness was 282/293ms, with zero additional team checks. A held target
+  summary bypassed the worker wait and restored actions after completion.
+  Original pending, network/partial failure, Retry, offer-editor and no-overflow
+  checks pass; pending-request Shiny heartbeats were 63–66ms. These are synthetic
+  local measurements, not a production or official-app comparison.
+- `Rscript test/test_player_card_during_saves.R`: four checks pass; seven held
+  history saves neither delay card opening nor restart availability when their
+  acknowledgements arrive. Its mock now accepts/asserts the interactive bypass
+  arguments. The browser error-state assertion waits for the complete settled
+  DOM instead of inspecting two successive output replacements between frames.
+- `Rscript test/test_worker_gui_readonly.R`,
+  `test/test_worker_manual_offer.R`,
+  `test/test_worker_card_availability_recovery.R`,
+  `test/test_card_live_capacity_recovery.R`,
+  `test/test_card_availability_freshness.R` and
+  `test/test_card_capacity_recheck.R`: worker replay and expiry, no recurring
+  source reads from worker publications, shared offer checks, context rejection,
+  slow-source freshness repair and strict original deadlines remain covered.
+  A two-session owned-card fixture exposed account-wide worker revision signals
+  tied to the first session's reactive domain; creating those shared signals
+  outside a session domain fixes reads after that session closes.
+- Existing market-offer opening, existing-offer controls, configured acquisition
+  rules, parallel acquisition, transport priority and worker-status redraw
+  checks pass. No transaction retry policy or concurrency budget changes.
+- Required `Rscript test/test_shiny_simulation.R`: 13 lifecycle checks plus eight
+  tabs pass, with no HTTP or live database mutation attempts. Deployment contract,
+  JavaScript syntax, scoped whitespace and staged runtime checksums are checked
+  before commit; development files remain excluded from the deployment bundle.
+
+Performance review: no polling or worker-cadence change. Valid worker/native
+observations avoid database reads; a new uncached scope makes at most one
+bounded database lookup before the existing source acquisition. Pending requests
+are joined and warm switches do not dispatch another team adapter. Snapshot
+writes occur for successful live observations and relevant invalidations through
+the existing bounded persistence queue. Retained provider data is limited to
+64 entries, 8 MiB/result and 16 MiB/root session; eviction excludes pending saves
+and active consumers. Existing native caches keep separate limits. Timing data
+uses fixed labels in the existing 64-sample ring and contains no identifiers.
+
+A representative synthetic summary (76 rounds, 365 price records, 239,928 decoded
+bytes) originally took about 196.5ms per synchronous save preparation. The final
+finite deferred preparation measured about 446ms total with a 162ms maximum
+heartbeat gap and 49 heartbeat ticks, moving preparation after the ready-output
+flush and yielding during JSON emission. This reduces uninterrupted work at the
+cost of total encoding CPU time. The primitive encoder and parsing still include
+bounded synchronous work; this is not a background-process implementation.
+Already-durable worker replay skips that preparation entirely. A truly cold
+card still depends on required source/database latency and complete transfer
+history; no deadline is extended and no missing fact is replaced with zero.
+
+The exact staged snapshot was also checked in an isolated directory: the new
+persistence/reuse regressions, three deployment checks and the full offline
+lifecycle harness pass independently of unrelated working-tree changes. All
+seven staged runtime checksums match the staged source blobs.
+
+No production deployment, real-account operation, live transaction, production
+latency measurement or hosted acceptance is claimed. Unrelated working changes
+are preserved. Documentation has no runtime performance effect.

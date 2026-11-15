@@ -199,7 +199,8 @@ get_cached_data <- function(key,expr,timeout_sec=NULL,context=NULL) {
     stop(failure)
   })
 }
-invalidate_resources <- function(context,resources=NULL,pattern=NULL) {
+invalidate_resources <- function(context,resources=NULL,pattern=NULL,notify_availability=TRUE) {
+  if(isTRUE(notify_availability)&&exists("player_availability_invalidate",mode="function"))player_availability_invalidate(context,resources,pattern)
   if(exists("fm_worker_invalidate_pattern",mode="function")&&(!is.null(resources)||!is.null(pattern)))fm_worker_invalidate_pattern(context,resources,pattern)
   keys<-ls(api_cache_env);drop<-vapply(keys,function(k) {
     x<-api_cache_env[[k]];ctx<-x$context
@@ -230,7 +231,7 @@ get_cached_resource_async <- function(resource,context,fetch,refresh=FALSE,cache
   resource_cache_prune();item<-api_cache_env[[key]];policy<-resource_policy(resource)
   if(!is.null(item$pending)){resource_metric("coalesced");return(item$pending)}
   if(!refresh&&!is.null(item$data)&&(is.null(cache_revision)||identical(item$cache_revision,cache_revision))&&as.numeric(difftime(Sys.time(),item$time,units="secs"))<policy$ttl&&resource_snapshot_unexpired(item$data)){resource_metric("hits");return(promises::promise_resolve(resource_state(item$data)))}
-  if(refresh)invalidate_resources(context,resources=resource)
+  if(refresh)invalidate_resources(context,resources=resource,notify_availability=FALSE)
   if(is.null(item)&&length(ls(api_cache_env))>=policy$max_entries){
     keys<-ls(api_cache_env);entries<-mget(keys,api_cache_env)
     candidates<-which(vapply(entries,function(x)is.null(x$pending),logical(1)))
@@ -360,7 +361,9 @@ resource_display_source<-function(session,read){
 
 # Fixed labels and a bounded sample ring; no account/player identifiers or bodies.
 resource_timing <- function(stage,started_at) {
-  allowed <- c("authentication","leagues","today_primary","card_identity","card_summary","card_history")
+  allowed <- c("authentication","leagues","today_primary","card_identity","card_summary","card_history",
+    "availability_team","availability_summary","availability_listings","availability_reuse","availability_database",
+    "availability_queue","availability_prerequisites","availability_transfers","availability_refresh","availability_actions")
   if(!stage %in% allowed)return(invisible(FALSE))
   elapsed <- as.numeric(difftime(Sys.time(),started_at,units="secs"))
   if(!is.finite(elapsed)||elapsed<0)return(invisible(FALSE))

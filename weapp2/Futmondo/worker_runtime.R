@@ -5,7 +5,7 @@ fm_worker_configured<-function() !isTRUE(getOption('futmondo.offline',FALSE))&&
  !isTRUE(getOption('futmondo.worker_helper',FALSE))&&identical(tolower(Sys.getenv('FUTMONDO_WORKER_ENABLED','true')),'true')&&
  grepl('^[a-fA-F0-9]{64}$',Sys.getenv('FUTMONDO_WORKER_KEY'))&&requireNamespace('sodium',quietly=TRUE)&&nzchar(get_sb_url())&&nzchar(get_sb_key())
 fm_worker_resource_revision<-function(state,key){
- if(is.null(state$resource_revisions[[key]]))state$resource_revisions[[key]]<-shiny::reactiveVal(0L)
+ if(is.null(state$resource_revisions[[key]]))state$resource_revisions[[key]]<-shiny::withReactiveDomain(NULL,shiny::reactiveVal(0L))
  state$resource_revisions[[key]]
 }
 fm_worker_notify<-function(account){
@@ -17,7 +17,7 @@ fm_worker_account_state<-function(id){
  state<-.fm_worker$accounts[[id]]
  if(is.null(state)){
   state<-new.env(parent=emptyenv());state$account<-NULL;state$known<-FALSE;state$busy<-FALSE;state$last_poll<-0
-  state$status_revision<-shiny::reactiveVal(0L);state$redirects<-list();state$redirect_revision<-shiny::reactiveVal(0L);state$descriptors<-list();state$waiters<-list();state$queued<-list();state$health<-NULL;state$jobs<-list();state$errors<-list();state$sessions<-character();state$policy_revision<-shiny::reactiveVal(0L);state$settings_revision<-shiny::reactiveVal(0L);state$resource_revisions<-new.env(parent=emptyenv())
+  state$status_revision<-shiny::withReactiveDomain(NULL,shiny::reactiveVal(0L));state$redirects<-list();state$redirect_revision<-shiny::withReactiveDomain(NULL,shiny::reactiveVal(0L));state$descriptors<-list();state$waiters<-list();state$queued<-list();state$health<-NULL;state$jobs<-list();state$errors<-list();state$sessions<-character();state$policy_revision<-shiny::withReactiveDomain(NULL,shiny::reactiveVal(0L));state$settings_revision<-shiny::withReactiveDomain(NULL,shiny::reactiveVal(0L));state$resource_revisions<-new.env(parent=emptyenv())
   .fm_worker$accounts[[id]]<-state
  }
  state

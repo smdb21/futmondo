@@ -12,9 +12,12 @@ getReactableState<-function(outputId,name,session)switch(name,page=1L,pageSize=1
 updateReactable<-function(...)invisible(NULL)
 record_acquired_resource<-function(...)invisible(TRUE)
 persist_recent_points_snapshot<-function(payload,context,on_complete){writes[[length(writes)+1L]]<<-on_complete;TRUE}
-async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is_current=function()TRUE){
+async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is_current=function()TRUE,worker_bypass=FALSE,...){
  reads<<-c(reads,fn)
- if(fn%in%c('get_player_summary','get_team_acquisition_capacity'))return(promises::promise(function(resolve,reject){pending[[fn]]<-list(resolve=resolve,reject=reject,current=is_current)}))
+ if(fn%in%c('get_player_summary','get_team_acquisition_capacity')){
+  stopifnot(worker_bypass)
+  return(promises::promise(function(resolve,reject){pending[[fn]]<-list(resolve=resolve,reject=reject,current=is_current)}))
+ }
  value<-switch(fn,
   read_league_round_dataset=list(points=data.frame(),checks=data.frame(),complete=TRUE),
   get_championship_players=rows,
