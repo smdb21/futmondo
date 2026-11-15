@@ -44,20 +44,20 @@ app<-function(input,output,session){
 }
 shiny::testServer(app,{
  session$setInputs(worker_timezone_detected='America/Los_Angeles',user='a');settle(session)
- stopifnot(output$label=='15/11/2026 07:02 CET',length(f$calls)==1L,f$calls[[1]]$mode=='get',is.null(f$rows$a))
+ stopifnot(output$label=='14/11/2026 22:02 PST',length(f$calls)==1L,f$calls[[1]]$mode=='get',is.null(f$rows$a))
  session$setInputs(worker_timezone_detected='Asia/Tokyo');settle(session)
- stopifnot(output$label=='15/11/2026 07:02 CET',length(f$calls)==1L)
+ stopifnot(output$label=='15/11/2026 15:02 JST',length(f$calls)==1L)
  session$setInputs(display_timezone='America/Los_Angeles',save_timezone=1);settle(session)
  stopifnot(output$label=='14/11/2026 22:02 PST',f$rows$a$source=='user')
  session$setInputs(user='b');settle(session)
- stopifnot(output$label=='15/11/2026 07:02 CET',is.null(f$rows$b),f$rows$a$timezone=='America/Los_Angeles')
+ stopifnot(output$label=='15/11/2026 15:02 JST',is.null(f$rows$b),f$rows$a$timezone=='America/Los_Angeles')
  session$setInputs(user='');settle(session);stopifnot(output$label=='15/11/2026 07:02 CET')
 })
 shiny::testServer(app,{
  session$setInputs(worker_timezone_detected='America/New_York',user='a');settle(session)
  stopifnot(output$label=='14/11/2026 22:02 PST')
 })
-cat('PASS one personal lookup, Spain default independent of browser, explicit durable save/reload and account isolation\n')
+cat('PASS one personal lookup, detected default, explicit durable override/reload and account isolation\n')
 for(source in c('browser','admin','user')){
  f$rows$legacy<-list(user_id='legacy',timezone='Asia/Tokyo',source=source)
  before<-length(f$calls)
@@ -68,10 +68,35 @@ for(source in c('browser','admin','user')){
  })
 }
 cat('PASS legacy automatic/admin values do not become personal choices; explicit user choices persist without rewriting history\n')
+shiny::testServer(app,{
+ session$setInputs(user='late');settle(session)
+ calls<-length(f$calls);stopifnot(output$label=='15/11/2026 07:02 CET')
+ session$setInputs(worker_timezone_detected='America/Los_Angeles');settle(session)
+ stopifnot(output$label=='14/11/2026 22:02 PST',length(f$calls)==calls)
+ session$setInputs(worker_timezone_detected='Invalid/Zone');settle(session)
+ stopifnot(output$label=='15/11/2026 07:02 CET',length(f$calls)==calls)
+ session$setInputs(display_timezone='Asia/Kolkata',save_timezone=1);settle(session)
+ session$setInputs(worker_timezone_detected='America/New_York');settle(session)
+ stopifnot(output$label=='15/11/2026 11:32 IST')
+})
+cat('PASS late detection updates only an unset default without I/O; invalid detection falls back to Spain and saved choices win\n')
+f$rows$race<-list(user_id='race',timezone='UTC',source='user');f$delay<-TRUE
+shiny::testServer(app,{
+ before<-length(f$calls)
+ session$setInputs(user='race',worker_timezone_detected='America/Los_Angeles');settle(session)
+ stopifnot(output$label=='14/11/2026 22:02 PST',length(f$calls)==before+1L)
+ f$resolve(f$rows$race);settle(session)
+ stopifnot(output$label=='15/11/2026 06:02 UTC')
+ session$setInputs(worker_timezone_detected='Asia/Tokyo');settle(session)
+ stopifnot(output$label=='15/11/2026 06:02 UTC',length(f$calls)==before+1L)
+});f$delay<-FALSE
+cat('PASS delayed saved preference replaces provisional detection and remains authoritative without extra I/O\n')
+
+
 f$fail<-TRUE
 shiny::testServer(app,{
  session$setInputs(worker_timezone_detected='America/Los_Angeles',user='a');settle(session)
- stopifnot(grepl('Temporarily displaying Spain',output$timezone_preference_status$html),output$label=='15/11/2026 07:02 CET')
+ stopifnot(grepl('Temporarily using the detected timezone',output$timezone_preference_status$html),output$label=='14/11/2026 22:02 PST')
  f$fail<-FALSE;session$setInputs(retry_timezone_preference=1);settle(session)
  stopifnot(is.null(output$timezone_preference_status),output$label=='14/11/2026 22:02 PST')
  f$fail<-TRUE;session$setInputs(display_timezone='Asia/Tokyo',save_timezone=1);settle(session)

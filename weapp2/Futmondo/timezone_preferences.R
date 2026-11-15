@@ -66,10 +66,14 @@ fm_timezone_store <- function(user_id=NULL, timezone=NULL, mode="get", token=NUL
 fm_timezone_preferences <- function(session, login, store=fm_timezone_store) {
   zone <- shiny::reactiveVal("Europe/Madrid"); issue <- shiny::reactiveVal(NULL)
   ready <- shiny::reactiveVal(FALSE); busy <- shiny::reactiveVal(FALSE)
-  generation <- 0L; account <- NULL; closed <- FALSE; started <- FALSE
+  generation <- 0L; account <- NULL; closed <- FALSE; started <- FALSE; personal_choice <- FALSE
   session$userData$display_timezone_ready <- ready
   session$userData$display_timezone <- zone
-  session$userData$set_display_timezone <- function(row) { zone(row$timezone); issue(NULL); ready(TRUE) }
+  session$userData$set_display_timezone <- function(row) { personal_choice <<- TRUE; zone(row$timezone); issue(NULL); ready(TRUE) }
+  default_timezone <- function() {
+    detected <- shiny::isolate(session$input$worker_timezone_detected)
+    if(fm_valid_timezone(detected)) detected else "Europe/Madrid"
+  }
   current <- function(g) !closed && identical(g,generation)
   load <- function(g) {
     if(!current(g)||started||is.null(account)) return(invisible(NULL))
@@ -77,24 +81,30 @@ fm_timezone_preferences <- function(session, login, store=fm_timezone_store) {
     auth <- shiny::isolate(login())
     promises::then(store(account,mode="get",token=auth,owner=session$token),function(row) {
       if(!current(g)) return(NULL)
-      # Only an explicit personal save is a choice. Old browser defaults and
-      # administrator overrides do not define this user's preference.
-      selected <- if(!is.null(row)&&identical(row$source,"user"))row$timezone else "Europe/Madrid"
-      zone(selected); issue(NULL); ready(TRUE); busy(FALSE); NULL
+      # A saved personal choice wins over device detection. Legacy automatic
+      # values and admin overrides do not pin another person's default.
+      personal_choice <<- !is.null(row)&&identical(row$source,"user")
+      zone(if(personal_choice)row$timezone else default_timezone())
+      issue(NULL); ready(TRUE); busy(FALSE); NULL
     },function(error) {
       if(!current(g)) return(NULL)
-      zone("Europe/Madrid"); busy(FALSE); ready(FALSE); issue("Your saved timezone could not be loaded. Temporarily displaying Spain time (Europe/Madrid); retry to restore your saved setting."); NULL
+      personal_choice <<- FALSE; zone(default_timezone()); busy(FALSE); ready(FALSE); issue("Your saved timezone could not be loaded. Temporarily using the detected timezone (Spain if detection is unavailable); retry to restore your saved setting."); NULL
     })
     invisible(NULL)
   }
   shiny::observeEvent(login(), {
     auth <- login(); id <- if(valid_login(auth))as.character(auth[["userid"]])else NULL
     if(identical(account,id)) return()
-    generation <<- generation+1L; account <<- id; started <<- FALSE
-    zone("Europe/Madrid"); issue(NULL); ready(FALSE); busy(FALSE)
+    generation <<- generation+1L; account <<- id; started <<- FALSE; personal_choice <<- FALSE
+    zone(if(is.null(id))"Europe/Madrid"else default_timezone()); issue(NULL); ready(FALSE); busy(FALSE)
     if(is.null(id)) return()
     load(generation)
   },ignoreNULL=FALSE,priority=110)
+  # Detection may arrive after the preference read. It updates only an unset
+  # default and never performs I/O or overwrites a confirmed personal choice.
+  shiny::observeEvent(session$input$worker_timezone_detected,{
+    if(!is.null(account)&&!personal_choice)zone(default_timezone())
+  })
   shiny::observeEvent(session$input$retry_timezone_preference,{
     if(!busy()) { started <<- FALSE; load(generation) }
   })
@@ -119,7 +129,7 @@ fm_timezone_preferences <- function(session, login, store=fm_timezone_store) {
   session$output$timezone_settings <- shiny::renderUI({
     shiny::req(valid_login(login()))
     shiny::tags$details(shiny::tags$summary(paste("Display timezone:",zone())),
-      shiny::p("Choose your own display timezone. Default: Spain (Europe/Madrid). Saved choices apply only to your account across sessions. Dates use DD/MM/YYYY and a 24-hour clock."),
+      shiny::p("Your timezone is detected automatically. You can change it here; your saved choice overrides detection across sessions. Spain (Europe/Madrid) is used if detection is unavailable. Dates use DD/MM/YYYY and a 24-hour clock."),
       shiny::selectizeInput("display_timezone","Your timezone",choices=fm_timezones(),selected=zone(),width="100%"),
       shiny::actionButton("save_timezone","Save timezone",disabled=!ready()||busy()))
   })

@@ -1,6 +1,6 @@
 # Administration
 
-Users manage their own display timezone under **Welcome → Display timezone**, with Spain (`Europe/Madrid`) as the default when no personal choice is saved. The former Admin user-timezone directory and editor have been removed. See [personal timezone contracts and verification](timezone_preferences.md).
+Users manage their own display timezone under **Welcome → Display timezone**, with an automatically detected default and Spain (`Europe/Madrid`) as the fallback when detection is unavailable. The former Admin user-timezone directory and editor have been removed. See [personal timezone contracts and verification](timezone_preferences.md).
 
 `admin_UI(id)` and `admin_Server(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV)` expose explicit database diagnostics to the configured administrator. Every operation rechecks the authenticated account and active module. Reset confirmation captures the current account/league; changing context invalidates it.
 

@@ -1721,3 +1721,17 @@ Production deployment and authenticated hosted acceptance remain separate.
   offline lifecycle pass. Measurements and limits are in `data_review_results.md`.
   This corrects existing preference ownership and default behavior; no new
   capability or login-tier expansion. Hosted rollout remains unverified.
+
+
+### Detected personal timezone default — implemented locally (2026-11-15)
+
+- Clarify the owner's final default: use the browser's detected IANA timezone
+  until the user saves an explicit personal choice. Use Europe/Madrid only
+  when detection is missing or invalid. Saved personal choices always win.
+- Accept detection arriving before or after the existing preference lookup,
+  with no extra database request or automatic preference write. Keep self-only
+  authorization, removed Admin directory, durable saves and failure readback.
+- Detection/fallback/delayed-read precedence regressions and phone/desktop
+  browser checks pass. Performance and lifecycle results are recorded in
+  `data_review_results.md`. No schema, dependency or environment change; this
+  corrects the previous Spain-only default without expanding product scope.

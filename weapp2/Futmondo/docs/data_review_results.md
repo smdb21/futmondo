@@ -3355,3 +3355,54 @@ correction/removal within existing display preferences, with no new comparison
 or login-tier capability. Local checks and branch delivery do not verify hosted
 rollout, physical devices or production network latency. Unrelated working-tree
 and staged changes are preserved.
+
+
+## Detected personal timezone default — 2026-11-15
+
+Final owner clarification: detect the browser timezone as the default, then
+let each user override it. `fm_timezone_preferences()` keeps its immediate
+personal database lookup and adds a guarded detection observer. Until an
+explicit source=user choice is acknowledged, the current valid detected IANA
+zone supplies the default. Missing/invalid detection falls back to Madrid.
+A delayed database choice replaces provisional detection; subsequent browser
+changes cannot overwrite the saved choice. Legacy browser/admin rows remain
+stored without pinning a default from another device/person. Admin cross-user
+controls and authorization remain removed. No default row or source observation
+is written automatically; explicit personal choices retain database persistence
+and authoritative readback after uncertain saves.
+
+`www/worker-state.js` reports `Intl.DateTimeFormat().resolvedOptions().timeZone`
+on connection/visibility changes, without coordinates or geolocation permission.
+Equal Shiny inputs do not republish. The existing client countdown is unchanged.
+There is no wait for detection or fallback timer; a late detection changes only
+the unset session default. Source dates, UTC instants and DST rules are unchanged.
+
+Executed checks: timezone regression passes nine reported groups, including
+known-answer DST/offset formatting, detected and late defaults, invalid/missing
+detection, delayed saved-read precedence, persistence, self-only authorization,
+uncertain writes, duplicate guards and logout/account isolation. One thousand
+parsed timestamp labels took 0.001s. Synthetic Chromium at 320/390/1440px
+confirms Los Angeles detection, saved Madrid overriding that browser after
+reload, two independent account choices, no Admin editor, no geolocation, no
+overflow or output errors, and held-save heartbeats of 82/77/86ms. An additional
+browser fixture makes detection unavailable and confirms Madrid fallback with
+zero default writes. The 390px screenshot was inspected.
+
+The required offline lifecycle passes 13 checks plus eight tabs against the
+exact task artifact, with zero HTTP/live database mutation attempts. Deployment
+checks pass all three groups and verify exclusions, unchanged dependencies/file
+inventories, and the two changed runtime checksums.
+No real accounts, transactions, production preference writes or deployment are
+used for local verification. This default correction introduces no new product
+capability or login-tier entry.
+
+Performance review: one existing bounded asynchronous preference GET per
+login/retry and writes only on explicit Save. Detection adds one guarded
+observer and bounded connection/visibility input publications, with zero
+detection-triggered DB/API operations, timers or polling. Matching values do
+not redraw; changed unset defaults update existing account-local outputs.
+Existing cache/queue bounds and responsive selector are retained. Saved worker
+quiet-hours settings stay independent. No dependency, schema or environment
+change; documentation has no runtime effect. Hosted appearance, physical-device
+behavior and network latency remain unverified. Unrelated working/index edits
+are preserved.

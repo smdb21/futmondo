@@ -1,9 +1,10 @@
 # Personal timezone and uniform dates
 
 Current behavior, corrected 2026-11-15: each user chooses their own timezone in
-**Welcome → Display timezone**. With no explicit personal choice, the app uses
-Spain time (`Europe/Madrid`, including mainland Spain's daylight-saving rules).
-The browser's timezone does not select or overwrite this preference. The same
+**Welcome → Display timezone**. With no explicit personal choice, the browser's
+IANA timezone is detected automatically. Spain (`Europe/Madrid`, including
+mainland Spain's daylight-saving rules) is the fallback if detection is missing
+or invalid. A saved personal choice always overrides browser detection. The same
 control is available to ordinary users and LigaRadar administrators; Admin no
 longer contains a user timezone directory or cross-user editor.
 
@@ -20,8 +21,12 @@ users elsewhere, including the Canary Islands, can select their own IANA zone.
 
 `fm_timezone_preferences(session, login, store)` immediately starts one
 asynchronous personal preference lookup at login, without waiting for browser
-reporting or a fallback timer. A missing row is an unset preference, so Madrid
-is immediately usable without an automatic write. Saving an explicit choice
+reporting or a fallback timer. A missing row is an unset preference, so the
+current detected default is immediately usable without an automatic write.
+Detection uses `Intl.DateTimeFormat().resolvedOptions().timeZone`, without
+coordinates or geolocation permission. The server validates the IANA value.
+Late detection updates only an unset default; it causes no database read or
+write. A missing/invalid detection uses Madrid until valid detection arrives. Saving an explicit choice
 persists it in `user_timezone_preferences` through the existing server-only
 `set_user_timezone` RPC with `source=user`, including when the user is a
 LigaRadar administrator. A successful save must acknowledge the matching
@@ -30,12 +35,12 @@ survive logout, browser/device changes, process restarts and redeployments.
 
 Legacy `source=browser` rows were automatic defaults and `source=admin` rows
 could be overrides by another person. They remain stored, but do not establish
-an explicit personal choice: display defaults to Madrid until the user saves
-a timezone. Existing `source=user` choices remain authoritative. No historical
+an explicit personal choice: the current browser supplies the default until
+the user saves a timezone. Existing `source=user` choices remain authoritative. No historical
 values are deleted or relabeled. The existing schema and migration remain
 compatible; no new migration or bulk production rewrite is required.
 
-A read failure displays temporary Spain time and an actionable failure notice;
+A read failure displays the temporary detected default (Spain fallback) and an actionable failure notice;
 it does not imply a missing preference. Saves remain disabled until the saved
 state can be checked. A failed or uncertain save stays unconfirmed; retry
 reads the authoritative row before another write, and never blindly replays a
@@ -43,8 +48,9 @@ write. Loading/saving yields to Shiny so navigation remains responsive.
 Overlapping saves are suppressed, and logout/account changes invalidate late
 callbacks. Rendering performs no database request or initialization write.
 
-`www/worker-state.js` now reports visibility only; it no longer publishes a
-browser timezone. Its local countdown remains independent of timezone choice.
+`www/worker-state.js` publishes visibility and detected timezone on connection/
+visibility changes. Equal inputs are deduplicated by Shiny. Its local countdown
+remains independent of timezone choice and sends no per-second server traffic.
 Background-sync **Quiet-hours timezone** remains a separate personal scheduling
 setting; its existing initial value follows the display timezone if no saved
 quiet-hours setting exists. Changing display timezone does not reschedule an
@@ -67,7 +73,7 @@ already configured worker.
   missing row as unset, validates persisted provenance, and SET verifies the
   acknowledged personal choice. Credentials remain on the R server.
 - `fm_timezone_preferences(session, login, store)`: owns account generation,
-  personal selector, safe default, acknowledgement, retry and readiness state.
+  personal selector, detected default, acknowledgement, retry and readiness state.
   The former `fm_admin_timezones()` controller has been removed.
 
 Legacy SQL initialization/directory functions remain server-only for stored
@@ -79,20 +85,21 @@ current user's display.
 
 ## Verification and performance
 
-Focused tests cover Madrid without a stored choice, browser-independent
-behavior, legacy provenance, durable personal saves/reloads, administrator
+Focused tests cover detected defaults without a stored choice, late detection,
+missing/invalid detection with Spain fallback, explicit-override precedence, legacy provenance, durable personal saves/reloads, administrator
 self-only authorization, uncertain-save readback, late replies, held read/write
 responsiveness, DST/offset known answers and shared module dates. Synthetic
-browser checks cover personal controls at phone/desktop widths, Spain default
-in a Los Angeles browser, account isolation, save acknowledgement and reload
+browser checks cover personal controls at phone/desktop widths, a Los Angeles
+default in a Los Angeles browser, a saved Madrid override, detection failure,
+account isolation, save acknowledgement and reload
 reuse without live accounts or database writes. Admin browser checks assert
 zero timezone-directory reads. The offline lifecycle is mandatory for these
 login changes; actual results and limits are in `data_review_results.md`.
 
 Performance: one bounded asynchronous GET per login/retry and one confirmed
-write per explicit save. Defaulting to Madrid creates no row. Removing the
-cross-user directory eliminates its activation/search/pagination queries;
-removing browser detection eliminates its publications and one-second fallback.
-No new polling, source acquisition, cache, queue or worker is introduced. The
+write per explicit save. A detected default creates no row. The cross-user
+directory remains removed. Detection adds one guarded session observer and
+bounded browser-state publications, with no one-second wait or timer. There
+are no detection-triggered database operations, new polling, source acquisition, cache, queue or worker is introduced. The
 bounded IANA catalog and mobile-safe selector are reused. Hosted rollout and
 physical-device/network latency remain separate from local verification.
