@@ -242,7 +242,7 @@ players_table_metric_ranges <- function(rows) {
     values <- rows[[column]]
     values <- values[is.finite(values)]
     if (!length(values)) return(list(min=NULL, max=NULL))
-    list(min=min(values), max=max(values))
+    list(min=as.numeric(min(values)), max=as.numeric(max(values)))
   }), columns)
 }
 
@@ -630,17 +630,29 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       rows<-as.data.frame(rows)
       attributes(rows)<-attributes(rows)[intersect(c("names","row.names","class"),names(attributes(rows)))]
       rownames(rows)<-NULL
+      # Native JSON and durable replay may encode the same number as integer or
+      # double. Compare the values the widget receives, not R storage types.
+      rows[]<-lapply(rows,function(column){
+        if(is.numeric(column)&&!inherits(column,c("Date","POSIXt","difftime")))as.numeric(column)else column
+      })
       rows
     })
     table_display_ids<-reactive(as.character(players_table_filtered_RV()$id))
+    # Publish one consistent visible snapshot. Source clocks, expiry and history
+    # progress cannot invalidate the widget when rows/identity/styles are equal.
+    table_display_snapshot<-resource_display_source(session,function(){
+      recent_n<-suppressWarnings(as.integer(input$recent_games_n)[1])
+      if(!is.finite(recent_n))recent_n<-5L
+      list(rows=table_display_data(),ids=table_display_ids(),meta=table_color_meta(),
+        context=table_context_RV(),recent_n=recent_n)
+    })
     table_schema<-reactiveVal(NULL)
     rendered_schema<-NULL;rendered_data<-NULL;rendered_ids<-character();rendered_meta<-NULL
     observe({
-      rows<-table_display_data();ids<-table_display_ids();meta<-table_color_meta()
+      snapshot<-table_display_snapshot();rows<-snapshot$rows;ids<-snapshot$ids;meta<-snapshot$meta
       if(is.null(rows)){table_schema(NULL);return()}
-      recent_n<-suppressWarnings(as.integer(input$recent_games_n)[1])
-      if(!is.finite(recent_n))recent_n<-5L
-      schema<-list(context=table_context_RV(),columns=names(rows),
+      recent_n<-snapshot$recent_n
+      schema<-list(context=snapshot$context,columns=names(rows),
         types=lapply(rows,function(column)if(is.numeric(column))"numeric"else class(column)),recent_n=recent_n,
         formatted=digest::digest(lapply(rows[setdiff(names(rows),c("recent_points_avg","recent_points_ratio","recent_points_trend","recent_points_details"))],
           function(column)if(is.numeric(column))as.numeric(column)else column)),ids=ids)
@@ -659,15 +671,14 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
     },priority=10)
     output$players_table <- renderReactable({
       schema<-table_schema();req(schema)
-      players_table<-isolate(table_display_data());req(players_table)
-      rendered_schema<<-schema;rendered_data<<-players_table;rendered_ids<<-isolate(table_display_ids());rendered_meta<<-isolate(table_color_meta())
+      snapshot<-isolate(table_display_snapshot());players_table<-snapshot$rows;req(players_table)
+      rendered_schema<<-schema;rendered_data<<-players_table;rendered_ids<<-snapshot$ids;rendered_meta<<-snapshot$meta
       table_columns <- get_reactable_columns_for_players(players_table,show_sale_profit=own_squad,separate_crest=TRUE)
       table_columns[[".selection"]]<-reactable::colDef(show=FALSE)
       if("points" %in% names(players_table))table_columns[["points"]]<-reactable::colDef(
         name="Points",align="center",sortNALast=TRUE,minWidth=84,resizable=TRUE,
         style=players_table_metric_style(),cell=players_table_metric_cell(0L))
-      recent_n <- suppressWarnings(as.integer(input$recent_games_n)[1])
-      if (!is.finite(recent_n)) recent_n <- 5L
+      recent_n <- schema$recent_n
       table_columns[["recent_points_avg"]] <- players_table_recent_average_column(recent_n)
       table_columns[["recent_points_details"]] <- reactable::colDef(show=FALSE,searchable=FALSE,filterable=FALSE)
       if(!is.null(points_ratio_basis))table_columns[["recent_points_ratio"]]<-reactable::colDef(

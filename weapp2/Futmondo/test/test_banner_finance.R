@@ -37,14 +37,14 @@ shiny::testServer(app_server,{
   })
   pending[[team_key]]$resolve(list(budget=180546496,withheld=0,teamValue=350438934));app_settle(session)
   check("known balance renders in both places while offers and schedule are pending", {
-    html <- output$round_countdown$html
-    stopifnot(grepl("180.546.496 EUR",html,fixed=TRUE),grepl("Loading active offers",html,fixed=TRUE),
+    html <- paste(output$round_countdown$html,output$round_finance_status$html)
+    stopifnot(grepl("180.546.496 EUR",html,fixed=TRUE),grepl("Active offers: Loading",html,fixed=TRUE),
       !grepl("round-countdown-warning",html,fixed=TRUE),
       grepl("180.546.496 €",output[["today-kpi_cash_box"]]$html,fixed=TRUE))
   })
   pending[[market_key]]$reject(simpleError("Synthetic market timeout"));app_settle(session)
   check("failed offers retain known cash and produce a neutral retry message", {
-    html <- output$round_countdown$html
+    html <- paste(output$round_countdown$html,output$round_finance_status$html)
     stopifnot(grepl("180.546.496 EUR",html,fixed=TRUE),grepl("could not load",html,fixed=TRUE),
       grepl("Active offers: Unavailable",html,fixed=TRUE),!grepl("round-countdown-warning",html,fixed=TRUE))
   })
@@ -60,9 +60,9 @@ shiny::testServer(app_server,{
     stopifnot(identical(added,"get_market_players"))
   })
   pending[[market_key]]$resolve(data.frame());app_settle(session)
-  check("verified empty market produces zero reservation and a solvent banner", {
-    html <- output$round_countdown$html
-    stopifnot(grepl("round-countdown-solvent",html,fixed=TRUE),
+  check("verified empty market produces zero reservation and a stable observed-amount banner", {
+    html <- paste(output$round_countdown$html,output$round_finance_status$html)
+    stopifnot(grepl("round-countdown-observed",html,fixed=TRUE),
       grepl("Active offers: 0 EUR (0)",html,fixed=TRUE),grepl("After offers: 180.546.496 EUR",html,fixed=TRUE))
   })
   before <- calls;session$setInputs(tabs="yourteam");app_settle(session);invisible(output$round_countdown)
@@ -85,7 +85,7 @@ shiny::testServer(app_server,{
   pending[[team_key]]$resolve(list(budget=-10,withheld=0,teamValue=1000))
   pending[[market_key]]$resolve(data.frame());app_settle(session)
   check("confirmed fresh debt is still visibly warned", {
-    html <- output$round_countdown$html
+    html <- paste(output$round_countdown$html,output$round_finance_status$html)
     stopifnot(grepl("round-countdown-warning",html,fixed=TRUE),grepl("Restore at least 11 EUR",html,fixed=TRUE))
   })
   # Replay typed database snapshots, preserving their original source time.
@@ -107,7 +107,7 @@ shiny::testServer(app_server,{
   saved_market <- restore_saved(market_fixture,"get_market_players")
   pending[[team_key]]$resolve(saved_team);pending[[market_key]]$resolve(saved_market);app_settle(session)
   check("expired database snapshots retain source time and disclose cache metadata behind an icon", {
-    html <- output$round_countdown$html
+    html <- paste(output$round_countdown$html,output$round_finance_status$html)
     stopifnot(grepl("Balance: 1.000 EUR",html,fixed=TRUE),
       grepl("Active offers: 200 EUR (1)",html,fixed=TRUE),
       grepl("After offers: 700 EUR",html,fixed=TRUE),
@@ -128,7 +128,7 @@ shiny::testServer(app_server,{
   })
   session$setInputs(tabs="today");app_settle(session)
   check("context change clears old team cash while new context loads", {
-    html <- output$round_countdown$html
+    html <- paste(output$round_countdown$html,output$round_finance_status$html)
     stopifnot(identical(championship_id_RV(),"different-league"),!grepl("Balance: -10 EUR",html,fixed=TRUE),
       grepl("Balance: Loading",html,fixed=TRUE))
   })

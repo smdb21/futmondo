@@ -3162,3 +3162,64 @@ environment or manifest-package change. Documentation has no runtime effect.
 Local timings establish responsiveness under the synthetic delay, not
 authenticated hosted latency or deployment. Only task-specific source checksums
 and documentation additions belong in the commit; unrelated edits remain.
+
+
+## Stable balances and unchanged player refreshes — 2026-11-15
+
+Reproduced the reported repaint against the committed code. The balance card's
+class and full display projection changed on freshness/loading transitions even
+with identical amounts; direct scheduled-job dependencies could also invalidate
+the whole header for metadata-only polls. Player rows and metric endpoints could
+compare unequal solely because native/worker values alternated between integer
+and double, causing an unnecessary `updateReactable()`.
+
+`round_finance_card_display()` now projects stable observed amounts independently
+of the strict finance state. Freshness, actual read errors, unverified balances
+and source timestamps update through the separate status detail. An observed
+nonpositive balance stays visibly marked without asserting current kickoff
+eligibility. Missing source data still clears known amounts. Rendered scheduled
+purchase details are compared before publishing. Player rows/IDs/metric styles/
+context/recent-N now publish atomically, with equivalent numeric encodings
+normalized only for display. Raw action data, source timestamps, completeness,
+expiry and existing manual preflights are unchanged.
+
+Verification:
+
+- New `test_unchanged_refresh_display.R`: eight groups covering ten repeated
+  freshness/loading/success cycles, genuine failures, changed/negative/unknown
+  amounts, scheduled-job metadata versus changed reservations, equivalent signed/
+  zero player snapshots, actual player changes and 524-player refreshes. Both
+  unchanged balance and table assertions failed against the pre-fix paths.
+- Existing finance banner (14), debt/countdown (14), refresh stability (11), player
+  filters (9), metric colors (10), shared roster note (3) and deployment (3) pass. Points
+  ratio/trend fixtures and recent-average known answers pass, preserving signed
+  scores, zero, missing values, history replacement and in-place history updates.
+- Chromium at 320/390/1440px uses the actual header, real player table and typed
+  worker snapshot codec. New versions/source clocks, two expiry/recovery cycles
+  and a delayed database refresh produce zero header/table recalculation or value
+  events and preserve DOM identity/color. Real balance/player changes appear;
+  no JavaScript errors or horizontal overflow. Held database heartbeat measures
+  215/161/163ms; ordinary heartbeat 62ms. Acquisition enqueue count remains zero.
+- The required offline lifecycle passes 13 checks plus eight tabs with no HTTP or
+  live DB mutation. Final isolated staged-code checks are recorded below.
+
+Performance review: unchanged data stops before header rendering and the table's
+schema hash/widget update work. A 524-player synthetic table handled ten unchanged
+publications in 0.228s, retaining one 99.2KiB visible snapshot and sending zero widget
+updates. The smaller ten table cycles measured 0.318s; thirty financial state
+transitions measured 0.762s. These development measurements include reactive/test
+flushes and do not establish Contabo production latency. Projection memory is
+bounded by the currently loaded table; numeric normalization is linear in its
+cells. Existing DB-persisted worker snapshots and bounded memory reuse remain;
+no API/DB request, persistence write, invalidation, timer, dependency or worker
+cadence is added. No new feature capability or login inventory change is needed.
+Authenticated hosted appearance and deployment are unverified. No real account
+or transaction was used; unrelated concurrent/working-tree edits are excluded.
+
+
+Final isolated task-only staged export: new display regression (8 groups), metric
+colors (10), deployment (3), full-server banner finance (14), refresh stability
+(11), and required offline lifecycle (13 checks plus eight tabs) all pass. The
+isolated 524-player measurement was 0.230s for ten unchanged publications, with
+zero widget renders/updates. The export excludes unrelated local and concurrent
+staged edits; no source or database service was contacted by these tests.

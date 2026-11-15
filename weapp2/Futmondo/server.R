@@ -138,6 +138,29 @@ function(input, output, session) {
     if(fm_clause_enabled())finance<-fm_clause_finance(finance,fm_clause_jobs(resource_context(login_token_RV(),championship_id_RV(),user_team_id_RV())),primary_team_state()$data)
     finance
   })
+  round_finance_card_RV <- resource_display_source(session,function()round_finance_card_display(round_finance_RV()))
+  round_clause_pending_display <- resource_display_source(session,function(){
+    if(!fm_clause_enabled())return(NULL)
+    req(valid_login(login_token_RV()))
+    fm_clause_pending_ui(fm_clause_jobs(resource_context(login_token_RV(),championship_id_RV(),user_team_id_RV())))
+  })
+  round_finance_status_display <- resource_display_source(session,function(){
+    finance<-round_finance_RV()
+    cash<-finance$cash;commitments<-finance$commitments;spendable<-finance$spendable_budget
+    fm_info(
+      if(!is.null(finance$message))tags$p(finance$message),
+      if(finance$cash_unverified)tags$p("Balance has not been verified by the latest check."),
+      if(finance$cash_stale)tags$p("Balance check is out of date."),
+      if(finance$offers_stale)tags$p("Active offers check is out of date."),
+      textOutput("round_finance_checked",inline=TRUE),
+      error=identical(finance$class,"round-countdown-warning")||
+        (!finance$cash_loading&&!finance$offers_loading&&
+          (!is.finite(cash)||!is.finite(commitments)||!is.finite(spendable)))||
+        (!is.null(finance$message)&&grepl("could not load",finance$message,fixed=TRUE)),
+      pending=(finance$cash_loading||finance$offers_loading)&&!identical(finance$class,"round-countdown-warning"),
+      class="round-countdown-solvency")
+  })
+  output$round_finance_status<-renderUI(round_finance_status_display())
   # Update source times independently of the countdown/financial card DOM.
   round_finance_checked<-resource_display_source(session,function(){
     if(!valid_login(login_token_RV()))return("")
@@ -191,20 +214,19 @@ function(input, output, session) {
       } else tags$div(class="round-countdown-main",icon("clock"),
         fm_info(if (primary_ready) "Round schedule unavailable" else "Loading round schedule…", error = primary_ready,pending=!primary_ready))
     }
-    finance <- round_finance_RV()
+    finance <- round_finance_card_RV()
     cash <- finance$cash
     commitments <- finance$commitments
     active_offer_count <- finance$active_offer_count
     final_balance <- finance$projected_committed_balance
     spendable <- finance$spendable_budget
-    money_text <- function(x, loading=FALSE, cached=FALSE) if (is.finite(x)) paste0(format(round(x), big.mark=".", decimal.mark=",", scientific=FALSE), " EUR") else if (loading) "Loading…" else "Unavailable"
+    money_text <- function(x, loading=FALSE) if (is.finite(x)) paste0(format(round(x), big.mark=".", decimal.mark=",", scientific=FALSE), " EUR") else if (loading) "Loading…" else "Unavailable"
     cash_text <- money_text(cash,finance$cash_loading)
     offers_text <- if (is.finite(commitments)) {
       suffix <- if (is.finite(active_offer_count)) paste0(" (", as.integer(active_offer_count), ")") else ""
-      paste0(money_text(commitments, cached=finance$offers_stale), suffix)
+      paste0(money_text(commitments), suffix)
     } else if (finance$offers_loading) "Loading…" else "Unavailable"
     solvency_class <- finance$class
-    solvency_text <- finance$message
     tags$div(class = paste("round-countdown-bar", solvency_class),
       round_heading,
       tags$div(class = "round-countdown-finance",
@@ -212,18 +234,10 @@ function(input, output, session) {
         tags$span(class = "round-countdown-finance-item", paste0("Active offers: ", offers_text)),
         if(fm_clause_enabled()&&is.finite(finance$manual_pending_amount)&&finance$manual_pending_amount>0)
           tags$span(class='round-countdown-finance-item',paste0('Pending offer confirmations: ',money_text(finance$manual_pending_amount))),
-        if(fm_clause_enabled())fm_clause_pending_ui(fm_clause_jobs(resource_context(login_token_RV(),championship_id_RV(),user_team_id_RV()))),
-        tags$span(class = "round-countdown-finance-item", paste0("After offers: ", money_text(final_balance,finance$cash_loading || finance$offers_loading,finance$calculations_stale))),
-        tags$span(class = "round-countdown-finance-item", paste0("Can spend: ", money_text(spendable,finance$cash_loading || finance$offers_loading,finance$calculations_stale))),
-        fm_info(
-          if (!is.null(solvency_text)) tags$p(solvency_text),
-          if (finance$cash_unverified) tags$p("Balance has not been verified by the latest check."),
-          textOutput("round_finance_checked",inline=TRUE),
-          error = identical(solvency_class, "round-countdown-warning") ||
-            (!finance$cash_loading && !finance$offers_loading &&
-              (!is.finite(cash) || !is.finite(commitments) || !is.finite(spendable))) ||
-            (!is.null(solvency_text) && grepl("could not load", solvency_text, fixed=TRUE)),
-          pending=(finance$cash_loading||finance$offers_loading)&&!identical(solvency_class,"round-countdown-warning"), class = "round-countdown-solvency")))
+        round_clause_pending_display(),
+        tags$span(class = "round-countdown-finance-item", paste0("After offers: ", money_text(final_balance,finance$cash_loading || finance$offers_loading))),
+        tags$span(class = "round-countdown-finance-item", paste0("Can spend: ", money_text(spendable,finance$cash_loading || finance$offers_loading))),
+        uiOutput("round_finance_status",inline=TRUE)))
   })
   user_teams_RV <- reactive({
     req(championship_id_RV()); refresh_trigger()

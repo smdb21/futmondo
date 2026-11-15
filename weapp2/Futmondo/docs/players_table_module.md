@@ -327,3 +327,24 @@ Pinned cells paint opaque theme-aware backgrounds so scrolling values cannot
 show through. Stripe, hover, selection and departure tints remain visible. Native
 sticky offsets follow column resizing without scroll handlers or server work.
 See `data_review_results.md` for measured browser/lifecycle checks and limits.
+
+
+## Suppress equivalent snapshot repaints — 2026-11-15
+
+`table_display_snapshot` publishes one atomic visible projection containing
+normalized widget rows, source row IDs, metric/departure styling, account/league/
+team/competition/season/scoring context and the selected recent-round count.
+Only a changed projection reaches the schema/update observer. Identical player
+values with new source timestamps, freshness flags or history progress therefore
+send neither a widget render nor `updateReactable()`. Source data and selection/
+action snapshots retain their original metadata and strict verification rules.
+
+`table_display_data()` normalizes ordinary numeric columns to doubles before
+comparison; integer/double changes from native JSON versus durable worker replay
+are equivalent display values. Date/time/duration classes remain intact.
+`players_table_metric_ranges()` likewise normalizes numeric range endpoints so
+styling metadata cannot force an otherwise identical update. Signed/zero points,
+missing values, metric domains, row identity, filtering, recent-N changes and
+R-formatted cell updates retain their existing behavior. The snapshot is bounded
+by the loaded table and reuses the existing shared observations; it introduces no
+API/database request, timer, persistent cache or source invalidation.

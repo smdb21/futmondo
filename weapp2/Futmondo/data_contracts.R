@@ -160,6 +160,21 @@ round_finance_display <- function(team_state, market_state) {
     class=class, message=message)
 }
 
+# Presentation of observed amounts is independent of action freshness. Keep the
+# strict finance contract above; source/error/expiry feedback has its own output.
+round_finance_card_display <- function(finance) {
+  fields<-c("cash","commitments","active_offer_count","projected_committed_balance",
+    "spendable_budget","manual_pending_amount")
+  card<-finance[intersect(fields,names(finance))]
+  card$cash_loading<-!is.finite(finance$cash)&&isTRUE(finance$cash_loading)
+  card$offers_loading<-!is.finite(finance$commitments)&&isTRUE(finance$offers_loading)
+  balances<-c(finance$cash,finance$projected_committed_balance)
+  negative<-any(is.finite(balances)&balances<=0)
+  card$class<-if(negative)"round-countdown-warning"else
+    if(any(is.finite(c(finance$cash,finance$commitments))))"round-countdown-observed"else "round-countdown-unavailable"
+  card
+}
+
 next_round_context <- function(rounds, now = Sys.time()) {
   unavailable <- list(available = FALSE, round_number = NA_real_, starts_at = as.POSIXct(NA))
   if (!is.data.frame(rounds) || !nrow(rounds) ||

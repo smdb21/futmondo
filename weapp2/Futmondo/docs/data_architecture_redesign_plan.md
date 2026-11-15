@@ -1660,3 +1660,19 @@ Exit criteria still open: capture the actual closed-clause rejection with the te
   measurements and verification limits are in `data_review_results.md`. No new
   capability, dependency, schema or environment setting; production rollout
   and authenticated hosted latency remain unverified.
+
+
+### Stable balances and player tables through unchanged refresh — 2026-11-15
+
+Implemented and verified locally: separate observed balance values/styling from
+freshness/error details; suppress duplicate header renders from unchanged job
+metadata. Publish player widget rows, IDs, styles and context together, comparing
+integer/double source encodings as equal display values. Actual changed amounts,
+player values, reservations, errors and context changes remain observable; manual
+preflights, original timestamps, expiry and durable snapshot reuse are intact.
+
+Focused reproductions, existing finance/history/filter/stability suites, synthetic
+phone/desktop browser checks, deployment exclusions and the required offline
+lifecycle pass. Measurements and limits are in `data_review_results.md`. No new
+capability, dependency, schema, acquisition cadence or transaction behavior.
+Production deployment and authenticated hosted acceptance remain separate.
