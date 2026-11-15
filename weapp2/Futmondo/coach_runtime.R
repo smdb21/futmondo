@@ -63,10 +63,10 @@ coach_on_login_source <- function(session,login,championship,user_team,team_stat
     if(state$confirming){
       stamp<-fm_time(info$observed_at %||% info$fetched_at)
       if(identical(info$status,"loading"))return()
-      if(info$status%in%c("unavailable","error","failed","stale")||identical(info$freshness,"stale")){state$confirming<-FALSE;state$done<-TRUE;status("Hire could not be confirmed. Check in Futmondo; no automatic retry.");return()}
+      if(info$status%in%c("unavailable","error","failed","stale")||identical(info$freshness,"stale")){state$confirming<-FALSE;state$done<-TRUE;status("Hire could not be confirmed. Check in LigaRadar; no automatic retry.");return()}
       if(length(stamp)!=1L||is.na(stamp)||stamp<state$confirmation_after)return()
       state$confirming<-FALSE;state$done<-TRUE
-      status(if(check=="hired")"Coach hired"else "Hire could not be confirmed. Check in Futmondo; no automatic retry.")
+      status(if(check=="hired")"Coach hired"else "Hire could not be confirmed. Check in LigaRadar; no automatic retry.")
       return()
     }
     if(state$submitted)return()
@@ -75,7 +75,7 @@ coach_on_login_source <- function(session,login,championship,user_team,team_stat
     if(check=="unsupported"){state$done<-TRUE;status("Coach mode is unsupported");return()}
     if(check!="absent"){state$done<-TRUE;status("Coach status unavailable");return()}
     # Latch before dispatch; duplicate observers can never submit a second request.
-    if(!coach_claim_submission(target)){state$done<-TRUE;status("Coach action already checked recently. Verify in Futmondo.");return()}
+    if(!coach_claim_submission(target)){state$done<-TRUE;status("Coach action already checked recently. Verify in LigaRadar.");return()}
     state$submitted<-TRUE;status("Hiring coach…");g<-state$generation;captured<-target
     confirm<-function(){
       if(!current(g,captured))return(NULL)

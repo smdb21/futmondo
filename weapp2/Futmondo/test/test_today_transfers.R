@@ -8,8 +8,8 @@ rows<-data.frame(created=c('2026-11-01','2026-10-31','2026-10-30'),player_id=c('
 teams<-data.frame(id='r1',teamname='Rival <one>')
 players<-data.frame(id='p1',team='Barcelona',logo='barcelona.png')
 x<-today_transfer_rows(rows,teams,players)
-stopifnot(identical(x$Buyer,c('Rival &lt;one&gt;','Futmondo','Futmondo')),
- identical(x$Seller,c('Futmondo','Captured rival','Other rival')),
+stopifnot(identical(x$Buyer,c('Rival &lt;one&gt;','LigaRadar','LigaRadar')),
+ identical(x$Seller,c('LigaRadar','Captured rival','Other rival')),
  identical(x$Price,c('1.234.568 €','0 €','')),
  grepl('&lt;script&gt;',x$Name[1],fixed=TRUE),!grepl('<script>',x$Name[1],fixed=TRUE),
  grepl('barcelona.png',x$Name[1],fixed=TRUE),!grepl('<img',x$Name[2],fixed=TRUE),

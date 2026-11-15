@@ -2,6 +2,8 @@
 
 `login(user_name=NULL, password=NULL)` and the login module authenticate credentials directly against Futmondo. Passwords are cleared from the form after submission and never persisted. Downstream modules still receive the same three named character fields (`token`, `userid`, `user_name`). Logout clears account caches and pending session work.
 
+Login, welcome, signed-in, authentication-error and startup-loading copy uses LigaRadar branding. The credential notice remains exactly: “Log in with your Futmondo account to authenticate directly with the official Futmondo server.” Authentication endpoints, session keys, remembered access and request counts are unchanged; this is a text-only presentation change.
+
 After authentication, `championship_RV()` in `server.R` selects the active league and checks for a playable team with explicit `shiny::validate(shiny::need(...))` calls. Hosting attaches Shiny before loading `global.R`, where JSON parsing imports can mask the unqualified `validate` name. Explicit namespaces keep successful league selection usable and preserve Shiny validation states for accounts with no leagues or no playable team. The offline lifecycle preloads Shiny to reproduce that hosting order; `test/test_competition_onboarding.R` covers all three outcomes and repeated league-result reuse without live I/O.
 
 ## Remembering a browser

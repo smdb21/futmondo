@@ -67,7 +67,7 @@ shiny::testServer(lineup_Server,args=args,{
 reset('timeout')
 shiny::testServer(lineup_Server,args=args,{
  settle(session);session$setInputs(best=1);settle(session);session$setInputs(save=1);settle(session)
- stopifnot(state$submits==1L,state$reads==3L,!saving(),grepl('Saved to Futmondo and verified',notice()))
+ stopifnot(state$submits==1L,state$reads==3L,!saving(),grepl('Saved to LigaRadar and verified',notice()))
  cat('PASS uncertain mutation is read back and never automatically replayed\n')
 })
 reset('readback-fail')
@@ -210,7 +210,7 @@ shiny::testServer(lineup_Server,args=args,{
  session$setInputs(recent_n=2);settle(session)
  stopifnot(identical(draft(),saved),grepl('fm-lineup-best-warning',output$status$html),state$optimizes==1L)
  session$setInputs(clear=1);settle(session);session$setInputs(reset=1);settle(session)
- stopifnot(identical(draft(),saved),!dirty(),grepl('successfully saved to Futmondo',notice()),
+ stopifnot(identical(draft(),saved),!dirty(),grepl('successfully saved to LigaRadar',notice()),
   grepl('Undo changes',as.character(lineup_UI('fixture')),fixed=TRUE))
  cat('PASS Undo changes restores the latest successfully saved and verified lineup\n')
 })
@@ -447,7 +447,7 @@ shiny::testServer(lineup_Server,args=args,{
 reset('snapshot-fail');transfers(transfer_state())
 shiny::testServer(lineup_Server,args=args,{
  settle(session);session$setInputs(best=1);settle(session);session$setInputs(save=1);settle(session)
- stopifnot(state$submits==1L,!saving(),!dirty(),grepl('Saved to Futmondo and verified',notice(),fixed=TRUE),
+ stopifnot(state$submits==1L,!saving(),!dirty(),grepl('Saved to LigaRadar and verified',notice(),fixed=TRUE),
   grepl('App copy not saved: context mismatch (FM-',cache_issue(),fixed=TRUE),
   grepl('App copy not saved:',output$status$html,fixed=TRUE),!grepl('fm-lineup-best-warning',output$status$html,fixed=TRUE))
  cat('PASS a verified Futmondo save remains distinct from a failed app snapshot with a safe diagnostic and no false recalculation warning\n')

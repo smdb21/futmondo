@@ -246,7 +246,7 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
             onclick = "var field=document.getElementById(this.dataset.targetInput);field.value=this.dataset.premium;field.dispatchEvent(new Event('change',{bubbles:true}));"))),
         p("Choose a button or type a percentage. Use 0% to list at the selected price. Prices are rounded up to whole euros."),
         uiOutput(ns("bulk_listing_preview"), `aria-live` = "polite"),
-        p(style = "color: var(--fm-muted); font-size: 12px;", "The clause option skips players without a valid closed clause. Other users and Futmondo can bid on listed players."),
+        p(style = "color: var(--fm-muted); font-size: 12px;", "The clause option skips players without a valid closed clause. Other users and LigaRadar can bid on listed players."),
         footer = tagList(
           modalButton("Cancel"),
           actionButton(ns("submit_put_all_on_market"), "Confirm Market Listing", class = "btn btn-offer-money")
@@ -386,7 +386,7 @@ team_received_offers_panel <- function(state,ns) {
     lapply(which(!system_rows),render_offer),
     if(any(system_rows))shiny::tags$section(class="fm-system-offers",`aria-labelledby`=ns("offers_system_heading"),
       shiny::tags$h4(id=ns("offers_system_heading"),class="fm-offer-group-heading",
-        shiny::tags$span(class="fm-offer-source",shiny::icon("robot"),"Futmondo system")),
+        shiny::tags$span(class="fm-offer-source",shiny::icon("robot"),"LigaRadar system")),
       lapply(which(system_rows),render_offer)))
 }
 

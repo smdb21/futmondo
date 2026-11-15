@@ -21,7 +21,7 @@ offer_error_message <- function(result) {
   return("Your squad has reached the league's maximum size. Pending incoming players can also count toward this limit. Complete a sale to free a place, then refresh before making another offer.")
  if(nzchar(message)&&!grepl("^api[.]",message)&&!identical(code,"error"))return(message)
  if(grepl("^api[.]",code)||grepl("^api[.]",message))
-  return("Futmondo rejected this offer. Refresh the player's details and check the league's buying rules before trying again.")
+  return("LigaRadar rejected this offer. Refresh the player's details and check the league's buying rules before trying again.")
  "The offer could not be confirmed. Refresh and check your active offers before trying again, so you do not submit it twice."
 }
 
@@ -565,21 +565,18 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           }
 
           action_buttons <- tagList(action_buttons, actionButton(ns("btn_direct_sell"),
-            label=tagList(icon("money-bill-transfer")," Sell directly to Futmondo"),
+            label=tagList(icon("money-bill-transfer")," Sell directly to LigaRadar"),
             class="btn btn-danger", disabled=isTRUE(is_listed_on_market),
-            title=if(is_listed_on_market) "Remove the existing listing first." else "Sell to Futmondo without waiting for an offer."))
+            title=if(is_listed_on_market) "Remove the existing listing first." else "Sell to LigaRadar without waiting for an offer."))
 
           # Check for received offer on squad player
           has_received_offer <- FALSE
           rec_offer_price <- NA_real_
-          rec_offer_bidder <- "Futmondo"
+          rec_offer_bidder <- offer_bidder_label(sp$bid_user, sp$bid_source, sp$bidder_team_id)
 
           if ("bid_price" %in% colnames(sp) && !is.na(sp$bid_price) && suppressWarnings(as.numeric(sp$bid_price)) > 0) {
             has_received_offer <- TRUE
             rec_offer_price <- suppressWarnings(as.numeric(sp$bid_price))
-            if ("bid_user" %in% colnames(sp) && !is.na(sp$bid_user) && sp$bid_user != "") {
-              rec_offer_bidder <- as.character(sp$bid_user)
-            }
           }
 
           if (has_received_offer) {
@@ -1079,7 +1076,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         shiny::showNotification("This received offer is no longer available. Please refresh and try again.", type = "warning")
         return(invisible(FALSE))
       }
-      rec_offer_bidder <- if ("bid_user" %in% colnames(sp) && !is.na(sp$bid_user) && sp$bid_user != "") as.character(sp$bid_user) else "Futmondo"
+      rec_offer_bidder <- offer_bidder_label(sp$bid_user, sp$bid_source, sp$bidder_team_id)
       remember_action_context("accept")
       showModal(modalDialog(
         title = tagList(icon("circle-check"), paste0(" Accept Offer for ", sp$name)),
@@ -1551,10 +1548,10 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         showNotification(check$message,type="error");return()
       }
       remember_action_context("direct_sell")
-      showModal(modalDialog(title=paste0("Sell ",sp$name," directly to Futmondo?"),
-        p("This immediately sells the player to Futmondo / Mercado without waiting for an offer."),
+      showModal(modalDialog(title=paste0("Sell ",sp$name," directly to LigaRadar?"),
+        p("This immediately sells the player to LigaRadar / Mercado without waiting for an offer."),
         if(is.finite(check$value)) p(paste0("Current market value (reference only): ",player_card_money(check$value))),
-        p("Futmondo determines the sale proceeds. A guaranteed sale price is not available. The player will leave your squad, which may affect your lineup."),
+        p("LigaRadar determines the sale proceeds. A guaranteed sale price is not available. The player will leave your squad, which may affect your lineup."),
         footer=tagList(modalButton("Cancel"),actionButton(ns("submit_direct_sell"),"Confirm direct sale",class="btn btn-danger")),
         easyClose=FALSE,size="s"))
     })
@@ -1711,7 +1708,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       sp <- selected_player()
       req(sp)
       rec_offer_price <- suppressWarnings(as.numeric(sp$bid_price))
-      rec_offer_bidder <- if ("bid_user" %in% colnames(sp) && !is.na(sp$bid_user) && sp$bid_user != "") as.character(sp$bid_user) else "Futmondo"
+      rec_offer_bidder <- offer_bidder_label(sp$bid_user, sp$bid_source, sp$bidder_team_id)
 
       showModal(modalDialog(
         title = tagList(icon("circle-xmark"), paste0(" Reject Offer for ", sp$name)),
@@ -2098,7 +2095,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
             div(class="player-match-card player-round-box",span(class="player-match-round",paste("Round",match$round)),render_match(match))
           }))),
         if(is.null(match_state$data)&&!identical(match_state$status,"loading"))fm_info(resource_failure_message(match_state$error),error=TRUE),
-        if(length(rounds$rounds))fm_info(p("About these points"),p("Points are reported by Futmondo. Final confirmation is not provided for some rounds."),class="player-points-explanation"),
+        if(length(rounds$rounds))fm_info(p("About these points"),p("Points are reported by LigaRadar. Final confirmation is not provided for some rounds."),class="player-points-explanation"),
         if(identical(history$freshness,"stale"))fm_info("Showing saved history; refresh failed.",error=TRUE))
     })
     output$player_external_details <- renderUI({

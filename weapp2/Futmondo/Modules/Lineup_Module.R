@@ -27,11 +27,11 @@ lineup_UI <- function(id) {
       shiny::div(class='fm-lineup-actions',
         shiny::actionButton(ns('clear'),'Clear lineup',icon=shiny::icon('eraser')),
         shiny::actionButton(ns('reset'),'Undo changes',icon=shiny::icon('rotate-left'),
-          title='Restore the latest lineup loaded from or successfully saved to Futmondo'),
+          title='Restore the latest lineup loaded from or successfully saved to LigaRadar'),
         shiny::actionButton(ns('reload'),label=NULL,icon=shiny::icon('rotate'),`aria-label`='Refresh lineup',
-          title='Reload the official lineup, squad and rules from Futmondo; keep your unsaved changes')),
+          title='Reload the official lineup, squad and rules from LigaRadar; keep your unsaved changes')),
       fm_info(class='fm-lineup-refresh-help',
-        'Refresh lineup reloads the official lineup, squad and rules from Futmondo. It keeps your unsaved changes and does not save them.'),
+        'Refresh lineup reloads the official lineup, squad and rules from LigaRadar. It keeps your unsaved changes and does not save them.'),
       shiny::uiOutput(ns('status')),
       shiny::div(class='fm-lineup-formation',shiny::uiOutput(ns('formation_control'))),
       shiny::uiOutput(ns('pitch')),shiny::uiOutput(ns('captain_control')),
@@ -120,7 +120,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
         if(!is.null(saved))accept(saved)
         if(lineup_snapshot_fresh(saved)){finish(saved,save=FALSE);return(NULL)}
         live();NULL
-      },function(error){if(current(g,key))cache_issue('Saved lineup could not be read; loading from Futmondo.');live();NULL})
+      },function(error){if(current(g,key))cache_issue('Saved lineup could not be read; loading from LigaRadar.');live();NULL})
       invisible(NULL)
     }
     session$onSessionEnded(function(){closed<<-TRUE;generation<<-generation+1L;fm_transport_cancel(owner)})
@@ -168,7 +168,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
     dirty<-shiny::reactive(!is.null(draft())&&!is.null(source())&&!identical(lineup_identity(draft()),lineup_identity(source()$official)))
     edit<-function(value){best_request(NULL);draft(value);best_note('')}
     shiny::observeEvent(input$clear,{shiny::req(draft(),!saving());edit(lineup_clear(draft()));notice('Lineup cleared. Select players or use Optimize to start over.')})
-    shiny::observeEvent(input$reset,{shiny::req(source(),!saving());edit(source()$official);shiny::updateSelectInput(session,'formation',selected=source()$official$strategy);notice('Changes undone. Restored the latest lineup loaded from or successfully saved to Futmondo.')})
+    shiny::observeEvent(input$reset,{shiny::req(source(),!saving());edit(source()$official);shiny::updateSelectInput(session,'formation',selected=source()$official$strategy);notice('Changes undone. Restored the latest lineup loaded from or successfully saved to LigaRadar.')})
     shiny::observeEvent(input$formation,{
       shiny::req(source(),draft(),!saving());strategy<-input$formation
       if(!strategy%in%unlist(source()$rules$allowed)){shiny::updateSelectInput(session,'formation',selected=draft()$strategy);notice('This formation is locked or unavailable.',error=TRUE);return()}
@@ -238,7 +238,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
           best_note(paste0('Best XI + bench',
             ' · starters ',format(round(result$total,2),trim=TRUE),' average points · rounds ',paste(result$rounds,collapse=', '),
             ' · bench coverage ',if(length(result$coverage))paste(result$coverage,collapse=' / ')else'none'))
-          notice('Review your selections, then Save to Futmondo.')
+          notice('Review your selections, then Save to LigaRadar.')
         },error=function(error)notice(paste('Best XI calculation failed. Your draft is retained.',conditionMessage(error)),error=TRUE))
       })},delay=0)},once=TRUE)
     })
@@ -414,7 +414,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       shiny::req(is_module_active());issues<-if(is.null(draft())||is.null(source()))'Lineup is loading'else lineup_validate(draft(),roster(),source()$rules)
       if(!is.null(draft()))issues<-c(issues,departure_issues(draft()))
       if(is.null(target()))issues<-c(issues,'Next round is not established')
-      shiny::tagList(shiny::actionButton(session$ns('save'),if(saving())'Saving…'else'Save to Futmondo',icon=shiny::icon('floppy-disk'),
+      shiny::tagList(shiny::actionButton(session$ns('save'),if(saving())'Saving…'else'Save to LigaRadar',icon=shiny::icon('floppy-disk'),
         disabled=saving()||loading()||length(issues)>0L||!dirty()),if(length(issues))fm_info(paste(unique(issues),collapse=' · '),error=!loading()))
     })
     shiny::observeEvent(input$save,{
@@ -428,10 +428,10 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
         promises::then(lineup_fetch_live(auth,ctx,next_round,owner,is_current=function()current(g,key)),function(result)tryCatch({
           if(!current(g,key))return(NULL)
           saving(FALSE);source(result);persist(result,ctx,next_round$id,g,key)
-          if(identical(lineup_identity(result$official),lineup_identity(value))){draft(result$official);notice('Saved to Futmondo and verified.');best_note('')}
-          else notice('Futmondo did not confirm the requested lineup. Your draft is retained; no automatic retry was sent.',error=TRUE)
+          if(identical(lineup_identity(result$official),lineup_identity(value))){draft(result$official);notice('Saved to LigaRadar and verified.');best_note('')}
+          else notice('LigaRadar did not confirm the requested lineup. Your draft is retained; no automatic retry was sent.',error=TRUE)
           NULL
-        },error=function(error)fail('Saved lineup could not be validated. Your draft is retained.')),function(error)fail('The save response is uncertain and readback failed. Your draft is retained. Check Futmondo before saving again.'))
+        },error=function(error)fail('Saved lineup could not be validated. Your draft is retained.')),function(error)fail('The save response is uncertain and readback failed. Your draft is retained. Check LigaRadar before saving again.'))
         NULL
       }
       promises::then(lineup_fetch_live(auth,ctx,next_round,owner,is_current=function()current(g,key)),function(fresh)tryCatch({
@@ -442,9 +442,9 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
         rows<-lineup_roster_frame(fresh);issues<-c(lineup_validate(value,rows,fresh$rules),shiny::isolate(departure_issues(value,current_departures())))
         if(length(issues))return(fail(paste(issues,collapse=' · ')))
         locked<-lineup_locked_changes(fresh,value)
-        if(length(locked))return(fail(paste('Futmondo has locked selected positions:',paste(locked,collapse=', '))))
+        if(length(locked))return(fail(paste('LigaRadar has locked selected positions:',paste(locked,collapse=', '))))
         wire<-lineup_modified_wire(value,rows,fresh$rules);changes<-lineup_changes(fresh$source$wire,wire)
-        notice('Saving lineup to Futmondo…')
+        notice('Saving lineup to LigaRadar…')
         promises::then(lineup_submit(auth,ctx$championship_id,ctx$user_team_id,fresh$source$wire,wire,owner,changes),function(result)verify(),function(error)verify())
         NULL
       },error=function(error)fail(paste('Lineup validation failed.',conditionMessage(error)))),function(error)fail(paste('Current lineup could not be verified.',resource_failure_message(error))))

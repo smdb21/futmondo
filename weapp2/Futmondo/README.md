@@ -1,6 +1,6 @@
-# Futmondo
+# LigaRadar
 
-An R Shiny companion for inspecting Futmondo players, squads, transfers, standings, league finances, official notifications, and historical results. Transactions are explicit manual actions.
+An R Shiny companion for inspecting players, squads, transfers, standings, league finances, official notifications, and historical results. Transactions are explicit manual actions.
 
 ## Run locally
 
@@ -18,7 +18,7 @@ The [data redesign plan](docs/data_architecture_redesign_plan.md) defines the cu
 
 The app retains observed data, historical accounting, descriptive statistics, official notifications, and manual roster/market actions. Predictions, Smart Bid, forecast-driven planners/optimizers, generated trading recommendations and unattended trading remain excluded. Explicit exceptions cover login-time coach hiring and, from 2026-11-11, per-account opt-in background acquisition of factual data through the Python worker described below.
 
-The user-triggered **Lineup** page is an explicit exception: it compares observed recent-round averages to select a valid XI and outfield-covering bench. It makes no predictions or unattended changes; **Save to Futmondo** is a separate manual action. Existing databases need `scripts/migrations/20261107191054_lineup_snapshots.sql` for durable lineup snapshots and the saved navigation page. See [lineup behavior and verification](docs/lineup_module.md).
+The user-triggered **Lineup** page is an explicit exception: it compares observed recent-round averages to select a valid XI and outfield-covering bench. It makes no predictions or unattended changes; **Save to LigaRadar** is a separate manual action. Existing databases need `scripts/migrations/20261107191054_lineup_snapshots.sql` for durable lineup snapshots and the saved navigation page. See [lineup behavior and verification](docs/lineup_module.md).
 
 Production runs on a Contabo VM using Docker/Dokploy. The Docker image starts Shiny and a supervised Python acquisition service. Accounts remain in interactive mode until they explicitly enable background sync. Opted-in browsing reads durable database snapshots, while the worker acquires source data and prepares finances independently of browser sessions. Pending work is distinct from acknowledged persistence. See [Python worker setup and contracts](docs/python_worker.md); production migration, deployment and authenticated acceptance are separate rollout steps.
 

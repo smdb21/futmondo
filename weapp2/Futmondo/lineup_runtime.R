@@ -46,7 +46,7 @@ lineup_catalog_problem <- function(catalog,state=NULL,expected_context=NULL,now=
     isTRUE((attr(catalog,'fetch_status') %||% 'ok')%in%c('ok','empty','stale'))&&
     length(stamp)==1L&&!is.na(stamp)&&stamp<=now
   if(!is.null(worker_status)&&!observed)return('Round schedule observations are incomplete or invalid.')
-  if(acquisition_data_unverified(catalog)&&!observed)return('Round schedule is unavailable from Futmondo.')
+  if(acquisition_data_unverified(catalog)&&!observed)return('Round schedule is unavailable from LigaRadar.')
   if(identical(attr(catalog,'catalog_complete'),FALSE))return(fm_scalar(attr(catalog,'catalog_reason'),''))
   ''
 }

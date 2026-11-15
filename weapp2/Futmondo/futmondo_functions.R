@@ -60,7 +60,7 @@ futmondo_post <- function(url, ...) {
       if (!(code %in% c(429L, 502L, 503L, 504L))) break
     }
   }
-  stop("Futmondo request unavailable; no operation has been retried unless it was a read.")
+  stop("LigaRadar request unavailable; no operation has been retried unless it was a read.")
 }
 
 get_real_clubs <- function(login, championship_id) {
@@ -206,6 +206,16 @@ roster_capacity_facts <- function(roster) {
   out<-data.frame(id=ids,value=if("value"%in%names(roster))suppressWarnings(as.numeric(roster$value))else rep(NA_real_,length(ids)),stringsAsFactors=FALSE)
   for(field in c("fetch_status","observed_at","fetched_at","fetch_error"))attr(out,field)<-attr(roster,field)
   out
+}
+
+# Presentation only: canonical bidder names and identities remain in stored rows.
+offer_bidder_label <- function(name=NULL, source=NULL, bidder_id=NULL) {
+  name <- fm_scalar(name, "")
+  source <- fm_scalar(source, "")
+  bidder_id <- fm_scalar(bidder_id, "")
+  if (source == "system" || (!nzchar(bidder_id) && source != "rival" &&
+      name %in% c("", "Futmondo", "Futmondo / Mercado", "Futmondo (System)"))) return("LigaRadar")
+  if (nzchar(name)) name else if (nzchar(bidder_id)) bidder_id else "Unknown bidder"
 }
 
 # Keep every received bid while legacy card/table fields retain one highest offer.
@@ -855,11 +865,7 @@ get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE) {
         num_val <- suppressWarnings(as.numeric(value))
         formatted <- sale_price(num_val,index)
 
-        bidder <- if ("bid_user" %in% colnames(table) && !is.na(table$bid_user[index]) && as.character(table$bid_user[index]) != "") {
-          as.character(table$bid_user[index])
-        } else {
-          "Futmondo"
-        }
+        bidder <- offer_bidder_label(table$bid_user[index], table$bid_source[index], table$bidder_team_id[index])
 
         shiny::tags$span(
           class = "badge-active-bid",
@@ -900,11 +906,7 @@ get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE) {
       minWidth = 180,
       cell = function(value, index) {
         if (is.na(value) || is.null(value) || value <= 0) return("")
-        bidder <- if ("other_bid_user" %in% colnames(table) && !is.na(table$other_bid_user[index]) && nzchar(as.character(table$other_bid_user[index]))) {
-          as.character(table$other_bid_user[index])
-        } else {
-          "Futmondo"
-        }
+        bidder <- offer_bidder_label(table$other_bid_user[index])
         shiny::tags$span(
           class = "badge-active-bid",
           title = paste0("Offer from ", bidder),
@@ -1646,7 +1648,7 @@ reconcile_pending_clause_transfers <- function(roster_df,pressroom_df,summaries,
           if(!out_fresh)"Departure verification failed: the player summary could not be retrieved."else
           if(!nzchar(owner))"Departure verification failed: the player summary omitted the current owner."else
           if(!transferred)"Departure verification failed: the player summary omitted the pending clause status."else
-          if(!valid_time)"Departure time missing or malformed in Futmondo's transferDate."else ""
+          if(!valid_time)"Departure time missing or malformed in LigaRadar's transferDate."else ""
         departure<-if(out_valid_time)transfer_at else if(nrow(old_out))old_out$leaves_at[1]else as.POSIXct(NA,tz="UTC")
         outgoing_records<-rbind(outgoing_records,data.frame(player_id=pid,
           player_name=field("name",fm_scalar(tx$player_name,if(nrow(old_out))old_out$player_name[1]else pid)),
@@ -1671,7 +1673,7 @@ reconcile_pending_clause_transfers <- function(roster_df,pressroom_df,summaries,
       if(!fresh)"Arrival verification failed: the player summary could not be retrieved."else
       if(!nzchar(owner))"Arrival verification failed: the player summary omitted the current owner."else
       if(!transferred)"Arrival verification failed: the player summary omitted the pending clause status."else
-      if(!valid_time)"Arrival time missing or malformed in Futmondo's transferDate."else ""
+      if(!valid_time)"Arrival time missing or malformed in LigaRadar's transferDate."else ""
     arrival<-if(valid_time)transfer_at else if(nrow(old))old$joins_at[1]else as.POSIXct(NA,tz="UTC")
     records<-rbind(records,data.frame(player_id=pid,player_name=field("name",fm_scalar(tx$player_name,pid)),
       seller_team_id=fm_scalar(tx$seller_team_id,""),purchased_at=fm_time(tx$created),joins_at=arrival,
@@ -3285,7 +3287,7 @@ direct_sale_preflight <- function(login, championship_id, team_id, player_id) {
   # The captured direct-sale flow first cancels an existing listing. Never
   # withdraw a listing implicitly as part of this action.
   if(any(c("pr","p","vom","pom") %in% names(summary$market)))
-    return(denied("listed","Remove this player's market listing before selling directly to Futmondo."))
+    return(denied("listed","Remove this player's market listing before selling directly to LigaRadar."))
   if(!all(c("bids","direct") %in% names(summary$market)))
     return(denied("unavailable","The returned market status does not establish that direct selling is available. Refresh before selling."))
   list(ok=TRUE,code="ok",message="",value=fm_number(summary$data$value))
@@ -3305,7 +3307,7 @@ direct_sell_player <- function(login, championship_id, team_id, player_id) {
     ok <- http_ok && identical(code,API_CODE_OK) && !isTRUE(answer$error)
     rejected <- http_ok && nzchar(code) && !identical(code,API_CODE_OK)
     list(success=ok,uncertain=!ok && !rejected,code=code,
-      message=if(ok) "Player sold to Futmondo / Mercado." else if(rejected) paste0("Futmondo rejected the sale (",code,").") else "The sale could not be confirmed. Refresh your roster and funds before trying again.")
+      message=if(ok) "Player sold to LigaRadar / Mercado." else if(rejected) paste0("LigaRadar rejected the sale (",code,").") else "The sale could not be confirmed. Refresh your roster and funds before trying again.")
   },error=function(e) list(success=FALSE,uncertain=TRUE,code="unconfirmed",
     message="The sale could not be confirmed. Refresh your roster and funds before trying again."))
 }

@@ -78,7 +78,7 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
     for (let i=0; i<100 && !releaseProbe; i++) await page.waitForTimeout(20);
     assert.ok(releaseProbe, 'cookie probe started');
     assert.equal(await page.locator('#login-user_name').isVisible(), false);
-    await page.locator('#login-text').getByText('Welcome to Futmondo', {exact:true}).waitFor();
+    await page.locator('#login-text').getByText('Welcome to LigaRadar', {exact:true}).waitFor();
     releaseProbe();
     await page.unrouteAll({behavior:'wait'});
     await page.locator('#login-user_name').waitFor({state:'visible'});
@@ -122,7 +122,7 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
     assert.ok(releaseProbe);
     await page.waitForTimeout(250);
     assert.equal(await page.locator('#login-user_name').isVisible(), false);
-    await page.locator('#login-text').getByText('Welcome to Futmondo', {exact:true}).waitFor();
+    await page.locator('#login-text').getByText('Welcome to LigaRadar', {exact:true}).waitFor();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2), false);
     releaseProbe();
     await page.unrouteAll({behavior:'wait'});

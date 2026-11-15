@@ -201,7 +201,7 @@ lineup_submit <- function(auth,championship_id,user_team_id,current,modified,own
     c(`Content-Type`='application/json; charset=utf-8'),owner=owner,priority='interactive'),function(response){
       result<-jsonlite::fromJSON(rawToChar(response$content),simplifyVector=FALSE)
       if(isTRUE(result$answer$error)||(!is.null(result$code)&&!identical(result$code,API_CODE_OK))||
-         (!is.null(result$answer$code)&&!identical(result$answer$code,API_CODE_OK)))stop('Futmondo rejected the lineup change')
+         (!is.null(result$answer$code)&&!identical(result$answer$code,API_CODE_OK)))stop('LigaRadar rejected the lineup change')
       result
     })
 }

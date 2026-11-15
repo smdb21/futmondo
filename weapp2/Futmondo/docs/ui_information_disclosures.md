@@ -73,3 +73,23 @@ The focused R fixtures cover concealed diagnostics, real offer links, unknown
 values, neutral loading, red failures and shared plot reads. The browser fixture
 uses production CSS/JavaScript with synthetic data and blocked backend I/O. See
 `data_review_results.md` for executed checks, timings and remaining limits.
+
+
+## LigaRadar branding
+
+All app-owned headings, buttons, source labels, notices and errors use LigaRadar.
+The login notice remains: “Log in with your Futmondo account to authenticate
+directly with the official Futmondo server.” API hosts, source identifiers,
+authentication fields, browser preference keys and stored provenance retain their
+existing contracts. User-supplied team/player names remain source data. Legacy
+labels without identity use exact brand-alias matching in the view only.
+
+`offer_bidder_label(name=NULL, source=NULL, bidder_id=NULL)` renders current and
+previously saved system offers as LigaRadar without editing their canonical
+`bid_user`, bid IDs or source. Player-card banners/confirmations and shared-table
+tooltips reuse it; explicit rival identity and unknown bidders stay intact.
+Notifications label the existing Futmondo filter option and source as LigaRadar
+while keeping its submitted value. `rivals_cash_history_rows()` projects saved
+system-counterparty labels in its view only; the shared accounting ledger and
+balances remain unchanged. Existing saved observations require no migration or
+refetch. No new dependencies, configuration, requests, timers or persistence.

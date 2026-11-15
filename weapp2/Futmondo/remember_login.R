@@ -255,7 +255,7 @@ remember_login_session <- function(session,on_restore,on_status,on_begin,on_end,
         # 403 may be a hosting/firewall/storage policy problem; only an explicit
         # upstream401 establishes authentication rejection in the known contract.
         if(isTRUE(error$http_status==401L)){
-          return(clear_invalid("rejected","Futmondo rejected saved access. Log in again."))
+          return(clear_invalid("rejected","LigaRadar rejected saved access. Log in again."))
         }
         on_end();status("error","Could not validate saved access right now. Retry or log in normally.","restore")
         remember_login_response("retry")

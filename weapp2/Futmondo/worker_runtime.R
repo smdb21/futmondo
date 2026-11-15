@@ -408,7 +408,7 @@ fm_worker_session<-function(session,login,leagues=function()list()){
   if(!s$known)return(fm_info('Loading background sync settings…'))
   a<-s$account
   shiny::tags$details(id='worker_settings_details',open=if(isTRUE(shiny::isolate(session$input$worker_settings_open)))'open'else NULL,shiny::tags$summary('Background sync'),
-   shiny::tags$p('Allow this server to retrieve factual Futmondo data while you are signed out. No password is saved. This continues until you disable it or Futmondo rejects access.'),
+   shiny::tags$p('Allow this server to retrieve factual LigaRadar data while you are signed out. No password is saved. This continues until you disable it or LigaRadar rejects access.'),
    shiny::checkboxInput('worker_enable','Enable background sync',isTRUE(a$enabled)),
    shiny::textInput('worker_timezone','Timezone',a$timezone %||% session$input$worker_timezone_detected %||% 'UTC'),
    shiny::fluidRow(shiny::column(6,shiny::numericInput('worker_quiet_start','Quiet hours start (0–23)',a$quiet_start %||% 0,0,23)),

@@ -17,7 +17,7 @@ today_transfer_rows <- function(rows, teams=NULL, players=NULL,timezone="UTC") {
       }
     }
     labels[!nzchar(labels)]<-ids[!nzchar(labels)]
-    labels[!nzchar(ids)|tolower(ids)%in%c("system","futmondo","computer")]<-"Futmondo"
+    labels[!nzchar(ids)|tolower(ids)%in%c("system","futmondo","computer")]<-"LigaRadar"
     escape(labels)
   }
   player<-rivals_transfer_player_html(field("player_name"),field("player_team_name"),field("player_team_slug"),field("player_id"),players)
@@ -26,8 +26,8 @@ today_transfer_rows <- function(rows, teams=NULL, players=NULL,timezone="UTC") {
   system_side<-function(side)tolower(clean(field(paste0(side,"_team_id"))))%in%c("","system","futmondo","computer")
   transfer_type<-rep("Transfer between teams",nrow(rows))
   transfer_type[!is.na(method)&!method]<-"Buy/sell between rivals"
-  transfer_type[system_side("seller")]<-"Bought from Futmondo"
-  transfer_type[system_side("buyer")]<-"Sold to Futmondo"
+  transfer_type[system_side("seller")]<-"Bought from LigaRadar"
+  transfer_type[system_side("buyer")]<-"Sold to LigaRadar"
   transfer_type[!is.na(method)&method]<-"Clause buyout"
   price<-suppressWarnings(as.numeric(field("price")))
   money<-rep("",length(price));valid<-is.finite(price)

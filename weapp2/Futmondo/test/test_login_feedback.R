@@ -55,7 +55,7 @@ testServer(login_Server, args = list(id = "login"), session = mock_session, {
   settle(session)
   html <- paste(as.character(output$login_feedback), collapse = "\n")
   stopifnot(is.null(login_token_RV()), attempts == 1L,
-    grepl("Could not authenticate with Futmondo", html, fixed = TRUE),
+    grepl("Could not authenticate with LigaRadar", html, fixed = TRUE),
     !grepl("private transport detail", html, fixed = TRUE),
     grepl('fm-info-error', html, fixed = TRUE),
     grepl('aria-label="Error details"', html, fixed = TRUE),

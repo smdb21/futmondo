@@ -20,26 +20,26 @@ mvp_api_answer <- function(login, url, query) {
       header=list(token=login[["token"]],userid=login[["userid"]]), query=query, answer=list()), auto_unbox=TRUE),
       httr::add_headers("Content-Type"="application/json; charset=utf-8"))
     status <- httr::status_code(response)
-    if (status %in% c(401L,403L)) return(mvp_result("authentication", reason="Futmondo access was denied. Log in again."))
-    if (status < 200L || status >= 300L) return(mvp_result("error", reason=paste("Futmondo request failed (HTTP",status,").")))
+    if (status %in% c(401L,403L)) return(mvp_result("authentication", reason="LigaRadar access was denied. Log in again."))
+    if (status < 200L || status >= 300L) return(mvp_result("error", reason=paste("LigaRadar request failed (HTTP",status,").")))
     body <- httr::content(response)
     answer <- body$answer
-    if (!is.list(answer)) return(mvp_result("unsupported", reason="The returned Futmondo format is not supported yet."))
+    if (!is.list(answer)) return(mvp_result("unsupported", reason="The returned LigaRadar format is not supported yet."))
     if (isTRUE(answer$error) || (!is.null(answer$code) && !identical(answer$code,API_CODE_OK))) {
       code <- fm_scalar(answer$code, "")
       if (!grepl("^[a-zA-Z0-9_.-]{0,80}$", code)) code <- ""
-      return(mvp_result("rejected", reason=paste0("Futmondo rejected the request",if(nzchar(code)) paste0(" (",code,")") else "","."), code=code))
+      return(mvp_result("rejected", reason=paste0("LigaRadar rejected the request",if(nzchar(code)) paste0(" (",code,")") else "","."), code=code))
     }
     list(status="ok", answer=answer)
   }, error=function(e) {
     # Async HTTP/parser failures arrive as conditions before an httr response.
     failure<-resource_failure(e,resource=url)
     if(identical(failure$category,"http")&&!is.null(failure$http_status)){
-      if(failure$http_status%in%c(401L,403L))return(mvp_result("authentication",reason="Futmondo access was denied. Log in again."))
-      return(mvp_result("error",reason=paste("Futmondo request failed (HTTP",failure$http_status,").")))
+      if(failure$http_status%in%c(401L,403L))return(mvp_result("authentication",reason="LigaRadar access was denied. Log in again."))
+      return(mvp_result("error",reason=paste("LigaRadar request failed (HTTP",failure$http_status,").")))
     }
-    if(identical(failure$category,"parser"))return(mvp_result("unsupported",reason="Futmondo returned a malformed data response."))
-    mvp_result("connection",reason="Futmondo data could not be loaded because the connection failed. Refresh to retry.")
+    if(identical(failure$category,"parser"))return(mvp_result("unsupported",reason="LigaRadar returned a malformed data response."))
+    mvp_result("connection",reason="LigaRadar data could not be loaded because the connection failed. Refresh to retry.")
   })
 }
 
@@ -50,9 +50,9 @@ normalize_mvp_catalog <- function(active, leagues, championship_id) {
   champ <- matches[[1]]; league <- champ$league
   lid <- if(is.list(league)) mvp_text(league$id %||% league$`_id`) else mvp_text(league)
   selected <- Filter(function(x) is.list(x) && nzchar(lid) && identical(mvp_text(x$id %||% x$`_id`),lid),mvp_records(leagues))
-  if(length(selected)!=1L || is.null(selected[[1]]$rounds)) return(unknown("We cannot determine completed rounds from the available Futmondo league catalog."))
+  if(length(selected)!=1L || is.null(selected[[1]]$rounds)) return(unknown("We cannot determine completed rounds from the available LigaRadar league catalog."))
   rounds <- mvp_records(selected[[1]]$rounds)
-  if(!length(rounds)) return(unknown("Futmondo returned an empty round catalog; historical coverage is unknown."))
+  if(!length(rounds)) return(unknown("LigaRadar returned an empty round catalog; historical coverage is unknown."))
   metadata <- c(mvp_records(active$rounds),mvp_records(champ$rounds))
   metadata <- Filter(function(round)is.list(round)&&
     (!nzchar(mvp_text(round$championshipId))||mvp_text(round$championshipId)%in%c(lid,as.character(championship_id))),metadata)
@@ -290,9 +290,9 @@ get_award_round_catalog <- function(login,championship_id,saved=data.frame(),ref
 
 normalize_official_dreamteam <- function(answer, championship_id, reference) {
   if(!is.list(answer)) return(mvp_result("unsupported",reason="The returned MVP format is not supported yet."))
-  if(isTRUE(answer$error)) return(mvp_result("rejected",reason="Futmondo rejected the MVP request."))
+  if(isTRUE(answer$error)) return(mvp_result("rejected",reason="LigaRadar rejected the MVP request."))
   # Empty/missing data alone does not establish that an award is unpublished.
-  if(is.null(answer$players) || is.null(answer$mvp)) return(mvp_result("unsupported",reason="Futmondo did not return a recognizable official MVP selection; publication status is unknown."))
+  if(is.null(answer$players) || is.null(answer$mvp)) return(mvp_result("unsupported",reason="LigaRadar did not return a recognizable official MVP selection; publication status is unknown."))
   mvp <- answer$mvp
   mid <- if(is.list(mvp)) mvp_text(mvp$id %||% mvp$`_id`) else mvp_text(mvp)
   players <- mvp_records(answer$players)

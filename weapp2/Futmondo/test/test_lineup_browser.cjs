@@ -204,7 +204,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       await modal.waitFor({ state: 'detached' });
       assert.deepEqual((await page.locator('#fixture_counts').innerText()).split('/').map(Number), clearCounts);
       await page.locator('#lineup-save').click();
-      await page.getByText('Saved to Futmondo and verified.', { exact: true }).waitFor();
+      await page.getByText('Saved to LigaRadar and verified.', { exact: true }).waitFor();
       await page.waitForFunction(n => Number(document.querySelector('#fixture_counts').textContent.split('/')[1]) === n + 1, clearCounts[1]);
       assert.equal(await page.locator('#lineup-save').isDisabled(), true);
       await page.locator('#lineup-clear').click();

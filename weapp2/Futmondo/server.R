@@ -324,7 +324,7 @@ players_in_championship_Server(id = "players_in_championship",
       empty="Signed in. No supported leagues are available.",partial="Some sections could not load. Retry the affected data.",
       failed="The first page could not load. Refresh to retry.","")
     if(identical(stage,"failed")){state<-tryCatch(championship_state(),error=function(e)NULL);if(!is.null(state$error))message<-resource_failure_message(state$error)}
-    if(loading&&isTRUE(startup_slow()))message<-paste(message,"Still loading data from Futmondo…")
+    if(loading&&isTRUE(startup_slow()))message<-paste(message,"Still loading data from LigaRadar…")
     if(loading)return(tags$div(class="fm-loading-status startup-feedback",
       fm_loading_visual("fm-startup-visual",compact=TRUE),
       tags$p(class="fm-loading-caption",role="status",`aria-live`="polite",message)))

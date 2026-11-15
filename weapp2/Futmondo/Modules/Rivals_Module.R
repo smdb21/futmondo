@@ -394,6 +394,11 @@ rivals_cash_history_rows <- function(ledger,undated=NULL,timezone="UTC") {
     output$player[indices]<-paste0(symbol,output$player[indices])
   }
   output$buyer<-field("transfer_buyer");output$seller<-field("transfer_seller")
+  # Saved ledgers retain their canonical source labels; rebrand only the view.
+  for (side in c("buyer", "seller")) {
+    system <- output[[side]] %in% c("Futmondo", "Futmondo / Mercado", "Futmondo (System)")
+    output[[side]][system] <- "LigaRadar"
+  }
   output[,c("date","player","money","buyer","seller","type","running_balance",setdiff(names(output),c("date","player","money","buyer","seller","type","running_balance"))),drop=FALSE]
 }
 rivals_cash_history_widget <- function(ledger,undated=NULL,timezone="UTC") {

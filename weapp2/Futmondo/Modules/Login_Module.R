@@ -24,7 +24,7 @@ login_UI <- function(id) {
       div(
         id = ns("login_progress"), class = "login-feedback", style = "display: none;",
         role = "status", `aria-live` = "polite",
-        icon("spinner", class = "fa-spin"), span("Connecting to Futmondo…")
+        icon("spinner", class = "fa-spin"), span("Connecting to LigaRadar…")
       ),
       uiOutput(ns("login_feedback")),
       tags$script(id = ns("login_feedback_script"), HTML(paste0(
@@ -39,7 +39,7 @@ login_UI <- function(id) {
         "function setBusy(busy,message){pending=!!busy;login.disabled=pending;logout.disabled=pending;",
         "login.setAttribute('aria-busy',String(pending));",
         "login.textContent=pending?'Logging in…':label;",
-        "progress.querySelector('span').textContent=message||'Connecting to Futmondo…';progress.style.display=pending?'flex':'none';feedback.style.display=pending?'none':'';}",
+        "progress.querySelector('span').textContent=message||'Connecting to LigaRadar…';progress.style.display=pending?'flex':'none';feedback.style.display=pending?'none':'';}",
         # Capture runs before Shiny's action-button handler, so feedback is immediate.
         "login.addEventListener('click',function(event){",
         "if(pending){event.preventDefault();event.stopImmediatePropagation();return;}",
@@ -242,7 +242,7 @@ login_Server <- function(id, user = NULL, password = NULL) {
         } else {
           session$userData$futmondo_user_id <- NULL
           session$userData$startup_stage("failed")
-          login_feedback_RV(list(kind="error",message="Could not authenticate with Futmondo. Check your username and password, then try again."))
+          login_feedback_RV(list(kind="error",message="Could not authenticate with LigaRadar. Check your username and password, then try again."))
           login_token_RV(NULL)
         }
         invisible(NULL)
@@ -257,9 +257,9 @@ login_Server <- function(id, user = NULL, password = NULL) {
     output$text <- renderUI({
       div(
         style = "padding: 10px;",
-        h3(style = "font-weight: 700; color: var(--fm-text); margin-top: 0; font-size: 20px;", "Welcome to Futmondo"),
+        h3(style = "font-weight: 700; color: var(--fm-text); margin-top: 0; font-size: 20px;", "Welcome to LigaRadar"),
         p(style = "color: var(--fm-text); font-size: 13px; margin-bottom: 20px;",
-          "Players, historical results, finances, and manual market actions for your Futmondo leagues."
+          "Players, historical results, finances, and manual market actions for your LigaRadar leagues."
         ),
         div(
           style = "display: grid; grid-template-columns: 1fr 1fr; gap: 15px;",
@@ -325,7 +325,7 @@ login_Server <- function(id, user = NULL, password = NULL) {
               shiny::tags$i(class = "fa-solid fa-circle-check", style = "font-size: 28px; color: var(--fm-text);"),
               div(
                 h3(style = "font-weight: 700; color: var(--fm-text); margin: 0; font-size: 18px;", paste0("Welcome back, ", user_name, "!")),
-                p(style = "color: var(--fm-text); margin: 2px 0 0 0; font-size: 13px;", "Signed in to Futmondo")
+                p(style = "color: var(--fm-text); margin: 2px 0 0 0; font-size: 13px;", "Signed in to LigaRadar")
               )
             ),
             fm_info("Signed in. Loading your leagues…")

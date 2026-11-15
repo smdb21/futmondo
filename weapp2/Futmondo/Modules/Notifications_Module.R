@@ -15,10 +15,10 @@ notifications_UI <- function(id) {
   ns <- shiny::NS(id)
   shiny::tagList(
     shiny::fluidRow(shiny::column(12, shiny::h2("Notifications"),
-      fm_info("Official Futmondo events and their last refresh."))),
+      fm_info("Official LigaRadar events and their last refresh."))),
     shiny::fluidRow(
       shiny::column(3, shiny::selectInput(ns("read_filter"), "Read status", c("Unread"="unread","All"="all"))),
-      shiny::column(3, shiny::selectInput(ns("source_filter"), "Source", c("Futmondo"))),
+      shiny::column(3, shiny::selectInput(ns("source_filter"), "Source", c("LigaRadar"="Futmondo"))),
       shiny::column(3, shiny::selectInput(ns("event_filter"), "Event", c("All"))),
       shiny::column(3, shiny::checkboxInput(ns("current_league"), "Current league only", TRUE),
         shiny::actionButton(ns("refresh"), "Refresh"))),
@@ -114,7 +114,7 @@ notifications_Server <- function(id, is_module_active, login_token, championship
           jsonlite::toJSON(session$ns(key),auto_unbox=TRUE),",",
           jsonlite::toJSON(as.character(value),auto_unbox=TRUE),",{priority:'event'});")
         shiny::div(class=paste("fm-notification",if(!r$is_read) "fm-notification-unread"),
-          shiny::div(class="fm-notification-meta",r$source," · ",r$league_name," · ",
+          shiny::div(class="fm-notification-meta",if(identical(r$source,"Futmondo"))"LigaRadar"else r$source," · ",r$league_name," · ",
             shiny::tags$time(datetime=r$created_at,r$created_at)),
           shiny::strong(r$message), shiny::p(r$player_name),
           if(notification_has_player_details(r)) shiny::tags$button(class="btn btn-default",type="button",

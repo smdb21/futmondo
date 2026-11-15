@@ -1416,3 +1416,10 @@ Implemented locally: remove the routine departure-exclusion paragraph, replace t
 
 - Today and Players display **Avg N × Trend (€M)** in millions with exactly three decimal places, including trailing zeros. Numeric products, sorting, missing values and color ranges remain intact.
 - Actual emitted callbacks, existing metric suites and the required offline lifecycle pass. The display adds constant work per visible cell and no acquisition or persistence work. Hosted appearance remains unverified; details are in `docs/data_review_results.md`.
+
+
+### LigaRadar app branding — implemented and verified locally
+
+- Replace app-owned Futmondo copy across Welcome, navigation/loading, market actions, lineup, notifications, administration, consent and errors with LigaRadar. Preserve the explicit Futmondo credential notice.
+- Project saved system-offer/transfer/source labels at display time; canonical API identifiers, observations and manual-action contracts remain unchanged. No migration or dependency change.
+- Focused synthetic checks, login browser checks and the required offline lifecycle passed. Performance review and local verification limits are recorded in `docs/data_review_results.md`; authenticated hosted appearance remains unverified.

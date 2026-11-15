@@ -99,10 +99,10 @@ check('API, HTTP, network, parser and malformed responses retain the real failur
       settle(session,function()!source()$loading);stopifnot(length(fixture$requests)==0L)
       stopifnot(attr(source,'retrieve')('missing'));settle(session,function()!source()$loading&&!source()$running)
       issue<-source()$coverage$issue
-      expected<-if(kind=='api')'Futmondo rejected the request (api.error.invalid).'else if(kind=='http')
-        'Futmondo access was denied. Log in again.'else if(kind=='parser')'Futmondo returned a malformed data response.'else if(kind=='malformed')
+      expected<-if(kind=='api')'LigaRadar rejected the request (api.error.invalid).'else if(kind=='http')
+        'LigaRadar access was denied. Log in again.'else if(kind=='parser')'LigaRadar returned a malformed data response.'else if(kind=='malformed')
         'No identifiable official MVP was returned; publication status is unknown.'else
-        'Futmondo data could not be loaded because the connection failed. Refresh to retry.'
+        'LigaRadar data could not be loaded because the connection failed. Refresh to retry.'
       stopifnot(identical(issue,expected),source()$failed==1L,source()$fetched==0L,source()$saved==0L,
         !length(fixture$pending),dreamteam_reads()==if(kind=='network')2L else 1L)
     })

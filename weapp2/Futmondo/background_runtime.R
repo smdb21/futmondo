@@ -26,7 +26,7 @@ persistence_job_scope<-function(name,args){
 
 persistence_failure_message<-function(issues=list()){
   categories<-vapply(issues,function(x)fm_scalar(x$category,"write"),character(1))
-  if("configuration"%in%categories)return("History saving is unavailable because the database is not configured. Live Futmondo data is still available.")
+  if("configuration"%in%categories)return("History saving is unavailable because the database is not configured. Live LigaRadar data is still available.")
   if("authorization"%in%categories)return("History could not be saved because database access was denied.")
   if("schema"%in%categories)return("History could not be saved because the database needs an update.")
   "Some history could not be saved. Live data remains available; Refresh to retry."
