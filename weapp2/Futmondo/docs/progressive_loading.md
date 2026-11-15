@@ -11,12 +11,31 @@ behavior. The visual follows actual readiness and never delays completion to
 finish an animation. It does not represent real player positions or progress.
 
 The local `www/loading-visual.js` and `www/loading-visual.css` assets animate a
-12-second loop: pitch markings become a flowing flock, gather into radar rings,
-and reveal 22 moving player dots before returning to the pitch. The component
+15-second loop: the flat pitch tilts and rotates into perspective, 22 player
+figures rise from the surface, and their particles become a flowing flock.
+The flock gathers into radar rings and reveals moving player dots before
+returning to the flat pitch. The component
 uses the existing `--fm-*` colors and updates on light/dark changes. Its canvas is
 hidden from assistive technology; the separate text supplies the loading status.
 Reduced-motion preferences or unavailable canvas rendering retain the static
 pitch/radar illustration.
+
+The added 3D stage uses a small perspective projection in Canvas 2D rather than
+a separate graphics engine: the pitch rotates from 1.2–3.2 seconds, players rise
+from 2.2–4.5 seconds, and their silhouette particles disperse into the flock from
+4.5–6.2 seconds. Radar assembly starts at 8 seconds, player detection at 10, and
+the return to the pitch at 13. It uses the existing particle budget, local theme
+colors and compact-size stroke scaling; no models, textures or network assets
+are required. The extended loop never prolongs loading or changes readiness.
+
+The private `cameraAt(t)` helper computes the view once per frame. `project()`
+treats the existing pitch coordinates as the ground plane and positive Z as
+height, reusing the camera's `px`, `py` and perspective-scale slots for projected
+points. `raisedBoard()` draws the shallow edge and shadow; `risingPlayers()`
+draws 22 anchored figures using cached formation positions and a bounded lift
+array. `makeParticles()` assigns each existing particle a player and silhouette
+sample once per size change. Team colors stay consistent through the field,
+figures, flock and radar, avoiding color jumps during the transformation.
 
 Rendering is browser-only, with one shared animation scheduler capped at 30 FPS,
 bounded particle counts (320, or 180 on narrow screens), and pixel density capped

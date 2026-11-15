@@ -1453,3 +1453,10 @@ Implemented locally: remove the routine departure-exclusion paragraph, replace t
 
 - Center direct Close/Cancel footer buttons on their own row so the floating Refresh button does not obscure them on phones. Preserve other footer actions and native dismissal. Remove the lineup picker sentence explaining missing-score dashes while retaining unknown-score display and round-window help.
 - Synthetic Chromium checks pass at 320/360/390/1440px, alongside the existing lineup browser suite and required offline lifecycle. No acquisition, persistence, dependency or schema changes. Performance review and hosted validation limits are recorded in `docs/data_review_results.md`.
+
+
+### Rotating 3D pitch and rising players — implemented locally (2026-11-15 UTC)
+
+- Extend the loading loop to 15 seconds with a perspective tilt/yaw, 22 figures rising from the pitch, and the same particles moving from their silhouettes into the flock. Readiness still dismisses loading immediately.
+- Keep the existing 320/180-particle limits, 30 FPS cap, compact legibility, themes, reduced-motion fallback and hidden/removal cleanup. Native Canvas 2D projection adds no library, model, texture, data request or server work.
+- Geometry, mobile/desktop visual, loop-continuity and performance checks are recorded in `data_review_results.md`, together with the required offline lifecycle and deployment checks. Local validation and branch delivery remain separate from production acceptance.

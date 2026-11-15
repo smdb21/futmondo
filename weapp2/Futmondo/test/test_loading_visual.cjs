@@ -11,24 +11,47 @@ const screenshotDir = process.env.FUTMONDO_LOADING_SCREENSHOTS || '/tmp/futmondo
 fs.mkdirSync(screenshotDir, { recursive: true });
 
 function instrument() {
-  const stats = window.loadingFixture = {draws: {}, samples: [], callbacks: 0, pending: new Set(), maxPending: 0, colors: {}};
+  const stats = window.loadingFixture = {draws: {}, samples: [], stageSamples: [], callbacks: 0, pending: new Set(), maxPending: 0, colors: {}, capture: false, geometry: []};
   const nativeRequest = window.requestAnimationFrame.bind(window);
   const nativeCancel = window.cancelAnimationFrame.bind(window);
   const nativeClear = CanvasRenderingContext2D.prototype.clearRect;
   const nativeStroke = CanvasRenderingContext2D.prototype.stroke;
+  const nativeFill = CanvasRenderingContext2D.prototype.fill;
+  const paths = new WeakMap();
   function id(context) { return context.canvas.closest('[data-fm-loading]')?.id; }
+  function trace(context) { return stats.capture && id(context) === 'fixture-hero'; }
+  for (const name of ['beginPath', 'moveTo', 'lineTo', 'arc', 'ellipse']) {
+    const original = CanvasRenderingContext2D.prototype[name];
+    CanvasRenderingContext2D.prototype[name] = function(...args) {
+      if (trace(this)) {
+        if (name === 'beginPath') paths.set(this, []);
+        else if (paths.has(this)) paths.get(this).push({op: name, args});
+      }
+      return original.apply(this, args);
+    };
+  }
+  function record(context, kind) {
+    if (trace(context) && stats.geometry.length < 500)
+      stats.geometry.push({kind, alpha: context.globalAlpha, path: paths.get(context) || []});
+  }
   CanvasRenderingContext2D.prototype.clearRect = function(...args) {
     const key = id(this);
     if (key) {
       stats.draws[key] = (stats.draws[key] || 0) + 1;
       if (stats.firstDrawAt === undefined) stats.firstDrawAt = performance.now();
+      if (stats.capture && key === 'fixture-hero') stats.geometry = [];
     }
     return nativeClear.apply(this, args);
   };
   CanvasRenderingContext2D.prototype.stroke = function(...args) {
     const key = id(this);
     if (key) stats.colors[key] = this.strokeStyle;
+    record(this, 'stroke');
     return nativeStroke.apply(this, args);
+  };
+  CanvasRenderingContext2D.prototype.fill = function(...args) {
+    record(this, 'fill');
+    return nativeFill.apply(this, args);
   };
   window.requestAnimationFrame = callback => {
     const handle = nativeRequest(timestamp => {
@@ -38,8 +61,12 @@ function instrument() {
       const started = performance.now();
       try { return callback(timestamp); }
       finally {
-        if (Object.values(stats.draws).reduce((sum, n) => sum + n, 0) > before && stats.samples.length < 10000)
-          stats.samples.push(performance.now() - started);
+        if (Object.values(stats.draws).reduce((sum, n) => sum + n, 0) > before && !stats.capture && stats.samples.length < 10000) {
+          const duration = performance.now() - started;
+          stats.samples.push(duration);
+          const phase = (timestamp - stats.firstDrawAt + 15000) % 15000;
+          if (phase >= 1800 && phase <= 5000) stats.stageSamples.push(duration);
+        }
       }
     });
     stats.pending.add(handle);
@@ -87,6 +114,47 @@ function p95(values) {
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.floor((sorted.length - 1) * 0.95)] || 0;
 }
+async function captureGeometry(page) {
+  await page.evaluate(() => { window.loadingFixture.capture = true; });
+  await waitDraw(page, 'fixture-hero');
+  return page.evaluate(() => {
+    window.loadingFixture.capture = false;
+    return window.loadingFixture.geometry;
+  });
+}
+function pitchCorners(geometry) {
+  const pitch = geometry.find(mark => mark.kind === 'stroke' && mark.path.length > 50);
+  assert.ok(pitch, 'Pitch markings remain a connected projected field');
+  return pitch.path.slice(0, 4).map(command => command.args.slice(0, 2));
+}
+function polygonArea(points) {
+  return Math.abs(points.reduce((sum, point, i) => {
+    const next = points[(i + 1) % points.length];
+    return sum + point[0] * next[1] - next[0] * point[1];
+  }, 0)) / 2;
+}
+function checkGeometry(phases) {
+  const flat = pitchCorners(phases.pitch);
+  const expected = [[50, 40], [370, 40], [370, 240], [50, 240]];
+  for (let i = 0; i < 4; i++) for (let axis = 0; axis < 2; axis++)
+    assert.ok(Math.abs(flat[i][axis] - expected[i][axis]) < 1, 'Flat pitch retains its known corner positions');
+  const tilted = pitchCorners(phases.tilted);
+  assert.ok(Math.abs(tilted[0][1] - tilted[1][1]) > 5, 'The rotated pitch edge is visibly sloped');
+  assert.ok(polygonArea(tilted) < polygonArea(flat) * 0.85, 'The tilted ground plane is foreshortened');
+  for (const geometry of Object.values(phases)) for (const mark of geometry) for (const command of mark.path)
+    assert.ok(command.args.every(value => typeof value === 'boolean' || Number.isFinite(value)), 'Canvas coordinates stay finite');
+  for (const name of ['pitch', 'tilted', 'rising', 'morph', 'flock']) for (const mark of phases[name]) for (const command of mark.path) {
+    const [x, y] = command.args;
+    assert.ok(x >= 0 && x <= 420 && y >= 0 && y <= 280, `Projected marks stay inside the scene (${x}, ${y})`);
+  }
+  const heads = phases.rising.filter(mark => mark.kind === 'fill' && mark.path.length === 1 &&
+    mark.path[0].op === 'arc' && mark.path[0].args[2] > 1.5).map(mark => mark.path[0].args);
+  const feet = phases.rising.filter(mark => mark.kind === 'fill' && mark.path.length === 1 &&
+    mark.path[0].op === 'ellipse' && mark.path[0].args[2] > 2 && mark.path[0].args[2] < 15).map(mark => mark.path[0].args);
+  assert.equal(heads.length, 22, 'Both teams have eleven raised player heads');
+  assert.equal(feet.length, 22, 'Every raised player retains one ground anchor');
+  for (let i = 0; i < 22; i++) assert.ok(heads[i][1] < feet[i][1] - 4, 'A player head rises visibly above its ground anchor');
+}
 
 async function visualChecks(browser) {
   for (const width of [1440, 390, 320]) {
@@ -102,16 +170,25 @@ async function visualChecks(browser) {
       // Reload resets the shared animation epoch as well as the real markup.
       await page.reload();
       await waitDraw(page, 'fixture-hero');
-      const pictures = [];
-      for (const [name, at] of [['pitch', 700], ['flock', 3600], ['radar', 6300], ['players', 8700], ['return', 11300]]) {
+      const pictures = [], phases = {};
+      for (const [name, at] of [['pitch', 700], ['tilted', 2400], ['rising', 4200], ['morph', 5400], ['flock', 7000], ['radar', 9300], ['players', 11500], ['return', 14300]]) {
         const elapsed = await page.evaluate(() => performance.now() - window.loadingFixture.firstDrawAt);
         await page.waitForTimeout(Math.max(0, at - elapsed));
+        phases[name] = await captureGeometry(page);
         pictures.push(await page.locator('#fixture-hero canvas').evaluate(canvas => canvas.toDataURL()));
         await page.locator('#fixture-parent').screenshot({path: path.join(screenshotDir, `${width}-${theme}-${name}.png`)});
+        if (['tilted', 'rising', 'morph'].includes(name))
+          await page.locator('#fixture-compact-parent').screenshot({path: path.join(screenshotDir, `${width}-${theme}-${name}-compact.png`)});
       }
       assert.equal(new Set(pictures).size, pictures.length, 'Each loop phase renders changing graphics');
+      checkGeometry(phases);
+      const seamElapsed = await page.evaluate(() => performance.now() - window.loadingFixture.firstDrawAt);
+      await page.waitForTimeout(Math.max(0, 15100 - seamElapsed));
+      const seam = await captureGeometry(page);
+      assert.deepEqual(seam, phases.pitch, 'The loop returns to identical field and particle geometry, including mark orientation');
+      assert.equal(await page.locator('#fixture-hero canvas').evaluate(canvas => canvas.toDataURL()), pictures[0], 'The complete canvas is identical across the flat loop seam');
       await noOverflow(page);
-      console.log(`PASS ${width}px ${theme}: five loop phases, responsive geometry, decorative semantics`);
+      console.log(`PASS ${width}px ${theme}: eight loop phases, projected field, 22 rising players, responsive geometry, decorative semantics`);
     }
     const responseMs = await page.evaluate(() => new Promise(resolve => {
       const start = performance.now();
@@ -122,14 +199,21 @@ async function visualChecks(browser) {
     await page.locator('#fixture-input').fill('Keyboard remains responsive');
     assert.equal(await page.locator('#fixture-input').inputValue(), 'Keyboard remains responsive');
     const normalSamples = await page.evaluate(() => window.loadingFixture.samples.splice(0));
+    const normalStageSamples = await page.evaluate(() => window.loadingFixture.stageSamples.splice(0));
     const cdp = await page.context().newCDPSession(page);
+    const untilStage = await page.evaluate(() => (2000 - ((performance.now() - window.loadingFixture.firstDrawAt) % 15000) + 15000) % 15000);
+    await page.waitForTimeout(untilStage);
+    await page.evaluate(() => { window.loadingFixture.samples = []; window.loadingFixture.stageSamples = []; });
     await cdp.send('Emulation.setCPUThrottlingRate', {rate: 4});
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(2500);
     const throttledSamples = await page.evaluate(() => window.loadingFixture.samples.splice(0));
+    const throttledStageSamples = await page.evaluate(() => window.loadingFixture.stageSamples.splice(0));
     await cdp.send('Emulation.setCPUThrottlingRate', {rate: 1});
     await cdp.detach();
     assert.ok(p95(normalSamples) < 16, 'Normal p95 draw work fits within frame budget');
     assert.ok(p95(throttledSamples) < 33.4, '4× throttled p95 draw work fits 30 FPS budget');
+    assert.ok(normalStageSamples.length >= 30 && throttledStageSamples.length >= 20, 'Performance samples include the rotating pitch and rising players');
+    assert.ok(p95(normalStageSamples) < 16 && p95(throttledStageSamples) < 33.4, 'The 3D stage stays within the frame budget');
 
     await page.locator('#fixture-dark').click();
     await waitDraw(page, 'fixture-hero');
@@ -182,7 +266,7 @@ async function visualChecks(browser) {
     await stopped(page, ['fixture-hero', 'fixture-compact']);
     assert.deepEqual(errors, []);
     assert.deepEqual(external, []);
-    console.log(`PASS ${width}px: response=${responseMs.toFixed(1)}ms, p95 draw=${p95(normalSamples).toFixed(2)}ms, 4x=${p95(throttledSamples).toFixed(2)}ms; hide/resume, visibility, motion preference, repeated mounts, removal, external requests=0`);
+    console.log(`PASS ${width}px: response=${responseMs.toFixed(1)}ms, p95 draw=${p95(normalSamples).toFixed(2)}ms, 3D=${p95(normalStageSamples).toFixed(2)}ms, 3D 4x=${p95(throttledStageSamples).toFixed(2)}ms; hide/resume, visibility, motion preference, repeated mounts, removal, external requests=0`);
     await page.close();
   }
   for (const fallback of ['reduced-motion', 'canvas-unavailable']) {
