@@ -1538,3 +1538,37 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 .shiny-notification.fm-info-notification .shiny-notification-content { flex: 1 1 auto; min-width: 0; }
 .shiny-notification.fm-info-notification .shiny-notification-close { position: static; float: none; flex: 0 0 24px; width: 24px; height: 28px; line-height: 28px; margin: 2px 0; text-align: center; }
 .shiny-output-error:has(> .fm-info)::before { content: none; }
+
+/* Public login feature tiers: two desktop columns, one mobile column. */
+.fm-login-features { margin-top: 22px; min-width: 0; }
+.fm-login-features h3 { font-size: 20px; font-weight: 700; }
+.fm-login-features-intro, .fm-login-feature-summary, .fm-login-features-note {
+  color: var(--fm-muted); font-size: 13px;
+}
+.fm-login-feature-tiers { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.fm-login-feature-tier {
+  min-width: 0; padding: 18px; border: 1px solid var(--fm-border);
+  border-radius: 10px; background: var(--fm-surface); overflow-wrap: anywhere;
+}
+.fm-login-feature-tier-advanced { border-top: 3px solid var(--fm-accent); }
+.fm-login-feature-tier h4 { margin: 0 0 8px; font-size: 18px; font-weight: 700; }
+.fm-login-feature-tier ul { list-style: none; padding: 0; margin: 18px 0 0; }
+.fm-login-feature-tier li + li { margin-top: 18px; }
+.fm-login-feature summary {
+  display: flex; align-items: flex-start; gap: 10px; cursor: pointer;
+  list-style: none; font-size: 14px; font-weight: 700;
+}
+.fm-login-feature summary::-webkit-details-marker { display: none; }
+.fm-login-feature summary:focus-visible { outline: 2px solid var(--fm-accent); outline-offset: 4px; }
+.fm-login-feature-toggle { flex: 0 0 7px; margin-top: 5px; }
+.fm-login-feature-toggle::before {
+  content: ""; display: block; width: 7px; height: 7px;
+  border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+}
+.fm-login-feature[open] .fm-login-feature-toggle::before { transform: rotate(45deg); }
+.fm-login-feature-tier li p { margin: 8px 0 0 17px; font-size: 13px; line-height: 1.5; }
+.fm-login-features-note { margin: 14px 0 0; overflow-wrap: anywhere; }
+@media (min-width: 992px) {
+  .fm-login-feature-tiers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

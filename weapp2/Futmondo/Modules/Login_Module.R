@@ -1,3 +1,67 @@
+# Public, static inventory; comparison evidence lives in docs/feature_comparison.md.
+# Keep higher-value analysis in Advanced without implying access restrictions.
+login_feature_tiers <- function() {
+  list(
+    list(id = "essentials", title = "Essentials", summary = "Explore your league in more detail.",
+      features = list(
+        list(id = "scouting_filters", title = "Combined scouting filters",
+          description = "Narrow player tables by owner, position, value, daily price movement and active clauses."),
+        list(id = "round_range_standings", title = "Standings for any round range",
+          description = "Choose a stretch of rounds to compare team points and points, position, Best XI and MVP bonuses."),
+        list(id = "league_charts", title = "League comparison charts",
+          description = "Compare squad values and rank progression, and see fantasy-owned players grouped by real club.")
+      )),
+    list(id = "advanced", title = "Advanced", summary = "Go deeper into lineups, player value and rival finances.",
+      features = list(
+        list(id = "lineup_optimizer", title = "Best XI + bench optimization",
+          description = "Build a lineup from your chosen 1–20 completed rounds, comparing allowed formations and bench coverage, with injury and next-round departure checks. Review and save it yourself."),
+        list(id = "recent_average", title = "Player rankings by last-N average",
+          description = "Sort players by their average over your chosen 1–20 recent rounds across market, squad and player tables."),
+        list(id = "price_efficiency", title = "Points per million",
+          description = "Rank recent points relative to market value or clause price to compare player value."),
+        list(id = "rival_cash", title = "Reconstructed rival balances",
+          description = "Inspect estimated rival cash and its running ledger of opening funds, transfers and configured rewards, with missing evidence identified."),
+        list(id = "trading_profit", title = "Trading profit and wealth comparisons",
+          description = "Compare league trading profit and estimated wealth gained, and inspect matched player purchases, sales and related fees.")
+      ))
+  )
+}
+
+login_features_UI <- function(id) {
+  ns <- NS(id)
+  tags$section(class = "fm-login-features", `aria-labelledby` = ns("features_heading"),
+    h3(id = ns("features_heading"), "More from your Futmondo league"),
+    p(class = "fm-login-features-intro",
+      "LigaRadar adds these workflows beyond the features described in the official Futmondo guides."),
+    div(class = "fm-login-feature-tiers",
+      lapply(login_feature_tiers(), function(tier) {
+        tags$section(class = paste("fm-login-feature-tier", paste0("fm-login-feature-tier-", tier$id)),
+          `aria-labelledby` = ns(paste0("features_", tier$id)),
+          h4(id = ns(paste0("features_", tier$id)), tier$title),
+          p(class = "fm-login-feature-summary", tier$summary),
+          tags$ul(lapply(tier$features, function(feature) {
+            tags$li(`data-feature` = feature$id,
+              tags$details(class = "fm-login-feature",
+                tags$summary(
+                  tags$span(class = "fm-login-feature-toggle", `aria-hidden` = "true"),
+                  tags$span(feature$title)
+                ),
+                p(feature$description)
+              )
+            )
+          }))
+        )
+      })
+    ),
+    p(class = "fm-login-features-note",
+      "Official app options can vary by league configuration. LigaRadar respects permitted formations and player eligibility; analysis depends on source data. Comparison: ",
+      tags$a(href = "https://help.futmondo.com/article/91-reglas-del", "official rules",
+        target = "_blank", rel = "noopener noreferrer"), ", ",
+      tags$a(href = "https://magazine.futmondo.com/novedades-en-la-nueva-app-de-futmondo/",
+        "official app feature guide", target = "_blank", rel = "noopener noreferrer"), ".")
+  )
+}
+
 login_UI <- function(id) {
   ns <- NS(id)
   div(
@@ -69,7 +133,8 @@ login_UI <- function(id) {
       width = 12,
       uiOutput(ns("text")),
       conditionalPanel(condition = "output.signed_in === 'TRUE'", ns = ns,
-        actionButton(inputId = ns("logout_button"), label = "Logout"))
+        actionButton(inputId = ns("logout_button"), label = "Logout")),
+      login_features_UI(id)
     ))
   )
 }
@@ -253,41 +318,11 @@ login_Server <- function(id, user = NULL, password = NULL) {
     })
 
 
-    # initial welcome card ----
+    # Authentication updates replace only this status; feature tiers stay mounted.
     output$text <- renderUI({
       div(
-        style = "padding: 10px;",
-        h3(style = "font-weight: 700; color: var(--fm-text); margin-top: 0; font-size: 20px;", "Welcome to LigaRadar"),
-        p(style = "color: var(--fm-text); font-size: 13px; margin-bottom: 20px;",
-          "Players, historical results, finances, and manual market actions for your LigaRadar leagues."
-        ),
-        div(
-          style = "display: grid; grid-template-columns: 1fr 1fr; gap: 15px;",
-          div(
-            style = "background: var(--fm-surface); padding: 14px; border-radius: 8px; border: 1px solid #e2e8f0;",
-            shiny::tags$i(class = "fa-solid fa-chart-line", style = "color: var(--fm-text); font-size: 20px;"),
-            h5(style = "font-weight: 600; margin: 8px 0 4px 0; color: var(--fm-text);", "Valuation Trends"),
-            p(style = "color: var(--fm-text); font-size: 12px; margin: 0;", "Track daily price movements and market value history.")
-          ),
-          div(
-            style = "background: var(--fm-surface); padding: 14px; border-radius: 8px; border: 1px solid #e2e8f0;",
-            shiny::tags$i(class = "fa-solid fa-coins", style = "color: var(--fm-text); font-size: 20px;"),
-            h5(style = "font-weight: 600; margin: 8px 0 4px 0; color: var(--fm-text);", "League Finances"),
-            p(style = "color: var(--fm-text); font-size: 12px; margin: 0;", "Monitor rival liquid cash balances and squad purchase costs.")
-          ),
-          div(
-            style = "background: var(--fm-surface); padding: 14px; border-radius: 8px; border: 1px solid #e2e8f0;",
-            shiny::tags$i(class = "fa-solid fa-hand-holding-dollar", style = "color: var(--fm-warning); font-size: 20px;"),
-            h5(style = "font-weight: 600; margin: 8px 0 4px 0; color: var(--fm-text);", "Market Offers"),
-            p(style = "color: var(--fm-text); font-size: 12px; margin: 0;", "Place, update, or cancel transfer market offers and clause buyouts.")
-          ),
-          div(
-            style = "background: var(--fm-surface); padding: 14px; border-radius: 8px; border: 1px solid #e2e8f0;",
-            shiny::tags$i(class = "fa-solid fa-user-ninja", style = "color: var(--fm-text); font-size: 20px;"),
-            h5(style = "font-weight: 600; margin: 8px 0 4px 0; color: var(--fm-text);", "Rival Scouting"),
-            p(style = "color: var(--fm-text); font-size: 12px; margin: 0;", "Scout rival rosters, position counts, and release clause timers.")
-          )
-        )
+        h3("Welcome to LigaRadar"),
+        p("Explore player form, compare your league and prepare your next lineup.")
       )
     })
 

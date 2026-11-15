@@ -1487,3 +1487,10 @@ Implemented locally: remove the routine departure-exclusion paragraph, replace t
 - Replace the rising stick figures with solid table-football shapes: round heads, molded shirts, rigid lower bodies and broad kicking feet. Retain both foot corners in the particle morph at both rendering budgets.
 - Distinguish the teams with theme-derived green and gold tones, consistently reused by the figures, flock particles and radar dots. Existing timing, reduced-motion fallback, particle/frame bounds and loading readiness remain unchanged.
 - Local visual, geometry, performance and offline verification results are recorded in `data_review_results.md`; production acceptance remains separate from the branch push.
+
+
+## Login feature comparison tiers — 2026-11-14
+
+Status: **implemented and verified locally; hosted rollout unverified**.
+
+Replace generic welcome cards with an evidence-backed inventory of LigaRadar additions, grouped into Essentials and Advanced. Render the tiers in two columns at desktop widths and one on mobile, preserving the list across authentication updates. Item descriptions start collapsed and open from a title with a chevron, using native keyboard-accessible disclosures. No commercial copy or feature gating. `docs/feature_comparison.md` records exact official equivalents, specific additions and evidence limits; `Agents.md` requires checking every new/expanded feature against the official app and maintaining both lists. No data acquisition, persistence, cache, dependency or access-policy changes. Verification and performance findings are recorded in `docs/data_review_results.md`; branch delivery is separate from hosted acceptance.

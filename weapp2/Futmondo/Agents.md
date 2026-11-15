@@ -32,6 +32,10 @@ Track work in `docs/data_architecture_redesign_plan.md`; record actual checks an
 
 The former prediction/automation roadmap is superseded. Keep `docs/v3_roadmap.md` as a short pointer to the current scope.
 
+## Feature comparison and login inventory
+
+Every time a feature is added or materially expanded, compare its actual behavior with the current official Futmondo app and authoritative official guides/release notes. Record the dated sources, official equivalent, specific LigaRadar addition and any verification limits in `docs/feature_comparison.md`. If it adds a new capability beyond the official app, add it to `login_feature_tiers()` in `Modules/Login_Module.R` and the comparison list in the same task. Use Essentials for exploration and Advanced for higher-value lineup, ranking and financial analysis. Keep the two tiers side by side on desktop and stacked on mobile, without pricing, subscription language or access gates. Do not advertise planned/unimplemented features, treat undocumented behavior as proven absent, or claim shared capabilities are exclusive. Recheck existing entries when contrary official evidence appears.
+
 ## Verification
 
 Every modification must pass a performance-impact review before it is considered complete. Evaluate each affected data and UI path for API/database request volume, cache reuse and invalidation, blocking work, reactive updates and timers, memory growth, and rendering cost, including on mobile. Keep the app responsive during loading, refreshes, and navigation. For changes that may affect runtime, use the smallest relevant existing check or measurement to verify the impact, and resolve responsiveness regressions before completion. Record the review outcome and verification limits with the change. For documentation-only or other changes with no runtime effect, explicitly record that assessment; no performance tests are required.
