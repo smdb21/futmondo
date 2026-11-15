@@ -2,7 +2,19 @@
 
 function(input, output, session) {
   session$userData$league_context_enabled<-TRUE
+  session$userData$information_context_revision<-reactiveVal(0L)
   login_token_RV <- login_Server(id = "login")
+  # Presentation state must never carry old account/league diagnostics forward.
+  info_context<-NULL
+  observeEvent(list(login_token_RV(),input$selected_league),{
+    auth<-login_token_RV()
+    key<-paste(if(valid_login(auth))auth[["userid"]]else"signed-out",input$selected_league %||% "",sep="|")
+    if(!is.null(info_context)&&!identical(info_context,key)){
+      session$userData$information_context_revision(isolate(session$userData$information_context_revision())+1L)
+      session$sendCustomMessage("fm-information-reset",list())
+    }
+    info_context<<-key
+  },ignoreNULL=FALSE,priority=100)
   fm_timezone_preferences(session, login_token_RV)
   fm_worker_session(session, login_token_RV, leagues=function()tryCatch(championships_RV(),error=function(e)list()),
     source_note=function()roster_source_note())
@@ -153,13 +165,13 @@ function(input, output, session) {
       if(finance$cash_unverified)tags$p("Balance has not been verified by the latest check."),
       if(finance$cash_stale)tags$p("Balance check is out of date."),
       if(finance$offers_stale)tags$p("Active offers check is out of date."),
-      textOutput("round_finance_checked",inline=TRUE),
+      tags$span(class="fm-info-neutral",textOutput("round_finance_checked",inline=TRUE)),
       error=identical(finance$class,"round-countdown-warning")||
         (!finance$cash_loading&&!finance$offers_loading&&
           (!is.finite(cash)||!is.finite(commitments)||!is.finite(spendable)))||
         (!is.null(finance$message)&&grepl("could not load",finance$message,fixed=TRUE)),
       pending=(finance$cash_loading||finance$offers_loading)&&!identical(finance$class,"round-countdown-warning"),
-      class="round-countdown-solvency")
+      class="round-countdown-solvency",source="Balance and active offers")
   })
   output$round_finance_status<-renderUI(round_finance_status_display())
   # Update source times independently of the countdown/financial card DOM.

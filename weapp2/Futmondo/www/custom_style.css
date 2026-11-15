@@ -1609,3 +1609,35 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 .fm-coach-control > .shiny-html-output, .fm-coach-control > .shiny-html-output > .fm-info { display: contents; }
 .fm-coach-control .fm-info > summary { grid-column: 2; grid-row: 1; }
 .fm-coach-control .fm-info-body { grid-column: 1 / -1; grid-row: 2; }
+
+/* One native disclosure per page/dialog. Source nodes retain their bindings. */
+.fm-information-heading { display:flex; align-items:center; flex-wrap:wrap; gap:4px 8px; min-width:0; margin-bottom:14px; }
+.fm-information-heading > h2, .fm-information-heading > .modal-title { margin:0; min-width:0; overflow-wrap:anywhere; }
+.fm-information-heading > .fm-info-panel { display:contents; }
+.fm-information-heading > .fm-info-panel[hidden] { display:none !important; }
+.fm-information-heading > .fm-info-panel > summary { flex:0 0 28px; }
+.fm-info-panel > .fm-info-body { flex:1 0 100%; width:100%; margin-top:4px; color:var(--fm-text); }
+.fm-info-panel:not([open]) > .fm-info-body { display:none; }
+.fm-info-panel .fm-info-entry { display:block; width:auto; margin:0; color:var(--fm-text); }
+.fm-info-entry > summary { display:none !important; }
+.fm-info-entry > .fm-info-body { display:block; padding:0; border:0; background:transparent; color:var(--fm-text); }
+.fm-info-entry.fm-info-error > .fm-info-body { color:var(--fm-danger); }
+.fm-info-entry .fm-info-neutral { color:var(--fm-text); }
+.fm-info-entry + .fm-info-entry { margin-top:10px; padding-top:10px; border-top:1px solid var(--fm-border); }
+.fm-info-source-label { margin-bottom:3px; color:var(--fm-text); font-size:12px; font-weight:600; }
+.fm-info-origin { position:absolute; width:1px; height:1px; pointer-events:none; }
+.fm-dialog-information-heading { padding:0 0 10px; }
+.fm-information-heading.modal-header > .close { margin-left:auto; order:2; }
+.fm-information-heading.modal-header > .fm-info-panel > .fm-info-body { order:3; }
+.shiny-output-error:has(> .fm-info-origin)::before { content:none; }
+/* Former inline icon grids collapse naturally once their source is grouped. */
+.fm-coach-control:has(.fm-info-origin) { display:block; }
+.fm-coach-control:has(.fm-info-origin) > .form-group { margin-bottom:0; }
+.fm-info-inline { overflow-wrap:anywhere; }
+.fm-info-inline-error { color:var(--fm-danger); }
+.fm-info-restoring[hidden] { display:none !important; }
+.fm-info-entry:not(.fm-info-attached) { visibility:hidden; }
+.shiny-output-error:has(> .fm-info-origin) { padding:0; background:transparent; }
+.fm-info-entry .shiny-output-error:not(.shiny-output-error-fm-loading) { color:var(--fm-danger); }
+/* Keep the coach's metadata output measurable after its details move away. */
+.fm-coach-control > .shiny-html-output:has(.fm-info-origin) { display:block; }

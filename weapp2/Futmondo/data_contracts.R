@@ -24,16 +24,41 @@ fm_info_content <- function(x) {
   text<-gsub("<[^>]*>|&nbsp;|[[:space:]\u00a0\u200b]","",text,perl=TRUE)
   c(content=any(nzchar(text)),dynamic=FALSE)
 }
-fm_info <- function(..., error = FALSE, class = NULL, pending = FALSE) {
+fm_info <- function(..., error = FALSE, class = NULL, pending = FALSE, source = NULL, inline = FALSE) {
   if(isTRUE(pending))return(NULL)
   content<-list(...);state<-fm_info_content(content)
   if(!state[["content"]]&&!state[["dynamic"]])return(NULL)
+  if(isTRUE(inline))return(shiny::tags$div(class=paste("fm-info-inline",if(isTRUE(error))"fm-info-inline-error",class),
+    role=if(isTRUE(error))"alert"else"status",content))
+  domain<-shiny::getDefaultReactiveDomain()
+  root<-if(!is.null(domain)&&is.function(domain$rootScope))domain$rootScope()else domain
+  revision<-if(!is.null(root)&&is.function(root$userData$information_context_revision))root$userData$information_context_revision()else NULL
   shiny::tags$details(class = paste(c("fm-info", if (isTRUE(error)) "fm-info-error",
       if(state[["dynamic"]]||!state[["content"]])"fm-info-empty",class), collapse = " "),
+    `data-fm-info-source` = source, `data-fm-info-context` = revision,
     shiny::tags$summary(`aria-label` = if (isTRUE(error)) "Error details" else "Information",
       shiny::tags$span(class = "fm-info-icon", `aria-hidden` = "true", "i")),
     shiny::tags$div(class = "fm-info-body", content))
 }
+# One persistent disclosure beside each page heading. Source bodies are adopted
+# by the browser registry without copying Shiny inputs or output bindings.
+fm_info_page_UI <- function(title, ...) {
+  omit_heading <- function(x) {
+    if(inherits(x,"shiny.tag")) {
+      if(identical(x$name,"h2") && identical(paste(unlist(x$children),collapse=""),title))return(NULL)
+      x$children<-omit_heading(x$children)
+    } else if(is.list(x)&&(!is.object(x)||inherits(x,"shiny.tag.list")))x[]<-lapply(x,omit_heading)
+    x
+  }
+  shiny::tags$div(class="fm-information-scope",`data-fm-info-page`="true",
+    shiny::tags$div(class="fm-information-heading",shiny::tags$h2(title),
+      shiny::tags$details(class="fm-info fm-info-panel",hidden="hidden",
+        shiny::tags$summary(`aria-label`="Page information",title="Page information",
+          shiny::tags$span(class="fm-info-icon",`aria-hidden`="true","i")),
+        shiny::tags$div(class="fm-info-body"))),
+    omit_heading(list(...)))
+}
+
 preserve_observation_time <- function(data, source = data) {
   if (!is.data.frame(data)) return(data)
   stamp <- attr(source, "observed_at")

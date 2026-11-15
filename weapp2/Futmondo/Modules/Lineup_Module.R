@@ -263,7 +263,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       shiny::showModal(dialog)
     }
     output$picker_error<-shiny::renderUI({
-      if(nzchar(picker_notice()))fm_info(picker_notice(),error=TRUE)
+      if(nzchar(picker_notice()))fm_info(picker_notice(),error=TRUE,inline=TRUE)
     })
     output$picker_players<-shiny::renderUI({
       pick<-selected();shiny::req(pick,source(),draft())
@@ -356,7 +356,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       shiny::tagList(
         if(nzchar(best_note()))shiny::div(class='fm-lineup-note fm-lineup-best-note',best_note()),
         shiny::div(role='status',`aria-live`='polite',`aria-busy`=if(!is.null(best_request()))'true'else'false',
-          if(nzchar(notice()))if(notice_error())fm_info(notice(),error=TRUE)else
+          if(nzchar(notice()))if(notice_error())fm_info(notice(),error=TRUE,inline=TRUE)else
             shiny::div(class='fm-lineup-note fm-lineup-message',notice())),
         if(length(changed))fm_info(error=TRUE,class='fm-lineup-best-warning',
           paste0('Optimization inputs changed: ',paste(changed,collapse=', '),'. Optimize to update this lineup.')),
@@ -417,7 +417,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       if(!is.null(draft()))issues<-c(issues,departure_issues(draft()))
       if(is.null(target()))issues<-c(issues,'Next round is not established')
       shiny::tagList(shiny::actionButton(session$ns('save'),if(saving())'Saving…'else'Save to LigaRadar',icon=shiny::icon('floppy-disk'),
-        disabled=saving()||loading()||length(issues)>0L||!dirty()),if(length(issues))fm_info(paste(unique(issues),collapse=' · '),error=!loading(),pending=loading()))
+        disabled=saving()||loading()||length(issues)>0L||!dirty()),if(length(issues))fm_info(paste(unique(issues),collapse=' · '),error=!loading(),pending=loading(),inline=TRUE))
     })
     shiny::observeEvent(input$save,{
       shiny::req(source(),draft(),target(),!saving(),!loading(),dirty());value<-draft();baseline<-source();ctx<-context();next_round<-target();key<-loaded_key;g<-generation;auth<-login_token()

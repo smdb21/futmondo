@@ -1789,3 +1789,19 @@ Production deployment and authenticated hosted acceptance remain separate.
   the offline lifecycle pass; results and performance review are recorded in
   `data_review_results.md`. No dependency, schema or environment change.
   Production rollout and authenticated hosted acceptance remain unverified.
+
+### Consolidated page information panels — implemented locally (2026-11-15)
+
+- Replace scattered passive icons with one native panel beside each page title,
+  plus one per dialog that contains passive information. Combine global status,
+  source clocks, coach help, calculation explanations and page diagnostics.
+- Preserve original Shiny bindings, independent clock updates, explicit Retry
+  handlers and truthful pending/error states. Any failed source makes the icon
+  red; healthy source messages remain normal. Account/league presentation
+  revisions prevent obsolete entries and republish identical current metadata.
+- Keep action validation, confirmations, transaction failures/uncertain outcomes
+  and official inbox records immediately visible. No data acquisition, durable
+  cache, accounting, worker schedule or transaction policy is changed.
+- Local exit checks and performance evidence are recorded in
+  `data_review_results.md`; contract: `ui_information_disclosures.md`.
+  Production deployment and authenticated hosted acceptance are not claimed.

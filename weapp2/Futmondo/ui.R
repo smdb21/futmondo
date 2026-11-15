@@ -1,3 +1,12 @@
+# Every page owns one information panel, including pages without a former title.
+fm_information_tab <- function(tabName, ...) {
+  titles<-c(notifications="Notifications",login="Welcome",today="Today's market",
+    lineup="Lineup",yourteam="My Team",players_in_championship="Players",
+    rivals="Rivals",plots="Plots",classification="Classification",
+    round_mvps="Round awards",admin="Administration")
+  shinydashboard::tabItem(tabName=tabName,fm_info_page_UI(unname(titles[[tabName]]),...))
+}
+
 fm_theme_control <- tags$div(class = "fm-theme-control",
     tags$button(id = "fm-theme-toggle", type = "button", class = "btn fm-theme-button",
       `aria-label` = "Color theme: System", title = "Color theme: System",
@@ -43,8 +52,8 @@ body <- shinydashboard::dashboardBody(
   uiOutput("worker_status"),
   uiOutput("clause_results"),
   shinydashboard::tabItems(
-    shinydashboard::tabItem(tabName="notifications", notifications_UI("notifications")),
-    shinydashboard::tabItem(
+    fm_information_tab(tabName="notifications", notifications_UI("notifications")),
+    fm_information_tab(
       tabName = "login",
       selectInput("selected_league", "League", choices = character()),
       uiOutput("league_preference_status"),
@@ -57,12 +66,12 @@ body <- shinydashboard::dashboardBody(
         )
       )
     ),
-    shinydashboard::tabItem(
+    fm_information_tab(
       tabName = "today",
       today_UI(id = "today")
     ),
-    shinydashboard::tabItem(tabName = "lineup", lineup_UI("lineup")),
-    shinydashboard::tabItem(
+    fm_information_tab(tabName = "lineup", lineup_UI("lineup")),
+    fm_information_tab(
       tabName = "yourteam",
       fluidRow(
         column(
@@ -74,27 +83,27 @@ body <- shinydashboard::dashboardBody(
         )
       )
     ),
-    shinydashboard::tabItem(
+    fm_information_tab(
       tabName = "players_in_championship",
       players_in_championship_UI(id = "players_in_championship")
     ),
-    shinydashboard::tabItem(
+    fm_information_tab(
       tabName = "rivals",
       rivals_UI(id = "rivals")
     ),
-    shinydashboard::tabItem(
+    fm_information_tab(
       tabName = "plots",
       plots_UI(id = "plots")
     ),
-    shinydashboard::tabItem(
+    fm_information_tab(
       tabName = "classification",
       classification_UI(id = "classification")
     ),
-    shinydashboard::tabItem(
+    fm_information_tab(
       tabName = "round_mvps",
       round_mvps_UI(id = "round_mvps")
     ),
-    shinydashboard::tabItem(
+    fm_information_tab(
       tabName = "admin",
       admin_UI(id = "admin")
     )

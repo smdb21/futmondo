@@ -396,7 +396,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     # ---- Live price preview helper ----
     render_input_price_preview <- function(val) {
       if (is.null(val) || is.na(val) || !is.numeric(val) || val <= 0) {
-        fm_info("Please enter a valid numerical price greater than 0 €.",error=TRUE)
+        fm_info("Please enter a valid numerical price greater than 0 €.",error=TRUE,inline=TRUE)
       } else {
         div(
           style = "margin-top: 6px; color: var(--fm-text); font-size: 14px; font-weight: 700;",
@@ -1012,7 +1012,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     output$market_offer_body <- renderUI({
       dialog <- market_offer_dialog_RV();req(dialog)
       if (isTRUE(dialog$pending)) return(fm_info("Checking availability…",pending=TRUE))
-      if (!isTRUE(dialog$preflight$ok)) return(fm_info(dialog$preflight$message,error=TRUE))
+      if (!isTRUE(dialog$preflight$ok)) return(fm_info(dialog$preflight$message,error=TRUE,inline=TRUE))
       market_price <- dialog$preflight$minimum_bid
       tagList(p("Minimum market bid: ",strong(player_card_money(market_price))),
         numericInput(ns("bid_amount"),label="Your offer amount (EUR):",value=market_price,min=market_price,step=10000),

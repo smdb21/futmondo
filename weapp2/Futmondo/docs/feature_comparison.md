@@ -84,3 +84,19 @@ six percentage shortcuts as its sale-listing dialog, based on the verified
 minimum bid and followed by explicit submission. This is a convenience within
 an existing shared market capability, without a new analysis/automation feature
 or exclusivity claim; no new login-tier item is added. Contract: `bid_management.md`.
+
+## Consolidated information panels — reviewed 2026-11-15
+
+Rechecked the [official app feature guide](https://magazine.futmondo.com/novedades-en-la-nueva-app-de-futmondo/)
+(published 2021-12-23) on 2026-11-15. It describes page navigation, market
+views, coach hiring and lineup warnings, but does not establish how the current
+authenticated app groups source/freshness diagnostics. That UI was not inspected;
+absence from this guide does not establish absence from the official app.
+
+LigaRadar now groups its existing source status, timestamps, errors and passive
+explanations behind one icon beside each page title and one per dialog. A failed
+source makes the icon red while successful messages retain their normal color.
+Actions and transaction failures stay immediately visible. This refines existing
+presentation without adding a data, analysis or automation capability, so no
+new login-tier item or exclusivity claim is added. Contract:
+`ui_information_disclosures.md`.

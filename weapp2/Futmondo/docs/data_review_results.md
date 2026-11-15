@@ -3605,3 +3605,79 @@ No dependency, environment setup or schema changes; only this task's runtime
 module checksum is updated in the deployment manifest. Unrelated working-tree
 and index changes are excluded. Production rollout, physical devices and real
 authenticated offers remain unverified.
+
+## Consolidated page information panels — 2026-11-15
+
+Implemented and verified locally: one collapsed native panel beside every page
+title, plus one per dialog containing passive information. Global finance and
+worker notes share the active page's panel. Each source retains its own error
+color; aggregate severity clears only after the last failed source recovers.
+Empty/pending entries are omitted independently. Inline action validation,
+transaction notifications, confirmations and official inbox records remain
+visible. Numerical finance fields and source timestamps retain their semantics.
+
+Executed checks:
+
+- `Rscript test/test_page_information.R`: all eleven pages render as a full
+  HTML document with dependencies preserved, one matching heading, source labels,
+  visible action validation and identical healthy metadata republished after a
+  context revision.
+- `node test/test_page_information.cjs`: six Chromium layouts (320/390/1440px,
+  light/dark), exercising independent colors, multiple errors, recovery while
+  collapsed, empty/pending-only scopes, delayed sources beside healthy sources,
+  unchanged source-clock DOM, coach-layout updates while collapsed, Retry
+  binding across repeated replacements,
+  dialog close/reopen and one-click Retry, generated table-error recovery,
+  source removal, account/league-style reset, native keyboard controls,
+  long diagnostic wrapping and no overflow.
+  Zero source/database I/O attempts or external requests; browser mutation gaps
+  were 10ms and Shiny heartbeats 61–68ms in the final run.
+- `node test/test_page_information_app.cjs` against the existing
+  `Rscript test/test_browser_app.R` synthetic server: nine actual app pages at
+  320/390/1440px, with exactly one populated panel each, no overflow and no
+  browser errors. This verifies UI integration/loading, not live source data.
+- Existing `node test/test_info_disclosures.cjs`: six layouts passed, including
+  standalone disclosures, empty/pending states, tooltips, source-clock identity,
+  keyboard actions and full persistent market/direct-owner offer failures.
+- `Rscript test/test_info_visibility.R`, `test/test_player_info_disclosures.R`
+  and `test/test_worker_status_redraw.R`: pending/empty/success/failure contracts,
+  preserved factual values and no repeated source reads or worker-driven
+  redraws on unchanged polls. Final focused measurements: 1,000 nested helper
+  renders in 0.206s; 100 offer-panel renders in 0.008s; twenty unchanged worker
+  polls in 0.333s with zero repeated output renders or source reads.
+- `Rscript test/test_lineup_module.R`, `test/test_market_offer_opening.R` and
+  `test/test_ui_reliability.R`: passed. A stale lineup test assertion expected
+  pending coverage disclosure text; it failed identically with the original
+  HEAD helper/module. Updated that assertion to require its omission while
+  retaining the existing visible waiting-action notice and draft checks.
+- Required `Rscript test/test_shiny_simulation.R`: 13 lifecycle checks plus
+  eight tabs passed, with no HTTP/live database mutations. JavaScript syntax
+  and task-scoped whitespace checks passed.
+- `Rscript test/test_deployment_contract.R`: three checks passed. Eight
+  changed runtime checksums match the exact staged source blobs; development
+  files remain excluded. Only task checksum fields are staged; unrelated
+  manifest package and source edits remain outside this commit.
+
+The browser executable came from the existing local Chromium cache using
+`FUTMONDO_TEST_CHROMIUM`; no dependency installation or deployed dependency
+change was required. Inspected the mobile full-app image and mixed-error dark
+panel image. The first full-document browser run exposed loss of custom list
+classes during heading traversal; fixed it and added the document-rendering
+regression above. A synthetic delayed callback is guarded against a closed
+session; fixture teardown cannot publish into a destroyed session.
+
+Performance review: no new source/API/database request, acquisition timer,
+worker work, persistent cache, schema or reactive input is added. The registry
+adopts existing bound nodes once, restores them before owning-output replacement,
+coalesces local DOM changes per animation frame and prunes removed scopes and
+sources. Source-clock-only changes preserve panel/source identities and open
+state. Context revisions republish metadata once per account/league change,
+including when its text is identical; they do not change acquisition policy.
+No full-document scan occurs on normal updates. Mobile wrapping and the bounded
+mutation/heartbeat checks found no responsiveness regression. Reusable factual
+results still use acknowledged durable database persistence with original
+context/source/freshness/completeness metadata; memory is only an accelerator.
+
+No production deployment, real-account operation, live transaction, real-device
+Safari test or hosted acceptance is claimed. Existing unrelated working changes
+are preserved. Documentation changes have no runtime performance effect.

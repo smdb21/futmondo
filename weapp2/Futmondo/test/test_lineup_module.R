@@ -177,7 +177,9 @@ history_data(partial_history);history_status(list(pending=1L,remaining=0L,saving
 shiny::testServer(lineup_Server,args=args,{
  settle(session);before<-draft();session$setInputs(best=1);settle(session)
  stopifnot(identical(draft(),before),grepl('waiting for complete scores for 1 eligible player',notice()),!nzchar(best_note()),
-  grepl('19 of 20 players have complete scores',output$status$html,fixed=TRUE))
+  # Pending source disclosures are intentionally omitted; the visible action
+  # notice above still explains why this request is waiting.
+  !grepl('players have complete scores',output$status$html,fixed=TRUE))
  # Even though a complete XI could be formed, it must not silently exclude p20.
  history_data(full_history);history_status(default_status);settle(session)
  stopifnot('p20'%in%draft()$starters,all(nzchar(draft()$starters)),nzchar(best_note()),state$reads==1L,

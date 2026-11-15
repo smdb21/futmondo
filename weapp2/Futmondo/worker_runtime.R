@@ -414,10 +414,10 @@ fm_worker_session<-function(session,login,leagues=function()list(),source_note=f
  })
  output$worker_status<-shiny::renderUI({
   if(!isTRUE(status_visible()))return(NULL)
-  fm_info(error=status_error(),
+  fm_info(error=status_error(),source="Background sync",
    shiny::textOutput('worker_status_message',inline=TRUE),
-   shiny::tags$small(style='display:block',shiny::textOutput('worker_status_checked_at',inline=TRUE)),
-   shiny::tags$small(style='display:block',shiny::textOutput('worker_roster_source_times',inline=TRUE)))
+   shiny::tags$small(class='fm-info-neutral',style='display:block',shiny::textOutput('worker_status_checked_at',inline=TRUE)),
+   shiny::tags$small(class='fm-info-neutral',style='display:block',shiny::textOutput('worker_roster_source_times',inline=TRUE)))
  })
  output$worker_status_message<-shiny::renderText(status_message())
  shiny::outputOptions(output,"worker_status_message",suspendWhenHidden=FALSE)

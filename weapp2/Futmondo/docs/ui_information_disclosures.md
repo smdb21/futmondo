@@ -132,3 +132,61 @@ while keeping its submitted value. `rivals_cash_history_rows()` projects saved
 system-counterparty labels in its view only; the shared accounting ledger and
 balances remain unchanged. Existing saved observations require no migration or
 refetch. No new dependencies, configuration, requests, timers or persistence.
+
+## Consolidated page and dialog panels — 2026-11-15
+
+`fm_info_page_UI(title, ...)` renders one stable native information disclosure
+beside the page heading and removes a matching former `h2` while preserving
+HTML dependencies and tag-list classes. All eleven application pages use it.
+Expanded details span the available width below the heading. Dialogs acquire
+one panel beside their existing title when they contain passive information;
+untitled player dialogs receive a Player details heading. Inline player views
+contribute to their enclosing page. Empty panels remain hidden.
+
+`fm_info(..., source=NULL, inline=FALSE)` adds an optional human-readable source
+label. `inline=TRUE` returns visible status/alert text without an icon for
+amount validation, lineup action failures and action-blocking preflights.
+Pending and recursively empty content still returns `NULL`. The numerical
+account summary, coach checkbox, factual rows, confirmations and official inbox
+events remain visible. Shiny action-result notifications retain their full
+message and dismissal button in the scoped application, including uncertain
+transaction outcomes; they are not passive source entries.
+
+The browser owns a bounded, page-local presentation registry in
+`www/info-disclosures.js`. It adopts the **original** source disclosure elements
+into the page/dialog panel, hides their individual summaries, and adds source
+labels. It never clones bound inputs, copies source HTML, or invents input IDs.
+Origin markers retain ownership; source labels prefer explicit `source`, then
+curated output categories or an existing section heading. Global statuses are
+shown on the active page; page entries and dialog entries remain separate.
+Failed sources color the aggregate icon red, with only failed messages red.
+Healthy text and explicitly neutral finance/worker timestamps use the normal
+text color. Confirmed nested output failures also set aggregate severity;
+pending/empty entries cannot suppress healthy entries. Error recovery clears
+aggregate severity when no failures remain.
+
+Before Shiny replaces or unbinds an owning output, `shiny:value`, `shiny:error`
+and `shiny:unbound` restore its source elements to their original binding
+scope. Freshly rendered controls finish binding before adoption. Subtree
+removal disposes orphaned adopted elements and their bindings. Registry maps
+are pruned on removal, updates are coalesced with `requestAnimationFrame`, and
+native toggles preserve the page's open state across source replacements.
+Independent text outputs keep their existing identities and update without
+replacing the source or page panel. No timer or normal-update document scan
+is added. Standalone disclosures outside page/dialog scopes retain their
+existing behavior.
+
+Account/league changes increment the server's presentation-only
+`session$userData$information_context_revision` and send `fm-information-reset`.
+`fm_info` includes that revision in reactive source markup, ensuring even
+identical successful metadata republishes after reset. The browser clears old
+dynamic entries and dialog information immediately, closes panels, and retains
+static page help. This counter contains no account data or credentials and
+creates no factual cache, source request or persistence operation.
+
+No API/database contract, dependency, environment variable, schema, worker rate
+or acquisition policy changes. Existing successful factual observations retain
+durable database persistence/reuse, original context, freshness/completeness
+and source timestamps; failed persistence remains retryable. Performance and
+executed checks are recorded in `data_review_results.md`. Hosted deployment
+and authenticated production appearance are separate from local verification.

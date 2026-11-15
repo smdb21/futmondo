@@ -69,7 +69,11 @@ The isolated PostgreSQL checks use `@electric-sql/pglite`; browser checks use Pl
 ```sh
 node test/test_factual_schema.cjs
 node test/test_observation_migration.cjs
+Rscript test/test_page_information.R
+node test/test_page_information.cjs
 ```
+
+The page-information browser fixture starts its own synthetic server and checks three viewport widths in both themes. For full-app integration, start `Rscript test/test_browser_app.R` in a separate terminal, then run `node test/test_page_information_app.cjs`. Both use offline fixtures; the latter blocks external browser requests. See [information panels](docs/ui_information_disclosures.md) for the source/binding contract.
 
 After a dependency change, regenerate and inspect the deployment manifest:
 
