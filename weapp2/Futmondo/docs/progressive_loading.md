@@ -11,7 +11,7 @@ behavior. The visual follows actual readiness and never delays completion to
 finish an animation. It does not represent real player positions or progress.
 
 The local `www/loading-visual.js` and `www/loading-visual.css` assets animate a
-15-second loop: the flat pitch tilts and rotates into perspective, 22 player
+15-second loop: the flat pitch tilts and rotates into perspective, 22 table-football
 figures rise from the surface, and their particles become a flowing flock.
 The flock gathers into radar rings and reveals moving player dots before
 returning to the flat pitch. The component
@@ -32,10 +32,14 @@ The private `cameraAt(t)` helper computes the view once per frame. `project()`
 treats the existing pitch coordinates as the ground plane and positive Z as
 height, reusing the camera's `px`, `py` and perspective-scale slots for projected
 points. `raisedBoard()` draws the shallow edge and shadow; `risingPlayers()`
-draws 22 anchored figures using cached formation positions and a bounded lift
-array. `makeParticles()` assigns each existing particle a player and silhouette
-sample once per size change. Team colors stay consistent through the field,
-figures, flock and radar, avoiding color jumps during the transformation.
+draws 22 anchored foosball figures with round heads, solid shirts, rigid lower
+bodies and broad kicking feet, using cached formation positions and a bounded
+lift array. `makeParticles()` assigns each existing particle a player and a
+sample of the same molded silhouette once per size change, retaining both foot
+corners even at the smaller particle budget. `readPalette()`
+caches green and warm-gold team tones from the existing text/warning theme
+tokens. These tones stay consistent through the figures, morph particles and
+radar player dots, while the radar beam uses the existing accent color.
 
 Rendering is browser-only, with one shared animation scheduler capped at 30 FPS,
 bounded particle counts (320, or 180 on narrow screens), and pixel density capped

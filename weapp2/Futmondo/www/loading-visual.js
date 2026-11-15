@@ -41,9 +41,13 @@
         team: team, delay: (index % 4)*.12 });
     });
   }
-  // A few samples of the head, shoulders, arms and legs reuse the pitch particles.
-  var silhouette = [[0,30],[-2.7,27],[0,24],[2.7,27],[-4,21],[4,21],
-    [-6,14],[6,14],[-2,13],[2,13],[-2,7],[2,7],[-3,0],[3,0]];
+  // Molded table-football body: broad shirt, rigid stem and one kicking foot.
+  var figurine = [[-2,24],[-5.5,22],[-6,16],[-3.5,14],[-2.5,5],[-5,5],
+    [-5,0],[5,0],[5,5],[2.5,5],[3.5,14],[6,16],[5.5,22],[2,24]];
+  var figurineShade = [[1.8,23.2],[5.2,21.8],[4,14.6],[1.2,14.6]];
+  // Sample the same head, shirt and broad foot for the silhouette-to-flock morph.
+  var silhouette = [[0,30],[-2.9,27],[0,24],[2.9,27],[-5.5,22],[5.5,22],
+    [-6,16],[6,16],[-3.5,14],[3.5,14],[-2.5,5],[2.5,5],[-5,5],[5,5],[-5,0],[5,0]];
   function clamp(x) { return Math.max(0, Math.min(1, x)); }
   function ease(x) { x = clamp(x); return x * x * x * (x * (x * 6 - 15) + 10); }
   function mix(a, b, w) { return a + (b - a) * w; }
@@ -69,6 +73,7 @@
     var style = window.getComputedStyle(root);
     function token(name) { return style.getPropertyValue('--fm-' + name).trim(); }
     palette = { ink: token('text'), muted: token('muted'), accent: token('accent'), surface: token('surface') };
+    palette.teams = [palette.ink, token('warning')];
   }
   function makeParticles(count) {
     var result = [];
@@ -85,7 +90,10 @@
       var ring = i % 3;
       var actor = i % actors.length;
       var samples = Math.floor((count-1-actor)/actors.length)+1;
-      var body = silhouette[Math.floor(Math.floor(i/actors.length)/samples*silhouette.length)];
+      var slot = Math.floor(i/actors.length);
+      // Keep both broad-foot corners even in the compact eight-sample figures.
+      var body = slot >= samples-2 ? silhouette[silhouette.length-2+slot-(samples-2)] :
+        silhouette[Math.floor(slot/(samples-2)*(silhouette.length-2))];
       result.push({ x: mix(segment.a[0], segment.b[0], f), y: mix(segment.a[1], segment.b[1], f),
         actor: actor, bodyX: body[0], bodyZ: body[1],
         angle: angle, u: u, radius: Math.sqrt(((i * .754877666) % 1)), ring: 32 + ring * 32,
@@ -142,34 +150,36 @@
   }
   function risingPlayers(ctx, opacity, markScale, camera, lifts) {
     if (opacity <= .001) return;
-    ctx.lineCap = 'round';
     for (var i = 0; i < actors.length; i++) {
       var actor = actors[i], rise = lifts[i];
       if (rise <= .001) continue;
-      var color = actor.team ? palette.accent : palette.ink;
+      var color = palette.teams[actor.team];
       project(camera,actor.x,actor.y,0);
       var footX = camera.px, footY = camera.py;
       ctx.fillStyle = color;
       ctx.globalAlpha = opacity*rise*.14;
       ctx.beginPath(); ctx.ellipse(footX,footY,5*camera.k,2*camera.k,0,0,tau); ctx.fill();
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1.25*markScale*camera.k;
-      ctx.globalAlpha = opacity*rise*.8;
+      ctx.globalAlpha = opacity*rise*.9;
       ctx.beginPath();
-      project(camera,actor.x,actor.y,24*rise); ctx.moveTo(camera.px,camera.py);
-      project(camera,actor.x,actor.y,12*rise); ctx.lineTo(camera.px,camera.py);
-      project(camera,actor.x-3,actor.y,0); ctx.lineTo(camera.px,camera.py);
-      project(camera,actor.x,actor.y,12*rise); ctx.moveTo(camera.px,camera.py);
-      project(camera,actor.x+3,actor.y,0); ctx.lineTo(camera.px,camera.py);
-      project(camera,actor.x-6,actor.y,14*rise); ctx.moveTo(camera.px,camera.py);
-      project(camera,actor.x-3,actor.y,21*rise); ctx.lineTo(camera.px,camera.py);
-      project(camera,actor.x+3,actor.y,21*rise); ctx.lineTo(camera.px,camera.py);
-      project(camera,actor.x+6,actor.y,14*rise); ctx.lineTo(camera.px,camera.py);
-      ctx.stroke();
+      for (var j = 0; j < figurine.length; j++) {
+        project(camera,actor.x+figurine[j][0],actor.y,figurine[j][1]*rise);
+        if (j === 0) ctx.moveTo(camera.px,camera.py); else ctx.lineTo(camera.px,camera.py);
+      }
+      ctx.closePath(); ctx.fill();
+      // A small shaded shirt face reads as molded material without a texture.
+      ctx.fillStyle = palette.surface;
+      ctx.globalAlpha = opacity*rise*.28;
+      ctx.beginPath();
+      for (var k = 0; k < figurineShade.length; k++) {
+        project(camera,actor.x+figurineShade[k][0],actor.y,figurineShade[k][1]*rise);
+        if (k === 0) ctx.moveTo(camera.px,camera.py); else ctx.lineTo(camera.px,camera.py);
+      }
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = color;
+      ctx.globalAlpha = opacity*rise*.9;
       project(camera,actor.x,actor.y,27*rise);
-      ctx.beginPath(); ctx.arc(camera.px,camera.py,2.6*camera.k*Math.sqrt(markScale)*rise,0,tau); ctx.fill();
+      ctx.beginPath(); ctx.arc(camera.px,camera.py,2.9*camera.k*Math.sqrt(markScale)*rise,0,tau); ctx.fill();
     }
-    ctx.lineCap = 'butt';
   }
   function radar(ctx, opacity, t, markScale) {
     if (opacity <= .001) return;
@@ -218,7 +228,7 @@
         var angle = Math.atan2(y-140,x-210);
         var elapsed = ((beam-angle) % tau + tau) % tau;
         var pulse = Math.exp(-elapsed*3.3);
-        var color = team ? palette.accent : palette.ink;
+        var color = palette.teams[team];
         ctx.strokeStyle = color;
         ctx.fillStyle = color;
         ctx.globalAlpha = opacity * pulse * .32;
@@ -268,7 +278,7 @@
       var x = pitchWeight*originX + flockWeight*flockX + radarWeight*(210+p.ring*Math.cos(ringAngle));
       var y = pitchWeight*originY + flockWeight*flockY + radarWeight*(140+p.ring*Math.sin(ringAngle));
       // Keep each particle's color identity through the silhouette/flock morph.
-      ctx.fillStyle = actors[p.actor].team ? palette.accent : palette.ink;
+      ctx.fillStyle = palette.teams[actors[p.actor].team];
       ctx.globalAlpha = (mix(.7,.9,p.depth)*flockWeight + .8*pitchWeight + .22*radarWeight);
       var size = (.75 + flockWeight*(.3+p.depth*.35)) * instance.markScale;
       ctx.beginPath(); ctx.ellipse(x,y,size*(1+flockWeight*.35),size*.6,-.25+flockWeight*Math.sin(phi)*.3,0,tau); ctx.fill();

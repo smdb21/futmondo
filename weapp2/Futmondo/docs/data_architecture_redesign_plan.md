@@ -1473,3 +1473,10 @@ Implemented locally: remove the routine departure-exclusion paragraph, replace t
 - Extend the loading loop to 15 seconds with a perspective tilt/yaw, 22 figures rising from the pitch, and the same particles moving from their silhouettes into the flock. Readiness still dismisses loading immediately.
 - Keep the existing 320/180-particle limits, 30 FPS cap, compact legibility, themes, reduced-motion fallback and hidden/removal cleanup. Native Canvas 2D projection adds no library, model, texture, data request or server work.
 - Geometry, mobile/desktop visual, loop-continuity and performance checks are recorded in `data_review_results.md`, together with the required offline lifecycle and deployment checks. Local validation and branch delivery remain separate from production acceptance.
+
+
+### Futbolín figures and distinct team tones — implemented locally (2026-11-15 UTC)
+
+- Replace the rising stick figures with solid table-football shapes: round heads, molded shirts, rigid lower bodies and broad kicking feet. Retain both foot corners in the particle morph at both rendering budgets.
+- Distinguish the teams with theme-derived green and gold tones, consistently reused by the figures, flock particles and radar dots. Existing timing, reduced-motion fallback, particle/frame bounds and loading readiness remain unchanged.
+- Local visual, geometry, performance and offline verification results are recorded in `data_review_results.md`; production acceptance remains separate from the branch push.

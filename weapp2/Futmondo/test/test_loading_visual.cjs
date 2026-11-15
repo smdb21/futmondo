@@ -32,7 +32,9 @@ function instrument() {
   }
   function record(context, kind) {
     if (trace(context) && stats.geometry.length < 500)
-      stats.geometry.push({kind, alpha: context.globalAlpha, path: paths.get(context) || []});
+      stats.geometry.push({kind, alpha: context.globalAlpha,
+        color: kind === 'fill' ? context.fillStyle : context.strokeStyle,
+        path: paths.get(context) || []});
   }
   CanvasRenderingContext2D.prototype.clearRect = function(...args) {
     const key = id(this);
@@ -155,6 +157,41 @@ function checkGeometry(phases) {
   assert.equal(feet.length, 22, 'Every raised player retains one ground anchor');
   for (let i = 0; i < 22; i++) assert.ok(heads[i][1] < feet[i][1] - 4, 'A player head rises visibly above its ground anchor');
 }
+function checkTeams(phases, teamColors) {
+  assert.notEqual(teamColors[0], teamColors[1], 'The two teams use different theme-derived tones');
+  function countTeams(marks, expected, label) {
+    assert.equal(marks.length, expected * 2, label + ' has one mark per player');
+    for (const color of teamColors)
+      assert.equal(marks.filter(mark => mark.color === color).length, expected, label + ' retains each team tone');
+  }
+  const heads = phases.rising.filter(mark => mark.kind === 'fill' && mark.path.length === 1 &&
+    mark.path[0].op === 'arc' && mark.path[0].args[2] > 1.5);
+  countTeams(heads, 11, 'Raised heads');
+  const bodies = phases.rising.filter(mark => mark.kind === 'fill' && mark.alpha > 0.65 &&
+    teamColors.includes(mark.color) && mark.path.length >= 8 &&
+    mark.path.every(command => command.op === 'moveTo' || command.op === 'lineTo'));
+  countTeams(bodies, 11, 'Solid foosball bodies');
+  for (const body of bodies) {
+    const points = body.path.map(command => command.args);
+    const xs = points.map(point => point[0]), ys = points.map(point => point[1]);
+    const width = Math.max(...xs) - Math.min(...xs), height = Math.max(...ys) - Math.min(...ys);
+    assert.ok(width >= 5 && width <= 25 && height >= 10 && height <= 40, 'Foosball bodies have a substantial filled silhouette');
+    assert.ok(polygonArea(points) > width * height * 0.3, 'The player is a solid molded body, not a thin stick figure');
+    const foot = points.filter(point => point[1] >= Math.max(...ys) - height * 0.2);
+    const footWidth = Math.max(...foot.map(point => point[0])) - Math.min(...foot.map(point => point[0]));
+    assert.ok(footWidth >= width * 0.6, 'Every foosball figure has a broad kicking foot');
+  }
+  const radarDots = phases.players.filter(mark => mark.path.length === 1 && mark.path[0].op === 'arc' &&
+    mark.path[0].args[2] >= 2.3 && mark.path[0].args[2] <= 3.2 && teamColors.includes(mark.color));
+  countTeams(radarDots, 11, 'Radar player dots');
+  for (const name of ['pitch', 'morph', 'flock']) {
+    const particles = phases[name].filter(mark => mark.kind === 'fill' && mark.alpha > 0.4 &&
+      mark.path.length === 1 && mark.path[0].op === 'ellipse');
+    assert.ok(particles.length >= 180, name + ' reuses the bounded particle pool');
+    assert.deepEqual([...new Set(particles.map(mark => mark.color))].sort(), [...teamColors].sort(),
+      name + ' keeps both team tones through the transformation');
+  }
+}
 
 async function visualChecks(browser) {
   for (const width of [1440, 390, 320]) {
@@ -170,6 +207,14 @@ async function visualChecks(browser) {
       // Reload resets the shared animation epoch as well as the real markup.
       await page.reload();
       await waitDraw(page, 'fixture-hero');
+      const teamColors = await page.evaluate(() => {
+        const style = getComputedStyle(document.documentElement);
+        const context = document.createElement('canvas').getContext('2d');
+        return ['text', 'warning'].map(name => {
+          context.fillStyle = style.getPropertyValue('--fm-' + name).trim();
+          return context.fillStyle;
+        });
+      });
       const pictures = [], phases = {};
       for (const [name, at] of [['pitch', 700], ['tilted', 2400], ['rising', 4200], ['morph', 5400], ['flock', 7000], ['radar', 9300], ['players', 11500], ['return', 14300]]) {
         const elapsed = await page.evaluate(() => performance.now() - window.loadingFixture.firstDrawAt);
@@ -182,13 +227,14 @@ async function visualChecks(browser) {
       }
       assert.equal(new Set(pictures).size, pictures.length, 'Each loop phase renders changing graphics');
       checkGeometry(phases);
+      checkTeams(phases, teamColors);
       const seamElapsed = await page.evaluate(() => performance.now() - window.loadingFixture.firstDrawAt);
       await page.waitForTimeout(Math.max(0, 15100 - seamElapsed));
       const seam = await captureGeometry(page);
       assert.deepEqual(seam, phases.pitch, 'The loop returns to identical field and particle geometry, including mark orientation');
       assert.equal(await page.locator('#fixture-hero canvas').evaluate(canvas => canvas.toDataURL()), pictures[0], 'The complete canvas is identical across the flat loop seam');
       await noOverflow(page);
-      console.log(`PASS ${width}px ${theme}: eight loop phases, projected field, 22 rising players, responsive geometry, decorative semantics`);
+      console.log(`PASS ${width}px ${theme}: eight loop phases, 22 solid foosball figures, broad feet, 11 green/11 gold players, persistent team tones, exact seam`);
     }
     const responseMs = await page.evaluate(() => new Promise(resolve => {
       const start = performance.now();
