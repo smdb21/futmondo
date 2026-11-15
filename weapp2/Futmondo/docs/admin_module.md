@@ -136,3 +136,23 @@ also removes its directory request on navigation. The earlier directory-loading
 notes above describe the superseded implementation. Both ordinary users and
 LigaRadar administrators use Welcome → Display timezone for their own account;
 `fm_timezone_store()` rejects every cross-account read or write.
+
+
+## Blank section during Background sync renewal — 2026-11-15
+
+A pending credential-renewal promise returned through the worker session's
+observer could hold the entire Shiny flush. Opening Admin during that wait
+left League settings blank even though the selected league and configuration
+were available. `fm_worker_session()` now returns immediately from its local
+`authorize()` helper after installing asynchronous acknowledgement/error
+callbacks. Both renewal and explicitly saved Background sync settings use
+this helper; their database acknowledgement, consent, encryption, generation
+guards and polling contract remain authoritative. No configuration request,
+cache, API retry or source-age relaxation is added.
+
+The full-root regression holds renewal for five seconds and opens the real
+Admin UI with existing synthetic configuration. It verifies visible boxed
+values and interactive input before renewal completes, then one acknowledged
+renewal. An explicit disable during renewal also remains authoritative over
+an older reply. The earlier standalone Admin fixture could not cover this
+opted-in session path. See `progressive_loading.md` and `data_review_results.md`.

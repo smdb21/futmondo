@@ -3450,3 +3450,64 @@ viewport-bounded panel. Documentation has no runtime effect. Production rollout,
 physical devices and real authenticated offer responses remain unverified; no
 real accounts or transactions are used. Unrelated working-tree/index edits are
 preserved and excluded from the task commit.
+
+
+## Permanent Welcome loading and blank League settings — 2026-11-15
+
+Both reported paths were reproduced through the actual root application.
+Welcome's readiness projection unconditionally returned false on the login
+page even when shared team/market states were both ok; startup consequently
+remained loading_today. Separately, `fm_worker_session()` returned its pending
+renewal/settings promise through an observer, holding Shiny's whole session
+flush. With an opt-in policy and a five-second synthetic renewal, opening
+Admin showed zero setting cards and a heartbeat took 3,879ms; after renewal,
+the same existing nine-field configuration rendered six groups. The original
+standalone module fixture lacked this root worker-controller path.
+
+The root now uses the actual primary readiness/status on Welcome and Today.
+The worker's local authorize helper returns immediately after installing its
+existing asynchronous callbacks. No read/write is treated as acknowledged
+early; failure feedback, self/account checks, consent, policy generation and
+durable preferences remain unchanged. Actual market failures become partial/
+failed status and scoped retry on Welcome, with unavailable values retained.
+No API result, cache, source deadline or worker schedule is changed.
+
+Read-only production metadata showed a current worker heartbeat and recent
+successful market/team observations. Existing retained rule records contained
+48 scalar configuration keys, matching the adapter's mapping, with 546 own-team
+rule observations. Some short-lived snapshots were genuinely expired; that
+status remains separate from the reproduced stuck banner/flush. Raw private
+worker snapshot access was rejected by automatic approval review; investigation
+continued with aggregate metadata and synthetic fixtures, without inspecting
+private response bodies, changing production data or accessing real accounts.
+No universal source outage is inferred from the UI symptoms.
+
+Executed focused checks: three root Welcome groups (already ready, held
+market response, real rejection followed by successful scoped retry); ten
+unrelated input publications added zero reads in 0.321s. The actual worker
+controller test holds renewal, acknowledges an explicit disable and then
+rejects the older policy reply, with no duplicate renewal or live transport.
+Existing Admin configuration recovery (two groups), league settings (six),
+access control (nine) and database-only worker GUI/replay regressions pass.
+Full production UI/root browser checks at 320/390/1440px hold renewal for five
+seconds: settings render in 844/843/828ms and heartbeat responses take
+373/59/260ms before acknowledgement. All six boxes retain known values;
+Welcome settles; one renewal occurs per login; no horizontal overflow, visible
+output/JavaScript error or live I/O. The 390px screenshot was inspected.
+
+The exact task artifact passes the required offline lifecycle (13 checks plus
+eight tabs, zero HTTP/live database mutations) and all three deployment checks. Two runtime checksums are updated, with unchanged
+dependencies and application-bundle inventory. No real transaction, live
+preference write, production schema change or deployment is used in tests.
+
+Performance review: primary readiness subscribes to existing shared resource
+projections; repeated settled Welcome inputs add no reads. Existing post-startup
+consumers can proceed once primary data settles. Promise completion uses the
+same bounded transport, account policy and durable database writes as before;
+only the UI flush is released. Existing generation checks prevent stale policy
+replies from restoring disabled access. No new timer, acquisition job, cache,
+queue, source request, dependency or environment variable is introduced.
+Rendering cost remains the existing bounded settings rows. Documentation has
+no runtime effect. Synthetic timing does not establish Contabo network/capacity
+or authenticated hosted acceptance; rollout remains unverified. Unrelated
+working-tree/index changes and concurrent task commits are preserved.

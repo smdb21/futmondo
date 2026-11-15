@@ -102,3 +102,26 @@ Finality regression checks use synthetic fields to verify conservative parser be
 The banner clock updates once per second using the already-loaded round and finance states. It does not invalidate or poll team information, market listings, rounds or player histories. Global Refresh, a targeted retry, or a confirmed relevant transaction still invalidates the existing shared resources. Navigation reuses the root primary snapshot; page-owned factual reads retain their cache check on resume.
 
 Player tables mount on account/league/team, visible column schema, or requested-N changes. Published average changes use `updateReactable` for data only and a JavaScript cell renderer; integer and double numeric storage share a schema. Other visible field changes regenerate the widget because existing R cell formatters produce static rendered content; this prevents stale prices, offers or player details. The current page is retained within its valid range, selection is remapped using player IDs, and source timestamps/hidden coverage-only changes do not send an update. Search and browser filters remain attached to the same widget. History progress is a separate output and can legitimately advance while a one-time backfill is running; it does not rebuild the player table. Inactive `recent_player_points_source` clients do not evaluate their player-row source, so hidden pages cannot demand or restart history acquisition. Existing two-read concurrency, five-second history publication, queue/memory bounds and manual transaction preflights remain in effect.
+
+
+## Welcome readiness and Background sync flush isolation — 2026-11-15
+
+`server.R` now evaluates `startup_primary_ready` and `startup_stage` from the
+existing Today team/market resource projections on both Welcome (`login`) and
+Today. Previously Welcome unconditionally returned false and continuously
+showed “Loading today's market…”, including after successful data retrieval.
+The notice now clears when both primary results settle, and actual partial/
+failed results retain their existing error/retry behavior. Other page gates,
+context changes and Today’s settled-context latch remain unchanged. This reuses
+shared database-backed observations and does not acquire a second copy.
+
+The local `authorize()` helper inside `fm_worker_session()` starts its existing
+async worker RPC and returns `invisible(NULL)`. Its callers are observers;
+returning the promise made Shiny wait for credential renewal/settings writes
+before flushing unrelated UI. Acknowledgement/error callbacks still update
+policy and feedback, with the existing account and generation guards. This
+restores rendering/navigation while a request is pending rather than treating
+an unacknowledged write as successful. No source acquisition or refresh cadence
+is changed. Test fixtures block live I/O and retain original persisted-source
+freshness semantics. See `test_welcome_primary_loading.R`,
+`test_worker_renewal_flush.R` and `test_startup_admin_browser_app.R` / `.cjs`.

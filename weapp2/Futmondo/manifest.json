@@ -2400,7 +2400,7 @@
       "checksum": "6941ec3d550551d6c41a20b6a4d2ff3e"
     },
     "server.R": {
-      "checksum": "129ec4191f3a141f02e4a54d620b9918"
+      "checksum": "633270ce9f6fa1005e6593b709df2f34"
     },
     "supabase_connector.R": {
       "checksum": "680c9d36dbe62c8206859aae9422019f"
@@ -2418,7 +2418,7 @@
       "checksum": "cc269284c3d8e36bdbabc2c2d5a61d62"
     },
     "worker_runtime.R": {
-      "checksum": "dae750f795d37cd01ce34a7739f95292"
+      "checksum": "b3906e8a4291c04253402800dda8b0fc"
     },
     "www/custom_style.css": {
       "checksum": "247221c893e2516f175c570098d4e911"

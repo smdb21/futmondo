@@ -1750,3 +1750,20 @@ Production deployment and authenticated hosted acceptance remain separate.
 - This corrects existing presentation without a new capability, login-tier entry,
   dependency, schema or acquisition/persistence change. Hosted rollout and real
   authenticated offer rejection are not verified; no live offer is submitted.
+
+
+### Welcome loading and empty Admin settings — implemented locally (2026-11-15)
+
+- Reproduce the permanent Welcome loading banner with successful primary
+  resources, and an empty Admin settings section during delayed Background
+  sync renewal. The latter also blocked heartbeat responses for 3,879ms.
+- Use actual shared primary readiness/status on Welcome and Today, preserving
+  real pending/partial/failure states and scoped retry. Make the worker's
+  renewal/settings helper yield without returning its promise to an observer;
+  require the existing acknowledgements and retain policy-generation guards.
+- Full-root phone/desktop held-renewal browser checks, ready/delayed/failed/
+  retried Welcome tests, disable-during-renewal isolation and existing Admin/
+  access/worker regressions pass. Required lifecycle/deployment results and
+  performance limits are recorded in `data_review_results.md`. No schema,
+  dependency, cache, schedule or feature-inventory expansion; hosted rollout
+  and authenticated acceptance remain separate.

@@ -455,6 +455,9 @@ fm_worker_session<-function(session,login,leagues=function()list(),source_note=f
    s<-fm_worker_account_state(generation);fm_worker_set_policy(s,a);s$queued<-list();s$errors<-list();fm_worker_settle(s)
    if(!renew_only)feedback('Background sync settings saved.');fm_worker_notify(generation);fm_worker_poll(generation,session$token,TRUE);NULL
   },function(error){feedback('Could not save background sync settings. Database acknowledgement is required.');NULL})
+  # An observer must not return this pending promise: renewal/settings writes
+  # can otherwise hold the whole session flush, including unrelated Admin UI.
+  invisible(NULL)
  }
  shiny::observeEvent(session$input$worker_save,{
   auth<-login();shiny::req(valid_login(auth));s<-fm_worker_account_state(auth[['userid']]);shiny::req(s$known)

@@ -22,8 +22,8 @@ function(input, output, session) {
   })
   startup_primary_ready <- resource_display_source(session,function(){
     if(!valid_login(login_token_RV()))return(FALSE)
-    if(is.null(input$tabs)||identical(input$tabs,"login"))return(FALSE)
-    if(!identical(input$tabs,"today"))return(TRUE)
+    if(is.null(input$tabs))return(FALSE)
+    if(!input$tabs%in%c("login","today"))return(TRUE)
     tryCatch(isTRUE(today$primary_settled()),error=function(e)FALSE)
   })
   observeEvent(list(login_token_RV(),refresh_trigger(),input$selected_league),{
@@ -355,7 +355,7 @@ players_in_championship_Server(id = "players_in_championship",
     if(is.null(state$data)){startup_stage("failed");return()}
     if(!length(fm_filter_league_answer(state$data)$championships)){startup_stage("empty");return()}
     if(!isTRUE(startup_primary_ready())){startup_stage("loading_today");return()}
-    stage<-if(identical(input$tabs,"today"))today$primary_status()else "ready"
+    stage<-if(isTRUE(input$tabs%in%c("login","today")))today$primary_status()else "ready"
     if(!identical(isolate(startup_stage()),stage))resource_timing("today_primary",isolate(startup_started()))
     startup_stage(stage)
   })
