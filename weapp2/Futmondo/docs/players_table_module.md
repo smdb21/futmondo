@@ -290,17 +290,21 @@ turn it off to see their reported dates. A short information disclosure explains
 both conditional fields. This repairs existing columns; no new advertised/login
 capability, transaction behavior, acquisition permission or dependency is added.
 
-## Pinned crest and position while scrolling — 2026-11-14
+## Pinned crest and recent average while scrolling — updated 2026-11-15
 
 The shared Today, Market, My Team, Players and rival-squad tables display the
-existing `team` field as a 36px crest-only column before Name. Crest and Position
-(`role`) use Reactable's native `sticky="left"` support, including their headers
-and filter cells. Name scrolls normally. The crest/name boundary has no border,
+existing `team` field as a 36px crest-only column before Name. Crest and Avg Last N
+(`recent_points_avg`) use Reactable's native `sticky="left"` support, including their
+headers and filter cells. Name and Position (`role`) scroll normally. The crest/name boundary has no border,
 uses matching row backgrounds and compact spacing, so the two columns initially
-look like one cell. Once the name scrolls away, Position settles beside the crest.
+look like one cell. Once Name and Position scroll away, Avg Last N settles beside
+the crest. `players_table_recent_average_column(n=5L)` starts at 84px (previously
+110px), retaining its wrapped heading, numeric badge, score-detail tooltip and
+resizing. Changing N preserves the compact pinned-column definition.
 The crest column has an accessible Club heading, source club alt/title text, no
 sort/filter/resize handle, and remains searchable through its original club value.
 Position keeps its 112px minimum and resize control; Name keeps its 180px minimum.
+The default pinned area is 120px, leaving more room for scrolling statistics.
 
 `get_reactable_columns_for_players(table, show_sale_profit=FALSE,
 separate_crest=FALSE)` accepts the new optional presentation flag. The shared

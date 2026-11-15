@@ -38,7 +38,7 @@ check('separate crest keeps source/fallback labels and scrolling names without d
   grepl('alt="Athletic Club"',crests[1],fixed=TRUE),grepl('sevilla.png',crests[2],fixed=TRUE),
   identical(crests[3],''),!grepl('<img',as.character(separated$name$cell('Vivian',1)),fixed=TRUE),
   grepl('&lt;unsafe&gt;',as.character(separated$name$cell('<unsafe>',4)),fixed=TRUE),
-  identical(separated$team$sticky,'left'),identical(separated$role$sticky,'left'),is.null(separated$name$sticky),
+  identical(separated$team$sticky,'left'),is.null(separated$role$sticky),is.null(separated$name$sticky),
   isFALSE(separated$team$resizable),isFALSE(separated$team$filterable))
 })
 selected_player_Server<-function(...)NULL
@@ -51,11 +51,12 @@ shiny::testServer(players_table_Server,args=list(players_table_RV=shiny::reactiv
  widget<-jsonlite::fromJSON(output$players_table,simplifyVector=FALSE)$x$tag$attribs
  definitions<-stats::setNames(widget$columns,vapply(widget$columns,`[[`,character(1),'id'))
  visible<-vapply(Filter(function(column)!identical(column$show,FALSE)&&column$id!='.selection',widget$columns),`[[`,character(1),'id')
- check('actual table starts pinned crest, scrolling Name, pinned Position and averages',{
+ check('actual table starts pinned crest, scrolling Name, scrolling Position and pinned average',{
   stopifnot(identical(names(display)[1:5],c('team','name','role','recent_points_avg','recent_points_ratio')),
    identical(head(visible,5),c('team','name','role','recent_points_avg','recent_points_ratio')),
    identical(definitions$role$name,'Position'),identical(definitions$team$sticky,'left'),
-   identical(definitions$team$width,36L),identical(definitions$role$sticky,'left'),
+   identical(definitions$team$width,36L),is.null(definitions$role$sticky),
+   identical(definitions$recent_points_avg$sticky,'left'),identical(definitions$recent_points_avg$minWidth,84L),
    is.null(definitions$name$sticky),isFALSE(definitions$logo$show),
    identical(definitions$average.fitness$name,'Latest 5'),
    !any(c('clause_suggestedClause','fav','owner_team_id')%in%names(display)),

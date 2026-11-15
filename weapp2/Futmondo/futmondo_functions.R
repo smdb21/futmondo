@@ -1088,7 +1088,6 @@ get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE, s
       name = switch(position_column, primary_role="Primary position", secondary_role="Secondary position", "Position"),
       align = "center",
       minWidth = 112, resizable = TRUE,
-      sticky = if(isTRUE(separate_crest) && position_column == "role")"left" else NULL,
       class = if(isTRUE(separate_crest) && position_column == "role")"fm-player-position" else NULL,
       headerClass = if(isTRUE(separate_crest) && position_column == "role")"fm-player-position" else NULL,
       cell = function(value) {

@@ -280,8 +280,9 @@ players_table_metric_cell <- function(digits=1L, title_column=NULL, divisor=1, f
 players_table_recent_average_column <- function(n=5L) {
   n <- suppressWarnings(as.integer(n)[1]);if(!is.finite(n))n <- 5L
   reactable::colDef(name=paste0("Avg Last ",max(1L,min(20L,n))),align="center",sortNALast=TRUE,
-    minWidth=110, headerClass="fm-metric-header",
-    header=htmltools::span("Avg last",htmltools::tags$br(),max(1L,min(20L,n))),
+    minWidth=84, resizable=TRUE, sticky="left", class="fm-player-average",
+    headerClass="fm-metric-header fm-player-average",
+    header=htmltools::span("Avg",htmltools::tags$br(),paste("last",max(1L,min(20L,n)))),
     style=players_table_metric_style(), cell=players_table_metric_cell(1L,"recent_points_details")
   )
 }

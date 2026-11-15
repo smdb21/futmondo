@@ -50,8 +50,14 @@ For each new or expanded feature, recheck current official sources/UI, record th
 Rechecked the [official app feature guide](https://magazine.futmondo.com/novedades-en-la-nueva-app-de-futmondo/)
 (published 2021-12-23) on 2026-11-14. It documents market table views; it does not
 specify their pinned-column behavior. LigaRadar now pins a separate club crest
-and Position while Name scrolls, with an initially seamless crest/name boundary,
+and Avg Last N while Name and Position scroll, with a seamless crest/name boundary,
 in every shared player table. This is a presentation refinement to the existing
 scouting/market/squad views, without a new analytical capability or login tier
 entry. No exclusivity claim is made. Current authenticated official-app behavior
 and hosted LigaRadar appearance were not verified.
+
+The 2026-11-15 scrolling refinement replaces the pinned Position column with an
+84px Avg Last N column (previously 110px). This changes the existing presentation,
+not the recent-average calculation or capability inventory; the official-source
+comparison above and its verification limits still apply. No login-tier entry is
+added.

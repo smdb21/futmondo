@@ -1537,3 +1537,13 @@ No schema, dependency, automation or login inventory expansion is required.
   Focused rendering, synthetic desktop/mobile browser and required offline
   lifecycle checks and limitations are recorded in `docs/data_review_results.md`.
   Branch delivery is separate from hosted deployment/acceptance.
+
+### Compact pinned recent average — implemented locally (2026-11-15)
+
+- Reduce Avg Last N from 110px to 84px, pin it beside the crest, and unpin Position.
+  Preserve the borderless crest/name join, numeric sorting/coverage/tooltips,
+  adjustable N and resizing. Native sticky offsets leave a 120px default pinned
+  area; no acquisition, persistence, dependency or schema changes.
+- Focused column/known-answer average checks, synthetic mobile/desktop browser
+  checks and the required offline lifecycle are recorded in
+  `docs/data_review_results.md`; branch delivery remains separate from deployment.

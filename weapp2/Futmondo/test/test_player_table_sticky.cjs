@@ -18,9 +18,9 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
         const bounds=e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right,width:r.width};};
         const row=el.querySelector('.rt-tbody .rt-tr');
         return {scroll:bounds(scroll),scrollLeft:scroll.scrollLeft,crestCell:bounds(row.querySelector('.fm-player-crest')),name:bounds(row.querySelector('.fm-player-name')),
-          position:bounds(row.querySelector('.fm-player-position')),crest:bounds(row.querySelector('.fm-team-crest')),
-          header:bounds(el.querySelector('.rt-th.fm-player-position')),
-          filter:bounds(el.querySelector('.rt-td-filter.fm-player-position')),
+          position:bounds(row.querySelector('.fm-player-position')),average:bounds(row.querySelector('.fm-player-average')),crest:bounds(row.querySelector('.fm-team-crest')),
+          header:bounds(el.querySelector('.rt-th.fm-player-average')),
+          filter:bounds(el.querySelector('.rt-td-filter.fm-player-average')),
           cells:Array.from(row.children).map(e=>({text:e.textContent,...bounds(e)}))};
       });
       const initial=await geometry();
@@ -40,10 +40,10 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
         assert.ok(Math.abs(initial[key].left-scrolled[key].left)<2,`${width}/${theme} pinned ${key}`);
         assert.ok(scrolled[key].right<=scrolled.scroll.right+1,`${width}/${theme} ${key} visible`);
       }
-      assert.ok(scrolled.cells.some((cell,i)=>!['crestCell','position'].some(key=>Math.abs(initial[key].left-cell.left)<1)&&Math.abs(cell.left-initial.cells[i].left)>100),'stats move');
+      assert.ok(scrolled.cells.some((cell,i)=>!['crestCell','average'].some(key=>Math.abs(initial[key].left-cell.left)<1)&&Math.abs(cell.left-initial.cells[i].left)>100),'stats move');
       // Cells must paint opaque backgrounds even on the departure/striped rows.
       const backgrounds=await table.locator('.rt-tbody .rt-tr').evaluateAll(rows=>rows.slice(0,3).map(row=>
-        ['.fm-player-crest','.fm-player-position'].map(selector=>getComputedStyle(row.querySelector(selector)).backgroundColor)));
+        ['.fm-player-crest','.fm-player-average'].map(selector=>getComputedStyle(row.querySelector(selector)).backgroundColor)));
       assert.ok(backgrounds.flat().every(color=>color!=='rgba(0, 0, 0, 0)'&&color!=='transparent'));
       assert.notEqual(backgrounds[0][0],backgrounds[1][0],'striping stays visible');
       const departing=await table.locator('.fm-departing-before-round .fm-player-crest').evaluate(el=>getComputedStyle(el).backgroundColor);
@@ -53,9 +53,11 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       await page.waitForTimeout(300);
       await table.locator('.rt-table').evaluate(el=>{el.scrollLeft=el.scrollWidth;});
       scrolled=await geometry();assert.ok(scrolled.scrollLeft>100);
-      assert.ok(Math.abs(scrolled.position.left-scrolled.crestCell.right)<2,'position sticks beside crest');
+      assert.ok(Math.abs(scrolled.average.left-scrolled.crestCell.right)<2,'average sticks beside crest');
       assert.ok(scrolled.name.right<=scrolled.crestCell.right,'name scrolls away');
-      for(const key of ['header','filter'])assert.ok(Math.abs(scrolled[key].left-scrolled.position.left)<2);
+      assert.ok(scrolled.position.right<=scrolled.crestCell.right,'position scrolls away');
+      assert.equal(scrolled.average.width,84,'average is narrower than its former 110px width');
+      for(const key of ['header','filter'])assert.ok(Math.abs(scrolled[key].left-scrolled.average.left)<2);
       // A player can still be selected from a pinned cell; heartbeat stays responsive.
       await table.locator('.rt-tbody .fm-player-crest').nth(1).click();
       await page.locator('#shiny-modal').waitFor();
@@ -64,21 +66,34 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       const start=Date.now();await page.locator('#heartbeat').click();
       await page.waitForFunction(()=>document.querySelector('#heartbeat_value').textContent==='1');
       const latency=Date.now()-start;assert.ok(latency<2000);
+      // Changing N rebuilds the header while retaining the narrow pinned column.
+      await page.locator('#fixture-recent_games_n').fill('20');
+      await page.locator('#fixture-recent_games_n').press('Tab');
+      await page.waitForFunction(()=>document.querySelector('.rt-th.fm-player-average')?.textContent.includes('20'));
+      await table.locator('.rt-table').evaluate(el=>{el.scrollLeft=el.scrollWidth;});
+      const changedN=await geometry();
+      assert.ok(Math.abs(changedN.average.left-changedN.crestCell.right)<2,'N20 retains pinning');
+      assert.equal(changedN.average.width,84,'N20 retains compact width');
+      if(width===390)await page.screenshot({path:`/tmp/futmondo-average-N20-${theme}.png`,fullPage:true});
+      await page.locator('#fixture-recent_games_n').fill('5');
+      await page.locator('#fixture-recent_games_n').press('Tab');
+      await page.waitForFunction(()=>document.querySelector('.rt-th.fm-player-average')?.textContent.includes('5'));
+      await table.locator('.rt-table').evaluate(el=>{el.scrollLeft=el.scrollWidth;});
       if(width===1440){
         const before=await geometry();
-        const handle=table.locator('.rt-th.fm-player-position .rt-resizer');
+        const handle=table.locator('.rt-th.fm-player-average .rt-resizer');
         const box=await handle.boundingBox();assert.ok(box);
         await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();
         await page.mouse.move(box.x+box.width/2+40,box.y+box.height/2,{steps:5});
         await page.waitForTimeout(100);await page.mouse.up();
         const resized=await geometry();
-        assert.ok(resized.position.width>before.position.width+20,'position resizes');
-        assert.ok(Math.abs(resized.position.left-resized.crestCell.right)<2,'resized sticky offset');
+        assert.ok(resized.average.width>before.average.width+20,'average resizes');
+        assert.ok(Math.abs(resized.average.left-resized.crestCell.right)<2,'resized sticky offset');
       }
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false,'no page overflow');
       assert.deepEqual(errors,[]);assert.deepEqual(await page.locator('.shiny-output-error:visible').allTextContents(),[]);
       await page.screenshot({path:`/tmp/futmondo-sticky-${width}-${theme}.png`,fullPage:true});
-      console.log(`PASS ${width}px ${theme}: pinned crest/position/header/filter, row states, update, selection; heartbeat ${latency}ms`);
+      console.log(`PASS ${width}px ${theme}: pinned crest/average/header/filter, scrolling position, N20, row states, update, selection; heartbeat ${latency}ms`);
       await page.close();
     }
   } finally {await browser.close();}

@@ -2800,3 +2800,36 @@ no runtime effect. Browser checks use synthetic image responses and rows; real
 accounts, transactions, production deployment, physical devices and hosted
 performance were not exercised. Only task changes and their runtime checksums
 belong in the delivery commit; unrelated working changes are preserved.
+
+### Compact pinned recent average — 2026-11-15
+
+Avg Last N now starts at 84px, down from 110px, and uses native left pinning beside
+the 36px crest. Position has no sticky setting and scrolls with Name. The header
+shows **Avg** above **last N** to remain readable at the narrower width; the column
+remains resizable. Numeric sorting, one-decimal badges, missing values, source
+score coverage, tooltip details and the existing 1–20 round window are unchanged.
+The borderless crest/name join and existing opaque row-state colors are retained.
+
+Passed: player-name/crest contracts (6); recent average (6 base checks plus 7
+additional known-answer/display/source-window checks); recent-point hover (6);
+deployment (3); required offline lifecycle (13 plus eight tabs, with zero external
+HTTP/live database mutation attempts). The updated synthetic browser suite passed
+at 320/390/1440px in both themes: Avg Last N is 84px, crest/average/header/filter
+remain aligned at the right scroll limit, Name and Position scroll away, changing
+N to 20 and back preserves pinning/compact defaults, the initial crest/name join
+is seamless, row backgrounds stay opaque, player cards still open from the crest,
+and desktop average resizing retains its sticky offset. No page overflow,
+JavaScript errors or visible output errors. Phone heartbeat responses were 260ms.
+Mobile dark screenshots for N5 and N20 were inspected.
+
+Performance review: the default pinned area shrinks from 148px to 120px; the
+existing cells, native sticky positioning and pagination are reused. No added
+requests, database reads/writes, cache entries/invalidation, reactive sources,
+timers, scroll handlers, retained state, dependencies or schema changes. Existing
+durable source observations and freshness/context isolation are unchanged. This
+is presentation only; no score/history transformation changed. The same focused
+known-answer fixtures still cover signed/zero/unknown points. Documentation has
+no runtime effect. Local synthetic checks do not establish hosted performance,
+physical-device rendering or production deployment; no real accounts or
+transactions were used. Only the two changed runtime checksums belong in this
+task's manifest update; unrelated working changes remain excluded from delivery.
