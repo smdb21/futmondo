@@ -1425,6 +1425,12 @@ Implemented locally: remove the routine departure-exclusion paragraph, replace t
 - Focused synthetic checks, login browser checks and the required offline lifecycle passed. Performance review and local verification limits are recorded in `docs/data_review_results.md`; authenticated hosted appearance remains unverified.
 
 
+### Lineup note visibility — implemented and verified locally
+
+- Show the Best XI summary directly, followed by the visible save reminder. Remove static refresh help while retaining actual load/refresh errors. Show score coverage only for missing player averages; keep read and database-save failures reportable independently of completeness.
+- Existing focused module checks and four offline browser variants pass. No acquisition, persistence, dependency or schema changes. Performance review and validation limits are recorded in `docs/data_review_results.md`; authenticated hosted appearance remains unverified.
+
+
 ### Readable notification dates — implemented and verified locally
 
 - Notification headers now show only the league and a date such as **12 Nov 2026, 12:34 UTC**, with no source-name prefix. Last-refresh dates use the same format.

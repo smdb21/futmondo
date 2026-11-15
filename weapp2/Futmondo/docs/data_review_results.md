@@ -2574,6 +2574,15 @@ Performance review: text substitutions add no requests, database work, cache ent
 Deployment contract passed all three checks; all 18 changed packaged entries match their exact staged source checksums. Unrelated source and manifest edits remain uncommitted.
 
 
+### Lineup note visibility
+
+The Best XI summary and subsequent save reminder now render directly without disclosure icons. Static refresh help is removed, while the button retains its label/tooltip and real refresh/load errors retain their existing reporting. Full score coverage is hidden; missing player averages still produce coverage information. Complete finite averages, including zero/negative scores, do not hide history acquisition or database-save failures. Existing pending calculation, persistence and manual-save behavior is unchanged.
+
+Verification passed: `Rscript test/test_lineup_module.R`, including incomplete coverage/recovery and complete-data read/save failure recovery; `PLAYWRIGHT_BROWSERS_PATH=/tmp/futmondo-browsers node test/test_lineup_errors_browser.cjs` at 390px and 1440px in light/dark themes; `Rscript test/test_deployment_contract.R` (three checks). Browser assertions establish visibility and ordering without icon clicks, absent complete-coverage/static-help notes, retained calendar errors, signed scores and durable snapshot reuse on reload. The mobile dark screenshot was inspected. The first browser attempt used the default empty browser cache; using the existing installed Chromium cache resolved this environment-only issue without a dependency change.
+
+Performance review: only bounded local score-vector checks and smaller status markup; no additional API/database calls, cache entries/invalidation, reactive sources, timers or retained state. Optimize preserved request/write counts, fresh saved snapshots were reused on reload, idle pitch redraws were zero, heartbeat responses were 62–80 ms, and all four viewports/themes had no horizontal overflow or JavaScript errors. No score transformation changed. Independent review passed; this module-only presentation change does not require the shared/startup lifecycle harness. No live accounts/transactions, hosted deployment or physical-device verification were performed. Only this module's manifest checksum changes; unrelated working-tree/manifest edits are preserved. Documentation has no runtime effect.
+
+
 ### Readable notification dates
 
 Removed the source-name prefix from notification cards and formatted UTC dates as **12 Nov 2026, 12:34 UTC**. The same formatter handles last-refresh notices. Complete timestamp validation prevents the shared parser's permissive fallback from turning malformed times into midnight. Valid original ISO timestamps remain in the HTML `datetime` attribute; source values, sorting inputs and durable observations are unchanged. Missing/malformed values stay unavailable.
