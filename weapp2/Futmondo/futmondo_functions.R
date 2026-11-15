@@ -326,6 +326,9 @@ get_players_from_team <- function(login, championship_id, user_team_id, teams = 
         stringsAsFactors = FALSE
       )
       for(field in names(roster_metadata))attr(empty_df,field)<-roster_metadata[[field]]
+      attr(empty_df,"received_offers")<-received_offers_empty()
+      attr(empty_df,"received_offers_status")<-"empty"
+      attr(empty_df,"received_offers_observed_at")<-roster_metadata$observed_at
       return(empty_df)
     }
     received_offers <- dplyr::bind_rows(lapply(roster,function(player) {

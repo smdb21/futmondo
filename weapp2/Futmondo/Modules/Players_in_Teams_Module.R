@@ -1,7 +1,7 @@
 library(reactable)
 players_in_teams_UI <- function(id) {
   ns <- NS(id)
-  tagList(tags$style(HTML(".fm-team-panels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-bottom:20px}.fm-team-panels>div{min-width:0}.fm-team-panels .fm-incoming-panel{height:100%;margin-bottom:0}.fm-offer-source{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--fm-border,#315540);border-radius:6px;padding:3px 7px;overflow-wrap:anywhere}.fm-offer-rival{color:var(--fm-warning,#f0c75e);border-color:currentColor;font-weight:600}.fm-team-offer{display:flex;flex-direction:column;gap:7px;padding:12px 0;border-top:1px solid var(--fm-border,#315540)}.fm-team-offer-heading{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}.fm-team-offer-heading>*{min-width:0;overflow-wrap:anywhere}.fm-offer-group-heading{font-size:inherit;margin:12px 0 8px}.fm-system-offers .fm-team-offer{padding:8px 0}.fm-system-offers .fm-team-offer-heading{align-items:center;min-height:28px}@media(max-width:767px){.fm-team-panels{grid-template-columns:minmax(0,1fr);gap:12px}}.fm-incoming-panel{border:1px solid var(--fm-border,#315540);border-radius:8px;padding:16px;margin-bottom:20px}.fm-incoming-panel h3{margin-top:0}.fm-incoming-player{display:flex;gap:16px;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid var(--fm-border,#315540)}.fm-incoming-identity{display:flex;gap:10px;align-items:center;flex-wrap:wrap;min-width:0}.fm-incoming-identity a{overflow-wrap:anywhere}.fm-incoming-arrival{display:flex;flex-direction:column;gap:4px;text-align:right;min-width:0}.fm-incoming-round{font-weight:600}.fm-incoming-schedule{color:var(--fm-muted)}.fm-incoming-error{color:var(--fm-warning,#f0c75e);overflow-wrap:anywhere}@media(max-width:600px){.fm-incoming-player{display:flex;flex-direction:column;align-items:stretch;gap:8px}.fm-incoming-arrival{text-align:left}.fm-incoming-panel{padding:12px}}")),
+  tagList(tags$style(HTML(".fm-team-panels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-bottom:20px}.fm-team-panels>div{min-width:0}.fm-team-panels .fm-incoming-panel{height:100%;margin-bottom:0}.fm-offer-source{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--fm-border,#315540);border-radius:6px;padding:3px 7px;overflow-wrap:anywhere}.fm-offer-rival{color:var(--fm-warning,#f0c75e);border-color:currentColor;font-weight:600}.fm-team-offer{display:flex;flex-direction:column;gap:7px;padding:12px 0;border-top:1px solid var(--fm-border,#315540)}.fm-team-offer-heading{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}.fm-team-offer-heading>*{min-width:0;overflow-wrap:anywhere}.fm-offer-group-heading{font-size:inherit;margin:12px 0 8px}.fm-system-offers .fm-team-offer{padding:8px 0}.fm-system-offers .fm-team-offer-heading{align-items:center;min-height:28px}@media(max-width:767px){.fm-team-panels{grid-template-columns:minmax(0,1fr);gap:12px}}.fm-incoming-panel{border:1px solid var(--fm-border,#315540);border-radius:8px;padding:16px;margin-bottom:20px}.fm-incoming-panel h3{margin-top:0}.fm-incoming-player{display:flex;gap:16px;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid var(--fm-border,#315540)}.fm-incoming-identity{display:flex;gap:10px;align-items:center;flex-wrap:wrap;min-width:0}.fm-incoming-identity a{overflow-wrap:anywhere}.fm-incoming-arrival{display:flex;flex-direction:column;gap:4px;text-align:right;min-width:0}.fm-incoming-round{font-weight:600}.fm-incoming-round-line{display:grid;grid-template-columns:minmax(0,max-content)28px;gap:4px 6px;align-items:center;justify-content:end;text-align:left}.fm-incoming-round-line>.fm-info{display:contents}.fm-incoming-round-line>.fm-info>summary{grid-column:2;grid-row:1}.fm-incoming-round-line>.fm-info>.fm-info-body{grid-column:1/-1;grid-row:2}.fm-incoming-schedule{color:var(--fm-muted)}.fm-incoming-error{color:var(--fm-warning,#f0c75e);overflow-wrap:anywhere}@media(max-width:600px){.fm-incoming-player{display:flex;flex-direction:column;align-items:stretch;gap:8px}.fm-incoming-arrival{text-align:left}.fm-incoming-round-line{justify-content:start}.fm-incoming-panel{padding:12px}}")),
     tags$div(class="fm-team-panels",uiOutput(ns("incoming_players")),uiOutput(ns("outgoing_players")),
       tags$div(style="grid-column:1/-1",uiOutput(ns("received_offers")))),
     uiOutput(ns("team_value_box")),
@@ -29,9 +29,18 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       roster_state_reader(login=login_token(),championship_id=championship_id(),user_team_id=user_team_id(),teams=NULL)
     })
     offers_state <- reactive(team_received_offers_state(roster_state()))
-    output$received_offers <- renderUI({
-      req(is_module_active());team_received_offers_panel(offers_state(),session$ns)
+    offers_source_time <- resource_display_source(session,function(){
+      req(is_module_active())
+      state<-offers_state()
+      if(isTRUE(state$observations_only))paste("Observed:",fm_format_datetime(state$observed_at))else ""
     })
+    output$received_offers_source_time <- renderText(offers_source_time())
+    offers_panel_display <- resource_display_source(session,function(){
+      req(is_module_active())
+      team_received_offers_panel(offers_state(),session$ns,
+        source_note=textOutput(session$ns("received_offers_source_time"),inline=TRUE))
+    })
+    output$received_offers <- renderUI(offers_panel_display())
 
     ns <- session$ns
     get_reactive_val <- function(x) if (is.function(x)) x() else x
@@ -343,7 +352,9 @@ team_received_offer_input <- function(row) paste0("offer_open_",digest::digest(
 
 team_received_offers_state <- function(roster_state) {
   roster<-roster_state$data
-  rows<-attr(roster,"received_offers") %||% received_offers_empty()
+  source_rows<-attr(roster,"received_offers",exact=TRUE)
+  rows_valid<-roster_offer_rows_valid(source_rows)
+  rows<-if(rows_valid)source_rows else received_offers_empty()
   # Resolve names from the same roster; an old-context player is never displayed.
   if(is.data.frame(roster)&&"id"%in%names(roster)) {
     rows<-rows[rows$id%in%as.character(roster$id),,drop=FALSE]
@@ -358,12 +369,24 @@ team_received_offers_state <- function(roster_state) {
   status<-roster_state$status %||% "unavailable"
   error<-roster_state$error %||% attr(roster,"received_offers_error")
   if(status%in%c("ok","empty"))status<-attr(roster,"received_offers_status") %||% "ok"
-  if(!is.null(error)&&status%in%c("ok","empty"))status<-"partial"
-  list(records=rows,status=status,error=error,observed_at=attr(roster,"received_offers_observed_at") %||% roster_state$observed_at)
+  if((!is.null(error)||(!is.null(source_rows)&&!rows_valid))&&status%in%c("ok","empty"))status<-"partial"
+  stamp<-fm_time(attr(roster,"received_offers_observed_at") %||% roster_state$observed_at)
+  # Expiry changes current-action eligibility, not the successful acquisition
+  # recorded in the durable worker snapshot. Require offer-specific parser proof;
+  # a missing offers attribute on a nonempty roster is never a verified zero.
+  offer_status<-attr(roster,"received_offers_status")
+  complete_offers<-isTRUE(offer_status%in%c("ok","empty"))&&rows_valid
+  empty_roster<-is.data.frame(roster)&&nrow(roster)==0L&&is.null(source_rows)&&
+    identical(attr(roster,"worker_acquisition_status"),"empty")&&is.null(offer_status)
+  observations_only<-incoming_clause_observed_source(roster_state)&&is.null(error)&&
+    (complete_offers||empty_roster)&&length(stamp)==1L&&!is.na(stamp)&&stamp<=Sys.time()
+  if(observations_only)status<-"observed" else if(!is.null(attr(roster,"worker_acquisition_status"))&&status%in%c("ok","empty"))status<-"partial"
+  list(records=rows,status=status,error=error,observed_at=stamp,observations_only=observations_only)
 }
 
-team_received_offers_panel <- function(state,ns) {
+team_received_offers_panel <- function(state,ns,source_note=NULL) {
   rows<-state$records;verified<-state$status%in%c("ok","empty")
+  observed<-identical(state$status,"observed")&&isTRUE(state$observations_only)
   rival_count<-sum(rows$bid_source%in%"rival")
   system_rows<-rows$bid_source%in%"system"
   render_offer<-function(i) {
@@ -376,13 +399,15 @@ team_received_offers_panel <- function(state,ns) {
         if(rival)paste0("Rival · ",row$bid_user)else "Unknown bidder")))
   }
   shiny::tags$section(class="fm-incoming-panel fm-offers-panel",`aria-labelledby`=ns("offers_heading"),
-    shiny::tags$h3(id=ns("offers_heading"),if(verified)paste0("Offers for your players (",nrow(rows),")")else "Offers for your players"),
+    shiny::tags$h3(id=ns("offers_heading"),if(verified)paste0("Offers for your players (",nrow(rows),")")else if(observed)paste0("Offers for your players (",nrow(rows)," observed)")else "Offers for your players"),
     if(rival_count)shiny::tags$p(class="fm-offer-rival",shiny::icon("user"),paste0(" ",rival_count," rival offer",if(rival_count==1L)""else "s")),
     if(identical(state$status,"loading"))fm_info("Checking received offers…"),
-    if(!verified&&!identical(state$status,"loading"))fm_info(error=TRUE,
+    if(observed)fm_info(source_note %||% paste("Observed:",fm_format_datetime(state$observed_at))),
+    if(!verified&&!observed&&!identical(state$status,"loading"))fm_info(error=TRUE,
       if(identical(state$status,"stale"))"Showing previously observed offers; current offers could not be verified. "else "Received offers could not be fully verified. ",
       if(!is.null(state$error))resource_failure_message(state$error)else "Refresh to retry."),
     if(verified&&!nrow(rows))shiny::tags$p("No offers for your players."),
+    if(observed&&!nrow(rows))shiny::tags$p("No offers observed."),
     lapply(which(!system_rows),render_offer),
     if(any(system_rows))shiny::tags$section(class="fm-system-offers",`aria-labelledby`=ns("offers_system_heading"),
       shiny::tags$h4(id=ns("offers_system_heading"),class="fm-offer-group-heading",
@@ -758,6 +783,11 @@ clause_transfer_panel <- function(state,next_round,ns,outgoing=FALSE,source_note
       role_names<-c(GK="Goalkeeper",DEF="Defender",MID="Midfielder",FWD="Forward")
       role<-paste(unname(role_names[roles]),collapse=", ")
       position<-get_reactable_columns_for_players(data.frame(role=role))$role$cell(role)
+      observed_note<-if(isTRUE(state$observations_only)&&"observed_at"%in%names(row)&&!is.na(row$observed_at))
+        paste("Observed:",fm_format_datetime(row$observed_at))else NULL
+      overdue_note<-if(isTRUE(row$overdue))paste0("Scheduled time has passed; ",if(outgoing)"departure"else"arrival"," is awaiting source confirmation.")else NULL
+      timing_note<-if(nzchar(row$timing_error)&&!identical(state$status,"loading"))row$timing_error else NULL
+      has_detail<-!all(vapply(list(observed_note,overdue_note,timing_note),is.null,logical(1)))
       shiny::tags$div(class=paste("fm-incoming-player",if(outgoing)"fm-outgoing-player"),
         shiny::tags$div(class="fm-incoming-identity",
           if(nzchar(logo))shiny::tags$img(src=paste0(TEAM_LOGO_URL,logo,".png"),alt="",title=row$team,width=24,height=24,loading="lazy",onerror="this.style.display='none';"),
@@ -766,11 +796,9 @@ clause_transfer_panel <- function(state,next_round,ns,outgoing=FALSE,source_note
           if(!is.na(at))shiny::tags$strong(paste0(if(outgoing)"Leaves: "else"Joins: ",incoming_clause_time(at)))else
             fm_info(if(identical(state$status,"loading"))paste0("Confirming ",if(outgoing)"departure"else"arrival"," time…")else
               paste0(if(outgoing)"Departure"else"Arrival"," time could not be verified"),error=!identical(state$status,"loading")),
-          if(nzchar(label))shiny::tags$span(class="fm-incoming-round",label),
-          if(isTRUE(state$observations_only)&&"observed_at"%in%names(row)&&!is.na(row$observed_at))
-            fm_info(paste("Observed:",fm_format_datetime(row$observed_at))),
-          if(isTRUE(row$overdue))fm_info(paste0("Scheduled time has passed; ",if(outgoing)"departure"else"arrival"," is awaiting source confirmation.")),
-          if(nzchar(row$timing_error)&&!identical(state$status,"loading"))fm_info(row$timing_error,error=TRUE)))
+          if(nzchar(label)||has_detail)shiny::tags$div(class="fm-incoming-round-line",
+            if(nzchar(label))shiny::tags$span(class="fm-incoming-round",label),
+            if(has_detail)fm_info(observed_note,overdue_note,timing_note,error=!is.null(timing_note)))))
     }))
 }
 

@@ -1,5 +1,12 @@
 # Futmondo data architecture redesign plan
 
+## Offer observation errors and transfer icons — 2026-11-14 Pacific
+
+- [x] Distinguish complete successful persisted offer observations from failures/current freshness, preserving source clocks and manual-action eligibility; repair empty-roster offer metadata.
+- [x] Place one player information icon to the right of the round timing label, with accessible expanded details below.
+- [x] Focused codec/persistence/state/reconciliation tests, 320/390/1440px browser layout/performance checks, and required offline lifecycle validation. No new schema/dependencies, polling or source acquisition.
+- [ ] Hosted application acceptance after deployment. Details: [My Team contracts](players_in_teams_module.md).
+
 ## Transfer panel copy — 2026-11-14 Pacific
 
 - [x] Removed the requested generic observation explanation from incoming/leaving panels; source clocks and row observation details remain available. Focused disclosure/reload/observation-contract checks passed. This is a text-only presentation change with no API/database, cache, timer, or reactive-work changes.
