@@ -31,6 +31,16 @@ check('club fallback, unavailable crest and escaped names remain usable',{
  stopifnot(grepl('Player',as.character(plain$name$cell('Player',1)),fixed=TRUE),
   identical(plain$name$cell(NA_character_,1),''))
 })
+check('separate crest keeps source/fallback labels and scrolling names without duplicate images',{
+ separated<-get_reactable_columns_for_players(rows,separate_crest=TRUE)
+ crests<-vapply(seq_len(nrow(rows)),function(i)paste(as.character(separated$team$cell(rows$team[i],i)),collapse=""),character(1))
+ stopifnot(grepl('authoritative-club.png',crests[1],fixed=TRUE),
+  grepl('alt="Athletic Club"',crests[1],fixed=TRUE),grepl('sevilla.png',crests[2],fixed=TRUE),
+  identical(crests[3],''),!grepl('<img',as.character(separated$name$cell('Vivian',1)),fixed=TRUE),
+  grepl('&lt;unsafe&gt;',as.character(separated$name$cell('<unsafe>',4)),fixed=TRUE),
+  identical(separated$team$sticky,'left'),identical(separated$role$sticky,'left'),is.null(separated$name$sticky),
+  isFALSE(separated$team$resizable),isFALSE(separated$team$filterable))
+})
 selected_player_Server<-function(...)NULL
 recent_player_points_source<-function(...)list(history=function()data.frame(),status=function()NULL)
 settle<-function(session){for(i in seq_len(5)){later::run_now(0);session$flushReact()}}
@@ -41,10 +51,12 @@ shiny::testServer(players_table_Server,args=list(players_table_RV=shiny::reactiv
  widget<-jsonlite::fromJSON(output$players_table,simplifyVector=FALSE)$x$tag$attribs
  definitions<-stats::setNames(widget$columns,vapply(widget$columns,`[[`,character(1),'id'))
  visible<-vapply(Filter(function(column)!identical(column$show,FALSE)&&column$id!='.selection',widget$columns),`[[`,character(1),'id')
- check('actual table starts Name, Position, averages and displays no Team column',{
-  stopifnot(identical(names(display)[1:4],c('name','role','recent_points_avg','recent_points_ratio')),
-   identical(head(visible,4),c('name','role','recent_points_avg','recent_points_ratio')),
-   identical(definitions$role$name,'Position'),isFALSE(definitions$team$show),isFALSE(definitions$logo$show),
+ check('actual table starts pinned crest, scrolling Name, pinned Position and averages',{
+  stopifnot(identical(names(display)[1:5],c('team','name','role','recent_points_avg','recent_points_ratio')),
+   identical(head(visible,5),c('team','name','role','recent_points_avg','recent_points_ratio')),
+   identical(definitions$role$name,'Position'),identical(definitions$team$sticky,'left'),
+   identical(definitions$team$width,36L),identical(definitions$role$sticky,'left'),
+   is.null(definitions$name$sticky),isFALSE(definitions$logo$show),
    identical(definitions$average.fitness$name,'Latest 5'),
    !any(c('clause_suggestedClause','fav','owner_team_id')%in%names(display)),
    !any(c('clause_suggestedClause','fav','owner_team_id')%in%visible),

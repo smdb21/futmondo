@@ -811,7 +811,7 @@ format_table_sale_price <- function(value, acquisition_cost, multiline = FALSE) 
   paste(price,profit)
 }
 
-get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE) {
+get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE, separate_crest = FALSE) {
   columns <- list()
   sale_price <- function(value,index) {
     if(!isTRUE(show_sale_profit))return(format_table_currency(value))
@@ -822,25 +822,36 @@ get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE) {
 
   for(field in intersect(c("bid_source","bidder_team_id","sale_acquisition_cost"),names(table)))columns[[field]]<-colDef(show=FALSE)
 
-  # Keep names as plain sortable/filterable values and show the club crest beside them.
-  # Club metadata stays in the payload for this formatter, without a separate Team column.
+  # A single crest formatter serves pinned table cells and combined award cards.
+  crest_cell <- function(value, index) {
+    club <- if("team" %in% names(table)) as.character(table$team[index]) else ""
+    if(is.na(club)) club <- ""
+    logo <- if("logo" %in% names(table)) table$logo[index] else NULL
+    image_name <- get_team_image_name(club, logo=logo)
+    if(!nzchar(image_name)) return(NULL)
+    shiny::tags$img(src=paste0(TEAM_LOGO_URL,image_name,".png"),
+      alt=club,title=if(nzchar(club))club else NULL,width=22,height=22,
+      loading="lazy",decoding="async",class="fm-team-crest",
+      onerror="this.style.display='none';")
+  }
   if ("logo" %in% names(table)) columns[["logo"]] <- colDef(show=FALSE)
-  if ("team" %in% names(table)) columns[["team"]] <- colDef(show=FALSE)
+  if ("team" %in% names(table)) columns[["team"]] <- if(isTRUE(separate_crest)) colDef(
+    name="Club", header=shiny::tags$span(class="sr-only","Club"),
+    width=36, resizable=FALSE, sortable=FALSE, filterable=FALSE,
+    sticky="left", class="fm-player-crest", headerClass="fm-player-crest", cell=crest_cell
+  ) else colDef(show=FALSE)
   if ("name" %in% names(table)) columns[["name"]] <- colDef(
     name="Name", minWidth=180,
+    class=if(isTRUE(separate_crest))"fm-player-name" else NULL,
+    headerClass=if(isTRUE(separate_crest))"fm-player-name" else NULL,
     cell=function(value, index) {
       if(is.null(value) || is.na(value) || !nzchar(value)) return("")
+      label <- shiny::tags$span(style="min-width: 0; white-space: normal; overflow-wrap: anywhere;",value)
+      if(isTRUE(separate_crest)) return(label)
       club <- if("team" %in% names(table)) as.character(table$team[index]) else ""
       if(is.na(club)) club <- ""
-      logo <- if("logo" %in% names(table)) table$logo[index] else NULL
-      image_name <- get_team_image_name(club, logo=logo)
-      crest <- if(nzchar(image_name)) shiny::tags$img(
-        src=paste0(TEAM_LOGO_URL,image_name,".png"),alt=club,width=22,height=22,
-        loading="lazy",decoding="async",class="fm-team-crest",
-        onerror="this.style.display='none';") else NULL
       shiny::tags$span(class="fm-team-label",title=if(nzchar(club))club else NULL,
-        style="max-width: 100%;",crest,
-        shiny::tags$span(style="min-width: 0; white-space: normal; overflow-wrap: anywhere;",value))
+        style="max-width: 100%;",crest_cell(NULL,index),label)
     }
   )
 
@@ -1077,6 +1088,9 @@ get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE) {
       name = switch(position_column, primary_role="Primary position", secondary_role="Secondary position", "Position"),
       align = "center",
       minWidth = 112, resizable = TRUE,
+      sticky = if(isTRUE(separate_crest) && position_column == "role")"left" else NULL,
+      class = if(isTRUE(separate_crest) && position_column == "role")"fm-player-position" else NULL,
+      headerClass = if(isTRUE(separate_crest) && position_column == "role")"fm-player-position" else NULL,
       cell = function(value) {
         if (is.null(value) || is.na(value) || value == "" || value == "NA") return("")
 

@@ -1517,3 +1517,15 @@ explain that the default active-clause filter excludes pending transfers. Local
 capture replay, delayed-source/recovery/isolation, persisted-snapshot reuse,
 performance and offline lifecycle checks are recorded in `data_review_results.md`.
 No schema, dependency, automation or login inventory expansion is required.
+
+### Pinned player-table crests and positions — implemented locally (2026-11-14)
+
+- Split the existing club crest from Name into its own narrow column, visually
+  joined to Name without a border. Pin Crest and Position in every shared player
+  table; Name and statistics scroll. Retain default combined identity rendering
+  for Best XI cards and existing source metadata, filters and player-card actions.
+- Native widget offsets and theme-aware opaque cells retain resizing and row
+  states without additional requests, persistence, timers or scroll handlers.
+  Focused rendering, synthetic desktop/mobile browser and required offline
+  lifecycle checks and limitations are recorded in `docs/data_review_results.md`.
+  Branch delivery is separate from hosted deployment/acceptance.

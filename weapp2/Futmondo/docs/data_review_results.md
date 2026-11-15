@@ -2738,3 +2738,52 @@ checksums are updated without changing
 packages or unrelated entries. Existing working-tree/index edits are excluded
 from the task commit. Local validation and branch delivery do not establish
 production rollout.
+
+### Pinned player-table crests and positions — 2026-11-14
+
+The shared player tables now display the source club crest in its own 36px
+pinned column, immediately before the scrolling Name cell. The boundary has no
+border, matching opaque row backgrounds and compact spacing. Position is also
+pinned; as Name scrolls away it settles beside the crest. Native Reactable sticky
+offsets cover headers/filters and column resizing. The optional `separate_crest`
+column-definition flag defaults to the original combined identity renderer for
+Best XI cards. Club/source-logo fallback, unknown crests, escaping, original row
+IDs, filters, numeric values, row selection and player-card actions are retained.
+
+Passed: `test/test_player_name_crest.R` (6 checks),
+`test/test_squad_table_prices.R` (7), `test/test_player_table_filters.R` (9), and
+`test/test_shiny_simulation.R` (13 checks plus eight tabs; zero external HTTP/live
+database mutation attempts). The synthetic real-module fixture
+`test/test_player_table_sticky_browser.R` plus `test/test_player_table_sticky.cjs`
+passed Chromium at 320/390/1440px in both themes: crest and Position remain
+visible at the right scroll limit, names scroll away, headers/filter cells stay
+aligned, the initial crest/name boundary has no border and identical backgrounds,
+stripes/departure tints remain opaque, rerendered tables retain pinning, clicking
+a pinned crest opens the player card, and desktop Position resizing retains its
+offset. No page overflow, visible output errors or JavaScript errors occurred.
+Initial light-mobile and scrolled dark-mobile screenshots were inspected.
+Heartbeat responses were 122–259ms locally. The first browser invocation used a
+mismatched existing browser cache; using `/tmp/futmondo-browsers` resolved it
+without a dependency change.
+
+`test/test_best_xi_crests.R` passes its identity/source-logo/escaping/missing-logo
+checks but fails its existing loading-notice assertion. Repeating it with the
+saved pre-task `get_reactable_columns_for_players()` produces the same failure:
+the existing `fm_info(..., pending=TRUE)` loading notice is suppressed. This task
+does not change that module or loading behavior; the unrelated fixture mismatch
+remains. Do not count that suite as passing.
+
+Performance review: reuse the existing `team` and `logo` payload fields without
+adding data fields or acquisitions. One previously hidden field becomes a narrow
+cell per rendered row; crest images are moved rather than duplicated and remain
+lazy/async. Native CSS sticky positioning adds no scroll listeners, timers,
+reactive sources, server calculations, request/database volume, cache entries,
+invalidation or retained state. Existing durable observations and context/freshness
+contracts are unchanged. DOM work remains bounded by existing pagination; mobile
+retains a 148px pinned area at default widths, leaving the remaining table viewport
+scrollable. Existing row-background painting is scoped to shared player tables.
+No dependency/environment/schema change or data transformation. Documentation has
+no runtime effect. Browser checks use synthetic image responses and rows; real
+accounts, transactions, production deployment, physical devices and hosted
+performance were not exercised. Only task changes and their runtime checksums
+belong in the delivery commit; unrelated working changes are preserved.

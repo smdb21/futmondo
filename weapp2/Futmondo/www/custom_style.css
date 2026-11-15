@@ -1572,3 +1572,32 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 @media (min-width: 992px) {
   .fm-login-feature-tiers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* Opaque cells cover scrolling metrics and preserve one seamless row tint.
+   Reactable owns sticky offsets (including column resizing) and row states. */
+.reactable .fm-player-table .rt-td {
+    background-color: var(--fm-surface) !important;
+}
+.reactable .fm-player-table .rt-tr-striped-sticky .rt-td {
+    background-color: var(--fm-bg) !important;
+}
+.reactable .fm-player-table .rt-tr-highlight-sticky:hover .rt-td,
+.reactable .fm-player-table .rt-tr-selected .rt-td {
+    background-color: var(--fm-highlight) !important;
+}
+.reactable .fm-player-table .fm-departing-before-round .rt-td {
+    background-color: var(--fm-error, #24100f) !important;
+    background-color: color-mix(in srgb, var(--fm-danger) 14%, var(--fm-surface)) !important;
+}
+
+/* Crest and scrolling name read as a single cell at the start of each row. */
+.reactable .rt-th.fm-player-crest,
+.reactable .rt-td.fm-player-crest {
+    border-right: 0 !important;
+    padding-right: 0 !important;
+}
+.reactable .rt-th.fm-player-name,
+.reactable .rt-td.fm-player-name {
+    border-left: 0 !important;
+    padding-left: 7px !important;
+}

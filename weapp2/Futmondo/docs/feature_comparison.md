@@ -38,3 +38,14 @@ The differences below are **specific implemented additions beyond the workflows 
 This is static shipped copy: rendering performs no API/database request, acquisition, persistence, invalidation, timer or optimizer calculation. Existing factual history and lineup features continue to reuse acknowledged database observations with account/league/season/scoring context and original source clocks; this task creates no result cache or persistence path. No dependencies, environment variables or schema changes are introduced.
 
 For each new or expanded feature, recheck current official sources/UI, record the dated equivalent and precise addition here, and add a login item only for an implemented new capability. Record uncertainty explicitly, revisit contradictory evidence, and retain the two-tier presentation without commercial or access-policy copy. See `Agents.md` / `AGENTS.md` for the standing rule.
+
+## Player-table scrolling refinement — 2026-11-14
+
+Rechecked the [official app feature guide](https://magazine.futmondo.com/novedades-en-la-nueva-app-de-futmondo/)
+(published 2021-12-23) on 2026-11-14. It documents market table views; it does not
+specify their pinned-column behavior. LigaRadar now pins a separate club crest
+and Position while Name scrolls, with an initially seamless crest/name boundary,
+in every shared player table. This is a presentation refinement to the existing
+scouting/market/squad views, without a new analytical capability or login tier
+entry. No exclusivity claim is made. Current authenticated official-app behavior
+and hosted LigaRadar appearance were not verified.

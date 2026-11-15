@@ -607,7 +607,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       if(isTRUE(hide_bid_column))cols_to_hide<-c(cols_to_hide,"bid_price")
       rows<-rows %>% reorder_player_table_columns() %>%
         dplyr::select(!any_of(setdiff(cols_to_hide,"logo"))) %>%
-        dplyr::select(any_of(c("name","role","recent_points_avg","recent_points_ratio","recent_points_trend")),everything())
+        dplyr::select(any_of(c("team","name","role","recent_points_avg","recent_points_ratio","recent_points_trend")),everything())
       # Source timestamps belong to the resource state, not widget equality.
       rows<-as.data.frame(rows)
       attributes(rows)<-attributes(rows)[intersect(c("names","row.names","class"),names(attributes(rows)))]
@@ -643,7 +643,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       schema<-table_schema();req(schema)
       players_table<-isolate(table_display_data());req(players_table)
       rendered_schema<<-schema;rendered_data<<-players_table;rendered_ids<<-isolate(table_display_ids());rendered_meta<<-isolate(table_color_meta())
-      table_columns <- get_reactable_columns_for_players(players_table,show_sale_profit=own_squad)
+      table_columns <- get_reactable_columns_for_players(players_table,show_sale_profit=own_squad,separate_crest=TRUE)
       table_columns[[".selection"]]<-reactable::colDef(show=FALSE)
       if("points" %in% names(players_table))table_columns[["points"]]<-reactable::colDef(
         name="Points",align="center",sortNALast=TRUE,minWidth=84,resizable=TRUE,
@@ -664,6 +664,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
         header=htmltools::span(paste0("Avg ",recent_n),htmltools::tags$br(),"× Trend (€M)"),
         style=players_table_metric_style(),cell=players_table_metric_cell(3L,divisor=1e6,fixed=TRUE))
       reactable(players_table,
+                class = "fm-player-table",
                 columns = table_columns,
                 meta = rendered_meta,
                 rowClass = if(isTRUE(own_squad)&&is.function(departing_player_ids))players_table_departure_class()else NULL,

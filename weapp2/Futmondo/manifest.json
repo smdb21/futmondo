@@ -2304,7 +2304,7 @@
       "checksum": "cc630a14c639bfaeee5414f14a1209f8"
     },
     "futmondo_functions.R": {
-      "checksum": "d7110e982056c5368e33b374dc40855f"
+      "checksum": "3fafbca1f0f0cb4add1b21aea73f32db"
     },
     "global.R": {
       "checksum": "549b72396ac890b5ec85014e0c21ff5e"
@@ -2352,7 +2352,7 @@
       "checksum": "73b511525b4bde41ff4179b5e3d118a5"
     },
     "Modules/Players_Table_Module.R": {
-      "checksum": "5502cce7aaaacd67770ef8fd344735f8"
+      "checksum": "0107ec14d615106fba1b323e2b290297"
     },
     "Modules/Plots_Module.R": {
       "checksum": "6eb616af21a125a9a4200a20e5494452"
@@ -2421,7 +2421,7 @@
       "checksum": "6364162382f8583683c76e5bb88972ea"
     },
     "www/custom_style.css": {
-      "checksum": "4f60c8e685bd52b8494177d5b8349015"
+      "checksum": "247221c893e2516f175c570098d4e911"
     },
     "www/info-disclosures.js": {
       "checksum": "8c21981ed61b5b8915175a4f7ebefcfa"
