@@ -42,10 +42,12 @@ reset();result<-start()
 check('four independent prerequisites dispatch together with interactive context',stopifnot(length(jobs)==4L,active==4L,peak==4L))
 complete(next_job('get_user_team_info'),info());complete(next_job('get_players_from_team'),roster());complete(next_job('get_market_players'),market())
 clock<-clock+31;complete(next_job('get_championship_pressroom'),history())
-check('a long history read refreshes only expired mutable facts in parallel',{
- stopifnot(!result$done,length(jobs)==7L,active==3L,
+check('a long history read settles roster dependencies before refreshing short-lived funds and offers',{
+ stopifnot(!result$done,length(jobs)==5L,active==1L,
   sum(vapply(jobs,function(x)x$fn=='get_championship_pressroom',logical(1)))==1L)
- complete(next_job('get_user_team_info'),info());complete(next_job('get_players_from_team'),roster());complete(next_job('get_market_players'),market())
+ complete(next_job('get_players_from_team'),roster())
+ stopifnot(length(jobs)==7L,active==2L)
+ complete(next_job('get_user_team_info'),info());complete(next_job('get_market_players'),market())
  stopifnot(result$done,result$data$status=='ok',result$data$valid_until>as.numeric(clock)+14,
   evaluate_acquisition_preflight(result$data,'bid',100)$ok)
  before<-length(jobs);warm<-start();stopifnot(warm$done,length(jobs)==before)
@@ -58,24 +60,25 @@ check('pending players use two summary slots and all seven are verified without 
   result$data$roster$effective_count==8L,result$data$roster$status=='ok')
 })
 reset();result<-start()
-complete(next_job('get_user_team_info'),info());complete(next_job('get_players_from_team'),roster('arrival'));complete(next_job('get_market_players'),market())
+complete(next_job('get_players_from_team'),roster('arrival'));complete(next_job('get_user_team_info'),info());complete(next_job('get_market_players'),market())
 clock<-clock+31;complete(next_job('get_championship_pressroom'),history('arrival'))
-complete(next_job('get_user_team_info'),info());complete(next_job('get_players_from_team'),roster(character()));complete(next_job('get_market_players'),market())
+complete(next_job('get_players_from_team'),roster(character()))
 check('a changed refreshed roster discovers and verifies new candidate IDs before completion',{
  stopifnot(!result$done,active==1L,jobs[[next_job('get_player_summary')]]$args$player_id=='arrival')
  complete(next_job('get_player_summary'),summary())
+ complete(next_job('get_user_team_info'),info());complete(next_job('get_market_players'),market())
  stopifnot(result$done,result$data$roster$pending_inbound_count==1L,result$data$roster$effective_count==1L)
 })
 reset();result<-start();complete_initial(history('arrival'),roster(character()))
 clock<-clock+31;complete(next_job('get_player_summary'),error=resource_failure(resource='get_player_summary',category='http',http_status=403L))
-complete(next_job('get_user_team_info'),info());complete(next_job('get_players_from_team'),roster('arrival'));complete(next_job('get_market_players'),market())
+complete(next_job('get_players_from_team'),roster('arrival'));complete(next_job('get_user_team_info'),info());complete(next_job('get_market_players'),market())
 check('removed candidates discard obsolete failures and failed summaries are not automatically replayed',{
  stopifnot(result$done,result$data$roster$status=='ok',is.null(attr(result$data,'fetch_error')),
   sum(vapply(jobs,function(x)x$fn=='get_player_summary',logical(1)))==1L)
 })
 reset();result<-start();complete_initial(history('arrival'),roster(character()))
 clock<-clock+31;complete(next_job('get_player_summary'),error=resource_failure(resource='get_player_summary',category='http',http_status=403L))
-complete(next_job('get_user_team_info'),info());complete(next_job('get_players_from_team'),roster(character()));complete(next_job('get_market_players'),market())
+complete(next_job('get_players_from_team'),roster(character()));complete(next_job('get_user_team_info'),info());complete(next_job('get_market_players'),market())
 check('a still-required permanent summary failure stays blocked without an extra freshness retry',{
  stopifnot(result$done,!evaluate_acquisition_preflight(result$data,'bid',100)$ok,
   attr(result$data,'fetch_error')$http_status==403L,
@@ -91,11 +94,29 @@ check('missing complete history settles with a failed preflight and its safe sou
 reset();result<-start()
 complete(next_job('get_user_team_info'),info());complete(next_job('get_players_from_team'),roster());complete(next_job('get_market_players'),market())
 clock<-clock+31;complete(next_job('get_championship_pressroom'),history())
-complete(next_job('get_user_team_info'),info());clock<-clock+20
-complete(next_job('get_players_from_team'),roster());complete(next_job('get_market_players'),market())
+complete(next_job('get_players_from_team'),roster());complete(next_job('get_user_team_info'),info());clock<-clock+20
+complete(next_job('get_market_players'),market())
+stopifnot(!result$done,length(jobs)==8L)
+old_info<-info();clock<-clock+20;complete(next_job('get_user_team_info'),old_info)
 check('the bounded final freshness pass cannot publish expired facts as verified or loop indefinitely',{
- stopifnot(result$done,length(jobs)==7L,result$data$status=='partial',
+ stopifnot(result$done,length(jobs)==8L,result$data$status=='partial',
   !evaluate_acquisition_preflight(result$data,'bid',100)$ok,result$data$valid_until<=as.numeric(clock))
+})
+reset();result<-start()
+failed_info<-info();attr(failed_info,'fetch_status')<-'stale'
+attr(failed_info,'fetch_error')<-resource_failure(resource='get_user_team_info',category='network')
+complete(next_job('get_user_team_info'),failed_info);complete(next_job('get_players_from_team'),roster())
+complete(next_job('get_market_players'),market());complete(next_job('get_championship_pressroom'),history('arrival'))
+clock<-clock+31
+failed_summary<-summary();attr(failed_summary,'fetch_status')<-'stale'
+attr(failed_summary,'fetch_error')<-resource_failure(resource='get_player_summary',category='http',http_status=403L)
+complete(next_job('get_player_summary'),failed_summary)
+complete(next_job('get_players_from_team'),roster());complete(next_job('get_market_players'),market())
+check('failed stale fallback facts retain diagnostics without another freshness retry',{
+ stopifnot(result$done,!evaluate_acquisition_preflight(result$data,'bid',100)$ok,
+  !is.null(attr(result$data,'fetch_error')),
+  sum(vapply(jobs,function(x)x$fn=='get_user_team_info',logical(1)))==1L,
+  sum(vapply(jobs,function(x)x$fn=='get_player_summary',logical(1)))==1L)
 })
 reset();result<-start();current<-FALSE;complete(next_job('get_user_team_info'),info())
 check('context cancellation settles the promise and starts no dependent work or capacity cache',{

@@ -153,6 +153,30 @@ async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is
   }
   adapter_env$.futmondo_request_context<-context
   adapter_env$fm_worker_mode<-function(...)FALSE
+  # Live reads bypass stored values, not the caller's verified identity. A
+  # worker observation may retain a known league scope after its freshness
+  # expires; dropping that scope here would miss the durable history baseline.
+  original_context<-adapter_env$resource_context
+  context_wrapper<-function(){
+    supplied<-lapply(as.list(match.call())[-1L],eval,envir=parent.frame())
+    value<-do.call(original_context,supplied)
+    if(!identical(value$account_id,context$account_id)||
+       !identical(value$championship_id,context$championship_id)||!nzchar(value$championship_id))return(value)
+    fields<-c("competition_id","season","scoring_version")
+    explicit<-c(competition_id=!is.null(supplied$competition_id),
+      season="season"%in%names(supplied),scoring_version="scoring_version"%in%names(supplied))
+    # An explicitly selected archive keeps its own context. Never assemble an
+    # archive identity from a different current season/scoring generation.
+    conflicting<-vapply(fields,function(field)fm_context_known(value[[field]])&&
+      fm_context_known(context[[field]])&&!identical(value[[field]],context[[field]]),logical(1))
+    if(any(conflicting&explicit[fields]))return(value)
+    if(any(conflicting))stop(resource_failure(resource=name,category="schema"))
+    for(field in fields)if(!explicit[[field]]&&!fm_context_known(value[[field]])&&fm_context_known(context[[field]]))
+      value[[field]]<-context[[field]]
+    value
+  }
+  formals(context_wrapper)<-formals(original_context)
+  adapter_env$resource_context<-context_wrapper
   # Replaying a composite read may encounter the same optional failure again.
   # Keep at most one safe diagnostic per source/category, capped by the read budget.
   failures<-new.env(parent=emptyenv());log_failure<-resource_log_failure

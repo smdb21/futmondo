@@ -1937,6 +1937,16 @@ get_team_acquisition_capacity_async <- function(login,championship_id,user_team_
   if(!identical(base$account_id,context$account_id)||!identical(base$championship_id,context$championship_id)||
      !identical(base$user_team_id,context$user_team_id))
     return(promises::promise_reject(resource_failure(resource="get_team_acquisition_capacity",category="schema")))
+  # This composite is dispatched before the ordinary adapter context wrapper.
+  # Use the caller's known identity for its own cache too, and reject a changed
+  # current generation before any cache hit can cross season/scoring boundaries.
+  for(field in c("competition_id","season","scoring_version")){
+    if(fm_context_known(context[[field]])){
+      if(fm_context_known(base[[field]]) && !identical(base[[field]],context[[field]]))
+        return(promises::promise_reject(resource_failure(resource="get_team_acquisition_capacity",category="schema")))
+      base[[field]]<-context[[field]]
+    }
+  }
   current<-function()isTRUE(tryCatch(is_current(),error=function(e)FALSE))
   cancelled<-function()resource_failure(structure(list(message="Session request cancelled",call=NULL),class=c("fm_async_cancelled","error","condition")))
   if(!current())return(promises::promise_reject(cancelled()))
@@ -2021,7 +2031,8 @@ get_team_acquisition_capacity_async <- function(login,championship_id,user_team_
       data<-state$summaries[[id]]
       # A failed acquisition is not an expired observation. Its transport has
       # already applied bounded recovery; the freshness pass must not retry it.
-      if(id%in%names(state$summaries)&&is.null(data))next
+      if(id%in%names(state$summaries) && (is.null(data) ||
+         !is.null(state$errors[[paste0("summary:",id)]]) || acquisition_data_unverified(data)))next
       if(!is.null(data)&&(!refresh_expired||!expired(data,60,2)))next
       spec<-list(fn="get_player_summary",args=c(args,list(player_id=id)),
         resources=paste0("player_summary_",login[["userid"]],"_",championship_id,"_",user_team_id,"_",id))
@@ -2049,21 +2060,42 @@ get_team_acquisition_capacity_async <- function(login,championship_id,user_team_
     progress("complete")
     resource_store(cache_key,data,base,cache_name,ttl=15)
   }
-  progress("prerequisites")
-  initial<-promises::then(batch(specs,4L),function(results){store_sources(results);load_summaries()})
-  promises::then(initial,function(unused){
+  needs_refresh<-function(data,ttl,error=NULL){
+    !is.null(data) && is.null(error) && !acquisition_data_unverified(data) && expired(data,ttl,2)
+  }
+  refresh_sources<-function(names){
     if(!current())stop(cancelled())
-    # One bounded freshness pass, with candidate discovery repeated after any
-    # roster/history change. New arrivals never inherit another player's check.
-    names<-names(specs)[vapply(names(specs),function(name)!is.null(state$sources[[name]])&&expired(state$sources[[name]],specs[[name]]$ttl,2),logical(1))]
+    names<-names[vapply(names,function(name)
+      needs_refresh(state$sources[[name]],specs[[name]]$ttl,state$errors[[name]]),logical(1))]
     jobs<-specs[names]
     for(spec in jobs)invalidate(spec)
     if(length(jobs))progress("refreshing_facts")
-    promises::then(batch(jobs,4L),function(results){
-      store_sources(results)
-      promises::then(load_summaries(TRUE),function(unused)finish())
+    promises::then(batch(jobs,2L),function(results){store_sources(results);NULL})
+  }
+  refresh_cycle<-function(attempt=1L){
+    # Settle history, roster and any changed transfer candidates before taking
+    # the shortest-lived funds/offers observations. Slow summary acquisition
+    # must not consume the freshness of a budget we have just rechecked.
+    promises::then(refresh_sources(c("history","roster")),function(unused){
+      promises::then(load_summaries(TRUE),function(unused){
+        promises::then(refresh_sources(c("market","info")),function(unused){
+          if(!current())stop(cancelled())
+          expiring_sources<-any(vapply(names(specs),function(name)
+            needs_refresh(state$sources[[name]],specs[[name]]$ttl,state$errors[[name]]),logical(1)))
+          expiring_summaries<-any(vapply(names(state$summaries),function(id)
+            needs_refresh(state$summaries[[id]],60,state$errors[[paste0("summary:",id)]]),logical(1)))
+          # A slower sibling request can still outlive an earlier result. One
+          # final repair rereads only expired successful observations; failures
+          # retain their transport diagnostics and never start another loop.
+          if(attempt<2L && (expiring_sources || expiring_summaries))return(refresh_cycle(attempt+1L))
+          finish()
+        })
+      })
     })
-  })
+  }
+  progress("prerequisites")
+  initial<-promises::then(batch(specs,4L),function(results){store_sources(results);load_summaries()})
+  promises::then(initial,function(unused)refresh_cycle())
 }
 
 # Existing interface: projecting a different target never repeats team checks.

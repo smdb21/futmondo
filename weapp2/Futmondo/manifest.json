@@ -2265,7 +2265,7 @@
       "checksum": "35285acf91d616a999b87ba74bb25a1f"
     },
     "async_transport.R": {
-      "checksum": "9e163c4c96b93aa0c60d84de734d0851"
+      "checksum": "95cbfefc3eb526f6b24de3a97bd11795"
     },
     "award_runtime.R": {
       "checksum": "5de52cb56511fe490c8d55b4fb457134"
@@ -2286,13 +2286,13 @@
       "checksum": "106b903f4ef9a42d4b455a98c2685bd6"
     },
     "data_service.R": {
-      "checksum": "abd04068d5d8db29c1c3e8280a48f6df"
+      "checksum": "88a05e10c33417edb15bcf2bc5d5b461"
     },
     "factual_helpers.R": {
       "checksum": "7dfbccbeb96917865907a3be3e7f967c"
     },
     "futmondo_functions.R": {
-      "checksum": "3ca328dcea4c230c94ad1ed2308a1871"
+      "checksum": "86cfb0d6d047402b72059faa4458c127"
     },
     "global.R": {
       "checksum": "8a46e15758ec050d6df75700a8846134"

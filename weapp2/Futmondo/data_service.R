@@ -7,10 +7,12 @@ resource_context <- function(login=NULL, championship_id=NULL, user_team_id=NULL
   account <- fm_scalar(account_id %||% if(valid_login(login)) login[["userid"]] else NULL, "")
   if(!nzchar(account)) stop("An explicit account is required for private resources.")
   # An observation's identity does not expire with its freshness. In database
-  # mode keep the last observed scope until newer evidence replaces it; live
-  # authorization/action checks continue to require fresh metadata separately.
+  # mode and explicit manual-live preflights keep the last observed scope until
+  # newer evidence replaces it. Source/action deadlines remain independently
+  # strict: identity reuse never authorizes an expired balance or roster.
   stored_mode<-exists("fm_worker_mode",mode="function")&&isTRUE(fm_worker_mode(account))
-  metadata<-league_context_metadata(championship_id,account,allow_stale=stored_mode)
+  retain_identity<-stored_mode||isTRUE(getOption("futmondo.worker_live",FALSE))
+  metadata<-league_context_metadata(championship_id,account,allow_stale=retain_identity)
   if(missing(season))season<-metadata$season %||% season
   if(missing(scoring_version))scoring_version<-metadata$scoring_version %||% scoring_version
   competition_id<-competition_id %||% metadata$competition_id %||% "unknown"

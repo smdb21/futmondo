@@ -36,9 +36,12 @@ s$account$enabled<-FALSE
 stopifnot(resource_context(auth,'game','team')$scoring_version=='unknown')
 s$account$enabled<-TRUE
 options(futmondo.worker_live=TRUE)
-stopifnot(resource_context(auth,'game','team')$scoring_version=='unknown')
+stopifnot(identical(resource_context(auth,'game','team'),before),
+ league_context_metadata('game',auth[['userid']])$scoring_version=='unknown',
+ resource_context(auth,'game','team',scoring_version='unknown')$scoring_version=='unknown',
+ !evaluate_acquisition_preflight(list(status='ok',valid_until=as.numeric(now)-1),'bid')$ok)
 options(futmondo.worker_live=FALSE)
-cat('PASS explicit unknown, different accounts/leagues, disabled worker and live checks keep strict scopes\n')
+cat('PASS live preflights retain observed identity with strict data deadlines; explicit unknown, foreign and disabled-worker scopes stay isolated\n')
 
 changed<-active;changed$leagues[[1]]$season<-'next-source-season'
 now<-now+1;attr(changed,'observed_at')<-now
