@@ -509,7 +509,7 @@ incoming_clause_source_times<-function(times){
   paste(vapply(names(labels),function(key){
     stamp<-fm_time(times[[key]])
     if(length(stamp)!=1L||is.na(stamp))return("")
-    paste0(labels[[key]],": ",format(stamp,"%d %b %Y, %H:%M UTC",tz="UTC"),".")
+    paste0(labels[[key]],": ",fm_format_datetime(stamp),".")
   },character(1)),collapse=" ")
 }
 
@@ -740,7 +740,7 @@ clause_transfer_panel <- function(state,next_round,ns,outgoing=FALSE,source_note
   rows<-state$records
   prefix<-if(outgoing)"outgoing"else"incoming"
   title<-if(outgoing)"Leaving players"else"Incoming players"
-  timing<-if(isTRUE(next_round$available))paste0("Round ",next_round$round_number," starts ",incoming_clause_time(next_round$starts_at)," (Spain)")else "Next round schedule is loading or could not be verified."
+  timing<-if(isTRUE(next_round$available))paste0("Round ",next_round$round_number," starts ",incoming_clause_time(next_round$starts_at))else "Next round schedule is loading or could not be verified."
   shiny::tags$section(class=paste("fm-incoming-panel",if(outgoing)"fm-outgoing-panel"),`aria-labelledby`=ns(paste0(prefix,"_heading")),
     shiny::tags$h3(id=ns(paste0(prefix,"_heading")),if(!nrow(rows)&&!state$status%in%c("ok","observed"))title else paste0(title," (",nrow(rows),")")),
     if(isTRUE(next_round$available))shiny::tags$p(class="fm-incoming-schedule",timing)else fm_info(timing,error=!identical(state$status,"loading")),
@@ -764,12 +764,12 @@ clause_transfer_panel <- function(state,next_round,ns,outgoing=FALSE,source_note
           if(nzchar(logo))shiny::tags$img(src=paste0(TEAM_LOGO_URL,logo,".png"),alt="",title=row$team,width=24,height=24,loading="lazy",onerror="this.style.display='none';"),
           shiny::actionLink(ns(paste0(prefix,"_open_",row$player_id)),row$player_name),position),
         shiny::tags$div(class="fm-incoming-arrival",
-          if(!is.na(at))shiny::tags$strong(paste0(if(outgoing)"Leaves: "else"Joins: ",incoming_clause_time(at)," (Spain)"))else
+          if(!is.na(at))shiny::tags$strong(paste0(if(outgoing)"Leaves: "else"Joins: ",incoming_clause_time(at)))else
             fm_info(if(identical(state$status,"loading"))paste0("Confirming ",if(outgoing)"departure"else"arrival"," time…")else
               paste0(if(outgoing)"Departure"else"Arrival"," time could not be verified"),error=!identical(state$status,"loading")),
           if(nzchar(label))shiny::tags$span(class="fm-incoming-round",label),
           if(isTRUE(state$observations_only)&&"observed_at"%in%names(row)&&!is.na(row$observed_at))
-            fm_info(paste("Observed:",format(fm_time(row$observed_at),"%d %b %Y, %H:%M UTC",tz="UTC"))),
+            fm_info(paste("Observed:",fm_format_datetime(row$observed_at))),
           if(isTRUE(row$overdue))fm_info(paste0("Scheduled time has passed; ",if(outgoing)"departure"else"arrival"," is awaiting source confirmation.")),
           if(nzchar(row$timing_error)&&!identical(state$status,"loading"))fm_info(row$timing_error,error=TRUE)))
     }))

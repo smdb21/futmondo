@@ -34,6 +34,7 @@ body <- shinydashboard::dashboardBody(
   ),
   uiOutput("startup_status"),
   uiOutput("page_preference_status"),
+  uiOutput("timezone_preference_status"),
   # Saved-access feedback must remain visible after navigation away from Welcome.
   uiOutput(shiny::NS("login", "remember_feedback")),
   conditionalPanel(
@@ -48,6 +49,7 @@ body <- shinydashboard::dashboardBody(
       tabName = "login",
       selectInput("selected_league", "League", choices = character()),
       uiOutput("league_preference_status"),
+      uiOutput("timezone_settings"),
       uiOutput("worker_settings"),
       fluidRow(
         column(

@@ -657,12 +657,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           is_clause_date_locked <- FALSE
           clause_date_formatted <- ""
           if ("clause_date" %in% colnames(sp) && !is.na(sp$clause_date) && sp$clause_date != "") {
-            clause_time <- suppressWarnings(as.POSIXct(sp$clause_date, format = "%Y-%m-%dT%H:%M:%S", tz = "UTC"))
-            if (is.na(clause_time)) {
-              clause_time <- suppressWarnings(as.POSIXct(sp$clause_date, tz = "UTC"))
-            }
+            clause_time <- fm_time(sp$clause_date)
             if (!is.na(clause_time)) {
-              clause_date_formatted <- format(clause_time, "%d-%m-%Y %H:%M")
+              clause_date_formatted <- fm_format_datetime(clause_time)
               if (clause_time > Sys.time()) {
                 is_clause_date_locked <- TRUE
               }
@@ -2018,7 +2015,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       values <- history$valuation
       if (!is.data.frame(values) || !all(c("recorded_at","value") %in% names(values))) values <- data.frame()
       if (nrow(values)) {
-        values$date <- fm_time(values$recorded_at);values$value <- suppressWarnings(as.numeric(values$value))
+        values$display_date <- fm_format_datetime(values$recorded_at); values$date <- fm_plot_datetime(values$recorded_at);values$value <- suppressWarnings(as.numeric(values$value))
         values <- values[!is.na(values$date)&is.finite(values$value),,drop=FALSE]
         values <- values[order(values$date),,drop=FALSE]
       }
@@ -2032,11 +2029,11 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       chart <- plotly::plot_ly()
       if (nrow(values)) chart <- chart %>% plotly::add_trace(data=values,type="scatter",mode="lines+markers",x=~date,y=~value,
         name="Valuation",yaxis="y",line=list(color="#00ff88",width=2.5,dash="solid"),marker=list(size=5),
-        hovertemplate="%{x|%d %b %Y}<br>Valuation: %{y:,.0f} EUR<extra></extra>")
+        text=~display_date,hovertemplate="%{text}<br>Valuation: %{y:,.0f} EUR<extra></extra>")
       if (nrow(points)) {
-        points$plot_x <- if(dated_points)points_dates else points$round_number
+        points$plot_x <- if(dated_points)fm_plot_datetime(points_dates) else points$round_number
         points$label <- paste0("Round ",points$round_number,"<br>Points: ",points$points,
-          if(dated_points)paste0("<br>",format(points_dates,"%d %b %Y",tz="UTC"))else "",
+          if(dated_points)paste0("<br>",fm_format_datetime(points_dates))else "",
           if("score_status" %in% names(points))paste0("<br>",points$score_status)else "")
         # Postponed fixtures can put round numbers out of date order. Plotly
         # connects rows as supplied, so order the complete rows by the axis
@@ -2053,7 +2050,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       # A NULL dtick serializes as [] and forces daily ticks on Plotly's date
       # axis. Omit it entirely for dates; keep numeric round ticks integral.
       round_spacing <- if(nrow(points))max(1,ceiling(diff(range(points$round_number))/3))else 1
-      if(date_axis)horizontal_axis$tickformat <- "%d %b" else {
+      if(date_axis)horizontal_axis$tickformat <- "%d/%m/%Y" else {
         horizontal_axis$tickmode <- "linear";horizontal_axis$dtick <- round_spacing
       }
       chart %>% fm_plot_layout(
@@ -2070,7 +2067,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     })
     render_match <- function(match) {
       score<-if(is.finite(match$home_score)&&is.finite(match$away_score))paste0(format(match$home_score,trim=TRUE),"–",format(match$away_score,trim=TRUE))else "Score unavailable"
-      date<-if(nzchar(match$occurred_at))sub("T.*","",match$occurred_at)else "Date unavailable"
+      date<-if(nzchar(match$occurred_at))fm_format_datetime(match$occurred_at)else "Date unavailable"
       div(class="player-round-fixture",strong(paste(match$home,score,match$away)),span(class="player-match-date",date))
     }
     output$recent_round_points <- renderUI({

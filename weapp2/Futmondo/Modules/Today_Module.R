@@ -1,5 +1,5 @@
 # Presentation only: reuse pressroom names, league teams and already loaded players.
-today_transfer_rows <- function(rows, teams=NULL, players=NULL,timezone="UTC") {
+today_transfer_rows <- function(rows, teams=NULL, players=NULL,timezone=fm_display_timezone()) {
   if(!is.data.frame(rows)||!nrow(rows))return(data.frame(Status="No completed transfers available."))
   if("created" %in% names(rows))rows<-rows[order(fm_time(rows$created),decreasing=TRUE,na.last=TRUE),,drop=FALSE]
   field<-function(name)if(name %in% names(rows))as.character(rows[[name]])else rep("",nrow(rows))
@@ -32,7 +32,7 @@ today_transfer_rows <- function(rows, teams=NULL, players=NULL,timezone="UTC") {
   price<-suppressWarnings(as.numeric(field("price")))
   money<-rep("",length(price));valid<-is.finite(price)
   money[valid]<-paste0(formatC(price[valid],format="f",digits=0,big.mark=".",decimal.mark=",")," €")
-  data.frame(Date=escape(format(fm_time(field("created")),"%d/%m/%Y %H:%M",tz=rivals_display_timezone(timezone))),Name=player,Price=escape(money),
+  data.frame(Date=escape(fm_format_datetime(field("created"),timezone)),Name=player,Price=escape(money),
     Buyer=party("buyer"),Seller=party("seller"),Type=escape(transfer_type),check.names=FALSE)
 }
 
@@ -45,7 +45,6 @@ today_UI <- function(id) {
     fluidRow(uiOutput(ns("kpi_cash_box")),uiOutput(ns("kpi_valuation_box"))),
     uiOutput(ns("market_status")),
     players_table_UI(ns("market_players"),box_title="Current market listings",filter_by_is_from_futmondo=TRUE,default_free_agents=TRUE,filter_by_players_with_bid=TRUE),
-    rivals_timezone_script(ns("browser_timezone")),
     h3("League transfers"),uiOutput(ns("transfer_coverage")),reactable::reactableOutput(ns("recent_transfers")))
 }
 today_Server <- function(id,is_module_active,login_token,championship_id,user_team_id,user_teams_RV,refresh_trigger=NULL,primary_sources=NULL,coach_source=NULL) {
@@ -187,7 +186,7 @@ today_Server <- function(id,is_module_active,login_token,championship_id,user_te
     })
     output$transfer_coverage<-renderUI(fm_info(transfer_coverage_display(),error=identical(attr(transfer_rows(),"fetch_status"),"partial")))
     transfer_display<-resource_display_source(session,function()
-      today_transfer_rows(transfer_rows(),user_teams_RV(),market_state()$data,input$browser_timezone))
+      today_transfer_rows(transfer_rows(),user_teams_RV(),market_state()$data,fm_display_timezone()))
     output$recent_transfers<-reactable::renderReactable({
       rows<-transfer_display()
       reactable::reactable(rows,compact=TRUE,striped=TRUE,highlight=TRUE,bordered=FALSE,

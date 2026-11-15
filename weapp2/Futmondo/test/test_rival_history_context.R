@@ -17,8 +17,8 @@ b$date[b$bonus_type=='points']<-'2026-11-03T19:00:00Z'
 b$timestamp<-fm_time(b$date)
 pst<-rivals_cash_history_rows(b,timezone='America/Los_Angeles')
 cet<-rivals_cash_history_rows(b,timezone='Europe/Madrid')
-stopifnot(pst$date[pst$bonus_type=='points']=='03/11/2026 11:00',cet$date[cet$bonus_type=='points']=='03/11/2026 20:00',
- identical(pst$money,cet$money),identical(pst$running_balance,cet$running_balance),rivals_display_timezone('invalid')=='UTC')
+stopifnot(pst$date[pst$bonus_type=='points']=='03/11/2026 11:00 PST',cet$date[cet$bonus_type=='points']=='03/11/2026 20:00 CET',
+ identical(pst$money,cet$money),identical(pst$running_balance,cet$running_balance),rivals_display_timezone('invalid')=='Europe/Madrid')
 b$date[b$bonus_type=='points']<-'2026-07-03T19:00:00Z';b$timestamp<-fm_time(b$date)
-stopifnot(any(rivals_cash_history_rows(b,timezone='America/Los_Angeles')$date=='03/07/2026 12:00'),any(rivals_cash_history_rows(b,timezone='Europe/Madrid')$date=='03/07/2026 21:00'))
+stopifnot(any(rivals_cash_history_rows(b,timezone='America/Los_Angeles')$date=='03/07/2026 12:00 PDT'),any(rivals_cash_history_rows(b,timezone='Europe/Madrid')$date=='03/07/2026 21:00 CEST'))
 cat('PASS round points, actual position, tied standings and browser-local DST labels without cash changes\n')

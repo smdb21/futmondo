@@ -1,5 +1,7 @@
 # Administration
 
+Admin → **User timezones** now provides a searchable, paginated account selector and saved IANA timezone choice per user, including accounts without a preference yet. Saved values override browser detection on subsequent logins. See [timezone preference contracts and verification](timezone_preferences.md).
+
 `admin_UI(id)` and `admin_Server(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV)` expose explicit database diagnostics to the configured administrator. Every operation rechecks the authenticated account and active module. Reset confirmation captures the current account/league; changing context invalidates it.
 
 `get_table_definitions()` derives the 15 retained factual tables from `supabase_known_tables()`. Counts load only after **Refresh table counts**; activation does not start a synchronous scan. Missing count headers and failed requests remain unknown. **Verify database connection** checks minimal identity columns; it does not create schemas. These explicit administrative probes are synchronous and can take up to the configured HTTP timeout per table.

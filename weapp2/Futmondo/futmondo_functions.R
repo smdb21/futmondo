@@ -1,4 +1,5 @@
 source("data_contracts.R")
+source("timezone_preferences.R")
 source("locker_transfers.R")
 LOGIN_URL <- "https://api.futmondo.com/5/login/with_mail"
 ACTIVE_CHAMPIONSHIPS_URL <- "https://api.futmondo.com/2/user/activechampionships"
@@ -741,18 +742,13 @@ get_lineup_from_team <- function(login, championship_id, user_team_id) {
   }, timeout_sec = 30, context=resource_context(login=login,championship_id=championship_id,user_team_id=user_team_id))
 }
 
-# Vectorized Date Formatter to DD-MM-YY HH:MM
+# Vectorized display formatter; source instants stay in UTC.
 format_table_date <- function(value) {
   if (is.null(value)) return("")
   if (all(is.na(value)) || all(value == "")) return(rep("", length(value)))
   
-  posix_time <- tryCatch({
-    as.POSIXct(value, format = "%Y-%m-%dT%H:%M:%S", tz = "UTC")
-  }, error = function(e) {
-    as.POSIXct(value, tz = "UTC")
-  })
-  
-  formatted <- format(posix_time, "%d-%m-%y %H:%M")
+  posix_time <- fm_time(value)
+  formatted <- fm_format_datetime(posix_time)
   formatted[is.na(posix_time)] <- ""
   return(formatted)
 }
@@ -1690,7 +1686,7 @@ reconcile_pending_clause_transfers <- function(roster_df,pressroom_df,summaries,
 incoming_clause_time <- function(value) {
   stamp<-fm_time(value)
   if(length(stamp)!=1L||is.na(stamp))return("")
-  format(stamp,"%d %b %Y, %H:%M %Z",tz="Europe/Madrid")
+  fm_format_datetime(stamp)
 }
 incoming_clause_round_label <- function(joins_at,next_round) {
   stamp<-fm_time(joins_at)

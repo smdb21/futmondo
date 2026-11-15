@@ -51,11 +51,11 @@ check('malformed championship shape produces a visible issue, not a crash',{
  stopifnot(nrow(malformed$incoming_records)==1L,nzchar(malformed$incoming_records$timing_error))
 })
 check('Madrid midnight and daylight-saving boundaries',{
- stopifnot(incoming_clause_time(fm_time('2026-09-19T22:00:00Z'))=='20 Sep 2026, 00:00 CEST',
- incoming_clause_time(fm_time('2026-03-29T00:59:00Z'))=='29 Mar 2026, 01:59 CET',
- incoming_clause_time(fm_time('2026-03-29T01:00:00Z'))=='29 Mar 2026, 03:00 CEST',
- incoming_clause_time(fm_time('2026-10-25T00:30:00Z'))=='25 Oct 2026, 02:30 CEST',
- incoming_clause_time(fm_time('2026-10-25T01:30:00Z'))=='25 Oct 2026, 02:30 CET')
+ stopifnot(incoming_clause_time(fm_time('2026-09-19T22:00:00Z'))=='20/09/2026 00:00 CEST',
+ incoming_clause_time(fm_time('2026-03-29T00:59:00Z'))=='29/03/2026 01:59 CET',
+ incoming_clause_time(fm_time('2026-03-29T01:00:00Z'))=='29/03/2026 03:00 CEST',
+ incoming_clause_time(fm_time('2026-10-25T00:30:00Z'))=='25/10/2026 02:30 CEST',
+ incoming_clause_time(fm_time('2026-10-25T01:30:00Z'))=='25/10/2026 02:30 CET')
 })
 check('strict round-start comparison and postponed schedule',{
  rounds<-data.frame(round_number=12,begin_process='2026-09-19T22:00:00Z');next_round<-next_round_context(rounds,now)
@@ -69,7 +69,7 @@ check('safe UI text, abbreviated position, authoritative arrival and separate ro
  state<-list(status='ok',records=result$incoming_records,error=NULL);state$records$player_name<-'<script>unsafe</script>'
  html<-as.character(incoming_clause_panel(state,list(available=TRUE,round_number=12,starts_at=fm_time('2026-09-20T22:00:00Z')),identity))
  stopifnot(grepl('Incoming players (1)',html,fixed=TRUE),grepl('&lt;script&gt;',html,fixed=TRUE),
- !grepl('<script>unsafe',html,fixed=TRUE),grepl('MID',html,fixed=TRUE),grepl('20 Sep 2026, 00:00 CEST',html,fixed=TRUE))
+ !grepl('<script>unsafe',html,fixed=TRUE),grepl('MID',html,fixed=TRUE),grepl('20/09/2026 00:00 CEST',html,fixed=TRUE))
 })
 check('incoming card uses authoritative rival ownership and pending clause instead of profile remnants',{
  card_summary<-summary();card_summary$data$userteamId<-'mine';card_summary$data$owner_team_id<-'mine';card_summary$data$clause_transferred<-FALSE

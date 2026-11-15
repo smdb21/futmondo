@@ -1,5 +1,14 @@
 # Futmondo data architecture redesign plan
 
+## Account timezones — 2026-11-14 Pacific
+
+- [x] Shared account-local `DD/MM/YYYY HH:MM TZ` presentation, browser initialization without geolocation, Spain fallback, durable user/admin overrides and cross-session reuse.
+- [x] Focused conversion/persistence/isolation/failure checks, isolated schema/grants checks, 390/1440px real browser controls and offline application lifecycle.
+- [x] Additive production DB migration applied; read-only server-role directory/grants verification passed.
+- [ ] Application deployment and hosted browser validation.
+
+See [timezone implementation and performance review](timezone_preferences.md).
+
 Created: 2026-10-26
 Status: Local implementation complete; production DB migrations applied and verified on 2026-10-27 UTC; application deployment pending. See data_review_results.md for executed evidence.
 Project: /home/rstudio/workspace/futmondo

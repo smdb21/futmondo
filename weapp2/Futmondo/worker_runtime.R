@@ -369,7 +369,7 @@ fm_worker_status_source<-function(session,login){
   if(running>0&&identical(s$account$auth_status,'active'))message<-paste(message,sprintf('Updating %d saved data source(s).',running))
   checks<-vapply(live_keys,function(k){item<-fm_worker_get(account,k);if(is.null(item))NA_real_ else as.numeric(fm_time(item$manifest$checked_at))},numeric(1))
   checks<-checks[is.finite(checks)]
-  value(list(message=message,error=failed,checked_at=if(length(checks))format(as.POSIXct(min(checks),origin='1970-01-01',tz='UTC'),'%Y-%m-%d %H:%M:%S UTC')else NULL))
+  value(list(message=message,error=failed,checked_at=if(length(checks))as.POSIXct(min(checks),origin='1970-01-01',tz='UTC')else NULL))
  },domain=session)
  session$onSessionEnded(function()observer$destroy())
  value
@@ -393,7 +393,7 @@ fm_worker_session<-function(session,login,leagues=function()list()){
  status_error<-resource_display_source(session,function()isTRUE(status()$error))
  status_checked<-resource_display_source(session,function(){
   checked<-status()$checked_at
-  if(is.null(checked))''else paste('Oldest displayed data check:',checked)
+  if(is.null(checked))''else paste('Oldest displayed data check:',fm_format_datetime(checked))
  })
  output$worker_status<-shiny::renderUI({
   if(!isTRUE(status_visible()))return(NULL)
@@ -410,7 +410,7 @@ fm_worker_session<-function(session,login,leagues=function()list()){
   shiny::tags$details(id='worker_settings_details',open=if(isTRUE(shiny::isolate(session$input$worker_settings_open)))'open'else NULL,shiny::tags$summary('Background sync'),
    shiny::tags$p('Allow this server to retrieve factual LigaRadar data while you are signed out. No password is saved. This continues until you disable it or LigaRadar rejects access.'),
    shiny::checkboxInput('worker_enable','Enable background sync',isTRUE(a$enabled)),
-   shiny::textInput('worker_timezone','Timezone',a$timezone %||% session$input$worker_timezone_detected %||% 'UTC'),
+   shiny::textInput('worker_timezone','Quiet-hours timezone',a$timezone %||% fm_display_timezone()),
    shiny::fluidRow(shiny::column(6,shiny::numericInput('worker_quiet_start','Quiet hours start (0–23)',a$quiet_start %||% 0,0,23)),
     shiny::column(6,shiny::numericInput('worker_quiet_end','Quiet hours end (0–23)',a$quiet_end %||% 7,0,23))),
    {items<-tryCatch(leagues(),error=function(e)list());choices<-setNames(vapply(items,function(x)fm_scalar(x$id %||% x$`_id`,''),character(1)),vapply(items,function(x)fm_scalar(x$name,'League'),character(1)));

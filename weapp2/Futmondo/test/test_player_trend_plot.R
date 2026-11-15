@@ -49,7 +49,7 @@ check("postponed rounds connect chronologically with score provenance intact",{
  # Input order and round order both differ from chronological order.
  history$points<-history$points[c(4,1,3,2),]
  chart<-render_fixture(history);trace<-chart$data[[2]]
- stopifnot(identical(as.numeric(trace$x),as.numeric(sort(history$points$date))),
+ stopifnot(identical(as.character(trace$x),fm_plot_datetime(sort(history$points$date))),
    identical(as.numeric(trace$y),c(0,-2,3,4)),
    all(startsWith(trace$text,paste0("Round ",c(2,3,4,1),"<br>"))),
    grepl("provisional",trace$text[3],fixed=TRUE),trace$line$dash=="dash")
@@ -60,7 +60,7 @@ check("dense histories use sparse automatic dates without an empty dtick",{
  history$points$date<-as.POSIXct("2026-07-01",tz="UTC")+0:3*7*86400
  chart<-render_fixture(history)
  stopifnot(chart$layout$xaxis$tickmode=="auto",chart$layout$xaxis$nticks==4,
-   is.null(chart$layout$xaxis$dtick),chart$layout$xaxis$tickformat=="%d %b",chart$layout$xaxis$tickangle==0,
+   is.null(chart$layout$xaxis$dtick),chart$layout$xaxis$tickformat=="%d/%m/%Y",chart$layout$xaxis$tickangle==0,
    identical(chart$layout$xaxis$showgrid,FALSE),identical(chart$layout$showlegend,FALSE),
    length(chart$data[[1]]$y)==124L)
 })

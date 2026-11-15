@@ -25,13 +25,13 @@ plots_empty <- function(message, error=TRUE) {
 plots_history <- function(history, metric, title) {
   if (!is.data.frame(history) || !nrow(history) || !metric %in% names(history)) return(plots_empty(paste0(title, " unavailable")))
   team <- if ("teamname" %in% names(history)) as.character(history$teamname) else "Team"
-  dates <- suppressWarnings(as.POSIXct(as.character(history$recorded_at), tz="UTC"))
+  dates <- fm_time(history$recorded_at)
   keep <- is.finite(as.numeric(dates)) & is.finite(suppressWarnings(as.numeric(history[[metric]])))
   if (!any(keep)) return(plots_empty(paste0(title, " unavailable")))
-  d <- data.frame(team=team[keep], date=dates[keep], value=as.numeric(history[[metric]][keep]))
+  d <- data.frame(team=team[keep], date=fm_plot_datetime(dates[keep]), display_date=fm_format_datetime(dates[keep]), value=as.numeric(history[[metric]][keep]))
   plotly::plot_ly(d,x=~date,y=~value,color=~team,type="scatter",mode="lines+markers",
-    hovertemplate=~paste0("<b>",team,"</b><br>",format(date,"%d-%m-%y"),"<br>",format(value,big.mark="."),"<extra></extra>")) %>%
-    fm_plot_layout(xaxis=list(title=""),yaxis=list(title=title),showlegend=FALSE,margin=list(l=55,r=15,t=10,b=45))
+    hovertemplate=~paste0("<b>",team,"</b><br>",display_date,"<br>",format(value,big.mark="."),"<extra></extra>")) %>%
+    fm_plot_layout(xaxis=list(title="",tickformat="%d/%m/%Y"),yaxis=list(title=title),showlegend=FALSE,margin=list(l=55,r=15,t=10,b=45))
 }
 
 plots_UI <- function(id) {
@@ -40,7 +40,7 @@ plots_UI <- function(id) {
     shiny::tabsetPanel(id=ns("plot_tab"), type="pills",
       shiny::tabPanel("Standings", shiny::uiOutput(ns("standings_status")), plotly::plotlyOutput(ns("standings_plot"), height="420px")),
       shiny::tabPanel("Squad values", shiny::uiOutput(ns("values_status")), plotly::plotlyOutput(ns("values_plot"), height="420px")),
-      shiny::tabPanel("Cash & transfers", shiny::fluidRow(shiny::column(7, shiny::dateRangeInput(ns("cash_dates"),"Date range")), shiny::column(5, shiny::radioButtons(ns("cash_metric"),"Metric",choices=c("Transfer-only balance estimate"="cash","Squad Purchases"="investment","Transaction Volume"="volume"),inline=TRUE))), shiny::uiOutput(ns("cash_status")), plotly::plotlyOutput(ns("cash_plot"), height="420px")),
+      shiny::tabPanel("Cash & transfers", shiny::fluidRow(shiny::column(7, shiny::dateRangeInput(ns("cash_dates"),"Date range",format="dd/mm/yyyy")), shiny::column(5, shiny::radioButtons(ns("cash_metric"),"Metric",choices=c("Transfer-only balance estimate"="cash","Squad Purchases"="investment","Transaction Volume"="volume"),inline=TRUE))), shiny::uiOutput(ns("cash_status")), plotly::plotlyOutput(ns("cash_plot"), height="420px")),
       shiny::tabPanel("Rank progression", shiny::fluidRow(shiny::column(7, shiny::sliderInput(ns("rank_range"),"Rounds",min=1,max=38,value=c(1,38))), shiny::column(5, shiny::selectInput(ns("rank_round"),"Inspect one round",choices=c("All rounds"="all")))), shiny::uiOutput(ns("rank_status")), plotly::plotlyOutput(ns("rank_plot"), height="420px")),
       shiny::tabPanel("Owned by real team", shiny::p("Currently fantasy-owned players, grouped by their real football club."), shiny::uiOutput(ns("owned_club_status")), plotly::plotlyOutput(ns("owned_club_plot"), height="520px"))
     ))
@@ -54,7 +54,7 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
     history <- shiny::reactive({ shiny::req(active(), championship_id()); if(is.function(refresh_trigger)) refresh_trigger(); tryCatch(get_league_standings_history(championship_id()),error=function(e)data.frame()) })
     standings_plot <- shiny::reactive({ plots_history(history(),"points","Cumulative points") })
     values_plot <- shiny::reactive({ plots_history(history(),"team_value","Squad valuation (EUR)") })
-    shiny::observe({ h<-history(); if(is.data.frame(h)&&nrow(h)&&"recorded_at"%in%names(h)) { d<-as.Date(as.character(h$recorded_at)); d<-d[!is.na(d)]; if(length(d)) shiny::updateDateRangeInput(session,"cash_dates",start=min(d),end=max(d),min=min(d),max=max(d)) } })
+    shiny::observe({ h<-history(); if(is.data.frame(h)&&nrow(h)&&"recorded_at"%in%names(h)) { d<-as.Date(fm_time(h$recorded_at),tz=fm_display_timezone()); d<-d[!is.na(d)]; if(length(d)) shiny::updateDateRangeInput(session,"cash_dates",start=min(d),end=max(d),min=min(d),max=max(d)) } })
     cash_plot <- shiny::reactive({
       shiny::req(active(),login_token(),championship_id(),user_team_id(),user_teams_RV()); if(is.function(refresh_trigger)) refresh_trigger()
       teams<-user_teams_RV(); snap<-tryCatch(get_financial_snapshot(login_token(),championship_id(),user_team_id()),error=function(e)NULL)
@@ -62,7 +62,7 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
       press<-tryCatch(get_championship_pressroom(login_token(),championship_id()),error=function(e)data.frame())
       if(!is.data.frame(press)||!nrow(press)) return(plots_empty("Observed transfer data unavailable"))
       dates<-input$cash_dates; if(is.null(dates)||length(dates)!=2) return(plots_empty("Choose a date range", error=FALSE))
-      d<-rivals_buying_power_values(press,teams,metric=input$cash_metric %||% "cash",start_date=as.POSIXct(dates[1],tz="UTC"),end_date=as.POSIXct(dates[2],tz="UTC"),initial_budget=initial)
+      d<-rivals_buying_power_values(press,teams,metric=input$cash_metric %||% "cash",start_date=fm_local_midnight(dates[1]),end_date=fm_local_midnight(dates[2]+1)-0.000001,initial_budget=initial)
       if(!is.data.frame(d)||!nrow(d)) return(plots_empty("League financial data unavailable"))
       d<-d[order(d$value),,drop=FALSE]; plotly::plot_ly(d,x=~value,y=~reorder(team,value),type="bar",orientation="h",hovertemplate=~paste0("<b>",team,"</b><br>",format(value,big.mark=".")," EUR<extra></extra>")) %>% fm_plot_layout(xaxis=list(title="EUR"),yaxis=list(title=""),margin=list(l=115,r=15,t=10,b=45))
     })

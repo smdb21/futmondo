@@ -4,23 +4,8 @@ library(shinydashboard)
 library(shinydashboardPlus)
 library(dplyr)
 
-# ---- Pure helper: safe ISO datetime parser (top-level for testability) ----
-# Mirrors the module's internal parse_safe_datetime so the pure helpers below
-# can parse pressroom `created` timestamps deterministically.
-rivals_parse_datetime <- function(date_vec) {
-  if (is.null(date_vec) || length(date_vec) == 0) return(as.POSIXct(character(0)))
-  date_str <- as.character(date_vec)
-  clean_str <- gsub("T", " ", date_str)
-  clean_str <- gsub("Z", "", clean_str)
-  clean_str <- gsub("\\..*", "", clean_str)
-  parsed <- suppressWarnings(as.POSIXct(clean_str, format = "%Y-%m-%d %H:%M:%S"))
-  na_idx <- is.na(parsed)
-  if (any(na_idx)) {
-    parsed[na_idx] <- suppressWarnings(as.POSIXct(clean_str[na_idx], format = "%Y-%m-%d"))
-  }
-  # Invalid / unparseable timestamps stay NA (never substituted with Sys.time()).
-  parsed
-}
+# Safe source-instant parser; never interpret UTC/offset dates in server time.
+rivals_parse_datetime <- function(date_vec) fm_time(date_vec)
 
 # ---- Pure helper: per-team buying-power values for the league plot ----
 # Transfer-only balance estimates use ALL transfers through the END date
@@ -50,7 +35,7 @@ rivals_buying_power_values <- function(pressroom_df, teams, metric = "cash",
     return(plot_df)
   }
 
-  parsed <- suppressWarnings(as.POSIXct(as.character(pressroom_df$created), tz = "UTC"))
+  parsed <- fm_time(pressroom_df$created)
 
   # Cash: no start filter (balance from all transfers through end).
   # Investment / Volume: [start, end] range.
@@ -324,10 +309,6 @@ rivals_transfer_player_html <- function(name,club,logo,id,players=NULL) {
   label<-paste0(images[match(keys,keys[unique_rows])],label)
   label
 }
-rivals_timezone_script <- function(input_id) {
-  tags$script(HTML(sprintf("(function(){function send(){var zone=Intl.DateTimeFormat().resolvedOptions().timeZone;Shiny.setInputValue(%s,zone,{priority:'event'});}$(document).one('shiny:connected',send);if(window.Shiny&&Shiny.shinyapp&&Shiny.shinyapp.isConnected())send();})();",jsonlite::toJSON(input_id,auto_unbox=TRUE))))
-}
-
 rivals_display_text <- function(text) {
   text<-gsub("reconstructed","estimated",text,ignore.case=TRUE)
   gsub("reconstruction","calculation",text,ignore.case=TRUE)
@@ -335,9 +316,9 @@ rivals_display_text <- function(text) {
 # View-only projection of the complete shared ledger. Balances were calculated
 # before selection, filtering, pagination or sorting; undated rows retain their labels.
 rivals_display_timezone <- function(timezone) {
-  if(is.character(timezone)&&length(timezone)==1L&&!is.na(timezone)&&timezone%in%OlsonNames())timezone else "UTC"
+  if(is.character(timezone)&&length(timezone)==1L&&!is.na(timezone)&&timezone%in%fm_timezones())timezone else "Europe/Madrid"
 }
-rivals_cash_history_rows <- function(ledger,undated=NULL,timezone="UTC") {
+rivals_cash_history_rows <- function(ledger,undated=NULL,timezone=fm_display_timezone()) {
   timezone<-rivals_display_timezone(timezone)
   if(!is.data.frame(ledger)||!nrow(ledger))return(data.frame())
   rows<-if(is.null(undated))ledger else ledger[if(undated)ledger$section%in%"undated"else!ledger$section%in%"undated",,drop=FALSE]
@@ -371,7 +352,7 @@ rivals_cash_history_rows <- function(ledger,undated=NULL,timezone="UTC") {
     round[i]<-"";round_detail[i]<-""
   }
   date_source<-if("payment_date_source"%in%names(rows))rows$payment_date_source else rep("",nrow(rows))
-  output<-data.frame(date=ifelse(rows$section%in%"opening" & is.na(rows$timestamp),"Opening balance",ifelse(date_source%in%c("reference_payment_pending","round_settlement_pending"),"Payment not confirmed",ifelse(is.na(rows$timestamp),"Payment date unknown",format(rows$timestamp,"%d/%m/%Y %H:%M",tz=timezone)))),
+  output<-data.frame(date=ifelse(rows$section%in%"opening" & is.na(rows$timestamp),"Opening balance",ifelse(date_source%in%c("reference_payment_pending","round_settlement_pending"),"Payment not confirmed",ifelse(is.na(rows$timestamp),"Payment date unknown",fm_format_datetime(rows$timestamp,timezone)))),
     type=ifelse(rows$component%in%"Best XI/MVP payment","Recorded Best XI/MVP payment",ifelse(rows$estimated,"Bonus",rows$type)),concept=paste0(description,round,round_detail,ifelse(rows$included,""," (excluded)")),money=rows$amount,
     payment_date_estimated=if("payment_date_estimated"%in%names(rows))rows$payment_date_estimated%in%TRUE else rep(FALSE,nrow(rows)),
     payment_date_source=if("payment_date_source"%in%names(rows))as.character(rows$payment_date_source)else rep("",nrow(rows)),
@@ -401,7 +382,7 @@ rivals_cash_history_rows <- function(ledger,undated=NULL,timezone="UTC") {
   }
   output[,c("date","player","money","buyer","seller","type","running_balance",setdiff(names(output),c("date","player","money","buyer","seller","type","running_balance"))),drop=FALSE]
 }
-rivals_cash_history_widget <- function(ledger,undated=NULL,timezone="UTC") {
+rivals_cash_history_widget <- function(ledger,undated=NULL,timezone=fm_display_timezone()) {
   display<-rivals_cash_history_rows(ledger,undated,timezone)
   if(!nrow(display))return(reactable::reactable(data.frame(Status="No cash movements available."),compact=TRUE))
   reactable::reactable(display,compact=TRUE,striped=TRUE,highlight=TRUE,bordered=FALSE,defaultPageSize=15,showPageSizeOptions=TRUE,pageSizeOptions=c(15,30,50),
@@ -463,11 +444,11 @@ rivals_points_pills <- function(points) {
       format(points[i],trim=TRUE,scientific=FALSE))
   })
 }
-rivals_last_access_cell <- function(value,timezone="UTC") {
+rivals_last_access_cell <- function(value,timezone=fm_display_timezone()) {
   timezone<-rivals_display_timezone(timezone)
   stamp<-fm_time(value)
   if(length(stamp)!=1L||is.na(stamp))return("Unavailable")
-  format(stamp,"%d/%m/%Y %H:%M",tz=timezone)
+  fm_format_datetime(stamp,timezone)
 }
 
 # Project the same numeric metrics into cards and sortable league columns.
@@ -548,7 +529,7 @@ rivals_calculation_details <- function(summary,ledger,metric=c("wealth","trading
 }
 
 # Keep observed team fields selectable even if financial audit details fail.
-rivals_finance_table_widget <- function(finances_data,on_error=function(error)NULL,timezone="UTC",selected_id=NULL,selection_input=NULL,selection_context=NULL,table_id=NULL,own_team_id=NULL) {
+rivals_finance_table_widget <- function(finances_data,on_error=function(error)NULL,timezone=fm_display_timezone(),selected_id=NULL,selection_input=NULL,selection_context=NULL,table_id=NULL,own_team_id=NULL) {
   timezone<-rivals_display_timezone(timezone)
   df<-finances_data$team_finances
   if(!is.data.frame(df)||!nrow(df))return(NULL)
@@ -719,19 +700,18 @@ rivals_status_message <- function(message, loading=FALSE, error=FALSE, details=N
   fm_info(message, details, error=error, class=if(loading)"rivals-loading-status"else NULL)
 }
 
-rivals_update_details <- function(rows, timezone="UTC") {
+rivals_update_details <- function(rows, timezone=fm_display_timezone()) {
   if(!is.data.frame(rows)||!nrow(rows)||!all(c("teamname","as_of")%in%names(rows)))return(NULL)
   tags$div(tags$strong("Last updated"), tags$ul(lapply(seq_len(nrow(rows)),function(i){
     stamp<-fm_time(mvp_text(rows$as_of[i]))
     tags$li(rows$teamname[i], ": ", if(length(stamp)==1L&&!is.na(stamp))
-      unname(format(stamp,"%d-%m %H:%M",tz=timezone))else"Update time unavailable")
+      fm_format_datetime(stamp,timezone)else"Update time unavailable")
   })))
 }
 
 rivals_UI <- function(id) {
   ns <- NS(id)
 tagList(
-    rivals_timezone_script(ns("browser_timezone")),
     # League Financial Standings Overview & Scouting Target Selection
     fluidRow(
       column(width = 12,
@@ -763,39 +743,14 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
     bind_factual_reads(c("get_user_team_info","get_players_from_team","get_financial_snapshot","get_championship_pressroom","get_league_standings_history","get_user_team_moneymovements"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
 
     ns <- session$ns
-    display_timezone<-reactive(rivals_display_timezone(input$browser_timezone))
+    display_timezone<-reactive(fm_display_timezone())
     mvp_snapshot <- shared_mvp_source(session,login_token,championship_id,is_module_active,refresh_trigger)
     
     # Observers ----
 
     # Reactives ----
 
-    # Safe date parsing helper
-    parse_safe_datetime <- function(date_vec) {
-      if (is.null(date_vec) || length(date_vec) == 0) return(as.POSIXct(character(0)))
-      date_str <- as.character(date_vec)
-
-      # Clean ISO 8601 formatting (e.g., "2024-03-15T10:30:00.000Z" -> "2024-03-15 10:30:00")
-      clean_str <- gsub("T", " ", date_str)
-      clean_str <- gsub("Z", "", clean_str)
-      clean_str <- gsub("\\..*", "", clean_str) # strip fractional seconds
-
-      parsed <- suppressWarnings(as.POSIXct(clean_str, format = "%Y-%m-%d %H:%M:%S"))
-
-      # Fallback for plain YYYY-MM-DD
-      na_idx <- is.na(parsed)
-      if (any(na_idx)) {
-        parsed[na_idx] <- suppressWarnings(as.POSIXct(clean_str[na_idx], format = "%Y-%m-%d"))
-      }
-
-      # Fallback for any remaining NAs
-      na_idx <- is.na(parsed)
-      if (any(na_idx)) {
-        parsed[na_idx] <- as.POSIXct(NA)
-      }
-
-      return(parsed)
-    }
+    parse_safe_datetime <- rivals_parse_datetime
 
     # Season start date helper -- programmatically detects the reset date
     get_season_start_date <- function(raw_movements = NULL) {
@@ -1093,10 +1048,8 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       }
 
       # Format dates
-      history_df$date <- as.POSIXct(history_df$recorded_at, format = "%Y-%m-%dT%H:%M:%S")
-      if (any(is.na(history_df$date))) {
-        history_df$date <- as.POSIXct(history_df$recorded_at)
-      }
+      history_df$display_date <- fm_format_datetime(history_df$recorded_at)
+      history_df$date <- fm_plot_datetime(history_df$recorded_at)
 
       history_df <- history_df %>% dplyr::arrange(date)
 
@@ -1105,11 +1058,11 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                       line = list(width = 2, shape = "spline"),
                       marker = list(size = 5),
                       hoverinfo = "text",
-                      text = ~paste0("Team: ", teamname, "<br>Date: ", format(date, "%d-%m-%y"), "<br>Valuation: ", format_table_currency(team_value))) %>%
+                      text = ~paste0("Team: ", teamname, "<br>Date: ", display_date, "<br>Valuation: ", format_table_currency(team_value))) %>%
         fm_plot_layout(
           paper_bgcolor = "rgba(0,0,0,0)",
           plot_bgcolor = "rgba(0,0,0,0)",
-          xaxis = list(title = "", gridcolor = "#f1f5f9", zeroline = FALSE, tickformat = "%d-%m"),
+          xaxis = list(title = "", gridcolor = "#f1f5f9", zeroline = FALSE, tickformat = "%d/%m/%Y"),
           yaxis = list(title = "Squad Valuation (EUR)", gridcolor = "#f1f5f9", zeroline = FALSE, tickformat = "s"),
           legend = list(orientation = "h", x = 0.5, y = -0.25, xanchor = "center"),
           margin = list(l = 60, r = 20, t = 10, b = 40)
@@ -1182,8 +1135,8 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
         )
       }
 
-      start_date <- as.POSIXct(date_range[1], tz = "UTC")
-      end_date <- as.POSIXct(date_range[2], tz = "UTC")
+      start_date <- fm_local_midnight(date_range[1],display_timezone())
+      end_date <- fm_local_midnight(date_range[2]+1,display_timezone())-0.000001
 
       # Per-team values via the pure helper. Liquid Cash uses ALL transfers
       # through the end date (balance not reset at slider start); investment
@@ -1349,7 +1302,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                 align = "right",
                 cell = function(val, index) {
                   if(!is.finite(val))return("Unavailable")
-                  d <- format(rivals_parse_datetime(ledger$Buy_Date[index]), "%d/%m/%Y")
+                  d <- fm_format_datetime(rivals_parse_datetime(ledger$Buy_Date[index]))
                   title_text <- paste0("Date: ", d, "\nType: ", ledger$Buy_Type[index])
                   shiny::tags$span(
                     style = "color: var(--fm-danger); font-weight: 600;",
@@ -1365,7 +1318,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
                   if (!is.finite(val)) {
                     shiny::tags$span(style = "color: var(--fm-muted);", "-")
                   } else {
-                    d <- format(rivals_parse_datetime(ledger$Sell_Date[index]), "%d/%m/%Y")
+                    d <- fm_format_datetime(rivals_parse_datetime(ledger$Sell_Date[index]))
                     title_text <- paste0("Date: ", d, "\nType: ", ledger$Sell_Type[index])
                     shiny::tags$span(
                       style = "color: var(--fm-text); font-weight: 600;",

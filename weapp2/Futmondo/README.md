@@ -10,6 +10,8 @@ Open this application directory and run:
 shiny::runApp(".")
 ```
 
+Display dates use the browser timezone on first login (Spain fallback), then the database-saved account preference. Users can change it under Welcome → Display timezone; Admin → User timezones can save a choice for each user. Apply `scripts/migrations/20261115061026_user_timezones.sql` for existing databases before releasing this app version. No new packages or environment variables are needed. See [timezone preferences](docs/timezone_preferences.md).
+
 Startup uses `global.R`, `ui.R`, and `server.R`. Install the packages recorded in `manifest.json`. Enter Futmondo credentials in the login screen; select a league after login. Credentials and HAR captures must not enter application bundles or logs.
 
 The [data redesign plan](docs/data_architecture_redesign_plan.md) defines the current work. [Executed results](docs/data_review_results.md) distinguish implementation, isolated verification, and deployment.

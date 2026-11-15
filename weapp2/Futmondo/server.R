@@ -3,6 +3,7 @@
 function(input, output, session) {
   session$userData$league_context_enabled<-TRUE
   login_token_RV <- login_Server(id = "login")
+  fm_timezone_preferences(session, login_token_RV)
   fm_worker_session(session, login_token_RV, leagues=function()tryCatch(championships_RV(),error=function(e)list()))
   refresh_trigger <- reactiveVal(0)
   history_refresh_trigger <- round_history_refresh_trigger(session)
@@ -120,7 +121,7 @@ function(input, output, session) {
     text<-vapply(names(states),function(key){
       stamp<-fm_time(states[[key]]$observed_at)
       if(is.null(states[[key]]$data)||length(stamp)!=1L||is.na(stamp)||stamp>Sys.time())return("")
-      paste0(if(key=="balance")"Balance observed: "else"Offers observed: ",format(stamp,"%d %b, %H:%M:%S UTC",tz="UTC"))
+      paste0(if(key=="balance")"Balance observed: "else"Offers observed: ",fm_format_datetime(stamp))
     },character(1))
     paste(text[nzchar(text)],collapse=" · ")
   })

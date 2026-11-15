@@ -1,5 +1,13 @@
 # Futmondo data review and implementation results
 
+## Uniform account dates — 2026-11-14 Pacific
+
+Implemented browser-first IANA timezone selection (no geolocation), Spain fallback and durable per-user overrides from Welcome/Admin. All date presentation adapters share one session source; UTC source timestamps, amounts and countdown instants are preserved. Details: [timezone contracts and measured review](timezone_preferences.md).
+
+Passed `test/test_timezone_preferences.R`, `node test/test_timezone_schema.cjs`, actual 390/1440px `test_timezone_browser` flows, notification datetime, Today transfers, incoming/outgoing clauses (24 checks each), rival-history context, player-trend plot (15 checks), page-preference transport (4 checks), worker status redraw and `Rscript test/test_shiny_simulation.R` (13 checks plus 8 tabs). Delayed preference responses retain event-loop responsiveness; failed saves stay unconfirmed and reload authoritative state. Formatting measured 0.001s/1,000 parsed instants and 0.032s/1,000 notification ISO labels; mobile/desktop browser heartbeats 84/97ms with no horizontal overflow. No additional factual API requests, polling or unbounded caches.
+
+Production additive `user_timezones` migration applied to the established Futmondo project. Read-only verification: RLS enabled, zero preference rows before application use, one discoverable known account; all three SECURITY INVOKER RPCs have empty search paths and deny anon/authenticated execution while allowing service_role. The security advisor reports only the expected server-only RLS-without-policies INFO for the new table; existing legacy GraphQL/function warnings are unchanged. No live user preference or transaction test writes were performed. Application deployment and hosted end-to-end checks remain pending; production latency/large-directory query plans were not load-tested.
+
 Updated 2026-10-26. Local implementation and release preparation are complete under the [redesign plan](data_architecture_redesign_plan.md). This record separates observed findings, executed verification, and rollout. **Update:** the production DB migrations were applied on 2026-10-27 UTC; application deployment remains pending. See [production migration evidence](production_migration_20261027.md).
 
 ## Baseline

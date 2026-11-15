@@ -101,7 +101,7 @@ check('leaving panel matches incoming timing, roles, safe labels and separate id
   next_round<-list(available=TRUE,round_number=12,starts_at=leaves_at+1)
   html<-as.character(outgoing_clause_panel(state,next_round,identity))
   stopifnot(grepl('Leaving players (1)',html,fixed=TRUE),grepl('Leaves:',html,fixed=TRUE),
-    grepl('15 Nov 2026, 00:00 CET',html,fixed=TRUE),grepl('Before round starts',html,fixed=TRUE),
+    grepl('15/11/2026 00:00 CET',html,fixed=TRUE),grepl('Before round starts',html,fixed=TRUE),
     grepl('MID',html,fixed=TRUE),grepl('&lt;script&gt;',html,fixed=TRUE),
     !grepl('<script>Leaving',html,fixed=TRUE),grepl('outgoing_open_out',html,fixed=TRUE),
     grepl('fm-outgoing-panel',html,fixed=TRUE))

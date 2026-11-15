@@ -11,8 +11,8 @@ notification_has_player_details <- function(notification_row) {
   !is_round_close
 }
 
-# Readable UTC labels only; original timestamps remain available to the view.
-notification_datetime_labels <- function(values) {
+# Shared account-local labels; original timestamps remain available to the view.
+notification_datetime_labels <- function(values, timezone=fm_display_timezone()) {
   if (!inherits(values, "POSIXt")) {
     values <- as.character(values)
     # Reject malformed timestamps before the shared parser's date-only fallback.
@@ -20,7 +20,7 @@ notification_datetime_labels <- function(values) {
     values[is.na(values) | !grepl(iso, values)] <- NA_character_
   }
   stamps <- fm_time(values)
-  labels <- format(stamps, "%d %b %Y, %H:%M UTC", tz="UTC")
+  labels <- fm_format_datetime(stamps, timezone)
   labels[is.na(stamps)] <- "Date unavailable"
   unname(labels)
 }
