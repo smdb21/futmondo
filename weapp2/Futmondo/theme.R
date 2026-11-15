@@ -29,7 +29,7 @@ fm_plot_layout <- function(p, ...) {
   args$font <- utils::modifyList(args$font %||% list(),list(family=t$font,color=t$text,size=13))
   for (axis in c('xaxis','yaxis','xaxis2','yaxis2')) args[[axis]] <- utils::modifyList(
     args[[axis]] %||% list(),list(gridcolor=t$border,zerolinecolor=t$border,
-      tickfont=list(color=t$muted,family=t$font),automargin=TRUE))
+      tickfont=list(color=args[[axis]]$tickfont$color %||% args[[axis]]$color %||% t$muted,family=t$font),automargin=TRUE))
   args$hoverlabel <- list(bgcolor=t$surface,font=list(color=t$text,family=t$font),bordercolor=t$border)
   args$colorway <- c(t$text,t$warning,t$danger,t$muted,t$accent)
   if (length(args$annotations)) args$annotations <- lapply(args$annotations,function(a) {

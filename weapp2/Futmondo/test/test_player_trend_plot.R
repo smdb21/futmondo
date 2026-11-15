@@ -40,6 +40,8 @@ check("both series have independent vertical scales and distinct styles",{
  stopifnot(length(chart$data)==2L,value$yaxis=="y",points$yaxis=="y2",points$xaxis=="x",
    value$line$dash=="solid",points$line$dash=="dash",value$line$color!=points$line$color,
    chart$layout$yaxis2$overlaying=="y",chart$layout$yaxis2$side=="right",identical(chart$layout$showlegend,FALSE),
+   chart$layout$yaxis$tickfont$color==value$line$color,chart$layout$yaxis$title$font$color==value$line$color,
+   chart$layout$yaxis2$tickfont$color==points$line$color,chart$layout$yaxis2$title$font$color==points$line$color,
    all(c(99e6,100e6)>chart$layout$yaxis$range[1]),all(c(99e6,100e6)<chart$layout$yaxis$range[2]),
    all(c(-2,4)>chart$layout$yaxis2$range[1]),all(c(-2,4)<chart$layout$yaxis2$range[2]))
 })
@@ -59,8 +61,8 @@ check("dense histories use sparse automatic dates without an empty dtick",{
  history$valuation<-data.frame(recorded_at=format(as.POSIXct("2026-07-01",tz="UTC")+0:123*86400,"%Y-%m-%dT%H:%M:%SZ",tz="UTC"),value=22e6+sin(0:123/12)*1e6)
  history$points$date<-as.POSIXct("2026-07-01",tz="UTC")+0:3*7*86400
  chart<-render_fixture(history)
- stopifnot(chart$layout$xaxis$tickmode=="auto",chart$layout$xaxis$nticks==4,
-   is.null(chart$layout$xaxis$dtick),chart$layout$xaxis$tickformat=="%d/%m/%Y",chart$layout$xaxis$tickangle==0,
+ stopifnot(chart$layout$xaxis$tickmode=="auto",chart$layout$xaxis$nticks==3,
+   is.null(chart$layout$xaxis$dtick),chart$layout$xaxis$tickformat=="%d/%m<br>%Y",chart$layout$xaxis$tickangle==0,
    identical(chart$layout$xaxis$showgrid,FALSE),identical(chart$layout$showlegend,FALSE),
    length(chart$data[[1]]$y)==124L)
 })
@@ -68,6 +70,8 @@ check("undated scores stay visible with an explicitly independent round axis",{
  chart<-render_fixture(combined)
  stopifnot(chart$data[[2]]$xaxis=="x2",identical(as.numeric(chart$data[[2]]$x),as.numeric(1:4)),
    chart$layout$xaxis2$overlaying=="x",!length(chart$layout$annotations),
+   chart$layout$xaxis2$tickfont$color==chart$data[[2]]$line$color,
+   chart$layout$xaxis2$title$font$color==chart$data[[2]]$line$color,
    grepl("not aligned with dates",as.character(player_trend_information(combined,data.frame(points=5,value=100))),fixed=TRUE))
 })
 check("existing scoped match dates align points without a new read",{
@@ -80,4 +84,11 @@ check("existing scoped match dates align points without a new read",{
 })
 check("stored undated final scores remain available",{rows<-data.frame(round=c(1,2,3),points=c(0,-2,5),score_status=c("final","final","provisional"));trace<-player_match_points_trace(rows);stopifnot(trace$has_points,identical(trace$points_df$points,c(0,-2)),all(is.na(trace$points_df$date)))})
 check("card exposes refresh and one combined chart",{html<-as.character(selected_player_UI("card"));stopifnot(grepl("refresh_history",html,fixed=TRUE),!grepl("Smart Bid|fis_panel|smart_bid_widget|player_chart_metric",html))})
+check("shared plot theme preserves series colors and retains neutral defaults",{
+ chart<-plotly::plotly_build(fm_plot_layout(plotly::plot_ly(),xaxis=list(title="Date"),
+   yaxis=list(color="#00ff88"),yaxis2=list(color="#F4C95D"),xaxis2=list(tickfont=list(color="#123456"))))$x
+ stopifnot(chart$layout$xaxis$tickfont$color==fm_theme_tokens()$muted,
+   chart$layout$yaxis$tickfont$color=="#00ff88",chart$layout$yaxis2$tickfont$color=="#F4C95D",
+   chart$layout$xaxis2$tickfont$color=="#123456")
+})
 cat("Player trend plot:",n,"checks passed.\n")

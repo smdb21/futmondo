@@ -1610,3 +1610,17 @@ No schema, dependency, automation or login inventory expansion is required.
   products (4 groups), six mobile/desktop/theme browser configurations and the
   required offline lifecycle pass. Performance and limits are recorded in
   `data_review_results.md`; hosted deployment remains unverified.
+
+
+### Phone value/points chart axes — implemented locally (2026-11-15)
+
+- Request three compact date ticks with DD/MM and year on separate lines,
+  retaining exact hover timestamps and every valuation/round observation.
+- Match valuation and points tick labels/titles to their existing green/amber
+  lines, including the independent undated-round axis. Repair shared R/browser
+  theme defaults so explicit axis colors survive rendering and theme changes.
+- Chart contracts (16), existing plots (3), offline rival summary (12), browser
+  geometry/color/theme/source/zoom checks at 320/390/1440px across four history
+  modes and both themes, deployment contract (3), and required offline lifecycle
+  pass. Performance and limits are recorded in `data_review_results.md`.
+  No data/dependency/schema changes; hosted rollout remains unverified.

@@ -11,3 +11,13 @@ Maintain readable contrast, visible keyboard focus, touch-friendly actions, and 
 The isolated browser fixture checks retained tabs and responsive overflow without accessing external services. Actual screenshots/check results belong in [review results](data_review_results.md).
 
 Run `Rscript test/test_theme_switch_app.R`, then `node test/test_theme_switch.cjs` for the focused desktop/mobile browser regression (synthetic account and offline data). It covers all three modes, system changes, explicit overrides, reload persistence, cross-tab synchronization, table/plot colors, preserved chart data/zoom, compact popup placement, keyboard/outside dismissal, and blocked-storage fallback.
+
+
+Plot axes can opt into a series color through their layout `color`.
+`fm_plot_layout()` preserves supplied tick/axis colors when choosing initial
+tick text colors. `fmApplyPlotTheme()` uses the declared axis color for tick
+labels and titles on later palette changes; uncolored axes retain the muted
+ticks and normal text titles. The player valuation/points chart declares its
+green/amber axis colors explicitly. Theme updates remain a single layout-only
+operation and preserve data and zoom. `test/test_player_trend_browser.cjs`
+checks both series-colored and ordinary axes under light/dark changes.

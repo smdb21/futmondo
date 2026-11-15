@@ -25,8 +25,9 @@
     Object.keys(plot.layout).filter(function (key) { return /^[xy]axis\d*$/.test(key); }).forEach(function (axis) {
       layout[axis + '.gridcolor'] = token('border');
       layout[axis + '.zerolinecolor'] = token('border');
-      layout[axis + '.tickfont.color'] = token('muted');
-      layout[axis + '.title.font.color'] = token('text');
+      var seriesColor = plot.layout[axis].color;
+      layout[axis + '.tickfont.color'] = seriesColor || token('muted');
+      layout[axis + '.title.font.color'] = seriesColor || token('text');
     });
     (plot.layout.annotations || []).forEach(function (annotation, index) {
       layout['annotations[' + index + '].font.color'] = token('text');

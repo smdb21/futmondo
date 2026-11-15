@@ -3005,3 +3005,52 @@ checks do not establish production latency, physical-device behavior or hosted
 deployment. No real accounts or transactions were used. Delivery excludes
 unrelated scheduled-clause interface edits and includes only this task's
 runtime checksum.
+
+
+### Phone chart dates and series-axis labels — 2026-11-15
+
+The card's four full-width date ticks crowded narrow plot domains. It now
+requests three automatic ticks with DD/MM above the year, retaining horizontal
+text and exact source timestamps/values in hover. Green valuation and amber
+points ticks/titles now match their lines. Both the R plot adapter and browser
+theme updater previously overrode those explicit colors; they now honor declared
+axis colors while keeping ordinary axes on their neutral theme defaults. The
+independent top Round axis also matches its points series.
+
+Passed: `test/test_player_trend_plot.R` (16), existing
+`test/test_plots_module.R` (3), `test/test_rival_summary_layout.R` (12),
+deployment contract (3), and required `test/test_shiny_simulation.R` (13 checks
+plus 8 tabs; no external HTTP/live DB mutation attempts). Chart known answers
+retain every finite source valuation, zero/negative scores, chronological
+postponed rounds, explicit finality, original dates and undated-score coverage.
+The exact staged module/theme also passes the chart contracts separately from
+unrelated working changes.
+
+The actual chart expression passed synthetic browser checks at 320/390/1440px
+across combined, valuation-only, dated-points-only and undated-score histories
+in both themes (24 combinations). Rendered date-label bounding boxes do not
+overlap; tick/title colors equal line colors; uncolored axes retain theme
+defaults; all 124 valuations and four scores remain intact. Theme changes
+preserve trace data and the zoomed date range. No page overflow, JavaScript
+errors or visible output errors; heartbeats were 81/93/95ms respectively.
+390px dark/light screenshots were inspected. The dedicated fixture uses the
+production plot expression, R adapter and browser theme script with synthetic
+history; it does not require accounts, worker tokens or a live database.
+
+A mistakenly invoked legacy `test/test_rivals_plot_df.R` stopped at missing
+credentials before login and is not counted as passing. It is a live-account
+script; verification continued with the offline rival-summary fixture. No
+authenticated request or transaction was performed. Browser setup initially
+addressed Selectize as a native select; using its actual selection API resolved
+that fixture issue without a production change.
+
+Performance review: fewer date ticks reduce label density; the second year line
+is bounded SVG text. Theme changes reuse the existing single layout update,
+adding only constant-time color lookups per axis. No new observer, resize
+handler, timer, listener, API/database request, source transformation, cache,
+invalidation, persistence work or retained state. Existing durable history and
+context/source-time/freshness contracts remain unchanged. No dependencies or
+environment/schema changes. Documentation has no runtime effect. Local browser
+fixtures do not establish hosted latency, physical-device behavior or deployed
+acceptance. Delivery includes only this task's changes/checksums; unrelated
+scheduled-clause, ownership and line-ending edits remain excluded.

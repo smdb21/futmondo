@@ -2364,7 +2364,7 @@
       "checksum": "1a1dd575681a9df0bdfe04c72332e1f3"
     },
     "Modules/Selected_Player_Module.R": {
-      "checksum": "7563ee14cc900ea2340a0bf36dda796a"
+      "checksum": "0995ce15d25a708c11a96fbb7b0abc29"
     },
     "Modules/Today_Module.R": {
       "checksum": "0656f9c299e1cc532cd601c856fcfc51"
@@ -2406,7 +2406,7 @@
       "checksum": "f49117c4a21dd8d417a32070c206f2cf"
     },
     "theme.R": {
-      "checksum": "a1e1d838c6dcce0a85e626a48ad799e9"
+      "checksum": "771495cb5f6af805b2b98f903f675375"
     },
     "ui.R": {
       "checksum": "afda51c1927a4e8739198e39103e755c"
@@ -2433,7 +2433,7 @@
       "checksum": "2b037334f8088f5b4a270acbaea52e91"
     },
     "www/theme-switch.js": {
-      "checksum": "616593ba18b7d3bb585da89e204c0cf4"
+      "checksum": "cbd0fc51a2810de3db14b8ad305c19ce"
     },
     "www/worker-state.js": {
       "checksum": "352065cfc635da026087de7a339b4d95"

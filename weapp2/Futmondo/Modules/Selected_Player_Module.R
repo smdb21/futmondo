@@ -2095,20 +2095,20 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       }
       date_axis <- nrow(values)>0L || dated_points
       horizontal_axis <- list(title=if(date_axis)"Date"else "Round",
-        type=if(date_axis)"date"else "linear",tickmode="auto",nticks=4,tickangle=0,showgrid=FALSE)
+        type=if(date_axis)"date"else "linear",tickmode="auto",nticks=3,tickangle=0,showgrid=FALSE)
       # A NULL dtick serializes as [] and forces daily ticks on Plotly's date
       # axis. Omit it entirely for dates; keep numeric round ticks integral.
       round_spacing <- if(nrow(points))max(1,ceiling(diff(range(points$round_number))/3))else 1
-      if(date_axis)horizontal_axis$tickformat <- "%d/%m/%Y" else {
+      if(date_axis)horizontal_axis$tickformat <- "%d/%m<br>%Y" else {
         horizontal_axis$tickmode <- "linear";horizontal_axis$dtick <- round_spacing
       }
       chart %>% fm_plot_layout(
         xaxis=horizontal_axis,
-        xaxis2=if(separate_round_axis)list(title="Round",overlaying="x",side="top",
+        xaxis2=if(separate_round_axis)list(title=list(text="Round",font=list(color="#F4C95D")),color="#F4C95D",overlaying="x",side="top",
           tickmode="linear",dtick=round_spacing,tickangle=0,showgrid=FALSE)else list(visible=FALSE),
-        yaxis=list(title="Value (EUR)",visible=nrow(values)>0L,autorange=FALSE,
+        yaxis=list(title=list(text="Value (EUR)",font=list(color="#00ff88")),visible=nrow(values)>0L,autorange=FALSE,
           range=player_trend_axis_range(values$value),tickformat=".3s",color="#00ff88"),
-        yaxis2=list(title="Points",visible=nrow(points)>0L,overlaying="y",side="right",autorange=FALSE,
+        yaxis2=list(title=list(text="Points",font=list(color="#F4C95D")),visible=nrow(points)>0L,overlaying="y",side="right",autorange=FALSE,
           range=player_trend_axis_range(points$points),showgrid=FALSE,color="#F4C95D",tickformat="~g"),
         showlegend=FALSE,
         margin=list(l=55,r=50,b=55,t=if(separate_round_axis)60 else 20),
