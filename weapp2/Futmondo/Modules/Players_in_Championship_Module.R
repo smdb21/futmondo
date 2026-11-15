@@ -13,7 +13,8 @@ players_in_championship_UI <- function(id) {
       filter_by_active_clause = TRUE,
       default_active_clause = TRUE,
       filter_by_max_clause_value = TRUE,
-      filter_by_clause_under_available_funds = TRUE
+      filter_by_clause_under_available_funds = TRUE,
+      filter_by_own_team = TRUE
     )
   )
 }
@@ -110,6 +111,7 @@ players_in_championship_Server <- function(id, is_module_active, login_token, ch
       user_team_id = user_team_id,
       available_funds_RV = available_funds_RV,
       points_ratio_basis = "clause_price",
+      filter_by_own_team = TRUE,
       refresh_trigger = refresh_trigger,
       is_module_active = is_module_active
     )

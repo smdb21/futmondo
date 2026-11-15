@@ -17,7 +17,8 @@ players_table_UI <- function(id, box_title = NULL,
                              show_position_breakdown = FALSE,
                              hide_bid_column = FALSE,
                              default_active_clause = FALSE,
-                             default_free_agents = FALSE) {
+                             default_free_agents = FALSE,
+                             filter_by_own_team = FALSE) {
   ns <- NS(id)
   filter_panel <- function(...) {
     tags$details(
@@ -32,9 +33,13 @@ players_table_UI <- function(id, box_title = NULL,
     )
   }
   checkbox_filters <-
-      if (filter_by_active_clause || filter_by_max_clause_value || filter_by_clause_under_available_funds || filter_by_is_favorite || filter_by_is_from_futmondo || filter_by_players_with_bid) {
+      if (filter_by_own_team || filter_by_active_clause || filter_by_max_clause_value || filter_by_clause_under_available_funds || filter_by_is_favorite || filter_by_is_from_futmondo || filter_by_players_with_bid) {
         fluidRow(
           class = "player-checkbox-filters",
+          if (filter_by_own_team) {
+            div(checkboxInput(ns("show_my_team_filter"),"Show players in my team",value=FALSE),
+              style="font-weight: 500;",title="Include players owned by your current team. All other filters still apply.")
+          },
           if (filter_by_active_clause) {
             div(checkboxInput(inputId = ns("active_clause_filter"), label = "Active Clause Only", value = isTRUE(default_active_clause)), style = "font-weight: 500;", title = "Show only players whose buyout clause is currently payable (lock period has expired)")
           },
@@ -317,7 +322,7 @@ players_table_renewal_disabled <- function(settings) {
   length(value)==1L && is.atomic(value) && !is.na(value) && identical(tolower(as.character(value)),"true")
 }
 
-players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL, available_funds_RV = NULL, hide_bid_column = FALSE, refresh_trigger = NULL, is_module_active = function() TRUE, optional_ready = function() TRUE, points_ratio_basis = NULL, own_squad = FALSE, league_settings_source = NULL, departing_player_ids = NULL) {
+players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL, available_funds_RV = NULL, hide_bid_column = FALSE, refresh_trigger = NULL, is_module_active = function() TRUE, optional_ready = function() TRUE, points_ratio_basis = NULL, own_squad = FALSE, league_settings_source = NULL, departing_player_ids = NULL, filter_by_own_team = FALSE, effective_squad_source = NULL) {
   if (!is.null(points_ratio_basis)) points_ratio_basis <- match.arg(points_ratio_basis, c("value", "clause_price"))
   moduleServer(id, function(input, output, session) {
     bind_factual_reads(c("get_finished_rounds"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
@@ -381,6 +386,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
         updateNumericInput(session, inputId = "max_clause_value_filter", value = NA_real_)
         updateCheckboxInput(session, inputId = "clause_under_available_funds_filter", value = FALSE)
         updateCheckboxInput(session, inputId = "is_favorite_filter", value = FALSE)
+        if(isTRUE(filter_by_own_team))updateCheckboxInput(session,"show_my_team_filter",value=FALSE)
         updateCheckboxInput(session, inputId = "is_from_futmondo_filter", value = FALSE)
         updateCheckboxInput(session, inputId = "players_you_bid_filter", value = FALSE)
         updateCheckboxInput(session, inputId = "players_with_bid_filter", value = FALSE)
@@ -491,6 +497,11 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       players_table <- players_table_enriched_RV()
       if(is.null(players_table))return(NULL)
       filter_added_fields<-attr(players_table,"filter_added_fields")
+      if(isTRUE(filter_by_own_team)&&!isTRUE(input$show_my_team_filter)) {
+        own_team<-table_context_RV()$team
+        shiny::validate(shiny::need(nzchar(own_team),"Loading your team…"),errorClass="fm-loading")
+        players_table<-players_table[!as.character(players_table$owner_team_id)%in%own_team,,drop=FALSE]
+      }
       if (!is.null(input$position_filter)) {
         if (input$position_filter != "All") {
           players_table <- players_table %>%
@@ -694,7 +705,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
     # Position Breakdown UI Renderer
     position_breakdown_display<-resource_display_source(session,function(){
       df <- players_table_RV()
-      if (is.null(df) || nrow(df) == 0) return(NULL)
+      if (!is.data.frame(df)) return(NULL)
 
       combined_roles <- paste(
         if ("role" %in% colnames(df)) ifelse(is.na(df$role), "", as.character(df$role)) else "",
@@ -707,12 +718,18 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       md <- sum(grepl("centrocampista|midfielder|mediocentro|^3$|\\bmed\\b|\\bcen\\b|\\bmid\\b|\\bmf\\b|\\bmc\\b", combined_roles, ignore.case = TRUE), na.rm = TRUE)
       fw <- sum(grepl("delantero|forward|extremo|atacante|^4$|\\bdel\\b|\\bfwd\\b|\\bfw\\b|\\batt\\b", combined_roles, ignore.case = TRUE), na.rm = TRUE)
       total_squad <- nrow(df) # Exact actual player count (distinct players)
+      effective<-if(is.function(effective_squad_source))effective_squad_source()else NULL
 
       div(
         class = "squad-breakdown-card",
-        div(class = "squad-breakdown-title",
+        div(class = "squad-breakdown-title",style="flex-wrap:wrap;gap:8px;",
             span(icon("users"), " Squad Position Breakdown"),
-            span(class = "badge", style = "background-color: var(--fm-surface); color: var(--fm-text); font-size: 11px; padding: 3px 8px;", paste0("Total: ", total_squad, " Players"))
+            div(style="display:flex;flex-wrap:wrap;gap:6px;",
+              span(class = "badge", style = "background-color: var(--fm-surface); color: var(--fm-text); font-size: 11px; padding: 3px 8px;", paste0("Total: ", total_squad, " Players")),
+            if(is.list(effective))span(class="badge squad-effective-count",title=effective$detail,
+              style="background-color:var(--fm-surface);color:var(--fm-text);font-size:11px;padding:3px 8px;white-space:normal;",
+              if(length(effective$count)==1L&&!is.na(effective$count))paste0("Effective: ",effective$count," Players")else
+                if(identical(effective$status,"loading"))"Effective: Checking…"else "Effective: Unavailable"))
         ),
         div(style = "display: flex; gap: 8px; flex-wrap: wrap; justify-content: space-between; margin-top: 8px;",
             span(class = "badge-gk squad-pos-badge", paste0("Goalkeepers: ", gk)),

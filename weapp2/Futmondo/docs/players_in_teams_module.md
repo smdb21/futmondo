@@ -1,5 +1,16 @@
 # My team
 
+## Current and effective squad totals — 2026-11-14 Pacific
+
+The position breakdown now presents the actual roster count and an adjacent effective purchase count. For example, 18 current players, two bought but not yet arrived and one leaving displays **Total: 18 Players · Effective: 19 Players**. Position badges and squad valuation still describe the actual roster. The count concerns pending transfer commitments, independently of the next-kickoff highlighting cutoff.
+
+`effective_squad_count(roster, incoming_ids, outgoing_ids)` in `futmondo_functions.R` is the shared pure identity ledger for display and `calculate_team_acquisition_capacity()`. It removes outgoing IDs present in the roster and adds incoming IDs absent from it. Repeated transfer IDs do not double count, arrived players do not add another slot, and already-absent departures do not subtract a slot. Confirmed empty sets use `character(0)`; NULL, missing/blank identities, duplicate roster IDs or contradictory incoming/outgoing identities return `NA_integer_`.
+
+`team_effective_squad_count(roster, transfers)` adapts the existing context-isolated `incoming()` resource to `list(count, status, detail)`. Complete `ok` or successful historical `observed` inbound/outbound records can supply this descriptive count. Loading stays pending; failed/partial roster or transfer evidence and absent identity columns stay unavailable rather than becoming zero. The tooltip explains the arithmetic, observed basis and purchase-time recheck. Strict purchase preflights still require fresh verified reconciliation and never accept this display state as authorization.
+
+`players_in_teams_Server()` supplies a stable active-navigation-gated `effective_squad` projection to the existing shared player table. Source-clock-only publications preserve the card DOM. This adds no acquisition, refresh timer, persistence queue or API/database work: reusable successful observations continue to be persisted/reused by the existing durable roster and clause-transfer infrastructure. The derived count is cheap to reconstruct and is not a separately stored fact.
+
+
 ## Saved offer observations and inline transfer information — 2026-11-14 Pacific
 
 `team_received_offers_state(roster_state)` separates successful stored observations from current-action freshness. Previously any expired worker roster inherited `stale`, creating a red “could not be verified / Refresh” error even when the acquisition succeeded. A dated `observed` state now requires successful worker acquisition, no parent/nested error or partial completeness, valid normalized `received_offers` rows, explicit `received_offers_status` (`ok`/`empty`), and a valid nonfuture source timestamp. Unknown global completeness is accepted only with this explicit offer parser proof, matching the worker’s existing per-resource contracts. Missing/malformed rows, failed/partial sources and future timestamps stay unverified. Attribute lookup is exact so an absent row attribute cannot partially match its timestamp metadata. Explicit old empty-roster acquisitions can reconstruct observed empty offers; new `get_players_from_team()` empty responses include the complete empty offer attributes for persistence/reuse.

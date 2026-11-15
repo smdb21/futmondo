@@ -1,5 +1,13 @@
 # Futmondo data architecture redesign plan
 
+## Own-team filter and effective squad count — 2026-11-14 Pacific
+
+- [x] All Players **Show players in my team**, unchecked by default, combines with existing filters and resets off; other tables retain their defaults.
+- [x] My Team displays actual/effective totals together, using one identity ledger shared with purchase capacity; bought/leaving players and unknown/pending observations retain their domain meaning.
+- [x] Focused known-answer/filter/transfer tests, phone/desktop browser checks, offline lifecycle and proportionate performance review. [Table contracts](players_table_module.md), [My Team contracts](players_in_teams_module.md), [official comparison](feature_comparison.md).
+- [ ] Hosted acceptance after deployment. No new acquisition, persistence schema, dependencies or transaction automation.
+
+
 ## Empty/pending information icons — 2026-11-14 Pacific
 
 - [x] Shared recursive empty-content detection and hidden dynamic placeholders; settled values reveal icons and empty/pending values hide them.

@@ -1724,6 +1724,17 @@ incoming_clause_round_label <- function(joins_at,next_round) {
   if(delta<0)"Before round starts"else if(delta>0)"After round starts"else "At round start"
 }
 
+# One identity-based count for purchase capacity and observed squad presentation.
+# NULL means unknown transfer identities; character(0) is a confirmed empty set.
+effective_squad_count <- function(roster, incoming_ids, outgoing_ids) {
+  valid<-function(ids) is.atomic(ids)&&!is.null(ids)&&!anyNA(ids)&&all(nzchar(trimws(as.character(ids))))
+  if(!is.data.frame(roster)||!"id"%in%names(roster)||!valid(roster$id)||anyDuplicated(roster$id)||
+     !valid(incoming_ids)||!valid(outgoing_ids))return(NA_integer_)
+  current<-as.character(roster$id);incoming<-unique(as.character(incoming_ids));outgoing<-unique(as.character(outgoing_ids))
+  if(length(intersect(incoming,outgoing)))return(NA_integer_)
+  as.integer(length(setdiff(current,outgoing))+length(setdiff(incoming,current)))
+}
+
 # Pure calculation shared by synchronous manual checks and asynchronous display.
 calculate_team_acquisition_capacity <- function(info,roster_df,pressroom,market,summaries,user_team_id,now=Sys.time()) {
   empty_target <- list(my_bid_id=NULL,my_bid_amount=NA_real_,highest_bid=NA_real_,bid_count=NA_integer_)
@@ -1840,7 +1851,7 @@ calculate_team_acquisition_capacity <- function(info,roster_df,pressroom,market,
     }
 
     effective_count <- if(!is.na(roster_count)&&identical(transfer_state$status,"ok"))
-      as.integer(roster_count-transfer_state$pending_outbound_count+transfer_state$pending_inbound_count) else NA_integer_
+      effective_squad_count(roster_df,transfer_state$pending_inbound_ids,transfer_state$pending_outbound_ids) else NA_integer_
     remaining_slots <- if (!is.na(roster_count) && !is.na(cap_val)) as.integer(cap_val-roster_count) else NA_integer_
     effective_remaining <- if(!is.na(effective_count)&&!is.na(cap_val)) as.integer(cap_val-effective_count) else NA_integer_
 

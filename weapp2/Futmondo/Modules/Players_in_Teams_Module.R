@@ -207,6 +207,9 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       return(players_table)
     })
 
+    effective_squad<-resource_display_source(session,function(){
+      req(is_module_active());team_effective_squad_count(players_table_RV(),incoming())
+    })
     output$team_value_box <- renderUI({
       req(is_module_active());roster <- players_table_RV()
       values <- suppressWarnings(as.numeric(roster$value))
@@ -316,10 +319,37 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
     selected <- players_table_Server("players_table_in_teams", players_table_RV, user_teams_RV,
       login_token, championship_id, user_team_id, hide_bid_column=FALSE, refresh_trigger=refresh_trigger,
       is_module_active=is_module_active,own_squad=TRUE,league_settings_source=league_settings_source,
-      departing_player_ids=departing_ids)
+      departing_player_ids=departing_ids,effective_squad_source=effective_squad)
     return(selected)
   })
 }
+# Display the same identity ledger as purchase preflights, using already shared
+# observations. This projection never grants eligibility to place a transaction.
+team_effective_squad_count <- function(roster, transfers) {
+  pending<-is.null(transfers)||any(attr(roster,"fetch_status")%in%c("loading","refreshing"))||
+    isTRUE(transfers$status%in%c("loading","refreshing"))||
+    isTRUE(transfers$outgoing_status%in%c("loading","refreshing"))
+  unavailable<-function(detail)list(count=NA_integer_,status=if(pending)"loading"else"unavailable",detail=detail)
+  if(pending)return(unavailable("Pending arrivals and departures are still loading."))
+  if(!is.data.frame(roster)||any(attr(roster,"fetch_status")%in%c("partial","unavailable"))||
+     !is.null(attr(roster,"fetch_error"))||(!is.null(attr(roster,"worker_acquisition_status"))&&!isTRUE(attr(roster,"worker_acquisition_status")%in%c("ok","empty")))||
+     any(attr(roster,"worker_completeness")%in%c("partial","unavailable","incomplete")))
+    return(unavailable("Current squad observation is incomplete or unavailable."))
+  if(!isTRUE(transfers$status%in%c("ok","observed"))||!isTRUE(transfers$outgoing_status%in%c("ok","observed"))||
+     !is.null(transfers$error)||!is.null(transfers$outgoing_error))
+    return(unavailable(transfers$error %||% transfers$outgoing_error %||% "Pending transfer verification is incomplete."))
+  incoming<-transfers$records;outgoing<-transfers$outgoing_records
+  if(!is.data.frame(incoming)||!is.data.frame(outgoing)||!"player_id"%in%names(incoming)||!"player_id"%in%names(outgoing))
+    return(unavailable("Pending arrival or departure identities are unavailable."))
+  count<-effective_squad_count(roster,incoming$player_id,outgoing$player_id)
+  if(is.na(count))return(unavailable("Squad or pending transfer identities are incomplete or inconsistent."))
+  bought<-length(setdiff(unique(as.character(incoming$player_id)),as.character(roster$id)))
+  leaving<-length(intersect(unique(as.character(outgoing$player_id)),as.character(roster$id)))
+  list(count=count,status=if(isTRUE(transfers$observations_only))"observed"else"ok",
+    detail=paste0(nrow(roster)," current + ",bought," bought awaiting arrival − ",leaving,
+      " leaving = ",count,". Based on observed transfers; purchases are rechecked before submitting."))
+}
+
 # One numeric asking price for My Team; raw fields remain player-card metadata.
 team_selling_prices <- function(roster,listings=NULL) {
   prices <- rep(NA_real_,nrow(roster))

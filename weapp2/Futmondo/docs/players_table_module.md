@@ -1,5 +1,14 @@
 # Players Table Module Documentation
 
+## Own-team inclusion and effective squad count — 2026-11-14 Pacific
+
+`players_table_UI(..., filter_by_own_team=FALSE)` and `players_table_Server(..., filter_by_own_team=FALSE)` opt into the **Show players in my team** checkbox. Only All Players in Championship enables it. It starts unchecked, excluding rows whose normalized `owner_team_id` matches the current explicit `user_team_id`. Checking it includes those rows alongside other owners; owner/position/active-clause/value and other filters still intersect. Missing owner identity stays unknown, not implicitly owned or free; a missing current team produces typed pending validation. Context changes compare the new immutable team identity, not display names. Clear Filters resets the checkbox off. Other tables retain their existing behavior.
+
+The server's optional `effective_squad_source` function returns `list(count=<integer or NA>, status=<ok|observed|loading|unavailable>, detail=<tooltip>)`. When supplied, the position card groups **Total: N Players** and **Effective: N Players** beside each other, wrapping on narrow screens. The actual total and primary/secondary position counts continue to use the complete current roster, independently of filters. Complete empty rosters display zero; pending effective data says **Checking…**, and incomplete/error data says **Unavailable**. The effective badge's native tooltip explains current + bought awaiting arrival − leaving and the observed-data qualification. Tables without this source get no extra badge.
+
+Both features project existing shared data. Filter changes operate on enriched in-session rows; they do not fetch catalog/history again or invalidate database observations. The effective count uses the existing persisted roster/transfer observations via My Team, with no new request, timer, database write or separately cached result. Successful reusable API results remain in the established context-isolated durable database stores; memory is only an accelerator.
+
+
 This document describes the `Players_Table_Module.R` Shiny module, which renders a data table of players with filtering and position breakdown capabilities.
 
 ---
