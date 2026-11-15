@@ -60,6 +60,7 @@ notifications_Server <- function(id, is_module_active, login_token, championship
     official <- shiny::reactiveVal(NULL)
     last_success <- shiny::reactiveVal(NULL)
     stale <- shiny::reactiveVal(FALSE)
+    pending <- shiny::reactiveVal(TRUE)
     selected <- shiny::reactiveVal(NULL)
     detail_context <- shiny::reactiveVal(NULL)
     pending_player <- shiny::reactiveVal(NULL)
@@ -80,13 +81,16 @@ notifications_Server <- function(id, is_module_active, login_token, championship
         })
     }
     shiny::observeEvent(request_context(),{pending_player(NULL);selected(NULL);detail_context(NULL)},ignoreNULL=FALSE,priority=100)
-    output$player_details <- shiny::renderUI({ if(!is.null(pending_player()))return(fm_info("Loading player details…"));shiny::req(selected()); selected_player_UI(session$ns("player")) })
+    output$player_details <- shiny::renderUI({ if(!is.null(pending_player()))return(fm_info("Loading player details…",pending=TRUE));shiny::req(selected()); selected_player_UI(session$ns("player")) })
     shiny::observeEvent(login_token(), {
-      official(NULL);pending_player(NULL); selected(NULL); detail_context(NULL); last_success(NULL)
+      official(NULL);pending_player(NULL); selected(NULL); detail_context(NULL); last_success(NULL);pending(TRUE);stale(FALSE)
     }, ignoreNULL = FALSE)
     refresh <- function() {
       auth <- login_token(); shiny::req(valid_login(auth))
-      result <- tryCatch(get_notifications(auth),error=function(e)NULL)
+      waiting<-FALSE
+      result <- tryCatch(get_notifications(auth),error=function(e){waiting<<-inherits(e,"fm-loading");NULL})
+      pending(waiting)
+      if(waiting)return(invisible(NULL))
       if (!is.null(result)) {
         record_round_publication_signal(session$rootScope(),auth[["userid"]],championship_id(),result)
         official(result); last_success(attr(result,"observed_at") %||% Sys.time())
@@ -118,6 +122,7 @@ notifications_Server <- function(id, is_module_active, login_token, championship
     })
     output$status <- shiny::renderUI({
       if (!valid_login(login_token())) return(shiny::p("Log in to see notifications."))
+      if(pending())return(NULL)
       if (is.null(last_success())) return(fm_info("Notifications unavailable. Refresh to retry.",error=TRUE))
       fm_info(if (stale()) "Showing the last successful refresh. " else "Updated ",
         notification_datetime_labels(last_success()),error=stale())

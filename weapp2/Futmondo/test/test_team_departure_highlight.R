@@ -49,6 +49,7 @@ shiny::testServer(players_table_Server,args=list(players_table_RV=source_rows,us
   widget<-jsonlite::fromJSON(initial,simplifyVector=FALSE)$x$tag$attribs
   stopifnot(identical(unlist(widget$meta$departingPlayerIndexes),c(0L,1L)),
    identical(widget$rowClass,as.character(players_table_departure_class())),
+   any(vapply(widget$columns,function(column)identical(column$id,'.selection')&&identical(column$show,FALSE),logical(1))),
    !any(grepl('depart',names(table_display_data()))))
  })
  check('departure-only changes update metadata in place without roster enrichment',{

@@ -126,6 +126,7 @@ function(input, output, session) {
     paste(text[nzchar(text)],collapse=" · ")
   })
   output$round_finance_checked<-renderText(round_finance_checked())
+  shiny::outputOptions(output,"round_finance_checked",suspendWhenHidden=FALSE)
   round_catalog_read <- factual_read_adapter(session,'get_finished_rounds',login_token_RV,championship_id_RV,user_team_id_RV,
     is_active=function()valid_login(login_token_RV())&&isTRUE(startup_primary_ready()),refresh_trigger=refresh_trigger,state_only=TRUE)
   round_catalog_state_RV <- reactive({
@@ -164,7 +165,7 @@ function(input, output, session) {
         tags$div(class="round-countdown-main",icon("futbol"),
           tags$strong(paste0("Round ",current_round$round_number)),tags$span("In progress"))
       } else tags$div(class="round-countdown-main",icon("clock"),
-        fm_info(if (primary_ready) "Round schedule unavailable" else "Loading round schedule…", error = primary_ready))
+        fm_info(if (primary_ready) "Round schedule unavailable" else "Loading round schedule…", error = primary_ready,pending=!primary_ready))
     }
     finance <- round_finance_RV()
     cash <- finance$cash
@@ -195,7 +196,7 @@ function(input, output, session) {
             (!finance$cash_loading && !finance$offers_loading &&
               (!is.finite(cash) || !is.finite(commitments) || !is.finite(spendable))) ||
             (!is.null(solvency_text) && grepl("could not load", solvency_text, fixed=TRUE)),
-          class = "round-countdown-solvency")))
+          pending=(finance$cash_loading||finance$offers_loading)&&!identical(solvency_class,"round-countdown-warning"), class = "round-countdown-solvency")))
   })
   user_teams_RV <- reactive({
     req(championship_id_RV()); refresh_trigger()

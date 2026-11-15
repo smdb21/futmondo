@@ -43,7 +43,7 @@ check('chart diagnostics preserve missing-data evidence without adding a fabrica
   stopifnot(!nzchar(visible_text(info)),grepl('Total points: 37',html,fixed=TRUE),
     grepl('1.234.567',html,fixed=TRUE),grepl('fm-info-error',html,fixed=TRUE))
 })
-check('loading diagnostics are neutral and rendering performs no source or database reads',{
+check('loading diagnostics have no icons and rendering performs no source or database reads',{
   reads<-0L
   async_adapter_fetch<-function(...){reads<<-reads+1L;stop('Unexpected acquisition')}
   get_cached_data<-function(...){reads<<-reads+1L;stop('Unexpected API read')}
@@ -51,7 +51,7 @@ check('loading diagnostics are neutral and rendering performs no source or datab
   state<-list(status='loading',records=received_offers_empty(),error=NULL)
   elapsed<-system.time(for(i in 1:100)team_received_offers_panel(state,identity))[['elapsed']]
   html<-as.character(team_received_offers_panel(state,identity))
-  stopifnot(reads==0L,grepl('Checking received offers',html,fixed=TRUE),!grepl('fm-info-error',html,fixed=TRUE))
+  stopifnot(reads==0L,!grepl('fm-info',html,fixed=TRUE),!grepl('fm-info-error',html,fixed=TRUE))
   cat(sprintf('MEASURE 100 offer-state renders %.3fs; source/database reads=%d\n',elapsed,reads))
 })
 cat(sprintf('PLAYER INFORMATION DISCLOSURES: %d passed / 0 failed\n',checks))

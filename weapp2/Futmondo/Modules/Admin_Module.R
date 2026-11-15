@@ -171,7 +171,7 @@ admin_Server <- function(id,is_module_active,login_token,championship_id,user_te
     reactable::reactable(rows,columns=list(round_id=reactable::colDef(show=FALSE),required=reactable::colDef(show=FALSE),round_number=reactable::colDef(name="Round",cell=function(value,index)award_round_labels(value,rows$round_id[index])),selection=reactable::colDef(name="Selection"),finality=reactable::colDef(name="Finality"),mvp=reactable::colDef(name="MVP"),last_fetched=reactable::colDef(name="Last fetched"),persistence=reactable::colDef(name="Saved status"),issue=reactable::colDef(name="Issue")),defaultSorted=list(round_number="desc"),compact=TRUE,wrap=TRUE)
   })
   output$awards_progress<-renderUI({req(is_module_active(),authorized());snapshot<-awards()
-    if(isTRUE(snapshot$loading))return(fm_info("Loading round details…"))
+    if(isTRUE(snapshot$loading))return(fm_info("Loading round details…",pending=TRUE))
     # Keep failure details available through a compact disclosure above the table.
     issues<-if(is.data.frame(snapshot$coverage)&&all(c("issue","required")%in%names(snapshot$coverage)))snapshot$coverage$issue[snapshot$coverage$required%in%TRUE] else character()
     issues<-issues[!is.na(issues)&nzchar(trimws(issues))]

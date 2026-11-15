@@ -574,7 +574,7 @@ classification_Server <- function(id, is_module_active, login_token, championshi
     output$round_buttons <- renderUI({
       numbers <- sort(round_numbers_RV(), decreasing = TRUE)
       if (!length(numbers)) {
-        return(fm_info("Loading played rounds…"))
+        return(fm_info("Loading played rounds…",pending=TRUE))
       }
       tagList(lapply(numbers, function(number) {
         selected <- identical(as.numeric(number), as.numeric(selected_round_RV()))
@@ -771,7 +771,7 @@ classification_Server <- function(id, is_module_active, login_token, championshi
           "Loading the official round lineup…"
         } else {
           resource_failure_message(result$error)
-        }, error = !isTRUE(result$loading)))
+        }, error = !isTRUE(result$loading),pending=isTRUE(result$loading)))
       }
       tagList(
         if (identical(attr(result$data, "fetch_status"), "stale")) {
@@ -897,7 +897,7 @@ classification_Server <- function(id, is_module_active, login_token, championshi
           "Loading league settings…"
         } else {
           resource_failure_message(settings$error)
-        }, error = !isTRUE(settings$loading)))
+        }, error = !isTRUE(settings$loading),pending=isTRUE(settings$loading)))
       }
       snapshot <- settings$data
       if (is.function(league_settings_source)) {
@@ -911,7 +911,7 @@ classification_Server <- function(id, is_module_active, login_token, championshi
               "Loading league settings…"
             } else {
               resource_failure_message(snapshot$error)
-            }, error = !identical(snapshot$status, "loading")
+            }, error = !identical(snapshot$status, "loading"),pending=identical(snapshot$status,"loading")
           ))
         }
         info <- list(configuration = configuration)
@@ -954,7 +954,7 @@ classification_Server <- function(id, is_module_active, login_token, championshi
           "Loading the published dream team…"
         } else {
           resource_failure_message(dreamteam$error)
-        }, error = !isTRUE(dreamteam$loading)))
+        }, error = !isTRUE(dreamteam$loading),pending=isTRUE(dreamteam$loading)))
       }
       players <- classification_dreamteam_rows(dreamteam$data)
       if (!nrow(players)) {

@@ -2274,7 +2274,7 @@
       "checksum": "52d7304690180c923a077723cc4c4e3a"
     },
     "app_access.R": {
-      "checksum": "35285acf91d616a999b87ba74bb25a1f"
+      "checksum": "cf2cbb166cfb870bbe1c8c369af2c744"
     },
     "async_transport.R": {
       "checksum": "95cbfefc3eb526f6b24de3a97bd11795"
@@ -2295,13 +2295,13 @@
       "checksum": "da040a3b0c28d53ab589b4c523e3bcb7"
     },
     "data_contracts.R": {
-      "checksum": "cc250d71ec5d00d71cc1b9d6515487f9"
+      "checksum": "266c842f0ced04f1506b6054f953a50b"
     },
     "data_service.R": {
       "checksum": "88a05e10c33417edb15bcf2bc5d5b461"
     },
     "factual_helpers.R": {
-      "checksum": "7dfbccbeb96917865907a3be3e7f967c"
+      "checksum": "cc630a14c639bfaeee5414f14a1209f8"
     },
     "futmondo_functions.R": {
       "checksum": "e8c8c8c74802eb3af00c70e3f1311c72"
@@ -2328,46 +2328,46 @@
       "checksum": "07666a5b7b3c48842a7b0a28ee504545"
     },
     "Modules/Admin_Module.R": {
-      "checksum": "5b3aff7f88ae34ec4047b4a11d24988f"
+      "checksum": "a1661bbcea9e0d69dc2828d5e9e427f5"
     },
     "Modules/Classification_Module.R": {
-      "checksum": "53e4b33acc788ea4127b396af3479975"
+      "checksum": "8f88c60f7ffd7966b86fac3b3a45377a"
     },
     "Modules/Lineup_Module.R": {
-      "checksum": "ae1233c70162f5f7b3812b7dbfdf8c75"
+      "checksum": "1c508b9c79a5fa3ee9d0fa357f28a0e8"
     },
     "Modules/Login_Module.R": {
-      "checksum": "f8821545e7ccae0a9bfc280d09272d07"
+      "checksum": "6fae693f55550d68174b172e1240220a"
     },
     "Modules/Market_Module.R": {
       "checksum": "676429892e2008352ddce0a3a4a2e32b"
     },
     "Modules/Notifications_Module.R": {
-      "checksum": "bcf1f6c04d6551d6474db1a8f0be42f8"
+      "checksum": "b759b9b900ef519c81613486b78b2d24"
     },
     "Modules/Players_in_Championship_Module.R": {
       "checksum": "0c220663de1f047b20b843e3998a1f8b"
     },
     "Modules/Players_in_Teams_Module.R": {
-      "checksum": "28a8a0bddca08facf5066f5080597cb8"
+      "checksum": "73b511525b4bde41ff4179b5e3d118a5"
     },
     "Modules/Players_Table_Module.R": {
-      "checksum": "5ffda00b3ab76995dcd30c62f79ccd1e"
+      "checksum": "5502cce7aaaacd67770ef8fd344735f8"
     },
     "Modules/Plots_Module.R": {
       "checksum": "6eb616af21a125a9a4200a20e5494452"
     },
     "Modules/Rivals_Module.R": {
-      "checksum": "ceb2a5fd2eb9882d8297fb26f96747e0"
+      "checksum": "fd9369170b83884cb79e27230f94d202"
     },
     "Modules/Round_MVPs_Module.R": {
-      "checksum": "84c7480b9122d0597df1606f59e6fcbf"
+      "checksum": "1a1dd575681a9df0bdfe04c72332e1f3"
     },
     "Modules/Selected_Player_Module.R": {
-      "checksum": "7d3ae31460a861bab6a8d298a5cd4b13"
+      "checksum": "95c5794c63912abb005cc57b68c12bdb"
     },
     "Modules/Today_Module.R": {
-      "checksum": "1b6e44534d2b466edba11231570be4a4"
+      "checksum": "d692b703874fcd126e7c5bbbc2ecc125"
     },
     "mvp_runtime.R": {
       "checksum": "74d8fbf348ade54f62447a832c3600d5"
@@ -2400,7 +2400,7 @@
       "checksum": "6941ec3d550551d6c41a20b6a4d2ff3e"
     },
     "server.R": {
-      "checksum": "96612b1089cdaddee35176cdaa4bdd2a"
+      "checksum": "da6477f7f11d7fcf0c1092651c6d311c"
     },
     "supabase_connector.R": {
       "checksum": "f49117c4a21dd8d417a32070c206f2cf"
@@ -2418,13 +2418,13 @@
       "checksum": "767c79704fb40aef1a0b75a20ab56a5a"
     },
     "worker_runtime.R": {
-      "checksum": "80e7961acda7c547d0945f9b13b20e7b"
+      "checksum": "6364162382f8583683c76e5bb88972ea"
     },
     "www/custom_style.css": {
-      "checksum": "d2f76be33ea4f992b7fbb47c91afcd29"
+      "checksum": "4f60c8e685bd52b8494177d5b8349015"
     },
     "www/info-disclosures.js": {
-      "checksum": "951ec848b9ffc7768d0ece925cfa825a"
+      "checksum": "8c21981ed61b5b8915175a4f7ebefcfa"
     },
     "www/release-info.json": {
       "checksum": "94a9e0ef704ee5c2f9de93c7055428b1"

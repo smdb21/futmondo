@@ -142,7 +142,7 @@ today_Server <- function(id,is_module_active,login_token,championship_id,user_te
     })
     primary_placeholder<-function(state,label){
       div(class="col-sm-6",div(class="small-box",h4(label),
-        if(identical(state$status,"loading"))fm_info("Loading data…")else
+        if(identical(state$status,"loading"))fm_info("Loading data…",pending=TRUE)else
           fm_info(resource_failure_message(state$error),actionButton(session$ns("retry_team"),"Retry balance"),error=TRUE)))
     }
     market_status_display<-resource_display_source(session,function(){

@@ -55,15 +55,15 @@ record('player card keeps the team logo in the visible identity row', {
 })
 record('player card location distinguishes ownership from market listing', {
   stopifnot(player_card_location_label(data.frame(), 'mine') ==
-      'Ownership: Free Agent · Market: Not listed on Market',
+      'Ownership: Free Agent · Not listed on Market',
     player_card_location_label(data.frame(market_inMarket=TRUE), 'mine') ==
-      'Ownership: Free Agent · Market: Listed on Market',
+      'Ownership: Free Agent · Listed on Market',
     player_card_location_label(data.frame(user_team_id='rival', userTeam='Rivals FC'), 'mine') ==
-      'Ownership: Rival Owned: Rivals FC · Market: Not listed on Market',
+      'Ownership: Rival Owned: Rivals FC · Not listed on Market',
     player_card_location_label(data.frame(user_team_id='rival',userTeam='Rivals FC',market_inMarket=TRUE),'mine') ==
-      'Ownership: Rival Owned: Rivals FC · Market: Listed on Market',
+      'Ownership: Rival Owned: Rivals FC · Listed on Market',
     player_card_location_label(data.frame(user_team_id='mine',market_inMarket=FALSE,price=999),'mine') ==
-      'Ownership: Your Squad · Market: Not listed on Market',
+      'Ownership: Your Squad · Not listed on Market',
     !player_card_location_status(data.frame(computer=FALSE,market_inMarket=FALSE),'mine')$on_market)
 })
 record('own player never exposes clause purchase eligibility', {
@@ -299,7 +299,7 @@ record('bulk listing handles unverified API outcomes without local roster mutati
 })
 record('classification UI renders all active controls', {
   html <- as.character(classification_UI('class'))
-  stopifnot(grepl('class-round_range_slider',html,fixed=TRUE),grepl('class-single_round_select',html,fixed=TRUE))
+  stopifnot(grepl('class-round_range_slider',html,fixed=TRUE),grepl('class-round_buttons',html,fixed=TRUE))
 })
 
 

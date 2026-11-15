@@ -547,7 +547,7 @@ rivals_finance_table_widget <- function(finances_data,on_error=function(error)NU
   currency<-function(value){value<-fm_number(value);if(is.finite(value))format_table_currency(value)else""}
   public_columns<-function(rows){
     pills<-rivals_points_pills(rows$Points)
-    list(team_id_hidden=colDef(show=FALSE),Team=colDef(name="User Team",align="left",minWidth=130),
+    list(.selection=colDef(show=FALSE),team_id_hidden=colDef(show=FALSE),Team=colDef(name="User Team",align="left",minWidth=130),
       `Overall wealth gained`=colDef(align="right",minWidth=155,cell=function(value,index){
         note<-if(!"net_gain_estimated"%in%names(df)||!identical(df$net_gain_estimated[index],FALSE))"Estimate: cash plus squad value minus starting cash"else "Cash plus squad value minus starting cash"
         tags$span(title=note,style=if(is.finite(value)&&value<0)"color:var(--fm-danger)"else NULL,
@@ -697,7 +697,7 @@ rivals_summary_values <- function(info, teams, finances, team_id) {
 
 rivals_status_message <- function(message, loading=FALSE, error=FALSE, details=NULL) {
   if(!nzchar(message) && is.null(details))return(NULL)
-  fm_info(message, details, error=error, class=if(loading)"rivals-loading-status"else NULL)
+  fm_info(message, details, error=error, pending=loading, class=if(loading)"rivals-loading-status"else NULL)
 }
 
 rivals_update_details <- function(rows, timezone=fm_display_timezone()) {

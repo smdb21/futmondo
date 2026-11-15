@@ -25,6 +25,7 @@ server<-function(input,output,session){
  state<-shiny::reactiveVal(resource_state(roster));panel<-resource_display_source(session,function()team_received_offers_panel(team_received_offers_state(state()),identity,
   source_note=shiny::textOutput('offer_stamp',inline=TRUE)))
  output$offers<-shiny::renderUI(panel());output$offer_stamp<-shiny::renderText(paste('Observed:',fm_format_datetime(team_received_offers_state(state())$observed_at)))
+ shiny::outputOptions(output,'offer_stamp',suspendWhenHidden=FALSE)
  shiny::observeEvent(input$advance,{next_roster<-roster;attr(next_roster,'received_offers_observed_at')<-source_stamp+600;state(resource_state(next_roster))})
  output$beats<-shiny::renderText(input$heartbeat %||% 0);output$calls<-shiny::renderText({input$heartbeat;io})
 }

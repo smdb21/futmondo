@@ -3,11 +3,33 @@ source("theme.R")
 
 # Compact, client-only disclosure. Source/diagnostic text is retained verbatim;
 # native details handles keyboard access without a reactive input or request.
-fm_info <- function(..., error = FALSE, class = NULL) {
-  content <- list(...)
-  content <- Filter(function(x) !is.null(x) && !(is.character(x) && !any(nzchar(x))), content)
-  if (!length(content)) return(NULL)
-  shiny::tags$details(class = paste(c("fm-info", if (isTRUE(error)) "fm-info-error", class), collapse = " "),
+# Recursively inspect tag/list children, rather than treating an empty wrapper
+# or a not-yet-bound Shiny output as readable information.
+fm_info_content <- function(x) {
+  if(is.null(x))return(c(content=FALSE,dynamic=FALSE))
+  if(inherits(x,"shiny.tag")) {
+    cls<-fm_scalar(x$attribs$class,"")
+    dynamic<-grepl("shiny-(text|html)-output",cls)
+    visual<-x$name%in%c("img","svg","canvas","button","select","textarea")||
+      (identical(x$name,"input")&&!identical(x$attribs$type,"hidden"))
+    children<-fm_info_content(x$children)
+    return(c(content=visual||children[["content"]],dynamic=dynamic||children[["dynamic"]]))
+  }
+  if(is.list(x)) {
+    states<-lapply(x,fm_info_content)
+    return(c(content=any(vapply(states,function(s)s[["content"]],logical(1))),
+      dynamic=any(vapply(states,function(s)s[["dynamic"]],logical(1)))))
+  }
+  text<-as.character(x);text[is.na(text)]<-""
+  text<-gsub("<[^>]*>|&nbsp;|[[:space:]\u00a0\u200b]","",text,perl=TRUE)
+  c(content=any(nzchar(text)),dynamic=FALSE)
+}
+fm_info <- function(..., error = FALSE, class = NULL, pending = FALSE) {
+  if(isTRUE(pending))return(NULL)
+  content<-list(...);state<-fm_info_content(content)
+  if(!state[["content"]]&&!state[["dynamic"]])return(NULL)
+  shiny::tags$details(class = paste(c("fm-info", if (isTRUE(error)) "fm-info-error",
+      if(state[["dynamic"]]||!state[["content"]])"fm-info-empty",class), collapse = " "),
     shiny::tags$summary(`aria-label` = if (isTRUE(error)) "Error details" else "Information",
       shiny::tags$span(class = "fm-info-icon", `aria-hidden` = "true", "i")),
     shiny::tags$div(class = "fm-info-body", content))

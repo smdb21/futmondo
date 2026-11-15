@@ -279,7 +279,7 @@ fm_worker_peek<-function(handler,args,context,direct,is_current=NULL){
  d<-fm_worker_descriptor(handler,args,context);fm_worker_demand(d,context$session_id %||% '',is_current)
  s<-fm_worker_account_state(context$account_id);try(fm_worker_resource_revision(s,d$resource_key)(),silent=TRUE)
  item<-fm_worker_get(context$account_id,d$resource_key)
- if(is.null(item))stop(structure(list(message='Loading data from background sync…',call=NULL),class=c('shiny.silent.error','validation','error','condition')))
+ if(is.null(item))stop(structure(list(message='Loading data from background sync…',call=NULL),class=c('shiny.silent.error','fm-loading','validation','error','condition')))
  if(!resource_snapshot_unexpired(item$data))attr(item$data,'fetch_status')<-'stale'
  item$data
 }
@@ -402,10 +402,12 @@ fm_worker_session<-function(session,login,leagues=function()list()){
    shiny::tags$small(style='display:block',shiny::textOutput('worker_status_checked_at',inline=TRUE)))
  })
  output$worker_status_message<-shiny::renderText(status_message())
+ shiny::outputOptions(output,"worker_status_message",suspendWhenHidden=FALSE)
  output$worker_status_checked_at<-shiny::renderText(status_checked())
+ shiny::outputOptions(output,"worker_status_checked_at",suspendWhenHidden=FALSE)
  output$worker_settings<-shiny::renderUI({
   auth<-login();if(!valid_login(auth))return(NULL);s<-fm_worker_account_state(auth[['userid']]);s$settings_revision()
-  if(!s$known)return(fm_info('Loading background sync settings…'))
+  if(!s$known)return(fm_info('Loading background sync settings…',pending=TRUE))
   a<-s$account
   shiny::tags$details(id='worker_settings_details',open=if(isTRUE(shiny::isolate(session$input$worker_settings_open)))'open'else NULL,shiny::tags$summary('Background sync'),
    shiny::tags$p('Allow this server to retrieve factual LigaRadar data while you are signed out. No password is saved. This continues until you disable it or LigaRadar rejects access.'),

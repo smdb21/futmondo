@@ -573,7 +573,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
     output$recent_points_status <- renderUI({
       req(is_module_active(),optional_ready())
       status <- tryCatch(recent_points$status(),error=function(e)NULL)
-      if(is.null(status))return(fm_info("Loading round history…"))
+      if(is.null(status))return(fm_info("Loading round history…",pending=TRUE))
       messages <- character()
       if(status$remaining+status$pending>0L)messages <- c(messages,paste0("Loading round history: ",
         status$completed %||% (status$total-status$remaining-status$pending),"/",status$total," players."))
@@ -592,7 +592,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       }
       if(!status$matrix_complete)messages <- c(messages,"Saved round history is incomplete.")
       if(!length(messages))return(NULL)
-      fm_info(paste(messages,collapse=" "),error=!is.null(status$save_error)||status$failed>0L||length(status$initial_errors %||% list())>0L||
+      fm_info(paste(messages,collapse=" "),pending=(status$remaining+status$pending>0L||status$saving>0L)&&is.null(status$save_error)&&status$failed==0L&&!length(status$initial_errors %||% list()),error=!is.null(status$save_error)||status$failed>0L||length(status$initial_errors %||% list())>0L||
         (!isTRUE(status$matrix_complete)&&status$remaining+status$pending==0L))
     })
 
@@ -644,6 +644,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       players_table<-isolate(table_display_data());req(players_table)
       rendered_schema<<-schema;rendered_data<<-players_table;rendered_ids<<-isolate(table_display_ids());rendered_meta<<-isolate(table_color_meta())
       table_columns <- get_reactable_columns_for_players(players_table,show_sale_profit=own_squad)
+      table_columns[[".selection"]]<-reactable::colDef(show=FALSE)
       if("points" %in% names(players_table))table_columns[["points"]]<-reactable::colDef(
         name="Points",align="center",sortNALast=TRUE,minWidth=84,resizable=TRUE,
         style=players_table_metric_style(),cell=players_table_metric_cell(0L))

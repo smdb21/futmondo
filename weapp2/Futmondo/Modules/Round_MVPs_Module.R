@@ -93,6 +93,7 @@ round_mvps_Server <- function(id, is_module_active, login_token, championship_id
     output$mvp_cards <- renderUI({
       snapshot <- mvp_snapshot()
       rows <- round_mvp_rows(snapshot$rows, championship_id())
+      if(isTRUE(snapshot$loading)||identical(snapshot$status,"loading"))return(NULL)
       notice <- if(nzchar(snapshot$reason)) fm_info(snapshot$reason,
         error = !isTRUE(snapshot$loading) && !identical(snapshot$status, "loading"), class="round-mvps-empty")
       if (!nrow(rows)) {
@@ -102,7 +103,7 @@ round_mvps_Server <- function(id, is_module_active, login_token, championship_id
       }
       catalog <- if (valid_login(login_token())) player_catalog_read(login_token(), championship_id()) else NULL
       crest_notice <- if (!is.null(catalog) && is.null(catalog$data)) fm_info(class = "round-mvps-empty",
-        error = !identical(catalog$status, "loading"),
+        error = !identical(catalog$status, "loading"),pending=identical(catalog$status,"loading"),
         if (identical(catalog$status, "loading")) "Loading player team crests…" else
           paste("Player team crests:", resource_failure_message(catalog$error)))
       tagList(notice, crest_notice, tags$div(class = "round-mvps-grid", lapply(seq_len(nrow(rows)), function(i) {

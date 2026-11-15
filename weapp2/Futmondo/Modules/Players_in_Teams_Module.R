@@ -5,7 +5,6 @@ players_in_teams_UI <- function(id) {
     tags$div(class="fm-team-panels",uiOutput(ns("incoming_players")),uiOutput(ns("outgoing_players")),
       tags$div(style="grid-column:1/-1",uiOutput(ns("received_offers")))),
     uiOutput(ns("team_value_box")),
-    uiOutput(ns("departure_legend")),
     actionButton(ns("btn_put_all_on_market"), "Put All Players on Market", icon=icon("tags")),
     players_table_UI(ns("players_table_in_teams"), box_title="Players in Team",
       filter_by_team=FALSE, filter_by_value=FALSE, filter_by_change_value=FALSE,
@@ -35,6 +34,7 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       if(isTRUE(state$observations_only))paste("Observed:",fm_format_datetime(state$observed_at))else ""
     })
     output$received_offers_source_time <- renderText(offers_source_time())
+    shiny::outputOptions(output,"received_offers_source_time",suspendWhenHidden=FALSE)
     offers_panel_display <- resource_display_source(session,function(){
       req(is_module_active())
       team_received_offers_panel(offers_state(),session$ns,
@@ -53,18 +53,14 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       clause_departure_round_state(incoming(),next_round_context(rounds))
     })
     departing_ids <- reactive(departure_state()$excluded_ids)
-    output$departure_legend <- renderUI({
-      req(is_module_active())
-      if(!any(as.character(players_table_RV()$id)%in%departing_ids()))return(NULL)
-      tags$p(class="fm-departure-legend",icon("right-from-bracket"),
-        " Red rows: players scheduled to leave by the next round's kickoff.")
-    })
     incoming_selected <- reactiveVal(NULL)
     incoming_context <- reactiveVal(NULL)
     incoming_requested <- reactiveVal(NULL)
     source_times<-resource_display_source(session,function()incoming_clause_source_times(incoming()$source_times))
     output$incoming_source_times<-renderText(source_times())
+    shiny::outputOptions(output,"incoming_source_times",suspendWhenHidden=FALSE)
     output$outgoing_source_times<-renderText(source_times())
+    shiny::outputOptions(output,"outgoing_source_times",suspendWhenHidden=FALSE)
     incoming_panel_display<-resource_display_source(session,function(){
       req(is_module_active())
       rounds<-if(is.function(round_catalog))tryCatch(round_catalog(),error=function(e)data.frame())else data.frame()
@@ -225,7 +221,7 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       subtitle<-paste0(nrow(roster)," players in your squad",
         if(!pending||count>0L)paste0(" · ",count," incoming")else "")
       box<-shinydashboard::valueBox(total,subtitle,icon=icon("users"),color="green",width=12)
-      if(pending)htmltools::tagAppendChild(box,fm_info(incoming_text,error=identical(arrivals$status,"partial")))else box
+      if(pending)htmltools::tagAppendChild(box,fm_info(incoming_text,error=identical(arrivals$status,"partial"),pending=identical(arrivals$status,"loading")))else box
     })
     # ---- Put All Players on Market Modal ----
     output$bulk_listing_preview <- renderUI({
@@ -401,7 +397,7 @@ team_received_offers_panel <- function(state,ns,source_note=NULL) {
   shiny::tags$section(class="fm-incoming-panel fm-offers-panel",`aria-labelledby`=ns("offers_heading"),
     shiny::tags$h3(id=ns("offers_heading"),if(verified)paste0("Offers for your players (",nrow(rows),")")else if(observed)paste0("Offers for your players (",nrow(rows)," observed)")else "Offers for your players"),
     if(rival_count)shiny::tags$p(class="fm-offer-rival",shiny::icon("user"),paste0(" ",rival_count," rival offer",if(rival_count==1L)""else "s")),
-    if(identical(state$status,"loading"))fm_info("Checking received offers…"),
+    if(identical(state$status,"loading"))fm_info("Checking received offers…",pending=TRUE),
     if(observed)fm_info(source_note %||% paste("Observed:",fm_format_datetime(state$observed_at))),
     if(!verified&&!observed&&!identical(state$status,"loading"))fm_info(error=TRUE,
       if(identical(state$status,"stale"))"Showing previously observed offers; current offers could not be verified. "else "Received offers could not be fully verified. ",
@@ -768,10 +764,10 @@ clause_transfer_panel <- function(state,next_round,ns,outgoing=FALSE,source_note
   timing<-if(isTRUE(next_round$available))paste0("Round ",next_round$round_number," starts ",incoming_clause_time(next_round$starts_at))else "Next round schedule is loading or could not be verified."
   shiny::tags$section(class=paste("fm-incoming-panel",if(outgoing)"fm-outgoing-panel"),`aria-labelledby`=ns(paste0(prefix,"_heading")),
     shiny::tags$h3(id=ns(paste0(prefix,"_heading")),if(!nrow(rows)&&!state$status%in%c("ok","observed"))title else paste0(title," (",nrow(rows),")")),
-    if(isTRUE(next_round$available))shiny::tags$p(class="fm-incoming-schedule",timing)else fm_info(timing,error=!identical(state$status,"loading")),
-    if(identical(state$status,"loading"))fm_info(if(outgoing)"Checking clause departures…"else"Checking incoming signings…"),
-    if(!is.null(state$error))fm_info(state$error,error=TRUE),
-    if(isTRUE(state$observations_only))fm_info(
+    if(isTRUE(next_round$available))shiny::tags$p(class="fm-incoming-schedule",timing)else fm_info(timing,error=!identical(state$status,"loading"),pending=state$status%in%c("loading","refreshing")),
+    if(identical(state$status,"loading"))fm_info(if(outgoing)"Checking clause departures…"else"Checking incoming signings…",pending=TRUE),
+    if(!is.null(state$error))fm_info(state$error,error=TRUE,pending=state$status%in%c("loading","refreshing")),
+    if(isTRUE(state$observations_only))fm_info(pending=state$status%in%c("loading","refreshing"),
       shiny::tags$small(style="display:block",source_note %||% incoming_clause_source_times(state$source_times))),
     if(!nrow(rows)&&state$status%in%c("ok","observed"))shiny::tags$p(
       if(outgoing)"No players leaving through a release clause."else"No incoming clause signings."),
@@ -795,10 +791,10 @@ clause_transfer_panel <- function(state,next_round,ns,outgoing=FALSE,source_note
         shiny::tags$div(class="fm-incoming-arrival",
           if(!is.na(at))shiny::tags$strong(paste0(if(outgoing)"Leaves: "else"Joins: ",incoming_clause_time(at)))else
             fm_info(if(identical(state$status,"loading"))paste0("Confirming ",if(outgoing)"departure"else"arrival"," time…")else
-              paste0(if(outgoing)"Departure"else"Arrival"," time could not be verified"),error=!identical(state$status,"loading")),
+              paste0(if(outgoing)"Departure"else"Arrival"," time could not be verified"),error=!identical(state$status,"loading"),pending=identical(state$status,"loading")),
           if(nzchar(label)||has_detail)shiny::tags$div(class="fm-incoming-round-line",
             if(nzchar(label))shiny::tags$span(class="fm-incoming-round",label),
-            if(has_detail)fm_info(observed_note,overdue_note,timing_note,error=!is.null(timing_note)))))
+            if(has_detail)fm_info(observed_note,overdue_note,timing_note,error=!is.null(timing_note),pending=state$status%in%c("loading","refreshing")))))
     }))
 }
 

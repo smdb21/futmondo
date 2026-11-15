@@ -34,7 +34,30 @@ const port = () => new Promise(resolve => {const server=net.createServer();serve
    const isOpen=selector=>page.locator(selector).evaluate(node=>node.open);
    const hidden=selector=>page.locator(selector).evaluate(node=>getComputedStyle(node).display==='none');
    const initial=await counts();assert.equal(initial.io_attempts,0);assert.equal(initial.retries,0);
-   assert.equal(await page.locator('.fm-info[open]').count(),0);
+   await page.locator('#tooltip_table .fm-team-label').first().waitFor();
+   await page.waitForFunction(()=>document.querySelector('#tooltip_table .fm-departing-before-round .fm-team-label')?.title.includes('Scheduled to leave'));
+   assert.equal(await page.locator('#tooltip_table input[type=radio], #tooltip_table .rt-td-select').count(),0);
+   const leaving=page.locator('#tooltip_table .fm-team-label').filter({hasText:'Departing name'});
+   const staying=page.locator('#tooltip_table .fm-team-label').filter({hasText:'Staying name'});
+   assert.ok((await leaving.getAttribute('title')).includes('Scheduled to leave'));
+   assert.ok(!(await staying.getAttribute('title')).includes('Scheduled to leave'));
+   await leaving.click();await page.waitForFunction(()=>document.querySelector('#selected_row').textContent==='1');
+   await page.locator('#toggle_departure').click();await page.waitForFunction(()=>!document.querySelector('#tooltip_table .fm-team-label').title.includes('Scheduled to leave'));
+   assert.equal(await leaving.getAttribute('title'),'Club');
+   await page.waitForFunction(()=>document.querySelector('#clock_panel details')?.hidden===false);
+   assert.equal(await page.locator('#empty_dynamic details').isVisible(),false);
+   assert.equal(await page.locator('#pending_panel .fm-info').count(),0);
+   assert.equal(await page.locator('#settled_error_panel .fm-info').count(),0);
+   await page.locator('#show_deferred').click();await page.locator('#empty_dynamic summary').waitFor({state:'visible'});
+   await page.locator('#empty_dynamic summary').click();assert.equal(await page.locator('#deferred_text').innerText(),'Ready source information');
+   await page.locator('#clear_deferred').click();await page.waitForFunction(()=>document.querySelector('#empty_dynamic details').hidden);
+   await page.locator('#wait_deferred').click();await page.waitForTimeout(100);assert.equal(await page.locator('#pending_panel .fm-info').count(),0);
+   await page.locator('#pending_panel summary').waitFor({state:'visible'});
+   await page.locator('#fail_deferred').click();await page.waitForTimeout(100);assert.equal(await page.locator('#settled_error_panel .fm-info').count(),0);
+   await page.locator('#settled_error_panel .fm-info-error').waitFor({state:'visible'});
+   await page.locator('#wait_deferred').click();await page.waitForTimeout(100);assert.equal(await page.locator('#settled_error_panel .fm-info').count(),0);
+   await page.locator('#pending_panel summary').waitFor({state:'visible'});
+   assert.equal(await page.locator('.fm-info[open]:visible').count(),0);
    for(const selector of ['#neutral','#long_error','#real_offers','#real_rivals','#real_chart','#login_feedback_fixture']){
     assert(await hidden(`${selector} .fm-info-body`),`${selector} must be collapsed`);
    }
@@ -71,10 +94,9 @@ const port = () => new Promise(resolve => {const server=net.createServer();serve
    assert.equal(requests.length,requestCount,'disclosures caused HTTP requests');
    // Real Shiny-generated notification and validation DOM are wrapped dynamically.
    await page.locator('#validate_loading').click();
-   await page.locator('#loading_validation .fm-info').waitFor();
-   assert.equal(await page.locator('#loading_validation .fm-info-error').count(),0);
-   assert.equal(await page.locator('#loading_validation summary').getAttribute('aria-label'),'Information');
-   assert(await hidden('#loading_validation .fm-info-body'));
+   await page.waitForFunction(()=>document.querySelector('#loading_validation').classList.contains('fm-info-waiting'));
+   assert.equal(await page.locator('#loading_validation .fm-info').count(),0);
+   assert.equal(await page.locator('#loading_validation').isVisible(),false);
    await page.locator('#validate_error').click();await page.locator('#runtime_error').click();await page.locator('#emit_error').click();await page.locator('#emit_warning').focus();await page.keyboard.press('Enter');
    for(const selector of ['#shiny-notification-fixture-error','#shiny-notification-fixture-warning','#validation','#runtime_error_output']){
     await page.locator(`${selector} .fm-info-error`).waitFor();

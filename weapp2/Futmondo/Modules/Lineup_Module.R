@@ -340,7 +340,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
     })
     output$heading<-shiny::renderUI({
       shiny::req(is_module_active());next_round<-target()
-      shiny::div(class='fm-lineup-note',if(is.null(next_round))fm_info('Next-round schedule unavailable; saving is disabled.',error=TRUE)else
+      shiny::div(class='fm-lineup-note',if(is.null(next_round))fm_info('Next-round schedule unavailable; saving is disabled.',error=TRUE,pending=loading())else
         paste0('Next scheduled round ',next_round$number),
         if(dirty())shiny::strong(' · Unsaved changes'))
     })
@@ -360,12 +360,12 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
             shiny::div(class='fm-lineup-note fm-lineup-message',notice())),
         if(length(changed))fm_info(error=TRUE,class='fm-lineup-best-warning',
           paste0('Optimization inputs changed: ',paste(changed,collapse=', '),'. Optimize to update this lineup.')),
-        if(!isTRUE(departure$complete))fm_info(error=!is.null(departure$error),
+        if(!isTRUE(departure$complete))fm_info(error=!is.null(departure$error),pending=loading()||identical(departure$status,"loading"),
           paste('Departure eligibility is not verified.',departure$error %||% 'Waiting for clause departure details.')),
         if(nzchar(cache_issue()))fm_info(cache_issue(),error=TRUE),
         if(nzchar(catalog_issue()))fm_info(catalog_issue(),error=TRUE)else
           if(nrow(score)&&(any(!is.finite(score$average))||(status$failed %||% 0L)>0L||!is.null(status$save_error)))
-            fm_info(error=(status$failed %||% 0L)>0L||!is.null(status$save_error),
+            fm_info(pending=((status$pending %||% 0L)+(status$remaining %||% 0L)+(status$saving %||% 0L)>0L)&&(status$failed %||% 0L)==0L&&is.null(status$save_error),error=(status$failed %||% 0L)>0L||!is.null(status$save_error),
           if(any(!is.finite(score$average)))paste(sum(is.finite(score$average)),'of',nrow(score),'players have complete scores for',length(wanted()),'completed rounds.'),
           if((status$pending %||% 0L)+(status$remaining %||% 0L)>0L)' Loading missing history…',
           if((status$failed %||% 0L)>0L)' Some history reads failed; use Refresh to retry.',
@@ -417,7 +417,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       if(!is.null(draft()))issues<-c(issues,departure_issues(draft()))
       if(is.null(target()))issues<-c(issues,'Next round is not established')
       shiny::tagList(shiny::actionButton(session$ns('save'),if(saving())'Saving…'else'Save to LigaRadar',icon=shiny::icon('floppy-disk'),
-        disabled=saving()||loading()||length(issues)>0L||!dirty()),if(length(issues))fm_info(paste(unique(issues),collapse=' · '),error=!loading()))
+        disabled=saving()||loading()||length(issues)>0L||!dirty()),if(length(issues))fm_info(paste(unique(issues),collapse=' · '),error=!loading(),pending=loading()))
     })
     shiny::observeEvent(input$save,{
       shiny::req(source(),draft(),target(),!saving(),!loading(),dirty());value<-draft();baseline<-source();ctx<-context();next_round<-target();key<-loaded_key;g<-generation;auth<-login_token()

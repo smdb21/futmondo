@@ -38,7 +38,7 @@ check('initial and error directories preserve public fields and unknown values',
 })
 check('points pills use background-to-red with distinct signed zero and missing scores',{
  pills<-rivals_points_pills(c(-2,0,2,NA_real_));html<-vapply(pills,as.character,character(1))
- stopifnot(grepl('--fm-metric-bg:#0B120D',html[1],fixed=TRUE),grepl('--fm-metric-bg:#FF6B6B',html[3],fixed=TRUE),grepl('>0</span>',html[2],fixed=TRUE),grepl('Unavailable',html[4]),!grepl('fm-metric-badge',html[4]))
+ stopifnot(grepl('--fm-metric-bg:#0B120D',html[1],fixed=TRUE),grepl(paste0('--fm-metric-bg:',fm_theme_tokens()$danger),html[3],fixed=TRUE),grepl('>0</span>',html[2],fixed=TRUE),grepl('Unavailable',html[4]),!grepl('fm-metric-badge',html[4]))
  stopifnot(all(vapply(rivals_points_pills(c(5,5)),function(x)grepl('#0B120D',as.character(x),fixed=TRUE),logical(1))),length(rivals_points_pills(numeric()))==0L)
  positive<-vapply(rivals_points_pills(c(0,700,800,900)),as.character,character(1))
  baseline<-vapply(rivals_points_pills(c(700,800,900)),as.character,character(1))
@@ -49,10 +49,11 @@ check('both full and fallback widgets keep public columns numeric and selectable
  for(data in list(rows,teams)){
   widget<-rivals_finance_table_widget(list(team_finances=data));attrs<-widget$x$tag$attribs
   stopifnot(inherits(widget,'reactable'),identical(attrs$onClick,'select'),identical(attrs$selection,'single'))
+  stopifnot(any(vapply(attrs$columns,function(x)identical(x$id,'.selection')&&identical(x$show,FALSE),logical(1))))
   columns<-vapply(attrs$columns,function(x)x$id,character(1));stopifnot(all(c('Points','Last Access','Squad Value')%in%columns))
  }
  stamp<-as.numeric(fm_time('2026-11-02T13:33:53.080Z'))
- stopifnot(grepl('02/11/2026 13:33',as.character(rivals_last_access_cell(stamp)),fixed=TRUE),identical(rivals_last_access_cell(NA_real_),'Unavailable'))
+ stopifnot(grepl('02/11/2026 13:33',as.character(rivals_last_access_cell(stamp,timezone="UTC")),fixed=TRUE),identical(rivals_last_access_cell(NA_real_),'Unavailable'))
 })
 check('selected rival valuation matches the table and never invents zero',{
  stopifnot(rivals_summary_values(list(teamValue=1),teams,rows,'team-a')$squad_value==563697490,

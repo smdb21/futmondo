@@ -1508,9 +1508,9 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 .reactable .rt-tbody .fm-departing-before-round .rt-td:first-child {
     box-shadow: inset 3px 0 0 var(--fm-danger);
 }
-.fm-departure-legend { color: var(--fm-danger); overflow-wrap: anywhere; }
 
 /* Technical information stays collapsed; native disclosure needs no server trip. */
+.fm-info[hidden], .fm-info.fm-info-empty, .fm-info-waiting, .recalculating .fm-info { display:none !important; }
 .fm-info { display: block; min-width: 0; max-width: 100%; margin: 2px 0; color: var(--fm-muted); font-size: 12px; font-weight: normal; text-align: left; white-space: normal; }
 .fm-info > summary { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 4px; margin: 0; cursor: pointer; list-style: none; border-radius: 50%; color: var(--fm-muted); }
 .fm-info > summary::-webkit-details-marker { display: none; }

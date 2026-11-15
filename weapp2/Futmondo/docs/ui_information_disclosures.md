@@ -1,9 +1,21 @@
 # Information and error disclosures
 
+## Empty and pending visibility — 2026-11-14 Pacific
+
+`fm_info(..., error=FALSE, class=NULL, pending=FALSE)` now returns `NULL` for explicit pending states and recursively empty content (including empty nested tags/lists/whitespace). `fm_info_content(x)` distinguishes meaningful content from dynamic Shiny text/HTML placeholders. Dynamic disclosures start with `fm-info-empty`, so an empty information icon cannot paint before its output binds. The client reveals them only after their nested output values settle and the body has content, and hides them again when emptied or recalculating. Confirmed failures retain red disclosures and Retry actions. The red departure legend is replaced by a native tooltip on affected player names, preserving the club tooltip and updating when departure metadata changes. All selectable player/rival tables hide Reactable’s `.selection` column while retaining the selection model, row clicks and card navigation. Player-card headers omit the redundant Market: prefix. These are presentation changes to existing facts and controls, with no new data capability. No error text is guessed to be loading.
+
+Pending reads use the existing explicit `fm-loading` validation class in the factual adapter and worker provider. Notification refresh preserves that pending condition instead of setting a false failure. My Team, header, Today, player cards/history, standings/lineups, awards, Rivals, Login and Admin pass explicit pending flags. Saving/transaction preflights and factual availability remain unchanged. Existing loading visuals continue to show progress; pending information icons are omitted.
+
+The screenshot’s empty transfer box came from an unpopulated nested source-clock output. The incoming/outgoing/offer clocks, header finance clock and worker status text now use `suspendWhenHidden=FALSE`: they format already-loaded shared state even inside a closed/hidden disclosure. This breaks the hidden-output visibility deadlock without acquiring data. Their existing resource projections still prevent metadata-only whole-panel replacement. Values arriving before their DOM node binds are handled safely.
+
+`www/info-disclosures.js` watches inserted/changed local subtrees, character data and pending classes, deduplicating affected panels with a temporary Set. An output-element WeakSet tracks settled bindings; the existing WeakMap preserves open panels across UI replacement. There is no polling or full-document scan per clock update. Only read-only metadata text is unsuspended, adding bounded changed-value WebSocket delivery; no HTTP/API/database request or cache/persistence policy changes. CSS hides empty/pending/recalculating panels before paint, including inline transfer icons.
+
+Passed focused empty/pending/ready/failure and notification transition tests, existing disclosure/offer/transfer and worker-stability checks, six Chromium layouts (320/390/1440px, light/dark), and the offline lifecycle harness. Browser tests cover filling/clearing hidden information, delayed success/error, keyboard toggles, retained open panels, no overflow and zero source/database I/O. Measured 1,000 nested renders at 0.200s, browser heartbeats 61–62ms and mutation gaps 10ms. Production hosted acceptance remains separate; no dependencies, environment variables or schema changes.
+
 Data availability, query/source explanations, database/cache status, update times,
-loading diagnostics and calculation coverage appear behind a small round `i`.
+settled diagnostics and calculation coverage appear behind a small round `i`.
 Panels start collapsed and expand in place on click, Enter or Space. A red icon
-identifies errors; ordinary information and loading use the muted theme color.
+identifies confirmed errors; ordinary information uses the muted theme color. Waiting and empty information icons remain hidden.
 The accessible names are `Information` and `Error details`.
 
 This is presentation only. Known figures and football facts remain visible;
@@ -15,7 +27,7 @@ Consent and transaction-confirmation controls retain their existing behavior.
 
 ## Interfaces and coverage
 
-- `fm_info(..., error = FALSE, class = NULL)` in `data_contracts.R` returns a
+- `fm_info(..., error = FALSE, class = NULL, pending = FALSE)` in `data_contracts.R` returns a
   native closed `details` element with a round summary icon and an escaped/tagged
   content body, or `NULL` for empty content. It introduces no Shiny input, timer,
   network call or stored preference. Put block content in the body; do not nest
@@ -28,7 +40,7 @@ Consent and transaction-confirmation controls retain their existing behavior.
   content into a disclosure rather than discarding or reinterpreting it. Notification
   dismissal keeps its own touch target; Shiny's generated `Error:` prefix is
   suppressed only when the red disclosure is present. Explicit
-  `errorClass = "fm-loading"` validation stays neutral. Only inserted subtrees
+  `errorClass = "fm-loading"` validation remains hidden while waiting. Only inserted subtrees
   and changed notification/error containers are inspected; class changes catch
   severity added after asynchronous insertion, with no polling or text matching.
 - Open panels survive replacement of their containing Shiny HTML output through

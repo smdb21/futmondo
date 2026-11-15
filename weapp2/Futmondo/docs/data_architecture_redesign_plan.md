@@ -1,5 +1,13 @@
 # Futmondo data architecture redesign plan
 
+## Empty/pending information icons — 2026-11-14 Pacific
+
+- [x] Shared recursive empty-content detection and hidden dynamic placeholders; settled values reveal icons and empty/pending values hide them.
+- [x] Typed pending validation and explicit UI flags suppress transient red/loading icons; read-only clocks populate while their details remain closed. Real settled failures retain diagnostics.
+- [x] Offline visibility/notification transitions, existing regressions, six mobile/desktop/theme browser layouts and required lifecycle validation. Review: [information disclosure contracts](ui_information_disclosures.md).
+- [x] Remove the departure legend in favor of affected-name tooltips, hide table selector columns while preserving row selection, and shorten the player-card market label.
+- [ ] Hosted acceptance after application deployment. No source acquisition, schema/dependency or transaction-policy changes.
+
 ## Offer observation errors and transfer icons — 2026-11-14 Pacific
 
 - [x] Distinguish complete successful persisted offer observations from failures/current freshness, preserving source clocks and manual-action eligibility; repair empty-roster offer metadata.

@@ -363,7 +363,7 @@ login_Server <- function(id, user = NULL, password = NULL) {
                 p(style = "color: var(--fm-text); margin: 2px 0 0 0; font-size: 13px;", "Signed in to LigaRadar")
               )
             ),
-            fm_info("Signed in. Loading your leagues…")
+            fm_info("Signed in. Loading your leagues…",pending=TRUE)
           )
         })
         updateBox(

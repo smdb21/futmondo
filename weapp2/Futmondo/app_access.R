@@ -91,7 +91,7 @@ fm_admin_access <- function(session, login_token, active, store = fm_access_stor
     shiny::tagList(shiny::div(class = "fm-access-switch", query$allTags()),
       shiny::p("Enabled: only administrators can use the app. Disabled: all users can log in."),
       fm_info("Existing non-admin sessions are checked every 2 minutes."),
-      if (!is.null(s$message)) fm_info(s$message, error = !s$busy && !s$loaded),
+      if (!is.null(s$message)) fm_info(s$message, error = !s$busy && !s$loaded,pending=s$busy),
       shiny::actionButton(session$ns("retry_access"), "Reload access setting", disabled = s$busy),
       shiny::tags$style(".fm-access-switch input[type=checkbox]{appearance:none;-webkit-appearance:none;width:2.6em;height:1.5em;border-radius:1em;background:#777;position:relative;vertical-align:middle;margin-top:0;cursor:pointer}.fm-access-switch input:checked{background:#167a5c}.fm-access-switch input:before{content:'';position:absolute;width:1.1em;height:1.1em;left:.2em;top:.2em;background:white;border-radius:50%}.fm-access-switch input:checked:before{left:1.3em}.fm-access-switch input:focus-visible{outline:2px solid #167a5c;outline-offset:2px}.fm-access-switch input:disabled{opacity:.5;cursor:wait}.fm-access-switch label span{padding-left:1.1em}"))
   })
