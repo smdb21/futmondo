@@ -48,11 +48,10 @@ reads<-writes<-0L
 async_adapter_fetch<-function(...){reads<<-reads+1L;stop('Display must not acquire source data')}
 persist_clause_transfer_summary<-function(...){writes<<-writes+1L;stop('Display must not write restored evidence')}
 settle<-function(session)for(i in 1:15){later::run_now(0);session$flushReact()}
-# Execute the actual module's display projections, including its separate clock
-# outputs. Source adapters are synthetic; no source account or database is used.
+# Execute the actual module's panel projections. Shared top-note clocks are
+# covered by test_roster_top_note.R. Source adapters are synthetic; no source account or database is used.
 module_body<-as.list(body(eval(body(players_in_teams_Server)[[2]][[3]])))[-1L]
-wanted<-c('source_times','output$incoming_source_times','output$outgoing_source_times',
- 'incoming_panel_display','outgoing_panel_display','output$incoming_players','output$outgoing_players')
+wanted<-c('incoming_panel_display','outgoing_panel_display','output$incoming_players','output$outgoing_players')
 shiny::testServer(function(input,output,session){
  incoming<-incoming_clause_source(session,function()auth,function()'league',function()'mine',function()TRUE)
  is_module_active<-function()TRUE;round_catalog<-function()data.frame();ns<-session$ns
@@ -64,15 +63,15 @@ shiny::testServer(function(input,output,session){
 },{
  settle(session)
  stopifnot(incoming()$status=='observed',incoming()$outgoing_status=='observed',is.null(incoming()$error),
-  !grepl('Last observed',output$incoming_players$html),grepl('Roster observed:',output$incoming_source_times),reads==0L,writes==0L)
- before<-as.list(stats);times<-output$incoming_source_times
+  !grepl('Last observed',output$incoming_players$html),!grepl('Roster observed:',output$incoming_players$html),!grepl('Transactions observed:',output$outgoing_players$html),reads==0L,writes==0L)
+ before<-as.list(stats);times<-incoming()$source_times
  elapsed<-system.time(for(i in 1:10){
   roster_state(state(observed(roster,at=now-1200+i*60)))
   history_state(state(observed(history,at=now-1200+i*60)))
   settle(session)
  })[['elapsed']]
- stopifnot(identical(as.list(stats),before),output$incoming_source_times!=times,reads==0L,writes==0L)
- cat(sprintf('PASS ten new observation clocks update source-time text with zero incoming/leaving panel redraws, source requests or writes (%.3fs)\n',elapsed))
+ stopifnot(identical(as.list(stats),before),!identical(incoming()$source_times,times),reads==0L,writes==0L)
+ cat(sprintf('PASS ten new observation clocks preserve source-time state with zero incoming/leaving panel redraws, source requests or writes (%.3fs)\n',elapsed))
  # Ordinary freshness expiry is not a failed acquisition or a new transfer fact.
  fresh_roster<-observed(roster,at=now,status='ok');fresh_history<-observed(history,at=now,status='ok')
  roster_state(state(fresh_roster));history_state(state(fresh_history));settle(session);before<-as.list(stats)
@@ -85,6 +84,7 @@ shiny::testServer(function(input,output,session){
  broken<-roster_state();broken$error<-resource_failure(category='network')
  roster_state(broken);settle(session)
  stopifnot(incoming()$status=='partial',!is.null(incoming()$error),length(incoming()$source_errors)==1L,
+  grepl('fm-info-error',output$incoming_players$html),grepl('fm-info-error',output$outgoing_players$html),
   incoming()$observations_only,nrow(incoming()$records)==1L)
  roster_state(state(fresh_roster));settle(session)
  partial<-roster_state();attr(partial$data,'worker_completeness')<-'partial';partial$status<-'ok';partial$freshness<-'fresh';attr(partial$data,'fetch_status')<-'ok'

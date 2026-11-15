@@ -9,6 +9,19 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
    await page.goto('http://127.0.0.1:3892');
    await page.locator('#offers').getByText('Offers for your players (1 observed)',{exact:true}).waitFor();
    assert.equal(await page.locator('#offers .fm-info-error').count(),0);
+   for(const tab of ['yourteam','today','players_in_championship']){
+    await page.locator('#tabs').evaluate((el,value)=>el.selectize.setValue(value),tab);
+    await page.waitForFunction(()=>document.querySelector('#worker_roster_source_times')?.textContent.includes('Roster observed:'));
+    assert.equal(await page.getByText(/Roster observed:/).count(),1);
+    assert.equal(await page.locator('#worker_status #worker_roster_source_times').count(),1);
+    for(const id of ['incoming','outgoing'])assert.ok(!(await page.locator('#'+id).innerText()).includes('Roster observed:'));
+   }
+   await page.locator('#worker_status .fm-info > summary').click();
+   await page.locator('#worker_roster_source_times').waitFor({state:'visible'});
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2),false);
+   const rosterStamp=await page.locator('#worker_roster_source_times').innerText();
+   await page.locator('#worker_status > details').evaluate(el=>el.dataset.fixtureIdentity='preserved');
+
    assert.ok((await page.locator('#offers').innerText()).includes('Rival'));
    assert.ok(!(await page.locator('#offers').innerText()).includes('could not be verified'));
    for(const id of ['incoming','outgoing']){
@@ -26,10 +39,12 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
    await page.locator('#offer_stamp').waitFor({state:'visible'});const stamp=await page.locator('#offer_stamp').innerText();
    await page.locator('#offers .fm-offers-panel').evaluate(el=>el.dataset.fixtureIdentity='preserved');
    await page.locator('#advance').click();await page.waitForFunction(old=>document.querySelector('#offer_stamp').textContent!==old,stamp);
+   await page.waitForFunction(old=>document.querySelector('#worker_roster_source_times').textContent!==old,rosterStamp);
+   assert.equal(await page.locator('#worker_status > details').getAttribute('data-fixture-identity'),'preserved');
    assert.equal(await page.locator('#offers .fm-offers-panel').getAttribute('data-fixture-identity'),'preserved');
    const started=Date.now();await page.locator('#heartbeat').click();await page.waitForFunction(()=>document.querySelector('#beats').textContent==='1');
    assert.ok(Date.now()-started<500);assert.equal(await page.locator('#calls').innerText(),'0');assert.deepEqual(errors,[]);
-   console.log(`PASS ${width}px: successful saved offers have no false red error, incoming/leaving icons stay beside timing labels open/closed, keyboard works, no overflow, timestamp advances without panel replacement or I/O; heartbeat ${Date.now()-started}ms`);
+   console.log(`PASS ${width}px: roster timestamps appear once in the top note on all three pages, successful saved offers have no false red error, incoming/leaving icons stay beside timing labels open/closed, keyboard works, no overflow, timestamp advances without panel replacement or I/O; heartbeat ${Date.now()-started}ms`);
    await page.close();
   }
  }finally{await browser.close();}

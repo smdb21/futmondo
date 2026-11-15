@@ -84,3 +84,31 @@ My Team initializes a missing `market_inMarket` column with a logical vector siz
 My Team gives roster players a reddish background when their observed clause departure is at or before the next scheduled round kickoff. Affected player names carry the departure explanation in their tooltip; the Leaving players panel retains the exact departure time and source status. Later departures are not highlighted. Missing dates or a missing next-round schedule do not produce invented eligibility. Known dates remain visible while later verification is incomplete; confirmed cancellation, departure or reacquisition clears them through the existing reconciler. Actual roster counts/value and manual market actions retain their existing source-based behavior.
 
 `clause_departure_round_state(transfers, next_round)` projects `outgoing_records`/`outgoing_status` into sorted `excluded_ids`, `unknown_ids`, `complete`, `status` and `error`. It compares absolute timestamps inclusively at kickoff. Missing records, identities, dates or schedule and incomplete source states cannot certify completeness. The same helper serves Lineup and My Team. `players_in_teams_Server(..., clause_transfers_source=NULL)` accepts the root session's shared transfer source; standalone instances retain their existing source. The root activates one existing bounded queue while either My Team or Lineup is visible, preserving context isolation and the existing database-first clause snapshot reuse. No additional storage or acquisition is introduced for the row highlight.
+
+
+## Shared roster observation note — 2026-11-15
+
+Roster and transaction observation timestamps now appear only in the global
+Background sync note above My Team, Market (Today), and All Players. Incoming
+and Leaving retain loading, source failures, schedule failures and individual
+player timing diagnostics, without repeating the roster/history note.
+
+`fm_worker_session(session, login, leagues, source_note=function()"")` accepts an
+optional reactive text callback and renders it through the independent
+`worker_roster_source_times` output. Root `roster_note_active`,
+`roster_note_readers` and `roster_source_note` project original source clocks
+from the existing scoped factual adapters on those three pages, only while
+Background sync is enabled. Missing/future timestamps are omitted. Account,
+league, team, competition, season and scoring isolation remains in the adapters;
+navigation and logout clear irrelevant clocks. `incoming_clause_panel()`,
+`outgoing_clause_panel()` and `clause_transfer_panel()` no longer accept the
+obsolete `source_note` argument or mount duplicate clock outputs. Per-player
+observation details remain available beside the transfer timing label.
+
+The note reuses database-persisted worker snapshots through existing bounded
+memory replay and the asynchronous database poll. A cold page can subscribe to
+the two existing roster/history resources; it does not request clause summaries,
+enqueue source acquisition, write restored observations, or change acquisition
+cadence, persistence acknowledgement, freshness deadlines or manual preflights.
+Clock-only updates change text without replacing the note or transfer panels.
+No new dependency, environment variable, migration or product capability is added.

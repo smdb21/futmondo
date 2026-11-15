@@ -387,7 +387,7 @@ fm_worker_status_source<-function(session,login){
  session$onSessionEnded(function()observer$destroy())
  value
 }
-fm_worker_session<-function(session,login,leagues=function()list()){
+fm_worker_session<-function(session,login,leagues=function()list(),source_note=function()""){
  if(!fm_worker_configured())return(invisible(NULL))
  closed<-FALSE;last_account<-NULL;renewed<-NULL
  session$onSessionEnded(function(){closed<<-TRUE;if(!is.null(last_account))fm_worker_detach(last_account,session$token)})
@@ -408,16 +408,23 @@ fm_worker_session<-function(session,login,leagues=function()list()){
   checked<-status()$checked_at
   if(is.null(checked))''else paste('Oldest displayed data check:',fm_format_datetime(checked))
  })
+ status_source_note<-resource_display_source(session,function(){
+  if(!isTRUE(status_visible()))return('')
+  source_note()
+ })
  output$worker_status<-shiny::renderUI({
   if(!isTRUE(status_visible()))return(NULL)
   fm_info(error=status_error(),
    shiny::textOutput('worker_status_message',inline=TRUE),
-   shiny::tags$small(style='display:block',shiny::textOutput('worker_status_checked_at',inline=TRUE)))
+   shiny::tags$small(style='display:block',shiny::textOutput('worker_status_checked_at',inline=TRUE)),
+   shiny::tags$small(style='display:block',shiny::textOutput('worker_roster_source_times',inline=TRUE)))
  })
  output$worker_status_message<-shiny::renderText(status_message())
  shiny::outputOptions(output,"worker_status_message",suspendWhenHidden=FALSE)
  output$worker_status_checked_at<-shiny::renderText(status_checked())
  shiny::outputOptions(output,"worker_status_checked_at",suspendWhenHidden=FALSE)
+ output$worker_roster_source_times<-shiny::renderText(status_source_note())
+ shiny::outputOptions(output,"worker_roster_source_times",suspendWhenHidden=FALSE)
  output$worker_settings<-shiny::renderUI({
   auth<-login();if(!valid_login(auth))return(NULL);s<-fm_worker_account_state(auth[['userid']]);s$settings_revision()
   if(!s$known)return(fm_info('Loading background sync settings…',pending=TRUE))

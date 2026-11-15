@@ -4,7 +4,8 @@ function(input, output, session) {
   session$userData$league_context_enabled<-TRUE
   login_token_RV <- login_Server(id = "login")
   fm_timezone_preferences(session, login_token_RV)
-  fm_worker_session(session, login_token_RV, leagues=function()tryCatch(championships_RV(),error=function(e)list()))
+  fm_worker_session(session, login_token_RV, leagues=function()tryCatch(championships_RV(),error=function(e)list()),
+    source_note=function()roster_source_note())
   fm_clause_session(session, login_token_RV)
   refresh_trigger <- reactiveVal(0)
   history_refresh_trigger <- round_history_refresh_trigger(session)
@@ -111,6 +112,26 @@ function(input, output, session) {
   primary_sources <- list(team_state=primary_team_state,market_state=primary_market_state,
     retry_team=function()team_retry(isolate(team_retry())+1L),
     retry_market=function()market_retry(isolate(market_retry())+1L))
+  # The global sync note owns roster/history clocks on the three player pages.
+  # Worker mode replays durable snapshots; this never runs clause-summary work.
+  roster_note_active <- reactive({
+    valid_login(login_token_RV())&&isTRUE(input$tabs%in%c("yourteam","today","players_in_championship"))&&
+      isTRUE(fm_worker_mode(login_token_RV()[["userid"]]))
+  })
+  roster_note_readers <- lapply(c(roster="get_players_from_team",transactions="get_championship_pressroom"),function(handler)
+    factual_read_adapter(session,handler,login_token_RV,championship_id_RV,user_team_id_RV,
+      is_active=roster_note_active,refresh_trigger=refresh_trigger,state_only=TRUE))
+  roster_source_note <- resource_display_source(session,function(){
+    if(!isTRUE(roster_note_active()))return("")
+    auth<-login_token_RV();league<-championship_id_RV();team<-user_team_id_RV()
+    states<-list(roster=roster_note_readers$roster(login=auth,championship_id=league,user_team_id=team,teams=NULL),
+      transactions=roster_note_readers$transactions(login=auth,championship_id=league))
+    times<-lapply(states,function(state){
+      stamp<-fm_time(state$observed_at)
+      if(is.null(state$data)||length(stamp)!=1L||is.na(stamp)||stamp>Sys.time())NULL else stamp
+    })
+    incoming_clause_source_times(times)
+  })
   coach <- coach_on_login_source(session,login_token_RV,championship_id_RV,user_team_id_RV,primary_team_state,primary_sources$retry_team)
   round_finance_RV <- resource_display_source(session,function(){
     finance<-round_finance_display(primary_team_state(), primary_market_state())

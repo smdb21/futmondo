@@ -1631,3 +1631,17 @@ Exit criteria still open: capture the actual closed-clause rejection with the te
   modes and both themes, deployment contract (3), and required offline lifecycle
   pass. Performance and limits are recorded in `data_review_results.md`.
   No data/dependency/schema changes; hosted rollout remains unverified.
+
+
+### Shared roster observation note — implemented and verified locally (2026-11-15)
+
+- Show roster/transaction source timestamps once in the global top sync note on
+  My Team, Market and All Players. Keep incoming/leaving source and timing
+  errors in their existing panels, including individual observation details.
+- Reuse scoped persisted worker snapshots through shared asynchronous adapters;
+  no clause-summary work, acquisition enqueue, database write, new timer,
+  dependency or schema change. Clock updates preserve mounted panels.
+- Focused observation/isolation/redraw tests, synthetic phone/desktop browser
+  checks, deployment exclusions and the required offline lifecycle pass.
+  Performance findings and hosted verification limits are recorded in
+  `data_review_results.md`; branch delivery is separate from deployment.

@@ -21,12 +21,12 @@ check('offer failure details are collapsed and red while amounts and exact offer
     !grepl('Synthetic source failure|verified|Refresh',visible),grepl('123.456',visible,fixed=TRUE),
     grepl(team_received_offer_input(row),html,fixed=TRUE),!grepl('<details[^>]* open',html))
 })
-check('observed transfer metadata remains inspectable with independent clock nodes',{
+check('transfer panels omit the shared roster note while preserving schedule and empty-list facts',{
   state<-list(status='observed',records=incoming_clause_empty(),error=NULL,observations_only=TRUE)
   panel<-incoming_clause_panel(state,list(available=TRUE,round_number=12,starts_at=fm_time('2026-12-01T12:00:00Z')),
-    identity,source_note=shiny::textOutput('source_clock',inline=TRUE))
+    identity)
   html<-as.character(panel);visible<-visible_text(panel)
-  stopifnot(grepl('id="source_clock"',html,fixed=TRUE),!grepl('Last observed transfer details.',html,fixed=TRUE),
+  stopifnot(!grepl('Roster observed:|Transactions observed:',html),!grepl('Last observed transfer details.',html,fixed=TRUE),
     !grepl('observed|Saved observations|confirm completion',visible),
     grepl('Round 12 starts',visible,fixed=TRUE),grepl('No incoming clause signings.',visible,fixed=TRUE),
     !grepl('fm-info-error',html,fixed=TRUE))

@@ -56,22 +56,17 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
     incoming_selected <- reactiveVal(NULL)
     incoming_context <- reactiveVal(NULL)
     incoming_requested <- reactiveVal(NULL)
-    source_times<-resource_display_source(session,function()incoming_clause_source_times(incoming()$source_times))
-    output$incoming_source_times<-renderText(source_times())
-    shiny::outputOptions(output,"incoming_source_times",suspendWhenHidden=FALSE)
-    output$outgoing_source_times<-renderText(source_times())
-    shiny::outputOptions(output,"outgoing_source_times",suspendWhenHidden=FALSE)
     incoming_panel_display<-resource_display_source(session,function(){
       req(is_module_active())
       rounds<-if(is.function(round_catalog))tryCatch(round_catalog(),error=function(e)data.frame())else data.frame()
-      incoming_clause_panel(incoming(),next_round_context(rounds),ns,source_note=textOutput(ns("incoming_source_times"),inline=TRUE))
+      incoming_clause_panel(incoming(),next_round_context(rounds),ns)
     })
     outgoing_panel_display<-resource_display_source(session,function(){
       req(is_module_active())
       transfers<-incoming()
       rounds<-if(is.function(round_catalog))tryCatch(round_catalog(),error=function(e)data.frame())else data.frame()
       outgoing_clause_panel(list(status=transfers$outgoing_status %||% transfers$status,
-        records=transfers$outgoing_records %||% outgoing_clause_empty(),error=transfers$outgoing_error %||% transfers$error,observations_only=isTRUE(transfers$observations_only)),next_round_context(rounds),ns,source_note=textOutput(ns("outgoing_source_times"),inline=TRUE))
+        records=transfers$outgoing_records %||% outgoing_clause_empty(),error=transfers$outgoing_error %||% transfers$error,observations_only=isTRUE(transfers$observations_only)),next_round_context(rounds),ns)
     })
     output$incoming_players<-renderUI(incoming_panel_display())
     output$outgoing_players<-renderUI(outgoing_panel_display())
@@ -779,15 +774,15 @@ incoming_clause_source <- function(session,login_token,championship_id,user_team
   shiny::reactive(state())
 }
 
-incoming_clause_panel <- function(state,next_round,ns,source_note=NULL) {
-  clause_transfer_panel(state,next_round,ns,source_note=source_note)
+incoming_clause_panel <- function(state,next_round,ns) {
+  clause_transfer_panel(state,next_round,ns)
 }
 
-outgoing_clause_panel <- function(state,next_round,ns,source_note=NULL) {
-  clause_transfer_panel(state,next_round,ns,outgoing=TRUE,source_note=source_note)
+outgoing_clause_panel <- function(state,next_round,ns) {
+  clause_transfer_panel(state,next_round,ns,outgoing=TRUE)
 }
 
-clause_transfer_panel <- function(state,next_round,ns,outgoing=FALSE,source_note=NULL) {
+clause_transfer_panel <- function(state,next_round,ns,outgoing=FALSE) {
   rows<-state$records
   prefix<-if(outgoing)"outgoing"else"incoming"
   title<-if(outgoing)"Leaving players"else"Incoming players"
@@ -797,8 +792,6 @@ clause_transfer_panel <- function(state,next_round,ns,outgoing=FALSE,source_note
     if(isTRUE(next_round$available))shiny::tags$p(class="fm-incoming-schedule",timing)else fm_info(timing,error=!identical(state$status,"loading"),pending=state$status%in%c("loading","refreshing")),
     if(identical(state$status,"loading"))fm_info(if(outgoing)"Checking clause departures…"else"Checking incoming signings…",pending=TRUE),
     if(!is.null(state$error))fm_info(state$error,error=TRUE,pending=state$status%in%c("loading","refreshing")),
-    if(isTRUE(state$observations_only))fm_info(pending=state$status%in%c("loading","refreshing"),
-      shiny::tags$small(style="display:block",source_note %||% incoming_clause_source_times(state$source_times))),
     if(!nrow(rows)&&state$status%in%c("ok","observed"))shiny::tags$p(
       if(outgoing)"No players leaving through a release clause."else"No incoming clause signings."),
     lapply(seq_len(nrow(rows)),function(i) {

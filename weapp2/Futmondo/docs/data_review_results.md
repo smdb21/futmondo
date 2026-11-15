@@ -3070,3 +3070,48 @@ Limits: no real account, purchase, production migration or deployment was exerci
 
 
 Final exact-staged-artifact verification passed all new suites (R6+4+4, Python13, SQL17), existing worker38, availability recovery/manual offer, native clause6, configured rules6, provider/freshness/UI/deployment checks and the mandatory lifecycle13 plus eight tabs. Actual isolated browser flows passed at360/390/1440px with143/142/144ms held-source heartbeat. All61 bundle checksums match and all78 package records are unchanged. Nine inherited stale checksum entries were reconciled against already committed files; their source contents and unrelated local edits are excluded. The native contract test received only a sanitized local fixture, excluded from the bundle and commit. Static login/comparison copy adds no acquisition or polling, and preserves the existing responsive tier layout.
+
+
+## Shared roster observation note — 2026-11-15
+
+Moved the repeated roster/transaction timestamps out of Incoming and Leaving
+into the existing global Background sync note on My Team, Market (Today), and
+All Players. Kept actual panel errors and each player's observation/timing
+information. This reorganizes existing information without adding a capability;
+no feature-comparison or login-tier expansion is required.
+
+Executed offline verification:
+
+- `test_roster_top_note.R`: three groups exercising the actual root projections,
+  actual shared note outputs and real factual adapters against synthetic stored
+  snapshots. All three pages retain original timestamps; ten clock publications
+  update text without replacing the note (0.708s), with zero I/O, acquisition
+  jobs or clause-summary work. League switch, unrelated page, unknown/future
+  timestamps, actual worker failures and logout are covered.
+- Existing clause observation contract (6 groups), observed reload (4),
+  information visibility (3 groups) and player disclosures (5) pass. Ten roster/
+  history clock updates preserve both transfer panels (0.370s), with zero source
+  requests/database writes; real prerequisite failures remain in both panels.
+- Worker status redraw regression (4 groups) passes: twenty unchanged polls
+  cause no repeated render/source acquisition (0.344s); account isolation and
+  genuine worker status failures/recovery remain visible.
+- Synthetic Chromium at 320/390/1440px verifies a single roster note across the
+  three pages, expanded note wrapping, unchanged note/offer DOM during clock
+  updates, incoming/leaving timing icons, keyboard operation, no horizontal
+  overflow, no JavaScript errors and zero source/database calls.
+- Required `Rscript test/test_shiny_simulation.R`: 13 checks plus eight tabs
+  pass, with no HTTP or live database mutation attempts. Deployment contract:
+  3 checks pass. No dependency or manifest dependency changes were required.
+
+Performance review: the note adds two subscriptions to existing shared roster/
+transaction resources while Background sync is enabled on these pages. Valid
+stored observations replay through the bounded worker store without I/O; cold
+reads join the existing asynchronous database snapshot poll and reuse durable
+observations, including their original freshness and completeness metadata.
+The shared timestamp text is independent of the note and transfer-panel DOM.
+No new timer, acquisition schedule, full transfer reconciliation, database write,
+manual action, unbounded cache or list rendering is introduced. The known
+worker/factual cache limits still apply; large cold snapshot transfer latency on
+the deployed VM was not measured. Local fixture/browser checks do not certify
+hosted appearance or production deployment. No real account or transaction was
+used. Unrelated working-tree documentation and source edits remain excluded.

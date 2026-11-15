@@ -10,13 +10,12 @@ cat('PASS recursively empty content has no disclosure, dynamic placeholders star
 for(outgoing in c(FALSE,TRUE)){
  state<-list(status='loading',error='Prior failure while retrying',observations_only=TRUE,
   records=if(outgoing)outgoing_clause_empty()else incoming_clause_empty())
- html<-as.character(clause_transfer_panel(state,list(available=FALSE),identity,outgoing=outgoing,
-  source_note=shiny::textOutput('pending_source',inline=TRUE)))
+ html<-as.character(clause_transfer_panel(state,list(available=FALSE),identity,outgoing=outgoing))
  stopifnot(!grepl('class="fm-info',html,fixed=TRUE))
  # An empty settled source-clock wrapper is not information.
  state$status<-'observed';state$error<-NULL
  html<-as.character(clause_transfer_panel(state,list(available=TRUE,round_number=1,starts_at=Sys.time()+86400),identity,
-  outgoing=outgoing,source_note=shiny::tags$small()))
+  outgoing=outgoing))
  stopifnot(!grepl('class="fm-info',html,fixed=TRUE))
 }
 html<-as.character(team_received_offers_panel(list(status='loading',records=received_offers_empty(),error=NULL),identity))
