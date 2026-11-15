@@ -1735,3 +1735,18 @@ Production deployment and authenticated hosted acceptance remain separate.
   browser checks pass. Performance and lifecycle results are recorded in
   `data_review_results.md`. No schema, dependency or environment change; this
   corrects the previous Spain-only default without expanding product scope.
+
+
+### Visible offer submission errors — implemented and verified locally (2026-11-15)
+
+- Trace hidden market/direct-owner offer errors to the shared client disclosure
+  script. Preserve `.fm-offer-error` as immediately visible notification text;
+  clear the compact layout when a notification ID is reused. Existing wording,
+  explicit dismissal, preflights and uncertain-response reconciliation remain.
+- Synthetic Chromium passes all six phone/desktop/theme layouts, including
+  roster-limit rejection, long owner rejection, reused IDs and persistence past
+  five seconds. Existing message/deployment checks and the required offline
+  lifecycle pass. Performance measurements and limits are in `data_review_results.md`.
+- This corrects existing presentation without a new capability, login-tier entry,
+  dependency, schema or acquisition/persistence change. Hosted rollout and real
+  authenticated offer rejection are not verified; no live offer is submitted.

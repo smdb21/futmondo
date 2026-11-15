@@ -43,6 +43,12 @@
   }
   function compact(node) {
     if (!node.matches(selector)) return;
+    // Failed offer submissions need an immediately readable, dismissible message.
+    if (node.querySelector('.fm-offer-error')) {
+      const notification = node.closest('.shiny-notification');
+      if (notification && notification.classList.contains('fm-info-notification')) notification.classList.remove('fm-info-notification');
+      return;
+    }
     const loading = node.classList.contains('shiny-output-error-fm-loading');
     if (node.classList.contains('fm-info-waiting') !== loading) node.classList.toggle('fm-info-waiting', loading);
     if (loading || node.closest('.fm-info') || node.querySelector('.fm-info') || !node.textContent.trim()) return;

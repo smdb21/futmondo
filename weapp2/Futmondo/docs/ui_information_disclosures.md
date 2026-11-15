@@ -23,7 +23,7 @@ missing values remain missing. Original source clocks, completeness, persistence
 acknowledgements, context isolation and preflight/action checks are unchanged.
 An error does not become a successful operation when its explanation is
 collapsed. Explicit Retry controls remain inside the corresponding disclosure.
-Consent and transaction-confirmation controls retain their existing behavior.
+Consent and transaction-confirmation controls retain their existing behavior. Failed market bids and direct-owner offers are an explicit exception: `.fm-offer-error` notifications keep their full message visible until dismissed, including when Shiny reuses a previously compact notification ID. These actionable submission failures do not require opening an information icon.
 
 ## Interfaces and coverage
 

@@ -17,7 +17,7 @@ const port = () => new Promise(resolve => {const server=net.createServer();serve
   let ready=false;
   for(let i=0;i<200;i++){if(app.exitCode!==null)throw Error(log);try{const response=await fetch(url);if(response.ok){ready=true;break;}}catch{}await delay(100);}
   assert(ready,'R fixture did not start');
-  browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+  browser=await chromium.launch({headless:true,executablePath:process.env.FUTMONDO_TEST_CHROMIUM||undefined,args:['--no-sandbox']});
   const results=[];
   for(const width of [320,390,1440])for(const theme of ['light','dark']){
    console.log('Checking',width,theme);
@@ -103,9 +103,33 @@ const port = () => new Promise(resolve => {const server=net.createServer();serve
     assert(await hidden(`${selector} .fm-info-body`),`${selector} error detail leaked`);
     await page.locator(`${selector} summary`).click();
     assert(await isOpen(`${selector} details`));await noOverflow();
-    if(selector.startsWith('#shiny-notification'))await page.locator(`${selector} .shiny-notification-close`).click();
+    if(selector.startsWith('#shiny-notification')){await page.locator(`${selector} .shiny-notification-close`).click();await page.locator(selector).waitFor({state:'detached'});}
    }
    assert.equal(await page.locator('#runtime_error_output').evaluate(node=>getComputedStyle(node,'::before').content),'none');
+   // Offer failures must be readable immediately, including reused notification IDs.
+   await page.locator('#emit_error').click();
+   await page.locator('#shiny-notification-fixture-error .fm-info-error').waitFor();
+   await page.locator('#emit_owner_offer_error').focus();await page.keyboard.press('Enter');
+   await page.locator('#emit_market_offer_error').focus();await page.keyboard.press('Enter');
+   for (const [id, message] of [['fixture-error', 'The owner no longer accepts offers.'], ['fixture-market-offer', 'maximum size']]) {
+    const notification = page.locator(`#shiny-notification-${id}`);
+    await notification.locator('.fm-offer-error').waitFor();
+    assert.equal(await notification.locator('.fm-info, summary').count(), 0, 'offer error was collapsed into an icon');
+    assert.equal(await notification.evaluate(node=>node.classList.contains('fm-info-notification')), false);
+    assert((await notification.locator('.fm-offer-error').innerText()).includes(message));
+    assert(await notification.locator('.fm-offer-error').isVisible());
+    assert(await notification.locator('.shiny-notification-close').isVisible());
+    await noOverflow();
+   }
+   // Survive the ordinary Shiny notification timeout, then dismiss explicitly.
+   await page.waitForTimeout(5200);
+   for (const id of ['fixture-error', 'fixture-market-offer']) {
+    const notification = page.locator(`#shiny-notification-${id}`);
+    assert(await notification.locator('.fm-offer-error').isVisible());
+    if(width===390 && theme==='light' && id==='fixture-error') await page.screenshot({path:'/tmp/futmondo-visible-offer-error.png'});
+    await notification.locator('.shiny-notification-close').click();
+    await notification.waitFor({state:'detached'});
+   }
    // A large mutation burst must not block the browser or the Shiny heartbeat.
    const performance=await page.evaluate(async()=>{
     let ticks=0;let previous=performance.now();let largestGap=0;

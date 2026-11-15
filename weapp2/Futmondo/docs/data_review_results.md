@@ -3406,3 +3406,47 @@ quiet-hours settings stay independent. No dependency, schema or environment
 change; documentation has no runtime effect. Hosted appearance, physical-device
 behavior and network latency remain unverified. Unrelated working/index edits
 are preserved.
+
+
+## Visible offer submission errors — 2026-11-15
+
+The market and direct-owner submission handlers already emit readable, persistent
+`.fm-offer-error` messages. The shared `www/info-disclosures.js` notification
+compactor hid that content inside a closed red information icon. Exempt this
+explicit markup and remove the compact layout if Shiny reuses a previously
+compact notification ID. Existing translation, safe unknown/uncertain-response
+wording, duration=NULL, dismissal, preflights and submission behavior are intact.
+No new product capability or login inventory entry is introduced.
+
+Verification: the new synthetic browser regression fails before the fix because
+the owner error exists but remains hidden. After the fix, all six Chromium layouts
+(320/390/1440px, light/dark) pass immediate market/owner error visibility, no icon,
+long-text wrapping/no horizontal overflow, reused notification ID handling,
+persistence beyond five seconds and explicit dismissal. Existing disclosure
+keyboard/ready/pending/error and replacement behavior still passes. Inspected the
+390px offer-error screenshot. The fixture waits for prior dismissal animations
+before reusing IDs; activation uses keyboard when test notices cover buttons.
+The runner accepts the existing optional FUTMONDO_TEST_CHROMIUM executable override
+because its default Playwright browser revision is unavailable locally.
+
+Executed `Rscript test/test_offer_error_messages.R` (all existing translation,
+readable-message, unknown-code and uncertain-response assertions pass),
+`Rscript test/test_deployment_contract.R` (three groups pass), and
+`Rscript test/test_shiny_simulation.R` (13 checks plus eight tabs pass; zero HTTP
+or live database mutation attempts). Browser fixture backend I/O remains blocked
+and records zero attempts; no external requests or browser errors are observed.
+The deployment manifest retains package/file inventories and updates only the
+changed script and README checksums relative to its starting working copy.
+No dependency, environment setup, schema, source-data or durable cache change.
+README documents the optional test browser executable override.
+
+Performance review: one bounded descendant-marker lookup per candidate error
+container, using the existing local mutation observer. No added timer, polling,
+API/database read/write, cache invalidation, server reactive work or retained
+collection; no new disclosure DOM is constructed for offer errors. A 150-node
+mutation burst has 10–12ms maximum browser timer gaps, and Shiny heartbeat round
+trips take 56–59ms across the six layouts. Mobile text wraps within the existing
+viewport-bounded panel. Documentation has no runtime effect. Production rollout,
+physical devices and real authenticated offer responses remain unverified; no
+real accounts or transactions are used. Unrelated working-tree/index edits are
+preserved and excluded from the task commit.

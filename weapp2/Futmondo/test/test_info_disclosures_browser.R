@@ -28,6 +28,8 @@ ui<-shiny::fluidPage(shiny::tags$head(
   shiny::actionButton('replace_panel','Publish new detail'),
   shiny::actionButton('emit_error','Notification error'),
   shiny::actionButton('emit_warning','Notification warning'),
+  shiny::actionButton('emit_market_offer_error','Market offer error'),
+  shiny::actionButton('emit_owner_offer_error','Owner offer error'),
   shiny::actionButton('validate_error','Validation error'),
   shiny::actionButton('validate_loading','Validation loading'),
   shiny::actionButton('runtime_error','Output error'),
@@ -65,6 +67,13 @@ server<-function(input,output,session){
  shiny::observeEvent(input$retry,retries(retries()+1L))
  shiny::observeEvent(input$emit_error,shiny::showNotification('Synthetic request failed. No acquisition was performed.',type='error',id='fixture-error',duration=NULL))
  shiny::observeEvent(input$emit_warning,shiny::showNotification('Synthetic verification warning.',type='warning',id='fixture-warning',duration=NULL))
+ shiny::observeEvent(input$emit_market_offer_error,shiny::showNotification(
+  shiny::tags$div(class='fm-offer-error',paste0('Offer failed: ',offer_error_message(list(code='api.market.max_number_players_in_roster')))),
+  type='error',id='fixture-market-offer',duration=NULL))
+ shiny::observeEvent(input$emit_owner_offer_error,shiny::showNotification(
+  shiny::tags$div(class='fm-offer-error',paste0('Offer failed: ',offer_error_message(list(code='api.market.other',message=paste('The owner no longer accepts offers.',long_detail))))),
+  type='error',id='fixture-error',duration=NULL))
+
  output$validation<-shiny::renderText({if(isTRUE((input$validate_error %||% 0L)>0L))shiny::validate(shiny::need(FALSE,'Synthetic validation failed.'));''})
  output$loading_validation<-shiny::renderText({if(isTRUE((input$validate_loading %||% 0L)>0L))shiny::validate(shiny::need(FALSE,'Synthetic loading is pending.'),errorClass='fm-loading');''})
  output$runtime_error_output<-shiny::renderText({if(isTRUE((input$runtime_error %||% 0L)>0L))stop('Synthetic output error.');''})

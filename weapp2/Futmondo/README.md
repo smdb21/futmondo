@@ -64,7 +64,7 @@ Rscript test/test_shiny_simulation.R
 
 This harness blocks HTTP and uses offline account/league fixtures. Never run real trades as verification.
 
-The isolated PostgreSQL checks use `@electric-sql/pglite`; browser checks use Playwright. These are development tools, not deployed R dependencies. Set `FUTMONDO_TEST_NODE_MODULES` to their installation directory or use the documented default `/tmp/futmondo-review-tools/node_modules`.
+The isolated PostgreSQL checks use `@electric-sql/pglite`; browser checks use Playwright. These are development tools, not deployed R dependencies. Set `FUTMONDO_TEST_NODE_MODULES` to their installation directory or use the documented default `/tmp/futmondo-review-tools/node_modules`. Browser fixtures that support `FUTMONDO_TEST_CHROMIUM` can use an existing Chromium executable at that path; otherwise Playwright uses its installed default browser.
 
 ```sh
 node test/test_factual_schema.cjs
