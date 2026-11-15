@@ -1,5 +1,14 @@
 # Futmondo data architecture redesign plan
 
+## Coach icon and account summary placement — 2026-11-15 Pacific
+
+- [x] Place the coach status information icon beside Automatically hire coach, with expanded details below.
+- [x] Put the existing balance/offers/after-offers/spending summary first on My Team, Today's market and Players; use the existing server visibility rule as its single owner.
+- [x] Reproduce and fix the pending-error CSS class surviving a successful Shiny output recovery; preserve empty/pending icons and real failures.
+- [x] Focused financial states/isolation regression, six responsive browser layouts and required offline lifecycle; performance review recorded in [review results](data_review_results.md), with [presentation contracts](ui_information_disclosures.md).
+- [ ] Hosted acceptance after deployment. No new data capability, persistence schema, dependency or transaction behavior.
+
+
 ## Successful saved player availability — 2026-11-15 Pacific
 
 - [x] Trace the opening-card expiry error through successful durable snapshots, the missing capacity completeness flag, codec restoration and card eligibility.

@@ -1,5 +1,32 @@
 # Information and error disclosures
 
+## Coach control and account summary placement — 2026-11-15 Pacific
+
+`today_UI()` groups the existing coach checkbox and `coach_status` output in
+`.fm-coach-control`. A two-column CSS grid places the information trigger beside
+the checkbox label; expanded details span the next row. Native disclosure
+keyboard behavior, pending/empty suppression and coach hiring checks are unchanged.
+
+The root `round_countdown` output is the first content output, above startup
+and preference notices and each page body. Its existing server visibility rule
+shows the account/selected-league finances on Today's market, My Team and Players.
+The redundant client conditional wrapper is removed. Balance, active offers,
+after-offers balance and spending allowance remain immediately visible; only
+source/error details use a disclosure. The root browser fixture
+reproduced the output retaining `fm-info-waiting` after Shiny removed its typed
+pending error class. The observer now clears the leftover marker on recovery,
+and CSS hides an output only while that marker and its actual pending error
+class both exist. Success can paint immediately without waiting for observer
+delivery; a leftover marker cannot hide/suspend the recovered summary. Real
+settled failures and empty/pending icon suppression retain their behavior.
+
+Both changes present existing capabilities. Account/league isolation, durable
+successful API observation reuse, original source/freshness/completeness metadata,
+and manual-action eligibility remain unchanged. No API/database request, timer,
+persistence schema, dependency or environment setting is added. The fixed grid
+and existing wrapping finance row remain bounded on mobile.
+
+
 ## Empty and pending visibility — 2026-11-14 Pacific
 
 `fm_info(..., error=FALSE, class=NULL, pending=FALSE)` now returns `NULL` for explicit pending states and recursively empty content (including empty nested tags/lists/whitespace). `fm_info_content(x)` distinguishes meaningful content from dynamic Shiny text/HTML placeholders. Dynamic disclosures start with `fm-info-empty`, so an empty information icon cannot paint before its output binds. The client reveals them only after their nested output values settle and the body has content, and hides them again when emptied or recalculating. Confirmed failures retain red disclosures and Retry actions. The red departure legend is replaced by a native tooltip on affected player names, preserving the club tooltip and updating when departure metadata changes. All selectable player/rival tables hide Reactable’s `.selection` column while retaining the selection model, row clicks and card navigation. Player-card headers omit the redundant Market: prefix. These are presentation changes to existing facts and controls, with no new data capability. No error text is guessed to be loading.

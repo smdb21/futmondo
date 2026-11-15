@@ -13,6 +13,16 @@ check("league selection lives only on Welcome", {
     length(htmltools::tagQuery(body)$find("#shiny-tab-login #selected_league")$selectedTags()) == 1L,
     grepl("Welcome", as.character(login_UI("login")), fixed=TRUE))
 })
+check("one summary output leads the page without a second client visibility gate", {
+  summary <- htmltools::tagQuery(body)$find("#round_countdown")$selectedTags()
+  stopifnot(length(summary)==1L,
+    !any(vapply(htmltools::tagQuery(body)$find("div")$selectedTags(),function(node)
+      !is.null(node$attribs[["data-display-if"]]) &&
+        grepl('id="round_countdown"',as.character(node),fixed=TRUE),logical(1))))
+  markup <- as.character(body)
+  stopifnot(regexpr('id="round_countdown"',markup,fixed=TRUE)[1] <
+    regexpr('id="startup_status"',markup,fixed=TRUE)[1])
+})
 original_async <- async_adapter_fetch
 calls <- character(); pending <- new.env(parent=emptyenv())
 async_adapter_fetch <- function(fn,args=list(),context,owner=context$session_id,is_current=function()TRUE,on_progress=NULL) {

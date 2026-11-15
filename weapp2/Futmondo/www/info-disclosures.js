@@ -42,7 +42,12 @@
     if (panel.classList.contains('fm-info-empty') !== empty) panel.classList.toggle('fm-info-empty', empty);
   }
   function compact(node) {
-    if (!node.matches(selector)) return;
+    if (!node.matches(selector)) {
+      // Shiny removes its error classes before publishing recovered content.
+      // Do not retain a loading class that can suspend the recovered output.
+      if (node.classList.contains('fm-info-waiting')) node.classList.remove('fm-info-waiting');
+      return;
+    }
     // Failed offer submissions need an immediately readable, dismissible message.
     if (node.querySelector('.fm-offer-error')) {
       const notification = node.closest('.shiny-notification');
@@ -105,7 +110,7 @@
         if (record.type === 'attributes') {
           if (target.matches('.rt-tr')) scanNames(target);
           if (target.matches('.shiny-notification')) scan(target);
-          else if (target.matches('.shiny-output-error')) compact(target);
+          else if (target.matches('.shiny-output-error, .fm-info-waiting')) compact(target);
           // Recalculation can change on a parent output without replacing nodes.
           if (target.matches(outputSelector) || target.hasAttribute('aria-busy')) target.querySelectorAll('.fm-info').forEach(node => panels.add(node));
           return;

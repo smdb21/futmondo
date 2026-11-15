@@ -2367,7 +2367,7 @@
       "checksum": "4d2e98eddbe74e039b41cacefb745d0f"
     },
     "Modules/Today_Module.R": {
-      "checksum": "0656f9c299e1cc532cd601c856fcfc51"
+      "checksum": "589e00cc033412df8a1cc0db1169dee2"
     },
     "mvp_runtime.R": {
       "checksum": "74d8fbf348ade54f62447a832c3600d5"
@@ -2409,7 +2409,7 @@
       "checksum": "771495cb5f6af805b2b98f903f675375"
     },
     "ui.R": {
-      "checksum": "29b51beb21529b1a6fd99754524c6d28"
+      "checksum": "3383859048d47057000f355a157d80a3"
     },
     "utils.R": {
       "checksum": "6253d5e12d91ddef162c7e9e7624680a"
@@ -2421,10 +2421,10 @@
       "checksum": "b3906e8a4291c04253402800dda8b0fc"
     },
     "www/custom_style.css": {
-      "checksum": "247221c893e2516f175c570098d4e911"
+      "checksum": "60f064f9793be4be2c3390be286d1bd5"
     },
     "www/info-disclosures.js": {
-      "checksum": "f522de15b53c2da0bfc351c8c325fea7"
+      "checksum": "6a29cd70de23eb9af39ab87b9aeebde5"
     },
     "www/release-info.json": {
       "checksum": "94a9e0ef704ee5c2f9de93c7055428b1"

@@ -1,5 +1,59 @@
 # Futmondo data review and implementation results
 
+## Coach icon and account summary placement — 2026-11-15 Pacific
+
+The coach status icon shares a row with Automatically hire coach. Expanded native
+information details occupy the next row. The root finance summary now precedes
+startup/preference notices and page content, using its existing server visibility
+rule on My Team, Today's market and Players; the duplicate client conditional
+wrapper is removed. Existing amounts remain visible outside information details.
+
+The real root browser fixture reproduced a missing summary: Shiny removed its
+pending error classes while `fm-info-waiting` remained, hiding the entire output
+and allowing suspension even though it held loading/recovering content. The
+shared disclosure observer now clears that marker when an error recovers. CSS
+hides it only while the actual typed pending error class exists, so success is
+visible immediately, before observer delivery. Real settled errors remain
+inspectable; transient/empty information icons remain suppressed. No source
+value, availability or transaction preflight is bypassed.
+
+Executed `Rscript test/test_banner_finance.R`: 15 checks pass, including held
+and failed reads, one leading summary output, three-page visibility, saved
+snapshot/source-time replay, scoped navigation reuse and clearing old league
+amounts. Executed `Rscript test/test_shiny_simulation.R` on the final runtime:
+13 checks plus eight tabs pass, with zero HTTP/live database mutation attempts.
+`Rscript test/test_deployment_contract.R` passes all three groups.
+
+`test/test_account_summary_browser.cjs` exercises the production root UI at
+320/390/1440px in light/dark themes, including pending-error-to-success class
+recovery, adjacent coach icon and details, visible financial amounts first on
+all three pages, absence on Welcome/Notifications/Lineup, and no page overflow.
+After existing page-specific resources mount, repeated navigation adds zero
+team/market adapter reads and no HTTP or coach mutations. Phone screenshots
+including expanded coach details were inspected. The synthetic fixture uses
+acknowledged in-memory preference stubs solely to avoid live test persistence;
+application persistence is unchanged. Local Chromium is selected using the
+existing FUTMONDO_TEST_CHROMIUM override. Hosted/physical-device acceptance
+remains separate. Maximum measured warm navigation was 28–35ms per layout.
+The existing disclosure browser checks also pass all six layouts, with 54–60ms
+heartbeats, 10–12ms measured browser gaps and zero source/database I/O. An initial
+run timed out awaiting a synthetic error notification; rerunning with temporary
+failure screenshot capture passed without changing its assertions or fixture.
+No recurrence was observed in that rerun.
+
+Performance review: the summary consumes the same shared team/market projections;
+no acquisition, invalidation, source query, database write, cache policy, queue,
+timer or growing collection is added. Existing valid durable observations and
+source/freshness/completeness context remain reusable. Recovery cleanup checks
+only changed local outputs and removes a class only when present; no observer
+polling or extra document scan. One fixed grid positions the coach control; the
+existing finance row wraps on mobile. Removing the conditional wrapper removes
+a client visibility gate. Documentation has no runtime effect. No dependency,
+environment, schema change or deployment is included. Only this task's four
+runtime checksums are updated in the manifest. Unrelated working-tree/index
+changes are preserved and excluded from the commit.
+
+
 ## Successful saved player availability — 2026-11-15 Pacific
 
 Root cause: the capacity parser omitted the collector's completeness attribute. Read-only production metadata showed two successful stored capacity observations with unknown completeness. Replay of their actual codec payloads confirmed successful roster/funds/commitments, empty diagnostics and a genuine 15-second original action window; these checks had completed, then aged. Because the card required proven completeness to distinguish ordinary aging, it rendered the generic red expiry failure. No raw private payload, authentication secret, account identity or financial amount was logged, and no database row or account setting was changed.

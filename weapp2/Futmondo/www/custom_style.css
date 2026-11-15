@@ -1510,7 +1510,7 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 }
 
 /* Technical information stays collapsed; native disclosure needs no server trip. */
-.fm-info[hidden], .fm-info.fm-info-empty, .fm-info-waiting, .recalculating .fm-info { display:none !important; }
+.fm-info[hidden], .fm-info.fm-info-empty, .fm-info-waiting.shiny-output-error-fm-loading, .recalculating .fm-info { display:none !important; }
 .fm-info { display: block; min-width: 0; max-width: 100%; margin: 2px 0; color: var(--fm-muted); font-size: 12px; font-weight: normal; text-align: left; white-space: normal; }
 .fm-info > summary { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 4px; margin: 0; cursor: pointer; list-style: none; border-radius: 50%; color: var(--fm-muted); }
 .fm-info > summary::-webkit-details-marker { display: none; }
@@ -1601,3 +1601,11 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
     border-left: 0 !important;
     padding-left: 7px !important;
 }
+
+/* Keep coach details beside the preference; expanded text uses the next row. */
+.fm-coach-control { display: grid; grid-template-columns: minmax(0, max-content) 28px; align-items: center; gap: 0 6px; margin-bottom: 10px; }
+.fm-coach-control > .shiny-input-container { width: auto; min-width: 0; margin: 0; }
+.fm-coach-control .checkbox { margin: 0; }
+.fm-coach-control > .shiny-html-output, .fm-coach-control > .shiny-html-output > .fm-info { display: contents; }
+.fm-coach-control .fm-info > summary { grid-column: 2; grid-row: 1; }
+.fm-coach-control .fm-info-body { grid-column: 1 / -1; grid-row: 2; }

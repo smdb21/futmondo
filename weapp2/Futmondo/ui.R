@@ -32,15 +32,13 @@ body <- shinydashboard::dashboardBody(
         }
       "))
   ),
+  # The server owns page visibility; keep account finances above page notices.
+  uiOutput("round_countdown"),
   uiOutput("startup_status"),
   uiOutput("page_preference_status"),
   uiOutput("timezone_preference_status"),
   # Saved-access feedback must remain visible after navigation away from Welcome.
   uiOutput(shiny::NS("login", "remember_feedback")),
-  conditionalPanel(
-    condition = "['today', 'players_in_championship', 'yourteam'].includes(input.tabs)",
-    uiOutput("round_countdown")
-  ),
   uiOutput("background_sync"),
   uiOutput("worker_status"),
   uiOutput("clause_results"),

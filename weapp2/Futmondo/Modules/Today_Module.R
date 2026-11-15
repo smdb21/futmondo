@@ -40,8 +40,10 @@ today_transfer_rows <- function(rows, teams=NULL, players=NULL,timezone=fm_displ
 today_UI <- function(id) {
   ns <- NS(id)
   tagList(h2("Today's market"),
-    coach_preference_script(),checkboxInput(ns("automatically_hire_coach"),"Automatically hire coach",value=TRUE),
-    uiOutput(ns("coach_status")),
+    coach_preference_script(),
+    tags$div(class="fm-coach-control",
+      checkboxInput(ns("automatically_hire_coach"),"Automatically hire coach",value=TRUE),
+      uiOutput(ns("coach_status"))),
     fluidRow(uiOutput(ns("kpi_cash_box")),uiOutput(ns("kpi_valuation_box"))),
     uiOutput(ns("market_status")),
     players_table_UI(ns("market_players"),box_title="Current market listings",filter_by_is_from_futmondo=TRUE,default_free_agents=TRUE,filter_by_players_with_bid=TRUE),
