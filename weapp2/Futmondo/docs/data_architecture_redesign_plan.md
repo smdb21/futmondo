@@ -1580,3 +1580,19 @@ No schema, dependency, automation or login inventory expansion is required.
   offline lifecycle (13 checks plus 8 tabs) pass. See `data_review_results.md`
   and `coach_and_round_awards.md`. No schema/dependency changes; production
   deployment and authenticated verification remain separate.
+
+
+### Automatic player availability on opening — implemented locally (2026-11-15)
+
+- Remove the initial Verify availability click for Background sync player cards.
+  Opening automatically runs the existing bounded asynchronous factual check
+  when stored capacity cannot establish availability; valid scoped durable
+  observations and native team calculations are reused first.
+- Retain failure/expiry retry, strict source deadlines, context cancellation,
+  duplicate protection and independent manual-action submission preflights.
+  Same-context redraws cannot retrigger acquisition; no recurring polling or
+  transaction is introduced. This restores the existing card-opening workflow
+  in worker mode, without adding a new product capability or login-tier entry.
+- Focused recovery/native/completeness/expiry/dialog checks, final mobile/desktop
+  browser checks and the required offline lifecycle pass; measurements and
+  limitations are in `data_review_results.md`. Deployment remains separate.

@@ -1,5 +1,5 @@
 # Stored worker observations may outlive the short transaction deadline. The
-# card must expose a real, enabled verification control before accepting input.
+# card must start one live factual check automatically before accepting input.
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages(source('global.R'))
 fm_worker_configured<-function()TRUE
@@ -42,7 +42,7 @@ async_adapter_fetch<-function(fn,args=list(),context,worker_bypass=FALSE,is_curr
  }
  value<-switch(fn,get_player_summary=list(championship=list(),points=list(),prices=list()),
   get_lineup_from_team=list(pointSystem='fixture'),get_player_full_profile=list(profile=list()),
-  get_player_matches=list(matches=list()),read_card_round_history=data.frame(),
+  get_player_matches=list(matches=list()),get_my_market_players=data.frame(),read_card_round_history=data.frame(),
   read_card_price_history=data.frame(),stop(fn))
  promises::promise_resolve(value)
 }
@@ -51,7 +51,7 @@ player<-data.frame(id='p',name='Fixture',role='delantero',team='Club',value=200,
  price=150,change=0,points=10,user_team_id='rival',market_inMarket=TRUE,
  clause_price=400,clause_transferred=FALSE)
 selected<-reactiveVal(player);team<-reactiveVal('mine')
-settle<-function(session)for(i in 1:30){later::run_now(0);session$flushReact()}
+settle<-function(session)for(i in 1:30){later::run_now(.001);session$flushReact()}
 button<-function(html,id){
  pattern<-paste0('<button\\b[^>]*\\bid="[^"]*',id,'"[^>]*>')
  match<-regmatches(html,regexpr(pattern,html,perl=TRUE))
@@ -60,118 +60,111 @@ button<-function(html,id){
 }
 enabled<-function(html,id){tag<-button(html,id);!is.null(tag)&&!grepl('\\bdisabled(?:=|\\s|>)',tag,perl=TRUE)}
 blocked<-function(html,id){tag<-button(html,id);is.null(tag)||grepl('\\bdisabled(?:=|\\s|>)',tag,perl=TRUE)}
-shiny::testServer(selected_player_Server,args=list(selected_player=selected,
- login_token=reactive(auth),championship_id=reactive('league'),user_team_id=team),{
+refresh<-reactiveVal(0L)
+reset<-function(value=capacity(-30,age=45)){
+ clear_api_cache();jobs<<-list();reads<<-list();rpc<<-character()
+ rm(list=ls(.fm_worker$values),envir=.fm_worker$values)
+ rm(list=auth[['userid']],envir=.fm_worker$accounts)
+ account<<-fm_worker_account_state(auth[['userid']])
+ account$known<-TRUE;account$account<-list(enabled=TRUE,auth_status='active')
+ selected(player);team('mine');refresh(0L);put_capacity(value,paste0('fixture-',runif(1)))
+}
+args<-list(selected_player=selected,login_token=reactive(auth),championship_id=reactive('league'),
+ user_team_id=team,refresh_trigger=refresh)
+reset()
+shiny::testServer(selected_player_Server,args=args,{
  settle(session)
- stopifnot(enabled(output$action_buttons$html,'btn_verify_availability'),
-  blocked(output$action_buttons$html,'btn_bid_market'),blocked(output$action_buttons$html,'btn_pay_clause'),
-  !length(jobs),!length(rpc),sum(vapply(reads,function(x)x$fn=='get_team_acquisition_capacity',logical(1)))==1L)
- cat('PASS expired stored capacity exposes an enabled verification button while purchase controls remain disabled; passive opening acquires nothing\n')
-
- failed_saved<-capacity(-30,status='partial',age=45)
- failed_saved$diagnostics<-'reported budget unavailable'
- put_capacity(failed_saved,'expired-partial');settle(session)
- stopifnot(!grepl('Verify availability to check your current roster, funds and offers.',output$action_buttons$html,fixed=TRUE),
-  blocked(output$action_buttons$html,'btn_bid_market'),enabled(output$action_buttons$html,'btn_verify_availability'))
- failed_saved<-capacity(-30,age=45)
- attr(failed_saved,'fetch_error')<-resource_failure(resource='get_team_acquisition_capacity',category='network')
- put_capacity(failed_saved,'expired-error');settle(session)
- stopifnot(!grepl('Verify availability to check your current roster, funds and offers.',output$action_buttons$html,fixed=TRUE),
-  blocked(output$action_buttons$html,'btn_bid_market'),enabled(output$action_buttons$html,'btn_verify_availability'))
- failed_saved<-capacity(-30,age=45)
- attr(failed_saved,'worker_completeness')<-'partial'
- attr(failed_saved,'worker_acquisition_status')<-'partial'
- put_capacity(failed_saved,'expired-incomplete-envelope');settle(session)
- stopifnot(!grepl('Verify availability to check your current roster, funds and offers.',output$action_buttons$html,fixed=TRUE),
-  blocked(output$action_buttons$html,'btn_bid_market'),enabled(output$action_buttons$html,'btn_verify_availability'))
- put_capacity(capacity(-30,age=45),'expired-recovered');settle(session)
- cat('PASS expired partial or failed stored observations retain failure presentation instead of being described as ordinary aging\n')
-
- session$setInputs(btn_verify_availability=1L);settle(session)
  stopifnot(length(jobs)==1L,blocked(output$action_buttons$html,'btn_verify_availability'),
-  blocked(output$action_buttons$html,'btn_bid_market'),blocked(output$action_buttons$html,'btn_pay_clause'))
- session$setInputs(btn_verify_availability=2L);settle(session)
+  blocked(output$action_buttons$html,'btn_bid_market'),blocked(output$action_buttons$html,'btn_pay_clause'),!length(rpc))
+ session$setInputs(btn_verify_availability=1L);settle(session)
  heartbeat<-FALSE;later::later(function()heartbeat<<-TRUE,0);settle(session)
  stopifnot(length(jobs)==1L,heartbeat,writes==0L)
  jobs[[1L]]$resolve(capacity());settle(session)
  stopifnot(enabled(output$action_buttons$html,'btn_bid_market'),enabled(output$action_buttons$html,'btn_pay_clause'),
-  !grepl('Availability checks expired',output$action_buttons$html,fixed=TRUE),writes==0L)
- cat('PASS one held live request coalesces duplicate verification input, leaves the event loop responsive and enables market/clause actions after success\n')
-
+  is.null(button(output$action_buttons$html,'btn_verify_availability')),writes==0L)
+ cat('PASS opening expired stored capacity starts one live check, coalesces duplicate inputs, yields to heartbeat and enables verified actions without a click\n')
  put_capacity(capacity(-30,budget=99,age=45),'older-replay');settle(session)
- stopifnot(card_states$capacity()$data$funds$spendable_budget==1000,
-  enabled(output$action_buttons$html,'btn_bid_market'),length(jobs)==1L,!length(rpc))
+ stopifnot(card_states$capacity()$data$funds$spendable_budget==1000,length(jobs)==1L,!length(rpc))
  now<<-now+1;put_capacity(capacity(budget=900),'newer-publication');settle(session)
- stopifnot(card_states$capacity()$data$funds$spendable_budget==900,
-  enabled(output$action_buttons$html,'btn_bid_market'),length(jobs)==1L)
- cat('PASS older worker replay cannot replace a fresh live result; a newer stored observation can replace it without source acquisition\n')
-
+ stopifnot(card_states$capacity()$data$funds$spendable_budget==900,length(jobs)==1L)
  now<<-now+16;put_capacity(capacity(-1,age=16),'expired-again');settle(session)
- stopifnot(enabled(output$action_buttons$html,'btn_verify_availability'),blocked(output$action_buttons$html,'btn_bid_market'))
- session$setInputs(btn_verify_availability=3L);settle(session)
- jobs[[2L]]$reject(resource_failure(resource='get_team_acquisition_capacity',category='network'));settle(session)
- stopifnot(length(jobs)==2L,enabled(output$action_buttons$html,'btn_verify_availability'),
-  blocked(output$action_buttons$html,'btn_bid_market'),blocked(output$action_buttons$html,'btn_pay_clause'),writes==0L)
- session$setInputs(btn_verify_availability=4L);settle(session)
- jobs[[3L]]$resolve(capacity(status='partial',budget=NA_real_));settle(session)
- stopifnot(length(jobs)==3L,enabled(output$action_buttons$html,'btn_verify_availability'),
-  blocked(output$action_buttons$html,'btn_bid_market'),blocked(output$action_buttons$html,'btn_pay_clause'))
- session$setInputs(btn_verify_availability=5L);settle(session)
- jobs[[4L]]$resolve(capacity(-1));settle(session)
- stopifnot(length(jobs)==4L,enabled(output$action_buttons$html,'btn_verify_availability'),
-  blocked(output$action_buttons$html,'btn_bid_market'),writes==0L)
- cat('PASS failed, partial and already-expired live checks keep actions blocked and offer explicit retry without automatic loops\n')
-
- session$setInputs(btn_verify_availability=6L);settle(session)
- undated<-capacity();undated$valid_until<-NULL
- jobs[[5L]]$resolve(undated);settle(session)
- stopifnot(length(jobs)==5L,enabled(output$action_buttons$html,'btn_verify_availability'),
-  blocked(output$action_buttons$html,'btn_bid_market'))
- session$setInputs(btn_verify_availability=7L);settle(session)
- invalid_deadline<-capacity();invalid_deadline$valid_until<-NA_real_
- jobs[[6L]]$resolve(invalid_deadline);settle(session)
- stopifnot(length(jobs)==6L,enabled(output$action_buttons$html,'btn_verify_availability'),
-  blocked(output$action_buttons$html,'btn_bid_market'),writes==0L)
- cat('PASS successful-looking live responses with missing or invalid deadlines cannot authorize an acquisition\n')
-
- session$setInputs(btn_verify_availability=8L);settle(session)
- stopifnot(length(jobs)==7L,jobs[[7L]]$current())
+ stopifnot(length(jobs)==1L,blocked(output$action_buttons$html,'btn_bid_market'),
+  enabled(output$action_buttons$html,'btn_verify_availability'))
+ updated<-selected();updated$points<-11;selected(updated);settle(session)
+ stopifnot(length(jobs)==1L,!is.null(manual_capacity_verification()))
+ cat('PASS worker publications retain timestamp ordering and do not start recurring automatic checks\n')
+})
+reset(capacity())
+shiny::testServer(selected_player_Server,args=args,{
+ settle(session)
+ stopifnot(!length(jobs),enabled(output$action_buttons$html,'btn_bid_market'),!length(rpc))
+ selected(NULL);settle(session);selected(player);settle(session)
+ stopifnot(!length(jobs),enabled(output$action_buttons$html,'btn_bid_market'))
+ cat('PASS fresh durable availability and warm reopening require zero live checks\n')
+})
+reset()
+shiny::testServer(selected_player_Server,args=args,{
+ settle(session);stopifnot(length(jobs)==1L)
+ jobs[[1L]]$reject(resource_failure(resource='get_team_acquisition_capacity',category='network'));settle(session)
+ stopifnot(enabled(output$action_buttons$html,'btn_verify_availability'),blocked(output$action_buttons$html,'btn_bid_market'),
+  grepl('unavailable',output$action_buttons$html,fixed=TRUE),length(jobs)==1L)
+ for(kind in c('partial','expired','undated','invalid-deadline')){
+  before<-length(jobs);session$setInputs(btn_verify_availability=before);settle(session)
+  value<-capacity()
+  if(kind=='partial'){value$status<-'partial';value$funds$spendable_budget<-NA_real_}
+  if(kind=='expired')value$valid_until<-as.numeric(now)-1
+  if(kind=='undated')value$valid_until<-NULL
+  if(kind=='invalid-deadline')value$valid_until<-NA_real_
+  jobs[[before+1L]]$resolve(value);settle(session)
+  stopifnot(length(jobs)==before+1L,enabled(output$action_buttons$html,'btn_verify_availability'),
+   blocked(output$action_buttons$html,'btn_bid_market'),blocked(output$action_buttons$html,'btn_pay_clause'),writes==0L)
+ }
+ cat('PASS network, partial, expired and malformed results remain truthful, block purchases and offer retry without automatic loops\n')
+})
+reset()
+shiny::testServer(selected_player_Server,args=args,{
+ settle(session);stopifnot(length(jobs)==1L,jobs[[1L]]$current())
  team('another');settle(session)
- stopifnot(!jobs[[7L]]$current(),enabled(output$action_buttons$html,'btn_verify_availability'))
- jobs[[7L]]$resolve(capacity(budget=9999));settle(session)
- stopifnot(is.null(card_states$capacity()$data),blocked(output$action_buttons$html,'btn_bid_market'),writes==0L)
- session$setInputs(btn_verify_availability=9L);settle(session)
- stopifnot(length(jobs)==8L,jobs[[8L]]$context$user_team_id=='another')
- jobs[[8L]]$resolve(capacity());settle(session)
- stopifnot(enabled(output$action_buttons$html,'btn_bid_market'),enabled(output$action_buttons$html,'btn_pay_clause'))
- cat('PASS a team change discards the old completion; missing stored capacity still exposes verification and can recover independently\n')
-
+ stopifnot(length(jobs)==2L,!jobs[[1L]]$current(),jobs[[2L]]$context$user_team_id=='another')
+ jobs[[1L]]$resolve(capacity(budget=9999));settle(session)
+ stopifnot(card_states$capacity()$status=='loading')
+ jobs[[2L]]$resolve(capacity());settle(session)
+ stopifnot(enabled(output$action_buttons$html,'btn_bid_market'))
  owner_player<-player;owner_player$id<-'owner-only';owner_player$price<-0;owner_player$market_inMarket<-FALSE
  selected(owner_player);settle(session)
- stopifnot(enabled(output$action_buttons$html,'btn_verify_availability'),blocked(output$action_buttons$html,'btn_offer_owner'))
- session$setInputs(btn_verify_availability=10L);settle(session)
- stopifnot(length(jobs)==9L)
- jobs[[9L]]$resolve(capacity());settle(session)
- stopifnot(enabled(output$action_buttons$html,'btn_offer_owner'),enabled(output$action_buttons$html,'btn_pay_clause'),writes==0L)
+ stopifnot(length(jobs)==3L,!jobs[[2L]]$current(),blocked(output$action_buttons$html,'btn_offer_owner'))
+ jobs[[3L]]$resolve(capacity());settle(session)
+ stopifnot(enabled(output$action_buttons$html,'btn_offer_owner'),enabled(output$action_buttons$html,'btn_pay_clause'))
  selected(NULL);settle(session)
- stopifnot(!jobs[[9L]]$current(),length(jobs)==9L,
-  all(vapply(reads,function(x)!x$bypass||x$fn=='get_team_acquisition_capacity',logical(1))),
-  !length(rpc),writes==0L)
- cat('PASS changing players resets live verification; owner and clause actions share successful recovery, and closing the card releases its scope\n')
-
- # Retain the real worker provider's missing/loading state separately. Mock
- # output extraction waits on its 120s provider promise, so missing DOM behavior
- # above uses a settled absent result; the browser fixture covers held loading.
- team('missing');selected(player);settle(session)
- stopifnot(card_states$capacity()$status=='loading',is.null(card_states$capacity()$data),length(account$waiters)>0L)
- put_capacity(capacity(-30,age=45),'missing-arrived',team='missing');fm_worker_settle(account);settle(session)
- stopifnot(enabled(output$action_buttons$html,'btn_verify_availability'),length(jobs)==9L)
- session$setInputs(btn_verify_availability=11L);settle(session)
- stopifnot(length(jobs)==10L,jobs[[10L]]$current())
+ stopifnot(!jobs[[3L]]$current(),length(jobs)==3L,writes==0L)
+ cat('PASS team/player changes automatically check the new context, reject late old results, enable owner/clause actions and release scope on close\n')
+})
+reset()
+shiny::testServer(selected_player_Server,args=args,{
+ settle(session);stopifnot(length(jobs)==1L)
+ refresh(1L);settle(session)
+ stopifnot(length(jobs)==2L,!jobs[[1L]]$current(),jobs[[2L]]$current())
+ jobs[[1L]]$resolve(capacity(budget=9999));settle(session)
+ stopifnot(card_states$capacity()$status=='loading')
+ jobs[[2L]]$resolve(capacity());settle(session)
+ stopifnot(enabled(output$action_buttons$html,'btn_bid_market'),length(jobs)==2L)
+ cat('PASS explicit Refresh starts exactly one new scoped check and discards the old completion\n')
+})
+reset()
+shiny::testServer(selected_player_Server,args=args,{
+ settle(session);stopifnot(length(jobs)==1L)
+ team('missing');settle(session)
+ stopifnot(length(jobs)==2L,length(account$waiters)>0L,jobs[[2L]]$current())
+ # A missing passive provider does not delay the independent live verification.
+ jobs[[2L]]$resolve(capacity());settle(session)
+ stopifnot(evaluate_acquisition_preflight(card_states$capacity()$data,'offer')$ok)
  fm_worker_set_policy(account,list(enabled=FALSE,auth_status='active'));settle(session)
- stopifnot(!jobs[[10L]]$current(),card_states$capacity()$data$funds$spendable_budget==800,
-  enabled(output$action_buttons$html,'btn_bid_market'),is.null(button(output$action_buttons$html,'btn_verify_availability')))
- jobs[[10L]]$resolve(capacity(budget=9999));settle(session)
- stopifnot(card_states$capacity()$data$funds$spendable_budget==800,writes==0L)
- cat('PASS real missing provider remains loading until publication; disabling worker mode discards held verification and restores normal reads\n')
+ stopifnot(!jobs[[2L]]$current(),card_states$capacity()$data$funds$spendable_budget==800,writes==0L)
+ cat('PASS missing worker snapshot launches automatically while its publication is pending; mode changes restore normal reads safely\n')
+})
+reset()
+owned<-player;owned$user_team_id<-'mine';selected(owned)
+shiny::testServer(selected_player_Server,args=args,{
+ settle(session);stopifnot(!length(jobs),writes==0L)
+ cat('PASS opening an owned player adds no acquisition verification\n')
 })

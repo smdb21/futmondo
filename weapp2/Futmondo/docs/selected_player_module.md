@@ -8,7 +8,7 @@ Opening a rival player could report **Availability checks expired before they co
 
 `fm_worker_restore()` also recognizes legacy **capacity only** envelopes with unknown completeness when the saved contract passes, the envelope acquisition succeeded, and its source timestamp is valid/nonfuture. It sets `worker_completeness=complete` and `worker_completeness_source=capacity_contract`; failed/partial/future or malformed evidence is never promoted. Existing immutable manifest metadata is retained and restored observations are not rewritten. The original source timestamps, payload deadline and more restrictive envelope deadline are preserved. Durable database observations remain the source of reuse across sessions/restarts; no new cache, schema or acquisition is introduced.
 
-The card's existing neutral **Verify availability** recovery now works for these restored successful results. Its disabled purchase-button tooltips use the same neutral recovery message, rather than retaining the misleading expiry failure. Expired observations still block purchases; explicit verification and independent submission preflights retain their freshness checks, context isolation, duplicate/cancellation protection and bounded retries. Real failed/partial acquisitions keep diagnostics. No background source acquisition or transaction is added by opening a card.
+Restored successful results retain their proven completeness while expired observations still block purchases. Following the owner's 2026-11-15 request, opening the card automatically runs the existing availability recovery when needed, as described below. Failed/partial acquisitions keep diagnostics; verification and independent submission preflights retain freshness checks, context isolation and duplicate/cancellation protection. Opening never submits a transaction.
 
 
 The selected-player module displays actual player identity, current values and availability, profile/match data, price history, and round points. It preserves explicit manual bid, sale, offer, and release-clause handlers with their current-state checks.
@@ -70,6 +70,8 @@ The broader `test_deterministic_fixes.R` run reported 29 passes and one failure,
 
 ## Explicit recovery of expired worker availability (2026-11-15 UTC)
 
+The initial click-to-verify behavior described in this section is superseded by **Automatic availability on opening** below; its factual read, persistence and purchase-safety contracts remain in use.
+
 Worker capacity observations are collected every 300 seconds, while their original transaction deadline remains at most 15 seconds. A saved result therefore usually cannot authorize a purchase. The passive card previously disabled every acquisition button at that deadline, leaving the existing live modal preflight unreachable; ordinary Refresh could only reread the same database observation.
 
 Non-owned cards now expose **Verify availability** when worker capacity is missing, loading, expired or otherwise unverified. This is an explicit factual read, not a purchase. It calls the existing asynchronous `get_team_acquisition_capacity` adapter with `worker_bypass=TRUE`, propagating the live check to its prerequisites. Repeated clicks while pending share one check. The control stays reachable outside the ordinary purchase-readiness gate; market, owner-offer and clause actions still require verified capacity and their existing player-summary prerequisites.
@@ -90,3 +92,41 @@ The source observation clocks and the 15/30/300/20/60-second funds/roster/histor
 Live bypass also retains the captured account/league/competition/season/scoring identity for implicitly scoped nested reads. Previously bypass disabled worker mode and lost expired-but-known identity, so a durable historical baseline could be queried under `unknown` instead of its original scope. The adapter now fills missing identity from its caller only within the matching account/league, preserves explicit archive/team/player scope, and rejects conflicting current metadata. `resource_context()` retains observed identity during the existing explicit `futmondo.worker_live` submission scope, so the independent synchronous preflight can reuse the exact just-verified capacity instead of starting a second cold scan. Source freshness checks remain separate and strict. See [transport context](transport_priority.md) and the exact verification record in [review results](data_review_results.md).
 
 The top-level asynchronous capacity cache also uses the supplied known scope and rejects conflicting current competition/season/scoring identity before lookup; it cannot return another context’s otherwise fresh cached balance.
+
+
+## Automatic availability on opening — 2026-11-15
+
+Opening a non-owned player now starts the existing live availability check
+automatically when Background sync's saved capacity is missing, pending, stale,
+expired or incomplete. A valid scoped database observation is reused first; the
+card also checks the already decoded worker snapshot if its reactive replay is
+still queued. Fresh successful team calculations reuse the existing native cache
+without repeating source requests. The ordinary non-worker path is unchanged.
+
+`verify_card_availability()` is the shared module-local entry for automatic
+opening and the retained retry input. It uses the same asynchronous
+`get_team_acquisition_capacity` adapter with `worker_bypass=TRUE`; duplicate
+inputs share an in-flight verification. Purchase controls show checking until
+verified facts arrive. **Retry availability** is available after a genuine
+failure or a later expiry; an initial verification click is no longer required.
+Partial/error/expired/undated results remain blocked with their diagnostics.
+
+One cancellable 10ms deferral gives immediate stored replay its first flush.
+The check is latched to account/league/team/player/season/scoring, refresh/history
+revision and worker mode. Identical context redraws cannot reset the result or
+launch more work. Closing, context changes and session end cancel the deferral
+and invalidate late completions. Each new opening or explicit refresh may check
+once; no recurring timer or source polling is added. Owned players skip the
+acquisition check.
+
+This changes interactive loading only. It adds no transaction, background job,
+worker consent/cadence, durable cache, database schema, dependency or environment
+variable. Existing durable worker observations and acquisition persistence hooks
+remain in use with their original context, completeness and source deadlines;
+session memory is only the current card's pending/result projection. Independent
+manual-action submission preflights remain required.
+
+Updated worker recovery, native capacity, legacy completeness and mobile/desktop
+browser fixtures cover automatic opening, fresh stored/native reuse, delayed
+sources, retry safety, redraws, context changes and missing worker publications.
+See `data_review_results.md` for measured request counts and verification limits.

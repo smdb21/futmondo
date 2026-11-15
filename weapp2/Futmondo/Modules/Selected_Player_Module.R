@@ -676,7 +676,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           blocked_reason <- if(!isTRUE(bid_gate$ok)) bid_gate$message else if(!isTRUE(clause_gate$ok)) clause_gate$message else NULL
           if(!is.null(blocked_reason)&&!identical(bid_gate$reason,"loading")&&!identical(clause_gate$reason,"loading")) {
             # A saved worker observation normally outlives its action deadline.
-            # Offer an explicit live check instead of asking Refresh to reread it.
+            # Opening starts a live check; failed checks retain an explicit retry.
             saved_state <- card_states$capacity()
             saved_expired <- worker_capacity_verification_available() &&
               is.null(manual_capacity_verification()) && is.null(saved_state$error) &&
@@ -685,7 +685,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
               identical(attr(saved_state$data,"worker_acquisition_status") %||% "ok","ok") &&
               identical(attr(saved_state$data,"worker_completeness") %||% "complete","complete") &&
               !resource_snapshot_unexpired(saved_state$data)
-            recovery_message<-"Verify availability to check your current roster, funds and offers."
+            recovery_message<-"Checking your current roster, funds and offers…"
             if(saved_expired){
               bid_gate$message<-recovery_message
               clause_gate$message<-recovery_message
@@ -768,7 +768,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           pending <- !is.null(verification) && isTRUE(verification$pending)
           if(pending || gate$reason %in% c("loading","unavailable"))
             action_buttons <- tagList(action_buttons,actionButton(ns("btn_verify_availability"),
-              if(pending) "Checking availability…" else "Verify availability",
+              if(pending) "Checking availability…" else "Retry availability",
               class="btn btn-default",disabled=pending))
         }
         output$action_buttons <- renderUI(action_buttons)
@@ -1864,6 +1864,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       refresh=function()paste(global_refresh(),capacity_recheck(),sep=":"))
     capacity_verification_RV <- reactiveVal(NULL)
     capacity_verification_generation <- 0L
+    capacity_open_check_cancel <- NULL
+    capacity_verification_last_scope <- NULL
+    capacity_open_check_scope <- NULL
     capacity_verification_scope <- reactive({
       ctx <- capacity_context()
       list(context=player_action_context_RV(),refresh=global_refresh(),history=history_refresh(),
@@ -1878,10 +1881,18 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       !is.null(ctx) && fm_worker_configured() && isTRUE(fm_worker_mode(ctx$account_id))
     }
     observeEvent(capacity_verification_scope(),{
+      scope <- capacity_verification_scope()
+      if(identical(scope,capacity_verification_last_scope))return()
+      capacity_verification_last_scope <<- scope
       capacity_verification_generation <<- capacity_verification_generation+1L
+      if(is.function(capacity_open_check_cancel))capacity_open_check_cancel()
+      capacity_open_check_cancel <<- NULL
       capacity_verification_RV(NULL)
     },ignoreNULL=FALSE,priority=105)
-    session$onSessionEnded(function(){capacity_verification_generation <<- capacity_verification_generation+1L})
+    session$onSessionEnded(function(){
+      capacity_verification_generation <<- capacity_verification_generation+1L
+      if(is.function(capacity_open_check_cancel))capacity_open_check_cancel()
+    })
     card_states$capacity <- reactive({
       saved <- stored_capacity();verified <- manual_capacity_verification()
       if(is.null(verified))return(saved)
@@ -1893,7 +1904,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
          length(checked_at)==1L && is.finite(checked_at) && saved_at>checked_at)return(saved)
       verified$state
     })
-    observeEvent(input$btn_verify_availability,{
+    verify_card_availability <- function(){
       req(worker_capacity_verification_available(),!is.null(selected_player()),
         !player_card_is_own_player(selected_player(),get_reactive_val(user_team_id)))
       previous <- manual_capacity_verification()
@@ -1923,7 +1934,40 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         error=function(error)promises::promise_reject(error))
       promises::then(request,function(data)finish(data),function(error)finish(error=error))
       invisible(NULL)
-    })
+    }
+    observeEvent(input$btn_verify_availability,verify_card_availability())
+    # Check once per opening/context/Refresh. Give immediate stored replay its
+    # first flush so a valid durable observation avoids a duplicate live read.
+    # A missing/held worker snapshot must not leave opening waiting for its job.
+    observeEvent(capacity_verification_scope(),{
+      scope <- capacity_verification_scope()
+      if(identical(scope,capacity_open_check_scope))return()
+      capacity_open_check_scope <<- scope
+      if(!worker_capacity_verification_available() || is.null(selected_player()) ||
+         player_card_is_own_player(selected_player(),get_reactive_val(user_team_id)))return()
+      capacity_open_check_cancel <<- later::later(function()shiny::isolate({
+        capacity_open_check_cancel <<- NULL
+        if(!identical(scope,capacity_verification_scope()) ||
+           !worker_capacity_verification_available() || !is.null(manual_capacity_verification()))return()
+        state <- stored_capacity()
+        if(identical(state$status,"loading")){
+          # Shared replay may be queued for the next reactive flush. Inspect its
+          # already decoded durable snapshot rather than racing it with live I/O.
+          ctx <- capacity_context()
+          ctx <- fm_worker_resolve_context("get_team_acquisition_capacity",auth_args(ctx),ctx)
+          descriptor <- fm_worker_descriptor("get_team_acquisition_capacity",auth_args(ctx),ctx)
+          saved <- fm_worker_get(ctx$account_id,descriptor$resource_key)
+          if(!is.null(saved))state <- resource_state(saved$data)
+        }
+        data <- state$data
+        deadline <- if(is.list(data))data$valid_until else NULL
+        verified <- identical(state$status,"ok") && is.null(state$error) &&
+          is.numeric(deadline) && length(deadline)==1L && is.finite(deadline) &&
+          resource_snapshot_unexpired(data) &&
+          !identical(evaluate_acquisition_preflight(data,"offer")$reason,"unavailable")
+        if(!verified)verify_card_availability()
+      }),.01)
+    },ignoreNULL=FALSE,priority=-2)
     observeEvent(card_states$capacity(),{
       dialog <- isolate(market_offer_dialog_RV());state <- card_states$capacity()
       if (is.null(dialog) || isTRUE(dialog$live_check) || !isTRUE(dialog$pending) || identical(state$status,"loading") ||

@@ -2909,3 +2909,54 @@ https://supabase.com/docs/guides/api/securing-your-api.md.
 Documentation has no runtime effect. Local fixtures establish the recovery/safety
 contracts, not production performance, physical-device rendering or the precise
 source state of the owner's hosted session. Production rollout is unverified.
+
+
+### Automatic player-card availability — 2026-11-15
+
+The worker card required an explicit Verify availability click for snapshots
+whose transaction deadline had expired. Opening now invokes the same live
+factual verifier automatically once per opening/context/Refresh. Valid scoped
+database observations are reused, including already decoded snapshots awaiting
+reactive publication. The existing native team cache is reused on warm reopening.
+The retained control reads Retry availability after failures or subsequent expiry.
+No purchase is sent by opening, verification or a retry.
+
+Passed: updated worker-card recovery (8 scenario groups), native live capacity
+(4 checks, including delayed history/market and zero-request warm reopening),
+legacy capacity completeness (4 groups plus malformed-evidence variants),
+existing card capacity recheck (4), native availability freshness (2), market
+offer opening (14), deployment contract (3), and the required final
+`test/test_shiny_simulation.R` (13 checks plus 8 tabs; no external HTTP or live
+database mutation attempts). Recovery covers one pending request, duplicate
+inputs, old/new snapshot ordering, identical-context redraws, fresh durable reuse,
+network/partial/expired/undated failures without loops, late context results,
+Refresh, missing worker publication, worker-mode changes and owned-player skip.
+The exact staged module is also checked with the worker/native fixtures so
+unrelated working player-card edits cannot explain those results.
+
+The final real-browser fixture passed at 360px and 1440px: opening starts a held
+live check without a click; verified actions/editor become usable; failed/partial
+checks remain blocked and can retry; missing/pending stored publication does not
+delay automatic verification; no overflow or JavaScript errors. Heartbeat
+responses were 64ms during the initial held check and 66ms during held stored
+publication at both widths. Mobile pending/success screenshots were inspected.
+
+Performance review: at most one opening verification per distinct context/revision
+plus explicitly requested retries; no worker-publication or same-context redraw
+loop. One cancellable 10ms deferral yields to initial replay; it does not repeat
+and is removed on scope/session changes. Valid durable capacity adds zero live
+checks; warm native reopening adds zero source requests. The existing composite
+retains four parallel prerequisites, bounded summary/freshness repair and strict
+15/30/300/20/60-second source deadlines. Its synthetic 31s-history/20s-market
+fixture made information=3, roster=2, market=2, pressroom=2 requests once, then
+zero additional requests for the verified offer editor and warm reopening. No
+additional schema/DB scan/write/cache layer or persistence acknowledgement
+dependency was introduced. Existing database snapshots/history and bounded
+persistence remain authoritative across sessions/restarts; the card projection
+does not assert an unacknowledged write is durable. Memory adds two fixed scope
+references and one timer handle, not an expanding cache. No CSS/layout,
+dependency/environment, background worker cadence or transaction changes.
+Documentation has no runtime effect. Local fixtures do not establish production
+latency, physical-device behavior or hosted deployment. No real accounts or
+transactions were used. The delivery includes only this task's module patch
+and its checksum; unrelated scheduled-clause/ownership edits remain unstaged.

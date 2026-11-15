@@ -68,15 +68,11 @@ settle<-function(session)for(i in 1:30){later::run_now(0);session$flushReact()}
 shiny::testServer(selected_player_Server,args=list(selected_player=reactive(player),login_token=reactive(auth),
  championship_id=reactive('league'),user_team_id=reactive('mine')),{
  settle(session);html<-output$action_buttons$html
- stopifnot(grepl('Verify availability to check your current roster, funds and offers.',html,fixed=TRUE),
+ stopifnot(live==1L,rpc==0L,writes==0L,
+  evaluate_acquisition_preflight(card_states$capacity()$data,'bid',200)$ok,
   !grepl('Availability checks expired before they completed',html,fixed=TRUE),
-  !grepl('fm-info-error',html,fixed=TRUE),grepl('btn_verify_availability',html,fixed=TRUE),rpc==0L,live==0L,
-  !evaluate_acquisition_preflight(card_states$capacity()$data,'bid',200)$ok)
- cat('PASS opening the real card shows enabled verification, no false red failure, and makes no passive source/DB read\n')
- session$setInputs(btn_verify_availability=1L);settle(session)
- stopifnot(live==1L,rpc==0L,writes==0L,evaluate_acquisition_preflight(card_states$capacity()$data,'bid',200)$ok,
-  !grepl('Availability checks expired before they completed',output$action_buttons$html,fixed=TRUE))
- cat('PASS explicit verification recovers purchase availability without a transaction or retry loop\n')
+  !grepl('btn_verify_availability',html,fixed=TRUE))
+ cat('PASS opening automatically verifies expired legacy evidence, enables actions and sends no transaction\n')
 })
 elapsed<-system.time(for(i in 1:1000)acquisition_capacity_observation_complete(legacy))[['elapsed']]
-cat(sprintf('METRIC 1000 completeness validations %.3fs; no acquisition, persistence or timer added\n',elapsed))
+cat(sprintf('METRIC 1000 completeness validations %.3fs; pure validation loop; no extra I/O\n',elapsed))

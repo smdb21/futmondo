@@ -77,9 +77,6 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
  championship_id=shiny::reactive('league'),user_team_id=shiny::reactive('mine'),
  capacity_fetcher=function(...)stop('Opening the verified modal must not run a synchronous preflight')) ,{
  settle(session)
- stopifnot(enabled(output$action_buttons$html,'btn_verify_availability'),
-  !enabled(output$action_buttons$html,'btn_bid_market'),live_calls==0L,!length(requests),writes==0L)
- session$setInputs(btn_verify_availability=1L);settle(session)
  stopifnot(live_calls==1L,is.function(pending[['pressroom:1']]),
   !enabled(output$action_buttons$html,'btn_bid_market'),
   !enabled(output$action_buttons$html,'btn_verify_availability'))
@@ -93,7 +90,7 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
   enabled(html,'btn_bid_market'),!grepl('Availability checks expired',html,fixed=TRUE),
   live_calls==1L,writes==0L,counts['information']==3L,counts['players']==2L,
   counts['pressroom']==2L,counts['roster']==2L)
- cat('PASS actual Verify button routes through native live acquisition, repairs expiry during a 20s market response and enables the market action once\n')
+ cat('PASS opening the card automatically routes through native live acquisition, repairs expiry during a 20s market response and enables the market action once\n')
 
  epoch<-as.numeric(start_time)
  stopifnot(identical(source_stamps[['team_info_league_mine']]-epoch,c(0,31,51)),
@@ -108,4 +105,8 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
   isTRUE(market_offer_dialog_RV()$preflight$ok),
   enabled(output$market_offer_submit$html,'submit_bid'),identical(requests,before),live_calls==1L,writes==0L)
  cat('PASS immediately opening the verified market editor adds zero source reads and zero transactions\n')
+ before<-requests;row<-selected();selected(NULL);settle(session);selected(row);settle(session)
+ stopifnot(identical(requests,before),live_calls==2L,writes==0L,
+  evaluate_acquisition_preflight(card_states$capacity()$data,'bid',1000)$ok)
+ cat('PASS automatic verification on warm reopening reuses the complete native team cache with zero additional source requests\n')
 })
