@@ -69,3 +69,47 @@ Future-round metadata does not reduce completed-round coverage or produce warnin
 The shared saved-catalog read loads this metadata cooperatively before publishing the initial table and selector; metadata hydration itself requests no dreamteam selections. Known historical completeness does not trigger a metadata request merely because future finality is unknown. Admin excludes not-due rounds from its table, selector, grouped issues and enabled retrieval controls; loading shows a loading status. Current-round identity protects retrieval even when its number is temporarily absent. Missing, selected and provisional refreshes invalidate only this account/championship's base and bulk-calendar caches before choosing due rounds, allowing a newly closed round to appear immediately. Successful numbered selections retain their request metadata in the existing acknowledged award snapshots and are reused across consuming sessions.
 
 Cold cost is at most one additional bulk-calendar HTTP read, under the existing cooperative adapter. Warm navigation reuses it; explicit retrieval rechecks the calendar. Award concurrency remains two. No schema, dependency, timer, polling worker or mobile layout structure changes. See `test_award_initial_catalog.R`, `test_award_admin_refresh.R` and the review results for executed checks and source limitations.
+
+
+## Coach status recovery — 2026-11-15
+
+A shared team snapshot can be valid for background display yet older than the
+coach action's twenty-second safety window. The former controller latched
+`done` on that initial unknown state and ignored later successful observations.
+The login controller now waits through loading, performs one bounded cooperative
+safety read when the settled source is unknown, and remains recoverable from a
+later fresh shared observation if that read fails or lacks verified fields.
+Missing mode/staff is unknown; only an explicit nonautomatic mode is unsupported.
+No unknown, stale, failed or expired observation authorizes hiring.
+
+`coach_read_team_info(auth, target, session, is_current, not_before=NULL)` uses
+interactive `async_adapter_fetch()` with worker replay bypassed, while retaining
+the existing factual parser, source timestamps and recording hooks. It invalidates
+only the selected account/league/team's inner team-info cache before reading.
+`get_coach_team_info(login, championship_id, user_team_id, not_before=NULL)` first
+reuses a valid compact database observation, then falls back to the official
+`userteam/information` market query. The ordinary shared initial read is still
+preferred, so an already fresh status adds no fallback acquisition.
+
+`coach_snapshot_scope()`, `coach_snapshot_id()` and `persist_coach_snapshot()`
+store only mode and coach state with account, league, team, competition, season,
+scoring version, source time, completeness and a twenty-second expiry. Records
+use `rival_finance_evidence` / its private latest view with an eligibility kind
+`coach_status` and a `rival-cache:coach-status-v1:` source ID. They contain no
+authentication and are excluded from financial facts. Only a confirmed database
+row is reused as saved; rejected/unacknowledged writes receive no durable marker,
+and the identical immutable revision can be resubmitted through the existing
+bounded persistence queue and its retries. No schema or dependency change.
+
+After a hire response (including uncertainty), the existing shared refresh is
+retained. If it yields old, stale, incomplete or failed evidence, at most one
+additional live safety read confirms the outcome. Its `not_before` cutoff rejects
+all observations before the action completed; only a fresh `staff.coach = 1`
+confirms hiring. Initial safety reads and confirmation fallbacks are separately
+latched. Preference opt-out, account/league/team changes and logout prevent late
+reads from authorizing actions. Failed confirmation never replays a hire.
+
+`test/test_coach_status_recovery.R` exercises real async read replay with synthetic
+HTTP/database boundaries, durable reuse and scope/expiry rejection, rejected-save
+resubmission, held-request yielding, stale-login recovery, unknown fields,
+post-action confirmation, opt-out/context changes and single-submit safety.

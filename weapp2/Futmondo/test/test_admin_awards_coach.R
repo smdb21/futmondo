@@ -41,6 +41,8 @@ fresh_info<-function(coach=0,mode='automatic',status='ok'){
   now<-Sys.time();list(status=status,freshness='fresh',observed_at=now,fetched_at=now,data=list(staff=list(coach=coach),configuration=list(enableCoach=mode)))
 }
 settle<-function(session,predicate=function()TRUE,timeout=2){deadline<-Sys.time()+timeout;repeat{session$flushReact();later::run_now(.01);session$flushReact();if(isTRUE(shiny::isolate(predicate())))return(invisible(NULL));if(Sys.time()>deadline)stop('fixture timed out')}}
+old_read<-coach_read_team_info
+coach_read_team_info<-function(...)promises::promise_resolve(observed_data(list()))
 old_hire<-fm_async_hire_coach;hires<-0L;resolve_hire<-NULL
 fm_async_hire_coach<-function(...){hires<<-hires+1L;promises::promise(function(resolve,reject){resolve_hire<<-resolve})}
 check('coach waits for preference, respects opt-out, and never submits twice',{
@@ -75,7 +77,7 @@ check('logout discards late coach completion and failure never causes mutation r
     a(NULL);settle(session);resolve_hire(TRUE);settle(session);stopifnot(retries$n==0L,source$status()=='Sign in to check coach')
   })
 })
-fm_async_hire_coach<-old_hire
+fm_async_hire_coach<-old_hire;coach_read_team_info<-old_read
 old_async<-async_adapter_fetch;old_persist<-persist_official_award_snapshot
 requests<-0L;running<-0L;maximum<-0L;saves<-list();read_count<-0L
 async_adapter_fetch<-function(fn,args,context,...){

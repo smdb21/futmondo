@@ -1566,3 +1566,17 @@ No schema, dependency, automation or login inventory expansion is required.
   and verification limits are recorded in `docs/data_review_results.md`.
   This presentation reduction adds no capability or data behavior. Branch
   delivery is separate from production deployment.
+
+
+### Login coach status recovery — implemented locally (2026-11-15)
+
+- Repair the terminal unknown-state latch when shared/background team information
+  exceeds the coach check's twenty-second freshness window. Use one asynchronous
+  scoped safety read and permit recovery from later verified shared data.
+- Reuse compact, context-isolated database coach observations before acquisition;
+  retain strict expiry and a post-action cutoff for confirmation. Keep opt-out,
+  login-only scope, duplicate protection and no mutation replay.
+- Focused recovery (9), existing coach/awards (11), deployment (3) and required
+  offline lifecycle (13 checks plus 8 tabs) pass. See `data_review_results.md`
+  and `coach_and_round_awards.md`. No schema/dependency changes; production
+  deployment and authenticated verification remain separate.

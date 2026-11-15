@@ -2862,3 +2862,50 @@ reduces rendering work on desktop and mobile and adds no width constraints.
 Documentation has no runtime effect. This is a single-screen presentation edit;
 no shared infrastructure, startup or cross-cutting UI behavior changed. No live
 accounts, transactions, browser/device verification or deployment performed.
+
+
+### Login coach status unavailable recovery — 2026-11-15
+
+Reproduced the pre-task controller with a synthetic thirty-second-old shared
+observation: it set `Coach status unavailable` and retained that message even
+after a fresh hired response arrived. The captured official market information
+query supplies `configuration.enableCoach=automatic` and `staff.coach=0`, then
+`1` after hiring; only those relevant fields/query shape were inspected, without
+logging private bodies or replaying an authenticated request.
+
+Fixed the terminal unknown latch, added a bounded asynchronous safety read when
+shared evidence is unknown, and a bounded post-action confirmation fallback when
+worker replay returns old evidence. Kept the twenty-second action freshness
+window, explicit hired/absent distinction, preference handshake and duplicate
+submission guards. Genuine failures retain safe source diagnostics; incomplete
+data remains unavailable and cannot authorize a hire.
+
+Passed: `test/test_coach_status_recovery.R` (9), existing
+`test/test_admin_awards_coach.R` (11), deployment contract (3), and required
+`test/test_shiny_simulation.R` (13 checks plus 8 tabs; zero external HTTP/live
+database mutation attempts). Recovery checks include real adapter/native request
+serialization, compact durable snapshot write/reuse, foreign context and expiry
+rejection, post-action cutoff, failed-save resubmission, pending-read heartbeat,
+opt-out/logout/league/team changes, recovery after a failed source, and uncertain
+mutation response without a repeated hire. Snapshot boundaries are synthetic;
+no live database write or authenticated hire was used.
+
+Performance review: fresh initial shared status has zero additional reads. Each
+login can add at most one initial and one confirmation safety acquisition, each
+with a one-row scoped database lookup and at most one logical team-information
+request (existing idempotent transport permits one bounded transient retry).
+Valid database reuse performs zero Futmondo HTTP requests and no duplicate save.
+Fresh fallback observations enqueue a small immutable coach snapshot alongside
+normal factual recording; rejected/unacknowledged writes receive no saved marker
+and can resubmit the same revision. Existing queue bounds/retries apply. Shared
+confirmation still invalidates only team information; market/roster/history
+acquisition is unaffected. No timers, global polling, growing memory cache, new
+dependency/schema, client-side credentials or mobile layout work was added.
+Held safety reads allowed event-loop heartbeat callbacks; UI loading is not
+blocked on HTTP. Existing server-only restricted evidence view/grants remain
+unchanged. Supabase changelog/security documentation was checked on 2026-11-15:
+https://supabase.com/changelog.md and
+https://supabase.com/docs/guides/api/securing-your-api.md.
+Documentation has no runtime effect. Local fixtures establish the recovery/safety
+contracts, not production performance, physical-device rendering or the precise
+source state of the owner's hosted session. Production rollout is unverified.
