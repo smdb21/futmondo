@@ -30,12 +30,15 @@ notifications_UI <- function(id) {
   shiny::tagList(
     shiny::fluidRow(shiny::column(12, shiny::h2("Notifications"),
       fm_info("Official LigaRadar events and their last refresh."))),
-    shiny::fluidRow(
-      shiny::column(3, shiny::selectInput(ns("read_filter"), "Read status", c("Unread"="unread","All"="all"))),
-      shiny::column(3, shiny::selectInput(ns("source_filter"), "Source", c("LigaRadar"="Futmondo"))),
-      shiny::column(3, shiny::selectInput(ns("event_filter"), "Event", c("All"))),
-      shiny::column(3, shiny::checkboxInput(ns("current_league"), "Current league only", TRUE),
-        shiny::actionButton(ns("refresh"), "Refresh"))),
+    shiny::fluidRow(shinydashboardPlus::box(
+      title = "Filters", width = 12, status = "primary", solidHeader = TRUE,
+      collapsible = TRUE, collapsed = TRUE,
+      shiny::fluidRow(
+        shiny::column(3, shiny::selectInput(ns("read_filter"), "Read status", c("Unread"="unread","All"="all"))),
+        shiny::column(3, shiny::selectInput(ns("source_filter"), "Source", c("LigaRadar"="Futmondo"))),
+        shiny::column(3, shiny::selectInput(ns("event_filter"), "Event", c("All"))),
+        shiny::column(3, shiny::checkboxInput(ns("current_league"), "Current league only", TRUE),
+          shiny::actionButton(ns("refresh"), "Refresh"))))),
     shiny::uiOutput(ns("status")), shiny::uiOutput(ns("items")),
     shiny::uiOutput(ns("player_details")))
 }

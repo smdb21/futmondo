@@ -37,3 +37,14 @@ Formatting occurs once per existing render over the displayed rows. No new
 requests, database reads/writes, persistence behavior, caches, reactive inputs,
 timers, dependencies or CSS changes are introduced. Existing wrapping supports
 narrow screens; the labels omit ISO separators, seconds and milliseconds.
+
+
+## Collapsible filters
+
+The read-status, source, event and current-league controls, together with Refresh,
+share a full-width **Filters** box that starts collapsed. It uses the existing
+`shinydashboardPlus::box()` collapse behavior and responsive Bootstrap columns.
+Expanding or collapsing the box retains selections; notification status and
+cards remain outside it. Input IDs, defaults, filtering, refresh, source reads
+and database-backed reuse are unchanged. No new dependency, observer, timer,
+request, persistent setting or CSS is needed.

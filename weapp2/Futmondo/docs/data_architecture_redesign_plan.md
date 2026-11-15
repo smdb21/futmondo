@@ -1441,3 +1441,9 @@ Implemented locally: remove the routine departure-exclusion paragraph, replace t
 
 - Remove the generic cached-amount explanation and saved-observation paragraph from financial displays. Preserve observed amounts, freshness flags, source times, unavailable/error feedback and manual-action checks.
 - Focused finance/rendering checks and the required offline lifecycle pass. No new data access or persistence behavior; performance results and hosted/mobile limits are recorded in `docs/data_review_results.md`.
+
+
+### Collapsed notification filters — implemented and verified locally
+
+- Group read status, source, event, current-league and Refresh controls in a full-width **Filters** box, collapsible and initially collapsed. Retain existing input IDs/defaults and keep notification cards/status outside it.
+- Existing notification checks and synthetic desktop/mobile browser checks pass. Native collapse behavior adds no acquisition or persistence changes; performance review and hosted limits are recorded in `docs/data_review_results.md`.
