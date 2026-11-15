@@ -82,6 +82,29 @@ admin_league_settings <- function(league=list(),info=list(),championship_id="") 
 }
 
 
+# Shared static styles also support the standalone league-settings renderer.
+admin_settings_styles <- function() singleton(tags$style(HTML("
+.fm-admin-section,.fm-admin-settings-card{padding:16px;border:1px solid var(--fm-border,#285238);border-radius:7px;background:var(--fm-surface,#0B120D);min-width:0;margin-bottom:16px}
+.fm-admin-section>h2{font-size:20px;margin:0 0 14px}
+.fm-admin-settings-card{padding:12px;margin-bottom:12px}
+.fm-admin-settings-card h3{font-size:15px;margin:0 0 8px}
+.fm-admin-setting{border-top:1px solid var(--fm-border,#285238);padding:7px 0;min-width:0}
+.fm-admin-setting summary{display:grid;grid-template-columns:10px minmax(0,1.35fr) minmax(0,1fr);gap:8px;align-items:baseline;cursor:pointer;overflow-wrap:anywhere;list-style:none}
+.fm-admin-setting summary::-webkit-details-marker{display:none}
+.fm-admin-setting summary::before{content:'+';color:var(--fm-muted)}
+.fm-admin-setting[open] summary::before{content:'−'}
+.fm-admin-setting summary>span,.fm-admin-setting summary>strong{min-width:0;text-align:left}
+.fm-admin-setting summary>strong{font-variant-numeric:tabular-nums}
+.fm-admin-setting p{color:var(--fm-muted);font-size:12px;margin:6px 0 2px;overflow-wrap:anywhere}
+.fm-admin-reported>summary{cursor:pointer;font-weight:700}
+.fm-admin-reported dl{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:6px 12px;margin:12px 0 0;max-width:480px}
+.fm-admin-reported dt,.fm-admin-reported dd{overflow-wrap:anywhere;min-width:0}
+.fm-admin-reported dd{margin:0;text-align:left;font-variant-numeric:tabular-nums}
+.fm-admin .btn{white-space:normal;max-width:100%;margin-bottom:8px}
+.fm-admin .shiny-input-container{max-width:100%}
+@media(max-width:767px){.fm-admin-section{padding:12px}.fm-admin-setting summary{gap:6px}}
+")))
+
 # Compact, keyboard-accessible disclosure rows; no requests or reactive state.
 admin_league_settings_UI <- function(rows,stale=FALSE) {
  row_ui<-function(part,i)tags$details(class="fm-admin-setting",
@@ -90,7 +113,7 @@ admin_league_settings_UI <- function(rows,stale=FALSE) {
  groups<-setdiff(unique(rows$group),"Other reported settings")
  other<-rows[rows$group=="Other reported settings",,drop=FALSE]
  tagList(
-  singleton(tags$style(HTML(".fm-admin-settings-card{margin-bottom:12px;padding:12px;border:1px solid var(--fm-border);border-radius:7px;background:var(--fm-surface);min-width:0}.fm-admin-settings-card h3{font-size:15px;margin:0 0 8px}.fm-admin-setting{border-top:1px solid var(--fm-border);padding:6px 0;min-width:0}.fm-admin-setting summary{display:flex;gap:8px;align-items:baseline;cursor:pointer;overflow-wrap:anywhere}.fm-admin-setting summary::before{content:'+';color:var(--fm-muted)}.fm-admin-setting[open] summary::before{content:'−'}.fm-admin-setting summary>span{flex:1;min-width:0}.fm-admin-setting summary>strong{text-align:right;max-width:55%;min-width:0}.fm-admin-setting p{color:var(--fm-muted);font-size:12px;margin:6px 0 2px;overflow-wrap:anywhere}.fm-admin-reported{margin:4px 0 16px}.fm-admin-reported>summary{cursor:pointer}.fm-admin-reported dl{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 12px;margin:8px 0;max-width:480px}.fm-admin-reported dt,.fm-admin-reported dd{overflow-wrap:anywhere}.fm-admin-reported dd{text-align:right;margin:0}"))),
+  admin_settings_styles(),
   fm_info("Current league settings · Read-only. Open a setting for details; change it in LigaRadar."),
   if(isTRUE(stale))fm_info("Showing saved settings while the latest configuration is unavailable.",error=TRUE),
   fluidRow(class="fm-admin-settings-grid",lapply(split(groups,ceiling(seq_along(groups)/2)),function(pair){
@@ -100,7 +123,7 @@ admin_league_settings_UI <- function(rows,stale=FALSE) {
      lapply(seq_len(nrow(part)),function(i)row_ui(part,i)))
    }))
   })),
-  if(nrow(other))tags$details(class="fm-admin-reported",tags$summary(paste0("Other reported settings (",nrow(other),")")),
+  if(nrow(other))tags$details(class="fm-admin-reported fm-admin-settings-card",tags$summary(paste0("Other reported settings (",nrow(other),")")),
    tags$p("These additional settings retain their reported field names because their meanings and units have not been established."),
    tags$dl(lapply(seq_len(nrow(other)),function(i)tagList(tags$dt(other$setting[i]),tags$dd(other$value[i]))))),
   fm_info("Round rewards exclude teams that started the round in debt. These are current rules; past changes may affect reconstructed balances.")
@@ -109,14 +132,19 @@ admin_league_settings_UI <- function(rows,stale=FALSE) {
 
 admin_UI <- function(id) {
  ns<-NS(id)
- tagList(h2("App access"),uiOutput(ns("access_control")),h2("User timezones"),uiOutput(ns("timezone_admin")),h2("League settings"),uiOutput(ns("league_settings")),h2("Database administration"),fm_info("Inspect retained factual tables. Changes require an authorized administrator."),
-  actionButton(ns("btn_refresh_stats"),"Refresh table counts"),reactable::reactableOutput(ns("tables_stats_table")),
-  actionButton(ns("btn_verify_db"),"Verify database connection"),
-  h3("Round awards"),fm_info("Saved selections improve reward estimates. Historical eligibility and payment coverage are checked separately."),
-  uiOutput(ns("award_actions")),
-  selectInput(ns("award_round"),"Round to refresh",choices=character()),actionButton(ns("btn_refresh_selected_award"),"Refresh selected round"),
-  uiOutput(ns("awards_progress")),reactable::reactableOutput(ns("awards_coverage")),
-  actionButton(ns("btn_reset_db"),"Reset retained database tables",class="btn-danger"))
+ section<-function(title,...)tags$section(class="fm-admin-section",h2(title),...)
+ tags$div(class="fm-admin",admin_settings_styles(),
+  section("App access",uiOutput(ns("access_control"))),
+  section("User timezones",uiOutput(ns("timezone_admin"))),
+  section("League settings",uiOutput(ns("league_settings"))),
+  section("Database administration",fm_info("Inspect retained factual tables. Changes require an authorized administrator."),
+   actionButton(ns("btn_refresh_stats"),"Refresh table counts"),reactable::reactableOutput(ns("tables_stats_table")),
+   actionButton(ns("btn_verify_db"),"Verify database connection"),
+   actionButton(ns("btn_reset_db"),"Reset retained database tables",class="btn-danger")),
+  section("Round awards",fm_info("Saved selections improve reward estimates. Historical eligibility and payment coverage are checked separately."),
+   uiOutput(ns("award_actions")),
+   selectInput(ns("award_round"),"Round to refresh",choices=character()),actionButton(ns("btn_refresh_selected_award"),"Refresh selected round"),
+   uiOutput(ns("awards_progress")),reactable::reactableOutput(ns("awards_coverage"))))
 }
 admin_Server <- function(id,is_module_active,login_token,championship_id,user_team_id,user_teams_RV,is_admin=NULL,refresh_trigger=NULL,league_settings_source=NULL) {
  moduleServer(id,function(input,output,session){

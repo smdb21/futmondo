@@ -158,6 +158,9 @@ fm_admin_timezones <- function(session, login, active, store=fm_timezone_store) 
       cursor <<- if(length(value)>200L)value[[200L]]$user_id else ""
       rows(head(value,200L)); loaded(TRUE);busy(FALSE);message(NULL);NULL
     },function(error){if(!closed&&g==generation){busy(FALSE);message("User timezones could not be loaded. Reload to retry.")};NULL})
+    # Do not return this promise to an observer: Shiny would hold the entire
+    # session flush until the user-directory request completes.
+    invisible(NULL)
   }
   preference_ready <- session$rootScope()$userData$display_timezone_ready
   shiny::observeEvent(list(active(),login(),if(is.function(preference_ready))preference_ready()else NULL),{

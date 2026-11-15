@@ -1645,3 +1645,18 @@ Exit criteria still open: capture the actual closed-clause rejection with the te
   checks, deployment exclusions and the required offline lifecycle pass.
   Performance findings and hosted verification limits are recorded in
   `data_review_results.md`; branch delivery is separate from deployment.
+
+
+### Admin loading and boxed settings — implemented and verified locally (2026-11-15)
+
+- Remove the timezone-directory promise returned to Shiny's activation observer,
+  allowing Admin output and navigation to flush while the existing asynchronous
+  request remains pending. Preserve authorization, loading/failure states,
+  generation guards and database-backed timezone preferences.
+- Box all Admin sections and league-setting groups; align values in consistent
+  grid columns with mobile wrapping and keyboard-accessible explanations.
+- Existing Admin/settings/timezone regressions, eight synthetic browser
+  width/theme configurations and the required offline lifecycle pass. Performance
+  measurements and verification limits are in `data_review_results.md`. No new
+  capability, dependency, schema or environment setting; production rollout
+  and authenticated hosted latency remain unverified.

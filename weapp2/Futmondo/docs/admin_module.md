@@ -72,3 +72,26 @@ Top-level `withheld` is reserved funds, `teamValue` is squad valuation, `points`
 ## Application access
 
 The first Admin section contains the database-backed, default-enabled Block non-admin access switch. Normal and remembered logins enforce it on the server; active non-admin sessions recheck it every 2 minutes. See [app_access.md](app_access.md) for failure handling, privileges and request bounds.
+
+
+## Boxed settings and independent loading — 2026-11-15
+
+`admin_UI()` groups App access, User timezones, League settings, Database
+administration and Round awards into bordered sections.
+`admin_settings_styles()` supplies singleton, module-scoped styles for these
+sections and the standalone `admin_league_settings_UI()` renderer. Each league
+category, including Other reported settings, has its own box; disclosure rows
+use consistent label/value grid columns, with tabular numerals and wrapping.
+The existing three-column desktop / single-column phone layout and native
+keyboard disclosure controls remain.
+
+The timezone directory previously returned its pending promise through the
+activation observer, making Shiny wait for that request before flushing the
+whole page. `fm_admin_timezones()` now starts the same asynchronous load and
+returns immediately. Its existing loading/failure state, authorization checks,
+generation guards, 200-user bound, persisted preferences and save confirmation
+remain authoritative. This changes no storage or acquisition contract and adds
+no cache, request or timer. Browser navigation and heartbeat checks deliberately
+hold directory reads for five seconds. See `test/test_admin_settings_browser_app.R`
+and `test/test_admin_settings_browser.cjs`; run the R fixture, then the Node
+check with the project's existing Playwright browser configuration.

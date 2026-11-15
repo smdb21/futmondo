@@ -3115,3 +3115,50 @@ worker/factual cache limits still apply; large cold snapshot transfer latency on
 the deployed VM was not measured. Local fixture/browser checks do not certify
 hosted appearance or production deployment. No real account or transaction was
 used. Unrelated working-tree documentation and source edits remain excluded.
+
+
+## Admin loading and boxed settings — 2026-11-15
+
+Root cause reproduced with the actual Admin module: `fm_admin_timezones()`
+returned a pending directory promise from its activation observer, holding the
+whole Shiny session flush. With a synthetic five-second directory response,
+settings appeared after 5,848ms. Returning immediately after installing the
+existing completion/error callbacks removes that dependency without changing
+the directory query, persisted preferences or failure semantics.
+
+Admin now boxes App access, User timezones, League settings, Database
+administration and Round awards. Each league category, including unresolved
+reported settings, has a border and consistent label/value columns. Values
+wrap on narrow screens; explanations retain native keyboard disclosure. This
+is a layout and loading correction, with no new product capability requiring
+a feature-comparison or login-tier expansion.
+
+Executed verification:
+
+- Existing `test_admin_league_settings.R` passes all six reported groups.
+- `test_timezone_preferences.R` passes all six groups, including persisted
+  acknowledgement, authorization/account isolation, duplicate-save protection
+  and truthful failed writes; 1,000 parsed timestamp labels took 0.002s.
+- Existing Admin awards/coach: 11 groups; initial award catalog: six groups,
+  including acknowledged historical results reused in another session.
+- Actual Admin browser fixture: 320/390/768/1440px, dark and light (eight
+  configurations). Settings appeared in 815–842ms while a five-second timezone
+  read remained pending; heartbeat round trips were 39–52ms. Navigation away
+  and reopening worked before the response, then the directory/editor loaded.
+  All category values share a column; all sections are bordered; disclosures
+  work with Enter; no horizontal overflow, JavaScript or Shiny output errors.
+  Phone dark and desktop light screenshots were inspected. Synthetic source
+  and database responses only; live I/O is blocked in the fixture.
+- Required `Rscript test/test_shiny_simulation.R`: 13 checks plus eight tabs
+  pass, with zero HTTP/live database mutation attempts.
+
+Performance review: the loader makes the same single bounded asynchronous
+directory request per activation/reload, and does not introduce polling,
+additional acquisition, database writes, caching or retained state. Existing
+durable preferences and shared team/league/award data reuse are preserved.
+Static singleton CSS, five section wrappers and bounded disclosure grids add
+only layout work; callbacks update the existing outputs. No dependency, schema,
+environment or manifest-package change. Documentation has no runtime effect.
+Local timings establish responsiveness under the synthetic delay, not
+authenticated hosted latency or deployment. Only task-specific source checksums
+and documentation additions belong in the commit; unrelated edits remain.
