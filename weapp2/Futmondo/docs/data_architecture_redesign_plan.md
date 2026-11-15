@@ -1767,3 +1767,16 @@ Production deployment and authenticated hosted acceptance remain separate.
   performance limits are recorded in `data_review_results.md`. No schema,
   dependency, cache, schedule or feature-inventory expansion; hosted rollout
   and authenticated acceptance remain separate.
+
+
+### Market-offer percentage shortcuts — implemented locally (2026-11-15)
+
+- Add +0.5%, +1%, +2%, +4%, +5% and +10% to Place Market Offer, matching
+  the existing sale-listing presets. Set the offer from the verified minimum,
+  round up to euros, retain editable amounts and explicit submission.
+- Keep availability/context/funds/duplicate guards, scoped resource reuse and
+  persistence behavior. Button clicks perform no source request or write.
+- Focused known-answer/preflight checks, responsive browser verification and
+  the offline lifecycle pass; results and performance review are recorded in
+  `data_review_results.md`. No dependency, schema or environment change.
+  Production rollout and authenticated hosted acceptance remain unverified.

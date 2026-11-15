@@ -50,6 +50,14 @@ testServer(selected_player_Server,args=list(selected_player=selected,login_token
       grepl('min="150"',output$market_offer_body$html,fixed=TRUE),
       !grepl('disabled',output$market_offer_submit$html,fixed=TRUE))
   })
+  check('six premiums use the verified minimum and round fractional euros upward', {
+    html <- output$market_offer_body$html
+    for (amount in c(151,152,153,156,158,165))
+      stopifnot(grepl(paste0('data-amount="',amount,'"'),html,fixed=TRUE))
+    for (pct in c(0.5,1,2,4,5,10))
+      stopifnot(grepl(paste0('+',pct,'%'),html,fixed=TRUE))
+    stopifnot(grepl('type="button"',html,fixed=TRUE),sync_reads==0L,writes==0L)
+  })
   session$setInputs(market_offer_closed=as.character(market_offer_dialog_RV()$generation));settle(session)
   before <- reads;action('market_bid');settle(session)
   check('external market action reuses fresh card evidence with zero source reads',{

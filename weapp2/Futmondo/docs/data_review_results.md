@@ -3511,3 +3511,43 @@ Rendering cost remains the existing bounded settings rows. Documentation has
 no runtime effect. Synthetic timing does not establish Contabo network/capacity
 or authenticated hosted acceptance; rollout remains unverified. Unrelated
 working-tree/index changes and concurrent task commits are preserved.
+
+
+## Market-offer percentage buttons — 2026-11-15
+
+Place Market Offer now offers +0.5%, +1%, +2%, +4%, +5% and +10%, matching
+sale-listing shortcuts. Each button sets the editable offer from the verified
+minimum bid plus the rounded-up euro premium; repeat clicks and manual edits
+do not change that base. The existing live currency preview receives the
+numeric input's normal change event. Availability, account/league/player
+isolation, current funds/capacity validation and explicit one-shot submission
+remain unchanged. No source response, stored observation or cache is introduced.
+The official-source comparison and its current-UI limits are recorded in
+`feature_comparison.md`; this is an editor convenience, not a new login tier.
+
+Executed `Rscript test/test_market_offer_opening.R`: 15 checks pass, including
+known amounts for a €150 minimum (€151/152/153/156/158/165), held availability,
+zero additional opening reads, rejected/duplicate submits and switched contexts.
+Pending shell opening took 50ms in the focused run. Executed
+`Rscript test/test_shiny_simulation.R`: 13 checks plus eight tabs pass, with
+zero HTTP or live database mutation attempts. Executed
+`Rscript test/test_deployment_contract.R`: all three groups pass.
+
+`test/test_market_offer_premium.cjs` uses the existing HTTP-blocked synthetic
+root app at 320/390/1440px in dark and light themes. Coverage includes all six
+buttons and currency previews, noncompounding repeat clicks, an arbitrary
+manually edited amount, cancellation/reopening at the minimum, and modal/page
+width bounds. Maximum click-to-preview times per layout were 62–67ms. No offer
+is submitted. The 390px screenshots in both themes were inspected. The runner supports the existing FUTMONDO_TEST_CHROMIUM override;
+local Chromium is used because the default bundled revision is unavailable.
+
+Performance review: six fixed buttons are rendered once when the existing
+modal body becomes ready. Each click changes one numeric input and its existing
+currency-preview output; the body does not depend on the edited amount. No new
+API/database request, persistence task, invalidation, timer, queue or growing
+collection. Existing durable acquisition reuse and source deadlines are
+unchanged. Buttons wrap on mobile. Documentation has no runtime effect.
+No dependency, environment setup or schema changes; only this task's runtime
+module checksum is updated in the deployment manifest. Unrelated working-tree
+and index changes are excluded. Production rollout, physical devices and real
+authenticated offers remain unverified.

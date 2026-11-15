@@ -1016,6 +1016,17 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       market_price <- dialog$preflight$minimum_bid
       tagList(p("Minimum market bid: ",strong(player_card_money(market_price))),
         numericInput(ns("bid_amount"),label="Your offer amount (EUR):",value=market_price,min=market_price,step=10000),
+        tags$div(role="group", `aria-label`="Choose an offer premium",
+          style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;",
+          lapply(c(0.5, 1, 2, 4, 5, 10), function(pct) tags$button(
+            type="button", class="btn btn-default", paste0("+", pct, "%"),
+            `data-target-input`=ns("bid_amount"),
+            # Add the whole-euro premium separately to avoid 100 * 1.10
+            # becoming 110.000000000000014 and rounding up an extra euro.
+            `data-amount`=format(market_price + ceiling(market_price * pct / 100),
+              scientific=FALSE, trim=TRUE),
+            onclick="var field=document.getElementById(this.dataset.targetInput);if(field){field.value=this.dataset.amount;field.dispatchEvent(new Event('change',{bubbles:true}));}"))),
+        p("Percentages are above the minimum market bid, rounded up to whole euros."),
         uiOutput(ns("bid_amount_preview")))
     })
     output$market_offer_submit <- renderUI({

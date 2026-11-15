@@ -68,3 +68,19 @@ added.
 The [official clause guide](https://help.futmondo.com/article/156-que-son-las-clausulas-y-como-activarlas) documents manual payment from player cards, timed locks/renewals, rival limits and delayed player delivery. The [official borrowing guide](https://help.futmondo.com/article/103-quiero-pujar-por-un-jugador-del-mercado-y-me-dice-que-no-tengo-saldo-suficiente) ties permitted debt to league configuration. Both were retrieved on 2026-11-15; their source publication/update dates do not establish an exhaustive current app specification. No authenticated official-app scheduling comparison was performed.
 
 Advanced login ID `scheduled_clauses` describes LigaRadar's implemented durable authorization for one capped purchase attempt at the published opening, local offer/funds reservation, cancellation, and saved next-login outcomes. This comparison does not claim ordinary clause purchases are exclusive or that official scheduling is absent. The new feature is disabled until the migration, deployment settings and individual consent are in place. The closed-rejection retry branch remains gated on a captured native code; its current absence is disclosed in the confirmation. See [the implementation contract](scheduled_clauses.md).
+
+
+## Market-offer percentage shortcuts — reviewed 2026-11-15
+
+Rechecked the official [getting-started guide](https://help.futmondo.com/article/90-empieza-a-jugar-a-futmondo)
+and [game rules](https://help.futmondo.com/article/91-reglas-del) on 2026-11-15.
+They document entering an offer in a player dialog and budget-limited secret
+market bidding; the rules were last updated on 2021-12-17. These public guides
+do not establish whether the current authenticated official app has percentage
+shortcuts; that UI was not inspected.
+
+LigaRadar extends its existing manual market-offer amount editor with the same
+six percentage shortcuts as its sale-listing dialog, based on the verified
+minimum bid and followed by explicit submission. This is a convenience within
+an existing shared market capability, without a new analysis/automation feature
+or exclusivity claim; no new login-tier item is added. Contract: `bid_management.md`.
