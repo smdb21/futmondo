@@ -21,7 +21,7 @@ Zero and negative scores are valid. A known round does not need a timestamp to b
 
 Cumulative price-snapshot totals never become per-round scores. Price charts use actual observed values only; no synthetic trend or default historical value fills gaps.
 
-The history chart displays both series together: solid green valuation on the left EUR scale and dashed amber round points on the right scale. The coloured axes identify the series without a legend. The horizontal axis requests about three horizontal date ticks, with DD/MM above the year to fit narrow phone plots without overlapping labels. Vertical date grid lines remain hidden; exact dates, timestamps and values remain in hover details. Each vertical scale keeps its own padded range. A shared date axis uses saved round dates or the existing context-checked match details (the last fixture date for a round with several matches). If any score remains undated, every score is preserved on a separate top round axis with an explicit notice that it is not aligned with valuation dates. Dated scores connect in chronological order, with round number as a stable tie-breaker for shared dates; postponed rounds therefore cannot draw backward across the date axis. Scores and hover provenance move together. Round axes also use sparse, whole-number labels. Points alone use round numbers when undated. Missing series retain their availability explanation.
+The history chart displays both series together: solid green valuation on the left EUR scale and dashed amber round points on the right scale. The coloured axes identify the series without a legend. The horizontal axis requests about three horizontal date ticks, using compact DD/MM labels to fit narrow phone plots without overlapping labels. Vertical date grid lines remain hidden; exact dates, timestamps and values remain in hover details. Each vertical scale keeps its own padded range. A shared date axis uses saved round dates or the existing context-checked match details (the last fixture date for a round with several matches). If any score remains undated, every score is preserved on a separate top round axis with an explicit notice that it is not aligned with valuation dates. Dated scores connect in chronological order, with round number as a stable tie-breaker for shared dates; postponed rounds therefore cannot draw backward across the date axis. Scores and hover provenance move together. Round axes also use sparse, whole-number labels. Points alone use round numbers when undated. Missing series retain their availability explanation.
 
 This presentation reuses the card's shared history and already requested match resource. It adds no requests, database reads, polling or cache entries; match completion can redraw the chart once to align its dates. Focused verification: `Rscript test/test_player_trend_plot.R`.
 
@@ -135,8 +135,8 @@ See `data_review_results.md` for measured request counts and verification limits
 ## Phone chart dates and series-colored axes — 2026-11-15
 
 `player_trend_plot` requests three automatic date ticks and uses
-`%d/%m<br>%Y`, keeping the year visible on a second line across season/year
-boundaries. It omits date `dtick` and retains horizontal text, padded independent
+`%d/%m`, omitting the year from axis labels at the owner's request. Full dates,
+including years, remain in hover details. It omits date `dtick` and retains horizontal text, padded independent
 value/points ranges and full hover provenance. Numeric undated-round axes keep
 their integral spacing and never supply invented dates.
 

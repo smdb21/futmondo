@@ -3279,3 +3279,23 @@ schema or environment changes; documentation has no runtime effect. Source
 checksums are updated without unrelated manifest/package changes. Local
 checks and branch delivery do not establish deployed appearance or eliminate
 genuine external/source latency. Unrelated working changes are preserved.
+
+
+### Player chart date labels without years — 2026-11-15
+
+Changed only the date tick format from DD/MM plus a second-line year to DD/MM
+at the owner's request. Full source dates/years remain in hover details.
+Chart contracts pass (16), including a known year in valuation hover text;
+the exact staged module passes the same checks. Browser checks at
+320/390/1440px across four history modes and both themes (24 combinations)
+assert day/month-only ticks without overlap and preserve series-colored axes,
+source data and zoom. Deployment contract: 3 passed.
+
+Performance review: fewer displayed characters and no second year line; no
+additional source/API/database work, cache/invalidation, persistence, reactive
+update, timer, listener or retained state. Existing durable history reuse and
+source timestamps are unchanged. This is a local chart-format edit; shared
+theme/startup/infrastructure are untouched, so the focused chart/browser checks
+are appropriate and the lifecycle harness was not repeated. Documentation has
+no runtime effect. Synthetic checks do not verify production deployment or
+physical-device behavior; no real accounts or transactions were used.

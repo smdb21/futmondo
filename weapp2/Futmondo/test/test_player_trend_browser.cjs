@@ -28,6 +28,7 @@ const {chromium}=require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp
      const state=await inspect();
      const labels=state.labels.sort((a,b)=>a.left-b.left);
      assert.ok(labels.length>0&&labels.length<=3,`${width}/${scenario}: sparse date ticks`);
+     assert.ok(labels.every(label=>/^\d{2}\/\d{2}$/.test(label.text)),`${width}/${scenario}: day/month labels without years`);
      for(let i=1;i<labels.length;i++)assert.ok(labels[i-1].right+2<=labels[i].left,`${width}/${scenario}: dates overlap ${JSON.stringify(labels)}`);
      for(const trace of state.data){
       const axis=trace.name==='Valuation'?state.y:state.y2;

@@ -1694,3 +1694,11 @@ Production deployment and authenticated hosted acceptance remain separate.
   does not claim to eliminate collector latency. See `data_review_results.md`.
   No new capability, dependency, schema or environment setting. Deployment and
   authenticated hosted UI verification remain separate.
+
+
+### Day/month-only player chart dates — implemented locally (2026-11-15)
+
+- Omit years from the compact chart axis, using DD/MM. Preserve full dates and
+  years in hover details, three sparse ticks and series-colored axes.
+- Focused chart/browser/deployment checks and performance review are recorded
+  in `data_review_results.md`. No data/dependency/schema change or deployment.

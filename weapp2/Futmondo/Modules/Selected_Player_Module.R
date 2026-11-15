@@ -2167,7 +2167,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       # A NULL dtick serializes as [] and forces daily ticks on Plotly's date
       # axis. Omit it entirely for dates; keep numeric round ticks integral.
       round_spacing <- if(nrow(points))max(1,ceiling(diff(range(points$round_number))/3))else 1
-      if(date_axis)horizontal_axis$tickformat <- "%d/%m<br>%Y" else {
+      if(date_axis)horizontal_axis$tickformat <- "%d/%m" else {
         horizontal_axis$tickmode <- "linear";horizontal_axis$dtick <- round_spacing
       }
       chart %>% fm_plot_layout(
