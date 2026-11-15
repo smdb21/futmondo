@@ -1423,3 +1423,9 @@ Implemented locally: remove the routine departure-exclusion paragraph, replace t
 - Replace app-owned Futmondo copy across Welcome, navigation/loading, market actions, lineup, notifications, administration, consent and errors with LigaRadar. Preserve the explicit Futmondo credential notice.
 - Project saved system-offer/transfer/source labels at display time; canonical API identifiers, observations and manual-action contracts remain unchanged. No migration or dependency change.
 - Focused synthetic checks, login browser checks and the required offline lifecycle passed. Performance review and local verification limits are recorded in `docs/data_review_results.md`; authenticated hosted appearance remains unverified.
+
+
+### Readable notification dates — implemented and verified locally
+
+- Notification headers now show only the league and a date such as **12 Nov 2026, 12:34 UTC**, with no source-name prefix. Last-refresh dates use the same format.
+- Retain original timestamps, source-filter values and read/action behavior. Reject malformed timestamp labels without manufacturing midnight; focused known-answer/rendered-output checks and the offline lifecycle pass. Performance and hosted/mobile validation limits are recorded in `docs/data_review_results.md`.

@@ -30,8 +30,6 @@ lineup_UI <- function(id) {
           title='Restore the latest lineup loaded from or successfully saved to LigaRadar'),
         shiny::actionButton(ns('reload'),label=NULL,icon=shiny::icon('rotate'),`aria-label`='Refresh lineup',
           title='Reload the official lineup, squad and rules from LigaRadar; keep your unsaved changes')),
-      fm_info(class='fm-lineup-refresh-help',
-        'Refresh lineup reloads the official lineup, squad and rules from LigaRadar. It keeps your unsaved changes and does not save them.'),
       shiny::uiOutput(ns('status')),
       shiny::div(class='fm-lineup-formation',shiny::uiOutput(ns('formation_control'))),
       shiny::uiOutput(ns('pitch')),shiny::uiOutput(ns('captain_control')),
@@ -355,16 +353,20 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
         if(identical(basis$n,n_rounds())&&!nzchar(catalog_issue())&&length(wanted())&&!identical(basis$rounds,wanted()))changed<-c(changed,'completed-round window')
         if(isTRUE(departure$complete)&&!identical(basis$excluded_ids %||% character(),departure$excluded_ids))changed<-c(changed,'player departures')
       }
-      shiny::tagList(shiny::div(role='status',`aria-live`='polite',`aria-busy`=if(!is.null(best_request()))'true'else'false',
-        if(nzchar(notice()))fm_info(notice(),error=notice_error())),
+      shiny::tagList(
+        if(nzchar(best_note()))shiny::div(class='fm-lineup-note fm-lineup-best-note',best_note()),
+        shiny::div(role='status',`aria-live`='polite',`aria-busy`=if(!is.null(best_request()))'true'else'false',
+          if(nzchar(notice()))if(notice_error())fm_info(notice(),error=TRUE)else
+            shiny::div(class='fm-lineup-note fm-lineup-message',notice())),
         if(length(changed))fm_info(error=TRUE,class='fm-lineup-best-warning',
           paste0('Optimization inputs changed: ',paste(changed,collapse=', '),'. Optimize to update this lineup.')),
         if(!isTRUE(departure$complete))fm_info(error=!is.null(departure$error),
           paste('Departure eligibility is not verified.',departure$error %||% 'Waiting for clause departure details.')),
-        if(nzchar(best_note()))fm_info(best_note()),
         if(nzchar(cache_issue()))fm_info(cache_issue(),error=TRUE),
         if(nzchar(catalog_issue()))fm_info(catalog_issue(),error=TRUE)else
-          if(nrow(score))fm_info(error=(status$failed %||% 0L)>0L||!is.null(status$save_error),paste(sum(is.finite(score$average)),'of',nrow(score),'players have complete scores for',length(wanted()),'completed rounds.'),
+          if(nrow(score)&&(any(!is.finite(score$average))||(status$failed %||% 0L)>0L||!is.null(status$save_error)))
+            fm_info(error=(status$failed %||% 0L)>0L||!is.null(status$save_error),
+          if(any(!is.finite(score$average)))paste(sum(is.finite(score$average)),'of',nrow(score),'players have complete scores for',length(wanted()),'completed rounds.'),
           if((status$pending %||% 0L)+(status$remaining %||% 0L)>0L)' Loading missing history…',
           if((status$failed %||% 0L)>0L)' Some history reads failed; use Refresh to retry.',
           if((status$saving %||% 0L)>0L)' Saving acquired history…',if(!is.null(status$save_error))status$save_error))

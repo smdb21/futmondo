@@ -47,6 +47,8 @@ args<-list(is_module_active=function()TRUE,login_token=function()c(userid='fixtu
 reset()
 shiny::testServer(lineup_Server,args=args,{
  settle(session);session$setInputs(formation='4-4-2');settle(session)
+ stopifnot(!grepl('players have complete scores',output$status$html),
+  !grepl('fm-lineup-refresh-help',as.character(lineup_UI('fixture'))))
  session$setInputs(best=1);settle(session);optimized<-draft()
  # Four forwards have the largest observed averages in this fixture, so the
  # unrestricted optimum is 3-3-4 rather than the currently selected 4-4-2.
@@ -174,11 +176,26 @@ partial_history<-history[history$player_id!='p20',]
 history_data(partial_history);history_status(list(pending=1L,remaining=0L,saving=0L,failed=0L))
 shiny::testServer(lineup_Server,args=args,{
  settle(session);before<-draft();session$setInputs(best=1);settle(session)
- stopifnot(identical(draft(),before),grepl('waiting for complete scores for 1 eligible player',notice()),!nzchar(best_note()))
+ stopifnot(identical(draft(),before),grepl('waiting for complete scores for 1 eligible player',notice()),!nzchar(best_note()),
+  grepl('19 of 20 players have complete scores',output$status$html,fixed=TRUE))
  # Even though a complete XI could be formed, it must not silently exclude p20.
  history_data(full_history);history_status(default_status);settle(session)
- stopifnot('p20'%in%draft()$starters,all(nzchar(draft()$starters)),nzchar(best_note()),state$reads==1L)
+ stopifnot('p20'%in%draft()$starters,all(nzchar(draft()$starters)),nzchar(best_note()),state$reads==1L,
+  !grepl('players have complete scores',output$status$html))
  cat('PASS one Best XI click waits for all eligible histories and applies the full result when acquisition finishes\n')
+})
+reset()
+shiny::testServer(lineup_Server,args=args,{
+ settle(session)
+ for(failure in list(list(failed=1L),list(save_error='History could not be saved.'))){
+  history_status(utils::modifyList(default_status,failure));settle(session)
+  stopifnot(all(is.finite(scores()$average)),grepl('fm-info-error',output$status$html),
+   grepl(if(is.null(failure$save_error))'Some history reads failed'else failure$save_error,output$status$html,fixed=TRUE),
+   !grepl('players have complete scores',output$status$html))
+ }
+ history_status(default_status);settle(session)
+ stopifnot(!grepl('fm-info-error|players have complete scores',output$status$html),state$reads==1L,state$submits==0L)
+ cat('PASS complete scores hide coverage while history read/save failures remain reported until recovery without source requests\n')
 })
 reset()
 history_data(partial_history);history_status(list(pending=1L,remaining=0L,saving=0L,failed=0L))
@@ -452,4 +469,4 @@ shiny::testServer(lineup_Server,args=args,{
   grepl('App copy not saved:',output$status$html,fixed=TRUE),!grepl('fm-lineup-best-warning',output$status$html,fixed=TRUE))
  cat('PASS a verified Futmondo save remains distinct from a failed app snapshot with a safe diagnostic and no false recalculation warning\n')
 })
-cat('LINEUP MODULE: 28 groups passed / 0 failed\n')
+cat('LINEUP MODULE: all checks passed\n')
