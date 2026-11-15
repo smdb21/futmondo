@@ -77,7 +77,10 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       if(!is.null(entry)&&identical(entry$context$account_id,who$account)&&identical(entry$context$championship_id,who$championship)&&identical(entry$context$user_team_id,who$team)&&
          identical(fm_scalar(entry$context$competition_id,'unknown'),who$competition)&&identical(entry$season,who$season)){
         if(!identical(entry$season,'unknown'))season<-entry$season
-        scoring<-entry$scoring
+        # Historical rows may still use an earlier scoring configuration. They
+        # can fill unknown scope, but cannot replace independently known current
+        # identity used by the lineup source and durable snapshot key.
+        if(!fm_context_known(scoring))scoring<-entry$scoring
       }
       resource_context(shiny::isolate(login_token()),who$championship,who$team,season=season,scoring_version=scoring,session_id=session$token,competition_id=who$competition)
     }

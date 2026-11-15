@@ -1359,3 +1359,11 @@ Implemented locally: remove the routine departure-exclusion paragraph, replace t
   regressions and the offline lifecycle harness. See `ui_information_disclosures.md`
   and `data_review_results.md`. Production appearance is not established by local
   checks; the standing branch push triggers the configured deployment.
+
+
+### Lineup snapshot and calendar error causes — implemented locally (2026-11-15 UTC)
+
+- Approved read-only inspection confirmed the screenshot's two causes: complete saved calendar parser results had unknown worker-envelope completeness; lineup answers omitted the scoring selector while matching authoritative custom settings. The request context and snapshot payload therefore disagreed before any database POST.
+- Resolve omitted scoring only from complete exact-scope authoritative metadata and matching custom configuration. Preserve current identity over older shared history. Save and reuse successful validated snapshots through the existing database contract, retaining worker source clocks/deadlines and stale status.
+- Publish round completeness correctly for new worker snapshots and strictly reconstruct the missing envelope mapping from existing persisted parser proof. Real partial/error/context failures remain red disclosures. No data is invented or source freshness extended.
+- Focused persistence/calendar and browser regression checks, required lifecycle results and performance limits are recorded in `data_review_results.md`. Production evidence was inspected without mutations; authenticated hosted acceptance remains separate from the local implementation and branch rollout.

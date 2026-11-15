@@ -180,6 +180,9 @@ get_finished_rounds <- function(login, championship_id) {
   rounds <- catalog$rounds
   attr(rounds,"catalog_status") <- catalog$status
   attr(rounds,"catalog_complete") <- isTRUE(catalog$complete)
+  # The worker's durable envelope reads this shared completeness attribute.
+  # Keep it aligned with the catalog parser's explicit acquisition proof.
+  attr(rounds,"complete") <- isTRUE(catalog$complete)
   attr(rounds,"catalog_reason") <- catalog$reason %||% ""
   attr(rounds,"observed_at") <- attr(catalog,"observed_at")
   attr(rounds,"valid_until") <- attr(catalog,"valid_until")

@@ -2,20 +2,78 @@
 lineup_api_payload <- function(auth,championship_id,user_team_id,extra=list()) list(
   header=list(token=auth[['token']],userid=auth[['userid']]),
   query=c(list(championshipId=championship_id,userteamId=user_team_id),extra),answer=list())
+# Read envelopes retain the original worker clocks; decoding answer must not
+# turn a saved observation into a newly acquired source result.
+lineup_api_answer <- function(envelope, worker=FALSE, observed_at=Sys.time()) {
+  if(!is.list(envelope)||!is.list(envelope$answer)||isTRUE(envelope$answer$error)||
+     (!is.null(envelope$code)&&!identical(envelope$code,API_CODE_OK))||
+     (!is.null(envelope$answer$code)&&!identical(envelope$answer$code,API_CODE_OK)))stop('Lineup source rejected this request')
+  answer<-envelope$answer
+  if(worker){
+    status<-attr(envelope,'worker_acquisition_status')
+    if(!isTRUE(status%in%c('ok','empty'))||!is.null(attr(envelope,'fetch_error'))||
+       isTRUE(attr(envelope,'worker_completeness')%in%c('partial','unavailable')))stop('Lineup source observation is incomplete')
+    for(field in c('observed_at','fetched_at','valid_until','fetch_status','worker_acquisition_status','worker_completeness'))
+      attr(answer,field)<-attr(envelope,field)
+    attr(answer,'worker_replay')<-TRUE
+  }else{
+    answer<-observed_data(answer,observed_at=observed_at)
+    attr(answer,'valid_until')<-as.numeric(fm_time(observed_at))+30
+  }
+  answer
+}
+
+# The lineup endpoint can omit pointSystem while retaining the full custom
+# settings. Resolve that omission only against independently observed, exact
+# league identity and matching custom evidence; never guess a scoring system.
+lineup_resolve_scoring <- function(lineup,context) {
+  point_system<-lineup$pointSystem
+  omitted<-is.null(point_system)||length(point_system)==0L||
+    (is.character(point_system)&&length(point_system)==1L&&!is.na(point_system)&&!nzchar(trimws(point_system)))
+  if(!omitted)return(lineup)
+  row<-league_context_metadata(context$championship_id,context$account_id,allow_stale=TRUE)
+  fields<-c('account_id','championship_id','competition_id','season','scoring_version')
+  if(is.null(row)||!isTRUE(row$complete)||!is.list(row$payload)||
+     !all(vapply(fields,function(field)fm_context_known(context[[field]])&&
+       identical(fm_scalar(row[[field]]),fm_scalar(context[[field]])),logical(1))))stop('Lineup scoring context is unavailable')
+  reference<-fm_scalar(row$payload$point_system,'')
+  if(!identical(reference,'custom')||!is.list(row$payload$custom)||!is.list(lineup$custom))stop('Lineup scoring configuration is unavailable')
+  expected<-fm_scoring_version(reference,row$payload$custom)
+  actual<-fm_scoring_version(reference,lineup$custom)
+  if(!fm_context_known(expected)||!identical(expected,context$scoring_version)||!identical(actual,expected))stop('Lineup source scoring context changed')
+  lineup$pointSystem<-reference
+  lineup
+}
+
+# A complete bundle is no newer or longer-lived than its oldest/first-expiring
+# component. Legacy direct parser callers have no envelope and keep the live TTL.
+lineup_bundle_observation <- function(answers,now=Sys.time()) {
+  stamps<-deadlines<-numeric();states<-character();replayed<-FALSE
+  for(answer in answers){
+    worker<-isTRUE(attr(answer,'worker_replay'));replayed<-replayed||worker
+    raw_stamp<-attr(answer,'observed_at');raw_deadline<-attr(answer,'valid_until')
+    if(worker&&(is.null(raw_stamp)||is.null(raw_deadline)))stop('Lineup source timestamps are unavailable')
+    stamp<-fm_time(raw_stamp %||% now);until<-fm_time(raw_deadline %||% (as.numeric(stamp)+30))
+    if(length(stamp)!=1L||is.na(stamp)||length(until)!=1L||is.na(until)||until<stamp||stamp>now+60)stop('Lineup source timestamps are invalid')
+    status<-attr(answer,'fetch_status') %||% 'ok'
+    if(!isTRUE(status%in%c('ok','empty','stale'))||!is.null(attr(answer,'fetch_error')))stop('Lineup source observation is incomplete')
+    stamps<-c(stamps,as.numeric(stamp));deadlines<-c(deadlines,as.numeric(until));states<-c(states,status)
+  }
+  list(observed_at=format(fm_time(min(stamps)),'%Y-%m-%dT%H:%M:%OS6Z',tz='UTC'),
+    expires_at=format(fm_time(min(deadlines)),'%Y-%m-%dT%H:%M:%OS6Z',tz='UTC'),
+    fetch_status=if(any(states=='stale')||min(deadlines)<=as.numeric(now))'stale'else'ok',worker_replay=replayed)
+}
 lineup_api_read <- function(route,auth,context,owner,extra=list(),worker_live=FALSE) {
   if(!worker_live&&exists("fm_worker_configured",mode="function")&&fm_worker_configured()&&!identical(fm_worker_mode(auth[['userid']]),FALSE)){
     args<-list(route=route,query=c(list(championshipId=context$championship_id,userteamId=context$user_team_id),extra))
-    return(promises::then(fm_worker_fetch("get_worker_http_read",args,context,owner),function(value)value$answer))
+    return(promises::then(fm_worker_fetch("get_worker_http_read",args,context,owner),function(value)lineup_api_answer(value,worker=TRUE)))
   }
   body<-jsonlite::toJSON(lineup_api_payload(auth,context$championship_id,context$user_team_id,extra),auto_unbox=TRUE,null='null')
   promises::then(fm_async_read_http(paste0('https://api.futmondo.com',route),'POST',body,
     c(`Content-Type`='application/json; charset=utf-8'),owner=owner,priority='interactive'),function(response){
       if(length(response$content)>2*1024^2)stop('Lineup response is too large')
       parsed<-jsonlite::fromJSON(rawToChar(response$content),simplifyVector=FALSE)
-      if(!is.list(parsed)||is.null(parsed$answer)||isTRUE(parsed$answer$error)||
-         (!is.null(parsed$code)&&!identical(parsed$code,API_CODE_OK))||
-         (!is.null(parsed$answer$code)&&!identical(parsed$answer$code,API_CODE_OK)))stop('Lineup source rejected this request')
-      parsed$answer
+      lineup_api_answer(parsed)
     })
 }
 lineup_roster_records <- function(raw) {
@@ -77,15 +135,15 @@ lineup_fetch_bundle <- function(auth,context,target,owner,is_current=function()T
     data<-lineup_normalize_bundle(answers,context,target)
     # This direct async bundle does not cross record_acquired_resource. Publish
     # verified scoring only after every component succeeds in its own generation.
-    if(exists('remember_league_scoring',mode='function')){
-      row<-remember_league_scoring(context,answers$lineup,fm_time(data$observed_at))
+    if(!isTRUE(data$source$worker_replay)&&exists('remember_league_scoring',mode='function')){
+      row<-remember_league_scoring(context,answers$lineup,attr(answers$lineup,'observed_at') %||% fm_time(data$observed_at))
       if(!is.null(row))persist_league_context(row,context)
     }
     data
   })
 }
 lineup_normalize_bundle <- function(answers,context,target) {
-  official<-lineup_parse_official(answers$lineup);cfg<-answers$info$configuration %||% list()
+  official<-lineup_parse_official(lineup_resolve_scoring(answers$lineup,context));cfg<-answers$info$configuration %||% list()
   available<-lineup_available_formations(answers$strategies,official$draft$strategy,cfg)
   source_league<-if(is.list(answers$info$league))answers$info$league else list()
   competition<-fm_scalar(source_league$id %||% source_league$`_id`,fm_scalar(context$competition_id,'unknown'))
@@ -94,16 +152,16 @@ lineup_normalize_bundle <- function(answers,context,target) {
     expected<-fm_scalar(context[[field]],'unknown');actual<-if(field=='competition_id')competition else season
     if(expected!='unknown'&&actual!='unknown'&&!identical(expected,actual))stop('Lineup source context changed')
   }
-  stamp<-Sys.time()
+  observation<-lineup_bundle_observation(answers)
   list(version=2L,roster=lineup_roster_records(answers$roster),official=official$draft,
     rules=list(allowed=available,multiposition=official$multiposition,
       bench_enabled=official$enabled,captain_enabled=isTRUE(cfg$cpt)),
     source=list(wire=official$wire,locked=official$locked,status=official$status,block_delayed=isTRUE(cfg$blc),
+      fetch_status=observation$fetch_status,worker_replay=observation$worker_replay,
       target_id=target$id %||% '',target_number=target$number %||% NA_real_,
       target_starts=if(is.null(target))''else format(target$starts_at,'%Y-%m-%dT%H:%M:%OSZ',tz='UTC')),
     competition_id=competition,season=season,scoring_version=fm_scoring_version(official$pointSystem,official$custom),
-    observed_at=format(stamp,'%Y-%m-%dT%H:%M:%OSZ',tz='UTC'),
-    expires_at=format(stamp+30,'%Y-%m-%dT%H:%M:%OSZ',tz='UTC'))
+    observed_at=observation$observed_at,expires_at=observation$expires_at)
 }
 lineup_available_formations <- function(answer,current,configuration=list()) {
   if(!is.list(answer)||!is.list(answer$strategies))stop('Formation availability is missing')

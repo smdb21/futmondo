@@ -85,6 +85,24 @@ fm_worker_restore<-function(resource,account){
  if(identical(m$handler,'get_active_championships'))value<-fm_filter_league_answer(value)
  attr(value,'observed_at')<-fm_time(m$observed_at);attr(value,'fetched_at')<-fm_time(m$checked_at)
  attr(value,'worker_completeness')<-m$completeness
+ # Older round snapshots recorded 'unknown' because the collector read only
+ # attr(complete), while this getter used attr(catalog_complete). Reconstruct
+ # that one metadata mapping from the saved parser proof, never from row count
+ # or a successful HTTP response alone. Other handlers/failures stay unchanged.
+ if(identical(m$handler,'get_finished_rounds')&&identical(m$completeness,'unknown')&&
+    isTRUE(m$status%in%c('ok','empty'))&&isTRUE(attr(value,'catalog_complete'))&&
+    identical(attr(value,'catalog_status'),'ok')&&is.data.frame(value)&&nrow(value)>0L&&nrow(value)<=120L&&
+    all(c('round_id','round_number','is_finished')%in%names(value))&&
+    is.character(value$round_id)&&!anyNA(value$round_id)&&all(nzchar(value$round_id))&&!anyDuplicated(value$round_id)&&
+    is.numeric(value$round_number)&&is.logical(value$is_finished)){
+  numbers<-value$round_number;known<-is.finite(numbers);observed<-attr(value,'observed_at')
+  if(all(is.na(numbers)|known)&&all(numbers[known]>=1&numbers[known]==floor(numbers[known]))&&
+     !anyDuplicated(numbers[known])&&all(known[value$is_finished%in%TRUE])&&
+     length(observed)==1L&&!is.na(observed)&&observed<=Sys.time()){
+   attr(value,'worker_completeness')<-'complete'
+   attr(value,'worker_completeness_source')<-'catalog_complete'
+  }
+ }
  attr(value,'worker_acquisition_status')<-m$status
  existing<-attr(value,'valid_until') %||% if(is.list(value))value$valid_until else NULL
  deadline<-as.numeric(fm_time(m$valid_until))
