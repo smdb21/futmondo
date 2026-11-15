@@ -232,7 +232,7 @@ players_table_duplicate_price_columns <- function(rows) {
 
 # One finite range per metric over the loaded source, before any table filters.
 players_table_metric_ranges <- function(rows) {
-  columns <- intersect(c("recent_points_avg", "recent_points_ratio", "points"), names(rows))
+  columns <- intersect(c("recent_points_avg", "recent_points_ratio", "recent_points_trend", "points"), names(rows))
   stats::setNames(lapply(columns, function(column) {
     values <- rows[[column]]
     values <- values[is.finite(values)]
@@ -291,6 +291,20 @@ players_table_points_ratio <- function(rows, basis) {
     ratio[!is.finite(ratio)] <- NA_real_
   }
   rows$recent_points_ratio <- ratio
+  rows
+}
+
+# Multiply the exact displayed N-round average by the observed euro trend.
+players_table_points_trend <- function(rows) {
+  product <- rep(NA_real_, nrow(rows))
+  if (all(c("recent_points_avg", "change") %in% names(rows))) {
+    average <- suppressWarnings(as.numeric(as.character(rows$recent_points_avg)))
+    trend <- suppressWarnings(as.numeric(as.character(rows$change)))
+    valid <- is.finite(average) & is.finite(trend)
+    product[valid] <- average[valid] * trend[valid]
+    product[!is.finite(product)] <- NA_real_
+  }
+  rows$recent_points_trend <- product
   rows
 }
 
@@ -457,7 +471,10 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       history <- if(isTRUE(optional_ready()))tryCatch(recent_points$history(),error=function(e)data.frame())else data.frame()
       players_table <- players_table_normalize_owner(players_table, if(isTRUE(optional_ready()))tryCatch(user_teams_RV(), error=function(e)NULL)else NULL)
       players_table <- add_recent_points_average(players_table,history,recent_n)
-      if(!is.null(points_ratio_basis))players_table<-players_table_points_ratio(players_table,points_ratio_basis)
+      if(!is.null(points_ratio_basis)) {
+        players_table<-players_table_points_ratio(players_table,points_ratio_basis)
+        players_table<-players_table_points_trend(players_table)
+      }
       attr(players_table,"filter_added_fields")<-filter_added_fields
       players_table
     })
@@ -589,7 +606,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       if(isTRUE(hide_bid_column))cols_to_hide<-c(cols_to_hide,"bid_price")
       rows<-rows %>% reorder_player_table_columns() %>%
         dplyr::select(!any_of(setdiff(cols_to_hide,"logo"))) %>%
-        dplyr::select(any_of(c("name","role","recent_points_avg","recent_points_ratio")),everything())
+        dplyr::select(any_of(c("name","role","recent_points_avg","recent_points_ratio","recent_points_trend")),everything())
       # Source timestamps belong to the resource state, not widget equality.
       rows<-as.data.frame(rows)
       attributes(rows)<-attributes(rows)[intersect(c("names","row.names","class"),names(attributes(rows)))]
@@ -606,7 +623,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       if(!is.finite(recent_n))recent_n<-5L
       schema<-list(context=table_context_RV(),columns=names(rows),
         types=lapply(rows,function(column)if(is.numeric(column))"numeric"else class(column)),recent_n=recent_n,
-        formatted=digest::digest(lapply(rows[setdiff(names(rows),c("recent_points_avg","recent_points_ratio","recent_points_details"))],
+        formatted=digest::digest(lapply(rows[setdiff(names(rows),c("recent_points_avg","recent_points_ratio","recent_points_trend","recent_points_details"))],
           function(column)if(is.numeric(column))as.numeric(column)else column)),ids=ids)
       if(!identical(isolate(table_schema()),schema)){table_schema(schema);return()}
       if(identical(rendered_schema,schema)&&(!identical(rendered_data,rows)||!identical(rendered_ids,ids)||!identical(rendered_meta,meta))){
@@ -639,6 +656,11 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
         header=htmltools::span(paste0("Avg ",recent_n),htmltools::tags$br(),
           paste0("/ ",if(points_ratio_basis=="value")"Value"else"Clause"," (€M)")),
         style=players_table_metric_style(),cell=players_table_metric_cell(3L))
+      if(!is.null(points_ratio_basis))table_columns[["recent_points_trend"]]<-reactable::colDef(
+        name=paste0("Avg Last ",recent_n," × Trend (€)"),
+        align="center",sortNALast=TRUE,minWidth=145,headerClass="fm-metric-header",
+        header=htmltools::span(paste0("Avg ",recent_n),htmltools::tags$br(),"× Trend (€)"),
+        style=players_table_metric_style(),cell=players_table_metric_cell(1L))
       reactable(players_table,
                 columns = table_columns,
                 meta = rendered_meta,

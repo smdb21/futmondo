@@ -26,12 +26,17 @@ assert.deepEqual(cell(1, 'recent_points_avg', {recent_points_avg: {min: null, ma
 assert.deepEqual(style({values: {recent_points_avg: 1}}, {id: 'recent_points_avg'}, {}), {});
 assert.equal(cell(0, 'recent_points_avg', {recent_points_avg: {min: 0, max: 0}})['--fm-metric-bg'], mix(100));
 assert.equal(cell(-3, 'recent_points_avg', {recent_points_avg: {min: -3, max: -3}})['--fm-metric-bg'], mix(100));
-const independent = {recent_points_avg: {min: 0, max: 20}, recent_points_ratio: {min: 0, max: 10}};
+const independent = {recent_points_avg: {min: 0, max: 20}, recent_points_ratio: {min: 0, max: 10}, recent_points_trend: {min: -1000000, max: 3000000}};
 assert.equal(cell(10, 'recent_points_avg', independent)['--fm-metric-bg'], mix(50));
 assert.equal(cell(10, 'recent_points_ratio', independent)['--fm-metric-bg'], mix(0));
+assert.equal(cell(-1000000, 'recent_points_trend', independent)['--fm-metric-bg'], mix(100));
+assert.equal(cell(1000000, 'recent_points_trend', independent)['--fm-metric-bg'], mix(50));
+assert.equal(cell(3000000, 'recent_points_trend', independent)['--fm-metric-bg'], mix(0));
+assert.deepEqual(cell(null, 'recent_points_trend', independent), {});
 assert.notEqual(cell(0)['--fm-metric-bg'], cell(0, 'recent_points_avg', {recent_points_avg: {min: -10, max: 30}})['--fm-metric-bg']);
 for (const client of [{searchValue: 'Player'}, {page: 2, pageSize: 5}, {sorted: [{id: 'name', desc: true}]}]) {
   assert.deepEqual(cell(5, 'recent_points_avg', ranges, client), cell(5));
+  assert.deepEqual(cell(1000000, 'recent_points_trend', independent, client), cell(1000000, 'recent_points_trend', independent));
 }
 function luminance(rgb) {
   return rgb.map(v => v / 255).map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)

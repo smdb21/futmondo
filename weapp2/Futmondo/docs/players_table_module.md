@@ -221,3 +221,30 @@ disclosure. Expansion state belongs to the mounted browser panel and starts
 closed when a new panel is created. No JavaScript handler, Shiny observer, API or
 database request, cache, persistence write, timer or dependency is added. Existing
 data acquisition and durable database reuse are unchanged.
+
+
+## Average points × euro trend — 2026-11-15 UTC
+
+Tables with `points_ratio_basis` enabled (Today and Players) now place **Avg N ×
+Trend (€)** directly after the existing average/price ratio.
+`players_table_points_trend(rows)` adds numeric `recent_points_trend`, multiplying
+the exact `recent_points_avg` by the observed euro-valued `change` field. The
+calculation uses the unrounded average; the badge displays up to one decimal. This is
+the displayed Trend amount, not its percentage or a forecast. For example, an
+average of 10 and trend of €250,000 produce 2,500,000. Zero and negative operands
+retain normal multiplication semantics, including a positive result for two
+negative operands. Missing/nonfinite operands or an overflowing product remain
+blank; unknown trend is never treated as zero.
+
+The product reuses the existing metric badge and theme-aware background scaling,
+with its own finite min/max over all loaded source rows before filtering.
+Sorting remains numeric and the default average-descending order is unchanged.
+The column follows N and observed history/trend updates; history-only updates
+reuse the mounted widget through `updateReactable()`. Its header wraps and the
+existing table scroll container accommodates the extra column on phones.
+
+Calculation and range extraction add bounded linear work during existing
+source/history/N enrichment; filters reuse that result. No additional source or
+database acquisition, persistence, cache, observer, timer, dependency or schema
+is introduced. Successful underlying observations retain existing durable
+database reuse and their source/context metadata.

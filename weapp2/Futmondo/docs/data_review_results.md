@@ -2467,3 +2467,36 @@ confirmation blocker above. No factual history or snapshot records were removed.
   bounded static markup/CSS, no observers, timers, dependencies, cache or database
   work. Existing durable database reuse and acquisition behavior are unchanged.
   Documentation has no runtime effect; local measurements exclude hosted latency.
+
+
+### 2026-11-15 UTC — Average points × euro trend
+
+- Today and Players now place **Avg N × Trend (€)** beside the existing
+  average/price ratio. The numeric product uses the same unrounded N-round
+  average and observed euro trend. Signed/zero arithmetic is preserved; absent,
+  missing/nonfinite inputs and overflow remain blank. The existing badge palette
+  uses a separate finite source-wide range, stable through filtering/search.
+- Focused checks passed: `test/test_player_points_ratios.R` (four groups) and
+  `test/test_player_metric_colors.R` (10 checks including generated JavaScript).
+  Known-answer fixtures cover both price bases, exact signed/zero eight-round
+  averages, missing/empty/nonfinite values, N/source/history updates, optional
+  column scope and filtering without repeated enrichment. Required
+  `Rscript test/test_shiny_simulation.R` passed 13 checks plus 8 tabs, with zero
+  HTTP/live database mutations; existing synthetic Plotly warnings remain.
+- Actual Shiny/Chromium checks passed both tables at 390/1440px in light/dark:
+  adjacent placement, numeric sorting with missing values last, signed/zero
+  values, stable independent colors through client search and application filters,
+  and exact N/history updates. A 17/3 average multiplied by €100 displays 566.7,
+  without rounding the input to 5.7 first. Screenshots were inspected. No page
+  overflow, JavaScript errors, extra HTTP or external I/O occurred. Tests use
+  synthetic data; hosted authenticated appearance/deployment remain unverified.
+- Performance: for 2,000 synthetic players over 200 iterations, existing
+  three-column range extraction averaged 0.145ms/run; the product calculation
+  plus four ranges averaged 2.520ms/run. The added numeric vector is 15.7KiB.
+  Browser N changes took 75–98ms and shared history changes 100–124ms; the latter
+  used two in-place table updates with zero widget rebuilds. Calculations run
+  only in existing enrichment, and filters reuse it. Rendering adds one column
+  within the existing scrollable table. No new acquisition, database work, cache,
+  persistence, observer, timer, dependency or schema is introduced; underlying
+  successful observations retain durable database reuse. Documentation has no
+  runtime cost and local timings exclude hosted latency.

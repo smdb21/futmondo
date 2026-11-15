@@ -1378,3 +1378,14 @@ Implemented locally: remove the routine departure-exclusion paragraph, replace t
 - This is a presentation change with no acquisition, persistence, dependency or
   schema change. Verification and performance results are recorded in
   `data_review_results.md`; authenticated hosted appearance remains unverified.
+
+
+### Average points × euro trend — implemented locally (2026-11-15 UTC)
+
+- Today and Players show **Avg N × Trend (€)** immediately beside their existing
+  average/price ratio, using the exact displayed N-round average and observed
+  euro trend. Signed/zero values remain numeric; unknown values remain blank.
+- The new metric has the same badge palette with an independent source-wide
+  range and updates through the shared enrichment/widget paths. No acquisition,
+  persistence, dependency or schema change. Verification and performance results
+  are recorded in `data_review_results.md`; hosted acceptance remains separate.
