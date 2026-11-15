@@ -1447,3 +1447,9 @@ Implemented locally: remove the routine departure-exclusion paragraph, replace t
 
 - Group read status, source, event, current-league and Refresh controls in a full-width **Filters** box, collapsible and initially collapsed. Retain existing input IDs/defaults and keep notification cards/status outside it.
 - Existing notification checks and synthetic desktop/mobile browser checks pass. Native collapse behavior adds no acquisition or persistence changes; performance review and hosted limits are recorded in `docs/data_review_results.md`.
+
+
+### Center dialog dismissal and shorten picker help — implemented and verified locally
+
+- Center direct Close/Cancel footer buttons on their own row so the floating Refresh button does not obscure them on phones. Preserve other footer actions and native dismissal. Remove the lineup picker sentence explaining missing-score dashes while retaining unknown-score display and round-window help.
+- Synthetic Chromium checks pass at 320/360/390/1440px, alongside the existing lineup browser suite and required offline lifecycle. No acquisition, persistence, dependency or schema changes. Performance review and hosted validation limits are recorded in `docs/data_review_results.md`.

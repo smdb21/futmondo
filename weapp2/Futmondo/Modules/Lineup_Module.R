@@ -278,7 +278,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
         title=label,role='img',`aria-label`=label,shiny::icon(icon))
       shiny::tagList(
         fm_info(paste0('Select a player to switch. Average uses the last ',length(attr(score,'rounds')),
-          ' completed rounds (requested ',n_rounds(),'). Missing scores are shown as —.')),
+          ' completed rounds (requested ',n_rounds(),').')),
         shiny::div(class='fm-lineup-note fm-lineup-picker-membership-note',
           marker('circle-check','Starting XI'),' XI · ',marker('chair','Bench'),' Bench · ',
           marker('crosshairs','Current slot'),' Current · including unsaved changes'),

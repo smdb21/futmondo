@@ -136,7 +136,8 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       assert.equal(await pitch.locator('.fm-lineup-points').nth(10).innerText(), '60');
       await page.locator('#lineup-recent_n').fill('2');
       await page.locator('#lineup-recent_n').blur();
-      await page.locator('.fm-lineup-best-warning').getByText(/Optimization inputs changed: last N rounds/).waitFor();
+      await page.locator('.fm-lineup-best-warning').waitFor();
+      assert.match(await page.locator('.fm-lineup-best-warning').textContent(), /Optimization inputs changed: last N rounds/);
       assert.deepEqual(await selections(), fiveRoundSelections);
       assert.equal(await pitch.locator('.fm-lineup-points').nth(10).innerText(), '0');
       await page.locator('#lineup-recent_n').fill('5');

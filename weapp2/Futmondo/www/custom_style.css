@@ -402,6 +402,19 @@ body, .wrapper {
     overflow-x: hidden !important;
 }
 
+/* Keep dialog dismissal centered and clear of the floating Refresh control. */
+.modal-footer {
+    text-align: center;
+}
+.modal-footer > .btn[data-dismiss="modal"] {
+    display: block;
+    width: fit-content;
+    margin: 8px auto;
+}
+.modal-footer > .btn[data-dismiss="modal"]:first-child {
+    margin-top: 0;
+}
+
 /* Floating Action Button (Refresh) */
 .btn-refresh-floating {
     position: fixed !important;

@@ -32,7 +32,7 @@ fixture_wire <- function(draft) {
   }
   list(strategy = draft$strategy, players = rows)
 }
-lineup_fetch_bundle <- function(auth, context, target, owner) {
+lineup_fetch_bundle <- function(auth, context, target, owner, is_current = function() TRUE) {
   fixture_reads <<- fixture_reads + 1L
   stamp <- Sys.time()
   result <- list(version = 1L,
