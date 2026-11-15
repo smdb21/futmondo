@@ -1,11 +1,9 @@
-/* Browser visibility/timezone and a clock that sends no per-second Shiny traffic. */
+/* Browser visibility and a clock that sends no per-second Shiny traffic. */
 (function () {
   'use strict';
   function publish() {
     if (!window.Shiny || !Shiny.setInputValue) return;
     Shiny.setInputValue('worker_visible', !document.hidden);
-    try { Shiny.setInputValue('worker_timezone_detected', Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Madrid'); }
-    catch (_) { Shiny.setInputValue('worker_timezone_detected', 'Europe/Madrid'); }
   }
   function clock() {
     if (document.hidden) return;

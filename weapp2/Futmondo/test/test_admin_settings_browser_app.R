@@ -1,4 +1,4 @@
-# Actual Admin module with synthetic, deliberately slow database responses.
+# Actual Admin module; timezone-directory access is forbidden.
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages(source("global.R"))
 Sys.setenv(admin="admin@example.invalid")
@@ -6,11 +6,7 @@ fixture<-new.env();fixture$timezone_reads<-0L;fixture$writes<-0L
 blocked_io<-function(...)stop("Unexpected live I/O in Admin fixture")
 for(name in c("futmondo_post","fm_async_http","supabase_read","supabase_upsert","supabase_write"))assign(name,blocked_io)
 fm_access_store<-function(...)promises::promise_resolve(TRUE)
-fm_timezone_store<-function(...){
- fixture$timezone_reads<-fixture$timezone_reads+1L
- promises::promise(function(resolve,reject)later::later(function()resolve(list(
-  list(user_id="fixture-user",display_name="Fixture user",timezone="Europe/Madrid"))),5))
-}
+fm_timezone_store<-function(...){fixture$timezone_reads<-fixture$timezone_reads+1L;blocked_io()}
 shared_mvp_source<-function(...)reactiveVal(list(coverage=data.frame(),loading=FALSE,reason="Synthetic empty coverage"))
 ui<-fluidPage(tags$head(tags$style(HTML(fm_theme_css())),includeCSS("www/custom_style.css")),
  actionButton("toggle_admin","Open / close Admin"),actionButton("heartbeat","Heartbeat"),

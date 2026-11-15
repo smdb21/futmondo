@@ -1,35 +1,98 @@
-# Account timezone and uniform dates
+# Personal timezone and uniform dates
 
-Implemented 2026-11-14 Pacific / 2026-11-15 UTC. All displayed timestamps use `DD/MM/YYYY HH:MM TZ` with a 24-hour clock. Date-only chart axes and date pickers use `DD/MM/YYYY`. The banner, incoming/leaving clauses and observations, notifications, transaction tables, rival access/update/cash histories, player clauses/fixtures/charts, league charts, award coverage and worker source-check text share the same account preference. Rival source parsing also uses the shared UTC/offset parser, retaining source times instead of relying on the server timezone or a date-only fallback. Persisted source instants, expiry checks, countdown durations, ledger amounts and source/context identity stay in UTC and retain their original meaning.
+Current behavior, corrected 2026-11-15: each user chooses their own timezone in
+**Welcome → Display timezone**. With no explicit personal choice, the app uses
+Spain time (`Europe/Madrid`, including mainland Spain's daylight-saving rules).
+The browser's timezone does not select or overwrite this preference. The same
+control is available to ordinary users and LigaRadar administrators; Admin no
+longer contains a user timezone directory or cross-user editor.
 
-## Selection and persistence
+All displayed timestamps retain `DD/MM/YYYY HH:MM TZ` and a 24-hour clock.
+Date-only chart axes and date pickers use `DD/MM/YYYY`. The banner, incoming/
+leaving clauses and observations, notifications, transaction tables, rival
+histories, player fixtures/charts, league charts, awards and worker source-check
+text share the account's display preference. Original UTC/offset instants,
+expiry checks, countdown durations, ledger values and context identity retain
+their original meaning. `Europe/Madrid` is a named zone, not a fixed UTC offset;
+users elsewhere, including the Canary Islands, can select their own IANA zone.
 
-`www/worker-state.js` publishes `Intl.DateTimeFormat().resolvedOptions().timeZone` through the existing browser-state input. This reads the browser's configured IANA timezone, without requesting coordinates or geolocation permission; see [MDN resolvedOptions](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat/resolvedOptions). Missing/unsupported detection falls back to `Europe/Madrid`, which follows Spain's daylight-saving rules. The server also has a cancellable one-second fallback if browser reporting never arrives.
+## Selection and durable storage
 
-`fm_timezone_preferences(session, login, store)` registers/loads one account preference asynchronously at login. Atomic initialization preserves an existing row's timezone/source/update time, including an administrator override saved before the user's first login. It updates only the account label on subsequent initialization. Later browser changes cannot overwrite the saved zone. Welcome → **Display timezone** lets a user explicitly save their own choice. Admin → **User timezones** can search known accounts, choose a timezone and save it for each user. Known accounts include navigation preferences and background-sync accounts even before they have a timezone row. Labels become available when a user next logs in. Results are ordered/paginated at 200 visible users plus one lookahead; Find/reload starts a new search. No user or token directory is exposed to regular users.
+`fm_timezone_preferences(session, login, store)` immediately starts one
+asynchronous personal preference lookup at login, without waiting for browser
+reporting or a fallback timer. A missing row is an unset preference, so Madrid
+is immediately usable without an automatic write. Saving an explicit choice
+persists it in `user_timezone_preferences` through the existing server-only
+`set_user_timezone` RPC with `source=user`, including when the user is a
+LigaRadar administrator. A successful save must acknowledge the matching
+account, timezone and personal source before the UI applies it. Saved choices
+survive logout, browser/device changes, process restarts and redeployments.
 
-`user_timezone_preferences` stores `{user_id, display_name, timezone, source, updated_at}`. Source is `browser`, `user` or `admin`. IANA identifiers, rather than fixed UTC offsets, preserve each event's historical daylight-saving offset. Rows survive sessions/restarts/redeployments. There is no process-global TZ override, location cache or credential in this table. A successful save must return the matching row/timezone. Failed reads/writes remain visibly unconfirmed and retry reloads the authoritative row; a fallback cannot overwrite an unknown saved preference. While storage is unavailable, displayed browser/Spain time is explicitly marked temporary. Save buttons/handlers prevent overlapping writes, and late responses cannot publish after logout or account changes.
+Legacy `source=browser` rows were automatic defaults and `source=admin` rows
+could be overrides by another person. They remain stored, but do not establish
+an explicit personal choice: display defaults to Madrid until the user saves
+a timezone. Existing `source=user` choices remain authoritative. No historical
+values are deleted or relabeled. The existing schema and migration remain
+compatible; no new migration or bulk production rewrite is required.
 
-An administrator's change to their own account updates the current display immediately. A change to another account takes effect at that account's next login, including another browser/device. Existing sessions do not poll preferences. Background-sync quiet-hour configuration remains an independent, explicitly saved scheduling setting; its control is labelled **Quiet-hours timezone**. This feature does not change acquisition schedules.
+A read failure displays temporary Spain time and an actionable failure notice;
+it does not imply a missing preference. Saves remain disabled until the saved
+state can be checked. A failed or uncertain save stays unconfirmed; retry
+reads the authoritative row before another write, and never blindly replays a
+write. Loading/saving yields to Shiny so navigation remains responsive.
+Overlapping saves are suppressed, and logout/account changes invalidate late
+callbacks. Rendering performs no database request or initialization write.
 
-## Interfaces and security
+`www/worker-state.js` now reports visibility only; it no longer publishes a
+browser timezone. Its local countdown remains independent of timezone choice.
+Background-sync **Quiet-hours timezone** remains a separate personal scheduling
+setting; its existing initial value follows the display timezone if no saved
+quiet-hours setting exists. Changing display timezone does not reschedule an
+already configured worker.
 
-`timezone_preferences.R` provides:
+## Interfaces and authorization
 
-- `fm_timezones()` / `fm_valid_timezone(x)`: bounded process-wide IANA-name catalog and scalar validation.
-- `fm_display_timezone(session)`: account-local reactive presentation state from the current Shiny session, including nested modules; Spain fallback outside an initialized session.
-- `fm_format_datetime(x, timezone, date_only, missing)`: vectorized source parsing and uniform labels; unavailable dates stay unavailable.
-- `fm_plot_datetime(x, timezone)`: civil ISO strings for Plotly date axes. Explicit hover labels retain timezone abbreviations, preventing the viewing browser from applying a second conversion.
-- `fm_local_midnight(date, timezone)`: local calendar boundaries. Inclusive date ranges end immediately before the following local midnight, respecting 23/25-hour DST days.
-- `fm_timezone_store(user_id, timezone, label, mode, token, owner, after, search)`: asynchronous server-credential storage; `get`, `initialize`, `set`, `list` modes. Own-account authorization is mandatory; directory access and other-account writes require the configured administrator. Read/list calls use bounded existing read recovery and an eight-second timeout; writes are single attempts.
-- `fm_admin_timezones(session, login, active, store)`: active/admin-gated directory/editor, preserving mounted controls during saves. A directory loaded during first-login registration refreshes once after registration settles so the current account is included.
+- `fm_timezones()` / `fm_valid_timezone(x)`: bounded IANA catalog and validation.
+- `fm_display_timezone(session)`: account-local reactive display zone; Madrid
+  outside an initialized session.
+- `fm_format_datetime(x, timezone, date_only, missing)`: vectorized labels with
+  unavailable dates distinct from real instants.
+- `fm_plot_datetime(x, timezone)`: civil Plotly axis strings and explicit hover
+  zones, preventing a second browser timezone conversion.
+- `fm_local_midnight(date, timezone)`: calendar boundaries preserving 23/25-hour
+  DST days and inclusive local date filters.
+- `fm_timezone_store(user_id, timezone=NULL, mode=get|set, token, owner)`: only
+  the authenticated account's row can be read or written, even for an admin.
+  Unsupported initialize/list modes are rejected before I/O. GET accepts a
+  missing row as unset, validates persisted provenance, and SET verifies the
+  acknowledged personal choice. Credentials remain on the R server.
+- `fm_timezone_preferences(session, login, store)`: owns account generation,
+  personal selector, safe default, acknowledgement, retry and readiness state.
+  The former `fm_admin_timezones()` controller has been removed.
 
-The RPCs `initialize_user_timezone(p_user,p_timezone,p_label)`, `set_user_timezone(p_user,p_timezone,p_source)` return one full preference row; `list_user_timezones(p_after,p_search)` returns up to 201 directory rows. They use SECURITY INVOKER and an empty search path. The database validates timezones with `pg_timezone_names`. RLS is enabled, PUBLIC/anon/authenticated grants are revoked, and only the server role can access the table/functions. Browser-forged account IDs cannot bypass R authorization. Logs contain safe resource/category diagnostics, without private rows, raw errors or tokens.
+Legacy SQL initialization/directory functions remain server-only for stored
+schema compatibility; the application no longer calls them. Existing restricted
+privileges and RLS are unchanged. There is no client account selector, public
+preference directory, process-global TZ mutation, new dependency or environment
+variable. Database preferences are durable; session state only accelerates the
+current user's display.
 
-## Installation and verification
+## Verification and performance
 
-Existing installations use `scripts/migrations/20261115061026_user_timezones.sql`; new schemas include the same additive SQL. No dependencies or environment variables were added. The connected production database migration has been applied as version `20261115062358`; application deployment/hosted end-to-end validation remains separate. No real account settings or transactions were modified during verification.
+Focused tests cover Madrid without a stored choice, browser-independent
+behavior, legacy provenance, durable personal saves/reloads, administrator
+self-only authorization, uncertain-save readback, late replies, held read/write
+responsiveness, DST/offset known answers and shared module dates. Synthetic
+browser checks cover personal controls at phone/desktop widths, Spain default
+in a Los Angeles browser, account isolation, save acknowledgement and reload
+reuse without live accounts or database writes. Admin browser checks assert
+zero timezone-directory reads. The offline lifecycle is mandatory for these
+login changes; actual results and limits are in `data_review_results.md`.
 
-Focused checks: `test/test_timezone_preferences.R`, `test/test_timezone_schema.cjs`, `test/test_timezone_browser_app.R` + `test/test_timezone_browser.cjs`; existing notification, Today, incoming/outgoing clause, rival-history, player-trend, worker-redraw and navigation-transport regressions. The required offline lifecycle harness passes. Browser tests use a synthetic durable store and a Los Angeles browser at 390/1440px; they cover module dates, no geolocation call, user/admin saves, isolation, reload reuse and no horizontal overflow. Isolated PostgreSQL verifies repeatable migration, initialization preserving overrides, unknown-user discovery, search/pagination, zone validation and restricted privileges. Production verification is read-only metadata/directory aggregation; persistence writes are tested only against synthetic/isolated stores.
-
-Performance review: one asynchronous preference initialization per login; no per-render reads, factual acquisition or polling added. Admin performs one bounded directory request on activation/search/next/reload, plus a single refresh if first-login registration finishes while Admin is already open. Preference state is per session; the IANA catalog is bounded. Native collapsed controls and 100%-width inputs fit phones. Formatting 1,000 parsed instants took 0.001s; 1,000 notification ISO labels took 0.032s. Browser heartbeats were 84/97ms at 390/1440px. Existing 20-poll worker regression produced zero repeated renders/source reads/enqueues. Synthetic delays kept event-loop heartbeats responsive. Production network latency and large-directory query plans were not load-tested.
+Performance: one bounded asynchronous GET per login/retry and one confirmed
+write per explicit save. Defaulting to Madrid creates no row. Removing the
+cross-user directory eliminates its activation/search/pagination queries;
+removing browser detection eliminates its publications and one-second fallback.
+No new polling, source acquisition, cache, queue or worker is introduced. The
+bounded IANA catalog and mobile-safe selector are reused. Hosted rollout and
+physical-device/network latency remain separate from local verification.

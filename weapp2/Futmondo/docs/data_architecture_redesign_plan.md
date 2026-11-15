@@ -1702,3 +1702,22 @@ Production deployment and authenticated hosted acceptance remain separate.
   years in hover details, three sparse ticks and series-colored axes.
 - Focused chart/browser/deployment checks and performance review are recorded
   in `data_review_results.md`. No data/dependency/schema change or deployment.
+
+
+### Personal timezone ownership and Spain default — implemented locally (2026-11-15)
+
+- Each user chooses their own display timezone in Welcome; unset preferences
+  use Europe/Madrid. Remove automatic browser selection and the Admin user
+  timezone directory/editor, including its activation query.
+- Restrict preference reads/writes to the authenticated account, including
+  LigaRadar administrators. Reuse explicit source=user database choices; legacy
+  automatic/admin rows remain stored but are not personal choices. A default
+  creates no row; explicit saves require acknowledgement and survive sessions.
+- Preserve real failure/retry states, duplicate protection and late-reply
+  isolation. Remove the browser-report wait/fallback timer and keep saves
+  nonblocking. No schema, dependency or environment change is required.
+- Focused ownership/default/persistence/DST checks, personal phone/desktop and
+  eight Admin browser configurations, login access/coach regressions and the
+  offline lifecycle pass. Measurements and limits are in `data_review_results.md`.
+  This corrects existing preference ownership and default behavior; no new
+  capability or login-tier expansion. Hosted rollout remains unverified.

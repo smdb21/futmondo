@@ -3299,3 +3299,59 @@ theme/startup/infrastructure are untouched, so the focused chart/browser checks
 are appropriate and the lifecycle harness was not repeated. Documentation has
 no runtime effect. Synthetic checks do not verify production deployment or
 physical-device behavior; no real accounts or transactions were used.
+
+
+## Personal timezone ownership and Spain default — 2026-11-15
+
+The owner clarified that users choose their own timezone and an unset choice
+means Spain. The former Admin directory/editor and `fm_admin_timezones()` are
+removed. `fm_timezone_store()` accepts only personal get/set operations and
+rejects foreign accounts even for a LigaRadar administrator before I/O.
+`fm_timezone_preferences()` starts one immediate async GET; a missing row uses
+Europe/Madrid without an automatic write. Explicit source=user choices are
+reused; legacy browser/admin values remain stored but do not define a personal
+choice. This avoids retaining an old automatic browser value as if the user
+selected it. Explicit saves always use source=user and require a matching
+account/zone/provenance acknowledgement. Source instants and DST formatting
+are unchanged; no unknown date or score is manufactured.
+
+Automatic browser-timezone publication and the cancellable one-second fallback
+are removed. Both loading and saving yield to Shiny; duplicate writes and late
+replies after account changes/logout remain guarded. Failed/unacknowledged
+saves require authoritative readback before another change. Personal defaults
+also feed the existing initial quiet-hours input; already-saved background
+scheduling settings remain independent. The database schema and restricted
+legacy RPCs remain compatible, with no migration or production rewrite.
+
+Verification: timezone regression passes seven reported groups, including DST/
+offset known answers, Spain despite a foreign browser, explicit save/reload,
+legacy provenance, self-only admin authorization, held read/write response,
+uncertain-save readback and logout isolation. Formatting 1,000 parsed dates
+took 0.001–0.002s. Personal Chromium at 320/390/1440px verifies Spain in a Los
+Angeles browser despite a legacy auto value, two independent users' saves,
+acknowledgement before display, logout/reload persistence, no other-user editor,
+no geolocation or overflow, and held-save heartbeats of 86/75/91ms. The 390px
+screenshot was inspected. The browser fixture's initial failures were its own
+reactive URL access and readiness wait; correcting these required no additional
+application behavior change.
+
+Eight Admin width/theme configurations pass with four sections, consistent
+setting-value columns and zero timezone-directory reads; settings appeared in
+812–834ms and heartbeats took 39–103ms. Existing Admin state/recovery (two),
+league settings (six), login access (nine) and coach recovery (nine) pass.
+The offline lifecycle passes 13 checks plus eight tabs with zero HTTP/live
+database mutation attempts. All verification uses synthetic personal records;
+no real account, transaction or live preference write was used.
+
+Performance review: one bounded asynchronous preference GET per login/retry and
+one write only for an explicit save; unset defaults do not write. Removing the
+Admin directory eliminates its activation/search/pagination reads and controls.
+The browser no longer reports timezone on connection/visibility events, and
+there is no initial one-second wait, new timer, polling, API acquisition, cache
+or queue. Existing bounded timezone choices and responsive controls are reused.
+Documented interfaces, setup and source checksums are updated; no dependencies,
+schema or environment changes. Documentation has no runtime effect. This is a
+correction/removal within existing display preferences, with no new comparison
+or login-tier capability. Local checks and branch delivery do not verify hosted
+rollout, physical devices or production network latency. Unrelated working-tree
+and staged changes are preserved.

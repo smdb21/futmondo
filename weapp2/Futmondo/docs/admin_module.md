@@ -1,6 +1,6 @@
 # Administration
 
-Admin → **User timezones** now provides a searchable, paginated account selector and saved IANA timezone choice per user, including accounts without a preference yet. Saved values override browser detection on subsequent logins. See [timezone preference contracts and verification](timezone_preferences.md).
+Users manage their own display timezone under **Welcome → Display timezone**, with Spain (`Europe/Madrid`) as the default when no personal choice is saved. The former Admin user-timezone directory and editor have been removed. See [personal timezone contracts and verification](timezone_preferences.md).
 
 `admin_UI(id)` and `admin_Server(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV)` expose explicit database diagnostics to the configured administrator. Every operation rechecks the authenticated account and active module. Reset confirmation captures the current account/league; changing context invalidates it.
 
@@ -76,7 +76,7 @@ The first Admin section contains the database-backed, default-enabled Block non-
 
 ## Boxed settings and independent loading — 2026-11-15
 
-`admin_UI()` groups App access, User timezones, League settings, Database
+`admin_UI()` groups App access, League settings, Database
 administration and Round awards into bordered sections.
 `admin_settings_styles()` supplies singleton, module-scoped styles for these
 sections and the standalone `admin_league_settings_UI()` renderer. Each league
@@ -126,3 +126,13 @@ source deadline instead of expiring its display at the shorter memory-cache
 TTL. Invalid/elapsed source deadlines remain stale; legacy snapshots without a
 deadline and interactive reads retain the ordinary TTL. No source deadline is
 extended, source time renewed, failed read hidden, or manual preflight relaxed.
+
+
+## Personal timezone ownership — 2026-11-15
+
+The user clarified that timezone choices belong to each user. Admin no longer
+renders the User timezones section or instantiates `fm_admin_timezones()`. This
+also removes its directory request on navigation. The earlier directory-loading
+notes above describe the superseded implementation. Both ordinary users and
+LigaRadar administrators use Welcome → Display timezone for their own account;
+`fm_timezone_store()` rejects every cross-account read or write.

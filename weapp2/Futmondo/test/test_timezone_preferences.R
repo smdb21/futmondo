@@ -24,13 +24,15 @@ filtered<-rivals_buying_power_values(transfers,data.frame(teamid='a',teamname='A
 stopifnot(filtered$value==5,as.numeric(rivals_parse_datetime('2026-03-29T23:59:59+02:00'))==as.numeric(fm_time('2026-03-29T21:59:59Z')))
 cat('PASS source-offset preservation and transfer filtering across a 23-hour local day\n')
 
-f<-new.env();f$rows<-list();f$calls<-list();f$delay<-FALSE;f$resolve<-NULL;f$fail<-FALSE
-store<-function(user_id=NULL,timezone=NULL,label='',mode='get',token=NULL,owner='',after='',search=''){
+f<-new.env();f$rows<-list();f$calls<-list();f$delay<-FALSE;f$resolve<-NULL;f$fail<-FALSE;f$uncertain<-FALSE
+store<-function(user_id=NULL,timezone=NULL,mode='get',token=NULL,owner=''){
  f$calls[[length(f$calls)+1L]]<-list(id=user_id,mode=mode,timezone=timezone)
  if(f$fail)return(promises::promise_reject(simpleError('fixture unavailable')))
- if(mode=='list')return(promises::promise_resolve(unname(f$rows)))
  value<-f$rows[[user_id]]
- if(mode=='set'||(mode=='initialize'&&is.null(value))){value<-list(user_id=user_id,timezone=timezone,display_name=label);f$rows[[user_id]]<-value}
+ if(mode=='set'){
+  value<-list(user_id=user_id,timezone=timezone,source='user');f$rows[[user_id]]<-value
+  if(f$uncertain)return(promises::promise_reject(simpleError('lost acknowledgement')))
+ }
  if(f$delay)return(promises::promise(function(resolve,reject)f$resolve<-resolve))
  promises::promise_resolve(value)
 }
@@ -38,46 +40,69 @@ app<-function(input,output,session){
  token<-shiny::reactive(if(is.null(input$user)||input$user=='')NULL else auth(input$user))
  fm_timezone_preferences(session,token,store)
  output$label<-shiny::renderText(fm_format_datetime('2026-11-15T06:02:48Z'))
+ output$beats<-shiny::renderText(input$heartbeat %||% 0L)
 }
 shiny::testServer(app,{
  session$setInputs(worker_timezone_detected='America/Los_Angeles',user='a');settle(session)
- stopifnot(output$label=='14/11/2026 22:02 PST',length(f$calls)==1L)
+ stopifnot(output$label=='15/11/2026 07:02 CET',length(f$calls)==1L,f$calls[[1]]$mode=='get',is.null(f$rows$a))
  session$setInputs(worker_timezone_detected='Asia/Tokyo');settle(session)
- stopifnot(output$label=='14/11/2026 22:02 PST',length(f$calls)==1L)
- session$setInputs(display_timezone='Europe/Madrid',save_timezone=1);settle(session)
- stopifnot(output$label=='15/11/2026 07:02 CET',f$rows$a$timezone=='Europe/Madrid')
+ stopifnot(output$label=='15/11/2026 07:02 CET',length(f$calls)==1L)
+ session$setInputs(display_timezone='America/Los_Angeles',save_timezone=1);settle(session)
+ stopifnot(output$label=='14/11/2026 22:02 PST',f$rows$a$source=='user')
  session$setInputs(user='b');settle(session)
- stopifnot(output$label=='15/11/2026 15:02 JST',f$rows$a$timezone=='Europe/Madrid')
+ stopifnot(output$label=='15/11/2026 07:02 CET',is.null(f$rows$b),f$rows$a$timezone=='America/Los_Angeles')
  session$setInputs(user='');settle(session);stopifnot(output$label=='15/11/2026 07:02 CET')
 })
 shiny::testServer(app,{
  session$setInputs(worker_timezone_detected='America/New_York',user='a');settle(session)
- stopifnot(output$label=='15/11/2026 07:02 CET')
+ stopifnot(output$label=='14/11/2026 22:02 PST')
 })
-cat('PASS one initialization, saved override across sessions, browser changes and account isolation\n')
+cat('PASS one personal lookup, Spain default independent of browser, explicit durable save/reload and account isolation\n')
+for(source in c('browser','admin','user')){
+ f$rows$legacy<-list(user_id='legacy',timezone='Asia/Tokyo',source=source)
+ before<-length(f$calls)
+ shiny::testServer(app,{
+  session$setInputs(user='legacy');settle(session)
+  stopifnot(output$label==if(source=='user')'15/11/2026 15:02 JST'else'15/11/2026 07:02 CET',
+   length(f$calls)==before+1L,identical(f$rows$legacy$source,source))
+ })
+}
+cat('PASS legacy automatic/admin values do not become personal choices; explicit user choices persist without rewriting history\n')
 f$fail<-TRUE
 shiny::testServer(app,{
  session$setInputs(worker_timezone_detected='America/Los_Angeles',user='a');settle(session)
- stopifnot(grepl('temporary timezone',output$timezone_preference_status$html),output$label=='14/11/2026 22:02 PST')
+ stopifnot(grepl('Temporarily displaying Spain',output$timezone_preference_status$html),output$label=='15/11/2026 07:02 CET')
  f$fail<-FALSE;session$setInputs(retry_timezone_preference=1);settle(session)
- stopifnot(is.null(output$timezone_preference_status),output$label=='15/11/2026 07:02 CET')
+ stopifnot(is.null(output$timezone_preference_status),output$label=='14/11/2026 22:02 PST')
  f$fail<-TRUE;session$setInputs(display_timezone='Asia/Tokyo',save_timezone=1);settle(session)
- stopifnot(grepl('not confirmed',output$timezone_preference_status$html),output$label=='15/11/2026 07:02 CET')
+ stopifnot(grepl('not confirmed',output$timezone_preference_status$html),output$label=='14/11/2026 22:02 PST')
  f$fail<-FALSE;session$setInputs(retry_timezone_preference=2);settle(session)
- stopifnot(output$label=='15/11/2026 07:02 CET')
+ stopifnot(output$label=='14/11/2026 22:02 PST')
 })
 f$delay<-TRUE
 shiny::testServer(app,{
- session$setInputs(worker_timezone_detected='Asia/Tokyo',user='a');settle(session)
- heartbeat<-FALSE;later::later(function()heartbeat<<-TRUE,0);settle(session);stopifnot(heartbeat)
+ session$setInputs(user='a');settle(session)
+ session$setInputs(heartbeat=1);settle(session);stopifnot(output$beats=='1')
  session$setInputs(user='');settle(session);f$resolve(f$rows$a);settle(session)
  stopifnot(output$label=='15/11/2026 07:02 CET',is.null(output$timezone_preference_status))
 });f$delay<-FALSE
 shiny::testServer(app,{
- session$setInputs(worker_timezone_detected='not-valid',user='fallback');settle(session)
- stopifnot(f$rows$fallback$timezone=='Europe/Madrid')
+ session$setInputs(user='a');settle(session)
+ f$delay<-TRUE
+ session$setInputs(display_timezone='Asia/Kolkata',save_timezone=1);settle(session)
+ calls<-length(f$calls);session$setInputs(save_timezone=2,heartbeat=1);settle(session)
+ stopifnot(length(f$calls)==calls,output$beats=='1')
+ session$setInputs(user='');settle(session);f$resolve(f$rows$a);settle(session)
+ stopifnot(output$label=='15/11/2026 07:02 CET')
+});f$delay<-FALSE
+shiny::testServer(app,{
+ session$setInputs(user='a');settle(session);f$uncertain<-TRUE
+ session$setInputs(display_timezone='Asia/Tokyo',save_timezone=1);settle(session)
+ count<-length(f$calls);session$setInputs(save_timezone=2);settle(session);stopifnot(length(f$calls)==count)
+ f$uncertain<-FALSE;session$setInputs(retry_timezone_preference=1);settle(session)
+ stopifnot(output$label=='15/11/2026 15:02 JST',length(f$calls)==count+1L,tail(f$calls,1)[[1]]$mode=='get')
 })
-cat('PASS truthful failed persistence/retry, delayed nonblocking load, logout guard and Spain fallback\n')
+cat('PASS truthful read/save failures, uncertain-save readback, duplicate guard, held read/write responsiveness and logout isolation\n')
 # Every representative presentation adapter consumes the same account timezone.
 shiny::testServer(function(input,output,session){
  session$userData$display_timezone<-shiny::reactiveVal('America/Los_Angeles')
@@ -85,42 +110,34 @@ shiny::testServer(function(input,output,session){
   incoming_clause_time('2026-11-15T06:02:48Z'),format_table_date('2026-11-15T06:02:48Z'),
   rivals_last_access_cell('2026-11-15T06:02:48Z'),collapse='|'))
 },{session$flushReact();stopifnot(identical(strsplit(output$labels,' ',fixed=TRUE)[[1]][1],'14/11/2026'),!grepl('UTC|CET',output$labels))})
-# Admin saves must match the editor that is actually displayed. Stale editors,
-# duplicate clicks and late replies after authorization changes cannot cross users.
-shiny::testServer(function(input,output,session){
- token<-shiny::reactive(auth(if(isTRUE(input$regular))'a'else'admin'))
- fm_admin_timezones(session,token,function()TRUE,store)
-},{
- session$flushReact();settle(session)
- before<-length(f$calls)
- session$setInputs(timezone_user='a',timezone_editing='b',timezone_choice='Asia/Tokyo',timezone_save=1);settle(session)
- stopifnot(length(f$calls)==before)
- session$setInputs(timezone_editing='a',timezone_save=2);settle(session)
- stopifnot(f$rows$a$timezone=='Asia/Tokyo',length(f$calls)==before+1L)
- f$delay<-TRUE
- session$setInputs(timezone_user='b',timezone_editing='b',timezone_choice='Asia/Kolkata',timezone_save=3);settle(session)
- calls<-length(f$calls);session$setInputs(timezone_save=4);settle(session);stopifnot(length(f$calls)==calls)
- session$setInputs(regular=TRUE);settle(session);f$resolve(f$rows$b);settle(session)
- session$setInputs(timezone_save=5);settle(session);stopifnot(length(f$calls)==calls)
-});f$delay<-FALSE
-cat('PASS admin editor/account binding, duplicate-save guard and authorization-change isolation\n')
+stopifnot(!exists('fm_admin_timezones',mode='function'),!grepl('User timezones|timezone_admin',as.character(admin_UI('admin'))))
+cat('PASS no administrator timezone directory or cross-user editor\n')
 
 # API authorization, wire payload, parser and acknowledgement use no live DB.
 get_sb_url<-function()'https://fixture.invalid';get_sb_key<-function()'synthetic'
-requests<-list();answer<-'[{"user_id":"a","timezone":"Asia/Tokyo","display_name":"A"}]'
+requests<-list();answer<-'[{"user_id":"a","timezone":"Asia/Tokyo","source":"user"}]'
 http<-function(url,method='GET',body=NULL,headers=character(),...){requests[[length(requests)+1L]]<<-list(url=url,method=method,body=body);promises::promise_resolve(list(content=charToRaw(answer)))}
 fm_async_http<-http;fm_async_read_http<-http
 await<-function(p){done<-FALSE;value<-NULL;error<-NULL;promises::then(p,function(x){value<<-x;done<<-TRUE;NULL},function(e){error<<-e;done<<-TRUE;NULL});settle();stopifnot(done);if(!is.null(error))stop(error);value}
 rejected<-function(p)inherits(tryCatch(await(p),error=identity),'error')
-stopifnot(rejected(fm_timezone_store('b','Asia/Tokyo',mode='set',token=auth('a'))),
- rejected(fm_timezone_store(mode='list',token=auth('a'))),rejected(fm_timezone_store('a','invalid',mode='set',token=auth('a'))),length(requests)==0L,
- await(fm_timezone_store('a','Asia/Tokyo',mode='initialize',token=auth('a')))$timezone=='Asia/Tokyo',
- grepl('initialize_user_timezone',requests[[1]]$url),jsonlite::fromJSON(requests[[1]]$body)$p_timezone=='Asia/Tokyo')
-for(bad in c('[]','{}','null','[{"user_id":"b","timezone":"Asia/Tokyo"}]','[{"user_id":"a","timezone":"invalid"}]')){
- answer<-bad;stopifnot(rejected(fm_timezone_store('a','Asia/Tokyo',mode='set',token=auth('admin'))))
+for(who in c('a','admin')){
+ stopifnot(rejected(fm_timezone_store('b','Asia/Tokyo',mode='set',token=auth(who))),
+  rejected(fm_timezone_store('b',mode='get',token=auth(who))),
+  rejected(fm_timezone_store(mode='list',token=auth(who))),
+  rejected(fm_timezone_store(who,'Asia/Tokyo',mode='initialize',token=auth(who))))
 }
-answer<-'[{"user_id":"a","timezone":"Europe/Madrid"}]'
-stopifnot(rejected(fm_timezone_store('a','Asia/Tokyo',mode='set',token=auth('admin'))))
+stopifnot(rejected(fm_timezone_store('a','invalid',mode='set',token=auth('a'))),length(requests)==0L,
+ await(fm_timezone_store('a','Asia/Tokyo',mode='set',token=auth('a')))$timezone=='Asia/Tokyo',
+ jsonlite::fromJSON(requests[[1]]$body)$p_source=='user')
+answer<-'[{"user_id":"admin","timezone":"UTC","source":"user"}]'
+stopifnot(await(fm_timezone_store('admin','UTC',mode='set',token=auth('admin')))$timezone=='UTC',
+ jsonlite::fromJSON(tail(requests,1)[[1]]$body)$p_source=='user')
+answer<-'[]';stopifnot(is.null(await(fm_timezone_store('a',mode='get',token=auth('a')))))
+for(bad in c('[]','{}','null','[{"user_id":"b","timezone":"Asia/Tokyo","source":"user"}]',
+ '[{"user_id":"a","timezone":"invalid","source":"user"}]','[{"user_id":"a","timezone":"Asia/Tokyo"}]',
+ '[{"user_id":"a","timezone":"Asia/Tokyo","source":"admin"}]')){
+ answer<-bad;stopifnot(rejected(fm_timezone_store('a','Asia/Tokyo',mode='set',token=auth('a'))))
+}
 cat('PASS shared display adapters, authorization, bounded async requests and acknowledged saves\n')
 elapsed<-system.time(fm_format_datetime(rep(fm_time('2026-11-15T06:02:48Z'),1000),'America/Los_Angeles'))[['elapsed']]
 cat(sprintf('MEASURE 1000 labels from parsed instants: %.3f seconds\n',elapsed))

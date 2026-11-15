@@ -16,15 +16,14 @@ const {chromium} = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/futm
         await page.locator('#toggle_admin').click();
         await page.locator('.fm-admin-setting').first().waitFor();
         const visible = Date.now() - started;
-        assert.ok(visible < 2000, `settings waited ${visible}ms for the 5s directory request`);
-        assert.match(await page.locator('#admin-timezone_status').innerText(), /Loading/);
-        assert.equal(await page.locator('#admin-timezone_user').inputValue(), '');
+        assert.ok(visible < 2000, `settings took ${visible}ms to render`);
+        assert.equal(await page.locator('#admin-timezone_admin').count(), 0);
         const beat = Date.now();
         await page.locator('#heartbeat').click();
         await page.waitForFunction(() => document.querySelector('#beats').textContent === '1');
         const heartbeat = Date.now() - beat;
-        assert.ok(heartbeat < 1000, `pending directory blocked heartbeat for ${heartbeat}ms`);
-        assert.equal(await page.locator('.fm-admin-section').count(), 5);
+        assert.ok(heartbeat < 1000, `heartbeat took ${heartbeat}ms`);
+        assert.equal(await page.locator('.fm-admin-section').count(), 4);
         const settingsText = await page.locator('#admin-league_settings').textContent();
         assert.ok(settingsText.includes("Only league's admin (might be different than LigaRadar admin) can make changes in Futmondo official app."));
         assert.ok(!settingsText.includes('change it in LigaRadar'));
@@ -50,17 +49,15 @@ const {chromium} = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/futm
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2), false);
         await reported.locator('summary').click();
         await page.locator('.fm-admin').screenshot({path:`/tmp/admin-settings-${width}-${theme}.png`});
-        // Navigation must also work before the original request completes.
+        // Admin navigation never loads a user timezone directory.
         await page.locator('#toggle_admin').click();
         await page.locator('#page').filter({hasText:'Another page'}).waitFor({timeout:1000});
         await page.locator('#toggle_admin').click();
         await page.locator('.fm-admin-setting').first().waitFor({timeout:1000});
-        await page.waitForFunction(() => document.querySelector('#admin-timezone_user')?.selectize?.options['fixture-user'], {timeout:8000});
-        await page.evaluate(() => document.querySelector('#admin-timezone_user').selectize.setValue('fixture-user'));
-        await page.waitForFunction(() => document.querySelector('#admin-timezone_choice')?.value === 'Europe/Madrid');
+        assert.equal(await page.locator('#reads').innerText(), '0');
         assert.deepEqual(errors, []);
         assert.equal(await page.locator('.shiny-output-error').count(), 0);
-        console.log(`PASS ${width}px ${theme}: settings ${visible}ms, pending-request heartbeat ${heartbeat}ms; boxes/alignment/disclosures/navigation and settled timezone editor`);
+        console.log(`PASS ${width}px ${theme}: settings ${visible}ms, heartbeat ${heartbeat}ms; boxes/alignment/disclosures/navigation; zero timezone-directory reads`);
         await page.close();
       }
     }

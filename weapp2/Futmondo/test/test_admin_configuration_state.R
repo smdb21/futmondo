@@ -2,7 +2,7 @@
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages(source('global.R'))
 auth<-c(userid='settings-fixture',token='synthetic')
-fm_admin_access<-function(...)NULL;fm_admin_timezones<-function(...)NULL
+fm_admin_access<-function(...)NULL
 shared_mvp_source<-function(...)reactiveVal(list(coverage=data.frame(),loading=FALSE))
 io<-0L;blocked<-function(...){io<<-io+1L;stop('Unexpected source/database I/O')}
 for(name in c('futmondo_post','fm_async_http','fm_worker_rpc','supabase_upsert'))assign(name,blocked)
