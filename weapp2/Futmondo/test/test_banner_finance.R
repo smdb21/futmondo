@@ -113,7 +113,8 @@ shiny::testServer(app_server,{
       grepl("After offers: 700 EUR",html,fixed=TRUE),
       grepl("Can spend: 5.500 EUR",html,fixed=TRUE),
       grepl('class="fm-info', html, fixed=TRUE), !grepl('<details[^>]* open', html),
-      grepl("Displayed amounts are saved observations (cached).", html, fixed=TRUE),
+      !grepl("Displayed amounts are saved observations (cached).", html, fixed=TRUE),
+      !grepl("Cached means the last saved amounts", html, fixed=TRUE),
       !grepl("Unavailable",html,fixed=TRUE),!grepl("round-countdown-solvent",html,fixed=TRUE),
       identical(as.numeric(primary_team_state()$observed_at),as.numeric(fm_time("2026-10-01T12:00:00Z"))))
   })

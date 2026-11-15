@@ -102,7 +102,7 @@ check("missing withheld and malformed market never imply zero reservation", {
   stopifnot(is.na(no_withheld$projected_committed_balance),no_withheld$class=="round-countdown-unavailable",
     is.na(malformed$commitments),is.na(invalid$commitments),stale$cash_stale,
     stale$class=="round-countdown-unavailable",stale_debt$class=="round-countdown-unavailable",
-    stale$projected_committed_balance==1000,stale$calculations_stale,grepl("Cached",stale$message))
+    stale$projected_committed_balance==1000,stale$calculations_stale,stale$message=="Spending allowance unavailable")
 })
 check("cached complete observations retain known amounts without verifying solvency", {
   team <- resource_state(observed_data(list(budget=1000,withheld=300,teamValue=10000,

@@ -189,7 +189,6 @@ function(input, output, session) {
         fm_info(
           if (!is.null(solvency_text)) tags$p(solvency_text),
           if (finance$cash_unverified) tags$p("Balance has not been verified by the latest check."),
-          if (finance$cash_stale || finance$offers_stale) tags$p("Displayed amounts are saved observations (cached)."),
           textOutput("round_finance_checked",inline=TRUE),
           error = identical(solvency_class, "round-countdown-warning") ||
             (!finance$cash_loading && !finance$offers_loading &&

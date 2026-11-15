@@ -102,9 +102,9 @@ team<-resource_state(observed(list(budget=100,withheld=0,teamValue=1000,configur
 market<-resource_state(observed(data.frame()))
 finance<-round_finance_display(team,market)
 stopifnot(finance$cash==100,finance$cash_stale,finance$class=='round-countdown-unavailable',
- grepl('Cached means the last saved amounts',finance$message),!grepl('Refresh',finance$message))
+ is.null(finance$message))
 team$error<-resource_failure(category='network');failed<-round_finance_display(team,market)
-stopifnot(failed$cash==100,grepl('could not load',failed$message),grepl('last saved amounts',failed$message))
+stopifnot(failed$cash==100,grepl('could not load',failed$message),!grepl('last saved amounts',failed$message))
 team$status<-'ok';team$freshness<-'fresh';attr(team$data,'fetch_status')<-'ok';team$data$budget<--100
 failed<-round_finance_display(team,market)
 stopifnot(failed$class=='round-countdown-unavailable',grepl('could not load',failed$message),!grepl('Restore at least',failed$message))

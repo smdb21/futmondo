@@ -1435,3 +1435,9 @@ Implemented locally: remove the routine departure-exclusion paragraph, replace t
 
 - Notification headers now show only the league and a date such as **12 Nov 2026, 12:34 UTC**, with no source-name prefix. Last-refresh dates use the same format.
 - Retain original timestamps, source-filter values and read/action behavior. Reject malformed timestamp labels without manufacturing midnight; focused known-answer/rendered-output checks and the offline lifecycle pass. Performance and hosted/mobile validation limits are recorded in `docs/data_review_results.md`.
+
+
+### Remove generic cached-amount copy — implemented and verified locally
+
+- Remove the generic cached-amount explanation and saved-observation paragraph from financial displays. Preserve observed amounts, freshness flags, source times, unavailable/error feedback and manual-action checks.
+- Focused finance/rendering checks and the required offline lifecycle pass. No new data access or persistence behavior; performance results and hosted/mobile limits are recorded in `docs/data_review_results.md`.

@@ -119,14 +119,12 @@ round_finance_display <- function(team_state, market_state) {
   team_stale <- stale_state(team_state)
   market_stale <- stale_state(market_state)
   stale <- team_stale || market_stale
-  saved_note<-"Cached means the last saved amounts; they may have changed since the last check."
   message <- if (confirmed_problem) {
     balance <- if (fresh(market_state) && is.finite(projected_committed_balance)) projected_committed_balance else cash
     paste0("Restore at least ", format(round(abs(balance) + 1), big.mark=".", decimal.mark=",", scientific=FALSE),
       " EUR before kickoff to score points", if (!fresh(market_state) || !is.finite(projected_committed_balance)) "; active offers still need verification" else "")
   } else if (loading(team_state)) "Loading balance…" else if (loading(market_state)) "Loading active offers…" else
-    if (!is.null(team_state$error) || !is.null(market_state$error)) paste("Financial data could not load.",if(stale)saved_note else "Please try again.") else
-    if (stale) saved_note else
+    if (!is.null(team_state$error) || !is.null(market_state$error)) "Financial data could not load. Please try again." else
     if (!is.finite(cash)) "Balance unavailable — cannot verify kickoff balance" else
     if (!is.finite(commitments)) "Active offers unavailable — cannot verify kickoff balance" else
     if (!is.finite(withheld) || withheld < 0) "Held funds unavailable — cannot verify kickoff balance" else
