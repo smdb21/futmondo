@@ -26,7 +26,7 @@ check('observed transfer metadata remains inspectable with independent clock nod
   panel<-incoming_clause_panel(state,list(available=TRUE,round_number=12,starts_at=fm_time('2026-12-01T12:00:00Z')),
     identity,source_note=shiny::textOutput('source_clock',inline=TRUE))
   html<-as.character(panel);visible<-visible_text(panel)
-  stopifnot(grepl('id="source_clock"',html,fixed=TRUE),grepl('Last observed transfer details.',html,fixed=TRUE),
+  stopifnot(grepl('id="source_clock"',html,fixed=TRUE),!grepl('Last observed transfer details.',html,fixed=TRUE),
     !grepl('observed|Saved observations|confirm completion',visible),
     grepl('Round 12 starts',visible,fixed=TRUE),grepl('No incoming clause signings.',visible,fixed=TRUE),
     !grepl('fm-info-error',html,fixed=TRUE))

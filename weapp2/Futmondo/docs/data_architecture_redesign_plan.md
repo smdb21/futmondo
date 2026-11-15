@@ -1,5 +1,9 @@
 # Futmondo data architecture redesign plan
 
+## Transfer panel copy — 2026-11-14 Pacific
+
+- [x] Removed the requested generic observation explanation from incoming/leaving panels; source clocks and row observation details remain available. Focused disclosure/reload/observation-contract checks passed. This is a text-only presentation change with no API/database, cache, timer, or reactive-work changes.
+
 ## Account timezones — 2026-11-14 Pacific
 
 - [x] Shared account-local `DD/MM/YYYY HH:MM TZ` presentation, browser initialization without geolocation, Spain fallback, durable user/admin overrides and cross-session reuse.

@@ -41,8 +41,8 @@ for(reload in 1:2)shiny::testServer(function(input,output,session){
   nrow(s$records)==1L,nrow(s$outgoing_records)==1L,all(!is.na(s$records$joins_at)),all(!is.na(s$outgoing_records$leaves_at)),source_reads==0L)
  html<-as.character(incoming_clause_panel(s,list(available=FALSE),session$ns))
  out_html<-as.character(outgoing_clause_panel(list(status=s$outgoing_status,records=s$outgoing_records,error=s$error,observations_only=s$observations_only,source_times=s$source_times),list(available=FALSE),session$ns))
- stopifnot(grepl('Last observed transfer details',html,fixed=TRUE),grepl('Incoming',html,fixed=TRUE),grepl('Observed:',html,fixed=TRUE),
-   grepl('Last observed transfer details',out_html,fixed=TRUE),grepl('Leaving',out_html,fixed=TRUE),grepl('Observed:',out_html,fixed=TRUE),grepl('Roster observed:',html,fixed=TRUE),
+ stopifnot(!grepl('Last observed transfer details',html,fixed=TRUE),grepl('Incoming',html,fixed=TRUE),grepl('Observed:',html,fixed=TRUE),
+   !grepl('Last observed transfer details',out_html,fixed=TRUE),grepl('Leaving',out_html,fixed=TRUE),grepl('Observed:',out_html,fixed=TRUE),grepl('Roster observed:',html,fixed=TRUE),
    grepl('Transactions observed:',out_html,fixed=TRUE),!grepl('Refresh to retry',html,fixed=TRUE))
 })
 cat('PASS two cold page sessions restore stored transfer details as dated observations without false failure warnings, known dates and zero new source reads\n')

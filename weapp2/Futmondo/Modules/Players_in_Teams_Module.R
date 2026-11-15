@@ -747,7 +747,6 @@ clause_transfer_panel <- function(state,next_round,ns,outgoing=FALSE,source_note
     if(identical(state$status,"loading"))fm_info(if(outgoing)"Checking clause departures…"else"Checking incoming signings…"),
     if(!is.null(state$error))fm_info(state$error,error=TRUE),
     if(isTRUE(state$observations_only))fm_info(
-      "Last observed transfer details. Saved observations update automatically; scheduled times do not confirm completion.",
       shiny::tags$small(style="display:block",source_note %||% incoming_clause_source_times(state$source_times))),
     if(!nrow(rows)&&state$status%in%c("ok","observed"))shiny::tags$p(
       if(outgoing)"No players leaving through a release clause."else"No incoming clause signings."),

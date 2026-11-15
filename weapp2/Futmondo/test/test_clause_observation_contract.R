@@ -64,7 +64,7 @@ shiny::testServer(function(input,output,session){
 },{
  settle(session)
  stopifnot(incoming()$status=='observed',incoming()$outgoing_status=='observed',is.null(incoming()$error),
-  grepl('Last observed',output$incoming_players$html),grepl('Roster observed:',output$incoming_source_times),reads==0L,writes==0L)
+  !grepl('Last observed',output$incoming_players$html),grepl('Roster observed:',output$incoming_source_times),reads==0L,writes==0L)
  before<-as.list(stats);times<-output$incoming_source_times
  elapsed<-system.time(for(i in 1:10){
   roster_state(state(observed(roster,at=now-1200+i*60)))

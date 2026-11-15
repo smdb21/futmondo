@@ -1,5 +1,9 @@
 # Futmondo data review and implementation results
 
+## Transfer panel copy — 2026-11-14 Pacific
+
+Removed “Last observed transfer details. Saved observations update automatically; scheduled times do not confirm completion.” from both clause-transfer panels. Existing independent source-clock nodes, observed timestamps, factual rows and error details are preserved. Passed `test/test_player_info_disclosures.R`, `test/test_clause_observed_reload.R` and `test/test_clause_observation_contract.R`. Performance review: only one text node is removed; no request, persistence, cache, timer, reactive or mobile-layout work is added. No performance benchmark is required for this copy-only change.
+
 ## Uniform account dates — 2026-11-14 Pacific
 
 Implemented browser-first IANA timezone selection (no geolocation), Spain fallback and durable per-user overrides from Welcome/Admin. All date presentation adapters share one session source; UTC source timestamps, amounts and countdown instants are preserved. Details: [timezone contracts and measured review](timezone_preferences.md).
