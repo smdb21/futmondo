@@ -5,6 +5,7 @@ function(input, output, session) {
   login_token_RV <- login_Server(id = "login")
   fm_timezone_preferences(session, login_token_RV)
   fm_worker_session(session, login_token_RV, leagues=function()tryCatch(championships_RV(),error=function(e)list()))
+  fm_clause_session(session, login_token_RV)
   refresh_trigger <- reactiveVal(0)
   history_refresh_trigger <- round_history_refresh_trigger(session)
   startup_stage <- session$userData$startup_stage
@@ -112,7 +113,9 @@ function(input, output, session) {
     retry_market=function()market_retry(isolate(market_retry())+1L))
   coach <- coach_on_login_source(session,login_token_RV,championship_id_RV,user_team_id_RV,primary_team_state,primary_sources$retry_team)
   round_finance_RV <- resource_display_source(session,function(){
-    round_finance_display(primary_team_state(), primary_market_state())
+    finance<-round_finance_display(primary_team_state(), primary_market_state())
+    if(fm_clause_enabled())finance<-fm_clause_finance(finance,fm_clause_jobs(resource_context(login_token_RV(),championship_id_RV(),user_team_id_RV())),primary_team_state()$data)
+    finance
   })
   # Update source times independently of the countdown/financial card DOM.
   round_finance_checked<-resource_display_source(session,function(){
@@ -186,6 +189,9 @@ function(input, output, session) {
       tags$div(class = "round-countdown-finance",
         tags$span(class = "round-countdown-finance-item", paste0("Balance: ", cash_text)),
         tags$span(class = "round-countdown-finance-item", paste0("Active offers: ", offers_text)),
+        if(fm_clause_enabled()&&is.finite(finance$manual_pending_amount)&&finance$manual_pending_amount>0)
+          tags$span(class='round-countdown-finance-item',paste0('Pending offer confirmations: ',money_text(finance$manual_pending_amount))),
+        if(fm_clause_enabled())fm_clause_pending_ui(fm_clause_jobs(resource_context(login_token_RV(),championship_id_RV(),user_team_id_RV()))),
         tags$span(class = "round-countdown-finance-item", paste0("After offers: ", money_text(final_balance,finance$cash_loading || finance$offers_loading,finance$calculations_stale))),
         tags$span(class = "round-countdown-finance-item", paste0("Can spend: ", money_text(spendable,finance$cash_loading || finance$offers_loading,finance$calculations_stale))),
         fm_info(

@@ -12,6 +12,7 @@ import os
 import re
 import signal
 import ssl
+import sys
 import time
 import uuid
 from datetime import datetime, timezone
@@ -210,6 +211,7 @@ class Helper:
         env = {k: v for k, v in os.environ.items() if k in
                ('PATH', 'LANG', 'LC_ALL', 'R_LIBS', 'R_LIBS_USER', 'R_LIBS_SITE', 'R_HOME', 'TMPDIR', 'OPENBLAS_NUM_THREADS', 'OMP_NUM_THREADS')}
         env['FUTMONDO_WORKER_HELPER'] = 'true'
+        env['FUTMONDO_CLAUSE_OBSERVATIONS_ENABLED'] = 'true' if os.getenv('FUTMONDO_CLAUSE_SCHEDULING_ENABLED', 'false').lower() == 'true' else 'false'
         self.process = await asyncio.create_subprocess_exec('Rscript', '--vanilla', str(self.root / 'worker' / 'helper.R'),
             cwd=str(self.root), env=env, stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE, limit=24 * 1024 * 1024)
@@ -267,13 +269,13 @@ class Helper:
                     safe_diagnostic = isinstance(code, str) and (code in diagnostic_codes or re.fullmatch(
                         r'resource_parse_(?:http|network|parser|schema|read_budget|unknown)_(?:' + resources + r')(?:_[1-5][0-9]{2})?', code, flags=re.ASCII))
                     raise WorkerFailure(code if safe_timeout or safe_diagnostic else 'resource_parse')
-                if message.get('type') not in ('http', 'database', 'persist', 'resource', 'discovery_resource', 'progress', 'history_ack'):
+                if message.get('type') not in ('http', 'database', 'persist', 'resource', 'discovery_resource', 'progress', 'history_ack', 'clause_observation'):
                     raise WorkerFailure('helper_protocol')
                 try:
                     response = await exchange(message)
                 except WorkerFailure as error:
                     # Send fixed codes only; do not convert auth/revocation into optional-source success.
-                    if error.code in ('access_revoked', 'source_authentication', 'source_rate_limited',
+                    if error.code.startswith('purchase_') or error.code in ('access_revoked', 'source_authentication', 'source_rate_limited',
                             'context_superseded', 'league_membership_unverified', 'source_context',
                             'source_route_denied', 'credential_in_fact',
                             'snapshot_corrupt', 'snapshot_size', 'snapshot_incomplete') or (error.code == 'source_rejected' and descriptor['handler'] != 'fm_worker_finances') or message['type'] in ('persist', 'progress'):
@@ -457,6 +459,14 @@ class Worker:
             if ready:
                 self.progress_ready.add(owner)
             return {'ok': True, 'published': True}
+        if message['type'] == 'clause_observation':
+            if os.getenv('FUTMONDO_CLAUSE_SCHEDULING_ENABLED', 'false').lower() != 'true':
+                return {'ok': True}
+            assert_factual(message.get('player'))
+            ok = await self.store.request('POST', 'rpc/clause_observe', json=dict(p_account=job['account_id'],
+                p_key=job['resource_key'], p_owner=owner, p_generation=job['generation'], p_context=message['context'],
+                p_player=message['player'], p_observed=message['observed_at']))
+            return {'ok': bool(ok)}
         if message['type'] == 'http':
             try:
                 return await self.source(job, owner, message)
@@ -548,6 +558,11 @@ class Worker:
             await self.guard(job, owner)
             await self.store.request('POST', 'worker_chunks', json=dict(account_id=job['account_id'], resource_key=resource_key,
                 version=version, part=i, data=part), headers={'Prefer': 'resolution=ignore-duplicates'})
+        if os.getenv('FUTMONDO_CLAUSE_SCHEDULING_ENABLED', 'false').lower() == 'true' and descriptor['handler'] == 'get_resolved_league_context':
+            context = plain(result['value'])
+            if isinstance(context, dict) and context.get('account_id') == job['account_id']:
+                await self.store.request('POST', 'rpc/clause_retire_context', json=dict(
+                    p_context=context, p_observed=result.get('observed_at', stamp())))
         checked = result.get('checked_at', stamp())
         observed = result.get('observed_at')
         if observed is None:
@@ -705,6 +720,8 @@ class Worker:
                 # avoid a per-account database scan every heartbeat.
                 if self.leader and time.monotonic() - self.last_cleanup > 3600:
                     await self.store.rpc('cleanup')
+                    if os.getenv('FUTMONDO_CLAUSE_SCHEDULING_ENABLED', 'false').lower() == 'true':
+                        await self.store.request('POST', 'rpc/clause_cleanup', json={})
                     self.last_cleanup = time.monotonic()
                 self.account_locks = {k: v for k, v in self.account_locks.items()
                     if v.locked() or time.monotonic() - self.last_request.get(k, 0) < 3600}
@@ -720,6 +737,10 @@ class Worker:
 
     async def run(self):
         tasks = [asyncio.create_task(self.maintenance())] + [asyncio.create_task(self.lane(i)) for i in range(len(self.helpers))]
+        if os.getenv('FUTMONDO_CLAUSE_SCHEDULING_ENABLED', 'false').lower() == 'true':
+            from worker.clauses import ClauseScheduler
+            scheduler = ClauseScheduler(self, Path(__file__).resolve().parent.parent)
+            tasks.append(asyncio.create_task(scheduler.run()))
         try:
             await self.stop.wait()
         finally:
@@ -752,4 +773,6 @@ async def main():
 
 
 if __name__ == '__main__':
+    # The supervised -m entry point and purchase module share exception/helper types.
+    sys.modules.setdefault('worker.main', sys.modules[__name__])
     asyncio.run(main())

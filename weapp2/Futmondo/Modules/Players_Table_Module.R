@@ -328,7 +328,7 @@ players_table_renewal_disabled <- function(settings) {
   length(value)==1L && is.atomic(value) && !is.na(value) && identical(tolower(as.character(value)),"true")
 }
 
-players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL, available_funds_RV = NULL, hide_bid_column = FALSE, refresh_trigger = NULL, is_module_active = function() TRUE, optional_ready = function() TRUE, points_ratio_basis = NULL, own_squad = FALSE, league_settings_source = NULL, departing_player_ids = NULL, filter_by_own_team = FALSE, effective_squad_source = NULL) {
+players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL, available_funds_RV = NULL, hide_bid_column = FALSE, refresh_trigger = NULL, is_module_active = function() TRUE, optional_ready = function() TRUE, points_ratio_basis = NULL, own_squad = FALSE, league_settings_source = NULL, departing_player_ids = NULL, filter_by_own_team = FALSE, effective_squad_source = NULL, allow_scheduled_clauses = FALSE) {
   if (!is.null(points_ratio_basis)) points_ratio_basis <- match.arg(points_ratio_basis, c("value", "clause_price"))
   moduleServer(id, function(input, output, session) {
     bind_factual_reads(c("get_finished_rounds"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
@@ -439,7 +439,8 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       championship_id = championship_id,
       user_team_id = user_team_id,
       refresh_trigger = refresh_trigger,
-      on_bid_updated = handle_bid_updated
+      on_bid_updated = handle_bid_updated,
+      allow_scheduled_clauses = allow_scheduled_clauses
     )
     # reactives ----
     # Capture identity when the user selects a row. A refresh can reorder rows;

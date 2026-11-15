@@ -28,20 +28,22 @@ settle<-function(session=NULL)for(i in 1:25){later::run_now(0);if(!is.null(sessi
 shiny::testServer(selected_player_Server,args=list(selected_player=selected,login_token=reactive(auth),
  championship_id=reactive('league'),user_team_id=team,capacity_fetcher=function(...){sync<<-sync+1L;capacity()}),{
  settle(session)
- stopifnot(!length(jobs),sum(vapply(reads,function(x)x$fn=='get_team_acquisition_capacity',logical(1)))==1L,
-  all(!vapply(reads,`[[`,logical(1),'bypass')))
- cat('PASS passive card opening reads stale database capacity once without a live preflight\n')
+ stopifnot(length(jobs)==1L, jobs[[1L]]$current(), sync==0L,
+  sum(vapply(reads,function(x)x$fn=='get_team_acquisition_capacity' && !x$bypass,logical(1)))==1L)
+ jobs[[1L]]$resolve(capacity(-30));settle(session)
+ stopifnot(!manual_capacity_verification()$pending)
+ cat('PASS card opening performs the existing asynchronous availability check without synchronous acquisition\n')
  session$setInputs(btn_bid_market=1L);settle(session)
- stopifnot(length(jobs)==1L,market_offer_dialog_RV()$pending,market_offer_dialog_RV()$live_check,
+ stopifnot(length(jobs)==2L,market_offer_dialog_RV()$pending,market_offer_dialog_RV()$live_check,
   grepl('disabled',output$market_offer_submit$html,fixed=TRUE),sync==0L)
  session$setInputs(submit_bid=1L,bid_amount=150);settle(session);stopifnot(writes==0L,sync==0L)
- jobs[[1L]]$resolve(capacity());settle(session)
- stopifnot(!market_offer_dialog_RV()$pending,market_offer_dialog_RV()$preflight$ok,
-  !grepl('disabled',output$market_offer_submit$html,fixed=TRUE),length(jobs)==1L)
- cat('PASS explicit offer opens one async live check; pending submission stays blocked and verified result enables confirmation\n')
- session$setInputs(btn_bid_market=2L);settle(session);stopifnot(length(jobs)==2L)
- team('another');settle(session);stopifnot(!jobs[[2L]]$current())
  jobs[[2L]]$resolve(capacity());settle(session)
+ stopifnot(!market_offer_dialog_RV()$pending,market_offer_dialog_RV()$preflight$ok,
+  !grepl('disabled',output$market_offer_submit$html,fixed=TRUE),length(jobs)==2L)
+ cat('PASS explicit offer opens one async live check; pending submission stays blocked and verified result enables confirmation\n')
+ session$setInputs(btn_bid_market=2L);settle(session);stopifnot(length(jobs)==3L)
+ team('another');settle(session);stopifnot(!jobs[[3L]]$current())
+ jobs[[3L]]$resolve(capacity());settle(session)
  stopifnot(is.null(market_offer_dialog_RV()),is.null(modal_context_RV()$bid),writes==0L)
  cat('PASS a team change rejects the old live completion; no transaction or automatic retry occurs\n')
 })

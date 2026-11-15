@@ -43,6 +43,7 @@ body <- shinydashboard::dashboardBody(
   ),
   uiOutput("background_sync"),
   uiOutput("worker_status"),
+  uiOutput("clause_results"),
   shinydashboard::tabItems(
     shinydashboard::tabItem(tabName="notifications", notifications_UI("notifications")),
     shinydashboard::tabItem(

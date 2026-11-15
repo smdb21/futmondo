@@ -1355,8 +1355,8 @@ get_teams <- function(login, championship_id) {
 }
 
 
-buy_clause <- function(login, championship_id, team_id, player_id, player_slug, price, isClause = TRUE) {
-  payload <- list(
+build_market_bid_payload <- function(login, championship_id, team_id, player_id, player_slug, price, isClause = TRUE) {
+  list(
     header = list(
       token = login[["token"]],
       userid = login[["userid"]]
@@ -1371,6 +1371,10 @@ buy_clause <- function(login, championship_id, team_id, player_id, player_slug, 
     ),
     answer = list()
   )
+}
+
+buy_clause <- function(login, championship_id, team_id, player_id, player_slug, price, isClause = TRUE) {
+  payload <- build_market_bid_payload(login, championship_id, team_id, player_id, player_slug, price, isClause)
 
   headers <- c(
     "Content-Type" = "application/json; charset=utf-8"
@@ -1467,7 +1471,7 @@ buy_roster_clause <- function(login, championship_id, team_id, player_id, player
     is_success <- (operation_code == API_CODE_OK)
 
     if (!is_success) {
-      print(paste0("[API] Roster clause request failed. Code: ", operation_code, " Msg: ", err_msg))
+      print(paste0("[API] Roster clause request failed. Code: ", if(is.character(operation_code)&&length(operation_code)==1L&&grepl("^[a-zA-Z0-9_.]{1,160}$",operation_code))operation_code else "unclassified"))
     } else {
       print("[API] Roster clause request succeeded (api.general.ok)")
     }
@@ -1475,7 +1479,7 @@ buy_roster_clause <- function(login, championship_id, team_id, player_id, player
     list(success = is_success, code = operation_code,
          message = clause_buyout_error_message(operation_code, err_msg))
   }, error = function(e) {
-    print(paste0("[API] Roster clause request error: ", e$message))
+    print("[API] Roster clause request failed: transport or parser error")
     list(success = FALSE, code = "error", message = e$message)
   })
 }
@@ -2175,6 +2179,11 @@ get_acquisition_capacity <- function(login,championship_id,user_team_id,target_p
     }
   }
   out$target_rows<-NULL
+  if(exists('fm_clause_enabled',mode='function')&&fm_clause_enabled()){
+    ctx<-resource_context(login,championship_id,user_team_id,target_player_id)
+    jobs<-fm_clause_jobs(ctx)
+    out<-fm_clause_adjust_capacity(out,jobs)
+  }
   out
 }
 
@@ -3088,8 +3097,8 @@ normalize_player_matches <- function(answer) {
   frame[order(frame$round, decreasing=TRUE, na.last=TRUE),,drop=FALSE]
 }
 
-modify_bid <- function(login, championship_id, team_id, player_id, bid_id, new_price) {
-  payload <- list(
+build_modify_bid_payload <- function(login, championship_id, team_id, player_id, bid_id, new_price) {
+  list(
     header = list(
       token = login[["token"]],
       userid = login[["userid"]]
@@ -3104,6 +3113,11 @@ modify_bid <- function(login, championship_id, team_id, player_id, bid_id, new_p
     ),
     answer = list()
   )
+}
+
+modify_bid <- function(login, championship_id, team_id, player_id, bid_id, new_price) {
+  payload <- build_modify_bid_payload(login, championship_id, team_id, player_id, bid_id, new_price)
+
   headers <- c("Content-Type" = "application/json; charset=utf-8")
   print(paste0("[API] Sending modify bid request for bid: ", bid_id, " new price: ", new_price))
   response <- futmondo_post(MODIFY_BID_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
@@ -3669,6 +3683,7 @@ get_financial_snapshot <- function(login, championship_id, user_team_id) {
       projected_committed_balance = projected_balance, reserved_amount = reserved_amount,
       roster_count = capacity$roster$effective_count, roster_raw_count=capacity$roster$raw_count,
       roster_cap = capacity$roster$cap, roster_capacity=capacity$roster,
+      scheduled_reservations=capacity$scheduled_reservations,
       pending_clause_inbound=capacity$roster$pending_inbound_count,
       pending_clause_outbound=capacity$roster$pending_outbound_count,
       commitments = capacity$outstanding, observed_at = observed_at,

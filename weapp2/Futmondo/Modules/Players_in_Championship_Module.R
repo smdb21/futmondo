@@ -97,6 +97,10 @@ players_in_championship_Server <- function(id, is_module_active, login_token, ch
       finance <- tryCatch(get_financial_snapshot(login_token(), championship_id(), user_team_id()), error = function(e) NULL)
       if (!is.list(finance) || !identical(finance$status, "ok")) return(NA_real_)
       funds <- suppressWarnings(as.numeric(finance$spendable_budget))
+      if(exists('fm_clause_enabled',mode='function')&&fm_clause_enabled()&&is.null(finance$scheduled_reservations)){
+        reserved<-fm_clause_reservations(fm_clause_jobs(resource_context(login_token(),championship_id(),user_team_id())))$amount
+        funds<-if(is.finite(reserved))max(0,funds-reserved)else NA_real_
+      }
       if (length(funds) == 1L && is.finite(funds) && funds >= 0) funds else NA_real_
     })
 
@@ -111,6 +115,7 @@ players_in_championship_Server <- function(id, is_module_active, login_token, ch
       user_team_id = user_team_id,
       available_funds_RV = available_funds_RV,
       points_ratio_basis = "clause_price",
+      allow_scheduled_clauses = TRUE,
       filter_by_own_team = TRUE,
       refresh_trigger = refresh_trigger,
       is_module_active = is_module_active

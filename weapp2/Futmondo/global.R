@@ -41,8 +41,10 @@ cfg_player_columns_to_hide <- fread(file = "player_columns_to_hide.txt", header 
 
 source("worker_contract.R")
 source("worker_runtime.R")
+source("clause_scheduler.R")
 if (!isTRUE(getOption("futmondo.worker_helper", FALSE))) {
   .fm_worker_finance_original <- shared_rival_finance_source
   shared_rival_finance_source <- fm_worker_finance_source
   fm_worker_wrap_reads()
+  fm_clause_install_guards()
 }

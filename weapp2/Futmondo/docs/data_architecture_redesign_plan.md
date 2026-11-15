@@ -1558,6 +1558,13 @@ No schema, dependency, automation or login inventory expansion is required.
   `docs/data_review_results.md`; branch delivery remains separate from deployment.
 
 
+### 2026-11-15 — Explicit scheduled-clause purchase exception
+
+Owner-authorized addition: an individually confirmed purchase at a rival's published clause opening, independent of factual-sync consent. Implemented locally: server-only durable schedules/attempts/evidence, separate encrypted purchase authorization, shared offer reservations, supervised Python execution, cancellation, price caps, lock updates from existing observations and source checks, five-minute expiry, response reconciliation and acknowledged next-login outcomes. See `docs/scheduled_clauses.md`.
+
+Exit criteria still open: capture the actual closed-clause rejection with the temporary account-scoped diagnostic and install its regression mapping; remove the bypass; apply the additive migration and deploy; verify a controlled hosted execution, restart behavior and Contabo capacity/timing. Synthetic tests do not certify a real purchase or production deployment. Other trading/lineup/coach automation remains outside this exception.
+
+
 ### Today heading information icon — implemented locally (2026-11-15)
 
 - Remove the introductory market/balances/transfers information icon from

@@ -217,7 +217,7 @@ market_offer_decision <- function(sp, preflight) {
 }
 
 
-selected_player_Server <- function(id, selected_player, login_token = NULL, championship_id = NULL, user_team_id = NULL, on_bid_updated = NULL, open_action = NULL, capacity_fetcher = NULL, refresh_trigger = NULL) {
+selected_player_Server <- function(id, selected_player, login_token = NULL, championship_id = NULL, user_team_id = NULL, on_bid_updated = NULL, open_action = NULL, capacity_fetcher = NULL, refresh_trigger = NULL, allow_scheduled_clauses = FALSE) {
   # Keep the caller's reactive lazy: parent tables define it after this module.
   player_source <- function() selected_player()
   moduleServer(id, function(input, output, session) {
@@ -247,6 +247,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     # preflight / missing player (FALSE). Exposed so the "clause_buyout"
     # open_action routing can be asserted in tests without a live UI.
     clause_modal_opened_RV <- reactiveVal(FALSE)
+    clause_diagnostic_RV <- reactiveVal(FALSE)
     # Test seam for direct and external active-bid update routing.
     modify_modal_opened_RV <- reactiveVal(FALSE)
 
@@ -279,6 +280,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       previous_context <- isolate(previous_player_action_context_RV())
       active_bid_info_RV(NULL);modal_context_RV(list());modal_bid_info_RV(list())
       market_offer_dialog_RV(NULL)
+      clause_diagnostic_RV(FALSE)
       offer_modal_opened_RV(FALSE);clause_modal_opened_RV(FALSE);modify_modal_opened_RV(FALSE)
       if (player_card_context_changed(previous_context, current_context)) removeModal()
       previous_player_action_context_RV(current_context)
@@ -364,13 +366,24 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       minimum<-if(mode %in% c("bid","modify"))market_bid_minimum(sp,capacity$rules$minimum_bid_at_value)else NULL
       result<-evaluate_acquisition_preflight(
         capacity = capacity,
-        mode = mode,
+        mode = if(mode=='clause'&&exists('fm_clause_enabled',mode='function')&&fm_clause_enabled())'offer'else mode,
         amount = amount,
         existing_bid_amount = existing_bid_amount,
         minimum_bid = minimum
       )
       result$minimum_bid<-minimum
       result
+    }
+
+    complete_acquisition<-function(result,callback){if(exists('fm_clause_complete',mode='function'))fm_clause_complete(result,callback)else callback(result)}
+
+    perform_acquisition <- function(handler,args,mode,diagnostic=FALSE) {
+      if(!exists('fm_clause_enabled',mode='function')||!fm_clause_enabled())return(do.call(get(handler,.GlobalEnv),args))
+      action<-player_action_context_RV();sp<-selected_player()
+      ctx<-resource_context(args$login,args$championship_id,args$team_id,args$player_id)
+      current<-function()!session$isClosed()&&identical(isolate(player_action_context_RV()),action)
+      result<-fm_clause_execute_async(handler,args,ctx,sp,current,session$token,diagnostic,action_mode=mode)
+      structure(list(result=result,current=current),class='fm_clause_async_action')
     }
 
     # Show a preflight failure notification, distinguishing unavailable
@@ -488,7 +501,11 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     # Actions need ownership, current bids, and verified acquisition/listing
     # state. Stored points, valuation, profile, and scoring are independent.
     observeEvent(
-      list(selected_player(), card_states$summary(), card_states$capacity(), card_states$listings()),
+      list(selected_player(), card_states$summary(), card_states$capacity(), card_states$listings(), {
+        auth<-get_reactive_val(login_token)
+        if(exists('fm_clause_enabled',mode='function')&&fm_clause_enabled()&&valid_login(auth))
+          fm_clause_jobs(resource_context(auth,get_reactive_val(championship_id),get_reactive_val(user_team_id)))else NULL
+      }),
       {
         sp <- selected_player()
         req(sp)
@@ -742,6 +759,13 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
             )
             action_buttons <- tagList(action_buttons, locked_badge)
           }
+          if(isTRUE(allow_scheduled_clauses)&&exists('fm_clause_schedule_ui',mode='function')){
+            ctx<-resource_context(get_reactive_val(login_token),get_reactive_val(championship_id),current_user_team,sp$id)
+            player<-fm_clause_row_player(sp)
+            action_buttons<-tagList(action_buttons,fm_clause_schedule_ui(ns,player,current_user_team,ctx))
+            if(fm_clause_diagnostic(get_reactive_val(login_token))&&fm_clause_eligible(player,current_user_team))
+              action_buttons<-tagList(action_buttons,actionButton(ns('test_locked_clause'),'Test locked clause (one real request)',class='btn btn-warning',style='white-space:normal;max-width:100%;'))
+          }
         }
 
         readiness<-if(is_own_player)card_states$listings() else card_states$capacity()
@@ -838,7 +862,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       bid_info <- modal_bid_info_RV()[["modify"]]
       req(sp, login, champ_id, team_id, bid_info)
 
-      bid_info <- verify_active_bid(sp,bid_info)
+      if(!exists("fm_clause_enabled",mode="function")||!fm_clause_enabled())bid_info <- verify_active_bid(sp,bid_info)
       req(bid_info)
 
       new_price <- input$new_bid_amount
@@ -848,7 +872,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       }
 
       # Preflight before write: verify capacity + funds (delta vs existing bid).
-      pf <- run_acquisition_preflight(sp, "modify", amount = new_price, existing_bid_amount = bid_info$price)
+      pf <- if(exists("fm_clause_enabled",mode="function")&&fm_clause_enabled())list(ok=TRUE)else run_acquisition_preflight(sp, "modify", amount = new_price, existing_bid_amount = bid_info$price)
       if (!isTRUE(pf$ok)) {
         show_preflight_failure(pf)
         return()
@@ -857,14 +881,16 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       bid_id <- bid_info$id
       player_id <- sp$id
 
-      success <- modify_bid(
+      result <- perform_acquisition("modify_bid", list(
         login = login,
         championship_id = champ_id,
         team_id = team_id,
         player_id = player_id,
         bid_id = bid_id,
         new_price = new_price
-      )
+      ), "modify")
+      complete_acquisition(result,function(res){
+      success<-if(is.list(res))isTRUE(res$success)else isTRUE(res)
 
       removeModal()
 
@@ -890,11 +916,12 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         invalidate_manual_resources(login,champ_id,team_id,sp$id)
       } else {
         shiny::showNotification(
-          "Failed to update bid. Please try again.",
+          if(is.list(res)&&nzchar(fm_scalar(res$message,"")))res$message else "Failed to update bid. Verify the current offer before trying again.",
           type = "error",
           duration = 5
         )
       }
+      })
     })
 
     # ---- Cancel Active Bid Modal ----
@@ -1141,7 +1168,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       }
 
       # Preflight before write: verify capacity + verified spendable funds.
-      pf <- run_acquisition_preflight(sp, "bid", amount = bid_amount)
+      pf <- if(exists("fm_clause_enabled",mode="function")&&fm_clause_enabled())list(ok=TRUE)else run_acquisition_preflight(sp, "bid", amount = bid_amount)
       if (!isTRUE(pf$ok)) {
         show_preflight_failure(pf)
         return()
@@ -1150,7 +1177,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       player_id <- sp$id
       player_slug <- if ("slug" %in% colnames(sp) && !is.na(sp$slug)) sp$slug else sp$name
 
-      res <- buy_clause(
+      result <- perform_acquisition("buy_clause", list(
         login = login,
         championship_id = champ_id,
         team_id = team_id,
@@ -1158,7 +1185,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         player_slug = player_slug,
         price = bid_amount,
         isClause = FALSE
-      )
+      ), "bid")
+      complete_acquisition(result,function(res){
 
       is_success <- if (is.list(res)) isTRUE(res$success) else isTRUE(res)
 
@@ -1194,6 +1222,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           duration = NULL
         )
       }
+      })
     })
 
     # ---- Option 2: Direct Offer to Owner Modal ----
@@ -1250,7 +1279,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       }
 
       # Preflight before write: verify capacity + verified spendable funds.
-      pf <- run_acquisition_preflight(sp, "offer", amount = offer_amount)
+      pf <- if(exists("fm_clause_enabled",mode="function")&&fm_clause_enabled())list(ok=TRUE)else run_acquisition_preflight(sp, "offer", amount = offer_amount)
       if (!isTRUE(pf$ok)) {
         show_preflight_failure(pf)
         return()
@@ -1259,7 +1288,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       player_id <- sp$id
       player_slug <- if ("slug" %in% colnames(sp) && !is.na(sp$slug)) sp$slug else sp$name
 
-      res <- buy_clause(
+      result <- perform_acquisition("buy_clause", list(
         login = login,
         championship_id = champ_id,
         team_id = team_id,
@@ -1267,7 +1296,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         player_slug = player_slug,
         price = offer_amount,
         isClause = FALSE
-      )
+      ), "offer")
+      complete_acquisition(result,function(res){
 
       is_success <- if (is.list(res)) isTRUE(res$success) else isTRUE(res)
 
@@ -1303,7 +1333,13 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           duration = NULL
         )
       }
+      })
     })
+
+    if(isTRUE(allow_scheduled_clauses)&&exists('fm_clause_card_observers',mode='function'))
+      fm_clause_card_observers(input,session,selected_player,function()get_reactive_val(login_token),
+        function()get_reactive_val(championship_id),function()get_reactive_val(user_team_id),
+        remember_action_context,consume_action_context,player_action_context_RV)
 
     # ---- Shared helper: open the release-clause buyout confirmation modal ----
     # Single code path for the "Buy Release Clause" button and for external
@@ -1315,7 +1351,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     # recomputed clause_price is shown and later executed -- no comparison
     # price (e.g. max(market, clause)) is ever used. Never opens the market
     # bid modal.
-    open_clause_buyout_modal <- function(sp) {
+    open_clause_buyout_modal <- function(sp, diagnostic=FALSE) {
       req(sp)
 
       current_team <- get_reactive_val(user_team_id)
@@ -1330,7 +1366,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
       # Recheck strict open state (fail closed): a stale / locked /
       # transferred clause must not open the buyout confirmation.
-      if (!isTRUE(today_is_clause_open(sp))) {
+      diagnostic<-isTRUE(diagnostic)&&isTRUE(allow_scheduled_clauses)&&exists('fm_clause_diagnostic',mode='function')&&
+        fm_clause_diagnostic(get_reactive_val(login_token))&&fm_clause_eligible(fm_clause_row_player(sp),current_team)
+      if (!isTRUE(today_is_clause_open(sp))&&!diagnostic) {
         shiny::showNotification(
           "This release clause is not currently open (price, transfer lock, or clause date no longer valid). Please refresh and try again.",
           type = "warning",
@@ -1352,11 +1390,12 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       }
 
       remember_action_context("clause")
+      clause_diagnostic_RV(diagnostic)
       clause_modal_opened_RV(TRUE)
       showModal(modalDialog(
         title = tagList(icon("bolt"), " Confirm Release Clause Buyout"),
         p(strong(sp$name)),
-        p("This will instantly purchase the player for their official release clause."),
+        p(if(diagnostic) 'DIAGNOSTIC: This sends one real purchase request while the clause is reported locked. If Futmondo accepts it, the player may be purchased and your balance may become negative. No automatic retry will occur.' else 'This purchases the player for their official release clause. Delivery follows your league settings.'),
         p("Clause price: ", strong(player_card_money(clause_price))),
         p(style = "color: var(--fm-danger); font-size: 13px; font-weight: 600;", "Are you sure you want to trigger this clause buyout?"),
         footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
@@ -1375,6 +1414,11 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       open_clause_buyout_modal(sp)
     })
 
+    observeEvent(input$test_locked_clause, {
+      req(isTRUE(allow_scheduled_clauses),fm_clause_diagnostic(get_reactive_val(login_token)))
+      open_clause_buyout_modal(selected_player(),diagnostic=TRUE)
+    })
+
     # ---- Submit Clause Purchase ----
     observeEvent(input$submit_clause, {
       req(consume_action_context("clause"))
@@ -1386,7 +1430,10 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
       # Recheck strict open state before the write (fail closed): the clause
       # may have locked / transferred between modal-open and submit.
-      if (!isTRUE(today_is_clause_open(sp))) {
+      diagnostic<-isTRUE(clause_diagnostic_RV())&&isTRUE(allow_scheduled_clauses)&&
+        exists('fm_clause_diagnostic',mode='function')&&fm_clause_diagnostic(login)
+      clause_diagnostic_RV(FALSE)
+      if (!isTRUE(today_is_clause_open(sp))&&!diagnostic) {
         removeModal()
         shiny::showNotification(
           "This release clause is no longer open (price, transfer lock, or clause date no longer valid). Please refresh and try again.",
@@ -1406,25 +1453,40 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       }
 
       # Preflight before write: verify roster slot + verified spendable funds.
-      pf <- run_acquisition_preflight(sp, "clause", amount = clause_price)
+      pf <- if(exists("fm_clause_enabled",mode="function")&&fm_clause_enabled())list(ok=TRUE)else run_acquisition_preflight(sp, "clause", amount = clause_price)
       if (!isTRUE(pf$ok)) {
         show_preflight_failure(pf)
         return()
       }
 
+      if(diagnostic&&(!exists("fm_clause_enabled",mode="function")||!fm_clause_enabled())){
+        diagnostic_read_options<-options(futmondo.worker_live=TRUE);on.exit(options(diagnostic_read_options),add=TRUE)
+        invalidate_resources(resource_context(login,champ_id,team_id,sp$id),pattern='player_summary')
+        current<-tryCatch(fm_clause_player(get_player_summary(login,champ_id,team_id,sp$id)),error=function(e)NULL)
+        if(!fm_clause_eligible(current,team_id)||!identical(current$owner_id,player_card_owner_id(sp))||current$price>clause_price){
+          removeModal();showNotification('Diagnostic stopped: the current owner, price or future lock changed.',type='error');return()
+        }
+        clause_price<-current$price
+      }
       player_id <- sp$id
       player_slug <- if ("slug" %in% colnames(sp) && !is.na(sp$slug)) sp$slug else sp$name
 
-      res <- buy_roster_clause(
+      diagnostic_options<-options(futmondo.clause_diagnostic=if(diagnostic)login[['userid']]else NULL)
+      on.exit(options(diagnostic_options),add=TRUE)
+      result <- perform_acquisition("buy_roster_clause", list(
         login = login,
         championship_id = champ_id,
         team_id = team_id,
         player_id = player_id,
         player_slug = player_slug,
         price = clause_price
-      )
+      ), "clause",diagnostic=diagnostic)
+      complete_acquisition(result,function(res){
 
       is_success <- if (is.list(res)) isTRUE(res$success) else isTRUE(res)
+
+      if(diagnostic)showNotification(paste0('Locked-clause diagnostic response: ',fm_clause_safe_code(res$code),
+        '. No retry was sent. Share this code; never share credentials or a raw response.'),type=if(isTRUE(res$success))'warning'else'message',duration=NULL)
 
       removeModal()
 
@@ -1459,6 +1521,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           duration = 6
         )
       }
+      })
     })
 
     # ---- Put Single Player on Market Modal ----
@@ -2001,7 +2064,12 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     passive_acquisition_gate<-function(sp,mode){
       state<-card_states$capacity()
       if(identical(state$status,"loading"))return(list(ok=FALSE,reason="loading",message=NULL))
-      evaluate_acquisition_preflight(state$data,mode=mode,minimum_bid=if(mode=="bid")market_bid_minimum(sp,state$data$rules$minimum_bid_at_value)else NULL)
+      capacity<-state$data
+      if(exists('fm_clause_enabled',mode='function')&&fm_clause_enabled()){
+        ctx<-resource_context(get_reactive_val(login_token),get_reactive_val(championship_id),get_reactive_val(user_team_id),sp$id)
+        capacity<-fm_clause_adjust_capacity(capacity,fm_clause_jobs(ctx))
+      }
+      evaluate_acquisition_preflight(capacity,mode=if(mode=='clause'&&exists('fm_clause_enabled',mode='function')&&fm_clause_enabled())'offer'else mode,minimum_bid=if(mode=="bid")market_bid_minimum(sp,capacity$rules$minimum_bid_at_value)else NULL)
     }
     card_started<-reactiveVal(Sys.time());timed_summary<-FALSE;timed_history<-FALSE
     card_chart_ready<-reactiveVal(FALSE)

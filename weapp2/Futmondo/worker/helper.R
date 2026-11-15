@@ -294,6 +294,10 @@ fm_worker_run<-function(descriptor){
  formals(season_wrapper)<-formals(original_season);env$league_season_context<-season_wrapper
 
  produced<-list();produced_bytes<-0;source_clock<-NULL
+ purchase_check<-identical(descriptor$handler,"get_scheduled_clause_check");purchase_scopes<-list()
+ purchase_ttl<-function(name,context){switch(name,get_user_team_info=5,get_market_players=5,
+  get_player_summary=if(identical(context$player_id,ctx$player_id))5 else 60,get_players_from_team=15,
+  get_championship_pressroom=15,get_active_championships=60,get_resolved_league_context=60,Inf)}
  # Discovery consumes existing source snapshots only. An unfinished dependency
  # is picked up on the next autonomous cycle, never fetched on a browser's behalf.
  env$fm_worker_saved_resource<-function(handler,args,context){
@@ -305,6 +309,11 @@ fm_worker_run<-function(descriptor){
   fm_worker_decode(saved$value)
  }
  summary_views<-function(value,context){
+  if(identical(Sys.getenv('FUTMONDO_CLAUSE_OBSERVATIONS_ENABLED'),'true')&&descriptor$handler!='get_scheduled_clause_check'&&exists('fm_clause_player',env,mode='function')){
+   player<-env$fm_clause_player(value);stamp<-attr(value,'observed_at') %||% source_clock
+   if(nzchar(fm_scalar(player$id,''))&&length(stamp)==1L&&!is.na(stamp))
+    fm_pipe_exchange(list(type='clause_observation',context=env$fm_clause_scope(context),player=player,observed_at=rival_finance_stamp(stamp)))
+  }
   if(!exists('fm_worker_summary_views',env,mode='function'))return(invisible(NULL))
   for(view in env$fm_worker_summary_views(value,context)){
    bytes<-as.numeric(object.size(view$value));key<-view$descriptor$resource_key
@@ -342,7 +351,19 @@ fm_worker_run<-function(descriptor){
   }
   value
  }
- env$Sys.time<-function()source_clock %||% Sys.time()
+ env$Sys.time<-function()if(purchase_check)base::Sys.time()else source_clock %||% Sys.time()
+ if(purchase_check){
+  original_store<-env$resource_store
+  env$resource_store<-function(key,data,context,resource,ttl=NULL){
+   if(is.null(attr(data,'observed_at'))){
+    primary<-if(length(purchase_scopes))purchase_scopes[[length(purchase_scopes)]]$primary else NULL
+    stamp<-primary %||% source_clock
+    if(!is.null(stamp))attr(data,'observed_at')<-stamp
+   }
+   original_store(key,data,context,resource,ttl)
+  }
+ }
+
  env$get_sb_url<-function()'https://worker-database.invalid'
  env$get_sb_key<-function()'worker-placeholder'
  env$futmondo_post<-function(url,...){
@@ -354,6 +375,8 @@ fm_worker_run<-function(descriptor){
   source_time<-fm_time(result$observed_at)
   if(length(source_time)!=1L||is.na(source_time))stop('Missing source observation time')
   source_clock<<-if(is.null(source_clock))source_time else min(source_clock,source_time)
+  if(purchase_check&&length(purchase_scopes)){scope<-purchase_scopes[[length(purchase_scopes)]]
+   scope$primary<-if(is.null(scope$primary))source_time else min(scope$primary,source_time)}
   content<-charToRaw(as.character(jsonlite::toJSON(result$body,auto_unbox=TRUE,null='null',na='null',digits=NA)))
   fm_httr_response(list(status_code=as.integer(result$status),content=content,times=c(total=0)),url)
  }
@@ -368,7 +391,10 @@ fm_worker_run<-function(descriptor){
  env$supabase_post_direct<-function(table_name,payload,conflict=NULL,ignore_duplicates=FALSE){
   if(is.data.frame(payload)&&!nrow(payload)||is.list(payload)&&!length(payload))return(TRUE)
   if(is.null(conflict))conflict<-supabase_conflict_key(table_name)
-  fm_pipe_exchange(list(type='persist',table=table_name,payload=payload,conflict=conflict,ignore=ignore_duplicates))$ok
+  message<-list(type='persist',table=table_name,payload=payload,conflict=conflict,ignore=ignore_duplicates)
+  if(purchase_check){primary<-if(length(purchase_scopes))purchase_scopes[[length(purchase_scopes)]]$primary else NULL
+   message$observed_at<-rival_finance_stamp(primary %||% source_clock %||% base::Sys.time())}
+  fm_pipe_exchange(message)$ok
  }
  env$supabase_post<-env$supabase_post_direct
  env$defer_persistence<-function(fn,args=list(),context=NULL,on_complete=NULL,retained_bytes=0){
@@ -397,12 +423,29 @@ fm_worker_run<-function(descriptor){
   if(!is.function(fn)||!startsWith(nm,'get_')||nm%in%finance_tasks||endsWith(nm,'_async')||!'login'%in%names(formals(fn)))next
   local({name<-nm;original<-fn
    wrapper<-function(){
+    if(purchase_check){
+     parent_clock<-source_clock;source_clock<<-NULL
+     scope<-new.env(parent=emptyenv());scope$primary<-NULL;purchase_scopes[[length(purchase_scopes)+1L]]<<-scope
+     on.exit({stamp<-source_clock;source_clock<<-if(is.null(parent_clock))stamp else if(is.null(stamp))parent_clock else min(parent_clock,stamp)
+      purchase_scopes<<-head(purchase_scopes,-1L)},add=TRUE)
+    }
     params<-lapply(as.list(match.call())[-1L],eval,envir=parent.frame())
     childctx<-env$resource_context(params$login,params$championship_id,params$user_team_id %||% params$team_id,params$player_id)
     child<-fm_worker_descriptor(name,params,childctx)
     if(child$resource_key!=descriptor$resource_key){
      existing<-produced[[child$resource_key]]
-     if(!is.null(existing))return(fm_worker_decode(existing$value))
+     if(!is.null(existing)){
+      if(!purchase_check||fm_time(existing$valid_until)>base::Sys.time()){
+       value<-fm_worker_decode(existing$value)
+       if(purchase_check)source_clock<<-fm_time(existing$observed_at)
+       return(value)
+      }
+      produced_bytes<<-max(0,produced_bytes-as.numeric(object.size(existing$value)))
+      produced[[child$resource_key]]<<-NULL
+      pattern<-switch(name,get_player_summary='^player_summary_',get_user_team_info='^team_info_',get_market_players='^market_players_',
+       get_players_from_team='^roster_facts_|^roster_payload_',get_championship_pressroom='^pressroom_|^locker_',get_active_championships='^active_championship_objects$',NULL)
+      if(!is.null(pattern))env$invalidate_resources(childctx,pattern=pattern)
+     }
      saved<-fm_pipe_exchange(list(type='resource',descriptor=child))
      if(!is.null(saved$value)){
       restored<-fm_worker_decode(saved$value)
@@ -430,6 +473,7 @@ fm_worker_run<-function(descriptor){
      if(!is.null(value)&&produced_bytes+bytes<=8*1024^2){
       stamp<-attr(value,'observed_at') %||% source_clock %||% Sys.time()
       deadline<-as.numeric(fm_time(stamp))+fm_worker_interval(name)
+      if(purchase_check)deadline<-min(deadline,as.numeric(fm_time(stamp))+purchase_ttl(name,childctx))
       original_deadline<-attr(value,'valid_until') %||% if(is.list(value))value$valid_until else NULL
       if(is.numeric(original_deadline)&&length(original_deadline)==1L&&is.finite(original_deadline))deadline<-min(deadline,original_deadline)
       produced[[child$resource_key]]<<-list(descriptor=child,value=wire,interval_seconds=fm_worker_interval(name),

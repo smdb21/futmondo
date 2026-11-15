@@ -56,3 +56,6 @@ Explicit scope exception requested on 2026-11-01: optional seven-day remembered 
 
 
 Explicit scope exception approved on 2026-11-11: implement a Docker-supervised Python service for per-account opt-in unattended factual acquisition, with durable DB snapshots and reuse of the R parsing/accounting engine. Consent is separate from browser remembered login; encrypted worker tokens persist until disabled or rejected. This does not authorize background transactions or coach/lineup automation. See `docs/python_worker.md`.
+
+
+Explicit scope exception requested on 2026-11-15: permit individually confirmed, capped, one-shot scheduled clause purchases at a rival player's published opening. Purchase consent and encrypted access are independent of factual Background sync. Each job reserves an offer slot/funds, follows verified lock extensions, expires five minutes after opening, and reconciles uncertain writes without blind retries. Closed-clause retries require an evidenced native rejection code. This does not authorize other trading automation. The account-scoped, disabled-by-default temporary locked-clause diagnostic sends only an explicitly confirmed real request; remove it after capturing the rejection fixture. See `docs/scheduled_clauses.md`.

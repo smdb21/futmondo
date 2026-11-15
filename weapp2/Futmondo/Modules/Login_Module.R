@@ -21,6 +21,8 @@ login_feature_tiers <- function() {
           description = "Rank recent points relative to market value or clause price to compare player value."),
         list(id = "rival_cash", title = "Reconstructed rival balances",
           description = "Inspect estimated rival cash and its running ledger of opening funds, transfers and configured rewards, with missing evidence identified."),
+        list(id = "scheduled_clauses", title = "Scheduled clause purchases",
+          description = "Authorize a capped purchase attempt at a rival player's published clause opening, with pending-offer reservations, cancellation and saved execution outcomes. Success is not guaranteed."),
         list(id = "trading_profit", title = "Trading profit and wealth comparisons",
           description = "Compare league trading profit and estimated wealth gained, and inspect matched player purchases, sales and related fees.")
       ))
