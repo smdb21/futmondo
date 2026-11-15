@@ -11,20 +11,6 @@ notification_has_player_details <- function(notification_row) {
   !is_round_close
 }
 
-# Readable UTC labels only; original timestamps remain available to the view.
-notification_datetime_labels <- function(values) {
-  if (!inherits(values, "POSIXt")) {
-    values <- as.character(values)
-    # Reject malformed timestamps before the shared parser's date-only fallback.
-    iso <- "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]([.][0-9]+)?(Z|[+-]([01][0-9]|2[0-3]):?[0-5][0-9])$"
-    values[is.na(values) | !grepl(iso, values)] <- NA_character_
-  }
-  stamps <- fm_time(values)
-  labels <- format(stamps, "%d %b %Y, %H:%M UTC", tz="UTC")
-  labels[is.na(stamps)] <- "Date unavailable"
-  unname(labels)
-}
-
 notifications_UI <- function(id) {
   ns <- shiny::NS(id)
   shiny::tagList(
@@ -117,20 +103,19 @@ notifications_Server <- function(id, is_module_active, login_token, championship
       if (!valid_login(login_token())) return(shiny::p("Log in to see notifications."))
       if (is.null(last_success())) return(fm_info("Notifications unavailable. Refresh to retry.",error=TRUE))
       fm_info(if (stale()) "Showing the last successful refresh. " else "Updated ",
-        notification_datetime_labels(last_success()),error=stale())
+        format(last_success(),"%Y-%m-%d %H:%M UTC",tz="UTC"),error=stale())
     })
     output$items <- shiny::renderUI({
       d <- filtered()
       if (!nrow(d)) return(shiny::p("No notifications match these filters."))
-      date_labels <- notification_datetime_labels(d$created_at)
       shiny::tagList(lapply(seq_len(nrow(d)), function(i) {
         r <- d[i,,drop=FALSE]
         event_js <- function(key, value) paste0("Shiny.setInputValue(",
           jsonlite::toJSON(session$ns(key),auto_unbox=TRUE),",",
           jsonlite::toJSON(as.character(value),auto_unbox=TRUE),",{priority:'event'});")
         shiny::div(class=paste("fm-notification",if(!r$is_read) "fm-notification-unread"),
-          shiny::div(class="fm-notification-meta",r$league_name," · ",
-            shiny::tags$time(datetime=if(date_labels[i]!="Date unavailable")r$created_at else NULL,date_labels[i])),
+          shiny::div(class="fm-notification-meta",if(identical(r$source,"Futmondo"))"LigaRadar"else r$source," · ",r$league_name," · ",
+            shiny::tags$time(datetime=r$created_at,r$created_at)),
           shiny::strong(r$message), shiny::p(r$player_name),
           if(notification_has_player_details(r)) shiny::tags$button(class="btn btn-default",type="button",
             onclick=event_js("open_player",r$id),"Player details"),
