@@ -2960,3 +2960,48 @@ Documentation has no runtime effect. Local fixtures do not establish production
 latency, physical-device behavior or hosted deployment. No real accounts or
 transactions were used. The delivery includes only this task's module patch
 and its checksum; unrelated scheduled-clause/ownership edits remain unstaged.
+
+
+### Zero-centered red/green Avg N × Trend — 2026-11-15
+
+The trend product now uses a symmetric range around zero with magnitude equal
+to the largest absolute finite source product. Zero remains neutral, negative
+products use red and positive products green, with equal absolute values having
+equal mixing intensity. Existing source min/max metadata and other metric
+palettes are retained. Its default minimum width shrinks from 145px to 104px
+with a three-line header; resizing and raw numeric sorting are preserved.
+
+Passed: `test/test_player_metric_colors.R` (10 plus its generated-client
+fixtures), `test/test_player_points_ratios.R` (4 known-answer/display/source
+groups), deployment contract (3), and required offline lifecycle
+`test/test_shiny_simulation.R` (13 checks plus 8 tabs, no external HTTP/live DB
+mutation attempts). Client fixtures cover asymmetric, one-sided, equal, empty,
+zero and missing domains, clamp behavior, stable filtered/sorted/paginated
+colors, unchanged other metrics and at least 4.5:1 text contrast over three
+surface colors. Exact staged-module color and known-answer tests also pass
+independently of unrelated working module edits.
+
+The real shared-table browser fixture passed at 320/390/1440px in dark and light
+settings: trend width is 104px, zero is neutral, signed values match expected
+red/green intensity and retain fixed three-decimal millions, and headers remain
+readable. Crest/average pinning, row backgrounds, N changes, native Position
+scrolling, rerenders, resizing and selection continue working. No overflow,
+JavaScript errors or visible output errors occurred. Heartbeats were 258–277ms.
+The 390px dark trend screenshot was inspected. Narrowing reduces total scroll
+width, so desktop Position can remain partially visible at the scroll limit;
+the fixture verifies its native scroll displacement rather than requiring it
+to disappear completely.
+
+Performance review: constant-time signed normalization replaces the existing
+color interpolation for this column only. Source range extraction, data/cache
+reads, API/DB requests, persisted observations, source timestamps, invalidation,
+reactive publication, pagination and memory bounds are unchanged. No extra
+observer, timer, retained cache, image request, CSS scope or dependency/schema
+change. The column is 41px narrower; its extra header line is bounded static
+markup. Existing durable database reuse is unaffected. Documentation has no
+runtime effect. This is presentation-only; point/history/product calculations
+are unchanged and their independent fixtures still pass. Local synthetic
+checks do not establish production latency, physical-device behavior or hosted
+deployment. No real accounts or transactions were used. Delivery excludes
+unrelated scheduled-clause interface edits and includes only this task's
+runtime checksum.

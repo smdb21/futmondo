@@ -248,8 +248,17 @@ blank; unknown trend is never treated as zero.
 `players_table_metric_cell(digits, title_column, divisor=1, fixed=FALSE)` scales
 only the display and optionally retains trailing zeros; this column uses
 `digits=3`, `divisor=1e6`, and `fixed=TRUE`. Other metric formatting is unchanged.
-The product reuses the existing metric badge and theme-aware background scaling,
-with its own finite min/max over all loaded source rows before filtering.
+The product reuses the existing metric badge with a zero-centered signed scale.
+Its symmetric extent is `M = max(abs(source_min), abs(source_max))` over finite
+products across all loaded source rows before filtering. Zero uses the theme
+surface; negative values mix toward red (`#FF6B6B`), positive values toward green
+(`#7CFF9B`), at intensity `min(1, abs(value) / M)`. An all-zero domain stays
+neutral; single-valued nonzero and one-sided domains retain their actual sign.
+Missing/nonfinite products remain blank. Text color still follows background
+luminance for at least 4.5:1 contrast. Other metric palettes are unchanged.
+
+As of 2026-11-15, the default trend-column width is 104px (formerly 145px), with
+Avg N, × Trend and (€M) on separate header lines. The column remains resizable.
 Sorting remains numeric and the default average-descending order is unchanged.
 The column follows N and observed history/trend updates; history-only updates
 reuse the mounted widget through `updateReactable()`. Its header wraps and the

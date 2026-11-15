@@ -1596,3 +1596,17 @@ No schema, dependency, automation or login inventory expansion is required.
 - Focused recovery/native/completeness/expiry/dialog checks, final mobile/desktop
   browser checks and the required offline lifecycle pass; measurements and
   limitations are in `data_review_results.md`. Deployment remains separate.
+
+
+### Zero-centered compact Avg N × Trend — implemented locally (2026-11-15)
+
+- Center the trend product's badge colors on true zero using the full-source
+  maximum absolute magnitude: neutral zero, red negative, green positive.
+  Preserve raw products, numeric sorting, missing values, source-wide domains
+  and the existing millions/three-decimal display.
+- Reduce its default width from 145px to 104px with a three-line header; retain
+  resizing. Other metric palettes and acquisition/persistence are unchanged.
+- Color/contrast contracts (10 R checks plus client fixtures), known-answer
+  products (4 groups), six mobile/desktop/theme browser configurations and the
+  required offline lifecycle pass. Performance and limits are recorded in
+  `data_review_results.md`; hosted deployment remains unverified.

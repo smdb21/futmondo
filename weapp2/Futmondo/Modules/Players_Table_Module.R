@@ -255,14 +255,19 @@ players_table_metric_style <- function() htmlwidgets::JS("function(rowInfo, colu
   if (typeof value !== 'number' || !Number.isFinite(value) || !range ||
       typeof range.min !== 'number' || !Number.isFinite(range.min) ||
       typeof range.max !== 'number' || !Number.isFinite(range.max)) return {};
-  var t = range.max === range.min ? 0 : Math.max(0, Math.min(1, (value - range.min) / (range.max - range.min)));
+  var signed = column.id === 'recent_points_trend';
+  var extent = Math.max(Math.abs(range.min), Math.abs(range.max));
+  var t = signed ? (extent === 0 ? 0 : Math.max(0, Math.min(1, Math.abs(value) / extent))) :
+    (range.max === range.min ? 0 : Math.max(0, Math.min(1, (value - range.min) / (range.max - range.min))));
+  var target = signed && value < 0 ? [255, 107, 107] : [124, 255, 155];
+  var targetHex = signed && value < 0 ? '#ff6b6b' : '#7cff9b';
   var surface = getComputedStyle(document.documentElement).getPropertyValue('--fm-surface').trim();
   var hex = surface.match(/^#([0-9a-f]{6})$/i);
   var base = hex ? hex[1].match(/../g).map(function(v) { return parseInt(v, 16); }) : [11, 18, 13];
-  var color = base.map(function(v, i) { return v + ([124, 255, 155][i] - v) * t; });
+  var color = base.map(function(v, i) { return v + (target[i] - v) * t; });
   var luminance = color.map(function(v) { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); })
     .reduce(function(sum, v, i) { return sum + v * [0.2126, 0.7152, 0.0722][i]; }, 0);
-  return { '--fm-metric-bg': 'color-mix(in srgb, var(--fm-surface) ' + ((1 - t) * 100) + '%, #7cff9b)',
+  return { '--fm-metric-bg': 'color-mix(in srgb, var(--fm-surface) ' + ((1 - t) * 100) + '%, ' + targetHex + ')',
     '--fm-metric-fg': luminance > 0.179 ? '#000000' : '#ffffff' };
 }")
 
@@ -672,8 +677,8 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
         style=players_table_metric_style(),cell=players_table_metric_cell(3L))
       if(!is.null(points_ratio_basis))table_columns[["recent_points_trend"]]<-reactable::colDef(
         name=paste0("Avg Last ",recent_n," × Trend (€M)"),
-        align="center",sortNALast=TRUE,minWidth=145,headerClass="fm-metric-header",
-        header=htmltools::span(paste0("Avg ",recent_n),htmltools::tags$br(),"× Trend (€M)"),
+        align="center",sortNALast=TRUE,minWidth=104,headerClass="fm-metric-header",
+        header=htmltools::span(paste0("Avg ",recent_n),htmltools::tags$br(),"× Trend",htmltools::tags$br(),"(€M)"),
         style=players_table_metric_style(),cell=players_table_metric_cell(3L,divisor=1e6,fixed=TRUE))
       reactable(players_table,
                 class = "fm-player-table",

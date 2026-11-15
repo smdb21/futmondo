@@ -53,6 +53,8 @@ shiny::testServer(players_table_Server,args=list(players_table_RV=source_rows,us
   columns<-widget$columns
   metric_columns<-Filter(function(column)column$id%in%c('recent_points_avg','recent_points_ratio','recent_points_trend','points'),columns)
   stopifnot(length(metric_columns)==4L,all(vapply(metric_columns,function(column)identical(column$style,as.character(players_table_metric_style())),logical(1))))
+  trend_column<-Filter(function(column)column$id=='recent_points_trend',columns)[[1]]
+  stopifnot(trend_column$minWidth==104)
  })
  session$setInputs(position_filter='Forward');settle(session);filtered_widget<-output$players_table
  check('app filter keeps global ranges without recalculating enrichment',{

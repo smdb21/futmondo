@@ -23,6 +23,33 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
           filter:bounds(el.querySelector('.rt-td-filter.fm-player-average')),
           cells:Array.from(row.children).map(e=>({text:e.textContent,...bounds(e)}))};
       });
+      const trendHeader=table.locator('.rt-th').filter({hasText:'× Trend'});
+      const signed=await trendHeader.evaluate(header=>{
+        const index=Array.from(header.parentElement.children).indexOf(header);
+        const canvas=document.createElement('canvas');canvas.width=canvas.height=1;
+        const context=canvas.getContext('2d');
+        const rgb=color=>{context.clearRect(0,0,1,1);context.fillStyle=color;context.fillRect(0,0,1,1);return Array.from(context.getImageData(0,0,1,1).data).slice(0,3);};
+        return {width:header.getBoundingClientRect().width,header:header.textContent,
+          surface:rgb(getComputedStyle(document.documentElement).getPropertyValue('--fm-surface').trim()),
+          rows:Array.from(header.closest('#fixture-players_table').querySelectorAll('.rt-tbody .rt-tr')).slice(0,4).map(row=>{
+            const badge=row.children[index].querySelector('.fm-metric-badge');
+            return {text:badge.textContent,color:rgb(getComputedStyle(badge).backgroundColor)};
+          })};
+      });
+      assert.equal(signed.width,104,'trend column is narrower than its former 145px width');
+      assert.match(signed.header,/Avg 5.*× Trend.*€M/);
+      assert.deepEqual(signed.rows.map(row=>row.text).sort((a,b)=>Number(a)-Number(b)),['-0.148','0.000','0.074','0.222']);
+      for(const [index,row] of signed.rows.entries()){
+        const value=Number(row.text);
+        const target=value<0?[255,107,107]:[124,255,155],t=Math.abs(value)/0.222;
+        const expected=signed.surface.map((channel,i)=>channel+(target[i]-channel)*t);
+        assert.ok(expected.every((channel,i)=>Math.abs(channel-signed.rows[index].color[i])<2),'signed trend uses neutral zero and symmetric red/green intensity');
+      }
+      if(width===390){
+        await trendHeader.evaluate(el=>el.scrollIntoView({block:'nearest',inline:'center'}));
+        await page.screenshot({path:`/tmp/futmondo-trend-${theme}.png`,fullPage:true});
+        await table.locator('.rt-table').evaluate(el=>el.scrollLeft=0);
+      }
       const initial=await geometry();
       const join=await table.locator('.rt-tbody .rt-tr').first().evaluate(row=>{
         const crest=getComputedStyle(row.querySelector('.fm-player-crest'));
@@ -55,7 +82,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       scrolled=await geometry();assert.ok(scrolled.scrollLeft>100);
       assert.ok(Math.abs(scrolled.average.left-scrolled.crestCell.right)<2,'average sticks beside crest');
       assert.ok(scrolled.name.right<=scrolled.crestCell.right,'name scrolls away');
-      assert.ok(scrolled.position.right<=scrolled.crestCell.right,'position scrolls away');
+      assert.ok(Math.abs((initial.position.left-scrolled.position.left)-scrolled.scrollLeft)<2,'position follows native horizontal scrolling');
       assert.equal(scrolled.average.width,84,'average is narrower than its former 110px width');
       for(const key of ['header','filter'])assert.ok(Math.abs(scrolled[key].left-scrolled.average.left)<2);
       // A player can still be selected from a pinned cell; heartbeat stays responsive.
@@ -93,7 +120,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false,'no page overflow');
       assert.deepEqual(errors,[]);assert.deepEqual(await page.locator('.shiny-output-error:visible').allTextContents(),[]);
       await page.screenshot({path:`/tmp/futmondo-sticky-${width}-${theme}.png`,fullPage:true});
-      console.log(`PASS ${width}px ${theme}: pinned crest/average/header/filter, scrolling position, N20, row states, update, selection; heartbeat ${latency}ms`);
+      console.log(`PASS ${width}px ${theme}: 104px signed trend, pinned crest/average/header/filter, scrolling position, N20, row states, update, selection; heartbeat ${latency}ms`);
       await page.close();
     }
   } finally {await browser.close();}
