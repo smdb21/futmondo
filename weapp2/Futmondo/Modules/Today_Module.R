@@ -39,7 +39,7 @@ today_transfer_rows <- function(rows, teams=NULL, players=NULL,timezone=fm_displ
 # Primary factual content resolves independently of optional history/finances.
 today_UI <- function(id) {
   ns <- NS(id)
-  tagList(h2("Today's market"),fm_info("Available market players and offers, current league balances and completed transfers."),
+  tagList(h2("Today's market"),
     coach_preference_script(),checkboxInput(ns("automatically_hire_coach"),"Automatically hire coach",value=TRUE),
     uiOutput(ns("coach_status")),
     fluidRow(uiOutput(ns("kpi_cash_box")),uiOutput(ns("kpi_valuation_box"))),

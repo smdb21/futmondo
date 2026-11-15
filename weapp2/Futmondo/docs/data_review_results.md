@@ -2844,3 +2844,21 @@ no runtime effect. Local synthetic checks do not establish hosted performance,
 physical-device rendering or production deployment; no real accounts or
 transactions were used. Only the two changed runtime checksums belong in this
 task's manifest update; unrelated working changes remain excluded from delivery.
+
+
+### Today heading information icon removal — 2026-11-15
+
+Removed the introductory information icon and its “Available market players and
+offers, current league balances and completed transfers.” tooltip in `today_UI()`.
+Focused offline rendering passed with `fm_info()` configured to fail if called:
+heading, market table placeholder, cash/valuation and recent-transfer outputs
+remain present. Deployment contract: 3 passed / 0 failed. Updated only the
+Today module checksum; no dependency changes.
+
+Performance review: one less static tooltip/icon; no new API or database calls,
+cache reads/writes/invalidation, blocking work, reactive updates, timers or retained
+state. Existing persisted observations are unaffected. Removing static markup
+reduces rendering work on desktop and mobile and adds no width constraints.
+Documentation has no runtime effect. This is a single-screen presentation edit;
+no shared infrastructure, startup or cross-cutting UI behavior changed. No live
+accounts, transactions, browser/device verification or deployment performed.

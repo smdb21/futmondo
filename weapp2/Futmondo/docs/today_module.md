@@ -15,7 +15,7 @@ The optional `coach_source` argument supplies Today’s login-only default-enabl
 
 ## Market presentation (2026-11-01)
 
-The page heading is **Today's market** and its description identifies available market players/offers alongside the existing balances and completed transfers. Its market table starts with **Free Agents Only** checked. This is a table-specific initial setting; users can uncheck it or use Clear Filters to see owned listings too. The navigation label is **Today's market**. The team page appears in navigation as **My team**. No retrieval, financial calculation, action or refresh behavior changed.
+The page heading is **Today's market**. As of 2026-11-15, the introductory information icon and its market/balances/transfers tooltip are omitted at the owner’s request. Its market table starts with **Free Agents Only** checked. This is a table-specific initial setting; users can uncheck it or use Clear Filters to see owned listings too. The navigation label is **Today's market**. The team page appears in navigation as **My team**. No retrieval, financial calculation, action or refresh behavior changed.
 
 ## Recent transfer presentation (2026-11-01)
 

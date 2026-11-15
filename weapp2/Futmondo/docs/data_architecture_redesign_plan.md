@@ -1556,3 +1556,13 @@ No schema, dependency, automation or login inventory expansion is required.
 - Focused column/known-answer average checks, synthetic mobile/desktop browser
   checks and the required offline lifecycle are recorded in
   `docs/data_review_results.md`; branch delivery remains separate from deployment.
+
+
+### Today heading information icon — implemented locally (2026-11-15)
+
+- Remove the introductory market/balances/transfers information icon from
+  `today_UI()` at the owner's request. Keep the existing page heading and outputs.
+- Focused offline UI rendering and deployment checks pass; performance review
+  and verification limits are recorded in `docs/data_review_results.md`.
+  This presentation reduction adds no capability or data behavior. Branch
+  delivery is separate from production deployment.
