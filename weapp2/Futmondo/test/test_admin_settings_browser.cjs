@@ -25,6 +25,9 @@ const {chromium} = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/futm
         const heartbeat = Date.now() - beat;
         assert.ok(heartbeat < 1000, `pending directory blocked heartbeat for ${heartbeat}ms`);
         assert.equal(await page.locator('.fm-admin-section').count(), 5);
+        const settingsText = await page.locator('#admin-league_settings').textContent();
+        assert.ok(settingsText.includes("Only league's admin (might be different than LigaRadar admin) can make changes in Futmondo official app."));
+        assert.ok(!settingsText.includes('change it in LigaRadar'));
         const geometry = await page.locator('.fm-admin-settings-grid .fm-admin-settings-card').evaluateAll(cards => cards.map(card => {
           const style = getComputedStyle(card);
           return {left:card.getBoundingClientRect().left, border:style.borderTopStyle, borderWidth:style.borderTopWidth,

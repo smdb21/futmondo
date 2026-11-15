@@ -102,7 +102,8 @@ function(input, output, session) {
     selected<-Filter(function(x)identical(as.character(x$id %||% x$`_id`),as.character(id)),leagues)
     state<-primary_team_state()
     list(league=if(length(selected))selected[[1]]else list(),info=state$data %||% list(),
-      status=state$status,error=state$error,
+      status=state$status,error=state$error,observed_at=state$observed_at,
+      freshness=state$freshness,source=state$source,
       stale=identical(state$freshness,"stale")||identical(state$status,"stale")||!is.null(state$error))
   })
   primary_market_state <- reactive({
@@ -344,7 +345,8 @@ players_in_championship_Server(id = "players_in_championship",
                championship_id = championship_id_RV,
                user_team_id = user_team_id_RV,
                user_teams_RV = user_teams_RV, is_admin = is_admin_RV,refresh_trigger=refresh_trigger,
-               league_settings_source = league_settings_source)
+               league_settings_source = league_settings_source,
+               retry_league_settings = function()team_retry(isolate(team_retry())+1L))
   observe({
     if(!valid_login(login_token_RV()))return()
     state<-championship_state()

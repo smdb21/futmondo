@@ -1676,3 +1676,21 @@ phone/desktop browser checks, deployment exclusions and the required offline
 lifecycle pass. Measurements and limits are in `data_review_results.md`. No new
 capability, dependency, schema, acquisition cadence or transaction behavior.
 Production deployment and authenticated hosted acceptance remain separate.
+
+
+### Admin configuration freshness — implemented and verified locally (2026-11-15)
+
+- Reproduce premature stale display when the 20-second memory TTL expires
+  before an explicit durable source deadline. Respect that original deadline
+  for worker replay; retain strict expiry, failures and interactive TTLs.
+- Pass the shared configuration observation time/status to Admin, distinguish
+  normal pending work from failure, and add an authorized scoped settings
+  reload. Preserve independent background collection and database reuse.
+- Clarify that only the league's admin, potentially different from LigaRadar's
+  admin, can change settings in the official Futmondo app.
+- Focused state/recovery/source-expiry/worker/coach checks, responsive browser
+  checks and the offline lifecycle pass. Production metadata confirms actual
+  successful source retrieval as well as real overdue periods; this change
+  does not claim to eliminate collector latency. See `data_review_results.md`.
+  No new capability, dependency, schema or environment setting. Deployment and
+  authenticated hosted UI verification remain separate.

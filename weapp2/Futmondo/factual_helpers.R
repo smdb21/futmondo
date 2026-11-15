@@ -409,9 +409,15 @@ factual_read_adapter<-function(session,handler,login_token,championship_id=NULL,
    deadline<-state$data$valid_until
    lineup_expired<-!is.numeric(deadline)||length(deadline)!=1L||!is.finite(deadline)||as.numeric(Sys.time())>=deadline
   }
-  if(!is.null(state$data)&&((is.finite(age)&&age>resource_policy(handler)$ttl)||lineup_expired||snapshot_expired)&&
+  worker<-fm_worker_configured()&&!identical(fm_worker_mode(ctx$account_id),FALSE)
+  # A database snapshot carries its own source deadline. The outer memory TTL
+  # controls cache reuse, not the validity of an already persisted observation.
+  # Keep ordinary TTL expiry for interactive reads and legacy undated snapshots.
+  source_deadline<-!is.null(attr(state$data,"valid_until"))||
+    (is.list(state$data)&&"valid_until"%in%names(state$data))
+  cache_expired<-is.finite(age)&&age>resource_policy(handler)$ttl&&!(worker&&source_deadline)
+  if(!is.null(state$data)&&(cache_expired||lineup_expired||snapshot_expired)&&
      !identical(state$status,"loading")&&!identical(state$freshness,"stale")){
-   worker<-fm_worker_configured()&&!identical(fm_worker_mode(ctx$account_id),FALSE)
    if(!worker){
     bump<-attr(entry,"demand_refresh");if(is.function(bump))shiny::isolate(bump(bump()+1L))
    }

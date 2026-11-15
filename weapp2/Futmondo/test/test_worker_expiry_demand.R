@@ -22,8 +22,14 @@ shiny::testServer(function(input,output,session){
  output$cash<-shiny::renderText(state()$data$budget)
 },{
  settle(session);stopifnot(output$cash=='100',!length(calls))
+ # The 20s memory policy cannot expire a durable observation valid for 60s.
+ original_time<-state()$observed_at;original_deadline<-attr(state()$data,'valid_until')
+ now<<-now+21;pulse(1L);settle(session)
+ stopifnot(state()$freshness=='fresh',state()$status=='ok',invalidations==0L,!length(calls),
+  identical(state()$observed_at,original_time),identical(attr(state()$data,'valid_until'),original_deadline))
+ cat('PASS a valid 21-second-old database snapshot retains its original source deadline without a false stale state or I/O\n')
  s$jobs<-list(list(key=d$resource_key,running=TRUE,pending=TRUE))
- now<<-now+61;pulse(1L);settle(session)
+ now<<-now+40;pulse(2L);settle(session)
  stopifnot(state()$freshness=='stale',invalidations==0L,!length(calls))
  cat('PASS automatic source expiry only marks stored data stale without queue changes\n')
  refresh(1L);settle(session)

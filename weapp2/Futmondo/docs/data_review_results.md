@@ -3223,3 +3223,59 @@ colors (10), deployment (3), full-server banner finance (14), refresh stability
 isolated 524-player measurement was 0.230s for ten unchanged publications, with
 zero widget renders/updates. The export excludes unrelated local and concurrent
 staged edits; no source or database service was contacted by these tests.
+
+
+## Admin configuration freshness and authority — 2026-11-15
+
+Two local causes of the reported warning were reproduced: the root conflated
+pending/stale snapshots with an unavailable configuration, and the shared
+factual adapter could expire a persisted worker observation at the memory
+cache's 20-second TTL despite its later explicit source deadline. The adapter
+now respects that deadline; it never extends it or renews the observation.
+Missing deadlines retain the ordinary TTL, malformed/expired deadlines stay
+stale, and interactive acquisition/manual preflight contracts are unchanged.
+Admin receives the existing shared status/error/source/observation metadata.
+Pending work follows the existing suppressed-information convention; expired
+observations are labeled out of date with their original check time; actual
+read failures retain safe diagnostics. An authorized scoped Reload settings
+action uses the existing primary-team retry, suppresses pending duplicates
+and preserves the database-only browsing boundary for opted-in accounts.
+The read-only text uses the owner's requested distinction between league and
+LigaRadar administrators and points to the official Futmondo app.
+
+Read-only production investigation: health advisories were empty; the service
+heartbeat was current. Stored team observations had 60-second deadlines, with
+real expired periods between collector turns. Rival jobs also had explicit
+source_rejected failures; those are not evidence that the active own-team
+request failed. The active resolved own-team job acknowledged another success
+at 2026-11-15 15:16:28 UTC with no source error. No production credentials, raw
+private responses, transactions, schema changes or queue writes were used.
+The initial project-list connector call failed transiently; scoped metadata
+queries worked. These observations do not establish continuous hosted
+freshness: genuine collection delays remain truthfully stale, and this task
+does not claim to repair every rejected rival endpoint or worker cadence gap.
+
+Executed checks: Admin configuration state/recovery (two groups using the real
+root projection and module), existing league settings (six groups), worker
+expiry (five groups, including a 21-second-old snapshot still valid until its
+original 60-second deadline), database-only GUI reads (two cold sessions,
+persistence replay, repeated polls and recovery), source-expiry contracts
+(seven), worker provider (eight reported assertions) and coach recovery (nine).
+The required offline lifecycle passed 13 checks plus eight tabs with zero
+HTTP/live database mutation attempts. Eight Chromium configurations cover
+320/390/768/1440px and both themes, the exact administrator explanation,
+aligned boxes, disclosure keyboard access, navigation under a five-second
+held directory read, and no overflow or output errors. Settings appeared in
+817–835ms and held-request heartbeats took 42–54ms.
+
+Performance review: constant-time deadline/metadata checks reuse existing
+resource state; no timer, cache, source request, DB write or acquisition job is
+added to automatic rendering. Explicit reload triggers one existing scoped
+read, coalescing pending work; opted-in sessions reread durable snapshots
+without scheduling acquisition. Existing cache/registry/queue limits and
+account/league/team/season/scoring isolation remain. Rendering is bounded to
+the existing settings rows plus one compact source disclosure. No dependency,
+schema or environment changes; documentation has no runtime effect. Source
+checksums are updated without unrelated manifest/package changes. Local
+checks and branch delivery do not establish deployed appearance or eliminate
+genuine external/source latency. Unrelated working changes are preserved.

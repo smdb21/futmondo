@@ -95,3 +95,34 @@ no cache, request or timer. Browser navigation and heartbeat checks deliberately
 hold directory reads for five seconds. See `test/test_admin_settings_browser_app.R`
 and `test/test_admin_settings_browser.cjs`; run the R fixture, then the Node
 check with the project's existing Playwright browser configuration.
+
+
+## Settings freshness and authority — 2026-11-15
+
+The read-only explanation now states: “Only league's admin (might be different
+than LigaRadar admin) can make changes in Futmondo official app.”
+
+`admin_league_settings_UI(rows, stale=FALSE, status=NULL, error=NULL,
+observed_at=NULL, retry=NULL)` delegates its source note to
+`admin_league_settings_status()` using the existing information disclosure.
+The shared pending-information convention suppresses a failure note during
+loading. A genuinely expired observation is labeled out of date, with its
+original last-checked time; a failed read retains the safe error diagnostic.
+Fresh observations display their original check time. Zero/false values and
+known values during a refresh remain intact.
+
+The root `league_settings_source` passes `observed_at`, `freshness` and `source`
+from the same shared team state, alongside the existing data/status/error.
+`admin_Server(..., retry_league_settings=NULL)` accepts an optional callback
+for the **Reload settings** control. The application increments only the
+existing primary team retry revision. Inactive, unauthorized and pending
+requests cannot invoke it. In Background sync mode this rereads database
+snapshots, preserving the independent worker schedule; interactive mode uses
+the existing factual read and persistence path. Reload cannot promise a newer
+source result when the collector/source is delayed.
+
+`factual_read_adapter()` now respects an explicit persisted worker observation's
+source deadline instead of expiring its display at the shorter memory-cache
+TTL. Invalid/elapsed source deadlines remain stale; legacy snapshots without a
+deadline and interactive reads retain the ordinary TTL. No source deadline is
+extended, source time renewed, failed read hidden, or manual preflight relaxed.

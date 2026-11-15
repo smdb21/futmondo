@@ -106,7 +106,7 @@ admin_settings_styles <- function() singleton(tags$style(HTML("
 ")))
 
 # Compact, keyboard-accessible disclosure rows; no requests or reactive state.
-admin_league_settings_UI <- function(rows,stale=FALSE) {
+admin_league_settings_UI <- function(rows,stale=FALSE,status=NULL,error=NULL,observed_at=NULL,retry=NULL) {
  row_ui<-function(part,i)tags$details(class="fm-admin-setting",
   tags$summary(tags$span(part$setting[i]),tags$strong(part$value[i])),
   tags$p(part$explanation[i]))
@@ -114,8 +114,8 @@ admin_league_settings_UI <- function(rows,stale=FALSE) {
  other<-rows[rows$group=="Other reported settings",,drop=FALSE]
  tagList(
   admin_settings_styles(),
-  fm_info("Current league settings · Read-only. Open a setting for details; change it in LigaRadar."),
-  if(isTRUE(stale))fm_info("Showing saved settings while the latest configuration is unavailable.",error=TRUE),
+  fm_info("Current league settings · Read-only. Open a setting for details. Only league's admin (might be different than LigaRadar admin) can make changes in Futmondo official app."),
+  admin_league_settings_status(stale,status,error,observed_at,retry),
   fluidRow(class="fm-admin-settings-grid",lapply(split(groups,ceiling(seq_along(groups)/2)),function(pair){
    column(12,class="col-md-4",lapply(pair,function(group){
     part<-rows[rows$group==group,,drop=FALSE]
@@ -128,6 +128,20 @@ admin_league_settings_UI <- function(rows,stale=FALSE) {
    tags$dl(lapply(seq_len(nrow(other)),function(i)tagList(tags$dt(other$setting[i]),tags$dd(other$value[i]))))),
   fm_info("Round rewards exclude teams that started the round in debt. These are current rules; past changes may affect reconstructed balances.")
  )
+}
+
+# Distinguish an in-flight refresh, an expired observation and a failed read.
+admin_league_settings_status <- function(stale=FALSE,status=NULL,error=NULL,observed_at=NULL,retry=NULL) {
+ status<-fm_scalar(status,if(isTRUE(stale))"stale"else"ok")
+ pending<-identical(status,"loading")
+ stamp<-fm_time(observed_at)
+ checked<-if(length(stamp)==1L&&!is.na(stamp))paste0(" Last checked: ",fm_format_datetime(stamp),".")else ""
+ text<-if(pending)"Updating league settings…"else if(!is.null(error)||status%in%c("unavailable","error"))
+  paste0("League settings could not be refreshed. ",resource_failure_message(error))else if(isTRUE(stale))
+  "Showing saved settings (out of date)."else ""
+ if(!nzchar(text)&&!nzchar(checked))return(NULL)
+ fm_info(paste0(text,checked),if(!is.null(retry))actionButton(retry,"Reload settings",disabled=pending),
+  error=!pending&&(!is.null(error)||status%in%c("unavailable","error")),pending=pending)
 }
 
 admin_UI <- function(id) {
@@ -146,7 +160,7 @@ admin_UI <- function(id) {
    selectInput(ns("award_round"),"Round to refresh",choices=character()),actionButton(ns("btn_refresh_selected_award"),"Refresh selected round"),
    uiOutput(ns("awards_progress")),reactable::reactableOutput(ns("awards_coverage"))))
 }
-admin_Server <- function(id,is_module_active,login_token,championship_id,user_team_id,user_teams_RV,is_admin=NULL,refresh_trigger=NULL,league_settings_source=NULL) {
+admin_Server <- function(id,is_module_active,login_token,championship_id,user_team_id,user_teams_RV,is_admin=NULL,refresh_trigger=NULL,league_settings_source=NULL,retry_league_settings=NULL) {
  moduleServer(id,function(input,output,session){
   ns<-session$ns
   authorized<-reactive(valid_login(login_token()) && if(is.function(is_admin))isTRUE(is_admin())else if(!is.null(is_admin))isTRUE(is_admin)else is_authorized_admin(login_token()))
@@ -158,7 +172,13 @@ admin_Server <- function(id,is_module_active,login_token,championship_id,user_te
    snapshot<-league_settings_source()
    if(!is.list(snapshot))return(fm_info("League settings are unavailable.",error=TRUE))
    rows<-admin_league_settings(snapshot$league %||% list(),snapshot$info %||% list(),championship_id())
-   admin_league_settings_UI(rows,stale=isTRUE(snapshot$stale))
+   admin_league_settings_UI(rows,stale=isTRUE(snapshot$stale),status=snapshot$status,error=snapshot$error,
+    observed_at=snapshot$observed_at,retry=if(is.function(retry_league_settings))ns("retry_league_settings")else NULL)
+  })
+  observeEvent(input$retry_league_settings,{
+   req(is_module_active(),authorized(),is.function(retry_league_settings))
+   if(is.function(league_settings_source)&&identical(league_settings_source()$status,"loading"))return()
+   retry_league_settings()
   })
   context<-reactive(list(user=fm_scalar(login_token()[["userid"]]),league=fm_scalar(championship_id())))
   reset_context<-reactiveVal(NULL);observeEvent(context(),reset_context(NULL),ignoreNULL=FALSE,priority=100)
