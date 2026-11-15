@@ -779,7 +779,7 @@ reorder_player_table_columns <- function(df) {
     "name", "role", "team", "selling_by", "market_inMarket", "bid_price", "bid_user", "numberOfBids",
     "points", "price", "market_price", "effective_market_price",
     "change", "change_by_value", "value",
-    "clause_price", "clause_suggestedClause", "clause_date",
+    "clause_price", "clause_suggestedClause", "clause_date", "clause_transferDate",
     "creationDate", "expirationDate", "userTeam"
   )
 
@@ -1049,6 +1049,17 @@ get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE) {
       align = "center",
       cell = function(value) {
         format_table_date(value)
+      }
+    )
+  }
+
+  if ("clause_transferDate" %in% colnames(table)) {
+    columns[["clause_transferDate"]] <- colDef(
+      name = "Clause Transfer Date",
+      align = "center",
+      cell = function(value) {
+        formatted <- format_table_date(value)
+        if (length(formatted) == 1L && nzchar(formatted)) formatted else "Not reported"
       }
     )
   }

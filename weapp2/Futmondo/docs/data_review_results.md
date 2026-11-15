@@ -2678,3 +2678,63 @@ The maintained [official comparison](feature_comparison.md) records dated source
 Verification: `Rscript test/test_login_feedback.R --browser` passed 5 server checks and 5 existing click/keyboard/duplicate-submission browser checks; the default Playwright browser binary was absent, so a temporary `/tmp` adapter selected the already installed Chromium 1248 without repository/dependency changes. `Rscript test/test_login_restore_visibility.R` passed cookie probing, completion, restore, expiry, denial and disabled-setting visibility. Required `Rscript test/test_shiny_simulation.R` passed 13 checks plus 8 tabs, with zero external HTTP/live database mutation attempts. A temporary browser script against the existing HTTP-blocked `test/test_browser_app.R` passed 320/390/992/1440px in light/dark themes: all eight explanations initially hidden, title-click and Enter/Space toggles, rotating chevrons, 3/5 tier assignment, stacked/two-column geometry, no page overflow while collapsed or expanded, no commercial wording or browser errors, and preserved catalog DOM/disclosure state across validation, login, navigation and logout. Initial scratch navigation assertions ran before startup navigation settled; explicit Shiny connection/authentication/idle synchronization resolved the harness timing. Settled collapsed 1440px dark and expanded 390px light screenshots were visually inspected. The lifecycle and existing login browser checks were rerun after the disclosure change. Scoped task diff/whitespace review passed.
 
 Performance review: only eight constant items and two static sections are rendered once per UI construction. Collapsed descriptions reduce initial layout height; native disclosure toggles lay out only the selected content locally. Authentication status updates do not rerender the inventory. Added CSS is scoped and layout is responsive; there are no listeners, reactive dependencies, timers, acquisition/optimizer work, API/database calls, cache invalidations, new persistence or growing buffers. Official reference links initiate no application request. Existing factual results continue to use their established durable database observations; this task adds no result cache. Documentation/rule changes have no runtime impact. No dependency, environment, schema or manifest-dependency change. Verification is synthetic/local; hosted rollout and authenticated official configuration inspection remain unverified.
+
+
+## Championship empty asking prices and clause dates — 2026-11-14
+
+Root cause: captured `/5/league/championshipplayers` responses carry catalog
+valuation/clauses but no asking price. `unify_columns()` consequently created an
+all-missing `effective_market_price`; the championship module never read/joined
+`/1/market/players`, whose `price` is the actual asking price. The market capture
+contains 163 unique player IDs with prices. The newer championship capture has
+520 rows, with three `clause.transferDate` values, all on `transferred=TRUE`
+players. Parsing preserves all three exactly. The default Active Clause Only
+filter correctly excludes these players; absent dates on other rows are expected.
+The raw date column also lacked its own label/formatter.
+
+The fix projects asking prices from the existing state-only shared market
+adapter by exact player identity, independently of catalog loading, without
+substituting valuation/clause prices or manufacturing dates. Missing dates render
+as Not reported, and supplied dates use the existing timezone formatter. Pending
+transfer dates remain visible when the active-clause filter is disabled. Market
+loading/failure/stale feedback remains separate from usable catalog data.
+Existing DB worker snapshots retain account/league/team/competition/season/scoring
+scope, source clocks and completeness. There is no new cache, durable write,
+acknowledgement shortcut, schema or dependency.
+
+Verification: `Rscript test/test_championship_columns.R` passes ten groups covering
+exact ID joins, zero row multiplication, known asking prices, unknown/empty/stale/
+partial/duplicate evidence, known-answer date formatting versus lock expiry,
+actual captured date preservation, typed persisted-snapshot restoration and the
+real market wrapper reusing that snapshot with zero source requests. Real shared
+adapters with a delayed synthetic market promise prove catalog access and an
+input/output heartbeat remain responsive, warm reactive access makes no added
+requests, league changes clear old prices, failures retain catalog data and safe
+retry feedback, and explicit Refresh recovers with one market request per scope/
+refresh. No real account, live database write or transaction was used.
+
+Adjacent checks passed: player-table filters 9, player metric colors 10, nested
+player fields 5 (including warm/restart reuse), deployment contract 3; required
+`Rscript test/test_shiny_simulation.R` passed 13 checks plus eight tabs with zero
+external HTTP/live DB mutation attempts. Existing synthetic source diagnostic and
+Plotly warnings remain; they do not fail the harness. Initial focused harness
+iterations needed an eager table consumer and HTML/dependency-aware assertions;
+loading feedback now uses a plain status element because the existing pending
+information helper intentionally returns no markup.
+
+Performance review: one additional shared market dependency for this page; a cold
+or invalid source can require one market acquisition, while valid persisted and
+warm resources are reused. No player-by-player request, new polling/timer, queue,
+service, history fetch or DB schema/index work. The projection uses a bounded ID
+match over the existing catalog/market data; 100 joins of 527 players took
+0.014–0.040 seconds locally across repeated runs, with a 112,136-byte projected frame. Actual timings vary
+and exclude hosted network/DB latency. Existing table equality logic prevents
+unchanged payload redraws; the small status element/disclosure uses responsive
+existing styles and introduces no fixed-width control. Mobile/browser appearance,
+production DB acknowledgement and authenticated hosted acceptance were not tested
+in this task. The exact task-only staged application independently passes the
+focused, filter, deployment and required lifecycle checks. Scoped runtime manifest
+checksums are updated without changing
+packages or unrelated entries. Existing working-tree/index edits are excluded
+from the task commit. Local validation and branch delivery do not establish
+production rollout.

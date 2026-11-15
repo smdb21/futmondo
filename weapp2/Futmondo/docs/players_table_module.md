@@ -251,3 +251,32 @@ source/history/N enrichment; filters reuse that result. No additional source or
 database acquisition, persistence, cache, observer, timer, dependency or schema
 is introduced. Successful underlying observations retain existing durable
 database reuse and their source/context metadata.
+
+
+## Championship asking prices and clause transfer dates (2026-11-14)
+
+`championship_market_prices(players, market_state)` projects `effective_market_price`
+from the shared market list's `price`, matching opaque player IDs without changing
+catalog row order, ownership, valuation or clause prices. The championship API
+has no asking-price field. Nonlisted players keep missing asking prices; valuation
+and buyout prices are never substituted. Duplicate/invalid market IDs are not
+matched. Only a complete successful current market list establishes nonlisting;
+loading, failed, stale and partial evidence cannot establish absence.
+
+`players_in_championship_Server()` reads market data through a state-only shared
+factual adapter alongside its existing catalog adapter. The catalog renders while
+market data loads, and updates when prices arrive. Loading, safe source failures
+and stale observations have separate status feedback; explicit Refresh retries
+through the existing scoped adapter. No per-player market request is made.
+Existing account/league/team/season/scoring worker snapshots provide durable DB
+persistence and restart reuse with original source times/completeness; the join
+adds no cache or persistence acknowledgement and never changes source freshness.
+
+`clause_transferDate` is displayed as **Clause Transfer Date**, using the existing
+user-timezone date formatter; absent/malformed values say **Not reported**. This
+is separate from `clause_date` (**Clause Expiration**, the buyout lock). Captured
+championship responses provide transfer dates only for pending clause transfers.
+The default **Active Clause Only** filter excludes those transferred players;
+turn it off to see their reported dates. A short information disclosure explains
+both conditional fields. This repairs existing columns; no new advertised/login
+capability, transaction behavior, acquisition permission or dependency is added.

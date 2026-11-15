@@ -1502,3 +1502,18 @@ Implemented locally: remove the routine departure-exclusion paragraph, replace t
 Status: **implemented and verified locally; hosted rollout unverified**.
 
 Replace generic welcome cards with an evidence-backed inventory of LigaRadar additions, grouped into Essentials and Advanced. Render the tiers in two columns at desktop widths and one on mobile, preserving the list across authentication updates. Item descriptions start collapsed and open from a title with a chevron, using native keyboard-accessible disclosures. No commercial copy or feature gating. `docs/feature_comparison.md` records exact official equivalents, specific additions and evidence limits; `Agents.md` requires checking every new/expanded feature against the official app and maintaining both lists. No data acquisition, persistence, cache, dependency or access-policy changes. Verification and performance findings are recorded in `docs/data_review_results.md`; branch delivery is separate from hosted acceptance.
+
+
+## Championship empty asking prices and clause dates — 2026-11-14
+
+Status: **implemented and verified locally; hosted rollout unverified**.
+
+Repair the championship table's missing price source by joining the existing
+shared market resource by player ID, with independent asynchronous loading,
+context isolation, safe failure/stale feedback and existing durable DB snapshot
+reuse. Preserve missing prices for players without market listings. Format the
+already-parsed clause transfer date independently of clause lock expiration and
+explain that the default active-clause filter excludes pending transfers. Local
+capture replay, delayed-source/recovery/isolation, persisted-snapshot reuse,
+performance and offline lifecycle checks are recorded in `data_review_results.md`.
+No schema, dependency, automation or login inventory expansion is required.
