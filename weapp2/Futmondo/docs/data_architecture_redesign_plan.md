@@ -1862,3 +1862,25 @@ environment setting, source-collection cadence or transaction change.
 - [x] Local visual/performance checks, actual-app offline loading checks, 13-check/eight-tab lifecycle and three deployment checks pass. See `docs/progressive_loading.md` and `docs/data_review_results.md`. Production rollout and physical-device acceptance remain separate.
 
 This is a presentation refinement of the existing loader, with no new analytical capability or login feature-tier addition.
+
+
+### Player-only availability after the remaining 32-second report — 2026-11-15 Pacific
+
+- [x] Reproduce rejection of a two-minute catalog by the blanket 60-second card
+  cutoff; preserve separate catalog/market source deadlines through selection.
+- [x] Remove financial/roster/transfer acquisition from player selection; retrieve
+  only stale target facts and update actual ownership/listing from evidenced
+  summary fields. Retain scoped session display reuse and durable factual sources.
+- [x] Admit financial checks only on explicit editor demand; attach fresh dormant
+  entries without duplicate reads and require target plus funds before Submit.
+  Keep original deadlines and independent final purchase checks.
+- [x] Verify actual table/modal wiring, held-history responsiveness, official
+  captured mappings, persistence/context isolation and the offline lifecycle.
+  Record final checks and performance in `data_review_results.md`.
+- [x] Add code-only Docker build fingerprints for reliable deployed-source checks.
+- [ ] Confirm the rebuilt production fingerprints and Dani Lorenzo's authenticated
+  hosted selection path. No live account/transaction is used in automated tests.
+
+No schema, dependency, environment variable, background schedule or new product
+capability is introduced. These implementation checks supersede the earlier
+expiry-driven card behavior; deployment and private-account acceptance are separate.

@@ -2,6 +2,8 @@
 # Held and delayed synthetic sources exercise card work without external I/O.
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages(source('global.R'))
+get_sb_url<-function()'';get_sb_key<-function()''
+fm_worker_configured<-function()FALSE
 checks<-0L;check<-function(name,expr){force(expr);checks<<-checks+1L;cat('PASS',name,'\n')}
 settle<-function(session){for(i in seq_len(20L)){later::run_now(0);session$flushReact()}}
 auth<-shiny::reactiveVal(c(userid='card-work-fixture',token='synthetic'))
@@ -16,7 +18,7 @@ renderUI<-function(expr,...,env=parent.frame(),quoted=FALSE){
 trace('updateBox',where=asNamespace('shinydashboardPlus'),print=FALSE,
  tracer=quote(if(identical(id,'selected_player_box')).GlobalEnv$box_updates<-.GlobalEnv$box_updates+1L))
 record_acquired_resource<-function(...)invisible(TRUE)
-async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is_current=function()TRUE){
+async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is_current=function()TRUE,worker_bypass=FALSE,...){
  index<-length(calls)+1L;calls[[index]]<<-list(fn=fn,context=context)
  promises::promise(function(resolve,reject){pending[[index]]<<-list(resolve=resolve,reject=reject,current=is_current)})
 }
@@ -29,13 +31,11 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
  championship_id=league,user_team_id=team),{
  opened<-Sys.time();selected(player('p1'));settle(session)
  check('identity renders while every source remains pending',{
-  stopifnot(grepl('Player p1',output$player_identity_summary$html,fixed=TRUE),length(calls)==6L,
+  stopifnot(grepl('Player p1',output$player_identity_summary$html,fixed=TRUE),length(calls)==4L,!length(indices('get_team_acquisition_capacity')),
    identical(card_states$lineup()$status,'loading'),identical(card_states$profile()$status,'loading'))
  })
- resolve('get_player_summary',observed_data(list(championship=list(season='2026'),points=list(list(round=1,points=-2)))))
- resolve('get_team_acquisition_capacity',list(status='ok',valid_until=as.numeric(Sys.time())+60,
-  roster=list(status='ok',count=1,cap=20,effective_count=1,effective_remaining_slots=19),
-  funds=list(spendable_budget=10000),outstanding=list(count=0),rules=list(minimum_bid_at_value=TRUE)))
+ resolve('get_player_summary',observed_data(list(data=list(id='p1'),championship=list(owner=list(computer=TRUE),season='2026'),
+  market=list(p=1000,bids=list()),points=list(list(round=1,points=-2)))))
  settle(session);available_ms<-as.numeric(difftime(Sys.time(),opened,units='secs'))*1000
  check('verified actions and summary scores render before optional history',{
   stopifnot(grepl('Make Market Offer',output$action_buttons$html,fixed=TRUE),
@@ -43,7 +43,7 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
    grepl('-2 pts',output$recent_round_points$html,fixed=TRUE),
    identical(card_states$lineup()$status,'loading'),identical(card_states$valuation()$status,'loading'))
  })
- before_actions<-action_builds
+ before_actions<-action_builds;before_boxes<-box_updates
  # Each optional completion occurs in a separate event-loop turn.
  for(source in c('get_lineup_from_team','get_player_full_profile','get_player_matches','read_card_price_history','read_card_round_history')){
   done<-FALSE
@@ -58,7 +58,7 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
  cat(sprintf('MEASURE card_available_ms=%.0f optional_complete_ms=%.0f box_updates=%d optional_action_rebuilds=%d source_reads=%d\n',
   available_ms,optional_ms,box_updates,action_builds-before_actions,length(calls)))
  check('optional completions do not rebuild the header or action controls',{
-  stopifnot(box_updates==1L,action_builds==before_actions,
+  stopifnot(box_updates==before_boxes,action_builds==before_actions,
    grepl('-2 pts',output$recent_round_points$html,fixed=TRUE))
  })
  # Navigation retains a team read even while the clicked player changes.
@@ -82,8 +82,8 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
    tail(calls[indices('get_my_market_players')],1L)[[1]]$context$account_id=='other-account')
  })
  selected(NULL);settle(session)
- check('closing the card makes its pending team requests obsolete',{
-  stopifnot(!tail(pending[indices('get_my_market_players')],1L)[[1]]$current())
+ check('closing the card detaches the view while a finite shared team read can complete for reuse',{
+  stopifnot(tail(pending[indices('get_my_market_players')],1L)[[1]]$current())
  })
 })
 untrace('updateBox',where=asNamespace('shinydashboardPlus'))

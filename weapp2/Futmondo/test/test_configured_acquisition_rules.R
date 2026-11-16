@@ -62,8 +62,8 @@ check('real bid dialog and final preflight reuse the same current league minimum
  showModal<-function(ui,...)captured<<-as.character(ui)
   dialog_refresh<-reactiveVal(0L)
   settle<-function(session)for(i in seq_len(20L)){later::run_now(0);session$flushReact()}
- selected<-reactiveVal(data.frame(id='target',name='Fixture Player',role='defensa',team='Club',value=200,price=150,
-   change=0,points=0,user_team_id='',market_inMarket=TRUE))
+ selected<-reactiveVal(observed_data(data.frame(id='target',name='Fixture Player',role='defensa',team='Club',value=200,price=150,
+   change=0,points=0,user_team_id='',market_inMarket=TRUE)))
  testServer(selected_player_Server,args=list(selected_player=selected,login_token=reactive(auth),
     championship_id=reactive('fixture-league'),user_team_id=reactive('mine'),capacity_fetcher=function(...)active_cap,
     refresh_trigger=dialog_refresh),{
@@ -78,7 +78,9 @@ check('real bid dialog and final preflight reuse the same current league minimum
    }
    active_cap$rules$minimum_bid_at_value<<-NA
     dialog_refresh(isolate(dialog_refresh())+1L);settle(session)
-   stopifnot(!run_acquisition_preflight(selected_player(),'bid',200)$ok,!isTRUE(open_market_offer_modal()))
+   opened<-open_market_offer_modal();settle(session)
+   stopifnot(!run_acquisition_preflight(selected_player(),'bid',200)$ok,
+     !isTRUE(opened)||(!market_offer_dialog_RV()$preflight$ok&&grepl('disabled',output$market_offer_submit$html,fixed=TRUE)))
  })
 })
 for(method in c('GET','POST','PUT','PATCH','DELETE'))suppressMessages(untrace(method,where=asNamespace('httr')))

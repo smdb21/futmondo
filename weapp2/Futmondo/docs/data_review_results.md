@@ -4003,3 +4003,105 @@ Fullscreen phone callback p95 was 0.90–1.00 ms; the 390px 4× CPU check measur
 The isolated release passed `node test/test_loading_visual.cjs --full-app` at 1440/320px: actual launch geometry and dismissal, stopped hidden animation, leagues → market → ready, retained partial/failed Retry controls, settled empty feedback and zero real HTTP attempts. The existing app-object fixture still drives synthetic credentials through Shiny; this does not claim to fix its previously documented login-form visibility limitation. An initial full-app assertion used the obsolete `#startup_status` location for settled feedback; the current disclosure registry moves that content into `.fm-info-panel`. Updating the test to open the actual panel resolved the failure without changing production status behavior.
 
 Required `Rscript test/test_shiny_simulation.R` passed 13 checks plus eight tabs with no real HTTP/live database mutation attempts. Three deployment-contract checks passed; existing synthetic Plotly warnings remain. The isolated release excludes unrelated working/staged changes; standalone fixture runtime inputs match it (theme file differs only in line endings). Only the two loader runtime manifest checksums change; package/dependency entries are preserved. This is a cosmetic refinement, not a new capability for the official-feature comparison/login tiers. These are local synthetic measurements, not hosted latency, physical-phone/GPU or deployment acceptance; no real account or transaction was used.
+
+
+## Target-only card selection after the remaining 32-second wait — 2026-11-15 Pacific
+
+The previous implementation did not eliminate the reported path. A reproducible
+remaining defect rejected a 120-second-old catalog because the card imposed a
+60-second cutoff, although that source's policy is 300 seconds. The rejection
+started full team capacity, including balances/roster/transfer history. Earlier
+fresh-row browser fixtures bypassed that branch and therefore did not establish
+that Dani Lorenzo's hosted wait was resolved. The user's actual private 32-second
+request timeline was not captured; no particular production request is claimed
+to have consumed the whole interval.
+
+Current behavior:
+
+- Catalog and market observations carry separate original deadlines through the
+  actual price join, enrichment, filters and selected snapshot. Explicit stricter
+  worker/database deadlines win. Market/Today endpoint rows retain listing proof
+  and their own source lifetime; no freshness is borrowed from a newer catalog.
+- Selecting a player never starts new team-capacity/roster/funds/transfer-history
+  work. It reuses recent target facts or acquires the stale target's existing
+  summary. Profile/points/history requests proceed independently of purchase
+  capacity. Newer authoritative summaries update actual owner/listing controls;
+  missing source fields and wrong IDs cannot establish availability. Captured
+  asking prices stay distinct from catalog valuation and negative points remain.
+- Successful display checks survive source expiry/reopening through a bounded
+  root-session registry (64 rows, 4 MiB, 128 KiB per row), with account, league,
+  team, player, competition, season, scoring, Refresh and invalidation isolation.
+  The original API facts remain durable in the existing successful catalog,
+  market and summary snapshots. Session display markers are not persisted as
+  authorization, and do not make old data current after another session/restart.
+- Financial work starts only on explicit editor demand. `ensure()` first attaches
+  a dormant entry so a fresh result is reused instead of forcing a second read.
+  The market editor requires both target and financial proof; even fresh funds
+  cannot enable Submit before target facts settle. A newly owned/off-market
+  target ends pending verification with submission disabled, even if funds are
+  still held. Independent final preflights/context/duplicate guards remain.
+- Remove the outer whole-card financial repair/retry loop. The native engine's
+  finite source freshness repairs remain unchanged. Failed financial completion
+  is truthful in the editor and explicit reopening is the retry path. Card Retry
+  refreshes only player facts. No timer, background service, schema, package,
+  environment setting or product capability/login-tier expansion is added.
+
+Executed verification:
+
+- Eleven selection/provider/loading suites pass: `test_player_selection_availability`,
+  `test_player_availability_reuse`, `test_player_availability_store`,
+  `test_availability_completion_window`, `test_card_capacity_recheck`,
+  `test_card_live_capacity_recovery`, `test_card_availability_freshness`,
+  `test_live_capacity_freshness`, `test_worker_card_availability_recovery`,
+  `test_player_card_loading_work` (7 checks) and `test_player_card_during_saves`
+  (4 checks), all `.R`. These include the real table-to-card selection,
+  two-minute catalog/independent market clocks, 32-second held source, stale
+  target-only acquisition, newer summary replacement, expired/failed states,
+  90-second reopen reuse, late-response isolation and seven pending save ACKs.
+- Eight related suites pass: market-offer opening (18 checks, including funds
+  before target and a target becoming owned), acquisition availability,
+  configured acquisition rules, championship columns (11 groups), capacity
+  completeness/legacy codec, trend plots (16), Today availability (3), and
+  deployment exclusions (3). The old loading mock's missing `worker_bypass`
+  parameter/exact pre-defer count is updated to the current contract; its
+  responsiveness/header/source-isolation checks now run and pass.
+- Three existing official captured summaries independently verify the target
+  ownership/computer/listing/`p` asking-price mapping, preserving signed points.
+  Saved requests are never replayed. Persistence replay retains its one scoped
+  cooperative DB GET / zero source acquisition behavior, failed ACK retry,
+  immutable original deadlines and context rejection.
+- Actual Reactable row click -> card -> market editor browser checks pass at
+  390/1440px. The phone keeps all optional/history responses held for a real
+  **32 seconds**: availability stays ready with **zero** financial acquisitions.
+  Reopening reuses facts, an expired catalog refreshes only the selected target,
+  and explicit editor entry starts one financial check with Submit disabled
+  until successful. No JavaScript errors or horizontal overflow. Final measured
+  card readiness after a visible row click: **1,840ms / 1,113ms**; held-request
+  heartbeats: **48ms / 51ms**. These are local synthetic timings, not Contabo or
+  authenticated Futmondo latency measurements.
+- Required offline lifecycle: **13 checks plus eight tabs pass**, with no live
+  HTTP/database mutation attempts. No real account or transaction is used.
+
+Performance review: card selection removes the financial composite rather than
+masking its pending state. Fresh table selection adds zero capacity/roster/funds/
+transfer reads, while a stale target shares one summary demand with history.
+Market/Today projections add no I/O: 100 x 527 rows measured 0.006s. Independent
+catalog-market joins measured 0.031s for 100 x 527 rows, retaining 113,096 bytes.
+The held-source loading fixture measured 1,794ms to target readiness and 2,335ms
+to optional completion, with two initial/target header updates and **zero**
+optional action rebuilds. Existing source request limits, DB queues and retry
+budgets remain bounded. There is no polling, growing per-player worker/session,
+broad periodic invalidation or mobile rendering loop. Documentation has no
+runtime effect; build fingerprints run only during image construction.
+
+Docker now generates code-only `/player-card-runtime.json` fingerprints for five
+relevant source files. `test_player_card_runtime.py` passes the exact build
+command in an isolated temporary directory, verifies all hashes/allowed fields
+and excludes any account/environment data. This fixes the earlier static
+release-metadata ambiguity; it does not deploy an image or certify a private
+account flow. No image build or production migration is claimed here.
+
+The prior report must remain distinct from these verified local fixes. After
+push, check the rebuilt public fingerprints against the commit, then verify
+Dani Lorenzo's actual authenticated selection. Hosted account acceptance remains
+open until that evidence exists; public static asset presence alone is insufficient.

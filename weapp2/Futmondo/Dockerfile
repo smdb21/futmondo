@@ -33,6 +33,8 @@ COPY --chown=shiny:shiny *.R player_columns_to_hide.txt ./
 COPY --chown=shiny:shiny Modules/ ./Modules/
 COPY --chown=shiny:shiny www/ ./www/
 COPY --chown=shiny:shiny worker/ ./worker/
+# Public code-only fingerprints prove which availability implementation shipped.
+RUN python3 -c 'import hashlib,json; from pathlib import Path; files=("Modules/Selected_Player_Module.R","Modules/Players_in_Championship_Module.R","Modules/Market_Module.R","Modules/Today_Module.R","player_availability.R"); Path("www/player-card-runtime.json").write_text(json.dumps({"version":1,"behavior":"target-only-selection","sha256":{f:hashlib.sha256(Path(f).read_bytes()).hexdigest() for f in files}},sort_keys=True)+"\n")'
 COPY worker/run /etc/services.d/futmondo-worker/run
 COPY worker/finish /etc/services.d/futmondo-worker/finish
 RUN chmod 0755 /etc/services.d/futmondo-worker/run /etc/services.d/futmondo-worker/finish

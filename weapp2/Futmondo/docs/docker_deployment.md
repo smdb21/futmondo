@@ -145,3 +145,20 @@ resulting deployment; do not routinely require a separate manual deploy. A
 missing Docker connection in a development session does not disable Dokploy's
 remote auto deployment. If a pushed revision does not become available, inspect
 the automatic build/deployment result before choosing a recovery action.
+
+
+## Player-card runtime fingerprint
+
+Each Docker build writes `/player-card-runtime.json` into the app's existing
+static web directory after copying source. It contains version 1, behavior
+`target-only-selection` and SHA-256 fingerprints of the selected-player module,
+championship-market join, Market/Today table projections and availability helper. The existing Python standard
+library produces it at build time; no environment variable, package, service,
+request loop or account information is involved. The marker is code-only public
+metadata and is not an authenticated availability check.
+
+Compare its five hashes against the deployed commit before attributing a hosted
+report to that implementation. An older image has no marker; rebuilding is
+required. This does not certify the private account flow or preserve an old
+browser session across deployment. The previous `release-info.json` is static
+legacy metadata and cannot by itself establish the running R source version.

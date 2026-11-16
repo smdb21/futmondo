@@ -1,5 +1,5 @@
-# Stored worker observations may outlive the short transaction deadline. The
-# card must start one live factual check automatically before accepting input.
+# Browsing target facts must not activate expired financial worker observations.
+# Explicit editor entry reuses or verifies them before authorizing submission.
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages(source('global.R'))
 fm_worker_configured<-function()TRUE
@@ -40,7 +40,7 @@ async_adapter_fetch<-function(fn,args=list(),context,worker_bypass=FALSE,is_curr
   if(identical(fm_worker_mode(context$account_id),FALSE))return(promises::promise_resolve(capacity(budget=800)))
   return(real_async(fn,args,context,worker_bypass=FALSE,is_current=is_current,...))
  }
- value<-switch(fn,get_player_summary=list(championship=list(),points=list(),prices=list()),
+ value<-switch(fn,get_player_summary=list(data=list(id=context$player_id),championship=list(owner=list(computer=TRUE),clause=list(price=400,transferred=FALSE,date='2026-11-14T00:00:00Z')),market=list(p=150,bids=list()),points=list(),prices=list()),
   get_lineup_from_team=list(pointSystem='fixture'),get_player_full_profile=list(profile=list()),
   get_player_matches=list(matches=list()),get_my_market_players=data.frame(),read_card_round_history=data.frame(),
   read_card_price_history=data.frame(),stop(fn))
@@ -74,97 +74,67 @@ args<-list(selected_player=selected,login_token=reactive(auth),championship_id=r
 reset()
 shiny::testServer(selected_player_Server,args=args,{
  settle(session)
- stopifnot(length(jobs)==1L,blocked(output$action_buttons$html,'btn_verify_availability'),
-  blocked(output$action_buttons$html,'btn_bid_market'),blocked(output$action_buttons$html,'btn_pay_clause'),!length(rpc))
- session$setInputs(btn_verify_availability=1L);settle(session)
- heartbeat<-FALSE;later::later(function()heartbeat<<-TRUE,0);settle(session)
- stopifnot(length(jobs)==1L,heartbeat,writes==0L)
- jobs[[1L]]$resolve(capacity());settle(session)
- stopifnot(enabled(output$action_buttons$html,'btn_bid_market'),enabled(output$action_buttons$html,'btn_pay_clause'),
-  is.null(button(output$action_buttons$html,'btn_verify_availability')),writes==0L)
- cat('PASS opening expired stored capacity starts one live check, coalesces duplicate inputs, yields to heartbeat and enables verified actions without a click\n')
- put_capacity(capacity(-30,budget=99,age=45),'older-replay');settle(session)
- stopifnot(card_states$capacity()$data$funds$spendable_budget==1000,length(jobs)==1L,!length(rpc))
- now<<-now+1;put_capacity(capacity(budget=900),'newer-publication');settle(session)
- stopifnot(card_states$capacity()$data$funds$spendable_budget==1000,length(jobs)==1L)
- now<<-now+16;put_capacity(capacity(-1,age=16),'expired-again');settle(session)
- stopifnot(length(jobs)==1L,enabled(output$action_buttons$html,'btn_bid_market'),
-  is.null(button(output$action_buttons$html,'btn_verify_availability')),
-  !evaluate_acquisition_preflight(card_states$capacity()$data,'bid',150)$ok)
- updated<-selected();updated$points<-11;selected(updated);settle(session)
- stopifnot(length(jobs)==1L,!is.null(manual_capacity_verification()))
- cat('PASS session verification remains stable through worker publications/expiry without recurring checks; current purchase preflight stays strict\n')
+ stopifnot(!length(jobs),enabled(output$action_buttons$html,'btn_bid_market'),
+  is.null(button(output$action_buttons$html,'btn_verify_availability')),!length(rpc))
+ heartbeat<-FALSE;later::later(function()heartbeat<<-TRUE,0);settle(session);stopifnot(heartbeat)
+ now<<-now+90;put_capacity(capacity(-1,age=16),'expired-again');settle(session)
+ stopifnot(!length(jobs),enabled(output$action_buttons$html,'btn_bid_market'))
+ cat('PASS expired worker capacity and later publications do not start financial checks or delay target controls\n')
+ session$setInputs(btn_bid_market=1L);settle(session)
+ stopifnot(length(jobs)==1L,market_offer_dialog_RV()$pending,blocked(output$market_offer_submit$html,'submit_bid'),!length(rpc))
+ jobs[[1]]$resolve(capacity());settle(session)
+ stopifnot(!market_offer_dialog_RV()$pending,enabled(output$market_offer_submit$html,'submit_bid'),writes==0L)
+ session$setInputs(market_offer_closed=as.character(market_offer_dialog_RV()$generation));settle(session)
+ selected(NULL);settle(session);selected(player);settle(session)
+ stopifnot(length(jobs)==1L,enabled(output$action_buttons$html,'btn_bid_market'))
+ session$setInputs(btn_bid_market=2L);settle(session)
+ stopifnot(length(jobs)==1L,!market_offer_dialog_RV()$pending)
+ cat('PASS explicit editor entry starts one verification; warm reopening reattaches the fresh completed result without another live request\n')
 })
 reset(capacity())
 shiny::testServer(selected_player_Server,args=args,{
- settle(session)
- stopifnot(!length(jobs),enabled(output$action_buttons$html,'btn_bid_market'),!length(rpc))
- selected(NULL);settle(session);selected(player);settle(session)
- stopifnot(!length(jobs),enabled(output$action_buttons$html,'btn_bid_market'))
- cat('PASS fresh durable availability and warm reopening require zero live checks\n')
+ settle(session);stopifnot(!length(jobs))
+ session$setInputs(btn_bid_market=1L);settle(session)
+ stopifnot(!length(jobs),!market_offer_dialog_RV()$pending,enabled(output$market_offer_submit$html,'submit_bid'),!length(rpc))
+ cat('PASS fresh durable worker capacity is reused on editor demand with zero live checks\n')
 })
 reset()
 shiny::testServer(selected_player_Server,args=args,{
- settle(session);stopifnot(length(jobs)==1L)
- jobs[[1L]]$reject(resource_failure(resource='get_team_acquisition_capacity',category='network'));settle(session)
- stopifnot(enabled(output$action_buttons$html,'btn_verify_availability'),blocked(output$action_buttons$html,'btn_bid_market'),
-  grepl('unavailable',output$action_buttons$html,fixed=TRUE),length(jobs)==1L)
+ settle(session);session$setInputs(btn_bid_market=1L);settle(session);stopifnot(length(jobs)==1L)
+ jobs[[1]]$reject(resource_failure(resource='get_team_acquisition_capacity',category='network'));settle(session)
+ stopifnot(blocked(output$market_offer_submit$html,'submit_bid'),enabled(output$action_buttons$html,'btn_bid_market'),length(jobs)==1L)
  for(kind in c('partial','expired','undated','invalid-deadline')){
-  before<-length(jobs);session$setInputs(btn_verify_availability=before);settle(session)
+  session$setInputs(market_offer_closed=as.character(market_offer_dialog_RV()$generation));settle(session)
+  before<-length(jobs);session$setInputs(btn_bid_market=before+1L);settle(session)
   value<-capacity()
   if(kind=='partial'){value$status<-'partial';value$funds$spendable_budget<-NA_real_}
   if(kind=='expired')value$valid_until<-as.numeric(now)-1
   if(kind=='undated')value$valid_until<-NULL
   if(kind=='invalid-deadline')value$valid_until<-NA_real_
   jobs[[before+1L]]$resolve(value);settle(session)
-  stopifnot(length(jobs)==before+1L,enabled(output$action_buttons$html,'btn_verify_availability'),
-   blocked(output$action_buttons$html,'btn_bid_market'),blocked(output$action_buttons$html,'btn_pay_clause'),writes==0L)
+  # Only the first never-usable completion can receive a bounded repair.
+  if(length(jobs)>before+1L){jobs[[length(jobs)]]$resolve(value);settle(session)}
+  stopifnot(blocked(output$market_offer_submit$html,'submit_bid'),writes==0L)
  }
- cat('PASS network, partial, expired and malformed results remain truthful, block purchases and offer retry without automatic loops\n')
+ cat('PASS failed/partial/expired/malformed financial responses cannot authorize Submit; explicit reopening remains the retry path\n')
 })
 reset()
 shiny::testServer(selected_player_Server,args=args,{
- settle(session);stopifnot(length(jobs)==1L,jobs[[1L]]$current())
+ settle(session);session$setInputs(btn_bid_market=1L);settle(session)
+ stopifnot(length(jobs)==1L,jobs[[1]]$current())
  team('another');settle(session)
- stopifnot(length(jobs)==2L,!jobs[[1L]]$current(),jobs[[2L]]$context$user_team_id=='another')
- jobs[[1L]]$resolve(capacity(budget=9999));settle(session)
- stopifnot(card_states$capacity()$status=='loading')
- jobs[[2L]]$resolve(capacity());settle(session)
- stopifnot(enabled(output$action_buttons$html,'btn_bid_market'))
- owner_player<-player;owner_player$id<-'owner-only';owner_player$price<-0;owner_player$market_inMarket<-FALSE
- selected(owner_player);settle(session)
- stopifnot(length(jobs)==2L,jobs[[2L]]$current())
- stopifnot(enabled(output$action_buttons$html,'btn_offer_owner'),enabled(output$action_buttons$html,'btn_pay_clause'))
- selected(NULL);settle(session)
- stopifnot(jobs[[2L]]$current(),length(jobs)==2L,writes==0L)
- cat('PASS team changes reject old results; player switches and card closure preserve the verified team result without another check\n')
+ stopifnot(length(jobs)==1L,!jobs[[1]]$current(),is.null(market_offer_dialog_RV()))
+ jobs[[1]]$resolve(capacity(budget=9999));settle(session)
+ stopifnot(is.null(market_offer_dialog_RV()))
+ session$setInputs(btn_bid_market=2L);settle(session)
+ stopifnot(length(jobs)==2L,jobs[[2]]$context$user_team_id=='another')
+ jobs[[2]]$resolve(capacity());settle(session)
+ stopifnot(enabled(output$market_offer_submit$html,'submit_bid'),writes==0L)
+ cat('PASS changed team context cancels pending authorization and needs its own explicit editor demand\n')
 })
 reset()
-shiny::testServer(selected_player_Server,args=args,{
- settle(session);stopifnot(length(jobs)==1L)
- refresh(1L);settle(session)
- stopifnot(length(jobs)==2L,!jobs[[1L]]$current(),jobs[[2L]]$current())
- jobs[[1L]]$resolve(capacity(budget=9999));settle(session)
- stopifnot(card_states$capacity()$status=='loading')
- jobs[[2L]]$resolve(capacity());settle(session)
- stopifnot(enabled(output$action_buttons$html,'btn_bid_market'),length(jobs)==2L)
- cat('PASS explicit Refresh starts exactly one new scoped check and discards the old completion\n')
-})
-reset()
-shiny::testServer(selected_player_Server,args=args,{
- settle(session);stopifnot(length(jobs)==1L)
- team('missing');settle(session)
- stopifnot(length(jobs)==2L,length(account$waiters)>0L,jobs[[2L]]$current())
- # A missing passive provider does not delay the independent live verification.
- jobs[[2L]]$resolve(capacity());settle(session)
- stopifnot(evaluate_acquisition_preflight(card_states$capacity()$data,'offer')$ok)
- fm_worker_set_policy(account,list(enabled=FALSE,auth_status='active'));settle(session)
- stopifnot(!jobs[[2L]]$current(),card_states$capacity()$data$funds$spendable_budget==800,writes==0L)
- cat('PASS missing worker snapshot launches automatically while its publication is pending; mode changes restore normal reads safely\n')
-})
-reset()
-owned<-player;owned$user_team_id<-'mine';selected(owned)
+owned<-observed_data(player,observed_at=now);owned$user_team_id<-'mine';selected(owned)
 shiny::testServer(selected_player_Server,args=args,{
  settle(session);stopifnot(!length(jobs),writes==0L)
- cat('PASS opening an owned player adds no acquisition verification\n')
+ cat('PASS owned-player browsing retains its listing gate without acquisition-capacity work\n')
 })

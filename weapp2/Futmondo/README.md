@@ -123,6 +123,8 @@ The last application page is saved per Futmondo account and restored on normal o
 ## Docker / Dokploy hosting
 
 For deployment on your own VPS, use [the Dokploy guide](docs/docker_deployment.md).
+The Docker build publishes code-only availability fingerprints at `/player-card-runtime.json`
+so the deployed player-card implementation can be verified without account data.
 The production Dockerfile is `weapp2/Futmondo/Dockerfile`. In Dokploy set Provider
 Build Path to `/weapp2/Futmondo`, Dockerfile Path to `Dockerfile`, and Docker Context
 Path to `.`; disable Create Environment File. It uses R 4.6.1 and serves the app directly at `/` on container

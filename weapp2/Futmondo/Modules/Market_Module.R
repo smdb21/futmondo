@@ -23,7 +23,7 @@ market_Server <- function(id, is_module_active, login_token, championship_id, us
       market_players_RV <- reactive({
         req(is_module_active() == TRUE)
         if (!is.null(refresh_trigger)) refresh_trigger() # Cache invalidation dependency
-        players_table <- get_market_players(login = login_token(), championship_id = championship_id(), user_team_id = user_team_id())
+        players_table <- player_availability_market_rows(get_market_players(login = login_token(), championship_id = championship_id(), user_team_id = user_team_id()))
         players_table <- players_table %>%
           translate_player_positions()
         players_table <- players_table %>%

@@ -1,5 +1,29 @@
 # Player card
 
+## Target-only selection correction — 2026-11-15 Pacific
+
+The remaining roughly 32-second report exposed a path missed by the previous
+fresh-row tests: a two-minute catalog observation was rejected by the card's
+60-second cutoff despite the catalog's five-minute policy, triggering full
+financial/transfer-history acquisition on selection. Card selection now verifies
+only target ownership/listing. Joined observations carry their independent
+original deadlines; stale targets use one scoped summary and update the actual
+ownership/listing controls. No roster/funds/transfer scan starts from selection.
+Historical/profile reads remain independent. See [availability](player_availability.md).
+
+Successful display checks are retained in a bounded, context-isolated root-session
+registry. Their factual source results remain database-backed; the session marker
+never extends source deadlines or authorizes a purchase. Opening a market editor
+attaches/reuses fresh team evidence or starts one current asynchronous preflight.
+Both target and financial checks must complete before Submit can be enabled;
+final submission checks are unchanged. The obsolete outer whole-card repair is
+removed; native financial source repairs remain bounded inside the engine.
+
+The actual catalog -> price join -> filters -> selection -> modal path is covered,
+including two-minute observations, a real 32-second held history browser check,
+known captured ownership/asking-price mappings, failures, scope changes and
+explicit purchase protection. Hosted authenticated acceptance remains separate.
+
 ## Reuse on selection and compact points attribution — 2026-11-15 Pacific
 
 The owner's final request is to reuse recent table ownership/market facts and

@@ -58,7 +58,7 @@ async_adapter_fetch<-function(fn,args=list(),context,worker_bypass=FALSE,...){
  }
  if(fn%in%c('get_user_team_info','get_players_from_team','get_championship_pressroom','get_market_players'))
   return(native_async(fn,args,context,worker_bypass=worker_bypass,...))
- value<-switch(fn,get_player_summary=list(championship=list(),points=list(),prices=list()),
+ value<-switch(fn,get_player_summary=list(data=list(id='target'),championship=list(owner=list(computer=TRUE)),market=list(p=1000,bids=list()),points=list(),prices=list()),
   get_lineup_from_team=list(pointSystem='fixture'),get_player_full_profile=list(profile=list()),
   get_player_matches=list(matches=list()),read_card_round_history=data.frame(),read_card_price_history=data.frame(),stop(fn))
  promises::promise_resolve(value)
@@ -76,12 +76,12 @@ clear_api_cache()
 shiny::testServer(selected_player_Server,args=list(selected_player=selected,login_token=shiny::reactive(auth),
  championship_id=shiny::reactive('league'),user_team_id=shiny::reactive('mine'),
  capacity_fetcher=function(...)stop('Opening the verified modal must not run a synchronous preflight')) ,{
- settle(session)
+ settle(session);stopifnot(live_calls==0L,enabled(output$action_buttons$html,'btn_bid_market'))
+ session$setInputs(btn_bid_market=1L);settle(session)
  stopifnot(live_calls==1L,is.function(pending[['pressroom:1']]),
-  !enabled(output$action_buttons$html,'btn_bid_market'),
-  !enabled(output$action_buttons$html,'btn_verify_availability'))
+  market_offer_dialog_RV()$pending,!enabled(output$market_offer_submit$html,'submit_bid'))
  clock_now<<-clock_now+31;pending[['pressroom:1']]();settle(session)
- stopifnot(is.function(pending[['players:1']]),!enabled(output$action_buttons$html,'btn_bid_market'))
+ stopifnot(is.function(pending[['players:1']]),market_offer_dialog_RV()$pending)
  session$setInputs(btn_verify_availability=2L);settle(session)
  stopifnot(live_calls==1L)
  clock_now<<-clock_now+20;pending[['players:1']]();settle(session)
@@ -90,7 +90,7 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
   enabled(html,'btn_bid_market'),!grepl('Availability checks expired',html,fixed=TRUE),
   live_calls==1L,writes==0L,counts['information']==2L,counts['players']==1L,
   counts['pressroom']==2L,counts['roster']==2L)
- cat('PASS opening the card automatically routes through native live acquisition, repairs expiry during a 20s market response and enables the market action once\n')
+ cat('PASS explicit editor entry routes through native live acquisition, repairs expiry during a 20s market response and enables the market action once\n')
 
  epoch<-as.numeric(start_time)
  stopifnot(identical(source_stamps[['team_info_league_mine']]-epoch,c(31,51)),
@@ -100,13 +100,13 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
   state$data$valid_until==epoch+61,state$data$valid_until-as.numeric(clock_now)==10)
  cat('PASS original source clocks remain unchanged; strict capacity deadline is the retained roster expiry, only 10s after completion\n')
 
- before<-requests;session$setInputs(btn_bid_market=1L);settle(session)
+ before<-requests;session$setInputs(btn_bid_market=2L);settle(session)
  stopifnot(offer_modal_opened_RV(),!market_offer_dialog_RV()$pending,
   isTRUE(market_offer_dialog_RV()$preflight$ok),
   enabled(output$market_offer_submit$html,'submit_bid'),identical(requests,before),live_calls==1L,writes==0L)
  cat('PASS immediately opening the verified market editor adds zero source reads and zero transactions\n')
  before<-requests;row<-selected();selected(NULL);settle(session);selected(row);settle(session)
  stopifnot(identical(requests,before),live_calls==1L,writes==0L,
-  evaluate_acquisition_preflight(card_states$capacity()$data,'bid',1000)$ok)
+  enabled(output$action_buttons$html,'btn_bid_market'))
  cat('PASS warm reopening reuses the completed shared verification with zero adapter dispatches or additional source requests\n')
 })

@@ -138,7 +138,7 @@ today_Server <- function(id,is_module_active,login_token,championship_id,user_te
       state$data
     }
     market <- reactive({
-      rows <- require_data(market_state())
+      rows <- player_availability_market_rows(require_data(market_state()))
       if(is.data.frame(rows)&&nrow(rows))rows<-unify_columns(calculate_player_changes(translate_player_positions(rows)))
       rows
     })

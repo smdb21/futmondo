@@ -57,7 +57,7 @@ async_adapter_fetch<-function(fn,args=list(),context,worker_bypass=FALSE,...){
   if(worker_bypass){live<<-live+1L;return(promises::promise_resolve(capacity()))}
   return(real_async(fn,args,context,worker_bypass=FALSE,...))
  }
- promises::promise_resolve(switch(fn,get_player_summary=list(championship=list(),points=list(),prices=list()),
+ promises::promise_resolve(switch(fn,get_player_summary=list(data=list(id='target'),championship=list(owner=list(id='rival',computer=FALSE)),market=list(p=150,bids=list()),points=list(),prices=list()),
   get_lineup_from_team=list(pointSystem='fixture'),get_player_full_profile=list(profile=list()),get_player_matches=list(matches=list()),
   read_card_round_history=data.frame(),read_card_price_history=data.frame(),stop(fn)))
 }
@@ -67,12 +67,13 @@ player<-data.frame(id='target',name='Fixture',role='delantero',team='',value=200
 settle<-function(session)for(i in 1:30){later::run_now(0);session$flushReact()}
 shiny::testServer(selected_player_Server,args=list(selected_player=reactive(player),login_token=reactive(auth),
  championship_id=reactive('league'),user_team_id=reactive('mine')),{
- settle(session);html<-output$action_buttons$html
+ settle(session);stopifnot(live==0L,!grepl('Checking availability|Retry availability',output$action_buttons$html))
+ session$setInputs(btn_bid_market=1L);settle(session);html<-output$action_buttons$html
  stopifnot(live==1L,rpc==0L,writes==0L,
   evaluate_acquisition_preflight(card_states$capacity()$data,'bid',200)$ok,
   !grepl('Availability checks expired before they completed',html,fixed=TRUE),
   !grepl('btn_verify_availability',html,fixed=TRUE))
- cat('PASS opening automatically verifies expired legacy evidence, enables actions and sends no transaction\n')
+ cat('PASS selection skips expired financial evidence; explicit editor demand verifies it without a transaction\n')
 })
 elapsed<-system.time(for(i in 1:1000)acquisition_capacity_observation_complete(legacy))[['elapsed']]
 cat(sprintf('METRIC 1000 completeness validations %.3fs; pure validation loop; no extra I/O\n',elapsed))

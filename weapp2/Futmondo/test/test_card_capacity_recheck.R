@@ -16,21 +16,16 @@ settle <- function(session) for(i in seq_len(20L)){later::run_now(0);session$flu
 clear_api_cache()
 shiny::testServer(selected_player_Server,args=list(selected_player=selected,login_token=shiny::reactive(auth),championship_id=shiny::reactive('league'),user_team_id=shiny::reactive('mine')),{
   settle(session)
-  pending$get_team_acquisition_capacity$resolve(list(status='ok',valid_until=as.numeric(Sys.time())+15,roster=list(status='ok',count=1,cap=20,effective_count=1),funds=list(spendable_budget=10000),outstanding=list(count=0),rules=list(minimum_bid_at_value=TRUE)))
+  stopifnot(sum(calls=='get_team_acquisition_capacity')==0L)
+  fixture_time <<- fixture_time+32
+  pending$get_player_summary$resolve(list(data=list(id='p1'),championship=list(owner=list(computer=TRUE)),market=list(p=1000,bids=list()),points=list(),prices=list()))
   settle(session)
-  stopifnot(identical(card_states$summary()$status,'loading'))
-  fixture_time <<- fixture_time+16
-  pending$get_player_summary$resolve(list(championship=list(),points=list(),prices=list()))
-  settle(session)
-  stopifnot(sum(calls=='get_team_acquisition_capacity')==1L,
-    isTRUE(card_states$capacity()$session_verified),
-    !grepl('Checking availability|Availability checks expired|Retry availability',output$action_buttons$html),
-    !grepl('disabled',output$action_buttons$html,fixed=TRUE),
-    !evaluate_acquisition_preflight(card_states$capacity()$data,'bid',1000)$ok)
-  cat('PASS a late summary does not repeat a successful session team check; actual-time purchase preflight rejects its expired source.\n')
+  stopifnot(sum(calls=='get_team_acquisition_capacity')==0L,
+    !grepl('Checking availability|Availability checks expired|Retry availability|disabled',output$action_buttons$html))
+  cat('PASS a 32s target response never starts team acquisition; target completion alone readies the card.\n')
   selected(NULL);settle(session);fixture_time <<- fixture_time+90;selected(player);settle(session)
-  stopifnot(sum(calls=='get_team_acquisition_capacity')==1L,
+  stopifnot(sum(calls=='get_team_acquisition_capacity')==0L,sum(calls=='get_player_summary')==1L,
     !grepl('Retry availability|expired before',output$action_buttons$html))
-  cat('PASS reopening after expiry reuses the successful session check without requests or a Retry loop.\n')
+  cat('PASS reopening after expiry reuses the successful session target check without acquisition or a Retry loop.\n')
 
 })

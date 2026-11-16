@@ -33,6 +33,50 @@ player_availability_invalidated <- function(context,kind) {
     if(length(stamps))max(stamps)else NULL
   }
 }
+# Preserve source deadlines through table projections. Explicit persisted/worker
+# deadlines win; legacy native observations use their existing resource policy.
+player_availability_deadline <- function(data,resource) {
+  stamp<-fm_time(attr(data,'observed_at') %||% if(is.data.frame(data)&&nrow(data)==1L&&'observed_at'%in%names(data))data$observed_at[1]else NULL)
+  if(length(stamp)!=1L||is.na(stamp))return(NA_real_)
+  deadline<-attr(data,'valid_until') %||% (as.numeric(stamp)+resource_policy(resource)$ttl)
+  if(!is.numeric(deadline)||length(deadline)!=1L||!is.finite(deadline))NA_real_ else deadline
+}
+# The market endpoint's rows are published listings. Preserve that endpoint's
+# own source deadline when handing them to either Market or Today's table.
+player_availability_market_rows <- function(data) {
+  if(!is.data.frame(data))return(data)
+  data$market_inMarket<-rep(TRUE,nrow(data))
+  attr(data,'availability_owner_valid_until')<-player_availability_deadline(data,'market')
+  attr(data,'availability_market_valid_until')<-attr(data,'availability_owner_valid_until')
+  attr(data,'availability_market_observed_at')<-attr(data,'observed_at')
+  attr(data,'availability_complete')<-!acquisition_data_unverified(data)
+  data
+}
+# A successful target display check survives source expiry in this browser.
+# Facts are already persisted by their catalog/market/summary acquisition path;
+# this bounded session marker is not persisted as purchase authorization.
+player_availability_remember_target <- function(session,identity,row=NULL) {
+  root<-session$rootScope()
+  if(is.null(root$userData$player_availability_targets))root$userData$player_availability_targets<-new.env(parent=emptyenv())
+  entries<-root$userData$player_availability_targets
+  key<-as.character(openssl::sha256(serialize(identity,NULL,version=2)))
+  if(is.null(row)){
+    value<-entries[[key]]
+    if(is.null(value))return(NULL)
+    value$used_at<-Sys.time();entries[[key]]<-value
+    return(value$row)
+  }
+  bytes<-as.numeric(object.size(row))
+  if(bytes>128L*1024L||any(fm_worker_secret_name(names(row))))return(row)
+  attr(row,'availability_session_verified')<-TRUE
+  entries[[key]]<-list(row=row,bytes=bytes,used_at=Sys.time())
+  keys<-ls(entries)
+  while(length(keys)>64L||sum(vapply(mget(keys,entries),function(x)x$bytes,numeric(1)))>4L*1024L^2L){
+    victim<-keys[which.min(vapply(mget(keys,entries),function(x)as.numeric(x$used_at),numeric(1)))]
+    rm(list=victim,envir=entries);keys<-ls(entries)
+  }
+  row
+}
 # Pure validation keeps expired, incomplete and failed evidence out of reuse.
 player_availability_valid <- function(data,kind,now=Sys.time()) {
   if(!is.list(data)||acquisition_data_unverified(data))return(FALSE)
@@ -461,6 +505,14 @@ player_availability_source <- function(session,kind,context,login,refresh=functi
     state
   })
   attr(value,'retry')<-function()acquire(TRUE)
+  # Editor demand first attaches an existing entry, then rechecks actual source
+  # freshness. A dormant accessor's loading shell must not force a duplicate.
+  attr(value,'ensure')<-function()shiny::isolate({
+    acquire(FALSE)
+    entry<-selected_entry()
+    if(!is.null(entry)&&!isTRUE(entry$pending)&&!player_availability_valid(entry$value()$data,kind))acquire(TRUE)
+    invisible(NULL)
+  })
   attr(value,'verification')<-shiny::reactive({entry<-selected_entry();if(is.null(entry))return(NULL)
     list(pending=entry$pending,started_at=entry$started_at,completed_at=entry$completed_at,generation=entry$generation,state=entry$value())})
   value

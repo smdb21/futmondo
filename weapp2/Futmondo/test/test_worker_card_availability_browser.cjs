@@ -1,81 +1,64 @@
 const assert=require('node:assert/strict');
+const {spawn}=require('node:child_process');
+const net=require('node:net');
 const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo-review-tools/node_modules')+'/playwright');
+const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 (async()=>{
- const browser=await chromium.launch({headless:true,executablePath:process.env.FUTMONDO_TEST_CHROMIUM||undefined,args:['--no-sandbox']});
+ let app,browser,log='';
  try{
-  for(const width of [360,1440]){
-   const page=await browser.newPage({viewport:{width,height:960}});const errors=[];
-   page.on('pageerror',e=>errors.push(e.message));
+  const port=await new Promise(resolve=>{const server=net.createServer();server.listen(0,'127.0.0.1',()=>{const p=server.address().port;server.close(()=>resolve(p))})});
+  const url=`http://127.0.0.1:${port}`;
+  app=spawn('Rscript',['test/test_worker_card_availability_browser_app.R'],{env:{...process.env,FUTMONDO_SELECTION_TEST_PORT:String(port)}});
+  app.stdout.on('data',x=>log+=x);app.stderr.on('data',x=>log+=x);
+  let ready=false;
+  for(let i=0;i<150;i++){if(app.exitCode!==null)throw Error(log);try{if((await fetch(url)).ok){ready=true;break}}catch{}await delay(100)}
+  assert(ready,'fixture startup');
+  browser=await chromium.launch({headless:true,executablePath:process.env.FUTMONDO_TEST_CHROMIUM,args:['--no-sandbox']});
+  for(const width of [390,1440]){
+   const page=await browser.newPage({viewport:{width,height:960}});page.setDefaultTimeout(15000);
+   const errors=[];page.on('pageerror',e=>errors.push(e.message));
    await page.route('**/*',r=>new URL(r.request().url()).hostname==='127.0.0.1'?r.continue():r.abort());
-   await page.goto('http://127.0.0.1:3907');
-   const verify=page.locator('#card-btn_verify_availability'),offer=page.locator('#card-btn_bid_market');
-   await verify.waitFor();await page.waitForFunction(()=>document.querySelector('#card-btn_verify_availability').disabled);assert.equal(await verify.isDisabled(),true);assert.equal(await offer.isDisabled(),true);
+   await page.goto(url);
    const stats=async()=>{
     await page.evaluate(()=>{window.fixtureStats=null;Shiny.addCustomMessageHandler('fixture-stats',x=>window.fixtureStats=x);Shiny.setInputValue('fixture_stats',Math.random(),{priority:'event'});});
-    await page.waitForFunction(()=>window.fixtureStats!==null);return await page.evaluate(()=>fixtureStats);
+    await page.waitForFunction(()=>window.fixtureStats!==null);return page.evaluate(()=>fixtureStats);
    };
-   assert.equal((await stats()).live,1);
-   await page.screenshot({path:`/tmp/futmondo-card-availability-before-${width}.png`,fullPage:true});
-   assert.equal((await stats()).live,1);assert.equal(await offer.isDisabled(),true);
-   const begin=Date.now();await page.locator('#heartbeat').click();
-   await page.waitForFunction(()=>document.querySelector('#heartbeat_value').textContent==='1');
-   const heartbeat=Date.now()-begin;assert.ok(heartbeat<750,`heartbeat ${heartbeat}ms`);
-   await page.waitForTimeout(1200);assert.equal((await stats()).live,1);
-   await page.locator('#finish_success').click();await page.waitForFunction(()=>!document.querySelector('#card-btn_bid_market').disabled);
-   assert.equal(await verify.count(),0);
-   await page.screenshot({path:`/tmp/futmondo-card-availability-after-${width}.png`,fullPage:true});
-   const switchBegin=Date.now();await page.locator('#next_card').click();
-   await page.waitForFunction(()=>document.querySelector('.player-card-identity')?.getAttribute('data-player-id')==='next1');
-   await page.waitForFunction(()=>!document.querySelector('#card-btn_bid_market').disabled);
-   const switchMs=Date.now()-switchBegin;
-   assert.equal((await stats()).live,1,'switching players must reuse team verification');assert.equal(await verify.count(),0);
-   await page.locator('#hold_next_summary').click();
-   await page.waitForFunction(()=>document.querySelector('#card-btn_bid_market')?.disabled===true);
-   const held=await stats();assert.equal(held.summary_live,1);assert.equal(held.summary_pending,true);assert.equal(held.live,1);
-   await page.locator('#finish_summary').click();await page.waitForFunction(()=>!document.querySelector('#card-btn_bid_market').disabled);
-   assert.equal((await stats()).live,1);assert.equal((await stats()).summary_pending,false);
-   console.log(`PASS ${width}px card switching: warm verified actions ${switchMs}ms, zero extra team checks, held summary bypasses worker publication`);
-   await offer.click();await page.locator('#card-bid_amount').waitFor();
-   assert.equal(await page.locator('#card-submit_bid').isEnabled(),true);assert.equal((await stats()).live,1);
-   await page.locator('.modal').getByRole('button',{name:'Cancel',exact:true}).click();
-   await page.locator('#reset_card').click();await verify.waitFor();
-   await page.waitForFunction(()=>document.querySelector('#card-btn_verify_availability').disabled);
-   await page.locator('#finish_failure').click();await page.waitForFunction(()=>document.querySelector('#card-btn_verify_availability')?.disabled===false&&!document.querySelector('#card-btn_bid_market'));
-   assert.equal((await stats()).live,2);assert.equal(await offer.count(),0);
-   assert.match(await page.locator('#card-action_buttons').textContent(),/network|connect|unavailable|retry|load/i);
-   await verify.click();await page.waitForFunction(()=>document.querySelector('#card-btn_verify_availability').disabled);
-   await page.locator('#finish_partial').click();await page.waitForFunction(()=>!document.querySelector('#card-btn_verify_availability').disabled);
-   assert.equal(await offer.isDisabled(),true);assert.match(await page.locator('#card-action_buttons').textContent(),/cash balance did not load/);
-   assert.equal((await stats()).live,3);
-   await verify.click();await page.waitForFunction(()=>document.querySelector('#card-btn_verify_availability').disabled);
-   await page.locator('#finish_success').click();await page.waitForFunction(()=>!document.querySelector('#card-btn_bid_market').disabled);
-   assert.equal((await stats()).live,4);
-   await page.locator('#hold_saved').click();await verify.waitFor();
-   await page.waitForFunction(()=>document.querySelector('#card-btn_verify_availability').disabled);
-   assert.equal(await verify.isDisabled(),true);assert.equal((await stats()).passive_pending,true);
-   assert.equal((await stats()).live,5);
-   const pendingBegin=Date.now();await page.locator('#heartbeat').click();
-   await page.waitForFunction(()=>document.querySelector('#heartbeat_value').textContent==='2');
-   const pendingHeartbeat=Date.now()-pendingBegin;assert.ok(pendingHeartbeat<750,`pending stored heartbeat ${pendingHeartbeat}ms`);
-   await page.locator('#finish_success').click();await page.waitForFunction(()=>!document.querySelector('#card-btn_bid_market').disabled);
-   assert.equal((await stats()).passive_pending,true);
-   await page.locator('#expire_facts').click();
-   await page.waitForTimeout(200);
-   assert.equal((await stats()).live,5);assert.equal(await offer.isEnabled(),true);
-   assert.equal(await verify.count(),0);
-   assert.doesNotMatch(await page.locator('#card-action_buttons').textContent(),/expired before|Retry availability/);
+   const send=async name=>page.evaluate(key=>Shiny.setInputValue(key,Math.random(),{priority:'event'}),name);
+   const offer=page.locator('#table-selected_player-btn_bid_market');
+   const select=async text=>page.locator('#table-players_table .rt-td').filter({hasText:text}).click();
+   await page.locator('#table-players_table .rt-td').filter({hasText:'Dani fixture'}).waitFor();
+   const start=Date.now();await select('Dani fixture');await offer.waitFor();await page.waitForFunction(()=>document.querySelector('#table-selected_player-btn_bid_market')?.disabled===false);
+   const elapsed=Date.now()-start;assert.equal((await stats()).financial,0);
+   assert.equal(await page.locator('#table-selected_player-btn_verify_availability').count(),0);
+   // Exercise a real 32-second pending source on the phone, not just a clock jump.
+   if(width===390)await page.waitForTimeout(32000);
+   else{await send('advance');await page.waitForTimeout(150)}
+   assert.equal(await offer.isEnabled(),true);assert.equal((await stats()).financial,0);
+   await page.evaluate(()=>Shiny.setInputValue('heartbeat',1,{priority:'event'}));
+   const heart=Date.now();await page.waitForFunction(()=>document.querySelector('#heartbeat_value').textContent==='1');const heartbeat=Date.now()-heart;
+   assert(heartbeat<750,`heartbeat ${heartbeat}ms`);
    await offer.click();
-   await page.waitForFunction(()=>document.querySelector('#card-submit_bid')?.disabled===true);
-   assert.equal((await stats()).live,6);
-   await page.locator('#finish_success').evaluate(button=>button.click());
-   await page.waitForFunction(()=>document.querySelector('#card-submit_bid')?.disabled===false);
-   await page.locator('.modal').getByRole('button',{name:'Cancel',exact:true}).click();
-   console.log(`PASS ${width}px session reuse: 90s expiry adds zero card checks, editor joins current verification with Submit disabled until success`);
-   console.log(`PASS ${width}px saved capacity still pending: automatic check runs without waiting for worker publication, heartbeat ${pendingHeartbeat}ms, live success enables actions`);
-   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
-   assert.deepEqual(errors,[]);
-   console.log(`PASS ${width}px actual card clicks: opening starts one held check without a click, heartbeat ${heartbeat}ms, verified offer modal opens, network/partial failures block and retry, zero overflow`);
+   const submit=page.locator('#table-selected_player-submit_bid');await submit.waitFor();
+   assert.equal(await submit.isDisabled(),true);assert.equal((await stats()).financial,1);
+   await send('finish_funds');await page.waitForFunction(()=>document.querySelector('#table-selected_player-submit_bid')?.disabled===false);
+   assert.equal((await stats()).financial,1);
+   await page.locator('.modal-footer').getByRole('button',{name:'Cancel',exact:true}).click();
+   await page.locator('.modal-content').waitFor({state:'detached'});
+   await select('Dani fixture');await offer.waitFor();assert.equal(await offer.isEnabled(),true);assert.equal((await stats()).financial,1);
+   assert.equal(await page.locator('#table-selected_player-btn_verify_availability').count(),0);
+   await page.locator('.modal-footer').getByRole('button',{name:'Close',exact:true}).click();
+   await page.locator('#old_table').click();await select('Stale fixture');
+   await page.locator('#table-selected_player-btn_verify_availability').waitFor();
+   assert.equal((await stats()).financial,1);assert.equal((await stats()).summaries,2);
+   await send('finish_summary');
+   await page.waitForFunction(()=>document.querySelector('#table-selected_player-btn_offer_owner')?.disabled===false);
+   assert((await page.locator('#table-selected_player-action_buttons').textContent()).includes('Verified owner'));
+   assert.equal((await stats()).financial,1);assert.equal(await page.locator('#table-selected_player-btn_verify_availability').count(),0);
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert.deepEqual(errors,[]);
+   await page.screenshot({path:`/tmp/futmondo-target-selection-${width}.png`,fullPage:true});
+   console.log(`PASS ${width}px actual table selection: ready ${elapsed}ms, heartbeat ${heartbeat}ms, held history adds zero finance reads; editor safely verifies; stale target refresh changes ownership; zero errors/overflow`);
    await page.close();
   }
- }finally{await browser.close();}
+ }catch(e){if(log.includes('Error'))process.stderr.write(log);throw e}
+ finally{if(browser)await browser.close();if(app)app.kill('SIGTERM')}
 })().catch(e=>{console.error(e.stack);process.exitCode=1});

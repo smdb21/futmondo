@@ -47,16 +47,14 @@ shiny::testServer(players_table_Server,args=list(players_table_RV=shiny::reactiv
    grepl('fm-info',output$recent_points_status$html,fixed=TRUE))
  })
  session$setInputs(fixture_selected=1L);settle(session)
- check('table click opens the captured player and dispatches availability before any save completes',{
+ check('table click dispatches target facts before any save completes, without financial acquisition',{
   stopifnot(selected_player_RV()$name=='Berenguer',
    grepl('Berenguer',output[['selected_player-player_identity_summary']]$html,fixed=TRUE),
    grepl('Checking availability',output[['selected_player-action_buttons']]$html,fixed=TRUE),
-   sum(reads=='get_team_acquisition_capacity')==1L,recent_points$status()$saving==7L)
+   sum(reads=='get_team_acquisition_capacity')==0L,recent_points$status()$saving==7L)
  })
- pending$get_player_summary$resolve(list(championship=list(),points=list(list(round=1,points=0),list(round=2,points=-2)),prices=list()))
- pending$get_team_acquisition_capacity$resolve(list(status='ok',valid_until=as.numeric(Sys.time())+15,
-  roster=list(status='ok',count=1,cap=20,effective_count=1,effective_remaining_slots=19),
-  funds=list(spendable_budget=10000),outstanding=list(count=0),rules=list(minimum_bid_at_value=TRUE)))
+ pending$get_player_summary$resolve(list(data=list(id='p1'),championship=list(owner=list(computer=TRUE)),
+  market=list(p=1000,bids=list()),points=list(list(round=1,points=0),list(round=2,points=-2)),prices=list()))
  settle(session)
  check('verified availability renders with all seven saves still pending',{
   html<-output[['selected_player-action_buttons']]$html

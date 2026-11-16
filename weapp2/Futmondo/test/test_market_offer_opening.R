@@ -12,16 +12,18 @@ capacity <- function(seconds=60) list(status='ok',valid_until=as.numeric(Sys.tim
   roster=list(status='ok',count=10,effective_count=10,cap=20),
   funds=list(spendable_budget=1000),outstanding=list(count=0),rules=list(minimum_bid_at_value=FALSE))
 manual_capacity <- capacity();jobs <- list();reads <- character();sync_reads <- 0L;writes <- 0L
-modal_shows <- 0L;modal_html <- NULL
+modal_shows <- 0L;modal_html <- NULL;hold_summary<-FALSE;summary_jobs<-list()
 showModal <- function(ui,...) {modal_shows <<- modal_shows+1L;modal_html <<- as.character(ui)}
 buy_clause <- function(...) {writes <<- writes+1L;TRUE}
 async_adapter_fetch <- function(fn,args=list(),context,...) {
   reads <<- c(reads,fn)
+  if(fn=='get_player_summary'&&hold_summary)return(promises::promise(function(resolve,reject)
+    summary_jobs[[length(summary_jobs)+1L]]<<-list(resolve=resolve,reject=reject,context=context)))
   if(fn=='get_team_acquisition_capacity')return(promises::promise(function(resolve,reject)
     jobs[[length(jobs)+1L]] <<- list(resolve=resolve,reject=reject,context=context)))
-  value <- switch(fn,get_player_summary=list(championship=list(),points=list(),prices=list()),
+  value <- switch(fn,get_player_summary=list(data=list(id=context$player_id),championship=list(owner=list(computer=TRUE)),market=list(p=150,bids=list()),points=list(),prices=list()),
     get_lineup_from_team=list(pointSystem='fixture'),get_player_full_profile=list(profile=list()),
-    get_player_matches=list(matches=list()),read_card_round_history=data.frame(),
+    get_player_matches=list(matches=list()),get_my_market_players=data.frame(),read_card_round_history=data.frame(),
     read_card_price_history=data.frame(),stop(paste('Unexpected resource',fn)))
   promises::promise_resolve(value)
 }
@@ -134,5 +136,31 @@ testServer(selected_player_Server,args=list(selected_player=selected,login_token
   check('team changes reject old results and queued submission',{
     stopifnot(is.null(market_offer_dialog_RV()),modal_shows==before,sync_reads==3L,writes==1L)
   })
+  hold_summary<<-TRUE
+  changed<-selected();changed$id<-'held-target';selected(changed);refresh(6L);settle(session)
+  session$setInputs(btn_bid_market=11L);settle(session)
+  jobs[[length(jobs)]]$resolve(capacity());settle(session)
+  session$setInputs(bid_amount=200,submit_bid=8L);settle(session)
+  check('fresh finances cannot enable Submit before target ownership/listing completes',{
+    stopifnot(market_offer_dialog_RV()$pending,grepl('disabled',output$market_offer_submit$html,fixed=TRUE),writes==1L)
+  })
+  summary_jobs[[length(summary_jobs)]]$resolve(observed_data(list(data=list(id='held-target'),
+    championship=list(owner=list(computer=TRUE)),market=list(p=150,bids=list()),points=list(),prices=list())))
+  settle(session)
+  check('target completion updates the same editor and only then enables submission',{
+    stopifnot(!market_offer_dialog_RV()$pending,market_offer_dialog_RV()$preflight$ok,
+      !grepl('disabled',output$market_offer_submit$html,fixed=TRUE),writes==1L)
+  })
+
+  changed<-selected();changed$id<-'now-owned';selected(changed);refresh(7L);settle(session)
+  session$setInputs(btn_bid_market=12L);settle(session)
+  summary_jobs[[length(summary_jobs)]]$resolve(observed_data(list(data=list(id='now-owned'),
+    championship=list(owner=list(id='another-team',computer=FALSE)),market=list(p=150,bids=list()),points=list(),prices=list())))
+  settle(session)
+  check('a newly owned target ends pending verification with Submit disabled even while funds are held',{
+    stopifnot(!market_offer_dialog_RV()$pending,!market_offer_dialog_RV()$preflight$ok,
+      grepl('disabled',output$market_offer_submit$html,fixed=TRUE),writes==1L)
+  })
+
 })
 cat(sprintf('MARKET OFFER OPENING: %d passed / 0 failed\n',checks))

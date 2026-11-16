@@ -1,50 +1,64 @@
 # Interactive player availability
 
-## Session reuse and recent table facts — 2026-11-15 Pacific
+## Target-only selection and source deadlines — 2026-11-15 Pacific
 
-The owner's final interaction contract supersedes the expiry-driven card behavior
-below: a successful team/target check is sufficient for subsequent selections in
-the same browser session and exact account/league/team/season/scoring scope.
-`player_availability_source()` now returns `session_verified` after an acquisition
-was valid on completion. Card display reuses that result across source expiry,
-reopening, switching players and background publications. Explicit Refresh,
-affected-resource invalidation, context changes and session end still reset it.
-Failed/partial acquisitions never receive this marker. The existing bounded
-registry and successful database persistence/acknowledgement queue remain in use;
-a session marker is never persisted as transaction authorization. Later sessions
-must validate the stored source's original freshness and completeness again.
-Unacknowledged saves remain retryable while eligible and through the durable queue.
+Opening/selecting a player verifies only that player's ownership, market listing,
+asking price and available clause fields. It never starts team capacity, balance,
+roster or transfer-history acquisition. These financial preflights start only on
+explicit market-editor demand; native source freshness repair and final purchase
+checks are retained. Own-player listing verification remains a separate sale gate.
+Points, profile, lineup and historical chart reads run independently of purchase
+capacity; their failures cannot masquerade as availability checks.
 
-`player_card_recent_table_facts(player, now)` recognizes explicit known ownership
-and market flags with a nonfuture observation younger than 60 seconds, matching
-the existing target-summary lifetime. Missing timestamps/flags are unknown.
-`championship_market_prices()` retains `availability_market_observed_at` and
-`availability_complete`: a joined market observation cannot borrow a newer
-catalog timestamp, and failed/partial joins cannot qualify. Existing table-context
-isolation protects the captured row. Recent facts admit the card/editor controls
-without a team-capacity acquisition or a wait for optional points/history.
-Old/unknown table facts use the bounded check once, then session reuse applies.
-Player summaries still load when needed for history, independently of the card's
-availability presentation; they share pending/completed requests per player.
+`player_availability_deadline(data, resource)` preserves an explicit source
+`valid_until`, including a stricter worker/database deadline; legacy native
+observations fall back to their original observation plus the existing resource
+policy. `championship_market_prices()` carries separate
+`availability_owner_valid_until` and `availability_market_valid_until` attributes,
+plus the original market clock and completeness. Catalog observations therefore
+keep their five-minute lifetime while market facts retain their own deadline.
+`player_availability_market_rows(data)` preserves endpoint listing proof and the
+market deadline for the Market and Today tables, including persisted worker data.
+`player_card_recent_table_facts(player, now)` checks both deadlines and rejects
+missing/future clocks, unknown owner/market fields and failed/partial joins. The
+previous blanket 60-second catalog cutoff is removed from this joined path.
 
-The session marker admits an **editor**, not a financial action. Actual-time
-source deadlines and `evaluate_acquisition_preflight()` are unchanged. Opening an
-expired/unverified market editor joins one asynchronous current check; Submit is
-disabled until it succeeds. Direct-owner/clause confirmations retain their
-current preflights, and every submission keeps its independent final checks,
-immutable action context and uncertain-response policy. An expired session result
-cannot authorize a purchase. Ordinary display expiry adds no Retry control,
-source acquisition, timer or polling. Genuine initial failures retain Retry.
+Recent table facts are sufficient for card/editor entry, even while history is
+pending. For stale/unknown rows the existing scoped summary provider retrieves
+only this player. `player_card_summary_row(player, summary)` requires a matching
+immutable ID and explicit owner/market contracts. It maps `_id`/`id` and
+`computer` ownership, market `p` asking price and the captured listing markers;
+a `bids`-only response establishes no listing. Missing evidence is unknown.
+Successful retrieval updates ownership/listing controls and clears stale asking
+prices/clause fields, preserving original score/statistic values and source
+clocks. An obsolete player or league completion cannot replace the current view.
 
-Cold native acquisition now settles history/roster/transfer candidates before the
-short-lived funds/offers reads, reusing existing source caches on first demand.
-This avoids immediately discarding successful early financial reads behind slow
-history. The two finite repair passes use a five-second refresh margin without
-extending any deadline. `verification` additionally exposes `completed_at` and
-`generation` so an initially unusable live completion can receive the existing
-single repair in worker mode; later ordinary expiry and explicit failed retries
-cannot create a loop. A successful session check never needs that repair merely
-because a target's history finished later.
+`player_availability_remember_target(session, identity, row=NULL)` retains
+successful target display checks for reopening, switching, source expiry and
+worker publications. Identity includes exact account/league/team/player,
+competition/season/scoring scope, explicit Refresh and summary invalidation epoch.
+The root-session registry holds at most 64 rows / 4 MiB, with a 128-KiB row cap
+and inactive/LRU eviction. It stores no authentication, timer or polling job.
+The underlying catalog/market/summary facts already use their context-isolated
+successful database snapshots and acknowledged persistence queues. This separate
+session marker is not durable authorization: another session must validate its
+persisted sources' original freshness and completeness before reusing them.
+
+`player_availability_source()` retains its `retry` and `verification` attributes
+and adds `ensure()`: explicit editor demand first attaches a dormant existing
+entry, reuses it if actually fresh, joins a pending check or requests one fresh
+calculation. An inactive accessor's loading shell cannot force a duplicate read.
+Market Submit waits for both the current target facts and financial preflight;
+completion of funds alone cannot authorize unknown ownership/listing. The editor
+uses the updated matching target row. Final submission preflights, immutable
+context, duplicate protection and uncertain-response reconciliation are intact.
+
+A failed/expired financial completion stays blocked in its editor; it does not
+start an outer whole-card retry. Explicit editor reopening is the retry path.
+The native acquisition engine still takes short-lived funds/offers after
+history/roster/transfer candidates and performs its existing bounded source
+repairs without changing deadlines. Card Retry retries target facts only.
+
 
 
 Implemented locally on 2026-11-15. This refines the existing manual player-card
@@ -64,8 +78,8 @@ are excluded. Summary identity additionally includes the immutable player ID.
 Accessors reject the previous context/revision immediately, before new reads
 settle. Returned player IDs, when supplied by the source, must match the request.
 
-Opening or switching cards joins pending team verification or reuses a successful
-session result. Errors settle until explicit retry; unrelated metadata redraws and
+Opening or switching cards joins/reuses target verification. Financial requests
+are admitted only by an explicit editor and can share a completed fresh team result. Errors settle until explicit retry; unrelated metadata redraws and
 worker publications cannot become acquisition loops. A closed card detaches its
 consumer; a finite already-started read may finish within the same interactive
 session for the next card. Account/team/context/refresh/mode changes and session
@@ -78,20 +92,17 @@ Missing, expired or incomplete selected-player summaries use the existing
 `get_player_summary` adapter with interactive priority and `worker_bypass=TRUE`;
 they do not wait for a worker publication. Owned-player listing checks similarly
 share the existing `get_my_market_players` read across owned cards, preserving
-its effective 20-second market lifetime. Team verification uses the same live
+its effective 20-second market lifetime. Explicit editor team verification uses the same live
 asynchronous capacity calculation. Optional lineup/profile/match/valuation
-requests wait for availability admission, not completion. Independent transport
+requests are independent of financial availability. Independent transport
 limits, reserved interactive capacity and bounded freshness repairs are retained.
 
-Offer dialogs join the card's pending verification. Opening an expired/failed
-editor explicitly retries that same provider rather than starting a separate
-live check. An initial acquisition that never produced usable facts can request one repair;
-that repair updates the existing shared entry. A failed/expired target summary
-keeps acquisition blocked and Retry refreshes just the failed/expired sources. Worker expiry publications and
-points-only redraws do not initiate that repair. Original team source deadlines
-(including the at-most-15-second composite deadline) and summary's 60-second
-source lifetime are unchanged. A first card opened after an explicit refresh
-cannot restore an observation from before that refresh.
+Offer dialogs join the shared financial provider on demand. Opening an
+expired/failed editor explicitly revalidates actual freshness. A target summary
+and financial check can settle in either order; both must succeed before Submit
+is enabled. Original team source deadlines (including the at-most-15-second
+composite deadline) and summary's 60-second acquisition lifetime remain intact.
+A first card after explicit Refresh cannot restore pre-refresh observations.
 
 The root registry retains at most 64 entries, 8 MiB per decoded result and
 16 MiB of retained result data per session. Inactive settled entries are evicted
