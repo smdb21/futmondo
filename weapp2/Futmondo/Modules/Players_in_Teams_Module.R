@@ -586,13 +586,13 @@ incoming_clause_prerequisite_failure <- function(roster,history) {
   list(message=paste("Clause transfers could not be verified.",paste(messages,collapse=" ")),failures=failures)
 }
 
-incoming_clause_source <- function(session,login_token,championship_id,user_team_id,is_active,refresh_trigger=NULL) {
+incoming_clause_source <- function(session,login_token,championship_id,user_team_id,is_active,refresh_trigger=NULL,prerequisite_readers=NULL) {
   empty_state<-function()list(status="loading",records=incoming_clause_empty(),
     outgoing_status="loading",outgoing_records=outgoing_clause_empty(),error=NULL)
   state<-shiny::reactiveVal(empty_state())
-  roster_read<-factual_read_adapter(session,"get_players_from_team",login_token,championship_id,user_team_id,
+  roster_read<-prerequisite_readers$roster %||% factual_read_adapter(session,"get_players_from_team",login_token,championship_id,user_team_id,
     is_active=is_active,refresh_trigger=refresh_trigger,state_only=TRUE)
-  history_read<-factual_read_adapter(session,"get_championship_pressroom",login_token,championship_id,user_team_id,
+  history_read<-prerequisite_readers$transactions %||% factual_read_adapter(session,"get_championship_pressroom",login_token,championship_id,user_team_id,
     is_active=is_active,refresh_trigger=refresh_trigger,state_only=TRUE)
   generation<-0L;closed<-FALSE;was_active<-FALSE;signature<-NULL;owner<-NULL
   jobs<-list();queue<-character();summaries<-list();snapshot<-NULL;job_sequence<-0L;prerequisite_problem<-NULL

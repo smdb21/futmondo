@@ -162,3 +162,8 @@ report to that implementation. An older image has no marker; rebuilding is
 required. This does not certify the private account flow or preserve an old
 browser session across deployment. The previous `release-info.json` is static
 legacy metadata and cannot by itself establish the running R source version.
+
+
+## Lineup departure runtime fingerprint
+
+Docker builds also write `/lineup-departure-runtime.json`, version 1 with behavior `shared-departure-prerequisites` and SHA-256 hashes for `server.R` and `Modules/Players_in_Teams_Module.R`. Compare both hashes with the pushed commit to verify the zero-departure reader-handoff fix has reached the hosted image. The static marker contains code metadata only; the app does not poll it. Existing player-card fingerprint behavior is unchanged. No dependency, environment variable or database migration is needed. Public source fingerprint verification does not claim access to an authenticated user's browser session.

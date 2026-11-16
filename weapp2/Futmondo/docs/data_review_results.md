@@ -4199,3 +4199,20 @@ the corrected selected-player parser and date-axis layout. Production source
 rollout is verified. This follow-up is documentation-only with no runtime or
 performance effect. An authenticated private browser interaction is not claimed
 by the read-only source replay, public fingerprint check or synthetic tests.
+
+
+### November 16: confirmed zero departures lost when entering Lineup
+
+The new actual-root/real-adapter regression first failed on Today → My Team → Lineup with the exact reported message: `Clause transfers could not be verified. Roster is refreshing. Transaction history is refreshing.` My Team had already rendered `Leaving players (0)`. Both consumers shared a factual-reader registry key, but the first source-time-note adapter owned an activity predicate excluding Lineup. Navigation deactivated the shared entries and reset their state to loading. The root now supplies one explicit roster/history reader pair with activity covering all consumers and the same global/clause refresh signature. Standalone transfer sources retain their existing defaults. No warning suppression, fabricated empty result or validation bypass is used.
+
+Executed checks:
+
+- `test/test_lineup_departure_handoff.R`: three entry orders, repeated page handoffs, league changes, delayed saved-data arrival, partial evidence, logout and account replacement pass. Ten timestamp-only publications per sequence cause zero eligibility redraws or source/database requests (0.614–0.629s locally); warm navigation uses zero I/O or persistence writes.
+- `test/test_lineup_departure_browser.cjs`: real Lineup/root wiring, decoded synthetic durable roster/history snapshots and page information panel pass at 390/1440px. Confirmed zero clears the warning, explicit refresh reaches the shared database readers, source timestamps remain unchanged, unsaved drafts survive navigation/refresh, no Futmondo mutation or unexpected I/O occurs, and there is no horizontal overflow/browser error. Heartbeat response: 89/104ms. Inspected the mobile screenshot.
+- Existing source-note, clause-observation contract, observed cold reload and complete Lineup module regressions pass, including genuine departures, unknown evidence, kickoff boundaries and final asynchronous save validation.
+- Required `Rscript test/test_shiny_simulation.R`: 13 checks plus eight tabs pass with zero live HTTP/database mutations. Existing synthetic Plotly warnings remain.
+- `python3 test/test_player_card_runtime.py` and `Rscript test/test_deployment_contract.R` pass. The additional build-only `/lineup-departure-runtime.json` contains exactly the root server/shared transfer module SHA-256 hashes and a fixed behavior label, enabling code rollout verification without account information or application polling.
+
+Performance review: two existing shared prerequisite readers replace competing owners; the bounded registry/cache and two-summary queue remain unchanged. Worker navigation reuses durable observations with zero source requests or GUI persistence writes. Explicit Refresh now reaches the intended shared prerequisite invalidation/read instead of inheriting the note's unrelated refresh predicate. Normal database polling/worker schedules and action preflights are unchanged; no timer, background acquisition, per-player read fan-out or dependency is added. Successful observations keep their original context, expiry/completeness and source timestamps; failed persistence remains retryable. The build marker adds two small file hashes during image construction and no application request or reactive work. Documentation has no runtime effect.
+
+Production read-only aggregate metadata showed successful current-context roster/history snapshots; no database or acquisition repair was needed to reproduce and fix this reader-lifetime defect. Browser/database replay checks are synthetic and do not access the user's private browser session or submit a live lineup. Application build/rollout and authenticated acceptance are distinct from these completed local checks.

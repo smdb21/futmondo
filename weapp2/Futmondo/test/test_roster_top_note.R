@@ -31,7 +31,7 @@ shiny::testServer(function(input,output,session){
  login_token_RV<-shiny::reactiveVal(fixture_auth);login<-login_token_RV
  championship_id_RV<-shiny::reactiveVal('league');user_team_id_RV<-function()'mine';refresh_trigger<-function()0L
  for(expr in root_exprs)if(is.call(expr)&&identical(expr[[1]],as.name('<-'))&&
-  paste(deparse(expr[[2]]),collapse='')%in%c('roster_note_active','roster_note_readers','roster_source_note'))eval(expr,envir=environment())
+  paste(deparse(expr[[2]]),collapse='')%in%c('clause_transfer_revision','roster_note_active','roster_sources_active','roster_source_readers','roster_source_note'))eval(expr,envir=environment())
  source_note<-function()roster_source_note()
  include<-FALSE
  for(expr in worker_exprs){

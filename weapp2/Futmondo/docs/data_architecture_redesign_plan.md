@@ -1907,3 +1907,14 @@ expiry-driven card behavior; deployment and private-account acceptance are separ
 
 No new capability, login-tier entry, dependency, environment variable, schema,
 background job or transaction is introduced.
+
+
+### Lineup / My Team departure reader handoff — 2026-11-16
+
+- [x] Reproduce My Team's confirmed zero followed by Lineup's exact roster/history refreshing warning using the real root declarations and worker adapters.
+- [x] Give the source-time note and transfer reconciler one explicit root-owned prerequisite reader pair, with combined page activity and global/clause refresh ownership.
+- [x] Verify all entry orders, repeated navigation, missing/partial recovery, account/league isolation, successful saved-observation reuse, unchanged timestamps, draft retention and existing departure/save gates.
+- [x] Complete focused regressions, 390/1440px browser checks, performance review and the required offline lifecycle. See `data_review_results.md`.
+- [ ] Verify push-triggered deployment serves the two corrected source fingerprints; authenticated user-session acceptance remains separate.
+
+This is a locally implemented root-cause fix within the existing factual data scope. No new capability/login-tier entry, database migration, dependency, environment setting, acquisition worker or transaction is introduced.

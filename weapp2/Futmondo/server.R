@@ -131,14 +131,22 @@ function(input, output, session) {
     valid_login(login_token_RV())&&isTRUE(input$tabs%in%c("yourteam","today","players_in_championship"))&&
       isTRUE(fm_worker_mode(login_token_RV()[["userid"]]))
   })
-  roster_note_readers <- lapply(c(roster="get_players_from_team",transactions="get_championship_pressroom"),function(handler)
+  clause_transfer_revision <- reactiveVal(0L)
+  # One owner for these shared prerequisites. The note's narrower visibility
+  # must not deactivate reads still needed by My Team or Lineup.
+  roster_sources_active <- reactive({
+    valid_login(login_token_RV())&&
+      (isTRUE(input$tabs%in%c("yourteam","lineup"))||isTRUE(roster_note_active()))
+  })
+  roster_source_readers <- lapply(c(roster="get_players_from_team",transactions="get_championship_pressroom"),function(handler)
     factual_read_adapter(session,handler,login_token_RV,championship_id_RV,user_team_id_RV,
-      is_active=roster_note_active,refresh_trigger=refresh_trigger,state_only=TRUE))
+      is_active=roster_sources_active,
+      refresh_trigger=reactive(list(refresh_trigger(),clause_transfer_revision())),state_only=TRUE))
   roster_source_note <- resource_display_source(session,function(){
     if(!isTRUE(roster_note_active()))return("")
     auth<-login_token_RV();league<-championship_id_RV();team<-user_team_id_RV()
-    states<-list(roster=roster_note_readers$roster(login=auth,championship_id=league,user_team_id=team,teams=NULL),
-      transactions=roster_note_readers$transactions(login=auth,championship_id=league))
+    states<-list(roster=roster_source_readers$roster(login=auth,championship_id=league,user_team_id=team,teams=NULL),
+      transactions=roster_source_readers$transactions(login=auth,championship_id=league))
     times<-lapply(states,function(state){
       stamp<-fm_time(state$observed_at)
       if(is.null(state$data)||length(stamp)!=1L||is.na(stamp)||stamp>Sys.time())NULL else stamp
@@ -269,7 +277,6 @@ function(input, output, session) {
       icon=icon("bell"),class="fm-notification-link",title=label,`aria-label`=label)
   })
   observeEvent(input$open_notifications, updateTabItems(session, "tabs", "notifications"))
-  clause_transfer_revision <- reactiveVal(0L)
   refresh_clause_transfers <- function() {
     auth<-isolate(login_token_RV());req(valid_login(auth))
     invalidate_saved_clause_transfers(resource_context(auth,isolate(championship_id_RV()),isolate(user_team_id_RV())))
@@ -277,7 +284,7 @@ function(input, output, session) {
   }
   clause_transfers_RV <- incoming_clause_source(session,login_token_RV,championship_id_RV,user_team_id_RV,
     reactive(isTRUE(input$tabs%in%c("yourteam","lineup"))),
-    reactive(list(refresh_trigger(),clause_transfer_revision())))
+    reactive(list(refresh_trigger(),clause_transfer_revision())),prerequisite_readers=roster_source_readers)
 selected_player_RV <- players_in_teams_Server(id = "players_in_teams",
                                                  is_module_active = reactive({
                                                    input$tabs == "yourteam"
