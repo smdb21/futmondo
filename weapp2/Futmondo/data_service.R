@@ -286,11 +286,12 @@ shared_resource<-function(session,resource,context,fetch,active=function()TRUE,r
   # Real refreshes, expiry and context changes retain loading UI.
   local_replay<-same_context&&!resumed&&identical(version,next_version)&&
     !identical(last_replay,next_replay)&&is.list(next_replay)&&isTRUE(next_replay$ready)
+  saved_display<-same_context&&!is.null(previous$data)&&exists('fm_worker_mode',mode='function')&&isTRUE(fm_worker_mode(ctx$account_id))
   last<<-key;version<<-next_version;last_replay<<-next_replay;generation<<-generation+1L;current_generation<-generation
   stale_data<-function(data){if(!is.null(data))attr(data,"fetch_status")<-"stale";data}
   loading<-resource_state(stale_data(previous$data),status="loading")
   if(!is.null(loading$data))loading$freshness<-"stale"
-  if(!local_replay)value(loading)
+  if(!local_replay&&!saved_display)value(loading)
   fallback<-previous
   # Preview data belongs only to this read generation. It is neither a fresh
   # cache hit nor a successful acquisition, and must retain its original age.

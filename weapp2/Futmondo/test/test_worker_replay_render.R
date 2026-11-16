@@ -8,7 +8,7 @@ auth<-c(userid='replay-render-fixture',token='synthetic')
 ctx<-resource_context(auth,'league','mine')
 args<-list(championship_id='league',user_team_id='mine')
 d<-fm_worker_descriptor('get_user_team_info',args,ctx)
-s<-fm_worker_account_state(ctx$account_id);s$known<-TRUE;s$account<-list(enabled=TRUE,auth_status='active')
+s<-fm_worker_account_state(ctx$account_id);s$bootstrap_complete<-TRUE;s$known<-TRUE;s$account<-list(enabled=TRUE,auth_status='active')
 store<-function(budget,age=0,valid=60){
  value<-observed_data(list(budget=budget),observed_at=now-age)
  attr(value,'valid_until')<-as.numeric(now)+valid
@@ -51,10 +51,10 @@ shiny::testServer(function(input,output,session){
  cat('PASS ten unrelated worker publications cause zero primary rerenders or acquisitions\n')
  # Explicit user refresh reloads the database without scheduling a source read.
  refresh(1L);session$flushReact()
- stopifnot(state()$status=='loading',state()$freshness=='stale')
+ stopifnot(state()$status=='ok',state()$freshness=='fresh',state()$data$budget==105)
  settle(session)
  stopifnot(length(calls)==1L,calls[[1L]]$name=='read')
- cat('PASS manual refresh keeps its visible stale/loading state and only rereads the database\n')
+ cat('PASS manual refresh retains displayed values and only rereads the database\n')
  # An expired stored publication remains stale, with the original source time.
  now<<-now+2;store(106,age=120,valid=-60);stamp<-now-120
  s$jobs<-list(list(key=d$resource_key,running=TRUE,pending=TRUE))

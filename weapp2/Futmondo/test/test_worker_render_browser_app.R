@@ -2,6 +2,7 @@
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages(source('global.R'))
 fm_worker_configured<-function()TRUE
+fm_worker_can_connect<-function()TRUE
 Sys.setenv(FUTMONDO_WORKER_KEY=paste(rep('ab',32),collapse=''))
 fixture_auth<-c(userid='render-fixture',token='synthetic',user_name='fixture@example.invalid')
 fixture_account<-list(account_id='render-fixture',enabled=TRUE,auth_status='active',generation=1L,
@@ -15,7 +16,7 @@ fm_worker_encrypt<-function(auth){
  structure('synthetic-envelope',credential_id='synthetic-credential')
 }
 fm_worker_rpc<-function(name,payload,owner=''){
- if(name=='renew')return(promises::promise_resolve(fixture_account))
+ if(name=='connect')return(promises::promise_resolve(fixture_account))
  if(name=='enqueue'){fixture_enqueues<<-fixture_enqueues+1L;stop('GUI attempted acquisition')}
  stopifnot(name=='read');fixture_reads<<-fixture_reads+1L
  # Real acquisitions create new versions/source clocks even when facts match.
@@ -65,6 +66,7 @@ server<-function(input,output,session){
  fixture_version<<-1L;fixture_cash<<-20000001;fixture_stamp<<-Sys.time();fixture_expired<<-FALSE;fixture_price<<-2000000
  refresh<-shiny::reactiveVal(0L)
  s<-fm_worker_account_state(fixture_auth[['userid']]);fm_worker_set_policy(s,fixture_account)
+ s$bootstrap_complete<-TRUE
  auth<-shiny::reactiveVal(fixture_auth)
  fm_worker_session(session,auth)
  login_token_RV<-auth

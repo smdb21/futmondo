@@ -321,7 +321,7 @@ player_availability_publish <- function(entry,entries,key,data,error=NULL) {
 # Root-session entries share pending and complete team reads across card modules.
 # A consumer's selection never owns the team request's cancellation predicate.
 player_availability_source <- function(session,kind,context,login,refresh=function()0,active=function()TRUE,
-  stored=function()NULL,current_context=context,mode=function()FALSE,opening=function()NULL) {
+  stored=function()NULL,current_context=context,mode=function()FALSE,opening=function()NULL,intent=function()'display') {
   root<-session$rootScope()
   if(is.null(root$userData$player_availability))root$userData$player_availability<-new.env(parent=emptyenv())
   entries<-root$userData$player_availability;handle<-shiny::reactiveVal(NULL)
@@ -334,7 +334,7 @@ player_availability_source <- function(session,kind,context,login,refresh=functi
   }
   closed<-FALSE;last_demand<-NULL
   session$onSessionEnded(function(){closed<<-TRUE})
-  acquire<-function(force=FALSE,allow_start=TRUE){shiny::isolate({
+  acquire<-function(force=FALSE,allow_start=TRUE,manual=FALSE){shiny::isolate({
     ctx<-context();if(is.null(ctx)||!isTRUE(active()))return(invisible(NULL))
     scope<-player_availability_scope(ctx,kind);if(is.null(scope))return(invisible(NULL))
     epoch<-player_availability_invalidated(ctx,kind)
@@ -354,6 +354,24 @@ player_availability_source <- function(session,kind,context,login,refresh=functi
       entry$identity<-identity;entry$attempted<-FALSE;entry$durable<-FALSE;entry$saving<-FALSE;entry$generation<-0L;entry$bytes<-0;entry$consumers<-character();entry$at<-Sys.time();entries[[key]]<-entry
     }
     attach(entry);entry$at<-Sys.time()
+    if(fm_worker_configured()&&isTRUE(fm_worker_mode(ctx$account_id))&&!manual&&!identical(intent(),'manual_action')){
+      handler<-switch(kind,team='get_team_acquisition_capacity',summary='get_player_summary',listings='get_my_market_players')
+      args<-list(championship_id=ctx$championship_id,user_team_id=ctx$user_team_id)
+      if(kind=='summary')args$player_id<-ctx$player_id
+      descriptor<-fm_worker_descriptor(handler,args,ctx)
+      fm_worker_demand(descriptor,root$token,function()shiny::isolate(!closed&&isTRUE(active())&&identical(context(),ctx)))
+      saved<-fm_worker_get(ctx$account_id,descriptor$resource_key)
+      old<-entry$value()
+      if(!is.null(saved$data)){
+        newer<-is.null(old$data)||as.numeric(fm_time(attr(saved$data,'observed_at')))>=as.numeric(fm_time(old$observed_at))
+        if(isTRUE(newer)){
+          attr(saved$data,'availability_from_saved')<-TRUE
+          player_availability_publish(entry,entries,key,saved$data)
+          entry$verified<-player_availability_valid(saved$data,kind);entry$durable<-TRUE
+        }
+      }else if(is.null(old$data)&&!isTRUE(entry$pending))entry$value(resource_state(status='unverified'))
+      return(invisible(NULL))
+    }
     schedule_save<-function(data,save_context,started_at){
       if(isTRUE(entry$saving))return(invisible(TRUE))
       entry$saving<-TRUE;g<-entry$generation
@@ -447,7 +465,7 @@ player_availability_source <- function(session,kind,context,login,refresh=functi
       handler<-switch(kind,team='get_team_acquisition_capacity',summary='get_player_summary',listings='get_my_market_players')
       args<-list(login=auth,championship_id=ctx$championship_id,user_team_id=ctx$user_team_id)
       if(kind=='summary')args$player_id<-ctx$player_id
-      tryCatch(async_adapter_fetch(handler,args,context=captured,is_current=current,priority='interactive',owner=root$token,worker_bypass=TRUE),error=function(error)promises::promise_reject(error))
+      tryCatch(async_adapter_fetch(handler,args,context=captured,is_current=current,priority='interactive',owner=root$token,intent='manual_action'),error=function(error)promises::promise_reject(error))
     }
     if(!is.null(saved)&&player_availability_valid(saved$data,kind)){
       finish(saved$data);return(invisible(NULL))
@@ -504,13 +522,13 @@ player_availability_source <- function(session,kind,context,login,refresh=functi
     state<-entry$value();state$session_verified<-isTRUE(entry$verified)
     state
   })
-  attr(value,'retry')<-function()acquire(TRUE)
+  attr(value,'retry')<-function()acquire(TRUE,manual=TRUE)
   # Editor demand first attaches an existing entry, then rechecks actual source
   # freshness. A dormant accessor's loading shell must not force a duplicate.
   attr(value,'ensure')<-function()shiny::isolate({
-    acquire(FALSE)
+    acquire(FALSE,manual=TRUE)
     entry<-selected_entry()
-    if(!is.null(entry)&&!isTRUE(entry$pending)&&!player_availability_valid(entry$value()$data,kind))acquire(TRUE)
+    if(!is.null(entry)&&!isTRUE(entry$pending)&&!player_availability_valid(entry$value()$data,kind))acquire(TRUE,manual=TRUE)
     invisible(NULL)
   })
   attr(value,'verification')<-shiny::reactive({entry<-selected_entry();if(is.null(entry))return(NULL)

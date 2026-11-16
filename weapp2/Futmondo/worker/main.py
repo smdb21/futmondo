@@ -327,7 +327,12 @@ class Worker:
         body = message['body']
         if isinstance(body, str):
             body = json.loads(body)
-        account = await self.store.account(job['account_id'])
+        request_key = hashlib.sha256(canonical(dict(path=url.path, body=body)).encode()).hexdigest()
+        prepared = await self.store.rpc('prepare_source', p_account=job['account_id'], p_key=job['resource_key'],
+            p_owner=owner, p_generation=job['generation'], p_request=request_key)
+        if not isinstance(prepared, dict) or not isinstance(prepared.get('account'), dict):
+            raise WorkerFailure('access_revoked')
+        account = prepared['account']
         limit = account.get('rate_limited_until')
         if limit:
             delay = datetime.fromisoformat(limit.replace('Z', '+00:00')).timestamp() - time.time()
@@ -336,7 +341,6 @@ class Worker:
         auth = decrypt_access(account, self.key)
         if not self.is_admitted(account, auth):
             raise WorkerFailure('access_revoked')
-        request_key = hashlib.sha256(canonical(dict(path=url.path, body=body)).encode()).hexdigest()
         body['header'] = {'token': auth['token'], 'userid': auth['userid']}
         query_league = str((body.get('query') or {}).get('championshipId', ''))
         expected = job['descriptor']['context'].get('championship_id', '')
@@ -353,8 +357,7 @@ class Worker:
                 current = membership.get(dimension, 'unknown')
                 if selected != 'unknown' and current != 'unknown' and selected != current:
                     raise WorkerFailure('context_superseded')
-        cached = await self.store.rpc('checkpoint', p_account=job['account_id'], p_key=job['resource_key'],
-            p_owner=owner, p_generation=job['generation'], p_request=request_key)
+        cached = prepared.get('checkpoint')
         if cached:
             response = unpack_snapshot(cached['manifest'], cached['chunks'])
             if url.path == '/2/user/activechampionships':
@@ -402,7 +405,9 @@ class Worker:
                         'generation': 'eq.' + str(job['generation'])}, json={'rate_limited_until': stamp(time.time() + delay)})
                     raise WorkerFailure('source_rate_limited', delay)
                 if response is not None and response.status_code == 401:
-                    raise WorkerFailure('source_authentication')
+                    failure = WorkerFailure('source_authentication')
+                    failure.credential_id = account.get('credential_id')
+                    raise failure
                 if response is not None and response.status_code in range(200, 300):
                     if len(response.content) > MAX_JSON:
                         raise WorkerFailure('source_size')
@@ -442,7 +447,10 @@ class Worker:
         return not getattr(self, 'admission_blocked', True) or bool(admin and auth.get('user_name', '').strip().lower() == admin)
 
     async def exchange(self, job, owner, message):
-        await self.guard(job, owner)
+        # These operations authorize atomically in their own RPC. Read-only
+        # bridges retain their guard; heartbeat renewal remains independent.
+        if message['type'] not in ('http', 'persist', 'progress', 'clause_observation'):
+            await self.guard(job, owner)
         if message['type'] == 'progress':
             if job['descriptor']['handler'] != 'fm_worker_finances':
                 raise WorkerFailure('helper_protocol')
@@ -554,10 +562,12 @@ class Worker:
         resource_key = descriptor['resource_key']
         parts, size, digest = pack_snapshot(result['value'])
         version = str(uuid.uuid4())
-        for i, part in enumerate(parts):
-            await self.guard(job, owner)
-            await self.store.request('POST', 'worker_chunks', json=dict(account_id=job['account_id'], resource_key=resource_key,
-                version=version, part=i, data=part), headers={'Prefer': 'resolution=ignore-duplicates'})
+        for offset in range(0, len(parts), 4):
+            if offset:
+                await self.guard(job, owner)
+            batch = [dict(account_id=job['account_id'], resource_key=resource_key,
+                version=version, part=i, data=parts[i]) for i in range(offset, min(offset + 4, len(parts)))]
+            await self.store.request('POST', 'worker_chunks', json=batch, headers={'Prefer': 'resolution=ignore-duplicates'})
         if os.getenv('FUTMONDO_CLAUSE_SCHEDULING_ENABLED', 'false').lower() == 'true' and descriptor['handler'] == 'get_resolved_league_context':
             context = plain(result['value'])
             if isinstance(context, dict) and context.get('account_id') == job['account_id']:
@@ -698,7 +708,8 @@ class Worker:
                     with contextlib.suppress(Exception):
                         if code == 'source_authentication':
                             await self.store.request('PATCH', 'worker_accounts', params={'account_id': 'eq.' + job['account_id'],
-                                'generation': 'eq.' + str(job['generation'])}, json={'auth_status': 'reauthorize'})
+                                'generation': 'eq.' + str(job['generation']),
+                                'credential_id': 'eq.' + str(getattr(error, 'credential_id', ''))}, json={'auth_status': 'reauthorize'})
                         if code in ('context_superseded', 'league_membership_unverified'):
                             await self.store.request('DELETE', 'worker_jobs', params={'account_id': 'eq.' + job['account_id'],
                                 'resource_key': 'eq.' + job['resource_key'], 'owner': 'eq.' + owner})

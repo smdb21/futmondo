@@ -87,6 +87,7 @@ login_UI <- function(id) {
       uiOutput(ns("remember_availability")),
       singleton(tags$script(src="remember-login.js")),
       actionButton(inputId = ns("login_button"), label = "Login"),
+      tags$p(class="fm-info-neutral", "Signing in starts automatic data synchronization, including after logout. Access is encrypted and your password is never saved. Use Disconnect account to stop synchronization."),
       div(
         id = ns("login_progress"), class = "login-feedback", style = "display: none;",
         role = "status", `aria-live` = "polite",
@@ -268,6 +269,12 @@ login_Server <- function(id, user = NULL, password = NULL) {
       updateTextInput(session, "user_name", value = "")
       updateTextInput(session, "password", value = "")
     })
+    login_root<-session$rootScope() %||% session
+    login_root$userData$disconnect_login<-function(){
+      signed_out()
+      if(!is.null(remembered))remembered$logout()
+      updateTextInput(session,"password",value="")
+    }
     observeEvent(input$login_button, {
       if(isTRUE(login_pending_RV()))return()
       user_name <- trimws(input$user_name %||% "")

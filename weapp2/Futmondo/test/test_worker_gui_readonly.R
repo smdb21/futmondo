@@ -8,7 +8,7 @@ ctx<-resource_context(auth,'league','mine')
 args<-list(championship_id='league',user_team_id='mine')
 d<-fm_worker_descriptor('get_user_team_info',args,ctx)
 s<-fm_worker_account_state(ctx$account_id)
-s$known<-TRUE;s$account<-list(enabled=TRUE,auth_status='active',generation=1L)
+s$bootstrap_complete<-TRUE;s$known<-TRUE;s$account<-list(enabled=TRUE,auth_status='active',generation=1L)
 value<-observed_data(list(budget=101),observed_at=now-600)
 attr(value,'valid_until')<-as.numeric(now)-540
 wire<-charToRaw(fm_worker_json(fm_worker_encode(value)));compressed<-history_baseline_compress(wire)
@@ -30,7 +30,7 @@ fm_worker_rpc<-function(name,payload,owner=''){
 }
 settle<-function(session=NULL)for(i in 1:30){later::run_now(0);if(!is.null(session))session$flushReact()}
 for(cold in 1:2){
- s<-fm_worker_account_state(ctx$account_id);s$known<-TRUE;s$account<-list(enabled=TRUE,auth_status='active',generation=1L)
+ s<-fm_worker_account_state(ctx$account_id);s$bootstrap_complete<-TRUE;s$known<-TRUE;s$account<-list(enabled=TRUE,auth_status='active',generation=1L)
  clear_api_cache();if(length(ls(.fm_worker$values)))rm(list=ls(.fm_worker$values),envir=.fm_worker$values)
  shiny::testServer(function(input,output,session){
   s$sessions<-c(s$sessions,session$token)
@@ -40,7 +40,7 @@ for(cold in 1:2){
   state<-shiny::reactive({pulse();read(auth,'league','mine')})
   output$cash<-shiny::renderText(state()$data$budget)
  },{
-  settle(session);stopifnot(length(s$waiters)==1L)
+  settle(session);stopifnot(length(s$waiters)==0L) # missing interests now read immediately
   fm_worker_poll(ctx$account_id,session$token,TRUE);settle(session)
   stopifnot(output$cash=='101',state()$status=='stale',state()$freshness=='stale',!length(s$waiters),
    identical(as.numeric(attr(state()$data,'observed_at')),as.numeric(fm_time(manifest$observed_at))))
@@ -66,7 +66,7 @@ for(cold in 1:2){
 }
 # Stored expired clause evidence should be shown truthfully, never wait120 seconds
 # for another collection simply because a GUI asks to display it.
-s<-fm_worker_account_state(ctx$account_id);s$known<-TRUE;s$account<-list(enabled=TRUE,auth_status='active',generation=1L)
+s<-fm_worker_account_state(ctx$account_id);s$bootstrap_complete<-TRUE;s$known<-TRUE;s$account<-list(enabled=TRUE,auth_status='active',generation=1L)
 clause_ctx<-resource_context(auth,'league','mine','player')
 clause_args<-list(championship_id='league',user_team_id='mine',player_id='player')
 clause_d<-fm_worker_descriptor('get_clause_transfer_summary',clause_args,clause_ctx)

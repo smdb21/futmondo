@@ -87,7 +87,9 @@ get_coach_team_info <- function(login,championship_id,user_team_id,not_before=NU
 coach_read_team_info <- function(auth,target,session,is_current,not_before=NULL) {
   context<-resource_context(auth,target$championship,target$team,session_id=session$token)
   cache_context<-context;cache_context$session_id<-""
-  invalidate_resources(cache_context,resources=paste0("team_info_",target$championship,"_",target$team))
+  # A read preflight invalidates only its local cache. The post-hire path below
+  # still records action invalidation after a submission may have changed funds.
+  invalidate_resources(cache_context,resources=paste0("team_info_",target$championship,"_",target$team),notify_availability=FALSE)
   request<-async_adapter_fetch("get_coach_team_info",
     list(login=auth,championship_id=target$championship,user_team_id=target$team,not_before=not_before),
     context,owner=paste0("coach:",session$token),is_current=is_current,

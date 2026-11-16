@@ -126,7 +126,10 @@ fm_async_http<-function(url,method="GET",body=NULL,headers=character(),owner="",
 fm_httr_response<-function(response,url){
   structure(list(url=url,status_code=response$status_code,headers=httr::insensitive(list(`content-type`="application/json; charset=utf-8")),all_headers=list(),cookies=data.frame(),content=response$content,date=Sys.time(),times=c(total=response$times[["total"]] %||% 0),request=list(method="POST",url=url)),class="response")
 }
-async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is_current=function()TRUE,priority=NULL,on_progress=NULL,worker_bypass=FALSE){
+async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is_current=function()TRUE,priority=NULL,on_progress=NULL,worker_bypass=FALSE,
+ intent=if(worker_bypass)'manual_action'else'display'){
+  intent<-match.arg(intent,c('display','manual_action'))
+  worker_bypass<-identical(intent,'manual_action')
   name<-if(is.character(fn))fn else deparse(substitute(fn))
   if(length(name)!=1L||!grepl("^(get_|read_|calculate_league_finances$)",name))return(promises::promise_reject(simpleError("Only factual reads may use asynchronous adapters")))
   source_fn<-if(is.character(fn))get0(name,envir=.GlobalEnv,mode="function")else fn
@@ -135,8 +138,7 @@ async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is
   source_getter<-is.function(source_fn)&&"login"%in%names(formals(source_fn))
   if(!worker_bypass && exists("fm_worker_configured",mode="function") && fm_worker_configured() &&
      startsWith(name,"get_") && source_getter && !identical(fm_worker_mode(context$account_id),FALSE))
-    return(fm_worker_fetch(name,args,context,owner,is_current,direct=function()
-      async_adapter_fetch(name,args,context,owner,is_current,priority,on_progress,worker_bypass=TRUE)))
+    return(fm_worker_fetch(name,args,context,owner,is_current))
   if(is.null(priority))priority<-if(name%in%c("get_team_acquisition_capacity","get_acquisition_capacity",
     "get_player_summary","get_my_market_players","get_round_lineup_snapshot"))"interactive"else "normal"
   priority<-fm_transport_priority(priority)
@@ -215,6 +217,7 @@ async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is
     stop(structure(list(message="Awaiting read response",key=key,url=url,method=method,body=body,headers=headers),class=c("fm_async_request","condition")))
   }
   adapter_env$futmondo_post<-function(url,...){
+    if(identical(intent,'display')&&fm_worker_configured())stop('Display reads must use saved database observations')
     route<-tail(strsplit(url,"/",fixed=TRUE)[[1]],1)
     allowed<-c("information","activechampionships","teams","roster","rounds","dreamteam","nightmareteam","roundlineup","lineup","championshipplayers","championshipteams","players","summary","fullprofile","matches","pressroom","news","moneymovements","rosterbids","myplayers","list","unread","getdtconfig")
     if(!route%in%allowed&&!identical(url,"https://api.futmondo.com/1/ranking/round"))stop("Mutation forbidden in asynchronous read")

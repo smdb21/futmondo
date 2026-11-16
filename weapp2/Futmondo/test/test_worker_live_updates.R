@@ -5,7 +5,7 @@ auth<-c(userid='live-fixture',token='synthetic')
 ctx<-resource_context(auth,'l','t')
 args<-list(championship_id='l',user_team_id='t')
 d<-fm_worker_descriptor('get_user_team_info',args,ctx)
-s<-fm_worker_account_state(auth[['userid']]);s$known<-TRUE;s$account<-list(enabled=TRUE,auth_status='active',generation=1L)
+s<-fm_worker_account_state(auth[['userid']]);s$bootstrap_complete<-TRUE;s$known<-TRUE;s$account<-list(enabled=TRUE,auth_status='active',generation=1L)
 initial<-list(budget=100,withheld=0,teamValue=100,configuration=list(mnmp=.25))
 attr(initial,'observed_at')<-Sys.time();attr(initial,'valid_until')<-as.numeric(Sys.time())+60
 fm_worker_put(auth[['userid']],d$resource_key,list(data=initial,manifest=list(version='v1')))

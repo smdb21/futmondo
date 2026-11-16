@@ -1,8 +1,9 @@
-# Database-backed browsing for explicitly opted-in accounts. All transport is async.
+# Browsing always reads durable observations. Collection is a separate service.
 .fm_worker <- new.env(parent=emptyenv())
 .fm_worker$accounts<-new.env(parent=emptyenv());.fm_worker$values<-new.env(parent=emptyenv())
 fm_worker_configured<-function() !isTRUE(getOption('futmondo.offline',FALSE))&&
- !isTRUE(getOption('futmondo.worker_helper',FALSE))&&identical(tolower(Sys.getenv('FUTMONDO_WORKER_ENABLED','true')),'true')&&
+ !isTRUE(getOption('futmondo.worker_helper',FALSE))
+fm_worker_can_connect<-function() fm_worker_configured()&&identical(tolower(Sys.getenv('FUTMONDO_WORKER_ENABLED','true')),'true')&&
  grepl('^[a-fA-F0-9]{64}$',Sys.getenv('FUTMONDO_WORKER_KEY'))&&requireNamespace('sodium',quietly=TRUE)&&nzchar(get_sb_url())&&nzchar(get_sb_key())
 fm_worker_resource_revision<-function(state,key){
  if(is.null(state$resource_revisions[[key]]))state$resource_revisions[[key]]<-shiny::withReactiveDomain(NULL,shiny::reactiveVal(0L))
@@ -17,6 +18,7 @@ fm_worker_account_state<-function(id){
  state<-.fm_worker$accounts[[id]]
  if(is.null(state)){
   state<-new.env(parent=emptyenv());state$account<-NULL;state$known<-FALSE;state$busy<-FALSE;state$last_poll<-0
+  state$bootstrap_complete<-FALSE;state$bootstrap_waiters<-list();state$requested_keys<-character();state$read_scheduled<-FALSE
   state$status_revision<-shiny::withReactiveDomain(NULL,shiny::reactiveVal(0L));state$redirects<-list();state$redirect_revision<-shiny::withReactiveDomain(NULL,shiny::reactiveVal(0L));state$descriptors<-list();state$waiters<-list();state$queued<-list();state$health<-NULL;state$jobs<-list();state$errors<-list();state$sessions<-character();state$policy_revision<-shiny::withReactiveDomain(NULL,shiny::reactiveVal(0L));state$settings_revision<-shiny::withReactiveDomain(NULL,shiny::reactiveVal(0L));state$resource_revisions<-new.env(parent=emptyenv())
   .fm_worker$accounts[[id]]<-state
  }
@@ -35,12 +37,10 @@ fm_worker_set_policy<-function(s,account){
 }
 fm_worker_mode<-function(id){
  if(!fm_worker_configured()||isTRUE(getOption('futmondo.worker_live',FALSE)))return(FALSE)
- state<-fm_worker_account_state(id)
- try(state$policy_revision(),silent=TRUE)
- if(!state$known)return(NA)
- isTRUE(state$account$enabled)
+ TRUE
 }
 fm_worker_rpc<-function(name,payload,owner=''){
+ if(!nzchar(get_sb_url())||!nzchar(get_sb_key()))return(promises::promise_reject(simpleError('Database access is not configured.')))
  url<-paste0(get_sb_url(),'/rest/v1/rpc/worker_',name)
  headers<-c(apikey=get_sb_key(),Authorization=paste('Bearer',get_sb_key()),`Content-Type`='application/json')
  promises::then(fm_async_http(url,'POST',fm_worker_json(payload),headers,owner=owner),function(response){
@@ -134,6 +134,40 @@ fm_worker_demand<-function(descriptor,owner='',is_current=NULL){
  if(length(s$descriptors)>128L){times<-vapply(s$descriptors,function(x)x$at,numeric(1));victims<-names(sort(times))[seq_len(length(times)-128L)];s$descriptors[victims]<-NULL;s$queued[victims]<-NULL;s$errors[victims]<-NULL
   for(v in victims)if(exists(v,s$resource_revisions,inherits=FALSE))rm(list=v,envir=s$resource_revisions)
  }
+ if(!key%in%s$requested_keys&&is.null(fm_worker_get(descriptor$context$account_id,key)))fm_worker_schedule_read(descriptor$context$account_id,owner)
+ invisible(NULL)
+}
+# Batch new interests on the next event-loop turn instead of waiting five seconds.
+fm_worker_schedule_read<-function(account,owner=''){
+ s<-fm_worker_account_state(account)
+ if(isTRUE(s$read_scheduled))return(invisible(NULL))
+ s$read_scheduled<-TRUE
+ later::later(function(){
+  if(!identical(.fm_worker$accounts[[account]],s))return()
+  s$read_scheduled<-FALSE
+  if(!s$busy)fm_worker_poll(account,owner,TRUE)
+ },0.001)
+ invisible(NULL)
+}
+fm_worker_preference<-function(account,owner=''){
+ s<-fm_worker_account_state(account)
+ if(isTRUE(s$bootstrap_complete))return(promises::promise_resolve(s$preferred_league))
+ if(length(s$bootstrap_waiters)>=128L)return(promises::promise_reject(resource_failure(category='read_budget')))
+ fm_worker_schedule_read(account,owner)
+ promises::promise(function(resolve,reject){s$bootstrap_waiters[[length(s$bootstrap_waiters)+1L]]<-list(resolve=resolve,reject=reject,owner=owner)})
+}
+fm_worker_prefetch<-function(account,leagues,owner=''){
+ s<-fm_worker_account_state(account);rows<-leagues$championships
+ if(!length(rows))return(invisible(NULL))
+ ids<-vapply(rows,function(x)fm_scalar(x$id %||% x$`_id`,''),character(1))
+ selected<-s$preferred_league$championship_id
+ index<-if(length(selected)==1L&&selected%in%ids)match(selected,ids)else 1L
+ row<-rows[[index]];team<-fm_scalar(row$userteam$id %||% row$userteam$`_id`,'')
+ if(!nzchar(ids[index])||!nzchar(team))return(invisible(NULL))
+ ctx<-resource_context(account_id=account,championship_id=ids[index],user_team_id=team)
+ args<-list(championship_id=ids[index],user_team_id=team)
+ for(handler in c('get_user_team_info','get_market_players','get_players_from_team'))
+  fm_worker_demand(fm_worker_descriptor(handler,args,ctx),owner)
  invisible(NULL)
 }
 fm_worker_live_keys<-function(state,now=as.numeric(Sys.time())){
@@ -223,13 +257,11 @@ fm_worker_settle<-function(s){
  for(id in names(s$waiters)){
   w<-s$waiters[[id]];saved<-fm_worker_get(w$descriptor$context$account_id,w$key)
   cancelled<-!isTRUE(tryCatch(w$current(),error=function(e)FALSE))
-  disabled<-s$known&&!isTRUE(s$account$enabled)
   ready<-!is.null(saved)
-  if(cancelled||disabled||ready){
+  if(cancelled||ready){
    s$waiters[[id]]<-NULL;if(is.function(w$cancel))w$cancel()
    if(cancelled)w$reject(structure(list(message='Session request cancelled',call=NULL),class=c('fm_async_cancelled','error','condition')))
-   else if(disabled&&is.function(w$direct))promises::then(w$direct(),w$resolve,w$reject)
-   else if(disabled)w$reject(simpleError('Background access disabled'))else {
+   else {
     if(!resource_snapshot_unexpired(saved$data))attr(saved$data,'fetch_status')<-'stale'
     w$resolve(saved$data)
    }
@@ -240,14 +272,30 @@ fm_worker_poll<-function(account,owner='',force=FALSE){
  s<-fm_worker_account_state(account)
  if(s$busy||!force&&as.numeric(Sys.time())-s$last_poll<4)return(invisible(NULL))
  s$busy<-TRUE;s$last_poll<-as.numeric(Sys.time())
+ bootstrap<-!isTRUE(s$bootstrap_complete)
+ if(bootstrap){
+  descriptor<-fm_worker_descriptor('get_active_championships',list(),resource_context(account_id=account))
+  fm_worker_demand(descriptor,owner)
+ }
  keys<-fm_worker_live_keys(s)
+ s$requested_keys<-union(intersect(s$requested_keys,names(s$descriptors)),keys)
  versions<-setNames(lapply(keys,function(k)fm_worker_get(account,k)$manifest$version %||% ''),keys)
  if(!length(versions))versions<-structure(list(),names=character())
  descriptors<-setNames(lapply(keys,function(k)s$descriptors[[k]]$descriptor),keys)
  if(!length(descriptors))descriptors<-structure(list(),names=character())
- p<-fm_worker_rpc('read',list(p_account=account,p_versions=versions,p_descriptors=descriptors),owner)
+ p<-tryCatch(fm_worker_rpc(if(bootstrap)'bootstrap'else'read',if(bootstrap)list(p_account=account)else list(p_account=account,p_versions=versions,p_descriptors=descriptors),owner),error=promises::promise_reject)
+ p<-promises::then(p,function(result){
+  if(!is.list(result)||!all(c('account','resources','jobs')%in%names(result)))stop('Invalid database read response')
+  result
+ })
  promises::then(p,function(result){
+  if(!identical(.fm_worker$accounts[[account]],s))return(NULL)
   s$busy<-FALSE;fm_worker_set_policy(s,result$account);s$health<-result$health;s$jobs<-result$jobs;s$service_error<-NULL
+  if(bootstrap){s$bootstrap_complete<-TRUE;s$preferred_league<-result$preferred_league
+   for(w in s$bootstrap_waiters)w$resolve(s$preferred_league);s$bootstrap_waiters<-list()
+   # The bootstrap RPC read only the account descriptor, not page interests.
+   s$requested_keys<-descriptor$resource_key
+  }
   s$errors<-s$errors[intersect(names(s$errors),keys)]
   for(redirect in result$redirects)fm_worker_accept_redirect(s,redirect,account)
   keys<-fm_worker_live_keys(s)
@@ -259,6 +307,7 @@ fm_worker_poll<-function(account,owner='',force=FALSE){
     if(identical(d$handler,'get_active_championships')){
      rows<-tryCatch(normalize_active_league_contexts(item$data,account,attr(item$data,'observed_at')),error=function(e)list())
      for(row in rows)remember_league_context(row)
+     if(bootstrap)fm_worker_prefetch(account,item$data,owner)
     }
     if(identical(d$handler,'get_lineup_from_team'))try(remember_league_scoring(d$context,item$data,attr(item$data,'observed_at')),silent=TRUE)
     # A genuinely newer source publication confirms an existing context hint;
@@ -281,8 +330,18 @@ fm_worker_poll<-function(account,owner='',force=FALSE){
    }
   }
   # Polling is read-only: stale/missing observations never alter worker jobs.
-  fm_worker_settle(s);fm_worker_notify(account);NULL
- },function(error){s$busy<-FALSE;s$service_error<-'Background status could not be read from the database.';fm_worker_notify(account);NULL})
+  fm_worker_settle(s);fm_worker_notify(account)
+  if(length(setdiff(fm_worker_live_keys(s),s$requested_keys)))fm_worker_schedule_read(account,owner)
+  NULL
+ },function(error){
+  if(!identical(.fm_worker$accounts[[account]],s))return(NULL)
+  s$busy<-FALSE;s$service_error<-'Saved data could not be read from the database.'
+  for(w in s$bootstrap_waiters)w$reject(error);s$bootstrap_waiters<-list()
+  for(id in names(s$waiters)){
+   w<-s$waiters[[id]];s$waiters[[id]]<-NULL;if(is.function(w$cancel))w$cancel();w$reject(error)
+  }
+  fm_worker_notify(account);NULL
+ })
  invisible(NULL)
 }
 fm_worker_peek<-function(handler,args,context,direct,is_current=NULL){
@@ -346,6 +405,10 @@ fm_worker_finance_source<-function(session,login,championship,user_team,teams,ac
 fm_worker_detach<-function(account,owner){
  s<-.fm_worker$accounts[[account]];if(is.null(s))return(invisible(NULL))
  s$sessions<-setdiff(s$sessions,owner)
+ for(i in rev(seq_along(s$bootstrap_waiters)))if(identical(s$bootstrap_waiters[[i]]$owner,owner)){
+  w<-s$bootstrap_waiters[[i]];s$bootstrap_waiters[i]<-NULL
+  w$reject(structure(list(message='Session request cancelled',call=NULL),class=c('fm_async_cancelled','error','condition')))
+ }
  for(key in names(s$descriptors)){
   d<-s$descriptors[[key]]
   if(length(d$watchers)){
@@ -369,17 +432,18 @@ fm_worker_status_source<-function(session,login){
  observer<-shiny::observe({
   auth<-login();if(!valid_login(auth)){value(NULL);return()}
   account<-auth[['userid']];s<-fm_worker_account_state(account);s$status_revision()
-  if(!isTRUE(s$account$enabled)){value(NULL);return()}
   health_age<-as.numeric(difftime(Sys.time(),fm_time(s$health$heartbeat),units='secs'))
-  failed<-!identical(s$account$auth_status,'active')||length(health_age)!=1L||!is.finite(health_age)||health_age>60||!is.null(s$service_error)||length(s$errors)>0L
-  message<-if(!identical(s$account$auth_status,'active'))'Background access needs renewal. Log in again.'else
+  failed<-!isTRUE(s$account$enabled)||!identical(s$account$auth_status,'active')||length(health_age)!=1L||!is.finite(health_age)||health_age>60||!is.null(s$service_error)||!is.null(s$connect_error)||length(s$errors)>0L
+  message<-if(!is.null(s$service_error))s$service_error else if(!is.null(s$connect_error))s$connect_error else
+   if(!s$known)'Loading saved data…'else if(!isTRUE(s$account$enabled))'Automatic sync is not connected; saved data remains available.'else
+   if(!identical(s$account$auth_status,'active'))'Background access needs renewal. Log in again.'else
    if(length(health_age)!=1L||!is.finite(health_age)||health_age>60)'Background worker is not responding; saved data remains available.'else
     if(!is.null(s$service_error))s$service_error else
      if(length(s$errors))paste(unique(unlist(s$errors)),collapse=' ')else 'Background sync is enabled.'
   live_keys<-fm_worker_live_keys(s)
   jobs<-s$jobs[vapply(s$jobs,function(j)j$key%in%live_keys,logical(1))]
   running<-sum(vapply(jobs,function(j)isTRUE(j$running),logical(1)))
-  if(running>0&&identical(s$account$auth_status,'active'))message<-paste(message,sprintf('Updating %d saved data source(s).',running))
+  # Routine collection is not a page-loading state or a changing queue banner.
   checks<-vapply(live_keys,function(k){item<-fm_worker_get(account,k);if(is.null(item))NA_real_ else as.numeric(fm_time(item$manifest$checked_at))},numeric(1))
   checks<-checks[is.finite(checks)]
   value(list(message=message,error=failed,checked_at=if(length(checks))as.POSIXct(min(checks),origin='1970-01-01',tz='UTC')else NULL))
@@ -389,12 +453,16 @@ fm_worker_status_source<-function(session,login){
 }
 fm_worker_session<-function(session,login,leagues=function()list(),source_note=function()""){
  if(!fm_worker_configured())return(invisible(NULL))
- closed<-FALSE;last_account<-NULL;renewed<-NULL
+ closed<-FALSE;last_account<-NULL;login_identity<-NULL;renewed<-NULL;connecting<-FALSE;connect_after<-0;disconnecting<-FALSE;login_generation<-NULL
  session$onSessionEnded(function(){closed<<-TRUE;if(!is.null(last_account))fm_worker_detach(last_account,session$token)})
  shiny::observe({
-  auth<-login();if(!valid_login(auth)){if(!is.null(last_account)){fm_worker_detach(last_account,session$token);last_account<<-NULL};return()}
+  auth<-login();if(!valid_login(auth)){if(!is.null(last_account)){fm_worker_detach(last_account,session$token);last_account<<-NULL};login_identity<<-NULL;renewed<<-NULL;connecting<<-FALSE;disconnecting<<-FALSE;connect_after<<-0;login_generation<<-NULL;return()}
+  identity<-paste(auth[['userid']],paste0(openssl::sha256(charToRaw(auth[['token']]))))
+  if(!identical(login_identity,identity)){login_identity<<-identity;renewed<<-NULL;connecting<<-FALSE;disconnecting<<-FALSE;connect_after<<-0;login_generation<<-NULL}
   account<-auth[['userid']];if(!is.null(last_account)&&!identical(last_account,account))fm_worker_detach(last_account,session$token);last_account<<-account;s<-fm_worker_account_state(account)
   s$sessions<-unique(c(s$sessions,session$token))
+  s$policy_revision()
+  if(!identical(renewed,paste0(openssl::sha256(charToRaw(auth[['token']]))))&&s$known&&!connecting&&!disconnecting&&as.numeric(Sys.time())>=connect_after)connect(auth)
   if(!identical(session$input$worker_visible,FALSE)){
    shiny::invalidateLater(5000,session);fm_worker_poll(account,session$token)
   }
@@ -430,53 +498,76 @@ fm_worker_session<-function(session,login,leagues=function()list(),source_note=f
   if(!s$known)return(fm_info('Loading background sync settings…',pending=TRUE))
   a<-s$account
   shiny::tags$details(id='worker_settings_details',open=if(isTRUE(shiny::isolate(session$input$worker_settings_open)))'open'else NULL,shiny::tags$summary('Background sync'),
-   shiny::tags$p('Allow this server to retrieve factual LigaRadar data while you are signed out. No password is saved. This continues until you disable it or LigaRadar rejects access.'),
-   shiny::checkboxInput('worker_enable','Enable background sync',isTRUE(a$enabled)),
-   shiny::textInput('worker_timezone','Quiet-hours timezone',a$timezone %||% fm_display_timezone()),
-   shiny::fluidRow(shiny::column(6,shiny::numericInput('worker_quiet_start','Quiet hours start (0–23)',a$quiet_start %||% 0,0,23)),
-    shiny::column(6,shiny::numericInput('worker_quiet_end','Quiet hours end (0–23)',a$quiet_end %||% 7,0,23))),
+   shiny::tags$p('Signing in connects automatic synchronization, including while you are signed out. Access is encrypted; your password is never saved.'),
    {items<-tryCatch(leagues(),error=function(e)list());choices<-setNames(vapply(items,function(x)fm_scalar(x$id %||% x$`_id`,''),character(1)),vapply(items,function(x)fm_scalar(x$name,'League'),character(1)));
     if(length(choices))shiny::checkboxGroupInput('worker_leagues','Leagues to sync',choices=choices,selected=setdiff(unname(choices),unlist(a$excluded_leagues)))
     else shiny::tags$p('All active leagues are included. League choices appear when your league list is ready.')},
-   shiny::actionButton('worker_save','Save background sync settings'),shiny::uiOutput('worker_setting_feedback'))
+   shiny::actionButton('worker_save','Save leagues'),
+   shiny::actionButton('worker_disconnect','Disconnect account and stop sync'),shiny::uiOutput('worker_setting_feedback'))
  })
  feedback<-shiny::reactiveVal(NULL);output$worker_setting_feedback<-shiny::renderUI({
   message<-feedback();if(is.null(message))return(NULL)
   fm_info(message,error=!identical(message,'Background sync settings saved.'))
  })
- authorize<-function(auth,enabled,settings=NULL,renew_only=FALSE){
-  generation<-auth[['userid']]
-  sealed<-if(enabled)fm_worker_encrypt(auth)else NULL
-  payload<-if(renew_only)list(p_account=generation,p_token=sealed,p_credential=attr(sealed,'credential_id'))else c(list(p_account=generation,p_enabled=enabled,p_token=sealed,p_credential=attr(sealed,'credential_id')),settings)
-  promises::then(fm_worker_rpc(if(renew_only)'renew'else'authorize',payload,session$token),function(a){
-   if(closed||!identical(shiny::isolate(login()[['userid']]),generation))return(NULL)
-   if(is.null(a)){fm_worker_poll(generation,session$token,TRUE);return(NULL)}
-   if(enabled)renewed<<-paste0(openssl::sha256(charToRaw(auth[['token']])))
-   s<-fm_worker_account_state(generation);fm_worker_set_policy(s,a);s$queued<-list();s$errors<-list();fm_worker_settle(s)
-   if(!renew_only)feedback('Background sync settings saved.');fm_worker_notify(generation);fm_worker_poll(generation,session$token,TRUE);NULL
-  },function(error){feedback('Could not save background sync settings. Database acknowledgement is required.');NULL})
-  # An observer must not return this pending promise: renewal/settings writes
-  # can otherwise hold the whole session flush, including unrelated Admin UI.
+ connect<-function(auth){
+  if(connecting||disconnecting)return(invisible(NULL))
+  account<-auth[['userid']];state<-fm_worker_account_state(account)
+  if(!fm_worker_can_connect()){
+   state$connect_error<-'Automatic sync is not configured on the server; saved data remains available.'
+   connect_after<<-as.numeric(Sys.time())+30;fm_worker_notify(account);return(invisible(NULL))
+  }
+  connecting<<-TRUE;key<-paste0(openssl::sha256(charToRaw(auth[['token']])))
+  if(is.null(login_generation))login_generation<<-state$account$generation %||% 0
+  current<-function()!closed&&!disconnecting&&identical(.fm_worker$accounts[[account]],state)&&
+   identical(shiny::isolate(login()),auth)
+  request<-tryCatch({
+   sealed<-fm_worker_encrypt(auth)
+   payload<-list(p_account=account,p_token=sealed,p_credential=attr(sealed,'credential_id'),
+    p_generation=login_generation,p_timezone=fm_display_timezone())
+   fm_worker_rpc('connect',payload,session$token)
+  },error=promises::promise_reject)
+  promises::then(request,function(a){
+   if(!current())return(NULL)
+   connecting<<-FALSE
+   if(is.null(a)||!is.null(state$account$generation)&&a$generation<state$account$generation){
+    renewed<<-key;state$connect_error<-'Synchronization access was revoked. Sign in again to reconnect.'
+    fm_worker_notify(account);fm_worker_poll(account,session$token,TRUE);return(NULL)
+   }
+   renewed<<-key;state$connect_error<-NULL;fm_worker_set_policy(state,a);fm_worker_notify(account);NULL
+  },function(error){
+   if(!current())return(NULL)
+   connecting<<-FALSE;connect_after<<-as.numeric(Sys.time())+30
+   state$connect_error<-'Automatic sync could not be connected. The server will retry; saved data remains available.'
+   fm_worker_notify(account);NULL
+  })
   invisible(NULL)
  }
  shiny::observeEvent(session$input$worker_save,{
   auth<-login();shiny::req(valid_login(auth));s<-fm_worker_account_state(auth[['userid']]);shiny::req(s$known)
-  tz<-session$input$worker_timezone;start<-session$input$worker_quiet_start;end<-session$input$worker_quiet_end
-  valid_hour<-function(x)is.numeric(x)&&length(x)==1L&&is.finite(x)&&x==floor(x)&&x>=0&&x<=23
-  if(!is.character(tz)||length(tz)!=1L||!tz%in%OlsonNames()||!valid_hour(start)||!valid_hour(end)){feedback('Choose a valid timezone and whole hours from 0 to 23.');return()}
   items<-tryCatch(leagues(),error=function(e)list());ids<-vapply(items,function(x)fm_scalar(x$id %||% x$`_id`,''),character(1))
   excluded<-if(length(ids))unique(c(setdiff(ids,session$input$worker_leagues),setdiff(unlist(s$account$excluded_leagues),ids)))else unlist(s$account$excluded_leagues)
-  if(is.null(excluded))excluded<-character()
-  authorize(auth,isTRUE(session$input$worker_enable),list(p_timezone=tz,p_start=start,p_end=end,p_excluded=I(excluded)))
+  promises::then(fm_worker_rpc('preferences',list(p_account=auth[['userid']],p_generation=s$account$generation,
+   p_excluded=I(excluded %||% character())),session$token),function(a){
+   if(closed||!identical(shiny::isolate(login()),auth)||!identical(.fm_worker$accounts[[auth[['userid']]]],s))return(NULL)
+   if(is.null(a)){feedback('Settings changed elsewhere. Reopen settings and retry.');return(NULL)}
+   fm_worker_set_policy(s,a);feedback('Background sync settings saved.');NULL
+  },function(error){if(!closed&&identical(shiny::isolate(login()),auth))feedback('Could not save synchronization settings.');NULL})
+  invisible(NULL)
  })
- shiny::observe({
-  auth<-login();if(!valid_login(auth))return();s<-fm_worker_account_state(auth[['userid']]);s$policy_revision()
-  key<-paste0(openssl::sha256(charToRaw(auth[['token']])))
-  if(s$known&&isTRUE(s$account$enabled)&&!identical(renewed,key)){
-   renewed<<-key;a<-s$account
-   authorize(auth,TRUE,renew_only=TRUE)
-  }
- },priority=100)
+ shiny::observeEvent(session$input$worker_disconnect,{
+  auth<-login();shiny::req(valid_login(auth));s<-fm_worker_account_state(auth[['userid']]);shiny::req(s$known)
+  if(disconnecting)return();disconnecting<<-TRUE
+  promises::then(fm_worker_rpc('disconnect',list(p_account=auth[['userid']],p_generation=s$account$generation),session$token),function(a){
+   if(closed||!identical(shiny::isolate(login()),auth)||!identical(.fm_worker$accounts[[auth[['userid']]]],s))return(NULL)
+   if(is.null(a)){disconnecting<<-FALSE;feedback('Account access changed. Retry disconnecting.');return(NULL)}
+   fm_worker_set_policy(s,a)
+   logout<-session$userData$disconnect_login
+   if(is.function(logout))logout()
+   NULL
+  },function(error){if(!closed&&identical(shiny::isolate(login()),auth)){disconnecting<<-FALSE;feedback('Could not revoke synchronization access. Retry disconnecting.')};NULL})
+  invisible(NULL)
+ })
+
  invisible(NULL)
 }
 # GUI refresh invalidates its local projections and reads durable observations.
@@ -485,12 +576,12 @@ fm_worker_session<-function(session,login,leagues=function()list(),source_note=f
 fm_worker_invalidate<-function(account,league,team=NULL,player=NULL){
  if(!fm_worker_configured())return(invisible(NULL))
  s<-fm_worker_account_state(account)
- if(isTRUE(s$account$enabled))fm_worker_poll(account,force=TRUE)
+ fm_worker_poll(account,force=TRUE)
  invisible(NULL)
 }
 fm_worker_invalidate_pattern<-function(context,resources=NULL,pattern=NULL){
  if(!fm_worker_configured())return(invisible(NULL))
  s<-fm_worker_account_state(context$account_id)
- if(isTRUE(s$account$enabled))fm_worker_poll(context$account_id,context$session_id %||% '',force=TRUE)
+ fm_worker_poll(context$account_id,context$session_id %||% '',force=TRUE)
  invisible(NULL)
 }

@@ -2035,7 +2035,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       stored=function(){
         ctx<-availability_team_context();saved<-availability_stored("get_team_acquisition_capacity",ctx,if(!is.null(ctx))auth_args(ctx)else list())
         saved
-      },current_context=availability_team_context,mode=availability_mode,opening=availability_opening)
+      },current_context=availability_team_context,mode=availability_mode,opening=availability_opening,intent=function()'manual_action')
     manual_capacity_verification<-attr(card_states$capacity,"verification")
     # Kept as the card's existing recovery seam; it now works in either mode.
     worker_capacity_verification_available<-function()!is.null(availability_team_context())

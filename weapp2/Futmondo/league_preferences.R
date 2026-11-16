@@ -5,6 +5,7 @@ fm_league_store <- function(user_id,championship_id=NULL,selected_at=NULL,owner=
     return(promises::promise_reject(simpleError('Invalid league preference identity')))
   if(!nzchar(get_sb_url())||!nzchar(get_sb_key()))return(promises::promise_reject(simpleError('League preference storage is not configured')))
   reading<-is.null(championship_id)
+  if(reading&&fm_worker_configured())return(fm_worker_preference(user_id,owner))
   query<-if(reading)list(user_id=paste0('eq.',user_id),select='championship_id,selected_at',limit='1')else list(on_conflict='user_id')
   url<-httr::modify_url(paste0(get_sb_url(),'/rest/v1/user_league_preferences'),query=query)
   headers<-c(apikey=get_sb_key(),Authorization=paste('Bearer',get_sb_key()),`Content-Type`='application/json',Prefer='resolution=merge-duplicates,return=minimal')

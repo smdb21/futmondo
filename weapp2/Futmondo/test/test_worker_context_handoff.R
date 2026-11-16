@@ -4,7 +4,7 @@ fm_worker_configured<-function()TRUE
 clear_api_cache();auth<-c(userid='handoff-fixture',token='synthetic');args<-list(championship_id='league',user_team_id='mine')
 unknown<-resource_context(auth,'league','mine');known<-unknown;known$competition_id<-'competition';known$season<-'season';known$scoring_version<-'score'
 old<-fm_worker_descriptor('get_players_from_team',args,unknown);canonical<-fm_worker_descriptor('get_players_from_team',args,known)
-s<-fm_worker_account_state(auth[['userid']]);s$known<-TRUE;s$account<-list(enabled=TRUE,auth_status='active',generation=1L)
+s<-fm_worker_account_state(auth[['userid']]);s$bootstrap_complete<-TRUE;s$known<-TRUE;s$account<-list(enabled=TRUE,auth_status='active',generation=1L)
 old_value<-observed_data(data.frame(id='old'),observed_at=Sys.time()-600);attr(old_value,'valid_until')<-as.numeric(Sys.time())-540
 fm_worker_put(auth[['userid']],old$resource_key,list(data=old_value,manifest=list(version='old')))
 value<-observed_data(data.frame(id='current'),observed_at=Sys.time()-5)

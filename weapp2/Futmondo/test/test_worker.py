@@ -46,6 +46,8 @@ class FakeStore:
                     resources.append(dict(manifest=manifest, chunks=self.chunks[manifest['version']]))
             return dict(resources=resources)
         if name == 'guard': return self.allowed
+        if name == 'prepare_source':
+            return dict(account=copy.deepcopy(self.row),checkpoint=copy.deepcopy(self.checkpoints.get(p['p_request']))) if self.allowed else None
         if name == 'enqueue_batch': return len(p['p_descriptors']) if self.allowed else None
         if name == 'checkpoint':
             key = p['p_request']
@@ -58,7 +60,8 @@ class FakeStore:
     async def request(self, method, table, **kw):
         self.calls.append((table, copy.deepcopy(kw)))
         if table == 'worker_chunks':
-            row = kw['json'];self.chunks.setdefault(row['version'], []).append(row['data'])
+            for row in kw['json'] if isinstance(kw['json'],list) else [kw['json']]:
+                self.chunks.setdefault(row['version'], []).append(row['data'])
         return []
 
 class ContractTests(unittest.TestCase):
@@ -123,11 +126,42 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
     def message(self,url='https://api.futmondo.com/1/league/championshipteams'):
         return dict(type='http',url=url,body=dict(query={'championshipId':'l'},answer=[]))
     async def test_acquire_checkpoint_restart_reuse(self):
-        first=await self.worker.source(self.job,'owner',self.message())
+        first=await self.worker.exchange(self.job,'owner',self.message())
+        self.assertEqual([name for name,_ in self.store.calls],['prepare_source','guard','checkpoint'])
         self.assertNotIn('header',first['body']);self.assertNotIn('query',first['body'])
         second_worker=Worker(self.store,self.client,KEY,Path.cwd());second_worker.admission_blocked=False
         again=await second_worker.source(self.job,'owner',self.message())
         self.assertEqual(first,again);self.assertEqual(len(self.requests),1)
+        self.assertEqual([name for name,_ in self.store.calls][3:],['prepare_source'])
+
+    async def test_snapshot_chunk_batches_are_bounded_and_publish_last(self):
+        value={'kind':'character','values':[os.urandom(750000).hex()]}
+        await self.worker.publish(self.job,'owner',dict(value=value,observed_at=stamp(),status='ok'))
+        chunks=[args['json'] for name,args in self.store.calls if name=='worker_chunks']
+        self.assertGreater(len(chunks),1)
+        self.assertTrue(all(1<=len(batch)<=4 for batch in chunks))
+        manifest=self.store.snapshots[self.job['resource_key']]
+        self.assertEqual(sum(map(len,chunks)),manifest['parts'])
+        self.assertEqual(unpack_snapshot(manifest,self.store.chunks[manifest['version']]),value)
+        self.assertEqual(self.store.calls[-1][0],'publish')
+
+    async def test_old_401_cannot_revoke_rotated_credentials(self):
+        failure=WorkerFailure('source_authentication');failure.credential_id='old-credential'
+        self.store.row['credential_id']='new-credential'
+        original_rpc=self.store.rpc
+        async def rpc(name,**params):
+            if name=='claim':return dict(self.job,attempts=1)
+            return await original_rpc(name,**params)
+        async def run(*args):
+            self.worker.stop.set()
+            raise failure
+        self.store.rpc=rpc;self.worker.leader=True
+        self.worker.helpers[0]=SimpleNamespace(run=run,close=AsyncMock())
+        await self.worker.lane(0)
+        updates=[p for name,p in self.store.calls if name=='worker_accounts']
+        self.assertEqual(len(updates),1)
+        self.assertEqual(updates[0]['params']['credential_id'],'eq.old-credential')
+        self.assertEqual(updates[0]['params']['generation'],'eq.1')
     async def test_active_league_http_and_legacy_checkpoints_exclude_basketball(self):
         raw = {'answer': {'championships': [{'id':'l','sport':'soccer'}, {'id':'b','sport':'basket'}]}}
         async def transport(request):

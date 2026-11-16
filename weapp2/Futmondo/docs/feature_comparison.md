@@ -1,5 +1,9 @@
 # LigaRadar additions to the official Futmondo workflows
 
+## Automatic factual sync review — 2026-11-16
+
+Rechecked the [official rules](https://help.futmondo.com/article/91-reglas-del) and [official app feature guide](https://magazine.futmondo.com/novedades-en-la-nueva-app-de-futmondo/) for own financial movements, market/ownership data and team browsing. The guide was published in 2021; neither source establishes the current official app's internal data-loading architecture, and no authenticated UI comparison was performed. LigaRadar now connects its existing factual collector on login, reads persisted observations for all browsing, and updates changed values quietly. This improves delivery of existing features rather than adding a new analytical capability; there is no new login tier item or exclusivity claim. Login discloses continued sync after logout and the Disconnect control revokes factual access. [Implementation and limits](database_first_sync.md).
+
 Reviewed 2026-11-14 against the official public material below and the current local implementation. This is the maintained comparison inventory behind the login page, not a roadmap or an access policy. Essentials contains exploration tools; Advanced contains higher-value lineup, player ranking and financial analysis. Both groups remain available under the existing app access rules.
 
 ## Evidence and limits

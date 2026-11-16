@@ -1967,3 +1967,14 @@ This root-cause fix is implemented locally and its production source rollout is 
 ### Scheduled-clause production database installation — 2026-11-16
 
 Completed the database exit criterion: applied the reviewed clause scheduling migration to production as `20261116161538_scheduled_clause_purchases` and verified all four tables, 23 server-only invoker functions, 11 indexes and the transfer trigger. A rolled-back service-role smoke check passed without a real account or purchase. Application flag/redeployment, captured native closed-clause rejection, diagnostic removal and controlled hosted execution/restart/capacity acceptance remain separate open criteria. See `docs/scheduled_clauses.md` and `docs/data_review_results.md`.
+
+
+## Database-first login and automatic sync — 2026-11-16
+
+Approved behavior: login connects factual sync automatically; collection continues after logout at normal cadence 24/7. Browsing uses stored observations, including Refresh and player cards; updates preserve mounted views. Explicit actions retain live safety checks. Disconnect revokes factual access and signs out. No additional worker processes or concurrency are introduced.
+
+Implemented locally: two-read primary bootstrap with shared league preference, immediate batched reads for new interests, enrollment independent of rendering, idempotent token rotation preserving jobs/checkpoints, revocation races, bounded worker RPC/chunk batching and fair queue claims. The shared R accounting engine and completeness rules remain authoritative. Contracts: [database-first sync](database_first_sync.md).
+
+Local exit checks cover held connection/DB responses, zero browsing source acquisition, mobile/desktop rendering, unchanged-refresh preservation, known finance fixtures, manual/coach/scheduled-action safeguards, isolated SQL permissions and the required offline lifecycle harness. Detailed executed results and limitations are in `data_review_results.md`. Production migration and deployment are recorded separately below; hosted two-second primary render/p95 heartbeat and multi-account collector capacity require production acceptance and are not certified by local timings.
+
+Production database exit criterion completed: migration `20261116213815_database_first_sync` applied and nine server-only invoker functions verified; read-only bootstrap measured 11.057 ms DB execution. Application/worker deployment and authenticated end-to-end acceptance remain separate from database installation. Existing native source rejections are not marked repaired by this infrastructure milestone.

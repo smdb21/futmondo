@@ -8,7 +8,7 @@ other_auth<-c(userid='status-other',token='synthetic')
 account<-auth[['userid']];other_account<-other_auth[['userid']]
 s<-fm_worker_account_state(account);other<-fm_worker_account_state(other_account)
 for(state in list(s,other)){
- state$known<-TRUE;state$account<-list(enabled=TRUE,auth_status='active',generation=1L)
+ state$bootstrap_complete<-TRUE;state$known<-TRUE;state$account<-list(enabled=TRUE,auth_status='active',generation=1L)
  state$health<-list(heartbeat=rival_finance_stamp(now))
 }
 ctx<-resource_context(auth,'league','team')
@@ -32,7 +32,7 @@ shiny::testServer(function(input,output,session){
  output$status<-shiny::renderText({metrics$renders<-metrics$renders+1L;view<-status();paste(view$message,view$checked_at)})
 },{
  flush(session);original<-output$status;before<-metrics$renders
- stopifnot(grepl('Updating 1 saved data source',original,fixed=TRUE))
+ stopifnot(!grepl('Updating|Preparing',original))
  started<-proc.time()[['elapsed']]
  for(i in 1:20){now<<-now+5;fm_worker_poll(account,session$token,TRUE);flush(session)}
  elapsed<-proc.time()[['elapsed']]-started
@@ -47,13 +47,13 @@ shiny::testServer(function(input,output,session){
  s$jobs[[1]]$pending<-TRUE
 
  s$jobs[[1]]$running<-FALSE;fm_worker_notify(account);flush(session)
- updated<-output$status;stopifnot(!grepl('Updating|Preparing|requested',updated),metrics$renders==before+1L)
+ updated<-output$status;stopifnot(!grepl('Updating|Preparing|requested',updated),metrics$renders==before+0L)
  s$service_error<-'Background status could not be read from the database.';fm_worker_notify(account);flush(session)
- stopifnot(grepl('could not be read from the database',output$status,fixed=TRUE),metrics$renders==before+2L)
+ stopifnot(grepl('could not be read from the database',output$status,fixed=TRUE),metrics$renders==before+1L)
  s$service_error<-NULL;s$health$heartbeat<-rival_finance_stamp(now-61);fm_worker_notify(account);flush(session)
- stopifnot(grepl('not responding',output$status,fixed=TRUE),metrics$renders==before+3L)
+ stopifnot(grepl('not responding',output$status,fixed=TRUE),metrics$renders==before+2L)
  s$health$heartbeat<-rival_finance_stamp(now);fm_worker_notify(account);flush(session)
- stopifnot(!grepl('not responding',output$status,fixed=TRUE),metrics$renders==before+4L)
+ stopifnot(!grepl('not responding',output$status,fixed=TRUE),metrics$renders==before+3L)
  cat('PASS queue, database failure, heartbeat expiry and recovery each publish their visible change once\n')
  login(other_auth);flush(session)
  stopifnot(!grepl('Updating',output$status,fixed=TRUE))
