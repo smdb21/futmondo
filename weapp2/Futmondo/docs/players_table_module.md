@@ -371,3 +371,16 @@ they add no API/database requests, acquisitions, cache invalidations or writes.
 The existing persistence/context/freshness contracts are unchanged. One bounded
 debounced reactive per table replaces the direct position-input dependency; no
 polling timer, dependency, environment variable or schema change is introduced.
+
+
+## Filter label icons — 2026-11-16
+
+`players_table_filter_label(text, icon_name)` returns a decorative Font Awesome
+icon and the existing visible text for shared input labels. Min Trend uses
+`arrows-up-down` in both layouts. Position/owner/value use user-tag/users/coins;
+own-team, active-clause, clause-ceiling and available-funds filters use
+house-user/lock-open/file-contract/wallet. Favorites, free agents, own bids and
+all bids use star/user-plus/hand-holding-dollar/gavel. All input IDs, label
+associations, defaults, tooltips and filtering/debounce behavior are preserved.
+Icons are hidden from assistive technology so the original text remains the
+accessible name. Existing responsive label wrapping and icon assets are reused.

@@ -4294,3 +4294,28 @@ authenticated production acceptance were not performed in this task.
 `Rscript test/test_player_trend_plot.R` passed 16 checks, including line styles and known point/value fixtures. `Rscript test/test_player_chart_stability.R` passed the offline same-player update and progressive loading checks. The existing `test/test_progressive_loading.R` fails its pre-existing five-request expectation: current behavior starts four requests, with capacity deferred; a diagnostic run past that assertion also found the later capacity fixture assumes a request that is no longer started. No real account was used. Mobile background/foreground behavior and deployed responsiveness were not measured.
 
 Performance review: preserving the chart and publishing only changed chart inputs reduces widget remounts and Plotly redraws. This adds one bounded reactive snapshot per open card and equality comparisons over existing history/match data; it adds no API or database requests, timers, persistence changes, or background work. Existing durable history reuse and scoped invalidation remain in place. Actual changed history may still redraw the chart.
+
+
+## Filter label icons — 2026-11-16
+
+Added decorative icons to the existing shared filter labels, including up/down
+arrows beside Min Trend in both layouts. The visible wording and input-label
+associations remain intact. No new capability or login inventory item is added.
+
+Verification: the existing offline position-filter browser suite passes both
+layouts at 320/390/1440 px in dark/light themes, preserving selection, debounce,
+clear/reset, isolation and responsive wrapping without page/control overflow or
+browser/Shiny errors. A separate browser inspection confirms that the actual
+Font Awesome up/down glyph renders, is `aria-hidden`, preserves the accessible
+name **Min Trend (M)** and focuses the numeric input when its label is clicked.
+The 390 px screenshot was inspected. The required
+`Rscript test/test_shiny_simulation.R` passes 13 checks plus eight tabs with no
+live HTTP/database mutation attempts; existing synthetic Plotly warnings remain.
+
+Performance review: static label markup adds at most twelve small icon elements
+per table and reuses the existing icon dependency. No API/database requests,
+cache/persistence changes, observers, timers, repeated filtering, invalidation,
+background work or new assets are introduced. Existing mobile wrapping handles
+the labels. No additional performance benchmark is needed for these static
+elements; documentation has no runtime effect. Verification is local; no
+authenticated production acceptance was performed.

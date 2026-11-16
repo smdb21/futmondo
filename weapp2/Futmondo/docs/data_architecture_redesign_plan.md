@@ -1940,3 +1940,13 @@ This root-cause fix is implemented locally and its production source rollout is 
   authenticated acceptance are separate from these completed local checks.
 
 - 2026-11-16: Local player-card chart stability and line styling implemented. Same-context record updates retain the mounted chart; changed chart inputs and context changes still propagate. Offline checks are recorded in `docs/data_review_results.md`; mobile background/foreground behavior remains to be checked in a deployed browser.
+
+
+## Filter label icons — implemented and verified locally 2026-11-16
+
+- Min Trend shows up/down arrows; the other shared player filters have matching
+  decorative icons while retaining their visible and accessible labels.
+- Both layouts pass existing mobile/desktop browser checks and the offline Shiny
+  lifecycle harness. The mobile screenshot and accessible trend label/focus were
+  inspected. This is presentation-only, with no new feature, data path,
+  dependency, schema change or migration; production acceptance is separate.

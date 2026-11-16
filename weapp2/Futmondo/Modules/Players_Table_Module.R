@@ -1,8 +1,13 @@
 library(reactable)
 
+# Decorative icons supplement the visible, accessible input labels.
+players_table_filter_label <- function(text, icon_name) {
+  tagList(icon(icon_name, `aria-hidden` = "true"), " ", text)
+}
+
 # Keep All exclusive in the browser, before the selection reaches Shiny.
 players_table_position_filter_UI <- function(input_id) {
-  selectizeInput(inputId = input_id, label = "Position",
+  selectizeInput(inputId = input_id, label = players_table_filter_label("Position", "user-tag"),
     choices = c("All", "Goalkeeper", "Defender", "Midfielder", "Forward"),
     selected = "All", multiple = TRUE, width = "100%",
     options = list(closeAfterSelect = FALSE, onChange = I("function() {
@@ -53,32 +58,32 @@ players_table_UI <- function(id, box_title = NULL,
         fluidRow(
           class = "player-checkbox-filters",
           if (filter_by_own_team) {
-            div(checkboxInput(ns("show_my_team_filter"),"Show players in my team",value=FALSE),
+            div(checkboxInput(ns("show_my_team_filter"),players_table_filter_label("Show players in my team", "house-user"),value=FALSE),
               style="font-weight: 500;",title="Include players owned by your current team. All other filters still apply.")
           },
           if (filter_by_active_clause) {
-            div(checkboxInput(inputId = ns("active_clause_filter"), label = "Active Clause Only", value = isTRUE(default_active_clause)), style = "font-weight: 500;", title = "Show only players whose buyout clause is currently payable (lock period has expired)")
+            div(checkboxInput(inputId = ns("active_clause_filter"), label = players_table_filter_label("Active Clause Only", "lock-open"), value = isTRUE(default_active_clause)), style = "font-weight: 500;", title = "Show only players whose buyout clause is currently payable (lock period has expired)")
           },
           if (filter_by_max_clause_value) {
-            div(numericInput(inputId = ns("max_clause_value_filter"), label = "Max Clause (M)", min = 0,
+            div(numericInput(inputId = ns("max_clause_value_filter"), label = players_table_filter_label("Max Clause (M)", "file-contract"), min = 0,
               value = NA_real_, step = 0.5, width = "160px"), style = "font-weight: 500;",
               title = "Show only players with a positive release clause at or below this amount")
           },
           if (filter_by_clause_under_available_funds) {
             div(checkboxInput(inputId = ns("clause_under_available_funds_filter"),
-              label = "Clause within available funds", value = FALSE), style = "font-weight: 500;",
+              label = players_table_filter_label("Clause within available funds", "wallet"), value = FALSE), style = "font-weight: 500;",
               title = "Show only release clauses at or below your verified debt-aware spending capacity")
           },
           if (filter_by_is_favorite) {
-            div(checkboxInput(inputId = ns("is_favorite_filter"), label = "Favorites Only", value = FALSE), style = "font-weight: 500;", title = "Show only players you have starred as favorite")
+            div(checkboxInput(inputId = ns("is_favorite_filter"), label = players_table_filter_label("Favorites Only", "star"), value = FALSE), style = "font-weight: 500;", title = "Show only players you have starred as favorite")
           },
           if (filter_by_is_from_futmondo) {
-            div(checkboxInput(inputId = ns("is_from_futmondo_filter"), label = "Free Agents Only", value = isTRUE(default_free_agents)), style = "font-weight: 500;", title = "Show only unowned players without a user team (free agents / market)")
+            div(checkboxInput(inputId = ns("is_from_futmondo_filter"), label = players_table_filter_label("Free Agents Only", "user-plus"), value = isTRUE(default_free_agents)), style = "font-weight: 500;", title = "Show only unowned players without a user team (free agents / market)")
           },
           if (filter_by_players_with_bid) {
             tagList(
-              div(checkboxInput(inputId = ns("players_you_bid_filter"), label = "Your Bids Only", value = FALSE), style = "font-weight: 500;", title = "Show only players you have placed an active bid on"),
-              div(checkboxInput(inputId = ns("players_with_bid_filter"), label = "Bidded Only", value = FALSE), style = "font-weight: 500;", title = "Show only players with active bids from any league team")
+              div(checkboxInput(inputId = ns("players_you_bid_filter"), label = players_table_filter_label("Your Bids Only", "hand-holding-dollar"), value = FALSE), style = "font-weight: 500;", title = "Show only players you have placed an active bid on"),
+              div(checkboxInput(inputId = ns("players_with_bid_filter"), label = players_table_filter_label("Bidded Only", "gavel"), value = FALSE), style = "font-weight: 500;", title = "Show only players with active bids from any league team")
             )
           },
           div(actionButton(ns("btn_clear_filters"), label = "Clear Filters", icon = icon("eraser"), class = "btn btn-sm btn-outline-secondary"), class = "player-clear-filters", title = "Reset all table filters to default values")
@@ -100,15 +105,15 @@ players_table_UI <- function(id, box_title = NULL,
                       column(width = if(!filter_by_team&&!filter_by_value&&!filter_by_change_value)12 else 4, div(title = "Choose one or more primary or secondary positions. All includes every position.", players_table_position_filter_UI(ns("position_filter"))))
                     },
                     if (filter_by_team) {
-                      column(width = 4, div(title = "Filter players by current user team owner or free agents", selectInput(inputId = ns("team_filter"), label = "User Team Owner", choices = c("All"), width = "100%")))
+                      column(width = 4, div(title = "Filter players by current user team owner or free agents", selectInput(inputId = ns("team_filter"), label = players_table_filter_label("User Team Owner", "users"), choices = c("All"), width = "100%")))
                     },
                     if (filter_by_value) {
                       tagList(
-                        column(width = 4, div(title = "Filter players by maximum market valuation in millions of EUR", numericInput(inputId = ns("max_value_filter"), label = "Max Val (M)", min = 0, value = NA_real_, step = 10, width = "100%")))
+                        column(width = 4, div(title = "Filter players by maximum market valuation in millions of EUR", numericInput(inputId = ns("max_value_filter"), label = players_table_filter_label("Max Val (M)", "coins"), min = 0, value = NA_real_, step = 10, width = "100%")))
                       )
                     },
                     if (filter_by_change_value) {
-                      column(width = 4, div(title = "Filter players by minimum 24-hour market trend in millions of EUR", numericInput(inputId = ns("change_value_filter"), label = "Min Trend (M)", min = 0, max = 1, value = default_minimum_change_value, step = 0.05, width = "100%")))
+                      column(width = 4, div(title = "Filter players by minimum 24-hour market trend in millions of EUR", numericInput(inputId = ns("change_value_filter"), label = players_table_filter_label("Min Trend (M)", "arrows-up-down"), min = 0, max = 1, value = default_minimum_change_value, step = 0.05, width = "100%")))
                     },
                     column(width=12, checkbox_filters)
                  )
@@ -123,15 +128,15 @@ players_table_UI <- function(id, box_title = NULL,
             column(width = 3, div(title = "Choose one or more primary or secondary positions. All includes every position.", players_table_position_filter_UI(ns("position_filter"))))
           },
           if (filter_by_team) {
-            column(width = 3, div(title = "Filter players by current user team owner or free agents", selectInput(inputId = ns("team_filter"), label = "User Team Owner", choices = c("All"), width = "100%")))
+            column(width = 3, div(title = "Filter players by current user team owner or free agents", selectInput(inputId = ns("team_filter"), label = players_table_filter_label("User Team Owner", "users"), choices = c("All"), width = "100%")))
           },
           if (filter_by_value) {
             tagList(
-              column(width = 2, div(title = "Filter players by maximum market valuation in millions of EUR", numericInput(inputId = ns("max_value_filter"), label = "Max Val (M)", min = 0, value = NA_real_, step = 10, width = "100%")))
+              column(width = 2, div(title = "Filter players by maximum market valuation in millions of EUR", numericInput(inputId = ns("max_value_filter"), label = players_table_filter_label("Max Val (M)", "coins"), min = 0, value = NA_real_, step = 10, width = "100%")))
             )
           },
           if (filter_by_change_value) {
-            column(width = 2, div(title = "Filter players by minimum 24-hour market trend in millions of EUR", numericInput(inputId = ns("change_value_filter"), label = "Min Trend (M)", min = 0, max = 1, value = default_minimum_change_value, step = 0.05, width = "100%")))
+            column(width = 2, div(title = "Filter players by minimum 24-hour market trend in millions of EUR", numericInput(inputId = ns("change_value_filter"), label = players_table_filter_label("Min Trend (M)", "arrows-up-down"), min = 0, max = 1, value = default_minimum_change_value, step = 0.05, width = "100%")))
           },
           column(width=12, checkbox_filters)
         )
