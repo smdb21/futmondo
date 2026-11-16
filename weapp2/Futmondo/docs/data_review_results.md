@@ -4101,7 +4101,16 @@ and excludes any account/environment data. This fixes the earlier static
 release-metadata ambiguity; it does not deploy an image or certify a private
 account flow. No image build or production migration is claimed here.
 
-The prior report must remain distinct from these verified local fixes. After
-push, check the rebuilt public fingerprints against the commit, then verify
-Dani Lorenzo's actual authenticated selection. Hosted account acceptance remains
-open until that evidence exists; public static asset presence alone is insufficient.
+Production source rollout is now verified after push: the public
+`https://ligaradar.com/player-card-runtime.json?commit=c63b9bb` returned behavior
+`target-only-selection` and all five SHA-256 fingerprints exactly matched the
+committed source blobs in `c63b9bb`. This verifies the rebuilt code-only image
+metadata, rather than the old static release label. No account, session token,
+private response or transaction was accessed. This follow-up edits verification
+documentation only and has no runtime/performance effect; the executed application
+checks above are unchanged.
+
+The prior incident remains distinct from deployment/source proof. Dani Lorenzo's
+actual authenticated selection timing has not been inspected in this environment.
+Hosted account acceptance remains open until that evidence exists; public code
+fingerprints and synthetic browser timings alone do not certify a private flow.

@@ -1878,8 +1878,10 @@ This is a presentation refinement of the existing loader, with no new analytical
   captured mappings, persistence/context isolation and the offline lifecycle.
   Record final checks and performance in `data_review_results.md`.
 - [x] Add code-only Docker build fingerprints for reliable deployed-source checks.
-- [ ] Confirm the rebuilt production fingerprints and Dani Lorenzo's authenticated
-  hosted selection path. No live account/transaction is used in automated tests.
+- [x] Confirm production serves `target-only-selection` and all five code hashes
+  match implementation commit `c63b9bb` through `/player-card-runtime.json`.
+- [ ] Confirm Dani Lorenzo's authenticated hosted selection timing. No live
+  account/transaction is used in automated tests.
 
 No schema, dependency, environment variable, background schedule or new product
 capability is introduced. These implementation checks supersede the earlier
