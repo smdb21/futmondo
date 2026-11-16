@@ -3856,3 +3856,45 @@ no runtime cost. Manifest entries include the new runtime helper and changed
 source hashes while preserving unrelated dependency edits. Hosted latency,
 production snapshot-save/readback and Dani's exact post-deployment chart remain
 unverified; the automatic-review export rejection limits that final replay.
+
+
+## Authorized Dani Lorenzo source replay — 2026-11-15 Pacific
+
+The owner explicitly approved locally decoding the saved player-profile snapshot
+to verify his exact price history. The initial automatic-review export blocker
+reported above is resolved. Only the relevant player's saved profile/summary
+snapshots and their source metadata were retrieved; no authentication material
+or full private response body was printed or added to the repository. Compressed
+payload SHA-256 and decoded byte lengths were checked before the existing safe
+worker decoder ran. All source/database network functions were blocked during
+local replay. Temporary encoded and decoded private files were removed afterward.
+
+Verified source evidence:
+
+- Full-profile snapshot observed 2026-11-15 08:16:09 UTC: 133 daily prices,
+  from 2026-07-06 through 2026-11-15. The source's player, competition and
+  season identities all match the saved league summary context.
+- Summary observed 2026-11-15 12:20:10 UTC: seven prices, November 9–15.
+  All seven exact source timestamps overlap and every price matches the
+  profile's social valuation, not its classic valuation.
+- `normalize_card_valuation()` returns all 133 values with no diagnostic,
+  preserving the complete available curve. Latest source and chart value:
+  **10,027,832 EUR**, matching the reported card screenshot.
+- The actual `player_trend_plot` expression was built with Plotly using this
+  curve. Its trace retains all 133 prices and all expected account-local date
+  strings on the Date axis. Stored instants were compared before presentation;
+  plot dates use the existing account-timezone civil-string formatter. Local
+  Plotly build took **0.106s**. No runtime changes were needed after this replay.
+- The price-only persistence projection passes returned-row completeness and
+  size checks: 133 rows and **17,322 JSON bytes**, below the 220-KiB limit.
+  Existing database snapshots supplied this inspection; no new Futmondo request,
+  production database write, transaction or source job was performed.
+
+This establishes that Dani Lorenzo's missing earlier curve was available in the
+saved source and is included by the corrected code. It does not certify every
+possible season date, a production write acknowledgement or a deployed-browser
+render. Hosted visual acceptance remains open. This follow-up changes only
+verification documentation, with no runtime performance effect; no additional
+application tests are required for the documentation edit. The earlier focused
+regressions, asynchronous persistence/replay and lifecycle results remain in
+force.

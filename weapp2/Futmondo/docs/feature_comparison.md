@@ -132,7 +132,10 @@ LigaRadar's existing combined points/valuation chart now consumes that longer
 source curve after verifying its context and valuation type, with durable
 historical reuse and a working profile refresh. This repairs the existing
 history feature; ordinary player price history is an official shared capability,
-so there is no new exclusive capability or login-tier entry. Dani Lorenzo's
-current encoded source payload and the hosted repaired chart were not inspected;
-automatic approval review rejected the payload export. See the player-card
-contract for exact evidence and limits.
+so there is no new exclusive capability or login-tier entry. After the owner's
+explicit approval, read-only replay of Dani Lorenzo's saved source response
+verified 133 daily profile prices versus seven summary prices, all seven shared
+prices matching the social series, and all 133 values/dates in the corrected
+Plotly output. This resolves the initial payload-export verification blocker.
+The deployed browser chart is still unverified. See the player-card contract
+and dated review for evidence and limits.

@@ -1829,7 +1829,8 @@ Production deployment and authenticated hosted acceptance remain separate.
 - [x] Persist bounded factual curves with original source clocks through the existing acknowledged database queue; restore them before live profile completion and retain older saved prices after a shorter response.
 - [x] Scope price reads to resolved history context, refresh inner/outer profile resources, and reject obsolete opening responses without purchase-availability dependencies.
 - [x] Focused known-answer, official-capture, asynchronous persistence/replay, scope, refresh, loading, mobile/desktop chart and offline lifecycle checks; performance review in `data_review_results.md`.
-- [ ] Hosted acceptance of Dani Lorenzo after deployment. His exact encoded worker payload could not be exported because automatic approval review rejected it. Unscoped legacy current-price records remain separate; no historical season is invented.
+- [x] With the owner's explicit approval, decode Dani Lorenzo's saved profile/summary and verify all 133 daily prices (July 6–November 15), all seven overlap prices, source context and the actual Plotly output. No source requests or database writes.
+- [ ] Hosted visual acceptance of Dani Lorenzo after deployment. The earlier payload-export blocker is resolved; unscoped legacy current-price records remain separate without an invented historical season.
 
 Contracts: [player card](selected_player_module.md). No schema, dependency,
 environment setting, source-collection cadence or transaction change.

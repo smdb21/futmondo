@@ -232,6 +232,12 @@ Dani Lorenzo's hosted metadata showed 627 current-price observations dating back
 to August 16, all with unknown season/competition, plus a successful full-profile
 worker snapshot. These old observations are not silently assigned to today's
 season. The longer authoritative profile is used instead when its identities
-and price mapping pass. Export of Dani's encoded snapshot was rejected by
-automatic approval review; his exact source payload and hosted post-deployment
-chart therefore remain unverified. See the dated review and regression results.
+and price mapping pass. An initial automatic-review export rejection was resolved
+by the owner's explicit approval. Read-only replay of his saved full profile now
+verifies 133 daily prices from 2026-07-06 through 2026-11-15, all seven matching
+summary dates, and matching source player/competition/season. The actual Plotly
+expression retains all 133 dates/prices and the latest value, 10,027,832 EUR.
+The normalized snapshot is complete for those returned rows and occupies 17,322
+JSON bytes, below the 220-KiB bound. This was local replay of saved source data;
+the deployed browser chart and production snapshot-save/readback remain
+unverified. See the dated review results.
