@@ -69,6 +69,16 @@ checks. No shared-browser/session tools are available to inspect the owner's
 signed-in tab, so authenticated hosted acceptance of the original failure remains
 open. Public rollout verification cannot replace it.
 
+Production source rollout verified after the successful non-force push of
+`90ac68e`: `https://ligaradar.com/lineup-departure-runtime.json?balance-summary=90ac68e`
+returned HTTP 200 with the exact committed `server.R` SHA-256. A fresh public root
+request returned HTTP 200, exactly one `account_finance_summary` output, and
+inline JavaScript/CSS matching the committed files byte-for-byte after whitespace
+trimming. This verifies the automatic source rollout, not the owner's signed-in
+session or real-account values. Authenticated hosted acceptance remains open.
+This delivery-record update has no runtime/performance effect; no additional
+performance test is required.
+
 
 ## Title-free information notes — 2026-11-16
 
