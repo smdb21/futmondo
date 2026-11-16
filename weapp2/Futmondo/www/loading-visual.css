@@ -48,7 +48,33 @@
   color: var(--fm-muted);
   overflow-wrap: anywhere;
 }
+/* Only the full-screen launch uses the phone's upper half; inline status
+   graphics keep their compact dimensions and do not cover app controls. */
+@media (max-width: 767px) and (orientation: portrait) {
+  .waiter-overlay .fm-loading-launch {
+    --fm-loading-mobile: 1;
+    position: absolute;
+    top: 0;
+    left: 0;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px);
+  }
+  .waiter-overlay .fm-loading-launch .fm-loading-visual {
+    width: 100%;
+    max-width: none;
+    height: calc(50vh - env(safe-area-inset-top, 0px));
+    height: calc(50dvh - env(safe-area-inset-top, 0px));
+    aspect-ratio: auto;
+    flex: 0 0 auto;
+  }
+  .waiter-overlay .fm-loading-launch .fm-loading-brand { margin-top: 12px; }
+  .waiter-overlay .fm-loading-launch .fm-loading-caption { padding: 0 16px; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .fm-loading-visual .fm-loading-canvas { visibility: hidden; }
-  .fm-loading-visual .fm-loading-fallback { visibility: visible; }
+  /* Match the drawing marker's specificity so CSS switches immediately. */
+  .fm-loading-visual[data-fm-loading] .fm-loading-canvas { visibility: hidden; }
+  .fm-loading-visual[data-fm-loading] .fm-loading-fallback { visibility: visible; }
 }

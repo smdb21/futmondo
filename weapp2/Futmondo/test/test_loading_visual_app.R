@@ -35,8 +35,18 @@ if ("--full-app" %in% commandArgs(trailingOnly = TRUE)) {
       includeCSS("www/loading-visual.css"),
       includeScript("www/theme-switch.js"),
       includeScript("www/loading-visual.js"),
-      tags$style(HTML("body {background:var(--fm-bg);color:var(--fm-text);margin:0;} .fixture-wrap {max-width:680px;margin:0 auto;padding:16px;} .fixture-controls {display:flex;flex-wrap:wrap;gap:8px;margin:16px 0;} .fixture-controls button {color:var(--fm-text);background:var(--fm-surface);border:1px solid var(--fm-border);padding:8px;} .fixture-controls input {color:var(--fm-text);background:var(--fm-surface);max-width:100%;} .fixture-late {margin-top:24px;}"))
+      tags$style(HTML("body {background:var(--fm-bg);color:var(--fm-text);margin:0;} .fixture-wrap {max-width:680px;margin:0 auto;padding:16px;} .fixture-controls {display:flex;flex-wrap:wrap;gap:8px;margin:16px 0;} .fixture-controls button {color:var(--fm-text);background:var(--fm-surface);border:1px solid var(--fm-border);padding:8px;} .fixture-controls input {color:var(--fm-text);background:var(--fm-surface);max-width:100%;} .fixture-late {margin-top:24px;} .fixture-fullscreen.waiter-overlay {position:fixed;inset:0;display:flex;z-index:9999;background:var(--fm-bg);color:var(--fm-text);} .fixture-fullscreen > .waiter-overlay-content {margin:auto;}"))
     ),
+    tags$script(HTML("document.addEventListener('DOMContentLoaded', function () {
+      if (new URLSearchParams(location.search).get('fullscreen') !== '1') return;
+      var overlay = document.createElement('div');
+      overlay.className = 'waiter-overlay fixture-fullscreen';
+      var content = document.createElement('div');
+      content.className = 'waiter-overlay-content';
+      content.appendChild(document.getElementById('fixture-parent'));
+      overlay.appendChild(content);
+      document.body.appendChild(overlay);
+    });")),
     tags$main(class = "fixture-wrap",
       tags$div(id = "fixture-parent", class = "fm-loading-launch", `data-fm-loading-host` = "true",
         fm_loading_visual("fixture-hero"),

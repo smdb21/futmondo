@@ -4,7 +4,9 @@
 
 `fm_loading_visual(id, compact = FALSE)` in `loading_visual.R` returns a decorative,
 theme-aware scene with a static SVG fallback and a browser canvas. The launch
-preloader uses the full scene (up to 420px); authenticated `loading_leagues` and
+preloader uses a 420px scene on desktop and landscape. On portrait phones up to
+767px wide, the fullscreen launch scene fills the upper half of the visible
+viewport, with the brand and loading text directly below. Authenticated `loading_leagues` and
 `loading_today` states use its compact 168px variant with visible, accessible
 status text. Error, empty, partial, and retry feedback keep their existing
 behavior. The visual follows actual readiness and never delays completion to
@@ -12,10 +14,11 @@ finish an animation. It does not represent real player positions or progress.
 
 The local `www/loading-visual.js` and `www/loading-visual.css` assets animate a
 15-second loop: the flat pitch tilts and rotates into perspective, 22 table-football
-figures rise from the surface, and their particles become a flowing flock.
+figures face their opposing goals, rise from the surface, dissolve from head to
+foot, and release particles upward into a flowing flock. This dissolve applies
+to every loader size.
 The flock gathers into radar rings and reveals moving player dots before
-returning to the flat pitch. The component
-uses the existing `--fm-*` colors and updates on light/dark changes. Its canvas is
+returning to the flat pitch. The component uses the existing `--fm-*` colors and updates on light/dark changes. Its canvas is
 hidden from assistive technology; the separate text supplies the loading status.
 Reduced-motion preferences or unavailable canvas rendering retain the static
 pitch/radar illustration.
@@ -23,26 +26,49 @@ pitch/radar illustration.
 The added 3D stage uses a small perspective projection in Canvas 2D rather than
 a separate graphics engine: the pitch rotates from 1.2–3.2 seconds, players rise
 from 2.2–4.5 seconds, and their silhouette particles disperse into the flock from
-4.5–6.2 seconds. Radar assembly starts at 8 seconds, player detection at 10, and
-the return to the pitch at 13. It uses the existing particle budget, local theme
+4.5–6.2 seconds. Each particle keeps its body position until release, initially
+travels upward on a curved path, then joins the cloud above the pitch. The
+remaining figure is clipped from the head down in sync with release; the pitch
+and ground shadows fade during departure. Radar assembly starts at 8 seconds,
+player detection at 10, and the return to the pitch at 13. It uses the existing particle budget, local theme
 colors and compact-size stroke scaling; no models, textures or network assets
 are required. The extended loop never prolongs loading or changes readiness.
 
-The private `cameraAt(t)` helper computes the view once per frame. `project()`
+The private `cameraAt(t, instance)` helper computes the view once per frame,
+fitting the board and shadow within short portrait canvases. Camera rotation
+eases to rest at takeoff, so particles leave stable body positions. `project()`
 treats the existing pitch coordinates as the ground plane and positive Z as
 height, reusing the camera's `px`, `py` and perspective-scale slots for projected
 points. `raisedBoard()` draws the shallow edge and shadow; `risingPlayers()`
 draws 22 anchored foosball figures with round heads, solid shirts, rigid lower
 bodies and broad kicking feet, using cached formation positions and a bounded
-lift array. `makeParticles()` assigns each existing particle a player and a
-sample of the same molded silhouette once per size change, retaining both foot
-corners even at the smaller particle budget. `readPalette()`
-caches green and warm-gold team tones from the existing text/warning theme
+lift array. Green figures face +X toward the right goal; gold figures face -X
+toward the left. Shirt width lies across pitch Y, with shallow depth along X,
+forward kicking feet and small nose cues. Cached front/back/side/top faces provide
+volume; the camera eye position selects the visible face for each player.
+`playerFace()` clips these faces at the descending local-Z dissolve boundary
+without allocating intermediate vertices. `makeParticles()` assigns each existing
+particle a player and a sample of the same goal-facing 3D silhouette and a release time when the particle
+budget changes, retaining both foot corners even at the smaller particle budget.
+Viewport-height changes reuse this pool. `radar()` and its particle targets share
+a fit factor for unusually short portrait scenes so the rings and crosshairs
+remain visible. `readPalette()` caches green and warm-gold team tones from the existing text/warning theme
 tokens. These tones stay consistent through the figures, morph particles and
 radar player dots, while the radar beam uses the existing accent color.
 
+The mobile layout is scoped to `.waiter-overlay .fm-loading-launch`, including
+safe-area padding and a `50dvh` drawing height (`50vh` fallback). Its inherited
+`--fm-loading-mobile: 1` flag selects the fuller sky composition. The renderer
+measures both dimensions on resize and uses uniform scaling with extra vertical
+space; pitch geometry and molded figures are never stretched. The mobile flock
+spans approximately 90% of the drawing width. The existing compact banner and
+desktop/landscape layout retain their dimensions. Static SVG fallback also fits
+inside this region without stretching; reduced-motion CSS takes precedence over
+the drawing marker immediately. Browser viewport-height changes reuse the
+existing resize observer; there is no new polling or per-frame DOM measurement.
+
 Rendering is browser-only, with one shared animation scheduler capped at 30 FPS,
-bounded particle counts (320, or 180 on narrow screens), and pixel density capped
+bounded particle counts (320, or 180 for phone/compact scenes), and pixel density capped
 at 1.5. Geometry and palette values are reused between frames. Hidden documents,
 hidden ancestors (including the retained waiter overlay), and removed components
 stop drawing; dynamic mounts cannot create duplicate animation instances. Lost

@@ -1852,3 +1852,13 @@ environment setting, source-collection cadence or transaction change.
   and required offline lifecycle checks and performance findings are recorded in
   `data_review_results.md`. No new capability, schema, dependency or environment
   setting. Hosted deployment and authenticated latency acceptance remain separate.
+
+
+### Mobile sky composition and goal-facing figures — implemented locally, 2026-11-15
+
+- [x] Fullscreen portrait launch uses the upper half of the visible viewport, safe-area padding and a fuller cloud spanning approximately 90% of the scene width. Desktop/landscape and compact status dimensions are retained.
+- [x] All loader sizes orient the green/gold futbolín figures toward opposing goals with shaded depth and forward feet, then dissolve them from head to foot into upward-curving particles; the stable takeoff camera, fading field and sky formation preserve the 15-second radar loop and readiness-driven dismissal.
+- [x] Uniform responsive canvas sizing, short-portrait pitch/radar fitting and immediate reduced-motion fallback pass focused browser coverage. Existing 30 FPS, bounded particle count, 1.5 DPR and visibility cleanup remain in place.
+- [x] Local visual/performance checks, actual-app offline loading checks, 13-check/eight-tab lifecycle and three deployment checks pass. See `docs/progressive_loading.md` and `docs/data_review_results.md`. Production rollout and physical-device acceptance remain separate.
+
+This is a presentation refinement of the existing loader, with no new analytical capability or login feature-tier addition.

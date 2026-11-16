@@ -38,25 +38,49 @@
   for (var team = 0; team < 2; team++) {
     formation.forEach(function (f, index) {
       actors.push({ x: 62 + (team ? 1-f[0] : f[0])*296, y: 55+f[1]*170,
-        team: team, delay: (index % 4)*.12 });
+        team: team, facing: team ? -1 : 1, delay: (index % 4)*.12 });
     });
   }
   // Molded table-football body: broad shirt, rigid stem and one kicking foot.
   var figurine = [[-2,24],[-5.5,22],[-6,16],[-3.5,14],[-2.5,5],[-5,5],
     [-5,0],[5,0],[5,5],[2.5,5],[3.5,14],[6,16],[5.5,22],[2,24]];
-  var figurineShade = [[1.8,23.2],[5.2,21.8],[4,14.6],[1.2,14.6]];
+  // Local X is forward toward the opponent's goal; shirt width lies across Y.
+  function frontDepth(width, z) { return z < 5 || (z === 5 && Math.abs(width) >= 4) ? 6 : z < 14 ? 2.2 : 3; }
+  var frontFace = figurine.map(function (v) { return [frontDepth(v[0],v[1]),v[0],v[1]]; });
+  var backFace = figurine.map(function (v) { return [-2.5,v[0],v[1]]; });
+  var sideFace = frontFace.slice(7).concat(backFace.slice(7).reverse());
+  var shirtTop = [[-2.5,-2,24],[3,-2,24],[3,2,24],[-2.5,2,24]];
+  var footTop = [[-2.5,-5,5],[6,-5,5],[6,5,5],[-2.5,5,5]];
   // Sample the same head, shirt and broad foot for the silhouette-to-flock morph.
   var silhouette = [[0,30],[-2.9,27],[0,24],[2.9,27],[-5.5,22],[5.5,22],
     [-6,16],[6,16],[-3.5,14],[3.5,14],[-2.5,5],[2.5,5],[-5,5],[5,5],[-5,0],[5,0]];
   function clamp(x) { return Math.max(0, Math.min(1, x)); }
   function ease(x) { x = clamp(x); return x * x * x * (x * (x * 6 - 15) + 10); }
   function mix(a, b, w) { return a + (b - a) * w; }
-  function cameraAt(t) {
+  function cameraAt(t, instance) {
     var turn = ease((t-1.2)/2);
-    var yaw = turn*(-.32 + .54*ease((t-2.6)/3));
+    var yaw = turn*(-.32 + .54*ease((t-2.6)/1.9));
     var tilt = turn*.96;
-    return { cy: Math.cos(yaw), sy: Math.sin(yaw), ct: Math.cos(tilt),
-      st: Math.sin(tilt), zoom: 1-.08*turn, lift: 9*turn, turn: turn };
+    var camera = { cy: Math.cos(yaw), sy: Math.sin(yaw), ct: Math.cos(tilt),
+      st: Math.sin(tilt), zoom: 1-.08*turn, lift: 0, turn: turn };
+    camera.eyeX = 210+600*camera.sy*camera.st;
+    // Fit the board/shadow in short portrait scenes before placing it below
+    // the sky. Extra scaling is needed only when perspective exceeds the box.
+    var top, bottom;
+    for (var pass = 0; pass < 2; pass++) {
+      top = Infinity; bottom = -Infinity;
+      for (var i = 0; i < 4; i++) {
+        project(camera,paths[0][i][0],paths[0][i][1],0);
+        top = Math.min(top,camera.py); bottom = Math.max(bottom,camera.py);
+        project(camera,paths[0][i][0],paths[0][i][1],-9);
+        top = Math.min(top,camera.py+3); bottom = Math.max(bottom,camera.py+3);
+      }
+      if (!pass) camera.zoom *= Math.min(1,(instance.height-16*turn)/(bottom-top));
+    }
+    var low = 7*turn-instance.offset-top;
+    var high = instance.height-instance.offset-7*turn-bottom;
+    camera.lift = Math.max(low,Math.min(high,(9+(instance.mobile ? instance.height*.20 : 25))*turn));
+    return camera;
   }
   // Perspective is a small projection of the same 2D pitch coordinates, not a
   // second render engine. Reuse the camera's output slots instead of point arrays.
@@ -94,8 +118,12 @@
       // Keep both broad-foot corners even in the compact eight-sample figures.
       var body = slot >= samples-2 ? silhouette[silhouette.length-2+slot-(samples-2)] :
         silhouette[Math.floor(slot/(samples-2)*(silhouette.length-2))];
+      var bodyX = body[1] >= 24 ? 0 : actors[actor].facing*frontDepth(body[0],body[1]);
+      var bodyY = body[0];
+      if (body[1] === 27 && body[0] > 0) { bodyX = actors[actor].facing*3.8; bodyY = 0; }
       result.push({ x: mix(segment.a[0], segment.b[0], f), y: mix(segment.a[1], segment.b[1], f),
-        actor: actor, bodyX: body[0], bodyZ: body[1],
+        actor: actor, bodyX: bodyX, bodyY: bodyY, bodyZ: body[1],
+        release: 4.5 + actors[actor].delay*.25 + (1-body[1]/30)*.36,
         angle: angle, u: u, radius: Math.sqrt(((i * .754877666) % 1)), ring: 32 + ring * 32,
         ringAngle: Math.floor(i / 3) / Math.ceil(count / 3) * tau, depth: (Math.sin(angle) + 1) * .5 });
     }
@@ -148,7 +176,28 @@
     }
     ctx.stroke();
   }
-  function risingPlayers(ctx, opacity, markScale, camera, lifts) {
+  // Clip cached volume faces in local height, so the dissolve follows Z even
+  // when a shoulder spans Y. Intersections reuse camera slots, without arrays.
+  function playerFace(ctx, camera, actor, vertices, rise, cut) {
+    var started = false;
+    ctx.beginPath();
+    for (var i = 0; i < vertices.length; i++) {
+      var v = vertices[i], previous = vertices[(i+vertices.length-1)%vertices.length];
+      var inside = v[2] <= cut, previousInside = previous[2] <= cut;
+      if (inside !== previousInside) {
+        var w = (cut-previous[2])/(v[2]-previous[2]);
+        project(camera,actor.x+actor.facing*mix(previous[0],v[0],w),
+          actor.y+mix(previous[1],v[1],w),cut*rise);
+        if (started) ctx.lineTo(camera.px,camera.py); else { ctx.moveTo(camera.px,camera.py); started = true; }
+      }
+      if (inside) {
+        project(camera,actor.x+actor.facing*v[0],actor.y+v[1],v[2]*rise);
+        if (started) ctx.lineTo(camera.px,camera.py); else { ctx.moveTo(camera.px,camera.py); started = true; }
+      }
+    }
+    if (started) { ctx.closePath(); ctx.fill(); }
+  }
+  function risingPlayers(ctx, opacity, markScale, camera, lifts, t) {
     if (opacity <= .001) return;
     for (var i = 0; i < actors.length; i++) {
       var actor = actors[i], rise = lifts[i];
@@ -159,47 +208,58 @@
       ctx.fillStyle = color;
       ctx.globalAlpha = opacity*rise*.14;
       ctx.beginPath(); ctx.ellipse(footX,footY,5*camera.k,2*camera.k,0,0,tau); ctx.fill();
+      var cut = 30*(1-clamp((t-4.5-actor.delay*.25)/.36));
+      if (cut <= 0) continue;
+      // Select the camera-facing X surface, then shade the visible +Y side.
+      // This gives opposing teams actual depth rather than rotated billboards.
       ctx.globalAlpha = opacity*rise*.9;
-      ctx.beginPath();
-      for (var j = 0; j < figurine.length; j++) {
-        project(camera,actor.x+figurine[j][0],actor.y,figurine[j][1]*rise);
-        if (j === 0) ctx.moveTo(camera.px,camera.py); else ctx.lineTo(camera.px,camera.py);
+      playerFace(ctx,camera,actor,(camera.eyeX-actor.x)*actor.facing >= 0 ? frontFace : backFace,rise,cut);
+      ctx.globalAlpha = opacity*rise*.58;
+      playerFace(ctx,camera,actor,sideFace,rise,cut);
+      ctx.globalAlpha = opacity*rise*.75;
+      playerFace(ctx,camera,actor,shirtTop,rise,cut);
+      ctx.globalAlpha = opacity*rise*.8;
+      playerFace(ctx,camera,actor,footTop,rise,cut);
+      if (cut > 24) {
+        var clipped = cut < 30;
+        if (clipped) {
+          project(camera,actor.x,actor.y,cut*rise);
+          ctx.save(); ctx.beginPath(); ctx.rect(0,camera.py,420,420); ctx.clip();
+        }
+        var headScale = Math.sqrt(markScale);
+        ctx.globalAlpha = opacity*rise*.9;
+        project(camera,actor.x,actor.y,27*rise);
+        ctx.beginPath(); ctx.arc(camera.px,camera.py,2.9*camera.k*headScale*rise,0,tau); ctx.fill();
+        // A small side-profile nose makes the two goal-facing directions clear.
+        ctx.beginPath();
+        project(camera,actor.x+actor.facing*2.1*headScale,actor.y,28*rise); ctx.moveTo(camera.px,camera.py);
+        project(camera,actor.x+actor.facing*4*headScale,actor.y,27*rise); ctx.lineTo(camera.px,camera.py);
+        project(camera,actor.x+actor.facing*2.1*headScale,actor.y,26*rise); ctx.lineTo(camera.px,camera.py);
+        ctx.closePath(); ctx.fill();
+        if (clipped) ctx.restore();
       }
-      ctx.closePath(); ctx.fill();
-      // A small shaded shirt face reads as molded material without a texture.
-      ctx.fillStyle = palette.surface;
-      ctx.globalAlpha = opacity*rise*.28;
-      ctx.beginPath();
-      for (var k = 0; k < figurineShade.length; k++) {
-        project(camera,actor.x+figurineShade[k][0],actor.y,figurineShade[k][1]*rise);
-        if (k === 0) ctx.moveTo(camera.px,camera.py); else ctx.lineTo(camera.px,camera.py);
-      }
-      ctx.closePath(); ctx.fill();
-      ctx.fillStyle = color;
-      ctx.globalAlpha = opacity*rise*.9;
-      project(camera,actor.x,actor.y,27*rise);
-      ctx.beginPath(); ctx.arc(camera.px,camera.py,2.9*camera.k*Math.sqrt(markScale)*rise,0,tau); ctx.fill();
     }
   }
-  function radar(ctx, opacity, t, markScale) {
+  function radar(ctx, opacity, t, markScale, fit) {
     if (opacity <= .001) return;
     ctx.strokeStyle = palette.ink;
     ctx.lineWidth = .6 * markScale;
     ctx.globalAlpha = opacity * .24;
     ctx.beginPath();
-    [32,64,96].forEach(function (r) { ctx.moveTo(210+r,140); ctx.arc(210,140,r,0,tau); });
-    ctx.moveTo(101,140); ctx.lineTo(319,140); ctx.moveTo(210,31); ctx.lineTo(210,249);
+    [32,64,96].forEach(function (r) { r *= fit; ctx.moveTo(210+r,140); ctx.arc(210,140,r,0,tau); });
+    ctx.moveTo(210-109*fit,140); ctx.lineTo(210+109*fit,140);
+    ctx.moveTo(210,140-109*fit); ctx.lineTo(210,140+109*fit);
     ctx.stroke();
     ctx.globalAlpha = opacity * .45;
     ctx.beginPath();
     for (var i = 0; i < 48; i++) {
-      var a = i * tau / 48, outer = i % 4 ? 101 : 105;
-      ctx.moveTo(210 + 98*Math.cos(a), 140 + 98*Math.sin(a));
+      var a = i * tau / 48, outer = (i % 4 ? 101 : 105)*fit;
+      ctx.moveTo(210 + 98*fit*Math.cos(a), 140 + 98*fit*Math.sin(a));
       ctx.lineTo(210 + outer*Math.cos(a), 140 + outer*Math.sin(a));
     }
     ctx.stroke();
     var beam = t * tau / 4 - Math.PI / 2;
-    var beamRadius = mix(96,176,ease((t-10)/.8));
+    var beamRadius = mix(96*fit,176,ease((t-10)/.8));
     ctx.save();
     ctx.beginPath(); ctx.rect(50,40,320,200); ctx.clip();
     ctx.fillStyle = palette.accent;
@@ -242,41 +302,59 @@
   }
   function draw(instance, t) {
     var ctx = instance.ctx;
-    ctx.setTransform(instance.scale,0,0,instance.scale,0,0);
-    ctx.clearRect(0,0,420,280);
+    ctx.setTransform(instance.scale,0,0,instance.scale,0,instance.offset*instance.scale);
+    ctx.clearRect(0,-instance.offset,420,instance.height);
     var leave = ease((t-4.5)/1.7), gather = ease((t-8)/2), returnPitch = ease((t-13)/2);
     var assemble = ease((t-2.2)/1.3);
     var radarWeight = gather * (1-returnPitch);
     var flockWeight = leave * (1-gather);
     var pitchWeight = 1-flockWeight-radarWeight;
-    var camera = t < 6.2 ? cameraAt(t) : null;
+    // Freeze the ground camera at takeoff so particles leave stable body points.
+    var camera = t < 6.2 ? cameraAt(Math.min(t,4.5),instance) : null;
     var board = (1-leave)*.56 + ease((t-10)/1.2)*(.25+.31*returnPitch);
     if (camera) raisedBoard(ctx,1-leave,instance.markScale,camera);
     pitch(ctx,board,instance.markScale,camera);
     for (var actorIndex = 0; actorIndex < actors.length; actorIndex++)
       instance.lifts[actorIndex] = ease((t-2.2-actors[actorIndex].delay)/1.4);
-    if (camera) risingPlayers(ctx,1-leave,instance.markScale,camera,instance.lifts);
-    radar(ctx,radarWeight,t,instance.markScale);
+    if (camera) risingPlayers(ctx,1-leave,instance.markScale,camera,instance.lifts,t);
+    var radarFit = Math.min(1,(instance.height-8)/218);
+    radar(ctx,radarWeight,t,instance.markScale,radarFit);
     var yaw = .18*Math.sin(t*.65), cos = Math.cos(yaw), sin = Math.sin(yaw);
     var particles = instance.particles;
     for (var i = 0; i < particles.length; i++) {
       var p = particles[i];
       var phi = p.angle+t*.48;
       var width = (8+34*Math.sqrt(1-p.u*p.u))*p.radius;
-      var fx = p.u*133 + Math.cos(phi)*width*.65;
+      var fx = p.u*(instance.mobile ? 182 : 133) + Math.cos(phi)*width*.65;
       var fy = Math.sin(p.u*3.2+t*.92)*22 + Math.sin(p.u*5.2-t*.4)*10 + Math.sin(phi)*width;
       var depth = Math.cos(phi)*width;
       var flockX = 210 + fx*cos-fy*sin + depth*.24;
-      var flockY = 140 + fx*sin+fy*cos + Math.sin(t*.7)*8;
+      var sky = instance.mobile ? instance.height*.38-instance.offset : 82;
+      var spread = instance.mobile ? instance.height/170 : .72;
+      var flockY = sky + (fx*sin+fy*cos)*spread + Math.sin(t*.7)*5;
       var ringAngle = p.ringAngle + .08*Math.sin(t*.8);
       var originX = p.x, originY = p.y;
       if (camera) {
         var actor = actors[p.actor];
-        project(camera,mix(p.x,actor.x+p.bodyX,assemble),mix(p.y,actor.y,assemble),p.bodyZ*instance.lifts[p.actor]);
+        project(camera,mix(p.x,actor.x+p.bodyX,assemble),mix(p.y,actor.y+p.bodyY,assemble),p.bodyZ*instance.lifts[p.actor]);
         originX = camera.px; originY = camera.py;
       }
-      var x = pitchWeight*originX + flockWeight*flockX + radarWeight*(210+p.ring*Math.cos(ringAngle));
-      var y = pitchWeight*originY + flockWeight*flockY + radarWeight*(140+p.ring*Math.sin(ringAngle));
+      var flight = ease((t-p.release)/(6.2-p.release));
+      var x, y;
+      if (t < 6.2) {
+        // A cubic path starts upward, then opens into the moving sky cloud.
+        // Ease at both ends keeps detachment and arrival continuous.
+        var remaining = 1-flight;
+        var a = remaining*remaining*remaining, b = 3*remaining*remaining*flight;
+        var c = 3*remaining*flight*flight, d = flight*flight*flight;
+        var curl = Math.sin(p.angle)*6;
+        x = a*originX + b*(originX+curl) + c*(flockX-curl) + d*flockX;
+        var up = Math.max(8-instance.offset,originY-48);
+        y = a*originY + b*up + c*(flockY+28) + d*flockY;
+      } else {
+        x = pitchWeight*originX + flockWeight*flockX + radarWeight*(210+p.ring*radarFit*Math.cos(ringAngle));
+        y = pitchWeight*originY + flockWeight*flockY + radarWeight*(140+p.ring*radarFit*Math.sin(ringAngle));
+      }
       // Keep each particle's color identity through the silhouette/flock morph.
       ctx.fillStyle = palette.teams[actors[p.actor].team];
       ctx.globalAlpha = (mix(.7,.9,p.depth)*flockWeight + .8*pitchWeight + .22*radarWeight);
@@ -294,17 +372,24 @@
     return style.visibility !== 'hidden' && style.visibility !== 'collapse';
   }
   function size(instance) {
-    var width = instance.node.getBoundingClientRect().width;
-    if (!width) return;
-    // Preserve readable dots and fine lines when the same scene is compact.
-    instance.markScale = Math.max(1,Math.min(2,420/width));
+    var rect = instance.node.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    instance.mobile = window.getComputedStyle(instance.node).getPropertyValue('--fm-loading-mobile').trim() === '1';
+    // A tall mobile scene has extra sky, not vertically stretched figures.
+    instance.markScale = Math.max(1,Math.min(2,420/rect.width));
     var dpr = Math.min(window.devicePixelRatio || 1,1.5);
-    var pixels = Math.max(1,Math.round(width*dpr));
-    var count = window.innerWidth < 480 || instance.node.classList.contains('fm-loading-visual--compact') ? 180 : 320;
-    if (instance.canvas.width !== pixels || instance.count !== count) {
+    var pixels = Math.max(1,Math.round(rect.width*dpr));
+    var height = Math.max(1,Math.round(rect.height*dpr));
+    instance.scale = pixels/420;
+    instance.height = height/instance.scale;
+    instance.offset = (instance.height-280)/2;
+    if (instance.canvas.width !== pixels || instance.canvas.height !== height) {
       instance.canvas.width = pixels;
-      instance.canvas.height = Math.round(pixels*2/3);
-      instance.scale = pixels/420;
+      instance.canvas.height = height;
+    }
+    var count = instance.mobile || window.innerWidth < 480 || instance.node.classList.contains('fm-loading-visual--compact') ? 180 : 320;
+    // Resizing a toolbar/viewport does not recreate the bounded particle pool.
+    if (instance.count !== count) {
       instance.count = count;
       instance.particles = makeParticles(count);
       instance.lifts = new Float32Array(actors.length);
