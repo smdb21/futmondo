@@ -38,7 +38,7 @@ fm_async_read_http<-function(url,method='POST',body=NULL,...){
  route<-tail(strsplit(url,'/',fixed=TRUE)[[1]],1L)
  if(is.na(counts[route]))counts[route]<<-0L
  counts[route]<<-counts[route]+1L;ordinal<-counts[route];requests<<-c(requests,route)
- if((route=='pressroom'&&ordinal==1L)||(route=='players'&&ordinal==2L))
+ if((route=='pressroom'&&ordinal==1L)||(route=='players'&&ordinal==1L))
   return(promises::promise(function(resolve,reject){
    pending[[paste(route,ordinal,sep=':')]]<<-function()resolve(response(url,body))
   }))
@@ -81,20 +81,20 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
   !enabled(output$action_buttons$html,'btn_bid_market'),
   !enabled(output$action_buttons$html,'btn_verify_availability'))
  clock_now<<-clock_now+31;pending[['pressroom:1']]();settle(session)
- stopifnot(is.function(pending[['players:2']]),!enabled(output$action_buttons$html,'btn_bid_market'))
+ stopifnot(is.function(pending[['players:1']]),!enabled(output$action_buttons$html,'btn_bid_market'))
  session$setInputs(btn_verify_availability=2L);settle(session)
  stopifnot(live_calls==1L)
- clock_now<<-clock_now+20;pending[['players:2']]();settle(session)
+ clock_now<<-clock_now+20;pending[['players:1']]();settle(session)
  state<-card_states$capacity();html<-output$action_buttons$html
  stopifnot(state$data$status=='ok',evaluate_acquisition_preflight(state$data,'bid',1000)$ok,
   enabled(html,'btn_bid_market'),!grepl('Availability checks expired',html,fixed=TRUE),
-  live_calls==1L,writes==0L,counts['information']==3L,counts['players']==2L,
+  live_calls==1L,writes==0L,counts['information']==2L,counts['players']==1L,
   counts['pressroom']==2L,counts['roster']==2L)
  cat('PASS opening the card automatically routes through native live acquisition, repairs expiry during a 20s market response and enables the market action once\n')
 
  epoch<-as.numeric(start_time)
- stopifnot(identical(source_stamps[['team_info_league_mine']]-epoch,c(0,31,51)),
-  identical(source_stamps[['market_league_mine']]-epoch,c(0,51)),
+ stopifnot(identical(source_stamps[['team_info_league_mine']]-epoch,c(31,51)),
+  identical(source_stamps[['market_league_mine']]-epoch,51),
   identical(source_stamps[['roster_facts_league_mine']]-epoch,c(0,31)),
   identical(source_stamps[['pressroom_league']]-epoch,0),
   state$data$valid_until==epoch+61,state$data$valid_until-as.numeric(clock_now)==10)

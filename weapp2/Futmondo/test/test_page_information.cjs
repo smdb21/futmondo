@@ -93,10 +93,14 @@ const port = () => new Promise(resolve => {const server=net.createServer();serve
    await page.locator('#dialog_retry').waitFor();await page.locator('#dialog_retry').click();
    await page.waitForFunction(()=>JSON.parse(document.querySelector('#counts').textContent).retries===2);
    assert.equal(await page.locator('.modal-content summary:visible').count(),1);
+   const points=dialog.locator('.player-points-explanation');
+   assert.match(await points.innerText(),/Points are reported by Futmondo/);
+   assert.equal(await points.locator('.fm-info-source-label').count(),0);
+   assert.doesNotMatch(await points.innerText(),/Player history|About these points|LigaRadar/);
    await page.locator('.modal-footer button').click();await page.locator('.modal-content').waitFor({state:'detached'});
    await page.locator('#open_dialog').click();await page.locator('.modal-content .fm-info-panel > summary').click();
    await page.waitForFunction(()=>document.querySelector('.modal-content .fm-info-panel').textContent.includes('Dialog generation 2'));
-   assert.equal(await page.locator('#dialog_retry').count(),1);assert.equal(await page.locator('.modal-content .fm-info-entry').count(),2);
+   assert.equal(await page.locator('#dialog_retry').count(),1);assert.equal(await page.locator('.modal-content .fm-info-entry').count(),3);
    await page.locator('#dialog_retry').click();await page.waitForFunction(()=>JSON.parse(document.querySelector('#counts').textContent).retries===3);
    await page.locator('.modal-footer button').click();await page.locator('.modal-content').waitFor({state:'detached'});
    await page.locator('#remove_source').click();await source('Optional source').waitFor({state:'detached'});

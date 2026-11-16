@@ -1,5 +1,52 @@
 # Interactive player availability
 
+## Session reuse and recent table facts — 2026-11-15 Pacific
+
+The owner's final interaction contract supersedes the expiry-driven card behavior
+below: a successful team/target check is sufficient for subsequent selections in
+the same browser session and exact account/league/team/season/scoring scope.
+`player_availability_source()` now returns `session_verified` after an acquisition
+was valid on completion. Card display reuses that result across source expiry,
+reopening, switching players and background publications. Explicit Refresh,
+affected-resource invalidation, context changes and session end still reset it.
+Failed/partial acquisitions never receive this marker. The existing bounded
+registry and successful database persistence/acknowledgement queue remain in use;
+a session marker is never persisted as transaction authorization. Later sessions
+must validate the stored source's original freshness and completeness again.
+Unacknowledged saves remain retryable while eligible and through the durable queue.
+
+`player_card_recent_table_facts(player, now)` recognizes explicit known ownership
+and market flags with a nonfuture observation younger than 60 seconds, matching
+the existing target-summary lifetime. Missing timestamps/flags are unknown.
+`championship_market_prices()` retains `availability_market_observed_at` and
+`availability_complete`: a joined market observation cannot borrow a newer
+catalog timestamp, and failed/partial joins cannot qualify. Existing table-context
+isolation protects the captured row. Recent facts admit the card/editor controls
+without a team-capacity acquisition or a wait for optional points/history.
+Old/unknown table facts use the bounded check once, then session reuse applies.
+Player summaries still load when needed for history, independently of the card's
+availability presentation; they share pending/completed requests per player.
+
+The session marker admits an **editor**, not a financial action. Actual-time
+source deadlines and `evaluate_acquisition_preflight()` are unchanged. Opening an
+expired/unverified market editor joins one asynchronous current check; Submit is
+disabled until it succeeds. Direct-owner/clause confirmations retain their
+current preflights, and every submission keeps its independent final checks,
+immutable action context and uncertain-response policy. An expired session result
+cannot authorize a purchase. Ordinary display expiry adds no Retry control,
+source acquisition, timer or polling. Genuine initial failures retain Retry.
+
+Cold native acquisition now settles history/roster/transfer candidates before the
+short-lived funds/offers reads, reusing existing source caches on first demand.
+This avoids immediately discarding successful early financial reads behind slow
+history. The two finite repair passes use a five-second refresh margin without
+extending any deadline. `verification` additionally exposes `completed_at` and
+`generation` so an initially unusable live completion can receive the existing
+single repair in worker mode; later ordinary expiry and explicit failed retries
+cannot create a loop. A successful session check never needs that repair merely
+because a target's history finished later.
+
+
 Implemented locally on 2026-11-15. This refines the existing manual player-card
 workflow; it adds no unattended acquisition or transaction. Production latency
 and rollout are distinct from the offline checks in `data_review_results.md`.
@@ -17,8 +64,8 @@ are excluded. Summary identity additionally includes the immutable player ID.
 Accessors reject the previous context/revision immediately, before new reads
 settle. Returned player IDs, when supplied by the source, must match the request.
 
-Opening or switching cards joins pending team verification or reuses a fresh
-result. Errors settle until explicit retry; unrelated metadata redraws and
+Opening or switching cards joins pending team verification or reuses a successful
+session result. Errors settle until explicit retry; unrelated metadata redraws and
 worker publications cannot become acquisition loops. A closed card detaches its
 consumer; a finite already-started read may finish within the same interactive
 session for the next card. Account/team/context/refresh/mode changes and session
@@ -38,7 +85,7 @@ limits, reserved interactive capacity and bounded freshness repairs are retained
 
 Offer dialogs join the card's pending verification. Opening an expired/failed
 editor explicitly retries that same provider rather than starting a separate
-live check. A summary that finishes after team expiry can request one repair;
+live check. An initial acquisition that never produced usable facts can request one repair;
 that repair updates the existing shared entry. A failed/expired target summary
 keeps acquisition blocked and Retry refreshes just the failed/expired sources. Worker expiry publications and
 points-only redraws do not initiate that repair. Original team source deadlines

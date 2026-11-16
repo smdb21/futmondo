@@ -331,6 +331,14 @@ player_availability_source <- function(session,kind,context,login,refresh=functi
       stamp<-fm_time(attr(data,'observed_at'))
       is.null(epoch)||(length(stamp)==1L&&!is.na(stamp)&&as.numeric(stamp)>=as.numeric(epoch))
     }
+    # Retain successful card observations for this session/scope. This marker
+    # supports display/editor entry only: original deadlines and actual-time
+    # transaction preflights remain authoritative for every purchase.
+    if(!force&&kind%in%c('team','summary')&&isTRUE(entry$verified)){
+      if(!entry$durable&&!isTRUE(entry$saving)&&player_availability_valid(entry$value()$data,kind))
+        schedule_save(entry$value()$data,ctx,entry$started_at %||% Sys.time())
+      return(invisible(NULL))
+    }
     old<-entry$value();saved<-if(force)NULL else stored()
     if(!is.null(saved$data)&&kind!='team'){
       stamp<-fm_time(attr(saved$data,'observed_at'))
@@ -339,12 +347,13 @@ player_availability_source <- function(session,kind,context,login,refresh=functi
     if(!is.null(saved$data)&&!after_epoch(saved$data))saved<-NULL
     saved_stamp<-as.numeric(saved$observed_at %||% NA_real_)
     old_stamp<-as.numeric(old$observed_at %||% NA_real_)
-    if(!is.null(saved$data)&&length(saved_stamp)==1L&&is.finite(saved_stamp)&&
+    if(!is.null(saved$data)&&player_availability_valid(saved$data,kind)&&length(saved_stamp)==1L&&is.finite(saved_stamp)&&
        (length(old_stamp)!=1L||!is.finite(old_stamp)||saved_stamp>old_stamp)){
       player_availability_publish(entry,entries,key,saved$data,saved$error);old<-entry$value()
       if(!is.null(old$error)&&identical(old$error$category,"read_budget"))return(invisible(NULL))
     }
     if(!force&&player_availability_valid(old$data,kind)){
+      entry$verified<-TRUE
       resource_timing('availability_reuse',Sys.time())
       if(isTRUE(attr(old$data,'availability_from_saved')))entry$durable<-TRUE
       if(!entry$durable)schedule_save(old$data,ctx,entry$started_at %||% Sys.time())
@@ -355,8 +364,8 @@ player_availability_source <- function(session,kind,context,login,refresh=functi
     }
     # An error settles once; redraws never become an automatic retry loop.
     if(!force&&entry$attempted&&(!allow_start||!is.null(old$error)))return(invisible(NULL))
-    entry$generation<-entry$generation+1L;generation<-entry$generation;entry$saving<-FALSE
-    entry$pending<-TRUE;entry$attempted<-TRUE;entry$started_at<-Sys.time();entry$value(resource_state(status='loading'))
+    entry$generation<-entry$generation+1L;generation<-entry$generation;entry$saving<-FALSE;entry$verified<-FALSE
+    entry$pending<-TRUE;entry$attempted<-TRUE;entry$started_at<-Sys.time();entry$completed_at<-NULL;entry$value(resource_state(status='loading'))
     captured<-ctx;auth<-login();captured$session_id<-root$token
     current<-function()shiny::isolate({
       if(root$isClosed())return(FALSE)
@@ -369,7 +378,7 @@ player_availability_source <- function(session,kind,context,login,refresh=functi
     })
     finish<-function(data=NULL,error=NULL){shiny::isolate({
       if(!current()){entry$pending<-FALSE;return(NULL)}
-      entry$pending<-FALSE
+      entry$pending<-FALSE;entry$completed_at<-Sys.time()
       if(is.null(error)&&is.null(data))error<-resource_failure(resource=paste0('availability_',kind),category='schema')
       if(is.null(error)&&kind=='team'&&(!is.numeric(data$valid_until)||length(data$valid_until)!=1L||!is.finite(data$valid_until)))error<-resource_failure(resource='get_team_acquisition_capacity',category='schema')
       if(!is.null(data))data<-observed_data(data,observed_at=attr(data,'observed_at') %||% Sys.time())
@@ -379,7 +388,9 @@ player_availability_source <- function(session,kind,context,login,refresh=functi
       }
       returned_id<-if(kind=='summary')fm_scalar(data$data$id %||% data$data$`_id`,'')else ''
       if(is.null(error)&&kind=='summary'&&nzchar(returned_id)&&!identical(returned_id,ctx$player_id))error<-resource_failure(resource='get_player_summary',category='schema')
+      entry$verified<-is.null(error)&&player_availability_valid(data,kind)
       published<-player_availability_publish(entry,entries,key,data,error);error<-published$error
+      if(!is.null(error))entry$verified<-FALSE
       resource_timing(paste0('availability_',kind),entry$started_at)
       if(is.null(error)&&player_availability_valid(data,kind)){
         entry$durable<-isTRUE(attr(data,'availability_from_saved'))
@@ -446,10 +457,11 @@ player_availability_source <- function(session,kind,context,login,refresh=functi
     if(!is.null(ctx)&&is.null(player_availability_scope(ctx,kind)))return(resource_state(error=resource_failure(category='schema')))
     entry<-selected_entry()
     if(is.null(entry))return(resource_state(status='loading'))
-    entry$value()
+    state<-entry$value();state$session_verified<-isTRUE(entry$verified)
+    state
   })
   attr(value,'retry')<-function()acquire(TRUE)
   attr(value,'verification')<-shiny::reactive({entry<-selected_entry();if(is.null(entry))return(NULL)
-    list(pending=entry$pending,started_at=entry$started_at,state=entry$value())})
+    list(pending=entry$pending,started_at=entry$started_at,completed_at=entry$completed_at,generation=entry$generation,state=entry$value())})
   value
 }

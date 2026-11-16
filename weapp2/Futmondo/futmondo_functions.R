@@ -2109,7 +2109,7 @@ get_team_acquisition_capacity_async <- function(login,championship_id,user_team_
       # already applied bounded recovery; the freshness pass must not retry it.
       if(id%in%names(state$summaries) && (is.null(data) ||
          !is.null(state$errors[[paste0("summary:",id)]]) || acquisition_data_unverified(data)))next
-      if(!is.null(data)&&(!refresh_expired||!expired(data,60,2)))next
+      if(!is.null(data)&&(!refresh_expired||!expired(data,60,5)))next
       spec<-list(fn="get_player_summary",args=c(args,list(player_id=id)),
         resources=paste0("player_summary_",login[["userid"]],"_",championship_id,"_",user_team_id,"_",id))
       if(refresh_expired)invalidate(spec)
@@ -2137,14 +2137,15 @@ get_team_acquisition_capacity_async <- function(login,championship_id,user_team_
     resource_store(cache_key,data,base,cache_name,ttl=15)
   }
   needs_refresh<-function(data,ttl,error=NULL){
-    !is.null(data) && is.null(error) && !acquisition_data_unverified(data) && expired(data,ttl,2)
+    !is.null(data) && is.null(error) && !acquisition_data_unverified(data) && expired(data,ttl,5)
   }
   refresh_sources<-function(names){
     if(!current())stop(cancelled())
     names<-names[vapply(names,function(name)
-      needs_refresh(state$sources[[name]],specs[[name]]$ttl,state$errors[[name]]),logical(1))]
+      (is.null(state$sources[[name]])&&!name%in%names(state$sources))||
+        needs_refresh(state$sources[[name]],specs[[name]]$ttl,state$errors[[name]]),logical(1))]
     jobs<-specs[names]
-    for(spec in jobs)invalidate(spec)
+    for(name in names(jobs))if(name%in%names(state$sources))invalidate(jobs[[name]])
     if(length(jobs))progress("refreshing_facts")
     promises::then(batch(jobs,2L),function(results){store_sources(results);NULL})
   }
@@ -2170,7 +2171,10 @@ get_team_acquisition_capacity_async <- function(login,championship_id,user_team_
     })
   }
   progress("prerequisites")
-  initial<-promises::then(batch(specs,4L),function(results){store_sources(results);load_summaries()})
+  # Resolve transfer history before acquiring the short-lived funds/offers.
+  # Otherwise a cold history read consumes their lifetime and forces duplicate
+  # requests before the card can use even one completed calculation.
+  initial<-promises::then(batch(specs[c("history","roster")],2L),function(results){store_sources(results);load_summaries()})
   promises::then(initial,function(unused)refresh_cycle())
 }
 

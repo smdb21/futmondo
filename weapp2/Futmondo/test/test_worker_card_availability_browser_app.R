@@ -5,7 +5,8 @@ fm_worker_configured <- function() TRUE
 fm_worker_mode <- function(id) TRUE
 record_acquired_resource <- function(...) invisible(TRUE)
 fm_worker_rpc <- function(...) stop('Unexpected database request or acquisition enqueue')
-fixture <- new.env(parent=emptyenv())
+fixture <- new.env(parent=emptyenv());fixture$offset<-0
+Sys.time<-function()base::Sys.time()+fixture$offset
 fixture_auth <- c(userid='availability-browser-fixture',token='synthetic')
 fixture_capacity <- function(valid=15,status='ok') observed_data(list(status=status,
  valid_until=as.numeric(Sys.time())+valid,
@@ -40,10 +41,10 @@ ui <- shiny::fluidPage(shiny::tags$head(shiny::tags$style(shiny::HTML(fm_theme_c
  shiny::actionButton('finish_partial','Partial live check'),shiny::actionButton('reset_card','Refresh card'),
  shiny::actionButton('next_card','Next player'),shiny::actionButton('hold_next_summary','Hold next player summary'),
  shiny::actionButton('finish_summary','Complete player summary'),
- shiny::actionButton('hold_saved','Hold saved capacity'),
+ shiny::actionButton('hold_saved','Hold saved capacity'),shiny::actionButton('expire_facts','Advance past source expiry'),
  shiny::textOutput('fixture_status'))),selected_player_UI('card'))
 server <- function(input,output,session) {
- clear_api_cache();fixture$reads <- character();fixture$live <- 0L;fixture$pending <- NULL
+ clear_api_cache();fixture$offset<-0;fixture$reads <- character();fixture$live <- 0L;fixture$pending <- NULL
  fixture$passive_hold <- FALSE;fixture$pending_passive <- NULL;fixture$summary_hold<-FALSE;fixture$summary_pending<-NULL;fixture$summary_live<-0L;refresh <- shiny::reactiveVal(0L)
  auth <- fixture_auth;auth[['userid']] <- paste0('availability-browser-',session$token)
  session$onSessionEnded(function()fm_worker_detach(auth[['userid']],session$token))
@@ -63,6 +64,7 @@ server <- function(input,output,session) {
   fixture$summary_pending$resolve(observed_data(list(data=list(id=fixture$summary_pending$player_id),championship=list(),points=list(),prices=list())))
   fixture$summary_pending<-NULL})
  shiny::observeEvent(input$hold_saved,{fixture$passive_hold <- TRUE;refresh(refresh()+1L)})
+ shiny::observeEvent(input$expire_facts,{fixture$offset<-fixture$offset+90;row<-selected();row$points<-row$points+1;selected(row)})
  shiny::observeEvent(input$fixture_stats,session$sendCustomMessage('fixture-stats',list(live=fixture$live,reads=length(fixture$reads),passive_pending=!is.null(fixture$pending_passive),summary_live=fixture$summary_live,summary_pending=!is.null(fixture$summary_pending))))
 }
 shiny::runApp(shiny::shinyApp(ui,server),host='127.0.0.1',port=3907,launch.browser=FALSE)

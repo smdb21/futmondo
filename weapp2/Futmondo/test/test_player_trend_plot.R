@@ -24,7 +24,8 @@ check("recent panel preserves points with a single finality explanation",{
  env$card_states<-list(matches=function()resource_state(list(matches=list())),summary=function()resource_state(list(points=list())))
  html<-as.character(eval(recent_body,env))
  stopifnot(grepl("-2 pts",html,fixed=TRUE),grepl("0 pts",html,fixed=TRUE),
-   grepl("About these points",html,fixed=TRUE),!grepl("player-round-status",html,fixed=TRUE))
+   grepl("Points are reported by Futmondo.",html,fixed=TRUE),
+   grepl('data-fm-info-source=""',html,fixed=TRUE),!grepl("About these points|LigaRadar|player-round-status",html))
 })
 check("unknown point finality is preserved in chart provenance",{
  history<-known;history$points$score_status[4]<-"unknown";chart<-render_fixture(history)

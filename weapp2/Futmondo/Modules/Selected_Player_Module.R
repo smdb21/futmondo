@@ -116,6 +116,25 @@ player_card_location_label <- function(player, current_team_id = NULL) {
   paste0("Ownership: ",status$ownership," · ",status$market)
 }
 
+# Recent table observations already establish ownership and market state.
+# Unknown timestamps/flags never become evidence of a free agent or listing.
+player_card_recent_table_facts <- function(player,now=Sys.time()) {
+  if(!is.data.frame(player)||nrow(player)!=1L||acquisition_data_unverified(player)||
+     !"id"%in%names(player)||!nzchar(fm_scalar(player$id,""))||
+     !any(c("owner_team_id","user_team_id","userteamId","userTeamId","userTeam._id","userTeam.id","userteam._id","userteam.id")%in%names(player))||
+     !"market_inMarket"%in%names(player)||is.na(player$market_inMarket[1]))return(FALSE)
+  owner_fields<-intersect(c("owner_team_id","user_team_id","userteamId","userTeamId","userTeam._id","userTeam.id","userteam._id","userteam.id"),names(player))
+  if(!any(vapply(owner_fields,function(field)!is.na(player[[field]][1]),logical(1)))||
+     !tolower(as.character(player$market_inMarket[1]))%in%c("true","false")||
+     identical(attr(player,"availability_complete"),FALSE))return(FALSE)
+  stamp<-fm_time(if("observed_at"%in%names(player))player$observed_at[1]else attr(player,"observed_at"))
+  market_stamp<-fm_time(attr(player,"availability_market_observed_at"))
+  if(!is.null(attr(player,"availability_complete"))&&(length(market_stamp)!=1L||is.na(market_stamp)))return(FALSE)
+  if(length(stamp)!=1L||is.na(stamp)||stamp>now||(length(market_stamp)==1L&&!is.na(market_stamp)&&market_stamp>now))return(FALSE)
+  if(length(market_stamp)==1L&&!is.na(market_stamp))stamp<-min(stamp,market_stamp)
+  length(stamp)==1L&&!is.na(stamp)&&stamp<=now&&as.numeric(difftime(now,stamp,units="secs"))<60
+}
+
 selected_player_UI <- function(id) {
   ns <- NS(id)
   tagList(
@@ -514,7 +533,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         team_id <- get_reactive_val(user_team_id)
         active_bid_info_RV(player_card_active_bid(card_states$summary()$data,
           card_states$capacity()$data,sp$id))
-        action_buttons <- tagList()
+        action_buttons <- tagList();table_checked<-FALSE
 
         current_user_team <- get_reactive_val(user_team_id)
         player_owner_team <- if ("user_team_id" %in% colnames(sp)) sp$user_team_id else NULL
@@ -691,7 +710,10 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           bid_gate <- passive_acquisition_gate(sp,if(!is.na(eff_market_price) && eff_market_price>0)"bid"else"offer")
           clause_gate <- passive_acquisition_gate(sp,"clause")
           blocked_reason <- if(!isTRUE(bid_gate$ok)) bid_gate$message else if(!isTRUE(clause_gate$ok)) clause_gate$message else NULL
-          if(!is.null(blocked_reason)&&!identical(bid_gate$reason,"loading")&&!identical(clause_gate$reason,"loading")) {
+          session_checked<-isTRUE(card_states$capacity()$session_verified)
+          table_checked<-player_card_recent_table_facts(sp)&&!availability_required()
+          can_open_editor<-session_checked||table_checked
+          if(!can_open_editor&&!is.null(blocked_reason)&&!identical(bid_gate$reason,"loading")&&!identical(clause_gate$reason,"loading")) {
             # A saved worker observation normally outlives its action deadline.
             # Opening starts a live check; failed checks retain an explicit retry.
             saved_state <- card_states$capacity()
@@ -718,8 +740,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
               actionButton(
                 ns("btn_bid_market"),
                 label = tagList(icon("hand-holding-dollar"), " Make Market Offer"),
-                class = "btn btn-buy-market", disabled=!isTRUE(bid_gate$ok),
-                title=if(!isTRUE(bid_gate$ok)) bid_gate$message else NULL
+                class = "btn btn-buy-market", disabled=!isTRUE(bid_gate$ok)&&!(can_open_editor&&bid_gate$reason%in%c("unavailable","loading")),
+                title=if(!isTRUE(bid_gate$ok))if(can_open_editor)"Current availability will be checked before submission."else bid_gate$message else NULL
               )
             )
           }
@@ -732,8 +754,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
               actionButton(
                 ns("btn_offer_owner"),
                 label = tagList(icon("hand-holding-dollar"), paste0(" Offer to ", owner_name)),
-                class = "btn btn-offer-money", disabled=!isTRUE(bid_gate$ok),
-                title=if(!isTRUE(bid_gate$ok)) bid_gate$message else NULL
+                class = "btn btn-offer-money", disabled=!isTRUE(bid_gate$ok)&&!(can_open_editor&&bid_gate$reason%in%c("unavailable","loading")),
+                title=if(!isTRUE(bid_gate$ok))if(can_open_editor)"Current availability will be checked before submission."else bid_gate$message else NULL
               )
             )
           }
@@ -746,8 +768,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
               actionButton(
                 ns("btn_pay_clause"),
                 label = tagList(icon("bolt"), clause_label),
-                class = "btn btn-buy-clause", disabled=!isTRUE(clause_gate$ok),
-                title=if(!isTRUE(clause_gate$ok)) clause_gate$message else NULL
+                class = "btn btn-buy-clause", disabled=!isTRUE(clause_gate$ok)&&!(can_open_editor&&clause_gate$reason%in%c("unavailable","loading")),
+                title=if(!isTRUE(clause_gate$ok))if(can_open_editor)"Current availability will be checked before submission."else clause_gate$message else NULL
               )
             )
           } else if (!is_own_player && clause_price_val > 0) {
@@ -769,12 +791,12 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         }
 
         summary_state<-card_states$summary()
-        summary_unverified<-!player_availability_valid(summary_state$data,"summary")
+        summary_unverified<-!isTRUE(summary_state$session_verified)&&!player_card_recent_table_facts(sp)
         readiness<-if(is_own_player)card_states$listings() else card_states$capacity()
         if(is_own_player&&!player_availability_valid(readiness$data,"listings")&&!identical(readiness$status,"loading")&&!is.null(readiness$data))
           readiness<-resource_state(status="unverified",error=readiness$error)
         if(!is_own_player && has_active_bid)readiness<-resource_state(data=active_bid_info_RV())
-        if(!is_own_player && !has_active_bid && identical(card_states$summary()$status,"loading"))readiness<-resource_state(status="loading")
+        if(!is_own_player && !has_active_bid && summary_unverified && identical(card_states$summary()$status,"loading"))readiness<-resource_state(status="loading")
         if(!is_own_player && !has_active_bid && !identical(summary_state$status,"loading")&&summary_unverified)
           readiness<-if(is.null(summary_state$data))summary_state else resource_state(status="unverified",error=summary_state$error)
         {
@@ -786,7 +808,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
             tag
           }
         }
-        if(identical(readiness$status,"loading")) {
+        if(table_checked)readiness<-resource_state(data=sp)
+        if(identical(readiness$status,"loading")&&!table_checked) {
           action_buttons<-tagList(fm_info("Checking availability…",pending=TRUE),disable(action_buttons))
         } else if(identical(readiness$status,"unverified")) {
           action_buttons<-tagList(fm_info(if(!is.null(readiness$error))resource_failure_message(readiness$error)else
@@ -800,8 +823,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         if(!is_own_player && !has_active_bid && worker_capacity_verification_available()) {
           gate <- bid_gate
           verification <- manual_capacity_verification()
-          pending <- (!is.null(verification) && isTRUE(verification$pending))||identical(summary_state$status,"loading")
-          if(pending || summary_unverified || gate$reason %in% c("loading","unavailable"))
+          pending <- (!is.null(verification) && isTRUE(verification$pending))||(summary_unverified&&identical(summary_state$status,"loading"))
+          if(pending || summary_unverified || (!isTRUE(card_states$capacity()$session_verified)&&availability_required()&&gate$reason %in% c("loading","unavailable")))
             action_buttons <- tagList(action_buttons,actionButton(ns("btn_verify_availability"),
               if(pending) "Checking availability…" else "Retry availability",
               class="btn btn-default",disabled=pending))
@@ -1093,7 +1116,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       ))
       # Join the card's team verification. A pending request is never duplicated
       # by opening an offer; only a settled expired/failed result needs retry.
-      if(pending&&!identical(state$status,"loading"))verify_card_availability()
+      if(pending)verify_card_availability(current=TRUE)
       invisible(TRUE)
     }
 
@@ -1933,6 +1956,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       saved<-fm_worker_get(ctx$account_id,descriptor$resource_key)
       if(is.null(saved))NULL else {attr(saved$data,'availability_from_saved')<-TRUE;resource_state(saved$data)}
     }
+    availability_requested<-reactiveVal(NULL)
+    availability_required<-function()!player_card_recent_table_facts(selected_player())||
+      identical(availability_requested(),availability_team_context())
     card_states<-list()
     card_states$resolved<-card_read("card_resolved_context","get_resolved_league_context",auth_args,context=team_card_context,active=function()isTRUE(session$rootScope()$userData$league_context_enabled))
     summary_availability_context<-reactive({
@@ -1944,7 +1970,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       refresh=function()paste(global_refresh(),history_refresh(),sep=":"),active=function()!is.null(card_context()),
       stored=function(){ctx<-summary_availability_context();availability_stored("get_player_summary",ctx,if(!is.null(ctx))player_args(ctx)else list())},
       current_context=availability_team_context,mode=availability_mode,opening=availability_opening)
-    availability_admitted<-function()player_card_is_own_player(selected_player(),get_reactive_val(user_team_id))||!is.null(manual_capacity_verification())
+    availability_admitted<-function()player_card_is_own_player(selected_player(),get_reactive_val(user_team_id))||player_card_recent_table_facts(selected_player())||!is.null(manual_capacity_verification())
     card_states$lineup<-card_read("card_lineup","get_lineup_from_team",auth_args,context=team_card_context,active=availability_admitted)
     card_states$profile<-card_read("card_profile","get_player_full_profile",function(ctx)list(login=get_reactive_val(login_token),player_id=ctx$player_id))
     card_states$matches<-card_read("card_matches","get_player_matches",function(ctx)list(login=get_reactive_val(login_token),player_id=ctx$player_id),active=availability_admitted)
@@ -1955,11 +1981,11 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     capacity_recheck<-reactiveVal(0L)
     capacity_recheck_context<-NULL;capacity_rechecks<-0L;last_worker_summary<-NULL
     stored_capacity<-card_read("card_capacity","get_team_acquisition_capacity",auth_args,context=capacity_context,
-      active=function()isTRUE(availability_mode())&&!player_card_is_own_player(selected_player(),get_reactive_val(user_team_id)),
+      active=function()availability_required()&&isTRUE(availability_mode())&&!player_card_is_own_player(selected_player(),get_reactive_val(user_team_id)),
       refresh=global_refresh)
     card_states$capacity<-player_availability_source(session,"team",availability_team_context,availability_login,
       refresh=global_refresh,
-      active=function()!is.null(card_context())&&!player_card_is_own_player(selected_player(),get_reactive_val(user_team_id)),
+      active=function()availability_required()&&!is.null(card_context())&&!player_card_is_own_player(selected_player(),get_reactive_val(user_team_id)),
       stored=function(){
         ctx<-availability_team_context();saved<-availability_stored("get_team_acquisition_capacity",ctx,if(!is.null(ctx))auth_args(ctx)else list())
         saved %||% stored_capacity()
@@ -1967,13 +1993,14 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     manual_capacity_verification<-attr(card_states$capacity,"verification")
     # Kept as the card's existing recovery seam; it now works in either mode.
     worker_capacity_verification_available<-function()!is.null(availability_team_context())
-    verify_card_availability<-function(){
+    verify_card_availability<-function(current=FALSE){
       if(player_card_is_own_player(selected_player(),get_reactive_val(user_team_id))){
         if(!player_availability_valid(isolate(card_states$listings())$data,"listings"))attr(card_states$listings,"retry")()
         return(invisible(NULL))
       }
-      if(!player_availability_valid(isolate(card_states$summary())$data,"summary"))attr(card_states$summary,"retry")()
-      if(!player_availability_valid(isolate(card_states$capacity())$data,"team"))attr(card_states$capacity,"retry")()
+      availability_requested(availability_team_context())
+      if(!isTRUE(isolate(card_states$summary())$session_verified)&&!player_card_recent_table_facts(selected_player()))attr(card_states$summary,"retry")()
+      if((isTRUE(current)||!isTRUE(isolate(card_states$capacity())$session_verified))&&!player_availability_valid(isolate(card_states$capacity())$data,"team"))attr(card_states$capacity,"retry")()
       invisible(NULL)
     }
     observeEvent(input$btn_verify_availability,verify_card_availability())
@@ -1991,8 +2018,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       active=function()!is.null(card_context())&&player_card_is_own_player(selected_player(),get_reactive_val(user_team_id)),refresh=global_refresh,
       stored=function(){ctx<-availability_team_context();availability_stored("get_my_market_players",ctx,if(!is.null(ctx))auth_args(ctx)else list())},
       current_context=availability_team_context,mode=availability_mode,opening=availability_opening)
-    # A slow player summary can outlive otherwise successful team checks.
-    # Reacquire once when both settle; never extend the old source timestamps.
+    # Repair only an initial acquisition that never produced usable facts.
+    # A successful session check survives slow history and later source expiry.
     observe({
       ctx<-card_context();scope<-list(context=ctx,refresh=global_refresh())
       if(!identical(scope,capacity_recheck_context)){
@@ -2000,15 +2027,17 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       }
       if(is.null(ctx)||player_card_is_own_player(selected_player(),get_reactive_val(user_team_id)))return()
       summary<-card_states$summary()
-      # Worker publications can report ordinary expiry. Only a late target
-      # summary, not each worker clock update, may initiate this one repair.
+      # Observe the first local completion as well as target history, without
+      # turning worker expiry publications or explicit retries into a poll.
       if(isTRUE(availability_mode())){
-        summary_key<-list(context=ctx,refresh=global_refresh(),status=summary$status,observed_at=summary$observed_at)
+        verification<-manual_capacity_verification()
+        summary_key<-list(context=ctx,refresh=global_refresh(),status=summary$status,observed_at=summary$observed_at,
+          initial_completion=if(identical(verification$generation,1L))verification$completed_at else NULL)
         if(identical(summary_key,last_worker_summary))return()
         last_worker_summary<<-summary_key
         capacity<-isolate(card_states$capacity())
       }else capacity<-card_states$capacity()
-      if(identical(summary$status,"loading")||is.null(summary$data)||
+      if(isTRUE(capacity$session_verified)||identical(summary$status,"loading")||is.null(summary$data)||
          identical(capacity$status,"loading")||is.null(capacity$data))return()
       deadline<-capacity$data$valid_until
       if(is.numeric(deadline)&&length(deadline)==1L&&is.finite(deadline)&&
@@ -2170,7 +2199,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
             div(class="player-match-card player-round-box",span(class="player-match-round",paste("Round",match$round)),render_match(match))
           }))),
         if(is.null(match_state$data)&&!identical(match_state$status,"loading"))fm_info(resource_failure_message(match_state$error),error=TRUE),
-        if(length(rounds$rounds))fm_info(p("About these points"),p("Points are reported by LigaRadar. Final confirmation is not provided for some rounds."),class="player-points-explanation"),
+        if(length(rounds$rounds))fm_info(p("Points are reported by Futmondo. Final confirmation is not provided for some rounds."),source="",class="player-points-explanation"),
         if(identical(history$freshness,"stale"))fm_info("Showing saved history; refresh failed.",error=TRUE))
     })
     output$player_external_details <- renderUI({

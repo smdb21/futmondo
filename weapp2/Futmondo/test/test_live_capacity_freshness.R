@@ -32,9 +32,9 @@ fm_async_read_http<-function(url,method='POST',body=NULL,...){
  if(is.na(counts[route]))counts[route]<<-0L
  counts[route]<<-counts[route]+1L;ordinal<-counts[route];requests<<-c(requests,route)
  hold<-(route=='pressroom'&&ordinal==1L)||
-  (mode%in%c('late-market','pathological')&&route=='players'&&ordinal==2L)||
+  (mode%in%c('late-market','pathological')&&route=='players'&&ordinal==1L)||
   (mode=='new-candidate'&&route=='summary'&&ordinal==1L)||
-  (mode=='pathological'&&route=='information'&&ordinal==3L)
+  (mode=='pathological'&&route=='information'&&ordinal==2L)
  if(hold)return(promises::promise(function(resolve,reject){
   pending[[paste(route,ordinal,sep=':')]]<<-function()resolve(response(url,body,ordinal))
  }))
@@ -61,25 +61,25 @@ assert_fresh<-function(result){
   result$data$valid_until>as.numeric(clock_now),evaluate_acquisition_preflight(result$data,'bid',100)$ok)
 }
 reset('late-market');result<-start();stopifnot(!result$done)
-release('pressroom:1',31);stopifnot(!result$done,is.function(pending[['players:2']]))
-release('players:2',20);assert_fresh(result)
-stopifnot(counts['information']==3L,counts['players']==2L,counts['pressroom']==2L,
+release('pressroom:1',31);stopifnot(!result$done,is.function(pending[['players:1']]))
+release('players:1',20);assert_fresh(result)
+stopifnot(counts['information']==2L,counts['players']==1L,counts['pressroom']==2L,
  counts['roster']<=3L,length(requests)<=10L)
 before<-requests;warm<-start();assert_fresh(warm);stopifnot(identical(requests,before))
 cat('PASS native explicit live check repairs funds after a 20s final market read; immediate reuse adds zero HTTP reads\n')
 
 reset('new-candidate');result<-start();release('pressroom:1',31)
-stopifnot(!result$done,is.function(pending[['summary:1']]),counts['information']==1L)
+stopifnot(!result$done,is.function(pending[['summary:1']]),is.na(counts['information']))
 release('summary:1',31);assert_fresh(result)
 stopifnot(result$data$roster$pending_inbound_count==1L,result$data$roster$effective_count==2L,
  counts['summary']==1L,counts['pressroom']==2L,length(requests)<=12L)
 cat('PASS refreshed roster discovers a new pending arrival; slow summary finishes before final funds acquisition and remains counted\n')
 
-reset('pathological');result<-start();release('pressroom:1',31);release('players:2',20)
-stopifnot(!result$done,is.function(pending[['information:3']]))
-release('information:3',21)
+reset('pathological');result<-start();release('pressroom:1',31);release('players:1',20)
+stopifnot(!result$done,is.function(pending[['information:2']]))
+release('information:2',21)
 stopifnot(result$done,is.null(result$error),result$data$status=='partial',
  result$data$valid_until<=as.numeric(clock_now),!evaluate_acquisition_preflight(result$data,'bid',100)$ok,
- counts['information']==3L,counts['players']==2L,length(requests)<=12L,!length(pending))
+ counts['information']==2L,counts['players']==1L,length(requests)<=12L,!length(pending))
 before<-requests;settle();stopifnot(identical(requests,before))
 cat('PASS pathological alternating delays stop at the bounded repair limit with original expired deadlines and no retry loop\n')

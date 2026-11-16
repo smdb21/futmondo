@@ -26,6 +26,9 @@ championship_market_prices <- function(players, market_state) {
   players$effective_market_price <- rep(NA_real_, nrow(players))
   players$market_inMarket <- rep(NA, nrow(players))
   market <- market_state$data
+  attr(players,"availability_market_observed_at")<-market_state$observed_at %||% attr(market,"observed_at")
+  attr(players,"availability_complete")<-market_state$status%in%c("ok","empty")&&
+    identical(market_state$completeness,"complete")&&is.null(market_state$error)
   if (!is.data.frame(market) || !"id" %in% names(players)) return(players)
   if (!nrow(market)) {
     if (identical(market_state$status, "empty") && identical(market_state$completeness, "complete") && is.null(market_state$error))

@@ -53,6 +53,8 @@ server<-function(input,output,session){
   dialog_count(dialog_count()+1L)
   shiny::showModal(shiny::modalDialog(title='Player details',
     fm_info('Player facts are available.',source='Player profile'),
+    fm_info(shiny::p('Points are reported by Futmondo. Final confirmation is not provided for some rounds.'),
+      source='',class='player-points-explanation'),
     shiny::uiOutput('dialog_info'),footer=shiny::modalButton('Close')))
  })
  output$dialog_info<-shiny::renderUI(fm_info(paste('Dialog generation',dialog_count()),shiny::actionButton('dialog_retry','Retry player source'),error=error(),source='Player history'))

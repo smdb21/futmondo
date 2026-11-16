@@ -63,5 +63,5 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
   stopifnot(identical(requests,before),evaluate_acquisition_preflight(card_states$capacity()$data,'offer')$ok)
   cat('PASS reopening the fresh card adds zero requests.\n')
  cat('READS:',paste(names(table(requests)),as.integer(table(requests)),sep='=',collapse=', '),'\n')
- stopifnot(all(table(requests)[c('information','roster','players','pressroom')]==2L))
+ stopifnot(identical(as.integer(table(requests)[c('information','roster','players','pressroom')]),c(1L,2L,1L,2L)))
 })

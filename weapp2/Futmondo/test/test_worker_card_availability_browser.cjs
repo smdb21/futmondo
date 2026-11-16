@@ -59,6 +59,18 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
    const pendingHeartbeat=Date.now()-pendingBegin;assert.ok(pendingHeartbeat<750,`pending stored heartbeat ${pendingHeartbeat}ms`);
    await page.locator('#finish_success').click();await page.waitForFunction(()=>!document.querySelector('#card-btn_bid_market').disabled);
    assert.equal((await stats()).passive_pending,true);
+   await page.locator('#expire_facts').click();
+   await page.waitForTimeout(200);
+   assert.equal((await stats()).live,5);assert.equal(await offer.isEnabled(),true);
+   assert.equal(await verify.count(),0);
+   assert.doesNotMatch(await page.locator('#card-action_buttons').textContent(),/expired before|Retry availability/);
+   await offer.click();
+   await page.waitForFunction(()=>document.querySelector('#card-submit_bid')?.disabled===true);
+   assert.equal((await stats()).live,6);
+   await page.locator('#finish_success').evaluate(button=>button.click());
+   await page.waitForFunction(()=>document.querySelector('#card-submit_bid')?.disabled===false);
+   await page.locator('.modal').getByRole('button',{name:'Cancel',exact:true}).click();
+   console.log(`PASS ${width}px session reuse: 90s expiry adds zero card checks, editor joins current verification with Submit disabled until success`);
    console.log(`PASS ${width}px saved capacity still pending: automatic check runs without waiting for worker publication, heartbeat ${pendingHeartbeat}ms, live success enables actions`);
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
    assert.deepEqual(errors,[]);

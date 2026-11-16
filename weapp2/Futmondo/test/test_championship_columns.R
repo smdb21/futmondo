@@ -34,6 +34,18 @@ check('loading, failed, partial and stale results cannot claim a player is not l
  bad<-state;bad$data<-rbind(market,market[2,]);rows<-championship_market_prices(catalog,bad)
  stopifnot(all(is.na(rows$effective_market_price)),all(is.na(rows$market_inMarket)))
 })
+check('joined availability retains the older market clock and completeness',{
+ current_catalog<-observed_data(catalog,observed_at=stamp);current_catalog$user_team_id<-''
+ old_market<-observed_data(market,observed_at=stamp-61)
+ joined<-championship_market_prices(current_catalog,resource_state(old_market))
+ stopifnot(identical(attr(joined,'availability_market_observed_at'),stamp-61),
+   isTRUE(attr(joined,'availability_complete')),
+   !player_card_recent_table_facts(joined[1,,drop=FALSE],now=stamp))
+ joined<-championship_market_prices(current_catalog,state)
+ stopifnot(player_card_recent_table_facts(joined[1,,drop=FALSE],now=stamp))
+ partial<-state;partial$completeness<-'partial'
+ stopifnot(!player_card_recent_table_facts(championship_market_prices(current_catalog,partial)[1,,drop=FALSE],now=stamp))
+})
 check('clause dates use the source instant and remain distinct from lock expiry',{
  rows<-championship_market_prices(catalog,state)
  columns<-get_reactable_columns_for_players(rows)

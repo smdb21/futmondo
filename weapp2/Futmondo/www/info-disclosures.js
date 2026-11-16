@@ -49,7 +49,7 @@
     return panel;
   }
   function sourceLabel(node, origin) {
-    if (node.dataset.fmInfoSource) return node.dataset.fmInfoSource;
+    if (node.hasAttribute('data-fm-info-source')) return node.dataset.fmInfoSource;
     const owner = origin.closest('[id].shiny-html-output, [id].shiny-text-output, [id].shiny-bound-output');
     const id = owner ? owner.id : '';
     const labels = [
@@ -83,7 +83,7 @@
     const label = document.createElement('div');
     label.className = 'fm-info-source-label';
     label.textContent = sourceLabel(node, origin);
-    node.insertBefore(label, node.querySelector('.fm-info-body'));
+    if (label.textContent) node.insertBefore(label, node.querySelector('.fm-info-body'));
     const record = {node, origin, home, label, wasOpen: node.open};
     entries.set(node, record);
     node.classList.add('fm-info-entry');

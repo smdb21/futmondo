@@ -1,5 +1,27 @@
 # Player card
 
+## Reuse on selection and compact points attribution — 2026-11-15 Pacific
+
+The owner's final request is to reuse recent table ownership/market facts and
+successful session checks, without expiry-driven repeat checks on selection.
+The current contract is in [interactive availability](player_availability.md).
+Recent explicit table observations show the editor controls without starting a
+team check or waiting for optional history. Older/unknown table observations use
+the scoped provider once; a successful result survives reopening and switching.
+Original source clocks/deadlines remain intact. Entering an expired editor and
+submitting a purchase still require the existing current preflights; the session
+marker does not authorize a write. Explicit Refresh and affected-context/action
+invalidation remain available. Real initial failures keep their diagnostics.
+
+The points disclosure now says **Points are reported by Futmondo. Final
+confirmation is not provided for some rounds.** It omits **About these points**
+and passes `source=""` to suppress the redundant **Player history** label in the
+consolidated dialog information panel. Other source headings and unknown point
+finality remain intact. The disclosure registry treats an explicitly empty source
+as an instruction to omit its label, with no new listener, timer or request.
+This corrects existing behavior/presentation, without a new feature-tier entry.
+
+
 ## Successful saved availability and completeness — 2026-11-15 Pacific
 
 Opening a rival player could report **Availability checks expired before they completed** even though the saved check had completed successfully. The worker collector records `attr(value, "complete")`, but capacity calculations did not publish it. Both inspected stored capacity envelopes had `status=ok`, successful roster/funds/commitments, no diagnostics and an original 15-second action window, yet envelope completeness was `unknown`. The card's ordinary-expiry recovery path required proven completeness, so these valid historical results appeared as failed acquisitions.

@@ -86,13 +86,14 @@ shiny::testServer(selected_player_Server,args=args,{
  put_capacity(capacity(-30,budget=99,age=45),'older-replay');settle(session)
  stopifnot(card_states$capacity()$data$funds$spendable_budget==1000,length(jobs)==1L,!length(rpc))
  now<<-now+1;put_capacity(capacity(budget=900),'newer-publication');settle(session)
- stopifnot(card_states$capacity()$data$funds$spendable_budget==900,length(jobs)==1L)
+ stopifnot(card_states$capacity()$data$funds$spendable_budget==1000,length(jobs)==1L)
  now<<-now+16;put_capacity(capacity(-1,age=16),'expired-again');settle(session)
- stopifnot(length(jobs)==1L,blocked(output$action_buttons$html,'btn_bid_market'),
-  enabled(output$action_buttons$html,'btn_verify_availability'))
+ stopifnot(length(jobs)==1L,enabled(output$action_buttons$html,'btn_bid_market'),
+  is.null(button(output$action_buttons$html,'btn_verify_availability')),
+  !evaluate_acquisition_preflight(card_states$capacity()$data,'bid',150)$ok)
  updated<-selected();updated$points<-11;selected(updated);settle(session)
  stopifnot(length(jobs)==1L,!is.null(manual_capacity_verification()))
- cat('PASS worker publications retain timestamp ordering and do not start recurring automatic checks\n')
+ cat('PASS session verification remains stable through worker publications/expiry without recurring checks; current purchase preflight stays strict\n')
 })
 reset(capacity())
 shiny::testServer(selected_player_Server,args=args,{

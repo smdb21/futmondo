@@ -3898,3 +3898,88 @@ verification documentation, with no runtime performance effect; no additional
 application tests are required for the documentation edit. The earlier focused
 regressions, asynchronous persistence/replay and lifecycle results remain in
 force.
+
+
+## Player availability reused from table/session — 2026-11-15 Pacific
+
+The owner clarified that selecting a player must reuse recent table facts and
+successful checks already made in the session. The reported sequence was a
+roughly 30-second wait, brief apparent success, then Retry and “expired before
+completed.” Code review reproduced an expiry-driven repeat check after a late
+summary/reopening, replacement risk from unusable stored publications, and a
+worker-mode observer that could miss the first expired live completion. The
+owner's private request timing was not captured, so no particular source is
+asserted to account for their entire 30 seconds.
+
+Implemented behavior and source integrity:
+
+- Recent explicit table ownership/listing facts (under 60 seconds) admit card
+  controls without a team-capacity request or waiting for historical points.
+  Market/catalog joins retain the older source clock and completeness. Unknown,
+  old, partial and future observations cannot qualify.
+- A team/target acquisition that was valid on completion receives a scoped
+  `session_verified` display marker. Source expiry, worker publications and
+  reopening/switching no longer repeat successful checks or turn them into a
+  Retry loop. Context/action invalidation and explicit Refresh remain separate.
+- The marker admits editor entry only. No preflight uses a past/fabricated clock,
+  and original financial source deadlines are unchanged. An expired market
+  editor joins one current asynchronous verification and keeps Submit disabled
+  until it succeeds. Every transaction retains its final current-state preflight,
+  immutable context, duplicate protection and uncertain-response reconciliation.
+- Real initial failures retain Retry. An initial completion that never yielded
+  usable facts can receive one bounded repair; failed explicit retries and
+  ordinary worker expiry cannot become an acquisition loop.
+- Cold acquisition takes short-lived funds/offers after history/roster/transfer
+  candidates. Existing source/database caches are reused first. Original source
+  clocks, exact scopes, successful database snapshots, acknowledgement handling
+  and bounded retry queues remain intact. A session marker is not durable
+  authorization and cannot make an expired database observation current in a
+  later session. No schema, dependency, environment variable or timer is added.
+- Points are attributed to Futmondo. Both “About these points” and the redundant
+  “Player history” source label are absent from that disclosure. Other source
+  headings, points and finality remain unchanged. This corrects an existing
+  workflow/presentation, without adding a product capability or login-tier entry.
+
+Validation:
+
+- Eight availability scripts pass: completion-window/session/table/strict-submit
+  reproduction, shared reuse, durable store replay, late-summary reuse, worker
+  recovery, actual-card/native recovery, slow-history freshness and alternating
+  source-delay limits. The new reproduction covers 90-second expiry/reopening,
+  zero table-triggered capacity reads while history is held, explicit editor
+  verification, failed final purchase preflight, old/future/unknown join clocks
+  and bounded failure repair. No account or transaction is used.
+- Seven additional suites pass: market-offer opening, acquisition availability,
+  configured acquisition rules, championship columns (11 groups, including the
+  actual join's clocks/completeness), capacity completeness, trend plots (16)
+  and deployment exclusions (3). Persistence replay still uses one database GET
+  and zero source requests; failed acknowledgements remain retryable.
+- The consolidated-information browser suite passes six layouts (320/390/1440px,
+  both themes), including an explicitly unlabelled Futmondo points note and
+  retained Retry bindings. Heartbeats: 52–67ms; browser scheduling gaps: 10ms;
+  zero source/database operations from disclosure interaction.
+- The actual-card browser checks at 360/1440px pass held-source responsiveness,
+  session expiry with zero new card acquisitions, current editor checks with
+  Submit disabled, recovery, context changes, and no page errors/overflow.
+- Required offline lifecycle: 13 checks plus eight tabs pass, with no live HTTP
+  or database mutation attempts.
+
+Performance review: a 31-second synthetic history read now requires one balance,
+one market, two roster and two pressroom requests (six total), compared with
+eight previously; the fresh and session-reused card paths add zero team reads.
+A 20-second final market delay still repairs expired funds, preserving the
+original ten-second remaining roster deadline; pathological alternating delays
+stop at the existing finite limit. Session state adds only scalar markers to the
+existing bounded registry. Joined timestamp/completeness metadata adds no I/O;
+100 joins of 527 rows took 0.015s locally, retaining about 110 KiB. Deferred
+persistence replay yielded with a measured 31ms maximum heartbeat gap. No extra
+poll, redraw clock, unbounded cache, background job or automatic transaction is
+introduced. Documentation-only additions have no runtime cost.
+
+One additional legacy `test_player_card_loading_work.R` run fails its initial
+exact-six-read assertion. The identical failure is reproduced with the unchanged
+HEAD selected-player module; its mock adapter predates the shared availability
+contract. It is not reported as passing. Current held-source card/browser,
+scoped reuse and lifecycle checks above verify the affected behavior directly.
+Production deployment, authenticated request timing and hosted acceptance of
+Dani Lorenzo remain unverified; these local results do not certify them.

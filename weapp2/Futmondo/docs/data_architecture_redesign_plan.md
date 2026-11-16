@@ -1834,3 +1834,21 @@ Production deployment and authenticated hosted acceptance remain separate.
 
 Contracts: [player card](selected_player_module.md). No schema, dependency,
 environment setting, source-collection cadence or transaction change.
+
+
+### Session-stable player availability and table reuse — implemented locally (2026-11-15)
+
+- Honor the owner's final selection contract: recent table ownership/market facts
+  admit card controls without repeated checks; successful scoped team/target
+  observations remain usable for display throughout the session. Preserve the
+  older market clock on catalog joins and keep unknown/failed facts distinct.
+- Keep editor-entry and final purchase preflights at actual time, original source
+  deadlines, durable successful snapshot reuse/acknowledgements, context/action
+  invalidation and explicit Refresh. No timer or automatic transaction is added.
+- Settle cold history before short-lived financial reads, and repair only an
+  initial acquisition that never produced usable facts. Change the points source
+  to Futmondo and remove its two redundant information headings.
+- Focused session/expiry/freshness/persistence/manual-safety, phone/desktop browser
+  and required offline lifecycle checks and performance findings are recorded in
+  `data_review_results.md`. No new capability, schema, dependency or environment
+  setting. Hosted deployment and authenticated latency acceptance remain separate.
