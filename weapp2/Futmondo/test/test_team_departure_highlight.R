@@ -41,7 +41,7 @@ updates<-list();enrichments<-0L;original_average<-add_recent_points_average
 add_recent_points_average<-function(...){enrichments<<-enrichments+1L;original_average(...)}
 updateReactable<-function(outputId,data=NULL,...){if(!is.null(data))updates[[length(updates)+1L]]<<-list(data=data,args=list(...));invisible(NULL)}
 getReactableState<-function(outputId,name,session){switch(name,page=1L,pageSize=20L,selected=NULL,NULL)}
-settle<-function(session)for(i in 1:8){later::run_now(0);session$flushReact()}
+settle<-function(session){session$elapse(350);for(i in 1:8){later::run_now(0);session$flushReact()}}
 shiny::testServer(players_table_Server,args=list(players_table_RV=source_rows,user_teams_RV=function()NULL,
  own_squad=TRUE,departing_player_ids=shiny::reactive(clause_departure_round_state(source_transfers(),round())$excluded_ids)),{
  settle(session);initial<-output$players_table;schema<-table_schema();before<-enrichments

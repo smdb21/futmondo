@@ -4,7 +4,7 @@ suppressPackageStartupMessages(source('global.R'))
 check<-function(label,expr){force(expr);cat('PASS',label,'\n')}
 selected_player_Server<-function(...)NULL
 recent_player_points_source<-function(...)list(history=function()data.frame(),status=function()NULL)
-settle<-function(session)for(i in 1:10){later::run_now(0);session$flushReact()}
+settle<-function(session){session$elapse(350);for(i in 1:10){later::run_now(0);session$flushReact()}}
 check('championship own-team checkbox exists, starts unchecked, and is absent from other tables',{
  html<-as.character(players_in_championship_UI('all'));id<-'all-championship_players_table-show_my_team_filter'
  input<-regmatches(html,regexpr(paste0('<input[^>]*id="',id,'"[^>]*>'),html))

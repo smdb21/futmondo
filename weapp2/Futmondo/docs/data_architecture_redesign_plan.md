@@ -1926,3 +1926,15 @@ background job or transaction is introduced.
 - [ ] Observe the user's authenticated browser interaction; source rollout and synthetic replays do not claim access to that private session.
 
 This root-cause fix is implemented locally and its production source rollout is verified within the existing factual data scope. No new capability/login-tier entry, database migration, dependency, environment setting, acquisition worker or transaction is introduced.
+
+
+## Multiple position filters — implemented and verified locally 2026-11-16
+
+- Shared player tables support multiple primary/secondary positions, default All,
+  automatic All/concrete mutual exclusion and reset-to-All when cleared.
+- Position filtering waits for a 300 ms pause and reuses existing enriched data.
+- Exit checks passed: focused R regressions, both layouts at 320/390/1440 px in
+  both themes, and the required offline Shiny lifecycle harness. Official-source
+  comparison and the existing Essentials login description are updated.
+- No migration or new acquisition/persistence path. Production deployment and
+  authenticated acceptance are separate from these completed local checks.

@@ -4254,3 +4254,37 @@ Performance review: two existing shared prerequisite readers replace competing o
 Production read-only aggregate metadata showed successful current-context roster/history snapshots; no database or acquisition repair was needed to reproduce and fix this reader-lifetime defect. Browser/database replay checks are synthetic and do not access the user's private browser session or submit a live lineup. Application build/rollout and authenticated acceptance are distinct from these completed local checks.
 
 After push, `https://ligaradar.com/lineup-departure-runtime.json?commit=50302b9` returned behavior `shared-departure-prerequisites` and both SHA-256 values exactly matching the committed `server.R` and shared transfer module. The automatic production source rollout is verified. Authenticated user-session acceptance remains separate. This follow-up records deployment evidence only and has no runtime or performance effect; no additional performance test is required.
+
+
+## Multiple position filters and debounce — 2026-11-16
+
+Implemented in the shared table component for every existing Position filter.
+All/concrete selection normalization is immediate in Selectize; the server
+debounces the actual position filter for 300 ms. Several positions match either
+primary or secondary role once per row; missing roles remain visible under All.
+
+Verification (synthetic data, no account access or live transactions):
+
+- `Rscript test/test_player_table_filters.R`: 13 checks pass, including both
+  default-All layouts, known-answer role unions, unknown roles, the exact 300 ms
+  idle boundary, rapid-selection coalescing and zero extra enrichment. A 524-row
+  multi-position pass averaged 0.686 ms over 1,000 repetitions locally.
+- Existing player metric colors (10), squad/own-team counts (8) and departure
+  highlighting (9) checks pass. Their mock clocks now advance through debounce.
+- `test/test_position_filters_browser.cjs` against its offline R fixture passes
+  both layouts at 320/390/1440 px, dark/light themes: mutual exclusion, successive
+  selections, primary/secondary union, debounce, clearing, reset and independent
+  table state. No page/control overflow, browser errors or visible Shiny errors;
+  heartbeat responses 63–93 ms. Inspected the mobile screenshots.
+- `Rscript test/test_shiny_simulation.R`: 13 checks plus eight tabs pass, with
+  no live HTTP/database mutation attempts. Existing synthetic Plotly warnings
+  remain. No dependency change or manifest regeneration is required.
+
+Performance review: position changes reuse enriched observations and existing
+durable database-backed resources. No API/database fan-out, persistence change,
+source invalidation, repeated history computation or polling is added. One
+bounded debounce per table coalesces redraws; filtering remains linear in loaded
+rows and the selection has at most four concrete roles. Native responsive chip
+wrapping handles mobile layouts. Documentation/login wording has no data-path
+effect. Browser/lifecycle checks establish local behavior; deployment and
+authenticated production acceptance were not performed in this task.

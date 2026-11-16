@@ -1,5 +1,21 @@
 library(reactable)
 
+# Keep All exclusive in the browser, before the selection reaches Shiny.
+players_table_position_filter_UI <- function(input_id) {
+  selectizeInput(inputId = input_id, label = "Position",
+    choices = c("All", "Goalkeeper", "Defender", "Midfielder", "Forward"),
+    selected = "All", multiple = TRUE, width = "100%",
+    options = list(closeAfterSelect = FALSE, onChange = I("function() {
+      var selected = this.items.slice();
+      if (!selected.length) {
+        this.addItem('All');
+      } else if (selected.length > 1 && selected.indexOf('All') !== -1) {
+        this.setValue(selected[selected.length - 1] === 'All' ? ['All'] :
+          selected.filter(function(value) { return value !== 'All'; }));
+      }
+    }")))
+}
+
 players_table_UI <- function(id, box_title = NULL,
                              solidHeader = TRUE,
                              status = "primary",
@@ -81,7 +97,7 @@ players_table_UI <- function(id, box_title = NULL,
           column(width = 7,
                  filter_panel(
                     if (filter_by_position) {
-                      column(width = if(!filter_by_team&&!filter_by_value&&!filter_by_change_value)12 else 4, div(title = "Filter players by primary or secondary position (Goalkeeper, Defender, Midfielder, Forward)", selectInput(inputId = ns("position_filter"), label = "Position", choices = c("All", "Goalkeeper", "Defender", "Midfielder", "Forward"), selected = "All", width = "100%")))
+                      column(width = if(!filter_by_team&&!filter_by_value&&!filter_by_change_value)12 else 4, div(title = "Choose one or more primary or secondary positions. All includes every position.", players_table_position_filter_UI(ns("position_filter"))))
                     },
                     if (filter_by_team) {
                       column(width = 4, div(title = "Filter players by current user team owner or free agents", selectInput(inputId = ns("team_filter"), label = "User Team Owner", choices = c("All"), width = "100%")))
@@ -104,7 +120,7 @@ players_table_UI <- function(id, box_title = NULL,
       } else {
         filter_panel(
           if (filter_by_position) {
-            column(width = 3, div(title = "Filter players by primary or secondary position (Goalkeeper, Defender, Midfielder, Forward)", selectInput(inputId = ns("position_filter"), label = "Position", choices = c("All", "Goalkeeper", "Defender", "Midfielder", "Forward"), selected = "All", width = "100%")))
+            column(width = 3, div(title = "Choose one or more primary or secondary positions. All includes every position.", players_table_position_filter_UI(ns("position_filter"))))
           },
           if (filter_by_team) {
             column(width = 3, div(title = "Filter players by current user team owner or free agents", selectInput(inputId = ns("team_filter"), label = "User Team Owner", choices = c("All"), width = "100%")))
@@ -499,6 +515,9 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       meta
     })
 
+    # Coalesce position choices without delaying the visible selection chips.
+    position_filter <- shiny::debounce(reactive(input$position_filter), millis = 300)
+
     ## players_table_filtered_RV ----
     players_table_filtered_RV <- reactive({
       players_table <- players_table_enriched_RV()
@@ -509,11 +528,10 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
         shiny::validate(shiny::need(nzchar(own_team),"Loading your team…"),errorClass="fm-loading")
         players_table<-players_table[!as.character(players_table$owner_team_id)%in%own_team,,drop=FALSE]
       }
-      if (!is.null(input$position_filter)) {
-        if (input$position_filter != "All") {
-          players_table <- players_table %>%
-            dplyr::filter(role == input$position_filter | role2 == input$position_filter)
-        }
+      positions <- position_filter()
+      if (length(positions) && !"All" %in% positions) {
+        players_table <- players_table %>%
+          dplyr::filter(role %in% positions | role2 %in% positions)
       }
       if (!is.null(input$team_filter)) {
         if (input$team_filter != "All") {

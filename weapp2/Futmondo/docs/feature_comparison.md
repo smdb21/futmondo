@@ -139,3 +139,18 @@ prices matching the social series, and all 133 values/dates in the corrected
 Plotly output. This resolves the initial payload-export verification blocker.
 The deployed browser chart is still unverified. See the player-card contract
 and dated review for evidence and limits.
+
+
+## Multiple position filters — reviewed 2026-11-16
+
+Rechecked the [official app feature guide](https://magazine.futmondo.com/novedades-en-la-nueva-app-de-futmondo/)
+(published 2021-12-23) on 2026-11-16. It documents market table views, squad
+inspection and multiposition players. It does not specify the current Position
+control's multi-selection, All-exclusion or debounce behavior. The authenticated
+official UI was not inspected; undocumented behavior is not claimed absent.
+
+LigaRadar expands the existing Essentials `scouting_filters` entry: shared player
+tables accept several primary/secondary positions together, start at All, keep
+All exclusive, and apply choices after a 300 ms pause. The existing login entry
+now says “multiple positions.” This extends the existing filter capability; it
+adds no separate tier item or exclusivity claim. Contract: `players_table_module.md`.

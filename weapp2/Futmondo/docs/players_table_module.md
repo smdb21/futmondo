@@ -348,3 +348,26 @@ missing values, metric domains, row identity, filtering, recent-N changes and
 R-formatted cell updates retain their existing behavior. The snapshot is bounded
 by the loaded table and reuses the existing shared observations; it introduces no
 API/database request, timer, persistent cache or source invalidation.
+
+
+## Multiple position selections and debounce — 2026-11-16
+
+`players_table_position_filter_UI(input_id)` supplies both shared table layouts
+with one multi-select Position control. Today, Market, Players, My Team and rival
+squads therefore share the same behavior. **All** is selected initially; selecting
+a concrete position removes All, and selecting All removes every concrete
+selection. Clearing the final chip restores All. Clear Filters also selects All.
+The control keeps its dropdown open for successive choices and wraps its chips
+within its existing responsive width.
+
+`players_table_Server()` debounces only position selections for 300 ms. Chips
+change immediately, while the table uses the last settled selection until the
+user pauses. The filter matches the union of selected positions against `role`
+and `role2`, retaining each source row once. All includes unknown/missing roles;
+concrete choices do not match unknown roles. Other filters still apply normally.
+
+Position changes reuse enriched rows and existing durable source observations;
+they add no API/database requests, acquisitions, cache invalidations or writes.
+The existing persistence/context/freshness contracts are unchanged. One bounded
+debounced reactive per table replaces the direct position-input dependency; no
+polling timer, dependency, environment variable or schema change is introduced.

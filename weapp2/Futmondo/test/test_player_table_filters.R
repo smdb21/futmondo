@@ -4,7 +4,7 @@ suppressPackageStartupMessages(source('global.R'))
 selected_player_Server<-function(...)NULL
 recent_player_points_source<-function(...)list(history=function()data.frame(),status=function()NULL)
 n<-0L;check<-function(name,expr){force(expr);n<<-n+1L;cat('PASS',name,'\n')}
-settle<-function(session){for(i in seq_len(8)){later::run_now(0);session$flushReact()}}
+settle<-function(session){session$elapse(350);for(i in seq_len(8)){later::run_now(0);session$flushReact()}}
 # Native source rows need not contain derived isClause or an optional lock date.
 source_rows<-shiny::reactiveVal(data.frame(id=c('free','owned'),name=c('Free','Owned'),role='defensa',value=1e6,
   clause_price=2e6,clause_transferred=FALSE,computer=c(TRUE,FALSE),userteamId=c('','rival')))
@@ -51,6 +51,43 @@ check('both table layouts omit the minimum valuation control',{
   stopifnot(!grepl('min_value_filter',html,fixed=TRUE),grepl('max_value_filter',html,fixed=TRUE))
  }
 })
+check('both layouts provide a default-All multiselect position input',{
+ for(breakdown in c(FALSE,TRUE)){
+  html<-htmltools::renderTags(players_table_UI('multi',show_position_breakdown=breakdown))$html
+  control<-regmatches(html,regexpr('<select[^>]*id="multi-position_filter"[^>]*>',html))
+  stopifnot(grepl('multiple',control,fixed=TRUE),grepl('<option value="All" selected>All</option>',html,fixed=TRUE))
+ }
+})
+position_rows<-data.frame(id=c('gk','def','mid','fwd','dual','unknown'),name=c('Keeper','Defender','Midfielder','Forward','Dual','Unknown'),
+ role=c('Goalkeeper','Defender','Midfielder','Forward','Midfielder',NA),role2=c('',NA,'Defender','','Forward',NA),value=1e6)
+enrichments<-0L;original_average<-add_recent_points_average
+add_recent_points_average<-function(...){enrichments<<-enrichments+1L;original_average(...)}
+shiny::testServer(players_table_Server,args=list(players_table_RV=function()position_rows,
+ user_teams_RV=function()NULL,optional_ready=function()FALSE),{
+ settle(session);baseline<-enrichments
+ check('initial selection includes unknown positions and multiple choices match either role without duplicates',{
+  stopifnot(identical(players_table_filtered_RV()$id,position_rows$id))
+  session$setInputs(position_filter=c('Defender','Midfielder'));settle(session)
+  stopifnot(identical(players_table_filtered_RV()$id,c('def','mid','dual')))
+  session$setInputs(position_filter=c('Goalkeeper','Forward'));settle(session)
+  stopifnot(identical(players_table_filtered_RV()$id,c('gk','fwd','dual')))
+ })
+ check('rapid selections publish only after 300ms idle and reuse enriched observations',{
+  session$setInputs(position_filter='Defender');session$elapse(150)
+  stopifnot(identical(players_table_filtered_RV()$id,c('gk','fwd','dual')))
+  session$setInputs(position_filter=c('Defender','Forward'));session$elapse(299)
+  stopifnot(identical(players_table_filtered_RV()$id,c('gk','fwd','dual')))
+  session$elapse(1)
+  stopifnot(identical(players_table_filtered_RV()$id,c('def','mid','fwd','dual')),enrichments==baseline)
+ })
+ check('All and an uninitialized or cleared input include every row',{
+  for(selection in list('All',character(),NULL)){
+   session$setInputs(position_filter=selection);settle(session)
+   stopifnot(identical(players_table_filtered_RV()$id,position_rows$id))
+  }
+ })
+})
+add_recent_points_average<-original_average
 check('clause eligibility uses price, transfer state and UTC lock times',{
  now<-as.POSIXct('2026-11-01 12:00:00',tz='UTC')
  rows<-data.frame(clause_price=c(10,10,10,10,10,0,10,10),clause_transferred=c(FALSE,FALSE,FALSE,FALSE,TRUE,FALSE,NA,NA),
@@ -76,3 +113,7 @@ rows<-data.frame(id=paste0('p',seq_len(524)),name='Player',value=1e6,clause_pric
 elapsed<-system.time({normalized<-players_table_filter_fields(players_table_normalize_owner(rows));mask<-players_table_active_clause(normalized)&normalized$is_free_agent})[['elapsed']]
 stopifnot(all(mask));cat(sprintf('METRIC 524-row normalization/combined filter: %.3fs; %.1fKiB\n',elapsed,as.numeric(object.size(normalized))/1024))
 cat(sprintf('PLAYER TABLE FILTERS: %d passed / 0 failed\n',n))
+
+positions<-c('Defender','Forward');large<-position_rows[rep(seq_len(nrow(position_rows)),length.out=524),]
+elapsed<-system.time(for(i in seq_len(1000))filtered<-dplyr::filter(large,role %in% positions | role2 %in% positions))[['elapsed']]
+cat(sprintf('METRIC 524-row multiposition filter: %.3fms per pass over 1000 iterations\n',elapsed))

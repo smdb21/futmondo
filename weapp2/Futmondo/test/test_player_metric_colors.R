@@ -42,7 +42,7 @@ updateReactable<-function(outputId,data=NULL,...){if(!is.null(data))updates[[len
 getReactableState<-function(outputId,name,session){switch(name,page=1L,pageSize=5L,selected=NULL,NULL)}
 enrichments<-0L;original_average<-add_recent_points_average
 add_recent_points_average<-function(...){enrichments<<-enrichments+1L;original_average(...)}
-settle<-function(session){for(i in seq_len(5)){later::run_now(0);session$flushReact()}}
+settle<-function(session){session$elapse(350);for(i in seq_len(5)){later::run_now(0);session$flushReact()}}
 shiny::testServer(players_table_Server,args=list(players_table_RV=source_rows,user_teams_RV=shiny::reactive(NULL),points_ratio_basis='value'),{
  session$setInputs(recent_games_n=3L);settle(session)
  initial<-output$players_table;global_meta<-table_color_meta();before<-enrichments
