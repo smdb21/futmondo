@@ -1915,6 +1915,7 @@ background job or transaction is introduced.
 - [x] Give the source-time note and transfer reconciler one explicit root-owned prerequisite reader pair, with combined page activity and global/clause refresh ownership.
 - [x] Verify all entry orders, repeated navigation, missing/partial recovery, account/league isolation, successful saved-observation reuse, unchanged timestamps, draft retention and existing departure/save gates.
 - [x] Complete focused regressions, 390/1440px browser checks, performance review and the required offline lifecycle. See `data_review_results.md`.
-- [ ] Verify push-triggered deployment serves the two corrected source fingerprints; authenticated user-session acceptance remains separate.
+- [x] Verify push-triggered deployment serves both corrected source fingerprints from `50302b9` through `/lineup-departure-runtime.json`.
+- [ ] Observe the user's authenticated browser interaction; source rollout and synthetic replays do not claim access to that private session.
 
-This is a locally implemented root-cause fix within the existing factual data scope. No new capability/login-tier entry, database migration, dependency, environment setting, acquisition worker or transaction is introduced.
+This root-cause fix is implemented locally and its production source rollout is verified within the existing factual data scope. No new capability/login-tier entry, database migration, dependency, environment setting, acquisition worker or transaction is introduced.
