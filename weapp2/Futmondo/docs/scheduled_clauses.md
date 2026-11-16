@@ -59,3 +59,12 @@ Unused purchase ciphertext is deleted after the final outstanding schedule/recon
 After the owner captures a native closed-clause rejection, add its exact verified mapping and fixture, then remove the diagnostic UI/date bypass and unset the variable. A timeout requires reconciliation before another test. No automated test uses a real account or transaction.
 
 Apply the migration before enabling `FUTMONDO_CLAUSE_SCHEDULING_ENABLED=true`, then redeploy the existing Docker image. The default-off flag avoids using an uninstalled schema. Verify source rejection mapping, dispatch lag, restart recovery, overall helper RSS, manual-action latency, mobile rendering, and real database/API request budgets in a controlled hosted acceptance run. Local checks do not certify production migration, deployment, Contabo capacity or real purchase success.
+
+
+## Production database migration — 2026-11-16
+
+Applied the exact reviewed `scripts/migrations/20261115075411_scheduled_clause_purchases.sql` to project `ozhnextrcxxksswpnglt` through the Supabase migration tool. Production migration history records version `20261116161538`, name `scheduled_clause_purchases`. Source SHA256: `fc1f7b61ac53e2a62484aa8aeb42809d7617e2e546822c243a84a89c5209a91e`.
+
+Verified four RLS-enabled server-only tables, all 23 SECURITY INVOKER functions with fixed search paths and restricted execution grants, 11 valid indexes and the enabled `market_transactions` observation trigger. The service-role read smoke check used a synthetic absent account inside a rolled-back transaction; it made no Futmondo request or purchase. The empty due-job lookup used `clause_jobs_deadline` and measured 0.129 ms execution time (2.804 ms planning); this does not establish loaded scheduler throughput or opening-time lag.
+
+Database installation is complete. Set `FUTMONDO_CLAUSE_SCHEDULING_ENABLED=true` in Dokploy with the existing worker settings and redeploy to activate it. This task did not change deployment settings or execute the diagnostic. Actual closed-clause rejection mapping, removal of the temporary diagnostic and controlled hosted execution/restart/resource checks remain open.

@@ -1962,3 +1962,8 @@ This root-cause fix is implemented locally and its production source rollout is 
   lifecycle harness. The mobile screenshot and accessible trend label/focus were
   inspected. This is presentation-only, with no new feature, data path,
   dependency, schema change or migration; production acceptance is separate.
+
+
+### Scheduled-clause production database installation — 2026-11-16
+
+Completed the database exit criterion: applied the reviewed clause scheduling migration to production as `20261116161538_scheduled_clause_purchases` and verified all four tables, 23 server-only invoker functions, 11 indexes and the transfer trigger. A rolled-back service-role smoke check passed without a real account or purchase. Application flag/redeployment, captured native closed-clause rejection, diagnostic removal and controlled hosted execution/restart/capacity acceptance remain separate open criteria. See `docs/scheduled_clauses.md` and `docs/data_review_results.md`.

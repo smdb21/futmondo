@@ -4399,3 +4399,14 @@ background work or new assets are introduced. Existing mobile wrapping handles
 the labels. No additional performance benchmark is needed for these static
 elements; documentation has no runtime effect. Verification is local; no
 authenticated production acceptance was performed.
+
+
+## Scheduled-clause production SQL application — 2026-11-16
+
+The owner explicitly requested applying the existing migration. Matched the connected project `ozhnextrcxxksswpnglt` to its prior documented worker migrations, confirmed all eight prerequisite worker/transaction tables and no clause tables, and applied the unchanged reviewed script. Supabase migration history confirms `20261116161538`, `scheduled_clause_purchases`; source SHA256 `fc1f7b61ac53e2a62484aa8aeb42809d7617e2e546822c243a84a89c5209a91e`.
+
+Post-application catalog assertions passed: four tables have RLS and no anon/authenticated read/write privileges; all 23 functions use SECURITY INVOKER, restricted `public, pg_temp` search paths, no anon/authenticated EXECUTE, and service-role EXECUTE; all 11 indexes are valid; the authoritative transfer trigger is enabled. A service-role `clause_read()` smoke check for a synthetic absent account passed inside an explicitly rolled-back transaction. No real account, Futmondo API operation or purchase was used, and no deployment setting was changed.
+
+Security and performance advisors were captured before and after. No new WARN/ERROR findings were introduced. The four new [RLS-without-policy INFO entries](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy) are intentional: these tables deny browser roles and are accessed only by the bypass-RLS server role. Six new [unused-index INFO entries](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index) concern the newly installed queue indexes, which are retained for their defined lookup/recovery paths. Existing unrelated advisor findings remain unchanged.
+
+Performance review: production `EXPLAIN (ANALYZE,BUFFERS)` of the empty due-job lookup selected `clause_jobs_deadline`, read one shared buffer hit, wrote none, and measured 0.129 ms execution plus 2.804 ms planning. This verifies installation/index use, not loaded queue throughput, host capacity or execution lag. No source collection, new schedules or timers were started by the migration verification. The documentation-only delivery has no additional runtime request, cache or rendering cost; no dependency/source change requires manifest regeneration or another lifecycle run. The earlier isolated SQL17, Python13, worker38, lifecycle13+eight tabs and browser checks remain the implementation evidence. Feature activation/redeployment, native rejection capture/mapping, temporary-diagnostic removal and controlled hosted execution/restart/resource acceptance remain open.
