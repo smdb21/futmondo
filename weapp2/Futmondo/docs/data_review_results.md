@@ -4191,6 +4191,11 @@ remain retryable. The plot changes only layout fields and three tick labels;
 no points/valuation transformation or source request is added. Extra bottom space
 slightly reduces the drawable plot height and is verified on narrow screens.
 Documentation changes have no runtime effect. No dependency, environment setting,
-new product capability/login entry or schema migration is required. Production
-code fingerprint verification follows push; an authenticated private browser
-interaction is not claimed by the read-only source replay or synthetic tests.
+new product capability/login entry or schema migration is required.
+
+After push, `https://ligaradar.com/player-card-runtime.json?commit=ed74995`
+returned all five source fingerprints matching the committed blobs, including
+the corrected selected-player parser and date-axis layout. Production source
+rollout is verified. This follow-up is documentation-only with no runtime or
+performance effect. An authenticated private browser interaction is not claimed
+by the read-only source replay, public fingerprint check or synthetic tests.

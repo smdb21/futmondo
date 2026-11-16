@@ -1900,8 +1900,10 @@ expiry-driven card behavior; deployment and private-account acceptance are separ
 - [x] Validate actual-source replay, minimized field-contract negatives,
   table-to-card mobile/desktop readiness, chart geometry/themes/source retention,
   persistence and the required offline lifecycle. Results: `data_review_results.md`.
-- [ ] Verify the new deployed source fingerprint after push; private browser
-  acceptance remains separate from the actual-source and synthetic UI replays.
+- [x] Verify production serves all five source fingerprints from `ed74995`,
+  including the corrected parser and vertical abbreviated-month date labels.
+- [ ] Observe the user's authenticated browser interaction; actual-source and
+  synthetic UI replays above do not claim access to that private session.
 
 No new capability, login-tier entry, dependency, environment variable, schema,
 background job or transaction is introduced.
