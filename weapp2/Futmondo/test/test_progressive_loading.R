@@ -11,7 +11,7 @@ check('initial card shell has no chart widget dependency',{
 auth<-c(token='synthetic-only',userid='progressive-fixture',user_name='Example')
 # Delayed promises exercise real shared-resource scheduling, without live I/O.
 pending<-new.env(parent=emptyenv());calls<-character()
-async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is_current=function()TRUE){
+async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is_current=function()TRUE,...){
  key<-paste(fn,context$player_id,sep=':');calls<<-c(calls,key)
  promises::promise(function(resolve,reject){pending[[key]]<-list(resolve=resolve,reject=reject,current=is_current)})
 }
@@ -25,7 +25,7 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
  check('identity and safe eligibility display while all sources are pending',{
    stopifnot(grepl('Immediate Player',output$player_identity_summary$html,fixed=TRUE),
      sum(gregexpr('Checking availability',output$action_buttons$html,fixed=TRUE)[[1]]>0)==1L,
-     identical(card_states$summary()$status,'loading'),length(calls)==6L,!card_chart_ready())
+     identical(card_states$summary()$status,'loading'),length(calls)==5L,!card_chart_ready())
  })
  check('chart waits for the current browser identity paint acknowledgment',{
    generation<-as.character(card_paint_generation())
@@ -37,7 +37,7 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
  pending[['get_player_summary:p1']]$resolve(summary);settle(session)
  check('summary points render before stored history or profile resolves',{
    html<-output$recent_round_points$html
-   stopifnot(grepl('-2 pts',html,fixed=TRUE),grepl('Loading match details',html,fixed=TRUE),
+   stopifnot(grepl('-2 pts',html,fixed=TRUE),!grepl('Match association unavailable',html,fixed=TRUE),
      identical(card_states$profile()$status,'loading'),!any(grepl('read_card_round_history',calls)))
  })
  pending[['get_lineup_from_team:']]$resolve(list(pointSystem='fixture'));settle(session)
@@ -65,8 +65,8 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
  pending[['read_card_round_history:p1']]$resolve(data.frame())
  pending[['read_card_price_history:p1']]$resolve(data.frame());settle(session)
  selected(NULL);settle(session)
- check('closing the card makes pending composite work obsolete',{
-   stopifnot(!pending[['get_team_acquisition_capacity:']]$current())
+ check('closing the card cancels player consumers and retains shared team work',{
+   stopifnot(!pending[['get_player_matches:p1']]$current(),pending[['get_team_acquisition_capacity:']]$current())
  })
  before<-calls
  selected(data.frame(id='p1',name='Immediate Player',role='defensa',team='Club A',photo='fixture',value=1000,change=0,points=8,user_team_id='',price=1000,market_inMarket=TRUE));settle(session)
@@ -81,15 +81,17 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
    raw<-list(summary=list(key='player_summary_fixture_league_team_p1',ctx=base),
      lineup=list(key='lineup_league_team',ctx=resource_context(auth,'league','team')),
      matches=list(key='player_matches_p1',ctx=resource_context(auth,player_id='p1')),
+     profile=list(key='player_full_profile_p1',ctx=resource_context(auth,player_id='p1')),
      unrelated=list(key='player_summary_fixture_league_team_p2',ctx=resource_context(auth,'league','team','p2')))
    for(item in raw)resource_store(api_cache_key(item$key,context=item$ctx),list(fixture=TRUE),item$ctx,item$key)
    before<-calls;session$setInputs(refresh_history=1);settle(session)
    stopifnot(!exists(api_cache_key(raw$summary$key,context=base),api_cache_env,inherits=FALSE),
      !exists(api_cache_key(raw$lineup$key,context=raw$lineup$ctx),api_cache_env,inherits=FALSE),
      !exists(api_cache_key(raw$matches$key,context=raw$matches$ctx),api_cache_env,inherits=FALSE),
+     !exists(api_cache_key(raw$profile$key,context=raw$profile$ctx),api_cache_env,inherits=FALSE),
      exists(api_cache_key(raw$unrelated$key,context=raw$unrelated$ctx),api_cache_env,inherits=FALSE))
    added<-tail(calls,length(calls)-length(before))
-   stopifnot(!any(grepl('get_player_full_profile|get_team_acquisition_capacity|get_my_market_players',added)))
+   stopifnot(sum(grepl('get_player_full_profile',added))==1L,!any(grepl('get_team_acquisition_capacity|get_my_market_players',added)))
  })
 })
 # Login checks exercise pending duplicate protection and a superseded response.

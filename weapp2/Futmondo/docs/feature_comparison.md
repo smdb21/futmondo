@@ -115,3 +115,24 @@ It preserves the existing transaction capability, freshness requirements and
 manual confirmation/preflight behavior. This is a loading/persistence refinement,
 not a new analytical or automated feature, so no login-tier item is added.
 See `player_availability.md` and the measured limits in `data_review_results.md`.
+
+
+## Player valuation-history repair — reviewed 2026-11-15 Pacific
+
+Rechecked the [official app guide](https://magazine.futmondo.com/novedades-en-la-nueva-app-de-futmondo/)
+(published 2021-12-23) on 2026-11-15. Existing local official-app response captures
+provide more specific price evidence: `/1/player/summary` has seven dated
+`price` rows; `/1/player/fullprofile` has 71 dated `social`/`classic` rows in the
+same captured player flow. All seven overlapping summary prices equal that
+profile's social values. These response shapes were replayed offline; they do
+not establish current history length for every player or an exhaustive current
+UI specification.
+
+LigaRadar's existing combined points/valuation chart now consumes that longer
+source curve after verifying its context and valuation type, with durable
+historical reuse and a working profile refresh. This repairs the existing
+history feature; ordinary player price history is an official shared capability,
+so there is no new exclusive capability or login-tier entry. Dani Lorenzo's
+current encoded source payload and the hosted repaired chart were not inspected;
+automatic approval review rejected the payload export. See the player-card
+contract for exact evidence and limits.

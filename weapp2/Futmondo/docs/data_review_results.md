@@ -3777,3 +3777,82 @@ seven staged runtime checksums match the staged source blobs.
 No production deployment, real-account operation, live transaction, production
 latency measurement or hosted acceptance is claimed. Unrelated working changes
 are preserved. Documentation has no runtime performance effect.
+
+
+## Dani Lorenzo / full player valuation-history repair — 2026-11-15 Pacific
+
+Root causes: the chart assembled only seven-day player-summary prices and saved
+current-price observations, ignoring the already requested full-profile curve.
+Card Refresh omitted the full profile, and a pending read surviving a previous
+opening could coalesce with Refresh before reusing an obsolete completion. The
+price DB resource also used the general card context instead of resolved history
+context. Read-only hosted metadata found 627 Dani Lorenzo price snapshots from
+2026-08-16 through 2026-11-16 UTC, all with unknown competition/season, and a
+successful full-profile worker snapshot. Those unscoped historical observations
+were retained without relabelling. Automatic approval review rejected export of
+the encoded profile payload as private data; no workaround, source account,
+transaction, production database write or deployment was used.
+
+The card now consumes context-checked full-profile curves, verifies all exact-date
+overlap prices against social/classic values and any explicitly reported divider,
+and keeps mismatches/ambiguity truthful. Raw price curves and source metadata
+persist via the existing server-only immutable evidence store and acknowledged
+queue, with exact context keys, 5,000-row/220-KiB limits and no authentication
+material. A scoped latest-view read restores them before the live profile;
+shorter responses retain older prices and their original observation clocks.
+Refresh evicts both inner and outer profile resources and now includes that
+existing full-profile read. No separate source-history endpoint, worker
+job/cadence, transaction, schema, dependency or setting is added.
+
+Executed checks:
+
+- `test_player_valuation_history.R`: 14 groups. Known-answer 71 vs seven dates;
+  independently captured official price fields; social/classic/divider mapping;
+  identity, all seven scope dimensions, JSONB key ordering, signed/unknown
+  prices, ambiguous/missing overlap, exact fractional dates, partial/stale data,
+  database reuse after memory clearing, shorter responses, actual card arrival,
+  refresh and late-completion isolation.
+- `test_player_valuation_persistence.R`: real queue/adapter fixture. Identical
+  source-time payload retried after HTTP 503, acknowledged only after success,
+  duplicate acknowledged write skipped. Cold DB replay used two reads (empty
+  current-price history plus one scoped latest-snapshot lookup), zero Futmondo
+  reads, and a heartbeat during the injected 50ms total DB delay; local elapsed
+  0.44s including adapter initialization/replay.
+- `test_progressive_loading.R`: 16 checks, including profile inner-cache eviction,
+  outer pending-read refresh, preserved unrelated sources, reopening and loading.
+  Updated its fixture to accept the existing availability adapter's keyword
+  arguments, the existing hidden pending-detail presentation and shared team
+  request lifetime; no production availability policy changed.
+- `test_player_trend_plot.R`: 16 checks; `test_player_profile_endpoints.R`: six;
+  `test_player_history_incremental.R`: unchanged four-to-two incremental request
+  behavior and delayed responsive replay; independent history known-answer pass;
+  `test_history_persistence_recovery.R`: 11; `test_competition_history.R`: 15.
+- `test_player_trend_browser.cjs`: 320/390/1440px, four history modes and both
+  themes passed; no overflowing date labels, source/zoom/color loss, visible
+  Shiny/JavaScript errors or unresponsive heartbeat (74–85ms). Used the existing
+  local Chromium executable through a temporary launcher adapter because the
+  installed Playwright default browser revision was absent; no app dependency
+  changed.
+- Required `test_shiny_simulation.R`: 13 lifecycle checks and eight tabs passed,
+  with zero live HTTP/database mutation attempts.
+
+An additional `test_worker_card_updates.R` run fails its old exact summary-read
+count; the same failure is reproduced with the unchanged HEAD player module.
+That fixture predates the current shared availability flow. The focused actual
+card history/refresh checks above pass; this pre-existing fixture failure is
+reported without claiming it passed.
+
+Performance review: history reuses the already requested profile and existing
+bounded caches. It adds one limit-one DB snapshot lookup for resolved contexts,
+and one bounded immutable write per newly acquired eligible curve; duplicate
+payloads coalesce/skip through the existing queue, with failed writes retryable.
+A vectorized ISO-date parse keeps the 5,000-row transformation at 0.087–0.099s
+locally with about 581 KiB of returned data. The actual source fixture has 71
+prices; browser checks retain 124 prices. There is no per-second work, polling,
+new listener, broad cache invalidation or duplicate native profile acquisition.
+The independent profile still refreshes its current facts; stored historical
+replay does not pretend that old biographical data is current. Documentation has
+no runtime cost. Manifest entries include the new runtime helper and changed
+source hashes while preserving unrelated dependency edits. Hosted latency,
+production snapshot-save/readback and Dani's exact post-deployment chart remain
+unverified; the automatic-review export rejection limits that final replay.

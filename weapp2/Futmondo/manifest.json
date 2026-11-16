@@ -2285,6 +2285,9 @@
     "background_runtime.R": {
       "checksum": "eccfe9a4a0874f08d925132b7b7f9df9"
     },
+    "player_valuation_history.R": {
+      "checksum": "27b3a72204bd37b236072472eaf194d9"
+    },
     "player_availability.R": {
       "checksum": "6e259b3150337023b771123054dc6ee0"
     },
@@ -2316,7 +2319,7 @@
       "checksum": "fae2bbeb23335fe69729f675970cc655"
     },
     "history_repository.R": {
-      "checksum": "dbf34a55113ccaed5d6f0ed5efb7dbdf"
+      "checksum": "122956ae931ea2c6b562813c49672b4d"
     },
     "lineup_api.R": {
       "checksum": "04bc0bf2689b277b19c417e410d568d7"
@@ -2367,7 +2370,7 @@
       "checksum": "1a1dd575681a9df0bdfe04c72332e1f3"
     },
     "Modules/Selected_Player_Module.R": {
-      "checksum": "0d2e247665a938c65a22e4e3715ac7d2"
+      "checksum": "19639b61087ac7e5f610129f5b7d1e9d"
     },
     "Modules/Today_Module.R": {
       "checksum": "589e00cc033412df8a1cc0db1169dee2"

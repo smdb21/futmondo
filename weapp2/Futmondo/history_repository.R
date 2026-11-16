@@ -1,4 +1,5 @@
 # Scoped factual history; unknown dates and context remain explicit.
+source("player_valuation_history.R")
 history_context_filter<-function(rows,context){
   if(!is.data.frame(rows)||!nrow(rows))return(data.frame())
   keep<-rep(TRUE,nrow(rows))
@@ -142,9 +143,12 @@ read_history_incremental <- function(table,query,context=NULL,identity_fields,wa
   rows
 }
 read_card_price_history<-function(context,max_rows=5000L){
-  read_history_incremental("player_history",list(championship_id=paste0("eq.",context$championship_id),player_id=paste0("eq.",context$player_id),
+  rows<-read_history_incremental("player_history",list(championship_id=paste0("eq.",context$championship_id),player_id=paste0("eq.",context$player_id),
     competition_id=paste0("eq.",fm_scalar(context$competition_id,"unknown")),season=paste0("eq.",context$season),
     select="id,player_id,championship_id,competition_id,season,value,observed_at,recorded_at",order="recorded_at.asc,id.asc"),context=context,identity_fields="id",watermark_fields="recorded_at",max_rows=max_rows,cursor_fields=c("recorded_at","id"))
+  saved<-read_player_valuation_profile(context)
+  if(!is.null(saved)){if(is.null(rows))rows<-data.frame();attr(rows,"valuation_profile")<-saved}
+  rows
 }
 read_card_round_history<-function(context,max_rows=5000L){
   read_history_incremental("player_match_observations",list(championship_id=paste0("eq.",context$championship_id),player_id=paste0("eq.",context$player_id),
@@ -154,21 +158,26 @@ read_card_round_history<-function(context,max_rows=5000L){
     identity_fields=c("player_id","championship_id","competition_id","season","scoring_version","round","source_round_key","observed_at"),
     watermark_fields="observed_at",max_rows=max_rows,cursor_fields=c("round","source_round_key","observed_at"))
 }
-normalize_card_valuation<-function(stored,summary){
+normalize_card_valuation<-function(stored,summary,profile=NULL,context=NULL){
   live<-summary$prices
   if(is.list(live)&&!is.data.frame(live))live<-tryCatch(dplyr::bind_rows(live),error=function(e)data.frame())
   if(!is.data.frame(live))live<-data.frame()
   normalize<-function(rows,source){
     if(!is.data.frame(rows)||!nrow(rows))return(data.frame())
-    date<-rows$recorded_at %||% rows$date;value<-rows$value %||% rows$price
+    date<-if("recorded_at"%in%names(rows))rows$recorded_at else rows$date;value<-if("value"%in%names(rows))rows$value else rows$price
     if(is.null(date)||is.null(value))return(data.frame())
-    out<-data.frame(recorded_at=format(fm_time(date),"%Y-%m-%dT%H:%M:%OSZ",tz="UTC"),value=suppressWarnings(as.numeric(value)),source=source,observed_at=as.character(rows$observed_at %||% rep(NA_character_,nrow(rows))),stringsAsFactors=FALSE)
-    out[!is.na(fm_time(out$recorded_at))&is.finite(out$value),,drop=FALSE]
+    parsed<-player_valuation_time(date)
+    out<-data.frame(recorded_at=format(parsed,"%Y-%m-%dT%H:%M:%OS6Z",tz="UTC"),value=suppressWarnings(as.numeric(value)),source=source,
+      observed_at=if("observed_at"%in%names(rows))as.character(rows$observed_at)else rep(NA_character_,nrow(rows)),stringsAsFactors=FALSE)
+    out[!is.na(parsed)&is.finite(out$value),,drop=FALSE]
   }
-  rows<-dplyr::bind_rows(normalize(stored,"supabase"),normalize(live,"futmondo"))
-  if(!nrow(rows))return(data.frame(recorded_at=character(),value=numeric(),source=character(),observed_at=character()))
-  rows<-rows[order(fm_time(rows$recorded_at),rows$source=="futmondo"),,drop=FALSE]
-  rows[!duplicated(rows$recorded_at,fromLast=TRUE),,drop=FALSE]
+  extended<-player_profile_valuation(summary,profile,attr(stored,"valuation_profile"),context)
+  rows<-dplyr::bind_rows(normalize(stored,"supabase"),extended$rows,normalize(live,"futmondo"))
+  if(!nrow(rows)){empty<-data.frame(recorded_at=character(),value=numeric(),source=character(),observed_at=character());attr(empty,"valuation_note")<-extended$note;return(empty)}
+  rows<-rows[order(player_valuation_time(rows$recorded_at),rows$source=="futmondo"),,drop=FALSE]
+  rows<-rows[!duplicated(rows$recorded_at,fromLast=TRUE),,drop=FALSE]
+  attr(rows,"valuation_note")<-extended$note
+  rows
 }
 get_player_card_history<-function(login,championship_id,user_team_id,player_id,refresh=FALSE,season=NULL,scoring_version=NULL){
   base<-resource_context(login,championship_id,user_team_id,player_id)
@@ -183,7 +192,7 @@ get_player_card_history<-function(login,championship_id,user_team_id,player_id,r
     stored<-tryCatch(read_card_round_history(ctx),error=function(e)NULL);prices<-tryCatch(read_card_price_history(ctx),error=function(e)NULL)
     live<-if(!is.null(summary))normalize_player_match_observations(summary,player_id,championship_id,scoring_version=api_scoring,season=api_season,observed_at=attr(summary,"observed_at") %||% Sys.time(),competition_id=fm_scalar(ctx$competition_id,"unknown"))else data.frame()
     previous_points<-reconcile_player_points(stored,data.frame(),ctx)
-    points<-reconcile_player_points(stored,live,ctx);valuation<-normalize_card_valuation(prices,summary)
+    points<-reconcile_player_points(stored,live,ctx);valuation<-normalize_card_valuation(prices,summary,context=ctx)
     known<-ctx$season!="unknown"&&ctx$scoring_version!="unknown"&&fm_scalar(ctx$competition_id,"unknown")!="unknown"
     complete<-known&&isTRUE(summary$history_complete)&&!identical(attr(summary,"fetch_status"),"stale")&&isTRUE(attr(stored,"complete"))&&isTRUE(attr(prices,"complete"))
     list(summary=summary,points=points,previous_points=previous_points,valuation=valuation,context=ctx,source=unique(c(points$source,valuation$source)),status=if(is.null(summary)&&is.null(stored)&&is.null(prices))"unavailable" else if(!nrow(points)&&!nrow(valuation))"empty" else if(complete)"ok" else "partial",freshness=if(any(vapply(list(summary,stored,prices),function(x)identical(attr(x,"fetch_status"),"stale"),logical(1))))"stale" else "fresh",completeness=if(complete)"complete" else "partial",coverage=list(database_rounds=if(is.data.frame(stored))nrow(stored)else 0L,live_rounds=nrow(live),season_known=ctx$season!="unknown",scoring_known=ctx$scoring_version!="unknown"),reason=if(!known)"Season or scoring context is unknown; this history is kept separate from known contexts." else if(!complete)"Historical coverage is partial." else "")
@@ -191,13 +200,13 @@ get_player_card_history<-function(login,championship_id,user_team_id,player_id,r
 }
 
 # Pure assembly allows summary points to render before either stored history read.
-assemble_player_card_history <- function(summary,lineup,stored,prices,context) {
+assemble_player_card_history <- function(summary,lineup,stored,prices,context,profile=NULL) {
   api_season<-league_season_context(context$championship_id,summary$championship$season %||% summary$championship$seasonId,account_id=context$account_id)
   api_scoring<-normalize_league_rules(list(),lineup,context$championship_id)$scoring_version
   live<-if(!is.null(summary))normalize_player_match_observations(summary,context$player_id,context$championship_id,
     scoring_version=api_scoring,season=api_season,observed_at=attr(summary,"observed_at") %||% Sys.time(),competition_id=fm_scalar(context$competition_id,"unknown"))else data.frame()
   points<-reconcile_player_points(stored,live,context)
-  valuation<-normalize_card_valuation(prices,summary)
+  valuation<-normalize_card_valuation(prices,summary,profile,context)
   list(summary=summary,points=points,previous_points=reconcile_player_points(stored,data.frame(),context),
     valuation=valuation,context=context,status=if(!nrow(points)&&!nrow(valuation))"empty"else "partial",
     freshness=if(any(vapply(list(summary,stored,prices),function(x)identical(attr(x,"fetch_status"),"stale"),logical(1))))"stale"else "fresh")

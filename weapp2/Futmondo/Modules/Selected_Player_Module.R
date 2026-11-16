@@ -1865,8 +1865,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       req(sp,valid_login(auth))
       base<-resource_context(auth,get_reactive_val(championship_id),get_reactive_val(user_team_id),sp$id)
       invalidate_resources(base,pattern="^player_summary_|^player_card_history$")
+      invalidate_resources(base,resources="card_profile",notify_availability=FALSE)
       invalidate_resources(resource_context(auth,base$championship_id,base$user_team_id),pattern="^lineup_")
-      invalidate_resources(resource_context(auth,player_id=sp$id),pattern="^player_matches_")
+      invalidate_resources(resource_context(auth,player_id=sp$id),pattern="^player_matches_|^player_full_profile_")
     },ignoreInit=TRUE,priority=120)
     card_context <- reactive({
       league_context_revision()
@@ -1945,11 +1946,11 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       current_context=availability_team_context,mode=availability_mode,opening=availability_opening)
     availability_admitted<-function()player_card_is_own_player(selected_player(),get_reactive_val(user_team_id))||!is.null(manual_capacity_verification())
     card_states$lineup<-card_read("card_lineup","get_lineup_from_team",auth_args,context=team_card_context,active=availability_admitted)
-    card_states$profile<-card_read("card_profile","get_player_full_profile",function(ctx)list(login=get_reactive_val(login_token),player_id=ctx$player_id),refresh=global_refresh,active=availability_admitted)
+    card_states$profile<-card_read("card_profile","get_player_full_profile",function(ctx)list(login=get_reactive_val(login_token),player_id=ctx$player_id))
     card_states$matches<-card_read("card_matches","get_player_matches",function(ctx)list(login=get_reactive_val(login_token),player_id=ctx$player_id),active=availability_admitted)
     context_ready<-function()!identical(card_states$summary()$status,"loading")&&!identical(card_states$lineup()$status,"loading")
     card_states$points<-card_read("card_points","read_card_round_history",function(ctx)list(context=ctx),context=history_context,active=context_ready)
-    card_states$valuation<-card_read("card_valuation","read_card_price_history",function(ctx)list(context=ctx),active=availability_admitted)
+    card_states$valuation<-card_read("card_valuation","read_card_price_history",function(ctx)list(context=ctx),context=history_context,active=context_ready)
     capacity_context<-availability_team_context
     capacity_recheck<-reactiveVal(0L)
     capacity_recheck_context<-NULL;capacity_rechecks<-0L;last_worker_summary<-NULL
@@ -2043,10 +2044,15 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       ctx<-history_context()
       if(is.null(ctx))return(list(summary=NULL,points=data.frame(),valuation=data.frame(),status="loading"))
       result<-assemble_player_card_history(card_states$summary()$data,card_states$lineup()$data,
-        card_states$points()$data,card_states$valuation()$data,ctx)
+        card_states$points()$data,card_states$valuation()$data,ctx,profile=card_states$profile()$data)
       states<-lapply(card_states[c("summary","lineup","points","valuation")],function(read)read())
       if(any(vapply(states,function(state)identical(state$status,"loading"),logical(1))))result$status<-"loading"
       result
+    })
+    observe({
+      ctx<-history_context();profile<-card_states$profile()$data
+      if(!is.null(ctx)&&!is.null(profile))persist_player_valuation_profile(profile,ctx,
+        previous=attr(card_states$valuation()$data,"valuation_profile"))
     })
     observe({
       history<-card_history()
@@ -2433,7 +2439,7 @@ player_trend_information <- function(history, player, matches=data.frame()) {
   if(!is.data.frame(values)||!all(c("recorded_at","value")%in%names(values)))values<-data.frame()
   if(nrow(values))values<-values[!is.na(fm_time(values$recorded_at))&
     is.finite(suppressWarnings(as.numeric(values$value))),,drop=FALSE]
-  notes<-character()
+  notes<-attr(history$valuation,"valuation_note") %||% character()
   if(!nrow(values))notes<-c(notes,paste0("Valuation history unavailable. Current value: ",player_card_money(player$value)))
   if(!nrow(points))notes<-c(notes,recent_round_points_empty_text(player$points))
   if(nrow(points)&&nrow(values)&&anyNA(player_trend_points_dates(points,matches,history$context %||% list())))

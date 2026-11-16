@@ -170,3 +170,68 @@ Manual confirmation generations and independent submission preflights remain
 unchanged. Full interfaces, bounds, payloads, invalidation and timing stages:
 [player availability](player_availability.md). Executed verification and limits:
 [data review results](data_review_results.md).
+
+
+## Full source valuation history — 2026-11-15 Pacific
+
+The combined chart now passes the already requested full-profile response into
+`assemble_player_card_history(..., profile=NULL)` and
+`normalize_card_valuation(stored, summary, profile=NULL, context=NULL)`. A captured
+native summary has seven price dates, whereas its full profile has 71. Previously
+only the summary and current-price observations reached the chart. The profile
+panel's latest value did not imply that its older prices were charted.
+
+`player_valuation_history.R` owns the longer curve's normalization and durable
+reuse. `player_valuation_profile()` whitelists player identity, source competition
+and season, dated social/classic values, per-row source observation clocks and
+returned-row completeness. It rejects contradictory identities, invalid source
+clocks and more than 5,000 rows. Completeness describes the returned source rows,
+not proof that every day of the season exists. Invalid rows remain partial;
+missing prices never become zero.
+
+`player_profile_valuation()` merges saved and current source rows by exact source
+date and observation clock. It verifies social/classic selection against every
+finite overlapping summary price, using direct values or the source's explicit
+positive divider. It never fits an arbitrary ratio. Contradictory/missing context,
+no overlap, a mismatch or differing historical curves with an ambiguous mode
+leave the longer curve unmerged and retain a specific diagnostic. Exact source
+values and dates are preserved; current summary prices take precedence on shared
+dates. Points and scoring provenance are unchanged.
+
+`persist_player_valuation_profile()` records successful already-fetched price
+curves in the existing server-only `rival_finance_evidence` table, under an
+`eligibility` payload with `kind=player_valuation_profile`, `format=1`, `scope` and
+`profile`. The reserved `rival-cache:player-valuation:v1:<hash>` source ID excludes
+these snapshots from financial evidence queries. Scope contains account, fantasy
+league, team, player, competition, season and scoring version. The profile keeps
+original source dates, observation clocks, mode columns, freshness and partial
+metadata. No token, header or authentication state is stored. Shorter new
+responses retain saved older prices and their original observation clocks.
+
+The existing bounded asynchronous persistence queue uses an immutable source-time
+conflict key and ignore-on-conflict. Only acknowledged writes are reusable as
+database results; failed/unacknowledged writes remain retryable. Payloads are
+limited to 220 KiB. `read_player_valuation_profile()` makes one scoped, limit-one
+lookup in the existing latest-evidence view. `read_card_price_history()` attaches
+it as `attr(result, "valuation_profile")`, preserving its existing current-price
+baseline and completeness metadata. The card's read now uses resolved history
+context. Saved curves render before the current profile arrives and survive
+memory resets. The independent profile resource still acquires current profile
+facts under the existing source/worker policy. No separate price-history endpoint
+is requested; explicit Refresh now includes the existing full-profile read.
+
+**Refresh history** now invalidates both the full-profile inner cache and its
+outer card resource, including obsolete pending reads from a prior opening, and
+advances the profile's refresh revision. Profile history no longer waits for
+purchase availability. Refresh retains account/player isolation, and closing the
+card rejects late profile completion. In Background sync mode the existing
+worker provider continues to replay durable source observations; no new worker
+job, cadence, purchase or bypass is added.
+
+Dani Lorenzo's hosted metadata showed 627 current-price observations dating back
+to August 16, all with unknown season/competition, plus a successful full-profile
+worker snapshot. These old observations are not silently assigned to today's
+season. The longer authoritative profile is used instead when its identities
+and price mapping pass. Export of Dani's encoded snapshot was rejected by
+automatic approval review; his exact source payload and hosted post-deployment
+chart therefore remain unverified. See the dated review and regression results.

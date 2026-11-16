@@ -1820,3 +1820,16 @@ Production deployment and authenticated hosted acceptance remain separate.
 - Local exit checks, timings and limits are recorded in `data_review_results.md`;
   implementation contract: `player_availability.md`. Production deployment,
   real-account timing and authenticated hosted acceptance are not claimed.
+
+
+## Full player valuation history and card refresh — 2026-11-15 Pacific
+
+- [x] Trace the seven-day chart to its summary/database-only assembly, disconnected full-profile curve and omitted full-profile refresh; inspect Dani Lorenzo's saved metadata without transactions.
+- [x] Connect source-dated full-profile prices, verify player/competition/season and social/classic/divider mapping against the actual summary, and retain truthful ambiguity/partial diagnostics.
+- [x] Persist bounded factual curves with original source clocks through the existing acknowledged database queue; restore them before live profile completion and retain older saved prices after a shorter response.
+- [x] Scope price reads to resolved history context, refresh inner/outer profile resources, and reject obsolete opening responses without purchase-availability dependencies.
+- [x] Focused known-answer, official-capture, asynchronous persistence/replay, scope, refresh, loading, mobile/desktop chart and offline lifecycle checks; performance review in `data_review_results.md`.
+- [ ] Hosted acceptance of Dani Lorenzo after deployment. His exact encoded worker payload could not be exported because automatic approval review rejected it. Unscoped legacy current-price records remain separate; no historical season is invented.
+
+Contracts: [player card](selected_player_module.md). No schema, dependency,
+environment setting, source-collection cadence or transaction change.
