@@ -1,5 +1,12 @@
 # Futmondo data architecture redesign plan
 
+## Title-free information notes — 2026-11-16
+
+- [x] Remove redundant generated source headings through the shared page/dialog registry; review note producers across the app and retain meaningful message context.
+- [x] Preserve timestamps, separators, error severity, Retry controls, output identity, context reset and pending/empty behavior.
+- [x] Focused responsive browser checks, nine-page app audit, required offline lifecycle and proportionate performance review; record executed results in `data_review_results.md`.
+- [ ] Hosted acceptance after deployment. No new capability, source request, database/persistence change, dependency or environment variable.
+
 ## Coach icon and account summary placement — 2026-11-15 Pacific
 
 - [x] Place the coach status information icon beside Automatically hire coach, with expanded details below.

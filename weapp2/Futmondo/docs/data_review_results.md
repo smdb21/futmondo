@@ -1,5 +1,41 @@
 # Futmondo data review and implementation results
 
+## Title-free information notes — 2026-11-16
+
+Removed source-heading inference and label insertion from the shared browser
+registry, including its label bookkeeping and CSS. All page/dialog notes now
+show their original content directly. Reviewed the shared note producers across
+Today, My Team, Players/cards/history, Rivals, standings/lineups, awards, charts,
+notifications, preferences, Login and Admin. Source clocks, coverage messages,
+errors, Retry controls and meaningful field labels remain intact. Non-visible
+explicit source metadata remains available. This is a presentation reduction,
+with no new feature or login-inventory/comparison change.
+
+Executed verification:
+
+- `Rscript test/test_page_information.R`: both groups pass, including eleven page panels, visible action validation and context republication.
+- `node test/test_page_information.cjs` with existing Chromium in `/tmp/futmondo-browsers`: six layouts pass (320/390/1440px, light/dark). Asserts no generated titles before/after updates and in dialogs, original message text, severity/recovery, Retry binding, pending/empty states, removal, context reset and keyboard toggling. No overflow, browser errors or external requests; zero source/database attempts. Inspected the expanded 390px dark error-panel screenshot.
+- `node test/test_page_information_app.cjs` against `Rscript test/test_browser_app.R`: all nine main pages pass at 320/390/1440px with populated panels, no generated titles, no overflow and no browser errors. Deterministic offline account only.
+- `Rscript test/test_shiny_simulation.R`: 13 checks plus eight tabs pass; zero HTTP/live database mutation attempts.
+
+Performance review: removes one label node and its creation, heading/category
+lookup and stored reference per grouped note. API/database volume, durable
+successful observation reuse, cache invalidation, source freshness/completeness,
+reactive outputs, timers and acquisition concurrency are unchanged. The registry
+retains its existing coalesced local updates and pruning. Browser mutation gaps
+were 10–14ms and Shiny heartbeats 57–71ms in the six-layout fixture. Message
+rendering occupies fewer lines on phones. No dependencies, schema, configuration
+or environment variables changed. Only affected deployment asset checksums need
+updating (the scoped asset hashes are updated in this commit). These are local synthetic results; hosted deployment and authenticated
+production appearance remain unverified. Unrelated working-tree edits are
+preserved and excluded from the task commit.
+
+Final isolated verification of the exact staged application also passed the six
+responsive browser layouts, both focused R groups, all three deployment contract
+checks, matching changed-asset checksums and the required 13-check/eight-tab
+offline lifecycle. Isolated browser heartbeats were 54–71ms with 10–13ms mutation
+gaps and zero acquisition attempts.
+
 ## Coach icon and account summary placement — 2026-11-15 Pacific
 
 The coach status icon shares a row with Automatically hire coach. Expanded native

@@ -48,27 +48,6 @@
     scopes.set(root, panel);
     return panel;
   }
-  function sourceLabel(node, origin) {
-    if (node.hasAttribute('data-fm-info-source')) return node.dataset.fmInfoSource;
-    const owner = origin.closest('[id].shiny-html-output, [id].shiny-text-output, [id].shiny-bound-output');
-    const id = owner ? owner.id : '';
-    const labels = [
-      [/round_finance/, 'Balance and active offers'], [/round_countdown/, 'Round schedule'],
-      [/worker|background_sync/, 'Background sync'], [/coach/, 'Coach'],
-      [/startup/, 'Startup'], [/timezone/, 'Timezone'], [/league_preference/, 'League preference'],
-      [/page_preference/, 'Page preference'], [/remember/, 'Remembered login'],
-      [/transfer_coverage|recent_transfers/, 'League transfers'], [/incoming/, 'Incoming signings'],
-      [/outgoing/, 'Departing players'], [/received_offer/, 'Received offers'],
-      [/market_prices|market_status/, 'Market data'], [/history|round_points/, 'Player history'],
-      [/chart|plot|standings_status|values_status|cash_status|rank_status|owned_club_status/, 'Chart details'],
-      [/classification|lineup|departure/, 'Lineup and round data'], [/catalog/, 'Player catalog'],
-      [/notifications.*status/, 'Official events'], [/login/, 'Login'], [/clause/, 'Scheduled purchases']
-    ];
-    for (const [pattern, label] of labels) if (pattern.test(id)) return label;
-    const section = origin.closest('.box, section, .fm-incoming-panel');
-    const title = section && section.querySelector('.box-title,h2,h3,h4');
-    return title && title.textContent.trim() ? title.textContent.trim() : 'Page details';
-  }
   function register(node) {
     if (!node.isConnected || entries.has(node) || node.matches('.fm-info-panel,.fm-info-inline,.fm-info-restoring') ||
         node.closest('.shiny-notification') || node.parentElement.closest('.fm-info-entry')) return;
@@ -80,11 +59,7 @@
     origin.className = 'fm-info-origin';
     origin.setAttribute('aria-hidden', 'true');
     node.before(origin);
-    const label = document.createElement('div');
-    label.className = 'fm-info-source-label';
-    label.textContent = sourceLabel(node, origin);
-    if (label.textContent) node.insertBefore(label, node.querySelector('.fm-info-body'));
-    const record = {node, origin, home, label, wasOpen: node.open};
+    const record = {node, origin, home, wasOpen: node.open};
     entries.set(node, record);
     node.classList.add('fm-info-entry');
     node.open = true;
@@ -95,7 +70,6 @@
     for (const [node, entry] of entries) {
       if (!target.contains(entry.origin) && !target.contains(node)) continue;
       if (entry.origin.isConnected) entry.origin.replaceWith(node);
-      entry.label.remove();
       node.classList.remove('fm-info-entry', 'fm-info-attached');
       node.classList.add('fm-info-restoring');
       node.open = entry.wasOpen;
@@ -121,7 +95,6 @@
       if (!node.isConnected) {
         entry.origin.replaceWith(node);
         entries.delete(node);
-        entry.label.remove();
         node.classList.remove('fm-info-entry', 'fm-info-attached');
         node.open = entry.wasOpen;
         register(node);
@@ -246,7 +219,6 @@
       for (const [node, entry] of entries) {
         if (!entry.origin.closest(outputSelector) && !entry.home?.matches('.modal-content')) continue; // Page help is context independent.
         entry.origin.replaceWith(node);
-        entry.label.remove();
         node.classList.remove('fm-info-entry', 'fm-info-attached');
         node.classList.add('fm-info-restoring');
         node.hidden = true;

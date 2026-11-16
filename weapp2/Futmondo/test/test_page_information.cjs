@@ -25,7 +25,13 @@ const port = () => new Promise(resolve => {const server=net.createServer();serve
    await page.evaluate(mode=>document.documentElement.setAttribute('data-fm-theme',mode),theme);
    const market=page.locator('#shiny-tab-market .fm-info-panel');
    const body=market.locator(':scope > .fm-info-body');
-   const source=label=>body.locator('.fm-info-entry').filter({has:page.locator('.fm-info-source-label',{hasText:label})});
+   const source=label=>body.locator(`.fm-info-entry[data-fm-info-source="${label}"]`);
+   const assertNoTitles=async(root)=>{
+    assert.equal(await root.locator('.fm-info-source-label').count(),0,'notes contain no generated headings');
+    for(const entry of await root.locator('.fm-info-entry').all()){
+     assert.deepEqual(await entry.evaluate(node=>Array.from(node.children,n=>n.tagName)),['SUMMARY','DIV'],'note contains only its native trigger and original message');
+    }
+   };
    const counts=async()=>JSON.parse(await page.locator('#counts').textContent());
    await page.waitForFunction(()=>document.querySelector('#counts')?.textContent.includes('io_attempts'));
    await page.waitForFunction(()=>document.querySelectorAll('#shiny-tab-market .fm-info-entry').length===5);
@@ -38,6 +44,8 @@ const port = () => new Promise(resolve => {const server=net.createServer();serve
    await market.locator(':scope > summary').focus();await page.keyboard.press('Enter');
    assert(await market.evaluate(n=>n.open));
    assert((await body.innerText()).includes('Finance context A'));
+   await assertNoTitles(market);
+   assert.equal(await source('Background sync').innerText(),'Successful source. Observed clock 1');
    const original=await counts();
    await page.evaluate(()=>{window.panelRef=document.querySelector('#shiny-tab-market .fm-info-panel');window.clockRef=document.querySelector('#source_clock');});
    await page.locator('#advance_stamp').click();
@@ -53,8 +61,8 @@ const port = () => new Promise(resolve => {const server=net.createServer();serve
     const entries=[...panel.querySelectorAll('.fm-info-entry')];
     const probe=document.createElement('span');probe.style.color='var(--fm-danger)';document.body.append(probe);const danger=getComputedStyle(probe).color;probe.remove();
     return {danger,icon:getComputedStyle(panel.querySelector('summary')).color,
-      error:getComputedStyle(entries.find(n=>n.querySelector('.fm-info-source-label').textContent==='Market prices').querySelector('.fm-info-body')).color,
-      healthy:getComputedStyle(entries.find(n=>n.querySelector('.fm-info-source-label').textContent==='Background sync').querySelector('.fm-info-body')).color};
+      error:getComputedStyle(entries.find(n=>n.dataset.fmInfoSource==='Market prices').querySelector('.fm-info-body')).color,
+      healthy:getComputedStyle(entries.find(n=>n.dataset.fmInfoSource==='Background sync').querySelector('.fm-info-body')).color};
    });
    assert.equal(colors.icon,colors.danger);assert.equal(colors.error,colors.danger);assert.notEqual(colors.healthy,colors.danger);
    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'expanded long error wraps on mobile');
@@ -93,6 +101,7 @@ const port = () => new Promise(resolve => {const server=net.createServer();serve
    await page.locator('#dialog_retry').waitFor();await page.locator('#dialog_retry').click();
    await page.waitForFunction(()=>JSON.parse(document.querySelector('#counts').textContent).retries===2);
    assert.equal(await page.locator('.modal-content summary:visible').count(),1);
+   await assertNoTitles(dialog);
    const points=dialog.locator('.player-points-explanation');
    assert.match(await points.innerText(),/Points are reported by Futmondo/);
    assert.equal(await points.locator('.fm-info-source-label').count(),0);
@@ -117,6 +126,7 @@ const port = () => new Promise(resolve => {const server=net.createServer();serve
    assert((await body.innerText()).includes('Successful source'),'unchanged healthy source republishes for the new context');
    await page.locator('#start_pending').click();await source('Market prices').waitFor({state:'detached'});await source('Market prices').waitFor();
    assert.equal(await page.locator('#retry').count(),1);
+   await assertNoTitles(market);
    const requestCount=requests.length;
    await market.locator(':scope > summary').focus();await page.keyboard.press('Space');await page.keyboard.press('Enter');
    assert.equal(requests.length,requestCount,'opening panel must not acquire data');

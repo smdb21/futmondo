@@ -21,6 +21,7 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
     await panel.locator(':scope > summary').click();
     assert(await panel.evaluate(n=>n.open));
     assert((await panel.locator(':scope > .fm-info-body').innerText()).trim(),`${tab}: populated panel`);
+    assert.equal(await panel.locator('.fm-info-source-label').count(),0,`${tab}: no redundant note titles`);
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2),`${tab}: no overflow at ${width}`);
     await panel.locator(':scope > summary').click();
    }

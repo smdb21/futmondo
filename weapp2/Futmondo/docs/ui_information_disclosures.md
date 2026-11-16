@@ -1,5 +1,22 @@
 # Information and error disclosures
 
+## Title-free notes — 2026-11-16
+
+All page and dialog information panels display each note's original message
+without an added source heading. The shared browser registry no longer infers
+headings from output IDs or section titles, creates label elements, or retains
+label references. Explicit `fm_info(source=...)` metadata remains available as a
+non-visible `data-fm-info-source` attribute; it does not render a title.
+
+Reviewed all shared note producers: balance/offer clocks, background sync, coach,
+transfers, roster/capacity, history/charts, standings/lineups, awards, preferences,
+login and administration. Their self-contained messages retain source timestamps,
+coverage and actionable errors. Descriptive field labels within message content
+(for example the per-team update-time list) still supply necessary context.
+Separators, error colors, native keyboard access, Retry binding, source-output
+identity, context reset and empty/pending suppression retain their contracts.
+This reduces presentation only; it adds no capability or login-tier entry.
+
 ## Coach control and account summary placement — 2026-11-15 Pacific
 
 `today_UI()` groups the existing coach checkbox and `coach_status` output in
@@ -143,8 +160,8 @@ one panel beside their existing title when they contain passive information;
 untitled player dialogs receive a Player details heading. Inline player views
 contribute to their enclosing page. Empty panels remain hidden.
 
-`fm_info(..., source=NULL, inline=FALSE)` adds an optional human-readable source
-label. `inline=TRUE` returns visible status/alert text without an icon for
+`fm_info(..., source=NULL, inline=FALSE)` retains optional non-visible source
+metadata. `inline=TRUE` returns visible status/alert text without an icon for
 amount validation, lineup action failures and action-blocking preflights.
 Pending and recursively empty content still returns `NULL`. The numerical
 account summary, coach checkbox, factual rows, confirmations and official inbox
@@ -154,10 +171,10 @@ transaction outcomes; they are not passive source entries.
 
 The browser owns a bounded, page-local presentation registry in
 `www/info-disclosures.js`. It adopts the **original** source disclosure elements
-into the page/dialog panel, hides their individual summaries, and adds source
-labels. It never clones bound inputs, copies source HTML, or invents input IDs.
-Origin markers retain ownership; source labels prefer explicit `source`, then
-curated output categories or an existing section heading. Global statuses are
+into the page/dialog panel and hides their individual summaries without adding
+source headings. It never clones bound inputs, copies source HTML, or invents input IDs.
+Origin markers retain ownership; explicit `source` metadata remains on each
+original element. Global statuses are
 shown on the active page; page entries and dialog entries remain separate.
 Failed sources color the aggregate icon red, with only failed messages red.
 Healthy text and explicitly neutral finance/worker timestamps use the normal

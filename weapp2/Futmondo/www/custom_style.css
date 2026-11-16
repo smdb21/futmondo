@@ -1624,7 +1624,6 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 .fm-info-entry.fm-info-error > .fm-info-body { color:var(--fm-danger); }
 .fm-info-entry .fm-info-neutral { color:var(--fm-text); }
 .fm-info-entry + .fm-info-entry { margin-top:10px; padding-top:10px; border-top:1px solid var(--fm-border); }
-.fm-info-source-label { margin-bottom:3px; color:var(--fm-text); font-size:12px; font-weight:600; }
 .fm-info-origin { position:absolute; width:1px; height:1px; pointer-events:none; }
 .fm-dialog-information-heading { padding:0 0 10px; }
 .fm-information-heading.modal-header > .close { margin-left:auto; order:2; }
