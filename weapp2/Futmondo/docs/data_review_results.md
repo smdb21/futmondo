@@ -4114,3 +4114,83 @@ The prior incident remains distinct from deployment/source proof. Dani Lorenzo's
 actual authenticated selection timing has not been inspected in this environment.
 Hosted account acceptance remains open until that evidence exists; public code
 fingerprints and synthetic browser timings alone do not certify a private flow.
+
+
+## Dani Lorenzo Retry and vertical month labels — 2026-11-15 Pacific
+
+The screenshot identifies a remaining field-contract defect, not a failed source
+request or financial timeout. Read-only scoped database inspection located Dani
+Lorenzo's successfully persisted interactive summary observed at
+**2026-11-16 04:19:12 UTC**, immediately before the screenshot. Its completeness
+was `complete` and acquisition status was `ok`. The actual response contains
+**`data.computer=TRUE` and a published `market.p`, but no `championship.owner`**.
+The earlier worker summary has the same omitted-owner shape. The previous
+projection required that owner object and returned NULL. Earlier captured/test
+summaries supplied an owner object and missed this real source variant.
+
+The corrected projection accepts the explicit data-level System/free-agent flag
+when the owner object is absent. It still rejects missing/false/NA/textual flags,
+wrong player IDs and unavailable market fields. The original source deadlines,
+asking price, negative/zero/missing scores, account/league/season/scoring scope,
+durable acquisition/persistence/ACK gates and final financial checks are intact.
+No unknown ownership or amount becomes zero. This fixes the cause of Retry after
+a successful Dani-shaped acquisition rather than hiding a legitimate failure.
+
+Actual-source replay:
+
+- Read only the matching player's factual summary in the existing private worker
+  and availability stores. No authentication/session-token tables were read;
+  no source API request, production write or transaction was made.
+- Validate the persisted availability payload's SHA-256 and **19,412** decoded
+  byte length, then use the existing safe primitive decoder. The earlier worker
+  body also matched its expected 21,444-byte decoded length.
+- Before the code change, the real payload matched the requested player and
+  `status=ok` but `player_card_summary_row()` returned NULL. After the change it
+  returns **Free Agent / Listed on Market**, preserves the exact source asking
+  price and original observation/expiry, and preserves supplied negative points.
+  Projection replay took about **61ms** locally including first-call compilation.
+- Network/database functions were blocked during the post-change replay. Only
+  structural diagnostics/booleans were printed; full private responses were not
+  printed or committed. Encoded payloads stayed in transient tool/process memory,
+  were cleared after replay and were not written to fixture files.
+
+The date axis now uses `%d %b` (for example `01 Nov`) and `tickangle=90`, retaining
+three sparse automatic ticks, full hover dates/years and all source observations.
+Round-only axes retain numeric labels rather than inventing calendar months.
+A 20px Date-title standoff and 95px bottom margin avoid collision/clipping. An
+initial geometry check caught overlap in the narrow points-only mode; the spacing
+was corrected and every mode/theme/width now passes. The browser check also waits
+for the actual requested trace names/paint instead of confusing same-count
+valuation-only and points-only transitions.
+
+Executed checks:
+
+- Focused target/table regression, shared session reuse, durable store replay,
+  market-offer opening (18 protections), trend plot contracts (16) and deployment
+  exclusions (3) pass. The minimized source-shape regression uses a synthetic ID
+  and asking price, preserving privacy while testing the exact missing-owner form.
+- The actual Reactable -> modal browser flow passes at 390/1440px, including the
+  Dani-shaped System response: it enables Make Market Offer and removes Retry
+  after the target source settles, with no financial acquisition. Explicit editor
+  entry still keeps Submit disabled until financial proof succeeds. The phone
+  again holds optional/history responses for a real 32 seconds. No JS errors or
+  page overflow; card readiness 1,801/1,047ms and heartbeat 48/49ms locally.
+- Actual Plotly expression/browser checks pass at 320/390/1440px across combined,
+  valuation-only, points-only and undated modes and both themes. Labels are
+  vertical, use abbreviated months, stay inside the plot, do not overlap Date or
+  one another, and preserve colors, all series values, zoom and exact hover data.
+  Final chart heartbeats: 77–79ms; no JS/Shiny errors or horizontal overflow.
+- Required offline lifecycle: 13 checks plus eight tabs pass, with zero live
+  HTTP/database mutation attempts. No real account/transaction is used in tests;
+  actual factual evidence is inspected separately through the readonly replay.
+
+Performance review: the parser adds one constant-time explicit-flag check to the
+existing single-player projection. It adds no API/DB read, poll, retry, queue or
+cache. Existing successful persisted summaries remain reusable and failed writes
+remain retryable. The plot changes only layout fields and three tick labels;
+no points/valuation transformation or source request is added. Extra bottom space
+slightly reduces the drawable plot height and is verified on narrow screens.
+Documentation changes have no runtime effect. No dependency, environment setting,
+new product capability/login entry or schema migration is required. Production
+code fingerprint verification follows push; an authenticated private browser
+interaction is not claimed by the read-only source replay or synthetic tests.

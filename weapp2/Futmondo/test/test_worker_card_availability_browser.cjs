@@ -54,9 +54,17 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
    await page.waitForFunction(()=>document.querySelector('#table-selected_player-btn_offer_owner')?.disabled===false);
    assert((await page.locator('#table-selected_player-action_buttons').textContent()).includes('Verified owner'));
    assert.equal((await stats()).financial,1);assert.equal(await page.locator('#table-selected_player-btn_verify_availability').count(),0);
+   await page.locator('.modal-footer').getByRole('button',{name:'Close',exact:true}).click();
+   await page.locator('#system_table').click();await select('System fixture');
+   await page.locator('#table-selected_player-btn_verify_availability').waitFor();
+   await send('finish_summary');
+   await page.waitForFunction(()=>document.querySelector('#table-selected_player-btn_bid_market')?.disabled===false);
+   assert.equal(await page.locator('#table-selected_player-btn_verify_availability').count(),0);
+   assert.match(await page.locator('#table-selected_player-action_buttons').textContent(),/Ownership: Free Agent/);
+   assert.equal((await stats()).financial,1);
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert.deepEqual(errors,[]);
    await page.screenshot({path:`/tmp/futmondo-target-selection-${width}.png`,fullPage:true});
-   console.log(`PASS ${width}px actual table selection: ready ${elapsed}ms, heartbeat ${heartbeat}ms, held history adds zero finance reads; editor safely verifies; stale target refresh changes ownership; zero errors/overflow`);
+   console.log(`PASS ${width}px actual table selection: ready ${elapsed}ms, heartbeat ${heartbeat}ms, held history adds zero finance reads; editor safely verifies; stale target refresh changes ownership, Dani-shaped missing-owner System response readies market action; zero errors/overflow`);
    await page.close();
   }
  }catch(e){if(log.includes('Error'))process.stderr.write(log);throw e}

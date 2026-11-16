@@ -63,7 +63,7 @@ check("dense histories use sparse automatic dates without an empty dtick",{
  history$points$date<-as.POSIXct("2026-07-01",tz="UTC")+0:3*7*86400
  chart<-render_fixture(history)
  stopifnot(chart$layout$xaxis$tickmode=="auto",chart$layout$xaxis$nticks==3,
-   is.null(chart$layout$xaxis$dtick),chart$layout$xaxis$tickformat=="%d/%m",chart$layout$xaxis$tickangle==0,
+   is.null(chart$layout$xaxis$dtick),chart$layout$xaxis$tickformat=="%d %b",chart$layout$xaxis$tickangle==90,
    identical(chart$layout$xaxis$showgrid,FALSE),identical(chart$layout$showlegend,FALSE),
    length(chart$data[[1]]$y)==124L,grepl("2026",chart$data[[1]]$text[1],fixed=TRUE))
 })

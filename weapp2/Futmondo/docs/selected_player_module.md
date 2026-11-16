@@ -67,7 +67,7 @@ Zero and negative scores are valid. A known round does not need a timestamp to b
 
 Cumulative price-snapshot totals never become per-round scores. Price charts use actual observed values only; no synthetic trend or default historical value fills gaps.
 
-The history chart displays both series together: solid green valuation on the left EUR scale and dashed amber round points on the right scale. The coloured axes identify the series without a legend. The horizontal axis requests about three horizontal date ticks, using compact DD/MM labels to fit narrow phone plots without overlapping labels. Vertical date grid lines remain hidden; exact dates, timestamps and values remain in hover details. Each vertical scale keeps its own padded range. A shared date axis uses saved round dates or the existing context-checked match details (the last fixture date for a round with several matches). If any score remains undated, every score is preserved on a separate top round axis with an explicit notice that it is not aligned with valuation dates. Dated scores connect in chronological order, with round number as a stable tie-breaker for shared dates; postponed rounds therefore cannot draw backward across the date axis. Scores and hover provenance move together. Round axes also use sparse, whole-number labels. Points alone use round numbers when undated. Missing series retain their availability explanation.
+The history chart displays both series together: solid green valuation on the left EUR scale and dashed amber round points on the right scale. The coloured axes identify the series without a legend. The horizontal axis requests about three date ticks, rotated 90 degrees and formatted as day plus abbreviated month (for example, 01 Nov). Explicit title spacing and a larger bottom margin prevent the vertical labels from colliding with Date on narrow phone plots. Vertical date grid lines remain hidden; exact dates, timestamps and values remain in hover details. Each vertical scale keeps its own padded range. A shared date axis uses saved round dates or the existing context-checked match details (the last fixture date for a round with several matches). If any score remains undated, every score is preserved on a separate top round axis with an explicit notice that it is not aligned with valuation dates. Dated scores connect in chronological order, with round number as a stable tie-breaker for shared dates; postponed rounds therefore cannot draw backward across the date axis. Scores and hover provenance move together. Round axes also use sparse, whole-number labels. Points alone use round numbers when undated. Missing series retain their availability explanation.
 
 This presentation reuses the card's shared history and already requested match resource. It adds no requests, database reads, polling or cache entries; match completion can redraw the chart once to align its dates. Focused verification: `Rscript test/test_player_trend_plot.R`.
 
@@ -181,8 +181,10 @@ See `data_review_results.md` for measured request counts and verification limits
 ## Phone chart dates and series-colored axes — 2026-11-15
 
 `player_trend_plot` requests three automatic date ticks and uses
-`%d/%m`, omitting the year from axis labels at the owner's request. Full dates,
-including years, remain in hover details. It omits date `dtick` and retains horizontal text, padded independent
+`%d %b` with 90-degree date labels, omitting the year from axis labels at the
+owner's request. Full dates, including years, remain in hover details. Date-title
+standoff is 20px and the bottom margin is 95px, retaining automatic margins. It
+omits date `dtick` and retains padded independent
 value/points ranges and full hover provenance. Numeric undated-round axes keep
 their integral spacing and never supply invented dates.
 
@@ -287,3 +289,22 @@ The normalized snapshot is complete for those returned rows and occupies 17,322
 JSON bytes, below the 220-KiB bound. This was local replay of saved source data;
 the deployed browser chart and production snapshot-save/readback remain
 unverified. See the dated review results.
+
+
+## Dani Lorenzo's omitted owner object — 2026-11-15 Pacific
+
+Read-only inspection of the actual availability snapshot observed at
+2026-11-16 04:19:12 UTC confirmed a successful matching player summary with
+`data.computer=TRUE`, a published `market.p`, and no `championship.owner` field.
+The previous projection returned NULL despite these explicit source facts, so
+the card displayed Retry after successful acquisition. The projection now accepts
+the explicit data-level System flag when the owner object is absent. It preserves
+the exact asking price and source clocks; missing ownership alone is never proof
+of a free agent. Existing durable results are reused through the same decoder and
+context/deadline gates. No persistence schema, eligibility clock, financial check,
+background cadence or manual submission policy changes.
+
+The actual saved source passes the corrected projection with zero source/database
+requests during replay. A minimized synthetic form covers missing/false/unknown
+flags, mismatching IDs and real table -> modal readiness on phone/desktop. Full
+private payloads and authentication material are not recorded in fixtures/docs.

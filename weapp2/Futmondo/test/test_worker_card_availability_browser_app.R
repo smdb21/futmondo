@@ -8,7 +8,7 @@ buy_clause<-function(...)stop('No real purchase is authorized')
 fixture<-new.env(parent=emptyenv());fixture$offset<-0
 Sys.time<-function()base::Sys.time()+fixture$offset
 rows<-function(age=120,id='dani-fixture'){
- catalog<-observed_data(data.frame(id=id,name=if(id=='dani-fixture')'Dani fixture'else'Stale fixture',
+ catalog<-observed_data(data.frame(id=id,name=if(id=='dani-fixture')'Dani fixture'else if(id=='system-fixture')'System fixture'else'Stale fixture',
  role='centrocampista',role2=NA_character_,team='Club',value=1000,change=0,points=-2,user_team_id='',computer=TRUE),observed_at=Sys.time()-age)
  market<-observed_data(data.frame(id=id,price=1000),observed_at=Sys.time())
  unify_columns(calculate_player_changes(translate_player_positions(championship_market_prices(catalog,resource_state(market)))))
@@ -29,7 +29,7 @@ ui<-shiny::fluidPage(shiny::tags$head(shiny::tags$style(shiny::HTML(fm_theme_css
  shiny::includeCSS('www/custom_style.css'),shiny::includeScript('www/info-disclosures.js')),
  shiny::actionButton('heartbeat','Heartbeat'),shiny::textOutput('heartbeat_value'),
  shiny::actionButton('finish_summary','Complete target source'),shiny::actionButton('finish_funds','Complete funds'),
- shiny::actionButton('old_table','Load old table'),shiny::actionButton('advance','Advance time'),
+ shiny::actionButton('old_table','Load old table'),shiny::actionButton('system_table','Load System player'),shiny::actionButton('advance','Advance time'),
  players_table_UI('table',box_title='Player fixture',filter_by_position=FALSE,filter_by_team=FALSE,
  filter_by_value=FALSE,filter_by_change_value=FALSE,filter_by_active_clause=FALSE,
  filter_by_is_favorite=FALSE,filter_by_is_from_futmondo=FALSE))
@@ -41,6 +41,8 @@ server<-function(input,output,session){
  output$heartbeat_value<-shiny::renderText(input$heartbeat)
  shiny::observeEvent(input$finish_summary,{
   job<-tail(fixture$summaries,1)[[1]]
+  if(job$id=='system-fixture')job$resolve(observed_data(list(data=list(id=job$id,computer=TRUE),championship=list(pro=FALSE,clause=list()),
+   market=list(pr=FALSE,p=123456,bids=list()),points=list(),prices=list())))else
   job$resolve(observed_data(list(data=list(id=job$id),championship=list(owner=list(id='rival',name='Verified owner',computer=FALSE)),
    market=list(bids=list()),points=list(),prices=list())))
  })
@@ -51,6 +53,7 @@ server<-function(input,output,session){
    outstanding=list(count=0),rules=list(minimum_bid_at_value=TRUE))))
  })
  shiny::observeEvent(input$old_table,data(rows(301,'stale-fixture')))
+ shiny::observeEvent(input$system_table,data(rows(301,'system-fixture')))
  shiny::observeEvent(input$advance,fixture$offset<-fixture$offset+90)
  shiny::observeEvent(input$fixture_stats,session$sendCustomMessage('fixture-stats',list(
   financial=length(fixture$finances),summaries=length(fixture$summaries),reads=as.list(fixture$reads))))

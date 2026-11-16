@@ -1886,3 +1886,22 @@ This is a presentation refinement of the existing loader, with no new analytical
 No schema, dependency, environment variable, background schedule or new product
 capability is introduced. These implementation checks supersede the earlier
 expiry-driven card behavior; deployment and private-account acceptance are separate.
+
+
+### Dani Lorenzo owner-shape correction and vertical month labels — 2026-11-15 Pacific
+
+- [x] Inspect Dani's actual saved successful summary; reproduce NULL projection
+  caused by omitted `championship.owner` despite explicit `data.computer=TRUE`.
+- [x] Recognize that explicit System/free-agent shape without promoting missing,
+  false, unknown or mismatching-player evidence. Preserve exact market asking
+  prices, source clocks, durable reuse and independent financial preflights.
+- [x] Rotate date labels 90 degrees, format day + abbreviated month (`01 Nov`),
+  and separate labels from Date with sufficient title spacing/bottom margin.
+- [x] Validate actual-source replay, minimized field-contract negatives,
+  table-to-card mobile/desktop readiness, chart geometry/themes/source retention,
+  persistence and the required offline lifecycle. Results: `data_review_results.md`.
+- [ ] Verify the new deployed source fingerprint after push; private browser
+  acceptance remains separate from the actual-source and synthetic UI replays.
+
+No new capability, login-tier entry, dependency, environment variable, schema,
+background job or transaction is introduced.

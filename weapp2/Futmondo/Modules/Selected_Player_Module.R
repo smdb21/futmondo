@@ -145,6 +145,9 @@ player_card_summary_row <- function(player,summary) {
   if(!is.data.frame(player)||nrow(player)!=1L||!is.list(summary)||acquisition_data_unverified(summary)||
      !identical(fm_scalar(summary$data$id %||% summary$data$`_id`,""),fm_scalar(player$id,"")))return(NULL)
   owner<-summary$championship$owner;market<-summary$market
+  # Futmondo omits championship.owner for some System players (including
+  # Dani Lorenzo). data.computer=TRUE is explicit ownership evidence.
+  if(is.null(owner)&&isTRUE(summary$data$computer))owner<-list(computer=TRUE)
   if(!is.list(owner)||!is.list(market))return(NULL)
   owner_id<-fm_scalar(owner$`_id` %||% owner$id,"")
   if(!nzchar(owner_id)&&!isTRUE(owner$computer))return(NULL)
@@ -2173,12 +2176,12 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           line=list(color="#F4C95D",width=2.5,dash="dash"),marker=list(size=7,color="#F4C95D"))
       }
       date_axis <- nrow(values)>0L || dated_points
-      horizontal_axis <- list(title=if(date_axis)"Date"else "Round",
-        type=if(date_axis)"date"else "linear",tickmode="auto",nticks=3,tickangle=0,showgrid=FALSE)
+      horizontal_axis <- list(title=if(date_axis)list(text="Date",standoff=20)else "Round",
+        type=if(date_axis)"date"else "linear",tickmode="auto",nticks=3,tickangle=if(date_axis)90 else 0,showgrid=FALSE)
       # A NULL dtick serializes as [] and forces daily ticks on Plotly's date
       # axis. Omit it entirely for dates; keep numeric round ticks integral.
       round_spacing <- if(nrow(points))max(1,ceiling(diff(range(points$round_number))/3))else 1
-      if(date_axis)horizontal_axis$tickformat <- "%d/%m" else {
+      if(date_axis)horizontal_axis$tickformat <- "%d %b" else {
         horizontal_axis$tickmode <- "linear";horizontal_axis$dtick <- round_spacing
       }
       chart %>% fm_plot_layout(
@@ -2190,7 +2193,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         yaxis2=list(title=list(text="Points",font=list(color="#F4C95D")),visible=nrow(points)>0L,overlaying="y",side="right",autorange=FALSE,
           range=player_trend_axis_range(points$points),showgrid=FALSE,color="#F4C95D",tickformat="~g"),
         showlegend=FALSE,
-        margin=list(l=55,r=50,b=55,t=if(separate_round_axis)60 else 20),
+        margin=list(l=55,r=50,b=95,t=if(separate_round_axis)60 else 20),
         annotations=list())
     })
     render_match <- function(match) {

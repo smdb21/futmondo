@@ -131,3 +131,20 @@ cat(sprintf('MEASURE 100 x 527-row market projections %.3fs; original source unm
 column_row<-data.frame(id='column-clock',user_team_id='',market_inMarket=TRUE,observed_at=clock)
 stopifnot(player_card_recent_table_facts(column_row),!player_card_recent_table_facts(column_row,clock+61))
 cat('PASS a selected row carrying its original clock as a column retains the conservative native deadline\n')
+
+# Minimized contract from Dani Lorenzo's persisted 04:19 UTC summary: owner
+# is absent and the explicit System flag is on data, not championship.owner.
+# Synthetic identity/price avoid retaining the private source body in tests.
+computer_summary<-observed_data(list(data=list(id='computer-target',computer=TRUE),
+ championship=list(pro=FALSE,clause=list()),market=list(pr=FALSE,p=123456,bids=list())))
+computer_row<-data.frame(id='computer-target',user_team_id='old-owner',market_inMarket=TRUE,price=1000,points=-2)
+projected<-player_card_summary_row(computer_row,computer_summary)
+stopifnot(!is.null(projected),identical(projected$user_team_id,''),projected$market_inMarket,
+ projected$effective_market_price==123456,projected$points==-2)
+for(flag in list(NULL,FALSE,NA,'true')){
+ invalid<-computer_summary;invalid$data$computer<-flag
+ stopifnot(is.null(player_card_summary_row(computer_row,invalid)))
+}
+wrong<-computer_summary;wrong$data$id<-'other-target'
+stopifnot(is.null(player_card_summary_row(computer_row,wrong)))
+cat('PASS missing championship.owner accepts only explicit data.computer=TRUE with matching player ID; unknown ownership stays unverified\n')

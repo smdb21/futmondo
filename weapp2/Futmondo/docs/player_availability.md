@@ -28,8 +28,11 @@ pending. For stale/unknown rows the existing scoped summary provider retrieves
 only this player. `player_card_summary_row(player, summary)` requires a matching
 immutable ID and explicit owner/market contracts. It maps `_id`/`id` and
 `computer` ownership, market `p` asking price and the captured listing markers;
-a `bids`-only response establishes no listing. Missing evidence is unknown.
-Successful retrieval updates ownership/listing controls and clears stale asking
+a `bids`-only response establishes no listing. When `championship.owner` is absent, an explicit logical
+`data.computer=TRUE` also establishes a System/free-agent player. Dani Lorenzo's
+actual saved summary uses this shape. Missing/false/NA/textual flags do not prove
+ownership, and a mismatching returned player ID remains invalid. Missing evidence
+is unknown. Successful retrieval updates ownership/listing controls and clears stale asking
 prices/clause fields, preserving original score/statistic values and source
 clocks. An obsolete player or league completion cannot replace the current view.
 
