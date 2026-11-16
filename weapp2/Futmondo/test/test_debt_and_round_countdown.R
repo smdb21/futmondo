@@ -144,13 +144,13 @@ check("global UI shares primary states and keeps manual capacity checks separate
   ui <- paste(readLines("ui.R",warn=FALSE),collapse="\n")
   server <- paste(readLines("server.R",warn=FALSE),collapse="\n")
   css <- paste(readLines("www/custom_style.css",warn=FALSE),collapse="\n")
-  stopifnot(grepl('uiOutput("round_countdown")',ui,fixed=TRUE),
+  stopifnot(grepl('uiOutput("account_finance_summary"',ui,fixed=TRUE),
     grepl('output$round_countdown <- renderUI',server,fixed=TRUE),
     grepl('round_finance_display(primary_team_state(), primary_market_state())',server,fixed=TRUE),
     grepl('primary_sources = primary_sources',server,fixed=TRUE),
     !grepl('get_financial_snapshot',server,fixed=TRUE),
-    grepl('Active offers:',server,fixed=TRUE),grepl('After offers:',server,fixed=TRUE),grepl('Can spend:',server,fixed=TRUE),
-    grepl('projected_committed_balance',server,fixed=TRUE),
+    grepl('id="round_finance_amounts"',server,fixed=TRUE),is.function(round_finance_amounts_UI),
+    grepl('projected_committed_balance',paste(deparse(body(round_finance_amounts_UI)),collapse=''),fixed=TRUE),
     grepl('tags$span("In progress")',server,fixed=TRUE),
     grepl("position: sticky",css,fixed=TRUE),grepl("overflow-wrap: anywhere",css,fixed=TRUE))
 })

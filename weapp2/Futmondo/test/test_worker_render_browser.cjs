@@ -15,14 +15,14 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
    await page.waitForTimeout(1000);
    await page.evaluate(()=>{
     window.renderEvents=[];
-    const ids=['worker_status','today-kpi_cash_box','today-kpi_valuation_box','today-recent_transfers','round_countdown','today-market_players-players_table'];
+    const ids=['worker_status','today-kpi_cash_box','today-kpi_valuation_box','today-recent_transfers','account_finance_summary','round_finance_amounts','round_countdown','today-market_players-players_table'];
     $(document).on('shiny:recalculating.fixture shiny:value.fixture',e=>{
      if(ids.includes(e.target.id))window.renderEvents.push({type:e.type,id:e.target.id});
     });
    });
    const table=page.locator('#today-market_players-players_table .ReactTable');
    await table.evaluate(el=>el.dataset.fixtureIdentity='kept');
-   const headerColor=await page.locator('.round-countdown-bar').evaluate(el=>getComputedStyle(el).color);
+   const headerColor=await page.locator('.fm-account-finance').evaluate(el=>getComputedStyle(el).color);
    const checkedBefore=await page.locator('#worker_status_checked_at').textContent();
    const financeCheckedBefore=await page.locator('#round_finance_checked').textContent();
    const countdownNode=await page.locator('.fm-browser-countdown').evaluate(el=>{el.dataset.fixtureIdentity='kept';return el.textContent;});
@@ -36,7 +36,7 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
    for(const button of ['expire','restore','expire','restore']){
     await page.locator('#'+button).click();
     await page.waitForFunction(expired=>document.querySelector('#round_finance_status').textContent.includes('out of date')===expired,button==='expire');
-    assert.equal(await page.locator('.round-countdown-bar').evaluate(el=>getComputedStyle(el).color),headerColor);
+    assert.equal(await page.locator('.fm-account-finance').evaluate(el=>getComputedStyle(el).color),headerColor);
     assert.equal(await page.locator('.fm-browser-countdown').getAttribute('data-fixture-identity'),'kept');
     assert.equal(await table.getAttribute('data-fixture-identity'),'kept');
    }

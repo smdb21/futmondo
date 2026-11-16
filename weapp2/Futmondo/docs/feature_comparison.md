@@ -154,3 +154,17 @@ tables accept several primary/secondary positions together, start at All, keep
 All exclusive, and apply choices after a 300 ms pause. The existing login entry
 now says “multiple positions.” This extends the existing filter capability; it
 adds no separate tier item or exclusivity claim. Contract: `players_table_module.md`.
+
+## Shared balance/squad summary — reviewed 2026-11-16
+
+Rechecked the official [game rules](https://help.futmondo.com/article/91-reglas-del)
+(updated 2021-12-17) and [clause guide](https://help.futmondo.com/article/156-que-son-las-clausulas-y-como-activarlas)
+(updated 2022-10-28) on 2026-11-16. They document own finances, squad inspection,
+market bids and configurable delayed clause arrivals. LigaRadar now puts its
+existing financial/identity ledger together at the top of My Team, Today's market
+and Players, showing actual/effective ownership, configured limit and reserved
+offer slots, with a full-capacity message. This extends presentation of existing
+capabilities, without a new calculation/transaction capability or login-tier item.
+The public sources do not establish whether the current official app has an
+identical combined box; no authenticated official UI comparison was performed,
+and no exclusivity claim is made. See [presentation contract](ui_information_disclosures.md).

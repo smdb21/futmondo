@@ -200,6 +200,75 @@ round_finance_card_display <- function(finance) {
   card
 }
 
+# Display existing ledger values only; missing data never becomes a zero.
+# A NULL card is a pending projection; an empty card is a settled failure.
+round_finance_amounts_UI <- function(finance = NULL) {
+  pending <- is.null(finance)
+  money <- function(x, loading = FALSE) {
+    value <- fm_number(x)
+    if (is.finite(value)) paste0(format(round(value), big.mark=".", decimal.mark=",", scientific=FALSE), " EUR")
+    else if (isTRUE(loading)) "Loading…" else "Unavailable"
+  }
+  cash_loading <- pending || isTRUE(finance$cash_loading)
+  offers_loading <- pending || isTRUE(finance$offers_loading)
+  count <- fm_number(finance$active_offer_count)
+  offers <- money(finance$commitments, offers_loading)
+  if (is.finite(fm_number(finance$commitments)) && is.finite(count))
+    offers <- paste0(offers, " (", as.integer(count), ")")
+  shiny::tags$div(class=paste("round-countdown-finance", finance$class %||% "round-countdown-unavailable"),
+    shiny::tags$span(class="round-countdown-finance-item", paste0("Balance: ", money(finance$cash, cash_loading))),
+    shiny::tags$span(class="round-countdown-finance-item", paste0("Active offers: ", offers)),
+    shiny::tags$span(class="round-countdown-finance-item", paste0("After offers: ", money(finance$projected_committed_balance, cash_loading || offers_loading))),
+    shiny::tags$span(class="round-countdown-finance-item", paste0("Can spend: ", money(finance$spendable_budget, cash_loading || offers_loading))),
+    if (is.finite(fm_number(finance$manual_pending_amount)) && finance$manual_pending_amount > 0)
+      shiny::tags$span(class="round-countdown-finance-item", paste0("Pending offer confirmations: ", money(finance$manual_pending_amount))))
+}
+
+# Descriptive projection of the same identity/offer-slot ledger as preflights.
+# It never authorizes a transaction or assumes a missing count/limit is zero.
+account_squad_display <- function(roster_state, transfers, team_state, active_offers, reserved_slots) {
+  roster<-roster_state$data
+  if(!is.null(roster_state$error)||isTRUE(roster_state$status%in%c("partial","unavailable")))roster<-NULL
+  empty<-list(status="ok",outgoing_status="ok",records=data.frame(player_id=character()),
+    outgoing_records=data.frame(player_id=character()))
+  actual<-team_effective_squad_count(roster,empty)
+  effective<-team_effective_squad_count(roster,transfers)
+  cap<-fm_number(team_state$data$configuration$maxPlayersInRoster)
+  if(is.null(team_state$data)||isTRUE(team_state$status%in%c("partial","unavailable"))||
+     any(attr(team_state$data,"fetch_status")%in%c("partial","unavailable"))||
+     any(attr(team_state$data,"worker_completeness")%in%c("partial","unavailable","incomplete"))||
+     (!is.null(attr(team_state$data,"worker_acquisition_status"))&&
+      !isTRUE(attr(team_state$data,"worker_acquisition_status")%in%c("ok","empty")))||
+     !is.finite(cap)||cap<=0||cap!=floor(cap))cap<-NA_real_
+  slots<-vapply(list(active_offers,reserved_slots),fm_number,numeric(1))
+  slots_known<-all(is.finite(slots)&slots>=0&slots==floor(slots))
+  reserved<-if(slots_known)sum(slots)else NA_real_
+  full<-is.finite(effective$count)&&is.finite(cap)&&
+    (effective$count>=cap||(slots_known&&effective$count+reserved>=cap))
+  loading<-isTRUE(roster_state$status=="loading")||isTRUE(team_state$status=="loading")||
+    identical(effective$status,"loading")
+  observed<-identical(effective$status,"observed")||identical(roster_state$freshness,"stale")||
+    identical(team_state$freshness,"stale")||!is.null(team_state$error)
+  list(actual=actual$count,effective=effective$count,cap=cap,reserved=reserved,full=full,
+    status=if(loading)"loading"else if(!all(is.finite(c(actual$count,effective$count,cap,reserved))))"unavailable"else if(observed)"observed"else"ok",
+    detail=paste(effective$detail,if(observed)"Displayed squad values include saved observations; action checks still require current verification."else"",
+      "Effective players plus active offers and pending purchase reservations consume squad slots. Existing offers can still be edited subject to the usual checks."),
+    roster_observed_at=roster_state$observed_at,team_observed_at=team_state$observed_at)
+}
+
+account_squad_UI <- function(state = NULL) {
+  pending<-is.null(state)||identical(state$status,"loading")
+  count<-function(x)if(is.finite(fm_number(x)))as.character(as.integer(x))else if(pending)"Loading…"else"Unavailable"
+  shiny::tags$div(class="fm-account-squad",
+    shiny::tags$span(paste0("Players: ",count(state$actual))),
+    shiny::tags$span(paste0("Effective players: ",count(state$effective)," / ",count(state$cap))),
+    shiny::tags$span(paste0("Reserved offer slots: ",count(state$reserved))),
+    if(isTRUE(state$full))shiny::tags$strong(class="fm-account-squad-full", "No more offers allowed."),
+    fm_info(state$detail,
+      shiny::textOutput("account_squad_checked",inline=TRUE),
+      source="Squad capacity",pending=pending,error=identical(state$status,"unavailable")))
+}
+
 next_round_context <- function(rounds, now = Sys.time()) {
   unavailable <- list(available = FALSE, round_number = NA_real_, starts_at = as.POSIXct(NA))
   if (!is.data.frame(rounds) || !nrow(rounds) ||

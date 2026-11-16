@@ -14,14 +14,51 @@ check("league selection lives only on Welcome", {
     grepl("Welcome", as.character(login_UI("login")), fixed=TRUE))
 })
 check("one summary output leads the page without a second client visibility gate", {
-  summary <- htmltools::tagQuery(body)$find("#round_countdown")$selectedTags()
+  summary <- htmltools::tagQuery(body)$find("#account_finance_summary")$selectedTags()
   stopifnot(length(summary)==1L,
     !any(vapply(htmltools::tagQuery(body)$find("div")$selectedTags(),function(node)
       !is.null(node$attribs[["data-display-if"]]) &&
-        grepl('id="round_countdown"',as.character(node),fixed=TRUE),logical(1))))
+        grepl('id="account_finance_summary"',as.character(node),fixed=TRUE),logical(1))))
   markup <- as.character(body)
-  stopifnot(regexpr('id="round_countdown"',markup,fixed=TRUE)[1] <
+  stopifnot(regexpr('id="account_finance_summary"',markup,fixed=TRUE)[1] <
     regexpr('id="startup_status"',markup,fixed=TRUE)[1])
+})
+check("squad summary uses the existing identity ledger and counts reserved offer slots", {
+  roster<-data.frame(id=paste0("p",1:18))
+  transfers<-list(status="ok",outgoing_status="ok",records=data.frame(player_id=c("bought1","bought2","bought2")),
+    outgoing_records=data.frame(player_id=c("p1","already-gone")))
+  team<-resource_state(list(configuration=list(maxPlayersInRoster=20)))
+  x<-account_squad_display(resource_state(roster),transfers,team,0,0)
+  stopifnot(x$actual==18L,x$effective==19L,x$cap==20L,!x$full)
+  x<-account_squad_display(resource_state(roster),transfers,team,1,0)
+  html<-as.character(account_squad_UI(x))
+  stopifnot(x$full,grepl("Players: 18",html,fixed=TRUE),grepl("Effective players: 19 / 20",html,fixed=TRUE),
+    grepl("No more offers allowed.",html,fixed=TRUE))
+  stopifnot(account_squad_display(resource_state(roster),transfers,team,0,1)$full,
+    account_squad_display(resource_state(roster),transfers,team,2,1)$full)
+})
+check("unknown and partial squad evidence never becomes zero or a false full-squad message", {
+  empty<-list(status="ok",outgoing_status="ok",records=data.frame(player_id=character()),outgoing_records=data.frame(player_id=character()))
+  roster<-resource_state(data.frame(id=character()))
+  team<-resource_state(list(configuration=list(maxPlayersInRoster=20)))
+  x<-account_squad_display(roster,empty,team,0,0)
+  stopifnot(x$actual==0L,x$effective==0L,!x$full)
+  for(bad in c("loading","partial","unavailable")){
+    transfers<-empty;transfers$status<-bad
+    x<-account_squad_display(roster,transfers,team,0,0)
+    stopifnot(is.na(x$effective),!x$full)
+  }
+  x<-account_squad_display(roster,empty,resource_state(status="loading"),NA_real_,NA_real_)
+  stopifnot(is.na(x$cap),is.na(x$reserved),!x$full,
+    !grepl("No more offers allowed",as.character(account_squad_UI(x)),fixed=TRUE))
+  roster<-resource_state(data.frame(id=paste0("p",1:20)))
+  stopifnot(account_squad_display(roster,empty,team,NA_real_,NA_real_)$full)
+  stopifnot(!account_squad_display(roster,empty,resource_state(list()),0,0)$full)
+  saved_team<-resource_state(list(configuration=list(maxPlayersInRoster=20)),status="stale")
+  x<-account_squad_display(roster,empty,saved_team,0,0)
+  stopifnot(x$cap==20L,x$status=="observed",grepl("saved observations",x$detail,fixed=TRUE))
+  for(limit in list(NA_real_,0,-1,20.5))stopifnot(is.na(account_squad_display(roster,empty,
+    resource_state(list(configuration=list(maxPlayersInRoster=limit))),0,0)$cap))
 })
 original_async <- async_adapter_fetch
 calls <- character(); pending <- new.env(parent=emptyenv())
@@ -41,20 +78,26 @@ shiny::testServer(app_server,{
   session$setInputs(tabs="login",`login-user_name`="offline@example.invalid",`login-password`="fixture",`login-login_button`=1)
   session$elapse(100);app_settle(session);session$setInputs(tabs="today");app_settle(session)
   team_key <- "get_user_team_info:champ:team1"; market_key <- "get_market_players:champ:team1"
+  check("the shell and financial labels remain mounted while primary reads are held", {
+    shell<-output$account_finance_summary$html
+    stopifnot(grepl("Balance summary",shell,fixed=TRUE),grepl("Balance: Loading",shell,fixed=TRUE),
+      grepl("Effective players: Loading",shell,fixed=TRUE),
+      grepl("Balance: Loading",output$round_finance_amounts$html,fixed=TRUE))
+  })
   check("Today and banner dispatch one team read and one market read", {
     stopifnot(sum(calls=="get_user_team_info")==1L,sum(calls=="get_market_players")==1L,
       !any(calls=="get_financial_snapshot"))
   })
   pending[[team_key]]$resolve(list(budget=180546496,withheld=0,teamValue=350438934));app_settle(session)
   check("known balance renders in both places while offers and schedule are pending", {
-    html <- paste(output$round_countdown$html,output$round_finance_status$html)
+    html <- paste(output$round_finance_amounts$html,output$round_finance_status$html)
     stopifnot(grepl("180.546.496 EUR",html,fixed=TRUE),grepl("Active offers: Loading",html,fixed=TRUE),
       !grepl("round-countdown-warning",html,fixed=TRUE),
       grepl("180.546.496 €",output[["today-kpi_cash_box"]]$html,fixed=TRUE))
   })
   pending[[market_key]]$reject(simpleError("Synthetic market timeout"));app_settle(session)
   check("failed offers retain known cash and produce a neutral retry message", {
-    html <- paste(output$round_countdown$html,output$round_finance_status$html)
+    html <- paste(output$round_finance_amounts$html,output$round_finance_status$html)
     stopifnot(grepl("180.546.496 EUR",html,fixed=TRUE),grepl("could not load",html,fixed=TRUE),
       grepl("Active offers: Unavailable",html,fixed=TRUE),!grepl("round-countdown-warning",html,fixed=TRUE))
   })
@@ -71,7 +114,7 @@ shiny::testServer(app_server,{
   })
   pending[[market_key]]$resolve(data.frame());app_settle(session)
   check("verified empty market produces zero reservation and a stable observed-amount banner", {
-    html <- paste(output$round_countdown$html,output$round_finance_status$html)
+    html <- paste(output$round_finance_amounts$html,output$round_finance_status$html)
     stopifnot(grepl("round-countdown-observed",html,fixed=TRUE),
       grepl("Active offers: 0 EUR (0)",html,fixed=TRUE),grepl("After offers: 180.546.496 EUR",html,fixed=TRUE))
   })
@@ -83,11 +126,11 @@ shiny::testServer(app_server,{
   check("balance banner appears only on market, players, and my team", {
     for (tab in c("today", "players_in_championship", "yourteam")) {
       session$setInputs(tabs=tab);app_settle(session)
-      stopifnot(grepl("round-countdown-bar",output$round_countdown$html,fixed=TRUE))
+      stopifnot(grepl("Balance summary",output$account_finance_summary$html,fixed=TRUE))
     }
     for (tab in c("login", "notifications", "lineup", "rivals", "plots", "classification", "round_mvps", "admin")) {
       session$setInputs(tabs=tab);app_settle(session)
-      stopifnot(is.null(output$round_countdown))
+      stopifnot(is.null(output$account_finance_summary))
     }
     stopifnot(grepl("Welcome",output$menu$html,fixed=TRUE))
   })
@@ -95,7 +138,7 @@ shiny::testServer(app_server,{
   pending[[team_key]]$resolve(list(budget=-10,withheld=0,teamValue=1000))
   pending[[market_key]]$resolve(data.frame());app_settle(session)
   check("confirmed fresh debt is still visibly warned", {
-    html <- paste(output$round_countdown$html,output$round_finance_status$html)
+    html <- paste(output$round_finance_amounts$html,output$round_finance_status$html)
     stopifnot(grepl("round-countdown-warning",html,fixed=TRUE),grepl("Restore at least 11 EUR",html,fixed=TRUE))
   })
   # Replay typed database snapshots, preserving their original source time.
@@ -117,7 +160,7 @@ shiny::testServer(app_server,{
   saved_market <- restore_saved(market_fixture,"get_market_players")
   pending[[team_key]]$resolve(saved_team);pending[[market_key]]$resolve(saved_market);app_settle(session)
   check("expired database snapshots retain source time and disclose cache metadata behind an icon", {
-    html <- paste(output$round_countdown$html,output$round_finance_status$html)
+    html <- paste(output$round_finance_amounts$html,output$round_finance_status$html)
     stopifnot(grepl("Balance: 1.000 EUR",html,fixed=TRUE),
       grepl("Active offers: 200 EUR (1)",html,fixed=TRUE),
       grepl("After offers: 700 EUR",html,fixed=TRUE),
@@ -134,11 +177,11 @@ shiny::testServer(app_server,{
   session$setInputs(tabs="login",refresh_all=3);app_settle(session)
   check("Welcome updates league context without displaying the banner", {
     session$setInputs(selected_league="different-league");app_settle(session)
-    stopifnot(identical(championship_id_RV(),"different-league"),is.null(output$round_countdown))
+    stopifnot(identical(championship_id_RV(),"different-league"),is.null(output$account_finance_summary))
   })
   session$setInputs(tabs="today");app_settle(session)
   check("context change clears old team cash while new context loads", {
-    html <- paste(output$round_countdown$html,output$round_finance_status$html)
+    html <- paste(output$round_finance_amounts$html,output$round_finance_status$html)
     stopifnot(identical(championship_id_RV(),"different-league"),!grepl("Balance: -10 EUR",html,fixed=TRUE),
       grepl("Balance: Loading",html,fixed=TRUE))
   })

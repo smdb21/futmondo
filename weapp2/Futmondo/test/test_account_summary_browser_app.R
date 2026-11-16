@@ -14,7 +14,7 @@ async_adapter_fetch <- function(fn,...) {
 }
 fm_async_hire_coach <- function(...) {fixture_mutations <<- fixture_mutations+1L;stop('Unexpected coach hire')}
 get_user_team_info <- function(...) list(budget=10000000,withheld=200000,maxBid=15000000,
-  teamValue=34000000,staff=list(coach=1),configuration=list(mnmp=.5,enableCoach='automatic'))
+  teamValue=34000000,staff=list(coach=1),configuration=list(mnmp=.5,maxPlayersInRoster=18,enableCoach='automatic'))
 app_market$bid_id <- c('own-offer',NA_character_,NA_character_)
 app_market$bid_price <- c(200000,NA_real_,NA_real_)
 app_rounds <- data.frame(round_id='next',round_number=12,

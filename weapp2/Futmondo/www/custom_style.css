@@ -1,3 +1,15 @@
+/* The financial shell stays independent of pending/error disclosure outputs. */
+.fm-account-finance { width:100%; min-width:0; margin:0 0 16px; padding:14px 16px; border:1px solid var(--fm-border); border-radius:6px; background:var(--fm-surface); color:var(--fm-text); }
+.fm-account-squad { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 18px; margin-top:12px; padding-top:10px; border-top:1px solid var(--fm-border); font-size:13px; overflow-wrap:anywhere; }
+.fm-account-squad > * { min-width:0; max-width:100%; }
+.fm-account-squad-full { color:var(--fm-warning); }
+.fm-account-finance-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px 16px; margin-bottom:10px; }
+.fm-account-finance-heading h2 { margin:0; font-size:18px; font-weight:600; }
+.fm-account-finance-heading .round-countdown-main { color:var(--fm-muted); font-size:12px; }
+.fm-account-finance .round-countdown-finance { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px 16px; text-align:left; font-variant-numeric:tabular-nums; }
+.fm-account-finance:has(.round-countdown-warning) { border-color:var(--fm-danger); }
+@media(max-width:767px) { .fm-account-finance { padding:12px; } .fm-account-finance .round-countdown-finance { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:359px) { .fm-account-finance .round-countdown-finance { grid-template-columns:minmax(0,1fr); } }
 /* System monospace typography; no external font request. */
 .round-countdown-bar { position: sticky; top: 0; z-index: 1025; display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; margin: 0 0 12px; padding: 9px 14px; border: 1px solid var(--fm-border); border-radius: 3px; background: var(--fm-bg); color: var(--fm-text); font-size: 12px; line-height: 1.4; font-variant-numeric: tabular-nums; }
 .round-countdown-main { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
@@ -1510,7 +1522,7 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 }
 
 /* Technical information stays collapsed; native disclosure needs no server trip. */
-.fm-info[hidden], .fm-info.fm-info-empty, .fm-info-waiting.shiny-output-error-fm-loading, .recalculating .fm-info { display:none !important; }
+.fm-info[hidden], .fm-info.fm-info-empty, .fm-info-waiting.shiny-output-error-fm-loading:not(.fm-summary-output), .recalculating .fm-info { display:none !important; }
 .fm-info { display: block; min-width: 0; max-width: 100%; margin: 2px 0; color: var(--fm-muted); font-size: 12px; font-weight: normal; text-align: left; white-space: normal; }
 .fm-info > summary { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 4px; margin: 0; cursor: pointer; list-style: none; border-radius: 50%; color: var(--fm-muted); }
 .fm-info > summary::-webkit-details-marker { display: none; }

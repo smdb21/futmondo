@@ -136,7 +136,7 @@ function(input, output, session) {
   # must not deactivate reads still needed by My Team or Lineup.
   roster_sources_active <- reactive({
     valid_login(login_token_RV())&&
-      (isTRUE(input$tabs%in%c("yourteam","lineup"))||isTRUE(roster_note_active()))
+      isTRUE(input$tabs%in%c("yourteam","today","players_in_championship","lineup"))
   })
   roster_source_readers <- lapply(c(roster="get_players_from_team",transactions="get_championship_pressroom"),function(handler)
     factual_read_adapter(session,handler,login_token_RV,championship_id_RV,user_team_id_RV,
@@ -154,17 +154,41 @@ function(input, output, session) {
     incoming_clause_source_times(times)
   })
   coach <- coach_on_login_source(session,login_token_RV,championship_id_RV,user_team_id_RV,primary_team_state,primary_sources$retry_team)
+  # One visibility projection keeps the same box mounted between target pages.
+  # No league, schedule or financial read can prevent the shell from rendering.
+  account_finance_visible <- resource_display_source(session,function(){
+    valid_login(login_token_RV()) && isTRUE(input$tabs %in% c("today","yourteam","players_in_championship"))
+  })
+  output$account_finance_summary <- renderUI({
+    if (!isTRUE(account_finance_visible())) return(NULL)
+    tags$section(class="fm-account-finance", `aria-label`="Balance summary",
+      tags$div(class="fm-account-finance-heading", tags$h2("Balance summary"), uiOutput("round_countdown")),
+      tags$div(id="round_finance_amounts",class="shiny-html-output fm-summary-output",round_finance_amounts_UI()),
+      tags$div(id="account_squad",class="shiny-html-output fm-summary-output",account_squad_UI()),
+      uiOutput("round_clause_pending"),
+      uiOutput("round_finance_status",inline=TRUE))
+  })
+  shiny::outputOptions(output,"account_finance_summary",suspendWhenHidden=FALSE)
   round_finance_RV <- resource_display_source(session,function(){
     finance<-round_finance_display(primary_team_state(), primary_market_state())
     if(fm_clause_enabled())finance<-fm_clause_finance(finance,fm_clause_jobs(resource_context(login_token_RV(),championship_id_RV(),user_team_id_RV())),primary_team_state()$data)
     finance
   })
   round_finance_card_RV <- resource_display_source(session,function()round_finance_card_display(round_finance_RV()))
+  output$round_finance_amounts <- renderUI({
+    # Keep labels/unknown states visible even during context validation or a real
+    # projection failure. The independent status output retains the actual error.
+    card <- tryCatch(round_finance_card_RV(), shiny.silent.error=function(e)NULL,
+      error=function(e)list())
+    round_finance_amounts_UI(card)
+  })
+  shiny::outputOptions(output,"round_finance_amounts",suspendWhenHidden=FALSE)
   round_clause_pending_display <- resource_display_source(session,function(){
     if(!fm_clause_enabled())return(NULL)
     req(valid_login(login_token_RV()))
     fm_clause_pending_ui(fm_clause_jobs(resource_context(login_token_RV(),championship_id_RV(),user_team_id_RV())))
   })
+  output$round_clause_pending <- renderUI(round_clause_pending_display())
   round_finance_status_display <- resource_display_source(session,function(){
     finance<-round_finance_RV()
     cash<-finance$cash;commitments<-finance$commitments;spendable<-finance$spendable_budget
@@ -207,7 +231,7 @@ function(input, output, session) {
     tryCatch(get_finished_rounds(login_token_RV(), championship_id_RV()), error=function(e) data.frame())
   })
   round_heading_state<-resource_display_source(session,function(){
-    if(!isTRUE(input$tabs%in%c("today","players_in_championship","yourteam")))return(list(visible=FALSE))
+    if(!isTRUE(account_finance_visible()))return(list(visible=FALSE))
     if(!valid_login(login_token_RV()))return(list(visible=TRUE,logged_in=FALSE))
     ready<-isTRUE(startup_primary_ready())
     rounds<-if(ready)round_catalog_RV()else data.frame()
@@ -235,31 +259,9 @@ function(input, output, session) {
       } else tags$div(class="round-countdown-main",icon("clock"),
         fm_info(if (primary_ready) "Round schedule unavailable" else "Loading round schedule…", error = primary_ready,pending=!primary_ready))
     }
-    finance <- round_finance_card_RV()
-    cash <- finance$cash
-    commitments <- finance$commitments
-    active_offer_count <- finance$active_offer_count
-    final_balance <- finance$projected_committed_balance
-    spendable <- finance$spendable_budget
-    money_text <- function(x, loading=FALSE) if (is.finite(x)) paste0(format(round(x), big.mark=".", decimal.mark=",", scientific=FALSE), " EUR") else if (loading) "Loading…" else "Unavailable"
-    cash_text <- money_text(cash,finance$cash_loading)
-    offers_text <- if (is.finite(commitments)) {
-      suffix <- if (is.finite(active_offer_count)) paste0(" (", as.integer(active_offer_count), ")") else ""
-      paste0(money_text(commitments), suffix)
-    } else if (finance$offers_loading) "Loading…" else "Unavailable"
-    solvency_class <- finance$class
-    tags$div(class = paste("round-countdown-bar", solvency_class),
-      round_heading,
-      tags$div(class = "round-countdown-finance",
-        tags$span(class = "round-countdown-finance-item", paste0("Balance: ", cash_text)),
-        tags$span(class = "round-countdown-finance-item", paste0("Active offers: ", offers_text)),
-        if(fm_clause_enabled()&&is.finite(finance$manual_pending_amount)&&finance$manual_pending_amount>0)
-          tags$span(class='round-countdown-finance-item',paste0('Pending offer confirmations: ',money_text(finance$manual_pending_amount))),
-        round_clause_pending_display(),
-        tags$span(class = "round-countdown-finance-item", paste0("After offers: ", money_text(final_balance,finance$cash_loading || finance$offers_loading))),
-        tags$span(class = "round-countdown-finance-item", paste0("Can spend: ", money_text(spendable,finance$cash_loading || finance$offers_loading))),
-        uiOutput("round_finance_status",inline=TRUE)))
+    round_heading
   })
+
   user_teams_RV <- reactive({
     req(championship_id_RV()); refresh_trigger()
     get_teams(login_token_RV(), championship_id_RV())
@@ -283,8 +285,37 @@ function(input, output, session) {
     clause_transfer_revision(isolate(clause_transfer_revision())+1L)
   }
   clause_transfers_RV <- incoming_clause_source(session,login_token_RV,championship_id_RV,user_team_id_RV,
-    reactive(isTRUE(input$tabs%in%c("yourteam","lineup"))),
+    reactive(valid_login(login_token_RV())&&isTRUE(input$tabs%in%c("yourteam","today","players_in_championship","lineup"))),
     reactive(list(refresh_trigger(),clause_transfer_revision())),prerequisite_readers=roster_source_readers)
+  account_squad_RV <- resource_display_source(session,function(){
+    req(account_finance_visible())
+    auth<-login_token_RV();league<-championship_id_RV();team<-user_team_id_RV()
+    roster<-roster_source_readers$roster(login=auth,championship_id=league,user_team_id=team,teams=NULL)
+    jobs<-if(fm_clause_enabled())fm_clause_jobs(resource_context(auth,league,team))else list()
+    account_squad_display(roster,clause_transfers_RV(),primary_team_state(),
+      active_offers=tryCatch(round_finance_card_RV()$active_offer_count,error=function(e)NA_real_),
+      reserved_slots=fm_clause_reservations(jobs)$count)
+  })
+  account_squad_card_RV <- resource_display_source(session,function(){
+    state<-account_squad_RV()
+    state[setdiff(names(state),c("roster_observed_at","team_observed_at"))]
+  })
+  output$account_squad_checked <- renderText({
+    state<-tryCatch(account_squad_RV(),error=function(e)NULL)
+    stamps<-c(roster="Roster observed",team="Squad limit observed")
+    text<-vapply(names(stamps),function(key){
+      at<-fm_time(state[[paste0(key,"_observed_at")]])
+      if(length(at)!=1L||is.na(at)||at>Sys.time())return("")
+      paste0(stamps[[key]],": ",fm_format_datetime(at))
+    },character(1))
+    paste(text[nzchar(text)],collapse=" · ")
+  })
+  shiny::outputOptions(output,"account_squad_checked",suspendWhenHidden=FALSE)
+  output$account_squad <- renderUI({
+    state<-tryCatch(account_squad_card_RV(),shiny.silent.error=function(e)NULL,
+      error=function(e)list(status="unavailable",detail="Squad capacity could not be verified."))
+    account_squad_UI(state)
+  })
 selected_player_RV <- players_in_teams_Server(id = "players_in_teams",
                                                  is_module_active = reactive({
                                                    input$tabs == "yourteam"

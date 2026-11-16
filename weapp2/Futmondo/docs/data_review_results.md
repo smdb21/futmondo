@@ -1,5 +1,75 @@
 # Futmondo data review and implementation results
 
+## Independent balance summary and squad slots — 2026-11-16
+
+The deployed public server fingerprint and inline summary assets matched local
+source before this task; synthetic rendering also showed the previous box. That
+does not establish the cause in the owner's signed-in session. The previous
+single `round_countdown` render depended on schedule, financial and pending-purchase
+projections. The repair gives the first-content **Balance summary** a stable,
+source-independent shell, independent child outputs and an explicit factual-output
+marker excluded from disclosure adoption/pending hiding. Held context/source reads
+keep labels visible; settled failures keep truthful unavailable fields and their
+independent diagnostics. No financial value or manual-action preflight is bypassed.
+
+Added actual/effective players, the observed configured squad limit and reserved
+offer slots. The existing identity ledger accounts for bought/leaving players
+without adding actual and effective totals together. The requested **No more
+offers allowed.** appears at/over the known effective-plus-reservation limit.
+Known saved limits retain observed status/source times; missing, partial or invalid
+counts/limits never become zero. No availability claim is made below the limit.
+
+Executed final isolated-source checks: `test/test_banner_finance.R` passes 18
+checks; `test/test_debt_and_round_countdown.R` passes 14; the required
+`test/test_shiny_simulation.R` passes 13 checks plus eight rendered tabs with
+zero HTTP/live database mutation attempts; `test/test_deployment_contract.R`
+passes all three groups. `test/test_unchanged_refresh_display.R` passes schedule
+failure isolation, refresh/error recovery, independent squad timestamps, context
+clearing and existing table stability. Ten squad timestamp updates took 0.212s,
+leaving the shell and count card unchanged while source times advanced. The
+existing effective-count/filter suite also passes in the shared workspace.
+
+The real-root synthetic browser fixture passes 320/390/1440px in light/dark
+(the six layouts), with visible facts on all three pages, the full-capacity
+message, closed information panels, pending schedule recovery, stale pending
+classes on factual outputs, retained shell/amount DOM, no page overflow/browser
+errors and no live HTTP/transaction. After warm-up, navigation repeats zero team,
+market, roster, history or transfer-summary acquisitions. Maximum measured warm
+navigation was 31–52ms per layout in the isolated-source run. Phone/light and
+desktop/dark screenshots were inspected. Fixtures use synthetic accounts only;
+blocked external images are a test limitation, not missing production data.
+
+`test/test_clause_transfer_persistence.R` passes 11 checks, including delayed
+DB replay, original deadlines/context isolation and retryable unacknowledged
+writes. Cold valid replay uses one scoped database read/zero API reads; warm
+replay uses zero reads. The same root readers and bounded two-summary transfer
+queue now serve Today/Players earlier. Their first entry may demand the existing
+roster and transaction prerequisites and candidate summaries; My Team/Lineup and
+navigation reuse those observations. There is no new result store, source polling
+timer, dependency, schema, worker service or automatic transaction. Counts are
+small identity-set projections; source clocks update independently. Existing
+successful factual observations remain database-persisted with original context,
+source deadlines and completeness, with bounded memory accelerators and retryable
+failed writes. Local timings do not establish hosted network latency.
+
+The worker rendering fixture initially stopped because local `sodium` is absent.
+Its existing synthetic RPC boundary now also stubs only the synthetic credential
+envelope, with an exact fake-auth assertion. Production encryption is unchanged;
+this display check does not verify cryptography. The final persisted-worker
+browser passes 320/390/1440px: source-version/expiry/recovery and delayed refresh
+preserve the header, amounts and player-table DOM; changed facts repaint;
+zero acquisition jobs are enqueued. During the 800ms delayed database read,
+heartbeat completion measured 178–210ms; ordinary heartbeats measured 60–95ms.
+These are synthetic local measurements, without hosted latency claims.
+
+Unrelated working-tree/staged changes are preserved. Dependency/schema/setup are
+unchanged; only this task's five runtime manifest checksums change. An isolated
+source copy excludes unrelated uncommitted runtime changes for the release
+checks. No shared-browser/session tools are available to inspect the owner's
+signed-in tab, so authenticated hosted acceptance of the original failure remains
+open. Public rollout verification cannot replace it.
+
+
 ## Title-free information notes — 2026-11-16
 
 Removed source-heading inference and label insertion from the shared browser

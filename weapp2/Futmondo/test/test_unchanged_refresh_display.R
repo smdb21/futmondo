@@ -18,37 +18,44 @@ shiny::testServer(function(input,output,session){
  team<-shiny::reactiveVal(state(team_value));market<-shiny::reactiveVal(state(market_value))
  primary_team_state<-function()team();primary_market_state<-function()market()
  startup_primary_ready<-function()TRUE
- round_catalog_RV<-function()data.frame(round_number=14,begin_process=format(now+86400,'%Y-%m-%dT%H:%M:%SZ',tz='UTC'),is_finished=FALSE)
+ schedule_fault<-shiny::reactiveVal(FALSE)
+ round_catalog_RV<-function(){if(schedule_fault())stop("Synthetic schedule failure");data.frame(round_number=14,begin_process=format(now+86400,'%Y-%m-%dT%H:%M:%SZ',tz='UTC'),is_finished=FALSE)}
  for(expr in root_exprs)if(is.call(expr)&&identical(expr[[1]],as.name('<-'))&&
-  paste(deparse(expr[[2]]),collapse='')%in%c('round_finance_RV','round_finance_card_RV','round_finance_status_display',
+  paste(deparse(expr[[2]]),collapse='')%in%c('account_finance_visible','output$account_finance_summary','output$round_finance_amounts','output$round_clause_pending','round_finance_RV','round_finance_card_RV','round_finance_status_display',
    'output$round_finance_status','round_clause_pending_display','round_finance_checked','output$round_finance_checked',
    'round_heading_state','output$round_countdown'))eval(expr,envir=environment())
 },{
  session$setInputs(tabs='today');settle(session)
- original<-output$round_countdown;clock<-output$round_finance_checked
+ original<-output$round_finance_amounts;clock<-output$round_finance_checked
+ shell<-output$account_finance_summary
+ schedule_fault(TRUE);settle(session)
+ stopifnot(inherits(tryCatch(output$round_countdown,error=identity),"error"),
+  identical(shell,output$account_finance_summary),identical(original,output$round_finance_amounts))
+ schedule_fault(FALSE);settle(session)
+ cat('PASS an independently failed schedule cannot hide the summary shell or known finances\n')
  elapsed<-system.time(for(i in 1:10){
   now<<-now+60
   for(phase in c('stale','loading','fresh')){
    team(state(team_value,phase,now));market(state(market_value,phase,now));settle(session)
-   stopifnot(identical(original,output$round_countdown))
+   stopifnot(identical(original,output$round_finance_amounts))
   }
  })[['elapsed']]
  stopifnot(output$round_finance_checked!=clock,team()$observed_at==now)
  cat(sprintf('PASS ten stale/loading/fresh cycles preserve the exact balance card while original clocks advance (%.3fs)\n',elapsed))
  team(state(team_value,'failed'));settle(session)
- stopifnot(identical(original,output$round_countdown),grepl('could not load',output$round_finance_status$html,fixed=TRUE),
+ stopifnot(identical(original,output$round_finance_amounts),grepl('could not load',output$round_finance_status$html,fixed=TRUE),
   grepl('fm-info-error',output$round_finance_status$html,fixed=TRUE),!is.null(team()$error))
  cat('PASS genuine read failures update the independent status without repainting known money or concealing the error\n')
  changed<-team_value;changed$budget<-2000;team(state(changed));settle(session)
- stopifnot(!identical(original,output$round_countdown),grepl('Balance: 2.000 EUR',output$round_countdown$html,fixed=TRUE))
+ stopifnot(!identical(original,output$round_finance_amounts),grepl('Balance: 2.000 EUR',output$round_finance_amounts$html,fixed=TRUE))
  changed$budget<--10;team(state(changed));settle(session)
- stopifnot(grepl('round-countdown-warning',output$round_countdown$html,fixed=TRUE),grepl('Restore at least',output$round_finance_status$html,fixed=TRUE))
+ stopifnot(grepl('round-countdown-warning',output$round_finance_amounts$html,fixed=TRUE),grepl('Restore at least',output$round_finance_status$html,fixed=TRUE))
  team(state(changed,'stale'));settle(session)
- stopifnot(grepl('round-countdown-warning',output$round_countdown$html,fixed=TRUE),grepl('out of date',output$round_finance_status$html,fixed=TRUE),
+ stopifnot(grepl('round-countdown-warning',output$round_finance_amounts$html,fixed=TRUE),grepl('out of date',output$round_finance_status$html,fixed=TRUE),
   round_finance_RV()$class=='round-countdown-unavailable')
  cat('PASS changed observed money updates immediately; negative observed amounts remain marked while stale action validity stays unavailable\n')
  team(resource_state(status='loading'));market(resource_state(status='loading'));settle(session)
- stopifnot(grepl('Balance: Loading',output$round_countdown$html,fixed=TRUE),!grepl('2.000 EUR',output$round_countdown$html,fixed=TRUE))
+ stopifnot(grepl('Balance: Loading',output$round_finance_amounts$html,fixed=TRUE),!grepl('2.000 EUR',output$round_finance_amounts$html,fixed=TRUE))
  cat('PASS dropping source data clears old amounts instead of treating unknown values as zero\n')
 })
 # Scheduled-job polls can change metadata without changing any visible reserve.
@@ -63,18 +70,51 @@ shiny::testServer(function(input,output,session){
  primary_team_state<-function()state(value);primary_market_state<-function()state(market_value)
  startup_primary_ready<-function()TRUE;round_catalog_RV<-function()data.frame()
  for(expr in root_exprs)if(is.call(expr)&&identical(expr[[1]],as.name('<-'))&&
-  paste(deparse(expr[[2]]),collapse='')%in%c('round_finance_RV','round_finance_card_RV','round_finance_status_display',
+  paste(deparse(expr[[2]]),collapse='')%in%c('account_finance_visible','output$account_finance_summary','output$round_finance_amounts','output$round_clause_pending','round_finance_RV','round_finance_card_RV','round_finance_status_display',
    'output$round_finance_status','round_clause_pending_display','round_finance_checked','output$round_finance_checked',
    'round_heading_state','output$round_countdown'))eval(expr,envir=environment())
 },{
- session$setInputs(tabs='today');settle(session);original<-output$round_countdown
+ session$setInputs(tabs='today');settle(session);original<-output$round_finance_amounts
  for(i in 1:10){next_jobs<-jobs();next_jobs[[1]]$updated_at<-now+i;jobs(next_jobs);settle(session)
-  stopifnot(identical(original,output$round_countdown))}
+  stopifnot(identical(original,output$round_finance_amounts))}
  next_jobs<-jobs();next_jobs[[1]]$reserved_amount<-200;jobs(next_jobs);settle(session)
- stopifnot(!identical(original,output$round_countdown),grepl('Scheduled purchases: 200 EUR',output$round_countdown$html,fixed=TRUE))
+ stopifnot(!identical(original,output$round_finance_amounts),grepl('Scheduled purchases: 200 EUR',output$round_clause_pending$html,fixed=TRUE))
  cat('PASS ten scheduled-job metadata polls preserve the header; a changed reserved amount updates the shared financial ledger/display\n')
 })
 fm_clause_enabled<-original_clause_enabled;fm_clause_jobs<-original_clause_jobs
+# The new squad projection shares source observations, without clock-only redraws.
+shiny::testServer(function(input,output,session){
+ login_token_RV<-function()fixture_auth;championship_id_RV<-function()'league';user_team_id_RV<-function()'mine'
+ roster<-shiny::reactiveVal(state(data.frame(id=paste0('p',1:18))))
+ info<-shiny::reactiveVal(state(list(configuration=list(maxPlayersInRoster=20))))
+ transfers<-shiny::reactiveVal(list(status='ok',outgoing_status='ok',records=data.frame(player_id=c('bought1','bought2')),
+  outgoing_records=data.frame(player_id='p1')))
+ roster_source_readers<-list(roster=function(...)roster())
+ primary_team_state<-function()info();clause_transfers_RV<-function()transfers()
+ round_finance_card_RV<-function()list(active_offer_count=1L)
+ for(expr in root_exprs)if(is.call(expr)&&identical(expr[[1]],as.name('<-'))&&
+  paste(deparse(expr[[2]]),collapse='')%in%c('account_finance_visible','output$account_finance_summary',
+   'account_squad_RV','account_squad_card_RV','output$account_squad_checked','output$account_squad'))eval(expr,envir=environment())
+},{
+ session$setInputs(tabs='today');settle(session)
+ original<-output$account_squad;clock<-output$account_squad_checked;shell<-output$account_finance_summary
+ stopifnot(grepl('Players: 18',original$html,fixed=TRUE),grepl('Effective players: 19 / 20',original$html,fixed=TRUE),
+  grepl('No more offers allowed.',original$html,fixed=TRUE))
+ elapsed<-system.time(for(i in 1:10){
+  now<<-now+60;roster(state(roster()$data,at=now));info(state(info()$data,at=now));settle(session)
+  stopifnot(identical(original,output$account_squad),identical(shell,output$account_finance_summary))
+ })[['elapsed']]
+ stopifnot(!identical(clock,output$account_squad_checked))
+ cat(sprintf('PASS ten squad source-clock updates preserve counts/full warning and shell while clocks advance (%.3fs)\n',elapsed))
+ roster(resource_state(status='loading'));transfers(NULL);settle(session)
+ stopifnot(grepl('Players: Loading',output$account_squad$html,fixed=TRUE),
+  !grepl('No more offers allowed',output$account_squad$html,fixed=TRUE),identical(shell,output$account_finance_summary))
+ roster(resource_state(status='unavailable'));transfers(list(status='partial'));settle(session)
+ stopifnot(grepl('Players: Unavailable',output$account_squad$html,fixed=TRUE),
+  !grepl('No more offers allowed',output$account_squad$html,fixed=TRUE))
+ session$setInputs(tabs='login');settle(session);stopifnot(is.null(output$account_finance_summary))
+ cat('PASS context loading/failure clears private counts and full warning without removing target-page shell; unrelated pages hide it\n')
+})
 # Equivalent native/worker numeric representations must not repaint player rows.
 selected_player_Server<-function(...)NULL
 recent_player_points_source<-function(...)list(history=function()data.frame(),status=function()NULL)

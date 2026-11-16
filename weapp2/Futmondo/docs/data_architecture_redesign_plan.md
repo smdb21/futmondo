@@ -1,5 +1,17 @@
 # Futmondo data architecture redesign plan
 
+## Independent balance summary and squad slots — 2026-11-16
+
+- [x] Separate the stable first-content summary shell from schedule, amounts, squad, purchase and diagnostic outputs on My Team, Today's market and Players.
+- [x] Show actual/effective players, configured squad limit and reserved offer slots through the existing identity ledger; display **No more offers allowed.** at the known limit without treating unknowns as zero.
+- [x] Share existing roster/history readers and the bounded transfer queue across summary pages; preserve durable database source reuse, original context/source clocks/completeness and manual preflights.
+- [x] Focused regression, phone/desktop browser acceptance, offline lifecycle, deployment contract and performance review; actual checks and limitations recorded in `data_review_results.md`.
+- [ ] Commit/push and verify the automatic production source rollout.
+- [ ] Authenticated hosted acceptance of the originally reported missing-box session. Public source fingerprints and synthetic tests do not certify this.
+
+Contracts: [information disclosures](ui_information_disclosures.md). This is an existing-data presentation expansion; no migration, new dependency or transaction behavior.
+
+
 ## Title-free information notes — 2026-11-16
 
 - [x] Remove redundant generated source headings through the shared page/dialog registry; review note producers across the app and retain meaningful message context.

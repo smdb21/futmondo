@@ -42,7 +42,7 @@ body <- shinydashboard::dashboardBody(
       "))
   ),
   # The server owns page visibility; keep account finances above page notices.
-  uiOutput("round_countdown"),
+  uiOutput("account_finance_summary",class="fm-summary-output"),
   uiOutput("startup_status"),
   uiOutput("page_preference_status"),
   uiOutput("timezone_preference_status"),

@@ -1,5 +1,52 @@
 # Information and error disclosures
 
+## Independent balance summary and squad capacity — 2026-11-16
+
+This supersedes the combined `round_countdown` placement described below. The root
+`account_finance_summary` is the first content output on Today's market, My Team
+and Players. One boolean `account_finance_visible` projection owns visibility and
+keeps the same **Balance summary** shell mounted between those pages. The shell
+reads no league, schedule, financial or transfer resource and is unsuspended so
+an initially empty/hidden output cannot prevent its first display.
+
+Independent child outputs own `round_countdown` (schedule only),
+`round_finance_amounts`, `account_squad`, `round_clause_pending` and
+`round_finance_status`. Static pending markup includes all financial and squad
+labels. Context validation produces Loading; settled financial projection errors
+produce Unavailable while the independent status retains their diagnostic.
+`round_finance_amounts_UI(finance=NULL)` formats the existing ledger without
+changing amounts, signed cash, commitments, reservations or preflight rules.
+A NULL card means pending; an empty card means unavailable. Known source amounts
+remain displayed while other reads are pending/failed.
+
+The `.fm-summary-output` marker excludes the shell and factual child outputs from
+error-disclosure adoption and pending-marker hiding. Only their actual information
+details enter the existing page information panel. Pending schedule/purchase
+outputs cannot hide the amounts, counts, heading or shell. Mobile uses two amount
+columns below 768px and one below 360px; desktop uses four. The box is at the top
+of content, with no dismiss control or additional sticky behavior.
+
+`account_squad_display(roster_state, transfers, team_state, active_offers,
+reserved_slots)` projects existing observations through `team_effective_squad_count()`
+and `effective_squad_count()`: actual ownership, effective ownership after observed
+arrivals/departures, the configured `maxPlayersInRoster`, and offer reservations.
+Actual and effective totals are not added together. **No more offers allowed.**
+appears when effective ownership alone reaches/exceeds the known limit, or when
+known effective ownership plus active offer/pending-purchase slots reaches it.
+Unknown evidence cannot become zero, a fabricated limit or permission to buy.
+Existing-offer edits and final manual-action preflights retain their rules.
+`account_squad_UI(state=NULL)` renders those counts and explanation; the separate
+`account_squad_checked` output updates source times without repainting the card.
+
+The existing root roster/transaction readers and bounded two-summary transfer
+queue now serve all three summary pages as well as Lineup. Today/Players entry
+can demand these existing prerequisites earlier; moving to My Team/Lineup reuses
+the same source and queue. Successful reusable source observations continue to
+use the existing account/league/season/scoring-isolated durable database stores,
+original source deadlines and completeness metadata. Failed writes remain
+retryable; memory is only a bounded accelerator. No derived count store, schema,
+package, environment variable, timer, background collection or transaction is added.
+
 ## Title-free notes — 2026-11-16
 
 All page and dialog information panels display each note's original message

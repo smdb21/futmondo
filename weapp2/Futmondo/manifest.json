@@ -2301,7 +2301,7 @@
       "checksum": "a137daf35c3241a324ff128037fe1a29"
     },
     "data_contracts.R": {
-      "checksum": "f7f27d5a3c288189ece5080c24dda2f7"
+      "checksum": "fe76a142c35aa5030d042de9dd67161a"
     },
     "data_service.R": {
       "checksum": "cac43ce1d75a5a1220e4d8f47540c3b4"
@@ -2406,7 +2406,7 @@
       "checksum": "6941ec3d550551d6c41a20b6a4d2ff3e"
     },
     "server.R": {
-      "checksum": "9fb828afdb6c4ce8ae84efebdf3b3318"
+      "checksum": "a51ce8045cbfd9df12f78d2ed4425af3"
     },
     "supabase_connector.R": {
       "checksum": "680c9d36dbe62c8206859aae9422019f"
@@ -2415,7 +2415,7 @@
       "checksum": "771495cb5f6af805b2b98f903f675375"
     },
     "ui.R": {
-      "checksum": "86158de3a734c8d7d8a4e59b32e79cd9"
+      "checksum": "db6588b21463077a22fdf009d6e3dc6e"
     },
     "utils.R": {
       "checksum": "6253d5e12d91ddef162c7e9e7624680a"
@@ -2427,10 +2427,10 @@
       "checksum": "898785d8029f8f24064877b2a160d06b"
     },
     "www/custom_style.css": {
-      "checksum": "ec781d0adff817bed0b663b1f6885ea2"
+      "checksum": "6f4d38908ecfeee1e8e3543ea51675a9"
     },
     "www/info-disclosures.js": {
-      "checksum": "d990b8eca09cd2c50413af59aca3bd9c"
+      "checksum": "c857838c71c03ff562f0e6ad2dfa0359"
     },
     "www/release-info.json": {
       "checksum": "94a9e0ef704ee5c2f9de93c7055428b1"

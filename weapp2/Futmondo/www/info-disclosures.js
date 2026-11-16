@@ -170,6 +170,12 @@
     if (panel.classList.contains('fm-info-empty') !== empty) panel.classList.toggle('fm-info-empty', empty);
   }
   function compact(node) {
+    // Financial facts have their own typed placeholders and independent status.
+    // Never adopt these output containers into a collapsed information panel.
+    if (node.classList.contains('fm-summary-output')) {
+      if (node.classList.contains('fm-info-waiting')) node.classList.remove('fm-info-waiting');
+      return;
+    }
     if (!node.matches(selector)) {
       // Shiny removes its error classes before publishing recovered content.
       // Do not retain a loading class that can suspend the recovered output.
