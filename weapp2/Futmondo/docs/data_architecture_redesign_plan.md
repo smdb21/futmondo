@@ -1938,3 +1938,5 @@ This root-cause fix is implemented locally and its production source rollout is 
   comparison and the existing Essentials login description are updated.
 - No migration or new acquisition/persistence path. Production deployment and
   authenticated acceptance are separate from these completed local checks.
+
+- 2026-11-16: Local player-card chart stability and line styling implemented. Same-context record updates retain the mounted chart; changed chart inputs and context changes still propagate. Offline checks are recorded in `docs/data_review_results.md`; mobile background/foreground behavior remains to be checked in a deployed browser.

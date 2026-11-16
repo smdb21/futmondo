@@ -4288,3 +4288,9 @@ rows and the selection has at most four concrete roles. Native responsive chip
 wrapping handles mobile layouts. Documentation/login wording has no data-path
 effect. Browser/lifecycle checks establish local behavior; deployment and
 authenticated production acceptance were not performed in this task.
+
+## Player chart stability — 2026-11-16 Pacific
+
+`Rscript test/test_player_trend_plot.R` passed 16 checks, including line styles and known point/value fixtures. `Rscript test/test_player_chart_stability.R` passed the offline same-player update and progressive loading checks. The existing `test/test_progressive_loading.R` fails its pre-existing five-request expectation: current behavior starts four requests, with capacity deferred; a diagnostic run past that assertion also found the later capacity fixture assumes a request that is no longer started. No real account was used. Mobile background/foreground behavior and deployed responsiveness were not measured.
+
+Performance review: preserving the chart and publishing only changed chart inputs reduces widget remounts and Plotly redraws. This adds one bounded reactive snapshot per open card and equality comparisons over existing history/match data; it adds no API or database requests, timers, persistence changes, or background work. Existing durable history reuse and scoped invalidation remain in place. Actual changed history may still redraw the chart.

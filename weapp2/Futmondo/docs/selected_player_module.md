@@ -308,3 +308,7 @@ The actual saved source passes the corrected projection with zero source/databas
 requests during replay. A minimized synthetic form covers missing/false/unknown
 flags, mismatching IDs and real table -> modal readiness on phone/desktop. Full
 private payloads and authentication material are not recorded in fixtures/docs.
+
+## Stable player trend chart — 2026-11-16 Pacific
+
+The chart remains mounted when the selected player's surrounding record changes but its account, league, team and player context stays the same. A chart-specific reactive value publishes history and match inputs only when they differ; an empty loading state retains the previous curve until a replacement arrives. Context changes clear it, and actual history changes and explicit refresh still update it. The valuation trace is a line without markers; points use a solid orange line. Existing scoped database history, persistence, freshness and acquisition policies are unchanged.

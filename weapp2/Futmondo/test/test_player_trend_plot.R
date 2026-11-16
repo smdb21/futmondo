@@ -11,7 +11,7 @@ tree<-parse("Modules/Selected_Player_Module.R");plot_body<-find_output(tree,"pla
 empty<-function()list(valuation=data.frame(),points=data.frame(),status="empty",freshness="fresh")
 render_fixture<-function(history=empty(),total=12,value=1000000,matches=list()){
  env<-new.env(parent=globalenv());env$selected_player<-function()data.frame(id="p",points=total,value=value);env$card_history<-function()history;env$card_chart_ready<-function()TRUE
- env$card_states<-list(matches=function()list(data=matches))
+ env$chart_data<-function()list(history=history,matches=normalize_player_matches(matches))
  plotly::plotly_build(eval(plot_body,env))$x
 }
 check("zero negative and large values have padded axes",{for(values in list(0,-2,c(-2,0,5),c(99e6,100e6))){bounds<-player_trend_axis_range(values);stopifnot(all(is.finite(bounds)),all(values>bounds[1]),all(values<bounds[2]))}})
@@ -39,7 +39,7 @@ check("both series have independent vertical scales and distinct styles",{
  history<-combined;history$points$date<-as.POSIXct("2026-10-01",tz="UTC")+0:3*86400
  chart<-render_fixture(history);value<-chart$data[[1]];points<-chart$data[[2]]
  stopifnot(length(chart$data)==2L,value$yaxis=="y",points$yaxis=="y2",points$xaxis=="x",
-   value$line$dash=="solid",points$line$dash=="dash",value$line$color!=points$line$color,
+   value$mode=="lines",value$line$dash=="solid",points$line$dash=="solid",points$line$color=="#F28C28",value$line$color!=points$line$color,
    chart$layout$yaxis2$overlaying=="y",chart$layout$yaxis2$side=="right",identical(chart$layout$showlegend,FALSE),
    chart$layout$yaxis$tickfont$color==value$line$color,chart$layout$yaxis$title$font$color==value$line$color,
    chart$layout$yaxis2$tickfont$color==points$line$color,chart$layout$yaxis2$title$font$color==points$line$color,
@@ -55,7 +55,7 @@ check("postponed rounds connect chronologically with score provenance intact",{
  stopifnot(identical(as.character(trace$x),fm_plot_datetime(sort(history$points$date))),
    identical(as.numeric(trace$y),c(0,-2,3,4)),
    all(startsWith(trace$text,paste0("Round ",c(2,3,4,1),"<br>"))),
-   grepl("provisional",trace$text[3],fixed=TRUE),trace$line$dash=="dash")
+   grepl("provisional",trace$text[3],fixed=TRUE),trace$line$dash=="solid")
 })
 check("dense histories use sparse automatic dates without an empty dtick",{
  history<-known

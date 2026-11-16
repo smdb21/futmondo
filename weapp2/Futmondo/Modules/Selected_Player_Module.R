@@ -2083,7 +2083,13 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     card_started<-reactiveVal(Sys.time());timed_summary<-FALSE;timed_history<-FALSE;timed_availability<-FALSE
     card_chart_ready<-reactiveVal(FALSE)
     card_paint_generation<-reactiveVal(0L)
+    chart_context<-NULL
+    chart_data<-reactiveVal(NULL)
     observeEvent(card_context(),{
+      current<-card_context()
+      if(identical(current,chart_context)) return()
+      chart_context<<-current
+      chart_data(NULL)
       card_started(Sys.time());timed_summary<<-FALSE;timed_history<<-FALSE;timed_availability<<-FALSE;card_chart_ready(FALSE);card_paint_generation(isolate(card_paint_generation())+1L)
 
     },ignoreNULL=FALSE,priority=100)
@@ -2119,7 +2125,6 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
          identical(fm_scalar(input$identity_painted$generation,""),as.character(card_paint_generation())))card_chart_ready(TRUE)
     })
     output$player_chart_container <- renderUI({
-      req(selected_player())
       if(!isTRUE(card_chart_ready()))return(NULL)
       plotly::plotlyOutput(ns("player_trend_plot"),height="340px")
     })
@@ -2128,9 +2133,21 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       if(!isTRUE(card_chart_ready()))return(fm_info("Loading chart…",pending=TRUE))
       player_trend_information(card_history(),sp,normalize_player_matches(card_states$matches()$data))
     })
+    # Publish only chart inputs: availability/status changes must not redraw the
+    # widget. Keep the last curve while a refresh has no replacement data.
+    observe({
+      req(card_chart_ready())
+      history<-card_history()
+      matches<-normalize_player_matches(card_states$matches()$data)
+      previous<-isolate(chart_data())
+      if(identical(history$status,"loading") && !nrow(history$points) &&
+         !nrow(history$valuation) && !is.null(previous)) return()
+      chart_data(list(history=list(points=history$points,valuation=history$valuation,
+        context=history$context,status=if(identical(history$status,"loading") && !nrow(history$points) && !nrow(history$valuation)) "loading" else "ready"),matches=matches))
+    })
     output$player_trend_plot <- plotly::renderPlotly({
       req(card_chart_ready())
-      sp <- selected_player(); req(sp); history <- card_history()
+      data<-chart_data();req(!is.null(data));history<-data$history
       empty_chart <- function() plotly::plot_ly() %>% fm_plot_layout(
         paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",
         xaxis=list(visible=FALSE),yaxis=list(visible=FALSE),
@@ -2154,12 +2171,12 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
       # Reuse the already requested match details to date rounds; never use
       # observation/save timestamps as match dates or discard undated scores.
-      points_dates <- player_trend_points_dates(points,normalize_player_matches(card_states$matches()$data),history$context %||% list())
+      points_dates <- player_trend_points_dates(points,data$matches,history$context %||% list())
       dated_points <- nrow(points)>0L && all(!is.na(points_dates))
       separate_round_axis <- nrow(values)>0L && nrow(points)>0L && !dated_points
       chart <- plotly::plot_ly()
-      if (nrow(values)) chart <- chart %>% plotly::add_trace(data=values,type="scatter",mode="lines+markers",x=~date,y=~value,
-        name="Valuation",yaxis="y",line=list(color="#00ff88",width=2.5,dash="solid"),marker=list(size=5),
+      if (nrow(values)) chart <- chart %>% plotly::add_trace(data=values,type="scatter",mode="lines",x=~date,y=~value,
+        name="Valuation",yaxis="y",line=list(color="#00ff88",width=2.5,dash="solid"),
         text=~display_date,hovertemplate="%{text}<br>Valuation: %{y:,.0f} EUR<extra></extra>")
       if (nrow(points)) {
         points$plot_x <- if(dated_points)fm_plot_datetime(points_dates) else points$round_number
@@ -2173,7 +2190,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         chart <- chart %>% plotly::add_trace(data=points,type="scatter",mode="lines+markers",
           x=~plot_x,y=~points,text=~label,hoverinfo="text",name="Points",yaxis="y2",
           xaxis=if(separate_round_axis)"x2"else "x",
-          line=list(color="#F4C95D",width=2.5,dash="dash"),marker=list(size=7,color="#F4C95D"))
+          line=list(color="#F28C28",width=2.5,dash="solid"),marker=list(size=7,color="#F28C28"))
       }
       date_axis <- nrow(values)>0L || dated_points
       horizontal_axis <- list(title=if(date_axis)list(text="Date",standoff=20)else "Round",
@@ -2186,12 +2203,12 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       }
       chart %>% fm_plot_layout(
         xaxis=horizontal_axis,
-        xaxis2=if(separate_round_axis)list(title=list(text="Round",font=list(color="#F4C95D")),color="#F4C95D",overlaying="x",side="top",
+        xaxis2=if(separate_round_axis)list(title=list(text="Round",font=list(color="#F28C28")),color="#F28C28",overlaying="x",side="top",
           tickmode="linear",dtick=round_spacing,tickangle=0,showgrid=FALSE)else list(visible=FALSE),
         yaxis=list(title=list(text="Value (EUR)",font=list(color="#00ff88")),visible=nrow(values)>0L,autorange=FALSE,
           range=player_trend_axis_range(values$value),tickformat=".3s",color="#00ff88"),
-        yaxis2=list(title=list(text="Points",font=list(color="#F4C95D")),visible=nrow(points)>0L,overlaying="y",side="right",autorange=FALSE,
-          range=player_trend_axis_range(points$points),showgrid=FALSE,color="#F4C95D",tickformat="~g"),
+        yaxis2=list(title=list(text="Points",font=list(color="#F28C28")),visible=nrow(points)>0L,overlaying="y",side="right",autorange=FALSE,
+          range=player_trend_axis_range(points$points),showgrid=FALSE,color="#F28C28",tickformat="~g"),
         showlegend=FALSE,
         margin=list(l=55,r=50,b=95,t=if(separate_round_axis)60 else 20),
         annotations=list())
