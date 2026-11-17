@@ -1,5 +1,19 @@
 # Futmondo data architecture redesign plan
 
+## Lineup save placement and real next-round fixtures — 2026-11-16
+
+Status: **implemented and verified locally; authenticated hosted acceptance pending**.
+
+- [x] Move the existing Save control above Formation/the pitch without changing manual-save safeguards.
+- [x] Verify the existing `/2/league/matches` request and home/away/kickoff fields against the current official public client; retain normalized facts in the existing durable calendar evidence and worker snapshots.
+- [x] Show the exact lineup target round's fixtures below the pitch, with account timezone, responsive cards, original timestamps and truthful incomplete/stale states; browsing adds no fixture acquisition.
+- [x] Verify parser known answers, context isolation, durable restart reuse, one-time legacy calendar upgrade, corrupt-cache recovery, existing lineup actions, 320/390/1440px layouts and the required offline lifecycle; record performance impact and limits.
+- [ ] Verify deployment and authenticated next-round fixture completeness after the worker's normal calendar publication.
+
+Contracts: [lineup module](lineup_module.md). Official comparison:
+[feature comparison](feature_comparison.md). No schema migration, dependency,
+new worker job or transaction permission is introduced.
+
 ## Player-card database display and obsolete Retry — 2026-11-16
 
 - [x] Reproduce successful persisted summaries being rejected by the 60-second action gate and stale history being mislabeled as a failed refresh.

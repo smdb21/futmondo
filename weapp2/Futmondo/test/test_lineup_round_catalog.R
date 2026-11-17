@@ -1,13 +1,15 @@
 #!/usr/bin/env Rscript
 # Captured compact league-list contract, synthetic HTTP/database boundaries only.
-options(futmondo.offline=TRUE)
+options(futmondo.offline=TRUE,futmondo.worker_helper=TRUE)
 suppressPackageStartupMessages(source('global.R'))
 auth<-c(userid='lineup-calendar-fixture',token='private-fixture-token');cid<-'fixture-league';lid<-'source-league'
 active<-list(championships=list(list(id=cid,league=lid,userteam=list(id='own-team'))),
  rounds=list(list(`_id`='r12',number=12,championshipId=lid,beginProcess='2026-11-01T12:00:00Z')))
 leagues<-list(list(`_id`=lid,rounds=lapply(1:38,function(i)list(`_id`=paste0('r',i),status=if(i==12)'next'else'future'))))
 calendar<-list(rounds=lapply(38:1,function(i)list(`_id`=paste0('r',i),number=i,
- status=if(i<12)'closed'else if(i==12)'running'else'future',matches=list(list(private='discarded')))))
+ status=if(i<12)'closed'else if(i==12)'running'else'future',matches=list(list(`_id`=paste0('match-',i),
+  h=list(`_id`='home-club',name='Home Club'),a=list(`_id`='away-club',name='Away Club'),
+  info=list(date='2026-12-01T20:00:00Z'),st='scheduled',private='discarded')))))
 fixture<-new.env(parent=emptyenv());fixture$stored<-list();fixture$writes<-0L;fixture$db_reads<-0L;fixture$calendar_reads<-0L;fixture$mode<-'ok'
 get_sb_url<-function()'https://database.fixture.invalid';get_sb_key<-function()'private-database-key'
 persist_rival_finance_evidence<-function(evidence,context){
@@ -84,7 +86,8 @@ fixture$stored[[1]]$payload$valid_until<-as.numeric(Sys.time())-1
 fixture$mode<-'missing';clear_api_cache();failed<-read_rounds()
 stopifnot(identical(attr(failed,'catalog_complete'),FALSE),attr(failed,'catalog_status')=='partial',
  grepl('could not be read',attr(failed,'catalog_reason'),fixed=TRUE),!any(failed$is_finished%in%TRUE),fixture$writes==3L)
-fixture$stored<-list();fixture$mode<-'conflict';clear_api_cache();conflicting<-read_rounds()
+fixture$stored<-list();fixture$mode<-'conflict';clear_api_cache();reads_before<-fixture$calendar_reads;conflicting<-read_rounds()
+stopifnot(fixture$calendar_reads==reads_before+1L)
 stopifnot(identical(attr(conflicting,'catalog_complete'),FALSE),is.na(conflicting$round_number[1]),
  grepl('conflicting',attr(conflicting,'catalog_reason'),fixed=TRUE),fixture$writes==3L)
 cat('PASS stale/unavailable and conflicting calendars stay partial, do not invent round ordinals and never replace persisted success\n')
@@ -126,4 +129,28 @@ selected<-lineup_average_scores(data.frame(id='a'),data.frame(player_id='a',roun
 stopifnot(isTRUE(attr(postponed,'catalog_complete')),identical(attr(selected,'rounds'),as.numeric(c(6:9,11))),
  selected$average==1,fixture$calendar_reads==reads_before+1L,fixture$writes==writes_before+1L)
 cat('PASS malformed database data falls back to acquisition; a confirmed unfinished older round is excluded from a complete five-round window\n')
-cat('LINEUP ROUND CATALOG: 6 groups passed / 0 failed\n')
+# Display fixtures travel inside the same persisted calendar and original scope.
+games<-attr(postponed,'fixture_calendar')
+stopifnot(league_fixture_matches_valid(games$matches),games$scope$account_id==auth[['userid']],
+ games$matches$rows$home_name[games$matches$rows$round_id=='r13']=='Home Club',
+ games$matches$rows$away_name[games$matches$rows$round_id=='r13']=='Away Club')
+reads_before<-fixture$calendar_reads;writes_before<-fixture$writes
+clear_api_cache();reused<-read_rounds()
+stopifnot(identical(attr(reused,'fixture_calendar')$matches,games$matches),
+ abs(as.numeric(attr(reused,'fixture_calendar')$observed_at)-as.numeric(games$observed_at))<.001,
+ fixture$calendar_reads==reads_before,fixture$writes==writes_before)
+# Upgrade a pre-feature successful calendar once inside acquisition, then reuse.
+fixture$stored[[1]]$payload$fixture_matches<-NULL
+clear_api_cache();upgraded<-read_rounds()
+stopifnot(fixture$calendar_reads==reads_before+1L,fixture$writes==writes_before+1L,
+ league_fixture_matches_valid(attr(upgraded,'fixture_calendar')$matches),
+ league_fixture_matches_valid(fixture$stored[[1]]$payload$fixture_matches))
+clear_api_cache();invisible(read_rounds())
+stopifnot(fixture$calendar_reads==reads_before+1L,fixture$writes==writes_before+1L)
+cat('PASS normalized club fixtures survive restart with unchanged clocks/no source request; legacy calendars upgrade once and persist\n')
+fixture$stored[[1]]$payload$fixture_matches$rounds<-fixture$stored[[1]]$payload$fixture_matches$rounds[-1,]
+clear_api_cache();repaired<-read_rounds()
+stopifnot(fixture$calendar_reads==reads_before+2L,fixture$writes==writes_before+2L,
+ nrow(attr(repaired,'fixture_calendar')$matches$rounds)==38L)
+cat('PASS incomplete persisted fixture identity coverage is reacquired and replaced by the complete source observation\n')
+cat('LINEUP ROUND CATALOG: 8 groups passed / 0 failed\n')

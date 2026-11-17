@@ -101,7 +101,7 @@ get_finished_round_catalog <- function(login, championship_id) {
 }
 
 # The official client uses this bulk source for its numbered match calendar.
-# Persist only compact source metadata; fixtures and authentication never enter it.
+# Persist compact source metadata and normalized fixtures, never authentication.
 award_calendar_rows_valid <- function(rows) {
   is.data.frame(rows)&&nrow(rows)>0L&&nrow(rows)<=120L&&
     identical(names(rows),c("round_id","round_number","is_finished","status"))&&
@@ -149,7 +149,75 @@ award_fixture_calendar_valid <- function(rows) {
         if(rows$all_fixtures_dated[i])nzchar(begin)&&!is.na(fm_time(begin))&&fm_time(begin)==min(fm_time(dates))else !nzchar(begin)
     },logical(1)))
 }
-get_award_round_metadata <- function(login,championship_id,league_id,refresh=FALSE,current_round_id="") {
+# Public official client: rounds[].matches[] has _id/id, h/a club objects,
+# info.date and st. Whitelist display facts instead of retaining raw responses.
+league_fixture_empty <- function() data.frame(round_id=character(),match_id=character(),
+  home_id=character(),home_name=character(),away_id=character(),away_name=character(),
+  kickoff=character(),status=character(),stringsAsFactors=FALSE)
+league_fixture_matches <- function(records) {
+  rounds<-list();rows<-list()
+  for(round in mvp_records(records)){
+    if(!is.list(round))next
+    id<-mvp_text(round$`_id` %||% round$id);if(!nzchar(id))next
+    matches<-mvp_records(round$matches);count<-if(is.list(round$matches))length(matches)else NA_integer_
+    parsed<-league_fixture_empty()
+    if(!is.na(count)&&count>0L&&count<=50L)parsed<-dplyr::bind_rows(c(list(parsed),lapply(matches,function(match){
+      if(!is.list(match))return(NULL)
+      club<-function(side){
+        value<-match[[side]];if(!is.list(value))value<-list()
+        name<-mvp_text(value$name);if(!nzchar(name))name<-mvp_text(value$shortname)
+        list(id=mvp_text(value$`_id` %||% value$id),name=name)
+      }
+      home<-club('h');away<-club('a')
+      date<-if(is.list(match$info))mvp_text(match$info$date)else ''
+      if(is.na(fm_time(date)))date<-''
+      data.frame(round_id=id,match_id=mvp_text(match$`_id` %||% match$id),
+        home_id=home$id,home_name=home$name,away_id=away$id,away_name=away$name,
+        kickoff=date,status=mvp_text(match$st),stringsAsFactors=FALSE)
+    })))
+    # Conflicting identities do not become repeated games or a complete schedule.
+    duplicate<-duplicated(parsed$match_id)|duplicated(parsed$match_id,fromLast=TRUE)
+    parsed<-parsed[nzchar(parsed$match_id)&!duplicate,,drop=FALSE]
+    complete<-!is.na(count)&&count>0L&&count<=50L&&nrow(parsed)==count&&
+      all(nzchar(parsed$home_id)&nzchar(parsed$away_id)&parsed$home_id!=parsed$away_id&
+        nzchar(parsed$home_name)&nzchar(parsed$away_name)&nzchar(parsed$kickoff))
+    rounds[[length(rounds)+1L]]<-data.frame(round_id=id,fixture_count=if(!is.na(count)&&count<=50L)count else NA_integer_,complete=complete)
+    rows[[length(rows)+1L]]<-parsed
+  }
+  list(version=1L,rounds=dplyr::bind_rows(c(list(data.frame(round_id=character(),fixture_count=integer(),complete=logical())),rounds)),
+    rows=dplyr::bind_rows(c(list(league_fixture_empty()),rows)))
+}
+league_fixture_matches_valid <- function(value,round_ids=NULL) {
+  if(!is.list(value)||!is.numeric(value$version)||length(value$version)!=1L||is.na(value$version)||value$version!=1)return(FALSE)
+  rounds<-value$rounds;rows<-value$rows
+  if(!is.data.frame(rounds)||nrow(rounds)<1L||nrow(rounds)>120L||!identical(names(rounds),c('round_id','fixture_count','complete'))||
+     !is.character(rounds$round_id)||anyNA(rounds$round_id)||any(!nzchar(rounds$round_id))||anyDuplicated(rounds$round_id)||
+     (!is.null(round_ids)&&!setequal(rounds$round_id,round_ids))||
+     !is.numeric(rounds$fixture_count)||any(!is.na(rounds$fixture_count)&(!is.finite(rounds$fixture_count)|rounds$fixture_count<0|rounds$fixture_count>50|rounds$fixture_count!=floor(rounds$fixture_count)))||
+     !is.logical(rounds$complete)||anyNA(rounds$complete)||
+     !is.data.frame(rows)||nrow(rows)>6000L||!identical(names(rows),names(league_fixture_empty()))||
+     !all(vapply(rows,function(x)is.character(x)&&!anyNA(x),logical(1)))||
+     any(!rows$round_id%in%rounds$round_id)||any(!nzchar(rows$match_id))||anyDuplicated(paste(rows$round_id,rows$match_id))||
+     any(nzchar(rows$kickoff)&is.na(fm_time(rows$kickoff))))return(FALSE)
+  all(vapply(seq_len(nrow(rounds)),function(i){
+    games<-rows[rows$round_id==rounds$round_id[i],,drop=FALSE];count<-rounds$fixture_count[i]
+    if(nrow(games)>50L||(!is.na(count)&&nrow(games)>count))return(FALSE)
+    !rounds$complete[i]||(!is.na(count)&&count>0L&&nrow(games)==count&&
+      all(nzchar(games$home_id)&nzchar(games$away_id)&games$home_id!=games$away_id&
+        nzchar(games$home_name)&nzchar(games$away_name)&nzchar(games$kickoff)))
+  },logical(1)))
+}
+league_fixture_matches_decode <- function(value) {
+  if(!is.list(value))return(NULL)
+  empty<-league_fixture_matches(list())
+  list(version=value$version,
+    rounds=dplyr::bind_rows(c(list(empty$rounds),mvp_records(value$rounds))),
+    rows=dplyr::bind_rows(c(list(empty$rows),mvp_records(value$rows))))
+}
+league_fixture_observation <- function(metadata) list(matches=metadata$fixture_matches,scope=metadata$scope,
+  observed_at=attr(metadata,'observed_at'),valid_until=metadata$valid_until,
+  status=metadata$status,reason=metadata$reason %||% '')
+get_award_round_metadata <- function(login,championship_id,league_id,refresh=FALSE,current_round_id="",include_matches=FALSE) {
   context<-resource_context(login,championship_id,season=league_season_context(championship_id))
   scope<-c(context[c("account_id","championship_id","competition_id","season")],list(league_id=as.character(league_id),current_round_id=mvp_text(current_round_id)))
   same_scope<-function(value)is.list(value)&&identical(names(value),names(scope))&&
@@ -183,6 +251,11 @@ get_award_round_metadata <- function(login,championship_id,league_id,refresh=FAL
             valid_fixtures<-award_fixture_calendar_valid(fixtures)
             if(valid_fixtures)result$fixture_rounds<-fixtures
           }
+          if(!is.null(payload$fixture_matches)||isTRUE(include_matches)){
+            games<-tryCatch(league_fixture_matches_decode(payload$fixture_matches),error=function(e)NULL)
+            valid_fixtures<-valid_fixtures&&league_fixture_matches_valid(games,restored$round_id)
+            if(valid_fixtures)result$fixture_matches<-games
+          }
           if(valid_fixtures){
             attr(result,"observed_at")<-stamp
             return(result)
@@ -206,7 +279,8 @@ get_award_round_metadata <- function(login,championship_id,league_id,refresh=FAL
         status=status,stringsAsFactors=FALSE)
     }))
     stamp<-Sys.time();deadline<-as.numeric(stamp)+ttl
-    result<-list(status="ok",rows=rows,fixture_rounds=award_fixture_calendar(records),scope=scope,complete=length(records)==nrow(rows)&&award_calendar_rows_valid(rows),valid_until=deadline)
+    result<-list(status="ok",rows=rows,fixture_rounds=award_fixture_calendar(records),fixture_matches=league_fixture_matches(records),
+      scope=scope,complete=length(records)==nrow(rows)&&award_calendar_rows_valid(rows),valid_until=deadline)
     attr(result,"observed_at")<-stamp
     result
   },context=context)
@@ -217,8 +291,9 @@ get_award_round_metadata <- function(login,championship_id,league_id,refresh=FAL
     result$rows$is_finished[running]<-FALSE
   }
   # A changed source league/active round cannot reuse the old process entry.
-  if(identical(result$status,"ok")&&!same_scope(result$scope)&&!isTRUE(refresh))
-    return(get_award_round_metadata(login,championship_id,league_id,refresh=TRUE,current_round_id=current_round_id))
+  if(identical(result$status,"ok")&&(!same_scope(result$scope)||
+     (isTRUE(include_matches)&&is.null(result$fixture_matches)))&&!isTRUE(refresh))
+    return(get_award_round_metadata(login,championship_id,league_id,refresh=TRUE,current_round_id=current_round_id,include_matches=include_matches))
   result
 }
 
@@ -238,6 +313,7 @@ persist_award_calendar_snapshot <- function(data,context) {
       row<-as.list(data$fixture_rounds[i,,drop=FALSE]);row$fixture_dates<-as.list(unlist(row$fixture_dates,use.names=FALSE));row
     })
   }
+  if(league_fixture_matches_valid(data$fixture_matches))payload$fixture_matches<-data$fixture_matches
   source_id<-paste0("calendar:v1:",as.character(openssl::sha256(scope$league_id)))
   evidence<-rival_finance_evidence(context$account_id,context$championship_id,context$season,"eligibility",source_id,payload,stamp)
   persist_rival_finance_evidence(list(evidence),context)
@@ -255,6 +331,7 @@ get_award_round_catalog <- function(login,championship_id,saved=data.frame(),ref
   metadata_reason<-""
   if(unresolved&&nzchar(mvp_text(catalog$league_id))){
     metadata<-get_award_round_metadata(login,championship_id,catalog$league_id,refresh=refresh,current_round_id=catalog$current_round_id)
+    attr(catalog,'fixture_calendar')<-league_fixture_observation(metadata)
     attr(catalog,"observed_at")<-attr(metadata,"observed_at")
     attr(catalog,"valid_until")<-metadata$valid_until
     if(identical(metadata$status,"ok")&&is.data.frame(metadata$rows)){

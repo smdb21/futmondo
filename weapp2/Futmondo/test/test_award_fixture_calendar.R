@@ -25,7 +25,7 @@ defer_persistence<-function(fn,args,context,on_complete=NULL,...){saved<<-args[[
 ctx<-resource_context(auth,'championship',season='unknown')
 stopifnot(persist_award_calendar_snapshot(metadata,ctx),saved$payload$version==2L)
 get_sb_url<-function()'https://database.synthetic.invalid';get_sb_key<-function()'synthetic-test-key'
-supabase_get<-function(...)data.frame(account_id=saved$account_id,championship_id=saved$championship_id,season=saved$season,
+supabase_get<-function(...)data.frame(account_id=saved$account_id,championship_id=saved$championship_id,competition_id=saved$competition_id,season=saved$season,
  evidence_type=saved$evidence_type,source_id=saved$source_id,observed_at=saved$observed_at,payload=I(list(saved$payload)))
 restored<-get_award_round_metadata(auth,'championship','league-id',current_round_id='r2')
 stopifnot(reads==1L,restored$from_saved,award_fixture_calendar_valid(restored$fixture_rounds),

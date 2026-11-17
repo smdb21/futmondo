@@ -8,7 +8,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
   const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
   let previousReads = 0;
   try {
-    for (const width of [390, 1440]) {
+    for (const width of [320, 390, 1440]) {
       const page = await browser.newPage({ viewport: { width, height: 1000 } });
       const errors = [];
       page.on('pageerror', error => errors.push(error.message));
@@ -23,9 +23,12 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
         const boxes = await page.evaluate(() => {
           const rect = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return {top:r.top,bottom:r.bottom,left:r.left,right:r.right}; };
           return {formation:rect('.fm-lineup-formation'), pitch:rect('.fm-lineup-pitch'),
+            save:rect('#lineup-save'), fixtures:rect('.fm-lineup-fixtures'),
             optimize:rect('#lineup-best'), rounds:rect('#lineup-recent_n')};
         });
         assert.ok(boxes.formation.bottom <= boxes.pitch.top && boxes.pitch.top - boxes.formation.bottom < 30, 'Formation sits directly above pitch');
+        assert.ok(boxes.save.bottom <= boxes.formation.top, 'Save sits above the formation and pitch');
+        assert.ok(boxes.fixtures.top >= boxes.pitch.bottom, 'Real matches sit below the pitch');
         assert.ok(Math.abs(boxes.optimize.bottom - boxes.rounds.bottom) < 3, 'Rounds and Optimize share one row');
         assert.ok(boxes.optimize.right <= boxes.rounds.left, 'Rounds sit next to Optimize');
         assert.ok(boxes.rounds.right <= width && boxes.optimize.left >= 0, 'Controls fit viewport');
@@ -64,6 +67,15 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
         await modal.waitFor({ state: 'detached' });
       };
       await pitch.locator('.fm-lineup-player').nth(10).waitFor();
+      await page.locator('.fm-lineup-fixture').nth(9).waitFor();
+      assert.equal(await page.locator('#lineup-save').count(), 1);
+      assert.match(await page.locator('.fm-lineup-fixtures h3').innerText(), /Round 6/);
+      assert.match(await page.locator('.fm-lineup-fixtures').innerText(), /Kickoff to be confirmed/);
+      assert.match(await page.locator('.fm-lineup-fixtures').innerText(), /schedule may be incomplete/);
+      assert.equal(await page.locator('.fm-lineup-fixture').first().locator('[aria-label^="Home:"]').innerText(), 'Home Club 1');
+      assert.equal(await page.locator('.fm-lineup-fixture').first().locator('[aria-label^="Away:"]').innerText(), 'A very long visiting football club name');
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Fixture cards do not overflow');
+      await page.screenshot({ path: `/tmp/futmondo-lineup-fixtures-${width}.png`, fullPage: true });
       await assertControlsLayout();
       await assertLineupLayout(page, page.locator('.fm-lineup-layout'));
       assert.equal(await pitch.locator('.fm-lineup-empty').count(), 0);
@@ -263,7 +275,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       }
       assert.deepEqual((await page.locator('#fixture_counts').innerText()).split('/').map(Number), savedCounts);
       previousReads = Number((await page.locator('#fixture_counts').innerText()).split('/')[0]);
-      console.log(`PASS ${width}px: clear, defaults, disabled save, exact XI/bench, changed N, coverage, immediate post-optimize click, current draft XI/bench labels, repeated/redrawn one-click picker (${pickerMs.toFixed(0)} ms), starter/bench removal and refill, verified one-shot save, undo latest saved, viewport, dense/no-forward formations and responsive lineup geometry`);
+      console.log(`PASS ${width}px: save above pitch, ten matches below with no overflow, clear, defaults, disabled save, exact XI/bench, changed N, coverage, immediate post-optimize click, current draft XI/bench labels, repeated/redrawn one-click picker (${pickerMs.toFixed(0)} ms), starter/bench removal and refill, verified one-shot save, undo latest saved, viewport, dense/no-forward formations and responsive lineup geometry`);
       await page.close();
     }
   } finally {

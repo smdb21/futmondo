@@ -15,6 +15,17 @@ lineup_UI <- function(id) {
       .fm-lineup-choice-membership{display:inline-flex;flex-shrink:0}
       .fm-lineup-choice-total,.fm-lineup-choice-average{text-align:right;font-variant-numeric:tabular-nums}
       .fm-lineup-choice-crest{width:24px;height:24px;object-fit:contain}
+      .fm-lineup-fixtures{margin-top:24px;padding-top:16px;border-top:1px solid var(--fm-border,#d8e2da)}
+      .fm-lineup-fixtures h3{margin-top:0;font-size:20px}
+      .fm-lineup-fixtures-note{font-size:12px;color:var(--fm-muted,#647067);overflow-wrap:anywhere}
+      .fm-lineup-fixtures-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;list-style:none;padding:0}
+      .fm-lineup-fixture{min-width:0;padding:12px;border:1px solid var(--fm-border,#d8e2da);border-radius:8px}
+      .fm-lineup-fixture-time{display:block;font-size:12px;color:var(--fm-muted,#647067);margin-bottom:6px}
+      .fm-lineup-fixture-teams{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:10px;align-items:center}
+      .fm-lineup-fixture-team{min-width:0;overflow-wrap:anywhere;font-weight:600}
+      .fm-lineup-fixture-away{text-align:right}
+      .fm-lineup-fixture-vs{font-size:12px;color:var(--fm-muted,#647067)}
+      @media(max-width:600px){.fm-lineup-fixtures-list{grid-template-columns:minmax(0,1fr)}}
     ")),
     shiny::div(class='fm-lineup-editor',
       shiny::h2('Lineup'),shiny::uiOutput(ns('heading')),
@@ -31,9 +42,10 @@ lineup_UI <- function(id) {
         shiny::actionButton(ns('reload'),label=NULL,icon=shiny::icon('rotate'),`aria-label`='Refresh lineup',
           title='Reload the official lineup, squad and rules from LigaRadar; keep your unsaved changes')),
       shiny::uiOutput(ns('status')),
+      shiny::div(class='fm-lineup-actions',shiny::uiOutput(ns('save_control'))),
       shiny::div(class='fm-lineup-formation',shiny::uiOutput(ns('formation_control'))),
       shiny::uiOutput(ns('pitch')),shiny::uiOutput(ns('captain_control')),
-      shiny::uiOutput(ns('save_control'))))
+      shiny::uiOutput(ns('fixtures'))))
 }
 lineup_Server <- function(id,is_module_active,login_token,championship_id,user_team_id,round_catalog,
   refresh_trigger=NULL,history_refresh_trigger=NULL,clause_transfers_source=NULL,clause_transfers_refresh=NULL,round_catalog_state=NULL) {
@@ -343,6 +355,30 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       shiny::div(class='fm-lineup-note',if(is.null(next_round))fm_info('Next-round schedule unavailable; saving is disabled.',error=TRUE,pending=loading())else
         paste0('Next scheduled round ',next_round$number),
         if(dirty())shiny::strong(' · Unsaved changes'))
+    })
+    output$fixtures<-shiny::renderUI({
+      shiny::req(is_module_active());who<-identity();shiny::req(who)
+      next_round<-target()
+      view<-lineup_fixture_view(round_catalog(),next_round,list(account_id=who$account,
+        championship_id=who$championship,competition_id=who$competition,season=who$season))
+      shiny::tags$section(class='fm-lineup-fixtures',`aria-label`='Next-round matches',
+        shiny::h3(if(is.null(next_round))'Next-round matches'else paste0('Next-round matches · Round ',next_round$number)),
+        shiny::p(class='fm-lineup-fixtures-note','Home team first · Times in ',fm_display_timezone()),
+        if(nzchar(view$message))shiny::p(class='fm-lineup-fixtures-note',role='status',view$message),
+        if(nrow(view$rows))shiny::tags$ul(class='fm-lineup-fixtures-list',lapply(seq_len(nrow(view$rows)),function(i){
+          row<-view$rows[i,,drop=FALSE]
+          home<-if(nzchar(row$home_name))row$home_name else 'Home team unconfirmed'
+          away<-if(nzchar(row$away_name))row$away_name else 'Away team unconfirmed'
+          shiny::tags$li(class='fm-lineup-fixture',`data-match-id`=row$match_id,
+            shiny::tags$time(class='fm-lineup-fixture-time',datetime=if(nzchar(row$kickoff))row$kickoff,
+              fm_format_datetime(row$kickoff,missing='Kickoff to be confirmed')),
+            shiny::div(class='fm-lineup-fixture-teams',
+              shiny::span(class='fm-lineup-fixture-team',`aria-label`=paste('Home:',home),home),
+              shiny::span(class='fm-lineup-fixture-vs','vs'),
+              shiny::span(class='fm-lineup-fixture-team fm-lineup-fixture-away',`aria-label`=paste('Away:',away),away)))
+        })),
+        if(!is.null(view$observed_at))shiny::p(class='fm-lineup-fixtures-note',
+          paste0('Schedule updated ',fm_format_datetime(view$observed_at),if(view$stale)' · Awaiting sync update'else '')))
     })
     output$status<-shiny::renderUI({
       shiny::req(is_module_active());status<-history$status();score<-scores()

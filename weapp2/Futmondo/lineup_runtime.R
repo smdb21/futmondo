@@ -25,6 +25,30 @@ lineup_target <- function(rounds,now=Sys.time()) {
   if(!nzchar(id)||!is.finite(number)||number<1||number!=floor(number))return(NULL)
   list(id=id,number=number,starts_at=times[i])
 }
+# No acquisition here: the shared round resource includes the durable calendar.
+lineup_fixture_view <- function(rounds,target,scope,now=Sys.time()) {
+  result<-list(rows=league_fixture_empty(),message='',complete=FALSE,stale=FALSE,observed_at=NULL)
+  unavailable<-function(message){result$message<-message;result}
+  if(is.null(target))return(unavailable('The next round has not been confirmed.'))
+  calendar<-attr(rounds,'fixture_calendar')
+  if(!is.list(calendar))return(unavailable('Next-round fixtures are awaiting the synced match calendar.'))
+  if(!identical(calendar$status,'ok'))return(unavailable('The match calendar could not be synced. Background sync will retry.'))
+  fields<-c('account_id','championship_id','competition_id','season')
+  if(!is.list(calendar$scope)||!all(vapply(fields,function(field)
+    identical(mvp_text(calendar$scope[[field]]),mvp_text(scope[[field]])),logical(1))))
+    return(unavailable('Waiting for the match calendar for this league and season.'))
+  stamp<-fm_time(calendar$observed_at);deadline<-fm_number(calendar$valid_until)
+  if(length(stamp)!=1L||is.na(stamp)||stamp>now||!is.finite(deadline)||!league_fixture_matches_valid(calendar$matches))
+    return(unavailable('The saved match calendar is incomplete. Background sync will retry.'))
+  coverage<-calendar$matches$rounds;coverage<-coverage[coverage$round_id==target$id,,drop=FALSE]
+  rows<-calendar$matches$rows;rows<-rows[rows$round_id==target$id,,drop=FALSE]
+  result$rows<-rows[order(fm_time(rows$kickoff),rows$match_id,na.last=TRUE),,drop=FALSE]
+  result$observed_at<-stamp;result$stale<-deadline<=as.numeric(now)
+  result$complete<-nrow(coverage)==1L&&isTRUE(coverage$complete)
+  if(!nrow(rows))result$message<-'Fixtures for this round have not been confirmed in the synced calendar.'
+  else if(!result$complete)result$message<-'Some match details are still unconfirmed; the schedule may be incomplete.'
+  result
+}
 # Completed-round facts remain usable when a successful worker observation ages.
 # Actual read failures, incomplete catalogs and foreign scopes remain unverified.
 lineup_catalog_problem <- function(catalog,state=NULL,expected_context=NULL,now=Sys.time()) {

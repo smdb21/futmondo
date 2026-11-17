@@ -1,5 +1,87 @@
 # Next-round lineup
 
+## Save placement and next-round fixtures — 2026-11-16
+
+The existing Save to LigaRadar control now sits above Formation and the pitch.
+Its validation, live manual-action preflight, duplicate prevention and readback
+remain unchanged. Below the pitch, substitutes and optional Captain selector,
+`lineup_Server` renders `fixtures`: home/away match cards for the same verified
+round selected by `lineup_target()`, ordered by kickoff. Cards use two columns on
+desktop and one on mobile; long club names wrap. Kickoffs use the account's
+selected timezone. Missing opponents/times remain unconfirmed, incomplete
+schedules are labelled, and expired observations retain their source time and an
+awaiting-sync note. No date, opponent, round identity or missing count is invented.
+
+### Source and payload
+
+Verified 2026-11-16 in the [public official client](https://app.futmondo.com/main.dart.js)
+(SHA-256 `08202076259d1678c7557478771d3aa38b5099f42044630569c704fdb7a7cd1c`):
+`qT/axL` calls `/2/league/matches` with `{leagueId: <source league ID>}`;
+`cwe` maps `answer.rounds` and `ces` maps each round's `matches`. The club parser
+`Ij` establishes `h` as home and `a` as away club objects, `_id`/`id`, `name` and
+`shortname`; `info.date` supplies kickoff and `st` the source status. These are
+real clubs, separate from fantasy user teams. The public bundle and synthetic
+responses establish the mapping; no authenticated production response or
+current official UI was inspected for this task.
+
+`mvp_runtime.R` adds:
+
+- `league_fixture_empty()` defines the display row columns: `round_id`, `match_id`,
+  `home_id`, `home_name`, `away_id`, `away_name`, `kickoff`, `status`.
+- `league_fixture_matches(records)` whitelists these facts into
+  `{version: 1, rounds: frame, rows: frame}`. Coverage rows contain `round_id`,
+  `fixture_count` (unknown for an absent/malformed/oversized collection) and
+  `complete`. A complete round requires all returned match identities, distinct
+  home/away clubs, club names and valid dates. Duplicate match identities are
+  excluded and coverage stays partial. Bounds are 120 rounds and 50 games per round.
+- `league_fixture_matches_valid(value, round_ids = NULL)` verifies types, bounds,
+  identity/count consistency and any asserted completeness. Optional round IDs
+  require an exact source-calendar identity set.
+- `league_fixture_matches_decode(value)` restores the typed frames from JSON;
+  `league_fixture_observation(metadata)` carries these frames with scope, original
+  `observed_at`, absolute `valid_until`, source status and failure reason.
+
+`get_award_round_metadata(..., include_matches = FALSE)` retains the normalized
+match facts on acquisition. With `include_matches = TRUE`, a legacy calendar
+missing these fields is reacquired once in the worker and then reused.
+`persist_award_calendar_snapshot()` adds optional `fixture_matches` to the
+existing calendar evidence payload (its existing version 2 remains compatible).
+The outer calendar completeness describes round metadata; fixture completeness
+is independently recorded per round. Invalid stored fixture identity coverage
+causes a source cache miss, not a successful empty schedule.
+
+`get_award_round_catalog()` carries already-acquired fixture metadata in a
+`fixture_calendar` attribute. `get_finished_rounds()` reuses it, including failure
+state, so a failed request is not repeated merely to obtain fixture details. If
+that catalog did not need the bulk endpoint, the worker reads it through the
+same database-first metadata cache. The shared round frame's `fixture_calendar`
+attribute is included by the existing worker codec and durable resource snapshot.
+`lineup_fixture_view(rounds, target, scope, now)` selects the exact target round,
+checks account/championship/competition/season, and prepares truthful display
+state without I/O. The outer worker envelope retains team/scoring context too.
+
+### Persistence, performance and delivery
+
+Both compact calendar evidence and the worker round snapshot use the existing
+server-only database stores. Fresh successful evidence is read before acquisition;
+reopening or restarting preserves the source deadline and creates no replacement
+write. Failed persistence retains the existing retry behavior. Only whitelisted
+factual fields enter storage; no credentials or raw private response bodies do.
+No migration, dependency, environment setting, job, lane, timer or source
+concurrency increase is needed. Old worker snapshots populate the new field on
+the normal calendar sync after deployment.
+
+The display uses the existing shared round resource: opening, navigating,
+editing, resizing or Refresh adds no fixture HTTP/database request. A worker
+calendar that previously needed only compact league metadata may now need one
+bulk calendar read when cold/expired; callers that already needed it share that
+read. The parser processes at most 6,000 matches, and the UI renders at most 50.
+A synthetic 380-match season used 96,848 bytes; parsing took 0.274–0.332 seconds in
+the worker and display selection/validation averaged 17–19 milliseconds. Mobile
+and desktop checks and the full offline lifecycle passed; see
+[data review](data_review_results.md). These measurements do not establish
+production worker latency, authenticated fixture completeness or hosted rollout.
+
 The **Lineup** sidebar page edits the selected league's current editable Futmondo lineup. Its heading names the next scheduled round; the source mutation API itself has no round parameter. The page never submits a historical or arbitrary future-round lineup. Saving is disabled without an identified next round and rechecks its identity/time immediately before submission.
 
 The pitch supports the twelve official 11-player formations, including 4-6-0. Available formations come from `/5/strategy/availables`; premium entries remain disabled unless the current source reports the relevant purchase or it is the existing formation. The app never buys formations. Player pickers use the squad's primary role and permitted alternative role, prevent duplicates across pitch/bench, and move/swap players only when the other position remains valid. Incoming clause transfers do not enter this squad before authoritative ownership arrives.

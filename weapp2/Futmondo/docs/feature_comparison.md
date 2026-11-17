@@ -1,5 +1,22 @@
 # LigaRadar additions to the official Futmondo workflows
 
+## Next-round match calendar beside the lineup — reviewed 2026-11-16
+
+Rechecked the [official rules](https://help.futmondo.com/article/91-reglas-del)
+(last updated 2021-12-17), the [official app guide](https://magazine.futmondo.com/novedades-en-la-nueva-app-de-futmondo/)
+(published 2021-12-23), and the [current public app bundle](https://app.futmondo.com/main.dart.js).
+The rules connect lineup selection to real matches; the current client supplies
+a numbered real-match calendar via `/2/league/matches`, including home/away clubs
+and kickoff. The verified field mapping and bundle digest are in
+[lineup_module.md](lineup_module.md#save-placement-and-next-round-fixtures--2026-11-16).
+
+LigaRadar places those existing factual fixtures below the editable pitch, with
+kickoffs in the account timezone, and moves its existing Save control above the
+pitch. This is a contextual presentation of a shared official capability, not a
+new exclusive analysis or automation feature, so no additional login-tier item
+is added. No authenticated current official UI or production response comparison
+was performed; the official app's exact placement is not asserted.
+
 ## Automatic factual sync review — 2026-11-16
 
 Rechecked the [official rules](https://help.futmondo.com/article/91-reglas-del) and [official app feature guide](https://magazine.futmondo.com/novedades-en-la-nueva-app-de-futmondo/) for own financial movements, market/ownership data and team browsing. The guide was published in 2021; neither source establishes the current official app's internal data-loading architecture, and no authenticated UI comparison was performed. LigaRadar now connects its existing factual collector on login, reads persisted observations for all browsing, and updates changed values quietly. This improves delivery of existing features rather than adding a new analytical capability; there is no new login tier item or exclusivity claim. Login discloses continued sync after logout and the Disconnect control revokes factual access. [Implementation and limits](database_first_sync.md).

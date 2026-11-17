@@ -1,5 +1,75 @@
 # Futmondo data review and implementation results
 
+## Lineup save placement and real next-round fixtures — 2026-11-16
+
+Moved the existing Save control above Formation/the pitch and added next-round
+home/away matches below the pitch and Captain selector. The current official
+public client's `/2/league/matches` request and `h`/`a`/`info.date` mapping were
+verified; the parser now retains these previously discarded facts. Existing
+calendar evidence and worker snapshots persist them with scope, source times,
+absolute expiry and per-round completeness. No browser acquisition is added.
+
+Executed locally with synthetic accounts and I/O:
+
+- `Rscript test/test_lineup_fixtures.R`: known-answer target selection, home/away
+  mapping, ordering, Madrid/Los Angeles times, actual worker codec hydration,
+  account/league/competition/season rejection, missing opponents/dates/counts,
+  duplicate games, corrupt counts, legacy/error/stale states and bounded costs pass.
+- `Rscript test/test_lineup_round_catalog.R`: eight groups pass, including actual
+  asynchronous getter/database filters, saved reuse without renewed clocks or
+  writes, one-time legacy-field acquisition/persistence, corrupted coverage
+  repair, failed-source preservation and existing exact zero/negative averages.
+  Its fixture now explicitly runs in worker acquisition mode, matching the
+  database-first production boundary.
+- `Rscript test/test_award_fixture_calendar.R`: all five groups pass, including
+  original postponed-date and ownership-calendar behavior. Corrected this test's
+  database fixture to include the required competition scope; the original test
+  also failed against the unchanged baseline without that field.
+- `Rscript test/test_lineup_worker_calendar.R`: eight groups pass, including
+  actual worker publication, legacy metadata recovery, scope checks and zero-I/O
+  hydration. One hundred small calendar hydrations took 0.135 seconds.
+- `Rscript test/test_lineup_module.R`: all checks pass, including held asynchronous
+  requests, context-switch cancellation, duplicate-safe save/readback, history
+  completeness and departure eligibility.
+- `Rscript test/test_lineup_browser.R` with
+  `PLAYWRIGHT_BROWSERS_PATH=/tmp/futmondo-browsers node test/test_lineup_browser.cjs`:
+  320, 390 and 1440px pass. Save appears exactly once above Formation/the pitch;
+  ten matches render below it, long names wrap, missing kickoffs remain explicit,
+  and the existing editing/verified one-shot save/dense formations/resize tests
+  pass without extra read/write counts. Player-picker timings were 75/106/127 ms.
+  Inspected the phone and desktop screenshots. The first launch needed the
+  existing Chromium location; no dependency was installed or changed.
+- `Rscript test/test_shiny_simulation.R`: 13 checks plus eight tabs pass, with no
+  HTTP or live database mutations. `Rscript test/test_deployment_contract.R`:
+  three groups pass; private captures, tests and docs remain excluded.
+
+Performance review: no new display API/DB reads, poll, timer, invalidation, worker
+lane or job. Existing cold compact-only calendars may need one additional bulk
+match read in the worker; an already-required numbered-calendar read is shared,
+and valid database evidence prevents repeated acquisition. Failed calendar reads
+are reused by both consumers in that attempt. The whitelisted parser is bounded
+to 120 rounds × 50 games and displays at most one round. A 380-match synthetic
+season occupied 96,848 bytes, parsed in 0.274–0.332 seconds, and took 17–19 ms per
+display selection/validation. Current drafts do not affect fixture outputs. No
+schema/dependency/environment changes; documentation has no runtime effect.
+
+Final delivery verification used an isolated copy of the exact staged application,
+without unrelated working-tree changes. Fixture/caching, award-calendar, lineup
+module, deployment and lifecycle checks pass there; all four changed runtime
+checksums match the staged manifest. The full browser sequence passes at
+320/390/1440px (picker samples 57/72/109 ms). One earlier isolated desktop run
+failed the existing picker-row geometry assertion; a desktop-only diagnostic and
+the full diagnostic rerun passed without runtime changes. No failing geometry
+was reproduced, so its cause remains unverified. This intermittent check is not
+evidence of a hosted performance measurement. The diagnostic script stayed in
+`/tmp` and is not part of the application or commit.
+
+Limits: no real account or transaction was used. The current public client and
+source-shaped fixtures establish the mapping, not a live production response.
+Authenticated hosted fixture completeness, worker latency and deployment remain
+unverified. Legacy snapshots gain match details on normal calendar sync after
+the matching worker code is deployed. Contract: [lineup_module.md](lineup_module.md).
+
 ## Independent balance summary and squad slots — 2026-11-16
 
 The deployed public server fingerprint and inline summary assets matched local

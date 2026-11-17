@@ -13,6 +13,13 @@ fixture_roster$status[24] <- 'injured'
 fixture_rounds <- data.frame(round_id = paste0('r', 1:6), round_number = 1:6,
   is_finished = c(rep(TRUE, 5), FALSE),
   begin_process = format(Sys.time() + c(-5:-1 * 86400, 3600), '%Y-%m-%dT%H:%M:%SZ', tz = 'UTC'))
+fixture_matches <- league_fixture_matches(list(list(`_id`='r6',matches=lapply(1:10,function(i)
+  list(`_id`=paste0('fixture-match-',i),h=list(`_id`=paste0('home-',i),name=paste('Home Club',i)),
+    a=list(`_id`=paste0('away-',i),name=if(i==1)'A very long visiting football club name'else paste('Away Club',i)),
+    info=list(date=if(i==10)''else format(Sys.time()+3600+i*1800,'%Y-%m-%dT%H:%M:%SZ',tz='UTC')))))))
+attr(fixture_rounds,'fixture_calendar') <- list(matches=fixture_matches,
+  scope=list(account_id='fixture-account',championship_id='fixture-league',competition_id='unknown',season='unknown'),
+  status='ok',observed_at=Sys.time()-60,valid_until=as.numeric(Sys.time())+3600)
 fixture_history <- expand.grid(player_id = fixture_roster$id, round = 1:5, stringsAsFactors = FALSE)
 fixture_history$points <- as.numeric(sub('p', '', fixture_history$player_id))
 fixture_history$points[fixture_history$player_id == 'p1'] <- c(100, 100, 100, 0, 0)

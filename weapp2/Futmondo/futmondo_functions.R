@@ -187,6 +187,17 @@ get_finished_rounds <- function(login, championship_id) {
   attr(rounds,"catalog_reason") <- catalog$reason %||% ""
   attr(rounds,"observed_at") <- attr(catalog,"observed_at")
   attr(rounds,"valid_until") <- attr(catalog,"valid_until")
+  # The existing worker calendar carries the next-round matchups to every
+  # session. Display adapters only restore this persisted resource.
+  if(nzchar(mvp_text(catalog$league_id))){
+    fixtures<-attr(catalog,'fixture_calendar')
+    if(is.null(fixtures)||(identical(fixtures$status,'ok')&&is.null(fixtures$matches))){
+      metadata<-get_award_round_metadata(login,championship_id,catalog$league_id,
+        current_round_id=catalog$current_round_id,include_matches=TRUE)
+      fixtures<-league_fixture_observation(metadata)
+    }
+    attr(rounds,"fixture_calendar")<-fixtures
+  }
   rounds
 }
 
