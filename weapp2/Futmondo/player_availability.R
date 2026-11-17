@@ -77,7 +77,24 @@ player_availability_remember_target <- function(session,identity,row=NULL) {
   }
   row
 }
-# Pure validation keeps expired, incomplete and failed evidence out of reuse.
+# A successful database observation remains a display fact after its action
+# deadline. This does not renew timestamps or make it valid for a transaction.
+# Legacy unknown envelope completeness still needs the caller's field contract.
+player_availability_observed <- function(data,kind,now=Sys.time()) {
+  if(!kind%in%c('summary','listings')||!is.list(data)||
+     !isTRUE(attr(data,'worker_acquisition_status')%in%if(kind=='summary')'ok'else c('ok','empty'))||
+     !is.null(attr(data,'fetch_error'))||identical(attr(data,'complete'),FALSE)||
+     any(attr(data,'worker_completeness')%in%c('partial','incomplete','unavailable'))||
+     !isTRUE(attr(data,'fetch_status')%in%c('ok','empty','stale')))return(FALSE)
+  stamp<-fm_time(attr(data,'observed_at'));deadline<-attr(data,'valid_until')
+  if(length(stamp)!=1L||is.na(stamp)||stamp>now||
+     !is.numeric(deadline)||length(deadline)!=1L||!is.finite(deadline))return(FALSE)
+  if(kind=='listings')return(is.data.frame(data)&&
+    (!nrow(data)||('id'%in%names(data)&&!anyNA(data$id)&&all(nzchar(as.character(data$id)))&&!anyDuplicated(data$id))))
+  !is.data.frame(data)
+}
+
+# Pure action validation keeps expired, incomplete and failed evidence out of reuse.
 player_availability_valid <- function(data,kind,now=Sys.time()) {
   if(!is.list(data)||acquisition_data_unverified(data))return(FALSE)
   stamp<-fm_time(attr(data,'observed_at'))

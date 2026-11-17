@@ -1,10 +1,11 @@
 #!/usr/bin/env Rscript
-# Actual card wiring; delayed factual promises, no accounts, HTTP or transactions.
+# Native/offline card reuse; production database-only browsing is covered by
+# test_player_card_database_display.R. No accounts, HTTP or transactions.
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages(source('global.R'))
 clock<-base::Sys.time();Sys.time<-function()clock
 get_sb_url<-function()'';get_sb_key<-function()''
-fm_worker_configured<-function()TRUE;fm_worker_mode<-function(...)TRUE
+fm_worker_configured<-function()FALSE;fm_worker_mode<-function(...)FALSE
 fm_worker_resolve_context<-function(handler,args,context)context
 fm_worker_rpc<-function(...)stop('No worker publication may be required')
 auth<-c(userid='availability-switch-fixture',token='synthetic')
@@ -18,7 +19,8 @@ capacity<-function(){observed_data(list(status='ok',valid_until=as.numeric(clock
  outstanding=list(count=0),rules=list(minimum_bid_at_value=TRUE)),observed_at=clock)}
 summary<-function(id,bid=NULL)observed_data(list(data=list(id=id),championship=list(owner=list(id='rival',computer=FALSE)),market=list(p=1000,bids=list()),points=list(),prices=list(),
  my_bid_id=bid,my_bid_price=if(is.null(bid))NULL else 1000),observed_at=clock)
-async_adapter_fetch<-function(fn,args=list(),context,is_current=function()TRUE,worker_bypass=FALSE,...){
+async_adapter_fetch<-function(fn,args=list(),context,is_current=function()TRUE,worker_bypass=FALSE,intent=if(worker_bypass)'manual_action'else'display',...){
+ worker_bypass<-identical(intent,'manual_action')
  reads[[length(reads)+1L]]<<-list(fn=fn,bypass=worker_bypass,context=context)
  if(fn=='get_team_acquisition_capacity'){
   if(!worker_bypass){old<-capacity();old$valid_until<-as.numeric(clock)-30;return(promises::promise_resolve(observed_data(old,status='stale',observed_at=clock-45)))}
@@ -86,7 +88,8 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
 })
 # Owned players use their own shared factual listing gate, not team acquisition.
 base_async<-async_adapter_fetch;listing_jobs<-list();team_jobs<-list();summary_jobs<-list()
-async_adapter_fetch<-function(fn,args=list(),context,is_current=function()TRUE,worker_bypass=FALSE,...){
+async_adapter_fetch<-function(fn,args=list(),context,is_current=function()TRUE,worker_bypass=FALSE,intent=if(worker_bypass)'manual_action'else'display',...){
+ worker_bypass<-identical(intent,'manual_action')
  if(fn=='get_my_market_players'){
   stopifnot(worker_bypass)
   return(promises::promise(function(resolve,reject)listing_jobs[[length(listing_jobs)+1L]]<<-list(resolve=resolve,reject=reject)))

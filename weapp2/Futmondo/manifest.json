@@ -2289,7 +2289,7 @@
       "checksum": "27b3a72204bd37b236072472eaf194d9"
     },
     "player_availability.R": {
-      "checksum": "635a1e2e5f9ff64ade93ef518bd7d11e"
+      "checksum": "a50301e0379ce9d3e5cbb1768b2b3274"
     },
     "clause_transfer_store.R": {
       "checksum": "33cb8b7eee5164d1cd15c9ee4e3d7bda"
@@ -2370,7 +2370,7 @@
       "checksum": "1a1dd575681a9df0bdfe04c72332e1f3"
     },
     "Modules/Selected_Player_Module.R": {
-      "checksum": "ce246bc2d718a51fad8a6a008565505a"
+      "checksum": "ea069c909c92d2926b01333a621b5d41"
     },
     "Modules/Today_Module.R": {
       "checksum": "589e00cc033412df8a1cc0db1169dee2"

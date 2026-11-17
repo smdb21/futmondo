@@ -37,7 +37,7 @@ async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is
  if(fn%in%c('get_team_acquisition_capacity','get_user_team_info','get_players_from_team','get_championship_pressroom','get_market_players'))
   return(real_async(fn,args,context,owner,is_current,...))
  value<-switch(fn,
-  get_player_summary=observed_data(list(data=list(id='target'),championship=list(owner=list(id='rival',computer=FALSE)),market=list(bids=list()),points=list(list(round=1,points=0),list(round=2,points=-2)),prices=list())),
+  get_player_summary=observed_data(list(data=list(id='target'),championship=list(owner=list(id='rival',computer=FALSE)),market=list(p=1000,bids=list()),points=list(list(round=1,points=0),list(round=2,points=-2)),prices=list())),
   get_lineup_from_team=list(pointSystem='fixture'),get_player_full_profile=list(profile=list()),
   get_player_matches=list(matches=list()),read_card_round_history=data.frame(),read_card_price_history=data.frame(),
   stop(paste('Unexpected card resource',fn)))
@@ -45,7 +45,7 @@ async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is
 }
 settle<-function(session){for(i in seq_len(60L)){later::run_now(0);session$flushReact()}}
 selected<-shiny::reactiveVal(data.frame(id='target',name='Berenguer',role='midfielder',team='Club',
- value=1000,change=0,points=2,user_team_id='rival',price=NA_real_,market_inMarket=FALSE,
+ value=1000,change=0,points=2,user_team_id='rival',price=1000,market_inMarket=TRUE,
  clause_price=1200,clause_transferred=FALSE,clause_date=NA_character_))
 clear_api_cache()
 shiny::testServer(selected_player_Server,args=list(selected_player=selected,login_token=shiny::reactive(auth),

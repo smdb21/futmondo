@@ -1,5 +1,37 @@
 # Interactive player availability
 
+## Database display versus transaction checks — 2026-11-16
+
+Production browsing follows [database-first sync](database_first_sync.md). The
+older acquisition-on-selection behavior below applies only to the native/offline
+path. Opening, reopening and Refresh read persisted worker observations; they do
+not verify availability against Futmondo. Database-mode cards no longer offer
+**Retry availability**, and a late event from that removed control cannot start a
+live request. Missing/incomplete saved evidence remains unverified and refers to
+the existing Background sync status instead of inviting interactive collection.
+
+`player_availability_observed(data, kind, now)` validates successful stored
+`summary`/`listings` observations for display independently of action expiry. It
+requires original nonfuture source time, a finite original deadline, successful
+worker acquisition and no failed/partial completeness or fetch error. Listings
+also require valid unique IDs (an explicitly successful empty list is valid).
+Legacy unknown envelope completeness is not promoted: summary target fields
+still have to satisfy `player_card_summary_row(player, summary, observed=TRUE)`:
+matching immutable player ID, explicit ownership and the captured market-price/
+listing contract. Unknown ownership/listing stays unknown.
+
+This projection retains the original stale flag, timestamps, action deadlines
+and unrelated player statistics. Existing bounded session display markers allow
+reopening, while the underlying facts continue to come from durable database
+snapshots after a restart. Newer successful saved facts update the open card.
+No additional cache, acquisition, persistence write, timer or worker is added.
+
+The card's `player_target_current()` separately checks original source freshness
+when a market offer is explicitly opened. `ensure()` joins/reuses one current
+target check or starts it with manual-action intent. Submit waits for both target
+ownership/listing and current financial capacity; a display marker alone cannot
+authorize it. Final transaction checks and uncertain-write protections remain.
+
 ## Target-only selection and source deadlines — 2026-11-15 Pacific
 
 Opening/selecting a player verifies only that player's ownership, market listing,

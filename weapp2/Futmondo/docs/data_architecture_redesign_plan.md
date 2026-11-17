@@ -1,5 +1,15 @@
 # Futmondo data architecture redesign plan
 
+## Player-card database display and obsolete Retry — 2026-11-16
+
+- [x] Reproduce successful persisted summaries being rejected by the 60-second action gate and stale history being mislabeled as a failed refresh.
+- [x] Reuse validated saved ownership/listing facts for display without renewing source/action deadlines; remove production browsing's Retry availability control and guard obsolete events.
+- [x] Keep live target/funds checks on explicit transaction entry and preserve final purchase guards; missing/partial/error states remain truthful.
+- [x] Verify actual snapshot restoration, restarted-session reuse, context isolation, automatic updates, zero browsing source calls, manual guards and required offline lifecycle. Checks and performance limits are recorded in `data_review_results.md`.
+- [ ] Authenticated hosted acceptance after deployment. This is a local implementation/validation milestone, not a claim that production acquisition errors or missing source data have been repaired.
+
+Contracts: [player availability](player_availability.md), [player card](selected_player_module.md). No schema, dependency, background cadence or feature-tier expansion.
+
 ## Independent balance summary and squad slots — 2026-11-16
 
 - [x] Separate the stable first-content summary shell from schedule, amounts, squad, purchase and diagnostic outputs on My Team, Today's market and Players.

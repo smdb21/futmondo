@@ -1,5 +1,20 @@
 # Player card
 
+## Database-backed card status correction — 2026-11-16
+
+Expired successful database snapshots remain usable observed player facts, with
+their original stale status and timestamps. They no longer generate an
+availability-retry prompt during browsing. Missing or incomplete saved evidence
+stays explicit. See [display and transaction contracts](player_availability.md).
+
+`card_history()` now retains errors from its shared summary, lineup, points and
+valuation resource states independently of their freshness. A stale result alone
+shows a neutral saved-history/background-observation note; it cannot claim a
+refresh failed. Actual read failures retain their safe diagnostic reference and
+error severity, including when older data is retained. Points, score finality,
+profile-value counts, historical calculations and chart projections are unchanged.
+This corrects existing data delivery/status behavior, with no new feature tier.
+
 ## Target-only selection correction — 2026-11-15 Pacific
 
 The remaining roughly 32-second report exposed a path missed by the previous

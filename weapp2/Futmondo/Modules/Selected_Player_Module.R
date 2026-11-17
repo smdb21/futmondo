@@ -141,8 +141,9 @@ player_card_recent_table_facts <- function(player,now=Sys.time()) {
 
 # Project only evidenced target facts from the existing official summary.
 # An absent owner/market contract never turns into a free agent or no listing.
-player_card_summary_row <- function(player,summary) {
-  if(!is.data.frame(player)||nrow(player)!=1L||!is.list(summary)||acquisition_data_unverified(summary)||
+player_card_summary_row <- function(player,summary,observed=FALSE) {
+  eligible<-if(isTRUE(observed))player_availability_observed(summary,"summary")else !acquisition_data_unverified(summary)
+  if(!is.data.frame(player)||nrow(player)!=1L||!is.list(summary)||!eligible||
      !identical(fm_scalar(summary$data$id %||% summary$data$`_id`,""),fm_scalar(player$id,"")))return(NULL)
   owner<-summary$championship$owner;market<-summary$market
   # Futmondo omits championship.owner for some System players (including
@@ -307,7 +308,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         }
         baseline<-if(player_card_recent_table_facts(row))row else NULL
         if(!is.null(previous)&&(is.null(baseline)||latest(previous)>latest(baseline)))baseline<-previous
-        updated<-if(isTRUE(state$session_verified))player_card_summary_row(row,state$data)else NULL
+        saved<-isTRUE(availability_mode())&&player_availability_observed(state$data,"summary")
+        updated<-if(saved||isTRUE(state$session_verified))player_card_summary_row(row,state$data,observed=saved)else NULL
         if(!is.null(updated)){
           stamp<-fm_time(attr(updated,"observed_at"))
           if(length(stamp)==1L&&!is.na(stamp)&&as.numeric(stamp)>latest(baseline))
@@ -318,6 +320,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       row
     })
     player_target_ready<-function(player=selected_player())isTRUE(attr(player,"availability_session_verified"))||player_card_recent_table_facts(player)
+    # Display may use an older successful database observation; an explicitly
+    # opened editor must establish current target facts before enabling Submit.
+    player_target_current<-function(player=selected_player())if(isTRUE(availability_mode()))player_card_recent_table_facts(player)else player_target_ready(player)
 
     active_bid_info_RV <- reactiveVal(NULL)
     modal_bid_info_RV <- reactiveVal(list())
@@ -840,7 +845,10 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         summary_state<-card_states$summary()
         summary_unverified<-!player_target_ready(sp)
         readiness<-if(is_own_player)card_states$listings() else if(!summary_unverified)resource_state(data=sp)else summary_state
-        if(is_own_player&&!player_availability_valid(readiness$data,"listings")&&!identical(readiness$status,"loading")&&!is.null(readiness$data))
+        stored_mode<-isTRUE(availability_mode())
+        listings_ready<-is_own_player&&(player_availability_valid(readiness$data,"listings")||
+          (stored_mode&&player_availability_observed(readiness$data,"listings")))
+        if(is_own_player&&!listings_ready&&!identical(readiness$status,"loading")&&!is.null(readiness$data))
           readiness<-resource_state(status="unverified",error=readiness$error)
         if(!is_own_player && has_active_bid && !summary_unverified)readiness<-resource_state(data=active_bid_info_RV())
         if(!is_own_player && !has_active_bid && summary_unverified && identical(card_states$summary()$status,"loading"))readiness<-resource_state(status="loading")
@@ -857,24 +865,27 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         }
         if(!is_own_player&&!summary_unverified)readiness<-resource_state(data=sp)
         if(identical(readiness$status,"loading")&&!target_checked) {
-          action_buttons<-tagList(fm_info("Checking availability…",pending=TRUE),disable(action_buttons))
+          action_buttons<-tagList(fm_info(if(stored_mode)"Loading saved availability…"else"Checking availability…",pending=TRUE),disable(action_buttons))
         } else if(identical(readiness$status,"unverified")) {
           action_buttons<-tagList(fm_info(if(!is.null(readiness$error))resource_failure_message(readiness$error)else
+            if(stored_mode)"Player availability is missing or incomplete in the saved data. See Background sync for acquisition status."else
             if(is_own_player)"Your market listings are not verified. Retry availability to check them."else
               "Player availability summary is not verified. Retry availability to check it.",error=!is.null(readiness$error)),disable(action_buttons))
         } else if(is.null(readiness$data)) {
-          action_buttons<-tagList(fm_info(resource_failure_message(readiness$error),error=TRUE))
+          action_buttons<-tagList(fm_info(if(stored_mode&&is.null(readiness$error))
+            "Player availability has not been saved yet. See Background sync for acquisition status."else
+            resource_failure_message(readiness$error),error=!is.null(readiness$error)))
         }
         # Keep recovery reachable even when the saved capacity is missing or
         # loading: the ordinary readiness gate disables purchase controls only.
-        if(!is_own_player && !has_active_bid && worker_capacity_verification_available()) {
+        if(!stored_mode && !is_own_player && !has_active_bid && worker_capacity_verification_available()) {
           pending <- summary_unverified&&identical(summary_state$status,"loading")
           if(summary_unverified)
             action_buttons <- tagList(action_buttons,actionButton(ns("btn_verify_availability"),
               if(pending) "Checking availability…" else "Retry availability",
               class="btn btn-default",disabled=pending))
         }
-        if(is_own_player&&!player_availability_valid(card_states$listings()$data,"listings")){
+        if(!stored_mode&&is_own_player&&!player_availability_valid(card_states$listings()$data,"listings")){
           pending<-identical(card_states$listings()$status,"loading")
           action_buttons<-tagList(action_buttons,actionButton(ns("btn_verify_availability"),
             if(pending)"Checking availability…"else"Retry availability",class="btn btn-default",disabled=pending))
@@ -1081,7 +1092,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     # Opening reuses verified card facts locally; submission independently runs
     # the existing current-state preflight. Never block this click on network I/O.
     market_offer_preflight <- function(sp, state) {
-      if(!player_target_ready(sp))return(list(ok=FALSE,reason="unavailable",message="Current player ownership and market status could not be verified."))
+      if(!player_target_current(sp))return(list(ok=FALSE,reason="unavailable",message="Current player ownership and market status could not be verified."))
       if(player_card_is_own_player(sp,get_reactive_val(user_team_id))||!isTRUE(sp$market_inMarket)||
          !is.finite(fm_number(sp$effective_market_price %||% sp$price)))
         return(list(ok=FALSE,reason="unavailable",message="This player is not available for a market offer."))
@@ -1134,11 +1145,11 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       sp <- selected_player()
       context <- player_action_context_RV();req(sp,!is.null(context))
       state <- card_states$capacity();deadline <- state$data$valid_until
-      if(player_target_ready(sp)&&(player_card_is_own_player(sp,get_reactive_val(user_team_id))||!isTRUE(sp$market_inMarket))){
+      if(player_target_current(sp)&&(player_card_is_own_player(sp,get_reactive_val(user_team_id))||!isTRUE(sp$market_inMarket))){
         show_preflight_failure(market_offer_preflight(sp,state));offer_modal_opened_RV(FALSE)
         return(invisible(FALSE))
       }
-      pending <- !player_target_ready(sp) || identical(state$status,"loading") || is.null(state$data) ||
+      pending <- !player_target_current(sp) || identical(state$status,"loading") || is.null(state$data) ||
         identical(state$freshness,"stale") || !is.numeric(deadline) || length(deadline)!=1L ||
         !is.finite(deadline) || deadline<=as.numeric(Sys.time())
       pf <- if (!pending) market_offer_preflight(sp,state) else NULL
@@ -2044,22 +2055,24 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         if(!player_availability_valid(isolate(card_states$listings())$data,"listings"))attr(card_states$listings,"retry")()
         return(invisible(NULL))
       }
-      if(!player_target_ready())attr(card_states$summary,"retry")()
+      if(if(isTRUE(current))!player_target_current()else!player_target_ready())attr(card_states$summary,"ensure")()
       if(isTRUE(current)){
         availability_requested(availability_team_context())
         attr(card_states$capacity,"ensure")()
       }
       invisible(NULL)
     }
-    observeEvent(input$btn_verify_availability,verify_card_availability())
+    observeEvent(input$btn_verify_availability,{
+      if(!isTRUE(availability_mode()))verify_card_availability()
+    })
     observeEvent(list(card_states$capacity(),selected_player(),card_states$summary()),{
       dialog <- isolate(market_offer_dialog_RV());state <- card_states$capacity()
       if (is.null(dialog) || isTRUE(dialog$live_check) || !isTRUE(dialog$pending) ||
           !identical(dialog$context,isolate(player_action_context_RV()))) return()
       target<-selected_player()
-      target_unavailable<-player_target_ready(target)&&(player_card_is_own_player(target,get_reactive_val(user_team_id))||!isTRUE(target$market_inMarket))
+      target_unavailable<-player_target_current(target)&&(player_card_is_own_player(target,get_reactive_val(user_team_id))||!isTRUE(target$market_inMarket))
       if(!target_unavailable&&identical(state$status,"loading"))return()
-      if(!player_target_ready(target)&&identical(card_states$summary()$status,"loading"))return()
+      if(!player_target_current(target)&&identical(card_states$summary()$status,"loading"))return()
       dialog$player<-target
       dialog$pending <- FALSE
       dialog$preflight <- market_offer_preflight(dialog$player,state)
@@ -2106,6 +2119,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         card_states$points()$data,card_states$valuation()$data,ctx,profile=card_states$profile()$data)
       states<-lapply(card_states[c("summary","lineup","points","valuation")],function(read)read())
       if(any(vapply(states,function(state)identical(state$status,"loading"),logical(1))))result$status<-"loading"
+      result$errors<-Filter(Negate(is.null),lapply(states,function(state)state$error))
       result
     })
     observe({
@@ -2232,7 +2246,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
               fm_info(if(identical(match_state$status,"loading"))"Loading match details…"else "Match association unavailable",error=!identical(match_state$status,"loading"),pending=identical(match_state$status,"loading")))
         })),
         if(!length(rounds$rounds))fm_info(if(identical(history$status,"loading"))"Loading round points…"else recent_round_points_empty_text(sp$points),error=!identical(history$status,"loading"),pending=identical(history$status,"loading")),
-        if(is.null(card_states$summary()$data)&&!identical(card_states$summary()$status,"loading"))fm_info(resource_failure_message(card_states$summary()$error),error=TRUE),
+        if(is.null(card_states$summary()$data)&&!identical(card_states$summary()$status,"loading"))fm_info(
+          if(isTRUE(availability_mode())&&is.null(card_states$summary()$error))"Player history has not been saved yet."else
+          resource_failure_message(card_states$summary()$error),error=!is.null(card_states$summary()$error)),
         if(nrow(rounds$unassociated))tagList(
           fm_info("Match records · points association unavailable",error=TRUE),
           div(class="player-round-boxes",lapply(seq_len(nrow(rounds$unassociated)),function(i){
@@ -2241,7 +2257,10 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           }))),
         if(is.null(match_state$data)&&!identical(match_state$status,"loading"))fm_info(resource_failure_message(match_state$error),error=TRUE),
         if(length(rounds$rounds))fm_info(p("Points are reported by Futmondo. Final confirmation is not provided for some rounds."),source="",class="player-points-explanation"),
-        if(identical(history$freshness,"stale"))fm_info("Showing saved history; refresh failed.",error=TRUE))
+        if(length(history$errors))fm_info(paste(if(nrow(history$points)||nrow(history$valuation))
+          "Showing saved history."else "Player history could not be read.",resource_failure_message(history$errors[[1L]])),error=TRUE)else
+          if(identical(history$freshness,"stale"))fm_info(if(isTRUE(availability_mode()))
+            "Showing saved history; awaiting a newer background observation."else "Showing the last saved history."))
     })
     output$player_external_details <- renderUI({
       req(selected_player());state<-card_states$profile();answer<-state$data
