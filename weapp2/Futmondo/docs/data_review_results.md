@@ -4530,3 +4530,73 @@ Performance review: the new metadata validator took 0.026 seconds for 1,000 call
 Delivery scope/limits: only the task delta is staged; unrelated ownership-label, test, documentation and manifest edits are preserved. The two changed runtime checksums match staged bytes. Six unrelated checksum mismatches already present in HEAD (`futmondo_functions.R`, Market, Players in Championship, Players in Teams, Players Table and Today) are left unchanged. Local behavior and source delivery do not establish authenticated hosted rollout, production worker health, missing first-time acquisition or complete historical coverage. Those remain separate acceptance/evidence checks; this task does not claim an underlying native API rejection was repaired.
 
 Final isolated verification: the exact staged code passes the new database-card regression, worker manual-offer checks, corrected 31-second freshness fixture, native reuse, deployment contract and required lifecycle (13 checks/eight tabs). Phone/desktop browser assertions also pass against that staged tree. Documentation-only verification notes add no runtime cost.
+
+
+## Classification bonus columns waiting on a saved loading flag — 2026-11-16
+
+Read-only production diagnosis (2026-11-17 UTC) found a 1,787,174-byte decoded
+finance snapshot with `loading=TRUE`, 45 pending tasks and no known MVP/Best XI
+round components. Its source timestamp was 2026-11-16 05:50:44 UTC. A separate
+compact calculation saved at 2026-11-17 04:29:24 UTC already retained later
+component coverage. The production worker reported rejected historical-ranking
+and private team-information/money-movement requests. The ranking getter still
+sent a calendar number even though the established Classification contract uses
+the opaque source round ID under `roundNumber`.
+
+Classification now reads the latest compact calculation directly through one
+asynchronous scoped database query, excluding transaction archives/chunks and
+detailed cache decoding. It reuses the original per-round ledger projection and
+does not acquire Futmondo data. The historical finance getter's query is fixed;
+its existing evidence persistence/signature reuse remains intact. Missing
+completed-round amounts remain NA, and pending rounds remain excluded. The
+calculation's saved time is visible and original per-team source times survive.
+
+Executed synthetic checks:
+
+- `test/test_classification_database_bonuses.R`: held database read with usable
+  standings/input changes; one query; known sums 30/10/20/7; true zero and unknown
+  amounts; zero extra reads on range changes; DB-only Refresh; retained values on
+  DB error; memory-cleared database reuse; minute-bounded active-page rereads;
+  missing-row completion; old-account response rejection; scope/hash validation.
+- `test/test_rival_saved_bonus_recovery.R`: six groups passed, including the
+  exact corrected query, closed participant validation, known-answer rewards,
+  persistence and subsequent reuse with no additional ranking request. The old
+  fixture needed explicit acquisition mode and recognition of the first
+  unknown-to-known scoring-context cache transition; no production guard was
+  relaxed to make the test pass.
+- `test/test_rival_bonus_snapshot.R`: four groups passed, covering the existing
+  full/compact ledger contracts, zero/NA preservation, pending settlement and
+  malformed projections.
+- `test/test_classification_partial_bonuses.R`: completed/pending selections,
+  independent component coverage, stored ledger restoration and range reuse
+  passed, including the underlying running-balance and classification fixtures.
+- `test/test_shiny_simulation.R`: 13 checks plus eight tabs passed; no source
+  HTTP or live database mutations. Existing fixture warnings remain visible.
+
+Performance review: the production read-only SELECT used the existing evidence
+primary-key index and returned one row in 32.794 ms database execution (29.959 ms
+planning; excludes REST/network/rendering). The compact compressed data field
+was about 7.5 KB, versus about 410 KB for the inspected worker envelope. One
+hundred local synthetic reads/decodes/projections took 0.435 s; 100 bonus range
+projections over 10 teams × 38 rounds took 0.298 s. No source requests, writes,
+transaction reconstruction, new polling timers, worker lanes or mobile layout
+work are introduced. Shared memory remains bounded, and persisted snapshots
+remain the cross-session source. The existing status tick adds at most one
+compact DB read per minute while the page is active, plus explicit Refresh.
+
+Limits: no real account was used in tests and no production data was mutated.
+The exact SQL projection was measured through the connected database tool; a
+separate local REST diagnostic could not run because this workspace has no
+server database credentials. No production source acquisition/backfill was
+triggered here. The newer stored calculation still lacks round-8 MVP coverage,
+Best XI historical ownership/eligibility for multiple rounds, and position
+reward coverage; corrected worker acquisition and end-to-end completeness are
+not yet certified. Desktop/mobile layout is unchanged; no new browser run or
+hosted latency claim is made. There is no new capability or schema/dependency
+change. Unrelated working-tree and staged changes are preserved.
+
+Final task-only checkout verification also passed the database display regression,
+all six historical recovery groups, deployment's three groups, and the offline
+lifecycle's 13 checks plus eight tabs. The existing classification loading/settings
+regression passed in the workspace. Only the three changed runtime checksums were
+updated in the manifest; no dependency regeneration was needed.

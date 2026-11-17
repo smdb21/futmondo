@@ -572,7 +572,9 @@ rival_ranking_signature <- function(rows,round_id,teams) {
 }
 get_rival_round_ranking_observation <- function(login,championship_id,user_team_id,round_id,round_number,signature,source_teams) {
   response<-mvp_api_answer(login,"https://api.futmondo.com/1/ranking/round",list(
-    championshipId=championship_id,roundNumber=round_number,userteamId=user_team_id))
+    # Despite its name, roundNumber is the opaque source ID, as in the
+    # classification getter. A calendar number is rejected by this endpoint.
+    championshipId=championship_id,roundNumber=as.character(round_id),userteamId=user_team_id))
   result<-list(round_id=round_id,round_number=round_number,signature=signature,source_teams=as.list(source_teams),status=response$status,
     answer=if(identical(response$status,"ok"))response$answer else NULL)
   attr(result,"observed_at")<-Sys.time();result

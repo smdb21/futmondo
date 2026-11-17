@@ -1,6 +1,9 @@
 #!/usr/bin/env Rscript
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages({source('futmondo_functions.R');source('supabase_connector.R');source('background_runtime.R');library(shiny)})
+# Exercise the acquisition engine behind the worker; every HTTP/DB boundary
+# below is synthetic, independently of production's database-only display mode.
+fm_worker_configured<-function()FALSE
 checks<-0L;check<-function(name,expr){force(expr);checks<<-checks+1L;cat('PASS',name,'\n')}
 cid<-'fixture-league';account<-'fixture-account';stamp<-as.POSIXct('2026-11-02T12:00:00',tz='UTC')
 e<-function(type,id,p)rival_finance_evidence(account,cid,'unknown',type,id,p,stamp)
@@ -35,7 +38,7 @@ fm_async_read_http<-function(url,method='GET',body=NULL,headers=character(),owne
  }else if(grepl('/activechampionships$',url)){
   list(answer=list(championships=list(list(id=cid,ps='custom',custom=list()))))
  }else if(identical(url,'https://api.futmondo.com/1/ranking/round')){
-  sent<-jsonlite::fromJSON(body);stopifnot(identical(sent$query,list(championshipId=cid,roundNumber=1L,userteamId='a')))
+  sent<-jsonlite::fromJSON(body);stopifnot(identical(sent$query,list(championshipId=cid,roundNumber='r1',userteamId='a')))
   list(answer=ranking_answer)
  }else stop('Unexpected synthetic request')
  promises::promise_resolve(list(status_code=200L,content=charToRaw(jsonlite::toJSON(value,auto_unbox=TRUE,na='null',null='null')),times=c(total=.001)))
@@ -49,7 +52,12 @@ check('actual async DB transport and saved award catalog reuse the corrected dec
  before<-length(http_calls)
  saved<-await(async_adapter_fetch('get_rival_finance_saved',list(account_id=account,championship_id=cid,season='unknown'),ctx))
  stopifnot(length(saved$evidence)==4L,nrow(rival_saved_rounds(saved$evidence))==4L,
-  sum(grepl('/rival_finance_evidence_latest',http_calls))==2L,length(http_calls)==before,!any(grepl("league_cash_defaults",http_calls,fixed=TRUE)))
+  sum(grepl('/rival_finance_evidence_latest',http_calls))==4L,length(http_calls)==before+2L,!any(grepl("league_cash_defaults",http_calls,fixed=TRUE)))
+ # The first active-league response resolves scoring after the initial read.
+ # The new scoped read is distinct; subsequent same-context use adds no I/O.
+ before<-length(http_calls)
+ again<-await(async_adapter_fetch('get_rival_finance_saved',list(account_id=account,championship_id=cid,season='unknown'),ctx))
+ stopifnot(length(again$evidence)==4L,length(http_calls)==before)
 })
 source_rounds<-rival_saved_rounds(decoded,include_ranking=FALSE)
 sig<-rival_ranking_signature(source_rounds,'r1',teams$teamid)

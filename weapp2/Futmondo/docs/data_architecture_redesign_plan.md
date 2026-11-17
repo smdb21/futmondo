@@ -2002,3 +2002,23 @@ Implemented locally: two-read primary bootstrap with shared league preference, i
 Local exit checks cover held connection/DB responses, zero browsing source acquisition, mobile/desktop rendering, unchanged-refresh preservation, known finance fixtures, manual/coach/scheduled-action safeguards, isolated SQL permissions and the required offline lifecycle harness. Detailed executed results and limitations are in `data_review_results.md`. Production migration and deployment are recorded separately below; hosted two-second primary render/p95 heartbeat and multi-account collector capacity require production acceptance and are not certified by local timings.
 
 Production database exit criterion completed: migration `20261116213815_database_first_sync` applied and nine server-only invoker functions verified; read-only bootstrap measured 11.057 ms DB execution. Application/worker deployment and authenticated end-to-end acceptance remain separate from database installation. Existing native source rejections are not marked repaired by this infrastructure milestone.
+
+
+## Classification saved bonus reads — implemented locally 2026-11-16
+
+- [x] Replace the deployed classification dependency on a persisted finance
+  loading preview with one asynchronous compact database projection of the same
+  ledger's round bonus totals.
+- [x] Preserve numeric zero/unknown values, pending-round coverage, source clocks,
+  context isolation and durable reuse; range changes perform no I/O.
+- [x] Correct historical finance ranking acquisition to send the opaque round ID
+  under `roundNumber`; regression verifies persistence and later reuse.
+- [x] Validate delayed reads, DB-only Refresh, restart reuse, late-account response
+  rejection, inactive-page bounds and the offline Shiny lifecycle. The existing
+  status tick permits one DB read per minute, with no added timer or worker.
+- [ ] Verify deployment and worker backfill of the actual missing historical
+  position/Best XI/MVP evidence. Stored production coverage is still incomplete;
+  the underlying historical totals are not marked fully repaired.
+
+See `docs/classification_module.md` and the dated review entry. No schema,
+dependency, login inventory or product-scope expansion is required.

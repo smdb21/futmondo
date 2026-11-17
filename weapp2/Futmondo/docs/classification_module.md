@@ -118,3 +118,48 @@ is distinct from the verified stored-data replay.
 
 
 Desktop lineup presentation (2026-11-10): the historical modal shares the editor's `fm-lineup-layout` wrapper. At 992px and above, substitutes sit left of the pitch and the position columns run goalkeeper → defenders → midfielders → forwards. Pitch markings rotate with the layout; empty official slots and numbered bench order remain visible. Narrower screens retain their vertical pitch and bench below, including the sticky Close lineup action. See `lineup_module.md` for the shared layout contract and `data_review_results.md` for verification.
+
+
+## Database-only bonus loading — 2026-11-16
+
+In deployed database mode, `classification_saved_bonus_source()` reads
+`read_rival_bonus_snapshot()` through the asynchronous shared-resource adapter.
+It does not construct the finance acquisition controller or wait for the large
+`fm_worker_finances` progress snapshot. The inspected worker snapshot retained
+`loading=TRUE` and 45 pending tasks, while a newer completed calculation already
+existed in the evidence database. Its saved loading flag was not a live browser
+request state.
+
+`read_rival_calculation_snapshot(..., summary_only=TRUE)` performs one scoped
+latest-row query to `rival_finance_evidence_latest`. PostgREST projects the row
+identity/time and five payload fields: `kind`, `encoding`, `data`, `sha256`,
+and numeric `json_bytes`. It excludes the transaction archive/manifest and does
+not read ledger chunks or decode the detailed calculation cache. Existing hash,
+size, account/league/team/competition/season/scoring, format and numeric bonus
+validation still applies. The default full-ledger reader is unchanged.
+
+The returned display contract contains `cash_ledgers` with the original
+`round_bonus_totals` attributes, `pending_bonus_rounds`, `saved_at`, per-team
+`source_times`, and false `loading`/`finance_loading` flags after a successful
+read. No second reward formula is introduced. Coverage remains component- and
+round-specific; absent amounts are not zero. The saved calculation time is shown
+in the status details, and source timestamps are retained separately.
+
+The existing worker status tick permits one database reread per minute while
+Classification is active; no new timer or worker is added. Explicit Refresh
+rereads only the database. Range changes reuse the loaded projection with no
+I/O. Same-context values remain mounted during refresh/errors; context switches
+reject late responses. Memory is a bounded shared-resource accelerator, and
+reopening after memory is cleared restores the durable result.
+
+The historical finance ranking request also now sends the source round ID,
+matching the previously verified classification request. This enables the
+existing worker to retrieve, persist and reuse missing historical participants.
+The inspected newer calculation still had missing MVP round-8 coverage, broader
+Best XI ownership/eligibility gaps, and position-reward gaps. This change does
+not claim those production gaps have already been backfilled. Fresh worker
+publication and authenticated acceptance remain to be verified.
+
+Checks and measured limits are recorded in `data_review_results.md`. This fixes
+existing bonus loading; it adds no new product capability, login-tier entry,
+dependency, environment setting or database schema.

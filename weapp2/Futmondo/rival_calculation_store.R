@@ -220,13 +220,22 @@ rival_snapshot_payload <- function(cache,calculated,context) {
   }
   compact
 }
-read_rival_calculation_snapshot <- function(account_id,championship_id,season,user_team_id,competition_id=NULL,scoring_version=NULL) {
+read_rival_calculation_snapshot <- function(account_id,championship_id,season,user_team_id,competition_id=NULL,scoring_version=NULL,summary_only=FALSE) {
   scope<-rival_snapshot_scope(list(account_id=account_id,championship_id=championship_id,competition_id=competition_id,season=season,scoring_version=scoring_version,user_team_id=user_team_id))
   if(is.null(scope))return(NULL)
   query<-list(account_id=paste0('eq.',account_id),championship_id=paste0('eq.',championship_id),competition_id=paste0('eq.',scope$competition_id),season=paste0('eq.',season),
     evidence_type='eq.eligibility',source_id=paste0('eq.',rival_snapshot_id(scope)),
     select='account_id,championship_id,competition_id,season,evidence_type,source_id,observed_at,payload',limit=1L)
-  rows<-tryCatch(supabase_get('rival_finance_evidence_latest',query),error=function(e)NULL)
+  if(isTRUE(summary_only)){
+    # Classification needs the numeric round projection, not the transaction
+    # archive (which can require additional chunk reads).
+    fields<-c('kind','encoding','data','sha256','json_bytes')
+    query$select<-paste(c('account_id','championship_id','competition_id','season','evidence_type','source_id','observed_at',
+      paste0(fields,':payload->',ifelse(fields=='json_bytes','','>'),fields)),collapse=',')
+    rows<-supabase_get('rival_finance_evidence_latest',query)
+    if(is.data.frame(rows)&&nrow(rows)==1L&&all(fields%in%names(rows)))
+      rows$payload<-list(as.list(rows[1,fields,drop=FALSE]))
+  }else rows<-tryCatch(supabase_get('rival_finance_evidence_latest',query),error=function(e)NULL)
   tryCatch({
     if(!is.data.frame(rows)||nrow(rows)!=1L)return(NULL)
     row<-rival_evidence_decode(rows)[[1]]
@@ -246,7 +255,7 @@ read_rival_calculation_snapshot <- function(account_id,championship_id,season,us
     if(!is.list(wire)||!identical(names(wire),c('format','scope','signature','summary','cache'))||
        !identical(wire$format,2L)||!identical(wire$scope,scope)||!is.character(wire$signature)||length(wire$signature)!=1L||
        !grepl('^[0-9a-f]{64}$',wire$signature))return(NULL)
-    summary<-rival_snapshot_decode(wire$summary);cache<-rival_snapshot_decode(wire$cache)
+    summary<-rival_snapshot_decode(wire$summary);cache<-if(!isTRUE(summary_only))rival_snapshot_decode(wire$cache)else NULL
     totals<-attr(summary,"round_bonus_totals") %||% list()
     attr(summary,"round_bonus_totals")<-NULL
     if(!rival_snapshot_bonus_valid(totals,summary$teamid))return(NULL)
@@ -268,7 +277,7 @@ read_rival_calculation_snapshot <- function(account_id,championship_id,season,us
         is.character(x$missing)&&is.character(x$assumptions)&&is.logical(x$estimated_movements)&&length(x$estimated_movements)==1L&&!is.na(x$estimated_movements)
       },logical(1))))return(NULL)
     }
-    archived<-rival_snapshot_restore_ledgers(payload,scope,summary$teamid)
+    archived<-if(!isTRUE(summary_only))rival_snapshot_restore_ledgers(payload,scope,summary$teamid)else NULL
     ledgers<-archived %||% if(is.list(cache))lapply(cache$teams,function(team)team$ledger)else list()
     for(id in setdiff(names(totals),names(ledgers))){
       ledger<-data.frame()
@@ -281,6 +290,22 @@ read_rival_calculation_snapshot <- function(account_id,championship_id,season,us
     list(scope=scope,signature=wire$signature,team_finances=summary,cash_ledgers=ledgers,
       pending_bonus_rounds=pending,cache=cache,ledger_complete=is.list(cache)||!is.null(archived),saved_at=row$observed_at)
   },error=function(e)NULL)
+}
+
+# Database-only display projection of the same persisted accounting ledger.
+# Missing coverage remains NA; a saved calculation never carries a live task's
+# loading flag. Full ledger readers keep their existing archive contract.
+read_rival_bonus_snapshot <- function(account_id,championship_id,season,user_team_id,competition_id=NULL,scoring_version=NULL) {
+  saved<-read_rival_calculation_snapshot(account_id,championship_id,season,user_team_id,competition_id,scoring_version,summary_only=TRUE)
+  if(is.null(saved))return(list(cash_ledgers=list(),loading=FALSE,finance_loading=FALSE,
+    reason='No saved bonus calculation is available for this league context yet. Background sync must publish it.'))
+  result<-list(cash_ledgers=saved$cash_ledgers,pending_bonus_rounds=saved$pending_bonus_rounds,
+    loading=FALSE,finance_loading=FALSE,saved_at=saved$saved_at,
+    source_times=setNames(saved$team_finances$as_of,saved$team_finances$teamid))
+  stamps<-fm_time(result$source_times);stamps<-stamps[!is.na(stamps)]
+  attr(result,'observed_at')<-if(length(stamps))min(stamps)else fm_time(saved$saved_at)
+  attr(result,'source')<-'saved bonus calculation'
+  result
 }
 persist_rival_calculation_snapshot <- function(cache,calculated,context,on_complete=NULL) {
   payload<-rival_snapshot_payload(cache,calculated,context);scope<-rival_snapshot_scope(context)

@@ -356,16 +356,57 @@ classification_dreamteam_rows <- function(answer) {
   }))
 }
 
+# Read only the compact persisted ledger projection in the deployed app. The
+# existing worker status tick permits at most one DB reread per minute while
+# this page is active; slider changes never perform I/O.
+classification_saved_bonus_source <- function(session, login, championship, user_team, active, refresh = NULL) {
+  context <- reactive({
+    league_context_revision()
+    auth <- login()
+    if (!valid_login(auth)) return(NULL)
+    ctx <- resource_context(auth, championship(), user_team(), session_id = session$token)
+    ctx <- fm_worker_resolve_context('fm_worker_finances',
+      list(championship_id = ctx$championship_id, user_team_id = ctx$user_team_id), ctx)
+    if (!fm_context_known(ctx$competition_id) || !fm_context_known(ctx$season)) return(NULL)
+    ctx
+  })
+  saved <- shared_resource(session, 'classification_saved_bonuses', context,
+    active = active,
+    refresh = function() {
+      ctx <- context()
+      if (!is.null(ctx)) fm_worker_account_state(ctx$account_id)$status_revision()
+      list(manual = if (is.function(refresh)) refresh() else 0L,
+        minute = floor(as.numeric(Sys.time()) / 60))
+    },
+    fetch = function(ctx) {
+      args <- ctx[c('account_id', 'championship_id', 'season', 'user_team_id', 'competition_id', 'scoring_version')]
+      async_adapter_fetch('read_rival_bonus_snapshot', args, ctx,
+        is_current = function() isolate(isTRUE(active()) && identical(context(), ctx)))
+    })
+  reactive({
+    state <- saved()
+    result <- state$data %||% list(cash_ledgers = list(), loading = identical(state$status, 'loading'))
+    if (is.null(context())) result$reason <- 'Resolving league context before reading saved bonuses.'
+    if (!is.null(state$error)) result$finance_error <- resource_failure_message(state$error)
+    result
+  })
+}
+
 classification_Server <- function(id, is_module_active, login_token, championship_id, user_team_id,
                                   user_teams_RV, refresh_trigger = NULL, league_settings_source = NULL) {
   moduleServer(id, function(input, output, session) {
     bind_factual_reads(c("get_classification_round_catalog", "get_classification_round_ranking", "get_user_team_rounds", "get_user_team_info", "get_round_dreamteam", "get_round_lineup_snapshot"), session, login_token, championship_id, user_team_id, is_active = is_module_active, refresh_trigger = refresh_trigger)
 
     mvp_snapshot <- shared_mvp_source(session, login_token, championship_id, is_module_active, refresh_trigger)
-    finances_RV <- shared_rival_finance_source(
-      session, login_token, championship_id,
-      user_team_id, user_teams_RV, is_module_active, mvp_snapshot, refresh_trigger
-    )
+    finances_RV <- if (fm_worker_configured()) {
+      classification_saved_bonus_source(session, login_token, championship_id,
+        user_team_id, is_module_active, refresh_trigger)
+    } else {
+      shared_rival_finance_source(
+        session, login_token, championship_id,
+        user_team_id, user_teams_RV, is_module_active, mvp_snapshot, refresh_trigger
+      )
+    }
 
     catalog_state_RV <- reactive({
       req(is_module_active() == TRUE, login_token(), championship_id())
@@ -695,6 +736,10 @@ classification_Server <- function(id, is_module_active, login_token, championshi
         },
         if (nzchar(mvp_text(finances$finance_error))) p(finances$finance_error),
         if (nzchar(mvp_text(finances$reason))) p(finances$reason),
+        if (nzchar(mvp_text(finances$saved_at))) {
+          p(paste('Bonus totals use saved calculations from',
+            format(fm_time(finances$saved_at), '%Y-%m-%d %H:%M UTC', tz = 'UTC')))
+        },
         if (length(failures)) {
           p(resource_failure_message(failures[[1]]))
         },
