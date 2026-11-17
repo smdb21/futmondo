@@ -10,6 +10,17 @@ Explicit scope exception requested on 2026-10-31: implement login-time coach hir
 
 Normal active-session loading, caching, and recording of already-fetched observations are data infrastructure. They must not perform autonomous trading or unattended harvesting.
 
+## Official Futmondo client as an API reference
+
+Use [Futmondo's official web app](https://app.futmondo.com/) and its [public JavaScript bundle](https://app.futmondo.com/main.dart.js) as first-party implementation evidence for how to query Futmondo data. This is the code a browser downloads to run the official app. Inspect it alongside existing application adapters and captured requests/responses before guessing an endpoint or asking the user to supply one.
+
+- Trace the relevant request and its response parser together: establish the HTTP method, API route, authentication/request envelope, query parameters, identifier meanings, response nesting and field mappings. Distinguish source league IDs from fantasy championship and user-team IDs.
+- Follow the app entry point/bootstrap if the bundle URL changes. Search for route strings and field names; minified function names can change between builds. Record the source URL, inspection date and relevant evidence in `docs/`, with a bundle digest when useful.
+- Corroborate the client contract with available captured responses and focused synthetic fixtures. Separate code-level evidence from a live response or authenticated UI verification; public client code alone does not establish that an account has complete or available data.
+- Integrate verified reads through the existing authenticated factual worker and durable database observations. Browsing continues to read persisted data; endpoint discovery does not change manual-action safeguards or authorize new transactions. Keep credentials and private response bodies out of documentation and diagnostic output.
+
+Verified example (2026-11-16): `POST https://api.futmondo.com/2/league/matches` uses `query: {leagueId: <source league ID>}` in the existing authenticated request envelope. Matches are in `answer.rounds[].matches[]`; `h` and `a` identify the home and away club objects, and `info.date` supplies kickoff. See [the recorded fixture contract](docs/lineup_module.md#source-and-payload) and `mvp_api_answer()` / `get_award_round_metadata()` in `mvp_runtime.R` for the implemented request and parsing path.
+
 ## Data architecture
 
 Follow `docs/data_architecture_redesign_plan.md` and the implemented contracts in the data-layer documentation. UI modules consume shared resource state. Pass account and league/team context explicitly, preserve source timestamps, bound caches and queues, and invalidate only affected resources.

@@ -1,5 +1,19 @@
 # Futmondo data review and implementation results
 
+## Official-client API reference guidance — 2026-11-17
+
+Added the official web app and public JavaScript bundle to `Agents.md` as sources
+for verifying request methods, routes, query/identity fields and response parsers.
+The dated match-calendar example was checked against `docs/lineup_module.md` and
+`mvp_api_answer()` / `get_award_round_metadata()` in `mvp_runtime.R`. This task
+records the existing 2026-11-16 evidence; it does not claim a new live API or
+authenticated UI verification. Reviewed the task-only diff and whitespace.
+
+Performance review: documentation only. No runtime code, API/database requests,
+cache/persistence behavior, worker jobs, reactive updates, timers, memory or
+rendering changes. No runtime/performance tests, dependency or manifest changes
+are needed. Existing unrelated working-tree and staged changes are preserved.
+
 ## Lineup save placement and real next-round fixtures — 2026-11-16
 
 Moved the existing Save control above Formation/the pitch and added next-round

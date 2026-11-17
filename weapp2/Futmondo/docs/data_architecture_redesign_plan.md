@@ -1,5 +1,10 @@
 # Futmondo data architecture redesign plan
 
+## Official-client API reference guidance — 2026-11-17
+
+- [x] Document the official web app and public JavaScript bundle in `Agents.md` as first-party sources for verifying Futmondo requests and response parsers, with the confirmed match-calendar example and existing data-access boundaries.
+- [x] Check the guidance against the recorded fixture contract and implemented adapter; review the scoped documentation diff and record the absence of runtime/performance impact in `data_review_results.md`.
+
 ## Lineup save placement and real next-round fixtures — 2026-11-16
 
 Status: **implemented and verified locally; authenticated hosted acceptance pending**.
