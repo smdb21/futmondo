@@ -58,6 +58,17 @@ check('both layouts provide a default-All multiselect position input',{
   stopifnot(grepl('multiple',control,fixed=TRUE),grepl('<option value="All" selected>All</option>',html,fixed=TRUE))
  }
 })
+check('filter labels and Clear Filters place decorative icons after their text in both layouts',{
+ for(breakdown in c(FALSE,TRUE)){
+  html<-htmltools::renderTags(players_table_UI('icons',show_position_breakdown=breakdown,
+   filter_by_own_team=TRUE,filter_by_max_clause_value=TRUE,filter_by_clause_under_available_funds=TRUE,filter_by_players_with_bid=TRUE))$html
+  dom<-xml2::read_html(html)
+  icons<-xml2::xml_find_all(dom,"//label//i | //button[@id='icons-btn_clear_filters']//i")
+  stopifnot(length(icons)==13L,all(xml2::xml_attr(icons,'aria-hidden')=='true'))
+  for(icon in icons)stopifnot(!is.na(xml2::xml_text(xml2::xml_find_first(icon,"preceding-sibling::text()[normalize-space()]"))),
+   length(xml2::xml_find_all(icon,"following-sibling::text()[normalize-space()]"))==0L)
+ }
+})
 position_rows<-data.frame(id=c('gk','def','mid','fwd','dual','unknown'),name=c('Keeper','Defender','Midfielder','Forward','Dual','Unknown'),
  role=c('Goalkeeper','Defender','Midfielder','Forward','Midfielder',NA),role2=c('',NA,'Defender','','Forward',NA),value=1e6)
 enrichments<-0L;original_average<-add_recent_points_average

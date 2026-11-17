@@ -4,8 +4,8 @@ options(futmondo.offline=TRUE)
 suppressPackageStartupMessages(source('global.R'))
 now<-as.POSIXct('2026-11-16T12:00:00',tz='UTC')
 scope<-list(account_id='fixture-account',championship_id='league',competition_id='competition',season='2026-27')
-match_record<-function(id,home,away,date)list(`_id`=id,h=list(`_id`=paste0('h-',id),name=home),
- a=list(id=paste0('a-',id),name=away),info=list(date=date),st='scheduled',private='discard me')
+match_record<-function(id,home,away,date)list(`_id`=id,h=list(`_id`=paste0('h-',id),name=home,logo=paste0('home-',id,'.png')),
+ a=list(id=paste0('a-',id),name=away,logo=paste0(TEAM_LOGO_URL,'away-',id,'.png')),info=list(date=date),st='scheduled',private='discard me')
 records<-list(
  list(`_id`='old',matches=list(match_record('previous','Old Home','Old Away','2026-11-15T10:00:00Z'))),
  list(`_id`='next',matches=list(match_record('late','Real Madrid','Barcelona','2026-11-22T20:00:00Z'),
@@ -39,6 +39,25 @@ for(field in names(scope)){
  stopifnot(nrow(view(context=foreign)$rows)==0L,nzchar(view(context=foreign)$message))
 }
 cat('PASS actual durable worker codec/restart retains fixtures and source clocks; account/league/competition/season isolation\n')
+stopifnot(league_fixture_matches_current(matches),identical(selected$rows$home_logo,c('home-early.png','home-late.png')),
+ identical(selected$rows$away_logo,paste0(TEAM_LOGO_URL,c('away-early.png','away-late.png'))),
+ lineup_fixture_crest_url(selected$rows$home_logo[1])==paste0(TEAM_LOGO_URL,'home-early.png'),
+ lineup_fixture_crest_url(selected$rows$away_logo[1])==selected$rows$away_logo[1],
+ lineup_fixture_crest_url('club')==paste0(TEAM_LOGO_URL,'club.png'),
+ lineup_fixture_crest_url('club.webp')==paste0(TEAM_LOGO_URL,'club.webp'))
+for(logo in c('',NA,'javascript:alert(1)','../club.png','http://example.invalid/club.png'))stopifnot(lineup_fixture_crest_url(logo)=='')
+legacy<-matches;legacy$version<-1L;legacy$rows[c('home_logo','away_logo')]<-NULL
+decoded<-league_fixture_matches_decode(jsonlite::fromJSON(jsonlite::toJSON(legacy,auto_unbox=TRUE),simplifyVector=FALSE))
+data<-rounds;attr(data,'fixture_calendar')$matches<-decoded
+stopifnot(league_fixture_matches_valid(decoded),!league_fixture_matches_current(decoded),
+ identical(view(data)$rows$match_id,selected$rows$match_id),identical(view(data)$observed_at,selected$observed_at))
+attr(data,'fixture_calendar')$refresh_error<-'Match calendar update failed; showing the saved schedule.'
+stopifnot(view(data)$stale,nzchar(view(data)$message),nrow(view(data)$rows)==2L,
+ identical(view(data)$observed_at,selected$observed_at))
+without_logo<-records;without_logo[[2]]$matches[[1]]$h$logo<-NULL
+data<-rounds;attr(data,'fixture_calendar')$matches<-league_fixture_matches(without_logo)
+stopifnot(view(data)$complete,view(data)$rows$home_logo[2]=='')
+cat('PASS source crest filenames/URLs persist through worker hydration; legacy fixtures remain readable and missing/unsafe logos never become invented images\n')
 
 partial<-records;partial[[2]]$matches[[2]]$info$date<-'';partial[[2]]$matches[[2]]$a$name<-''
 data<-rounds;attr(data,'fixture_calendar')$matches<-league_fixture_matches(partial)

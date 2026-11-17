@@ -1,5 +1,46 @@
 # Next-round lineup
 
+## Match crests — 2026-11-17
+
+Each home and away club now displays its observed crest beside its name in the
+next-round fixtures. The 24px images have fixed dimensions, lazy loading and
+asynchronous decoding; long names still wrap on mobile. The adjacent text remains
+the accessible club label. Missing or failed images leave the name visible.
+
+Rechecked the [official public client](https://app.futmondo.com/main.dart.js) on
+2026-11-17 (SHA-256
+`08202076259d1678c7557478771d3aa38b5099f42044630569c704fdb7a7cd1c`):
+`ces` parses each match's `h`/`a` through `Ij`, which reads the club's `logo`.
+`league_fixture_matches()` retains those exact values as `home_logo` and
+`away_logo` in inner fixture payload version 2. The existing outer calendar
+evidence payload and worker snapshot format are unchanged. The source-field
+check used public code and synthetic responses, not a signed-in account.
+
+`league_fixture_empty(version = 2L)` defines the current row schema and can
+construct the original version-1 schema. `league_fixture_matches_valid()` and
+`league_fixture_matches_decode()` accept either; `league_fixture_matches_current()`
+identifies the version that carries logos. `get_award_round_metadata(...,
+include_matches = TRUE)` upgrades version-1 evidence through the existing worker
+read, persists the successful result and reuses it after a restart.
+`get_finished_rounds()` retains a valid saved schedule and its original clocks
+if that upgrade fails, adding `fixture_calendar$refresh_error` for
+`lineup_fixture_view()` to show a stale/error note. Normal sync can retry;
+opening or refreshing the page never acquires the calendar.
+
+`lineup_fixture_crest_url(logo)` is a pure formatter. It accepts an observed HTTPS
+URL or a safe observed filename under the existing `TEAM_LOGO_URL` CDN prefix,
+adding `.png` when no supported image extension is present. Empty/unsafe values
+produce no image. It does not infer filenames from club names. Absent logos do
+not erase matches or change schedule-completeness claims.
+
+No schema migration, dependency, environment setting, additional worker job or
+poll is needed. Durable source reuse, source clocks and context isolation are
+preserved. The display adds at most two lazy crest images per match (100 at the
+existing 50-match limit), with ordinary browser asset reuse and no extra API or
+database read. Focused persistence, legacy/failure and responsive-browser checks
+passed; measurements and hosted verification limits are in
+[data review](data_review_results.md).
+
 ## Save placement and next-round fixtures — 2026-11-16
 
 The existing Save to LigaRadar control now sits above Formation and the pitch.
@@ -19,17 +60,18 @@ Verified 2026-11-16 in the [public official client](https://app.futmondo.com/mai
 `qT/axL` calls `/2/league/matches` with `{leagueId: <source league ID>}`;
 `cwe` maps `answer.rounds` and `ces` maps each round's `matches`. The club parser
 `Ij` establishes `h` as home and `a` as away club objects, `_id`/`id`, `name` and
-`shortname`; `info.date` supplies kickoff and `st` the source status. These are
+`shortname` (plus `logo`, rechecked above); `info.date` supplies kickoff and `st` the source status. These are
 real clubs, separate from fantasy user teams. The public bundle and synthetic
 responses establish the mapping; no authenticated production response or
 current official UI was inspected for this task.
 
 `mvp_runtime.R` adds:
 
-- `league_fixture_empty()` defines the display row columns: `round_id`, `match_id`,
-  `home_id`, `home_name`, `away_id`, `away_name`, `kickoff`, `status`.
+- `league_fixture_empty(version = 2L)` defines the display row columns: `round_id`,
+  `match_id`, `home_id`, `home_name`, `home_logo`, `away_id`, `away_name`,
+  `away_logo`, `kickoff`, `status`.
 - `league_fixture_matches(records)` whitelists these facts into
-  `{version: 1, rounds: frame, rows: frame}`. Coverage rows contain `round_id`,
+  `{version: 2, rounds: frame, rows: frame}` (original version 1 remains readable). Coverage rows contain `round_id`,
   `fixture_count` (unknown for an absent/malformed/oversized collection) and
   `complete`. A complete round requires all returned match identities, distinct
   home/away clubs, club names and valid dates. Duplicate match identities are

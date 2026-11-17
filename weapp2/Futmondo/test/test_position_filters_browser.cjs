@@ -26,6 +26,16 @@ const {chromium}=require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp
      await wrapper.locator(`.selectize-dropdown [data-value="${value}"]`).click();
     };
     await page.locator(`#${id}-filters summary`).click();
+    const labels = await page.locator(`#${id}-filters label, #${id}-btn_clear_filters`).evaluateAll(nodes => nodes.map(node => {
+      const icon=node.querySelector('i'); if (!icon) return null;
+      const text=document.createRange(); text.selectNodeContents(icon.parentNode); text.setEndBefore(icon);
+      const textRect=text.getBoundingClientRect(), imageRect=icon.getBoundingClientRect();
+      return {text:text.toString().trim(), hidden:icon.getAttribute('aria-hidden'),
+        after: imageRect.top >= textRect.bottom - 1 || imageRect.left >= textRect.right - 1,
+        fits:imageRect.left >= 0 && imageRect.right <= innerWidth + 1};
+    }).filter(Boolean));
+    assert.ok(labels.length >= 8 && labels.every(label => label.text && label.hidden === 'true' && label.after && label.fits),
+      'Visible filter icons follow their accessible labels and fit the viewport');
     assert.deepEqual(await items(),['All']);
     await expectRows(['Keeper','Defender','Midfielder','Forward','Dual','Unknown']);
     await choose('Defender');assert.deepEqual(await items(),['Defender']);

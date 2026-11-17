@@ -8,7 +8,8 @@ active<-list(championships=list(list(id=cid,league=lid,userteam=list(id='own-tea
 leagues<-list(list(`_id`=lid,rounds=lapply(1:38,function(i)list(`_id`=paste0('r',i),status=if(i==12)'next'else'future'))))
 calendar<-list(rounds=lapply(38:1,function(i)list(`_id`=paste0('r',i),number=i,
  status=if(i<12)'closed'else if(i==12)'running'else'future',matches=list(list(`_id`=paste0('match-',i),
-  h=list(`_id`='home-club',name='Home Club'),a=list(`_id`='away-club',name='Away Club'),
+  h=list(`_id`='home-club',name='Home Club',logo='home-source.png'),
+  a=list(`_id`='away-club',name='Away Club',logo=paste0(TEAM_LOGO_URL,'away-source.png')),
   info=list(date='2026-12-01T20:00:00Z'),st='scheduled',private='discarded')))))
 fixture<-new.env(parent=emptyenv());fixture$stored<-list();fixture$writes<-0L;fixture$db_reads<-0L;fixture$calendar_reads<-0L;fixture$mode<-'ok'
 get_sb_url<-function()'https://database.fixture.invalid';get_sb_key<-function()'private-database-key'
@@ -133,7 +134,8 @@ cat('PASS malformed database data falls back to acquisition; a confirmed unfinis
 games<-attr(postponed,'fixture_calendar')
 stopifnot(league_fixture_matches_valid(games$matches),games$scope$account_id==auth[['userid']],
  games$matches$rows$home_name[games$matches$rows$round_id=='r13']=='Home Club',
- games$matches$rows$away_name[games$matches$rows$round_id=='r13']=='Away Club')
+ games$matches$rows$away_name[games$matches$rows$round_id=='r13']=='Away Club',
+ all(games$matches$rows$home_logo=='home-source.png'),all(games$matches$rows$away_logo==paste0(TEAM_LOGO_URL,'away-source.png')))
 reads_before<-fixture$calendar_reads;writes_before<-fixture$writes
 clear_api_cache();reused<-read_rounds()
 stopifnot(identical(attr(reused,'fixture_calendar')$matches,games$matches),
@@ -153,4 +155,20 @@ clear_api_cache();repaired<-read_rounds()
 stopifnot(fixture$calendar_reads==reads_before+2L,fixture$writes==writes_before+2L,
  nrow(attr(repaired,'fixture_calendar')$matches$rounds)==38L)
 cat('PASS incomplete persisted fixture identity coverage is reacquired and replaced by the complete source observation\n')
-cat('LINEUP ROUND CATALOG: 8 groups passed / 0 failed\n')
+fixture$stored[[1]]$payload$fixture_matches$version<-1L
+fixture$stored[[1]]$payload$fixture_matches$rows[c('home_logo','away_logo')]<-NULL
+reads_before<-fixture$calendar_reads;writes_before<-fixture$writes
+fixture$mode<-'missing';clear_api_cache();kept<-read_rounds()
+stopifnot(fixture$calendar_reads==reads_before+1L,fixture$writes==writes_before,
+ nrow(attr(kept,'fixture_calendar')$matches$rows)==38L,
+ nzchar(attr(kept,'fixture_calendar')$refresh_error),!league_fixture_matches_current(attr(kept,'fixture_calendar')$matches))
+fixture$mode<-'ok';reads_before<-fixture$calendar_reads
+clear_api_cache();with_crests<-read_rounds()
+stopifnot(fixture$calendar_reads==reads_before+1L,fixture$writes==writes_before+1L,
+ league_fixture_matches_current(attr(with_crests,'fixture_calendar')$matches),
+ all(attr(with_crests,'fixture_calendar')$matches$rows$home_logo=='home-source.png'))
+clear_api_cache();crest_reuse<-read_rounds()
+stopifnot(fixture$calendar_reads==reads_before+1L,fixture$writes==writes_before+1L,
+ identical(attr(crest_reuse,'fixture_calendar')$matches,attr(with_crests,'fixture_calendar')$matches))
+cat('PASS a legacy fixture calendar acquires crest fields once, persists them and reuses them after restart without another source request or write\n')
+cat('LINEUP ROUND CATALOG: 9 groups passed / 0 failed\n')

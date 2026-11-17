@@ -22,8 +22,10 @@ lineup_UI <- function(id) {
       .fm-lineup-fixture{min-width:0;padding:12px;border:1px solid var(--fm-border,#d8e2da);border-radius:8px}
       .fm-lineup-fixture-time{display:block;font-size:12px;color:var(--fm-muted,#647067);margin-bottom:6px}
       .fm-lineup-fixture-teams{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:10px;align-items:center}
-      .fm-lineup-fixture-team{min-width:0;overflow-wrap:anywhere;font-weight:600}
-      .fm-lineup-fixture-away{text-align:right}
+      .fm-lineup-fixture-team{display:flex;align-items:center;gap:6px;min-width:0;font-weight:600}
+      .fm-lineup-fixture-team-name{min-width:0;overflow-wrap:anywhere}
+      .fm-lineup-fixture-crest{width:24px;height:24px;flex:0 0 24px;object-fit:contain}
+      .fm-lineup-fixture-away{justify-content:flex-end;text-align:right}
       .fm-lineup-fixture-vs{font-size:12px;color:var(--fm-muted,#647067)}
       @media(max-width:600px){.fm-lineup-fixtures-list{grid-template-columns:minmax(0,1fr)}}
     ")),
@@ -369,13 +371,21 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
           row<-view$rows[i,,drop=FALSE]
           home<-if(nzchar(row$home_name))row$home_name else 'Home team unconfirmed'
           away<-if(nzchar(row$away_name))row$away_name else 'Away team unconfirmed'
+          club<-function(name,logo,away=FALSE){
+            url<-lineup_fixture_crest_url(logo)
+            shiny::span(class=paste('fm-lineup-fixture-team',if(away)'fm-lineup-fixture-away'),
+              `aria-label`=paste(if(away)'Away:'else'Home:',name),
+              if(nzchar(url))shiny::tags$img(class='fm-lineup-fixture-crest',src=url,alt='',`aria-hidden`='true',
+                width=24,height=24,loading='lazy',decoding='async',onerror="this.style.display='none'"),
+              shiny::span(class='fm-lineup-fixture-team-name',name))
+          }
           shiny::tags$li(class='fm-lineup-fixture',`data-match-id`=row$match_id,
             shiny::tags$time(class='fm-lineup-fixture-time',datetime=if(nzchar(row$kickoff))row$kickoff,
               fm_format_datetime(row$kickoff,missing='Kickoff to be confirmed')),
             shiny::div(class='fm-lineup-fixture-teams',
-              shiny::span(class='fm-lineup-fixture-team',`aria-label`=paste('Home:',home),home),
+              club(home,row$home_logo),
               shiny::span(class='fm-lineup-fixture-vs','vs'),
-              shiny::span(class='fm-lineup-fixture-team fm-lineup-fixture-away',`aria-label`=paste('Away:',away),away)))
+              club(away,row$away_logo,away=TRUE)))
         })),
         if(!is.null(view$observed_at))shiny::p(class='fm-lineup-fixtures-note',
           paste0('Schedule updated ',fm_format_datetime(view$observed_at),if(view$stale)' · Awaiting sync update'else '')))

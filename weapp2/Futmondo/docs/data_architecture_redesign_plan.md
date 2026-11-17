@@ -1,5 +1,19 @@
 # Futmondo data architecture redesign plan
 
+## Match crests and filter label icons — 2026-11-17
+
+Status: **implemented and verified locally; hosted acceptance pending**.
+
+- [x] Verify home/away `logo` fields against the official public client and retain them in existing durable calendar evidence and worker snapshots.
+- [x] Display both club crests beside the fixture names with bounded, lazy, mobile-safe images; preserve version-1 schedules and original timestamps on failed upgrades.
+- [x] Put decorative icons after all shared player-filter labels and Clear Filters, preserving existing controls and behavior.
+- [x] Verify source mapping, durable restart reuse, one-time legacy upgrade, failed-upgrade recovery, both layouts/themes, mobile/desktop geometry and the required offline lifecycle; record performance and official-feature comparison.
+- [ ] Verify hosted rendering with the deployed application/worker and normal calendar publication.
+
+Contracts: [lineup](lineup_module.md), [player tables](players_table_module.md).
+Checks and limits: [data review](data_review_results.md). No schema migration,
+dependency, new background job or transaction behavior.
+
 ## Official-client API reference guidance — 2026-11-17
 
 - [x] Document the official web app and public JavaScript bundle in `Agents.md` as first-party sources for verifying Futmondo requests and response parsers, with the confirmed match-calendar example and existing data-access boundaries.

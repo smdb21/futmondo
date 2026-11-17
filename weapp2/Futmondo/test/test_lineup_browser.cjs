@@ -12,10 +12,10 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       const page = await browser.newPage({ viewport: { width, height: 1000 } });
       const errors = [];
       page.on('pageerror', error => errors.push(error.message));
-      await page.route('https://static02.mondocore.com/**/fixture-club.png', route => route.fulfill({
+      await page.route('https://static02.mondocore.com/**/fixture-*.png', route => route.fulfill({
         contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22"><circle cx="11" cy="11" r="10" fill="orange"/></svg>'
       }));
-      await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.request().url().endsWith('/fixture-club.png') ? route.fallback() : route.abort());
+      await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : /\/fixture-(club|home|away)\.png$/.test(route.request().url()) ? route.fallback() : route.abort());
       await page.goto(`http://127.0.0.1:${process.env.FUTMONDO_EDITOR_TEST_PORT || '8542'}`);
       const pitch = page.locator('.fm-lineup-pitch');
       const modal = page.locator('.modal');
@@ -75,6 +75,24 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       assert.equal(await page.locator('.fm-lineup-fixture').first().locator('[aria-label^="Home:"]').innerText(), 'Home Club 1');
       assert.equal(await page.locator('.fm-lineup-fixture').first().locator('[aria-label^="Away:"]').innerText(), 'A very long visiting football club name');
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Fixture cards do not overflow');
+      const fixtureCrests = page.locator('.fm-lineup-fixture-crest');
+      assert.equal(await fixtureCrests.count(), 20);
+      for (const crest of await fixtureCrests.all()) {
+        await crest.scrollIntoViewIfNeeded();
+        await crest.evaluate(el => el.decode());
+        const size = await crest.boundingBox();
+        assert.equal(size.width, 24); assert.equal(size.height, 24);
+        assert.equal(await crest.getAttribute('loading'), 'lazy');
+        assert.equal(await crest.getAttribute('decoding'), 'async');
+        assert.equal(await crest.getAttribute('aria-hidden'), 'true');
+        assert.equal(await crest.getAttribute('alt'), '');
+      }
+      const crestSources = await fixtureCrests.evaluateAll(nodes => nodes.map(n => n.src));
+      assert.ok(crestSources.every((src, i) => src.endsWith(i % 2 ? '/fixture-away.png' : '/fixture-home.png')));
+      assert.ok(await page.locator('.fm-lineup-fixture-team').evaluateAll(nodes => nodes.every(n => {
+        const crest=n.querySelector('img').getBoundingClientRect(), name=n.querySelector('.fm-lineup-fixture-team-name').getBoundingClientRect();
+        return crest.right <= name.left + 1 && name.right <= innerWidth + 1;
+      })), 'Crests sit beside club names without overflow');
       await page.screenshot({ path: `/tmp/futmondo-lineup-fixtures-${width}.png`, fullPage: true });
       await assertControlsLayout();
       await assertLineupLayout(page, page.locator('.fm-lineup-layout'));
@@ -275,7 +293,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       }
       assert.deepEqual((await page.locator('#fixture_counts').innerText()).split('/').map(Number), savedCounts);
       previousReads = Number((await page.locator('#fixture_counts').innerText()).split('/')[0]);
-      console.log(`PASS ${width}px: save above pitch, ten matches below with no overflow, clear, defaults, disabled save, exact XI/bench, changed N, coverage, immediate post-optimize click, current draft XI/bench labels, repeated/redrawn one-click picker (${pickerMs.toFixed(0)} ms), starter/bench removal and refill, verified one-shot save, undo latest saved, viewport, dense/no-forward formations and responsive lineup geometry`);
+      console.log(`PASS ${width}px: save above pitch, ten matches with source crests below and no overflow, clear, defaults, disabled save, exact XI/bench, changed N, coverage, immediate post-optimize click, current draft XI/bench labels, repeated/redrawn one-click picker (${pickerMs.toFixed(0)} ms), starter/bench removal and refill, verified one-shot save, undo latest saved, viewport, dense/no-forward formations and responsive lineup geometry`);
       await page.close();
     }
   } finally {

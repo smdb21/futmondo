@@ -1,5 +1,24 @@
 # LigaRadar additions to the official Futmondo workflows
 
+## Fixture crests and trailing filter icons — reviewed 2026-11-17
+
+Rechecked the [official app guide](https://magazine.futmondo.com/novedades-en-la-nueva-app-de-futmondo/)
+(published 2021-12-23) and the
+[current public client](https://app.futmondo.com/main.dart.js). The guide explicitly
+places next-round matches at the bottom of the official lineup page. This
+clarifies the existing comparison below: fixtures in that location are a shared
+official workflow. The current client supplies `logo` in both home and away club
+objects; the dated mapping and bundle digest are recorded in
+[lineup_module.md](lineup_module.md#match-crests--2026-11-17).
+
+LigaRadar now retains those observed logos in its durable calendar and displays
+crests beside both opponents. Its shared player filters put decorative icons
+after the visible labels, including Clear Filters. These refine existing
+presentation and introduce no new analytical capability or login-tier item.
+Neither crest presentation nor the match list is claimed as exclusive. The
+public sources do not establish current official filter icon placement; no
+current authenticated official UI or production API response was inspected.
+
 ## Next-round match calendar beside the lineup — reviewed 2026-11-16
 
 Rechecked the [official rules](https://help.futmondo.com/article/91-reglas-del)

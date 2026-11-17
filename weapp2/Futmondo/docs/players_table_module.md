@@ -1,5 +1,18 @@
 # Players Table Module Documentation
 
+## Filter label icon placement — 2026-11-17
+
+`players_table_filter_label(text, icon_name)` renders the visible text followed
+by a space and its decorative `aria-hidden` icon. All shared filter labels use
+this order in both table layouts, including optional own-team, funds and bid
+filters. The Clear Filters button uses the same helper, so its eraser follows
+the label too. Accessible text, input IDs, defaults, selection/debounce logic
+and clearing behavior are unchanged.
+
+This is a rendering-only change: no source/database requests, cache changes,
+timers or new reactive work. Tests cover all 13 labels/actions and phone/desktop
+geometry in both layouts and themes; see [review results](data_review_results.md).
+
 ## Own-team inclusion and effective squad count — 2026-11-14 Pacific
 
 `players_table_UI(..., filter_by_own_team=FALSE)` and `players_table_Server(..., filter_by_own_team=FALSE)` opt into the **Show players in my team** checkbox. Only All Players in Championship enables it. It starts unchecked, excluding rows whose normalized `owner_team_id` matches the current explicit `user_team_id`. Checking it includes those rows alongside other owners; owner/position/active-clause/value and other filters still intersect. Missing owner identity stays unknown, not implicitly owned or free; a missing current team produces typed pending validation. Context changes compare the new immutable team identity, not display names. Clear Filters resets the checkbox off. Other tables retain their existing behavior.

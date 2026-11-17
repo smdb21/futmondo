@@ -2,7 +2,7 @@ library(reactable)
 
 # Decorative icons supplement the visible, accessible input labels.
 players_table_filter_label <- function(text, icon_name) {
-  tagList(icon(icon_name, `aria-hidden` = "true"), " ", text)
+  tagList(text, " ", icon(icon_name, `aria-hidden` = "true"))
 }
 
 # Keep All exclusive in the browser, before the selection reaches Shiny.
@@ -86,7 +86,7 @@ players_table_UI <- function(id, box_title = NULL,
               div(checkboxInput(inputId = ns("players_with_bid_filter"), label = players_table_filter_label("Bidded Only", "gavel"), value = FALSE), style = "font-weight: 500;", title = "Show only players with active bids from any league team")
             )
           },
-          div(actionButton(ns("btn_clear_filters"), label = "Clear Filters", icon = icon("eraser"), class = "btn btn-sm btn-outline-secondary"), class = "player-clear-filters", title = "Reset all table filters to default values")
+          div(actionButton(ns("btn_clear_filters"), label = players_table_filter_label("Clear Filters", "eraser"), class = "btn btn-sm btn-outline-secondary"), class = "player-clear-filters", title = "Reset all table filters to default values")
         )
       }
   tagList(

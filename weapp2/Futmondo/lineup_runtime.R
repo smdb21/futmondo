@@ -25,6 +25,13 @@ lineup_target <- function(rounds,now=Sys.time()) {
   if(!nzchar(id)||!is.finite(number)||number<1||number!=floor(number))return(NULL)
   list(id=id,number=number,starts_at=times[i])
 }
+# Images use only observed logo values, never inferred club-name filenames.
+lineup_fixture_crest_url <- function(logo) {
+  logo<-mvp_text(logo)
+  if(grepl('^https://[^[:space:]]+$',logo,ignore.case=TRUE))return(logo)
+  if(!grepl('^[A-Za-z0-9][A-Za-z0-9_.-]*$',logo))return('')
+  paste0(TEAM_LOGO_URL,logo,if(grepl('\\.(png|svg|webp)$',logo,ignore.case=TRUE))''else'.png')
+}
 # No acquisition here: the shared round resource includes the durable calendar.
 lineup_fixture_view <- function(rounds,target,scope,now=Sys.time()) {
   result<-list(rows=league_fixture_empty(),message='',complete=FALSE,stale=FALSE,observed_at=NULL)
@@ -47,6 +54,9 @@ lineup_fixture_view <- function(rounds,target,scope,now=Sys.time()) {
   result$complete<-nrow(coverage)==1L&&isTRUE(coverage$complete)
   if(!nrow(rows))result$message<-'Fixtures for this round have not been confirmed in the synced calendar.'
   else if(!result$complete)result$message<-'Some match details are still unconfirmed; the schedule may be incomplete.'
+  if(nzchar(mvp_text(calendar$refresh_error))){
+    result$stale<-TRUE;result$message<-trimws(paste(result$message,calendar$refresh_error))
+  }
   result
 }
 # Completed-round facts remain usable when a successful worker observation ages.

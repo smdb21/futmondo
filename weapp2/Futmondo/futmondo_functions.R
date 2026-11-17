@@ -191,10 +191,12 @@ get_finished_rounds <- function(login, championship_id) {
   # session. Display adapters only restore this persisted resource.
   if(nzchar(mvp_text(catalog$league_id))){
     fixtures<-attr(catalog,'fixture_calendar')
-    if(is.null(fixtures)||(identical(fixtures$status,'ok')&&is.null(fixtures$matches))){
+    if(is.null(fixtures)||(identical(fixtures$status,'ok')&&!league_fixture_matches_current(fixtures$matches))){
       metadata<-get_award_round_metadata(login,championship_id,catalog$league_id,
         current_round_id=catalog$current_round_id,include_matches=TRUE)
-      fixtures<-league_fixture_observation(metadata)
+      if(!identical(metadata$status,'ok')&&is.list(fixtures)&&league_fixture_matches_valid(fixtures$matches)){
+        fixtures$refresh_error<-'Match calendar update failed; showing the saved schedule.'
+      }else fixtures<-league_fixture_observation(metadata)
     }
     attr(rounds,"fixture_calendar")<-fixtures
   }

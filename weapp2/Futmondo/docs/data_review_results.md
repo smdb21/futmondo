@@ -1,5 +1,72 @@
 # Futmondo data review and implementation results
 
+## Match crests and trailing filter icons — 2026-11-17
+
+Retained the official client's `h.logo` and `a.logo` fields in the existing
+persisted fixture calendar (inner payload version 2), displayed 24px crests
+beside both club names, and moved all shared filter icons after their labels,
+including Clear Filters. Source URLs/digest and contracts are in
+[lineup_module.md](lineup_module.md) and
+[players_table_module.md](players_table_module.md). Version-1 calendars remain
+readable; a failed normal-worker upgrade preserves their known matches and
+source times with an explicit stale/error note. A successful upgrade is stored
+and reused after restart.
+
+Executed with synthetic accounts, responses and database adapters:
+
+- `Rscript test/test_lineup_fixtures.R`: source filename/URL mapping, actual
+  durable worker codec, legacy decoding, missing/unsafe logos, failed-upgrade
+  display, original clocks, scope isolation, known-answer fixtures and bounds pass.
+- `Rscript test/test_lineup_round_catalog.R`: nine groups pass, including saved
+  source reuse, exactly one successful legacy upgrade/write, restart reuse
+  without acquisition, and preservation/retry after failed upgrade.
+- `Rscript test/test_award_fixture_calendar.R`: all five groups pass.
+- `Rscript test/test_player_table_filters.R`: all 14 groups pass, including
+  all 13 labels/actions in both layouts and existing filtering/debounce behavior.
+- `Rscript test/test_lineup_module.R`: all checks pass, including asynchronous
+  lifecycle, draft editing and duplicate-safe manual save/readback.
+- The lineup browser fixture and `test/test_lineup_browser.cjs` pass at
+  320/390/1440px: 20 source-mapped crest images decode at 24px beside the club
+  names, long names fit, Save stays above the pitch, and existing editing,
+  verified save and resize checks pass. Picker samples: 57/107/95 ms.
+- The filter browser fixture and `test/test_position_filters_browser.cjs` pass
+  at 320/390/1440px in dark/light themes, with trailing icon geometry, wrapping,
+  All exclusivity, role unions, debounce, Clear Filters and table isolation.
+  Heartbeat samples: 59–93 ms. Focused phone/desktop crest and phone filter
+  screenshots were inspected; crest assets were mocked in browser tests.
+- `Rscript test/test_shiny_simulation.R`: 13 checks plus eight tabs pass, without
+  HTTP or live database mutations. `Rscript test/test_deployment_contract.R`:
+  all three groups pass.
+
+Performance review: the crest fields add no browser source-API/database reads,
+reactive timers, worker jobs/lanes or cache entries. A legacy calendar may need
+one existing bulk read in normal worker sync to obtain the new fields; valid
+persisted version-2 evidence prevents repeated acquisition or replacement writes.
+A failed upgrade remains retryable. The UI adds two lazy CDN image elements per
+match (at most 100), with fixed geometry, async decoding and ordinary browser
+asset reuse. A synthetic 380-match season used 194,480 bytes including logo
+strings; parsing took 0.312–0.418 seconds in the worker and display selection/
+validation took 17–21 ms. The filter change only reorders rendering; existing
+524-row normalization/combined filtering took 0.002 seconds (95.1 KiB), and
+multiposition filtering averaged 0.658 ms over 1,000 passes. No dependencies,
+environment variables or schema changed. Only the five changed runtime-file
+checksums are refreshed in the deployment manifest; documentation has no runtime
+cost.
+
+Final delivery verification used an isolated copy of the exact staged
+application, without unrelated working-tree changes. The fixture, round-catalog,
+award-calendar, filter, lineup-module, deployment and required lifecycle checks
+all pass there. All five changed runtime checksums match the staged manifest.
+The isolated 380-match sample parsed in 0.332 seconds and selected/validated in
+17.7 ms; multiposition filtering averaged 0.721 ms. No runtime changes followed
+these checks.
+
+Limits: no real account or transaction was used. The public-client mapping and
+synthetic fixtures do not establish authenticated production response completeness,
+CDN availability or hosted latency. Existing snapshots gain crests during normal
+calendar sync after the matching worker code is deployed; hosted acceptance
+remains unverified.
+
 ## Official-client API reference guidance — 2026-11-17
 
 Added the official web app and public JavaScript bundle to `Agents.md` as sources
