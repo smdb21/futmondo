@@ -1,5 +1,35 @@
 # Futmondo data review and implementation results
 
+## Player-card calendar labels — 2026-11-17
+
+The history chart now uses 10px horizontal labels (previously the inherited
+13px size), with date ticks on the 1st and 15th of each account-local calendar
+month. It retains the vertical day/month format, title spacing, plotted data,
+hover details and separate undated-round axis. No feature-tier expansion.
+
+Verification: `Rscript test/test_player_trend_plot.R` passes all 16 groups.
+The existing browser fixture and `test/test_player_trend_browser.cjs` pass at
+320/390/1440px across four history modes and both themes, including February,
+a year boundary, exact calendar labels, font size, nonoverlapping bounds,
+source/zoom preservation and no page errors. Inspected both 390px screenshots.
+The fixture was updated to supply the existing `chart_data()` input and current
+orange points colour. Browser checks used the installed Chromium binary through
+`FUTMONDO_TEST_CHROMIUM`; its default Playwright binary was unavailable.
+
+Performance review: tick construction scans already formatted dates and creates
+two positions per covered month. No source/API/database reads or writes, cache
+entries/invalidation, persistence changes, timers or reactive dependencies are
+added. Existing durable history reuse is unchanged. Phone/desktop heartbeat
+samples were 83/88/83 ms with no overflow; this is local fixture responsiveness,
+not production latency. Documentation has no runtime effect. No dependency or
+environment setup change; only the affected runtime checksum is updated in the
+deployment manifest. Hosted visual acceptance remains unverified.
+
+An isolated export of the staged application also passed all 16 plot groups,
+all responsive browser modes and the three deployment checks; its runtime
+checksum matches the manifest. Staged heartbeat samples were 81/81/63 ms.
+Unrelated working-tree changes remain excluded.
+
 ## Match crests and trailing filter icons — 2026-11-17
 
 Retained the official client's `h.logo` and `a.logo` fields in the existing

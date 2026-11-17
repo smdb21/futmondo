@@ -1,5 +1,13 @@
 # Futmondo data architecture redesign plan
 
+## Player-card calendar labels — 2026-11-17
+
+- [x] Reduce horizontal tick labels to 10px and replace automatic date spacing with the 1st and 15th of each displayed month, preserving the existing date/round distinction.
+- [x] Verify the focused plot and phone/desktop browser checks; record performance and validation limits in `data_review_results.md`.
+- [ ] Hosted visual acceptance after deployment.
+
+Contract: [player-card chart](selected_player_module.md). Presentation only; no new capability, source acquisition, persistence or dependency change.
+
 ## Match crests and filter label icons — 2026-11-17
 
 Status: **implemented and verified locally; hosted acceptance pending**.

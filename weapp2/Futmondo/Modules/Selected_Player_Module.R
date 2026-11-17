@@ -2208,17 +2208,24 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       }
       date_axis <- nrow(values)>0L || dated_points
       horizontal_axis <- list(title=if(date_axis)list(text="Date",standoff=20)else "Round",
-        type=if(date_axis)"date"else "linear",tickmode="auto",nticks=3,tickangle=if(date_axis)90 else 0,showgrid=FALSE)
-      # A NULL dtick serializes as [] and forces daily ticks on Plotly's date
-      # axis. Omit it entirely for dates; keep numeric round ticks integral.
+        type=if(date_axis)"date"else "linear",tickfont=list(size=10),tickangle=if(date_axis)90 else 0,showgrid=FALSE)
       round_spacing <- if(nrow(points))max(1,ceiling(diff(range(points$round_number))/3))else 1
-      if(date_axis)horizontal_axis$tickformat <- "%d %b" else {
+      if(date_axis) {
+        # Use displayed calendar dates so month lengths and account timezones
+        # cannot shift the first/midmonth ticks as a fixed 15-day interval would.
+        dates <- as.Date(substr(c(values$date,if(dated_points)points$plot_x),1,10))
+        months <- seq(as.Date(format(min(dates),"%Y-%m-01")),
+          as.Date(format(max(dates),"%Y-%m-01")),by="month")
+        horizontal_axis$tickmode <- "array"
+        horizontal_axis$tickvals <- as.character(sort(c(months,months+14)))
+        horizontal_axis$tickformat <- "%d %b"
+      } else {
         horizontal_axis$tickmode <- "linear";horizontal_axis$dtick <- round_spacing
       }
       chart %>% fm_plot_layout(
         xaxis=horizontal_axis,
         xaxis2=if(separate_round_axis)list(title=list(text="Round",font=list(color="#F28C28")),color="#F28C28",overlaying="x",side="top",
-          tickmode="linear",dtick=round_spacing,tickangle=0,showgrid=FALSE)else list(visible=FALSE),
+          tickmode="linear",dtick=round_spacing,tickfont=list(size=10),tickangle=0,showgrid=FALSE)else list(visible=FALSE),
         yaxis=list(title=list(text="Value (EUR)",font=list(color="#00ff88")),visible=nrow(values)>0L,autorange=FALSE,
           range=player_trend_axis_range(values$value),tickformat=".3s",color="#00ff88"),
         yaxis2=list(title=list(text="Points",font=list(color="#F28C28")),visible=nrow(points)>0L,overlaying="y",side="right",autorange=FALSE,

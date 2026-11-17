@@ -13,7 +13,7 @@ const {chromium}=require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp
    await page.waitForFunction(()=>document.querySelector('#chart')?._fullLayout&&document.querySelector('#neutral')?._fullLayout);
    const inspect=()=>plot.evaluate(el=>{
     const axis=name=>{const a=el._fullLayout[name];return a?{color:a.tickfont.color,title:a.title.font.color,visible:a.visible}:{visible:false};};
-    const labels=Array.from(el.querySelectorAll('.xtick text')).map(text=>{const r=text.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,text:text.textContent};});
+    const labels=Array.from(el.querySelectorAll('.xtick text')).map(text=>{const r=text.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,text:text.textContent,size:getComputedStyle(text).fontSize};});
     const bounds=el.getBoundingClientRect();const title=el.querySelector('.xtitle')?.getBoundingClientRect();
     return {bounds:{left:bounds.left,right:bounds.right,bottom:bounds.bottom},titleTop:title?.top,labels,tickangle:el._fullLayout.xaxis.tickangle,y:axis('yaxis'),y2:axis('yaxis2'),x2:axis('xaxis2'),
      data:el.data.map(trace=>({name:trace.name,color:trace.line.color,count:trace.y.length})),
@@ -29,7 +29,12 @@ const {chromium}=require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp
      await plot.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
      const state=await inspect();
      const labels=state.labels.sort((a,b)=>a.left-b.left);
-     assert.ok(labels.length>0&&labels.length<=3,`${width}/${scenario}: sparse date ticks`);
+     const calendarLabels=['01 Nov','15 Nov','01 Dec','15 Dec','01 Jan','15 Jan','01 Feb','15 Feb','01 Mar'];
+     // A line-only date axis starts at 01 Nov 01:00 in Madrid; midnight is
+     // just outside its range. Dated point markers add padding around it.
+     assert.deepEqual(labels.map(label=>label.text),scenario==='points'?calendarLabels.slice(0,2):
+       scenario==='both'?calendarLabels:calendarLabels.slice(1),`${width}/${scenario}: first and fifteenth calendar ticks`);
+     assert.ok(labels.every(label=>label.size==='10px'),`${width}/${scenario}: smaller date labels`);
      assert.equal(state.tickangle,90,`${width}/${scenario}: vertical date labels`);
      assert.ok(labels.every(label=>/^\d{2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)$/.test(label.text)),`${width}/${scenario}: abbreviated month labels without years`);
      assert.ok(labels.every(label=>label.left>=state.bounds.left-1&&label.right<=state.bounds.right+1&&label.bottom<=state.bounds.bottom+1),`${width}/${scenario}: date labels stay inside plot`);
@@ -40,9 +45,9 @@ const {chromium}=require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp
       assert.equal(axis.color.toLowerCase(),trace.color.toLowerCase());assert.equal(axis.title.toLowerCase(),trace.color.toLowerCase());
       assert.equal(trace.count,trace.name==='Valuation'?124:4);
      }
-     for(const tick of state.ticks)assert.equal(tick.fill,tick.axis==='ytick'?'rgb(0, 255, 136)':'rgb(244, 201, 93)');
-     for(const title of state.titles)assert.equal(title.fill,title.axis==='ytitle'?'rgb(0, 255, 136)':'rgb(244, 201, 93)');
-     if(scenario==='undated'){assert.equal(state.x2.color,'#F4C95D');assert.equal(state.x2.title,'#F4C95D');}
+     for(const tick of state.ticks)assert.equal(tick.fill,tick.axis==='ytick'?'rgb(0, 255, 136)':'rgb(242, 140, 40)');
+     for(const title of state.titles)assert.equal(title.fill,title.axis==='ytitle'?'rgb(0, 255, 136)':'rgb(242, 140, 40)');
+     if(scenario==='undated'){assert.equal(state.x2.color,'#F28C28');assert.equal(state.x2.title,'#F28C28');}
      const neutral=await page.locator('#neutral').evaluate(el=>({color:el._fullLayout.yaxis.tickfont.color,muted:getComputedStyle(document.documentElement).getPropertyValue('--fm-muted').trim()}));
      assert.equal(neutral.color.toLowerCase(),neutral.muted.toLowerCase());
      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);
@@ -60,7 +65,7 @@ const {chromium}=require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp
    const begin=Date.now();await page.locator('#heartbeat').click();await page.waitForFunction(()=>document.querySelector('#heartbeat_value').textContent==='1');
    const heartbeat=Date.now()-begin;assert.ok(heartbeat<1500);
    assert.deepEqual(errors,[]);assert.deepEqual(await page.locator('.shiny-output-error:visible').allTextContents(),[]);
-   console.log(`PASS ${width}px: four history modes, both themes, vertical nonoverlapping abbreviated-month date ticks, series-colored ticks/titles, neutral theme defaults, source/zoom retention; heartbeat ${heartbeat}ms`);
+   console.log(`PASS ${width}px: four history modes, both themes, small nonoverlapping first/fifteenth date ticks, series-colored ticks/titles, neutral theme defaults, source/zoom retention; heartbeat ${heartbeat}ms`);
    await page.close();
   }
  }finally{await browser.close();}

@@ -57,12 +57,14 @@ check("postponed rounds connect chronologically with score provenance intact",{
    all(startsWith(trace$text,paste0("Round ",c(2,3,4,1),"<br>"))),
    grepl("provisional",trace$text[3],fixed=TRUE),trace$line$dash=="solid")
 })
-check("dense histories use sparse automatic dates without an empty dtick",{
+check("dense histories label the first and fifteenth with smaller date text",{
  history<-known
  history$valuation<-data.frame(recorded_at=format(as.POSIXct("2026-07-01",tz="UTC")+0:123*86400,"%Y-%m-%dT%H:%M:%SZ",tz="UTC"),value=22e6+sin(0:123/12)*1e6)
  history$points$date<-as.POSIXct("2026-07-01",tz="UTC")+0:3*7*86400
  chart<-render_fixture(history)
- stopifnot(chart$layout$xaxis$tickmode=="auto",chart$layout$xaxis$nticks==3,
+ stopifnot(chart$layout$xaxis$tickmode=="array",chart$layout$xaxis$tickfont$size==10,
+   identical(as.character(chart$layout$xaxis$tickvals),c("2026-07-01","2026-07-15","2026-08-01","2026-08-15",
+     "2026-09-01","2026-09-15","2026-10-01","2026-10-15","2026-11-01","2026-11-15")),
    is.null(chart$layout$xaxis$dtick),chart$layout$xaxis$tickformat=="%d %b",chart$layout$xaxis$tickangle==90,
    identical(chart$layout$xaxis$showgrid,FALSE),identical(chart$layout$showlegend,FALSE),
    length(chart$data[[1]]$y)==124L,grepl("2026",chart$data[[1]]$text[1],fixed=TRUE))
