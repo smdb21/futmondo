@@ -2123,3 +2123,16 @@ History rollout delivery: `f21f9fe` and held adapter commits were pushed to
 cutovers and the below-500-million-byte target are complete; container-version,
 fresh worker-write and automatic-cleanup acceptance checks await owner restart.
 No restart or manual cleanup was performed.
+
+
+### Whole-cluster storage target — 2026-11-18 (verified complete)
+
+Corrects the earlier quota claim, which measured only the application database.
+Supabase's size total includes template0 and template1: the actual pre-maintenance
+cluster size was 510,562,481 bytes. With production confirmed stopped, sequential
+physical compaction of worker chunks, jobs, checkpoints and snapshots reduced
+the full cluster to 347,508,913 bytes, leaving 152,491,087 bytes of headroom below
+500,000,000. Full-row fingerprints and counts match for all four tables; no
+history, values, column types or retention changed. Indexes remain valid. See
+docs/database_storage_headroom.md. Runtime/automatic-cleanup acceptance remains
+pending owner restart; no restart or source acquisition was performed.

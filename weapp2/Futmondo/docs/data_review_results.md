@@ -4852,3 +4852,26 @@ Owner confirmed production is intentionally stopped. Therefore a current worker
 write, deployed container version and automatic cleanup cannot yet be verified.
 Resume those checks after owner restart; no manual cleanup or restart was used
 to mask this limit. Final delivery-note edits have no runtime/performance impact.
+
+
+### Whole-cluster headroom correction and compaction — 2026-11-18
+
+The earlier 495,479,955-byte size was application-only. PostgreSQL template
+databases add 15,082,526 bytes, explaining the dashboard's 0.511 GB; the earlier
+quota-completion claim was premature. Verified cluster size after stopped-app
+physical compaction is 347,508,913 bytes (application: 332,426,387), leaving
+152,491,087 bytes under 500,000,000.
+
+Sequential VACUUM FULL ANALYZE rebuilt worker_chunks, worker_jobs,
+worker_checkpoints and worker_snapshots. All pre/post full-row fingerprints and
+counts matched (4,922 / 1,889 / 711 / 4,640 rows). No historical table was modified;
+all indexes are valid/ready and zero active worker leaders remain. Measured
+base64-to-binary potential was only about 8.6 MB; types/precision/contracts were
+retained while physical reclamation saved about 163 MB.
+
+Performance review: exclusive maintenance locks were confined to the confirmed
+stopped-production window. Smaller physical relations and refreshed statistics;
+no app request/cache/timer/rendering or dependency changes. No automatic VACUUM
+FULL was added. Row integrity, index health and whole-cluster size were verified;
+no runtime code changes warranted rerunning app tests. Automatic cleanup still
+requires a running worker and remains an explicit post-restart check.

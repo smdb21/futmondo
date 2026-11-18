@@ -131,8 +131,10 @@ removing rows. Their names and before/after byte sizes are recorded below.
 | idx_snapshots_player | 1,605,632 | 1,196,032 |
 
 Database size changed from 1,101,270,163 to 495,479,955 bytes (495.5 decimal MB).
-This is below 500,000,000 bytes, with limited headroom; useful new history can still
-grow. Membership observation timestamps were not removed. All indexes were valid
+This measurement covers only the application database. Adding system/template
+databases gave 510,562,481 bytes, so the project was still over 500,000,000 bytes.
+The subsequent physical compaction and corrected whole-cluster measurement are
+recorded in [Database storage headroom](database_storage_headroom.md). Membership observation timestamps were not removed. All indexes were valid
 and ready. Sample indexed production reads executed in 7.468 ms (price), 79.778 ms
 (match latest) and 224.207 ms (finance latest), with no temporary blocks written.
 These are single sampled reads, not production latency percentiles.
@@ -161,8 +163,8 @@ active worker leaders; cleanup remained at 18:55:07 UTC, with cumulative counter
 6,054 chunks and 2,980 checkpoints. The owner then confirmed production is still
 intentionally stopped. No restart or manual cleanup was performed.
 
-Production database normalization and the below-500-million-byte measurement are
-complete. The deployed container revision and fresh automatic cleanup activity
+Production database normalization is complete. The original quota-completion
+claim used an incomplete size metric; see the corrected cluster measurement above. The deployed container revision and fresh automatic cleanup activity
 cannot be verified while production is stopped. After the owner restarts it,
 verify a fresh worker heartbeat/leader lease and an advancing cleanup success
 time (even a zero-deletion batch is a successful automatic run), then verify

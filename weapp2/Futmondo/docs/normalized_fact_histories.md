@@ -100,8 +100,11 @@ and switched only when the pending queue was empty. Full details, exact counts,
 index maintenance and performance checks are in
 [the batch migration record](history_batch_migration.md).
 
-Database size after normalization and concurrent index rebuilding is
-495,479,955 bytes, down from 1,101,270,163 bytes at the start of this rollout. Every
+Application database size after normalization and concurrent index rebuilding
+was 495,479,955 bytes, down from 1,101,270,163 bytes at the start of this rollout.
+That excluded system/template databases, so it did not prove quota compliance.
+Subsequent physical compaction reduced the full cluster to 347,508,913 bytes; see
+[Database storage headroom](database_storage_headroom.md). Every
 factual transition and first/last confirmation survives; intermediate confirmation
 timestamps are intentionally discarded. Membership retains every timestamp.
 
