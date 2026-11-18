@@ -95,9 +95,11 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
  })
 })
 # Login checks exercise pending duplicate protection and a superseded response.
+fm_database_probe<-function(...)promises::promise_resolve(TRUE)
 attempts<-0L;login_resolve<-NULL
 fm_async_login<-function(...){attempts<<-attempts+1L;promises::promise(function(resolve,reject)login_resolve<<-resolve)}
 shiny::testServer(login_Server,{
+ settle(session) # Finish the synthetic startup DB check before submitting.
  session$setInputs(user_name='person@example.invalid',password='fixture',login_button=1);settle(session)
  session$setInputs(login_button=2);settle(session)
  check('pending authentication allows one attempt and no token yet',stopifnot(attempts==1L,isTRUE(login_pending_RV()),is.null(login_token_RV())))

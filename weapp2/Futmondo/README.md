@@ -34,7 +34,7 @@ supabase_secret_key=YOUR_SERVER_SERVICE_ROLE_KEY
 admin=YOUR_ADMIN_LOGIN_EMAIL
 ```
 
-The optional `admin` value identifies the account authorized for administrative actions. Database credentials remain server-side. Missing database configuration leaves live factual inspection available but prevents historical persistence.
+The optional `admin` value identifies the account authorized for administrative actions. Database credentials remain server-side. Every new browser session checks database connectivity before enabling login, including administrator and remembered login. Missing database configuration or a failed check shows Database unavailable and keeps login disabled, with a Retry connection action. The read-only check uses the existing application_access main row; ensure the app-access migration is installed and the server key can read it. Its overall deadline is ten seconds, including transport queue time. Browsing uses stored database observations; there is no live-source fallback. No new environment variable, dependency or migration is required.
 
 Use the project base URL for `supabase_project_url`, without `/rest/v1`. The shared URL getter also accepts a copied REST base URL and removes its trailing `/rest/v1` and slashes before callers add the endpoint. A duplicated `/rest/v1/rest/v1/` returns HTTP 404 and prevents both reading and saving history. After correcting a hosted environment value, restart or redeploy the app so R receives it.
 

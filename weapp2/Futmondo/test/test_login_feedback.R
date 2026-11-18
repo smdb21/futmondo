@@ -9,6 +9,7 @@ updateBox <- function(...) invisible(NULL)
 resource_timing <- function(...) invisible(TRUE)
 fm_transport_cancel <- function(...) invisible(TRUE)
 fm_app_access <- function(...) promises::promise_resolve(TRUE)
+fm_database_probe <- function(...) promises::promise_resolve(TRUE) # explicit healthy startup fixture
 is_authorized_admin <- function(...) FALSE
 source("Modules/Login_Module.R")
 
@@ -32,13 +33,14 @@ messages <- list()
 cleared_passwords <- list()
 mock_session <- MockShinySession$new()
 mock_session$sendCustomMessage <- function(type, message) {
-  messages[[length(messages) + 1L]] <<- list(type = type, payload = message)
+  if (endsWith(type, "-login_state")) messages[[length(messages) + 1L]] <<- list(type = type, payload = message)
 }
 mock_session$sendInputMessage <- function(inputId, message) {
   if (identical(inputId, "password") || endsWith(inputId, "-password")) cleared_passwords[[length(cleared_passwords) + 1L]] <<- message
 }
 settle <- function(session){for(i in seq_len(10L)){later::run_now(0);session$flushReact()}}
 testServer(login_Server, args = list(id = "login"), session = mock_session, {
+  settle(session)
   invisible(output$login_feedback)
 
   # Missing fields never reach the API, and always release the browser button.

@@ -17,10 +17,12 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
   let log = '';
   const fixtureKey = randomBytes(32).toString('hex');
   let app;
+  let starts = 0;
   async function startApp() {
     log = '';
     app = spawn('Rscript', ['test/test_remember_browser_app.R', String(backend), path.join(tmp,'records.json')],
-      {env:{...process.env,FUTMONDO_TEST_REMEMBER_KEY:fixtureKey}});
+      {env:{...process.env,FUTMONDO_TEST_REMEMBER_KEY:fixtureKey,
+        FUTMONDO_TEST_DB_STARTUP_FAILURE:starts++ === 0 ? 'true' : 'false'}});
     app.stdout.on('data', d => {log += d;}); app.stderr.on('data', d => {log += d;});
     for (let i=0;i<100 && !log.includes('Listening on');i++) await new Promise(resolve => setTimeout(resolve,100));
     assert.ok(log.includes('Listening on'), log);
@@ -60,6 +62,12 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
     context = await openBrowser();
     let page = await context.newPage(); page.setDefaultTimeout(10000);
     const endpointStatuses = [];
+    async function openInformation(page, text) {
+      // Settled feedback lives in the current page's shared information panel.
+      await page.waitForFunction(text => Array.from(document.querySelectorAll('.tab-pane.active .fm-info-panel'))
+        .some(panel => panel.textContent.includes(text)), text);
+      await page.locator('.tab-pane.active .fm-info-panel').evaluate(panel => {panel.open = true;});
+    }
     function observePage(page) {
     page.on('pageerror', e => {log += '\nBROWSER: ' + e.message;});
     page.on('console', m => {if(m.type()==='error') log += '\nCONSOLE: ' + m.text();});
@@ -75,6 +83,27 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
     });
     await page.goto(appUrl);
     await page.waitForFunction(() => window.Shiny && Shiny.shinyapp && Shiny.shinyapp.isConnected());
+    // Startup DB outage must block the real remembered-cookie controller too.
+    await page.locator('#login-database_status').getByText('Checking database connection…').waitFor();
+    assert.equal(await page.locator('#login-login_button').isDisabled(), true);
+    assert.equal(releaseProbe, undefined, 'no cookie probe before DB readiness');
+    const pulse = Date.now();
+    await page.evaluate(() => {
+      Shiny.setInputValue('fixture_heartbeat', 1, {priority:'event'});
+      Shiny.setInputValue('login-login_button', 99, {priority:'event'});
+    });
+    await page.waitForFunction(() => document.querySelector('#fixture_heartbeat').textContent === '1');
+    const heartbeatMs = Date.now() - pulse;
+    assert.ok(heartbeatMs < 700, `startup heartbeat took ${heartbeatMs}ms`);
+    const outage = page.locator('#login-database_status [role="alert"]');
+    await outage.waitFor({state:'visible'});
+    assert.match(await outage.innerText(), /Database unavailable.*Login is disabled/s);
+    assert.equal(await page.locator('#login-login_button').isDisabled(), true);
+    assert.equal(await page.locator('#login-user_name').isVisible(), true);
+    assert.equal(releaseProbe, undefined, 'no cookie probe during DB failure');
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2), false);
+    await page.screenshot({path:path.join(process.env.FUTMONDO_TEST_ARTIFACTS || tmp, 'database-unavailable-mobile.png'), fullPage:true});
+    await page.locator('#login-database_retry').click();
     for (let i=0; i<100 && !releaseProbe; i++) await page.waitForTimeout(20);
     assert.ok(releaseProbe, 'cookie probe started');
     assert.equal(await page.locator('#login-user_name').isVisible(), false);
@@ -83,13 +112,14 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
     await page.unrouteAll({behavior:'wait'});
     await page.locator('#login-user_name').waitFor({state:'visible'});
     console.log('PASS credentials stay hidden during cookie probe and appear after absent cookie');
+    assert.equal(await page.locator('#login-login_button').isEnabled(), true);
+    console.log(`PASS mobile DB outage blocks login and cookie restore; retry resumes restoration; heartbeat ${heartbeatMs}ms during 2s probe`);
     await page.locator('#login-user_name').fill('fixture@example.invalid');
     await page.locator('#login-password').fill('synthetic-password');
     await page.locator('#login-remember_login').check();
     await page.locator('#login-login_button').click();
     await page.locator('#shiny-tab-today').waitFor({state: 'visible'});
-    await page.locator('#login-remember_feedback').waitFor({state: 'visible'});
-    await page.waitForFunction(() => document.querySelector('#login-remember_feedback').textContent.includes('remembered for 7 days'));
+    await openInformation(page, 'remembered for 7 days');
     assert.equal(await page.locator('#login-login_button').isVisible(), false);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2), false);
     for(let i=0;i<100 && !(await context.cookies()).some(c=>c.name.startsWith('__Secure-fm_remember_'));i++) await page.waitForTimeout(30);
@@ -139,6 +169,7 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
     await page.route('**/dataobj/**', route => route.abort('failed'));
     await page.reload();
     await page.locator('#login-user_name').waitFor({state:'visible'});
+    await openInformation(page, 'Retry saved access');
     await page.locator('#login-remember_retry').waitFor({state:'visible'});
     assert.ok((await context.cookies()).some(c => c.name === cookie.name));
     await page.unrouteAll({behavior:'wait'});
@@ -176,13 +207,12 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
     await page.locator('#login-remember_login').check();
     await page.locator('#login-login_button').click();
     await page.locator('#shiny-tab-today').waitFor({state: 'visible'});
-    await page.locator('#login-remember_feedback').waitFor({state: 'visible'});
-    await page.waitForFunction(() => document.querySelector('#login-remember_feedback').textContent.includes('Remembering this device failed'));
+    await openInformation(page, 'Remembering this device failed');
     assert.equal((await context.cookies()).some(c => c.name.startsWith('__Secure-fm_remember_')), false);
     assert.equal(await page.locator('#login-login_button').isVisible(), false);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2), false);
     console.log('PASS failed persistence remains visible on Today without issuing a remembered cookie');
-    console.log(`REMEMBER LOGIN BROWSER (${proxyWithoutOrigin ? 'proxied without WebSocket Origin' : 'original WebSocket Origin'}${proxyRewritesHost ? ', rewritten Host' : ''}): 8 passed / 0 failed`);
+    console.log(`REMEMBER LOGIN BROWSER (${proxyWithoutOrigin ? 'proxied without WebSocket Origin' : 'original WebSocket Origin'}${proxyRewritesHost ? ', rewritten Host' : ''}): 9 passed / 0 failed`);
   } catch(error) {
     throw new Error(error.stack + '\nAPP LOG: ' + log);
   } finally {

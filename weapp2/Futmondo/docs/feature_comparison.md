@@ -208,3 +208,8 @@ capabilities, without a new calculation/transaction capability or login-tier ite
 The public sources do not establish whether the current official app has an
 identical combined box; no authenticated official UI comparison was performed,
 and no exclusivity claim is made. See [presentation contract](ui_information_disclosures.md).
+
+
+## Startup database availability — reviewed 2026-11-17
+
+Rechecked the [official public app entry point](https://app.futmondo.com/) and [official app guide](https://magazine.futmondo.com/novedades-en-la-nueva-app-de-futmondo/) (published 2021-12-23). These public sources do not establish the official app's internal database checks or outage/login behavior; no authenticated outage simulation was performed against Futmondo. LigaRadar now checks its own database before password/remembered login and shows a blocking error with a retry action when unavailable. This is reliability infrastructure for its existing database-first browsing, not a new analytical or football capability, so no login-tier item or exclusivity claim is added. See [implementation](login_module.md#startup-database-check--2026-11-17) and [verification limits](data_review_results.md#startup-database-admission-check--2026-11-17).

@@ -47,6 +47,7 @@ app_champ <- list(id='champ',name='Offline League',league='fixture-competition',
 app_rounds <- data.frame(round_id=c('r1','r2'),round_number=1:2,begin_process=c('2026-08-15T00:00:00Z','2026-08-22T00:00:00Z'),is_finished=TRUE)
 login <- function(...) app_auth
 fm_async_login <- function(...) promises::promise_resolve(app_auth)
+fm_database_probe <- function(...) promises::promise_resolve(TRUE) # explicit healthy startup fixture
 fm_access_store <- function(...) promises::promise_resolve(FALSE) # explicit open-policy fixture
 get_championships <- function(...) unlist(app_champ)
 get_active_championships <- function(...) {
@@ -103,6 +104,7 @@ get_player_matches<-function(...)NULL
 app_settle<-function(session){for(i in seq_len(40L)){later::run_now(timeoutSecs=0);session$flushReact()};invisible(TRUE)}
 app_check('full server login, navigation, refresh and logout',{
  shiny::testServer(app_server,{
+  app_settle(session) # Finish the synthetic startup DB check before submitting.
   session$setInputs(tabs='login',`login-user_name`='offline@example.invalid',`login-password`='fixture',`login-login_button`=1)
   session$elapse(100);app_settle(session);stopifnot(valid_login(login_token_RV()))
   tabs<-list(today=c('today-kpi_cash_box','today-kpi_valuation_box','today-market_players-players_table','today-recent_transfers'),
@@ -141,6 +143,7 @@ app_check('countdown ticks reuse fetched round catalog',{
  original_rounds<-get_finished_rounds;round_reads<-0L
  get_finished_rounds<-function(...){round_reads<<-round_reads+1L;app_rounds};clear_api_cache()
  shiny::testServer(app_server,{
+  app_settle(session) # Finish the synthetic startup DB check before submitting.
   session$setInputs(tabs='login',`login-user_name`='offline@example.invalid',`login-password`='fixture',`login-login_button`=1)
   session$elapse(100);app_settle(session);session$setInputs(tabs='today');app_settle(session);clock<-output$round_countdown;before<-round_reads
   session$elapse(3100);app_settle(session);clock<-output$round_countdown;stopifnot(round_reads==before)

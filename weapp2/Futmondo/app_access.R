@@ -16,13 +16,48 @@ fm_access_store <- function(blocked = NULL, token = NULL, owner = "") {
   promises::then(fm_async_http(url, if (reading) "GET" else "POST", body, headers,
     owner = owner, timeout = 8), function(response) {
       rows <- jsonlite::fromJSON(rawToChar(response$content), simplifyVector = FALSE)
-      if (!is.list(rows) || length(rows) != 1L || !is.list(rows[[1L]]) ||
+      if (!is.list(rows) || !is.null(names(rows)) || length(rows) != 1L || !is.list(rows[[1L]]) ||
           !is.logical(rows[[1L]]$admin_only) || length(rows[[1L]]$admin_only) != 1L ||
           is.na(rows[[1L]]$admin_only)) stop("Invalid or missing access policy")
       value <- rows[[1L]]$admin_only
       if (!reading && !identical(value, blocked)) stop("Access-policy save was not confirmed")
       value
     })
+}
+
+# A real, read-only database response is required even for administrators.
+# The policy value controls admission separately; either boolean proves access.
+fm_database_probe <- function(owner = "", timeout = 10) {
+  if (!is.numeric(timeout) || length(timeout) != 1L || !is.finite(timeout) || timeout <= 0)
+    return(promises::promise_reject(simpleError("Invalid database check deadline")))
+  # Callers provide a dedicated session owner. Standalone checks also get their
+  # own cancellation scope, never the transport's shared empty owner.
+  if (!nzchar(owner)) owner <- paste0("database:", basename(tempfile("probe-")))
+  promises::promise(function(resolve, reject) {
+    settled <- FALSE
+    timer <- NULL
+    finish <- function(error = NULL) {
+      if (settled) return(invisible(NULL))
+      settled <<- TRUE
+      if (is.function(timer)) timer()
+      if (is.null(error)) resolve(TRUE) else reject(error)
+      invisible(NULL)
+    }
+    # Includes time spent waiting for a shared transport slot. The underlying
+    # read retains its eight-second socket timeout once it is dispatched.
+    timer <- later::later(function() {
+      if (settled) return(invisible(NULL))
+      finish(simpleError("Database connection check timed out"))
+      fm_transport_cancel(owner)
+      invisible(NULL)
+    }, timeout)
+    request <- tryCatch(fm_access_store(owner = owner),
+      error = function(error) promises::promise_reject(error))
+    promises::then(request, function(blocked) {
+      if (!is.logical(blocked) || length(blocked) != 1L || is.na(blocked))
+        finish(simpleError("Invalid database startup response")) else finish()
+    }, function(error) finish(error))
+  })
 }
 
 fm_app_access <- function(token, owner = "", store = fm_access_store) {

@@ -4,7 +4,7 @@ const path = require('node:path');
 const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/futmondo-review-tools/node_modules', 'playwright'));
 
 (async () => {
-  const browser = await chromium.launch({headless: true, args: ['--no-sandbox']});
+  const browser = await chromium.launch({headless: true, executablePath: process.env.FUTMONDO_TEST_CHROMIUM || undefined, args: ['--no-sandbox']});
   try {
     const page = await browser.newPage({viewport: {width: 390, height: 800}});
     await page.evaluate(() => {
@@ -23,6 +23,16 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
     await page.locator('#login-user_name').fill('person@example.invalid');
     await page.locator('#login-password').fill('offline-password');
     await feedback.evaluate(el => { el.textContent = 'Previous failed attempt'; });
+
+    assert.equal(await button.isDisabled(), true);
+    await page.evaluate(() => window.loginStateHandlers['login-login_state']({busy: false}));
+    assert.equal(await button.isDisabled(), true);
+    await button.evaluate(el => el.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true})));
+    await page.locator('#login-password').press('Enter');
+    assert.equal(await page.evaluate(() => window.loginSubmissions), 0);
+    await page.evaluate(() => window.loginStateHandlers['login-database_state']({ready: true}));
+    assert.equal(await button.isEnabled(), true);
+    console.log('PASS database gate blocks clicks and Enter until verified healthy');
 
     await button.click();
     assert.equal(await button.isDisabled(), true);
@@ -63,7 +73,11 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
     assert.equal(await button.isEnabled(), true);
     assert.equal(await page.evaluate(() => window.loginSubmissions), 3);
     console.log('PASS composing Enter does not submit credentials');
-    console.log('LOGIN BROWSER FEEDBACK: 5 passed / 0 failed');
+    await page.evaluate(() => window.loginStateHandlers['login-database_state']({ready: false}));
+    await page.evaluate(() => window.loginStateHandlers['login-login_state']({busy: false}));
+    assert.equal(await button.isDisabled(), true);
+    console.log('PASS failed database readiness cannot be overridden by idle login feedback');
+    console.log('LOGIN BROWSER FEEDBACK: 7 passed / 0 failed');
   } finally {
     await browser.close();
   }

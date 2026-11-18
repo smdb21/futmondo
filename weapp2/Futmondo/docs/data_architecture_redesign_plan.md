@@ -2059,3 +2059,13 @@ dependency, login inventory or product-scope expansion is required.
 - [x] Focused browser geometry, color, random-identity, mobile and performance checks pass, including a fully outlined pair at 4× CPU throttling; required offline lifecycle passes 13 checks plus eight tabs and deployment passes three checks. See `docs/progressive_loading.md` and `docs/data_review_results.md` for contracts, measurements and local-validation limits.
 
 This remains a decorative presentation refinement and adds no data/analysis capability or login feature-tier entry. Hosted rollout and physical-device appearance remain separate acceptance steps.
+
+
+### Startup database admission check — implemented locally 2026-11-17
+
+- [x] Check the existing database access-policy row before enabling any password or remembered login, including administrators. Validate the response; missing configuration/row, unauthorized, malformed and failed reads remain blocking errors.
+- [x] Show a visible mobile-safe error and explicit Retry connection. Combine client readiness with pending authentication and enforce readiness on the server; defer the protected saved-cookie controller until success.
+- [x] Keep the check asynchronous and bounded to ten seconds including queue wait, with scoped cancellation, one outstanding attempt, no polling or writes, and no process-wide healthy cache.
+- [x] Verify isolated probe/login regressions, required offline lifecycle and real HTTPS browser failure/retry/restoration. See [results and limits](data_review_results.md#startup-database-admission-check--2026-11-17).
+
+Runtime implementation and local exit criteria are complete. The workspace has no configured database connection for a live probe, so hosted connectivity/deployment acceptance is not claimed. Existing application_access schema/seed and server credentials remain prerequisites; no migration or dependency was added.

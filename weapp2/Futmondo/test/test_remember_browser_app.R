@@ -19,13 +19,21 @@ remember_login_store<-function(method="GET",hash=NULL,payload=NULL,owner="",expi
 remember_login_validate<-function(...)promises::promise_resolve(TRUE)
 # Keep the real admission gate, with an explicitly open synthetic policy.
 fm_access_store<-function(...)promises::promise_resolve(FALSE)
+fixture_database_probes<-0L
+fm_database_probe<-function(...){
+ fixture_database_probes<<-fixture_database_probes+1L
+ if(identical(Sys.getenv("FUTMONDO_TEST_DB_STARTUP_FAILURE"),"true")&&fixture_database_probes==1L)
+   return(promises::promise(function(resolve,reject)later::later(function()reject(simpleError("PRIVATE synthetic database error")),2)))
+ promises::promise_resolve(TRUE)
+}
 fm_async_login<-function(user_name,...){
  fixture_fail_write<<-identical(user_name,"remember-failure@example.invalid")
  promises::promise_resolve(c(token="synthetic-browser-token",userid="synthetic-browser-user",user_name="Fixture"))
 }
 # Real dashboard layout and Login -> Today navigation; synthetic data only.
-fixture_ui<-source("ui.R",local=.GlobalEnv)$value
+fixture_ui<-htmltools::tagList(source("ui.R",local=.GlobalEnv)$value,shiny::textOutput("fixture_heartbeat"))
 fixture_server<-function(input,output,session){
+ output$fixture_heartbeat<-shiny::renderText(input$fixture_heartbeat %||% 0L)
  token<-login_Server("login")
  output$menu<-shinydashboard::renderMenu(shinydashboard::sidebarMenu(id="tabs",
    shinydashboard::menuItem("Login",tabName="login",selected=TRUE),

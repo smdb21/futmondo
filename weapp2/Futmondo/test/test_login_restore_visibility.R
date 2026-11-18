@@ -2,6 +2,7 @@
 # Synthetic module callbacks: no real credentials, database or HTTP.
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages(source('global.R'))
+fm_database_probe <- function(...) promises::promise_resolve(TRUE) # explicit healthy startup fixture
 auth <- c(token='synthetic-token',userid='synthetic-user',user_name='Fixture')
 remember_login_enabled <- function() TRUE
 remember_login_session <- function(session,on_restore,on_status,on_begin,on_end,on_expire) {

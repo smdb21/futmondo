@@ -1,6 +1,8 @@
 #!/usr/bin/env Rscript
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages(source('global.R'))
+# These checks isolate admission policy after the independent startup DB gate.
+fm_database_probe <- function(...) promises::promise_resolve(TRUE)
 Sys.setenv(admin=' Admin@Example.Invalid ')
 auth<-c(userid='fixture-user',token='synthetic',user_name='user@example.invalid')
 admin<-c(userid='fixture-admin',token='synthetic',user_name='admin@example.invalid')
@@ -29,6 +31,7 @@ old_login<-fm_async_login
 fm_async_login<-function(...)promises::promise_resolve(auth)
 check('password admission blocks before publishing the token; reopen allows login',{
  shiny::testServer(login_Server,{
+  settle(session,function()identical(database_state(),"ready"))
   session$setInputs(user_name='fixture',password='synthetic',login_button=1)
   settle(session,function()!login_pending_RV());stopifnot(is.null(login_token_RV()),grepl('restricted',login_feedback_RV()$message),session$userData$startup_stage()=='signed_out')
   blocked_policy<<-FALSE
@@ -40,6 +43,7 @@ check('password admission blocks before publishing the token; reopen allows logi
 check('failed policy reads deny access with truthful feedback',{
  fail<-TRUE
  shiny::testServer(login_Server,{
+  settle(session,function()identical(database_state(),"ready"))
   session$setInputs(user_name='fixture',password='synthetic',login_button=1)
   settle(session,function()!login_pending_RV());stopifnot(is.null(login_token_RV()),grepl('could not be verified',login_feedback_RV()$message))
  });fail<-FALSE
@@ -47,15 +51,17 @@ check('failed policy reads deny access with truthful feedback',{
 check('late policy completions cannot restore an account after logout',{
  delayed<-TRUE
  shiny::testServer(login_Server,{
+  settle(session,function()identical(database_state(),"ready"))
   session$setInputs(user_name='fixture',password='synthetic',login_button=1)
   settle(session,function()!is.null(resolve_policy));stopifnot(is.null(login_token_RV()),login_pending_RV())
   heartbeat<-FALSE;later::later(function(){heartbeat<<-TRUE},.001);deadline<-Sys.time()+.2;while(!heartbeat&&Sys.time()<deadline)later::run_now(.01);stopifnot(heartbeat)
   session$setInputs(logout_button=1);settle(session);resolve_policy(FALSE);settle(session);stopifnot(is.null(login_token_RV()))
  });delayed<-FALSE;resolve_policy<-NULL
 })
-check('admin login works while storage is unavailable',{
+check('after a healthy startup admins bypass later access-policy reads',{
  fail<-TRUE;before<-reads;fm_async_login<-function(...)promises::promise_resolve(admin)
  shiny::testServer(login_Server,{
+  settle(session,function()identical(database_state(),"ready"))
   session$setInputs(user_name='admin',password='synthetic',login_button=1)
   settle(session,function()valid_login(login_token_RV()));stopifnot(identical(login_token_RV(),admin),reads==before)
  });fail<-FALSE;fm_async_login<-function(...)promises::promise_resolve(auth)
@@ -68,6 +74,7 @@ check('remembered restoration uses the same admission gate',{
  }
  blocked_policy<-TRUE
  shiny::testServer(login_Server,{
+  settle(session,function()identical(database_state(),"ready"))
   session$userData$restore(auth);settle(session,function()!login_pending_RV());stopifnot(is.null(login_token_RV()),grepl('restricted',login_feedback_RV()$message))
   blocked_policy<<-FALSE
   session$userData$restore(auth);settle(session,function()valid_login(login_token_RV()));stopifnot(identical(login_token_RV(),auth))
@@ -77,6 +84,7 @@ check('remembered restoration uses the same admission gate',{
 check('active non-admin session is removed on the next policy check',{
  blocked_policy<-FALSE
  shiny::testServer(login_Server,{
+  settle(session,function()identical(database_state(),"ready"))
   session$setInputs(user_name='fixture',password='synthetic',login_button=1)
   settle(session,function()valid_login(login_token_RV()))
   blocked_policy<<-TRUE

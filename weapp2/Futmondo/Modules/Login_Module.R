@@ -68,6 +68,9 @@ login_UI <- function(id) {
   ns <- NS(id)
   div(
     style = "display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-start;",
+    uiOutput(ns("database_status"), inline = FALSE, container = div,
+      style = "flex: 1 0 100%; min-width: 0;",
+      div(role = "status", `aria-live` = "polite", "Checking database connection…")),
     conditionalPanel(
       condition = "output.login_form_visible === 'TRUE'", ns = ns,
       style = "flex: 1 1 300px; min-width: 0;",
@@ -86,7 +89,8 @@ login_UI <- function(id) {
       }),
       uiOutput(ns("remember_availability")),
       singleton(tags$script(src="remember-login.js")),
-      actionButton(inputId = ns("login_button"), label = "Login"),
+      actionButton(inputId = ns("login_button"), label = "Login", disabled = TRUE,
+        `aria-describedby` = ns("database_status")),
       tags$p(class="fm-info-neutral", "Signing in starts automatic data synchronization, including after logout. Access is encrypted and your password is never saved. Use Disconnect account to stop synchronization."),
       div(
         id = ns("login_progress"), class = "login-feedback", style = "display: none;",
@@ -102,20 +106,23 @@ login_UI <- function(id) {
         "var progress=document.getElementById('", ns("login_progress"), "');",
         "var feedback=document.getElementById('", ns("login_feedback"), "');",
         "var logout=document.getElementById('", ns("logout_button"), "');",
-        "var pending=false;var label=login.textContent;",
-        "function setBusy(busy,message){pending=!!busy;login.disabled=pending;logout.disabled=pending;",
+        "var pending=false;var databaseReady=false;var label=login.textContent;",
+        "function setDisabled(){login.disabled=pending||!databaseReady;login.setAttribute('aria-disabled',String(login.disabled));}",
+        "setDisabled();",
+        "function setBusy(busy,message){pending=!!busy;setDisabled();logout.disabled=pending;",
         "login.setAttribute('aria-busy',String(pending));",
         "login.textContent=pending?'Logging in…':label;",
         "progress.querySelector('span').textContent=message||'Connecting to LigaRadar…';progress.style.display=pending?'flex':'none';feedback.style.display=pending?'none':'';}",
         # Capture runs before Shiny's action-button handler, so feedback is immediate.
         "login.addEventListener('click',function(event){",
-        "if(pending){event.preventDefault();event.stopImmediatePropagation();return;}",
+        "if(pending||!databaseReady){event.preventDefault();event.stopImmediatePropagation();return;}",
         "setBusy(true);},true);",
         "['", ns("user_name"), "','", ns("password"), "'].forEach(function(id){",
         "document.getElementById(id).addEventListener('keydown',function(event){",
         "if(event.key==='Enter'&&!event.isComposing){event.preventDefault();",
-        "if(!pending)login.click();}});});",
+        "if(!login.disabled)login.click();}});});",
         "Shiny.addCustomMessageHandler('", ns("login_state"), "',function(message){setBusy(message.busy,message.message);});",
+        "Shiny.addCustomMessageHandler('", ns("database_state"), "',function(message){databaseReady=message.ready===true;setDisabled();});",
         "}if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',bindLogin,{once:true});}",
         "else{bindLogin();}})();"
       ))),
@@ -142,21 +149,38 @@ login_UI <- function(id) {
   )
 }
 
-login_Server <- function(id, user = NULL, password = NULL) {
+login_Server <- function(id, user = NULL, password = NULL, database_probe = fm_database_probe) {
   moduleServer(id, function(input, output, session) {
     login_token_RV <- reactiveVal(NULL)
     login_pending_RV <- reactiveVal(FALSE)
+    database_state <- reactiveVal("checking")
+    database_busy <- FALSE
+    database_owner <- paste0("database:", session$token)
+    database_ready <- function() identical(isolate(database_state()), "ready")
     # Keep credentials hidden from the first browser paint until cookie probing ends.
     restore_checking <- reactiveVal(exists("remember_login_session", mode="function") &&
       exists("remember_login_enabled", mode="function") && remember_login_enabled())
-    output$login_form_visible <- renderText(!restore_checking() && !valid_login(login_token_RV()))
+    output$login_form_visible <- renderText((!restore_checking() || identical(database_state(), "error")) && !valid_login(login_token_RV()))
     output$signed_in <- renderText(valid_login(login_token_RV()))
     outputOptions(output, "login_form_visible", suspendWhenHidden=FALSE)
     outputOptions(output, "signed_in", suspendWhenHidden=FALSE)
     generation <- 0L
     closed <- FALSE
     if(is.null(session$userData$startup_stage))session$userData$startup_stage <- reactiveVal("signed_out")
-    session$onSessionEnded(function(){closed<<-TRUE;generation<<-generation+1L;fm_transport_cancel(session$token)})
+    session$onSessionEnded(function(){closed<<-TRUE;generation<<-generation+1L;fm_transport_cancel(session$token);fm_transport_cancel(database_owner)})
+    # Always visible, including while the saved-login probe hides credentials.
+    # Do not move this blocking error into the collapsed information panel.
+    output$database_status <- renderUI({
+      state <- database_state()
+      if (identical(state, "ready")) return(NULL)
+      if (identical(state, "checking")) return(div(role="status", `aria-live`="polite",
+        icon("spinner", class="fa-spin"), " Checking database connection…"))
+      div(class="alert alert-danger", role="alert",
+        tags$strong("Database unavailable"),
+        p("LigaRadar could not connect to its database. Login is disabled. Retry the connection; if it still fails, contact the app administrator."),
+        actionButton(session$ns("database_retry"), "Retry connection"))
+    })
+    outputOptions(output, "database_status", suspendWhenHidden=FALSE)
     # Authentication feedback is intentionally independent from the token.
     # A failed first login changes NULL to NULL, which must still be visible.
     login_feedback_RV <- reactiveVal(NULL)
@@ -200,9 +224,10 @@ login_Server <- function(id, user = NULL, password = NULL) {
         "The app is currently restricted to administrators. Please try again when access is reopened."))
     }
     authorize <- function(token, on_allowed) {
+      if (closed || !database_ready()) return(promises::promise_resolve(FALSE))
       attempt <- generation
       promises::then(fm_app_access(token, owner=session$token), function(allowed) {
-        if (closed || !identical(attempt, generation)) return(FALSE)
+        if (closed || !database_ready() || !identical(attempt, generation)) return(FALSE)
         if (isTRUE(allowed)) { on_allowed(); return(TRUE) }
         deny_access(); FALSE
       }, function(error) {
@@ -236,8 +261,11 @@ login_Server <- function(id, user = NULL, password = NULL) {
       })
       invisible(NULL)
     }, priority=200)
-    if(exists("remember_login_session",mode="function"))remembered<-remember_login_session(session,
+    start_remembered <- function() {
+      if(closed || !database_ready() || !is.null(remembered)) return(invisible(NULL))
+      if(exists("remember_login_session",mode="function"))remembered<<-remember_login_session(session,
       on_restore=function(token){
+        if(closed || !database_ready()) return(promises::promise_resolve(FALSE))
         generation<<-generation+1L
         authorize(token, function() {
           session$userData$futmondo_user_id<-token[["userid"]]
@@ -254,7 +282,29 @@ login_Server <- function(id, user = NULL, password = NULL) {
       on_end=function(){restore_checking(FALSE);login_pending_RV(FALSE);if(!valid_login(isolate(login_token_RV())))session$userData$startup_stage("signed_out")
         session$sendCustomMessage(session$ns("login_state"),list(busy=FALSE))},
       on_expire=function(){signed_out();remember_feedback(list(kind="error",message="Your remembered session expired after 7 days. Log in again."))})
+      invisible(NULL)
+    }
+    check_database <- function() {
+      if(closed || database_busy || database_ready()) return(invisible(NULL))
+      database_busy <<- TRUE
+      database_state("checking")
+      session$sendCustomMessage(session$ns("database_state"), list(ready=FALSE))
+      request <- tryCatch(database_probe(owner=database_owner), error=promises::promise_reject)
+      finish <- function(ready=FALSE) {
+        if(closed) return(invisible(NULL))
+        database_busy <<- FALSE
+        database_state(if(isTRUE(ready)) "ready" else "error")
+        session$sendCustomMessage(session$ns("database_state"), list(ready=isTRUE(ready)))
+        if(isTRUE(ready)) shiny::withReactiveDomain(session, start_remembered())
+        invisible(NULL)
+      }
+      promises::then(request, function(ready) finish(identical(ready, TRUE)), function(error) finish())
+      invisible(NULL) # Release the Shiny flush while the HTTP request is pending.
+    }
+    observeEvent(TRUE, check_database(), once=TRUE)
+    observeEvent(input$database_retry, check_database())
     observeEvent(input$remember_retry,{
+      if(closed || !database_ready()) return()
       if(!is.null(remembered)){
         action <- isolate(remember_retry())
         if(identical(action,"restore"))restore_checking(TRUE)
@@ -276,6 +326,10 @@ login_Server <- function(id, user = NULL, password = NULL) {
       updateTextInput(session,"password",value="")
     }
     observeEvent(input$login_button, {
+      if(closed || !database_ready()) {
+        session$sendCustomMessage(session$ns("login_state"),list(busy=FALSE))
+        return()
+      }
       if(isTRUE(login_pending_RV()))return()
       user_name <- trimws(input$user_name %||% "")
       secret <- input$password %||% ""
@@ -296,7 +350,7 @@ login_Server <- function(id, user = NULL, password = NULL) {
         error=function(e)promises::promise_reject(e))
       secret <- NULL
       finish <- function(token=NULL) {
-        if(closed||!identical(attempt,generation))return(invisible(NULL))
+        if(closed||!database_ready()||!identical(attempt,generation))return(invisible(NULL))
         resource_timing("authentication",started)
         login_pending_RV(FALSE)
         session$sendCustomMessage(session$ns("login_state"),list(busy=FALSE))
