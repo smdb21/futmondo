@@ -4791,3 +4791,21 @@ security advisors and database connections timed out. Production migration,
 indexed latency/storage measurements, advancing cleanup counters and adapter
 deployment remain outstanding. Local commit is held from push because push
 automatically deploys adapters requiring these uninstalled RPCs.
+
+
+### Production history retry — 2026-11-18
+
+Price normalization reached PostgreSQL but timed out in CREATE TABLE AS
+(SQLSTATE 57014, 20:01:13 UTC). Confirmed rolled back: no price timestamp table
+and no active migration. Last measured size 1,101,245,587 bytes. EXPLAIN identified
+a full-history index scan/incremental sort. Bulk extraction now uses sequential
+reads, typed comparisons, bounded 64 MB work_mem and no parallel workers for that
+step only; transaction-local settings reset afterward. Runtime writer/read
+functions and app request volume are unchanged. All endpoint/isolation fixtures
+pass; 200-repeat synthetic measurements are 57/48/43 ms, not production timings.
+Read-only production probes exceeded 45 seconds; revised migration initialization
+and subsequent status connection timed out. Production migration/deployment and
+below-500-MB verification remain blocked; push is held to avoid premature deploy.
+
+Offline Shiny lifecycle rerun passed: 13 checks/eight tabs plus full server
+login/navigation/refresh/logout checks.

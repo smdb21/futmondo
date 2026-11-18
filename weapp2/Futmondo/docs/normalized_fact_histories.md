@@ -65,7 +65,10 @@ be recovered or used to infer an exact change time. No continuity is invented.
 Latest score/evidence views use an indexed newest-event lookup per identity
 rather than sorting every historical revision. Historical filters can use compact
 identity/time indexes. No extra source acquisition or memory cache is introduced.
-Hash joins support the bulk copy, with refreshed planner statistics after loading
+Bulk endpoint extraction uses sequential reads, typed record comparisons, 64 MB
+work_mem and no parallel workers within that step; transaction-local planner and
+memory settings return to their defaults afterward. Normal application indexes
+and runtime settings are unchanged. Hash joins support the bulk copy, with refreshed planner statistics after loading
 entities/states; indexes support indexed state reuse afterward.
 Normalization trades small indexed joins for repeated wide strings and payloads.
 Writes scan only the matching entity’s compact endpoint list, using identity/time
@@ -117,3 +120,28 @@ with the project PYTHONPATH completed all 40 checks successfully.
 
 Changes are locally committed; push/deployment is withheld because the production
 RPC migration has not succeeded. No production reduction is claimed for this task.
+
+
+### Production retry — 2026-11-18
+
+The owner requested another attempt. Preflight confirmed all three migrations
+pending and database size 1,101,221,011 bytes. The price attempt reached PostgreSQL
+but failed during CREATE TABLE AS with SQLSTATE 57014 at 20:01:13 UTC. A subsequent
+check confirmed no price timestamp relation and no active migration (database
+1,101,245,587 bytes). The original source table remained. EXPLAIN showed an index
+scan plus incremental sort over approximately 444,654 rows.
+
+Bulk extraction now disables index/bitmap scans for that step, bounds work_mem
+to 64 MB, disables parallel workers and compares typed records instead of
+repeated JSON construction. This avoids the planned scattered full-table reads
+and JSON allocation; no production speedup is claimed. Both read-only production
+measurements exceeded their 45-second limit. The revised migration retry then
+failed during migration-history connection initialization, and the final status
+connection also timed out. No successful production migration was acknowledged.
+
+The revised isolated SQL fixture passes all retained-data and isolation checks;
+200-repeat fixtures took 57/48/43 ms for price/match/finance. Push remains held
+until production migration succeeds, because the remote branch auto-deploys.
+
+The offline Shiny lifecycle rerun also passed (13 checks/eight tabs and full
+login/navigation/refresh/logout checks).

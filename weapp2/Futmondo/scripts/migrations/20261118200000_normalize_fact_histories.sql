@@ -5,16 +5,25 @@ SET LOCAL statement_timeout='120s';
 SET LOCAL transaction_timeout='150s';
 LOCK TABLE public.player_history IN ACCESS EXCLUSIVE MODE;
 ALTER TABLE public.player_history RENAME TO player_history_legacy;
+-- Bulk history scans use sequential reads and typed comparisons, not JSON conversion.
+SET LOCAL enable_indexscan=off;
+SET LOCAL enable_bitmapscan=off;
+SET LOCAL work_mem='64MB';
+SET LOCAL max_parallel_workers_per_gather=0;
 CREATE TEMP TABLE price_retained ON COMMIT DROP AS
  SELECT (original).* FROM (
  SELECT o AS original,(observed_at IS NULL OR NOT isfinite(observed_at) OR player_id IS NULL OR championship_id IS NULL) AS uncertain,
- jsonb_build_array(value,change,points,avg_points,avg_last_five,matches) AS fact,
- lag(jsonb_build_array(value,change,points,avg_points,avg_last_five,matches)) OVER w AS preceding,
- lead(jsonb_build_array(value,change,points,avg_points,avg_last_five,matches)) OVER w AS following
+ ROW(value,change,points,avg_points,avg_last_five,matches) AS fact,
+ lag(ROW(value,change,points,avg_points,avg_last_five,matches)) OVER w AS preceding,
+ lead(ROW(value,change,points,avg_points,avg_last_five,matches)) OVER w AS following
  FROM public.player_history_legacy o
  WINDOW w AS (PARTITION BY player_id,championship_id,competition_id,season ORDER BY observed_at,recorded_at,id)
  ) periods WHERE uncertain OR fact IS DISTINCT FROM preceding OR fact IS DISTINCT FROM following;
 ANALYZE price_retained;
+SET LOCAL enable_indexscan=DEFAULT;
+SET LOCAL enable_bitmapscan=DEFAULT;
+SET LOCAL work_mem=DEFAULT;
+SET LOCAL max_parallel_workers_per_gather=DEFAULT;
 
 CREATE TABLE public.price_history_entities(entity_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,player_id text REFERENCES public.players(id) ON DELETE CASCADE,championship_id text REFERENCES public.championships(id) ON DELETE CASCADE,competition_id text NOT NULL DEFAULT 'unknown',season text NOT NULL DEFAULT 'unknown',UNIQUE NULLS NOT DISTINCT(player_id,championship_id,competition_id,season));
 CREATE INDEX price_history_scope ON public.price_history_entities(championship_id,competition_id,season,player_id);
@@ -212,16 +221,25 @@ SET LOCAL statement_timeout='120s';
 SET LOCAL transaction_timeout='150s';
 LOCK TABLE public.player_match_observations IN ACCESS EXCLUSIVE MODE;
 ALTER TABLE public.player_match_observations RENAME TO player_match_observations_legacy;
+-- Bulk history scans use sequential reads and typed comparisons, not JSON conversion.
+SET LOCAL enable_indexscan=off;
+SET LOCAL enable_bitmapscan=off;
+SET LOCAL work_mem='64MB';
+SET LOCAL max_parallel_workers_per_gather=0;
 CREATE TEMP TABLE match_retained ON COMMIT DROP AS
  SELECT (original).* FROM (
  SELECT o AS original,(observed_at IS NULL OR NOT isfinite(observed_at)) AS uncertain,
- jsonb_build_array(points,score_status,is_home,minutes_raw,start_raw,participation,round_id,match_id,source_round_number,occurred_at,round_start_at) AS fact,
- lag(jsonb_build_array(points,score_status,is_home,minutes_raw,start_raw,participation,round_id,match_id,source_round_number,occurred_at,round_start_at)) OVER w AS preceding,
- lead(jsonb_build_array(points,score_status,is_home,minutes_raw,start_raw,participation,round_id,match_id,source_round_number,occurred_at,round_start_at)) OVER w AS following
+ ROW(points,score_status,is_home,minutes_raw,start_raw,participation,round_id,match_id,source_round_number,occurred_at,round_start_at) AS fact,
+ lag(ROW(points,score_status,is_home,minutes_raw,start_raw,participation,round_id,match_id,source_round_number,occurred_at,round_start_at)) OVER w AS preceding,
+ lead(ROW(points,score_status,is_home,minutes_raw,start_raw,participation,round_id,match_id,source_round_number,occurred_at,round_start_at)) OVER w AS following
  FROM public.player_match_observations_legacy o
  WINDOW w AS (PARTITION BY player_id,championship_id,competition_id,season,scoring_version,round,source_round_key ORDER BY observed_at)
  ) periods WHERE uncertain OR fact IS DISTINCT FROM preceding OR fact IS DISTINCT FROM following;
 ANALYZE match_retained;
+SET LOCAL enable_indexscan=DEFAULT;
+SET LOCAL enable_bitmapscan=DEFAULT;
+SET LOCAL work_mem=DEFAULT;
+SET LOCAL max_parallel_workers_per_gather=DEFAULT;
 
 CREATE TABLE public.match_history_entities(entity_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,player_id text NOT NULL,championship_id text NOT NULL,competition_id text NOT NULL DEFAULT 'unknown',season text NOT NULL,scoring_version text NOT NULL,round numeric NOT NULL,source_round_key text NOT NULL DEFAULT '',UNIQUE NULLS NOT DISTINCT(player_id,championship_id,competition_id,season,scoring_version,round,source_round_key));
 CREATE INDEX match_history_scope ON public.match_history_entities(championship_id,competition_id,season,player_id);
@@ -417,16 +435,25 @@ SET LOCAL statement_timeout='120s';
 SET LOCAL transaction_timeout='150s';
 LOCK TABLE public.rival_finance_evidence IN ACCESS EXCLUSIVE MODE;
 ALTER TABLE public.rival_finance_evidence RENAME TO rival_finance_evidence_legacy;
+-- Bulk history scans use sequential reads and typed comparisons, not JSON conversion.
+SET LOCAL enable_indexscan=off;
+SET LOCAL enable_bitmapscan=off;
+SET LOCAL work_mem='64MB';
+SET LOCAL max_parallel_workers_per_gather=0;
 CREATE TEMP TABLE finance_retained ON COMMIT DROP AS
  SELECT (original).* FROM (
  SELECT o AS original,(observed_at IS NULL OR NOT isfinite(observed_at)) AS uncertain,
- jsonb_build_array(payload) AS fact,
- lag(jsonb_build_array(payload)) OVER w AS preceding,
- lead(jsonb_build_array(payload)) OVER w AS following
+ ROW(payload) AS fact,
+ lag(ROW(payload)) OVER w AS preceding,
+ lead(ROW(payload)) OVER w AS following
  FROM public.rival_finance_evidence_legacy o
  WINDOW w AS (PARTITION BY account_id,championship_id,competition_id,season,evidence_type,source_id ORDER BY observed_at)
  ) periods WHERE uncertain OR fact IS DISTINCT FROM preceding OR fact IS DISTINCT FROM following;
 ANALYZE finance_retained;
+SET LOCAL enable_indexscan=DEFAULT;
+SET LOCAL enable_bitmapscan=DEFAULT;
+SET LOCAL work_mem=DEFAULT;
+SET LOCAL max_parallel_workers_per_gather=DEFAULT;
 
 CREATE TABLE public.finance_history_entities(entity_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,account_id text NOT NULL CHECK(length(btrim(account_id))>0),championship_id text NOT NULL CHECK(length(btrim(championship_id))>0),competition_id text NOT NULL DEFAULT 'unknown',season text NOT NULL CHECK(length(btrim(season))>0),evidence_type text NOT NULL CHECK(evidence_type IN ('awards','rules','movements','team','coverage','eligibility','notifications')),source_id text NOT NULL CHECK(length(btrim(source_id))>0),UNIQUE NULLS NOT DISTINCT(account_id,championship_id,competition_id,season,evidence_type,source_id));
 CREATE INDEX finance_history_scope ON public.finance_history_entities(championship_id,competition_id,season,account_id,evidence_type,source_id);
