@@ -67,9 +67,17 @@ supabase_post_direct <- function(table_name, payload, conflict = NULL, ignore_du
     "Prefer" = if (isTRUE(ignore_duplicates)) "resolution=ignore-duplicates" else "resolution=merge-duplicates"
   )
   
+  # Membership facts are normalized; the read view keeps the legacy row shape.
+  membership_write <- identical(table_name, "player_membership_observations")
+  if (membership_write) {
+    url <- paste0(sb_url, "/rest/v1/rpc/membership_write")
+    payload <- list(p_payload = jsonlite::fromJSON(supabase_payload_json(payload), simplifyVector = FALSE),
+                    p_ignore = isTRUE(ignore_duplicates))
+    conflict <- NULL
+  }
   # Perform request defensively
   tryCatch({
-    response <- POST(url, query = if (!is.null(conflict)) list(on_conflict = conflict) else NULL, body = supabase_payload_json(payload), add_headers(.headers = headers), httr::timeout(15), httr::config(connecttimeout = 5))
+    response <- POST(url, query = if (!is.null(conflict)) list(on_conflict = conflict) else NULL, body = if(membership_write) jsonlite::toJSON(payload,auto_unbox=TRUE,na="null",null="null",rownames=FALSE) else supabase_payload_json(payload), add_headers(.headers = headers), httr::timeout(15), httr::config(connecttimeout = 5))
     code <- status_code(response)
     if (code >= 200 && code < 300) {
       if(identical(table_name,"round_dream_team")) invalidate_mvp_saved_cache()

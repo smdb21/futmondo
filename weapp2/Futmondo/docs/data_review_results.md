@@ -4759,3 +4759,7 @@ See [worker storage cleanup](worker_storage_cleanup.md): explicit production com
 ## History/index storage verification — 2026-11-18
 
 [Storage review](worker_storage_cleanup.md#historyindex-storage-review--2026-11-18) records nine concurrent index rebuilds with all history retained, database reduction to 1.203 GB, valid indexes and verified automatic cleanup progress. The 500 MB target is not met; historical normalization remains unimplemented. No runtime source changes in this task.
+
+## Lossless membership normalization — 2026-11-18
+
+[Membership storage](membership_storage.md) documents normalized facts plus exact observation timestamps, compatibility interfaces, full transactional equality verification and production migration. Membership storage fell from 146.4 MB to 41.1 MB without historical row loss; database is about 1.10 GB. SQL/R fixtures, 40 worker tests, 14 context groups and offline Shiny lifecycle passed. Other history normalization remains outside this implemented step.

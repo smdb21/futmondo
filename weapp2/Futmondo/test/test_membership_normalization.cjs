@@ -1,0 +1,27 @@
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const {PGlite}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo-review-tools/node_modules')+'/@electric-sql/pglite');
+(async()=>{const db=new PGlite();try{
+ await db.exec('create role anon;create role authenticated;create role service_role bypassrls;');
+ const schema=fs.readFileSync('scripts/schema.sql','utf8');await db.exec(schema.split('-- Lossless membership normalization;')[0]);
+ const q=async(s,a=[]) => (await db.query(s,a)).rows;
+ const rows=[1,2,3,4].map(i=>({player_id:'p',competition_id:'c',season:'s',real_club_id:i===3?'b':'a',observed_at:`2026-01-0${i}T00:00:00Z`,effective_at:null,source:'fixture'}));
+ rows.push({...rows[0],competition_id:'europe',real_club_id:null});
+ for(const row of rows)await q('insert into player_membership_observations select * from jsonb_populate_record(null::player_membership_observations,$1)',[row]);
+ const before=await q('select * from player_membership_observations order by competition_id,observed_at');
+ await db.exec(fs.readFileSync('scripts/migrations/20261118190000_normalize_membership_history.sql','utf8'));
+ assert.deepEqual(await q('select * from player_membership_observations order by competition_id,observed_at'),before);
+ assert.equal(Number((await q('select count(*) n from membership_states'))[0].n),3);
+ await db.exec('set role service_role');
+ await q('select membership_write($1,true)',[rows]);
+ assert.equal(Number((await q('select count(*) n from membership_times'))[0].n),5);
+ await q('select membership_write($1,true)',[{...rows[0],source:'correction'}]);
+ assert.equal((await q("select source from player_membership_observations where competition_id='c' order by observed_at limit 1"))[0].source,'fixture');
+ await q('select membership_write($1,false)',[{...rows[0],source:'correction'}]);
+ assert.equal((await q("select source from player_membership_observations where competition_id='c' order by observed_at limit 1"))[0].source,'correction');
+ await q('select membership_write($1,true)',[{...rows[0],observed_at:'2025-12-01T00:00:00Z'}]);
+ assert.equal(Number((await q('select count(*) n from membership_times'))[0].n),6);
+ await assert.rejects(q('select membership_write($1,true)',[{...rows[0],token:'forbidden'}]));
+ await assert.rejects(q('select membership_write($1,true)',[{...rows[0],observed_at:null}]));
+ await db.exec('set role anon');await assert.rejects(q('select * from player_membership_observations'));await assert.rejects(q('select membership_write($1,true)',[rows]));
+ console.log('PASS exact migration roundtrip; A/B/A timestamps; null club and context isolation; duplicate/merge semantics; late observations; validation; access');
+}finally{await db.close();}})().catch(e=>{console.error(e);process.exit(1)});

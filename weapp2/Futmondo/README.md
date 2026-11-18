@@ -262,3 +262,10 @@ current-run checkpoints are protected. `worker_cleanup_status` records durable
 success timestamps and deletion counts. Stale cleanup progress and
 `worker_cleanup code=cleanup_failed` require investigation. Cleanup removes rows;
 physical disk reclamation may require separately scheduled database maintenance.
+
+Membership-history normalization requires
+`scripts/migrations/20261118190000_normalize_membership_history.sql` before the
+updated R adapter. It preserves the read view and worker write RPCs while storing
+repeated states once. The migration verifies every reconstructed observation
+before releasing old storage. See `docs/membership_storage.md`; no new environment
+variables or dependencies are needed.
