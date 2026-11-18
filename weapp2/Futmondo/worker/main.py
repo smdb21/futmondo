@@ -313,7 +313,6 @@ class Worker:
         self.connections = asyncio.Semaphore(max(1, min(8, int(os.getenv('FUTMONDO_WORKER_CONNECTIONS', '2')))))
         self.request_interval = 1 / max(.1, min(10, float(os.getenv('FUTMONDO_WORKER_ACCOUNT_RPS', '2'))))
         self.leader = False
-        self.last_cleanup = 0
         self.account_locks = {}
         self.last_request = {}
         self.request_count = self.job_count = 0
@@ -736,11 +735,6 @@ class Worker:
                 self.admission_blocked = not health['admitted']
                 # Enrollment durably seeds account discovery. Restart reads jobs directly;
                 # avoid a per-account database scan every heartbeat.
-                if self.leader and time.monotonic() - self.last_cleanup > 3600:
-                    await self.store.rpc('cleanup')
-                    if os.getenv('FUTMONDO_CLAUSE_SCHEDULING_ENABLED', 'false').lower() == 'true':
-                        await self.store.request('POST', 'rpc/clause_cleanup', json={})
-                    self.last_cleanup = time.monotonic()
                 self.account_locks = {k: v for k, v in self.account_locks.items()
                     if v.locked() or time.monotonic() - self.last_request.get(k, 0) < 3600}
                 self.last_request = {k: v for k, v in self.last_request.items() if k in self.account_locks}
@@ -753,8 +747,29 @@ class Worker:
             except asyncio.TimeoutError:
                 pass
 
+    async def cleanup_once(self):
+        if not self.leader:
+            return
+        try:
+            result = await asyncio.wait_for(self.store.rpc('cleanup_batch', p_limit=500), 20)
+            LOG.info('worker_cleanup chunks=%s checkpoints=%s', result['chunks'], result['checkpoints'])
+            if os.getenv('FUTMONDO_CLAUSE_SCHEDULING_ENABLED', 'false').lower() == 'true':
+                await asyncio.wait_for(self.store.request('POST', 'rpc/clause_cleanup', json={}), 20)
+        except Exception:
+            # Never revoke healthy leadership because housekeeping failed.
+            # No acknowledgement means retry next minute, including after restart.
+            LOG.warning('worker_cleanup code=cleanup_failed')
+
+    async def cleanup_loop(self):
+        while not self.stop.is_set():
+            await self.cleanup_once()
+            try:
+                await asyncio.wait_for(self.stop.wait(), 60)
+            except asyncio.TimeoutError:
+                pass
+
     async def run(self):
-        tasks = [asyncio.create_task(self.maintenance())] + [asyncio.create_task(self.lane(i)) for i in range(len(self.helpers))]
+        tasks = [asyncio.create_task(self.maintenance()), asyncio.create_task(self.cleanup_loop())] + [asyncio.create_task(self.lane(i)) for i in range(len(self.helpers))]
         if os.getenv('FUTMONDO_CLAUSE_SCHEDULING_ENABLED', 'false').lower() == 'true':
             from worker.clauses import ClauseScheduler
             scheduler = ClauseScheduler(self, Path(__file__).resolve().parent.parent)

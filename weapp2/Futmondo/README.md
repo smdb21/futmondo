@@ -253,3 +253,12 @@ durable schedule; R does not need the variable. Routine intervals use the greate
 of the resource cadence and this base. Login refreshes current resources, coalesced
 per account for five minutes. Historical/profile schedules remain slower. This
 setting does not change purchase timing or live transaction preflights.
+
+Apply `scripts/migrations/20261118150000_worker_bounded_cleanup.sql` for bounded
+worker storage cleanup. The elected worker runs a separate cleanup task every
+minute: at most 500 obsolete chunks and 500 obsolete checkpoints per call.
+Unreferenced chunks/uploads have a one-hour grace period; current snapshots and
+current-run checkpoints are protected. `worker_cleanup_status` records durable
+success timestamps and deletion counts. Stale cleanup progress and
+`worker_cleanup code=cleanup_failed` require investigation. Cleanup removes rows;
+physical disk reclamation may require separately scheduled database maintenance.

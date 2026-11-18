@@ -2073,3 +2073,7 @@ Runtime implementation and local exit criteria are complete. The workspace has n
 ## Configurable worker cadence — 2026-11-18
 
 Local implementation and isolated checks are recorded in [worker cadence](worker_cadence.md). Production job inventory timed out; deployment verification remains pending. This does not mark the Round awards defect fixed.
+
+## Worker storage cleanup — 2026-11-18
+
+See [worker storage cleanup](worker_storage_cleanup.md): explicit production compaction reclaimed about 1.19 GB; bounded cleanup and cadence migrations were acknowledged. Synthetic checks and offline lifecycle passed. Worker deployment verification remains separate; total database size still exceeds the free allowance.

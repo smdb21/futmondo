@@ -42,3 +42,7 @@ production workload reduction and the Round awards failure remain unverified.
 Production migration attempt failed before acknowledgement while initializing
 Supabase migration history: connection timeout. The application branch auto-deploys
 on push, so push/deployment is held until the required RPC migration succeeds.
+
+Update 2026-11-18: after explicitly authorized chunk compaction, the cadence and
+bounded-cleanup migrations succeeded. The earlier migration blocker is resolved;
+see worker_storage_cleanup.md for measurements and deployment limits.
