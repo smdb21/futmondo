@@ -43,7 +43,9 @@ tables use RLS with server-only grants; public roles cannot read/write them.
 
 ## Migration and performance
 
-The forward migration uses one bounded transaction per domain, locks its original
+For large existing databases, use [resumable batches](history_batch_migration.md).
+The atomic migration for empty/small databases uses one bounded transaction per
+domain, locks its original
 table, builds compact storage,
 and derives the first/last rows of each factual run using full typed facts, then
 checks reconstructed endpoints with bidirectional EXCEPT ALL over the full JSONB
@@ -89,59 +91,21 @@ tests, and offline Shiny lifecycle (13 checks/eight tabs) passed. Production siz
 and query measurements are recorded after acknowledged migration; the 500 MB
 objective must be checked against measured total size, not projected savings.
 
-## Production status and rollout limitation — 2026-11-18
+## Production status — 2026-11-18
 
-The combined production transaction timed out and rolled back. Subsequent
-per-domain attempts were blocked by connection timeouts during migration-history
-initialization; one tool confirmation expired. At final verification all three
-normalized timestamp relations were absent and the original tables remained.
-Database size was 1,101,221,011 bytes; the below-500-MB target is **not achieved**.
-The last automatic cleanup success was 18:55:07 UTC. This does not establish a
-cleanup failure while the app is stopped, nor verify current automatic operation.
+The resumable production migration is complete for all three histories. Initial
+atomic attempts timed out; the successful alternative copied and verified complete
+identities in separately committed batches, tracked concurrent source changes,
+and switched only when the pending queue was empty. Full details, exact counts,
+index maintenance and performance checks are in
+[the batch migration record](history_batch_migration.md).
 
-The single forward SQL file contains three independently committed domain blocks
-(price, match, finance), each with its corresponding writer routing and checks.
-Apply these blocks in order once production SQL connections are reliable; verify
-catalog state after any ambiguous timeout before resuming. Do not rerun a domain
-that already committed. Deploy the R adapter only after all three writers exist.
-Then measure total and per-domain storage, sample indexed reads, verify fresh
-worker writes and advancing cleanup counters, and run security advisors. Health
-advisors returned no findings, but security advisors timed out and are outstanding.
+Database size after normalization and concurrent index rebuilding is
+495,479,955 bytes, down from 1,101,270,163 bytes at the start of this rollout. Every
+factual transition and first/last confirmation survives; intermediate confirmation
+timestamps are intentionally discarded. Membership retains every timestamp.
 
-The final isolated SQL fixture processed 200 identical confirmations per domain
-in 148/125/123 ms (price/match/finance), retaining one additional endpoint and no
-additional state. These are synthetic single-entity measurements, not production
-latency estimates. The split migration passed endpoint, A/B/A, late arrival,
-cutoff, context isolation and access-control fixtures. R envelope, membership,
-persistence recovery (11 groups), continuation bounds, 40 Python worker checks,
-and the offline Shiny lifecycle (13 checks/eight tabs) passed. An initial Python
-unittest module invocation failed to locate the module; running the test file
-with the project PYTHONPATH completed all 40 checks successfully.
-
-Changes are locally committed; push/deployment is withheld because the production
-RPC migration has not succeeded. No production reduction is claimed for this task.
-
-
-### Production retry — 2026-11-18
-
-The owner requested another attempt. Preflight confirmed all three migrations
-pending and database size 1,101,221,011 bytes. The price attempt reached PostgreSQL
-but failed during CREATE TABLE AS with SQLSTATE 57014 at 20:01:13 UTC. A subsequent
-check confirmed no price timestamp relation and no active migration (database
-1,101,245,587 bytes). The original source table remained. EXPLAIN showed an index
-scan plus incremental sort over approximately 444,654 rows.
-
-Bulk extraction now disables index/bitmap scans for that step, bounds work_mem
-to 64 MB, disables parallel workers and compares typed records instead of
-repeated JSON construction. This avoids the planned scattered full-table reads
-and JSON allocation; no production speedup is claimed. Both read-only production
-measurements exceeded their 45-second limit. The revised migration retry then
-failed during migration-history connection initialization, and the final status
-connection also timed out. No successful production migration was acknowledged.
-
-The revised isolated SQL fixture passes all retained-data and isolation checks;
-200-repeat fixtures took 57/48/43 ms for price/match/finance. Push remains held
-until production migration succeeds, because the remote branch auto-deploys.
-
-The offline Shiny lifecycle rerun also passed (13 checks/eight tabs and full
-login/navigation/refresh/logout checks).
+The SQL source schemas and application write/read contracts are identical between
+the atomic empty-database path and the batched existing-database path. Use only
+one migration path per domain. Deployment and automatic-cleanup verification
+follow the successful production cutovers.

@@ -270,10 +270,12 @@ repeated states once. The migration verifies every reconstructed observation
 before releasing old storage. See `docs/membership_storage.md`; no new environment
 variables or dependencies are needed.
 
-Price, match and finance normalization requires
-`scripts/migrations/20261118200000_normalize_fact_histories.sql` before the updated
-R adapters. It retains the existing read views and worker RPCs, verifies the
-first/last confirmation of every unchanged period transactionally, and routes
-direct/deferred writes through
-server-only normalized-history RPCs. See `docs/normalized_fact_histories.md`.
-No dependencies or environment variables are added.
+Price, match and finance normalization must finish before deploying the updated
+R adapters. Large existing databases should use the resumable preparation,
+discovery, copy and cutover scripts in `scripts/history_batches/`, following
+`docs/history_batch_migration.md`. Fresh empty installations use the equivalent
+schema in `scripts/schema.sql`; do not apply both paths to the same domain.
+Both retain existing read views and worker RPCs, verify first/last confirmations
+of every unchanged period, and route direct/deferred writes through server-only
+normalized-history RPCs. See `docs/normalized_fact_histories.md` for the data
+contract. No dependencies or environment variables are added.

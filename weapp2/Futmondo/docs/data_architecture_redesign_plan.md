@@ -2099,3 +2099,20 @@ timeouts; all three original relations remain. Database is 1,101,221,011 bytes;
 below 500 MB is not achieved. Apply/verify the three bounded domain transactions
 before deploying adapters, then measure storage and current automatic cleanup.
 See docs/normalized_fact_histories.md. No feature or acquisition scope expansion.
+
+
+### Resumable history normalization — 2026-11-18 (production data migration complete)
+
+Supersedes the earlier blocked atomic rollout. All three histories now use compact
+state/endpoint storage in production: 444,610 price, 196,129 match and 188,505
+finance source rows were verified; 77,298 / 49,042 / 35,875 endpoints retained.
+Every factual change and first/last confirmation survives under the approved rule.
+Batches checkpoint in the database; source triggers invalidate copies changed
+during migration; cutover refuses pending/unverified identities. Large finance
+payloads use one cached hash per retained row plus full-value equality.
+
+Nine concurrent index rebuilds preserved all rows and definitions. Total size is
+495,479,955 bytes, meeting the below-500,000,000-byte target with limited headroom.
+Normal source acquisition, manual-action safeguards and UI scope are unchanged.
+Production migration and isolated checks are complete; deployment and fresh
+automatic cleanup verification follow this commit. See docs/history_batch_migration.md.

@@ -4809,3 +4809,37 @@ below-500-MB verification remain blocked; push is held to avoid premature deploy
 
 Offline Shiny lifecycle rerun passed: 13 checks/eight tabs plus full server
 login/navigation/refresh/logout checks.
+
+
+### Resumable history normalization — 2026-11-18 production completion
+
+All three cutovers acknowledged after per-identity bidirectional retained-row
+equality checks and zero pending work. Verified source/endpoint counts:
+price 444,610/77,298; match 196,129/49,042; finance 188,505/35,875. The final source
+counts matched the verification ledger before cutover. Source writes during the
+copy invalidate verification and requeue both old/new identities as appropriate.
+
+Tests: resumable fixture passes discovery pagination, behind-cursor insertion,
+rollback/resume, insert/update/delete tracking, A/B/A, legacy null keys, large JSON
+payloads, premature-switch refusal, exact independent-JavaScript endpoint results
+and public denial. Existing normalized-history/writer fixtures pass. Offline Shiny
+lifecycle passes 13 checks/eight tabs. Concurrent database-session races were not
+simulated in PGlite; lock ordering and trigger behavior were reviewed against
+PostgreSQL 17 documentation. No real-account test transactions were used.
+
+Performance: identity batches bounded to 200 entities and a 5–10s between-identity
+budget, normally with a 25s statement limit. One 67MB/305-observation finance
+identity needed 60s after materializing row hashes. Full equality remains mandatory.
+Temporary data is scoped to a batch; source writes to its locked identities can
+wait/retry. The tracker is removed at cutover. No extra API acquisition, UI work,
+timers or caches were introduced. Indexed sampled production reads executed in
+7.468/79.778/224.207 ms (price/match/finance), with no temporary spill; these are not
+latency percentiles. All indexes are valid/ready.
+
+Nine existing indexes were concurrently rebuilt with unchanged definitions and
+rows. Database size is 495,479,955 bytes versus 1,101,270,163 before this rollout.
+Exact relation/index measurements are in docs/history_batch_migration.md. The
+500-million-byte target is met, with limited growth headroom. RLS notices on new
+private tables are expected; unrelated pre-existing advisor warnings are recorded
+with remediation references in that document. Cleanup status and worker heartbeat
+were stale before push; automatic cleanup requires post-deployment verification.
