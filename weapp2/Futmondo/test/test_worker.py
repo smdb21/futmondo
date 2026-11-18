@@ -641,8 +641,12 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
             self.requests.append(request)
             return httpx.Response(200,json={'answer':{'error':'api.error.general'}})
         self.client._transport=httpx.MockTransport(rejected)
-        with self.assertRaisesRegex(WorkerFailure,'source_rejected'):
-            await self.worker.source(self.job,'owner',self.message())
+        with self.assertLogs('futmondo.worker', level='WARNING') as logs:
+            with self.assertRaisesRegex(WorkerFailure,'source_rejected'):
+                await self.worker.source(self.job,'owner',self.message())
+        self.assertIn('status=200 detail=api.error.general', logs.output[0])
+        self.assertNotIn('synthetic', logs.output[0])
+        self.assertEqual(len(self.requests), 1)
         self.assertFalse(self.store.checkpoints)
         self.assertFalse(self.worker.source_stamps.get('owner'))
 

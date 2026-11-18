@@ -279,3 +279,13 @@ Both retain existing read views and worker RPCs, verify first/last confirmations
 of every unchanged period, and route direct/deferred writes through server-only
 normalized-history RPCs. See `docs/normalized_fact_histories.md` for the data
 contract. No dependencies or environment variables are added.
+
+Worker startup now logs `worker_config base_interval_minutes=… interval_source=…`
+and acknowledged leadership changes as `worker_schedule`. Set
+`FUTMONDO_WORKER_BASE_INTERVAL_MINUTES=45` in the container runtime environment
+for a 45-minute base; the separate Python worker does not read R's `.Renviron`.
+Failure-only `worker_database` and `worker_source` diagnostics expose bounded
+protocol codes, never credentials or private response bodies. Database diagnostic
+repeats are suppressed for 60 seconds. See [worker diagnostics](docs/worker_error_diagnostics.md)
+for interpretation and production verification limits. No extra configuration is
+needed to enable these logs.

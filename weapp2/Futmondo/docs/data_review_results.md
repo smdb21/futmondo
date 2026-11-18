@@ -4880,3 +4880,8 @@ requires a running worker and remains an explicit post-restart check.
 ## Column-type audit — 2026-11-18
 
 Completed read-only live schema/value review; see [column-type audit](database_column_types.md). Whole cluster measured 347,549,873 bytes. Binary chunks offer approximately 8.55 MB of content savings, binary signatures 1.18 MB; no schema migration was performed. Preserve decimal averages, opaque IDs and existing time/amount precision. Documentation-only change has no runtime performance impact; app tests not required. Automatic cleanup verification still awaits the owner restarting production.
+
+
+## Worker error and interval diagnostics — 2026-11-18
+
+Implemented bounded safe startup/leadership, database status/SQLSTATE/transport and Futmondo rejection diagnostics. See [investigation](worker_error_diagnostics.md). Historical log window had zero quota HTTP 402s, five 500s; sampled PostgreSQL failures were query cancellations during earlier migration activity. Current policy remains 1800 seconds with no active leader; authenticated source reproduction and 45-minute production acknowledgement remain unverified. No extra API/database requests, retries, persistence, timers or UI work; diagnostic map bounded to 128 entries and repeated database errors throttled to 60 seconds. Eight new diagnostics tests, 40 existing worker tests, the updated native-rejection test and offline lifecycle (13 checks/eight tabs) pass. No schema or historical data changes; underlying source failures are not declared fixed.

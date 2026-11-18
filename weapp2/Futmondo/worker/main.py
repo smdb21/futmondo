@@ -72,6 +72,26 @@ def source_response_rejected(body):
     return rejected(body) or (isinstance(body, dict) and rejected(body.get('answer')))
 
 
+def source_rejection_detail(body):
+    """Only known public protocol codes, never arbitrary source strings."""
+    values = [body, body.get('answer') if isinstance(body, dict) else None]
+    for value in values:
+        candidates = [value] if isinstance(value, str) else (
+            [value.get('code'), value.get('error')] if isinstance(value, dict) else [])
+        for code in candidates:
+            if code in ('api.error.general', 'api.error.already_bid'):
+                return code
+    return 'unclassified'
+
+
+DB_DIAGNOSTIC_PATHS = FACT_TABLES | frozenset("""worker_accounts worker_jobs worker_chunks
+worker_snapshots worker_checkpoints worker_health worker_schedule_policy
+rpc/worker_read rpc/worker_claim rpc/worker_guard rpc/worker_prepare_source
+rpc/worker_checkpoint rpc/worker_write_fact rpc/worker_publish rpc/worker_publish_child
+rpc/worker_enqueue_batch rpc/worker_maintenance rpc/worker_cleanup_batch rpc/worker_release
+rpc/clause_observe rpc/clause_cleanup rpc/clause_retire_context""".split())
+
+
 def plain(node):
     """Decode safe R nodes for discovery, never executable R serialization."""
     kind = node['kind']
@@ -178,14 +198,44 @@ class Store:
         self.client = client
         self.url = re.sub(r'(/rest/v1)+$', '', url.rstrip('/')) + '/rest/v1/'
         self.headers = {'apikey': key, 'Authorization': 'Bearer ' + key}
+        self.diagnostic_times = {}
+
+    def diagnostic(self, method, path, status, detail):
+        # Fixed endpoint names only: no query filters, identifiers, SQL or bodies.
+        endpoint = path if path in DB_DIAGNOSTIC_PATHS else 'other'
+        method = method if method in ('GET', 'POST', 'PATCH', 'DELETE') else 'other'
+        key = (method, endpoint, status, detail)
+        now = time.monotonic()
+        if now - self.diagnostic_times.get(key, float('-inf')) < 60:
+            return
+        if len(self.diagnostic_times) >= 128:
+            self.diagnostic_times.pop(next(iter(self.diagnostic_times)))
+        self.diagnostic_times[key] = now
+        LOG.warning('worker_database method=%s endpoint=%s status=%s detail=%s',
+                    method, endpoint, status, detail)
 
     async def request(self, method, path, **kwargs):
         headers = dict(self.headers, **kwargs.pop('headers', {}))
         try:
             response = await self.client.request(method, self.url + path, headers=headers, **kwargs)
-        except httpx.HTTPError:
+        except httpx.HTTPError as error:
+            detail = next((name for cls, name in (
+                (httpx.ConnectTimeout, 'connect_timeout'), (httpx.ReadTimeout, 'read_timeout'),
+                (httpx.WriteTimeout, 'write_timeout'), (httpx.PoolTimeout, 'pool_timeout'),
+                (httpx.ConnectError, 'connect_error'), (httpx.RemoteProtocolError, 'remote_protocol'))
+                if isinstance(error, cls)), 'transport_error')
+            self.diagnostic(method, path, 'connection', detail)
             raise WorkerFailure('database_connection') from None
         if response.status_code not in range(200, 300):
+            detail = 'unknown'
+            try:
+                payload = response.json()
+                code = payload.get('code') if isinstance(payload, dict) else None
+                if isinstance(code, str) and re.fullmatch(r'(?:[0-9A-Z]{5}|PGRST[0-9]{3})', code, flags=re.ASCII):
+                    detail = code
+            except ValueError:
+                pass
+            self.diagnostic(method, path, response.status_code, detail)
             raise WorkerFailure('database_' + str(response.status_code))
         return response.json() if response.content else None
 
@@ -431,6 +481,8 @@ class Worker:
                         parsed = filter_football_leagues(parsed)
                     assert_factual(parsed)
                     if source_response_rejected(parsed):
+                        LOG.warning('worker_source route=%s status=%d detail=%s',
+                                    url.path, response.status_code, source_rejection_detail(parsed))
                         failure = WorkerFailure('source_rejected')
                         failure.source_route = url.path
                         raise failure
@@ -727,12 +779,18 @@ class Worker:
                 await asyncio.sleep(2)
 
     async def maintenance(self):
+        previous_state = None
         while not self.stop.is_set():
             try:
                 health = await self.store.rpc('maintenance', p_owner=self.identity,
                     p_base_interval=self.base_interval, p_requests=self.request_count, p_jobs=self.job_count)
                 self.leader = health['leader']
                 self.admission_blocked = not health['admitted']
+                state = (self.leader, not self.admission_blocked)
+                if state != previous_state:
+                    LOG.info('worker_schedule leader=%s admitted=%s base_interval_minutes=%d',
+                             state[0], state[1], self.base_interval // 60)
+                    previous_state = state
                 # Enrollment durably seeds account discovery. Restart reads jobs directly;
                 # avoid a per-account database scan every heartbeat.
                 self.account_locks = {k: v for k, v in self.account_locks.items()
@@ -741,6 +799,7 @@ class Worker:
             except Exception:
                 self.admission_blocked = True
                 self.leader = False
+                previous_state = None
                 LOG.warning('worker_service code=database_unavailable')
             try:
                 await asyncio.wait_for(self.stop.wait(), 60)
@@ -769,6 +828,10 @@ class Worker:
                 pass
 
     async def run(self):
+        LOG.info('worker_config base_interval_minutes=%d interval_source=%s lanes=%d',
+                 self.base_interval // 60,
+                 'environment' if os.getenv('FUTMONDO_WORKER_BASE_INTERVAL_MINUTES', '').strip() else 'default',
+                 len(self.helpers))
         tasks = [asyncio.create_task(self.maintenance()), asyncio.create_task(self.cleanup_loop())] + [asyncio.create_task(self.lane(i)) for i in range(len(self.helpers))]
         if os.getenv('FUTMONDO_CLAUSE_SCHEDULING_ENABLED', 'false').lower() == 'true':
             from worker.clauses import ClauseScheduler
