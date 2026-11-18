@@ -1,0 +1,20 @@
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const {PGlite}=require('/tmp/futmondo-review-tools/node_modules/@electric-sql/pglite');
+(async()=>{const db=new PGlite();try{
+ await db.exec('create role anon;create role authenticated;create role service_role bypassrls;');
+ await db.exec(fs.readFileSync('scripts/schema.sql','utf8'));
+ const q=async(s,a=[]) => (await db.query(s,a)).rows;
+ await q("insert into worker_accounts(account_id,enabled,encrypted_token,credential_id) values('fixture',true,'synthetic','fixture')");
+ const d={handler:'get_notifications',resource_key:'a'.repeat(64),args:[],context:{account_id:'fixture'}};
+ await q('select worker_enqueue($1,$2,60,0)',['fixture',d]);
+ let j=(await q('select * from worker_jobs'))[0];assert.equal(j.interval_seconds,1800);assert.equal(j.native_interval_seconds,300);
+ await q("select worker_maintenance('fixture',3600,0,0)");
+ j=(await q('select * from worker_jobs'))[0];assert.equal(j.interval_seconds,3600);assert.equal(j.native_interval_seconds,300);
+ await q("select worker_maintenance('fixture',1800,0,0)");
+ await q("select worker_login_refresh('fixture')");
+ j=(await q('select * from worker_jobs'))[0];assert.equal(j.interval_seconds,1800);assert.ok(Date.now()-new Date(j.due_at)>=-1000);
+ await q("update worker_jobs set due_at=now()+interval '20 minutes'");
+ await q("select worker_login_refresh('fixture')");
+ j=(await q('select * from worker_jobs'))[0];assert.ok(new Date(j.due_at)-Date.now()>1100000);
+ console.log('PASS cadence default, startup reconciliation, decrease, login and coalescing');
+}finally{await db.close();}})().catch(e=>{console.error(e);process.exit(1)});

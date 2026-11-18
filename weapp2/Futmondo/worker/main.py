@@ -296,10 +296,18 @@ class Helper:
         self.process = None
 
 
+def base_interval_seconds():
+    raw = os.getenv('FUTMONDO_WORKER_BASE_INTERVAL_MINUTES', '').strip() or '30'
+    if not raw.isascii() or not raw.isdecimal() or int(raw) < 1 or int(raw) > 35791394:
+        raise ValueError('FUTMONDO_WORKER_BASE_INTERVAL_MINUTES must be a positive whole number of minutes (maximum 35791394)')
+    return int(raw) * 60
+
+
 class Worker:
     def __init__(self, store, client, key, root):
         self.store, self.client, self.key = store, client, key
         self.identity = str(uuid.uuid4())
+        self.base_interval = base_interval_seconds()
         self.helpers = [Helper(root) for _ in range(max(1, min(2, int(os.getenv('FUTMONDO_WORKER_LANES', '2')))))]
         self.stop = asyncio.Event()
         self.connections = asyncio.Semaphore(max(1, min(8, int(os.getenv('FUTMONDO_WORKER_CONNECTIONS', '2')))))
@@ -584,7 +592,7 @@ class Worker:
         # Child display projections carry the R resource policy and any stricter
         # original deadline. Publication never renews the source observation.
         interval = result.get('interval_seconds', 60) if child else job['interval_seconds']
-        if type(interval) not in (int, float) or not 0 < interval <= 86400:
+        if type(interval) not in (int, float) or not 0 < interval <= 2147483647:
             raise WorkerFailure('snapshot_deadline')
         deadline = datetime.fromisoformat(checked.replace('Z', '+00:00')).timestamp() + interval
         if result.get('valid_until') is not None:
@@ -656,7 +664,7 @@ class Worker:
                     continue
                 job = await self.store.rpc('claim', p_owner=owner, p_foreground=index == 1)
                 if not job:
-                    await asyncio.sleep(5)
+                    await asyncio.sleep(30)
                     continue
                 await self.guard(job, owner)
                 self.source_stamps[owner] = []
@@ -722,11 +730,10 @@ class Worker:
     async def maintenance(self):
         while not self.stop.is_set():
             try:
-                self.leader = await self.store.rpc('elect', p_owner=self.identity)
-                policy = await self.store.request('GET', 'application_access', params={'id': 'eq.main', 'select': 'admin_only'})
-                self.admission_blocked = not (len(policy) == 1 and policy[0]['admin_only'] is False)
-                await self.store.request('POST', 'worker_health', json={'id': self.identity, 'status': 'running' if self.leader else 'standby',
-                    'heartbeat': stamp(), 'requests': self.request_count, 'jobs': self.job_count}, headers={'Prefer': 'resolution=merge-duplicates'})
+                health = await self.store.rpc('maintenance', p_owner=self.identity,
+                    p_base_interval=self.base_interval, p_requests=self.request_count, p_jobs=self.job_count)
+                self.leader = health['leader']
+                self.admission_blocked = not health['admitted']
                 # Enrollment durably seeds account discovery. Restart reads jobs directly;
                 # avoid a per-account database scan every heartbeat.
                 if self.leader and time.monotonic() - self.last_cleanup > 3600:
@@ -742,7 +749,7 @@ class Worker:
                 self.leader = False
                 LOG.warning('worker_service code=database_unavailable')
             try:
-                await asyncio.wait_for(self.stop.wait(), 15)
+                await asyncio.wait_for(self.stop.wait(), 60)
             except asyncio.TimeoutError:
                 pass
 

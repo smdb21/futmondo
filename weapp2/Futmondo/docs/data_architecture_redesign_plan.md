@@ -2069,3 +2069,7 @@ This remains a decorative presentation refinement and adds no data/analysis capa
 - [x] Verify isolated probe/login regressions, required offline lifecycle and real HTTPS browser failure/retry/restoration. See [results and limits](data_review_results.md#startup-database-admission-check--2026-11-17).
 
 Runtime implementation and local exit criteria are complete. The workspace has no configured database connection for a live probe, so hosted connectivity/deployment acceptance is not claimed. Existing application_access schema/seed and server credentials remain prerequisites; no migration or dependency was added.
+
+## Configurable worker cadence — 2026-11-18
+
+Local implementation and isolated checks are recorded in [worker cadence](worker_cadence.md). Production job inventory timed out; deployment verification remains pending. This does not mark the Round awards defect fixed.

@@ -270,7 +270,7 @@ fm_worker_settle<-function(s){
 }
 fm_worker_poll<-function(account,owner='',force=FALSE){
  s<-fm_worker_account_state(account)
- if(s$busy||!force&&as.numeric(Sys.time())-s$last_poll<4)return(invisible(NULL))
+ if(s$busy||!force&&as.numeric(Sys.time())-s$last_poll<14)return(invisible(NULL))
  s$busy<-TRUE;s$last_poll<-as.numeric(Sys.time())
  bootstrap<-!isTRUE(s$bootstrap_complete)
  if(bootstrap){
@@ -433,11 +433,11 @@ fm_worker_status_source<-function(session,login){
   auth<-login();if(!valid_login(auth)){value(NULL);return()}
   account<-auth[['userid']];s<-fm_worker_account_state(account);s$status_revision()
   health_age<-as.numeric(difftime(Sys.time(),fm_time(s$health$heartbeat),units='secs'))
-  failed<-!isTRUE(s$account$enabled)||!identical(s$account$auth_status,'active')||length(health_age)!=1L||!is.finite(health_age)||health_age>60||!is.null(s$service_error)||!is.null(s$connect_error)||length(s$errors)>0L
+  failed<-!isTRUE(s$account$enabled)||!identical(s$account$auth_status,'active')||length(health_age)!=1L||!is.finite(health_age)||health_age>180||!is.null(s$service_error)||!is.null(s$connect_error)||length(s$errors)>0L
   message<-if(!is.null(s$service_error))s$service_error else if(!is.null(s$connect_error))s$connect_error else
    if(!s$known)'Loading saved data…'else if(!isTRUE(s$account$enabled))'Automatic sync is not connected; saved data remains available.'else
    if(!identical(s$account$auth_status,'active'))'Background access needs renewal. Log in again.'else
-   if(length(health_age)!=1L||!is.finite(health_age)||health_age>60)'Background worker is not responding; saved data remains available.'else
+   if(length(health_age)!=1L||!is.finite(health_age)||health_age>180)'Background worker is not responding; saved data remains available.'else
     if(!is.null(s$service_error))s$service_error else
      if(length(s$errors))paste(unique(unlist(s$errors)),collapse=' ')else 'Background sync is enabled.'
   live_keys<-fm_worker_live_keys(s)
@@ -464,7 +464,7 @@ fm_worker_session<-function(session,login,leagues=function()list(),source_note=f
   s$policy_revision()
   if(!identical(renewed,paste0(openssl::sha256(charToRaw(auth[['token']]))))&&s$known&&!connecting&&!disconnecting&&as.numeric(Sys.time())>=connect_after)connect(auth)
   if(!identical(session$input$worker_visible,FALSE)){
-   shiny::invalidateLater(5000,session);fm_worker_poll(account,session$token)
+   shiny::invalidateLater(15000,session);fm_worker_poll(account,session$token)
   }
  },priority=1000)
  output<-session$output

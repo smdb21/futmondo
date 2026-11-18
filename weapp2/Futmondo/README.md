@@ -244,3 +244,12 @@ The scheduler uses existing Python/R dependencies. It performs at most one globa
 See [scheduling, security and state contracts](docs/scheduled_clauses.md). Synthetic checks: `Rscript test/test_scheduled_clauses.R`, `node test/test_scheduled_clause_schema.cjs`, and `PYTHONPATH=. <worker-venv>/bin/python test/test_scheduled_clauses.py`. No new dependency or manifest regeneration is required.
 
 Player-card availability shares current team checks across cards and restores successful observations from the existing private evidence store. No new environment variable, dependency or migration is required; the existing server database access must include `rival_finance_evidence` and its latest-observation view. See [the availability contract](docs/player_availability.md) for expiry, persistence and verification. For the isolated card browser check, start `Rscript test/test_worker_card_availability_browser_app.R`, then run `node test/test_worker_card_availability_browser.cjs`.
+
+Worker collection cadence: `FUTMONDO_WORKER_BASE_INTERVAL_MINUTES` defaults to `30`
+when unset or empty. Set a positive whole number of minutes (maximum 35791394,
+the integer-seconds storage limit); invalid values stop worker startup. Set this
+on the Python worker container and restart it. The elected worker reconciles the
+durable schedule; R does not need the variable. Routine intervals use the greater
+of the resource cadence and this base. Login refreshes current resources, coalesced
+per account for five minutes. Historical/profile schedules remain slower. This
+setting does not change purchase timing or live transaction preflights.
