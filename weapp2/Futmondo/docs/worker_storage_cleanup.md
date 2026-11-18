@@ -57,3 +57,52 @@ and 500 obsolete checkpoints, with durable success status acknowledged. All 40
 worker tests, three cleanup Python checks, synthetic cleanup SQL, cadence SQL,
 and offline Shiny lifecycle (13 checks and eight tabs) passed. Worker restart
 and scheduled cleanup after deployment still require verification.
+
+## History/index storage review — 2026-11-18
+
+Automatic cleanup verified without additional manual calls: status advanced from
+500/500 manually deleted chunks/checkpoints at 18:14:16 UTC to 1000/1000 at
+18:16:42 and 2500/2500 at 18:19:54. A fresh leader heartbeat accompanied these
+updates. This confirms the deployed independent cleanup loop is running.
+
+Concurrent sequential rebuilding of nine existing indexes preserved every
+historical row, uniqueness constraint, key order and read path. Definitions were
+inspected against scoped price-history and round-history readers. No index was
+dropped simply because its cumulative scan count was low.
+
+| Index | Before bytes | After bytes |
+|---|---:|---:|
+| player_membership_observation_player_id_competition_id_seas_key | 90169344 | 51249152 |
+| player_history_full_context_page | 74801152 | 50618368 |
+| player_history_source_time | 68558848 | 46776320 |
+| player_history_context_page | 67878912 | 42344448 |
+| player_membership_context_time | 63504384 | 37158912 |
+| player_match_observations_pkey | 56713216 | 40738816 |
+| player_round_league_context_revision | 52150272 | 40812544 |
+| player_round_context_revision | 48668672 | 34242560 |
+| idx_player_history_player | 44441600 | 26247168 |
+
+Database size changed from 1,399,516,307 to 1,203,440,787 bytes while the worker
+continued operating. All rebuilt indexes were valid/ready; no invalid public
+indexes remained. Concurrent rebuilding retained reads/writes and was performed
+one index at a time to limit temporary space and I/O. These are physical
+maintenance changes, not schema/API changes; no application tests were needed
+for this documentation-only repository update. Ongoing latency was not benchmarked.
+
+Membership history contains 388,092 observations but 527 distinct tuples of
+player, competition, season, club, effective date and source. The recorder emits
+membership observations from catalog/roster/market acquisitions, and uniqueness
+includes observed_at: repeated facts at different observation times are retained.
+These are not exact duplicate records. Removing them would discard observation
+evidence and potentially obscure repeated transitions or historical cutoffs.
+No history retention rule was changed, and no rows were deduplicated.
+
+Further reduction below 500 MB is not established. A future normalization of
+repeated factual payloads should preserve every observation timestamp and context
+through separate state/observation records, preserve return-to-prior-state
+transitions, and verify as-of queries before migrating data. Low index usage alone
+is not evidence that an index is redundant. Automatic cleanup controls obsolete
+worker payloads, not long-term factual history growth.
+
+Reference: https://www.postgresql.org/docs/17/sql-reindex.html — concurrent REINDEX
+rebuilds physical indexes while retaining their definitions and allowing writes.

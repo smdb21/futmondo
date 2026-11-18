@@ -4755,3 +4755,7 @@ Local implementation and isolated checks are recorded in [worker cadence](worker
 ## Worker storage cleanup — 2026-11-18
 
 See [worker storage cleanup](worker_storage_cleanup.md): explicit production compaction reclaimed about 1.19 GB; bounded cleanup and cadence migrations were acknowledged. Synthetic checks and offline lifecycle passed. Worker deployment verification remains separate; total database size still exceeds the free allowance.
+
+## History/index storage verification — 2026-11-18
+
+[Storage review](worker_storage_cleanup.md#historyindex-storage-review--2026-11-18) records nine concurrent index rebuilds with all history retained, database reduction to 1.203 GB, valid indexes and verified automatic cleanup progress. The 500 MB target is not met; historical normalization remains unimplemented. No runtime source changes in this task.
