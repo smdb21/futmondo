@@ -2136,3 +2136,8 @@ the full cluster to 347,508,913 bytes, leaving 152,491,087 bytes of headroom bel
 history, values, column types or retention changed. Indexes remain valid. See
 docs/database_storage_headroom.md. Runtime/automatic-cleanup acceptance remains
 pending owner restart; no restart or source acquisition was performed.
+
+
+## Column-type audit — 2026-11-18
+
+Completed read-only live schema/value review; see [column-type audit](database_column_types.md). Whole cluster measured 347,549,873 bytes. Binary chunks offer approximately 8.55 MB of content savings, binary signatures 1.18 MB; no schema migration was performed. Preserve decimal averages, opaque IDs and existing time/amount precision. Documentation-only change has no runtime performance impact; app tests not required. Automatic cleanup verification still awaits the owner restarting production.
