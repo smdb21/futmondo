@@ -151,3 +151,23 @@ offline Shiny lifecycle rerun passed 13 checks/eight tabs. Before deployment the
 last cleanup success was 18:55:07 UTC and latest worker heartbeat 21:16:53 UTC,
 both stale at 22:52 UTC; current automatic cleanup still needs verification after
 deployment. No manual cleanup call was used to disguise stale automatic status.
+
+
+## Delivery and stopped-production status
+
+Commit `f21f9fe` and the previously held adapter commits were pushed successfully
+to `origin/2.0`. At the post-push check (22:58:57 UTC), the database reported zero
+active worker leaders; cleanup remained at 18:55:07 UTC, with cumulative counters
+6,054 chunks and 2,980 checkpoints. The owner then confirmed production is still
+intentionally stopped. No restart or manual cleanup was performed.
+
+Production database normalization and the below-500-million-byte measurement are
+complete. The deployed container revision and fresh automatic cleanup activity
+cannot be verified while production is stopped. After the owner restarts it,
+verify a fresh worker heartbeat/leader lease and an advancing cleanup success
+time (even a zero-deletion batch is a successful automatic run), then verify
+normal factual writes through the normalized RPCs. This is a remaining runtime
+verification condition, not a claim that cleanup is currently running.
+
+This final delivery note changes documentation only and has no runtime or
+performance impact; no additional tests were needed.

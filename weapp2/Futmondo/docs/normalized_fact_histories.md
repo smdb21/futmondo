@@ -107,5 +107,6 @@ timestamps are intentionally discarded. Membership retains every timestamp.
 
 The SQL source schemas and application write/read contracts are identical between
 the atomic empty-database path and the batched existing-database path. Use only
-one migration path per domain. Deployment and automatic-cleanup verification
-follow the successful production cutovers.
+one migration path per domain. The adapter changes were committed and pushed. The owner confirmed production
+remains intentionally stopped, so the running container revision and fresh
+automatic-cleanup activity require verification after restart.

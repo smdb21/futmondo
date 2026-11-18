@@ -4843,3 +4843,12 @@ Exact relation/index measurements are in docs/history_batch_migration.md. The
 private tables are expected; unrelated pre-existing advisor warnings are recorded
 with remediation references in that document. Cleanup status and worker heartbeat
 were stale before push; automatic cleanup requires post-deployment verification.
+
+
+Post-push verification: `f21f9fe` and earlier held adapter commits reached
+`origin/2.0`. At 22:58:57 UTC there were zero active worker leaders; last cleanup
+success remained 18:55:07 UTC (6,054 chunks / 2,980 checkpoints cumulatively).
+Owner confirmed production is intentionally stopped. Therefore a current worker
+write, deployed container version and automatic cleanup cannot yet be verified.
+Resume those checks after owner restart; no manual cleanup or restart was used
+to mask this limit. Final delivery-note edits have no runtime/performance impact.

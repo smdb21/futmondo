@@ -2116,3 +2116,10 @@ Nine concurrent index rebuilds preserved all rows and definitions. Total size is
 Normal source acquisition, manual-action safeguards and UI scope are unchanged.
 Production migration and isolated checks are complete; deployment and fresh
 automatic cleanup verification follow this commit. See docs/history_batch_migration.md.
+
+
+History rollout delivery: `f21f9fe` and held adapter commits were pushed to
+`origin/2.0`. Owner confirms production remains intentionally stopped. Database
+cutovers and the below-500-million-byte target are complete; container-version,
+fresh worker-write and automatic-cleanup acceptance checks await owner restart.
+No restart or manual cleanup was performed.
