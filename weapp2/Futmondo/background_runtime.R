@@ -180,9 +180,10 @@ persistence_tick<-function(){
     retry_safe<-persistence_operation_retry_safe(op)
     table<-op[[1]];payload<-op[[2]];conflict<-if(length(op)>=3L)op[[3]]else supabase_conflict_key(table)
     if(!nzchar(get_sb_url())||!nzchar(get_sb_key())){finish(FALSE,list(list(category="configuration")));return(invisible(FALSE))}
-    url<-httr::modify_url(paste0(get_sb_url(),"/rest/v1/",table),query=if(!is.null(conflict))list(on_conflict=conflict)else NULL)
+    wire<-supabase_write_request(table,payload,conflict,length(op)>=4L&&isTRUE(op[[4]]))
+    url<-httr::modify_url(paste0(get_sb_url(),"/rest/v1/",wire$path),query=if(!is.null(wire$conflict))list(on_conflict=wire$conflict)else NULL)
     headers<-c(apikey=get_sb_key(),Authorization=paste("Bearer",get_sb_key()),`Content-Type`="application/json",Prefer=if(length(op)>=4L&&isTRUE(op[[4]]))"resolution=ignore-duplicates" else "resolution=merge-duplicates")
-    request<-fm_async_http(url,"POST",supabase_payload_json(payload),headers,owner=paste0("persistence:",job$session_id))
+    request<-fm_async_http(url,"POST",wire$body,headers,owner=paste0("persistence:",job$session_id))
     promises::then(request,function(response){
       if(identical(table,"round_dream_team"))tryCatch(invalidate_mvp_saved_cache(),error=function(e)NULL)
       finish(TRUE)

@@ -4763,3 +4763,31 @@ See [worker storage cleanup](worker_storage_cleanup.md): explicit production com
 ## Lossless membership normalization — 2026-11-18
 
 [Membership storage](membership_storage.md) documents normalized facts plus exact observation timestamps, compatibility interfaces, full transactional equality verification and production migration. Membership storage fell from 146.4 MB to 41.1 MB without historical row loss; database is about 1.10 GB. SQL/R fixtures, 40 worker tests, 14 context groups and offline Shiny lifecycle passed. Other history normalization remains outside this implemented step.
+
+
+### History confirmation periods — 2026-11-18
+
+Local endpoint migration fixtures pass full retained-field equality, IDs,
+microseconds, nullable legacy rows, negative/zero values, JSON null/empty values,
+A/B/A, late changes, historical cutoffs, context isolation and denied public access.
+Each 200-confirmation stress fixture adds one endpoint and zero states; final
+isolated times 148/125/123 ms for price/match/finance, not production benchmarks.
+Shared direct/deferred routing preserves retry acknowledgments and null payloads.
+R envelope/membership, 11 recovery groups, continuation bounds, 40 Python worker
+tests and full offline Shiny lifecycle (13 checks/eight tabs) pass.
+
+Performance review: source request counts, timers, UI redraws and cache policy are
+unchanged. Repeated facts reuse durable states; endpoint lists grow with changes,
+not poll count. Writes scan indexed entity-local endpoints; latest views use
+indexed newest-event lookup. Bulk copy refreshes statistics; rollout is bounded
+per domain (5s lock wait, 120s statement, 150s transaction). Historical confirmation
+precision intentionally changes: an as-of read returns an actual retained earlier
+confirmation, never a future one. Discarded intermediate times are unrecoverable.
+
+Production migration did not commit; all three normalized timestamp tables were
+absent on final check. Total size 1,101,221,011 bytes. Cleanup last success was
+18:55:07 UTC; no claim of current operation. Health advisors found no issues;
+security advisors and database connections timed out. Production migration,
+indexed latency/storage measurements, advancing cleanup counters and adapter
+deployment remain outstanding. Local commit is held from push because push
+automatically deploys adapters requiring these uninstalled RPCs.

@@ -44,6 +44,18 @@ record_persistence_failure <- function(table_name, http_status = NULL, error_cod
 # Database row names are R implementation metadata, never factual columns.
 supabase_payload_json <- function(payload) jsonlite::toJSON(payload,auto_unbox=TRUE,na="null",rownames=FALSE)
 
+# Shared synchronous/deferred write routing; normalized views remain read-only.
+supabase_write_request <- function(table_name,payload,conflict=NULL,ignore_duplicates=FALSE) {
+  rpc <- c(player_membership_observations="membership_write",player_history="price_history_write",
+           player_match_observations="match_history_write",rival_finance_evidence="finance_history_write")
+  if(!table_name %in% names(rpc))return(list(path=table_name,conflict=conflict,body=supabase_payload_json(payload)))
+  envelope <- list(p_payload=jsonlite::fromJSON(jsonlite::toJSON(payload,auto_unbox=TRUE,na="null",null="null",rownames=FALSE),simplifyVector=FALSE),
+                   p_ignore=isTRUE(ignore_duplicates))
+  if(table_name!="player_membership_observations")envelope["p_conflict"]<-list(conflict)
+  list(path=paste0("rpc/",unname(rpc[[table_name]])),conflict=NULL,
+       body=jsonlite::toJSON(envelope,auto_unbox=TRUE,na="null",null="null",rownames=FALSE))
+}
+
 supabase_post_direct <- function(table_name, payload, conflict = NULL, ignore_duplicates = FALSE) {
   if (isTRUE(getOption("futmondo.offline", FALSE))) return(NULL)
   if (is.null(payload) || (is.data.frame(payload) && nrow(payload) == 0) || (is.list(payload) && length(payload) == 0)) {
@@ -67,17 +79,12 @@ supabase_post_direct <- function(table_name, payload, conflict = NULL, ignore_du
     "Prefer" = if (isTRUE(ignore_duplicates)) "resolution=ignore-duplicates" else "resolution=merge-duplicates"
   )
   
-  # Membership facts are normalized; the read view keeps the legacy row shape.
-  membership_write <- identical(table_name, "player_membership_observations")
-  if (membership_write) {
-    url <- paste0(sb_url, "/rest/v1/rpc/membership_write")
-    payload <- list(p_payload = jsonlite::fromJSON(supabase_payload_json(payload), simplifyVector = FALSE),
-                    p_ignore = isTRUE(ignore_duplicates))
-    conflict <- NULL
-  }
+  request <- supabase_write_request(table_name,payload,conflict,ignore_duplicates)
+  url <- paste0(sb_url,"/rest/v1/",request$path)
+  conflict <- request$conflict
   # Perform request defensively
   tryCatch({
-    response <- POST(url, query = if (!is.null(conflict)) list(on_conflict = conflict) else NULL, body = if(membership_write) jsonlite::toJSON(payload,auto_unbox=TRUE,na="null",null="null",rownames=FALSE) else supabase_payload_json(payload), add_headers(.headers = headers), httr::timeout(15), httr::config(connecttimeout = 5))
+    response <- POST(url, query = if (!is.null(conflict)) list(on_conflict = conflict) else NULL, body = request$body, add_headers(.headers = headers), httr::timeout(15), httr::config(connecttimeout = 5))
     code <- status_code(response)
     if (code >= 200 && code < 300) {
       if(identical(table_name,"round_dream_team")) invalidate_mvp_saved_cache()

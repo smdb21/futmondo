@@ -2085,3 +2085,17 @@ See [worker storage cleanup](worker_storage_cleanup.md): explicit production com
 ## Lossless membership normalization — 2026-11-18
 
 [Membership storage](membership_storage.md) documents normalized facts plus exact observation timestamps, compatibility interfaces, full transactional equality verification and production migration. Membership storage fell from 146.4 MB to 41.1 MB without historical row loss; database is about 1.10 GB. SQL/R fixtures, 40 worker tests, 14 context groups and offline Shiny lifecycle passed. Other history normalization remains outside this implemented step.
+
+
+### History confirmation periods — 2026-11-18 (local implementation; production blocked)
+
+Owner approved retaining first/last confirmation per unchanged period and dropping
+intermediate confirmation times. Player valuation, match observations and finance
+evidence now have a prepared normalized-state/endpoint migration and shared
+direct/deferred R write routing. All factual changes, A/B/A returns, context and
+actual endpoint timestamps survive. Synthetic migration and runtime checks pass.
+Production attempts rolled back or failed to initialize due to SQL connection
+timeouts; all three original relations remain. Database is 1,101,221,011 bytes;
+below 500 MB is not achieved. Apply/verify the three bounded domain transactions
+before deploying adapters, then measure storage and current automatic cleanup.
+See docs/normalized_fact_histories.md. No feature or acquisition scope expansion.
