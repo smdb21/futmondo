@@ -41,20 +41,41 @@ treats the existing pitch coordinates as the ground plane and positive Z as
 height, reusing the camera's `px`, `py` and perspective-scale slots for projected
 points. `raisedBoard()` draws the shallow edge and shadow; `risingPlayers()`
 draws 22 anchored foosball figures with round heads, solid shirts, rigid lower
-bodies and broad kicking feet, using cached formation positions and a bounded
-lift array. Green figures face +X toward the right goal; gold figures face -X
-toward the left. Shirt width lies across pitch Y, with shallow depth along X,
-forward kicking feet and small nose cues. Cached front/back/side/top faces provide
+bodies and short shoes, using cached formation positions and a bounded lift
+array. The first club faces +X toward the right goal; the second faces -X toward
+the left. Shoes are 3 units high and 6.4 wide, spanning -1.6 to +3.2 in local X
+(compared with the previous 5 high, 10 wide, -2.5 to +6 plate). The same shorter
+corners feed the dissolve particles and the ground shadow is smaller. Shirt
+width lies across pitch Y, with shallow depth along X,
+short forward-facing shoes and small nose cues. Cached front/back/side/top faces provide
 volume; the camera eye position selects the visible face for each player.
 `playerFace()` clips these faces at the descending local-Z dissolve boundary
-without allocating intermediate vertices. `makeParticles()` assigns each existing
+without allocating intermediate vertices; its optional outline uses the current
+stroke style for pale kits. `makeParticles()` assigns each existing
 particle a player and a sample of the same goal-facing 3D silhouette and a release time when the particle
 budget changes, retaining both foot corners even at the smaller particle budget.
 Viewport-height changes reuse this pool. `radar()` and its particle targets share
 a fit factor for unusually short portrait scenes so the rings and crosshairs
-remain visible. `readPalette()` caches green and warm-gold team tones from the existing text/warning theme
-tokens. These tones stay consistent through the figures, morph particles and
-radar player dots, while the radar beam uses the existing accent color.
+remain visible. `readPalette()` keeps the field and radar beam on the existing
+application theme while resolving the selected clubs' base/stripe colors and
+contrast edges. Shirt stripes cover both the visible front/back and side faces;
+particles sample those same surfaces. Radar dots retain the base fill and stripe
+outline. White and pale kits keep light-theme edges, and black stripe particles
+have a contrasting rim so colors remain readable in both themes.
+
+The renderer chooses two classic club-inspired color schemes once per page load:
+Real Madrid, Barcelona, Atlético Madrid, Real Betis, Inter, AC Milan, Dortmund,
+Juventus, Manchester City or Liverpool. It picks the first club uniformly, then
+an opponent from a different primary-color family. This avoids duplicate or
+same-primary-color pairs. Both launch and compact loaders share the pair, which
+stays fixed across loops, theme changes and remounts; a new page load makes a new
+random selection (a repeat is possible). No selection is persisted or fetched.
+`mount()` sets `data-fm-teams` to the two space-separated club IDs on each
+`data-fm-loading` root for inspection. White Madrid and blue/garnet Barcelona
+remain available, alongside the other schemes. Each private catalog entry has
+a stable ID, primary-color family, dark/light base colors and optional stripe
+colors and a light-theme edge. These decorative palettes use classic colors,
+with shades adjusted for readability.
 
 The mobile layout is scoped to `.waiter-overlay .fm-loading-launch`, including
 safe-area padding and a `50dvh` drawing height (`50vh` fallback). Its inherited

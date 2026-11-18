@@ -1,6 +1,6 @@
 // Start test_loading_visual_app.R, then run this file. Add --full-app to both
 // commands for the real offline application startup acceptance checks.
-// --fullscreen-only runs the focused portrait/landscape launch checks.
+// --fullscreen-only runs the portrait/landscape checks; --clubs-only checks kit variants.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -10,6 +10,20 @@ const fullApp = process.argv.includes('--full-app');
 const origin = `http://127.0.0.1:${fullApp ? 38768 : 38767}`;
 const screenshotDir = process.env.FUTMONDO_LOADING_SCREENSHOTS || '/tmp/futmondo-loading-visual';
 fs.mkdirSync(screenshotDir, { recursive: true });
+
+// Independent expected classic club palettes; decorative kit selection is local.
+const clubKits = {
+  'real-madrid': {family: 'white', base: ['#f7f8fc', '#f7f8fc']},
+  barcelona: {family: 'blue', base: ['#356ed1', '#2456a6'], stripe: ['#cf3659', '#b9234b']},
+  atletico: {family: 'red', base: ['#e64a57', '#b92338'], stripe: ['#f7f8fc', '#f7f8fc']},
+  betis: {family: 'green', base: ['#36b97b', '#087846'], stripe: ['#f7f8fc', '#f7f8fc']},
+  inter: {family: 'blue', base: ['#4082df', '#1759a8'], stripe: ['#111827', '#111827']},
+  milan: {family: 'red', base: ['#e74a4f', '#ba2331'], stripe: ['#111827', '#111827']},
+  dortmund: {family: 'yellow', base: ['#f5d638', '#f5d638'], stripe: ['#111827', '#111827'], edge: '#806000'},
+  juventus: {family: 'white', base: ['#f7f8fc', '#f7f8fc'], stripe: ['#111827', '#111827']},
+  'man-city': {family: 'blue', base: ['#7dc9ef', '#7dc9ef'], edge: '#376b83'},
+  liverpool: {family: 'red', base: ['#ee4c5b', '#bb1f38']}
+};
 
 function instrument() {
   const stats = window.loadingFixture = {captureId: 'fixture-hero', draws: {}, samples: [], stageSamples: [], callbacks: 0, pending: new Set(), maxPending: 0, colors: {}, capture: false, geometry: []};
@@ -174,7 +188,7 @@ function checkGeometry(phases) {
   for (let i = 0; i < 22; i++) assert.ok(heads[i][1] < feet[i][1] - 4, 'A player head rises visibly above its ground anchor');
 }
 function checkTeams(phases, teamColors) {
-  assert.notEqual(teamColors[0], teamColors[1], 'The two teams use different theme-derived tones');
+  assert.notEqual(teamColors[0], teamColors[1], 'The selected clubs have distinct primary colors');
   function countTeams(marks, expected, label) {
     assert.equal(marks.length, expected * 2, label + ' has one mark per player');
     for (const color of teamColors)
@@ -183,6 +197,23 @@ function checkTeams(phases, teamColors) {
   const heads = phases.rising.filter(mark => mark.kind === 'fill' && mark.path.length === 1 &&
     mark.path[0].op === 'arc' && mark.path[0].args[2] > 1.5);
   countTeams(heads, 11, 'Raised heads');
+  let previousHead = -1;
+  for (const head of heads) {
+    const team = teamColors.indexOf(head.color), headIndex = phases.rising.indexOf(head);
+    const shirtPanels = phases.rising.slice(previousHead + 1, headIndex).filter(mark =>
+      mark.kind === 'fill' && Math.abs(mark.alpha - 0.95) < 0.01 && mark.path.length === 4);
+    const stripe = teamColors.stripes[team];
+    assert.equal(shirtPanels.length, stripe ? 2 : 0,
+      'Each striped kit has a colored panel on its visible front/back and side');
+    assert.ok(shirtPanels.every(mark => mark.color === stripe), 'Shirt panels use the selected club accent');
+    if (head.color === '#f7f8fc') {
+      const outline = phases.rising.find(mark => mark.kind === 'stroke' && mark.color === teamColors.edge &&
+        mark.path.length === 1 && mark.path[0].op === 'arc' &&
+        JSON.stringify(mark.path) === JSON.stringify(head.path));
+      assert.ok(outline, 'White figures keep a visible neutral contour in both themes');
+    }
+    previousHead = headIndex;
+  }
   const bodies = phases.rising.filter(mark => mark.kind === 'fill' && mark.alpha > 0.65 &&
     teamColors.includes(mark.color) && mark.path.length >= 8 &&
     mark.path.every(command => command.op === 'moveTo' || command.op === 'lineTo'));
@@ -201,17 +232,37 @@ function checkTeams(phases, teamColors) {
 
   }
   checkGoalFacing(phases.rising, teamColors);
-  const radarDots = phases.players.filter(mark => mark.path.length === 1 && mark.path[0].op === 'arc' &&
+  const radarDots = phases.players.filter(mark => mark.kind === 'fill' && mark.path.length === 1 && mark.path[0].op === 'arc' &&
     mark.path[0].args[2] >= 2.3 && mark.path[0].args[2] <= 3.2 && teamColors.includes(mark.color));
   countTeams(radarDots, 11, 'Radar player dots');
+  for (const dot of radarDots) {
+    const team = teamColors.indexOf(dot.color);
+    assert.ok(phases.players.some(mark => mark.kind === 'stroke' &&
+      mark.color === (teamColors.stripes[team] || teamColors.edges[team] || teamColors[team]) &&
+      JSON.stringify(mark.path) === JSON.stringify(dot.path)),
+    'Radar dots retain the club stripe or a neutral readable edge');
+  }
   const expectedParticles = particleMarks(phases.pitch).length;
   assert.ok([180, 320].includes(expectedParticles), 'Pitch starts with exactly the configured particle budget');
   for (const name of ['pitch', 'morph', 'flock']) {
     const particles = phases[name].filter(mark => mark.kind === 'fill' && mark.alpha > 0.4 &&
       mark.path.length === 1 && mark.path[0].op === 'ellipse');
     assert.equal(particles.length, expectedParticles, name + ' retains the complete bounded particle pool');
-    assert.deepEqual([...new Set(particles.map(mark => mark.color))].sort(), [...teamColors].sort(),
-      name + ' keeps both team tones through the transformation');
+    const expectedColors = [...new Set([...teamColors, ...teamColors.stripes.filter(Boolean)])].sort();
+    assert.deepEqual([...new Set(particles.map(mark => mark.color))].sort(), expectedColors,
+      name + ' carries the selected primary and shirt-stripe colors into the transformation');
+    for (const particle of particles) {
+      let edges = [];
+      if (particle.color === '#111827') edges = [...teamColors];
+      else if (teamColors.light && particle.color === '#f7f8fc') edges = [teamColors.edge];
+      else if (teamColors.light) {
+        const team = teamColors.indexOf(particle.color);
+        if (team !== -1 && teamColors.edges[team]) edges = [teamColors.edges[team]];
+      }
+      if (edges.length) assert.ok(phases[name].some(mark => mark.kind === 'stroke' && edges.includes(mark.color) &&
+        JSON.stringify(mark.path) === JSON.stringify(particle.path)),
+      'Low-contrast kit particles retain a readable edge in the active theme');
+    }
   }
 }
 
@@ -248,35 +299,66 @@ function checkGoalFacing(geometry, teamColors) {
   const noses = geometry.filter(mark => mark.kind === 'fill' && mark.path.length === 3 &&
     Math.abs(mark.alpha - 0.9) < 0.01 && teamColors.includes(mark.color));
   assert.equal(anchors.length, 22);
-  assert.equal(feet.length, 22, 'Each molded player has a broad forward kicking foot');
+  assert.equal(feet.length, 22, 'Each molded player has a short forward kicking foot');
   assert.equal(heads.length, 22);
   assert.equal(noses.length, 22, 'Each head has a visible goal-facing profile');
+  const sides = geometry.filter(mark => mark.kind === 'fill' && Math.abs(mark.alpha - 0.58) < 0.01 &&
+    teamColors.includes(mark.color) && mark.path.length >= 8);
+  assert.equal(sides.length, 22, 'Every body retains its visible volume side');
   const goal = [pitch[1][0] - pitch[0][0], pitch[1][1] - pitch[0][1]];
   const goalLength = Math.hypot(...goal);
   for (let i = 0; i < 22; i++) {
     const direction = feet[i].color === teamColors[0] ? 1 : -1;
     assert.equal(noses[i].color, feet[i].color, 'The head and foot retain the same team identity');
     const foot = feet[i].path.map(command => command.args);
-    const center = foot.reduce((sum, point) => [sum[0] + point[0] / 4, sum[1] + point[1] / 4], [0, 0]);
-    const anchor = anchors[i].path[0].args;
-    const forward = ((center[0] - anchor[0]) * goal[0] + (center[1] - anchor[1]) * goal[1]) / goalLength;
-    assert.ok(direction * forward > 0.2, 'The teams kick toward opposite goals along the pitch');
-    assert.ok(polygonArea(foot) > 12, 'The kicking foot is a broad solid plate');
+    const forward = ((foot[1][0] - foot[0][0]) * goal[0] + (foot[1][1] - foot[0][1]) * goal[1]) / goalLength;
+    assert.ok(direction * forward > 2, 'Each short toe points toward its opposing goal');
+    // Compare like-axis dimensions on the projected model. A shoe can remain
+    // directional without being wider than the shoulders or longer than the
+    // torso depth, as the previous pedestal-like foot was.
+    const side = sides[i].path.map(command => command.args);
+    const shoulder = bodies[i].path;
+    const distance = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+    const toeDepth = distance(foot[0], foot[1]);
+    const bodyDepth = distance(side[4], side[9]);
+    const shoeWidth = distance(foot[1], foot[2]);
+    const shoulderWidth = distance(shoulder[2].args, shoulder[11].args);
+    assert.ok(toeDepth > bodyDepth * 0.45 && toeDepth < bodyDepth * 1.1,
+      'The shoe is shorter than the torso depth rather than a projecting pedestal');
+    assert.ok(shoeWidth > shoulderWidth * 0.3 && shoeWidth < shoulderWidth * 0.72,
+      'The shoe is narrower than the shirt rather than a wide base');
+    assert.ok(polygonArea(foot) > 5, 'The shortened foot still has a visible solid top');
     const tip = noses[i].path[1].args, head = heads[i].path[0].args;
     const facing = ((tip[0] - head[0]) * goal[0] + (tip[1] - head[1]) * goal[1]) / goalLength;
-    assert.ok(direction * facing > 2, 'Green heads face one goal and gold heads face the opposite goal');
+    assert.ok(direction * facing > 2, 'The two club teams face opposite goals');
   }
 }
 async function readTeamColors(page) {
-  return page.evaluate(() => {
-    const style = getComputedStyle(document.documentElement);
-    const context = document.createElement('canvas').getContext('2d');
-    return ['text', 'warning'].map(name => {
-      context.fillStyle = style.getPropertyValue('--fm-' + name).trim();
-      return context.fillStyle;
-    });
-  });
+  const state = await page.locator('#fixture-hero').evaluate(node => ({
+    ids: (node.getAttribute('data-fm-teams') || '').split(' '),
+    light: document.documentElement.getAttribute('data-fm-theme') === 'light'
+  }));
+  assert.equal(state.ids.length, 2, 'Each page chooses exactly two clubs');
+  assert.ok(state.ids.every(id => clubKits[id]), 'Only known classic club kits are selected');
+  assert.notEqual(clubKits[state.ids[0]].family, clubKits[state.ids[1]].family,
+    'Opponents use distinguishable primary-color families');
+  const mode = state.light ? 1 : 0;
+  const colors = state.ids.map(id => clubKits[id].base[mode]);
+  colors.ids = state.ids;
+  colors.light = state.light;
+  colors.stripes = state.ids.map(id => clubKits[id].stripe?.[mode] || null);
+  colors.edge = state.light ? '#657286' : '#a5afbf';
+  colors.edges = state.ids.map(id => clubKits[id].family === 'white' ? colors.edge : state.light && clubKits[id].edge || null);
+  return colors;
 }
+async function checkPairIdentity(page, expected) {
+  const identities = await page.locator('[data-fm-loading]').evaluateAll(nodes =>
+    nodes.map(node => node.getAttribute('data-fm-teams')));
+  assert.ok(identities.length >= 2, 'Hero and compact instances remain mounted');
+  assert.ok(identities.every(ids => ids === expected.join(' ')),
+    'All instances retain one page-level club pair through theme, loop and remount changes');
+}
+
 function particleMarks(geometry) {
   return geometry.filter(mark => mark.kind === 'fill' && mark.alpha > 0.4 &&
     mark.path.length === 1 && mark.path[0].op === 'ellipse');
@@ -347,6 +429,8 @@ async function fullscreenChecks(browser) {
       await waitDraw(page, 'fixture-hero');
       const layout = await checkLaunchLayout(page);
       const teamColors = await readTeamColors(page);
+      assert.deepEqual(teamColors.ids, ['real-madrid', 'barcelona'], 'The main matrix uses a deterministic Madrid/Barcelona pair');
+      await checkPairIdentity(page, teamColors.ids);
       const phases = {};
       for (const [name, at] of [['pitch', 700], ['rising', 4200], ['release', 4500], ['dissolve', 4800], ['morph', 5400], ['flock', 7000], ['radar', 9300], ['players', 11500], ['return', 14300]]) {
         const elapsed = await page.evaluate(() => performance.now() - window.loadingFixture.firstDrawAt);
@@ -357,10 +441,11 @@ async function fullscreenChecks(browser) {
         checkFullscreenGeometry(phases[name], layout, name === 'flock');
       }
       checkAscent(phases.release, phases.dissolve, phases.rising);
-      checkGoalFacing(phases.rising, teamColors);
+      checkTeams(phases, teamColors);
       const seamElapsed = await page.evaluate(() => performance.now() - window.loadingFixture.firstDrawAt);
       await page.waitForTimeout(Math.max(0, 15100 - seamElapsed));
       assert.deepEqual(await captureGeometry(page), phases.pitch, 'Fullscreen geometry returns to the exact flat loop seam');
+      await checkPairIdentity(page, teamColors.ids);
       const normal = await page.evaluate(() => window.loadingFixture.samples);
       assert.ok(normal.length >= 30 && p95(normal) < 16, 'Larger fullscreen canvas keeps normal drawing within budget');
       console.log(`PASS fullscreen ${viewport.width}x${viewport.height} ${theme}: upper-half layout, full cloud, upward dissolve; p95=${p95(normal).toFixed(2)}ms`);
@@ -418,6 +503,87 @@ async function fullscreenChecks(browser) {
   }
 }
 
+async function clubChecks(browser) {
+  const {page, errors, external} = await createPage(browser, 390, {deviceScaleFactor: 3});
+  const catalog = Object.keys(clubKits);
+  for (let i = 0; i < catalog.length; i++) {
+    const seed = i === 0 ? '0' : i === 9 ? '0.999' : String((i + 0.5) / 10);
+    await page.goto(origin + '/?kits=' + seed);
+    await waitDraw(page, 'fixture-hero');
+    const colors = await readTeamColors(page);
+    assert.equal(colors.ids[0], catalog[i], 'Every catalog club can be selected on a new page load');
+    await checkPairIdentity(page, colors.ids);
+    assert.ok(await page.evaluate(() => typeof window.fixtureRestoreRandom === 'undefined' &&
+      new Set([Math.random(), Math.random(), Math.random()]).size > 1),
+    'Fixture restores native randomness immediately after the loader chooses kits');
+  }
+  console.log('PASS ten club choices: distinct primary families, shared hero/compact pair, native randomness restored');
+
+  for (const variant of [
+    {seed: '0.999', ids: ['liverpool', 'man-city']},
+    {seed: '0.85', ids: ['man-city', 'juventus']},
+    {seed: '0.75,0.7', ids: ['juventus', 'dortmund']}
+  ]) {
+    for (const theme of ['dark', 'light']) {
+      await page.goto(origin + '/?kits=' + variant.seed);
+      await page.evaluate(theme => localStorage.setItem('futmondo.color-theme', theme), theme);
+      await page.reload();
+      await waitDraw(page, 'fixture-hero');
+      const colors = await readTeamColors(page);
+      assert.deepEqual(colors.ids, variant.ids, 'A new document can choose another known club pair');
+      const phases = {};
+      for (const [name, at] of [['pitch', 700], ['rising', 4200], ['morph', 5400], ['flock', 7000], ['players', 11500]]) {
+        const elapsed = await page.evaluate(() => performance.now() - window.loadingFixture.firstDrawAt);
+        await page.waitForTimeout(Math.max(0, at - elapsed));
+        phases[name] = await captureGeometry(page);
+        if (name === 'rising') checkGoalFacing(await captureGeometry(page, 'fixture-compact'), colors);
+        if (['rising', 'flock'].includes(name))
+          await page.locator('#fixture-parent').screenshot({path: path.join(screenshotDir, variant.ids.join('-') + '-' + theme + '-' + name + '.png')});
+      }
+      checkTeams(phases, colors);
+      await checkPairIdentity(page, variant.ids);
+      if (theme === 'light') {
+        // Force a different choice only while remounting the decorative nodes;
+        // an accidental re-roll is deterministic without perturbing app widgets.
+        await page.evaluate(() => {
+          window.fixtureSavedRandom = Math.random;
+          Math.random = () => 0;
+          document.documentElement.dataset.fmTheme = 'dark';
+          const hero = document.getElementById('fixture-hero');
+          hero.replaceWith(hero.cloneNode(true));
+        });
+        await waitDraw(page, 'fixture-hero');
+        await checkPairIdentity(page, variant.ids);
+        await page.evaluate(() => { Math.random = window.fixtureSavedRandom; delete window.fixtureSavedRandom; });
+      }
+      console.log(`PASS ${variant.ids.join('/')} ${theme}: club accents, readable edges, short shoes and persistent page identity`);
+    }
+  }
+  // Both outlined bodies and black-accent shirts, at the maximum 320-particle
+  // hero budget plus the compact instance, exercise the highest draw-call cost.
+  await page.setViewportSize({width: 1440, height: 900});
+  await page.evaluate(() => localStorage.setItem('futmondo.color-theme', 'light'));
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setCPUThrottlingRate', {rate: 4});
+  await page.goto(origin + '/?kits=0.75,0.7');
+  await waitDraw(page, 'fixture-hero');
+  await page.waitForTimeout(4100);
+  const worstGeometry = await captureGeometry(page);
+  assert.equal(particleMarks(worstGeometry).length, 320, 'Worst-case outlined capture retains all 320 hero particles');
+  checkGoalFacing(worstGeometry, await readTeamColors(page));
+  await page.locator('#fixture-parent').screenshot({path: path.join(screenshotDir, 'juventus-dortmund-light-worstcase.png')});
+  await page.waitForTimeout(2200);
+  const samples = await page.evaluate(() => window.loadingFixture.stageSamples);
+  assert.ok(samples.length >= 40 && p95(samples) < 33.4, 'Outlined Juventus/Dortmund kits keep the 30 FPS frame budget at 4× CPU');
+  console.log(`PASS outlined-kit 4× CPU: stage p95=${p95(samples).toFixed(2)}ms, samples=${samples.length}`);
+  await cdp.send('Emulation.setCPUThrottlingRate', {rate: 1});
+  await cdp.detach();
+  await noOverflow(page);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(external, []);
+  await page.close();
+}
+
 async function visualChecks(browser) {
   for (const width of [1440, 390, 320]) {
     const {page, errors, external} = await createPage(browser, width);
@@ -433,6 +599,8 @@ async function visualChecks(browser) {
       await page.reload();
       await waitDraw(page, 'fixture-hero');
       const teamColors = await readTeamColors(page);
+      assert.deepEqual(teamColors.ids, ['real-madrid', 'barcelona'], 'The main matrix uses a deterministic Madrid/Barcelona pair');
+      await checkPairIdentity(page, teamColors.ids);
       const pictures = [], phases = {};
       for (const [name, at] of [['pitch', 700], ['tilted', 2400], ['rising', 4200], ['release', 4500], ['dissolve', 4800], ['morph', 5400], ['flock', 7000], ['radar', 9300], ['players', 11500], ['return', 14300]]) {
         const elapsed = await page.evaluate(() => performance.now() - window.loadingFixture.firstDrawAt);
@@ -454,8 +622,9 @@ async function visualChecks(browser) {
       const seam = await captureGeometry(page);
       assert.deepEqual(seam, phases.pitch, 'The loop returns to identical field and particle geometry, including mark orientation');
       assert.equal(await page.locator('#fixture-hero canvas').evaluate(canvas => canvas.toDataURL()), pictures[0], 'The complete canvas is identical across the flat loop seam');
+      await checkPairIdentity(page, teamColors.ids);
       await noOverflow(page);
-      console.log(`PASS ${width}px ${theme}: ten loop phases, upward head-first dissolve, 22 solid goal-facing foosball figures, opposed heads and broad feet, 11 green/11 gold players, persistent team tones, exact seam`);
+      console.log(`PASS ${width}px ${theme}: ten loop phases, upward head-first dissolve, 22 solid goal-facing foosball figures, opposed heads and short shoes, eleven players per club, persistent kit colors, exact seam`);
     }
     const responseMs = await page.evaluate(() => new Promise(resolve => {
       const start = performance.now();
@@ -525,6 +694,7 @@ async function visualChecks(browser) {
       });
       await waitDraw(page, 'fixture-hero');
     }
+    await checkPairIdentity(page, ['real-madrid', 'barcelona']);
     const countBefore = await draws(page, 'fixture-hero');
     await page.waitForTimeout(1000);
     const rate = await draws(page, 'fixture-hero') - countBefore;
@@ -556,6 +726,7 @@ async function visualChecks(browser) {
     console.log('PASS initial ' + fallback + ': static illustration, no animated draws');
   }
   await fullscreenChecks(browser);
+  await clubChecks(browser);
   const files = ['www/loading-visual.js', 'www/loading-visual.css', 'loading_visual.R'];
   const bytes = zlib.gzipSync(Buffer.concat(files.map(file => fs.readFileSync(file)))).length;
   assert.ok(bytes <= 20 * 1024, `New assets/helper gzip budget (${bytes} bytes)`);
@@ -626,6 +797,6 @@ async function appChecks(browser) {
 (async () => {
   const executablePath = process.env.FUTMONDO_TEST_CHROMIUM || '/tmp/futmondo-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell';
   const browser = await chromium.launch({headless: true, executablePath, args: ['--no-sandbox']});
-  try { await (fullApp ? appChecks(browser) : process.argv.includes("--fullscreen-only") ? fullscreenChecks(browser) : visualChecks(browser)); }
+  try { await (fullApp ? appChecks(browser) : process.argv.includes("--fullscreen-only") ? fullscreenChecks(browser) : process.argv.includes("--clubs-only") ? clubChecks(browser) : visualChecks(browser)); }
   finally { await browser.close(); }
 })().catch(error => { console.error(error.stack); process.exitCode = 1; });

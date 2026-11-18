@@ -10,6 +10,24 @@
   var root = document.documentElement;
   var palette;
   var pendingSync = false;
+  // Classic club color schemes; select once per page, never per frame or theme.
+  // Keep different primary-color families so both teams remain distinguishable.
+  var clubs = [
+    { id: 'real-madrid', family: 'white', base: ['#f7f8fc','#f7f8fc'] },
+    { id: 'barcelona', family: 'blue', base: ['#356ed1','#2456a6'], stripe: ['#cf3659','#b9234b'] },
+    { id: 'atletico', family: 'red', base: ['#e64a57','#b92338'], stripe: ['#f7f8fc','#f7f8fc'] },
+    { id: 'betis', family: 'green', base: ['#36b97b','#087846'], stripe: ['#f7f8fc','#f7f8fc'] },
+    { id: 'inter', family: 'blue', base: ['#4082df','#1759a8'], stripe: ['#111827','#111827'] },
+    { id: 'milan', family: 'red', base: ['#e74a4f','#ba2331'], stripe: ['#111827','#111827'] },
+    { id: 'dortmund', family: 'yellow', base: ['#f5d638','#f5d638'], stripe: ['#111827','#111827'], edge: '#806000' },
+    { id: 'juventus', family: 'white', base: ['#f7f8fc','#f7f8fc'], stripe: ['#111827','#111827'] },
+    { id: 'man-city', family: 'blue', base: ['#7dc9ef','#7dc9ef'], edge: '#376b83' },
+    { id: 'liverpool', family: 'red', base: ['#ee4c5b','#bb1f38'] }
+  ];
+  var firstClub = clubs[Math.floor(Math.random()*clubs.length)];
+  var opponents = clubs.filter(function (club) { return club.family !== firstClub.family; });
+  var selectedClubs = [firstClub,opponents[Math.floor(Math.random()*opponents.length)]];
+  var teamIds = selectedClubs.map(function (club) { return club.id; }).join(' ');
   var paths = [
     [[50,40],[370,40],[370,240],[50,240],[50,40]],
     [[210,40],[210,240]],
@@ -41,19 +59,23 @@
         team: team, facing: team ? -1 : 1, delay: (index % 4)*.12 });
     });
   }
-  // Molded table-football body: broad shirt, rigid stem and one kicking foot.
-  var figurine = [[-2,24],[-5.5,22],[-6,16],[-3.5,14],[-2.5,5],[-5,5],
-    [-5,0],[5,0],[5,5],[2.5,5],[3.5,14],[6,16],[5.5,22],[2,24]];
+  // Molded table-football body with a short shoe, not a projecting plinth.
+  var figurine = [[-2,24],[-5.5,22],[-6,16],[-3.5,14],[-2.5,3],[-3.2,3],
+    [-3.2,0],[3.2,0],[3.2,3],[2.5,3],[3.5,14],[6,16],[5.5,22],[2,24]];
   // Local X is forward toward the opponent's goal; shirt width lies across Y.
-  function frontDepth(width, z) { return z < 5 || (z === 5 && Math.abs(width) >= 4) ? 6 : z < 14 ? 2.2 : 3; }
+  function frontDepth(width, z) { return z < 3 || (z === 3 && Math.abs(width) >= 3) ? 3.2 : z < 14 ? 2.2 : 3; }
   var frontFace = figurine.map(function (v) { return [frontDepth(v[0],v[1]),v[0],v[1]]; });
-  var backFace = figurine.map(function (v) { return [-2.5,v[0],v[1]]; });
+  var backFace = figurine.map(function (v) { return [v[1] <= 3 ? -1.6 : -2.5,v[0],v[1]]; });
   var sideFace = frontFace.slice(7).concat(backFace.slice(7).reverse());
   var shirtTop = [[-2.5,-2,24],[3,-2,24],[3,2,24],[-2.5,2,24]];
-  var footTop = [[-2.5,-5,5],[6,-5,5],[6,5,5],[-2.5,5,5]];
-  // Sample the same head, shirt and broad foot for the silhouette-to-flock morph.
+  var footTop = [[-1.6,-3.2,3],[3.2,-3.2,3],[3.2,3.2,3],[-1.6,3.2,3]];
+  // A stripe on both shirt planes stays readable while players face the goals.
+  var frontStripe = [[3,-1.6,14],[3,1.6,14],[3,1.6,23],[3,-1.6,23]];
+  var backStripe = frontStripe.map(function (v) { return [-2.5,v[1],v[2]]; });
+  var sideStripe = [[-.5,6,16],[1.8,6,16],[1.8,5.5,22],[-.5,5.5,22]];
+  // Sample the same head, shirt and short shoe for the silhouette-to-flock morph.
   var silhouette = [[0,30],[-2.9,27],[0,24],[2.9,27],[-5.5,22],[5.5,22],
-    [-6,16],[6,16],[-3.5,14],[3.5,14],[-2.5,5],[2.5,5],[-5,5],[5,5],[-5,0],[5,0]];
+    [-6,16],[6,16],[-3.5,14],[3.5,14],[-2.5,3],[2.5,3],[-3.2,3],[3.2,3],[-3.2,0],[3.2,0]];
   function clamp(x) { return Math.max(0, Math.min(1, x)); }
   function ease(x) { x = clamp(x); return x * x * x * (x * (x * 6 - 15) + 10); }
   function mix(a, b, w) { return a + (b - a) * w; }
@@ -97,7 +119,18 @@
     var style = window.getComputedStyle(root);
     function token(name) { return style.getPropertyValue('--fm-' + name).trim(); }
     palette = { ink: token('text'), muted: token('muted'), accent: token('accent'), surface: token('surface') };
-    palette.teams = [palette.ink, token('warning')];
+    palette.light = root.getAttribute('data-fm-theme') === 'light';
+    var mode = palette.light ? 1 : 0;
+    palette.teams = selectedClubs.map(function (club) { return club.base[mode]; });
+    palette.stripes = selectedClubs.map(function (club) { return club.stripe ? club.stripe[mode] : null; });
+    palette.whiteEdge = palette.light ? '#657286' : '#a5afbf';
+    palette.edges = selectedClubs.map(function (club) {
+      return club.family === 'white' ? palette.whiteEdge : palette.light && club.edge || null;
+    });
+    palette.particleEdges = palette.stripes.map(function (color, team) {
+      return color === '#111827' ? palette.teams[team] :
+        color === '#f7f8fc' && palette.light ? palette.whiteEdge : null;
+    });
   }
   function makeParticles(count) {
     var result = [];
@@ -115,14 +148,15 @@
       var actor = i % actors.length;
       var samples = Math.floor((count-1-actor)/actors.length)+1;
       var slot = Math.floor(i/actors.length);
-      // Keep both broad-foot corners even in the compact eight-sample figures.
+      // Keep both shoe corners even in the compact eight-sample figures.
       var body = slot >= samples-2 ? silhouette[silhouette.length-2+slot-(samples-2)] :
         silhouette[Math.floor(slot/(samples-2)*(silhouette.length-2))];
-      var bodyX = body[1] >= 24 ? 0 : actors[actor].facing*frontDepth(body[0],body[1]);
+      var stripe = body[1] >= 16 && body[1] <= 22 && body[0] > 0;
+      var bodyX = body[1] >= 24 ? 0 : actors[actor].facing*(stripe ? 1 : frontDepth(body[0],body[1]));
       var bodyY = body[0];
       if (body[1] === 27 && body[0] > 0) { bodyX = actors[actor].facing*3.8; bodyY = 0; }
       result.push({ x: mix(segment.a[0], segment.b[0], f), y: mix(segment.a[1], segment.b[1], f),
-        actor: actor, bodyX: bodyX, bodyY: bodyY, bodyZ: body[1],
+        actor: actor, bodyX: bodyX, bodyY: bodyY, bodyZ: body[1], stripe: stripe,
         release: 4.5 + actors[actor].delay*.25 + (1-body[1]/30)*.36,
         angle: angle, u: u, radius: Math.sqrt(((i * .754877666) % 1)), ring: 32 + ring * 32,
         ringAngle: Math.floor(i / 3) / Math.ceil(count / 3) * tau, depth: (Math.sin(angle) + 1) * .5 });
@@ -178,7 +212,7 @@
   }
   // Clip cached volume faces in local height, so the dissolve follows Z even
   // when a shoulder spans Y. Intersections reuse camera slots, without arrays.
-  function playerFace(ctx, camera, actor, vertices, rise, cut) {
+  function playerFace(ctx, camera, actor, vertices, rise, cut, outline) {
     var started = false;
     ctx.beginPath();
     for (var i = 0; i < vertices.length; i++) {
@@ -195,7 +229,7 @@
         if (started) ctx.lineTo(camera.px,camera.py); else { ctx.moveTo(camera.px,camera.py); started = true; }
       }
     }
-    if (started) { ctx.closePath(); ctx.fill(); }
+    if (started) { ctx.closePath(); ctx.fill(); if (outline) ctx.stroke(); }
   }
   function risingPlayers(ctx, opacity, markScale, camera, lifts, t) {
     if (opacity <= .001) return;
@@ -207,19 +241,30 @@
       var footX = camera.px, footY = camera.py;
       ctx.fillStyle = color;
       ctx.globalAlpha = opacity*rise*.14;
-      ctx.beginPath(); ctx.ellipse(footX,footY,5*camera.k,2*camera.k,0,0,tau); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(footX,footY,4*camera.k,1.5*camera.k,0,0,tau); ctx.fill();
       var cut = 30*(1-clamp((t-4.5-actor.delay*.25)/.36));
       if (cut <= 0) continue;
       // Select the camera-facing X surface, then shade the visible +Y side.
       // This gives opposing teams actual depth rather than rotated billboards.
+      var front = (camera.eyeX-actor.x)*actor.facing >= 0;
+      var outline = palette.edges[actor.team];
+      ctx.strokeStyle = outline || color;
+      ctx.lineWidth = .55*markScale;
       ctx.globalAlpha = opacity*rise*.9;
-      playerFace(ctx,camera,actor,(camera.eyeX-actor.x)*actor.facing >= 0 ? frontFace : backFace,rise,cut);
+      playerFace(ctx,camera,actor,front ? frontFace : backFace,rise,cut,outline);
       ctx.globalAlpha = opacity*rise*.58;
-      playerFace(ctx,camera,actor,sideFace,rise,cut);
+      playerFace(ctx,camera,actor,sideFace,rise,cut,outline);
       ctx.globalAlpha = opacity*rise*.75;
-      playerFace(ctx,camera,actor,shirtTop,rise,cut);
+      playerFace(ctx,camera,actor,shirtTop,rise,cut,outline);
       ctx.globalAlpha = opacity*rise*.8;
-      playerFace(ctx,camera,actor,footTop,rise,cut);
+      playerFace(ctx,camera,actor,footTop,rise,cut,outline);
+      if (palette.stripes[actor.team]) {
+        ctx.fillStyle = palette.stripes[actor.team];
+        ctx.globalAlpha = opacity*rise*.95;
+        playerFace(ctx,camera,actor,front ? frontStripe : backStripe,rise,cut);
+        playerFace(ctx,camera,actor,sideStripe,rise,cut);
+        ctx.fillStyle = color;
+      }
       if (cut > 24) {
         var clipped = cut < 30;
         if (clipped) {
@@ -230,12 +275,13 @@
         ctx.globalAlpha = opacity*rise*.9;
         project(camera,actor.x,actor.y,27*rise);
         ctx.beginPath(); ctx.arc(camera.px,camera.py,2.9*camera.k*headScale*rise,0,tau); ctx.fill();
+        if (outline) ctx.stroke();
         // A small side-profile nose makes the two goal-facing directions clear.
         ctx.beginPath();
         project(camera,actor.x+actor.facing*2.1*headScale,actor.y,28*rise); ctx.moveTo(camera.px,camera.py);
         project(camera,actor.x+actor.facing*4*headScale,actor.y,27*rise); ctx.lineTo(camera.px,camera.py);
         project(camera,actor.x+actor.facing*2.1*headScale,actor.y,26*rise); ctx.lineTo(camera.px,camera.py);
-        ctx.closePath(); ctx.fill();
+        ctx.closePath(); ctx.fill(); if (outline) ctx.stroke();
         if (clipped) ctx.restore();
       }
     }
@@ -296,7 +342,10 @@
         ctx.beginPath(); ctx.arc(x,y,4+(1-pulse)*7,0,tau); ctx.stroke();
         ctx.globalAlpha = opacity * (.65+.35*pulse);
         ctx.beginPath(); ctx.arc(x,y,2.4+pulse*.65,0,tau);
-        if (team) { ctx.lineWidth = 1.4; ctx.stroke(); } else ctx.fill();
+        ctx.fill();
+        ctx.strokeStyle = palette.stripes[team] || palette.edges[team] || color;
+        ctx.lineWidth = palette.stripes[team] ? 1.2 : .8;
+        ctx.stroke();
       }
     }
   }
@@ -356,10 +405,18 @@
         y = pitchWeight*originY + flockWeight*flockY + radarWeight*(140+p.ring*radarFit*Math.sin(ringAngle));
       }
       // Keep each particle's color identity through the silhouette/flock morph.
-      ctx.fillStyle = palette.teams[actors[p.actor].team];
+      var team = actors[p.actor].team;
+      var stripe = p.stripe && palette.stripes[team];
+      ctx.fillStyle = stripe || palette.teams[team];
       ctx.globalAlpha = (mix(.7,.9,p.depth)*flockWeight + .8*pitchWeight + .22*radarWeight);
       var size = (.75 + flockWeight*(.3+p.depth*.35)) * instance.markScale;
       ctx.beginPath(); ctx.ellipse(x,y,size*(1+flockWeight*.35),size*.6,-.25+flockWeight*Math.sin(phi)*.3,0,tau); ctx.fill();
+      var edge = stripe ? palette.particleEdges[team] : palette.light ? palette.edges[team] : null;
+      if (edge) {
+        ctx.strokeStyle = edge;
+        ctx.lineWidth = .65*instance.markScale;
+        ctx.stroke();
+      }
     }
     players(ctx,ease((t-10)/.9)*(1-returnPitch),t);
     ctx.globalAlpha = 1;
@@ -456,6 +513,7 @@
   }) : null;
   function mount(node) {
     if (instances.has(node)) return;
+    node.setAttribute('data-fm-teams',teamIds);
     // DOM clones copy readiness attributes, but never the canvas bitmap.
     node.removeAttribute('data-fm-drawing');
     var canvas = node.querySelector('.fm-loading-canvas');

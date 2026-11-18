@@ -2049,3 +2049,13 @@ Production database exit criterion completed: migration `20261116213815_database
 
 See `docs/classification_module.md` and the dated review entry. No schema,
 dependency, login inventory or product-scope expansion is required.
+
+
+### Random club loading colors and shorter shoes — implemented locally, 2026-11-17
+
+- [x] Choose a contrasting pair from ten classic club palettes once per page load, including Real Madrid white and Barcelona blue/garnet. Launch/compact instances retain the pair through loops, themes and remounts.
+- [x] Apply base/stripe colors to goal-facing figures, the upward flock and radar dots; contrast edges preserve white, pale and black-accent visibility in both themes.
+- [x] Replace projecting feet with 3-unit-high, 6.4-wide shoes spanning -1.6 to +3.2, with matching dissolve origins and smaller shadows.
+- [x] Focused browser geometry, color, random-identity, mobile and performance checks pass, including a fully outlined pair at 4× CPU throttling; required offline lifecycle passes 13 checks plus eight tabs and deployment passes three checks. See `docs/progressive_loading.md` and `docs/data_review_results.md` for contracts, measurements and local-validation limits.
+
+This remains a decorative presentation refinement and adds no data/analysis capability or login feature-tier entry. Hosted rollout and physical-device appearance remain separate acceptance steps.

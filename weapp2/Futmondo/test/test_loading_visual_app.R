@@ -34,7 +34,22 @@ if ("--full-app" %in% commandArgs(trailingOnly = TRUE)) {
       tags$style(HTML(fm_theme_css())),
       includeCSS("www/loading-visual.css"),
       includeScript("www/theme-switch.js"),
+      # Seed only the loader's synchronous kit choice; preserve Shiny/widget RNG.
+      tags$script(HTML("(function () {
+        var nativeRandom = Math.random;
+        var choices = (new URLSearchParams(location.search).get('kits') || '0').split(',').map(function (value) {
+          value = Number(value);
+          return Number.isFinite(value) && value >= 0 && value < 1 ? value : 0;
+        });
+        var choiceIndex = 0;
+        Math.random = function () { return choices[Math.min(choiceIndex++, choices.length - 1)]; };
+        window.fixtureRestoreRandom = function () {
+          Math.random = nativeRandom;
+          delete window.fixtureRestoreRandom;
+        };
+      })();")),
       includeScript("www/loading-visual.js"),
+      tags$script(HTML("window.fixtureRestoreRandom();")),
       tags$style(HTML("body {background:var(--fm-bg);color:var(--fm-text);margin:0;} .fixture-wrap {max-width:680px;margin:0 auto;padding:16px;} .fixture-controls {display:flex;flex-wrap:wrap;gap:8px;margin:16px 0;} .fixture-controls button {color:var(--fm-text);background:var(--fm-surface);border:1px solid var(--fm-border);padding:8px;} .fixture-controls input {color:var(--fm-text);background:var(--fm-surface);max-width:100%;} .fixture-late {margin-top:24px;} .fixture-fullscreen.waiter-overlay {position:fixed;inset:0;display:flex;z-index:9999;background:var(--fm-bg);color:var(--fm-text);} .fixture-fullscreen > .waiter-overlay-content {margin:auto;}"))
     ),
     tags$script(HTML("document.addEventListener('DOMContentLoaded', function () {
