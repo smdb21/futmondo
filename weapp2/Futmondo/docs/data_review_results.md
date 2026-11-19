@@ -1,5 +1,11 @@
 # Futmondo data review and implementation results
 
+## Market offer button emphasis (2026-11-19)
+
+The shared purchase style gave **Make Market Offer** a 0 px border in both themes. A scoped stylesheet rule now applies a 2 px border, tinted fill and bold label to the player card’s opening action. Headless Chromium checked 320, 390 and 1440 px with both themes. The resting border contrast against the card was 9.1:1 in light and 15.0:1 in dark, and label contrast against the fill was 7.6:1 and 10.2:1 respectively. The 45 px control fit at every width, had a visible keyboard focus outline, and opened the offer editor with verification still required before submission. Narrow screenshots were inspected.
+
+The offline offer-opening suite passed 18 checks, and the offline lifecycle passed 13 checks and eight tabs. Performance review found a single matched control and an existing CSS color transition with zero added source requests, database reads, reactivity, scripts or assets. The fixture used synthetic market data and did not submit a live offer. Hosted rendering on a physical phone remains unverified.
+
 ## Player-card opening latency review (2026-11-19)
 
 Today’s market uses `players_table_Server()`. The Reactable click travels over the Shiny connection. The server captures the existing selected row and sends modal HTML, then enables the selected-player reactive in `session$onFlushed()`. The first shell contains the close control and output placeholders. The identity arrives through a subsequent output flush even though the clicked row already contains the name. Its server metric starts when the card context activates, so it omits the click, modal delivery and browser paint. The browser’s identity acknowledgement unlocks the chart separately. History also depends on resolved league, summary and lineup facts.

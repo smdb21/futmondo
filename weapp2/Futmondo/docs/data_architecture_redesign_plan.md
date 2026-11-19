@@ -1,5 +1,10 @@
 # Futmondo data architecture redesign plan
 
+## Market offer button emphasis (2026-11-19)
+
+- [x] Give the player card's **Make Market Offer** control a distinct border, tint and stronger label.
+- [x] Verify the control with the actual offer dialog in both themes at phone and desktop widths. See [data review](data_review_results.md#market-offer-button-emphasis-2026-11-19).
+
 ## Player-card opening latency review (2026-11-19)
 
 - [x] Trace Today’s market from its Reactable click to modal shell, player name and delayed match details. Record browser timings for phone and desktop layouts with both small and 524-player tables.

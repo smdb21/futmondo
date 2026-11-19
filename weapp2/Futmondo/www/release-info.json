@@ -24,6 +24,7 @@
     "round_settlement_runtime.R": "074180388b1f924196fda9e2314c2207047889c1a77286846754b0a9c6001d02",
     "Modules/Lineup_Module.R": "3f5c376f047fdf4317ef59a6ae2647f5361d15f538f80ffaf125468ac8da08bf",
     "lineup_runtime.R": "738f59d948ea06c1e3fd1169058e069ab419fb45c6fd24754747f4676f4726a7",
-    "clause_scheduler.R": "a3153522918e68b20e8adf6aeffc8e4a68b099e3498c58e0ab784241943fcdc2"
+    "clause_scheduler.R": "a3153522918e68b20e8adf6aeffc8e4a68b099e3498c58e0ab784241943fcdc2",
+    "www/custom_style.css": "394aaaba3c23484f146b5867ce78d2705be7e3622bc974068b1e39f699159e73"
   }
 }

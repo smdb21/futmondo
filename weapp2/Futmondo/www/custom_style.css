@@ -375,6 +375,17 @@ body, .content-wrapper, .right-side {
     box-shadow: none;
 }
 
+.btn.btn-buy-market[id$="-btn_bid_market"] {
+    background-color: var(--fm-highlight) !important;
+    border: 2px solid var(--fm-text) !important;
+    font-weight: 700 !important;
+    max-width: calc(100% - 10px);
+    white-space: normal;
+}
+.btn.btn-buy-market[id$="-btn_bid_market"]:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--fm-surface), var(--fm-text) 22%) !important;
+}
+
 .btn-buy-clause {
     background-color: var(--fm-surface) !important; /* Amber */
     color: var(--fm-text) !important;
