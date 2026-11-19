@@ -1980,7 +1980,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       ctx<-card_context();if(is.null(ctx))return(NULL)
       if(isTRUE(session$rootScope()$userData$league_context_enabled)){resolved<-card_states$resolved()$data;req(!is.null(resolved),resolved$competition_id!="unknown",resolved$season!="unknown")}
       summary<-card_states$summary()$data;lineup<-card_states$lineup()$data
-      ctx$season<-league_season_context(ctx$championship_id,summary$championship$season %||% summary$championship$seasonId)
+      ctx$season<-league_season_context(ctx$championship_id,summary$championship$season %||% summary$championship$seasonId,account_id=ctx$account_id)
       ctx$scoring_version<-normalize_league_rules(list(),lineup,ctx$championship_id)$scoring_version
       supplied_competition<-fm_scalar(summary$championship$competitionId %||% summary$championship$competition$id,"")
       if(nzchar(supplied_competition)&&ctx$competition_id!="unknown"&&!identical(supplied_competition,ctx$competition_id))stop("Player summary competition mismatch")
@@ -2052,6 +2052,14 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     card_states$lineup<-card_read("card_lineup","get_lineup_from_team",auth_args,context=team_card_context,active=availability_admitted)
     card_states$profile<-card_read("card_profile","get_player_full_profile",function(ctx)list(login=get_reactive_val(login_token),player_id=ctx$player_id))
     card_states$matches<-card_read("card_matches","get_player_matches",function(ctx)list(login=get_reactive_val(login_token),player_id=ctx$player_id),active=availability_admitted)
+    # The autonomous worker already publishes one calendar per league. Keep
+    # this display interest league-scoped and independent of player Refresh.
+    card_states$calendar<-card_read("card_fixture_calendar","get_finished_rounds",
+      function(ctx)list(login=get_reactive_val(login_token),championship_id=ctx$championship_id),
+      context=team_card_context,active=function() {
+        ctx <- team_card_context()
+        isTRUE(availability_mode()) && fm_context_known(ctx$competition_id) && fm_context_known(ctx$season)
+      },refresh=function()0L)
     context_ready<-function()!identical(card_states$summary()$status,"loading")&&!identical(card_states$lineup()$status,"loading")
     card_states$points<-card_read("card_points","read_card_round_history",function(ctx)list(context=ctx),context=history_context,active=context_ready)
     card_states$valuation<-card_read("card_valuation","read_card_price_history",function(ctx)list(context=ctx),context=history_context,active=context_ready)
@@ -2157,22 +2165,30 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       if(!isTRUE(card_chart_ready()))return(NULL)
       plotly::plotlyOutput(ns("player_trend_plot"),height="340px")
     })
+    card_round_details <- reactive({
+      history <- card_history()
+      ctx <- history$context %||% list()
+      evidence <- player_card_fixture_evidence(card_states$matches()$data, card_states$calendar()$data, ctx)
+      rounds <- build_player_recent_rounds(history$points, evidence$matches, ctx, limit=Inf)
+      list(rounds=rounds$rounds, unassociated=rounds$unassociated,
+        dates=player_trend_points_dates(history$points, rounds$rounds, evidence$dates))
+    })
     output$player_chart_info <- renderUI({
       sp<-selected_player();req(sp)
       if(!isTRUE(card_chart_ready()))return(fm_info("Loading chart…",pending=TRUE))
-      player_trend_information(card_history(),sp,normalize_player_matches(card_states$matches()$data))
+      player_trend_information(card_history(),sp)
     })
     # Publish only chart inputs: availability/status changes must not redraw the
     # widget. Keep the last curve while a refresh has no replacement data.
     observe({
       req(card_chart_ready())
       history<-card_history()
-      matches<-normalize_player_matches(card_states$matches()$data)
+      dates<-card_round_details()$dates
       previous<-isolate(chart_data())
       if(identical(history$status,"loading") && !nrow(history$points) &&
          !nrow(history$valuation) && !is.null(previous)) return()
       chart_data(list(history=list(points=history$points,valuation=history$valuation,
-        context=history$context,status=if(identical(history$status,"loading") && !nrow(history$points) && !nrow(history$valuation)) "loading" else "ready"),matches=matches))
+        context=history$context,status=if(identical(history$status,"loading") && !nrow(history$points) && !nrow(history$valuation)) "loading" else "ready"),dates=dates))
     })
     output$player_trend_plot <- plotly::renderPlotly({
       req(card_chart_ready())
@@ -2185,6 +2201,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       points <- history$points
       if (!is.data.frame(points) || !all(c("round_number","points") %in% names(points))) points <- data.frame()
       if (nrow(points)) {
+        points$date <- data$dates
+        points$calendar_date <- attr(data$dates, "round_calendar")
         points$round_number <- suppressWarnings(as.numeric(points$round_number));points$points <- suppressWarnings(as.numeric(points$points))
         points <- points[is.finite(points$round_number)&is.finite(points$points),,drop=FALSE]
         points <- points[order(points$round_number),,drop=FALSE]
@@ -2198,9 +2216,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       }
       if (!nrow(values) && !nrow(points)) return(empty_chart())
 
-      # Reuse the already requested match details to date rounds; never use
-      # observation/save timestamps as match dates or discard undated scores.
-      points_dates <- player_trend_points_dates(points,data$matches,history$context %||% list())
+      points_dates <- points$date
       dated_points <- nrow(points)>0L && all(!is.na(points_dates))
       separate_round_axis <- nrow(values)>0L && nrow(points)>0L && !dated_points
       chart <- plotly::plot_ly()
@@ -2210,7 +2226,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       if (nrow(points)) {
         points$plot_x <- if(dated_points)fm_plot_datetime(points_dates) else points$round_number
         points$label <- paste0("Round ",points$round_number,"<br>Points: ",points$points,
-          if(dated_points)paste0("<br>",fm_format_datetime(points_dates))else "",
+          if(dated_points)paste0("<br>",ifelse(points$calendar_date,"Round calendar: ",""),fm_format_datetime(points_dates))else "",
           if("score_status" %in% names(points))paste0("<br>",points$score_status)else "")
         # Postponed fixtures can put round numbers out of date order. Plotly
         # connects rows as supplied, so order the complete rows by the axis
@@ -2257,28 +2273,29 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     }
     output$recent_round_points <- renderUI({
       sp<-selected_player();req(sp);history<-card_history();match_state<-card_states$matches()
-      matches<-normalize_player_matches(match_state$data)
-      rounds<-build_player_recent_rounds(history$points,matches,history$context %||% list(),limit=50L,current_player_responses=TRUE)
+      rounds <- card_round_details()
+      rounds$rounds <- head(rounds$rounds, 50L)
+      rounds$unassociated <- head(rounds$unassociated, 50L)
+      notice <- player_round_history_notice(history, rounds, match_state)
       tags$details(class="player-recent-rounds",
         tags$summary(icon("futbol")," Recent rounds"),
         div(class="player-round-boxes",lapply(rounds$rounds,function(round){
           div(class="player-match-card player-round-box",
             div(class="player-round-heading",span(paste("Round",round$round_number)),
               strong(if(is.finite(round$points))paste0(round$points," pts")else "Points unavailable")),
-            if(nrow(round$fixtures))lapply(seq_len(nrow(round$fixtures)),function(i)render_match(round$fixtures[i,,drop=FALSE]))else
-              fm_info(if(identical(match_state$status,"loading"))"Loading match details…"else "Match association unavailable",error=!identical(match_state$status,"loading"),pending=identical(match_state$status,"loading")))
+            if(nrow(round$fixtures))lapply(seq_len(nrow(round$fixtures)),function(i)render_match(round$fixtures[i,,drop=FALSE])))
         })),
         if(!length(rounds$rounds))fm_info(if(identical(history$status,"loading"))"Loading round points…"else recent_round_points_empty_text(sp$points),error=!identical(history$status,"loading"),pending=identical(history$status,"loading")),
         if(is.null(card_states$summary()$data)&&!identical(card_states$summary()$status,"loading"))fm_info(
           if(isTRUE(availability_mode())&&is.null(card_states$summary()$error))"Player history has not been saved yet."else
           resource_failure_message(card_states$summary()$error),error=!is.null(card_states$summary()$error)),
+        if(length(notice))fm_info(paste(notice, collapse=" "),error=TRUE),
         if(nrow(rounds$unassociated))tagList(
-          fm_info("Match records · points association unavailable",error=TRUE),
+          tags$h5("Other matches"),
           div(class="player-round-boxes",lapply(seq_len(nrow(rounds$unassociated)),function(i){
             match<-rounds$unassociated[i,,drop=FALSE]
-            div(class="player-match-card player-round-box",span(class="player-match-round",paste("Round",match$round)),render_match(match))
+            div(class="player-match-card player-round-box",if(is.finite(match$round))span(class="player-match-round",paste("Round",match$round)),render_match(match))
           }))),
-        if(is.null(match_state$data)&&!identical(match_state$status,"loading"))fm_info(resource_failure_message(match_state$error),error=TRUE),
         if(length(rounds$rounds))fm_info(p("Points are reported by Futmondo. Final confirmation is not provided for some rounds."),source="",class="player-points-explanation"),
         if(length(history$errors))fm_info(paste(if(nrow(history$points)||nrow(history$valuation))
           "Showing saved history."else "Player history could not be read.",resource_failure_message(history$errors[[1L]])),error=TRUE)else
@@ -2442,19 +2459,48 @@ player_trend_axis_range <- function(values) {
   bounds + c(-padding, padding)
 }
 
-# Match association applies the same context checks as the recent-round cards.
-# For rounds with several fixtures, use the last actual fixture date.
-player_trend_points_dates <- function(points,matches,context) {
+# Use an associated player fixture first. Calendar dates identify the round
+# for chart alignment and carry separate hover provenance.
+player_trend_points_dates <- function(points, rounds, calendar_dates=data.frame()) {
   dates <- fm_time(points$date %||% rep(NA_character_,nrow(points)))
-  if (!nrow(points) || !anyNA(dates)) return(dates)
-  rounds <- build_player_recent_rounds(points,matches,context,limit=nrow(points),current_player_responses=TRUE)$rounds
-  for (round in rounds) {
+  from_calendar <- rep(FALSE, length(dates))
+  if (anyNA(dates)) for (round in rounds) {
     indices <- which(points$round_number==round$round_number & is.na(dates))
+    if (!length(indices)) next
     fixture_dates <- fm_time(round$fixtures$occurred_at %||% character())
     fixture_dates <- fixture_dates[!is.na(fixture_dates)]
-    if(length(indices) && length(fixture_dates))dates[indices] <- max(fixture_dates)
+    if (length(fixture_dates)) dates[indices] <- max(fixture_dates)
   }
+  if (nrow(calendar_dates) && anyNA(dates)) {
+    for (i in which(is.na(dates))) {
+      id <- fm_scalar(points$round_id[i], "")
+      candidates <- which(if (fm_context_known(id)) calendar_dates$round_id == id else
+        calendar_dates$round_number == points$round_number[i])
+      if (length(candidates) != 1L || !is.finite(calendar_dates$date[candidates])) next
+      dates[i] <- as.POSIXct(calendar_dates$date[candidates], origin="1970-01-01", tz="UTC")
+      from_calendar[i] <- TRUE
+    }
+  }
+  attr(dates, "round_calendar") <- from_calendar
   dates
+}
+
+player_round_history_notice <- function(history, rounds, match_state) {
+  if (identical(match_state$status, "loading")) return(character())
+  notice <- character()
+  missing <- sum(vapply(rounds$rounds, function(round) !nrow(round$fixtures), logical(1)))
+  unassociated <- nrow(rounds$unassociated)
+  if (missing || unassociated) {
+    notice <- c(notice,
+      if (missing == 1L) "One round has no verified player fixture." else
+        if (missing) sprintf("%d rounds have no verified player fixture.", missing),
+      if (unassociated == 1L) "One match record has no verified points link." else
+        if (unassociated) sprintf("%d match records have no verified points link.", unassociated))
+  }
+  if (!is.null(match_state$error)) notice <- c(notice, resource_failure_message(match_state$error))
+  if (nrow(history$valuation) && any(is.na(rounds$dates) & is.finite(history$points$points)))
+    notice <- c(notice,"The points chart uses a separate round axis because some dates are unavailable.")
+  notice
 }
 
 # Convert stored final per-round observations into the card chart series.
@@ -2542,7 +2588,7 @@ add_sign <- function(x) {
 # Preserve the selected player's score and shape; calculate only when absent.
 
 # Chart diagnostics use existing history/match state; expanding them never fetches.
-player_trend_information <- function(history, player, matches=data.frame()) {
+player_trend_information <- function(history, player) {
   if(identical(history$status,"loading"))return(fm_info("Loading player history…",pending=TRUE))
   points<-history$points;values<-history$valuation
   if(!is.data.frame(points)||!all(c("round_number","points")%in%names(points)))points<-data.frame()
@@ -2554,8 +2600,6 @@ player_trend_information <- function(history, player, matches=data.frame()) {
   notes<-attr(history$valuation,"valuation_note") %||% character()
   if(!nrow(values))notes<-c(notes,paste0("Valuation history unavailable. Current value: ",player_card_money(player$value)))
   if(!nrow(points))notes<-c(notes,recent_round_points_empty_text(player$points))
-  if(nrow(points)&&nrow(values)&&anyNA(player_trend_points_dates(points,matches,history$context %||% list())))
-    notes<-c(notes,"Match dates unavailable: round axis is not aligned with dates.")
   if(!length(notes))return(NULL)
   fm_info(lapply(notes,shiny::tags$p),error=TRUE,class="player-history-status")
 }

@@ -11,7 +11,8 @@ tree<-parse("Modules/Selected_Player_Module.R");plot_body<-find_output(tree,"pla
 empty<-function()list(valuation=data.frame(),points=data.frame(),status="empty",freshness="fresh")
 render_fixture<-function(history=empty(),total=12,value=1000000,matches=list()){
  env<-new.env(parent=globalenv());env$selected_player<-function()data.frame(id="p",points=total,value=value);env$card_history<-function()history;env$card_chart_ready<-function()TRUE
- env$chart_data<-function()list(history=history,matches=normalize_player_matches(matches))
+ grouped <- build_player_recent_rounds(history$points, normalize_player_matches(matches), history$context %||% list())
+ env$chart_data<-function()list(history=history,dates=player_trend_points_dates(history$points, grouped$rounds))
  plotly::plotly_build(eval(plot_body,env))$x
 }
 check("zero negative and large values have padded axes",{for(values in list(0,-2,c(-2,0,5),c(99e6,100e6))){bounds<-player_trend_axis_range(values);stopifnot(all(is.finite(bounds)),all(values>bounds[1]),all(values<bounds[2]))}})
@@ -22,9 +23,16 @@ check("recent panel preserves points with a single finality explanation",{
  env<-new.env(parent=globalenv());env$selected_player<-function()data.frame(id="p",points=5,value=100)
  env$card_history<-function()known
  env$card_states<-list(matches=function()resource_state(list(matches=list())),summary=function()resource_state(list(points=list())))
+ env$card_round_details<-function() {
+   rounds<-build_player_recent_rounds(known$points, data.frame(), list(), limit=Inf)
+   rounds$dates<-player_trend_points_dates(known$points, rounds$rounds)
+   rounds
+ }
  html<-as.character(eval(recent_body,env))
  stopifnot(grepl("-2 pts",html,fixed=TRUE),grepl("0 pts",html,fixed=TRUE),
    grepl("Points are reported by Futmondo.",html,fixed=TRUE),
+   lengths(regmatches(html, gregexpr("fm-info-error", html, fixed=TRUE)))==1L,
+   grepl("4 rounds have no verified player fixture.",html,fixed=TRUE),
    grepl('data-fm-info-source=""',html,fixed=TRUE),!grepl("About these points|LigaRadar|player-round-status",html))
 })
 check("unknown point finality is preserved in chart provenance",{
@@ -75,15 +83,49 @@ check("undated scores stay visible with an explicitly independent round axis",{
    chart$layout$xaxis2$overlaying=="x",!length(chart$layout$annotations),
    chart$layout$xaxis2$tickfont$color==chart$data[[2]]$line$color,
    chart$layout$xaxis2$title$font$color==chart$data[[2]]$line$color,
-   grepl("not aligned with dates",as.character(player_trend_information(combined,data.frame(points=5,value=100))),fixed=TRUE))
+   grepl("separate round axis", player_round_history_notice(combined,list(rounds=list(),unassociated=data.frame(),
+     dates=combined$points$date),list(status="ok")),fixed=TRUE))
 })
 check("existing scoped match dates align points without a new read",{
  history<-combined;history$context<-list(player_id="p",season="2026",competition_id="league")
  history$points$source<-"futmondo"
  matches<-data.frame(round=1:4,occurred_at=paste0("2026-10-0",1:4,"T12:00:00Z"),season="2026",competition_id="league")
- dates<-player_trend_points_dates(history$points,matches,history$context)
+ dates<-player_trend_points_dates(history$points,build_player_recent_rounds(history$points,matches,history$context)$rounds)
  stopifnot(identical(as.numeric(dates),as.numeric(fm_time(matches$occurred_at))))
- matches$season<-"2025";stopifnot(all(is.na(player_trend_points_dates(history$points,matches,history$context))))
+ matches$season<-"2025";stopifnot(all(is.na(player_trend_points_dates(history$points,
+   build_player_recent_rounds(history$points,matches,history$context)$rounds))))
+})
+check("calendar match identity repairs stale league metadata without accepting conflicting fixtures", {
+ ctx<-list(account_id="account",championship_id="championship",competition_id="domestic",season="2026-2027")
+ fixture<-function(id, round, time="2026-09-13T14:15:00Z") {
+   list(id=id,r=round,info=list(date=time),h=list(name="Home",id="h",score=2),a=list(name="Away",id="a",score=1))
+ }
+ native<-fixture("match-5",5)
+ absent_date<-fixture("match-6",6,"")
+ wrong_comp<-fixture("match-7",7);wrong_comp$competitionId<-"foreign"
+ wrong_season<-fixture("match-8",8);wrong_season$season<-"2025-2026"
+ duplicate<-fixture("ambiguous-match",10)
+ answer<-list(league=list(`_id`="domestic",season="2025-2026"),matches=list(
+   native,absent_date,wrong_comp,wrong_season,duplicate,fixture("outside",5)))
+ calendar<-lapply(5:11,function(i)list(`_id`=paste0("round-",i),
+   matches=list(fixture(if(i>=10)"ambiguous-match"else paste0("match-",i),i))))
+ schedule<-data.frame(round_id=paste0("round-",5:11),round_number=5:11,is_finished=c(rep(TRUE,6),FALSE))
+ attr(schedule,"fixture_calendar")<-list(status="ok",scope=ctx,observed_at=Sys.time()-300,valid_until=as.numeric(Sys.time())-60,matches=league_fixture_matches(calendar))
+ evidence<-player_card_fixture_evidence(answer,schedule,ctx)
+ repaired<-evidence$matches[evidence$matches$season==ctx$season,]
+ stopifnot(identical(repaired$match_id,c("match-6","match-5")),
+   all(repaired$occurred_at=="2026-09-13T14:15:00Z"))
+ scores<-data.frame(round_number=c(5,9,11),points=c(-2,0,3))
+ grouped<-build_player_recent_rounds(scores,evidence$matches,ctx)
+ dates<-player_trend_points_dates(scores,grouped$rounds,evidence$dates)
+ stopifnot(identical(grouped$rounds[[3]]$fixtures$match_id,"match-5"),
+   identical(attr(dates,"round_calendar"),c(FALSE,TRUE,FALSE)),
+   dates[1]==dates[2],is.na(dates[3]))
+ for (field in names(ctx)) {
+   foreign<-ctx;foreign[[field]]<-"wrong"
+   blocked<-player_card_fixture_evidence(answer,schedule,foreign)
+   stopifnot(!nrow(blocked$dates),identical(blocked$matches,normalize_player_matches(answer)))
+ }
 })
 check("stored undated final scores remain available",{rows<-data.frame(round=c(1,2,3),points=c(0,-2,5),score_status=c("final","final","provisional"));trace<-player_match_points_trace(rows);stopifnot(trace$has_points,identical(trace$points_df$points,c(0,-2)),all(is.na(trace$points_df$date)))})
 check("card exposes refresh and one combined chart",{html<-as.character(selected_player_UI("card"));stopifnot(grepl("refresh_history",html,fixed=TRUE),!grepl("Smart Bid|fis_panel|smart_bid_widget|player_chart_metric",html))})

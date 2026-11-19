@@ -3099,7 +3099,7 @@ normalize_player_full_profile <- function(answer) {
 }
 
 normalize_player_matches <- function(answer) {
-  empty <- data.frame(round=numeric(), occurred_at=character(), home=character(), away=character(), home_score=numeric(), away_score=numeric(), status=character(), match_id=character(), round_id=character(), season=character(), competition_id=character(), stringsAsFactors=FALSE)
+  empty <- data.frame(round=numeric(), occurred_at=character(), home=character(), away=character(), home_score=numeric(), away_score=numeric(), status=character(), match_id=character(), round_id=character(), season=character(), competition_id=character(), fixture_season=character(), stringsAsFactors=FALSE)
   matches <- if (is.list(answer)) answer$matches else NULL
   if (is.null(matches) || !length(matches)) return(empty)
   if (is.data.frame(matches)) matches <- split(matches, seq_len(nrow(matches)))
@@ -3113,7 +3113,8 @@ normalize_player_matches <- function(answer) {
        match_id=fm_scalar(match$id %||% match$`_id` %||% match$matchId, ""),
        round_id=fm_scalar(match$roundId, ""),
        season=fm_scalar(match$season %||% match$seasonId %||% answer$season %||% answer$seasonId %||% answer$league$season,"unknown"),
-       competition_id=fm_scalar(match$competitionId %||% answer$competitionId %||% answer$league$`_id` %||% answer$league$id,"unknown"),stringsAsFactors=FALSE)
+       competition_id=fm_scalar(match$competitionId %||% answer$competitionId %||% answer$league$`_id` %||% answer$league$id,"unknown"),
+       fixture_season=fm_scalar(match$season %||% match$seasonId %||% answer$season %||% answer$seasonId,"unknown"),stringsAsFactors=FALSE)
   })
   out <- Filter(Negate(is.null), out)
   if (!length(out)) return(empty)

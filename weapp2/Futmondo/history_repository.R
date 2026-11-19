@@ -212,6 +212,65 @@ assemble_player_card_history <- function(summary,lineup,stored,prices,context,pr
     freshness=if(any(vapply(list(summary,stored,prices),function(x)identical(attr(x,"fetch_status"),"stale"),logical(1))))"stale"else "fresh")
 }
 
+# Project the existing durable calendar into fixture identity and round-date
+# evidence. The player endpoint's enclosing league season can be obsolete.
+player_card_fixture_evidence <- function(answer, schedule, context) {
+  matches <- normalize_player_matches(answer)
+  result <- list(matches=matches, dates=data.frame())
+  calendar <- attr(schedule, "fixture_calendar")
+  if (!identical(calendar$status, "ok")) return(result)
+  stamp <- fm_time(calendar$observed_at)
+  if (length(stamp) != 1L || is.na(stamp) || stamp > Sys.time() ||
+      !is.finite(fm_number(calendar$valid_until))) return(result)
+  fields <- c("account_id", "championship_id", "competition_id", "season")
+  if (!all(vapply(fields, function(field) {
+    fm_context_known(context[[field]]) && identical(calendar$scope[[field]], context[[field]])
+  }, logical(1)))) return(result)
+  games <- calendar$matches$rows
+  coverage <- calendar$matches$rounds
+  if (!is.data.frame(games) || !all(c("match_id", "round_id", "kickoff") %in% names(games)) ||
+      !is.data.frame(coverage) || !all(c("round_id", "complete") %in% names(coverage)) ||
+      !is.data.frame(schedule) || !all(c("round_id", "round_number", "is_finished") %in% names(schedule))) return(result)
+
+  # A calendar ID must identify a unique fixture/round. Explicit fixture-level
+  # season, competition, and round-ID conflicts cannot be repaired by this join.
+  unique_ids <- function(ids) !is.na(ids) & nzchar(ids) & !duplicated(ids) & !duplicated(ids, fromLast=TRUE)
+  schedule <- schedule[unique_ids(schedule$round_id), , drop=FALSE]
+  valid_games <- games[unique_ids(games$match_id), , drop=FALSE]
+  game <- match(matches$match_id, valid_games$match_id)
+  round <- match(valid_games$round_id[game], schedule$round_id)
+  agrees <- function(actual, expected) is.na(actual) | !nzchar(actual) | actual == "unknown" | actual == expected
+  verified <- which(!is.na(round) & agrees(matches$round_id, schedule$round_id[round]) &
+    agrees(matches$competition_id, context$competition_id) & agrees(matches$fixture_season, context$season))
+  matches$season[verified] <- context$season
+  matches$competition_id[verified] <- context$competition_id
+  matches$round_id[verified] <- schedule$round_id[round[verified]]
+  official_number <- schedule$round_number[round[verified]]
+  numbered <- is.finite(official_number)
+  duplicate_numbers <- schedule$round_number[duplicated(schedule$round_number)]
+  official_number[official_number %in% duplicate_numbers] <- NA_real_
+  matches$round[verified[numbered]] <- official_number[numbered]
+  undated <- verified[is.na(fm_time(matches$occurred_at[verified]))]
+  matches$occurred_at[undated] <- valid_games$kickoff[game[undated]]
+  result$matches <- matches
+
+  # When a player has no associated fixture, use the last confirmed kickoff
+  # of a fully dated completed round for the chart. This says nothing about
+  # whether the player appeared in any of the fixtures.
+  completed <- schedule[schedule$is_finished %in% TRUE &
+    schedule$round_id %in% coverage$round_id[coverage$complete %in% TRUE], , drop=FALSE]
+  dates <- fm_time(games$kickoff)
+  by_round <- split(as.numeric(dates), games$round_id)
+  # Duplicate display numbers remain usable only by exact round ID.
+  completed$round_number[completed$round_number %in% duplicate_numbers] <- NA_real_
+  completed$date <- vapply(completed$round_id, function(id) {
+    times <- by_round[[id]]
+    if (length(times) && all(is.finite(times)) && max(times) <= as.numeric(stamp)) max(times) else NA_real_
+  }, numeric(1))
+  result$dates <- completed
+  result
+}
+
 # Fixture labels are joined only within verified competition/season context,
 # or by an exact source identity without contradictory context. A player-only
 # endpoint can move to another competition after a transfer.

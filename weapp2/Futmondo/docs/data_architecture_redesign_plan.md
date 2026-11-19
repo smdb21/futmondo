@@ -2284,3 +2284,15 @@ fingerprints matched at 2026-11-19 04:34:46 UTC. Automatic source rollout is
 verified; authenticated hosted acceptance remains distinct from the synthetic
 browser and saved-data replay checks. Documentation-only delivery tracking
 has no runtime/performance effect.
+
+
+## Player-card match history — 2026-11-19
+
+- Reconcile inconsistent player fixture league metadata using exact fixture IDs
+  from the existing scoped worker calendar. Preserve original observations,
+  fantasy scores and unresolved associations.
+- Use fully dated completed rounds for chart dates when player fixture dates
+  are missing and consolidate history gaps in the card information panel.
+- See [player-card contract](selected_player_module.md#player-fixture-and-chart-dates--2026-11-19)
+  and [verification](data_review_results.md#player-card-match-history--2026-11-19).
+  Authenticated hosted verification remains pending.

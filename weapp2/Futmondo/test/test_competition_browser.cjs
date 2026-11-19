@@ -65,7 +65,8 @@ const url=`http://127.0.0.1:${process.env.FUTMONDO_COMPETITION_TEST_PORT||'38862
    const rounds=await modal.locator('.player-round-box').allTextContents();
    await page.screenshot({path:`/tmp/futmondo-competition-european-${width}.png`,fullPage:true});
    const scored=rounds.filter(text=>text.includes(' pts'));
-   assert.match(await modal.locator('.player-recent-rounds').textContent(),/Match records · points association unavailable/);
+   const associationNotice=modal.locator('.fm-info-error').filter({hasText:'One match record has no verified points link'});
+   assert.equal(await associationNotice.count(),1);
    assert.equal(scored.length,1,JSON.stringify(rounds));assert.match(scored[0],/17 pts/);assert.doesNotMatch(scored[0],/Domestic Home|Domestic Away|0–0|2–1/);
    await modal.locator('.player-recent-rounds').evaluate(el=>el.open=true);
    await assertNoOverflow();await page.screenshot({path:`/tmp/futmondo-competition-european-${width}.png`,fullPage:true});

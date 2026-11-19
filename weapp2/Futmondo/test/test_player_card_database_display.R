@@ -191,3 +191,43 @@ shiny::testServer(selected_player_Server, args=list(selected_player=selected, lo
 })
 elapsed<-system.time(for(i in 1:1000)player_availability_observed(saved,'summary'))[['elapsed']]
 cat(sprintf('METRIC 1000 display-evidence validations %.3fs; no I/O, timers or additional cache\n',elapsed))
+
+
+# Replay the conflicting player league label through the same durable snapshot
+# codec and asynchronous adapter used by a real card.
+active <- list(championships=list(list(id='league',league='domestic',ps='fixture')),
+  leagues=list(list(`_id`='domestic',season='2026-2027')))
+publish_active_league_contexts(auth,active)
+scoped <- resource_context(auth,'league','mine','player')
+scoped_team <- scoped;scoped_team$player_id <- ''
+fixture <- function(id, round, date) list(id=id,r=round,info=list(date=date),
+  h=list(id='home',name='Home',score=2),a=list(id='away',name='Away',score=1))
+first <- fixture('game-1',1,'2026-09-01T14:00:00Z')
+second <- fixture('game-2',2,'2026-09-08T14:00:00Z')
+schedule <- data.frame(round_id=c('r1','r2'),round_number=1:2,is_finished=TRUE)
+attr(schedule,'fixture_calendar') <- list(status='ok',observed_at=now-300,valid_until=as.numeric(now)-60,
+  scope=as.list(scoped[c('account_id','championship_id','competition_id','season')]),
+  matches=league_fixture_matches(list(list(`_id`='r1',matches=list(first)),list(`_id`='r2',matches=list(second)))))
+snapshot('get_finished_rounds',list(championship_id='league'),schedule,scoped_team,complete='complete')
+snapshot('get_player_matches',list(player_id='player'),
+  list(league=list(`_id`='domestic',season='2025-2026'),matches=list(second)),scoped)
+scoped_summary <- summary()
+scoped_summary$prices <- list(list(date='2026-09-03T00:00:00Z',price=200))
+snapshot('get_player_summary',c(args,list(player_id='player')),scoped_summary,scoped)
+snapshot('get_lineup_from_team',args,list(pointSystem='fixture'),scoped_team)
+restore_all();selected(row)
+shiny::testServer(selected_player_Server,args=list(selected_player=selected,login_token=reactive(auth),
+  championship_id=reactive('league'),user_team_id=reactive('mine')),{
+  for (pass in 1:2) {
+    settle(session)
+    html <- output$recent_round_points$html
+    rounds <- card_round_details()
+    stopifnot(grepl('Home 2–1 Away',html,fixed=TRUE),grepl('-2 pts',html,fixed=TRUE),
+      grepl('0 pts',html,fixed=TRUE),grepl('One round has no verified player fixture',html,fixed=TRUE),
+      !grepl('separate round axis|no verified points link',html),
+      identical(as.numeric(rounds$dates),as.numeric(fm_time(c(first$info$date,second$info$date)))),
+      identical(attr(rounds$dates,'round_calendar'),c(TRUE,FALSE)),!length(source_reads))
+    session$setInputs(refresh_history=pass)
+  }
+  cat('PASS saved match IDs repair the league-season mismatch, match and calendar dates stay distinct, and Refresh reuses persisted data\n')
+})

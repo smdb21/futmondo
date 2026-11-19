@@ -5260,3 +5260,37 @@ Deployment verification: runtime fix `44ef1cb` was committed and pushed to
 matched both committed Lineup module/runtime SHA-256 values. Automatic source
 rollout is verified; authenticated post-deployment rendering on the user's
 phone remains separate. This verification note has no runtime/performance effect.
+
+
+## Player-card match history — 2026-11-19
+
+- The authenticated player-match capture reproduces the conflicting enclosing
+  season label and the matching summary's number-only history. A synthetic
+  calendar tests exact ID repair, missing kickoff recovery, duplicate and
+  mismatched IDs, wrong account/championship/competition/season, and an undated
+  score with incomplete schedule evidence.
+- `test_player_card_database_display.R` restores encoded worker snapshots
+  through the real card loader and asynchronous adapter. It verifies that the
+  fixture pairs with its negative score, a zero score stays visible, the two
+  dates have distinct provenance, and Refresh reuses persisted data. The
+  existing award-calendar test verifies database acknowledgement and reuse of
+  the underlying source snapshot without another bulk request.
+- Trend, profile, recent-round association, competition-context and chart
+  stability checks passed. The offline lifecycle passed 13 checks and 8 tabs.
+  A dedicated Chromium test of the actual card and disclosure registry using
+  those persisted synthetic fixtures passed at 360, 390 and 1440 px. Each
+  viewport showed the paired score and match, one history notice and no modal
+  overflow.
+- The supplemental full-app competition browser fixture timed out at its
+  market-table startup selector before opening a card. The legacy progressive
+  test expected five startup reads and failed the same assertion with the
+  pre-change player module. Authenticated hosted verification, including exact
+  match-ID overlap in the reported league's saved calendar, remains pending.
+- The display adds one league-scoped interest in the existing batched worker
+  snapshot read if the calendar is cold. Refresh and player switching reuse
+  that calendar. The shared reactive computes one association for recent
+  rounds and chart dates. Chart updates depend on visible point/date inputs,
+  and the mobile dialog renders one history diagnostic instead of a row per
+  gap. There are no additional source calls, database writes, worker jobs,
+  polling timers or dependencies. A local CPU check ran 100 warm projections
+  of 380 calendar fixtures and 12 scores in 2.185 seconds total.

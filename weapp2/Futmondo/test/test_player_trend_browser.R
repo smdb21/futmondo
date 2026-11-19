@@ -20,7 +20,7 @@ server<-function(input,output,session){
   env<-new.env(parent=globalenv())
   env$selected_player<-function()data.frame(id='fixture',points=5,value=99e6)
   env$card_history<-function()history;env$card_chart_ready<-function()TRUE
-  env$chart_data<-function()list(history=history,matches=normalize_player_matches(list()))
+  env$chart_data<-function()list(history=history,dates=player_trend_points_dates(history$points,list()))
   env$card_states<-list(matches=function()list(data=list()))
   eval(plot_body,env)
  })

@@ -1,5 +1,47 @@
 # Player card
 
+## Player fixture and chart dates — 2026-11-19
+
+The card reads player fixtures from the existing durable `get_player_matches`
+snapshot and uses the existing league-scoped `get_finished_rounds` snapshot
+to resolve questionable context. The [official web bundle](https://app.futmondo.com/main.dart.js)
+inspected on 2026-11-19 (SHA-256
+`08202076259d1678c7557478771d3aa38b5099f42044630569c704fdb7a7cd1c`)
+calls `POST /2/player/matches` with `query.playerId` in its standard
+authenticated envelope. The `axY`, `cxV`, `b8v`, `k4` and `Ij` functions
+read `answer.matches[]` (`id`, `r`, `st`, `h`, `a`, `info.date`) and the
+enclosing `answer.league` (`_id` or `id`, `season`). Club objects supply
+`name` and `score`. The same bundle's `a9p`/`cxZ` use
+`POST /1/player/summary` with championship, user-team and player IDs and
+read `answer.points[]` separately. The calendar's matching round and fixture
+fields are documented in [the lineup contract](lineup_module.md#source-and-payload).
+
+A saved match response reports `league.season = "2025-2026"` and has five
+fixtures dated August–September 2026. The matching player-summary capture
+contains numeric round labels and scores for rounds 1–5 without fixture IDs.
+The previous join rejected the fixture rows if their inherited season differed
+from the selected league's season, leaving their scores without fixture dates.
+`normalize_player_matches()` now retains fixture-level season evidence
+separately from the enclosing league label. `player_card_fixture_evidence()`
+can establish fixture scope, round identity and a missing kickoff through a unique
+match ID in the existing saved calendar for the same account, championship,
+source competition and season. Explicit fixture-level season, round-ID and
+competition conflicts still block repair. Timestamps alone supply no season
+identity. The stored source payload and historical rows are preserved.
+
+Recent rounds shows unmatched scores and match records along with one notice
+summarizing unresolved fixture/points links and any remaining date-axis
+fallback. The chart uses existing point timestamps or dates of associated
+fixtures first. An undated score can use the last confirmed kickoff of its
+fully dated, completed round, labeled **Round calendar** in the chart hover.
+A calendar date supplies no evidence of player participation. Unresolved
+dates keep the independent round-number axis. The existing autonomous worker
+and database snapshots supply both resources, with their original observation
+clocks and scope. The card adds one league-scoped saved-resource interest
+and shares the in-process projection across its chart and recent rounds.
+There is no new Futmondo request, acquisition job, table, migration or timer.
+
+
 ## Market offer button emphasis (2026-11-19)
 
 The player card's **Make Market Offer** action uses a 2 px border in the theme’s foreground color, a tinted fill and a bold label. The rule matches the namespaced card action; the caption can wrap within the card on narrow screens. Hover changes the tint and keyboard navigation uses the shared focus outline.
@@ -90,7 +132,7 @@ Zero and negative scores are valid. A known round does not need a timestamp to b
 
 Cumulative price-snapshot totals never become per-round scores. Price charts use actual observed values only; no synthetic trend or default historical value fills gaps.
 
-The history chart displays both series together: solid green valuation on the left EUR scale and solid orange round points on the right scale. The coloured axes identify the series without a legend. The horizontal axis uses 10px labels on the 1st and 15th of each month, rotated 90 degrees and formatted as day plus abbreviated month (for example, 01 Nov). Tick positions follow the displayed account-local calendar across both dated series, so month lengths, February and year boundaries do not shift them. Undated round-axis labels also use 10px text. Explicit title spacing and a larger bottom margin prevent the vertical labels from colliding with Date on narrow phone plots. Vertical date grid lines remain hidden; exact dates, timestamps and values remain in hover details. Each vertical scale keeps its own padded range. A shared date axis uses saved round dates or the existing context-checked match details (the last fixture date for a round with several matches). If any score remains undated, every score is preserved on a separate top round axis with an explicit notice that it is not aligned with valuation dates. Dated scores connect in chronological order, with round number as a stable tie-breaker for shared dates; postponed rounds therefore cannot draw backward across the date axis. Scores and hover provenance move together. Round axes also use sparse, whole-number labels. Points alone use round numbers when undated. Missing series retain their availability explanation.
+The history chart displays both series together: solid green valuation on the left EUR scale and solid orange round points on the right scale. The coloured axes identify the series without a legend. The horizontal axis uses 10px labels on the 1st and 15th of each month, rotated 90 degrees and formatted as day plus abbreviated month (for example, 01 Nov). Tick positions follow the displayed account-local calendar across both dated series, so month lengths, February and year boundaries do not shift them. Undated round-axis labels also use 10px text. Explicit title spacing and a larger bottom margin prevent the vertical labels from colliding with Date on narrow phone plots. Vertical date grid lines remain hidden; exact dates, timestamps and values remain in hover details. Each vertical scale keeps its own padded range. A shared date axis uses saved point dates, the last associated player fixture date, or a confirmed completed-round date from the synced calendar. If any score remains undated, every score is preserved on a separate top round axis with an explicit notice that it is not aligned with valuation dates. Dated scores connect in chronological order, with round number as a stable tie-breaker for shared dates; postponed rounds therefore cannot draw backward across the date axis. Scores and hover provenance move together. Round axes also use sparse, whole-number labels. Points alone use round numbers when undated. Missing series retain their availability explanation.
 
 This presentation reuses the card's shared history and already requested match resource. It adds no requests, database reads, polling or cache entries; match completion can redraw the chart once to align its dates. Focused verification: `Rscript test/test_player_trend_plot.R`.
 
