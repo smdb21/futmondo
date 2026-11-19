@@ -20,6 +20,31 @@ The CSS changes only text color. It adds no layout work, requests, database
 operations, cache changes, timers, reactive updates, or persistent browser
 state. The deployment manifest reflects the stylesheet checksum.
 
+## Player-card light-mode valuation green — 2026-11-18
+
+Changed the light-mode valuation line, left-axis ticks and title to `#15803D`.
+The existing browser theme adapter updates the explicitly marked player chart
+on initial render and palette changes; dark green becomes the original neon
+green in dark mode. Orange points and ordinary plot behavior are preserved.
+
+Verification: all 16 `test/test_player_trend_plot.R` groups pass. The existing
+`test/test_player_trend_browser.cjs` fixture passes at 320/390/1440px across four
+history modes and both themes, checking exact colors, axis matching, layout,
+source data and zoom preservation, and no browser errors. Both 390px screenshots
+were inspected. Browser heartbeat samples were 81/82/90 ms. The mandatory offline
+lifecycle passes 13 checks plus eight tabs with no external I/O.
+All three deployment-contract checks pass; both runtime checksums match the
+task-only Git index, which excludes unrelated working-tree changes.
+
+Performance review: one existing browser plot update now includes the valuation
+line color together with the layout; trace selection inspects at most the card's
+two series. No API/database calls, cache invalidation, persistence work, timers,
+server reactive dependencies, extra plot nodes or growing state are added.
+Existing durable history reuse is unchanged. No dependency or environment change;
+only affected runtime manifest checksums are updated. Documentation has no
+runtime cost. Checks are local and synthetic; hosted visual acceptance remains
+unverified.
+
 ## Player-card calendar labels — 2026-11-17
 
 The history chart now uses 10px horizontal labels (previously the inherited

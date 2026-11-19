@@ -4,7 +4,7 @@ The sidebar ends with one 40px theme icon button, below Admin when Admin is avai
 
 The application shares light and dark color tokens through `theme.R` and `www/custom_style.css`. Tables, plots, inputs, notifications, loading overlays, and manual-action controls use those tokens. `www/theme-switch.js` resolves the preference before the body paints. Reactable uses CSS variables; Plotly receives resolved colors on initial rendering and theme changes, preserving data and zoom. Keep sports pitch and position/metric badge colors meaningful in both themes.
 
-Theme changes run entirely in the browser: no API requests, database writes, server reactive invalidation, or data reload. Existing plots receive one layout update per effective palette change; no polling or DOM observer is needed.
+Theme changes run entirely in the browser: no API requests, database writes, server reactive invalidation, or data reload. Existing plots receive one update per effective palette change; no polling or DOM observer is needed.
 
 Maintain readable contrast, visible keyboard focus, touch-friendly actions, and responsive layouts at desktop and narrow mobile widths. Hidden or removed recommendation widgets must not dictate new layout behavior.
 
@@ -18,6 +18,10 @@ Plot axes can opt into a series color through their layout `color`.
 tick text colors. `fmApplyPlotTheme()` uses the declared axis color for tick
 labels and titles on later palette changes; uncolored axes retain the muted
 ticks and normal text titles. The player valuation/points chart declares its
-green/amber axis colors explicitly. Theme updates remain a single layout-only
-operation and preserve data and zoom. `test/test_player_trend_browser.cjs`
-checks both series-colored and ordinary axes under light/dark changes.
+green/orange axis colors explicitly. Its `meta.fm_player_valuation` flag opts
+into a dark-green valuation line and axis (`#15803D`) in light mode, retaining
+`#00ff88` in dark mode. The adapter finds the valuation trace and uses one
+`Plotly.update()` for that line and the layout; points-only and ordinary plots
+retain the existing layout-only update. Theme changes preserve source data and
+zoom. `test/test_player_trend_browser.cjs` checks both series-colored and ordinary
+axes under light/dark changes.

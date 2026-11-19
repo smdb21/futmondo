@@ -2223,6 +2223,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         horizontal_axis$tickmode <- "linear";horizontal_axis$dtick <- round_spacing
       }
       chart %>% fm_plot_layout(
+        meta=list(fm_player_valuation=TRUE),
         xaxis=horizontal_axis,
         xaxis2=if(separate_round_axis)list(title=list(text="Round",font=list(color="#F28C28")),color="#F28C28",overlaying="x",side="top",
           tickmode="linear",dtick=round_spacing,tickfont=list(size=10),tickangle=0,showgrid=FALSE)else list(visible=FALSE),

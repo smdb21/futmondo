@@ -14,6 +14,9 @@
     if (!window.Plotly || !plot.layout) return;
     var css = window.getComputedStyle(document.documentElement);
     function token(name) { return css.getPropertyValue('--fm-' + name).trim(); }
+    var valuationIndex = plot.layout.meta && plot.layout.meta.fm_player_valuation
+      ? (plot.data || []).findIndex(function (trace) { return trace.name === 'Valuation'; }) : -1;
+    var valuationColor = document.documentElement.getAttribute('data-fm-theme') === 'light' ? '#15803D' : '#00ff88';
     var layout = {
       paper_bgcolor: token('surface'), plot_bgcolor: token('surface'),
       'font.color': token('text'), 'legend.font.color': token('text'),
@@ -26,6 +29,10 @@
       layout[axis + '.gridcolor'] = token('border');
       layout[axis + '.zerolinecolor'] = token('border');
       var seriesColor = plot.layout[axis].color;
+      if (axis === 'yaxis' && valuationIndex !== -1) {
+        seriesColor = valuationColor;
+        layout[axis + '.color'] = seriesColor;
+      }
       layout[axis + '.tickfont.color'] = seriesColor || token('muted');
       layout[axis + '.title.font.color'] = seriesColor || token('text');
     });
@@ -34,7 +41,9 @@
       layout['annotations[' + index + '].bgcolor'] = token('surface');
       layout['annotations[' + index + '].bordercolor'] = token('border');
     });
-    window.Plotly.relayout(plot, layout);
+    if (valuationIndex !== -1) {
+      window.Plotly.update(plot, {'line.color': valuationColor}, layout, [valuationIndex]);
+    } else window.Plotly.relayout(plot, layout);
   };
 
   function apply() {

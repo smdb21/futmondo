@@ -86,6 +86,13 @@ The history chart displays both series together: solid green valuation on the le
 
 This presentation reuses the card's shared history and already requested match resource. It adds no requests, database reads, polling or cache entries; match completion can redraw the chart once to align its dates. Focused verification: `Rscript test/test_player_trend_plot.R`.
 
+In light mode, the valuation line and left-axis labels/title use dark green
+`#15803D` for contrast against white. Dark mode retains `#00ff88`; points remain
+orange. The chart's `meta.fm_player_valuation` flag lets the existing browser
+theme adapter update the valuation trace and its axis together on initial render
+and theme changes, preserving history, hover details and zoom. This is a palette
+adjustment without a new feature or data acquisition.
+
 The chart waits for the current identity's browser paint acknowledgement. A one-time `shiny:value` check could run before asynchronous identity HTML insertion, or acknowledge cached HTML from an earlier card generation, leaving **Loading chart…** indefinitely. The listener now observes only the identity output, waits two animation frames for each new player/generation, rejects replaced HTML, and disposes the previous observer on remount. Duplicate updates send no additional acknowledgements. This adds no API requests, database reads, cache entries, polling, or whole-page mutation observer. Existing database-backed history retrieval and reuse are unchanged. `node test/test_player_chart_paint.cjs` reproduces delayed insertion, context changes and reopening at desktop/mobile widths; progressive-loading and trend-plot checks cover the server gate, history reuse and score rendering. De Jong's live summary and hosted deployment still require verification.
 
 ## Interaction

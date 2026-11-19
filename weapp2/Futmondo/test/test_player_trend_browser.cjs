@@ -42,11 +42,13 @@ const {chromium}=require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp
      for(let i=1;i<labels.length;i++)assert.ok(labels[i-1].right+2<=labels[i].left,`${width}/${scenario}: dates overlap ${JSON.stringify(labels)}`);
      for(const trace of state.data){
       const axis=trace.name==='Valuation'?state.y:state.y2;
+      assert.equal(trace.color,trace.name==='Valuation'?(theme==='light'?'#15803D':'#00ff88'):'#F28C28');
       assert.equal(axis.color.toLowerCase(),trace.color.toLowerCase());assert.equal(axis.title.toLowerCase(),trace.color.toLowerCase());
       assert.equal(trace.count,trace.name==='Valuation'?124:4);
      }
-     for(const tick of state.ticks)assert.equal(tick.fill,tick.axis==='ytick'?'rgb(0, 255, 136)':'rgb(242, 140, 40)');
-     for(const title of state.titles)assert.equal(title.fill,title.axis==='ytitle'?'rgb(0, 255, 136)':'rgb(242, 140, 40)');
+     const valuationFill=theme==='light'?'rgb(21, 128, 61)':'rgb(0, 255, 136)';
+     for(const tick of state.ticks)assert.equal(tick.fill,tick.axis==='ytick'?valuationFill:'rgb(242, 140, 40)');
+     for(const title of state.titles)assert.equal(title.fill,title.axis==='ytitle'?valuationFill:'rgb(242, 140, 40)');
      if(scenario==='undated'){assert.equal(state.x2.color,'#F28C28');assert.equal(state.x2.title,'#F28C28');}
      const neutral=await page.locator('#neutral').evaluate(el=>({color:el._fullLayout.yaxis.tickfont.color,muted:getComputedStyle(document.documentElement).getPropertyValue('--fm-muted').trim()}));
      assert.equal(neutral.color.toLowerCase(),neutral.muted.toLowerCase());
@@ -57,10 +59,11 @@ const {chromium}=require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp
    await page.locator('#scenario').evaluate(el=>el.selectize.setValue('both'));
    await page.waitForFunction(()=>document.querySelector('#chart').data.length===2&&!document.querySelector('#chart')._fullLayout.xaxis2?.visible);
    await plot.evaluate(el=>Plotly.relayout(el,{'xaxis.range':['2026-11-15','2027-01-15'],'xaxis.autorange':false}));
-   const before=await plot.evaluate(el=>({data:JSON.stringify(el.data),range:el.layout.xaxis.range}));
+   const sourceAndZoom=()=>plot.evaluate(el=>({data:JSON.stringify(el.data.map(trace=>({...trace,line:{...trace.line,color:undefined}}))),range:el.layout.xaxis.range}));
+   const before=await sourceAndZoom();
    await page.evaluate(()=>{window.dispatchEvent(new StorageEvent('storage',{key:'futmondo.color-theme',newValue:'dark'}));});
    await page.waitForFunction(()=>document.querySelector('#chart').layout.paper_bgcolor==='#0B120D');
-   const after=await plot.evaluate(el=>({data:JSON.stringify(el.data),range:el.layout.xaxis.range}));
+   const after=await sourceAndZoom();
    assert.deepEqual(after,before,'theme update preserves source data and zoom');
    const begin=Date.now();await page.locator('#heartbeat').click();await page.waitForFunction(()=>document.querySelector('#heartbeat_value').textContent==='1');
    const heartbeat=Date.now()-begin;assert.ok(heartbeat<1500);

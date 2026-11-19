@@ -5,6 +5,15 @@
 - [x] Restore readable labels and amounts on Today’s market balance and team value cards.
 - [x] Verify locally in both themes and record the browser, lifecycle and performance checks in [data review](data_review_results.md).
 
+## Player-card light-mode valuation green — 2026-11-18
+
+- [x] Darken the valuation line and matching left axis to `#15803D` in light mode, retaining the dark-mode green and orange points.
+- [x] Verify the existing plot, responsive browser and offline lifecycle checks; record performance and limits in `data_review_results.md`.
+- [ ] Hosted visual acceptance after deployment.
+
+Contract: [player-card chart](selected_player_module.md). Palette adjustment only;
+no feature-tier expansion, acquisition, persistence or dependency change.
+
 ## Player-card calendar labels — 2026-11-17
 
 - [x] Reduce horizontal tick labels to 10px and replace automatic date spacing with the 1st and 15th of each displayed month, preserving the existing date/round distinction.
