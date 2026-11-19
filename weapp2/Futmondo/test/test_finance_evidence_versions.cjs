@@ -1,0 +1,22 @@
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const {PGlite}=require('/tmp/futmondo-review-tools/node_modules/@electric-sql/pglite');
+(async()=>{const db=new PGlite();try{
+ await db.exec('create role anon;create role authenticated;create role service_role bypassrls;');
+ await db.exec(fs.readFileSync('scripts/schema.sql','utf8'));
+ const q=async(s,a=[]) => (await db.query(s,a)).rows;
+ await db.exec('set role service_role');
+ const base={account_id:'a',championship_id:'l',competition_id:'c',season:'s',evidence_type:'team',source_id:'t',payload:{cash:-20,unknown:null}};
+ const write=async(day,payload=base.payload)=>q('select finance_history_write($1)',[{...base,payload,observed_at:`2026-01-0${day}T00:00:00Z`}]);
+ await write(1);let old=(await q('select * from rival_finance_evidence_versions'))[0];
+ await write(2);let next=(await q('select * from rival_finance_evidence_versions'))[0];
+ assert.equal(old.state_id,next.state_id);assert.notEqual(old.observed_at,next.observed_at);
+ await write(3,{cash:50,unknown:null});next=(await q('select * from rival_finance_evidence_versions'))[0];assert.notEqual(old.state_id,next.state_id);
+ await write(4);next=(await q('select * from rival_finance_evidence_versions'))[0];assert.equal(old.state_id,next.state_id);
+ const restored=await q(`select v.account_id,v.championship_id,v.competition_id,v.season,v.evidence_type,v.source_id,v.observed_at,s.payload from rival_finance_evidence_versions v join finance_history_states s using(state_id)`);
+ assert.deepEqual(restored,await q('select * from rival_finance_evidence_latest'));
+ assert.equal((await q('select count(*)::int n from rival_finance_evidence'))[0].n,4);
+ await q('select finance_history_write($1)',[{...base,account_id:'b',observed_at:'2026-01-01T00:00:00Z'}]);
+ assert.equal((await q("select * from rival_finance_evidence_versions where account_id='a'")).length,1);
+ await db.exec('set role anon');await assert.rejects(q('select * from rival_finance_evidence_versions'));await assert.rejects(q('select * from finance_history_states'));
+ console.log('PASS exact reconstruction, first/last times, A/B/A reuse, account scopes and private grants');
+}finally{await db.close();}})().catch(e=>{console.error(e);process.exit(1)});

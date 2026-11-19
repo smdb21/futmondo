@@ -309,3 +309,13 @@ failure counts/gaps. Match references to distinguish repeated requests from diff
 teams or parent jobs. No credentials, raw IDs or private response bodies are logged;
 references use the existing worker server key and change if it rotates. No new
 environment variable is required. See [rejection diagnostics](docs/futmondo_rejection_diagnostics.md).
+
+Full financial-evidence reads in Python now fetch current metadata and reuse
+immutable normalized payloads by account/state ID. Apply
+`20261119004554_finance_evidence_version_metadata.sql` before the image (already
+applied to production). The cache is capped at 16 MiB/4,096 payloads; DB metadata is
+checked on every read, and restart/eviction reloads persisted data. No new env
+variables or dependencies. Telemetry names `rival_finance_evidence_versions` and
+`finance_history_states` distinguish metadata from payload traffic. See
+[financial evidence egress](docs/finance_evidence_egress.md) for supported reads,
+verification and quota limits.

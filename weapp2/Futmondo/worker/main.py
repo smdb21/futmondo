@@ -91,7 +91,8 @@ worker_snapshots worker_checkpoints worker_health worker_schedule_policy
 rpc/worker_read rpc/worker_read_cached rpc/worker_checkpoint_ack rpc/worker_claim rpc/worker_guard rpc/worker_prepare_source
 rpc/worker_checkpoint rpc/worker_write_fact rpc/worker_publish rpc/worker_publish_child
 rpc/worker_enqueue_batch rpc/worker_maintenance rpc/worker_cleanup_batch rpc/worker_release
-rpc/clause_observe rpc/clause_cleanup rpc/clause_retire_context""".split())
+rpc/clause_observe rpc/clause_cleanup rpc/clause_retire_context rpc/clause_claim
+rival_finance_evidence_latest rival_finance_evidence_versions finance_history_states player_round_dataset""".split())
 
 
 def plain(node):
@@ -203,6 +204,8 @@ class Store:
         self.diagnostic_times = {}
         self.snapshot_cache = {}
         self.snapshot_cache_bytes = 0
+        self.evidence_payloads = {}
+        self.evidence_bytes = 0
         self.traffic = {}
         self.traffic_started = time.monotonic()
 
@@ -221,6 +224,64 @@ class Store:
                     method, endpoint, status, detail)
 
     async def request(self, method, path, **kwargs):
+        params = kwargs.get('params')
+        fields = {'account_id', 'championship_id', 'competition_id', 'season',
+                  'evidence_type', 'source_id', 'observed_at', 'payload'}
+        # Only the complete factual-row contract is optimized. Projections, complex
+        # filters and alternative headers keep their original request semantics.
+        if (method == 'GET' and path == 'rival_finance_evidence_latest' and set(kwargs) == {'params'}
+                and isinstance(params, dict) and isinstance(params.get('select'), str)
+                and set(params['select'].split(',')) == fields
+                and isinstance(params.get('account_id'), str) and params['account_id'].startswith('eq.')
+                and len(params['account_id']) > 3
+                and set(params) <= fields | {'select', 'limit', 'offset', 'order'}
+                and 'payload' not in params
+                and isinstance(params.get('order', ''), str)
+                and all(term.split('.')[0] in fields - {'payload'}
+                        for term in params.get('order', '').split(',') if term)):
+            return await self.read_evidence(params)
+        return await self.raw_request(method, path, **kwargs)
+
+    async def read_evidence(self, params):
+        account = params['account_id'][3:]
+        metadata = dict(params, select='account_id,championship_id,competition_id,season,evidence_type,source_id,observed_at,state_id')
+        rows = await self.raw_request('GET', 'rival_finance_evidence_versions', params=metadata)
+        required = {'account_id', 'championship_id', 'competition_id', 'season',
+                    'evidence_type', 'source_id', 'observed_at', 'state_id'}
+        if not isinstance(rows, list) or any(not isinstance(row, dict) or set(row) != required or row.get('account_id') != account
+                or type(row.get('state_id')) is not int or row['state_id'] <= 0 for row in rows):
+            raise WorkerFailure('database_evidence_shape')
+        # Capture references so eviction during another request cannot invalidate this read.
+        payloads = {row['state_id']: self.evidence_payloads[(account, row['state_id'])]
+                    for row in rows if (account, row['state_id']) in self.evidence_payloads}
+        missing = sorted({row['state_id'] for row in rows} - payloads.keys())
+        for offset in range(0, len(missing), 128):
+            ids = missing[offset:offset + 128]
+            values = await self.raw_request('GET', 'finance_history_states', params={
+                'state_id': 'in.(' + ','.join(map(str, ids)) + ')', 'select': 'state_id,payload', 'limit': len(ids)})
+            if (not isinstance(values, list) or len(values) != len(ids)
+                    or any(not isinstance(value, dict) or type(value.get('state_id')) is not int
+                           or not isinstance(value.get('payload'), dict) for value in values)
+                    or {value['state_id'] for value in values} != set(ids)):
+                raise WorkerFailure('database_evidence_incomplete')
+            for value in values:
+                encoded = canonical(value['payload']).encode()
+                payloads[value['state_id']] = encoded
+                key = (account, value['state_id'])
+                if key in self.evidence_payloads:
+                    self.evidence_bytes -= len(self.evidence_payloads.pop(key))
+                if len(encoded) <= 16 * 1024 * 1024:
+                    while self.evidence_payloads and (len(self.evidence_payloads) >= 4096 or
+                            self.evidence_bytes + len(encoded) > 16 * 1024 * 1024):
+                        self.evidence_bytes -= len(self.evidence_payloads.pop(next(iter(self.evidence_payloads))))
+                    self.evidence_payloads[key] = encoded
+                    self.evidence_bytes += len(encoded)
+        # Fresh identities, ordering and timestamps always come from this DB read.
+        # Reused payloads correspond to immutable normalized states, not hash guesses.
+        return [dict({key: value for key, value in row.items() if key != 'state_id'},
+                     payload=json.loads(payloads[row['state_id']])) for row in rows]
+
+    async def raw_request(self, method, path, **kwargs):
         headers = dict(self.headers, **kwargs.pop('headers', {}))
         try:
             response = await self.client.request(method, self.url + path, headers=headers, **kwargs)
