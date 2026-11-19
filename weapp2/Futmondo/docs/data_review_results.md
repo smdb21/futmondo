@@ -5218,3 +5218,10 @@ averaged 17 ms. All twenty observed public CDN crest URLs returned HTTP 200.
 Only the two changed runtime checksums/fingerprints are included; unrelated
 working changes remain excluded. No dependency/schema change or production
 data mutation was needed.
+
+Deployment verification: runtime fix `44ef1cb` was committed and pushed to
+`origin/2.0`. At 2026-11-19 04:34:46 UTC, the public
+`https://ligaradar.com/release-info.json?lineup-crests=44ef1cb-check2` marker
+matched both committed Lineup module/runtime SHA-256 values. Automatic source
+rollout is verified; authenticated post-deployment rendering on the user's
+phone remains separate. This verification note has no runtime/performance effect.

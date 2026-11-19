@@ -2257,3 +2257,9 @@ job or storage schema is added. Synthetic adapter/codec restart checks,
 320/390/1440px browser checks and the offline lifecycle cover local exit criteria;
 see `data_review_results.md`. Deployment fingerprint and authenticated hosted
 acceptance are separate checks.
+
+Crest recovery delivery: `44ef1cb` is pushed and both public Lineup runtime
+fingerprints matched at 2026-11-19 04:34:46 UTC. Automatic source rollout is
+verified; authenticated hosted acceptance remains distinct from the synthetic
+browser and saved-data replay checks. Documentation-only delivery tracking
+has no runtime/performance effect.
