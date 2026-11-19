@@ -50,7 +50,16 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
           current: node.getAttribute('aria-pressed') === 'true',
           icon: node.querySelector('.fm-lineup-choice-membership i')?.className,
           visibleText: node.innerText,
+          average: Number(node.querySelector('.fm-lineup-choice-average').textContent),
         })));
+        const priorities = { bench: 0, none: 1, starter: 2 };
+        for (let i = 1; i < rows.length; i++) {
+          const previous = rows[i - 1], current = rows[i];
+          assert.ok(priorities[previous.membership] <= priorities[current.membership], 'Bench precedes unused squad, then starters');
+          if (previous.membership === current.membership && Number.isFinite(previous.average) && Number.isFinite(current.average)) {
+            assert.ok(previous.average >= current.average, 'Average points descend within each membership group');
+          }
+        }
         for (const row of rows) {
           assert.equal(row.membership, expected[row.id] || 'none', `Current draft membership for ${row.id}`);
           if (row.membership === 'none') assert.equal(row.label, undefined);
@@ -69,6 +78,21 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       await pitch.locator('.fm-lineup-player').nth(10).waitFor();
       await page.locator('.fm-lineup-fixture').nth(9).waitFor();
       assert.equal(await page.locator('#lineup-save').count(), 1);
+      for (const id of ['p7', 'p17']) {
+        const status = page.locator(`.fm-lineup-player[data-player-id="${id}"] .fm-lineup-portrait > .fm-lineup-status`);
+        assert.equal(await status.getAttribute('title'), 'Doubtful');
+        assert.equal(await status.getAttribute('aria-label'), 'Doubtful');
+        const box = await status.boundingBox();
+        const portrait = await status.locator('..').boundingBox();
+        assert.ok(box.width >= 14 && box.x >= portrait.x && box.x + box.width <= portrait.x + portrait.width + 1, 'Status stays beside the portrait within the slot');
+      }
+      const coverageOption = page.locator('#lineup-require_bench_coverage');
+      assert.equal(await coverageOption.isChecked(), false);
+      assert.equal(await coverageOption.isEnabled(), true);
+      const coverageLabel = page.locator('label').filter({ has: coverageOption });
+      assert.match(await coverageLabel.locator('span[title]').getAttribute('title'), /defender, midfielder and forward.*Goalkeeper cover is not required/);
+      const coverageBox = await coverageLabel.boundingBox();
+      assert.ok(coverageBox.x >= 0 && coverageBox.x + coverageBox.width <= width, 'Coverage checkbox fits the viewport');
       assert.match(await page.locator('.fm-lineup-fixtures h3').innerText(), /Round 6/);
       assert.match(await page.locator('.fm-lineup-fixtures').innerText(), /Kickoff to be confirmed/);
       assert.match(await page.locator('.fm-lineup-fixtures').innerText(), /schedule may be incomplete/);
@@ -112,6 +136,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
         formation: document.querySelector('#lineup-formation').value,
         n: document.querySelector('#lineup-recent_n').value,
         unavailable: document.querySelector('#lineup-include_unavailable').checked,
+        coverage: document.querySelector('#lineup-require_bench_coverage').checked,
       }));
       const before = await settings();
       await page.locator('#lineup-clear').click();
@@ -183,6 +208,16 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       assert.equal(await page.locator('.fm-lineup-best-warning').count(), 0);
       assert.deepEqual((await page.locator('#fixture_counts').innerText()).split('/').map(Number), clearCounts);
 
+      const beforeCoverage = await selections();
+      await coverageOption.check();
+      await page.locator('.fm-lineup-best-warning').waitFor();
+      assert.match(await page.locator('.fm-lineup-best-warning').textContent(), /bench coverage setting/);
+      assert.deepEqual(await selections(), beforeCoverage);
+      await page.locator('#lineup-best').click();
+      await page.locator('.fm-lineup-best-warning').waitFor({ state: 'detached' });
+      for (const role of ['DEF', 'MID', 'FWD']) await page.locator('.fm-lineup-coverage').getByText(`${role} ✓`, { exact: true }).waitFor();
+      assert.deepEqual((await page.locator('#fixture_counts').innerText()).split('/').map(Number), clearCounts);
+
       // The picker shows live metrics and applies one row click immediately.
       const starter = pitch.locator('.fm-lineup-player').first();
       const pickerStarted = performance.now();
@@ -196,6 +231,10 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       const player17 = modal.locator('.fm-lineup-choice[data-player-id="p17"]');
       assert.match(await player17.locator('.fm-lineup-choice-name').innerText(), /^P\. 17\nFWD$/);
       assert.equal(await player17.getAttribute('title'), 'Player 17');
+      assert.equal(await player17.locator('.fm-lineup-status').getAttribute('title'), 'Doubtful');
+      const injuredStatus = modal.locator('.fm-lineup-choice[data-player-id="p24"] .fm-lineup-status');
+      assert.equal(await injuredStatus.getAttribute('title'), 'Injured');
+      assert.equal(await injuredStatus.getAttribute('aria-label'), 'Injured');
       assert.equal(await player17.locator('.fm-lineup-choice-total').innerText(), '117');
       assert.equal(await player17.locator('.fm-lineup-choice-average').innerText(), '17');
       assert.ok((await player17.locator('img').getAttribute('src')).endsWith('/fixture-club.png'));

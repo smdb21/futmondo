@@ -2,8 +2,8 @@
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages(source('global.R'))
 ctx<-resource_context(c(userid='account',token='private-fixture'),'league','team',season='S1',scoring_version='score',competition_id='competition')
-players<-list(list(id='p1',name='Player',points=0,role='portero',team=list(name='Real Madrid',logo='source-club.png')),
- list(id='p2',name='Other player',points=-5,role='defensa',team='Barcelona',logo='other-club.png'))
+players<-list(list(id='p1',name='Player',points=0,role='portero',status='injured2',team=list(name='Real Madrid',logo='source-club.png')),
+ list(id='p2',name='Other player',points=-5,role='defensa',status='doubt',team='Barcelona',logo='other-club.png'))
 parsed_roster<-lineup_roster_records(players)
 stopifnot(parsed_roster[[1]]$logo=='source-club.png',parsed_roster[[1]]$club=='Real Madrid',
  parsed_roster[[1]]$points==0,parsed_roster[[2]]$points== -5,parsed_roster[[2]]$logo=='other-club.png',parsed_roster[[2]]$club=='Barcelona')
@@ -21,8 +21,9 @@ settle<-function(p){failure<<-NULL;value<<-NULL;promises::then(p,function(x){val
 settle(lineup_snapshot_store(ctx,'r7'))
 stopifnot(is.null(failure),is.character(value$official$starters),length(value$official$starters)==11L,
  !length(writes),grepl('competition_id=eq.competition',requests[[1]],fixed=TRUE),grepl('season=eq.S1',requests[[1]],fixed=TRUE),grepl('scoring_version=eq.score',requests[[1]],fixed=TRUE))
-stopifnot(lineup_roster_frame(value)$logo[1]=='source-club.png',lineup_roster_frame(value)$club[1]=='Real Madrid')
-cat('PASS source crests survive normalized roster parsing and persisted JSON hydration\n')
+stopifnot(lineup_roster_frame(value)$logo[1]=='source-club.png',lineup_roster_frame(value)$club[1]=='Real Madrid',
+ identical(lineup_roster_frame(value)$status,c('injured2','doubt')))
+cat('PASS source crests and player statuses survive normalized roster parsing and persisted JSON hydration\n')
 cat('PASS source arrays normalize on hydration, UTC representations compare equally, known context filters and reads do not write\n')
 row$account_id<-'other';settle(lineup_snapshot_store(ctx,'r7'));stopifnot(!is.null(failure),is.null(value));row$account_id<-'account'
 row$scoring_version<-'other';settle(lineup_snapshot_store(ctx,'r7'));stopifnot(!is.null(failure));row$scoring_version<-'score'
@@ -32,7 +33,7 @@ stopifnot(isTRUE(value),length(writes)==1L,!grepl('private-fixture|private-datab
  grepl('"complete":true',writes[[1]]$body,fixed=TRUE))
 stored<-jsonlite::fromJSON(writes[[1]]$body,simplifyVector=FALSE)
 stopifnot(stored$payload$roster[[1]]$logo=='source-club.png',stored$payload$roster[[1]]$points==0,
- stored$payload$roster[[2]]$points== -5)
+ stored$payload$roster[[2]]$points== -5,stored$payload$roster[[1]]$status=='injured2',stored$payload$roster[[2]]$status=='doubt')
 legacy<-snapshot;legacy$roster<-lapply(legacy$roster,function(player){player$logo<-NULL;player$points<-NULL;player})
 stopifnot(all(lineup_roster_frame(legacy)$logo==''),nrow(lineup_roster_frame(NULL))==0L,all(is.na(lineup_roster_frame(legacy)$points)),
  !lineup_snapshot_fresh(legacy,now=fm_time(legacy$observed_at)))

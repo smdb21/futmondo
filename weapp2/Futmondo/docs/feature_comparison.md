@@ -63,7 +63,7 @@ The differences below are **specific implemented additions beyond the workflows 
 
 | Login ID / addition | Official baseline | Specific LigaRadar behavior | Local implementation evidence |
 | --- | --- | --- | --- |
-| `lineup_optimizer` — Best XI + bench optimization | Suggested lineup and aggregate lineup average already exist; the automatic coach performs post-round substitutions. | An explicit click maximizes observed average totals over a selected 1–20 completed-round window across permitted formations, then chooses coverage-aware substitutes. Applies injury policy and verified departures by next kickoff. It is a LigaRadar calculation independent of opening the official suggested-lineup control, which the owner does not see in their league. Permitted formation entitlements, multiposition, player eligibility and official save preflights still apply. A complete eligible history/check is required; the user reviews and saves the draft. | `Modules/Lineup_Module.R`, `lineup_runtime.R`; [lineup](lineup_module.md). |
+| `lineup_optimizer` — Best XI + bench optimization | Suggested lineup and aggregate lineup average already exist; the automatic coach performs post-round substitutions. | An explicit click maximizes observed average totals over a selected 1–20 completed-round window across permitted formations, then chooses coverage-aware substitutes; an optional full outfield coverage requirement can also constrain the XI and formation. Applies injury policy and verified departures by next kickoff. It is a LigaRadar calculation independent of opening the official suggested-lineup control, which the owner does not see in their league. Permitted formation entitlements, multiposition, player eligibility and official save preflights still apply. A complete eligible history/check is required; the user reviews and saves the draft. | `Modules/Lineup_Module.R`, `lineup_runtime.R`; [lineup](lineup_module.md). |
 | `recent_average` — Player rankings by last-N average | Player averages and a top-five total-points ranking already exist. | Choose 1–20 recent rounds and numerically sort market, squad and all-player tables by that window's average. Table windows and lineup completed-round windows have distinct documented finality contracts. Unknown scores remain unknown; source zero and negative scores count. | `Modules/Players_Table_Module.R`, `factual_helpers.R`; [player tables](players_table_module.md), [score reuse](round_points_matrix.md). |
 | `price_efficiency` — Points per million | Official market/clause prices and player points. | Sort the same recent average divided by market value in Today or clause price in Players, expressed as points per €1M. Missing/nonpositive prices do not produce ratios. | `Modules/Players_Table_Module.R`; [player tables](players_table_module.md#points-to-price-ratios). |
 | `rival_cash` — Reconstructed rival balances | Own financial movements and other teams' squad values. | Reconcile an estimated rival cash balance and running history from opening funds, transfers, configured rewards and available historical eligibility. Estimates, gaps and discrepancies remain labelled. | `Modules/Rivals_Module.R`; [cash accounting](rival_cash_accounting.md), [rivals](rivals_module.md). |
@@ -213,3 +213,37 @@ and no exclusivity claim is made. See [presentation contract](ui_information_dis
 ## Startup database availability — reviewed 2026-11-17
 
 Rechecked the [official public app entry point](https://app.futmondo.com/) and [official app guide](https://magazine.futmondo.com/novedades-en-la-nueva-app-de-futmondo/) (published 2021-12-23). These public sources do not establish the official app's internal database checks or outage/login behavior; no authenticated outage simulation was performed against Futmondo. LigaRadar now checks its own database before password/remembered login and shows a blocking error with a retry action when unavailable. This is reliability infrastructure for its existing database-first browsing, not a new analytical or football capability, so no login-tier item or exclusivity claim is added. See [implementation](login_module.md#startup-database-check--2026-11-17) and [verification limits](data_review_results.md#startup-database-admission-check--2026-11-17).
+
+
+## Lineup bench constraint, picker priority and status icons — reviewed 2026-11-18
+
+Rechecked the [official app](https://app.futmondo.com/) and its
+[public client](https://app.futmondo.com/main.dart.js), SHA-256
+`08202076259d1678c7557478771d3aa38b5099f42044630569c704fdb7a7cd1c`,
+together with the [official app feature guide](https://magazine.futmondo.com/novedades-en-la-nueva-app-de-futmondo/),
+[automatic-coach guide](https://help.futmondo.com/article/159-entrenador-automatico)
+and [official 5.0.5 release notes](https://magazine.futmondo.com/nueva-version-de-la-app-en-futmondo/).
+The guides document suggested lineups, player selection, ordered substitutes,
+position-compatible coaching and injury/doubt/suspension information. Current
+public client code renders observed player status images and parses home/away
+club logos. These are shared capabilities, with no exclusivity claim.
+
+LigaRadar adds an unchecked-by-default requirement that the exact historical
+average optimizer leave three distinct substitutes covering DEF, MID and FWD.
+It can change the XI/formation, excludes goalkeeper cover and retains the draft
+with an explanation when infeasible. The existing Advanced `lineup_optimizer`
+login entry and comparison row now name this implemented option. No separate
+tier or access restriction is introduced.
+
+The picker now presents bench players, unused squad and starters in that order,
+retaining average ordering within groups. The pitch, bench and picker share
+observed injury/doubt/suspension icons with accessible labels and tooltips.
+These are refinements of existing lineup editing and factual player information,
+not additional exclusive login capabilities. The requested real-match crests
+already existed and were reverified through stored fixtures and browser checks.
+
+The public sources do not establish an equivalent mandatory coverage optimizer
+or the current signed-in picker ordering. No authenticated current official UI
+or hosted LigaRadar acceptance was performed. Missing documentation is not proof
+of official feature absence. See [lineup contract](lineup_module.md) and
+[executed checks](data_review_results.md).

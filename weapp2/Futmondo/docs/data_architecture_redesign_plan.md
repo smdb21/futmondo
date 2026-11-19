@@ -2161,3 +2161,19 @@ Expanded source rejection diagnostics from two named codes to bounded machine co
 ## Financial evidence payload reuse — 2026-11-18 (Pacific)
 
 Implemented current metadata reads plus account/state-scoped immutable payload reuse in Python; see [contract and measurements](finance_evidence_egress.md). Existing R helper cache was process-local and full financial-evidence reads bypassed the earlier snapshot cache. Live 581-row sample: 7,369,223 bytes full JSON versus 187,434 metadata bytes; metadata query 97.284 ms with no disk reads. New service-only view applied as 20261119004554, privileges verified; no evidence/timestamps/history changed. Six evidence Python tests and SQL reconstruction/private-access fixture pass, along with six egress tests, ten diagnostic checks, 40 worker and 13 clause-worker checks, and offline lifecycle (13 checks/eight tabs). Performance: one metadata GET for warm pages, bounded 128-ID fetches for missing payloads, 16 MiB/4,096-entry cache; no new source requests/timers/UI changes. Cold reads can use more DB requests; warm reads avoid large unchanged payload transfers. Monthly quota compliance and steady-state production bytes remain to be measured after deployment.
+
+
+## Lineup bench constraint, picker priority and player status — 2026-11-18
+
+Status: **implemented and verified locally; hosted acceptance pending**.
+
+- [x] Add an unchecked-by-default bench coverage option with a tooltip, exact feasible-XI optimization, truthful infeasibility and unchanged manual-save safeguards.
+- [x] Order picker candidates by current bench, unused squad and starters, retaining average order within each group and reacting to unsaved edits.
+- [x] Show observed injury/doubt/suspension icons beside pitch/bench portraits and picker names, reusing persisted roster statuses.
+- [x] Recheck the already implemented home/away match crests, source contract and durable fixture reuse without adding browsing acquisition.
+- [x] Update the official-feature comparison and existing Advanced lineup login entry.
+- [x] Verify status icons, checkbox, picker ordering and existing match crests at 320/390/1440px; record focused offline tests, full lifecycle and performance limits.
+- [ ] Hosted visual acceptance after deployment and normal factual sync.
+
+Contract: [lineup module](lineup_module.md). Verification: [data review](data_review_results.md).
+No schema migration, dependency, environment variable, automated transaction or new worker job.

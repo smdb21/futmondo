@@ -106,7 +106,8 @@ lineup_average_scores <- function(roster,history,rounds,n=5L) {
 }
 # One player per pass, vectorized over a bounded positional count lattice.
 # Predecessors reconstruct exact distinct-player assignments (no greedy picks).
-lineup_optimize <- function(roster,scores,allowed,current=NULL,include_unavailable=FALSE,bench_enabled=TRUE,multiposition=TRUE,excluded_ids=character()) {
+lineup_optimize <- function(roster,scores,allowed,current=NULL,include_unavailable=FALSE,bench_enabled=TRUE,multiposition=TRUE,excluded_ids=character(),require_bench_coverage=FALSE) {
+  if(isTRUE(require_bench_coverage)&&!isTRUE(bench_enabled))return(NULL)
   allowed<-intersect(lineup_formations(),as.character(allowed));if(!length(allowed))return(NULL)
   roster<-roster[order(as.character(roster$id)),,drop=FALSE]
   values<-as.numeric(scores$average[match(as.character(roster$id),as.character(scores$id))])
@@ -114,8 +115,15 @@ lineup_optimize <- function(roster,scores,allowed,current=NULL,include_unavailab
   if(!include_unavailable)keep<-keep&!analytics_known_unavailable(roster)
   roster<-roster[keep,,drop=FALSE];values<-values[keep];positions<-lineup_positions(roster,multiposition)
   counts<-t(vapply(allowed,function(x)c(1L,as.integer(strsplit(x,'-',fixed=TRUE)[[1]])),integer(4)))
-  maxima<-apply(counts,2,max);dims<-maxima+1L;stride<-c(1L,cumprod(dims)[1:3]);size<-prod(dims)
-  lattice<-as.matrix(expand.grid(lapply(maxima,function(x)0:x)));valid<-rowSums(lattice)<=11L
+  maxima<-apply(counts,2,max);dims<-maxima+1L;stride<-c(1L,cumprod(dims)[1:3]);base_size<-prod(dims)
+  masks<-if(isTRUE(require_bench_coverage))0:7 else 0L;size<-base_size*length(masks)
+  lattice<-as.matrix(expand.grid(lapply(maxima,function(x)0:x)))
+  lattice<-lattice[rep(seq_len(base_size),length(masks)),,drop=FALSE];slots<-rowSums(lattice)
+  starter_from<-lapply(seq_len(4L),function(role)which(slots<11L&lattice[,role]<maxima[role]))
+  # Each coverage bit reserves a distinct remaining player for DEF/MID/FWD.
+  # A pass can place this player in the XI or reserve them, never both.
+  reserve_from<-if(isTRUE(require_bench_coverage))lapply(c(1L,2L,4L),function(bit)
+    which(slots<=11L&bitwAnd(rep(masks,each=base_size),bit)==0L))else list()
   # Equal observed totals favor dual MID/FWD players in midfield; no bonus
   # points are invented. Track this in every state before retention ties.
   midfield_eligible<-vapply(positions,function(p)all(c('MID','FWD')%in%p),logical(1))
@@ -125,7 +133,7 @@ lineup_optimize <- function(roster,scores,allowed,current=NULL,include_unavailab
   for(i in seq_len(nrow(roster))){
     old<-best;old_midfield<-midfield;old_kept<-retained;next_best<-best;next_midfield<-midfield;next_kept<-retained;prev[i,]<-seq_len(size)
     for(role in which(role_names%in%positions[[i]])){
-      from<-which(is.finite(old)&valid&lattice[,role]<maxima[role]&rowSums(lattice)<11L);if(!length(from))next
+      from<-starter_from[[role]];from<-from[is.finite(old[from])];if(!length(from))next
       to<-from+stride[role];candidate<-old[from]+values[i];kept<-old_kept[from]+as.integer(roster$id[i]%in%current_ids)
       mids<-old_midfield[from]+as.integer(role_names[role]=='MID'&&midfield_eligible[i])
       better<-candidate>next_best[to]+1e-9|(abs(candidate-next_best[to])<=1e-9&
@@ -133,9 +141,19 @@ lineup_optimize <- function(roster,scores,allowed,current=NULL,include_unavailab
       hit<-which(better);if(!length(hit))next
       dest<-to[hit];next_best[dest]<-candidate[hit];next_midfield[dest]<-mids[hit];next_kept[dest]<-kept[hit];prev[i,dest]<-from[hit];chosen[i,dest]<-role
     }
+    if(isTRUE(require_bench_coverage))for(role in which(c('DEF','MID','FWD')%in%positions[[i]])){
+      from<-reserve_from[[role]];from<-from[is.finite(old[from])];if(!length(from))next
+      to<-from+base_size*bitwShiftL(1L,role-1L)
+      candidate<-old[from];mids<-old_midfield[from];kept<-old_kept[from]
+      better<-candidate>next_best[to]+1e-9|(abs(candidate-next_best[to])<=1e-9&
+        (mids>next_midfield[to]|(mids==next_midfield[to]&kept>next_kept[to])))
+      hit<-which(better);if(!length(hit))next
+      dest<-to[hit];next_best[dest]<-candidate[hit];next_midfield[dest]<-mids[hit];next_kept[dest]<-kept[hit]
+      prev[i,dest]<-from[hit];chosen[i,dest]<-0L
+    }
     best<-next_best;midfield<-next_midfield;retained<-next_kept
   }
-  ends<-1L+as.vector(counts%*%stride);viable<-which(is.finite(best[ends]));if(!length(viable))return(NULL)
+  ends<-1L+as.vector(counts%*%stride)+max(masks)*base_size;viable<-which(is.finite(best[ends]));if(!length(viable))return(NULL)
   rank<-order(-best[ends[viable]],-midfield[ends[viable]],allowed[viable]!=(current$strategy %||% ''),-retained[ends[viable]],match(allowed[viable],lineup_formations()))
   pick<-viable[rank[1]];state<-ends[pick];assignment<-setNames(vector('list',4L),role_names)
   for(i in rev(seq_len(nrow(roster)))){

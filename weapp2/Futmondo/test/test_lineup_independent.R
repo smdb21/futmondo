@@ -13,11 +13,21 @@ canonical <- function(x) {
   parts <- trimws(tolower(unlist(strsplit(as.character(x),'[,;/|]+'))))
   unique(unname(aliases[parts[parts %in% names(aliases)]]))
 }
-oracle_lineup <- function(roster,scores,formations,include_unavailable=FALSE) {
+oracle_coverage <- function(roles,index) {
+  assign <- function(role_index,used) {
+    if(role_index>3L)return(0L)
+    eligible<-index[vapply(index,function(i)c('DEF','MID','FWD')[role_index]%in%roles[[i]],logical(1))]
+    remaining<-setdiff(eligible,used)
+    max(c(assign(role_index+1L,used),if(length(remaining))
+      1L+vapply(remaining,function(i)assign(role_index+1L,c(used,i)),integer(1))else integer()))
+  }
+  assign(1L,integer())
+}
+oracle_lineup <- function(roster,scores,formations,include_unavailable=FALSE,require_bench_coverage=FALSE,multiposition=TRUE) {
   if(!include_unavailable)roster<-roster[!analytics_known_unavailable(roster),,drop=FALSE]
   score <- setNames(scores$average,scores$id)
   roles <- lapply(seq_len(nrow(roster)),function(i)
-    unique(c(canonical(roster$role[i]),canonical(roster$role2[i]))))
+    unique(c(canonical(roster$role[i]),if(multiposition)canonical(roster$role2[i]))))
   best <- -Inf
   for(strategy in formations) {
     n <- as.integer(strsplit(strategy,'-',fixed=TRUE)[[1]])
@@ -32,6 +42,7 @@ oracle_lineup <- function(roster,scores,formations,include_unavailable=FALSE) {
     for(d in picks[[1]])for(m in picks[[2]])for(f in picks[[3]])for(g in gk) {
       chosen <- c(d,m,f,g)
       if(anyDuplicated(chosen))next
+      if(require_bench_coverage&&oracle_coverage(roles,setdiff(seq_len(nrow(roster)),chosen))<3L)next
       total <- sum(score[roster$id[chosen]])
       if(total>best)best<-total
     }
@@ -41,18 +52,9 @@ oracle_lineup <- function(roster,scores,formations,include_unavailable=FALSE) {
 brute_bench <- function(roster,scores,size) {
   role <- lapply(seq_len(nrow(roster)),function(i)
     unique(c(canonical(roster$role[i]),canonical(roster$role2[i]))))
-  covered_by_distinct_players <- function(index) {
-    assign <- function(role_index,used) {
-      if(role_index>3L)return(0L)
-      eligible<-index[vapply(index,function(i)c('DEF','MID','FWD')[role_index]%in%role[[i]],logical(1))]
-      max(c(assign(role_index+1L,used),if(length(eligible[!eligible%in%used]))
-        1L+vapply(eligible[!eligible%in%used],function(i)assign(role_index+1L,c(used,i)),integer(1)) else integer()))
-    }
-    assign(1L,integer())
-  }
   choices <- combn(seq_len(nrow(roster)),size,simplify=FALSE)
   totals <- vapply(choices,function(index)sum(scores$average[match(roster$id[index],scores$id)]),numeric(1))
-  covered <- vapply(choices,covered_by_distinct_players,integer(1))
+  covered <- vapply(choices,function(index)oracle_coverage(role,index),integer(1))
   pick <- order(-covered,-totals)[1]
   list(coverage=covered[pick],total=totals[pick],ids=roster$id[choices[[pick]]])
 }
@@ -82,6 +84,20 @@ stopifnot(included$total==oracle_lineup(roster,scores,formations,include_unavail
   'injured-forward'%in%included$draft$starters)
 stopifnot(is.null(lineup_optimize(roster,scores,'not-a-formation',current=current)))
 cat('PASS exhaustive independent XI oracle across five formations, multiposition roles, signed/zero scores, injury exclusion/override, uniqueness, captain and invalid formation\n')
+
+for(multi in c(FALSE,TRUE))for(override in c(FALSE,TRUE))for(shift in 0:2){
+  varied<-scores;varied$average<-c(tail(score_values,shift),head(score_values,length(score_values)-shift))
+  expected<-oracle_lineup(roster,varied,formations,override,require_bench_coverage=TRUE,multiposition=multi)
+  actual<-lineup_optimize(roster,varied,formations,current,override,multiposition=multi,require_bench_coverage=TRUE)
+  if(!is.finite(expected)){stopifnot(is.null(actual));next}
+  stopifnot(!is.null(actual),actual$total==expected,
+    !anyDuplicated(c(actual$draft$starters,actual$draft$bench)),length(actual$coverage)==3L)
+  bench_rows<-roster[match(actual$draft$bench[nzchar(actual$draft$bench)],roster$id),]
+  roles<-lapply(seq_len(nrow(bench_rows)),function(i)
+    unique(c(canonical(bench_rows$role[i]),if(multi)canonical(bench_rows$role2[i]))))
+  stopifnot(oracle_coverage(roles,seq_len(nrow(bench_rows)))==3L)
+}
+cat('PASS constrained XI matches independent exhaustive feasible-lineup oracle for 12 score/eligibility/multiposition cases\n')
 
 # Coverage outranks bench points. Four high-scoring defenders must give way to
 # distinct midfield/forward cover when four substitutes can cover all roles.

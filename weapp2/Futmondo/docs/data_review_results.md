@@ -4900,3 +4900,67 @@ Expanded source rejection diagnostics from two named codes to bounded machine co
 ## Financial evidence payload reuse — 2026-11-18 (Pacific)
 
 Implemented current metadata reads plus account/state-scoped immutable payload reuse in Python; see [contract and measurements](finance_evidence_egress.md). Existing R helper cache was process-local and full financial-evidence reads bypassed the earlier snapshot cache. Live 581-row sample: 7,369,223 bytes full JSON versus 187,434 metadata bytes; metadata query 97.284 ms with no disk reads. New service-only view applied as 20261119004554, privileges verified; no evidence/timestamps/history changed. Six evidence Python tests and SQL reconstruction/private-access fixture pass, along with six egress tests, ten diagnostic checks, 40 worker and 13 clause-worker checks, and offline lifecycle (13 checks/eight tabs). Performance: one metadata GET for warm pages, bounded 128-ID fetches for missing payloads, 16 MiB/4,096-entry cache; no new source requests/timers/UI changes. Cold reads can use more DB requests; warm reads avoid large unchanged payload transfers. Monthly quota compliance and steady-state production bytes remain to be measured after deployment.
+
+
+## Lineup bench constraint, picker priority and player status — 2026-11-18
+
+Implemented the optional, initially unchecked full outfield bench requirement,
+bench/unused-squad/starter picker ordering, and observed injury/doubt/suspension
+icons on pitch/bench portraits and picker rows. Existing real-match team crests
+were already present and were reverified. Contract and dated official comparison:
+[lineup module](lineup_module.md), [feature comparison](feature_comparison.md).
+
+Executed successfully with synthetic/offline data:
+
+- `Rscript test/test_lineup_runtime.R`: 16 groups, including a known-answer
+  4-3-3 optimum of 127 that must become a 4-4-2 optimum of 119 to leave DEF/MID/FWD
+  cover; off-mode equivalence, impossible/disabled benches, distinct substitutes,
+  missing scores, injuries, departures and multiposition restrictions.
+- `Rscript test/test_lineup_independent.R`: existing exhaustive XI/bench checks
+  plus twelve independent feasible-XI oracle cases across score orderings,
+  multiposition and injury settings; negative and zero scores stay intact.
+- `Rscript test/test_lineup_module.R`: all groups passed, including checkbox
+  default/tooltip, no recalculation on toggling, stale-setting warning, pending
+  cancellation, infeasible-draft retention, picker order after unsaved swaps,
+  portrait/picker status labels, unchanged request counters and existing
+  conflict/readback/context/departure save safeguards.
+- `Rscript test/test_lineup_store.R`: source status and crest fields survive
+  normalized persistence/hydration, with context isolation, credential exclusion
+  and retryable persistence errors preserved.
+- `Rscript test/test_lineup_fixtures.R` and
+  `Rscript test/test_award_fixture_calendar.R`: source logo mapping, actual worker
+  codec restart reuse, legacy fixtures, original clocks, context isolation,
+  calendar evidence reuse and malformed-evidence reacquisition passed.
+- `Rscript test/test_lineup_browser.R` with
+  `PLAYWRIGHT_BROWSERS_PATH=/tmp/futmondo-browsers FUTMONDO_EDITOR_TEST_PORT=8543 node test/test_lineup_browser.cjs`:
+  320, 390 and 1440px passed, covering the unchecked usable checkbox/tooltip,
+  explicit constrained calculation, live picker membership/order, status icons
+  and accessible tooltips, twenty fixture crests, no overflow, dense/no-forward
+  formations, immediate picker interaction, manual edits and one synthetic
+  verified save. Source/database counters stayed unchanged for local interactions.
+  Inspected the 390px screenshot. Fixture data and intercepted image assets are
+  synthetic; this was not an authenticated account test.
+- `Rscript test/test_shiny_simulation.R`: 13 lifecycle checks plus eight tabs,
+  including no live HTTP/database mutations, passed after the final UI changes.
+  Existing Plotly empty-trace warnings remained non-failing.
+- Scoped `git diff --check` passed. No dependencies changed, so no deployment
+  manifest regeneration was needed.
+
+Performance review: twenty 100-player/all-formation runs averaged 41.1 ms with
+coverage off and 64.0 ms with it required; independent warm optimization took
+37 ms. Enabled coverage uses at most 3,360 lattice states, with about 2.6 MiB for
+100-player reconstruction matrices, released after calculation. Warm picker
+opens measured 108/41/57 ms at 320/390/1440px in the final browser run. The added
+membership key keeps the existing sort complexity; fixed-size font icons and
+wrapping labels avoid new image transfers and overflow. No new API/database
+requests, timers, recurring work, cache, persistence format or source acquisition
+were added. Shared durable score/roster/calendar observations remain the source
+of data across sessions and restarts. Calendar parsing measured 313 ms for 380
+matches in the worker; existing local fixture selection averaged 17 ms.
+
+Official public code and captured status codes were inspected without logging
+credentials, account/player details or private response bodies. Public Real
+Madrid and Barcelona crest assets returned HTTP 200 PNGs. No authenticated
+`league/matches` response existed in the available captures; deployed match-logo
+coverage, deployment and hosted visual acceptance remain unverified. This task
+does not claim to have fixed a demonstrated production crest acquisition defect.

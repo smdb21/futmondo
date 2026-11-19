@@ -144,7 +144,7 @@ The button shows **Calculating…** with an animated spinner while a request is 
 
 A vectorized positional-count dynamic program selects the maximum-total XI across every allowed formation with each player used at most once. The selected formation is a manual-edit starting point, not a constraint on Best XI: the calculated formation replaces it. For equal historical totals, the optimizer first maximizes the number of dual MID/FWD players assigned to midfield, then prefers the existing formation, retaining existing starters, and stable formation/player order. This midfield preference is included in both player assignment and formation selection, applies only when multiposition is enabled and both roles are eligible, and allows a forward assignment whenever it produces a higher historical total or is required for a legal XI. It does not add an estimated defensive-stat bonus to observed scores. The captain is retained if still starting; otherwise the highest-average starter is selected when captains are enabled.
 
-The bench is selected from the remaining players after fixing the best starting XI. A separate bounded dynamic program first maximizes distinct outfield positions covered by distinct substitutes, then their total historical averages. It fills up to four places and orders them by average descending. Goalkeeper-only players are excluded from automatic substitutes; manual bench selection may still include them where the official rules permit. Injury/suspension exclusion applies to both XI and bench by default and has an explicit override. Missing coverage and unfilled places stay visible. Coverage indicators use the same distinct-player matching as the optimizer, so one multiposition substitute cannot claim three simultaneous replacements.
+By default, the bench is selected from the remaining players after fixing the best starting XI. A separate bounded dynamic program first maximizes distinct outfield positions covered by distinct substitutes, then their total historical averages. It fills up to four places and orders them by average descending. Goalkeeper-only players are excluded from automatic substitutes; manual bench selection may still include them where the official rules permit. Injury/suspension exclusion applies to both XI and bench by default and has an explicit override. Missing coverage and unfilled places stay visible. Coverage indicators use the same distinct-player matching as the optimizer, so one multiposition substitute cannot claim three simultaneous replacements. The optional **Require full outfield bench coverage** checkbox constrains the XI to leave this coverage available; see the contract below.
 
 The lineup history client requests squad IDs and the exact completed-round window. It does not initialize the championship catalog until an ordinary player-table client requires it. New completed windows can request one bounded new acquisition despite an older successful same-N attempt. Existing table clients preserve their defaults and wider-window semantics.
 
@@ -219,7 +219,7 @@ The UI observer adds no API/database request, polling, dependency, or durable da
 
 ## Selectable player list and individual removal — 2026-11-07
 
-Clicking a starter or substitute opens a scrollable list of eligible squad players, ordered by the existing exact-window average. Each button shows the club crest, abbreviated name (full name on hover), positions, source total points and average over the selected N completed rounds. Current selections and injured/suspended players remain labelled. A row click applies the existing role-aware move/swap immediately and closes the picker. Invalid selections retain the draft and show their explanation inside the dialog. Picker identities and account/league/round/formation checks reject obsolete clicks. History arriving while the dialog is open updates its scores through the existing reactive source.
+Clicking a starter or substitute opens a scrollable list of eligible squad players: current bench first, unselected squad players next, and current starters last. Each group is ordered by the existing exact-window average descending, then name and player ID, with unknown averages last within their group. Membership follows the displayed draft, including unsaved swaps. Each button shows the club crest, abbreviated name (full name on hover), positions, source total points and average over the selected N completed rounds. Current selections and injured/suspended players remain labelled. A row click applies the existing role-aware move/swap immediately and closes the picker. Invalid selections retain the draft and show their explanation inside the dialog. Picker identities and account/league/round/formation checks reject obsolete clicks. History arriving while the dialog is open updates its scores through the existing reactive source.
 
 **Remove player** clears only the clicked starter or substitute, without requiring an immediate replacement. Removing the captain also clears the captain selection. Empty positions can be reopened and filled later; the existing incomplete-XI validation disables saving until all eleven starters are selected. These edits remain local until **Save to Futmondo**.
 
@@ -290,3 +290,74 @@ The root now owns one pair of `roster_source_readers`, active while either the s
 Successful empty departure results satisfy `clause_departure_round_state()` without inventing zero from missing data. Missing/partial evidence and account/league changes still clear eligibility until matching observations arrive. Existing selection/save gates and draft retention are unchanged. Successful factual observations continue through the existing worker database snapshot/chunk storage and restoration, preserving account/league/team/competition/season/scoring scope, source timestamps, absolute expiry and completeness. GUI reuse neither rewrites successful snapshots nor treats a failed write as durable. No schema, dependency, environment variable, acquisition schedule or new timer is introduced.
 
 Regressions cover all three entry orders (Today, My Team and Lineup), repeated navigation, delayed/partial recovery, league changes, logout/account replacement and metadata-only publications. The browser fixture runs the real Lineup module, root declarations, worker snapshot decoder and page information registry against synthetic persisted observations at 390/1440px. It verifies zero departures, absence of the stale warning, unchanged source times, draft retention and the explicit shared refresh. Details and limitations are in `data_review_results.md`.
+
+
+## Outfield bench requirement, picker order and status icons — 2026-11-18
+
+**Require full outfield bench coverage** is an enabled checkbox that starts
+unchecked. Its tooltip explains that Optimize must leave separate defender,
+midfielder and forward substitutes, excluding goalkeeper cover. It can change
+the XI or permitted formation to achieve this. If no eligible XI can leave that
+cover, or the league disables substitutes, the calculation stops with a specific
+message and retains the draft. Three substitutes suffice; a fourth is filled
+when another eligible outfield player remains. Manual editing and saving retain
+the existing source rules and are not forced to meet this optional optimization
+preference.
+
+`lineup_optimize(..., require_bench_coverage = FALSE)` appends the option to its
+existing interface. When enabled, its positional dynamic program also tracks an
+eight-value coverage mask, assigning three distinct eligible players to reserve
+roles without awarding their points to the XI. This finds the highest observed
+starting total among feasible XI/bench combinations, preserving the existing
+tie rules, allowed formations, multiposition, injury policy and departure
+exclusions. The existing bench optimizer then chooses and orders the remaining
+substitutes. Off keeps the original objective. No scores are manufactured.
+
+`best_request` and `best_basis` carry the local `coverage` setting. Changing it
+cancels pending work, leaves selections intact and warns when a generated lineup
+uses different settings. Calculation still requires an explicit Optimize click;
+its busy state flushes before the bounded synchronous calculation. Retained
+league/round drafts keep their calculation basis.
+
+Both starter and substitute pickers now group the current draft's bench first,
+unused squad next and starters last. Each group keeps descending observed
+average, name/ID ties and unknown averages last. Unsaved swaps, removals and Undo
+changes immediately update membership; eligibility and obsolete-click checks
+are unchanged.
+
+`lineup_status_icon(status)` renders the same observed status beside each
+occupied pitch/bench portrait and beside the name in picker rows. `doubt`
+(and the supported `doubtful` alias) shows a warning triangle, `injured` a minus
+circle, `injured2` a hospital, `redcard`/`suspended` a square, and `unavailable`
+a barred circle. Tooltips and accessible labels distinguish these meanings.
+Empty/`ok` statuses add no icon; unrecognized nonempty codes show **Status
+unconfirmed**, never a guessed fitness label. Doubtful players remain eligible
+under the existing optimizer policy. Status changes only redraw the existing
+roster projection. Current status is not added to historical round lineups.
+
+The current official public bundle still has SHA-256
+`08202076259d1678c7557478771d3aa38b5099f42044630569c704fdb7a7cd1c`.
+Its `Dy.p` renderer builds `assets/images/player_status/<status>.png` for source
+statuses. Existing captured responses corroborate `ok`, `doubt`, `injured`,
+`injured2` and `redcard`; no private response bodies or credentials are included
+here. `lineup_roster_records()` already persists `status` in the existing
+context-scoped database lineup snapshot; hydration reuses it without new reads.
+The new icons use the app's existing font icons, adding no image requests.
+
+The requested bottom match-card crests were already implemented in this branch.
+Their observed `h.logo`/`a.logo` mapping, durable worker round-trip and legacy
+readability were rechecked. Both clubs render beside their names at 320, 390 and
+1440px in the offline browser fixture. Public Real Madrid and Barcelona crest
+URLs returned HTTP 200 PNGs. No captured authenticated match response was
+available, so this does not establish a particular deployed account's logo
+coverage or deployment state.
+
+Performance review: the 100-player/all-formation optimizer averaged 41.1 ms with
+the option off and 64.0 ms with it on over twenty runs each. The enabled lattice
+has at most 3,360 states; the two 100-player predecessor matrices total about
+2.6 MiB and are released after the call. Picker sorting remains O(n log n), with
+one extra local membership key. Icons have fixed dimensions and picker labels
+wrap. There are no new API/database requests, timers, result caches, persistence
+formats, dependencies or environment settings. Existing durable histories,
+rosters and calendars retain their context and original source clocks. See
+[data review](data_review_results.md) for final executed checks and limits.

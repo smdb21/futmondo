@@ -46,6 +46,52 @@ settle<-function(session){for(i in seq_len(30)){later::run_now(0);session$flushR
 args<-list(is_module_active=function()TRUE,login_token=function()c(userid='fixture',token='synthetic'),championship_id=function()'league',user_team_id=function()'team',round_catalog=function()rounds,clause_transfers_source=function()list(outgoing_status='ok',outgoing_records=outgoing_clause_empty()))
 reset()
 shiny::testServer(lineup_Server,args=args,{
+ settle(session);ui<-as.character(lineup_UI('fixture'))
+ checkbox<-xml2::xml_find_first(xml2::read_html(ui),'.//input[@id="fixture-require_bench_coverage"]')
+ stopifnot(!is.na(xml2::xml_attr(checkbox,'id')),is.na(xml2::xml_attr(checkbox,'checked')),
+  grepl('Goalkeeper cover is not required',ui,fixed=TRUE))
+ session$setInputs(best=1);settle(session);before<-draft()
+ session$setInputs(require_bench_coverage=TRUE);settle(session)
+ stopifnot(identical(draft(),before),state$optimizes==1L,
+  grepl('bench coverage setting',output$status$html,fixed=TRUE),state$reads==1L,state$submits==0L)
+ session$setInputs(best=2);settle(session)
+ stopifnot(isTRUE(best_basis()$coverage),length(lineup_bench_coverage(roster(),draft()$bench))==3L,
+  !grepl('fm-lineup-best-warning',output$status$html),state$optimizes==2L)
+ session$setInputs(require_bench_coverage=FALSE);settle(session)
+ stopifnot(grepl('bench coverage setting',output$status$html,fixed=TRUE),state$optimizes==2L)
+ session$setInputs(require_bench_coverage=TRUE);settle(session)
+ stopifnot(!grepl('fm-lineup-best-warning',output$status$html),state$reads==1L,state$submits==0L)
+ cat('PASS bench coverage defaults off with explanatory tooltip; changing it warns without recalculation or I/O\n')
+})
+reset()
+scarce<-c('p1',paste0('p',3:6),paste0('p',9:13),paste0('p',16:19))
+state$official$roster<-Filter(function(row)row$id%in%scarce,state$official$roster)
+state$official$rules$allowed<-'4-4-2'
+shiny::testServer(lineup_Server,args=args,{
+ settle(session);session$setInputs(best=1);settle(session);before<-draft()
+ session$setInputs(require_bench_coverage=TRUE,best=2);settle(session)
+ stopifnot(identical(draft(),before),is.null(best_request()),notice_error(),
+  grepl('No eligible XI can leave separate defender, midfielder and forward',notice(),fixed=TRUE),
+  grepl('aria-busy="false"',output$status$html,fixed=TRUE),state$submits==0L)
+ no_bench<-source();no_bench$rules$bench_enabled<-FALSE;source(no_bench)
+ session$setInputs(best=3);settle(session)
+ stopifnot(identical(draft(),before),is.null(best_request()),state$optimizes==2L,
+  grepl('substitutes are disabled',notice(),fixed=TRUE),state$reads==1L,state$submits==0L)
+ cat('PASS infeasible coverage and disabled benches retain the draft with actionable status and no mutation\n')
+})
+reset()
+history_data(history[history$player_id!='p20',])
+shiny::testServer(lineup_Server,args=args,{
+ settle(session);before<-draft();session$setInputs(best=1);settle(session)
+ stopifnot(!is.null(best_request()),state$optimizes==0L)
+ session$setInputs(require_bench_coverage=TRUE);settle(session)
+ stopifnot(is.null(best_request()),grepl('settings changed',notice()))
+ history_data(full_history);settle(session)
+ stopifnot(identical(draft(),before),state$optimizes==0L,state$reads==1L,state$submits==0L)
+ cat('PASS bench coverage changes cancel pending work before late history can replace the draft\n')
+})
+reset()
+shiny::testServer(lineup_Server,args=args,{
  settle(session);session$setInputs(formation='4-4-2');settle(session)
  stopifnot(!grepl('players have complete scores',output$status$html),
   !grepl('fm-lineup-refresh-help',as.character(lineup_UI('fixture'))))
@@ -59,6 +105,55 @@ shiny::testServer(lineup_Server,args=args,{
  stopifnot(identical(draft(),optimized),is.null(best_request()),state$optimizes==1L,state$reads==1L,state$submits==0L,
   grepl('<option value="3-3-4" selected="selected">',output$formation_control$html,fixed=TRUE))
  cat('PASS Best XI changes formation, renders its selection, and retains the draft on reactive flush and input acknowledgement\n')
+})
+reset()
+shiny::testServer(lineup_Server,args=args,{
+ settle(session);session$setInputs(best=1);settle(session)
+ # Selected substitutes have lower averages than starters: membership must
+ # outrank points. Verify the live draft again after a starter/bench swap.
+ assert_picker_order<-function(){
+  nodes<-xml2::xml_find_all(xml2::read_html(output$picker_players$html),'.//button[contains(@class,"fm-lineup-choice")]')
+  ids<-xml2::xml_attr(nodes,'data-player-id');rows<-roster();avg<-scores()$average[match(ids,scores()$id)]
+  group<-ifelse(ids%in%draft()$bench,1L,ifelse(ids%in%draft()$starters,3L,2L))
+  stopifnot(identical(order(group,-avg,rows$name[match(ids,rows$id)],ids,na.last=TRUE),seq_along(ids)))
+  invisible(ids)
+ }
+ session$setInputs(slot_click=slot_event(FALSE,1L));settle(session);ids<-assert_picker_order()
+ stopifnot(ids[1]%in%draft()$bench,tail(ids,1)%in%draft()$starters)
+ pick<-selected();incoming<-ids[1];outgoing<-draft()$starters[1]
+ session$setInputs(player_choice=list(id=incoming,picker=pick$sequence));settle(session)
+ stopifnot(incoming%in%draft()$starters,outgoing%in%draft()$bench)
+ session$setInputs(slot_click=slot_event(FALSE,1L));settle(session);ids<-assert_picker_order()
+ stopifnot(match(outgoing,ids)<match(incoming,ids))
+ session$setInputs(slot_click=slot_event(TRUE,1L));settle(session);ids<-assert_picker_order()
+ stopifnot(any(!ids%in%c(draft()$bench,draft()$starters)),state$reads==1L,state$submits==0L)
+ cat('PASS starter and substitute pickers show bench, unused squad, then starters, updating after unsaved swaps without I/O\n')
+})
+reset()
+shiny::testServer(lineup_Server,args=args,{
+ settle(session);session$setInputs(best=1);settle(session);before<-draft();data<-source()
+ ids<-c(before$starters[1:2],before$bench[1:3])
+ codes<-c('injured','doubt','injured2','redcard','unavailable')
+ labels<-c('Injured','Doubtful','Long-term injury','Suspended','Unavailable')
+ for(i in seq_along(ids))data$roster[[match(ids[i],vapply(data$roster,`[[`,character(1),'id'))]]$status<-codes[i]
+ source(data);settle(session)
+ pitch<-xml2::read_html(output$pitch$html)
+ for(i in seq_along(ids)){
+  icon<-xml2::xml_find_first(pitch,paste0('.//button[@data-player-id="',ids[i],'"]//div[@class="fm-lineup-portrait"]//span[@data-status="',codes[i],'"]'))
+  stopifnot(xml2::xml_attr(icon,'title')==labels[i],xml2::xml_attr(icon,'aria-label')==labels[i])
+ }
+ session$setInputs(slot_click=slot_event(TRUE,1L));settle(session)
+ picker<-xml2::read_html(output$picker_players$html)
+ for(i in seq_along(ids)){
+  icon<-xml2::xml_find_first(picker,paste0('.//button[@data-player-id="',ids[i],'"]//span[@data-status="',codes[i],'"]'))
+  stopifnot(xml2::xml_attr(icon,'title')==labels[i],xml2::xml_attr(icon,'role')=='img')
+ }
+ stopifnot(is.null(lineup_status_icon('ok')),is.null(lineup_status_icon(NA_character_)),is.null(lineup_status_icon('')),
+  grepl('Status unconfirmed',as.character(lineup_status_icon('new-source-code')),fixed=TRUE),
+  grepl('Doubtful',as.character(lineup_status_icon(' DOUBT ')),fixed=TRUE),
+  !analytics_known_unavailable(data.frame(status='doubt')),
+  identical(draft(),before),state$optimizes==1L,state$reads==1L,state$submits==0L)
+ cat('PASS observed injury, doubt, long-term injury and suspension icons follow pitch/bench portraits and picker rows without I/O or eligibility changes\n')
 })
 reset('conflict')
 shiny::testServer(lineup_Server,args=args,{

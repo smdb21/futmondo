@@ -1,3 +1,18 @@
+lineup_status_icon <- function(status) {
+  code<-tolower(trimws(fm_scalar(status,'')))
+  if(code%in%c('','ok'))return(NULL)
+  info<-switch(code,
+    doubt=list(label='Doubtful',icon='triangle-exclamation',tone='warning'),
+    doubtful=list(label='Doubtful',icon='triangle-exclamation',tone='warning'),
+    injured=list(label='Injured',icon='circle-minus',tone='danger'),
+    injured2=list(label='Long-term injury',icon='hospital',tone='danger'),
+    redcard=list(label='Suspended',icon='square',tone='danger'),
+    suspended=list(label='Suspended',icon='square',tone='danger'),
+    unavailable=list(label='Unavailable',icon='ban',tone='muted'),
+    list(label='Status unconfirmed',icon='circle-question',tone='muted'))
+  shiny::span(class=paste('fm-lineup-status',paste0('fm-lineup-status-',info$tone)),
+    `data-status`=code,title=info$label,role='img',`aria-label`=info$label,shiny::icon(info$icon))
+}
 lineup_UI <- function(id) {
   ns<-shiny::NS(id)
   shiny::tagList(shiny::tags$style(shiny::HTML(".fm-lineup-controls{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:16px}.fm-lineup-controls .form-group{margin:0}.fm-lineup-optimize-controls{display:flex;gap:12px;align-items:flex-end;flex:0 0 100%;min-width:0}.fm-lineup-optimize-controls .shiny-input-container{flex:1;min-width:0;max-width:180px}.fm-lineup-optimize-controls .btn{flex-shrink:0}.fm-lineup-formation .shiny-input-container{width:180px;max-width:100%;margin-bottom:8px}.fm-lineup-availability{flex:0 0 100%;min-width:0}.fm-lineup-controls .shiny-input-container{width:180px}.fm-lineup-editor{max-width:900px;margin:auto}.fm-lineup-editor .fm-lineup-player{background:transparent;border:0;color:var(--fm-text,#eef6f0);cursor:pointer;padding:6px;min-width:0}.fm-lineup-editor .fm-lineup-player:focus{outline:2px solid var(--fm-warning,#f0c75e)}.fm-lineup-editor .fm-lineup-portrait{margin:auto}.fm-lineup-editor .fm-lineup-name{white-space:normal}.fm-lineup-editor .fm-lineup-portrait img{max-width:48px;max-height:48px}.fm-lineup-note{padding:10px 0;color:var(--fm-muted,#acbdb0)}.fm-lineup-warning{color:var(--fm-warning,#f0c75e)}.fm-lineup-actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.fm-lineup-coverage{display:flex;gap:12px;flex-wrap:wrap}.fm-lineup-editor .fm-lineup-row{display:grid;grid-template-columns:repeat(var(--lineup-count),minmax(0,1fr))}@media(max-width:600px){.fm-lineup-controls .shiny-input-container{width:140px}.fm-lineup-editor .fm-lineup-name{font-size:10px}.fm-lineup-editor .fm-lineup-player{padding:2px}.fm-lineup-editor .fm-lineup-portrait img{max-width:34px;max-height:34px}}")),
@@ -11,8 +26,13 @@ lineup_UI <- function(id) {
       .fm-lineup-choice:focus-visible{outline:2px solid var(--fm-warning,#bd8d1e);outline-offset:-2px}
       .fm-lineup-choice-name{min-width:0;overflow-wrap:anywhere}
       .fm-lineup-choice-name small{display:block;color:var(--fm-muted,#647067)}
-      .fm-lineup-choice-label{display:flex;align-items:center;gap:6px}
+      .fm-lineup-choice-label{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
       .fm-lineup-choice-membership{display:inline-flex;flex-shrink:0}
+      .fm-lineup-status{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;font-size:14px;line-height:1}
+      .fm-lineup-status-warning{color:var(--fm-warning,#b38012)}
+      .fm-lineup-status-danger{color:var(--fm-danger,#c63c4a)}
+      .fm-lineup-status-muted{color:var(--fm-muted,#647067)}
+      .fm-lineup-editor .fm-lineup-portrait>.fm-lineup-status{position:absolute;right:0;bottom:2px;width:18px;height:18px;border-radius:50%;background:var(--fm-surface,#fff)}
       .fm-lineup-choice-total,.fm-lineup-choice-average{text-align:right;font-variant-numeric:tabular-nums}
       .fm-lineup-choice-crest{width:24px;height:24px;object-fit:contain}
       .fm-lineup-fixtures{margin-top:24px;padding-top:16px;border-top:1px solid var(--fm-border,#d8e2da)}
@@ -36,7 +56,10 @@ lineup_UI <- function(id) {
           shiny::actionButton(ns('best'),'Optimize',icon=shiny::icon('wand-magic-sparkles')),
           shiny::numericInput(ns('recent_n'),'Last N rounds',value=3,min=1,max=20,step=1)),
         shiny::div(class='fm-lineup-availability',
-          shiny::checkboxInput(ns('include_unavailable'),'Include injured/suspended players',FALSE,width='100%'))),
+          shiny::checkboxInput(ns('include_unavailable'),'Include injured/suspended players',FALSE,width='100%'),
+          shiny::checkboxInput(ns('require_bench_coverage'),shiny::span(
+            title='When enabled, Optimize requires separate substitutes covering defender, midfielder and forward. Goalkeeper cover is not required. The starting XI or formation may change to leave this cover on the bench. If no eligible lineup can provide it, your draft is kept.',
+            'Require full outfield bench coverage'),FALSE,width='100%'))),
       shiny::div(class='fm-lineup-actions',
         shiny::actionButton(ns('clear'),'Clear lineup',icon=shiny::icon('eraser')),
         shiny::actionButton(ns('reset'),'Undo changes',icon=shiny::icon('rotate-left'),
@@ -190,7 +213,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       if(saving()){notice('Wait for the lineup save to finish before calculating Best XI.');return()}
       shiny::req(identity(),is_module_active())
       best_sequence<<-best_sequence+1L
-      best_request(list(generation=generation,key=loaded_key,sequence=best_sequence,n=n_rounds(),include=isTRUE(input$include_unavailable)));best_note('')
+      best_request(list(generation=generation,key=loaded_key,sequence=best_sequence,n=n_rounds(),include=isTRUE(input$include_unavailable),coverage=isTRUE(input$require_bench_coverage)));best_note('')
       notice('Preparing Best XI + bench…')
     })
     shiny::observe({
@@ -203,12 +226,15 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
     shiny::observe({
       request<-best_request();if(is.null(request))return()
       if(!current(request$generation,request$key)||saving()||!isTRUE(is_module_active()))return()
-      n<-n_rounds();include<-isTRUE(input$include_unavailable)
-      if(!identical(request$n,n)||!identical(request$include,include)){
+      n<-n_rounds();include<-isTRUE(input$include_unavailable);coverage<-isTRUE(input$require_bench_coverage)
+      if(!identical(request$n,n)||!identical(request$include,include)||!identical(request$coverage,coverage)){
         best_request(NULL);notice('Best XI calculation cancelled because the settings changed. Press Optimize to calculate again.');return()
       }
       data<-source()
       if(is.null(data)){notice('Best XI is waiting for the current squad and lineup to load.');return()}
+      if(coverage&&!isTRUE(data$rules$bench_enabled)){
+        best_request(NULL);notice('Full outfield bench coverage is unavailable because substitutes are disabled in this league. Uncheck the coverage option to optimize. Your draft is retained.',error=TRUE);return()
+      }
       issue<-catalog_issue()
       if(nzchar(issue)){notice(paste('Best XI is waiting for the completed-round schedule.',issue),error=TRUE);return()}
       departure<-departures()
@@ -234,7 +260,8 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       session$onFlushed(function(){later::later(function(){shiny::isolate({
         if(identical(best_scheduled,request))best_scheduled<<-NULL
         if(!current(request$generation,request$key)||!identical(best_request(),request)||saving()||
-          !isTRUE(is_module_active())||!identical(n_rounds(),n)||!identical(isTRUE(input$include_unavailable),include))return()
+          !isTRUE(is_module_active())||!identical(n_rounds(),n)||!identical(isTRUE(input$include_unavailable),include)||
+          !identical(isTRUE(input$require_bench_coverage),coverage))return()
         latest_departure<-current_departures()
         if(!isTRUE(latest_departure$complete)||!identical(latest_departure$excluded_ids,departure$excluded_ids)){
           best_request(NULL);notice('Departure eligibility changed before calculation. Press Optimize to calculate again.');return()
@@ -242,11 +269,13 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
         best_request(NULL)
         tryCatch({
           result<-lineup_optimize(rows,score,unlist(data$rules$allowed),draft(),include,
-            data$rules$bench_enabled,data$rules$multiposition,excluded_ids=departure$excluded_ids)
-          if(is.null(result)){notice('No eligible XI can be formed from the current squad and allowed formations. Your draft is retained.',error=TRUE);return()}
+            data$rules$bench_enabled,data$rules$multiposition,excluded_ids=departure$excluded_ids,require_bench_coverage=coverage)
+          if(is.null(result)){notice(if(coverage)
+            'No eligible XI can leave separate defender, midfielder and forward cover on the bench with the allowed formations. Review player availability or uncheck the coverage option. Your draft is retained.'else
+            'No eligible XI can be formed from the current squad and allowed formations. Your draft is retained.',error=TRUE);return()}
           value<-result$draft;if(!data$rules$captain_enabled)value$captain<-''
           draft(value);shiny::updateSelectInput(session,'formation',selected=value$strategy)
-          best_basis(list(n=n,include=include,rounds=result$rounds,excluded_ids=departure$excluded_ids,lineup=lineup_identity(value)))
+          best_basis(list(n=n,include=include,coverage=coverage,rounds=result$rounds,excluded_ids=departure$excluded_ids,lineup=lineup_identity(value)))
           best_note(paste0('Best XI + bench',
             ' · starters ',format(round(result$total,2),trim=TRUE),' average points · rounds ',paste(result$rounds,collapse=', '),
             ' · bench coverage ',if(length(result$coverage))paste(result$coverage,collapse=' / ')else'none'))
@@ -285,8 +314,10 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       rows<-roster();positions<-lineup_positions(rows,source()$rules$multiposition);leaving<-departures()$excluded_ids
       eligible<-if(pick$bench)rep(TRUE,nrow(rows))else vapply(positions,function(p)lineup_slot_roles(draft()$strategy)[pick$index]%in%p,logical(1))
       rows<-rows[eligible,,drop=FALSE];score<-scores();averages<-score$average[match(rows$id,score$id)];positions<-positions[eligible]
-      order_rows<-order(-averages,rows$name,rows$id,na.last=TRUE);rows<-rows[order_rows,,drop=FALSE];averages<-averages[order_rows];positions<-positions[order_rows]
       value<-draft();old<-if(pick$bench)value$bench[pick$index]else value$starters[pick$index]
+      membership_order<-ifelse(rows$id%in%value$bench,1L,ifelse(rows$id%in%value$starters,3L,2L))
+      order_rows<-order(membership_order,-averages,rows$name,rows$id,na.last=TRUE)
+      rows<-rows[order_rows,,drop=FALSE];averages<-averages[order_rows];positions<-positions[order_rows]
       number<-function(value)if(length(value)==1L&&is.finite(value))format(round(value,2),trim=TRUE)else'—'
       marker<-function(icon,label)shiny::span(class='fm-lineup-choice-membership',
         title=label,role='img',`aria-label`=label,shiny::icon(icon))
@@ -313,6 +344,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
                 loading='lazy',decoding='async',onerror="this.style.visibility='hidden'")else shiny::span(),
               shiny::span(class='fm-lineup-choice-name',
                 shiny::span(class='fm-lineup-choice-label',lineup_player_label(row$name),
+                  lineup_status_icon(row$status),
                   if(membership!='none')marker(if(identical(row$id,old))'crosshairs'else if(membership=='starter')'circle-check'else'chair',
                     paste0(if(identical(row$id,old))'Current slot · 'else'',membership_label))),
                 shiny::tags$small(paste0(paste(positions[[i]],collapse='/'),if(unavailable)' · injured/suspended'else'',
@@ -396,6 +428,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       if(!is.null(basis)&&!is.null(draft())&&identical(basis$lineup,lineup_identity(draft()))) {
         if(!identical(basis$n,n_rounds()))changed<-c(changed,'last N rounds')
         if(!identical(basis$include,isTRUE(input$include_unavailable)))changed<-c(changed,'injury/suspension setting')
+        if(!identical(isTRUE(basis$coverage),isTRUE(input$require_bench_coverage)))changed<-c(changed,'bench coverage setting')
         if(identical(basis$n,n_rounds())&&!nzchar(catalog_issue())&&length(wanted())&&!identical(basis$rounds,wanted()))changed<-c(changed,'completed-round window')
         if(isTRUE(departure$complete)&&!identical(basis$excluded_ids %||% character(),departure$excluded_ids))changed<-c(changed,'player departures')
       }
@@ -431,12 +464,12 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
         if(bench)shiny::span(class='fm-lineup-order',paste('Bench',index)),
         shiny::div(class='fm-lineup-points',if(length(average)&&is.finite(average))format(round(average,2),trim=TRUE)else'—'),
         shiny::div(class='fm-lineup-portrait',if(occupied&&nzchar(row$photo)&&grepl('^[A-Za-z0-9_.-]+$',row$photo))
-          shiny::tags$img(src=paste0(PHOTO_URL,'/',row$photo),alt='',loading='lazy',onerror="this.style.display='none'")else shiny::span(class='fm-lineup-silhouette',if(occupied)'●'else'+')),
+          shiny::tags$img(src=paste0(PHOTO_URL,'/',row$photo),alt='',loading='lazy',onerror="this.style.display='none'")else shiny::span(class='fm-lineup-silhouette',if(occupied)'●'else'+'),
+          if(occupied)lineup_status_icon(row$status)),
         shiny::div(class='fm-lineup-name',`data-position`=position,
           if(nzchar(crest))shiny::tags$img(class='fm-lineup-crest',src=crest,alt=row$club,title=row$club,
             width=14,height=14,loading='lazy',decoding='async',onerror="this.style.display='none'"),
-          shiny::span(class='fm-lineup-label',if(occupied)lineup_player_label(row$name)else'Empty position')),
-        if(occupied&&analytics_known_unavailable(row))shiny::span(class='fm-lineup-warning','⚠')),
+          shiny::span(class='fm-lineup-label',if(occupied)lineup_player_label(row$name)else'Empty position'))),
         class=paste('fm-lineup-player',if(!occupied)'fm-lineup-empty'),disabled=if(saving())'disabled',
         title=if(occupied)paste('Change',row$name)else paste('Select',role))
     }

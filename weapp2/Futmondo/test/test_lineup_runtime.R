@@ -63,6 +63,36 @@ check('bench covers all three outfield roles before maximizing average and sorts
  one<-data.frame(id='multi',role='defensa',role2='delantero')
  stopifnot(length(lineup_bench_coverage(one,'multi'))==1L)
 })
+coverage_roster<-data.frame(id=c('g',paste0('d',1:5),paste0('m',1:5),paste0('f',1:3)),
+ role=c('GK',rep('DEF',5),rep('MID',5),rep('FWD',3)),role2='',status='ok')
+coverage_scores<-data.frame(id=coverage_roster$id,average=c(0,rep(10,4),1,rep(10,4),1,20,19,18))
+check('required bench coverage changes the optimal formation and leaves three distinct outfield substitutes',{
+ allowed<-c('4-3-3','4-4-2')
+ ordinary<-lineup_optimize(coverage_roster,coverage_scores,allowed)
+ explicit_off<-lineup_optimize(coverage_roster,coverage_scores,allowed,require_bench_coverage=FALSE)
+ covered<-lineup_optimize(coverage_roster,coverage_scores,allowed,require_bench_coverage=TRUE)
+ stopifnot(identical(ordinary,explicit_off),ordinary$draft$strategy=='4-3-3',ordinary$total==127,
+  !'FWD'%in%ordinary$coverage,covered$draft$strategy=='4-4-2',covered$total==119,
+  setequal(covered$coverage,c('DEF','MID','FWD')),sum(nzchar(covered$draft$bench))==3L,
+  !anyDuplicated(c(covered$draft$starters,covered$draft$bench)),
+  !any(covered$draft$bench%in%'g'),sum(coverage_scores$average[match(covered$draft$starters,coverage_scores$id)])==119)
+ stopifnot(is.null(lineup_optimize(coverage_roster,coverage_scores,'4-3-3',require_bench_coverage=TRUE)),
+  is.null(lineup_optimize(coverage_roster,coverage_scores,allowed,bench_enabled=FALSE,require_bench_coverage=TRUE)))
+})
+check('required coverage respects unavailable players, departures, missing scores and multiposition permissions',{
+ rows<-coverage_roster;rows$status[rows$id=='f3']<-'injured'
+ stopifnot(is.null(lineup_optimize(rows,coverage_scores,'4-4-2',require_bench_coverage=TRUE)),
+  !is.null(lineup_optimize(rows,coverage_scores,'4-4-2',include_unavailable=TRUE,require_bench_coverage=TRUE)),
+  is.null(lineup_optimize(rows,coverage_scores,'4-4-2',include_unavailable=TRUE,excluded_ids='f3',require_bench_coverage=TRUE)))
+ missing<-coverage_scores;missing$average[missing$id=='f3']<-NA_real_
+ stopifnot(is.null(lineup_optimize(coverage_roster,missing,'4-4-2',require_bench_coverage=TRUE)))
+ rows<-coverage_roster;rows$role[rows$id=='m5']<-'DEF';rows$role2[rows$id=='m5']<-'MID'
+ stopifnot(!is.null(lineup_optimize(rows,coverage_scores,'4-4-2',require_bench_coverage=TRUE)),
+  is.null(lineup_optimize(rows,coverage_scores,'4-4-2',multiposition=FALSE,require_bench_coverage=TRUE)))
+ # Even a substitute eligible for every role cannot replace three players.
+ rows<-coverage_roster[!coverage_roster$id%in%c('d5','m5'),];rows$role2[rows$id=='f3']<-'DEF/MID'
+ stopifnot(is.null(lineup_optimize(rows,coverage_scores,'4-4-2',require_bench_coverage=TRUE)))
+})
 check('completed-round arithmetic uses the shared exact window, including zero and negative points',{
  rounds<-data.frame(round_number=1:7,is_finished=c(rep(TRUE,6),FALSE))
  history<-data.frame(player_id=rep('p1',7),round=1:7,points=c(100,2,0,-3,4,7,999))
@@ -114,4 +144,7 @@ large_scores<-data.frame(id=large$id,average=seq_len(nrow(large)))
 time<-system.time(for(i in 1:20)lineup_optimize(large,large_scores,lineup_formations()))[['elapsed']]/20
 cat(sprintf('PERFORMANCE 100-player/all-formation optimizer + bench: %.1f ms mean (20 runs)\n',1000*time))
 stopifnot(time<.1)
+coverage_time<-system.time(for(i in 1:20)lineup_optimize(large,large_scores,lineup_formations(),require_bench_coverage=TRUE))[['elapsed']]/20
+cat(sprintf('PERFORMANCE required coverage, 100 players/all formations: %.1f ms mean (20 runs)\n',1000*coverage_time))
+stopifnot(coverage_time<.2)
 cat('LINEUP RUNTIME:',checks,'groups passed / 0 failed\n')

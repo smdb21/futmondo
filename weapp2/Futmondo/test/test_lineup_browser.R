@@ -10,6 +10,7 @@ fixture_roster <- data.frame(
   points = 100 + 1:24, buyPrice = 1000000, value = 2000000, stringsAsFactors = FALSE)
 fixture_roster$role2[8] <- 'centrocampista'
 fixture_roster$status[24] <- 'injured'
+fixture_roster$status[c(7, 17)] <- 'doubt'
 fixture_rounds <- data.frame(round_id = paste0('r', 1:6), round_number = 1:6,
   is_finished = c(rep(TRUE, 5), FALSE),
   begin_process = format(Sys.time() + c(-5:-1 * 86400, 3600), '%Y-%m-%dT%H:%M:%SZ', tz = 'UTC'))
