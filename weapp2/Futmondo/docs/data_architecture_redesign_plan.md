@@ -1,5 +1,10 @@
 # Futmondo data architecture redesign plan
 
+## Market balance card contrast — 2026-11-18
+
+- [x] Restore readable labels and amounts on Today’s market balance and team value cards.
+- [x] Verify locally in both themes and record the browser, lifecycle and performance checks in [data review](data_review_results.md).
+
 ## Player-card calendar labels — 2026-11-17
 
 - [x] Reduce horizontal tick labels to 10px and replace automatic date spacing with the 1st and 15th of each displayed month, preserving the existing date/round distinction.

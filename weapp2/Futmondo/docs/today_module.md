@@ -17,6 +17,8 @@ The optional `coach_source` argument supplies Today’s login-only default-enabl
 
 The page heading is **Today's market**. As of 2026-11-15, the introductory information icon and its market/balances/transfers tooltip are omitted at the owner’s request. Its market table starts with **Free Agents Only** checked. This is a table-specific initial setting; users can uncheck it or use Clear Filters to see owned listings too. The navigation label is **Today's market**. The team page appears in navigation as **My team**. No retrieval, financial calculation, action or refresh behavior changed.
 
+The **Current balance** and **Team value** cards below the coach checkbox use the active theme's text color so both labels and amounts are readable on the themed card background.
+
 ## Recent transfer presentation (2026-11-01)
 
 The latest 20 transfers show Date (`DD/MM/YYYY HH:MM`, UTC like the rival ledger), Name, Price, Buyer, Seller and Type. Names use the existing league directory with captured party names as fallback; system counterparties read Futmondo. Prices use dot thousands separators and no decimals. Historical club name/slug from captured `_playerTeam` is retained for the crest beside the player name; already loaded market metadata is a fallback. All text is HTML-escaped before the table permits generated image markup.

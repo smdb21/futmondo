@@ -1,5 +1,25 @@
 # Futmondo data review and implementation results
 
+## Market balance card contrast — 2026-11-18
+
+AdminLTE applied white text to the balance and team value cards even after the
+shared theme replaced their colored backgrounds. The card content now uses the
+active theme’s text color.
+
+Headless Chromium reproduced the light-theme contrast defect with the original
+CSS. Using the actual value-box markup and dashboard styles, the corrected
+labels and amounts had minimum contrast ratios of 9.11:1 in light mode and
+15.03:1 in dark mode at 320, 390 and 1440 px. The fixture had no horizontal
+overflow. The deployed site was unverified.
+
+`Rscript test/test_today_availability.R` passed all 3 checks, including one
+shared team read and preserved zero, negative and unavailable amounts.
+`Rscript test/test_shiny_simulation.R` passed 13 checks plus 8 tabs.
+
+The CSS changes only text color. It adds no layout work, requests, database
+operations, cache changes, timers, reactive updates, or persistent browser
+state. The deployment manifest reflects the stylesheet checksum.
+
 ## Player-card calendar labels — 2026-11-17
 
 The history chart now uses 10px horizontal labels (previously the inherited

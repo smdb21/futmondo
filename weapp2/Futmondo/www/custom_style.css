@@ -1025,6 +1025,7 @@ a, .box-title, .control-label, .description-header, .sidebar-menu > li > a, .mai
 .text-danger, .text-red { color: var(--fm-danger) !important; }
 .text-warning, .text-orange, .text-yellow { color: var(--fm-warning) !important; }
 .btn, .label, .badge, .small-box, .info-box, .alert, .list-group-item { background: var(--fm-surface) !important; color: var(--fm-text); border: 1px solid var(--fm-border); border-radius: 3px; }
+.small-box > .inner { color: var(--fm-text); }
 .btn-danger, .alert-danger { color: var(--fm-danger) !important; border-color: var(--fm-danger); }
 .btn-warning, .alert-warning { color: var(--fm-warning) !important; border-color: var(--fm-warning); }
 .btn:hover, .btn:focus, .sidebar-menu > li.active > a, .selectize-dropdown .active, .nav-tabs > li.active > a { background: var(--fm-border) !important; color: var(--fm-text) !important; }
