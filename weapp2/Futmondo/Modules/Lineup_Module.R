@@ -57,7 +57,9 @@ lineup_UI <- function(id) {
           shiny::actionButton(ns('best'),'Optimize',icon=shiny::icon('wand-magic-sparkles')),
           shiny::numericInput(ns('recent_n'),'Last N rounds',value=3,min=1,max=20,step=1)),
         shiny::div(class='fm-lineup-availability',
-          shiny::checkboxInput(ns('include_unavailable'),'Include injured/suspended players',FALSE,width='100%'),
+          shiny::checkboxInput(ns('include_doubtful'),shiny::span(
+            title='Allow doubtful players when optimizing. Injured, suspended and unavailable players are always excluded from the starting XI and bench.',
+            'Include doubtful players'),FALSE,width='100%'),
           shiny::checkboxInput(ns('require_bench_coverage'),shiny::span(
             title='When enabled, Optimize requires separate substitutes covering defender, midfielder and forward. Goalkeeper cover is not required. The starting XI or formation may change to leave this cover on the bench. If no eligible lineup can provide it, your draft is kept.',
             'Require full outfield bench coverage'),FALSE,width='100%'))),
@@ -214,7 +216,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       if(saving()){notice('Wait for the lineup save to finish before calculating Best XI.');return()}
       shiny::req(identity(),is_module_active())
       best_sequence<<-best_sequence+1L
-      best_request(list(generation=generation,key=loaded_key,sequence=best_sequence,n=n_rounds(),include=isTRUE(input$include_unavailable),coverage=isTRUE(input$require_bench_coverage)));best_note('')
+      best_request(list(generation=generation,key=loaded_key,sequence=best_sequence,n=n_rounds(),include=isTRUE(input$include_doubtful),coverage=isTRUE(input$require_bench_coverage)));best_note('')
       notice('Preparing Best XI + bench…')
     })
     shiny::observe({
@@ -227,7 +229,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
     shiny::observe({
       request<-best_request();if(is.null(request))return()
       if(!current(request$generation,request$key)||saving()||!isTRUE(is_module_active()))return()
-      n<-n_rounds();include<-isTRUE(input$include_unavailable);coverage<-isTRUE(input$require_bench_coverage)
+      n<-n_rounds();include<-isTRUE(input$include_doubtful);coverage<-isTRUE(input$require_bench_coverage)
       if(!identical(request$n,n)||!identical(request$include,include)||!identical(request$coverage,coverage)){
         best_request(NULL);notice('Best XI calculation cancelled because the settings changed. Press Optimize to calculate again.');return()
       }
@@ -244,7 +246,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       }
       score<-scores();rows<-roster()
       if(!length(attr(score,'rounds'))){best_request(NULL);notice('No completed rounds are available for this calculation.');return()}
-      eligible<-!rows$id%in%departure$excluded_ids&(if(include)rep(TRUE,nrow(rows))else !analytics_known_unavailable(rows))
+      eligible<-!rows$id%in%departure$excluded_ids&lineup_status_eligible(rows,include)
       missing<-sum(eligible&!is.finite(score$average[match(rows$id,score$id)]))
       if(missing){
         status<-history$status()
@@ -261,7 +263,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       session$onFlushed(function(){later::later(function(){shiny::isolate({
         if(identical(best_scheduled,request))best_scheduled<<-NULL
         if(!current(request$generation,request$key)||!identical(best_request(),request)||saving()||
-          !isTRUE(is_module_active())||!identical(n_rounds(),n)||!identical(isTRUE(input$include_unavailable),include)||
+          !isTRUE(is_module_active())||!identical(n_rounds(),n)||!identical(isTRUE(input$include_doubtful),include)||
           !identical(isTRUE(input$require_bench_coverage),coverage))return()
         latest_departure<-current_departures()
         if(!isTRUE(latest_departure$complete)||!identical(latest_departure$excluded_ids,departure$excluded_ids)){
@@ -428,7 +430,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       basis<-best_basis();departure<-departures();changed<-character()
       if(!is.null(basis)&&!is.null(draft())&&identical(basis$lineup,lineup_identity(draft()))) {
         if(!identical(basis$n,n_rounds()))changed<-c(changed,'last N rounds')
-        if(!identical(basis$include,isTRUE(input$include_unavailable)))changed<-c(changed,'injury/suspension setting')
+        if(!identical(basis$include,isTRUE(input$include_doubtful)))changed<-c(changed,'doubtful-player setting')
         if(!identical(isTRUE(basis$coverage),isTRUE(input$require_bench_coverage)))changed<-c(changed,'bench coverage setting')
         if(identical(basis$n,n_rounds())&&!nzchar(catalog_issue())&&length(wanted())&&!identical(basis$rounds,wanted()))changed<-c(changed,'completed-round window')
         if(isTRUE(departure$complete)&&!identical(basis$excluded_ids %||% character(),departure$excluded_ids))changed<-c(changed,'player departures')

@@ -23,8 +23,9 @@ oracle_coverage <- function(roles,index) {
   }
   assign(1L,integer())
 }
-oracle_lineup <- function(roster,scores,formations,include_unavailable=FALSE,require_bench_coverage=FALSE,multiposition=TRUE) {
-  if(!include_unavailable)roster<-roster[!analytics_known_unavailable(roster),,drop=FALSE]
+oracle_lineup <- function(roster,scores,formations,include_doubtful=FALSE,require_bench_coverage=FALSE,multiposition=TRUE) {
+  blocked<-c('injured','injured2','redcard','suspended','unavailable',if(!include_doubtful)c('doubt','doubtful'))
+  roster<-roster[!tolower(trimws(roster$status))%in%blocked,,drop=FALSE]
   score <- setNames(scores$average,scores$id)
   roles <- lapply(seq_len(nrow(roster)),function(i)
     unique(c(canonical(roster$role[i]),if(multiposition)canonical(roster$role2[i]))))
@@ -65,25 +66,26 @@ roster <- data.frame(id=c('gk','d1','d2','d3','d4','m1','m2','m3','m4','f1','f2'
   role=c('portero',rep('defensa',4),rep('centrocampista',4),rep('delantero',4),'defensa','centrocampista','delantero'),
   role2=c(NA,rep(NA,8),rep(NA,4),'centrocampista','delantero',NA),
   status=c('ok',rep('ok',14),'injured'),stringsAsFactors=FALSE)
+roster$status[roster$id=='f1']<-'doubt'
 score_values <- c(4,9,2,6,3,8,1,7,5,11,2,10,0,-2,12,100)
 scores <- data.frame(id=roster$id,average=score_values,coverage=5L,required=5L,status='complete',stringsAsFactors=FALSE)
 formations <- c('4-4-2','4-3-3','3-4-3','3-5-2','4-5-1')
 current <- list(strategy='4-4-2',starters=c('f1','f2','m1','m2','m3','m4','d1','d2','d3','d4','gk'),bench=rep('',4),captain='d1')
 expected <- oracle_lineup(roster,scores,formations)
-actual <- lineup_optimize(roster,scores,formations,current=current,include_unavailable=FALSE)
+actual <- lineup_optimize(roster,scores,formations,current=current,include_doubtful=FALSE)
 stopifnot(!is.null(actual),actual$total==expected,length(actual$draft$starters)==11L,
   length(unique(actual$draft$starters))==11L,actual$draft$captain%in%actual$draft$starters,
-  !'injured-forward'%in%actual$draft$starters)
+  !any(c('injured-forward','f1')%in%c(actual$draft$starters,actual$draft$bench)))
 for(i in seq_along(actual$draft$starters)) {
   id <- actual$draft$starters[i]
   eligible <- unique(c(canonical(roster$role[match(id,roster$id)]),canonical(roster$role2[match(id,roster$id)])))
   stopifnot(lineup_slot_roles(actual$draft$strategy)[i]%in%eligible)
 }
-included <- lineup_optimize(roster,scores,formations,current=current,include_unavailable=TRUE)
-stopifnot(included$total==oracle_lineup(roster,scores,formations,include_unavailable=TRUE),
-  'injured-forward'%in%included$draft$starters)
+included <- lineup_optimize(roster,scores,formations,current=current,include_doubtful=TRUE)
+stopifnot(included$total==oracle_lineup(roster,scores,formations,include_doubtful=TRUE),
+  'f1'%in%included$draft$starters,!'injured-forward'%in%c(included$draft$starters,included$draft$bench))
 stopifnot(is.null(lineup_optimize(roster,scores,'not-a-formation',current=current)))
-cat('PASS exhaustive independent XI oracle across five formations, multiposition roles, signed/zero scores, injury exclusion/override, uniqueness, captain and invalid formation\n')
+cat('PASS exhaustive independent XI oracle across five formations, multiposition roles, signed/zero scores, hard injury exclusion, optional doubt, uniqueness, captain and invalid formation\n')
 
 for(multi in c(FALSE,TRUE))for(override in c(FALSE,TRUE))for(shift in 0:2){
   varied<-scores;varied$average<-c(tail(score_values,shift),head(score_values,length(score_values)-shift))

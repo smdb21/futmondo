@@ -132,21 +132,21 @@ The pitch supports the twelve official 11-player formations, including 4-6-0. Av
 
 **Refresh lineup** reads the latest official lineup, current squad and formation/rule availability from Futmondo and persists successful observations through the existing snapshot store. It preserves the current on-screen draft, including unsaved optimized or manual selections, and never saves that draft to Futmondo. Use **Undo changes** to replace the draft with the latest loaded or successfully saved official lineup.
 
-**Clear lineup** empties starters, four substitutes and captain locally, preserving the selected formation, N and injury toggle. It makes no request and cannot submit an invalid empty XI. **Undo changes** restores the latest lineup loaded from or successfully saved to Futmondo, including a save confirmed by readback. Drafts survive navigation during the session; official successful observations survive restarts through database snapshots. A direct account replacement discards prior private drafts.
+**Clear lineup** empties starters, four substitutes and captain locally, preserving the selected formation, N and doubtful-player toggle. It makes no request and cannot submit an invalid empty XI. **Undo changes** restores the latest lineup loaded from or successfully saved to Futmondo, including a save confirmed by readback. Drafts survive navigation during the session; official successful observations survive restarts through database snapshots. A direct account replacement discards prior private drafts.
 
 Player tiles display a compact club crest beside the name for both starters and substitutes, in the editor and historical round lineups. Names wrap within their slot on narrow screens. The roster parser retains the source `team.logo` (or flat `logo`) in the existing database snapshot; hydration reuses it without new API or database requests. Older snapshots use the existing club-name image lookup until the normal 30-second refresh supplies source metadata. Images load lazily and share browser caching by URL. Position colors underline names without a separate abbreviation; bench colors use the main role only.
 
-The **Include injured/suspended players** checkbox occupies its own full-width row below Optimize and recent-round controls on mobile and desktop. Its label uses the available row width and wraps naturally on narrow screens.
+The **Include doubtful players** checkbox occupies its own full-width row below Optimize and recent-round controls on mobile and desktop. Its label uses the available row width and wraps naturally on narrow screens.
 
 ## Best XI and bench
 
-**Best XI + bench** compares arithmetic means over the same latest N source-confirmed completed rounds for all squad players, default five, selectable from one to twenty. Before N rounds exist, the actual completed count is displayed. Ongoing rounds and unanchored last-five vectors are excluded. Explicit zeroes and negative scores count normally; absent scores remain unknown. Missing histories are requested through the shared bounded controller and persisted through its existing score-first/check-last workflow. Best XI waits for complete scores for every eligible squad player before changing the draft. A single click remains pending while the schedule or histories load, with visible progress; verified publication completes that request automatically. Each click calculates once. Changing N updates displayed averages while keeping starters, bench, formation and captain unchanged. Changing N or the injury toggle cancels pending calculation; another explicit click is required. A generated lineup carries its calculation settings and completed-round window with its session draft, including when navigating between retained league/round contexts. When these differ from the current controls, a warning explains that the lineup does not correspond to Best XI for the new settings and asks the user to recalculate. Returning to the original settings clears the warning. The warning applies only while the lineup still matches the generated selection, and remains available after a verified save. Manual edits, Undo changes, explicit lineup refresh, save and account/league/round changes cancel pending calculation.
+**Best XI + bench** compares arithmetic means over the same latest N source-confirmed completed rounds for all squad players, default five, selectable from one to twenty. Before N rounds exist, the actual completed count is displayed. Ongoing rounds and unanchored last-five vectors are excluded. Explicit zeroes and negative scores count normally; absent scores remain unknown. Missing histories are requested through the shared bounded controller and persisted through its existing score-first/check-last workflow. Best XI waits for complete scores for every eligible squad player before changing the draft. A single click remains pending while the schedule or histories load, with visible progress; verified publication completes that request automatically. Each click calculates once. Changing N updates displayed averages while keeping starters, bench, formation and captain unchanged. Changing N or the doubtful-player toggle cancels pending calculation; another explicit click is required. A generated lineup carries its calculation settings and completed-round window with its session draft, including when navigating between retained league/round contexts. When these differ from the current controls, a warning explains that the lineup does not correspond to Best XI for the new settings and asks the user to recalculate. Returning to the original settings clears the warning. The warning applies only while the lineup still matches the generated selection, and remains available after a verified save. Manual edits, Undo changes, explicit lineup refresh, save and account/league/round changes cancel pending calculation.
 
 The button shows **Calculating…** with an animated spinner while a request is pending. Waiting-history messages remain visible, and the **Calculating Best XI + bench…** status is flushed to the browser before the optimizer runs on the next event-loop turn. Completion, no eligible XI, cancellation and optimizer errors settle the busy state; failures retain the draft. No artificial delay or recurring work is added. Average/history reads retain their existing durable reuse; changing controls never runs the optimizer by itself or introduces lineup API/database requests. The warning compares small local metadata and the displayed lineup identity.
 
 A vectorized positional-count dynamic program selects the maximum-total XI across every allowed formation with each player used at most once. The selected formation is a manual-edit starting point, not a constraint on Best XI: the calculated formation replaces it. For equal historical totals, the optimizer first maximizes the number of dual MID/FWD players assigned to midfield, then prefers the existing formation, retaining existing starters, and stable formation/player order. This midfield preference is included in both player assignment and formation selection, applies only when multiposition is enabled and both roles are eligible, and allows a forward assignment whenever it produces a higher historical total or is required for a legal XI. It does not add an estimated defensive-stat bonus to observed scores. The captain is retained if still starting; otherwise the highest-average starter is selected when captains are enabled.
 
-By default, the bench is selected from the remaining players after fixing the best starting XI. A separate bounded dynamic program first maximizes distinct outfield positions covered by distinct substitutes, then their total historical averages. It fills up to four places and orders them by average descending. Goalkeeper-only players are excluded from automatic substitutes; manual bench selection may still include them where the official rules permit. Injury/suspension exclusion applies to both XI and bench by default and has an explicit override. Missing coverage and unfilled places stay visible. Coverage indicators use the same distinct-player matching as the optimizer, so one multiposition substitute cannot claim three simultaneous replacements. The optional **Require full outfield bench coverage** checkbox constrains the XI to leave this coverage available; see the contract below.
+By default, the bench is selected from the remaining players after fixing the best starting XI. A separate bounded dynamic program first maximizes distinct outfield positions covered by distinct substitutes, then their total historical averages. It fills up to four places and orders them by average descending. Goalkeeper-only players are excluded from automatic substitutes; manual bench selection may still include them where the official rules permit. Injured, suspended and unavailable players are always excluded from the optimized XI and bench. Doubtful players are excluded by default and may be included with the checkbox. Missing coverage and unfilled places stay visible. Coverage indicators use the same distinct-player matching as the optimizer, so one multiposition substitute cannot claim three simultaneous replacements. The optional **Require full outfield bench coverage** checkbox constrains the XI to leave this coverage available; see the contract below.
 
 The lineup history client requests squad IDs and the exact completed-round window. It does not initialize the championship catalog until an ordinary player-table client requires it. New completed windows can request one bounded new acquisition despite an older successful same-N attempt. Existing table clients preserve their defaults and wider-window semantics.
 
@@ -154,13 +154,13 @@ The lineup history client requests squad IDs and the exact completed-round windo
 
 Lineup and My Team consume one context-scoped `incoming_clause_source` through the optional `clause_transfers_source` module argument. The optional `clause_transfers_refresh` callback retries that shared source on explicit **Refresh lineup**, preserving the local draft; standalone modules invalidate and refresh their own clause source. This refresh is scoped to clause evidence and the existing lineup reload. The root activates that source while either page is open; a standalone Lineup module creates its own source only when none is supplied. This reuses the existing persisted clause summaries and shared roster/history resources, with the same bounded two-read candidate queue and truthful partial/observed states. Entering Lineup first may activate those existing roster/history prerequisites and up to two candidate summary reads concurrently. Production shares that queue with My Team; moving between the pages reuses its observations. The normalized eligibility state publishes only material changes, so source timestamp updates alone do not redraw the picker or status.
 
-`clause_departure_round_state()` compares authoritative outgoing `leaves_at` instants with the selected round start. A player leaving **before or exactly at kickoff** is excluded from both optimized starters and substitutes, even when the injury/suspension override is enabled. A player leaving later remains eligible. The optimizer's optional `excluded_ids` argument applies before positional optimization and bench selection. Missing history for an excluded player does not hold up calculation; the existing history display remains available.
+`clause_departure_round_state()` compares authoritative outgoing `leaves_at` instants with the selected round start. A player leaving **before or exactly at kickoff** is excluded from both optimized starters and substitutes, even when Include doubtful players is enabled. A player leaving later remains eligible. The optimizer's optional `excluded_ids` argument applies before positional optimization and bench selection. Missing history for an excluded player does not hold up calculation; the existing history display remains available.
 
 Optimize waits for a complete departure check, including known departure times and the next-round schedule. Unknown/partial evidence retains the draft and explains the missing check; a verified publication completes the pending explicit calculation once. Known departures remain excluded when a partial update retains their last verified dates. A later change in exclusions warns that a generated lineup needs recalculation, without changing the draft automatically.
 
 The manual picker retains departing players with a **leaves by round start** explanation and a disabled selection button. Server-side selection and save checks also reject them. Existing official/draft selections stay visible for review and replacement. Save requires complete departure evidence, checks both XI and bench, and checks the current shared state directly again after its existing asynchronous official preflight, before submitting; this validation does not wait for the deduplicated display projection. It introduces no extra mutation or automatic retry.
 
-Offline regressions cover one second before/at/after kickoff, the injury override, missing histories only for excluded players, unknown departure dates, deferred completion, disabled picker buttons/server-side rejection, bench validation, and a departure discovered while save preflight is pending. These changes add a bounded local set-membership check and no timer, per-player table fetch, or snapshot format change.
+Offline regressions cover one second before/at/after kickoff, the doubtful-player option, missing histories only for excluded players, unknown departure dates, deferred completion, disabled picker buttons/server-side rejection, bench validation, and a departure discovered while save preflight is pending. These changes add a bounded local set-membership check and no timer, per-player table fetch, or snapshot format change.
 
 ## Official save and durable observations
 
@@ -245,7 +245,7 @@ Picker rows now place a compact icon beside the name instead of the long members
 
 ## Lineup control placement — 2026-11-09
 
-The formation selector sits directly above the pitch, replacing its repeated static formation heading. Optimize and the **Last N rounds** input share a single row, including narrow phones; the input can shrink to fit. The injury toggle keeps its own full-width row. Input identities, formation entitlements, draft selection and optimization/save behavior are unchanged.
+The formation selector sits directly above the pitch, replacing its repeated static formation heading. Optimize and the **Last N rounds** input share a single row, including narrow phones; the input can shrink to fit. The doubtful-player toggle keeps its own full-width row. Input identities, formation entitlements, draft selection and optimization/save behavior are unchanged.
 
 
 ## Horizontal desktop lineups — 2026-11-10
@@ -257,7 +257,7 @@ Both the editable lineup and `round_lineup_pitch_ui()` use this wrapper. Desktop
 
 ## Concise status and observed round schedules — 2026-11-14
 
-The routine departure-exclusion paragraph is removed; the My Team tint, disabled picker entries and save validation still explain or enforce affected selections. A generated lineup shows one short recalculation warning naming only actual changed inputs: Last N, injury/suspension setting, a verified completed-round window, or verified departure eligibility. Changing N is not also reported as a calendar change. Unavailable calendar/transfer evidence stays an unresolved check rather than being presented as a changed optimization result.
+The routine departure-exclusion paragraph is removed; the My Team tint, disabled picker entries and save validation still explain or enforce affected selections. A generated lineup shows one short recalculation warning naming only actual changed inputs: Last N, doubtful-player setting, a verified completed-round window, or verified departure eligibility. Changing N is not also reported as a calendar change. Unavailable calendar/transfer evidence stays an unresolved check rather than being presented as a changed optimization result.
 
 `lineup_catalog_problem(catalog, state=NULL, expected_context=NULL, now=Sys.time())` accepts successful complete worker observations for historical completed-round calculations even when their original freshness deadline expires. It preserves source timestamps/deadlines and does not reacquire or repersist observations. Real read/fetch errors, incomplete worker acquisition, invalid observation times and account/league/team/competition/season/scoring mismatches remain rejected. The existing unknown-finality contract remains: known completed rounds can be used when the calendar has no acquisition/conflict reason, even if another round's finality is unknown.
 
@@ -333,8 +333,8 @@ occupied pitch/bench portrait and beside the name in picker rows. `doubt`
 circle, `injured2` a hospital, `redcard`/`suspended` a square, and `unavailable`
 a barred circle. Tooltips and accessible labels distinguish these meanings.
 Empty/`ok` statuses add no icon; unrecognized nonempty codes show **Status
-unconfirmed**, never a guessed fitness label. Doubtful players remain eligible
-under the existing optimizer policy. Status changes only redraw the existing
+unconfirmed**, never a guessed fitness label. Doubtful players are eligible only when Include doubtful players is checked;
+injured, suspended and unavailable players remain excluded in either state. Status changes only redraw the existing
 roster projection. Current status is not added to historical round lineups.
 
 The current official public bundle still has SHA-256
@@ -363,3 +363,27 @@ wrap. There are no new API/database requests, timers, result caches, persistence
 formats, dependencies or environment settings. Existing durable histories,
 rosters and calendars retain their context and original source clocks. See
 [data review](data_review_results.md) for final executed checks and limits.
+
+
+## Doubtful-only optimization option — 2026-11-18
+
+The former injury/suspension override is replaced by **Include doubtful players**,
+unchecked by default. Its tooltip explains that the option can admit only
+observed `doubt`/`doubtful` players. Injured (`injured`/`injured2`), suspended
+(`redcard`/`suspended`) and unavailable players, including an explicit
+`available = FALSE`, are always excluded from both optimized starters and bench.
+Verified departure `excluded_ids` remain unconditional exclusions as well.
+
+`lineup_status_eligible(roster, include_doubtful = FALSE)` returns one eligibility
+mask for the optimizer and the module's complete-score preflight. This prevents
+missing histories for ineligible players from blocking calculation, while
+requiring doubtful-player histories when the option is selected. The fifth
+`lineup_optimize()` argument and Shiny input are now named `include_doubtful`;
+all internal callers use the new name. Changing it keeps the draft, cancels
+pending work and uses the existing stale-settings warning until another explicit
+Optimize click. There is no automatic save or recalculation.
+
+This is a local selection policy over already persisted roster/status and score
+observations. Shared availability facts, history arithmetic, context isolation,
+source clocks and durable database reuse are unchanged; no new acquisition,
+cache, persistence schema, timer, dependency or environment setting is added.

@@ -45,6 +45,36 @@ lineup_submit<-function(auth,championship_id,user_team_id,current,modified,owner
 settle<-function(session){for(i in seq_len(30)){later::run_now(0);session$flushReact()}}
 args<-list(is_module_active=function()TRUE,login_token=function()c(userid='fixture',token='synthetic'),championship_id=function()'league',user_team_id=function()'team',round_catalog=function()rounds,clause_transfers_source=function()list(outgoing_status='ok',outgoing_records=outgoing_clause_empty()))
 reset()
+state$official$roster[[20]]$status<-'injured'
+state$official$roster[[19]]$status<-'doubt'
+state$official$roster[[18]]$status<-'doubtful'
+history_data(full_history[!full_history$player_id%in%c('p20','p19','p18'),])
+shiny::testServer(lineup_Server,args=args,{
+ settle(session);ui<-xml2::read_html(as.character(lineup_UI('fixture')))
+ checkbox<-xml2::xml_find_first(ui,'.//input[@id="fixture-include_doubtful"]')
+ stopifnot(is.na(xml2::xml_attr(checkbox,'checked')),
+  grepl('Include doubtful players',xml2::xml_text(xml2::xml_parent(checkbox)),fixed=TRUE))
+ session$setInputs(best=1,require_bench_coverage=TRUE);settle(session);before<-draft()
+ stopifnot(state$optimizes==1L,is.null(best_request()),
+  !any(c('p20','p19','p18')%in%c(before$starters,before$bench)))
+ session$setInputs(include_doubtful=TRUE,best=2);settle(session)
+ stopifnot(identical(draft(),before),state$optimizes==1L,!is.null(best_request()),
+  grepl('complete scores for 2 eligible players',notice(),fixed=TRUE))
+ session$setInputs(include_doubtful=FALSE);settle(session)
+ stopifnot(is.null(best_request()),grepl('settings changed',notice(),fixed=TRUE))
+ history_data(full_history[full_history$player_id!='p20',]);settle(session)
+ stopifnot(identical(draft(),before),state$optimizes==1L)
+ session$setInputs(include_doubtful=TRUE,best=3);settle(session)
+ stopifnot(state$optimizes==2L,is.null(best_request()),all(c('p19','p18')%in%draft()$starters),
+  !'p20'%in%c(draft()$starters,draft()$bench))
+ included<-draft();session$setInputs(include_doubtful=FALSE);settle(session)
+ stopifnot(identical(draft(),included),grepl('doubtful-player setting',output$status$html,fixed=TRUE))
+ session$setInputs(best=4);settle(session)
+ stopifnot(state$optimizes==3L,!any(c('p20','p19','p18')%in%c(draft()$starters,draft()$bench)),
+  state$reads==1L,state$submits==0L)
+ cat('PASS doubtful-only checkbox defaults off, matches history eligibility, cancels pending work and never admits injured players\n')
+})
+reset()
 shiny::testServer(lineup_Server,args=args,{
  settle(session);ui<-as.character(lineup_UI('fixture'))
  checkbox<-xml2::xml_find_first(xml2::read_html(ui),'.//input[@id="fixture-require_bench_coverage"]')
@@ -246,7 +276,7 @@ shiny::testServer(lineup_Server,args=args,{
   identical(wanted(),as.numeric(5:6)),grepl('fm-lineup-best-warning',output$status$html),
   grepl('Optimization inputs changed:',output$status$html,fixed=TRUE),
   grepl('last N rounds',output$status$html,fixed=TRUE),grepl('Optimize to update this lineup.',output$status$html,fixed=TRUE),
-  !grepl('injury/suspension setting|completed-round window|player departures',output$status$html))
+  !grepl('doubtful-player setting|completed-round window|player departures',output$status$html))
  session$setInputs(recent_n=5);settle(session)
  stopifnot(identical(draft(),five_round_draft),state$optimizes==1L,!grepl('fm-lineup-best-warning',output$status$html))
  session$setInputs(recent_n=2);settle(session)
@@ -254,10 +284,10 @@ shiny::testServer(lineup_Server,args=args,{
  stopifnot(draft()$starters[11]=='p2',state$optimizes==2L,grepl('rounds 5, 6',best_note(),fixed=TRUE),
   !grepl('fm-lineup-best-warning',output$status$html),grepl('aria-busy="false"',output$status$html,fixed=TRUE))
  two_round_draft<-draft()
- session$setInputs(include_unavailable=TRUE);settle(session)
+ session$setInputs(include_doubtful=TRUE);settle(session)
  stopifnot(identical(draft(),two_round_draft),state$optimizes==2L,grepl('fm-lineup-best-warning',output$status$html),
-  grepl('Optimization inputs changed: injury/suspension setting.',output$status$html,fixed=TRUE))
- session$setInputs(include_unavailable=FALSE);settle(session)
+  grepl('Optimization inputs changed: doubtful-player setting.',output$status$html,fixed=TRUE))
+ session$setInputs(include_doubtful=FALSE);settle(session)
  stopifnot(!grepl('fm-lineup-best-warning',output$status$html))
  # Later history publication also updates only averages, without an optimizer run.
  revised<-window_history;revised$points[revised$player_id=='p1']<-1000;history_data(revised);settle(session)
@@ -485,7 +515,7 @@ reset()
 transfers(transfer_state(c('p20','p19','p18'),c(-1,0,1)))
 history_data(full_history[!full_history$player_id%in%c('p20','p19'),])
 shiny::testServer(lineup_Server,args=args,{
- settle(session);session$setInputs(best=1,include_unavailable=TRUE);settle(session)
+ settle(session);session$setInputs(best=1,include_doubtful=TRUE);settle(session)
  stopifnot(state$optimizes==1L,is.null(best_request()),!any(c(draft()$starters,draft()$bench)%in%c('p20','p19')),
   'p18'%in%draft()$starters,state$reads==1L,state$submits==0L,
   !grepl('fm-lineup-departures',output$status$html,fixed=TRUE),
@@ -500,7 +530,7 @@ shiny::testServer(lineup_Server,args=args,{
  # The server rejects a forged/obsolete save, including a departure on the bench.
  bad<-draft();bad$bench[1]<-'p19';draft(bad);session$setInputs(save=1);settle(session)
  stopifnot(state$submits==0L,state$reads==1L,grepl('replace them before saving',notice(),fixed=TRUE))
- cat('PASS before/at kickoff departures are excluded despite missing histories and injury override; later departures remain eligible; picker and save reject departing players\n')
+ cat('PASS before/at kickoff departures are excluded despite missing histories and enabling doubtful players; later departures remain eligible; picker and save reject departing players\n')
 })
 reset()
 transfers(transfer_state(status='loading'))

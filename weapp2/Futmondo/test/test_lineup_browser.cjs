@@ -87,6 +87,9 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
         assert.ok(box.width >= 14 && box.x >= portrait.x && box.x + box.width <= portrait.x + portrait.width + 1, 'Status stays beside the portrait within the slot');
       }
       const coverageOption = page.locator('#lineup-require_bench_coverage');
+      const doubtOption = page.locator('#lineup-include_doubtful');
+      assert.equal(await doubtOption.isChecked(), false);
+      assert.match(await page.locator('label').filter({ has: doubtOption }).innerText(), /Include doubtful players/);
       assert.equal(await coverageOption.isChecked(), false);
       assert.equal(await coverageOption.isEnabled(), true);
       const coverageLabel = page.locator('label').filter({ has: coverageOption });
@@ -138,7 +141,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       const settings = async () => page.evaluate(() => ({
         formation: document.querySelector('#lineup-formation').value,
         n: document.querySelector('#lineup-recent_n').value,
-        unavailable: document.querySelector('#lineup-include_unavailable').checked,
+        doubtful: document.querySelector('#lineup-include_doubtful').checked,
         coverage: document.querySelector('#lineup-require_bench_coverage').checked,
       }));
       const before = await settings();
@@ -187,6 +190,8 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       assert.equal(await page.evaluate(() => window.lineupClickedBeforeBinding), true);
       await assertMembership();
       await closePicker();
+      assert.equal(await page.locator('.fm-lineup-player[data-player-id="p7"], .fm-lineup-player[data-player-id="p17"], .fm-lineup-player[data-player-id="p24"]').count(), 0,
+        'Default optimization excludes doubtful and injured players from both XI and bench');
 
       const selections = async () => page.locator('.fm-lineup-player').evaluateAll(nodes => nodes.map(n => n.title));
       const fiveRoundSelections = await selections();
@@ -209,6 +214,22 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       await page.locator('#lineup-status').getByText(/Best XI \+ bench.*rounds 4, 5/).waitFor();
       assert.equal((await selections())[10], 'Change Player 2');
       assert.equal(await page.locator('.fm-lineup-best-warning').count(), 0);
+      assert.deepEqual((await page.locator('#fixture_counts').innerText()).split('/').map(Number), clearCounts);
+
+      const beforeDoubt = await selections();
+      await doubtOption.check();
+      await page.locator('.fm-lineup-best-warning').waitFor();
+      assert.match(await page.locator('.fm-lineup-best-warning').textContent(), /doubtful-player setting/);
+      assert.deepEqual(await selections(), beforeDoubt);
+      await page.locator('#lineup-best').click();
+      await page.locator('.fm-lineup-best-warning').waitFor({ state: 'detached' });
+      assert.equal(await page.locator('.fm-lineup-player[data-player-id="p7"]').count(), 1, 'Enabled option can select the high-scoring doubtful defender');
+      assert.equal(await page.locator('.fm-lineup-player[data-player-id="p24"]').count(), 0, 'The highest-scoring injured player is still excluded');
+      await doubtOption.uncheck();
+      await page.locator('.fm-lineup-best-warning').waitFor();
+      await page.locator('#lineup-best').click();
+      await page.locator('.fm-lineup-best-warning').waitFor({ state: 'detached' });
+      assert.equal(await page.locator('.fm-lineup-player[data-player-id="p7"], .fm-lineup-player[data-player-id="p17"], .fm-lineup-player[data-player-id="p24"]').count(), 0);
       assert.deepEqual((await page.locator('#fixture_counts').innerText()).split('/').map(Number), clearCounts);
 
       const beforeCoverage = await selections();

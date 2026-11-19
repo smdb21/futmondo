@@ -82,8 +82,12 @@ check('required bench coverage changes the optimal formation and leaves three di
 check('required coverage respects unavailable players, departures, missing scores and multiposition permissions',{
  rows<-coverage_roster;rows$status[rows$id=='f3']<-'injured'
  stopifnot(is.null(lineup_optimize(rows,coverage_scores,'4-4-2',require_bench_coverage=TRUE)),
-  !is.null(lineup_optimize(rows,coverage_scores,'4-4-2',include_unavailable=TRUE,require_bench_coverage=TRUE)),
-  is.null(lineup_optimize(rows,coverage_scores,'4-4-2',include_unavailable=TRUE,excluded_ids='f3',require_bench_coverage=TRUE)))
+  is.null(lineup_optimize(rows,coverage_scores,'4-4-2',include_doubtful=TRUE,require_bench_coverage=TRUE)),
+  is.null(lineup_optimize(rows,coverage_scores,'4-4-2',include_doubtful=TRUE,excluded_ids='f3',require_bench_coverage=TRUE)))
+ rows$status[rows$id=='f3']<-'doubt'
+ stopifnot(is.null(lineup_optimize(rows,coverage_scores,'4-4-2',require_bench_coverage=TRUE)),
+  !is.null(lineup_optimize(rows,coverage_scores,'4-4-2',include_doubtful=TRUE,require_bench_coverage=TRUE)),
+  is.null(lineup_optimize(rows,coverage_scores,'4-4-2',include_doubtful=TRUE,excluded_ids='f3',require_bench_coverage=TRUE)))
  missing<-coverage_scores;missing$average[missing$id=='f3']<-NA_real_
  stopifnot(is.null(lineup_optimize(coverage_roster,missing,'4-4-2',require_bench_coverage=TRUE)))
  rows<-coverage_roster;rows$role[rows$id=='m5']<-'DEF';rows$role2[rows$id=='m5']<-'MID'
@@ -127,15 +131,28 @@ check('formation entitlement never purchases a paid formation',{
  available<-lineup_available_formations(list(strategies=list(list(st='4-4-2',pro=FALSE),list(st='3-6-1',pro=TRUE),list(st='4-6-0',pro=TRUE)),bought=list(list(st='4-6-0',fs=FALSE))),'4-4-2')
  stopifnot(setequal(available,c('4-4-2','4-6-0')))
 })
-check('injury exclusion applies to starters and bench and can be overridden',{
- injured<-roster;injured$status[20]<-'injured'
- got<-lineup_optimize(injured,score,lineup_formations())
- stopifnot(!'p20'%in%c(got$draft$starters,got$draft$bench),
-  'p20'%in%lineup_optimize(injured,score,lineup_formations(),include_unavailable=TRUE)$draft$starters)
+check('injury, suspension and unavailability exclusions cannot be overridden for starters or bench',{
+ for(status in c('injured','injured2','redcard','suspended','unavailable'))for(include in c(FALSE,TRUE)){
+  rows<-roster;rows$status[rows$id%in%c('p20','p4')]<-status
+  rows$available<-rows$id!='p19'
+  got<-lineup_optimize(rows,score,'4-4-2',include_doubtful=include,require_bench_coverage=TRUE)
+  stopifnot(!is.null(got),!any(c('p20','p19','p4')%in%c(got$draft$starters,got$draft$bench)))
+ }
 })
-check('departure exclusion always applies to XI and bench, including the injury override',{
+check('doubtful players are optional for starters and bench, with explicit exclusions preserved',{
+ rows<-roster;rows$status[rows$id=='p20']<-' DOUBT ';rows$status[rows$id=='p4']<-'doubtful'
+ for(coverage in c(FALSE,TRUE)){
+  excluded<-lineup_optimize(rows,score,'4-4-2',require_bench_coverage=coverage)
+  included<-lineup_optimize(rows,score,'4-4-2',include_doubtful=TRUE,require_bench_coverage=coverage)
+  stopifnot(!any(c('p20','p4')%in%c(excluded$draft$starters,excluded$draft$bench)),
+   'p20'%in%included$draft$starters,'p4'%in%included$draft$bench)
+ }
+ departed<-lineup_optimize(rows,score,'4-4-2',include_doubtful=TRUE,excluded_ids=c('p20','p4'))
+ stopifnot(!any(c('p20','p4')%in%c(departed$draft$starters,departed$draft$bench)))
+})
+check('departure exclusion always applies to XI and bench, including when doubtful players are enabled',{
  departed<-c('p20','p15','p8');rows<-roster;rows$status[20]<-'injured'
- got<-lineup_optimize(rows,score,lineup_formations(),include_unavailable=TRUE,excluded_ids=departed)
+ got<-lineup_optimize(rows,score,lineup_formations(),include_doubtful=TRUE,excluded_ids=departed)
  stopifnot(!any(c(got$draft$starters,got$draft$bench)%in%departed),
   'p19'%in%got$draft$starters,all(c(got$draft$starters,got$draft$bench)%in%rows$id))
 })

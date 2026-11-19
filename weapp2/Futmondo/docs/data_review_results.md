@@ -5051,3 +5051,46 @@ findings are unchanged from before the migration; health advisor is clear.
 No account/job/history contents were changed by verification. Hosted UI acceptance
 and updated-worker telemetry remain separate deployment checks; no claim of a
 complete HTTP trace or resolution of unrelated source-data failures is made.
+
+
+## Doubtful-only lineup option — 2026-11-18
+
+Changed the checkbox and optimizer argument to `include_doubtful`, off by default.
+A shared lineup-only status predicate always rejects injury, long-term injury,
+suspension, unavailability and explicit `available = FALSE`; only source
+`doubt`/`doubtful` can be admitted by the checkbox. Explicit exclusions/departures
+still take precedence. The complete-score preflight uses the same predicate, so
+missing excluded-player scores do not block an otherwise valid calculation.
+
+Executed checks:
+
+- `Rscript test/test_lineup_runtime.R`: 17 groups passed, including every hard
+  status in both checkbox states, starter/bench doubt inclusion, full-coverage
+  infeasibility, explicit exclusion precedence and existing score calculations.
+- `Rscript test/test_lineup_independent.R`: exhaustive XI/bench oracle and twelve
+  constrained cases passed with independent status filtering, permanent injury
+  exclusion and optional doubt; signed/zero scores remain unchanged.
+- `Rscript test/test_lineup_module.R`: all groups passed, including default/label,
+  matching history requirements, cancellation before late publication, no
+  automatic recalculation, hard exclusions despite missing histories, and
+  existing departure/context/conflict/readback checks.
+- Offline `test/test_lineup_browser.R` plus `test/test_lineup_browser.cjs` on port
+  8545 with the installed Playwright browser passed at 320/390/1440px. Default
+  optimization excludes the doubtful defender/forward; opting in admits the
+  doubtful defender while the highest-scoring injured player stays excluded;
+  opting out and explicitly optimizing removes doubtful selections. Existing
+  order, icons, opposite fixture crests, manual editing and synthetic save flows
+  pass; local interactions leave API/database counters unchanged.
+- Scoped whitespace checks passed. No shared infrastructure, startup or global
+  availability predicate changed; the focused suites cover this lineup policy.
+
+Performance review: twenty 100-player/all-formation runs averaged 41.3 ms with
+bench coverage off and 63.0 ms with it required; the independent warm case took
+36 ms. Picker opens measured 39/72/42 ms at 320/390/1440px. Eligibility adds one
+linear status-vector check; the bounded optimizer, rendering and memory limits
+remain unchanged. There are no new requests, timers, recurring work, result
+caches or persistence formats. Existing durable roster/status/history snapshots
+retain their account/league/season/scoring context and source clocks. No new
+dependencies or environment settings; manifest regeneration is unnecessary.
+All execution was local/offline with synthetic accounts. Deployment and hosted
+acceptance remain unverified.

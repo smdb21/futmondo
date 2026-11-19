@@ -2208,3 +2208,15 @@ Status: **implemented and verified locally; additive production migration applie
 
 See [monitor contracts](admin_worker_monitor.md) and [executed checks](data_review_results.md).
 Public login feature tiers are unchanged: this is admin-only operational infrastructure.
+
+
+## Doubtful-only lineup option — 2026-11-18
+
+- [x] Replace the injury override with an unchecked-by-default Include doubtful players option and explanatory tooltip.
+- [x] Always exclude injured, suspended, unavailable and explicitly excluded/departing players from optimized XI and bench, regardless of the option.
+- [x] Share status eligibility with complete-score checks; preserve pending cancellation, explicit optimization and existing save safeguards.
+- [x] Verify runtime/independent oracle/module regressions, mobile/desktop browser behavior, request reuse and performance.
+- [ ] Hosted acceptance after deployment.
+
+Contract: [lineup module](lineup_module.md). Local checks and limits:
+[data review](data_review_results.md). No new capability, schema or dependency.

@@ -63,7 +63,7 @@ The differences below are **specific implemented additions beyond the workflows 
 
 | Login ID / addition | Official baseline | Specific LigaRadar behavior | Local implementation evidence |
 | --- | --- | --- | --- |
-| `lineup_optimizer` — Best XI + bench optimization | Suggested lineup and aggregate lineup average already exist; the automatic coach performs post-round substitutions. | An explicit click maximizes observed average totals over a selected 1–20 completed-round window across permitted formations, then chooses coverage-aware substitutes; an optional full outfield coverage requirement can also constrain the XI and formation. Applies injury policy and verified departures by next kickoff. It is a LigaRadar calculation independent of opening the official suggested-lineup control, which the owner does not see in their league. Permitted formation entitlements, multiposition, player eligibility and official save preflights still apply. A complete eligible history/check is required; the user reviews and saves the draft. | `Modules/Lineup_Module.R`, `lineup_runtime.R`; [lineup](lineup_module.md). |
+| `lineup_optimizer` — Best XI + bench optimization | Suggested lineup and aggregate lineup average already exist; the automatic coach performs post-round substitutions. | An explicit click maximizes observed average totals over a selected 1–20 completed-round window across permitted formations, then chooses coverage-aware substitutes; an optional full outfield coverage requirement can also constrain the XI and formation. Always excludes injured, suspended and unavailable players and verified departures by next kickoff; doubtful players are optional and excluded by default. It is a LigaRadar calculation independent of opening the official suggested-lineup control, which the owner does not see in their league. Permitted formation entitlements, multiposition, player eligibility and official save preflights still apply. A complete eligible history/check is required; the user reviews and saves the draft. | `Modules/Lineup_Module.R`, `lineup_runtime.R`; [lineup](lineup_module.md). |
 | `recent_average` — Player rankings by last-N average | Player averages and a top-five total-points ranking already exist. | Choose 1–20 recent rounds and numerically sort market, squad and all-player tables by that window's average. Table windows and lineup completed-round windows have distinct documented finality contracts. Unknown scores remain unknown; source zero and negative scores count. | `Modules/Players_Table_Module.R`, `factual_helpers.R`; [player tables](players_table_module.md), [score reuse](round_points_matrix.md). |
 | `price_efficiency` — Points per million | Official market/clause prices and player points. | Sort the same recent average divided by market value in Today or clause price in Players, expressed as points per €1M. Missing/nonpositive prices do not produce ratios. | `Modules/Players_Table_Module.R`; [player tables](players_table_module.md#points-to-price-ratios). |
 | `rival_cash` — Reconstructed rival balances | Own financial movements and other teams' squad values. | Reconcile an estimated rival cash balance and running history from opening funds, transfers, configured rewards and available historical eligibility. Estimates, gaps and discrepancies remain labelled. | `Modules/Rivals_Module.R`; [cash accounting](rival_cash_accounting.md), [rivals](rivals_module.md). |
@@ -262,3 +262,20 @@ account versus other accounts. This is internal operational infrastructure,
 not a public football-analysis capability, and is excluded from the public
 Essentials/Advanced login inventory. Sampling, authorization and limits:
 [admin worker monitor](admin_worker_monitor.md).
+
+
+## Doubtful-only lineup inclusion — 2026-11-18
+
+The existing lineup optimizer checkbox now opts into doubtful players only;
+injured, suspended and unavailable players cannot be admitted by that option.
+The same rule governs starting XI, substitutes and required score completeness.
+This refines the existing `lineup_optimizer` policy, without a new login-tier
+capability or exclusivity claim. The current Advanced copy's injury/departure
+checks remain accurate.
+
+The official 5.0.5 release notes and public-client status rendering inspected
+above already establish shared injury, doubt and suspension information. They
+do not establish the current official suggested-lineup eligibility policy; no
+new authenticated official comparison is claimed. This correction follows the
+owner's requested selection rule and reuses the previously verified source codes
+and database observations. See [lineup contract](lineup_module.md).

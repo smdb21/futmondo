@@ -104,15 +104,22 @@ lineup_average_scores <- function(roster,history,rounds,n=5L) {
   }
   attr(result,'rounds')<-wanted;result
 }
+# Injuries/suspensions are hard exclusions; only doubt can be opted into.
+lineup_status_eligible <- function(roster,include_doubtful=FALSE) {
+  eligible<-!analytics_known_unavailable(roster)
+  if(!isTRUE(include_doubtful)&&'status'%in%names(roster))
+    eligible<-eligible&!tolower(trimws(as.character(roster$status)))%in%c('doubt','doubtful')
+  eligible
+}
 # One player per pass, vectorized over a bounded positional count lattice.
 # Predecessors reconstruct exact distinct-player assignments (no greedy picks).
-lineup_optimize <- function(roster,scores,allowed,current=NULL,include_unavailable=FALSE,bench_enabled=TRUE,multiposition=TRUE,excluded_ids=character(),require_bench_coverage=FALSE) {
+lineup_optimize <- function(roster,scores,allowed,current=NULL,include_doubtful=FALSE,bench_enabled=TRUE,multiposition=TRUE,excluded_ids=character(),require_bench_coverage=FALSE) {
   if(isTRUE(require_bench_coverage)&&!isTRUE(bench_enabled))return(NULL)
   allowed<-intersect(lineup_formations(),as.character(allowed));if(!length(allowed))return(NULL)
   roster<-roster[order(as.character(roster$id)),,drop=FALSE]
   values<-as.numeric(scores$average[match(as.character(roster$id),as.character(scores$id))])
   keep<-is.finite(values)&!duplicated(as.character(roster$id))&!as.character(roster$id)%in%excluded_ids
-  if(!include_unavailable)keep<-keep&!analytics_known_unavailable(roster)
+  keep<-keep&lineup_status_eligible(roster,include_doubtful)
   roster<-roster[keep,,drop=FALSE];values<-values[keep];positions<-lineup_positions(roster,multiposition)
   counts<-t(vapply(allowed,function(x)c(1L,as.integer(strsplit(x,'-',fixed=TRUE)[[1]])),integer(4)))
   maxima<-apply(counts,2,max);dims<-maxima+1L;stride<-c(1L,cumprod(dims)[1:3]);base_size<-prod(dims)
