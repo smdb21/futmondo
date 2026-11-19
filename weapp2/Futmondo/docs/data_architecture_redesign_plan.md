@@ -2177,3 +2177,13 @@ Status: **implemented and verified locally; hosted acceptance pending**.
 
 Contract: [lineup module](lineup_module.md). Verification: [data review](data_review_results.md).
 No schema migration, dependency, environment variable, automated transaction or new worker job.
+
+
+## Opposing match-crest placement — 2026-11-18
+
+- [x] Put the home crest at the outside left and the away crest at the outside right of each lineup match card, with names toward the center.
+- [x] Verify existing browser flows at 320/390/1440px, inspect the narrow-screen screenshot and record the performance assessment.
+- [ ] Hosted visual acceptance after deployment.
+
+Presentation-only refinement of the existing fixture feature; no new capability,
+login inventory, data contract, source acquisition or persistence change.

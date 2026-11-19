@@ -46,6 +46,7 @@ lineup_UI <- function(id) {
       .fm-lineup-fixture-team-name{min-width:0;overflow-wrap:anywhere}
       .fm-lineup-fixture-crest{width:24px;height:24px;flex:0 0 24px;object-fit:contain}
       .fm-lineup-fixture-away{justify-content:flex-end;text-align:right}
+      .fm-lineup-fixture-away>.fm-lineup-fixture-crest{order:1}
       .fm-lineup-fixture-vs{font-size:12px;color:var(--fm-muted,#647067)}
       @media(max-width:600px){.fm-lineup-fixtures-list{grid-template-columns:minmax(0,1fr)}}
     ")),

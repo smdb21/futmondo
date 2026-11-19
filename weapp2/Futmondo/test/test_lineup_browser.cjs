@@ -115,8 +115,11 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       assert.ok(crestSources.every((src, i) => src.endsWith(i % 2 ? '/fixture-away.png' : '/fixture-home.png')));
       assert.ok(await page.locator('.fm-lineup-fixture-team').evaluateAll(nodes => nodes.every(n => {
         const crest=n.querySelector('img').getBoundingClientRect(), name=n.querySelector('.fm-lineup-fixture-team-name').getBoundingClientRect();
-        return crest.right <= name.left + 1 && name.right <= innerWidth + 1;
-      })), 'Crests sit beside club names without overflow');
+        const team=n.getBoundingClientRect(), away=n.classList.contains('fm-lineup-fixture-away');
+        return (away ? name.right <= crest.left + 1 && Math.abs(crest.right - team.right) <= 1
+          : crest.right <= name.left + 1 && Math.abs(crest.left - team.left) <= 1) &&
+          Math.min(crest.left, name.left) >= 0 && Math.max(crest.right, name.right) <= innerWidth + 1;
+      })), 'Home crest sits outside left and away crest outside right, without overflow');
       await page.screenshot({ path: `/tmp/futmondo-lineup-fixtures-${width}.png`, fullPage: true });
       await assertControlsLayout();
       await assertLineupLayout(page, page.locator('.fm-lineup-layout'));

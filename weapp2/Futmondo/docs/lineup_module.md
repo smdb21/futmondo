@@ -3,7 +3,9 @@
 ## Match crests — 2026-11-17
 
 Each home and away club now displays its observed crest beside its name in the
-next-round fixtures. The 24px images have fixed dimensions, lazy loading and
+next-round fixtures. Following the 2026-11-18 layout adjustment, the home crest
+sits on the outside left and the away crest on the outside right, with both
+names toward the middle. The 24px images have fixed dimensions, lazy loading and
 asynchronous decoding; long names still wrap on mobile. The adjacent text remains
 the accessible club label. Missing or failed images leave the name visible.
 

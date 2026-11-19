@@ -4964,3 +4964,22 @@ Madrid and Barcelona crest assets returned HTTP 200 PNGs. No authenticated
 `league/matches` response existed in the available captures; deployed match-logo
 coverage, deployment and hosted visual acceptance remain unverified. This task
 does not claim to have fixed a demonstrated production crest acquisition defect.
+
+
+## Opposing match-crest placement — 2026-11-18
+
+The away crest now follows its club name visually, placing both match crests at
+opposite outside edges. One local CSS ordering rule changes presentation only;
+existing accessible club labels, 24px images, lazy loading and failed-image
+handling remain intact. The existing browser geometry assertion now verifies
+both outer-edge positions and name/image separation.
+
+`test/test_lineup_browser.R` plus `test/test_lineup_browser.cjs` passed at
+320/390/1440px using the installed Playwright browser and local fixture port
+8544; inspected the 320px screenshot. Long names wrap without overflow, and
+existing edit/optimize/save flows and request counters pass. Scoped whitespace
+checks passed. Performance review: unchanged node/image counts, layout
+complexity, API/database traffic, cache reuse, reactive work, timers and memory;
+only flex-item order changes. No additional runtime performance test, dependency
+or full lifecycle run is required for this module-local CSS adjustment. No
+production deployment or authenticated hosted acceptance is claimed.
