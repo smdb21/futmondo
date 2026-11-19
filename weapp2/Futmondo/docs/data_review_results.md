@@ -1,5 +1,22 @@
 # Futmondo data review and implementation results
 
+## Player-card opening latency review (2026-11-19)
+
+Today’s market uses `players_table_Server()`. The Reactable click travels over the Shiny connection. The server captures the existing selected row and sends modal HTML, then enables the selected-player reactive in `session$onFlushed()`. The first shell contains the close control and output placeholders. The identity arrives through a subsequent output flush even though the clicked row already contains the name. Its server metric starts when the card context activates, so it omits the click, modal delivery and browser paint. The browser’s identity acknowledgement unlocks the chart separately. History also depends on resolved league, summary and lineup facts.
+
+Headless Chromium measured the actual Today’s market table in the offline application, timing DOM visibility from the click. Requests outside the local fixture were blocked. The fixture delays summary by 2 seconds and match details by 2.8 seconds. It uses one R process across browser sessions.
+
+| Rows | Viewport | First shell | First name | Match details | Reopen name |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 3 | 390 px | 304 ms | 502 ms | 3,256 ms | 196–203 ms |
+| 3 | 1440 px | 213 ms | 378 ms | 3,005 ms | 199–216 ms |
+| 524 | 390 px | 366 ms | 581 ms | 3,335 ms | 227 ms |
+| 524 | 1440 px | 260 ms | 422 ms | 3,088 ms | 221 ms |
+
+In the dense fixture the click reached the WebSocket in 20–29 ms. The first modal frame arrived at 110–215 ms, before the shell became visible. A separate first-open R profile sampled 0.40 seconds of byte compilation in a 1.94-second window spanning selection and early rendering. It does not attribute all of that work to the interval before identity. `test/test_player_card_database_display.R` also passed, including saved-snapshot reuse, pending optional reads, and zero source acquisition from browsing.
+
+This separates a measured startup/second-flush cost from the reproducible multi-second wait for match details. The local fixtures did not reproduce several seconds before the shell appeared. A delay before the shell on the hosted app requires an authenticated browser trace from click to selection send, modal frame and DOM visibility to distinguish session/network delay from browser initialization. A follow-up speed change could include the captured row’s name in the initial shell and leave optional history deferred. Public fingerprints match all four runtime files from `9a66a7f`. This review makes no runtime change and has no performance impact.
+
 ## Player-card clause controls and Market offers (2026-11-19)
 
 The player card previously treated every non-owned player row as a possible clause purchase. Saved System ownership and a retained positive clause price reproduce the screenshot. The focused database-backed card test exercises open and locked rival clauses, a listed free agent with the same positive clause price, stale clause entry and confirmation, market-offer availability and zero browsing source calls.

@@ -1,5 +1,12 @@
 # Futmondo data architecture redesign plan
 
+## Player-card opening latency review (2026-11-19)
+
+- [x] Trace Today’s market from its Reactable click to modal shell, player name and delayed match details. Record browser timings for phone and desktop layouts with both small and 524-player tables.
+- [ ] Measure the reported multi-second wait in an authenticated hosted session. The local browser measurements do not identify that incident’s cause.
+
+This review has no runtime effect. See [the measured stages](data_review_results.md#player-card-opening-latency-review-2026-11-19).
+
 ## Player-card clauses and Market offers (2026-11-19)
 
 - [x] Require rival ownership for clause actions and exercise saved free-agent cards, stale confirmation and rival open/locked states.
