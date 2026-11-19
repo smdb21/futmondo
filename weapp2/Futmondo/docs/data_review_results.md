@@ -5158,3 +5158,63 @@ budget are unchanged. Browser p95 3D drawing took 1.3–1.5 ms at standard sizes
 and at most 6.7 ms at 4× CPU throttling, including the outlined kit fixture.
 Timing is local to the renderer and adds no requests, persistent state, or
 delay to application readiness.
+
+## Missing Lineup fixture crests — 2026-11-18
+
+Read-only production diagnostics found a successful, context-matched calendar
+with 38 rounds / 380 matches. Round 13 selected ten games correctly; the actual
+Shiny render also produced ten cards after synthetic identity substitution. The
+user confirmed that reloading restored the section and supplied a screenshot
+showing missing crests. Every persisted calendar logo field was empty (760/760).
+The existing club snapshot held twenty logos and exactly matched all twenty
+next-round club IDs. Fixed pure-display replay resolved twenty of twenty crests,
+without acquiring from Futmondo or changing any database rows. Public client
+contract and hash are recorded in `lineup_module.md`.
+
+The fix uses the existing shared `get_real_clubs` database resource only when a
+selected fixture lacks its own logo. It joins by source ID, preserves direct
+logos and match names, rejects foreign/ambiguous/unverified observations, and
+keeps separate original catalogue and calendar clocks. Games stay visible while
+crests load; the draft and manual-action protections are unchanged.
+
+Validation:
+
+- `test/test_lineup_fixture_crests.R`: actual worker codec and factual adapter;
+  synthetic delayed database reads, two sessions with decoded/process caches
+  cleared, exact-ID matching despite different names/order, version-1 calendars,
+  direct-logo precedence, duplicate IDs, scope isolation, failure/partial/future
+  rejection, stale timestamps and zero source calls. Each cold session uses one
+  coalesced saved-catalogue read; additional flushes add no reads or writes.
+  Two local publication samples were 236/117 ms, including test flush overhead.
+- `test/test_lineup_fixture_crests_browser.R` and `.cjs`: 320/390/1440px, light
+  and dark; ten visible games before catalogue publication, twenty loaded image
+  elements afterward, opposing crest placement, unchanged draft/read-write
+  counters, no overflow or browser errors. Images use intercepted synthetic
+  assets; this does not measure CDN/mobile-network reliability. Screenshots
+  inspected. Initial test setup issues (pending-output waiting and theme
+  selector) were corrected before final verification.
+- Existing fixture and worker-calendar checks passed (including eight calendar
+  groups), as did the Lineup edit/save module suite. The 380-fixture parser took
+  326 ms; existing selection/validation averaged 18 ms. Required offline
+  lifecycle passed 13 checks plus eight tabs with zero real HTTP/database
+  mutations; existing synthetic warnings remained visible.
+
+Performance review: the ID join handles at most 50 selected matches against a
+2,000-row bounded catalogue (observed size: twenty clubs / 2,073 encoded bytes).
+It adds one cold database resource interest and reuses the existing bounded
+shared cache; it adds no source request, write, timer or worker job. Both input
+observations remain durable and reusable after restart. Direct-logo calendars
+skip the catalogue read entirely. Only the fixture output depends on catalogue
+publication; the pitch/draft stays mounted. Two lazy images per match were
+already part of the UI contract. This is an existing feature repair, so feature
+comparison/login tiers are unchanged. Hosted authenticated rendering and
+physical-phone latency remain separate from these local checks.
+
+Final isolated delivery checks passed against the exact prepared task tree:
+crest adapter/codec, fixture/calendar, Lineup edit/save, deployment exclusions
+and offline lifecycle (13 checks/eight tabs), plus all six responsive browser
+combinations. Isolated publication samples were 219/112 ms; 380-match selection
+averaged 17 ms. All twenty observed public CDN crest URLs returned HTTP 200.
+Only the two changed runtime checksums/fingerprints are included; unrelated
+working changes remain excluded. No dependency/schema change or production
+data mutation was needed.

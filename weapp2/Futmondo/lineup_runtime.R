@@ -32,9 +32,27 @@ lineup_fixture_crest_url <- function(logo) {
   if(!grepl('^[A-Za-z0-9][A-Za-z0-9_.-]*$',logo))return('')
   paste0(TEAM_LOGO_URL,logo,if(grepl('\\.(png|svg|webp)$',logo,ignore.case=TRUE))''else'.png')
 }
-# No acquisition here: the shared round resource includes the durable calendar.
-lineup_fixture_view <- function(rounds,target,scope,now=Sys.time()) {
-  result<-list(rows=league_fixture_empty(),message='',complete=FALSE,stale=FALSE,observed_at=NULL)
+# Match records may omit logos. Reuse the separately persisted club catalogue,
+# with exact source club IDs and its own scope/clocks, never name-derived files.
+lineup_fixture_clubs <- function(state,scope,now=Sys.time()) {
+  empty<-list(rows=data.frame(teamId=character(),logo=character()),observed_at=NULL,stale=FALSE)
+  if(!is.list(state)||!is.list(state$context)||!all(vapply(
+    c('account_id','championship_id','competition_id','season'),function(field)
+      identical(mvp_text(state$context[[field]]),mvp_text(scope[[field]])),logical(1))))return(empty)
+  rows<-state$data;stamp<-fm_time(attr(rows,'observed_at'));deadline<-fm_number(attr(rows,'valid_until'))
+  status<-attr(rows,'worker_acquisition_status') %||% attr(rows,'fetch_status')
+  if(!is.data.frame(rows)||nrow(rows)>2000L||!all(c('teamId','logo')%in%names(rows))||
+     !is.character(rows$teamId)||!is.character(rows$logo)||
+     !isTRUE(status%in%c('ok','empty','stale'))||identical(attr(rows,'worker_completeness'),'partial')||
+     length(stamp)!=1L||is.na(stamp)||stamp>now||!is.finite(deadline))return(empty)
+  duplicate<-duplicated(rows$teamId)|duplicated(rows$teamId,fromLast=TRUE)
+  rows<-rows[!is.na(rows$teamId)&nzchar(rows$teamId)&!is.na(rows$logo)&!duplicate,c('teamId','logo'),drop=FALSE]
+  list(rows=rows,observed_at=stamp,stale=deadline<=as.numeric(now)||!is.null(state$error))
+}
+# No acquisition here: both inputs come from shared durable worker resources.
+lineup_fixture_view <- function(rounds,target,scope,now=Sys.time(),clubs_state=NULL) {
+  result<-list(rows=league_fixture_empty(),message='',complete=FALSE,stale=FALSE,observed_at=NULL,
+    crest_observed_at=NULL,crest_stale=FALSE)
   unavailable<-function(message){result$message<-message;result}
   if(is.null(target))return(unavailable('The next round has not been confirmed.'))
   calendar<-attr(rounds,'fixture_calendar')
@@ -49,6 +67,18 @@ lineup_fixture_view <- function(rounds,target,scope,now=Sys.time()) {
     return(unavailable('The saved match calendar is incomplete. Background sync will retry.'))
   coverage<-calendar$matches$rounds;coverage<-coverage[coverage$round_id==target$id,,drop=FALSE]
   rows<-calendar$matches$rows;rows<-rows[rows$round_id==target$id,,drop=FALSE]
+  # Keep direct match logos when supplied. Missing fields in older saved
+  # calendars can be recovered from the same catalogue without reacquisition.
+  for(side in c('home','away'))if(!paste0(side,'_logo')%in%names(rows))rows[[paste0(side,'_logo')]]<-rep('',nrow(rows))
+  if(any(!nzchar(rows$home_logo)|!nzchar(rows$away_logo))){
+    clubs<-lineup_fixture_clubs(clubs_state,scope,now)
+    for(side in c('home','away')){
+      field<-paste0(side,'_logo');logos<-clubs$rows$logo[match(rows[[paste0(side,'_id')]],clubs$rows$teamId)]
+      fill<-!nzchar(rows[[field]])&!is.na(logos)&nzchar(logos)
+      rows[[field]][fill]<-logos[fill]
+      if(any(fill)){result$crest_observed_at<-clubs$observed_at;result$crest_stale<-clubs$stale}
+    }
+  }
   result$rows<-rows[order(fm_time(rows$kickoff),rows$match_id,na.last=TRUE),,drop=FALSE]
   result$observed_at<-stamp;result$stale<-deadline<=as.numeric(now)
   result$complete<-nrow(coverage)==1L&&isTRUE(coverage$complete)

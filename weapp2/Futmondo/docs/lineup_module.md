@@ -387,3 +387,45 @@ This is a local selection policy over already persisted roster/status and score
 observations. Shared availability facts, history arithmetic, context isolation,
 source clocks and durable database reuse are unchanged; no new acquisition,
 cache, persistence schema, timer, dependency or environment setting is added.
+
+## Fixture crests from the saved club catalogue — 2026-11-18
+
+The reported match section appeared after the user's page reload. Read-only
+inspection then confirmed the remaining crest defect: the current durable
+calendar contained 380 matches with all 760 logo fields empty. Its ten next-round
+matches had twenty distinct club IDs, all matching nonempty logos in the already
+persisted twenty-club `get_real_clubs` snapshot. The former display depended only
+on optional `h.logo` / `a.logo`, so it could not render those crests.
+
+`lineup_fixture_view(rounds, target, scope, now, clubs_state = NULL)` now fills
+absent home/away logos using exact `home_id` / `away_id` → `teamId` matches.
+Direct calendar logos take precedence. `lineup_fixture_clubs(state, scope, now)`
+validates account/championship/competition/season, a successful observation,
+original observation/deadline clocks and the bounded club frame (2,000 rows).
+Duplicate IDs are excluded; names never determine image filenames. Version-1
+calendars can use the same saved catalogue. Partial, failed, future-dated or
+foreign observations cannot supply crests. Expired successful observations remain
+usable with a separate crest source-time/stale note; calendar clocks and
+completeness are unchanged.
+
+The module registers the existing `get_real_clubs` factual read adapter only when
+selected matches lack logos. Its nonblocking state keeps games visible while the
+catalogue arrives and updates their crests without changing the draft. Both
+calendar and club facts already persist through worker snapshots; no migration,
+new source endpoint, acquisition job, timer, dependency or environment setting is
+needed. A cold display adds one small existing catalogue interest to the
+coalesced database read; warmed sessions share it. Opening/refreshing the page
+never fetches Futmondo data. No extra database write or redundant copy of the
+joined facts is needed, and restart hydration retains the original source clocks.
+
+Rechecked the [official public client](https://app.futmondo.com/main.dart.js) on
+2026-11-18 (SHA-256
+`08202076259d1678c7557478771d3aa38b5099f42044630569c704fdb7a7cd1c`).
+`qT/axL`, `cwe`, `ces`, `Ij` retain the documented league/matches, round, club ID
+and optional logo contracts; `JZ.p` formats a supplied logo beneath the existing
+`futmondo/img/teams/64/` CDN path. The saved club catalogue comes from the existing
+`POST /1/league/championshipteams` adapter (`query.championshipId`,
+`answer[].id/name/logo`). Live saved-observation inspection and pure replay
+confirmed twenty of twenty crest mappings; no source authentication/transaction
+was performed, and no private bodies were printed or committed. This repairs
+the existing crest display, with no new login-tier capability.

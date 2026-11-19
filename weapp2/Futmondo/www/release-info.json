@@ -21,6 +21,8 @@
     "lineup_api.R": "dcc39d69a67da1e5d4a02577f160531da8539776901c58dbee34c1c57bfdcace",
     "mvp_runtime.R": "65a75717d1120dc4ff9d545eb30376c5b9fa24d1e60c8b7fbc224b512a54fbcd",
     "rival_ownership_runtime.R": "ab2ec68d89cba850e7de10c4a095afd5422ecfb66ee27676d2dbc3581424331d",
-    "round_settlement_runtime.R": "074180388b1f924196fda9e2314c2207047889c1a77286846754b0a9c6001d02"
+    "round_settlement_runtime.R": "074180388b1f924196fda9e2314c2207047889c1a77286846754b0a9c6001d02",
+    "Modules/Lineup_Module.R": "3f5c376f047fdf4317ef59a6ae2647f5361d15f538f80ffaf125468ac8da08bf",
+    "lineup_runtime.R": "738f59d948ea06c1e3fd1169058e069ab419fb45c6fd24754747f4676f4726a7"
   }
 }

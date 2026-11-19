@@ -2244,3 +2244,16 @@ motion for 4.3 seconds before gathering into the radar. See
 [loading animation timing](progressive_loading.md) and
 [verification](data_review_results.md). This refines presentation of the existing
 loader and adds no feature to the login inventory.
+
+### Lineup fixture crest recovery — 2026-11-18
+
+Implemented and locally verified: join missing match logos to the existing
+durable club catalogue by exact source club ID. Preserve direct logo preference,
+context isolation, independent source clocks, stale visibility and the lineup
+draft during delayed catalogue loading. The initial missing section appeared
+after the user's reload; the evidenced remaining defect was empty fixture logo
+fields despite complete persisted club crests. No source collection, background
+job or storage schema is added. Synthetic adapter/codec restart checks,
+320/390/1440px browser checks and the offline lifecycle cover local exit criteria;
+see `data_review_results.md`. Deployment fingerprint and authenticated hosted
+acceptance are separate checks.

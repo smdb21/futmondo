@@ -95,6 +95,8 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
         competition=ctx$competition_id,season=ctx$season,scoring=ctx$scoring_version)
     })
     target<-shiny::reactive(lineup_target(round_catalog()))
+    fixture_clubs_read<-factual_read_adapter(session,'get_real_clubs',login_token,championship_id,user_team_id,
+      is_active=is_module_active,refresh_trigger=refresh_trigger,state_only=TRUE)
     local_transfer_refresh<-shiny::reactive(list(shared=if(is.function(refresh_trigger))refresh_trigger()else 0L,local=reload()))
     transfers<-if(is.function(clause_transfers_source))clause_transfers_source else
       incoming_clause_source(session,login_token,championship_id,user_team_id,is_module_active,local_transfer_refresh)
@@ -397,7 +399,8 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       shiny::req(is_module_active());who<-identity();shiny::req(who)
       next_round<-target()
       view<-lineup_fixture_view(round_catalog(),next_round,list(account_id=who$account,
-        championship_id=who$championship,competition_id=who$competition,season=who$season))
+        championship_id=who$championship,competition_id=who$competition,season=who$season),
+        clubs_state=fixture_clubs_read(login=login_token(),championship_id=championship_id()))
       shiny::tags$section(class='fm-lineup-fixtures',`aria-label`='Next-round matches',
         shiny::h3(if(is.null(next_round))'Next-round matches'else paste0('Next-round matches · Round ',next_round$number)),
         shiny::p(class='fm-lineup-fixtures-note','Home team first · Times in ',fm_display_timezone()),
@@ -422,6 +425,8 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
               shiny::span(class='fm-lineup-fixture-vs','vs'),
               club(away,row$away_logo,away=TRUE)))
         })),
+        if(isTRUE(view$crest_stale))shiny::p(class='fm-lineup-fixtures-note',
+          paste0('Club crests updated ',fm_format_datetime(view$crest_observed_at),' · Awaiting sync update')),
         if(!is.null(view$observed_at))shiny::p(class='fm-lineup-fixtures-note',
           paste0('Schedule updated ',fm_format_datetime(view$observed_at),if(view$stale)' · Awaiting sync update'else '')))
     })
