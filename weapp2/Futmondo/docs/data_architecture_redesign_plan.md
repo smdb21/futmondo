@@ -1,5 +1,14 @@
 # Futmondo data architecture redesign plan
 
+## Player-card clauses and Market offers (2026-11-19)
+
+- [x] Require rival ownership for clause actions and exercise saved free-agent cards, stale confirmation and rival open/locked states.
+- [x] Verify Market's **Max Value (M)** against the player valuation, testing different asking and clause prices and reuse of the loaded rows.
+- [x] Reproduce the post-confirmation failure when live funds expire during history acquisition. Recheck expired facts once before admission and verify the captured normal-offer envelope.
+- [ ] Confirm the affected offer path in an authenticated hosted session. No real transaction was used in local verification.
+
+Contracts are recorded in [player card](selected_player_module.md), [player tables](players_table_module.md) and [scheduled purchases](scheduled_clauses.md). See [data review](data_review_results.md) for verification and performance.
+
 ## Market balance card contrast — 2026-11-18
 
 - [x] Restore readable labels and amounts on Today’s market balance and team value cards.

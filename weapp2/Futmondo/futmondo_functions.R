@@ -1382,7 +1382,7 @@ build_market_bid_payload <- function(login, championship_id, team_id, player_id,
       price = as.numeric(price),
       isClause = as.logical(isClause)
     ),
-    answer = list()
+    answer = structure(list(), names = character())
   )
 }
 

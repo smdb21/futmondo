@@ -1,5 +1,17 @@
 # Futmondo data review and implementation results
 
+## Player-card clause controls and Market offers (2026-11-19)
+
+The player card previously treated every non-owned player row as a possible clause purchase. Saved System ownership and a retained positive clause price reproduce the screenshot. The focused database-backed card test exercises open and locked rival clauses, a listed free agent with the same positive clause price, stale clause entry and confirmation, market-offer availability and zero browsing source calls.
+
+The Market maximum already read `value`. The filter now names that column explicitly and the label matches the player valuation. The real Market module test with parsed synthetic rows keeps a €5M player with a €12M clause and €8M asking price, excludes a €6M player with a €4M clause and €3M asking price, and excludes an unknown valuation only while the cap is active. Opening and editing/clearing the filter share one Market read. The table suite passed 15 groups.
+
+The reported post-confirmation message was reproduced through the live adapter with transfer history completing 20 seconds after verification began. Production read-only reservation and RPC-log queries found no corresponding admission evidence. The delay reproduces the symptom locally, and the exact cause of the hosted attempt remains unverified. The focused async test refreshes the expired team-information read once, reuses the other five factual responses and confirms one synthetic `isClause: false` write after one admission and one dispatch. Repeated expiry, insufficient funds, a context switch and a lost native acknowledgement all exercise the applicable no-send or no-repeat rules. Two successful historical native bid captures establish the empty-object envelope, without replaying captured credentials.
+
+Performance review: the rival guard uses row IDs and avoids a passive clause check for free agents. The valuation filter applies one vectorized comparison over the existing reactive table with no extra read, cache or redraw dependency. Manual submit adds no request on the fresh path and at most one verification recheck after expiry, reusing valid inputs. In the delayed fixture only fresh team information was fetched again. Source observation clocks, persisted reuse, reservation and transaction safeguards remain in effect. No schema, dependency, timer, CSS or background acquisition change. Authenticated hosted rendering, physical-phone timings and a real offer were outside the offline fixture.
+
+Exact task tree verification passed the saved-card suite, 15 filter groups, 11 clause refresh groups, the manual and scheduled clause checks, 17 isolated database schema checks, three deployment checks, and the offline Shiny lifecycle with 13 checks and eight tabs. The supplemental UI reliability script passed its clause ownership checks and stopped because its standalone bootstrap does not load `player_availability_source()`. The full lifecycle and saved-card tests cover that module through the application bootstrap.
+
 ## Market balance card contrast — 2026-11-18
 
 AdminLTE applied white text to the balance and team value cards even after the

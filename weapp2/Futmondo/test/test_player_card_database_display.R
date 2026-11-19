@@ -149,5 +149,45 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
   settle(session);stopifnot(!grepl('Retry availability|btn_verify_availability|not verified',output$action_buttons$html),!length(source_reads))
   cat('PASS own-player listings also reuse successful saved observations without a browsing retry\n')
 })
+# Clause pricing can survive a change to System ownership in the source summary.
+clause_summary <- function(owner, opens) {
+  value <- summary(owner)
+  value$championship$owner$computer <- !nzchar(owner)
+  value$championship$clause <- list(price=300, transferred=FALSE, date=opens)
+  value
+}
+publish_clause <- function(owner, opens) {
+  snapshot('get_player_summary', c(args, list(player_id='player')), clause_summary(owner, opens), age=120L-version)
+  restore(target$resource_key)
+}
+past <- '2026-11-15T12:00:00Z'
+future <- '2026-11-17T12:00:00Z'
+publish_clause('rival', past)
+selected(row)
+action <- shiny::reactiveVal(NULL)
+shiny::testServer(selected_player_Server, args=list(selected_player=selected, login_token=reactive(auth),
+  championship_id=reactive('league'), user_team_id=reactive('mine'), open_action=action), {
+  settle(session)
+  stopifnot(!blocked(output$action_buttons$html, 'btn_pay_clause'))
+  publish_clause('rival', future); settle(session)
+  stopifnot(grepl('Release Clause Locked', output$action_buttons$html, fixed=TRUE),
+    !grepl('btn_pay_clause', output$action_buttons$html, fixed=TRUE))
+  remember_action_context('clause')
+  for (opens in c(past, future)) {
+    publish_clause('', opens); settle(session)
+    html <- output$action_buttons$html
+    stopifnot(player_target_ready(), selected_player()$clause_price==300,
+      grepl('Ownership: Free Agent', html, fixed=TRUE), !blocked(html, 'btn_bid_market'),
+      !grepl('btn_pay_clause|Release Clause Locked|schedule_clause|test_locked_clause', html),
+      !length(source_reads))
+  }
+  publish_clause('', past); settle(session)
+  session$setInputs(submit_clause=1L); settle(session)
+  stopifnot(is.null(modal_context_RV()$clause), !length(source_reads))
+  action('clause_buyout')
+  session$setInputs(btn_pay_clause=1L); settle(session)
+  stopifnot(!isTRUE(clause_modal_opened_RV()), is.null(modal_context_RV()$clause), !length(source_reads))
+  cat('PASS saved listed free agents keep market offers and reject stale clause entry points; rival clauses still render open and locked states\n')
+})
 elapsed<-system.time(for(i in 1:1000)player_availability_observed(saved,'summary'))[['elapsed']]
 cat(sprintf('METRIC 1000 display-evidence validations %.3fs; no I/O, timers or additional cache\n',elapsed))

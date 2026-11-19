@@ -45,6 +45,38 @@ shiny::testServer(players_table_Server,args=list(players_table_RV=shiny::reactiv
   stopifnot(identical(players_table_filtered_RV()$id,c("low","high")))
  })
 })
+check('Market caps the Valuation column independently of listing and clause prices',local({
+  market_rows <- dplyr::bind_rows(lapply(list(
+    list(id='under', name='At Valuation Cap', value=5e6, price=8e6, clause=list(price=12e6)),
+    list(id='over', name='Above Valuation Cap', value=6e6, price=3e6, clause=list(price=4e6)),
+    list(id='unknown', name='Unknown Valuation', price=1e6, clause=list(price=2e6))
+  ),parse_player_json))
+  market_reads <- 0L
+  original_market <- get_market_players
+  original_bind <- bind_factual_reads
+  get_market_players <<- function(...) {market_reads <<- market_reads+1L; market_rows}
+  bind_factual_reads <<- function(...) NULL
+  on.exit({
+    get_market_players <<- original_market
+    bind_factual_reads <<- original_bind
+  }, add=TRUE)
+
+  html <- htmltools::renderTags(market_UI('market'))$html
+  stopifnot(grepl('Max Value (M)',html,fixed=TRUE),
+    !grepl('max_clause_value_filter',html,fixed=TRUE))
+  shiny::testServer(market_Server,args=list(is_module_active=function()TRUE,
+    login_token=function()NULL,championship_id=function()NULL,user_team_id=function()NULL,
+    user_teams_RV=function()NULL),{
+    rendered <- function() jsonlite::toJSON(output[['market_players_table-players_table']],auto_unbox=TRUE)
+    settle(session)
+    stopifnot(all(vapply(market_rows$name,grepl,logical(1),x=rendered(),fixed=TRUE)), market_reads==1L)
+    session$setInputs(`market_players_table-max_value_filter`=5);settle(session)
+    stopifnot(grepl('At Valuation Cap',rendered(),fixed=TRUE),
+      !grepl('Above Valuation Cap|Unknown Valuation',rendered()),market_reads==1L)
+    session$setInputs(`market_players_table-max_value_filter`=NA_real_);settle(session)
+    stopifnot(all(vapply(market_rows$name,grepl,logical(1),x=rendered(),fixed=TRUE)),market_reads==1L)
+  })
+}))
 check('both table layouts omit the minimum valuation control',{
  for(breakdown in c(FALSE,TRUE)){
   html<-htmltools::renderTags(players_table_UI('filters',show_position_breakdown=breakdown))$html

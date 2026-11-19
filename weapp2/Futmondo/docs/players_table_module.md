@@ -28,6 +28,8 @@ This document describes the `Players_Table_Module.R` Shiny module, which renders
 
 ## 1. Overview
 
+On Market, **Max Value (M)** caps the **Valuation** column using the player row's `value` in euros. The input is in millions, includes the exact boundary and starts blank. Listing prices and clause prices have their own fields (`price` and `clause_price`). The captured `POST /1/market/players` response in `app.futmondo.com.market.har` contains numeric `value` and `price` fields on all 163 rows. The existing worker snapshot preserves these fields for database-first browsing. Filtering runs over the already-enriched rows and does not refresh the source.
+
 The Players Table Module provides two exported functions:
 * `players_table_UI(id, show_position_breakdown = FALSE)` -- Renders the player table UI, including optional position breakdown card.
 * `players_table_Server(id, data, ...)` -- Processes player data, applies filters, and renders the reactive table.

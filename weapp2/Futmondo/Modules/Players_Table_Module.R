@@ -109,7 +109,7 @@ players_table_UI <- function(id, box_title = NULL,
                     },
                     if (filter_by_value) {
                       tagList(
-                        column(width = 4, div(title = "Filter players by maximum market valuation in millions of EUR", numericInput(inputId = ns("max_value_filter"), label = players_table_filter_label("Max Val (M)", "coins"), min = 0, value = NA_real_, step = 10, width = "100%")))
+                        column(width = 4, div(title = "Caps the Valuation column in millions of euros", numericInput(inputId = ns("max_value_filter"), label = players_table_filter_label("Max Value (M)", "coins"), min = 0, value = NA_real_, step = 10, width = "100%")))
                       )
                     },
                     if (filter_by_change_value) {
@@ -132,7 +132,7 @@ players_table_UI <- function(id, box_title = NULL,
           },
           if (filter_by_value) {
             tagList(
-              column(width = 2, div(title = "Filter players by maximum market valuation in millions of EUR", numericInput(inputId = ns("max_value_filter"), label = players_table_filter_label("Max Val (M)", "coins"), min = 0, value = NA_real_, step = 10, width = "100%")))
+              column(width = 2, div(title = "Caps the Valuation column in millions of euros", numericInput(inputId = ns("max_value_filter"), label = players_table_filter_label("Max Value (M)", "coins"), min = 0, value = NA_real_, step = 10, width = "100%")))
             )
           },
           if (filter_by_change_value) {
@@ -555,8 +555,8 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
         }
       }
       if (!is.null(input$max_value_filter) && is.finite(input$max_value_filter)) {
-        players_table <- players_table %>%
-          dplyr::filter(value <= input$max_value_filter * 1000000)
+        maximum_value <- input$max_value_filter * 1e6
+        players_table <- dplyr::filter(players_table, .data$value <= .env$maximum_value)
       }
       clause_values <- if ("clause_price" %in% names(players_table)) {
         suppressWarnings(as.numeric(as.character(players_table$clause_price)))

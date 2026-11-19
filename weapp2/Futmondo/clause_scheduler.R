@@ -451,9 +451,22 @@ fm_clause_execute_async <- function(handler,args,context,player,is_current,owner
  # A direct owner offer and a market bid share the native write endpoint.
  if(handler=='buy_clause'&&!isTRUE(args$isClause %||% TRUE)&&isTRUE(player$market_inMarket))mode<-'bid'
  if(!is.null(action_mode)){stopifnot(action_mode%in%c('bid','offer','modify','clause'));mode<-action_mode}
- check<-async_adapter_fetch('get_scheduled_clause_check',list(login=args$login,championship_id=args$championship_id,
+ stage<-'live_facts'
+ read_facts<-function()async_adapter_fetch('get_scheduled_clause_check',list(login=args$login,championship_id=args$championship_id,
   user_team_id=args$team_id,player_id=args$player_id,require_clause=mode=='clause'),context=context,
   is_current=is_current,owner=owner,priority='interactive',worker_bypass=TRUE)
+ # A long prerequisite read can outlast the first funds observation. Start
+ # one fresh read before admission so expired inputs refresh and valid inputs
+ # remain reusable. A dispatched or uncertain write never enters this path.
+ check<-promises::then(read_facts(),function(facts){
+  if(!isTRUE(is_current()))stop('Action context changed')
+  deadline<-fm_time(facts$valid_until)
+  if(length(deadline)==1L&&!is.na(deadline)&&deadline<=Sys.time()){
+   stage<<-'live_facts_recheck'
+   return(read_facts())
+  }
+  facts
+ })
  check<-promises::then(check,function(facts){
   if(!isTRUE(is_current()))stop('Action context changed')
   amount<-if(handler=='modify_bid')args$new_price else args$price
@@ -471,12 +484,15 @@ fm_clause_execute_async <- function(handler,args,context,player,is_current,owner
   numeric_capacity<-facts;numeric_capacity$valid_until<-as.numeric(fm_time(facts$valid_until))
   decision<-evaluate_acquisition_preflight(numeric_capacity,if(mode=='clause')'offer'else mode,amount,
    existing_bid_amount=if(length(existing))existing[[1]]$price else NULL,minimum_bid=minimum)
-  if(!isTRUE(decision$ok))stop('Acquisition preflight failed')
+  if(!isTRUE(decision$ok))
+   return(list(success=FALSE,code='acquisition_preflight_blocked',message=decision$message))
   id<<-fm_clause_id()
   request<-fm_clause_action_payload(handler,args)
   payload<-list(p_id=id,p_context=fm_clause_scope(context),p_kind='manual',p_mode=mode,p_player=facts$player,p_price=amount,p_facts=facts)
+  stage<<-'admission'
   promises::then(fm_clause_rpc('admit',payload,owner),function(job){
    if(!is.list(job)||!identical(job$id,id)||!isTRUE(is_current()))stop('Action admission was not confirmed')
+   stage<<-'dispatch'
    promises::then(fm_clause_rpc('dispatch',list(p_id=id,p_owner='',p_facts=facts),owner),function(ok){
     if(!isTRUE(ok))stop('Dispatch preflight changed')
     dispatched<<-TRUE
@@ -485,6 +501,7 @@ fm_clause_execute_async <- function(handler,args,context,player,is_current,owner
      dispatched<<-FALSE;stop('Action context changed before send')
     }
     # A queued mutation is independent of browser cancellation; it is never retried.
+    stage<<-'native_write'
     promises::then(fm_async_http(request$url,'POST',request$body,c(`Content-Type`='application/json; charset=utf-8'),owner='',priority='interactive'),function(response){
      if(response$status_code<200L||response$status_code>=300L)stop('Purchase HTTP acknowledgement is uncertain')
      answer<-jsonlite::fromJSON(rawToChar(response$content),simplifyVector=FALSE)$answer
@@ -499,9 +516,11 @@ fm_clause_execute_async <- function(handler,args,context,player,is_current,owner
   })
  })
  promises::then(check,function(result){
+  if(identical(result$code,'acquisition_preflight_blocked'))return(result)
   invalidate_resources(context,pattern='acq_capacity|team_info|market_players|financial_snapshot|player_summary|roster')
   fm_clause_refresh(context$account_id,force=TRUE);result
  },function(error){
+  if(isTRUE(is_current()))message(sprintf('[Futmondo acquisition] mode=%s stage=%s',mode,stage))
   state<-if(dispatched)'uncertain'else'failed'
   if(!is.null(id))promises::then(fm_clause_rpc('settle',list(p_id=id,p_owner='',p_state=state,
     p_code=if(dispatched)'purchase_response_uncertain'else'dispatch_not_sent'),owner=''),function(x)NULL,function(e)NULL)

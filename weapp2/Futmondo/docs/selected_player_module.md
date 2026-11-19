@@ -1,5 +1,9 @@
 # Player card
 
+## Rival ownership for release clause actions (2026-11-19)
+
+`player_card_has_rival_owner()` requires distinct, nonempty owner and manager team IDs. The card uses the existing owner-ID aliases from the table and saved player summary. `player_card_can_buy_clause()` also requires an open clause. The locked label, schedule control and diagnostic control use the same ownership requirement. A listed free agent can still show **Make Market Offer**, even when a saved summary includes a clause price. The clause modal and its submit handler repeat the owner check against the card's latest facts. The live dispatch check still verifies actual ownership before a clause purchase.
+
 ## Database-backed card status correction — 2026-11-16
 
 Expired successful database snapshots remain usable observed player facts, with

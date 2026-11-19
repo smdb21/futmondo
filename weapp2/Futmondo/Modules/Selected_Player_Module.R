@@ -45,8 +45,14 @@ player_card_is_own_player <- function(player, current_team_id = NULL) {
   !is.na(owner) && nzchar(owner) && nzchar(current) && identical(owner,current)
 }
 
+player_card_has_rival_owner <- function(player, current_team_id) {
+  owner <- player_card_owner_id(player)
+  current <- trimws(fm_scalar(current_team_id, ""))
+  nzchar(owner) && nzchar(current) && owner != current
+}
+
 player_card_can_buy_clause <- function(player,current_team_id,clause_open) {
-  isTRUE(clause_open) && !player_card_is_own_player(player,current_team_id)
+  isTRUE(clause_open) && player_card_has_rival_owner(player, current_team_id)
 }
 
 # Direct bid fields in the account/team-scoped market response describe our
@@ -782,7 +788,6 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           # Option 1: "Make Market Offer" button when player is listed on market
           # Off-market owner offers have no listing minimum to verify.
           bid_gate <- passive_acquisition_gate(sp,if(!is.na(eff_market_price) && eff_market_price>0)"bid"else"offer")
-          clause_gate <- passive_acquisition_gate(sp,"clause")
           target_checked<-player_target_ready(sp)
           can_open_editor<-target_checked
 
@@ -812,8 +817,10 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
             )
           }
 
-          # Option 3: "Buy Release Clause" button when clause is OPEN
+          # Option 3: rival-owned release clause
+          has_rival_owner <- player_card_has_rival_owner(sp, current_user_team)
           if (player_card_can_buy_clause(sp,current_user_team,is_clause_open)) {
+            clause_gate <- passive_acquisition_gate(sp,"clause")
             clause_label <- paste0(" Buy Clause: ", player_card_money(clause_price_val))
             action_buttons <- tagList(
               action_buttons,
@@ -824,7 +831,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
                 title=if(!isTRUE(clause_gate$ok))if(can_open_editor)"Current availability will be checked before submission."else clause_gate$message else NULL
               )
             )
-          } else if (!is_own_player && clause_price_val > 0) {
+          } else if (has_rival_owner && clause_price_val > 0) {
             # Release clause exists but is currently LOCKED
             lock_reason <- if (clause_date_formatted != "") paste0("until ", clause_date_formatted) else "transferred/cooldown"
             locked_badge <- div(
@@ -833,7 +840,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
             )
             action_buttons <- tagList(action_buttons, locked_badge)
           }
-          if(isTRUE(allow_scheduled_clauses)&&exists('fm_clause_schedule_ui',mode='function')){
+          if(has_rival_owner&&isTRUE(allow_scheduled_clauses)&&exists('fm_clause_schedule_ui',mode='function')){
             ctx<-resource_context(get_reactive_val(login_token),get_reactive_val(championship_id),current_user_team,sp$id)
             player<-fm_clause_row_player(sp)
             action_buttons<-tagList(action_buttons,fm_clause_schedule_ui(ns,player,current_user_team,ctx))
@@ -1448,9 +1455,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       req(sp)
 
       current_team <- get_reactive_val(user_team_id)
-      if (player_card_is_own_player(sp,current_team)) {
+      if (!player_card_has_rival_owner(sp, current_team)) {
         shiny::showNotification(
-          "This player already belongs to your squad; you cannot buy your own release clause.",
+          "Release clause purchases require a player owned by a rival team.",
           type="warning",duration=5
         )
         clause_modal_opened_RV(FALSE)
@@ -1520,6 +1527,14 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       champ_id <- get_reactive_val(championship_id)
       team_id <- get_reactive_val(user_team_id)
       req(sp, login, champ_id, team_id)
+      if (!player_card_has_rival_owner(sp, team_id)) {
+        clause_modal_opened_RV(FALSE)
+        clause_diagnostic_RV(FALSE)
+        removeModal()
+        shiny::showNotification("Release clause purchases require a player owned by a rival team.",
+          type = "warning", duration = 5)
+        return()
+      }
 
       # Recheck strict open state before the write (fail closed): the clause
       # may have locked / transferred between modal-open and submit.

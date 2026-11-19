@@ -1,5 +1,11 @@
 # Scheduled clause purchases
 
+## Manual offer verification (2026-11-19)
+
+An asynchronous manual confirmation can spend the first cash observation's validity window waiting for transfer history. If the live check returns an expired deadline, `fm_clause_execute_async()` starts one more live verification before creating a reservation. Current inputs are reused through the existing resource layer and expired facts are read again. The normal preflight runs on the result, and an expired or unaffordable result prevents admission. SQL admission and dispatch still enforce freshness, context, funds and capacity. A source write or uncertain response cannot trigger this recheck. Before dispatch, the log identifies the mode and failing stage using fixed labels without private payloads.
+
+Two successful captured market offers in `app.futmondo.com.har` identify the existing `POST /1/market/bid` request. The query contains `championshipId`, `userteamId`, `player_id`, `player_slug`, `price` and `isClause: false`. The empty root `answer` is a JSON object and the response code is `api.general.ok`. `build_market_bid_payload()` preserves that object in both the direct and asynchronous callers.
+
 Implemented locally on 2026-11-15 under the owner's explicit scope exception. Deployment and native closed-rejection evidence remain separate acceptance steps. This authorizes selected one-shot purchases, not general trading automation.
 
 ## Product behavior
