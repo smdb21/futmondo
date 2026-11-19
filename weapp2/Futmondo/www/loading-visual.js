@@ -7,6 +7,14 @@
   var epoch = null;
   var lastFrame = -Infinity;
   var tau = Math.PI * 2;
+  // Time to rise and read the figures, then watch the cloud in motion.
+  var riseStart = 2.2, riseDuration = 2.6;
+  var takeoffStart = 6.7, takeoffDuration = 1.7;
+  var flockStart = takeoffStart + takeoffDuration;
+  var radarStart = 12.7, radarDuration = 2;
+  var detectionStart = radarStart + radarDuration;
+  var returnStart = detectionStart + 3, returnDuration = 2;
+  var loopDuration = returnStart + returnDuration;
   var root = document.documentElement;
   var palette;
   var pendingSync = false;
@@ -157,7 +165,7 @@
       if (body[1] === 27 && body[0] > 0) { bodyX = actors[actor].facing*3.8; bodyY = 0; }
       result.push({ x: mix(segment.a[0], segment.b[0], f), y: mix(segment.a[1], segment.b[1], f),
         actor: actor, bodyX: bodyX, bodyY: bodyY, bodyZ: body[1], stripe: stripe,
-        release: 4.5 + actors[actor].delay*.25 + (1-body[1]/30)*.36,
+        release: takeoffStart + actors[actor].delay*.25 + (1-body[1]/30)*.36,
         angle: angle, u: u, radius: Math.sqrt(((i * .754877666) % 1)), ring: 32 + ring * 32,
         ringAngle: Math.floor(i / 3) / Math.ceil(count / 3) * tau, depth: (Math.sin(angle) + 1) * .5 });
     }
@@ -242,7 +250,7 @@
       ctx.fillStyle = color;
       ctx.globalAlpha = opacity*rise*.14;
       ctx.beginPath(); ctx.ellipse(footX,footY,4*camera.k,1.5*camera.k,0,0,tau); ctx.fill();
-      var cut = 30*(1-clamp((t-4.5-actor.delay*.25)/.36));
+      var cut = 30*(1-clamp((t-takeoffStart-actor.delay*.25)/.36));
       if (cut <= 0) continue;
       // Select the camera-facing X surface, then shade the visible +Y side.
       // This gives opposing teams actual depth rather than rotated billboards.
@@ -305,7 +313,7 @@
     }
     ctx.stroke();
     var beam = t * tau / 4 - Math.PI / 2;
-    var beamRadius = mix(96*fit,176,ease((t-10)/.8));
+    var beamRadius = mix(96*fit,176,ease((t-detectionStart)/.8));
     ctx.save();
     ctx.beginPath(); ctx.rect(50,40,320,200); ctx.clip();
     ctx.fillStyle = palette.accent;
@@ -353,34 +361,38 @@
     var ctx = instance.ctx;
     ctx.setTransform(instance.scale,0,0,instance.scale,0,instance.offset*instance.scale);
     ctx.clearRect(0,-instance.offset,420,instance.height);
-    var leave = ease((t-4.5)/1.7), gather = ease((t-8)/2), returnPitch = ease((t-13)/2);
-    var assemble = ease((t-2.2)/1.3);
+    var leave = ease((t-takeoffStart)/takeoffDuration);
+    var gather = ease((t-radarStart)/radarDuration);
+    var returnPitch = ease((t-returnStart)/returnDuration);
+    var assemble = ease((t-riseStart)/riseDuration);
     var radarWeight = gather * (1-returnPitch);
     var flockWeight = leave * (1-gather);
     var pitchWeight = 1-flockWeight-radarWeight;
-    // Freeze the ground camera at takeoff so particles leave stable body points.
-    var camera = t < 6.2 ? cameraAt(Math.min(t,4.5),instance) : null;
-    var board = (1-leave)*.56 + ease((t-10)/1.2)*(.25+.31*returnPitch);
+    // The camera finishes rotating before takeoff so particles leave stable body points.
+    var camera = t < flockStart ? cameraAt(t,instance) : null;
+    var board = (1-leave)*.56 + ease((t-detectionStart)/1.2)*(.25+.31*returnPitch);
     if (camera) raisedBoard(ctx,1-leave,instance.markScale,camera);
     pitch(ctx,board,instance.markScale,camera);
     for (var actorIndex = 0; actorIndex < actors.length; actorIndex++)
-      instance.lifts[actorIndex] = ease((t-2.2-actors[actorIndex].delay)/1.4);
+      instance.lifts[actorIndex] = ease((t-riseStart-actors[actorIndex].delay)/riseDuration);
     if (camera) risingPlayers(ctx,1-leave,instance.markScale,camera,instance.lifts,t);
     var radarFit = Math.min(1,(instance.height-8)/218);
     radar(ctx,radarWeight,t,instance.markScale,radarFit);
-    var yaw = .18*Math.sin(t*.65), cos = Math.cos(yaw), sin = Math.sin(yaw);
+    // Start the same flock motion relative to the figures' takeoff.
+    var flockTime = t-takeoffStart+4.5;
+    var yaw = .18*Math.sin(flockTime*.65), cos = Math.cos(yaw), sin = Math.sin(yaw);
     var particles = instance.particles;
     for (var i = 0; i < particles.length; i++) {
       var p = particles[i];
-      var phi = p.angle+t*.48;
+      var phi = p.angle+flockTime*.48;
       var width = (8+34*Math.sqrt(1-p.u*p.u))*p.radius;
       var fx = p.u*(instance.mobile ? 182 : 133) + Math.cos(phi)*width*.65;
-      var fy = Math.sin(p.u*3.2+t*.92)*22 + Math.sin(p.u*5.2-t*.4)*10 + Math.sin(phi)*width;
+      var fy = Math.sin(p.u*3.2+flockTime*.92)*22 + Math.sin(p.u*5.2-flockTime*.4)*10 + Math.sin(phi)*width;
       var depth = Math.cos(phi)*width;
       var flockX = 210 + fx*cos-fy*sin + depth*.24;
       var sky = instance.mobile ? instance.height*.38-instance.offset : 82;
       var spread = instance.mobile ? instance.height/170 : .72;
-      var flockY = sky + (fx*sin+fy*cos)*spread + Math.sin(t*.7)*5;
+      var flockY = sky + (fx*sin+fy*cos)*spread + Math.sin(flockTime*.7)*5;
       var ringAngle = p.ringAngle + .08*Math.sin(t*.8);
       var originX = p.x, originY = p.y;
       if (camera) {
@@ -388,9 +400,9 @@
         project(camera,mix(p.x,actor.x+p.bodyX,assemble),mix(p.y,actor.y+p.bodyY,assemble),p.bodyZ*instance.lifts[p.actor]);
         originX = camera.px; originY = camera.py;
       }
-      var flight = ease((t-p.release)/(6.2-p.release));
+      var flight = ease((t-p.release)/(flockStart-p.release));
       var x, y;
-      if (t < 6.2) {
+      if (t < flockStart) {
         // A cubic path starts upward, then opens into the moving sky cloud.
         // Ease at both ends keeps detachment and arrival continuous.
         var remaining = 1-flight;
@@ -418,7 +430,7 @@
         ctx.stroke();
       }
     }
-    players(ctx,ease((t-10)/.9)*(1-returnPitch),t);
+    players(ctx,ease((t-detectionStart)/.9)*(1-returnPitch),t);
     ctx.globalAlpha = 1;
   }
   function visible(instance) {
@@ -461,7 +473,7 @@
       instances.forEach(function (instance) {
         if (!instance.active) return;
         try {
-          draw(instance,((now-epoch)/1000)%15);
+          draw(instance,((now-epoch)/1000)%loopDuration);
           if (!instance.ready) {
             instance.ready = true;
             instance.node.setAttribute('data-fm-drawing','true');

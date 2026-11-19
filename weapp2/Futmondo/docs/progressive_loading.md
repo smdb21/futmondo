@@ -13,7 +13,7 @@ behavior. The visual follows actual readiness and never delays completion to
 finish an animation. It does not represent real player positions or progress.
 
 The local `www/loading-visual.js` and `www/loading-visual.css` assets animate a
-15-second loop: the flat pitch tilts and rotates into perspective, 22 table-football
+19.7-second loop: the flat pitch tilts and rotates into perspective, 22 table-football
 figures face their opposing goals, rise from the surface, dissolve from head to
 foot, and release particles upward into a flowing flock. This dissolve applies
 to every loader size.
@@ -25,12 +25,13 @@ pitch/radar illustration.
 
 The added 3D stage uses a small perspective projection in Canvas 2D rather than
 a separate graphics engine: the pitch rotates from 1.2–3.2 seconds, players rise
-from 2.2–4.5 seconds, and their silhouette particles disperse into the flock from
-4.5–6.2 seconds. Each particle keeps its body position until release, initially
+from 2.2–5.2 seconds, then stay fully raised for about 1.5 seconds. Their
+silhouette particles disperse into the flock from 6.7–8.4 seconds. The formed
+flock moves across the sky for 4.3 seconds. Each particle keeps its body position until release, initially
 travels upward on a curved path, then joins the cloud above the pitch. The
 remaining figure is clipped from the head down in sync with release; the pitch
-and ground shadows fade during departure. Radar assembly starts at 8 seconds,
-player detection at 10, and the return to the pitch at 13. It uses the existing particle budget, local theme
+and ground shadows fade during departure. Radar assembly starts at 12.7 seconds,
+player detection at 14.7, and the return to the pitch at 17.7. It uses the existing particle budget, local theme
 colors and compact-size stroke scaling; no models, textures or network assets
 are required. The extended loop never prolongs loading or changes readiness.
 

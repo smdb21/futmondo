@@ -2234,3 +2234,13 @@ Public login feature tiers are unchanged: this is admin-only operational infrast
 
 Contract: [lineup module](lineup_module.md). Local checks and limits:
 [data review](data_review_results.md). No new capability, schema or dependency.
+
+
+## Loading animation pacing — 2026-11-18
+
+The 19.7-second loading loop gives the table-football players a slower rise and
+about 1.5 seconds fully raised before they dissolve. The formed flock stays in
+motion for 4.3 seconds before gathering into the radar. See
+[loading animation timing](progressive_loading.md) and
+[verification](data_review_results.md). This refines presentation of the existing
+loader and adds no feature to the login inventory.

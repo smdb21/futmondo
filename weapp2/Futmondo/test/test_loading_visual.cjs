@@ -96,8 +96,8 @@ function instrument() {
         if (Object.values(stats.draws).reduce((sum, n) => sum + n, 0) > before && !stats.capture && stats.samples.length < 10000) {
           const duration = performance.now() - started;
           stats.samples.push(duration);
-          const phase = (timestamp - stats.firstDrawAt + 15000) % 15000;
-          if (phase >= 1800 && phase <= 6200) stats.stageSamples.push(duration);
+          const phase = (timestamp - stats.firstDrawAt + 19700) % 19700;
+          if (phase >= 1800 && phase <= 8400) stats.stageSamples.push(duration);
         }
       }
     });
@@ -244,7 +244,7 @@ function checkTeams(phases, teamColors) {
   }
   const expectedParticles = particleMarks(phases.pitch).length;
   assert.ok([180, 320].includes(expectedParticles), 'Pitch starts with exactly the configured particle budget');
-  for (const name of ['pitch', 'morph', 'flock']) {
+  for (const name of ['pitch', 'morph', 'flock', 'lateFlock'].filter(name => phases[name])) {
     const particles = phases[name].filter(mark => mark.kind === 'fill' && mark.alpha > 0.4 &&
       mark.path.length === 1 && mark.path[0].op === 'ellipse');
     assert.equal(particles.length, expectedParticles, name + ' retains the complete bounded particle pool');
@@ -432,7 +432,7 @@ async function fullscreenChecks(browser) {
       assert.deepEqual(teamColors.ids, ['real-madrid', 'barcelona'], 'The main matrix uses a deterministic Madrid/Barcelona pair');
       await checkPairIdentity(page, teamColors.ids);
       const phases = {};
-      for (const [name, at] of [['pitch', 700], ['rising', 4200], ['release', 4500], ['dissolve', 4800], ['morph', 5400], ['flock', 7000], ['radar', 9300], ['players', 11500], ['return', 14300]]) {
+      for (const [name, at] of [['pitch', 700], ['rising', 6050], ['release', 6700], ['dissolve', 7000], ['morph', 7600], ['flock', 9200], ['lateFlock', 12000], ['radar', 14000], ['players', 16200], ['return', 19000]]) {
         const elapsed = await page.evaluate(() => performance.now() - window.loadingFixture.firstDrawAt);
         await page.waitForTimeout(Math.max(0, at - elapsed));
         phases[name] = await captureGeometry(page);
@@ -443,7 +443,7 @@ async function fullscreenChecks(browser) {
       checkAscent(phases.release, phases.dissolve, phases.rising);
       checkTeams(phases, teamColors);
       const seamElapsed = await page.evaluate(() => performance.now() - window.loadingFixture.firstDrawAt);
-      await page.waitForTimeout(Math.max(0, 15100 - seamElapsed));
+      await page.waitForTimeout(Math.max(0, 19800 - seamElapsed));
       assert.deepEqual(await captureGeometry(page), phases.pitch, 'Fullscreen geometry returns to the exact flat loop seam');
       await checkPairIdentity(page, teamColors.ids);
       const normal = await page.evaluate(() => window.loadingFixture.samples);
@@ -463,7 +463,7 @@ async function fullscreenChecks(browser) {
         await waitDraw(page, 'fixture-hero');
         const shortLayout = await checkLaunchLayout(page);
         checkFullscreenGeometry(await captureGeometry(page), shortLayout);
-        for (const [phase, at] of [['rising', 4200], ['radar', 9300], ['players', 11500], ['return', 14300]]) {
+        for (const [phase, at] of [['rising', 6050], ['radar', 14000], ['players', 16200], ['return', 19000]]) {
           const elapsed = await page.evaluate(() => performance.now() - window.loadingFixture.firstDrawAt);
           await page.waitForTimeout(Math.max(0, at - elapsed));
           checkFullscreenGeometry(await captureGeometry(page), shortLayout);
@@ -532,7 +532,7 @@ async function clubChecks(browser) {
       const colors = await readTeamColors(page);
       assert.deepEqual(colors.ids, variant.ids, 'A new document can choose another known club pair');
       const phases = {};
-      for (const [name, at] of [['pitch', 700], ['rising', 4200], ['morph', 5400], ['flock', 7000], ['players', 11500]]) {
+      for (const [name, at] of [['pitch', 700], ['rising', 6050], ['morph', 7600], ['flock', 9200], ['players', 16200]]) {
         const elapsed = await page.evaluate(() => performance.now() - window.loadingFixture.firstDrawAt);
         await page.waitForTimeout(Math.max(0, at - elapsed));
         phases[name] = await captureGeometry(page);
@@ -567,7 +567,7 @@ async function clubChecks(browser) {
   await cdp.send('Emulation.setCPUThrottlingRate', {rate: 4});
   await page.goto(origin + '/?kits=0.75,0.7');
   await waitDraw(page, 'fixture-hero');
-  await page.waitForTimeout(4100);
+  await page.waitForTimeout(6050);
   const worstGeometry = await captureGeometry(page);
   assert.equal(particleMarks(worstGeometry).length, 320, 'Worst-case outlined capture retains all 320 hero particles');
   checkGoalFacing(worstGeometry, await readTeamColors(page));
@@ -602,7 +602,7 @@ async function visualChecks(browser) {
       assert.deepEqual(teamColors.ids, ['real-madrid', 'barcelona'], 'The main matrix uses a deterministic Madrid/Barcelona pair');
       await checkPairIdentity(page, teamColors.ids);
       const pictures = [], phases = {};
-      for (const [name, at] of [['pitch', 700], ['tilted', 2400], ['rising', 4200], ['release', 4500], ['dissolve', 4800], ['morph', 5400], ['flock', 7000], ['radar', 9300], ['players', 11500], ['return', 14300]]) {
+      for (const [name, at] of [['pitch', 700], ['tilted', 2400], ['rising', 6050], ['release', 6700], ['dissolve', 7000], ['morph', 7600], ['flock', 9200], ['lateFlock', 12000], ['radar', 14000], ['players', 16200], ['return', 19000]]) {
         const elapsed = await page.evaluate(() => performance.now() - window.loadingFixture.firstDrawAt);
         await page.waitForTimeout(Math.max(0, at - elapsed));
         phases[name] = await captureGeometry(page);
@@ -614,17 +614,20 @@ async function visualChecks(browser) {
       }
       assert.equal(new Set(pictures).size, pictures.length, 'Each loop phase renders changing graphics');
       checkGeometry(phases);
+      assert.deepEqual(particleMarks(phases.flock).map(mark => mark.alpha),
+        particleMarks(phases.lateFlock).map(mark => mark.alpha), 'The cloud remains fully formed near the end of its longer stage');
+      assert.notDeepEqual(particleMarks(phases.flock), particleMarks(phases.lateFlock), 'The cloud keeps moving throughout the longer stage');
       checkTeams(phases, teamColors);
       checkAscent(phases.release, phases.dissolve, phases.rising);
       checkGoalFacing(phases.rising, teamColors);
       const seamElapsed = await page.evaluate(() => performance.now() - window.loadingFixture.firstDrawAt);
-      await page.waitForTimeout(Math.max(0, 15100 - seamElapsed));
+      await page.waitForTimeout(Math.max(0, 19800 - seamElapsed));
       const seam = await captureGeometry(page);
       assert.deepEqual(seam, phases.pitch, 'The loop returns to identical field and particle geometry, including mark orientation');
       assert.equal(await page.locator('#fixture-hero canvas').evaluate(canvas => canvas.toDataURL()), pictures[0], 'The complete canvas is identical across the flat loop seam');
       await checkPairIdentity(page, teamColors.ids);
       await noOverflow(page);
-      console.log(`PASS ${width}px ${theme}: ten loop phases, upward head-first dissolve, 22 solid goal-facing foosball figures, opposed heads and short shoes, eleven players per club, persistent kit colors, exact seam`);
+      console.log(`PASS ${width}px ${theme}: eleven loop phases, upward head-first dissolve, 22 solid goal-facing foosball figures, opposed heads and short shoes, eleven players per club, persistent kit colors, exact seam`);
     }
     const responseMs = await page.evaluate(() => new Promise(resolve => {
       const start = performance.now();
@@ -637,7 +640,7 @@ async function visualChecks(browser) {
     const normalSamples = await page.evaluate(() => window.loadingFixture.samples.splice(0));
     const normalStageSamples = await page.evaluate(() => window.loadingFixture.stageSamples.splice(0));
     const cdp = await page.context().newCDPSession(page);
-    const untilStage = await page.evaluate(() => (2000 - ((performance.now() - window.loadingFixture.firstDrawAt) % 15000) + 15000) % 15000);
+    const untilStage = await page.evaluate(() => (2000 - ((performance.now() - window.loadingFixture.firstDrawAt) % 19700) + 19700) % 19700);
     await page.waitForTimeout(untilStage);
     await page.evaluate(() => { window.loadingFixture.samples = []; window.loadingFixture.stageSamples = []; });
     await cdp.send('Emulation.setCPUThrottlingRate', {rate: 4});

@@ -5139,3 +5139,22 @@ retain their account/league/season/scoring context and source clocks. No new
 dependencies or environment settings; manifest regeneration is unnecessary.
 All execution was local/offline with synthetic accounts. Deployment and hosted
 acceptance remain unverified.
+
+
+## Loading animation pacing — 2026-11-18
+
+The existing canvas loop now runs for 19.7 seconds. The table-football figures
+rise more slowly and remain fully raised for about 1.5 seconds. After the
+upward dissolve, the formed flock moves for 4.3 seconds before radar assembly.
+
+Browser checks passed at 320, 390 and 1440 px, plus three fullscreen phone
+sizes, in both themes. Tests verified the fully formed cloud keeps moving late
+in its stage, the upward dissolve, exact loop seam, and alternate club kits.
+The offline Shiny lifecycle passed 13 checks and eight tabs. All three
+deployment manifest checks passed.
+
+The loop spends more time drawing the 3D stage. The 30 FPS cap and particle
+budget are unchanged. Browser p95 3D drawing took 1.3–1.5 ms at standard sizes
+and at most 6.7 ms at 4× CPU throttling, including the outlined kit fixture.
+Timing is local to the renderer and adds no requests, persistent state, or
+delay to application readiness.
