@@ -1,5 +1,9 @@
 # Worker restart investigation — 2026-11-18
 
+The source-code allowlist described below was subsequently expanded to bounded
+machine-code diagnostics with pseudonymous request/team correlation; see
+[fresh rejection diagnostics](futmondo_rejection_diagnostics.md).
+
 ## Evidence and remaining limits
 
 The supplied container log covers 18:22–18:52 UTC, including successful bounded

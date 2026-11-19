@@ -302,3 +302,10 @@ and HTTPX wire-body bytes each maintenance cycle, without additional requests.
 No new environment variables or dependencies are required. See
 [endpoint and egress review](docs/worker_egress_review.md) for measured traffic,
 quota-verification limits and the fixed 45-minute startup failure.
+
+Futmondo rejection logs now include supported exact `api.*` machine codes,
+pseudonymous `team_ref`/`request_ref`, parent `job_ref`/`run_ref`, and per-process
+failure counts/gaps. Match references to distinguish repeated requests from different
+teams or parent jobs. No credentials, raw IDs or private response bodies are logged;
+references use the existing worker server key and change if it rotates. No new
+environment variable is required. See [rejection diagnostics](docs/futmondo_rejection_diagnostics.md).

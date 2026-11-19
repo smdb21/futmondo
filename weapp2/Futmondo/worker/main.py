@@ -5,6 +5,7 @@ import base64
 import contextlib
 import gzip
 import hashlib
+import hmac
 import io
 import json
 import logging
@@ -73,13 +74,14 @@ def source_response_rejected(body):
 
 
 def source_rejection_detail(body):
-    """Only known public protocol codes, never arbitrary source strings."""
+    """Only bounded machine codes; never messages, IDs, or response bodies."""
     values = [body, body.get('answer') if isinstance(body, dict) else None]
     for value in values:
         candidates = [value] if isinstance(value, str) else (
             [value.get('code'), value.get('error')] if isinstance(value, dict) else [])
         for code in candidates:
-            if code in ('api.error.general', 'api.error.already_bid'):
+            if isinstance(code, str) and len(code) <= 120 and re.fullmatch(
+                    r'api\.[a-z_]{1,32}(?:\.[a-z_]{1,32}){1,5}', code, flags=re.ASCII):
                 return code
     return 'unclassified'
 
@@ -437,8 +439,48 @@ class Worker:
         self.request_count = self.job_count = 0
         self.source_stamps = {}
         self.source_errors = {}
+        self.source_diagnostics = {}
         self.progress_times = {}
         self.progress_ready = set()
+
+    def source_reference(self, kind, *values):
+        # Stable across restarts with the same server key; resistant to ID guessing.
+        return hmac.new(bytes.fromhex(self.key), canonical([kind, *values]).encode(),
+                        hashlib.sha256).hexdigest()[:16]
+
+    def log_source_rejection(self, job, owner, route, body, parsed, status):
+        query = body.get('query') if isinstance(body.get('query'), dict) else {}
+        account = job['account_id']
+        league = query.get('championshipId')
+        team = query.get('userteamId')
+        team_ref = self.source_reference('team', account, league, team) if team else 'missing'
+        # Correlate the same request across standalone and finance-parent jobs.
+        request_ref = self.source_reference('request', account, route, query)
+        now = time.monotonic()
+        previous = self.source_diagnostics.pop(request_ref, None)
+        count, gap = (previous[0] + 1, round(now - previous[1], 1)) if previous else (1, -1)
+        if len(self.source_diagnostics) >= 512:
+            self.source_diagnostics.pop(next(iter(self.source_diagnostics)))
+        self.source_diagnostics[request_ref] = (count, now)
+        handler = job['descriptor'].get('handler', '')
+        if not isinstance(handler, str) or not re.fullmatch(r'(?:get_|read_|fm_worker_)[a-z_]{1,64}', handler):
+            handler = 'unknown'
+        context = job['descriptor'].get('context', {})
+        args = job['descriptor'].get('args', {})
+        args = args if isinstance(args, dict) else {}
+        def matches(value):
+            return 'missing' if not value or not team else ('yes' if value == team else 'no')
+        answer = parsed.get('answer')
+        error_flag = parsed.get('error') is True or (isinstance(answer, dict) and answer.get('error') is True)
+        attempts = job.get('attempts')
+        attempts = attempts if type(attempts) is int and 0 <= attempts <= 1000000 else -1
+        LOG.warning('worker_source route=%s status=%d detail=%s error_flag=%s handler=%s '
+                    'team_ref=%s request_ref=%s job_ref=%s run_ref=%s process_count=%d gap_seconds=%s '
+                    'job_attempt=%d team_context=%s team_argument=%s',
+                    route, status, source_rejection_detail(parsed), error_flag, handler,
+                    team_ref, request_ref, self.source_reference('job', account, job['resource_key']),
+                    self.source_reference('run', account, job.get('run_id', owner)), count, gap,
+                    attempts, matches(context.get('user_team_id')), matches(args.get('user_team_id')))
 
     async def guard(self, job, owner, checkpoint=None):
         valid = await self.store.rpc('guard', p_account=job['account_id'], p_key=job['resource_key'],
@@ -550,8 +592,7 @@ class Worker:
                         parsed = filter_football_leagues(parsed)
                     assert_factual(parsed)
                     if source_response_rejected(parsed):
-                        LOG.warning('worker_source route=%s status=%d detail=%s',
-                                    url.path, response.status_code, source_rejection_detail(parsed))
+                        self.log_source_rejection(job, owner, url.path, body, parsed, response.status_code)
                         failure = WorkerFailure('source_rejected')
                         failure.source_route = url.path
                         raise failure

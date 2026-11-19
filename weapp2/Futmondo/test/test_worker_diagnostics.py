@@ -92,9 +92,47 @@ class DiagnosticTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(store.params['p_base_interval'],2700)
             self.assertIn('leader=True admitted=True base_interval_minutes=45',logs.output[0])
 
+    def test_source_rejections_correlate_teams_and_parent_jobs_without_ids(self):
+        worker=Worker(None,None,'ab'*32,Path.cwd())
+        job=dict(account_id='PRIVATE_ACCOUNT',resource_key='PRIVATE_JOB',run_id='PRIVATE_RUN',attempts=3,
+                 descriptor=dict(handler='get_user_team_info',context={'user_team_id':'PRIVATE_TEAM'},
+                                 args={'user_team_id':'PRIVATE_TEAM'}))
+        body=dict(header={'token':'PRIVATE_TOKEN'},query={'championshipId':'PRIVATE_LEAGUE','userteamId':'PRIVATE_TEAM'})
+        rejection={'answer':{'error':True,'code':'api.error.invalid','message':'PRIVATE_MESSAGE'}}
+        with self.assertLogs('futmondo.worker',level='WARNING') as logs:
+            worker.log_source_rejection(job,'owner','/1/userteam/information',body,rejection,200)
+            job['descriptor']['handler']='fm_worker_finances';job['resource_key']='PRIVATE_PARENT'
+            worker.log_source_rejection(job,'owner','/1/userteam/information',body,rejection,200)
+            body['query']['userteamId']='PRIVATE_OTHER'
+            worker.log_source_rejection(job,'owner','/1/userteam/information',body,rejection,200)
+        self.assertNotIn('PRIVATE',str(logs.output))
+        self.assertIn('detail=api.error.invalid error_flag=True',logs.output[0])
+        self.assertIn('process_count=2',logs.output[1])
+        self.assertIn('handler=fm_worker_finances',logs.output[1])
+        self.assertIn('team_context=no team_argument=no',logs.output[2])
+        def fields(line):return dict(x.split('=',1) for x in line.split() if '=' in x)
+        a,b,c=map(fields,logs.output)
+        self.assertEqual(a['team_ref'],b['team_ref']);self.assertEqual(a['request_ref'],b['request_ref'])
+        self.assertNotEqual(a['job_ref'],b['job_ref']);self.assertNotEqual(a['team_ref'],c['team_ref'])
+        again=Worker(None,None,'ab'*32,Path.cwd())
+        self.assertEqual(worker.source_reference('team','a','l','t'),again.source_reference('team','a','l','t'))
+        self.assertNotEqual(worker.source_reference('team','a','l','t'),worker.source_reference('team','b','l','t'))
+
+    def test_source_diagnostic_memory_is_bounded(self):
+        worker=Worker(None,None,'ab'*32,Path.cwd())
+        job=dict(account_id='a',resource_key='k',descriptor={'handler':'get_user_team_info'})
+        with patch('worker.main.LOG.warning'):
+            for i in range(520):
+                worker.log_source_rejection(job,'owner','/1/userteam/information',
+                    {'query':{'userteamId':str(i)}},{'error':True},200)
+        self.assertEqual(len(worker.source_diagnostics),512)
+
     def test_source_detail_is_allowlisted(self):
         self.assertEqual(source_rejection_detail({'answer':{'error':'api.error.general'}}),'api.error.general')
-        for body in ({'answer':'api.error.SECRET'}, {'answer':{'error':True,'message':'SECRET'}},
+        for code in ('api.error.invalid','api.userteam.access_denied','api.error.general'):
+            self.assertEqual(source_rejection_detail({'answer':{'error':True,'code':code}}),code)
+        for body in ({'answer':'api.error.SECRET'}, {'answer':{'code':'api.error.bad\nprivate'}},
+                     {'answer':{'code':'api.error.'+'x'*121}}, {'answer':{'code':'api.error.507f191e810c19729de860ea'}}, {'answer':{'error':True,'message':'SECRET'}},
                      {'code':{'private':'SECRET'}}, {'answer':{'code':['SECRET']}}):
             self.assertEqual(source_rejection_detail(body),'unclassified')
 
