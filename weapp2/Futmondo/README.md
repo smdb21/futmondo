@@ -289,3 +289,16 @@ protocol codes, never credentials or private response bodies. Database diagnosti
 repeats are suppressed for 60 seconds. See [worker diagnostics](docs/worker_error_diagnostics.md)
 for interpretation and production verification limits. No extra configuration is
 needed to enable these logs.
+
+Worker egress optimization requires migrations
+`20261119000714_worker_maintenance_scoped_interval_update.sql` and
+`20261119001151_worker_conditional_payload_reads.sql` before the new image (both
+applied to production). Checkpoint writes return small acknowledgements and Python
+reuses unchanged DB snapshot chunks in a bounded cache, checking current database
+metadata on every read. Empty/settled scheduled-purchase UI lists poll once per
+minute; active reservations and explicit actions retain fast/live checks.
+`worker_traffic` log summaries report per-endpoint calls, decoded response bytes
+and HTTPX wire-body bytes each maintenance cycle, without additional requests.
+No new environment variables or dependencies are required. See
+[endpoint and egress review](docs/worker_egress_review.md) for measured traffic,
+quota-verification limits and the fixed 45-minute startup failure.

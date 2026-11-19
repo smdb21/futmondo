@@ -49,7 +49,7 @@ class FakeStore:
         if name == 'prepare_source':
             return dict(account=copy.deepcopy(self.row),checkpoint=copy.deepcopy(self.checkpoints.get(p['p_request']))) if self.allowed else None
         if name == 'enqueue_batch': return len(p['p_descriptors']) if self.allowed else None
-        if name == 'checkpoint':
+        if name in ('checkpoint', 'checkpoint_ack'):
             key = p['p_request']
             if p.get('p_response') is not None: self.checkpoints[key] = copy.deepcopy(p['p_response'])
             return copy.deepcopy(self.checkpoints.get(key))
@@ -127,7 +127,7 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
         return dict(type='http',url=url,body=dict(query={'championshipId':'l'},answer=[]))
     async def test_acquire_checkpoint_restart_reuse(self):
         first=await self.worker.exchange(self.job,'owner',self.message())
-        self.assertEqual([name for name,_ in self.store.calls],['prepare_source','guard','checkpoint'])
+        self.assertEqual([name for name,_ in self.store.calls],['prepare_source','guard','checkpoint_ack'])
         self.assertNotIn('header',first['body']);self.assertNotIn('query',first['body'])
         second_worker=Worker(self.store,self.client,KEY,Path.cwd());second_worker.admission_blocked=False
         again=await second_worker.source(self.job,'owner',self.message())

@@ -86,7 +86,7 @@ def source_rejection_detail(body):
 
 DB_DIAGNOSTIC_PATHS = FACT_TABLES | frozenset("""worker_accounts worker_jobs worker_chunks
 worker_snapshots worker_checkpoints worker_health worker_schedule_policy
-rpc/worker_read rpc/worker_claim rpc/worker_guard rpc/worker_prepare_source
+rpc/worker_read rpc/worker_read_cached rpc/worker_checkpoint_ack rpc/worker_claim rpc/worker_guard rpc/worker_prepare_source
 rpc/worker_checkpoint rpc/worker_write_fact rpc/worker_publish rpc/worker_publish_child
 rpc/worker_enqueue_batch rpc/worker_maintenance rpc/worker_cleanup_batch rpc/worker_release
 rpc/clause_observe rpc/clause_cleanup rpc/clause_retire_context""".split())
@@ -199,6 +199,10 @@ class Store:
         self.url = re.sub(r'(/rest/v1)+$', '', url.rstrip('/')) + '/rest/v1/'
         self.headers = {'apikey': key, 'Authorization': 'Bearer ' + key}
         self.diagnostic_times = {}
+        self.snapshot_cache = {}
+        self.snapshot_cache_bytes = 0
+        self.traffic = {}
+        self.traffic_started = time.monotonic()
 
     def diagnostic(self, method, path, status, detail):
         # Fixed endpoint names only: no query filters, identifiers, SQL or bodies.
@@ -226,6 +230,11 @@ class Store:
                 if isinstance(error, cls)), 'transport_error')
             self.diagnostic(method, path, 'connection', detail)
             raise WorkerFailure('database_connection') from None
+        endpoint = path if path in DB_DIAGNOSTIC_PATHS else 'other'
+        counters = self.traffic.setdefault(endpoint, [0, 0, 0])
+        counters[0] += 1
+        counters[1] += len(response.content)
+        counters[2] += response.num_bytes_downloaded
         if response.status_code not in range(200, 300):
             detail = 'unknown'
             try:
@@ -239,7 +248,67 @@ class Store:
             raise WorkerFailure('database_' + str(response.status_code))
         return response.json() if response.content else None
 
+    def report_traffic(self):
+        elapsed = max(1, round(time.monotonic() - self.traffic_started))
+        for endpoint, (calls, decoded, wire) in self.traffic.items():
+            LOG.info('worker_traffic seconds=%d endpoint=%s calls=%d decoded_bytes=%d wire_body_bytes=%d',
+                     elapsed, endpoint, calls, decoded, wire)
+        self.traffic.clear()
+        self.traffic_started = time.monotonic()
+
+    def evict_snapshot(self, key):
+        old = self.snapshot_cache.pop(key, None)
+        if old:
+            self.snapshot_cache_bytes -= old[1]
+
+    async def read_cached(self, params):
+        account = params['p_account']
+        versions = dict(params.get('p_versions', {}))
+        # Only empty-version worker reads participate. Preserve explicit caller versions.
+        wanted = {key for key, version in versions.items() if not version}
+        cached = {}
+        for key in wanted:
+            item = self.snapshot_cache.get((account, key))
+            if item:
+                cached[key] = item[0]
+                versions[key] = item[0]['manifest']['version']
+        result = await self.request('POST', 'rpc/worker_read_cached', json=dict(params, p_versions=versions))
+        if not isinstance(result, dict):
+            return result
+        resources = list(result.get('resources', []))
+        for item in result.pop('unchanged', []):
+            key = item['key']
+            old = cached.get(key)
+            if old and old['manifest']['version'] == item['manifest']['version']:
+                # Latest DB metadata controls expiry/status; only immutable chunks are reused.
+                resources.append(dict(item, chunks=old['chunks']))
+        present = {item['key'] for item in resources}
+        for key in wanted - present:
+            self.evict_snapshot((account, key))
+        for item in resources:
+            key = item['key']
+            if key not in wanted:
+                continue
+            cache_key = (account, key)
+            self.evict_snapshot(cache_key)
+            if key not in cached or item['chunks'] is not cached[key]['chunks']:
+                unpack_snapshot(item['manifest'], item['chunks'])  # Never retain corrupt payloads.
+            # Base64 chunks are ASCII. Count without re-encoding the entire payload.
+            size = len(canonical({k: v for k, v in item.items() if k != 'chunks'}).encode()) + sum(
+                len(chunk) + 4 for chunk in item['chunks']) + 16
+            if size > 8 * 1024 * 1024:
+                continue
+            while self.snapshot_cache and (len(self.snapshot_cache) >= 128 or
+                    self.snapshot_cache_bytes + size > 8 * 1024 * 1024):
+                self.evict_snapshot(next(iter(self.snapshot_cache)))
+            self.snapshot_cache[cache_key] = (item, size)
+            self.snapshot_cache_bytes += size
+        result['resources'] = resources
+        return result
+
     async def rpc(self, name, **params):
+        if name == 'read':
+            return await self.read_cached(params)
         return await self.request('POST', 'rpc/worker_' + name, json=params)
 
     async def account(self, identity):
@@ -488,7 +557,7 @@ class Worker:
                         raise failure
                     answer = {'status': response.status_code, 'body': parsed, 'observed_at': stamp()}
                     parts, size, digest = pack_snapshot(answer)
-                    await self.store.rpc('checkpoint', p_account=job['account_id'], p_key=job['resource_key'],
+                    await self.store.rpc('checkpoint_ack', p_account=job['account_id'], p_key=job['resource_key'],
                         p_owner=owner, p_generation=job['generation'], p_request=request_key,
                         p_response={'manifest': dict(parts=len(parts), json_bytes=size, sha256=digest), 'chunks': parts})
                     self.source_stamps.setdefault(owner, []).append(answer['observed_at'])
@@ -801,6 +870,8 @@ class Worker:
                 self.leader = False
                 previous_state = None
                 LOG.warning('worker_service code=database_unavailable')
+            if isinstance(self.store, Store):
+                self.store.report_traffic()
             try:
                 await asyncio.wait_for(self.stop.wait(), 60)
             except asyncio.TimeoutError:

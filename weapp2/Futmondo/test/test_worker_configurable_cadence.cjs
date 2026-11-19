@@ -8,6 +8,8 @@ const {PGlite}=require('/tmp/futmondo-review-tools/node_modules/@electric-sql/pg
  const d={handler:'get_notifications',resource_key:'a'.repeat(64),args:[],context:{account_id:'fixture'}};
  await q('select worker_enqueue($1,$2,60,0)',['fixture',d]);
  let j=(await q('select * from worker_jobs'))[0];assert.equal(j.interval_seconds,1800);assert.equal(j.native_interval_seconds,300);
+ await q("select worker_maintenance('fixture',2700,0,0)");
+ j=(await q('select * from worker_jobs'))[0];assert.equal(j.interval_seconds,2700);
  await q("select worker_maintenance('fixture',3600,0,0)");
  j=(await q('select * from worker_jobs'))[0];assert.equal(j.interval_seconds,3600);assert.equal(j.native_interval_seconds,300);
  await q("select worker_maintenance('fixture',1800,0,0)");

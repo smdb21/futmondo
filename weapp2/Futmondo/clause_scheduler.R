@@ -113,11 +113,18 @@ fm_clause_account <- function(id) {
  }
  s
 }
+# Empty/settled purchase lists do not need a full DB download every five seconds.
+# Active/uncertain reservations and errors retain fast polling; actions force a read.
+fm_clause_poll_interval <- function(s) {
+ if(!isTRUE(s$known)||!is.null(s$error))return(5)
+ active<-any(vapply(s$jobs,function(j)!isTRUE(j$state%in%c('succeeded','cancelled','expired','failed')),logical(1)))
+ if(active)5 else 60
+}
 fm_clause_refresh <- function(account,owner='',force=FALSE) {
  if(!fm_clause_enabled())return(invisible(NULL))
  s<-.fm_clause$accounts[[account]]
  if(is.null(s)){if(!nzchar(owner))return(invisible(NULL));s<-fm_clause_account(account)}
- if(s$busy||!force&&as.numeric(Sys.time())-s$last<4)return(invisible(NULL))
+ if(s$busy||!force&&as.numeric(Sys.time())-s$last<fm_clause_poll_interval(s)-1)return(invisible(NULL))
  s$busy<-TRUE;s$last<-as.numeric(Sys.time())
  promises::then(fm_clause_rpc('read',list(p_account=account),owner),function(value){
   if(!is.list(value)||!is.list(value$jobs)||any(vapply(value$jobs,function(j)

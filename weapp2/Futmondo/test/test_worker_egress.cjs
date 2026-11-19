@@ -1,0 +1,31 @@
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const {PGlite}=require('/tmp/futmondo-review-tools/node_modules/@electric-sql/pglite');
+(async()=>{const db=new PGlite();try{
+ await db.exec('create role anon;create role authenticated;create role service_role bypassrls;');
+ await db.exec(fs.readFileSync('scripts/schema.sql','utf8'));
+ const q=async(s,a=[]) => (await db.query(s,a)).rows;
+ const rpc=async(name,args)=>(await q(`select worker_${name}(${args.map((_,i)=>'$'+(i+1)).join(',')}) result`,args))[0].result;
+ await db.exec('set role service_role');
+ const a=await rpc('connect',['fixture','synthetic','credential',0,'UTC']);
+ const seed=(await q('select * from worker_jobs'))[0];
+ await rpc('elect',['leader']);
+ await q("update worker_jobs set owner='leader:0',lease_until=now()+interval '60 seconds',started_at=now() where account_id='fixture'");
+ const response={chunks:['x'.repeat(100000)],manifest:{fixture:true}};
+ assert.equal(await rpc('checkpoint_ack',['fixture',seed.resource_key,'leader:0',a.generation,'request',response]),true);
+ assert.deepEqual(await rpc('checkpoint',['fixture',seed.resource_key,'leader:0',a.generation,'request',null]),response);
+ await assert.rejects(rpc('checkpoint_ack',['fixture',seed.resource_key,'wrong',a.generation,'request',response]));
+ const version='11111111-1111-4111-8111-111111111111';
+ await q(`insert into worker_snapshots(account_id,resource_key,context,handler,version,observed_at,checked_at,valid_until,completeness,status,json_bytes,sha256,parts,run_id,descriptor)
+ values('fixture',$1,$2,'get_active_championships',$3,now(),now(),now()+interval '1 hour','complete','ok',1,$4,1,gen_random_uuid(),$5)`,[seed.resource_key,seed.descriptor.context,version,'a'.repeat(64),seed.descriptor]);
+ await q('insert into worker_chunks(account_id,resource_key,version,part,data) values($1,$2,$3,0,$4)',['fixture',seed.resource_key,version,'x'.repeat(100000)]);
+ let result=await rpc('read_cached',['fixture',{[seed.resource_key]:''}]);assert.equal(result.resources.length,1);assert.equal(result.unchanged.length,0);
+ let same=await rpc('read_cached',['fixture',{[seed.resource_key]:version}]);assert.equal(same.resources.length,0);assert.equal(same.unchanged.length,1);assert.ok(!('chunks' in same.unchanged[0]));
+ assert.ok(JSON.stringify(same).length<JSON.stringify(result).length/10);
+ assert.equal((await rpc('read_cached',['other',{[seed.resource_key]:version}])).unchanged.length,0);
+ await q("update worker_snapshots set status='partial',valid_until=now()-interval '1 hour' where account_id='fixture'");
+ same=await rpc('read_cached',['fixture',{[seed.resource_key]:version}]);assert.equal(same.unchanged[0].manifest.status,'partial');
+ await q("delete from worker_snapshots where account_id='fixture'");
+ same=await rpc('read_cached',['fixture',{[seed.resource_key]:version}]);assert.equal(same.unchanged.length,0);assert.equal(same.resources.length,0);
+ await db.exec('set role anon');await assert.rejects(rpc('read_cached',['fixture',{}]));await assert.rejects(rpc('checkpoint_ack',['fixture',seed.resource_key,'leader:0',a.generation,'request',response]));
+ console.log('PASS small durable checkpoint acknowledgement, lease checks, conditional reads, metadata updates, deletion, isolation and grants');
+}finally{await db.close();}})().catch(e=>{console.error(e);process.exit(1)});
