@@ -156,3 +156,13 @@ values and interactive input before renewal completes, then one acknowledged
 renewal. An explicit disable during renewal also remains authoritative over
 an older reply. The earlier standalone Admin fixture could not cover this
 opted-in session path. See `progressive_loading.md` and `data_review_results.md`.
+
+
+## Worker activity — 2026-11-18
+
+The admin-only Worker activity section separates shared live process totals from
+latest reported requests, grouped by route with My account / Other accounts
+columns. Positive fresh counts are green; zeros and stale counts are neutral.
+Opening this section only reads durable operational metadata. It does not start
+acquisition or create workers. See [authorization, sampling, database contract,
+and performance bounds](admin_worker_monitor.md).

@@ -45,7 +45,7 @@ class FakeStore:
                     manifest = self.snapshots[key]
                     resources.append(dict(manifest=manifest, chunks=self.chunks[manifest['version']]))
             return dict(resources=resources)
-        if name == 'guard': return self.allowed
+        if name in ('guard', 'guard_activity'): return self.allowed
         if name == 'prepare_source':
             return dict(account=copy.deepcopy(self.row),checkpoint=copy.deepcopy(self.checkpoints.get(p['p_request']))) if self.allowed else None
         if name == 'enqueue_batch': return len(p['p_descriptors']) if self.allowed else None
@@ -127,7 +127,7 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
         return dict(type='http',url=url,body=dict(query={'championshipId':'l'},answer=[]))
     async def test_acquire_checkpoint_restart_reuse(self):
         first=await self.worker.exchange(self.job,'owner',self.message())
-        self.assertEqual([name for name,_ in self.store.calls],['prepare_source','guard','checkpoint_ack'])
+        self.assertEqual([name for name,_ in self.store.calls],['prepare_source','guard_activity','checkpoint_ack'])
         self.assertNotIn('header',first['body']);self.assertNotIn('query',first['body'])
         second_worker=Worker(self.store,self.client,KEY,Path.cwd());second_worker.admission_blocked=False
         again=await second_worker.source(self.job,'owner',self.message())

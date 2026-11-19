@@ -4983,3 +4983,71 @@ complexity, API/database traffic, cache reuse, reactive work, timers and memory;
 only flex-item order changes. No additional runtime performance test, dependency
 or full lifecycle run is required for this module-local CSS adjustment. No
 production deployment or authenticated hosted acceptance is claimed.
+
+
+## Admin worker activity by account and route — 2026-11-18 (Pacific)
+
+Implemented the admin-only route matrix, shared-process totals, durable sampled
+activity and visible-page asynchronous polling. See [monitor contract](admin_worker_monitor.md).
+The current account comes from the authenticated token; no browser-supplied scope,
+credentials, raw account IDs, descriptors, bodies or backend exceptions are displayed.
+
+Executed successfully with isolated/synthetic data:
+
+- `test/test_admin_worker_monitor.R`: eight focused groups, plus two actual SQL
+  JSON projection fixtures. Covers independent authorization, strict projection,
+  own/other route counts, positive/zero/stale styling, unavailable states, serialized
+  refreshes, visible-page polling, cancellation and late replies, and the overall
+  20-second deadline including queued work.
+- `node test/test_admin_worker_monitor.cjs`: nine SQL groups, including old process
+  records, expired leadership/leases, ordered activity updates and same-sequence
+  heartbeat freshness, owner/run/generation changes, disabled/excluded/blocked
+  account contexts, browser-role denial, safe sentinels and row limits. SQL and
+  Python allowlists match all 85 routes. The migration is appended unchanged to
+  the fresh-install schema.
+- Python worker activity/core/diagnostic/cleanup/cadence suites: 61 tests passed
+  in 30.002 seconds. Six new activity tests verify reuse of existing guards,
+  allowlisted payloads, delayed phase visibility and final cleanup.
+- `test/test_admin_worker_monitor_browser_app.R` with the matching Playwright
+  check: six viewport/theme combinations (320/390/1440px, dark/light), plus hidden
+  browser, navigation and admin-loss checks. Correct route counts (2/1 and 0/1),
+  computed positive/zero/stale colors, wrapping, no horizontal overflow, stopped
+  real 15-second polls and rejected late/forged refreshes. A delayed two-second
+  response kept heartbeat interactions responsive at 84–154 ms. The table precedes
+  collapsed worker details, whose keyboard toggle also passed. Screenshots inspected. All
+  transport/source/database calls are synthetic or forbidden in this fixture.
+- Existing Admin browser fixture: eight viewport/theme combinations (320, 390,
+  768, 1440px), all five sections, settings/disclosures/navigation, no browser or
+  Shiny errors and no timezone-directory reads. Settings rendered in 820–834 ms;
+  heartbeat responses took 38–87 ms. Existing Admin configuration (two groups),
+  league-settings (six groups) and awards/coach (11 groups) checks passed.
+- `Rscript test/test_shiny_simulation.R`: 13 offline lifecycle checks plus eight
+  tabs passed on the isolated task candidate; no live HTTP/database mutation.
+  Existing non-failing Plotly empty-trace warnings remain.
+- `Rscript test/test_deployment_contract.R`: three groups passed. New runtime
+  module and changed R checksums are included; credentials, tests, internal docs
+  and development scripts remain excluded. No dependencies changed.
+
+Performance review: worker activity adds bounded JSON to the same existing guard
+requests and row update, with no additional source/DB call or timer. Per-process
+activity is limited to the two existing lanes; the database retains one <=2 KiB
+sample per job, not an event stream. The admin view performs at most four metadata
+reads/minute per visible session plus serialized explicit refreshes; hidden or
+unauthorized views do none. Metadata projection avoids factual/checkpoint payloads
+and uses a partial owned-job index. A PGlite fixture with 10,000 idle jobs, 132
+active jobs and 67 recent workers executed in 11.446 ms; bounded response was
+43,524 bytes (normal two-job response 1,576 bytes). Rendering is bounded to 64
+workers/128 jobs, with details collapsed. Short requests can finish between
+samples; the UI reports latest sampled activity, not an instantaneous wire trace.
+
+Production migration `20261119030721_admin_worker_monitor` was applied before
+releasing code. Read-only verification at 2026-11-19 03:07 UTC found one live
+worker/two active jobs, ten retained old worker records and zero expired leases;
+old workers correctly reported unknown endpoint activity. The monitor query took
+9.921 ms with zero disk reads; the partial index is valid and worker_jobs RLS
+remains enabled. All three new functions are security-invoker, denied to anon and
+authenticated roles and granted to service_role. Security/performance advisor
+findings are unchanged from before the migration; health advisor is clear.
+No account/job/history contents were changed by verification. Hosted UI acceptance
+and updated-worker telemetry remain separate deployment checks; no claim of a
+complete HTTP trace or resolution of unrelated source-data failures is made.

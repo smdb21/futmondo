@@ -2187,3 +2187,24 @@ No schema migration, dependency, environment variable, automated transaction or 
 
 Presentation-only refinement of the existing fixture feature; no new capability,
 login inventory, data contract, source acquisition or persistence change.
+
+
+## Admin worker activity by account and route — 2026-11-18 (Pacific)
+
+Status: **implemented and verified locally; additive production migration applied**.
+
+- [x] Restrict monitoring independently to the authenticated LigaRadar administrator.
+- [x] Separate shared live-worker totals from latest request counts by route, with
+  My account / Other accounts columns; positive fresh counts green, zero/stale neutral.
+- [x] Piggyback safe activity metadata on existing guards and retain only the latest
+  bounded sample in the database; no new worker/source request or acquisition timer.
+- [x] Exclude old heartbeat records, expired leases and stale/previous-owner activity;
+  label unknown/unavailable reports truthfully.
+- [x] Verify account isolation, cancellation, late callbacks, responsive mobile/desktop
+  layouts, SQL permissions and performance, and the shared offline lifecycle.
+- [x] Apply and verify production migration `20261119030721_admin_worker_monitor`;
+  repository source is `20261119025754_admin_worker_monitor.sql`.
+- [ ] Hosted visual acceptance and fresh telemetry from the updated worker image.
+
+See [monitor contracts](admin_worker_monitor.md) and [executed checks](data_review_results.md).
+Public login feature tiers are unchanged: this is admin-only operational infrastructure.

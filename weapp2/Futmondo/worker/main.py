@@ -90,7 +90,7 @@ DB_DIAGNOSTIC_PATHS = FACT_TABLES | frozenset("""worker_accounts worker_jobs wor
 worker_snapshots worker_checkpoints worker_health worker_schedule_policy
 rpc/worker_read rpc/worker_read_cached rpc/worker_checkpoint_ack rpc/worker_claim rpc/worker_guard rpc/worker_prepare_source
 rpc/worker_checkpoint rpc/worker_write_fact rpc/worker_publish rpc/worker_publish_child
-rpc/worker_enqueue_batch rpc/worker_maintenance rpc/worker_cleanup_batch rpc/worker_release
+rpc/worker_enqueue_batch rpc/worker_maintenance rpc/worker_cleanup_batch rpc/worker_release rpc/worker_guard_activity rpc/worker_admin_monitor
 rpc/clause_observe rpc/clause_cleanup rpc/clause_retire_context rpc/clause_claim
 rival_finance_evidence_latest rival_finance_evidence_versions finance_history_states player_round_dataset""".split())
 
@@ -503,6 +503,34 @@ class Worker:
         self.source_diagnostics = {}
         self.progress_times = {}
         self.progress_ready = set()
+        # Only the two reusable factual lanes retain activity. Existing guards
+        # sample it; activity changes never create another request or timer.
+        self.activities = {}
+        self.activity_sequences = {}
+
+    def set_activity(self, owner, phase, route=None, method=None):
+        if phase not in ('starting', 'processing', 'source_wait', 'source_request', 'database', 'publishing'):
+            phase = 'processing'
+        if not isinstance(route, str) or (route not in READ_PATHS and route not in DB_DIAGNOSTIC_PATHS):
+            route = None
+        if method not in ('GET', 'POST', 'PATCH', 'DELETE') or route is None:
+            method = None
+        sequence = self.activity_sequences.get(owner, 0) + 1
+        self.activity_sequences[owner] = sequence
+        self.activities[owner] = dict(phase=phase, route=route, method=method,
+                                     started_at=stamp(), sequence=sequence)
+
+    @contextlib.contextmanager
+    def activity_scope(self, owner, phase, route=None, method=None):
+        previous = self.activities.get(owner)
+        self.set_activity(owner, phase, route, method)
+        try:
+            yield
+        finally:
+            if previous is None:
+                self.activities.pop(owner, None)
+            else:
+                self.set_activity(owner, previous['phase'], previous['route'], previous['method'])
 
     def source_reference(self, kind, *values):
         # Stable across restarts with the same server key; resistant to ID guessing.
@@ -544,12 +572,19 @@ class Worker:
                     attempts, matches(context.get('user_team_id')), matches(args.get('user_team_id')))
 
     async def guard(self, job, owner, checkpoint=None):
-        valid = await self.store.rpc('guard', p_account=job['account_id'], p_key=job['resource_key'],
-            p_owner=owner, p_generation=job['generation'], p_checkpoint=checkpoint)
+        if owner not in self.activities:
+            self.set_activity(owner, 'processing')
+        activity = dict(self.activities[owner], run_id=job.get('run_id'))
+        valid = await self.store.rpc('guard_activity', p_account=job['account_id'], p_key=job['resource_key'],
+            p_owner=owner, p_generation=job['generation'], p_checkpoint=checkpoint, p_activity=activity)
         if not valid:
             raise WorkerFailure('access_revoked')
 
     async def source(self, job, owner, message):
+        with self.activity_scope(owner, 'processing'):
+            return await self._source(job, owner, message)
+
+    async def _source(self, job, owner, message):
         url = urlparse(message['url'])
         if url.scheme != 'https' or url.netloc != 'api.futmondo.com' or url.path not in READ_PATHS or url.query or url.fragment:
             raise WorkerFailure('source_route_denied')
@@ -557,6 +592,7 @@ class Worker:
         if isinstance(body, str):
             body = json.loads(body)
         request_key = hashlib.sha256(canonical(dict(path=url.path, body=body)).encode()).hexdigest()
+        self.set_activity(owner, 'database', 'rpc/worker_prepare_source', 'POST')
         prepared = await self.store.rpc('prepare_source', p_account=job['account_id'], p_key=job['resource_key'],
             p_owner=owner, p_generation=job['generation'], p_request=request_key)
         if not isinstance(prepared, dict) or not isinstance(prepared.get('account'), dict):
@@ -597,13 +633,18 @@ class Worker:
             # Older workers checkpointed HTTP-200 application errors. Retain
             # that diagnostic record, but acquire a new source response rather
             # than replaying the same rejection forever after a parser failure.
+        self.set_activity(owner, 'source_wait', url.path, 'POST')
         lock = self.account_locks.setdefault(job['account_id'], asyncio.Lock())
         async with lock, self.connections:
             for attempt in range(3):
-                await self.guard(job, owner)
+                self.set_activity(owner, 'source_wait', url.path, 'POST')
                 delay = self.request_interval - (time.monotonic() - self.last_request.get(job['account_id'], 0))
                 if delay > 0:
                     await asyncio.sleep(delay)
+                self.set_activity(owner, 'source_request', url.path, 'POST')
+                # Same authorization request as before, now immediately before
+                # dispatch and carrying its bounded activity sample.
+                await self.guard(job, owner)
                 self.last_request[job['account_id']] = time.monotonic()
                 self.request_count += 1
                 try:
@@ -620,6 +661,7 @@ class Worker:
                     response = await asyncio.wait_for(bounded_request(), 15)
                 except (httpx.HTTPError, asyncio.TimeoutError):
                     response = None
+                self.set_activity(owner, 'processing')
                 if response is not None and response.status_code == 429:
                     retry = response.headers.get('Retry-After', '')
                     try:
@@ -630,6 +672,7 @@ class Worker:
                         except (ValueError, TypeError, OverflowError):
                             delay = 60
                     delay = max(1, delay)
+                    self.set_activity(owner, 'database', 'worker_accounts', 'PATCH')
                     await self.store.request('PATCH', 'worker_accounts', params={'account_id': 'eq.' + job['account_id'],
                         'generation': 'eq.' + str(job['generation'])}, json={'rate_limited_until': stamp(time.time() + delay)})
                     raise WorkerFailure('source_rate_limited', delay)
@@ -659,6 +702,7 @@ class Worker:
                         raise failure
                     answer = {'status': response.status_code, 'body': parsed, 'observed_at': stamp()}
                     parts, size, digest = pack_snapshot(answer)
+                    self.set_activity(owner, 'database', 'rpc/worker_checkpoint_ack', 'POST')
                     await self.store.rpc('checkpoint_ack', p_account=job['account_id'], p_key=job['resource_key'],
                         p_owner=owner, p_generation=job['generation'], p_request=request_key,
                         p_response={'manifest': dict(parts=len(parts), json_bytes=size, sha256=digest), 'chunks': parts})
@@ -669,6 +713,7 @@ class Worker:
                 if attempt == 2:
                     raise WorkerFailure('source_transient')
                 retry = response.headers.get('Retry-After', '') if response is not None else ''
+                self.set_activity(owner, 'source_wait', url.path, 'POST')
                 await asyncio.sleep(min(30, max(1, int(retry))) if retry.isdigit() else .5 * 2 ** attempt)
         raise WorkerFailure('source_transient')
 
@@ -677,6 +722,16 @@ class Worker:
         return not getattr(self, 'admission_blocked', True) or bool(admin and auth.get('user_name', '').strip().lower() == admin)
 
     async def exchange(self, job, owner, message):
+        kind = message.get('type')
+        route = 'rpc/worker_read' if kind in ('resource', 'history_ack', 'discovery_resource') else message.get('table')
+        phase = 'database' if kind in ('database', 'persist', 'resource', 'history_ack', 'discovery_resource') else 'processing'
+        method = 'GET' if kind == 'database' else 'POST'
+        if kind == 'persist':
+            route = 'rpc/worker_write_fact'
+        with self.activity_scope(owner, phase, route, method):
+            return await self._exchange(job, owner, message)
+
+    async def _exchange(self, job, owner, message):
         # These operations authorize atomically in their own RPC. Read-only
         # bridges retain their guard; heartbeat renewal remains independent.
         if message['type'] not in ('http', 'persist', 'progress', 'clause_observation'):
@@ -785,6 +840,10 @@ class Worker:
         return {'ok': True}
 
     async def publish(self, job, owner, result, child=None):
+        with self.activity_scope(owner, 'publishing'):
+            return await self._publish(job, owner, result, child)
+
+    async def _publish(self, job, owner, result, child=None):
         await self.guard(job, owner)
         if self.source_errors.get(owner) and not self.source_stamps.get(owner):
             raise WorkerFailure('source_unavailable')
@@ -797,6 +856,7 @@ class Worker:
                 await self.guard(job, owner)
             batch = [dict(account_id=job['account_id'], resource_key=resource_key,
                 version=version, part=i, data=parts[i]) for i in range(offset, min(offset + 4, len(parts)))]
+            self.set_activity(owner, 'publishing', 'worker_chunks', 'POST')
             await self.store.request('POST', 'worker_chunks', json=batch, headers={'Prefer': 'resolution=ignore-duplicates'})
         if os.getenv('FUTMONDO_CLAUSE_SCHEDULING_ENABLED', 'false').lower() == 'true' and descriptor['handler'] == 'get_resolved_league_context':
             context = plain(result['value'])
@@ -840,6 +900,7 @@ class Worker:
         if not child:
             manifest['full_audit'] = bool(job.get('_full_audit'))
         if child:
+            self.set_activity(owner, 'publishing', 'rpc/worker_publish_child', 'POST')
             if not await self.store.rpc('publish_child', p_account=job['account_id'], p_parent=job['resource_key'],
                     p_owner=owner, p_generation=job['generation'], p_descriptor=descriptor, p_manifest=manifest):
                 raise WorkerFailure('access_revoked')
@@ -847,6 +908,7 @@ class Worker:
         for resource in result.get('resources', []):
             if resource['descriptor']['resource_key'] != job['resource_key']:
                 await self.publish(job, owner, resource, child=resource['descriptor'])
+        self.set_activity(owner, 'publishing', 'rpc/worker_publish', 'POST')
         if not await self.store.rpc('publish', p_account=job['account_id'], p_key=job['resource_key'], p_owner=owner,
                                     p_generation=job['generation'], p_manifest=manifest):
             raise WorkerFailure('access_revoked')
@@ -859,6 +921,7 @@ class Worker:
         # bounded and acknowledged, without mutating helper descriptors.
         batch, size = [], 0
         async def flush():
+            self.set_activity(owner, 'publishing', 'rpc/worker_enqueue_batch', 'POST')
             acknowledged = await self.store.rpc('enqueue_batch', p_account=job['account_id'],
                 p_owner=owner, p_generation=job['generation'], p_descriptors=batch)
             if type(acknowledged) is not int or not 0 <= acknowledged <= len(batch):
@@ -888,6 +951,7 @@ class Worker:
                 if not job:
                     await asyncio.sleep(30)
                     continue
+                self.set_activity(owner, 'starting')
                 await self.guard(job, owner)
                 self.source_stamps[owner] = []
                 self.source_errors[owner] = set()
@@ -904,6 +968,7 @@ class Worker:
                     time.time() - datetime.fromisoformat(audit.replace('Z', '+00:00')).timestamp() >= 86400)
                 if job['_full_audit']:
                     run_descriptor['args']['full_audit'] = True
+                self.set_activity(owner, 'processing')
                 run = asyncio.create_task(self.helpers[index].run(run_descriptor, lambda m: self.exchange(job, owner, m)))
                 try:
                     done, _ = await asyncio.wait([run, renewal], return_when=asyncio.FIRST_COMPLETED)
@@ -948,6 +1013,8 @@ class Worker:
                             json={'owner': None, 'lease_until': None, 'last_error': code,
                                   'due_at': stamp(time.time() + max(getattr(error, 'retry_after', 0), min(3600, 15 * 2 ** min(job['attempts'], 8))))})
                 await asyncio.sleep(2)
+            finally:
+                self.activities.pop(owner, None)
 
     async def maintenance(self):
         previous_state = None

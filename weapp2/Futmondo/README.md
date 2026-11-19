@@ -319,3 +319,12 @@ variables or dependencies. Telemetry names `rival_finance_evidence_versions` and
 `finance_history_states` distinguish metadata from payload traffic. See
 [financial evidence egress](docs/finance_evidence_egress.md) for supported reads,
 verification and quota limits.
+
+
+Admin worker monitoring requires `scripts/migrations/20261119025754_admin_worker_monitor.sql`
+before deploying the updated app/worker image. Admin → Worker activity groups
+latest reported requests by route, with My account / Other accounts counts and
+separate shared-process totals. Only the configured administrator can read this
+server-only view. No environment variable or dependency is added. Telemetry uses
+existing worker guard calls; the visible Admin page reads metadata every 15 seconds.
+See [monitor contracts and limits](docs/admin_worker_monitor.md).

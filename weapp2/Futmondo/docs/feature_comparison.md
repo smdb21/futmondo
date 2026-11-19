@@ -247,3 +247,18 @@ or the current signed-in picker ordering. No authenticated current official UI
 or hosted LigaRadar acceptance was performed. Missing documentation is not proof
 of official feature absence. See [lineup contract](lineup_module.md) and
 [executed checks](data_review_results.md).
+
+
+## Admin worker activity — 2026-11-18
+
+Reviewed the [official Futmondo web app](https://app.futmondo.com/) and
+[official app guide](https://magazine.futmondo.com/novedades-en-la-nueva-app-de-futmondo/)
+(guide published 2021-12-23; reviewed 2026-11-18). These public sources do not
+establish an equivalent for LigaRadar's own acquisition-process monitoring.
+No authenticated official admin interface was inspected, so absence/exclusivity
+is not claimed. LigaRadar adds an administrator-only operational view of its own
+shared factual workers, with latest sampled request counts by route and current
+account versus other accounts. This is internal operational infrastructure,
+not a public football-analysis capability, and is excluded from the public
+Essentials/Advanced login inventory. Sampling, authorization and limits:
+[admin worker monitor](admin_worker_monitor.md).
