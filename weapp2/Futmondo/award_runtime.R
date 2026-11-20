@@ -89,12 +89,13 @@ award_settlement_rechecks <- function(evidence,rows,catalog) {
   },intersect(unique(payments$round_id),catalog$round_id))
 }
 get_mvp_saved_catalog <- function(login,championship_id) {
-  season<-league_season_context(championship_id)
-  saved<-tryCatch(read_rival_finance_evidence(login[["userid"]],championship_id,season),error=function(e)list(evidence=list(),complete=FALSE))
+  season<-league_season_context(championship_id);competition<-NULL
+  if(!fm_context_known(season)){scope<-league_history_scope(championship_id,login[["userid"]]);season<-scope$season;competition<-scope$competition_id}
+  saved<-tryCatch(read_rival_finance_evidence(login[["userid"]],championship_id,season,competition_id=competition),error=function(e)list(evidence=list(),complete=FALSE))
   expected<-award_expected_scoring(login,championship_id)
   rows<-award_saved_rows(rival_evidence_rows(saved$evidence,"awards"),championship_id,season,expected,login[["userid"]])
   catalog<-get_award_round_catalog(login,championship_id,rows)
-  list(saved=rows,expected_scoring=expected,saved_complete=isTRUE(saved$complete),catalog=catalog,season=season,
+  list(saved=rows,expected_scoring=expected,saved_complete=isTRUE(saved$complete),context_unknown=isTRUE(saved$context_unknown),catalog=catalog,season=season,
     settlement_rechecks=award_settlement_rechecks(saved$evidence,rows,award_catalog_numbers(catalog$rounds,rows)))
 }
 award_snapshot_evidence <- function(result,login,championship_id,reference,context) {
@@ -164,7 +165,7 @@ shared_mvp_source <- function(session,login,championship,active,refresh=NULL) {
     complete<-nrow(required)>0L&&(isTRUE(state$catalog_complete)||scoped_catalog_complete)&&isTRUE(state$saved_complete)&&all(required$persistence=="Saved")&&all(required$selection=="11 players")
     catalog_reason<-state$catalog_reason
     if(identical(catalog_reason,"Some round numbers or completion states are not confirmed. Retrieve missing awards to check their schedules."))catalog_reason<-""
-    reason<-paste(unique(c(catalog_reason,if(!state$saved_complete)"Saved coverage could not be fully read.",
+    reason<-paste(unique(c(catalog_reason,if(!state$saved_complete)if(isTRUE(state$context_unknown))"The league season could not be resolved, so saved awards were not read." else "Saved coverage could not be fully read.",
       if(nrow(coverage)&&any(coverage$selection=="Missing"))"Some round awards are missing. Retrieve them in Admin.",
       if(length(state$unsaved))"Some fetched selections could not be saved. Retry saving in Admin.")),collapse=" ")
     state$value(list(status=if(state$loading||state$running)"loading"else if(complete)"ok"else"partial",rows=state$rows,
@@ -308,7 +309,7 @@ shared_mvp_source <- function(session,login,championship,active,refresh=NULL) {
       promises::then(async_adapter_fetch("get_mvp_saved_catalog",list(login=auth,championship_id=cid),ctx,is_current=function()current(g,key)),function(result){
         if(!current(g,key))return(NULL)
         state$loading<-FALSE;state$expected_scoring<-mvp_text(result$expected_scoring,"unknown");state$rows<-result$saved %||% data.frame();state$rounds<-award_catalog_numbers(result$catalog$rounds %||% empty_finished_rounds(),state$rows)
-        state$catalog_complete<-isTRUE(result$catalog$complete);state$catalog_identity_complete<-isTRUE(result$catalog$identity_complete %||% result$catalog$complete);state$saved_complete<-isTRUE(result$saved_complete);state$catalog_reason<-result$catalog$reason %||% ""
+        state$catalog_complete<-isTRUE(result$catalog$complete);state$catalog_identity_complete<-isTRUE(result$catalog$identity_complete %||% result$catalog$complete);state$saved_complete<-isTRUE(result$saved_complete);state$context_unknown<-isTRUE(result$context_unknown);state$catalog_reason<-result$catalog$reason %||% ""
         state$user_team_id<-result$catalog$user_team_id;state$current_round_number<-result$catalog$current_round_number;state$current_round_id<-result$catalog$current_round_id
         # Active-session recovery only; the normal bounded async acquisition and
         # acknowledged persistence path handles these paid-round revisions.

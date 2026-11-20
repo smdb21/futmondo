@@ -1202,7 +1202,12 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
           )
         )
       } else {
+        teams<-tryCatch(league_finances_RV()$team_finances,error=function(e)NULL)
+        rival_name<-if(is.data.frame(teams)&&all(c("teamid","teamname")%in%names(teams)))
+          as.character(teams$teamname[match(rival_id,as.character(teams$teamid))])else NA_character_
         tagList(
+          h3(class="fm-selected-rival-title",icon("user"),
+            if(length(rival_name)==1L&&!is.na(rival_name)&&nzchar(rival_name))rival_name else "Selected user team"),
           uiOutput(ns("rival_financial_summary_box")),
           tabsetPanel(id = ns("rival_tabs"), type = "pills", selected = "history",
             tabPanel(title = "Current team", value = "roster", icon = icon("users"),
@@ -1269,14 +1274,12 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
           tags$p("Ordinary purchases (identified): ",ui_financial_amount(outflow$market)),
           tags$p("Clause purchases (identified): ",ui_financial_amount(outflow$clauses)),
           if(is.finite(outflow$other)&&outflow$other!=0)tags$p("Other debits: ",ui_financial_amount(outflow$other)),
-          fm_info("Every purchase is included in the numeric total. Its method is identified from recorded transfer evidence.",
-            if(outflow$incomplete)" Some amounts are missing; only known expenses are included.", error=isTRUE(outflow$incomplete))
+          if(isTRUE(outflow$incomplete))fm_info("Some amounts are missing; only known expenses are included.", error=TRUE)
         )),
         if(is.finite(inflow$unknown)&&is.finite(outflow$unknown)&&(inflow$unknown+outflow$unknown)>0)
-          fm_info(paste0("Transfer-method evidence still needed for ",format_table_currency(inflow$unknown)," of sales and ",format_table_currency(outflow$unknown)," of purchases. These amounts are already included in the totals."), error=TRUE),
+          fm_info(paste0("Transfer type (clause or market) couldn't be verified for ",format_table_currency(inflow$unknown)," of sales and ",format_table_currency(outflow$unknown)," of purchases. These amounts are still included in the totals."), error=TRUE),
         p(strong("Total income − total expenses = balance: "),ui_financial_amount(inflow$total-outflow$total)),
         h4("Financial history"),
-        fm_info("Includes transfers and paid bonuses. Pending bonuses are not shown or added to your balance."),
         reactable::reactableOutput(ns("rival_transactions_table"))
       )
     })

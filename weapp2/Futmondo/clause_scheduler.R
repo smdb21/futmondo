@@ -427,9 +427,19 @@ fm_clause_pending_ui <- function(jobs) {
  r<-fm_clause_reservations(scheduled)
  amount<-if(is.finite(r$amount))paste0(format(round(r$amount),big.mark='.',decimal.mark=',',scientific=FALSE),' EUR')else'Unavailable'
  pending<-Filter(function(j)j$state%in%c('scheduled','preparing','dispatched','uncertain','accepted'),scheduled %||% list())
- shiny::tags$details(class='round-countdown-finance-item',shiny::tags$summary(paste0('Scheduled purchases: ',amount,' (',if(is.finite(r$count))r$count else'?',')')),
-  lapply(pending,function(j)shiny::tags$p(j$player_name,' · ',fm_format_datetime(j$opens_at),' · ',fm_clause_status_text(j))),
-  if(length(pending))shiny::actionButton('clause_revoke','Cancel all scheduled purchases and revoke access',style='white-space:normal;max-width:100%;'))
+ eur<-function(x)if(is.finite(fm_number(x)))paste0(format(round(fm_number(x)),big.mark='.',decimal.mark=',',scientific=FALSE),' EUR')else'Unavailable'
+ # Manual offers/clause buys already sent whose outcome is not yet confirmed.
+ manual<-if(is.null(jobs))list()else Filter(function(j)identical(j$kind,'manual')&&j$state%in%c('dispatched','uncertain','accepted'),jobs)
+ shiny::tagList(
+  shiny::tags$details(class='round-countdown-finance-item',shiny::tags$summary(paste0('Scheduled clause purchases: ',amount,' (',if(is.finite(r$count))r$count else'?',')')),
+   if(!length(pending))shiny::tags$p('No scheduled clause purchases.'),
+   lapply(pending,function(j)shiny::tags$p(shiny::tags$strong(j$player_name %||% 'Unknown player'),' · ',eur(j$reserved_amount),' · opens ',fm_format_datetime(j$opens_at),' · ',fm_clause_status_text(j))),
+   if(length(pending))shiny::actionButton('clause_revoke','Cancel all scheduled purchases and revoke access',style='white-space:normal;max-width:100%;')),
+  if(length(manual))shiny::tags$details(class='round-countdown-finance-item',
+   shiny::tags$summary(paste0('Offers awaiting confirmation: ',eur(sum(vapply(manual,function(j)fm_number(j$reserved_amount),numeric(1)))),' (',length(manual),')')),
+   shiny::tags$p('Sent manually; Futmondo has not yet confirmed the result. The amount is held from Can spend until reconciled.'),
+   lapply(manual,function(j)shiny::tags$p(shiny::tags$strong(j$player_name %||% 'Unknown player'),' · ',eur(j$reserved_amount),' · ',
+    if(identical(j$mode,'clause'))'clause' else 'market offer',' · ',fm_clause_status_text(j)))))
 }
 
 # Share the exact native builders with the ordinary synchronous API functions.

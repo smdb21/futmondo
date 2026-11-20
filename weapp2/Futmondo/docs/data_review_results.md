@@ -5294,3 +5294,24 @@ phone remains separate. This verification note has no runtime/performance effect
   gap. There are no additional source calls, database writes, worker jobs,
   polling timers or dependencies. A local CPU check ran 100 warm projections
   of 380 calendar fixtures and 12 scores in 2.185 seconds total.
+
+## 2026-11-20 UI wording, light-mode pitch, market funds filter, league formations
+
+- Formations: `lineup_available_formations()` now honors league `configuration.allowExtraStrategies` (official client bundle main.dart.js, inspected 2026-11-20: league admin toggle stored next to `allowPlayerMultiposition`). When TRUE, `pro` formations are unlocked for all teams. Code-level evidence only; not yet confirmed with a live league response. Test added in `test/test_lineup_runtime.R`.
+- Market (Today) adds a "Value within available funds" filter using the already-displayed `spendable_budget` (`round_finance_display()`); unknown funds show no rows. No new API/DB requests.
+- Rivals: selected row highlighted with an accent bar; the details section shows the rival name as a title. Removed redundant info texts; reworded transfer-method notice. Squad-capacity info now shows only the effective-count detail. "Pending offer confirmations" renamed "Offers awaiting confirmation".
+- Light mode: brighter pitch grass and higher-contrast player labels and bench (CSS only).
+- Login Essentials: added "Dates and times in your timezone".
+- Performance review: CSS/text changes and one reactive derived from existing in-memory states; no added requests, timers or caches. Checks: `test/test_lineup_runtime.R` (17 passed), `test/test_shiny_simulation.R` (passed).
+- Not changed: empty round awards ("Saved coverage could not be fully read") and empty history plots are data-read failures (`rival_finance_evidence_latest` pagination incomplete; `user_team_history` returning no rows); require investigating the production database.
+
+## 2026-11-20 History context fix (plots / round awards)
+
+- Diagnosis (read-only, production DB): 60,994 `user_team_history` rows for league 5b55f9d7… were stored as `competition_id/season = unknown`; 285 under `504e…/2025-2026`. Cause: writes and reads resolved context from 5-minute in-memory metadata and fell back to `unknown` after expiry or without an account in scope.
+- Fix: `league_history_scope()` (competition_context.R) resolves the stable identity from persistence context → account memory (stale allowed) → single agreeing memory entry → latest complete `league_context_observations` row (cached per league, 300 s known / 60 s unknown, max 256 entries). `league_persistence_scope()` uses it.
+- Writes: `supabase_post()` refuses `user_team_history`, `player_history`, `player_daily_snapshots` when competition/season are unknown (returns FALSE, logs `context_unknown`; data is re-acquired by the next sync).
+- Reads: `get_league_standings_history()` / `get_league_finances_history()` return an empty frame tagged `context_unknown` instead of querying `unknown`. Plots show "season could not be resolved" or a partial-history notice when the row cap is hit. Award evidence reads fall back to the stable identity only when live metadata is unknown; the awards message distinguishes an unresolved season.
+- Live check: cold cache resolves from database, standings history returns 285 rows / 10 teams, complete.
+- Tests: new `test/test_history_scope_context.R` (6 passed); competition_context, competition_history, history_persistence(+recovery), league_history_incremental, rival_history_context, normalized_history_writes, player_history_incremental, worker_cold_context, worker_context_handoff, rival_persistent_cache, shiny_simulation pass. `test_live_read_context` and `test_round_history_recovery` fail identically on the pre-change baseline.
+- Performance: at most one small DB lookup per league per 5 minutes when memory context is absent; no source requests, timers or unbounded caches.
+- Pending: `scripts/migrations/DRAFT_20261120_relabel_unknown_team_history.sql` is a reviewed-only draft (ROLLBACK by default); not applied. Historical `unknown` player_history/daily snapshots not addressed.

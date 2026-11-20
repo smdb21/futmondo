@@ -32,6 +32,7 @@ players_table_UI <- function(id, box_title = NULL,
                              filter_by_active_clause = TRUE,
                              filter_by_max_clause_value = FALSE,
                              filter_by_clause_under_available_funds = FALSE,
+                             filter_by_value_under_available_funds = FALSE,
                              filter_by_is_favorite = TRUE,
                              filter_by_is_from_futmondo = TRUE,
                              filter_by_players_with_bid = FALSE,
@@ -54,7 +55,7 @@ players_table_UI <- function(id, box_title = NULL,
     )
   }
   checkbox_filters <-
-      if (filter_by_own_team || filter_by_active_clause || filter_by_max_clause_value || filter_by_clause_under_available_funds || filter_by_is_favorite || filter_by_is_from_futmondo || filter_by_players_with_bid) {
+      if (filter_by_own_team || filter_by_active_clause || filter_by_max_clause_value || filter_by_clause_under_available_funds || filter_by_value_under_available_funds || filter_by_is_favorite || filter_by_is_from_futmondo || filter_by_players_with_bid) {
         fluidRow(
           class = "player-checkbox-filters",
           if (filter_by_own_team) {
@@ -73,6 +74,11 @@ players_table_UI <- function(id, box_title = NULL,
             div(checkboxInput(inputId = ns("clause_under_available_funds_filter"),
               label = players_table_filter_label("Clause within available funds", "wallet"), value = FALSE), style = "font-weight: 500;",
               title = "Show only release clauses at or below your verified debt-aware spending capacity")
+          },
+          if (filter_by_value_under_available_funds) {
+            div(checkboxInput(inputId = ns("value_under_available_funds_filter"),
+              label = players_table_filter_label("Value within available funds", "wallet"), value = FALSE), style = "font-weight: 500;",
+              title = "Show only players whose market value is at or below your current spending capacity (Can spend)")
           },
           if (filter_by_is_favorite) {
             div(checkboxInput(inputId = ns("is_favorite_filter"), label = players_table_filter_label("Favorites Only", "star"), value = FALSE), style = "font-weight: 500;", title = "Show only players you have starred as favorite")
@@ -412,6 +418,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
         updateCheckboxInput(session, inputId = "active_clause_filter", value = FALSE)
         updateNumericInput(session, inputId = "max_clause_value_filter", value = NA_real_)
         updateCheckboxInput(session, inputId = "clause_under_available_funds_filter", value = FALSE)
+        updateCheckboxInput(session, inputId = "value_under_available_funds_filter", value = FALSE)
         updateCheckboxInput(session, inputId = "is_favorite_filter", value = FALSE)
         if(isTRUE(filter_by_own_team))updateCheckboxInput(session,"show_my_team_filter",value=FALSE)
         updateCheckboxInput(session, inputId = "is_from_futmondo_filter", value = FALSE)
@@ -557,6 +564,13 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       if (!is.null(input$max_value_filter) && is.finite(input$max_value_filter)) {
         maximum_value <- input$max_value_filter * 1e6
         players_table <- dplyr::filter(players_table, .data$value <= .env$maximum_value)
+      }
+      if (isTRUE(input$value_under_available_funds_filter)) {
+        funds <- tryCatch(suppressWarnings(as.numeric(if (is.function(available_funds_RV)) available_funds_RV() else available_funds_RV)[1]), error = function(e) NA_real_)
+        values <- suppressWarnings(as.numeric(as.character(players_table$value)))
+        # Unknown funds never imply affordability.
+        keep <- if (length(funds) == 1L && is.finite(funds) && funds >= 0) is.finite(values) & values <= funds else rep(FALSE, nrow(players_table))
+        players_table <- players_table[keep, , drop = FALSE]
       }
       clause_values <- if ("clause_price" %in% names(players_table)) {
         suppressWarnings(as.numeric(as.character(players_table$clause_price)))

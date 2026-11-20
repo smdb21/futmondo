@@ -78,7 +78,7 @@ shiny::testServer(function(input,output,session){
  for(i in 1:10){next_jobs<-jobs();next_jobs[[1]]$updated_at<-now+i;jobs(next_jobs);settle(session)
   stopifnot(identical(original,output$round_finance_amounts))}
  next_jobs<-jobs();next_jobs[[1]]$reserved_amount<-200;jobs(next_jobs);settle(session)
- stopifnot(!identical(original,output$round_finance_amounts),grepl('Scheduled purchases: 200 EUR',output$round_clause_pending$html,fixed=TRUE))
+ stopifnot(!identical(original,output$round_finance_amounts),grepl('Scheduled clause purchases: 200 EUR',output$round_clause_pending$html,fixed=TRUE))
  cat('PASS ten scheduled-job metadata polls preserve the header; a changed reserved amount updates the shared financial ledger/display\n')
 })
 fm_clause_enabled<-original_clause_enabled;fm_clause_jobs<-original_clause_jobs

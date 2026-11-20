@@ -279,3 +279,7 @@ do not establish the current official suggested-lineup eligibility policy; no
 new authenticated official comparison is claimed. This correction follows the
 owner's requested selection rule and reuses the previously verified source codes
 and database observations. See [lineup contract](lineup_module.md).
+
+## Dates and times in your timezone (added to login inventory 2026-11-20)
+
+Official app: shows times in device locale; no documented in-app timezone selector was found (verification limited to the public web client). LigaRadar addition: explicit timezone preference applied across kickoffs, deadlines and history.

@@ -46,7 +46,7 @@ today_UI <- function(id) {
       uiOutput(ns("coach_status"))),
     fluidRow(uiOutput(ns("kpi_cash_box")),uiOutput(ns("kpi_valuation_box"))),
     uiOutput(ns("market_status")),
-    players_table_UI(ns("market_players"),box_title="Current market listings",filter_by_is_from_futmondo=TRUE,default_free_agents=TRUE,filter_by_players_with_bid=TRUE),
+    players_table_UI(ns("market_players"),box_title="Current market listings",filter_by_is_from_futmondo=TRUE,filter_by_value_under_available_funds=TRUE,default_free_agents=TRUE,filter_by_players_with_bid=TRUE),
     h3("League transfers"),uiOutput(ns("transfer_coverage")),reactable::reactableOutput(ns("recent_transfers")))
 }
 today_Server <- function(id,is_module_active,login_token,championship_id,user_team_id,user_teams_RV,refresh_trigger=NULL,primary_sources=NULL,coach_source=NULL) {
@@ -195,7 +195,12 @@ today_Server <- function(id,is_module_active,login_token,championship_id,user_te
         defaultPageSize=15,showPageSizeOptions=TRUE,pageSizeOptions=c(15,30,50),
         defaultColDef=reactable::colDef(html=TRUE),columns=if("Price"%in%names(rows))list(Price=reactable::colDef(align="right"))else list())
     })
-    players_table_Server("market_players",market,user_teams_RV,login_token,championship_id,user_team_id,
+    market_funds<-reactive({
+      finance<-tryCatch(round_finance_display(team_state(),market_state()),error=function(e)NULL)
+      funds<-suppressWarnings(as.numeric(finance$spendable_budget %||% NA_real_)[1])
+      if(is.finite(funds)&&funds>=0)funds else NA_real_
+    })
+    players_table_Server("market_players",market,user_teams_RV,login_token,championship_id,user_team_id,available_funds_RV=market_funds,
       refresh_trigger=refresh_trigger,is_module_active=is_module_active,optional_ready=primary_settled,points_ratio_basis="value")
     list(primary_settled=primary_settled,primary_status=primary_status,retry_failed=retry_failed)
   })

@@ -203,12 +203,47 @@ normalize_player_memberships <- function(players,context,source="futmondo_catalo
   unique(rows)
 }
 
-league_persistence_scope <- function(championship_id) {
+# Stable competition/season identity for history storage and reads.
+# The 5-minute expiry governs freshness of live metadata, not the identity of
+# already-recorded history, so lookups fall back to the last observed context
+# (memory, then the persisted league_context_observations row) before "unknown".
+.fm_history_scope_cache <- new.env(parent=emptyenv())
+league_history_scope <- function(championship_id,account_id=NULL,lookup=TRUE) {
+  cid<-fm_scalar(championship_id,"")
+  unknown<-list(competition_id="unknown",season="unknown",scoring_version="unknown",known=FALSE,source="none")
+  if(!nzchar(cid))return(unknown)
+  pack<-function(row,source){
+    out<-list(competition_id=fm_scalar(row$competition_id,"unknown"),season=fm_scalar(row$season,"unknown"),
+      scoring_version=fm_scalar(row$scoring_version,"unknown"),source=source)
+    out$known<-fm_context_known(out$competition_id)&&fm_context_known(out$season);out}
   ctx<-getOption("futmondo.persistence_context")
-  if(is.list(ctx)&&identical(fm_scalar(ctx$championship_id,""),fm_scalar(championship_id,"")))
-    return(list(competition_id=fm_scalar(ctx$competition_id,"unknown"),season=fm_scalar(ctx$season,"unknown"),scoring_version=fm_scalar(ctx$scoring_version,"unknown")))
-  row<-league_context_metadata(championship_id)
-  list(competition_id=fm_scalar(row$competition_id,"unknown"),season=fm_scalar(row$season,"unknown"),scoring_version=fm_scalar(row$scoring_version,"unknown"))
+  if(is.list(ctx)&&identical(fm_scalar(ctx$championship_id,""),cid)){
+    out<-pack(ctx,"persistence_context");if(out$known)return(out)
+  }
+  account<-tryCatch(fm_context_account(account_id),error=function(e)fm_scalar(account_id,""))
+  if(nzchar(account)){
+    out<-pack(league_context_metadata(cid,account,allow_stale=TRUE),"memory");if(out$known)return(out)
+  }
+  # Without an account, accept memory only when every known account agrees.
+  items<-Filter(function(x)identical(fm_scalar(x$championship_id,""),cid)&&
+    fm_context_known(fm_scalar(x$competition_id,""))&&fm_context_known(fm_scalar(x$season,"")),.fm_league_contexts$items)
+  ids<-unique(vapply(items,function(x)paste(x$competition_id,x$season,sep="|"),character(1)))
+  if(length(ids)==1L)return(pack(items[[1]],"memory"))
+  if(length(ids)>1L||!isTRUE(lookup))return(unknown)
+  cached<-.fm_history_scope_cache[[cid]]
+  if(!is.null(cached)&&cached$until>Sys.time())return(cached$value)
+  rows<-tryCatch(supabase_get("league_context_observations",list(championship_id=paste0("eq.",cid),complete="is.true",
+    competition_id="neq.unknown",season="neq.unknown",select="competition_id,season,scoring_version,observed_at",
+    order="observed_at.desc",limit=1L)),error=function(e)NULL)
+  value<-if(is.data.frame(rows)&&nrow(rows)==1L)pack(as.list(rows[1,,drop=FALSE]),"database")else unknown
+  # Bounded: one entry per championship; failures retried after 60 seconds.
+  if(length(ls(.fm_history_scope_cache))>256L)rm(list=ls(.fm_history_scope_cache),envir=.fm_history_scope_cache)
+  .fm_history_scope_cache[[cid]]<-list(value=value,until=Sys.time()+if(value$known)300 else 60)
+  value
+}
+league_persistence_scope <- function(championship_id) {
+  s<-league_history_scope(championship_id)
+  list(competition_id=s$competition_id,season=s$season,scoring_version=s$scoring_version)
 }
 complete_point_identity <- function(rows,context) {
   if(!is.data.frame(rows)||!nrow(rows))return(rows)

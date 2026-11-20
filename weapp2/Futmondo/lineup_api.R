@@ -166,12 +166,15 @@ lineup_normalize_bundle <- function(answers,context,target) {
 lineup_available_formations <- function(answer,current,configuration=list()) {
   if(!is.list(answer)||!is.list(answer$strategies))stop('Formation availability is missing')
   bought<-vapply(answer$bought %||% list(),function(x)fm_scalar(x$st,''),character(1))
+  # League admin setting (official client: configuration.allowExtraStrategies)
+  # unlocks paid formations for every team in the league.
+  extra<-isTRUE(configuration$allowExtraStrategies)
   allowed<-vapply(answer$strategies,function(strategy){
     st<-fm_scalar(strategy$st,'');pro<-strategy$pro
     # The source omits pro for standard formations; its client checks pro ===
     # true for paid entries. Reject malformed values rather than guessing.
     if(!is.null(pro)&&(!is.logical(pro)||length(pro)!=1L||is.na(pro)))stop('Formation entitlement is unknown')
-    if(!isTRUE(pro)||st%in%bought||identical(st,current))st else ''
+    if(!isTRUE(pro)||extra||st%in%bought||identical(st,current))st else ''
   },character(1))
   intersect(lineup_formations(),allowed[nzchar(allowed)])
 }

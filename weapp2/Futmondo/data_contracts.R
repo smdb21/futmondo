@@ -219,9 +219,7 @@ round_finance_amounts_UI <- function(finance = NULL) {
     shiny::tags$span(class="round-countdown-finance-item", paste0("Balance: ", money(finance$cash, cash_loading))),
     shiny::tags$span(class="round-countdown-finance-item", paste0("Active offers: ", offers)),
     shiny::tags$span(class="round-countdown-finance-item", paste0("After offers: ", money(finance$projected_committed_balance, cash_loading || offers_loading))),
-    shiny::tags$span(class="round-countdown-finance-item", paste0("Can spend: ", money(finance$spendable_budget, cash_loading || offers_loading))),
-    if (is.finite(fm_number(finance$manual_pending_amount)) && finance$manual_pending_amount > 0)
-      shiny::tags$span(class="round-countdown-finance-item", paste0("Pending offer confirmations: ", money(finance$manual_pending_amount))))
+    shiny::tags$span(class="round-countdown-finance-item", paste0("Can spend: ", money(finance$spendable_budget, cash_loading || offers_loading))))
 }
 
 # Descriptive projection of the same identity/offer-slot ledger as preflights.
@@ -251,8 +249,7 @@ account_squad_display <- function(roster_state, transfers, team_state, active_of
     identical(team_state$freshness,"stale")||!is.null(team_state$error)
   list(actual=actual$count,effective=effective$count,cap=cap,reserved=reserved,full=full,
     status=if(loading)"loading"else if(!all(is.finite(c(actual$count,effective$count,cap,reserved))))"unavailable"else if(observed)"observed"else"ok",
-    detail=paste(effective$detail,if(observed)"Displayed squad values include saved observations; action checks still require current verification."else"",
-      "Effective players plus active offers and pending purchase reservations consume squad slots. Existing offers can still be edited subject to the usual checks."),
+    detail=effective$detail,
     roster_observed_at=roster_state$observed_at,team_observed_at=team_state$observed_at)
 }
 

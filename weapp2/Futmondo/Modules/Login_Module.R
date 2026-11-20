@@ -8,6 +8,8 @@ login_feature_tiers <- function() {
           description = "Narrow player tables by owner, multiple positions, value, daily price movement and active clauses. Choose whether to include your own team in All Players."),
         list(id = "round_range_standings", title = "Standings for any round range",
           description = "Choose a stretch of rounds to compare team points and points, position, Best XI and MVP bonuses."),
+        list(id = "local_timezone", title = "Dates and times in your timezone",
+          description = "See kickoffs, deadlines and history in your local timezone. You can also choose a different timezone in settings."),
         list(id = "league_charts", title = "League comparison charts",
           description = "Compare squad values and rank progression, and see fantasy-owned players grouped by real club.")
       )),

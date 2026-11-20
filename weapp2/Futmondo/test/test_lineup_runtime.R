@@ -130,6 +130,8 @@ check('batch events remove before placing swaps, retain captain changes and neve
 check('formation entitlement never purchases a paid formation',{
  available<-lineup_available_formations(list(strategies=list(list(st='4-4-2',pro=FALSE),list(st='3-6-1',pro=TRUE),list(st='4-6-0',pro=TRUE)),bought=list(list(st='4-6-0',fs=FALSE))),'4-4-2')
  stopifnot(setequal(available,c('4-4-2','4-6-0')))
+ league<-lineup_available_formations(list(strategies=list(list(st='4-4-2'),list(st='3-6-1',pro=TRUE))),'4-4-2',list(allowExtraStrategies=TRUE))
+ stopifnot(setequal(league,c('4-4-2','3-6-1')))
 })
 check('injury, suspension and unavailability exclusions cannot be overridden for starters or bench',{
  for(status in c('injured','injured2','redcard','suspended','unavailable'))for(include in c(FALSE,TRUE)){

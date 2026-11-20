@@ -23,7 +23,9 @@ plots_empty <- function(message, error=TRUE) {
 }
 
 plots_history <- function(history, metric, title) {
+  if (isTRUE(attr(history, "context_unknown"))) return(plots_empty(paste0(title, " unavailable: the league season could not be resolved"), error=TRUE))
   if (!is.data.frame(history) || !nrow(history) || !metric %in% names(history)) return(plots_empty(paste0(title, " unavailable")))
+  partial <- identical(attr(history, "fetch_status"), "partial")
   team <- if ("teamname" %in% names(history)) as.character(history$teamname) else "Team"
   dates <- fm_time(history$recorded_at)
   keep <- is.finite(as.numeric(dates)) & is.finite(suppressWarnings(as.numeric(history[[metric]])))
@@ -31,7 +33,9 @@ plots_history <- function(history, metric, title) {
   d <- data.frame(team=team[keep], date=fm_plot_datetime(dates[keep]), display_date=fm_format_datetime(dates[keep]), value=as.numeric(history[[metric]][keep]))
   plotly::plot_ly(d,x=~date,y=~value,color=~team,type="scatter",mode="lines+markers",
     hovertemplate=~paste0("<b>",team,"</b><br>",display_date,"<br>",format(value,big.mark="."),"<extra></extra>")) %>%
-    fm_plot_layout(xaxis=list(title="",tickformat="%d/%m/%Y"),yaxis=list(title=title),showlegend=FALSE,margin=list(l=55,r=15,t=10,b=45))
+    fm_plot_layout(xaxis=list(title="",tickformat="%d/%m/%Y"),yaxis=list(title=title),showlegend=FALSE,margin=list(l=55,r=15,t=10,b=45)) -> plot
+  if (partial) attr(plot, "fm_info") <- fm_info("Showing partial history: the saved record limit was reached before all rows were read.", error=TRUE)
+  plot
 }
 
 plots_UI <- function(id) {

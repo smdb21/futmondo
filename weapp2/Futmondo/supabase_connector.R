@@ -362,12 +362,17 @@ get_player_round_points_history<-function(player_id,championship_id,season="unkn
 get_player_historical_data<-function(player_id,championship_id){read_card_price_history(resource_context(account_id="database",championship_id=championship_id,player_id=player_id))}
 
 get_league_standings_history <- function(championship_id) {
+  scope <- league_history_scope(championship_id)
+  if (!isTRUE(scope$known)) {
+    out <- data.frame(); attr(out, "fetch_status") <- "unavailable"; attr(out, "context_unknown") <- TRUE
+    return(out)
+  }
   query <- list(
     select = "points,budget,position,team_value,recorded_at,user_teams!inner(name,championship_id)",
     championship_id = paste0("eq.", championship_id),
     "user_teams.championship_id" = paste0("eq.", championship_id),
-    competition_id=paste0("eq.",league_competition_context(championship_id)),
-    season=paste0("eq.",league_season_context(championship_id)),
+    competition_id=paste0("eq.",scope$competition_id),
+    season=paste0("eq.",scope$season),
     order = "recorded_at.asc,id.asc"
   )
   
@@ -392,12 +397,17 @@ get_user_teams_finances <- function(championship_id) {
 }
 
 get_league_finances_history <- function(championship_id) {
+  scope <- league_history_scope(championship_id)
+  if (!isTRUE(scope$known)) {
+    out <- data.frame(); attr(out, "fetch_status") <- "unavailable"; attr(out, "context_unknown") <- TRUE
+    return(out)
+  }
   query <- list(
     select = "budget,team_value,points,position,recorded_at,user_teams!inner(name,championship_id)",
     championship_id = paste0("eq.", championship_id),
     "user_teams.championship_id" = paste0("eq.", championship_id),
-    competition_id=paste0("eq.",league_competition_context(championship_id)),
-    season=paste0("eq.",league_season_context(championship_id)),
+    competition_id=paste0("eq.",scope$competition_id),
+    season=paste0("eq.",scope$season),
     order = "recorded_at.asc,id.asc"
   )
 
@@ -754,12 +764,19 @@ supabase_conflict_key <- function(table_name) {
 supabase_post<-function(table_name,payload,conflict=supabase_conflict_key(table_name),ignore_duplicates=FALSE){
  if(is.null(payload)||(is.data.frame(payload)&&!nrow(payload)))return(invisible(204L))
  contextual<-c("player_history","user_team_history","player_daily_snapshots","round_dream_team","market_transactions","league_rule_snapshots")
+ season_scoped<-c("player_history","user_team_history","player_daily_snapshots")
  if(table_name%in%contextual){
    cid<-if(is.data.frame(payload))unique(as.character(payload$championship_id))else payload$championship_id
    if(length(cid)==1L){
      scope<-league_persistence_scope(cid)
      fields<-if(table_name=="market_transactions")"competition_id"else if(table_name%in%c("round_dream_team","league_rule_snapshots"))names(scope)else c("competition_id","season")
      for(field in setdiff(fields,names(payload)))payload[[field]]<-if(is.data.frame(payload))rep(scope[[field]],nrow(payload))else scope[[field]]
+   }
+   # Never store season-scoped history under an unresolved context; the next
+   # sync reacquires it. Returning FALSE keeps the write non-durable.
+   known<-function(k)all(vapply(as.character(payload[[k]] %||% "unknown"),fm_context_known,logical(1)))
+   if(table_name%in%season_scoped&&(length(cid)!=1L||!known("competition_id")||!known("season"))){
+     record_persistence_failure(table_name,category="context_unknown");return(invisible(FALSE))
    }
  }
  if(isTRUE(getOption("futmondo.offline",FALSE)))return(invisible(204L))

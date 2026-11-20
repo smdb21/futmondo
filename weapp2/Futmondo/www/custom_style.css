@@ -1044,7 +1044,10 @@ a, .box-title, .control-label, .description-header, .sidebar-menu > li > a, .mai
 input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 .table, .table > tbody > tr > td, .table > thead > tr > th, .rt-thead, .rt-tbody, .rt-td, .rt-th, .rt-tr { color: var(--fm-text) !important; background: var(--fm-surface); border-color: var(--fm-border) !important; }
 .table-striped > tbody > tr:nth-of-type(odd), .rt-tr-striped { background: var(--fm-bg) !important; }
-.rt-tr-highlight:hover, .rt-tr-selected { background: var(--fm-border) !important; }
+.rt-tr-highlight:hover { background: var(--fm-border) !important; }
+.rt-tr-selected { background: var(--fm-highlight) !important; box-shadow: inset 4px 0 0 var(--fm-accent); font-weight: 700; }
+.fm-selected-rival-title { margin: 18px 0 10px; font-weight: 800; color: var(--fm-text); overflow-wrap: anywhere; }
+.fm-selected-rival-title .fa, .fm-selected-rival-title svg { margin-right: 8px; color: var(--fm-muted); }
 .ReactTable, .reactable { font-size: 13px; }
 .pitch-player-card, .sandbox-kpi-card { background: var(--fm-surface) !important; color: var(--fm-text); border: 1px solid var(--fm-border); }
 .pitch-player-name, .pitch-player-role, .pitch-player-val, .pitch-player-fis { color: var(--fm-text) !important; font-size: 12px !important; }
@@ -1664,3 +1667,16 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 .fm-info-entry .shiny-output-error:not(.shiny-output-error-fm-loading) { color:var(--fm-danger); }
 /* Keep the coach's metadata output measurable after its details move away. */
 .fm-coach-control > .shiny-html-output:has(.fm-info-origin) { display:block; }
+
+/* Light mode: brighter grass and higher-contrast cards/bench. */
+html[data-fm-theme="light"] .fm-lineup-pitch { border-color: #2f7d32; background: repeating-linear-gradient(0deg,#5cb85c 0%,#5cb85c 12.5%,#4fa84f 12.5%,#4fa84f 25%); }
+html[data-fm-theme="light"] .fm-lineup-markings, html[data-fm-theme="light"] .fm-lineup-markings::before,
+html[data-fm-theme="light"] .fm-lineup-circle, html[data-fm-theme="light"] .fm-lineup-goal-top,
+html[data-fm-theme="light"] .fm-lineup-goal-bottom { border-color: #ffffffcc; }
+html[data-fm-theme="light"] .fm-lineup-name { background: #ffffff; color: #0f172a; box-shadow: 0 1px 3px #0003; }
+html[data-fm-theme="light"] .fm-lineup-points { background: #0f172a; color: #ffffff; border-color: #0f172a; }
+html[data-fm-theme="light"] .fm-lineup-silhouette { color: #ffffff; opacity: .9; }
+html[data-fm-theme="light"] .fm-lineup-empty .fm-lineup-name { color: #475569; }
+html[data-fm-theme="light"] .fm-lineup-bench { background: #eef2f7; border-color: #94a3b8; }
+html[data-fm-theme="light"] .fm-lineup-bench h4 { color: #0f172a; }
+html[data-fm-theme="light"] .fm-lineup-order { color: #334155; }
