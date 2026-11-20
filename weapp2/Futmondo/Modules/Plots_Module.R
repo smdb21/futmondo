@@ -22,6 +22,16 @@ plots_empty <- function(message, error=TRUE) {
   plot
 }
 
+# 12 distinct, colour-blind-aware hues (Okabe-Ito + Tableau extras) for team lines;
+# names are sorted so each team keeps its colour across plots.
+plots_team_colors <- function(teams) {
+  base <- c("#0072B2","#E69F00","#009E73","#CC79A7","#D55E00","#56B4E9",
+            "#8C564B","#F0E442","#7F3C8D","#17BECF","#BCBD22","#E15759")
+  teams <- sort(unique(as.character(teams)))
+  cols <- if (length(teams) > length(base)) grDevices::hcl.colors(length(teams), "Dynamic") else base[seq_along(teams)]
+  stats::setNames(cols, teams)
+}
+
 plots_history <- function(history, metric, title) {
   if (isTRUE(attr(history, "context_unknown"))) return(plots_empty(paste0(title, " unavailable: the league season could not be resolved"), error=TRUE))
   if (!is.data.frame(history) || !nrow(history) || !metric %in% names(history)) return(plots_empty(paste0(title, " unavailable")))
@@ -31,8 +41,8 @@ plots_history <- function(history, metric, title) {
   keep <- is.finite(as.numeric(dates)) & is.finite(suppressWarnings(as.numeric(history[[metric]])))
   if (!any(keep)) return(plots_empty(paste0(title, " unavailable")))
   d <- data.frame(team=team[keep], date=fm_plot_datetime(dates[keep]), display_date=fm_format_datetime(dates[keep]), value=as.numeric(history[[metric]][keep]))
-  plotly::plot_ly(d,x=~date,y=~value,color=~team,type="scatter",mode="lines+markers",
-    hovertemplate=~paste0("<b>",team,"</b><br>",display_date,"<br>",format(value,big.mark="."),"<extra></extra>")) %>%
+  plotly::plot_ly(d,x=~date,y=~value,color=~team,colors=plots_team_colors(d$team),type="scatter",mode="lines+markers",
+    hovertemplate=~paste0("<b>",team,"</b><br>",display_date,"<br>",format(value,big.mark=".",decimal.mark=",",scientific=FALSE),"<extra></extra>")) %>%
     fm_plot_layout(xaxis=list(title="",tickformat="%d/%m/%Y"),yaxis=list(title=title),showlegend=FALSE,margin=list(l=55,r=15,t=10,b=45)) -> plot
   if (partial) attr(plot, "fm_info") <- fm_info("Showing partial history: the saved record limit was reached before all rows were read.", error=TRUE)
   plot
@@ -68,14 +78,14 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
       dates<-input$cash_dates; if(is.null(dates)||length(dates)!=2) return(plots_empty("Choose a date range", error=FALSE))
       d<-rivals_buying_power_values(press,teams,metric=input$cash_metric %||% "cash",start_date=fm_local_midnight(dates[1]),end_date=fm_local_midnight(dates[2]+1)-0.000001,initial_budget=initial)
       if(!is.data.frame(d)||!nrow(d)) return(plots_empty("League financial data unavailable"))
-      d<-d[order(d$value),,drop=FALSE]; plotly::plot_ly(d,x=~value,y=~reorder(team,value),type="bar",orientation="h",hovertemplate=~paste0("<b>",team,"</b><br>",format(value,big.mark=".")," EUR<extra></extra>")) %>% fm_plot_layout(xaxis=list(title="EUR"),yaxis=list(title=""),margin=list(l=115,r=15,t=10,b=45))
+      d<-d[order(d$value),,drop=FALSE]; plotly::plot_ly(d,x=~value,y=~reorder(team,value),type="bar",orientation="h",hovertemplate=~paste0("<b>",team,"</b><br>",format(value,big.mark=".",decimal.mark=",",scientific=FALSE)," EUR<extra></extra>")) %>% fm_plot_layout(xaxis=list(title="EUR"),yaxis=list(title=""),margin=list(l=115,r=15,t=10,b=45))
     })
     rank_rows <- shiny::reactive({
       shiny::req(active(),login_token(),championship_id(),user_teams_RV()); teams<-user_teams_RV(); id_col<-c("teamid","id")[c("teamid","id")%in%names(teams)][1]; name_col<-c("teamname","name")[c("teamname","name")%in%names(teams)][1]
       if(is.na(id_col)||is.na(name_col)) return(data.frame()); dplyr::bind_rows(lapply(seq_len(nrow(teams)),function(i) classification_round_rows(tryCatch(get_user_team_rounds(login_token(),championship_id(),teams[[id_col]][i]),error=function(e)list()),teams[[id_col]][i],teams[[name_col]][i])))
     })
     shiny::observe({ r<-rank_rows(); if(nrow(r)){n<-sort(unique(r$round)); shiny::updateSliderInput(session,"rank_range",min=min(n),max=max(n),value=c(min(n),max(n))); shiny::updateSelectInput(session,"rank_round",choices=c("All rounds"="all",stats::setNames(n,n))) } })
-    rank_plot <- shiny::reactive({ r<-rank_rows(); if(!nrow(r)) return(plots_empty("No published round history", error=FALSE)); n<-sort(unique(r$round)); h<-dplyr::bind_rows(lapply(n,function(x){d<-classification_window_table(r,c(min(n),x));d$round<-x;d})); z<-input$rank_range;if(length(z)==2)h<-h[h$round>=z[1]&h$round<=z[2],,drop=FALSE]; if(!is.null(input$rank_round)&&input$rank_round!="all")h<-h[h$round==as.numeric(input$rank_round),,drop=FALSE]; plotly::plot_ly(h,x=~round,y=~rank,color=~team_name,type="scatter",mode="lines+markers") %>% fm_plot_layout(xaxis=list(title="Round",dtick=1),yaxis=list(title="Cumulative rank",autorange="reversed",dtick=1),margin=list(l=55,r=15,t=10,b=45)) })
+    rank_plot <- shiny::reactive({ r<-rank_rows(); if(!nrow(r)) return(plots_empty("No published round history", error=FALSE)); n<-sort(unique(r$round)); h<-dplyr::bind_rows(lapply(n,function(x){d<-classification_window_table(r,c(min(n),x));d$round<-x;d})); z<-input$rank_range;if(length(z)==2)h<-h[h$round>=z[1]&h$round<=z[2],,drop=FALSE]; if(!is.null(input$rank_round)&&input$rank_round!="all")h<-h[h$round==as.numeric(input$rank_round),,drop=FALSE]; plotly::plot_ly(h,x=~round,y=~rank,color=~team_name,colors=plots_team_colors(h$team_name),type="scatter",mode="lines+markers") %>% fm_plot_layout(xaxis=list(title="Round",dtick=1),yaxis=list(title="Cumulative rank",autorange="reversed",dtick=1),margin=list(l=55,r=15,t=10,b=45)) })
     owned_club_plot <- shiny::reactive({ shiny::req(active(),login_token(),championship_id()); if(is.function(refresh_trigger))refresh_trigger(); d<-plots_owned_by_real_team(tryCatch(get_championship_players(login_token(),championship_id()),error=function(e)data.frame())); if(!nrow(d))return(plots_empty("Owned-player and real-club data unavailable")); plotly::plot_ly(d,x=~owned_players,y=~reorder(real_team,owned_players),type="bar",orientation="h",hovertemplate=~paste0("<b>",real_team,"</b><br>",owned_players," owned players<extra></extra>")) %>% fm_plot_layout(xaxis=list(title="Players owned"),yaxis=list(title=""),margin=list(l=115,r=15,t=10,b=45)) })
     plot_sources <- list(standings=standings_plot, values=values_plot, cash=cash_plot,
       rank=rank_plot, owned_club=owned_club_plot)
