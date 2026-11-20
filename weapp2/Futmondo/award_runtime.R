@@ -46,10 +46,13 @@ award_expected_scoring <- function(login,championship_id) {
 }
 award_saved_rows <- function(snapshots,championship_id,season,expected_scoring="unknown",account_id=NULL) {
   if(!nzchar(mvp_text(account_id)))return(data.frame())
+  # Live metadata first; the stable history identity only replaces "unknown".
+  competition<-league_competition_context(championship_id,account_id)
+  if(!fm_context_known(competition))competition<-league_history_scope(championship_id,account_id)$competition_id
   snapshots<-Filter(function(snapshot){
     identical(mvp_text(snapshot$account_id),as.character(account_id))&&
       identical(mvp_text(snapshot$championship_id),as.character(championship_id))&&
-      identical(fm_scalar(snapshot$competition_id,"unknown"),league_competition_context(championship_id,account_id))&&
+      identical(fm_scalar(snapshot$competition_id,"unknown"),competition)&&
       identical(mvp_text(snapshot$season,"unknown"),as.character(season))
   },snapshots)
   dplyr::bind_rows(lapply(snapshots,function(snapshot){

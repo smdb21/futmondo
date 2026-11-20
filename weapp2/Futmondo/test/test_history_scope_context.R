@@ -193,4 +193,21 @@ check('daily standings reader is preferred, paged and falls back when not instal
   stopifnot(raw == 1L)
 })
 
+check('saved awards match the stable competition when live metadata has expired', {
+  reset()
+  remember_league_context(ctx_row('acct', 'league-a', 'comp-1', '2025-2026'))
+  source('award_runtime.R')
+  snap <- function(comp) list(account_id = 'acct', championship_id = 'league-a', competition_id = comp, season = '2025-2026', payload = list())
+  kept <- 0L
+  award_saved_rows_filter <- function(comp) {
+    rows <- Filter(function(x) identical(x$competition_id, comp), list(snap('comp-1'), snap('comp-2')))
+    length(rows)
+  }
+  stopifnot(league_competition_context('league-a', 'acct') == 'unknown',
+    league_history_scope('league-a', 'acct', lookup = FALSE)$competition_id == 'comp-1')
+  # A different competition is never accepted.
+  out <- award_saved_rows(list(snap('comp-2')), 'league-a', '2025-2026', 'unknown', 'acct')
+  stopifnot(!nrow(out))
+})
+
 cat('HISTORY SCOPE CONTEXT:', checks, 'checks passed\n')
