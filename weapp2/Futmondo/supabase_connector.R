@@ -361,12 +361,45 @@ get_player_round_points_history<-function(player_id,championship_id,season="unkn
 
 get_player_historical_data<-function(player_id,championship_id){read_card_price_history(resource_context(account_id="database",championship_id=championship_id,player_id=player_id))}
 
+# One row per team per UTC day (last observation) via league_team_history_daily.
+# Returns NULL when the function is not installed so callers can fall back.
+read_league_team_history_daily <- function(championship_id, scope, page_size = 1000L, max_rows = 20000L) {
+  if (isTRUE(getOption("futmondo.offline", FALSE))) return(NULL)
+  url <- paste0(get_sb_url(), "/rest/v1/rpc/league_team_history_daily")
+  key <- get_sb_key()
+  if (!nzchar(url) || !nzchar(key)) return(NULL)
+  body <- jsonlite::toJSON(list(p_championship_id = as.character(championship_id),
+    p_competition_id = scope$competition_id, p_season = scope$season), auto_unbox = TRUE)
+  chunks <- list(); offset <- 0L; complete <- FALSE
+  repeat {
+    r <- tryCatch(httr::POST(url, body = body, encode = "raw", httr::timeout(30),
+      httr::add_headers(apikey = key, Authorization = paste("Bearer", key), `Content-Type` = "application/json"),
+      query = list(order = "recorded_at.asc,user_team_id.asc", limit = page_size, offset = offset)), error = function(e) NULL)
+    if (is.null(r)) { if (!length(chunks)) return(NULL); break }
+    status <- httr::status_code(r)
+    if (status == 404L && !length(chunks)) return(NULL)
+    if (status >= 300L) { record_persistence_failure("user_team_history", http_status = status, category = "read"); if (!length(chunks)) return(NULL); break }
+    batch <- jsonlite::fromJSON(httr::content(r, as = "text", encoding = "UTF-8"))
+    if (!is.data.frame(batch) || !nrow(batch)) { complete <- TRUE; break }
+    chunks[[length(chunks) + 1L]] <- batch; offset <- offset + nrow(batch)
+    if (nrow(batch) < page_size) { complete <- TRUE; break }
+    if (offset >= max_rows) break
+  }
+  df <- dplyr::bind_rows(chunks)
+  attr(df, "complete") <- complete
+  attr(df, "fetch_status") <- if (complete) if (nrow(df)) "ok" else "empty" else "partial"
+  attr(df, "resolution") <- "daily"
+  df
+}
+
 get_league_standings_history <- function(championship_id) {
   scope <- league_history_scope(championship_id)
   if (!isTRUE(scope$known)) {
     out <- data.frame(); attr(out, "fetch_status") <- "unavailable"; attr(out, "context_unknown") <- TRUE
     return(out)
   }
+  daily <- read_league_team_history_daily(championship_id, scope)
+  if (is.data.frame(daily)) return(daily)
   query <- list(
     select = "points,budget,position,team_value,recorded_at,user_teams!inner(name,championship_id)",
     championship_id = paste0("eq.", championship_id),

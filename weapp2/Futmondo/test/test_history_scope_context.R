@@ -176,4 +176,21 @@ check('plots distinguish unresolved context and partial history from no data', {
   )))
 })
 
+check('daily standings reader is preferred, paged and falls back when not installed', {
+  reset()
+  remember_league_context(ctx_row('acct', 'league-a', 'comp-1', '2025-2026'))
+  raw <- 0L
+  supabase_read_all <<- function(...) { raw <<- raw + 1L; data.frame() }
+  read_league_team_history_daily <<- function(championship_id, scope, ...) {
+    stopifnot(scope$season == '2025-2026', scope$competition_id == 'comp-1')
+    d <- data.frame(user_team_id = 't', teamname = 'T', day = '2026-11-01', points = 3,
+      recorded_at = '2026-11-01T20:00:00Z'); attr(d, 'fetch_status') <- 'ok'; d
+  }
+  h <- get_league_standings_history('league-a')
+  stopifnot(raw == 0L, nrow(h) == 1L, h$teamname == 'T')
+  read_league_team_history_daily <<- function(...) NULL
+  get_league_standings_history('league-a')
+  stopifnot(raw == 1L)
+})
+
 cat('HISTORY SCOPE CONTEXT:', checks, 'checks passed\n')
