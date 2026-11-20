@@ -56,7 +56,7 @@ check("unknown and partial squad evidence never becomes zero or a false full-squ
   stopifnot(!account_squad_display(roster,empty,resource_state(list()),0,0)$full)
   saved_team<-resource_state(list(configuration=list(maxPlayersInRoster=20)),status="stale")
   x<-account_squad_display(roster,empty,saved_team,0,0)
-  stopifnot(x$cap==20L,x$status=="observed",grepl("saved observations",x$detail,fixed=TRUE))
+  stopifnot(x$cap==20L,x$status=="observed")  # explanatory sentence removed by request 2026-11-20
   for(limit in list(NA_real_,0,-1,20.5))stopifnot(is.na(account_squad_display(roster,empty,
     resource_state(list(configuration=list(maxPlayersInRoster=limit))),0,0)$cap))
 })
@@ -75,6 +75,7 @@ get_financial_snapshot <- function(...) stop("Composite finance is deliberately 
 app_rounds <- data.frame(round_number=11,begin_process=format(Sys.time()+86400,"%Y-%m-%dT%H:%M:%SZ",tz="UTC"),is_finished=FALSE)
 clear_api_cache()
 shiny::testServer(app_server,{
+  app_settle(session) # finish the synthetic startup DB check before login (since 2b502ee)
   session$setInputs(tabs="login",`login-user_name`="offline@example.invalid",`login-password`="fixture",`login-login_button`=1)
   session$elapse(100);app_settle(session);session$setInputs(tabs="today");app_settle(session)
   team_key <- "get_user_team_info:champ:team1"; market_key <- "get_market_players:champ:team1"
@@ -174,6 +175,7 @@ shiny::testServer(app_server,{
   # Superseding a context must discard known old balance before new data arrives.
   .GlobalEnv$app_champ <- list(id="different-league",name="Other League",userteam=list(id="different-team",name="Other Team"))
   invalidate_resources(resource_context(app_auth),pattern="active_championship")
+  app_settle(session) # finish the synthetic startup DB check before login (since 2b502ee)
   session$setInputs(tabs="login",refresh_all=3);app_settle(session)
   check("Welcome updates league context without displaying the banner", {
     session$setInputs(selected_league="different-league");app_settle(session)

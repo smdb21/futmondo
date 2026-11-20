@@ -393,12 +393,9 @@ read_league_team_history_daily <- function(championship_id, scope, page_size = 1
 }
 
 get_league_standings_history <- function(championship_id) {
+  # A resolved season is preferred; "unknown" remains a valid archive scope.
   scope <- league_history_scope(championship_id)
-  if (!isTRUE(scope$known)) {
-    out <- data.frame(); attr(out, "fetch_status") <- "unavailable"; attr(out, "context_unknown") <- TRUE
-    return(out)
-  }
-  daily <- read_league_team_history_daily(championship_id, scope)
+  daily <- if (isTRUE(scope$known)) read_league_team_history_daily(championship_id, scope) else NULL
   if (is.data.frame(daily)) return(daily)
   query <- list(
     select = "points,budget,position,team_value,recorded_at,user_teams!inner(name,championship_id)",
@@ -430,11 +427,8 @@ get_user_teams_finances <- function(championship_id) {
 }
 
 get_league_finances_history <- function(championship_id) {
+  # A resolved season is preferred; "unknown" remains a valid archive scope.
   scope <- league_history_scope(championship_id)
-  if (!isTRUE(scope$known)) {
-    out <- data.frame(); attr(out, "fetch_status") <- "unavailable"; attr(out, "context_unknown") <- TRUE
-    return(out)
-  }
   query <- list(
     select = "budget,team_value,points,position,recorded_at,user_teams!inner(name,championship_id)",
     championship_id = paste0("eq.", championship_id),

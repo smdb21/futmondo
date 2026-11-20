@@ -10,7 +10,12 @@ fm_worker_mode<-function(id)!isTRUE(getOption('futmondo.worker_live',FALSE))
 get_sb_url<-function()'';get_sb_key<-function()''
 get_locker_clause_payments<-function(...)observed_data(data.frame())
 record_acquired_resource<-function(...)invisible(TRUE)
-fm_worker_rpc<-function(...)stop('Card must not enqueue acquisition or write the database')
+# Since 76dec9b an opened card may ask for newer saved observations ('read');
+# answer "nothing newer". Enqueueing acquisition or writing still fails.
+fm_worker_rpc<-function(name,...){
+ if(identical(name,'read'))return(promises::promise_resolve(list(account=list(enabled=TRUE,auth_status='active'),resources=list(),jobs=list())))
+ stop('Card must not enqueue acquisition or write the database')
+}
 futmondo_post<-function(...)stop('No synchronous source request is allowed by this fixture')
 writes<-0L;buy_clause<-function(...){writes<<-writes+1L;stop('Verification must not submit a transaction')}
 auth<-c(userid='card-native-capacity-fixture',token='synthetic')
@@ -45,7 +50,9 @@ fm_async_read_http<-function(url,method='POST',body=NULL,...){
  promises::promise_resolve(response(url,body))
 }
 native_async<-async_adapter_fetch
-async_adapter_fetch<-function(fn,args=list(),context,worker_bypass=FALSE,...){
+async_adapter_fetch<-function(fn,args=list(),context,worker_bypass=FALSE,intent=NULL,...){
+ # Since 76dec9b manual checks pass intent='manual_action' instead of worker_bypass.
+ worker_bypass<-isTRUE(worker_bypass)||identical(intent,'manual_action')
  if(fn=='get_team_acquisition_capacity'){
   if(worker_bypass){
    live_calls<<-live_calls+1L
@@ -64,7 +71,9 @@ async_adapter_fetch<-function(fn,args=list(),context,worker_bypass=FALSE,...){
  promises::promise_resolve(value)
 }
 selected<-shiny::reactiveVal(data.frame(id='target',name='Konaté',role='defensa',team='Real Madrid',
- value=1000,change=0,points=67,user_team_id='',price=1000,market_inMarket=TRUE))
+ value=1000,change=0,points=67,user_team_id='',price=1000,market_inMarket=TRUE,
+ # Table rows carry their observation time; the card trusts only recent facts (9a27d10).
+ observed_at=format(start_time-5,'%Y-%m-%dT%H:%M:%SZ',tz='UTC')))
 settle<-function(session)for(i in 1:80){later::run_now(0);session$flushReact()}
 button<-function(html,id){
  match<-regmatches(html,regexpr(paste0('<button\\b[^>]*\\bid="[^"]*',id,'"[^>]*>'),html,perl=TRUE))

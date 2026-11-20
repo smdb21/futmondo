@@ -50,7 +50,7 @@ shiny::testServer(function(input,output,session){
  updated<-output$status;stopifnot(!grepl('Updating|Preparing|requested',updated),metrics$renders==before+0L)
  s$service_error<-'Background status could not be read from the database.';fm_worker_notify(account);flush(session)
  stopifnot(grepl('could not be read from the database',output$status,fixed=TRUE),metrics$renders==before+1L)
- s$service_error<-NULL;s$health$heartbeat<-rival_finance_stamp(now-61);fm_worker_notify(account);flush(session)
+ s$service_error<-NULL;s$health$heartbeat<-rival_finance_stamp(now-181);fm_worker_notify(account);flush(session)
  stopifnot(grepl('not responding',output$status,fixed=TRUE),metrics$renders==before+2L)
  s$health$heartbeat<-rival_finance_stamp(now);fm_worker_notify(account);flush(session)
  stopifnot(!grepl('not responding',output$status,fixed=TRUE),metrics$renders==before+3L)

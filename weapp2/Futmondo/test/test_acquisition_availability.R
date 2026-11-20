@@ -1,6 +1,9 @@
 #!/usr/bin/env Rscript
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages(source('futmondo_functions.R'))
+# Since 76dec9b display reads use saved observations when the factual worker is
+# configured; this fixture exercises the direct acquisition path.
+fm_worker_configured<-function()FALSE
 # This native capacity fixture has no locker payments; dedicated incoming/locker
 # regressions cover that source and its pending-transfer reconciliation.
 get_locker_clause_payments<-function(...)observed_data(data.frame())

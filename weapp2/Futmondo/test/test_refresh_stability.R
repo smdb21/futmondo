@@ -11,6 +11,7 @@ original_async<-async_adapter_fetch;calls<-character()
 async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is_current=function()TRUE){calls<<-c(calls,fn);original_async(fn,args,context,owner,is_current)}
 clear_api_cache()
 shiny::testServer(app_server,{
+ app_settle(session) # finish the synthetic startup DB check before login (since 2b502ee)
  session$setInputs(tabs='login',`login-user_name`='offline@example.invalid',`login-password`='fixture',`login-login_button`=1)
  session$elapse(100);app_settle(session);session$setInputs(tabs='today');app_settle(session)
  invisible(output[['today-market_players-players_table']]);before<-calls

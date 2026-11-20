@@ -1,6 +1,9 @@
 #!/usr/bin/env Rscript
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages({source('futmondo_functions.R');source('supabase_connector.R');source('background_runtime.R');source('Modules/Players_Table_Module.R');source('Modules/Rivals_Module.R')})
+# Since 76dec9b display reads use saved observations when the factual worker is
+# configured; this fixture exercises the direct acquisition path.
+fm_worker_configured<-function()FALSE
 n<-0L;check<-function(name,expr){force(expr);n<<-n+1L;cat('PASS',name,'\n')}
 cid<-'fixture-league';now<-as.POSIXct('2026-11-01T12:00:00',tz='UTC')
 teams<-data.frame(teamid=c('a','b'),teamname=c('A','B'),points=c(10,5))

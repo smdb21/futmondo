@@ -69,7 +69,6 @@ rival_evidence_decode <- function(rows) {
 }
 read_rival_finance_evidence <- function(account_id,championship_id,season="unknown",max_rows=20000L,competition_id=NULL) {
   competition_id<-fm_scalar(competition_id,league_stable_competition(championship_id,account_id))
-  if(!fm_context_known(competition_id)||!fm_context_known(season))return(list(evidence=list(),complete=FALSE,context_unknown=TRUE))
   get_cached_data(paste0("rival_finance_evidence_",account_id,"_",championship_id,"_",season),{
     rows<-history_read_pages("rival_finance_evidence_latest",list(account_id=paste0("eq.",account_id),championship_id=paste0("eq.",championship_id),
       competition_id=paste0("eq.",competition_id),season=paste0("eq.",season),select="account_id,championship_id,competition_id,season,evidence_type,source_id,observed_at,payload",

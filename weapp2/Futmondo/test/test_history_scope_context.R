@@ -90,29 +90,17 @@ check('persisted context is used after memory is empty, and cached in a bounded 
   stopifnot(!league_history_scope('league-a')$known)
 })
 
-check('history reader queries the resolved season and refuses unknown', {
-  reset()
-  remember_league_context(ctx_row('acct', 'league-a', 'comp-1', '2025-2026'))
+check('history reader prefers the resolved season and keeps unknown as an archive scope', {
+  reset(); remember_league_context(ctx_row('acct', 'league-a', 'comp-1', '2025-2026'))
   seen <- NULL
-  supabase_read_all <<- function(table, query, ...) {
-    seen <<- query
-    d <- data.frame(points = 1, recorded_at = '2026-11-01T00:00:00Z')
-    attr(d, 'fetch_status') <- 'partial'
-    d
-  }
+  read_league_team_history_daily <<- function(...) NULL
+  supabase_read_all <<- function(table, query, ...) { seen <<- query; d <- data.frame(points = 1, recorded_at = '2026-11-01T00:00:00Z'); attr(d, 'fetch_status') <- 'partial'; d }
   h <- get_league_standings_history('league-a')
-  stopifnot(
-    seen$season == 'eq.2025-2026',
-    seen$competition_id == 'eq.comp-1',
-    identical(attr(h, 'fetch_status'), 'partial')
-  )
-  reset()
-  supabase_get <<- function(...) NULL
-  seen <- NULL
-  h <- get_league_standings_history('league-a')
-  stopifnot(is.null(seen), isTRUE(attr(h, 'context_unknown')), !nrow(h))
+  stopifnot(seen$season == 'eq.2025-2026', seen$competition_id == 'eq.comp-1', identical(attr(h, 'fetch_status'), 'partial'))
+  reset(); supabase_get <<- function(...) NULL; seen <- NULL
+  get_league_standings_history('league-a')
+  stopifnot(seen$season == 'eq.unknown', seen$competition_id == 'eq.unknown')
 })
-
 check('season-scoped history is not written under an unknown context', {
   reset()
   supabase_get <<- function(...) NULL

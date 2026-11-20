@@ -4,6 +4,7 @@ suppressPackageStartupMessages({library(shiny);library(dplyr);library(reactable)
 options(futmondo.offline=TRUE)
 cfg_player_columns_to_hide <- character()
 source('futmondo_functions.R');source('factual_helpers.R');source('supabase_connector.R')
+source('player_availability.R')  # split out of the card module in 8bf2dd3
 get_player_card_history<-function(...)list(points=data.frame(),valuation=data.frame(),status='empty')
 get_player_full_profile<-function(...)NULL
 get_player_matches<-function(...)NULL

@@ -2,6 +2,9 @@
 # Synthetic transport fixtures exercise real sync loaders and async replay.
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages(source("futmondo_functions.R"))
+# Since 76dec9b display reads use saved observations when the factual worker is
+# configured; this fixture checks the direct source request contracts.
+fm_worker_configured<-function()FALSE
 n<-0L;check<-function(name,expr){force(expr);n<<-n+1L;cat("PASS",name,"\n")}
 auth<-c(token="synthetic-token",userid="synthetic-user");league<-"synthetic-league";team<-"synthetic-team"
 ctx<-resource_context(auth,league,team,session_id="contract-fixture")
