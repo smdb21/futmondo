@@ -971,7 +971,7 @@ persist_auction_history <- function(pressroom_df, championship_id) {
 }
 
 read_player_match_history<-function(championship_id,cutoff=Sys.time(),final_only=TRUE,season="unknown",scoring_version="unknown",player_ids=NULL,round_min=NULL,round_max=NULL,max_rows=5000L,competition_id=NULL){
- competition_id<-fm_scalar(competition_id,league_competition_context(championship_id))
+ competition_id<-fm_scalar(competition_id,league_stable_competition(championship_id))
  q<-list(championship_id=paste0("eq.",championship_id),competition_id=paste0("eq.",competition_id),season=paste0("eq.",season),scoring_version=paste0("eq.",scoring_version),observed_at=paste0("lte.",format(fm_time(cutoff),"%Y-%m-%dT%H:%M:%OSZ",tz="UTC")),order="player_id.asc,round.asc,observed_at.asc")
  q$select<-"player_id,championship_id,competition_id,season,scoring_version,round,source_round_number,source_round_key,round_id,match_id,points,score_status,observed_at"
  if(!is.null(round_min))q$round<-paste0("gte.",round_min)

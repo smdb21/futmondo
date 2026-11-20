@@ -83,6 +83,9 @@ fm_async_http<-function(url,method='GET',body=NULL,headers=character(),owner='',
   promises::promise_resolve(list(status_code=200L,content=charToRaw(jsonlite::toJSON(list(answer=answer),
     auto_unbox=TRUE,null='null',digits=NA)),times=list(total=0)))
 }
+# Since 76dec9b, display reads use saved observations when the factual worker is
+# configured; this fixture deliberately exercises the direct-source path.
+fm_worker_configured<-function()FALSE
 options(futmondo.offline=FALSE)
 settle<-function(session,predicate,timeout=3){
   deadline<-Sys.time()+timeout

@@ -43,7 +43,7 @@ rival_finance_evidence <- function(account_id,championship_id,season,type,id,pay
   if(type%in%c("team_rounds","round_lineup","round_ranking")){
     payload$kind<-type;id<-paste0(switch(type,team_rounds="rounds:",round_lineup="lineup:",round_ranking="ranking:"),id);type<-"eligibility"
   }
-  list(account_id=as.character(account_id),championship_id=as.character(championship_id),competition_id=fm_scalar(competition_id,league_competition_context(championship_id,account_id)),season=mvp_text(season,"unknown"),
+  list(account_id=as.character(account_id),championship_id=as.character(championship_id),competition_id=fm_scalar(competition_id,league_stable_competition(championship_id,account_id)),season=mvp_text(season,"unknown"),
     evidence_type=type,source_id=as.character(id),observed_at=rival_finance_stamp(observed_at),payload=payload)
 }
 rival_evidence_rows <- function(evidence,type) {
@@ -68,9 +68,7 @@ rival_evidence_decode <- function(rows) {
   })
 }
 read_rival_finance_evidence <- function(account_id,championship_id,season="unknown",max_rows=20000L,competition_id=NULL) {
-  competition_id<-fm_scalar(competition_id,league_competition_context(championship_id,account_id))
-  # Live metadata first; the stable history identity only replaces "unknown".
-  if(!fm_context_known(competition_id))competition_id<-league_history_scope(championship_id,account_id)$competition_id
+  competition_id<-fm_scalar(competition_id,league_stable_competition(championship_id,account_id))
   if(!fm_context_known(competition_id)||!fm_context_known(season))return(list(evidence=list(),complete=FALSE,context_unknown=TRUE))
   get_cached_data(paste0("rival_finance_evidence_",account_id,"_",championship_id,"_",season),{
     rows<-history_read_pages("rival_finance_evidence_latest",list(account_id=paste0("eq.",account_id),championship_id=paste0("eq.",championship_id),
@@ -1065,7 +1063,8 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
   empty<-data.frame(teamid=character(),teamname=character(),estimated_cash=numeric(),confidence=character(),as_of=character(),stringsAsFactors=FALSE)
   if(!is.data.frame(teams)||!nrow(teams))return(list(team_finances=empty,breakdowns=list(),cash_ledgers=list(),all_purchases=data.frame()))
   if(!nzchar(mvp_text(account_id)))stop("An explicit account is required for rival finance evidence.")
-  evidence<-Filter(function(x)identical(mvp_text(x$championship_id),as.character(championship_id))&&identical(fm_scalar(x$competition_id,"unknown"),league_competition_context(championship_id,account_id))&&identical(mvp_text(x$season,"unknown"),as.character(season))&&(is.null(account_id)||identical(mvp_text(x$account_id),as.character(account_id))),Filter(function(x)!rival_snapshot_record(x),rival_merge_evidence(list(),evidence)))
+  stable_competition<-league_stable_competition(championship_id,account_id)
+  evidence<-Filter(function(x)identical(mvp_text(x$championship_id),as.character(championship_id))&&identical(fm_scalar(x$competition_id,"unknown"),stable_competition)&&identical(mvp_text(x$season,"unknown"),as.character(season))&&(is.null(account_id)||identical(mvp_text(x$account_id),as.character(account_id))),Filter(function(x)!rival_snapshot_record(x),rival_merge_evidence(list(),evidence)))
   scope_frame<-function(rows){
     if(!is.data.frame(rows))return(data.frame())
     expected<-list(championship_id=championship_id,season=season,account_id=account_id)

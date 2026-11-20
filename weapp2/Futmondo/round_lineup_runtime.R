@@ -99,7 +99,7 @@ read_saved_round_lineup <- function(context,round_id,now=Sys.time()) {
 }
 get_round_lineup_snapshot <- function(login,championship_id,user_team_id,round_id) {
   if(!nzchar(mvp_text(round_id))||!nzchar(mvp_text(user_team_id)))stop("Historical lineup identity unavailable")
-  context<-resource_context(login,championship_id,user_team_id,season=league_season_context(championship_id))
+  context<-resource_context(login,championship_id,user_team_id,season=league_stable_season(championship_id,login[["userid"]]))
   get_cached_data(paste0("round_lineup_snapshot_v4_",championship_id,"_",user_team_id,"_",round_id),{
     saved<-read_saved_round_lineup(context,round_id)
     if(!is.null(saved)&&as.numeric(Sys.time())<saved$valid_until)return(saved)

@@ -223,7 +223,7 @@ league_fixture_observation <- function(metadata) list(matches=metadata$fixture_m
   observed_at=attr(metadata,'observed_at'),valid_until=metadata$valid_until,
   status=metadata$status,reason=metadata$reason %||% '')
 get_award_round_metadata <- function(login,championship_id,league_id,refresh=FALSE,current_round_id="",include_matches=FALSE) {
-  context<-resource_context(login,championship_id,season=league_season_context(championship_id))
+  context<-resource_context(login,championship_id,season=league_stable_season(championship_id,login[["userid"]]))
   scope<-c(context[c("account_id","championship_id","competition_id","season")],list(league_id=as.character(league_id),current_round_id=mvp_text(current_round_id)))
   same_scope<-function(value)is.list(value)&&identical(names(value),names(scope))&&
     identical(value[names(scope)!="current_round_id"],scope[names(scope)!="current_round_id"])&&

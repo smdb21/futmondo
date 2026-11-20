@@ -3278,7 +3278,7 @@ classification_saved_future <- function(evidence,context,round_id,round_number,n
 
 get_classification_round_ranking <- function(login, championship_id, user_team_id, round_id, round_number) {
   if(!nzchar(mvp_text(round_id))||!is.finite(fm_number(round_number)))stop("Round identity unavailable")
-  context <- resource_context(login,championship_id,user_team_id,season=league_season_context(championship_id))
+  context <- resource_context(login,championship_id,user_team_id,season=league_stable_season(championship_id,login[["userid"]]))
   resource <- paste0("classification_ranking_",championship_id,"_",round_id)
   get_cached_data(resource, {
     saved <- resource_optional_cache_read(function()

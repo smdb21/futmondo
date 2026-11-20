@@ -47,8 +47,7 @@ award_expected_scoring <- function(login,championship_id) {
 award_saved_rows <- function(snapshots,championship_id,season,expected_scoring="unknown",account_id=NULL) {
   if(!nzchar(mvp_text(account_id)))return(data.frame())
   # Live metadata first; the stable history identity only replaces "unknown".
-  competition<-league_competition_context(championship_id,account_id)
-  if(!fm_context_known(competition))competition<-league_history_scope(championship_id,account_id)$competition_id
+  competition<-league_stable_competition(championship_id,account_id)
   snapshots<-Filter(function(snapshot){
     identical(mvp_text(snapshot$account_id),as.character(account_id))&&
       identical(mvp_text(snapshot$championship_id),as.character(championship_id))&&
@@ -92,8 +91,8 @@ award_settlement_rechecks <- function(evidence,rows,catalog) {
   },intersect(unique(payments$round_id),catalog$round_id))
 }
 get_mvp_saved_catalog <- function(login,championship_id) {
-  season<-league_season_context(championship_id);competition<-NULL
-  if(!fm_context_known(season)){scope<-league_history_scope(championship_id,login[["userid"]]);season<-scope$season;competition<-scope$competition_id}
+  season<-league_stable_season(championship_id,login[["userid"]])
+  competition<-league_stable_competition(championship_id,login[["userid"]])
   saved<-tryCatch(read_rival_finance_evidence(login[["userid"]],championship_id,season,competition_id=competition),error=function(e)list(evidence=list(),complete=FALSE))
   expected<-award_expected_scoring(login,championship_id)
   rows<-award_saved_rows(rival_evidence_rows(saved$evidence,"awards"),championship_id,season,expected,login[["userid"]])
@@ -307,7 +306,7 @@ shared_mvp_source <- function(session,login,championship,active,refresh=NULL) {
     publication<-root$userData$round_publication_revision();version<-if(is.function(refresh))refresh()else 0
     if(!identical(state$key,key)||(!state$running&&!identical(state$refresh,version))){
       state$key<-key;state$refresh<-version;state$generation<-state$generation+1L;g<-state$generation
-      state$loading<-TRUE;state$season<-league_season_context(championship());state$catalog_complete<-state$catalog_identity_complete<-state$saved_complete<-FALSE;state$catalog_reason<-"";publish()
+      state$loading<-TRUE;state$season<-league_stable_season(championship(),login()[["userid"]]);state$catalog_complete<-state$catalog_identity_complete<-state$saved_complete<-FALSE;state$catalog_reason<-"";publish()
       auth<-login();cid<-championship();ctx<-resource_context(auth,cid,season=state$season,session_id=root$token)
       promises::then(async_adapter_fetch("get_mvp_saved_catalog",list(login=auth,championship_id=cid),ctx,is_current=function()current(g,key)),function(result){
         if(!current(g,key))return(NULL)

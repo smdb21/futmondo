@@ -277,7 +277,7 @@ record_acquired_resource<-function(resource,data,context){
       saved<-api_cache_env[[api_cache_key("history_write_ack_locker",context=context)]]$data$hashes %||% character()
       prior<-saved[names(hashes)];changed<-is.na(prior)|prior!=hashes
       locker<-locker[unname(changed),,drop=FALSE];hashes<-hashes[changed]
-      season<-league_season_context(league)
+      season<-league_stable_season(league,context$account_id)
       evidence<-lapply(seq_len(nrow(locker)),function(i){
         # Store normalized payment facts; never authentication or actor profiles.
         fields<-intersect(c("id","locker_event_id","created","delivery_at","player_id","player_name","player_team_name","player_team_slug","buyer_team_id","buyer_team_name","seller_team_id","seller_team_name","price","is_clause"),names(locker))

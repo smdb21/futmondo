@@ -210,4 +210,20 @@ check('saved awards match the stable competition when live metadata has expired'
   stopifnot(!nrow(out))
 })
 
+check('stable helpers prefer live metadata and replace only unknown', {
+  reset()
+  remember_league_context(ctx_row('acct', 'league-a', 'comp-1', '2025-2026'))
+  stopifnot(league_competition_context('league-a', 'acct') == 'unknown',
+    league_stable_competition('league-a', 'acct') == 'comp-1',
+    league_stable_season('league-a', 'acct') == '2025-2026')
+  remember_league_context(ctx_row('acct', 'league-a', 'comp-live', 'S-live', age = 1))
+  stopifnot(league_stable_competition('league-a', 'acct') == 'comp-live',
+    league_stable_season('league-a', 'acct') == 'S-live')
+  # Asynchronous adapters never trigger the extra database lookup.
+  reset(); calls <- 0L; supabase_get <<- function(...) { calls <<- calls + 1L; NULL }
+  env <- new.env(parent = globalenv()); env$.futmondo_request_context <- list(account_id = 'acct')
+  f <- league_history_scope; environment(f) <- env; f('league-a')
+  stopifnot(calls == 0L)
+})
+
 cat('HISTORY SCOPE CONTEXT:', checks, 'checks passed\n')

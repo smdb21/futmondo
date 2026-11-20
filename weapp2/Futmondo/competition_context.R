@@ -229,7 +229,9 @@ league_history_scope <- function(championship_id,account_id=NULL,lookup=TRUE) {
     fm_context_known(fm_scalar(x$competition_id,""))&&fm_context_known(fm_scalar(x$season,"")),.fm_league_contexts$items)
   ids<-unique(vapply(items,function(x)paste(x$competition_id,x$season,sep="|"),character(1)))
   if(length(ids)==1L)return(pack(items[[1]],"memory"))
-  if(length(ids)>1L||!isTRUE(lookup))return(unknown)
+  # Inside asynchronous source adapters supabase_get is a suspending request;
+  # those reads carry their own verified context, so no extra lookup is made.
+  if(length(ids)>1L||!isTRUE(lookup)||!is.null(get0(".futmondo_request_context",inherits=TRUE)))return(unknown)
   cached<-.fm_history_scope_cache[[cid]]
   if(!is.null(cached)&&cached$until>Sys.time())return(cached$value)
   rows<-tryCatch(supabase_get("league_context_observations",list(championship_id=paste0("eq.",cid),complete="is.true",
@@ -240,6 +242,15 @@ league_history_scope <- function(championship_id,account_id=NULL,lookup=TRUE) {
   if(length(ls(.fm_history_scope_cache))>256L)rm(list=ls(.fm_history_scope_cache),envir=.fm_history_scope_cache)
   .fm_history_scope_cache[[cid]]<-list(value=value,until=Sys.time()+if(value$known)300 else 60)
   value
+}
+# Live competition first; the stable recorded identity only replaces "unknown".
+league_stable_competition <- function(championship_id,account_id=NULL) {
+  live<-league_competition_context(championship_id,account_id)
+  if(fm_context_known(live))live else league_history_scope(championship_id,account_id)$competition_id
+}
+league_stable_season <- function(championship_id,account_id=NULL) {
+  live<-league_season_context(championship_id,account_id=account_id)
+  if(fm_context_known(live))live else league_history_scope(championship_id,account_id)$season
 }
 league_persistence_scope <- function(championship_id) {
   s<-league_history_scope(championship_id)
