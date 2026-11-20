@@ -97,7 +97,6 @@ Contracts: [player availability](player_availability.md), [player card](selected
 
 Contracts: [information disclosures](ui_information_disclosures.md). This is an existing-data presentation expansion; no migration, new dependency or transaction behavior.
 
-
 ## Title-free information notes — 2026-11-16
 
 - [x] Remove redundant generated source headings through the shared page/dialog registry; review note producers across the app and retain meaningful message context.
@@ -739,15 +738,18 @@ Hosted follow-up verified: `790cc1bdab777449f79beaf26a242176c493ea60`, release `
 
 ## Player-card availability expiry — 2026-11-05
 
-Status: **exact release verified locally; hosted publication pending**.
+Status: **deployed and public startup/hash verified; authenticated hosted timing remains unverified**.
 
 - [x] Reproduce the reported expiry in the actual card with a synthetic 31-second history delay; trace frozen composite time, sequential reads, queue contention and nested cache expiry.
 - [x] Acquire independent prerequisites concurrently, refresh only expired facts once, reconcile changed pending players, and retain source-based deadlines and manual preflights.
 - [x] Prioritize interactive queued reads without raising concurrency/request limits; exclude connection-queue time from network timeout; preserve fairness, owner cancellation and single-attempt manual operations.
 - [x] Honor absolute validity in outer caches and recheck once if a late summary outlives team checks; use Boolean action-button disable flags.
 - [x] Independently review scheduling/cancellation, cache reuse, candidate changes and failure gates; run focused delayed/reopening fixtures.
-- [ ] Pass the final exact-release lifecycle and bundle checks, deploy and verify public startup/hash.
+- [x] Pass the final exact-release lifecycle and bundle checks, deploy and verify public startup/hash.
 - [ ] Confirm authenticated hosted Berenguer behavior; fixture timing does not establish production latency.
+
+Hosted expiry follow-up verified: `1cfdd4aa42c615356cb637cc8a98af562e0c512c`, release `player-availability-freshness-2026-11-05`, HTTP200, connected Shiny session and all12 matching release hashes.
+
 
 ## Clause-purchase history refresh scope — 2026-11-05
 
@@ -1075,13 +1077,6 @@ Status: **implemented and verified locally; hosted rollout remains unverified**.
 Add a matching Leaving players panel beside Incoming players, with source-confirmed departure time, next-round timing and shared player-card navigation. Retain confirmed departures across partial/stale/overdue observations; remove them only on verified departure, cancellation or a newer repurchase. Both directions share the existing two-read queue and actual roster counts/value. Safe clause observations persist in the existing private database evidence store, preserving context and the original 60-second deadline; failed writes remain retryable. No dependency, environment variable, migration, timer or unattended worker is added. Focused data/persistence, responsive browser and offline lifecycle verification and performance limits are recorded in `data_review_results.md`.
 
 
-## Horizontal desktop lineups — 2026-11-10
-
-Status: **implemented and verified locally; hosted rollout remains unverified**.
-
-Use a shared responsive pitch/bench wrapper in the editor and historical lineup modal. At desktop widths, place substitutes far left, then goalkeeper, defenders, midfielders and forwards in vertical columns, with matching field markings. Preserve the existing narrow-screen layout, source slot identity and manual actions. Focused geometry, dense/no-forward formation, resize reuse, player editing, phone dismissal and mandatory offline lifecycle checks passed. Performance review and verification limits are recorded in `data_review_results.md`.
-
-
 ## Round history database URL correction — 2026-11-10
 
 Status: **implemented and verified locally; hosted configuration/recovery remains unverified**.
@@ -1096,6 +1091,13 @@ history without source requests, and responsiveness during delayed reads. The
 required offline lifecycle passes. Correct the hosted environment value and restart,
 or deploy the code, then confirm active-session history recovery. Actual checks,
 performance review and verification limits are in `data_review_results.md`.
+
+
+## Horizontal desktop lineups — 2026-11-10
+
+Status: **implemented and verified locally; hosted rollout remains unverified**.
+
+Use a shared responsive pitch/bench wrapper in the editor and historical lineup modal. At desktop widths, place substitutes far left, then goalkeeper, defenders, midfielders and forwards in vertical columns, with matching field markings. Preserve the existing narrow-screen layout, source slot identity and manual actions. Focused geometry, dense/no-forward formation, resize reuse, player editing, phone dismissal and mandatory offline lifecycle checks passed. Performance review and verification limits are recorded in `data_review_results.md`.
 
 
 ## Bulk market listing premiums — 2026-11-10
@@ -1220,7 +1222,6 @@ Implemented source-based basketball exclusion across live reads, persisted check
 The account's last selected available league is now stored durably and restored before dependent league reads. The initial valid choice and later changes are saved; removed/blocked leagues use a valid fallback without inventing data, and delayed/error cases remain isolated/retryable. Fixed the football market worker's rejection of canonical `data.table` results rather than treating basketball removal as the market fix. Actual helper persistence/replay, source sport filtering, preference races, SQL policy/security, deployment packaging, performance and offline lifecycle checks pass as recorded in `data_review_results.md`.
 
 Local implementation and live database policy/cleanup are verified. The R/Python/UI changes still require application/worker rebuild and restart; hosted market acquisition and browser restore across sessions remain acceptance checks. No source membership change, trading automation, credential change or background transaction was introduced.
-
 
 ### Finance worker context ownership and incremental results — 2026-11-11
 
@@ -1486,17 +1487,17 @@ separate from these migration checks.
 - Also fixed the independently reproduced delayed cadence promotion: idle successful summaries shortened from hourly to five-minute collection now honor that next due time. Guarded repair/migration applied as `20261114144934_worker_shorter_cadence`; equal-interval rediscovery, source deadlines and failed/active jobs remain unchanged.
 
 
-### November 14: compact system offers
-
-- Implemented and verified locally: My Team groups system offers under one **Futmondo system** heading with compact rows. Rival/unknown offers retain individual source labels above the system group; every bid, amount, gain/loss, exact-offer link and source-status message is preserved.
-- Existing received-offers checks pass; synthetic Chromium checks at 320/360/390/1440px confirm grouping, mixed/unknown bidders, wrapping and unchanged prices/links. Performance results and limits are recorded in `docs/data_review_results.md`. No dependency, schema, acquisition or persistence change; authenticated hosted appearance remains unverified.
-
-
 ## Next-round clause departures in Lineup and My Team — 2026-11-14
 
 Implemented locally: share the existing scoped clause-transfer source across My Team and Lineup; compare observed departure dates with the next kickoff; exclude departures at/before kickoff from Best XI and bench even when injury exclusion is overridden; reject selecting/saving known departures while retaining the official lineup/draft for correction. Missing departure evidence stays unresolved. My Team highlights those roster rows with a reddish background and an explanatory legend, preserving actual ownership/count/value.
 
 The existing database snapshots, original observation/completeness metadata and bounded queue remain the source of reusable transfer evidence. No new service, schema, dependency or timer. Focused offline, lifecycle and browser verification and performance limits are recorded in `data_review_results.md`; local verification does not claim authenticated hosted acceptance.
+
+
+### November 14: compact system offers
+
+- Implemented and verified locally: My Team groups system offers under one **Futmondo system** heading with compact rows. Rival/unknown offers retain individual source labels above the system group; every bid, amount, gain/loss, exact-offer link and source-status message is preserved.
+- Existing received-offers checks pass; synthetic Chromium checks at 320/360/390/1440px confirm grouping, mixed/unknown bidders, wrapping and unchanged prices/links. Performance results and limits are recorded in `docs/data_review_results.md`. No dependency, schema, acquisition or persistence change; authenticated hosted appearance remains unverified.
 
 
 ## Lineup status duplication and expired schedule observations — 2026-11-14
@@ -1649,6 +1650,7 @@ capture replay, delayed-source/recovery/isolation, persisted-snapshot reuse,
 performance and offline lifecycle checks are recorded in `data_review_results.md`.
 No schema, dependency, automation or login inventory expansion is required.
 
+
 ### Pinned player-table crests and positions — implemented locally (2026-11-14)
 
 - Split the existing club crest from Name into its own narrow column, visually
@@ -1660,6 +1662,7 @@ No schema, dependency, automation or login inventory expansion is required.
   Focused rendering, synthetic desktop/mobile browser and required offline
   lifecycle checks and limitations are recorded in `docs/data_review_results.md`.
   Branch delivery is separate from hosted deployment/acceptance.
+
 
 ### Compact pinned recent average — implemented locally (2026-11-15)
 
@@ -2214,16 +2217,6 @@ Contract: [lineup module](lineup_module.md). Verification: [data review](data_re
 No schema migration, dependency, environment variable, automated transaction or new worker job.
 
 
-## Opposing match-crest placement — 2026-11-18
-
-- [x] Put the home crest at the outside left and the away crest at the outside right of each lineup match card, with names toward the center.
-- [x] Verify existing browser flows at 320/390/1440px, inspect the narrow-screen screenshot and record the performance assessment.
-- [ ] Hosted visual acceptance after deployment.
-
-Presentation-only refinement of the existing fixture feature; no new capability,
-login inventory, data contract, source acquisition or persistence change.
-
-
 ## Admin worker activity by account and route — 2026-11-18 (Pacific)
 
 Status: **implemented and verified locally; additive production migration applied**.
@@ -2243,6 +2236,16 @@ Status: **implemented and verified locally; additive production migration applie
 
 See [monitor contracts](admin_worker_monitor.md) and [executed checks](data_review_results.md).
 Public login feature tiers are unchanged: this is admin-only operational infrastructure.
+
+
+## Opposing match-crest placement — 2026-11-18
+
+- [x] Put the home crest at the outside left and the away crest at the outside right of each lineup match card, with names toward the center.
+- [x] Verify existing browser flows at 320/390/1440px, inspect the narrow-screen screenshot and record the performance assessment.
+- [ ] Hosted visual acceptance after deployment.
+
+Presentation-only refinement of the existing fixture feature; no new capability,
+login inventory, data contract, source acquisition or persistence change.
 
 
 ## Doubtful-only lineup option — 2026-11-18
@@ -2284,7 +2287,6 @@ fingerprints matched at 2026-11-19 04:34:46 UTC. Automatic source rollout is
 verified; authenticated hosted acceptance remains distinct from the synthetic
 browser and saved-data replay checks. Documentation-only delivery tracking
 has no runtime/performance effect.
-
 
 ## Player-card match history — 2026-11-19
 

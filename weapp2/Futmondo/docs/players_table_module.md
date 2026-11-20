@@ -314,6 +314,7 @@ turn it off to see their reported dates. A short information disclosure explains
 both conditional fields. This repairs existing columns; no new advertised/login
 capability, transaction behavior, acquisition permission or dependency is added.
 
+
 ## Pinned crest and recent average while scrolling — updated 2026-11-15
 
 The shared Today, Market, My Team, Players and rival-squad tables display the

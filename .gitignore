@@ -9,3 +9,6 @@ target/**
 
 # Local chat attachments
 .codex-attachments/
+
+__pycache__/
+webapp/futmondo/.Renviron

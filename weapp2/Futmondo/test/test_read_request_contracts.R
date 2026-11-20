@@ -5,6 +5,9 @@ suppressPackageStartupMessages(source("futmondo_functions.R"))
 # Since 76dec9b display reads use saved observations when the factual worker is
 # configured; this fixture checks the direct source request contracts.
 fm_worker_configured<-function()FALSE
+# This fixture covers the native pressroom request contract; locker transport
+# pagination and payment integration have dedicated offline regressions.
+get_locker_clause_payments<-function(...)observed_data(data.frame())
 n<-0L;check<-function(name,expr){force(expr);n<<-n+1L;cat("PASS",name,"\n")}
 auth<-c(token="synthetic-token",userid="synthetic-user");league<-"synthetic-league";team<-"synthetic-team"
 ctx<-resource_context(auth,league,team,session_id="contract-fixture")

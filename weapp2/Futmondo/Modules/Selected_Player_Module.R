@@ -112,7 +112,7 @@ player_card_location_status <- function(player, current_team_id = NULL) {
   }
   ownership <- if (!nzchar(owner_id)) "Free Agent" else if (nzchar(current_id) && identical(owner_id, current_id)) {
     "Your Squad"
-  } else paste0("Rival Owned", if (nzchar(owner_name)) paste0(": ", owner_name) else "")
+  } else if (nzchar(owner_name)) paste0(owner_name, " (rival)") else "Rival Owned"
   list(ownership=ownership,on_market=on_market,
     market=if (on_market) "Listed on Market" else "Not listed on Market")
 }

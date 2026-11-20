@@ -2,6 +2,9 @@
 # Replays response bodies only. Credentials and requests in captures are never used.
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages(source('futmondo_functions.R'))
+# This capture set covers native pressroom/bids; locker pagination and the
+# clause-payment merge are verified by the dedicated offline locker fixtures.
+get_locker_clause_payments<-function(...)observed_data(data.frame())
 http_attempts<-0L
 for(method in c('GET','POST','PUT','PATCH','DELETE')) suppressMessages(trace(method,where=asNamespace('httr'),print=FALSE,
   tracer=quote({http_attempts<<-http_attempts+1L;stop('Network forbidden in HAR tests')})))

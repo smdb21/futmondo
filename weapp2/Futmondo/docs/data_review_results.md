@@ -1505,6 +1505,10 @@ Limitations: already-running requests still occupy slots; a cold complete histor
 
 Final exact-release verification passed native card2, late-summary/reopening4, parallel acquisition9, source expiry6, transport priority9, deployment3 and the required offline lifecycle13 plus eight tabs (zero HTTP/live database mutation attempts). The four runtime files were frozen before those checks. Direct-sale6 passed after repairing two obsolete fixture assumptions: contextless cache insertion and a missing scoped manual-invalidation mock; production sale behavior was unchanged. All38 bundle checksums match, all78 deployed package records are unchanged, and scoped whitespace review is clean. Credentials, captures, tests, docs and development scripts remain excluded. The new release marker includes all four changed runtime hashes; no new dependency requires manifest dependency regeneration. Public publication follows below after the authorized push.
 
+
+Hosted publication verified: commit `1cfdd4aa42c615356cb637cc8a98af562e0c512c` pushed non-force to the GitHub `2.0` branch. A fresh public Chromium session returned HTTP200, connected to Shiny and served `player-availability-freshness-2026-11-05` with all12 marker hashes matching the prepared release. The changed runtime SHA256 values are transport `cd9e20b307643909f58c357ef051e344eda07b7b3073e80a628ee87bd1946a2e`, data service `69cfe9abd65a15acddebf16cd51b70be2cafde0f5ea5f48fbe757f41fa80f1d1`, source functions `77830a364a0d1fc66b0eac2568cb3cf384bdd0bb86475d6ca4827d513e18e09f` and Selected Player `46e506656c87ed8dedd9f1a14c52e4a0f3a56fd93047880983a0d180372d8fe8`. The isolated release checkout is clean. No authenticated account, real transaction or production data mutation was used to verify this follow-up. Publication/startup is confirmed; the user's live Berenguer timing remains distinct from the reproduced expiry and delayed-source tests. Updating these delivery notes/static metadata has no query or rendering cost.
+
+
 ### Clause purchase restarted league-wide round-history retrieval — 2026-11-05
 
 The successful clause callback advanced the same global revision used by the table history controller for explicit correction requests. The controller therefore forced all current table players, cleared their attempts and invalidated summary caches even though no score changed. Separately, shared-resource refreshes replaced same-context values with an empty loading state, so the table vanished while catalog/ownership data refreshed. An expired factual table read also discarded retained rows and could demand repeated refresh work.
@@ -2015,8 +2019,6 @@ Verification: outgoing known-answer/source/UI checks passed 24 groups; durable s
 
 Performance review: one shared incoming/outgoing queue remains capped at two reads, including delayed requests, context switches and the single expiry recheck. Only the current team's unresolved transfer candidates are inspected; no league-wide scan or polling is added. Each cold uncached candidate adds at most one scoped database lookup and one source read when needed; valid persisted replay uses one DB read and zero API reads, warm navigation uses zero DB/API reads. Safe snapshots are capped at 32 KiB and use the existing bounded cache and deduplicated persistence queue. Rendering adds one roster-sized panel and corresponding bounded click observers. The unchanged cold capacity fixture measured five factual reads, responsive heartbeat, 0.868 seconds locally and a 9.9 KiB snapshot. These synthetic measurements establish local behavior, not hosted latency. No real account, transaction or live database was used; deployment and authenticated hosted behavior remain unverified. Unrelated working-tree, staged and documentation edits are preserved.
 
-Final isolated verification of the exact staged artifact passed outgoing 24, persistence 10, incoming 20, source recovery 6, offers 8, parallel capacity 9, availability 7, deployment 3 and the mandatory lifecycle 13 plus eight tabs. All 50 bundle checksums match. Three inherited stale checksum entries were reconciled against already committed player-table, server and stylesheet files; their source content and unrelated local changes were not included in this task. No dependency regeneration was required.
-
 
 ## Horizontal desktop lineups — 2026-11-10
 
@@ -2027,6 +2029,8 @@ Verification: `Rscript test/test_classification_lineup.R` passed 17 groups and `
 Independent review: isolated Chromium checks at 992px with a 230px sidebar passed for 3-6-1 and 4-6-0 with and without a bench, including long player names, card nonoverlap and viewport fit. Dense long-name columns can reach about 820px high and use normal vertical scrolling. No further runtime issue was found.
 
 Performance review: one static wrapper per lineup and CSS layout rules; unchanged bounded 11+4 player tiles, API/database request volume, persistence/cache reuse, invalidation, reactive work, timers and acquisition behavior. Browser resize only relayouts existing elements, with no new source or storage work. Six-player columns can require vertical scrolling; no fixed height clips content. No runtime dependency, environment variable, schema or manifest dependency change. Verification used offline synthetic data; no authenticated transaction or hosted deployment was performed. Unrelated working-tree and staged edits are preserved.
+
+Final isolated verification of the exact staged artifact passed outgoing 24, persistence 10, incoming 20, source recovery 6, offers 8, parallel capacity 9, availability 7, deployment 3 and the mandatory lifecycle 13 plus eight tabs. All 50 bundle checksums match. Three inherited stale checksum entries were reconciled against already committed player-table, server and stylesheet files; their source content and unrelated local changes were not included in this task. No dependency regeneration was required.
 
 
 ## Round history HTTP404 from a duplicated database API path — 2026-11-10
@@ -2274,7 +2278,6 @@ Production: automatic review initially rejected the combined dynamic permanent p
 Executed checks: league preference/sport tests passed 8 groups, including no wrong-default demand while a read is delayed, manual/account races, cross-session restoration, coalescing, acknowledgements and all-basketball fallback. Worker codec passed 20 groups; Python suite passed 17 tests, including real market persistence/restart reuse and live/legacy basketball checkpoint filtering. Worker provider passed 7 groups with zero source HTTP, including recovered-status clearing without a payload download. Existing competition context passed 14 groups. Isolated football policy SQL passed 6 groups, including block-only preservation, approved cleanup of exact basketball records, old-session reinsertion denial, old discovery publication guards, durable/latest preferences and denied browser access. Existing worker SQL passed 10 groups through the full migration order. The final offline lifecycle passed 13 checks plus eight tabs with no real HTTP/live database mutation attempts. Deployment packaging passed 3 checks. All automated acquisition/account fixtures were synthetic; production work was the explicitly approved policy/cleanup, not a test transaction or account enrollment.
 
 Performance review: preferences add one bounded async database read per login, bounded timestamped selection writes, no polling/timer, and no source HTTP. Restoring a valid choice avoids an initial fetch/redraw for another league. Existing durable resource/checkpoint reuse and source-age semantics remain unchanged. Sport filtering traverses small source league lists; Python uses a competition lookup. Policy probes use the blocked-ID primary key; the final isolated run inserted 1,000 guarded football history rows in 54.3 ms. Existing 5,001-entry ledger restore measured 0.141 s. The market frame conversion runs in the existing private helper under the same row/byte budgets. These measurements exclude hosted latency and do not size VM capacity. No new fixed-width controls or recurring redraws were added. Existing unrelated security advisories and working-tree edits are preserved; no dependency change required manifest regeneration, only scoped source checksums and the new module entry.
-
 
 ### Long-loading finance worker: context ownership and durable previews — 2026-11-11
 
@@ -3194,6 +3197,7 @@ packages or unrelated entries. Existing working-tree/index edits are excluded
 from the task commit. Local validation and branch delivery do not establish
 production rollout.
 
+
 ### Pinned player-table crests and positions — 2026-11-14
 
 The shared player tables now display the source club crest in its own 36px
@@ -3242,6 +3246,7 @@ no runtime effect. Browser checks use synthetic image responses and rows; real
 accounts, transactions, production deployment, physical devices and hosted
 performance were not exercised. Only task changes and their runtime checksums
 belong in the delivery commit; unrelated working changes are preserved.
+
 
 ### Compact pinned recent average — 2026-11-15
 
@@ -5046,25 +5051,6 @@ coverage, deployment and hosted visual acceptance remain unverified. This task
 does not claim to have fixed a demonstrated production crest acquisition defect.
 
 
-## Opposing match-crest placement — 2026-11-18
-
-The away crest now follows its club name visually, placing both match crests at
-opposite outside edges. One local CSS ordering rule changes presentation only;
-existing accessible club labels, 24px images, lazy loading and failed-image
-handling remain intact. The existing browser geometry assertion now verifies
-both outer-edge positions and name/image separation.
-
-`test/test_lineup_browser.R` plus `test/test_lineup_browser.cjs` passed at
-320/390/1440px using the installed Playwright browser and local fixture port
-8544; inspected the 320px screenshot. Long names wrap without overflow, and
-existing edit/optimize/save flows and request counters pass. Scoped whitespace
-checks passed. Performance review: unchanged node/image counts, layout
-complexity, API/database traffic, cache reuse, reactive work, timers and memory;
-only flex-item order changes. No additional runtime performance test, dependency
-or full lifecycle run is required for this module-local CSS adjustment. No
-production deployment or authenticated hosted acceptance is claimed.
-
-
 ## Admin worker activity by account and route — 2026-11-18 (Pacific)
 
 Implemented the admin-only route matrix, shared-process totals, durable sampled
@@ -5131,6 +5117,25 @@ findings are unchanged from before the migration; health advisor is clear.
 No account/job/history contents were changed by verification. Hosted UI acceptance
 and updated-worker telemetry remain separate deployment checks; no claim of a
 complete HTTP trace or resolution of unrelated source-data failures is made.
+
+
+## Opposing match-crest placement — 2026-11-18
+
+The away crest now follows its club name visually, placing both match crests at
+opposite outside edges. One local CSS ordering rule changes presentation only;
+existing accessible club labels, 24px images, lazy loading and failed-image
+handling remain intact. The existing browser geometry assertion now verifies
+both outer-edge positions and name/image separation.
+
+`test/test_lineup_browser.R` plus `test/test_lineup_browser.cjs` passed at
+320/390/1440px using the installed Playwright browser and local fixture port
+8544; inspected the 320px screenshot. Long names wrap without overflow, and
+existing edit/optimize/save flows and request counters pass. Scoped whitespace
+checks passed. Performance review: unchanged node/image counts, layout
+complexity, API/database traffic, cache reuse, reactive work, timers and memory;
+only flex-item order changes. No additional runtime performance test, dependency
+or full lifecycle run is required for this module-local CSS adjustment. No
+production deployment or authenticated hosted acceptance is claimed.
 
 
 ## Doubtful-only lineup option — 2026-11-18

@@ -14,11 +14,13 @@ x<-get_championship_pressroom(list(userid='fixture',token='fixture'),'league')
 stopifnot(nrow(x)==30,page==31L,identical(attr(x,'fetch_status'),'ok'))
 cat('PASS all cursor pages beyond the former cap, source IDs deduplicated, completion established by empty page\n')
 # A repeated cursor is incomplete evidence, never a claim of full history.
+clear_completed_history_baselines()
 page<-0L
 futmondo_post<-function(...){page<<-page+1L;structure(list(url="https://fixture.invalid/pressroom",status_code=200L,headers=structure(list('content-type'='application/json'),class='insensitive'),content=charToRaw('{"answer":{"news":[{"_id":"same","created":"2026-09-01","price":10}]}}')),class='response')}
 x<-get_championship_pressroom(list(userid='fixture',token='fixture'),'league')
 stopifnot(page==2,nrow(x)==1,identical(attr(x,'fetch_status'),'partial'))
 cat('PASS repeated cursors terminate with explicit partial coverage\n')
+clear_completed_history_baselines()
 # Production contract: created-desc ordering, ObjectId cursor filtering. Several
 # writers generate IDs in the same second, so ID order differs from time order.
 source_rows<-lapply(seq_len(149),function(i)list(`_id`=sprintf('70000002%016x',i),created=sprintf('2026-10-17T04:22:26.%03dZ',1000-i),price=1))

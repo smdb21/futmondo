@@ -85,6 +85,7 @@ This is static shipped copy: rendering performs no API/database request, acquisi
 
 For each new or expanded feature, recheck current official sources/UI, record the dated equivalent and precise addition here, and add a login item only for an implemented new capability. Record uncertainty explicitly, revisit contradictory evidence, and retain the two-tier presentation without commercial or access-policy copy. See `Agents.md` / `AGENTS.md` for the standing rule.
 
+
 ## Player-table scrolling refinement — 2026-11-14
 
 Rechecked the [official app feature guide](https://magazine.futmondo.com/novedades-en-la-nueva-app-de-futmondo/)
@@ -95,6 +96,7 @@ in every shared player table. This is a presentation refinement to the existing
 scouting/market/squad views, without a new analytical capability or login tier
 entry. No exclusivity claim is made. Current authenticated official-app behavior
 and hosted LigaRadar appearance were not verified.
+
 
 The 2026-11-15 scrolling refinement replaces the pinned Position column with an
 84px Avg Last N column (previously 110px). This changes the existing presentation,
@@ -181,20 +183,6 @@ The deployed browser chart is still unverified. See the player-card contract
 and dated review for evidence and limits.
 
 
-## Multiple position filters — reviewed 2026-11-16
-
-Rechecked the [official app feature guide](https://magazine.futmondo.com/novedades-en-la-nueva-app-de-futmondo/)
-(published 2021-12-23) on 2026-11-16. It documents market table views, squad
-inspection and multiposition players. It does not specify the current Position
-control's multi-selection, All-exclusion or debounce behavior. The authenticated
-official UI was not inspected; undocumented behavior is not claimed absent.
-
-LigaRadar expands the existing Essentials `scouting_filters` entry: shared player
-tables accept several primary/secondary positions together, start at All, keep
-All exclusive, and apply choices after a 300 ms pause. The existing login entry
-now says “multiple positions.” This extends the existing filter capability; it
-adds no separate tier item or exclusivity claim. Contract: `players_table_module.md`.
-
 ## Shared balance/squad summary — reviewed 2026-11-16
 
 Rechecked the official [game rules](https://help.futmondo.com/article/91-reglas-del)
@@ -208,6 +196,21 @@ capabilities, without a new calculation/transaction capability or login-tier ite
 The public sources do not establish whether the current official app has an
 identical combined box; no authenticated official UI comparison was performed,
 and no exclusivity claim is made. See [presentation contract](ui_information_disclosures.md).
+
+
+## Multiple position filters — reviewed 2026-11-16
+
+Rechecked the [official app feature guide](https://magazine.futmondo.com/novedades-en-la-nueva-app-de-futmondo/)
+(published 2021-12-23) on 2026-11-16. It documents market table views, squad
+inspection and multiposition players. It does not specify the current Position
+control's multi-selection, All-exclusion or debounce behavior. The authenticated
+official UI was not inspected; undocumented behavior is not claimed absent.
+
+LigaRadar expands the existing Essentials `scouting_filters` entry: shared player
+tables accept several primary/secondary positions together, start at All, keep
+All exclusive, and apply choices after a 300 ms pause. The existing login entry
+now says “multiple positions.” This extends the existing filter capability; it
+adds no separate tier item or exclusivity claim. Contract: `players_table_module.md`.
 
 
 ## Startup database availability — reviewed 2026-11-17

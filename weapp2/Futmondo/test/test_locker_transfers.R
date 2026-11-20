@@ -32,17 +32,21 @@ view<-rivals_cash_history_rows(ledger,timezone='America/Los_Angeles')
 stopifnot(any(grepl('fm-bonus-icon',view$player)),any(grepl('width:22px;height:22px',view$player,fixed=TRUE)),!any(grepl('PST|PDT|UTC|known payment|estimated date',view$date)))
 cat('PASS bonus icon dimensions and plain local payment dates\n')
 # Existing evidence storage preserves normalized source facts, not HTML/actor data.
-old_persist<-persist_rival_finance_evidence;old_sync<-sync_pressroom_transactions_to_supabase
-saved<-NULL;writes<-0L
+old_persist<-persist_rival_finance_evidence;old_auction<-persist_auction_history
+saved<-NULL;native<-NULL;writes<-0L
 persist_rival_finance_evidence<-function(evidence,context,on_complete=NULL){saved<<-evidence;TRUE}
-sync_pressroom_transactions_to_supabase<-function(...){writes<<-writes+1L;TRUE}
+persist_auction_history<-function(rows,championship_id){stopifnot(championship_id=='c');native<<-rows;writes<<-writes+1L;TRUE}
 record_acquired_resource('pressroom_c',observed_data(merged),resource_context(account_id='u',championship_id='c'))
-stopifnot(length(saved)==1,saved[[1]]$payload$kind=='locker_transfer',!any(c('txt','u','token')%in%names(saved[[1]]$payload$transfer)),writes==1)
+stopifnot(length(saved)==1,saved[[1]]$payload$kind=='locker_transfer',!any(c('txt','u','token')%in%names(saved[[1]]$payload$transfer)),writes==1,identical(native$id,'delivery'),native$price==397345103,native$created==raw$created,native$delivery_at==feed$created)
 old_read<-read_rival_finance_evidence
 read_rival_finance_evidence<-function(account_id,championship_id,season){stopifnot(account_id=='u',championship_id=='c');list(evidence=saved,complete=TRUE)}
 reused<-get_rival_finance_saved('u','c')$pressroom
 stopifnot(nrow(reused)==1,reused$locker_event_id=='payment',nrow(merge_locker_transfers(feed,reused))==1)
-read_rival_finance_evidence<-old_read;persist_rival_finance_evidence<-old_persist;sync_pressroom_transactions_to_supabase<-old_sync
+single_saved<-saved
+record_acquired_resource('pressroom_c',observed_data(combined),resource_context(account_id='u',championship_id='c'))
+stopifnot(length(saved)==2L,writes==2L,nrow(native)==1L,identical(native$id,'delivery'),!any(startsWith(native$id,'locker:')),sum(native$price)==397345103)
+saved<-single_saved
+read_rival_finance_evidence<-old_read;persist_rival_finance_evidence<-old_persist;persist_auction_history<-old_auction
 cat('PASS normalized clause persistence, exact scoped saved recovery and repeated merge without extra cash\n')
 saved[[1]]$payload$transfer$delivery_at<-NULL
 stopifnot(locker_saved_transfer_rows(saved)$delivery_at=='')

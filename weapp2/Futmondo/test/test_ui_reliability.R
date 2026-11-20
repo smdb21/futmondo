@@ -1,187 +1,388 @@
 #!/usr/bin/env Rscript
 # Offline regression tests: no credentials, HTTP requests or database writes.
-suppressPackageStartupMessages({library(shiny);library(dplyr);library(reactable)})
-options(futmondo.offline=TRUE)
+suppressPackageStartupMessages({
+  library(shiny)
+  library(dplyr)
+  library(reactable)
+})
+options(futmondo.offline = TRUE)
 cfg_player_columns_to_hide <- character()
-source('futmondo_functions.R');source('factual_helpers.R');source('supabase_connector.R')
-source('player_availability.R')  # split out of the card module in 8bf2dd3
-get_player_card_history<-function(...)list(points=data.frame(),valuation=data.frame(),status='empty')
-get_player_full_profile<-function(...)NULL
-get_player_matches<-function(...)NULL
-get_financial_snapshot<-function(...)list(lineup_rules=list())
+source('futmondo_functions.R')
+source('factual_helpers.R')
+source('supabase_connector.R')
+source('player_availability.R') # split out of the card module in 8bf2dd3
+get_player_card_history <- function(...) {
+  list(points = data.frame(), valuation = data.frame(), status = 'empty')
+}
+get_player_full_profile <- function(...) NULL
+get_player_matches <- function(...) NULL
+get_financial_snapshot <- function(...) list(lineup_rules = list())
 source('Modules/Players_Table_Module.R')
 source('Modules/Selected_Player_Module.R')
 source('Modules/Players_in_Teams_Module.R')
 suppressPackageStartupMessages(source('Modules/Classification_Module.R'))
 suppressPackageStartupMessages(source('Modules/Round_MVPs_Module.R'))
 suppressPackageStartupMessages(source('Modules/Rivals_Module.R'))
-format_table_currency <- function(x) paste0(format(x, scientific=FALSE, trim=TRUE), ' EUR')
-record <- function(name, expr) {force(expr); cat('[PASS]', name, '\n')}
+format_table_currency <- function(x) {
+  paste0(format(x, scientific = FALSE, trim = TRUE), ' EUR')
+}
+record <- function(name, expr) {
+  force(expr)
+  cat('[PASS]', name, '\n')
+}
 record('desktop sidebar reserves room for full navigation labels', {
-  ui_source <- paste(readLines('ui.R', warn=FALSE), collapse='\n')
-  stopifnot(grepl('width = 180', ui_source, fixed=TRUE))
+  ui_source <- paste(readLines('ui.R', warn = FALSE), collapse = '\n')
+  stopifnot(grepl('width = 180', ui_source, fixed = TRUE))
 })
 record('all player-card money displays use the shared formatter', {
-  source_text <- paste(readLines('Modules/Selected_Player_Module.R', warn=FALSE), collapse='\n')
-  stopifnot(!grepl('format_currency\\(', source_text),
-            !grepl('format_table_currency\\(', source_text),
-            length(gregexpr('player_card_money\\(', source_text)[[1]]) > 10L)
+  source_text <- paste(
+    readLines('Modules/Selected_Player_Module.R', warn = FALSE),
+    collapse = '\n'
+  )
+  stopifnot(
+    !grepl('format_currency\\(', source_text),
+    !grepl('format_table_currency\\(', source_text),
+    length(gregexpr('player_card_money\\(', source_text)[[1]]) > 10L
+  )
 })
 record('player card has an accessible top close control', {
   card_html <- htmltools::renderTags(selected_player_UI('fixture'))$html
-  stopifnot(grepl('player-card-close-shortcut', card_html, fixed=TRUE),
-            grepl('Close player card', card_html, fixed=TRUE),
-            grepl('data-dismiss="modal"', card_html, fixed=TRUE))
+  stopifnot(
+    grepl('player-card-close-shortcut', card_html, fixed = TRUE),
+    grepl('Close player card', card_html, fixed = TRUE),
+    grepl('data-dismiss="modal"', card_html, fixed = TRUE)
+  )
 })
 record('player card opens before expensive selected-player outputs are enabled', {
-  source_text <- paste(readLines('Modules/Players_Table_Module.R', warn=FALSE), collapse='\n')
-  show_at <- regexpr('showModal(modalDialog(', source_text, fixed=TRUE)[1]
-  flush_at <- regexpr('session$onFlushed(function()', source_text, fixed=TRUE)[1]
-  ready_at <- regexpr('selected_player_ready_RV(TRUE)', source_text, fixed=TRUE)[1]
-  stopifnot(show_at > 0L, flush_at > show_at, ready_at > flush_at,
-            grepl('!isTRUE(selected_player_ready_RV())', source_text, fixed=TRUE))
+  source_text <- paste(
+    readLines('Modules/Players_Table_Module.R', warn = FALSE),
+    collapse = '\n'
+  )
+  show_at <- regexpr('showModal(modalDialog(', source_text, fixed = TRUE)[1]
+  flush_at <- regexpr(
+    'session$onFlushed(function()',
+    source_text,
+    fixed = TRUE
+  )[1]
+  ready_at <- regexpr(
+    'selected_player_ready_RV(TRUE)',
+    source_text,
+    fixed = TRUE
+  )[1]
+  stopifnot(
+    show_at > 0L,
+    flush_at > show_at,
+    ready_at > flush_at,
+    grepl('!isTRUE(selected_player_ready_RV())', source_text, fixed = TRUE)
+  )
 })
 record('player card hides the legacy userBox header', {
-  css <- paste(readLines('www/custom_style.css', warn=FALSE), collapse='\n')
-  stopifnot(grepl("[id$='selected_player_box'] .widget-user-header", css, fixed=TRUE),
-            grepl("[id$='selected_player_box'] .widget-user-image", css, fixed=TRUE))
+  css <- paste(readLines('www/custom_style.css', warn = FALSE), collapse = '\n')
+  stopifnot(
+    grepl("[id$='selected_player_box'] .widget-user-header", css, fixed = TRUE),
+    grepl("[id$='selected_player_box'] .widget-user-image", css, fixed = TRUE)
+  )
 })
 record('player card keeps the team logo in the visible identity row', {
-  source_text <- paste(readLines('Modules/Selected_Player_Module.R', warn=FALSE), collapse='\n')
-  css <- paste(readLines('www/custom_style.css', warn=FALSE), collapse='\n')
-  stopifnot(grepl('player-card-identity-team-logo', source_text, fixed=TRUE),
-            grepl('get_team_image_name(team, logo = team_logo_field)', source_text, fixed=TRUE),
-            grepl('TEAM_LOGO_URL, team_image_name', source_text, fixed=TRUE),
-            grepl('.player-card-identity-team-logo', css, fixed=TRUE))
+  source_text <- paste(
+    readLines('Modules/Selected_Player_Module.R', warn = FALSE),
+    collapse = '\n'
+  )
+  css <- paste(readLines('www/custom_style.css', warn = FALSE), collapse = '\n')
+  stopifnot(
+    grepl('player-card-identity-team-logo', source_text, fixed = TRUE),
+    grepl(
+      'get_team_image_name(team, logo = team_logo_field)',
+      source_text,
+      fixed = TRUE
+    ),
+    grepl('TEAM_LOGO_URL, team_image_name', source_text, fixed = TRUE),
+    grepl('.player-card-identity-team-logo', css, fixed = TRUE)
+  )
 })
 record('player card location distinguishes ownership from market listing', {
-  stopifnot(player_card_location_label(data.frame(), 'mine') ==
+  stopifnot(
+    player_card_location_label(data.frame(), 'mine') ==
       'Ownership: Free Agent · Not listed on Market',
-    player_card_location_label(data.frame(market_inMarket=TRUE), 'mine') ==
+    player_card_location_label(data.frame(market_inMarket = TRUE), 'mine') ==
       'Ownership: Free Agent · Listed on Market',
-    player_card_location_label(data.frame(user_team_id='rival', userTeam='Rivals FC'), 'mine') ==
-      'Ownership: Rival Owned: Rivals FC · Not listed on Market',
-    player_card_location_label(data.frame(user_team_id='rival',userTeam='Rivals FC',market_inMarket=TRUE),'mine') ==
-      'Ownership: Rival Owned: Rivals FC · Listed on Market',
-    player_card_location_label(data.frame(user_team_id='mine',market_inMarket=FALSE,price=999),'mine') ==
+    player_card_location_label(
+      data.frame(user_team_id = 'rival', userTeam = 'Rivals FC'),
+      'mine'
+    ) ==
+      'Ownership: Rivals FC (rival) · Not listed on Market',
+    player_card_location_label(
+      data.frame(
+        user_team_id = 'rival',
+        userTeam = 'Rivals FC',
+        market_inMarket = TRUE
+      ),
+      'mine'
+    ) ==
+      'Ownership: Rivals FC (rival) · Listed on Market',
+    player_card_location_label(
+      data.frame(user_team_id = 'mine', market_inMarket = FALSE, price = 999),
+      'mine'
+    ) ==
       'Ownership: Your Squad · Not listed on Market',
-    !player_card_location_status(data.frame(computer=FALSE,market_inMarket=FALSE),'mine')$on_market)
+    !player_card_location_status(
+      data.frame(computer = FALSE, market_inMarket = FALSE),
+      'mine'
+    )$on_market
+  )
 })
 record('own player never exposes clause purchase eligibility', {
-  own <- data.frame(id='p1',user_team_id=' mine ',clause_price=1000000)
-  rival <- data.frame(id='p2',user_team_id='rival',clause_price=1000000)
-  stopifnot(player_card_is_own_player(own,'mine'),
-    !player_card_can_buy_clause(own,'mine',TRUE),
-    player_card_can_buy_clause(rival,'mine',TRUE),
-    !player_card_can_buy_clause(rival,'mine',FALSE))
+  own <- data.frame(id = 'p1', user_team_id = ' mine ', clause_price = 1000000)
+  rival <- data.frame(id = 'p2', user_team_id = 'rival', clause_price = 1000000)
+  stopifnot(
+    player_card_is_own_player(own, 'mine'),
+    !player_card_can_buy_clause(own, 'mine', TRUE),
+    player_card_can_buy_clause(rival, 'mine', TRUE),
+    !player_card_can_buy_clause(rival, 'mine', FALSE)
+  )
 })
 record('rival card resolves owner aliases and preserves own-player protection', {
-  for (field in c('owner_team_id','userteamId','userTeamId','userTeam.id','userteam._id')) {
-    player <- data.frame(id='p',user_team_id=NA_character_,userTeam='Rivals FC')
+  for (field in c(
+    'owner_team_id',
+    'userteamId',
+    'userTeamId',
+    'userTeam.id',
+    'userteam._id'
+  )) {
+    player <- data.frame(
+      id = 'p',
+      user_team_id = NA_character_,
+      userTeam = 'Rivals FC'
+    )
     player[[field]] <- ' rival '
-    stopifnot(player_card_location_status(player,'mine')$ownership=='Rival Owned: Rivals FC')
+    stopifnot(
+      player_card_location_status(player, 'mine')$ownership ==
+        'Rivals FC (rival)'
+    )
     player[[field]] <- 'mine'
-    stopifnot(player_card_is_own_player(player,'mine'),
-              !player_card_can_buy_clause(player,'mine',TRUE))
+    stopifnot(
+      player_card_is_own_player(player, 'mine'),
+      !player_card_can_buy_clause(player, 'mine', TRUE)
+    )
   }
-  stopifnot(player_card_owner_id(data.frame(user_team_id='',userteamId=NA_character_))=='')
+  stopifnot(
+    player_card_owner_id(data.frame(
+      user_team_id = '',
+      userteamId = NA_character_
+    )) ==
+      ''
+  )
 })
 record('player card offer money uses stable Spanish euro formatting', {
-  stopifnot(player_card_money(11234778) == '11.234.778 €',
-            player_card_money(-5000.5) == '-5.000 €',
-            player_card_money(NA_real_) == 'Unavailable')
+  stopifnot(
+    player_card_money(11234778) == '11.234.778 €',
+    player_card_money(-5000.5) == '-5.000 €',
+    player_card_money(NA_real_) == 'Unavailable'
+  )
 })
 record('signed and missing financial values', {
-  stopifnot(ui_financial_amount(0)=='0 EUR', ui_financial_amount(-50)=='-50 EUR',
-            ui_financial_amount(NA_real_)=='Unavailable',ui_financial_amount(NULL)=='Unavailable')
+  stopifnot(
+    ui_financial_amount(0) == '0 EUR',
+    ui_financial_amount(-50) == '-50 EUR',
+    ui_financial_amount(NA_real_) == 'Unavailable',
+    ui_financial_amount(NULL) == 'Unavailable'
+  )
 })
 record('league owner filter uses immutable team IDs and fills blank labels', {
-  teams <- data.frame(teamid=c('t1','t2'),teamname=c('Alpha','Beta'),stringsAsFactors=FALSE)
-  players <- data.frame(id=c('a','b','free'),name=c('A','B','Free'),role='MID',role2=NA_character_,
-    user_team_id=c('t1','t2',''),userTeam=c('','',''),value=1e6,fis_score=60,
-    bid_price=NA_real_,numberOfBids=0,market_inMarket=FALSE,stringsAsFactors=FALSE)
-  normalized <- players_table_normalize_owner(players,teams)
-  choices <- players_table_owner_choices(teams)
-  stopifnot(identical(normalized$userTeam,c('Alpha','Beta','')),
-    identical(unname(choices[c('Alpha','Beta')]),c('team:t1','team:t2')))
-  testServer(players_table_Server,args=list(players_table_RV=reactive(players),
-    user_teams_RV=reactive(teams)), {
-      session$setInputs(team_filter='team:t2')
-      stopifnot(identical(players_table_filtered_RV()$id,'b'))
-      session$setInputs(team_filter='Free')
-      stopifnot(identical(players_table_filtered_RV()$id,'free'))
-  })
-})
-record('league owner filter falls back past empty normalized owner aliases', {
-  teams <- data.frame(teamid = 't2', teamname = 'Beta', stringsAsFactors = FALSE)
+  teams <- data.frame(
+    teamid = c('t1', 't2'),
+    teamname = c('Alpha', 'Beta'),
+    stringsAsFactors = FALSE
+  )
   players <- data.frame(
-    owner_team_id = '', user_team_id = '', userteamId = 't2',
-    userTeam = '', `userTeam.name` = 'Beta', stringsAsFactors = FALSE
+    id = c('a', 'b', 'free'),
+    name = c('A', 'B', 'Free'),
+    role = 'MID',
+    role2 = NA_character_,
+    user_team_id = c('t1', 't2', ''),
+    userTeam = c('', '', ''),
+    value = 1e6,
+    fis_score = 60,
+    bid_price = NA_real_,
+    numberOfBids = 0,
+    market_inMarket = FALSE,
+    stringsAsFactors = FALSE
   )
   normalized <- players_table_normalize_owner(players, teams)
-  stopifnot(identical(normalized$owner_team_id, 't2'),
-            identical(normalized$user_team_id, 't2'),
-            player_card_location_status(normalized,'mine')$ownership=='Rival Owned: Beta',
-            identical(normalized$userTeam, 'Beta'))
+  choices <- players_table_owner_choices(teams)
+  stopifnot(
+    identical(normalized$userTeam, c('Alpha', 'Beta', '')),
+    identical(unname(choices[c('Alpha', 'Beta')]), c('team:t1', 'team:t2'))
+  )
+  testServer(
+    players_table_Server,
+    args = list(
+      players_table_RV = reactive(players),
+      user_teams_RV = reactive(teams)
+    ),
+    {
+      session$setInputs(team_filter = 'team:t2')
+      stopifnot(identical(players_table_filtered_RV()$id, 'b'))
+      session$setInputs(team_filter = 'Free')
+      stopifnot(identical(players_table_filtered_RV()$id, 'free'))
+    }
+  )
+})
+record('league owner filter falls back past empty normalized owner aliases', {
+  teams <- data.frame(
+    teamid = 't2',
+    teamname = 'Beta',
+    stringsAsFactors = FALSE
+  )
+  players <- data.frame(
+    owner_team_id = '',
+    user_team_id = '',
+    userteamId = 't2',
+    userTeam = '',
+    `userTeam.name` = 'Beta',
+    stringsAsFactors = FALSE
+  )
+  normalized <- players_table_normalize_owner(players, teams)
+  stopifnot(
+    identical(normalized$owner_team_id, 't2'),
+    identical(normalized$user_team_id, 't2'),
+    player_card_location_status(normalized, 'mine')$ownership == 'Beta (rival)',
+    identical(normalized$userTeam, 'Beta')
+  )
 })
 record('rival balance estimates require an explicit league budget', {
-  teams <- data.frame(teamid='t1',teamname='Team')
+  teams <- data.frame(teamid = 't1', teamname = 'Team')
   no_budget <- rivals_buying_power_values(data.frame(), teams)
-  stopifnot(is.na(no_budget$value), nrow(rivals_buying_power_values(data.frame(),NULL))==0L)
-  stopifnot(rivals_buying_power_values(data.frame(),teams,initial_budget=0)$value==0)
-  stopifnot(rivals_buying_power_values(data.frame(),teams,initial_budget=-25)$value== -25)
+  stopifnot(
+    is.na(no_budget$value),
+    nrow(rivals_buying_power_values(data.frame(), NULL)) == 0L
+  )
+  stopifnot(
+    rivals_buying_power_values(data.frame(), teams, initial_budget = 0)$value ==
+      0
+  )
+  stopifnot(
+    rivals_buying_power_values(
+      data.frame(),
+      teams,
+      initial_budget = -25
+    )$value ==
+      -25
+  )
 })
 record('restricted rival histories contain only observed transfers', {
-  feed <- data.frame(id=c('a','a','b','c'),player_name=c('A','A','B','C'),
-    buyer_team_id=c('t1','t1',NA,'t2'),seller_team_id=c(NA,NA,'t1','t1'),
-    price=c(100,100,150,99),created=c('2026-08-01T10:00:00Z','2026-08-01T10:00:00Z','2026-08-02T10:00:00Z','invalid'))
-  history <- rivals_observed_transfers(feed,'t1')
-  stopifnot(nrow(history)==2L,sum(history$money)==50,all(is.na(history$running_balance)),
-            setequal(history$type,c('buy','sell')),all(history$date%in%feed$created))
+  feed <- data.frame(
+    id = c('a', 'a', 'b', 'c'),
+    player_name = c('A', 'A', 'B', 'C'),
+    buyer_team_id = c('t1', 't1', NA, 't2'),
+    seller_team_id = c(NA, NA, 't1', 't1'),
+    price = c(100, 100, 150, 99),
+    created = c(
+      '2026-08-01T10:00:00Z',
+      '2026-08-01T10:00:00Z',
+      '2026-08-02T10:00:00Z',
+      'invalid'
+    )
+  )
+  history <- rivals_observed_transfers(feed, 't1')
+  stopifnot(
+    nrow(history) == 2L,
+    sum(history$money) == 50,
+    all(is.na(history$running_balance)),
+    setequal(history$type, c('buy', 'sell')),
+    all(history$date %in% feed$created)
+  )
 })
 
 
 record('round filters change standings without replacing unavailable scores', {
-  catalog <- data.frame(round_id=c('r1','r2'),round_number=1:2)
-  a <- classification_round_rows(list(list(round='r1',points=10),list(round='r2',points=0)), 'a','Alpha',catalog)
-  b <- classification_round_rows(list(list(number=1,points=2),list(number=2,points=20)), 'b','Beta',catalog)
-  all <- rbind(a,b)
-  first <- classification_window_table(all,c(1,2),'1')
-  second <- classification_window_table(all,c(2,2),'all')
-  stopifnot(first$team_id[1]=='a',second$team_id[1]=='b',sum(second$points)==20)
+  catalog <- data.frame(round_id = c('r1', 'r2'), round_number = 1:2)
+  a <- classification_round_rows(
+    list(list(round = 'r1', points = 10), list(round = 'r2', points = 0)),
+    'a',
+    'Alpha',
+    catalog
+  )
+  b <- classification_round_rows(
+    list(list(number = 1, points = 2), list(number = 2, points = 20)),
+    'b',
+    'Beta',
+    catalog
+  )
+  all <- rbind(a, b)
+  first <- classification_window_table(all, c(1, 2), '1')
+  second <- classification_window_table(all, c(2, 2), 'all')
+  stopifnot(
+    first$team_id[1] == 'a',
+    second$team_id[1] == 'b',
+    sum(second$points) == 20
+  )
   a$points[2] <- NA_real_
-  incomplete <- classification_window_table(a,c(1,2),'all')
-  stopifnot(is.na(incomplete$points),nrow(classification_round_rows(list(),'a','Alpha'))==0)
+  incomplete <- classification_window_table(a, c(1, 2), 'all')
+  stopifnot(
+    is.na(incomplete$points),
+    nrow(classification_round_rows(list(), 'a', 'Alpha')) == 0
+  )
   missing_round <- classification_window_table(all[-2, ], c(1, 2), 'all')
-  stopifnot(is.na(missing_round$points[missing_round$team_id=='a']),
-            missing_round$points[missing_round$team_id=='b']==22)
+  stopifnot(
+    is.na(missing_round$points[missing_round$team_id == 'a']),
+    missing_round$points[missing_round$team_id == 'b'] == 22
+  )
   missing_team <- classification_window_table(all[-2, ], c(2, 2), 'all')
-  stopifnot(nrow(missing_team)==2L,is.na(missing_team$rank[missing_team$team_id=='a']))
+  stopifnot(
+    nrow(missing_team) == 2L,
+    is.na(missing_team$rank[missing_team$team_id == 'a'])
+  )
 })
 record('round MVP records keep completed MVPs in newest-first order', {
-  rows <- data.frame(championship_id=c('league','league','league','other'), round_number=c(2,1,2,9),
-    player_id=c('p2','p1','not-mvp','other'), player_name=c('Latest','Earlier','Other','Wrong league'),
-    player_role=c('MID','GK','DEF','FWD'), points=c(12,8,99,30),
-    is_mvp=c(TRUE,'true',FALSE,TRUE), is_finished=c(TRUE,'1',TRUE,TRUE))
+  rows <- data.frame(
+    championship_id = c('league', 'league', 'league', 'other'),
+    round_number = c(2, 1, 2, 9),
+    player_id = c('p2', 'p1', 'not-mvp', 'other'),
+    player_name = c('Latest', 'Earlier', 'Other', 'Wrong league'),
+    player_role = c('MID', 'GK', 'DEF', 'FWD'),
+    points = c(12, 8, 99, 30),
+    is_mvp = c(TRUE, 'true', FALSE, TRUE),
+    is_finished = c(TRUE, '1', TRUE, TRUE)
+  )
   out <- round_mvp_rows(rows, 'league')
-  stopifnot(identical(out$player_id,c('p2','p1')), identical(out$round_number,c(2,1)),
-            nrow(round_mvp_rows(rows[rows$is_finished %in% FALSE,,drop=FALSE], 'league')) == 0L)
+  stopifnot(
+    identical(out$player_id, c('p2', 'p1')),
+    identical(out$round_number, c(2, 1)),
+    nrow(round_mvp_rows(
+      rows[rows$is_finished %in% FALSE, , drop = FALSE],
+      'league'
+    )) ==
+      0L
+  )
 })
 record('round awards UI has dedicated responsive card output', {
   html <- htmltools::renderTags(round_mvps_UI('mvp'))$html
-  stopifnot(grepl('mvp-mvp_cards', html, fixed=TRUE), grepl('Round awards', html, fixed=TRUE))
-  server_source <- paste(readLines('server.R', warn=FALSE), collapse='\n')
-  stopifnot(grepl('tabName = "round_mvps"', server_source, fixed=TRUE),
-            grepl('menuItem("Round awards"', server_source, fixed=TRUE))
+  stopifnot(
+    grepl('mvp-mvp_cards', html, fixed = TRUE),
+    grepl('Round awards', html, fixed = TRUE)
+  )
+  server_source <- paste(readLines('server.R', warn = FALSE), collapse = '\n')
+  stopifnot(
+    grepl('tabName = "round_mvps"', server_source, fixed = TRUE),
+    grepl('menuItem("Round awards"', server_source, fixed = TRUE)
+  )
 })
 record('dream team preserves actual MVP and missing scores', {
-  d <- classification_dreamteam_rows(list(mvp='p1',players=list(list(id='p1',name='A',role=1,points=0),list(id='p2',name='B',role=2))))
-  stopifnot(d$mvp[1],!d$mvp[2],d$points[1]==0,is.na(d$points[2]))
-  alternate <- classification_dreamteam_rows(list(mvp=list(`_id`='p1'),players=list(list(`_id`='p1',name='A',points=0))))
-  stopifnot(alternate$player_id=='p1',alternate$mvp,alternate$points==0)
+  d <- classification_dreamteam_rows(list(
+    mvp = 'p1',
+    players = list(
+      list(id = 'p1', name = 'A', role = 1, points = 0),
+      list(id = 'p2', name = 'B', role = 2)
+    )
+  ))
+  stopifnot(d$mvp[1], !d$mvp[2], d$points[1] == 0, is.na(d$points[2]))
+  alternate <- classification_dreamteam_rows(list(
+    mvp = list(`_id` = 'p1'),
+    players = list(list(`_id` = 'p1', name = 'A', points = 0))
+  ))
+  stopifnot(alternate$player_id == 'p1', alternate$mvp, alternate$points == 0)
 })
-
-
 
 
 # Stub unrelated rendering and child modules. The parent reactive is the API
@@ -193,106 +394,259 @@ reorder_player_table_columns <- function(x) x
 get_reactable_columns_for_players <- function(x) list()
 record('all players clause filters respect maximum and verified funds', {
   players <- reactive(data.frame(
-    id=c('low','equal','high'), name=c('Low','Equal','High'), role='MID', role2=NA_character_,
-    value=1000000, clause_price=c(1000000,2000000,3000000), isClause=TRUE,
-    clause_date='', fis_score=60, stringsAsFactors=FALSE
+    id = c('low', 'equal', 'high'),
+    name = c('Low', 'Equal', 'High'),
+    role = 'MID',
+    role2 = NA_character_,
+    value = 1000000,
+    clause_price = c(1000000, 2000000, 3000000),
+    isClause = TRUE,
+    clause_date = '',
+    fis_score = 60,
+    stringsAsFactors = FALSE
   ))
-  testServer(players_table_Server, args=list(
-    players_table_RV=players, user_teams_RV=reactive(NULL), available_funds_RV=reactive(2000000)
-  ), {
-    session$setInputs(max_clause_value_filter=2, clause_under_available_funds_filter=FALSE)
-    stopifnot(identical(players_table_filtered_RV()$id, c('low','equal')))
-    session$setInputs(max_clause_value_filter=1000, clause_under_available_funds_filter=TRUE)
-    stopifnot(identical(players_table_filtered_RV()$id, c('low','equal')))
-  })
+  testServer(
+    players_table_Server,
+    args = list(
+      players_table_RV = players,
+      user_teams_RV = reactive(NULL),
+      available_funds_RV = reactive(2000000)
+    ),
+    {
+      session$setInputs(
+        max_clause_value_filter = 2,
+        clause_under_available_funds_filter = FALSE
+      )
+      stopifnot(identical(players_table_filtered_RV()$id, c('low', 'equal')))
+      session$setInputs(
+        max_clause_value_filter = 1000,
+        clause_under_available_funds_filter = TRUE
+      )
+      stopifnot(identical(players_table_filtered_RV()$id, c('low', 'equal')))
+    }
+  )
 })
 record('listing and rejected offers refresh authoritative data', {
   trigger <- reactiveVal(0L)
   authoritative <- reactive({
     n <- trigger()
-    data.frame(id='p1',name='Player',role='DF',role2=NA_character_,userTeam='My team',value=1e6,
-               fis_score=60,bid_price=NA_real_,numberOfBids=if(n==0L) 0 else 2,market_inMarket=n>0L)
+    data.frame(
+      id = 'p1',
+      name = 'Player',
+      role = 'DF',
+      role2 = NA_character_,
+      userTeam = 'My team',
+      value = 1e6,
+      fis_score = 60,
+      bid_price = NA_real_,
+      numberOfBids = if (n == 0L) 0 else 2,
+      market_inMarket = n > 0L
+    )
   })
-  testServer(players_table_Server,args=list(players_table_RV=authoritative,user_teams_RV=reactive(NULL),refresh_trigger=trigger),{
-    handle_bid_updated(player_id='p1',new_bid_price=1.5e6,action_type='player_listed')
-    d <- players_table_filtered_RV()
-    stopifnot(trigger()==1L,isTRUE(d$market_inMarket),is.na(d$bid_price),d$numberOfBids==2)
-    handle_bid_updated(player_id='p1',is_cancel=TRUE,action_type='offer_rejected')
-    d <- players_table_filtered_RV()
-    stopifnot(trigger()==2L,isTRUE(d$market_inMarket),is.na(d$bid_price),d$numberOfBids==2)
-  })
+  testServer(
+    players_table_Server,
+    args = list(
+      players_table_RV = authoritative,
+      user_teams_RV = reactive(NULL),
+      refresh_trigger = trigger
+    ),
+    {
+      handle_bid_updated(
+        player_id = 'p1',
+        new_bid_price = 1.5e6,
+        action_type = 'player_listed'
+      )
+      d <- players_table_filtered_RV()
+      stopifnot(
+        trigger() == 1L,
+        isTRUE(d$market_inMarket),
+        is.na(d$bid_price),
+        d$numberOfBids == 2
+      )
+      handle_bid_updated(
+        player_id = 'p1',
+        is_cancel = TRUE,
+        action_type = 'offer_rejected'
+      )
+      d <- players_table_filtered_RV()
+      stopifnot(
+        trigger() == 2L,
+        isTRUE(d$market_inMarket),
+        is.na(d$bid_price),
+        d$numberOfBids == 2
+      )
+    }
+  )
 })
 record('selected player identity survives authoritative table reordering', {
   trigger <- reactiveVal(0L)
   real_get_state <- getReactableState
-  getReactableState <- function(outputId, name, session) session$input$fixture_selection
+  getReactableState <- function(outputId, name, session) {
+    session$input$fixture_selection
+  }
   authoritative <- reactive({
-    rows <- data.frame(id=c('p1','p2'),name=c('Selected','Other'),role='DF',role2=NA_character_,
-      userTeam='My team',value=c(1e6,2e6),fis_score=c(60,70),bid_price=NA_real_,numberOfBids=0,market_inMarket=FALSE)
-    if (trigger()>0) rows <- rows[2:1,,drop=FALSE]
+    rows <- data.frame(
+      id = c('p1', 'p2'),
+      name = c('Selected', 'Other'),
+      role = 'DF',
+      role2 = NA_character_,
+      userTeam = 'My team',
+      value = c(1e6, 2e6),
+      fis_score = c(60, 70),
+      bid_price = NA_real_,
+      numberOfBids = 0,
+      market_inMarket = FALSE
+    )
+    if (trigger() > 0) {
+      rows <- rows[2:1, , drop = FALSE]
+    }
     rows
   })
-  testServer(players_table_Server,args=list(players_table_RV=authoritative,user_teams_RV=reactive(NULL),refresh_trigger=trigger), {
-    session$setInputs(fixture_selection=1L)
-    session$flushReact()
-    stopifnot(isTRUE(selected_player_ready_RV()),selected_player_RV()$id=='p1',player_selection_event_RV()==1L)
-    session$setInputs(fixture_selection=NA_integer_)
-    session$setInputs(fixture_selection=1L)
-    session$flushReact()
-    stopifnot(selected_player_RV()$id=='p1',player_selection_event_RV()==2L)
-    handle_bid_updated(player_id='p1',action_type='bid_modified')
-    session$flushReact()
-    stopifnot(players_table_filtered_RV()$id[1]=='p2',selected_player_RV()$id=='p1')
-  })
+  testServer(
+    players_table_Server,
+    args = list(
+      players_table_RV = authoritative,
+      user_teams_RV = reactive(NULL),
+      refresh_trigger = trigger
+    ),
+    {
+      session$setInputs(fixture_selection = 1L)
+      session$flushReact()
+      stopifnot(
+        isTRUE(selected_player_ready_RV()),
+        selected_player_RV()$id == 'p1',
+        player_selection_event_RV() == 1L
+      )
+      session$setInputs(fixture_selection = NA_integer_)
+      session$setInputs(fixture_selection = 1L)
+      session$flushReact()
+      stopifnot(
+        selected_player_RV()$id == 'p1',
+        player_selection_event_RV() == 2L
+      )
+      handle_bid_updated(player_id = 'p1', action_type = 'bid_modified')
+      session$flushReact()
+      stopifnot(
+        players_table_filtered_RV()$id[1] == 'p2',
+        selected_player_RV()$id == 'p1'
+      )
+    }
+  )
   getReactableState <- real_get_state
 })
 record('bid cancellation sends the selected ID and explicit action', {
   tree <- parse('Modules/Selected_Player_Module.R')
   find_event <- function(x) {
-    if (is.call(x) && identical(x[[1]],as.name('observeEvent')) && identical(paste(deparse(x[[2]]),collapse=''),'input$submit_cancel_bid')) return(x[[3]])
-    if (is.call(x)||is.expression(x)||is.pairlist(x)) for(y in as.list(x)) {if(missing(y)) next; r<-find_event(y);if(!is.null(r)) return(r)}
+    if (
+      is.call(x) &&
+        identical(x[[1]], as.name('observeEvent')) &&
+        identical(
+          paste(deparse(x[[2]]), collapse = ''),
+          'input$submit_cancel_bid'
+        )
+    ) {
+      return(x[[3]])
+    }
+    if (is.call(x) || is.expression(x) || is.pairlist(x)) {
+      for (y in as.list(x)) {
+        if (missing(y)) {
+          next
+        }
+        r <- find_event(y)
+        if (!is.null(r)) return(r)
+      }
+    }
     NULL
   }
-  body <- find_event(tree);stopifnot(!is.null(body))
-  env <- new.env(parent=globalenv());events<-list()
-  env$selected_player <- function() list(id='selected-player',name='Selected')
-  env$login_token <- 'fake';env$championship_id<-'champ';env$user_team_id<-'team'
+  body <- find_event(tree)
+  stopifnot(!is.null(body))
+  env <- new.env(parent = globalenv())
+  events <- list()
+  env$selected_player <- function() {
+    list(id = 'selected-player', name = 'Selected')
+  }
+  env$login_token <- 'fake'
+  env$championship_id <- 'champ'
+  env$user_team_id <- 'team'
   env$get_reactive_val <- identity
-  env$modal_bid_info_RV <- function() list(cancel=list(id='own-bid',price=10))
-  env$verify_active_bid <- function(sp,expected) expected
-  env$consume_action_context <- function(action) identical(action,'cancel')
-  env$cancel_bid <- function(...){stopifnot(list(...)$bid_id=='own-bid');TRUE}
+  env$modal_bid_info_RV <- function() {
+    list(cancel = list(id = 'own-bid', price = 10))
+  }
+  env$verify_active_bid <- function(sp, expected) expected
+  env$consume_action_context <- function(action) identical(action, 'cancel')
+  env$cancel_bid <- function(...) {
+    stopifnot(list(...)$bid_id == 'own-bid')
+    TRUE
+  }
   env$removeModal <- function(...) NULL
   env$clear_api_cache <- function(...) NULL
-  env$on_bid_updated <- function(...) events[[length(events)+1L]] <<- list(...)
+  env$on_bid_updated <- function(...) {
+    events[[length(events) + 1L]] <<- list(...)
+  }
   session <- shiny::MockShinySession$new()
-  shiny::withReactiveDomain(session,eval(body,env))
+  shiny::withReactiveDomain(session, eval(body, env))
   session$close()
-  stopifnot(length(events)==1L,events[[1]]$player_id=='selected-player',events[[1]]$action_type=='bid_cancelled')
+  stopifnot(
+    length(events) == 1L,
+    events[[1]]$player_id == 'selected-player',
+    events[[1]]$action_type == 'bid_cancelled'
+  )
 })
 record('bulk listing handles unverified API outcomes without local roster mutation', {
   find_event <- function(x) {
-    if (is.call(x) && identical(x[[1]], as.name('observeEvent')) &&
-        identical(paste(deparse(x[[2]]), collapse=''), 'input$submit_put_all_on_market')) return(x[[3]])
-    if (is.call(x) || is.expression(x) || is.pairlist(x)) for (y in as.list(x)) {
-      if (missing(y)) next
-      result <- find_event(y)
-      if (!is.null(result)) return(result)
+    if (
+      is.call(x) &&
+        identical(x[[1]], as.name('observeEvent')) &&
+        identical(
+          paste(deparse(x[[2]]), collapse = ''),
+          'input$submit_put_all_on_market'
+        )
+    ) {
+      return(x[[3]])
+    }
+    if (is.call(x) || is.expression(x) || is.pairlist(x)) {
+      for (y in as.list(x)) {
+        if (missing(y)) {
+          next
+        }
+        result <- find_event(y)
+        if (!is.null(result)) return(result)
+      }
     }
     NULL
   }
   handler <- find_event(parse('Modules/Players_in_Teams_Module.R'))
-  env <- new.env(parent=globalenv())
-  env$login_token <- 'fixture'; env$championship_id <- 'champ'; env$user_team_id <- 'team'
+  env <- new.env(parent = globalenv())
+  env$login_token <- 'fixture'
+  env$championship_id <- 'champ'
+  env$user_team_id <- 'team'
   env$get_reactive_val <- identity
-  env$input <- list(bulk_listing_price_mode='value', bulk_listing_clause_premium=5)
-  env$current_context <- function()list(team='fixture')
-  env$bulk_context <- local({context<-list(team='fixture');function(value){if(!missing(value))context<<-value;context}})
-  env$players_table_RV <- function(...) data.frame(id='p1', value=1000000, market_inMarket=FALSE)
+  env$input <- list(
+    bulk_listing_price_mode = 'value',
+    bulk_listing_clause_premium = 5
+  )
+  env$current_context <- function() list(team = 'fixture')
+  env$bulk_context <- local({
+    context <- list(team = 'fixture')
+    function(value) {
+      if (!missing(value)) {
+        context <<- value
+      }
+      context
+    }
+  })
+  env$players_table_RV <- function(...) {
+    data.frame(id = 'p1', value = 1000000, market_inMarket = FALSE)
+  }
   calls <- 0L
-  env$put_player_on_market <- function(...) { calls <<- calls + 1L; stop('unverified transport failure') }
+  env$put_player_on_market <- function(...) {
+    calls <<- calls + 1L
+    stop('unverified transport failure')
+  }
   env$removeModal <- function(...) NULL
-  env$refresh_trigger <- function(...) stop('must not refresh as successful mutation')
+  env$refresh_trigger <- function(...) {
+    stop('must not refresh as successful mutation')
+  }
   session <- shiny::MockShinySession$new()
   shiny::withReactiveDomain(session, eval(handler, env))
   session$close()
@@ -300,7 +654,10 @@ record('bulk listing handles unverified API outcomes without local roster mutati
 })
 record('classification UI renders all active controls', {
   html <- as.character(classification_UI('class'))
-  stopifnot(grepl('class-round_range_slider',html,fixed=TRUE),grepl('class-round_buttons',html,fixed=TRUE))
+  stopifnot(
+    grepl('class-round_range_slider', html, fixed = TRUE),
+    grepl('class-round_buttons', html, fixed = TRUE)
+  )
 })
 
 

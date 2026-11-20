@@ -12,7 +12,7 @@
     "Modules/Players_in_Teams_Module.R": "ac199b94aa0e0ce68ab30f50e89e44e478587f362d3ed0cac30a6136f6e865c7",
     "Modules/Players_Table_Module.R": "5d876ecbfd99af79fbbb6faa55135d5781885a8ad4ca6a15961a3048bb4499da",
     "supabase_connector.R": "d9181b6dfd143f20fae5c1ee6531bf1e32447b4a01e3143fd83b3901f8803c35",
-    "Modules/Selected_Player_Module.R": "94396f865158574468ee42bdc1e467d11594860e8284dba25b74f8a17427dc3d",
+    "Modules/Selected_Player_Module.R": "59bdb4291896849478bdb55d633a338955090efe33fb8b66fae9a8d7e9a32487",
     "factual_helpers.R": "810ce0b2dfb2e2609171ea697b3fbcf0164a37261294cf3212d299e2d85eeff8",
     "server.R": "76f472d93b1d292964eacc7a232ac2d6b55b376985944b8b5f9a4a99e6c1c8f5",
     "Modules/Classification_Module.R": "0782c9e6f94c2a8dcc1c52d170cf8936af77ad3821756e4adfe6b0e257980272",
