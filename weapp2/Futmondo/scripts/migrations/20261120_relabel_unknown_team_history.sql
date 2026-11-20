@@ -1,4 +1,7 @@
--- DRAFT — NOT APPLIED. Review before running. Requires explicit owner approval.
+-- APPLIED 2026-11-20 (owner-approved) via the REST API in 120 id-batches; 59,682 rows relabelled.
+-- Boundary: season opening budget movement at 2026-07-30T12:58:37Z (rival_finance_evidence).
+-- Left 'unknown': 1,310 rows with NULL observed_at, 2 rows colliding with existing labelled rows.
+-- Undo list (row ids) kept outside the repo; this SQL is the equivalent reviewed statement.
 -- Relabels user_team_history rows saved under competition_id/season 'unknown'
 -- for league 5b55f9d767214483120b87cf (OHY CAMPEÓN) to the observed context
 -- 504e4f584d8bec9a67000079 / 2025-2026 (league_context_observations, 2026-11-20).
@@ -22,7 +25,7 @@ SELECT count(*) AS to_relabel,
 FROM public.user_team_history h
 WHERE h.championship_id = '5b55f9d767214483120b87cf'
   AND h.competition_id = 'unknown' AND h.season = 'unknown'
-  AND h.observed_at >= TIMESTAMPTZ '2025-08-01T00:00:00Z'  -- TODO: confirm season start
+  AND h.observed_at >= TIMESTAMPTZ '2026-07-30T12:58:37Z'
   AND NOT EXISTS (
     SELECT 1 FROM public.user_team_history k
     WHERE k.user_team_id = h.user_team_id AND k.championship_id = h.championship_id
@@ -34,7 +37,7 @@ UPDATE public.user_team_history h
 SET competition_id = '504e4f584d8bec9a67000079', season = '2025-2026'
 WHERE h.championship_id = '5b55f9d767214483120b87cf'
   AND h.competition_id = 'unknown' AND h.season = 'unknown'
-  AND h.observed_at >= TIMESTAMPTZ '2025-08-01T00:00:00Z'  -- TODO: confirm season start
+  AND h.observed_at >= TIMESTAMPTZ '2026-07-30T12:58:37Z'
   AND NOT EXISTS (
     SELECT 1 FROM public.user_team_history k
     WHERE k.user_team_id = h.user_team_id AND k.championship_id = h.championship_id
