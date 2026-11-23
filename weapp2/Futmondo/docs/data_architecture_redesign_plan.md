@@ -2375,4 +2375,4 @@ Player-card market and direct-owner offers use the selected row and saved league
 
 ### Scheduled lineups for confirmed arrivals — implemented locally 2026-11-23
 
-The requested scope authorizes one user-approved immediate lineup and one approved lineup per verified pre-kickoff clause arrival. The elected worker uses separate encrypted access tied to that plan, stores progress durably, and verifies each guarded batch with readback. A confirmed manual save cancels pending stages. Production migration, rollout and live verification are pending. [Lineup contract](lineup_module.md#staged-lineups-for-incoming-signings--2026-11-23).
+The requested scope authorizes one user-approved immediate lineup and one approved lineup per verified pre-kickoff clause arrival. The elected worker uses separate encrypted access tied to that plan, stores progress durably, and verifies each guarded batch with readback. A confirmed manual save cancels pending stages. The production database migration is installed. Worker rollout and live submission verification are pending. [Lineup contract](lineup_module.md#staged-lineups-for-incoming-signings--2026-11-23).

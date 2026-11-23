@@ -5506,3 +5506,7 @@ Performance review found no additional requests, cache reads or invalidation, wr
 ### Welcome page visibility for incoming lineups
 
 The full Welcome markup lists **Lineups for incoming signings** exactly once under Advanced with the scheduling flag unset, disabled, and enabled. Login feedback passed all five checks. The broader Welcome loading fixture failed its synthetic login assertion on both the committed baseline and this change. The inventory change renders one static disclosure in the existing responsive grid and introduces no API calls, database reads, timers, or worker activity.
+
+### Production migration for scheduled lineups
+
+Supabase project `ozhnextrcxxksswpnglt` recorded migration `20261123154622` as `scheduled_lineups`. The deployed repository migration has SHA-256 `4aa3d824df00784a6c09ac2d2c09825e9dc963cdd2b233ad5eff2ae39f63b8d4`. All three tables have row-level security and deny browser reads. Ten security-invoker functions allow server execution only, and all eight indexes are valid. A read-only service-role smoke test passed with a synthetic absent account. The empty due-job lookup used `lineup_schedule_due` and took 0.061 ms. This measurement covers the empty lookup. Security advisor reports the intentional server-only tables as informational findings because there are no browser policies. Worker rollout and live lineup submission remain unverified.
