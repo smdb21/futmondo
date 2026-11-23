@@ -97,16 +97,30 @@ async function main() {
     await plain.evaluate(() => Shiny.shinyapp.reconnect());
     await plainDialog.waitFor({ state: 'hidden' });
     await plain.waitForFunction(() => Shiny.shinyapp.$socket?.readyState === 1);
-    await socket.close({ code: 1001, reason: 'Offline fixture disconnect before reload' });
-    await plainDialog.waitFor({ state: 'visible' });
-    await Promise.all([
-      plain.waitForEvent('framenavigated', frame => frame === plain.mainFrame()),
-      plainDialog.getByRole('button', { name: 'Refresh page' }).click()
-    ]);
-    assert.equal(plain.url(), url);
-    await plain.waitForFunction(() => window.Shiny?.shinyapp?.$socket?.readyState === 1);
-    assert.equal(await plainDialog.isVisible(), false);
-    console.log('PASS: hosted retry, final disconnect and recovery; mobile themes, focus and radar; plain socket close and same-URL reload');
+    for (const [theme, ready, pending] of [
+      ['dark', 'rgb(124, 255, 155)', 'rgb(244, 201, 93)'],
+      ['light', 'rgb(20, 83, 45)', 'rgb(120, 88, 0)']
+    ]) {
+      await socket.close({ code: 1001, reason: 'Offline fixture disconnect before reload' });
+      await plainDialog.waitFor({ state: 'visible' });
+      await plain.evaluate(mode => { document.documentElement.dataset.fmTheme = mode; }, theme);
+      const [, feedback] = await Promise.all([
+        plain.waitForEvent('framenavigated', frame => frame === plain.mainFrame()),
+        plainDialog.getByRole('button', { name: 'Refresh page' }).evaluate(button => {
+          const before = getComputedStyle(button).backgroundColor;
+          button.click();
+          return new Promise(resolve => requestAnimationFrame(() => {
+            resolve({ before, after: getComputedStyle(button).backgroundColor,
+              disabled: button.getAttribute('aria-disabled') });
+          }));
+        })
+      ]);
+      assert.deepEqual(feedback, { before: ready, after: pending, disabled: 'true' }, theme);
+      assert.equal(plain.url(), url);
+      await plain.waitForFunction(() => window.Shiny?.shinyapp?.$socket?.readyState === 1);
+      assert.equal(await plainDialog.isVisible(), false);
+    }
+    console.log('PASS: hosted retry and recovery; mobile radar and focus; socket close, button color in both themes and same-URL reload');
   } finally {
     await browser.close();
   }

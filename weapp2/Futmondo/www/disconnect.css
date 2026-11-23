@@ -52,6 +52,11 @@
   outline-offset: 3px;
 }
 
+#fm-disconnect-refresh[aria-disabled="true"] {
+  background: var(--fm-warning);
+  cursor: wait;
+}
+
 .fm-disconnect-open #ss-connect-dialog,
 .fm-disconnect-open #ss-overlay,
 .fm-disconnect-open #shiny-disconnected-overlay {

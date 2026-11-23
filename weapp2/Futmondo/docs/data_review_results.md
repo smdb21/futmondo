@@ -5399,3 +5399,5 @@ Chromium verified the hosted retry, final-message and recovery states with the u
 The existing fullscreen loader browser suite passed both themes at 320, 390 and 430 px, plus landscape, reduced motion and 4× CPU throttling checks.
 
 The performance review found about 3.5 kB of inline browser code and styles plus one static SVG. The closed dialog occupies no layout space. The browser test confirmed zero dialog asset requests and no loader canvas. A scoped observer watches the hosted reconnect message. The dialog adds no polling, Shiny reactive work, source acquisition, database operations or cache invalidation. A user-initiated reload follows normal page startup.
+
+Refresh button follow-up. Chromium confirmed the amber color on the next animation frame in both themes and the subsequent same-URL reload. One 180 ms timer runs per activation and repeated clicks are ignored while it is pending. The feedback adds no background timers, API or database calls, cache effects or server-side redraws.

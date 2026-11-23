@@ -80,7 +80,8 @@ is a separate feature for restoring access to a new session.
 
 When Shiny Server displays its final disconnect message, LigaRadar shows a
 modal with the static pitch and radar from `fm_pitch_radar()`. **Refresh page**
-reloads the current browser URL and can start a new session. The host's retry
+turns amber when pressed, gives the browser 180 ms to show the feedback, then
+reloads the current URL and can start a new session. The host's retry
 countdown and **Try now** link remain available during automatic recovery. The
 dialog closes if the connection becomes available again. Running directly with
 Shiny also shows it on a socket close when Shiny has no reconnect notification.

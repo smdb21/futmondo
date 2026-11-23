@@ -49,8 +49,12 @@
     });
 
     dialog.addEventListener('cancel', function (event) { event.preventDefault(); });
-    document.getElementById('fm-disconnect-refresh').addEventListener('click', function () {
-      window.location.reload();
+    document.getElementById('fm-disconnect-refresh').addEventListener('click', function (event) {
+      const button = event.currentTarget;
+      if (button.getAttribute('aria-disabled') === 'true') return;
+      button.setAttribute('aria-disabled', 'true');
+      // Leave time for the browser to paint the pressed state before navigation.
+      window.setTimeout(() => window.location.reload(), 180);
     });
   });
 })(window.jQuery);
