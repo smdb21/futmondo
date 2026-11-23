@@ -16,7 +16,7 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
       const readCounts = async () => (await page.locator('#fixture_counts').innerText()).trim().split('/').map(Number);
       const counts = await readCounts();
       assert.ok(await page.getByLabel('Include incoming players').isChecked());
-      await page.getByText('Eligible before kickoff', {exact: false}).waitFor();
+      await page.getByText(/Incoming Keeper.*Eligible before kickoff/).waitFor();
       await page.getByText('Due at or after kickoff', {exact: false}).waitFor();
       const start = performance.now();
       await page.getByRole('button', {name: 'Optimize'}).click();
@@ -31,6 +31,43 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
         return incoming && owned && getComputedStyle(incoming).filter === 'grayscale(1)' &&
           getComputedStyle(owned).filter === 'none';
       });
+      if (process.env.FUTMONDO_EDITOR_COVERAGE_FIXTURE === 'true') {
+        const stageList = page.locator('#lineup-schedule_preview details');
+        const schedule = page.locator('#lineup-schedule_status li');
+        const approveStages = async () => {
+          for (const stage of await stageList.all()) {
+            await stage.locator('summary').click();
+            await stage.getByLabel('Approve this lineup').check();
+          }
+        };
+        const scheduleButton = page.getByRole('button', { name: 'Save and schedule approved lineups' });
+        assert.equal(await stageList.count(), 3);
+        await approveStages();
+        await scheduleButton.click();
+        await page.getByText('Scheduled lineup preview').waitFor();
+        await schedule.nth(2).waitFor();
+        await page.getByLabel('Require full outfield bench coverage').check();
+        await page.getByRole('button', { name: 'Optimize' }).click();
+        await page.getByText(/Full bench coverage first becomes possible after Incoming Forward/).waitFor();
+        await signing.waitFor();
+        assert.equal(await stageList.count(), 1);
+        assert.equal(await schedule.count(), 3);
+        await approveStages();
+        await scheduleButton.click();
+        const keep = page.getByRole('button', { name: 'Keep schedule' });
+        await keep.click();
+        assert.equal(await schedule.count(), 3);
+        await scheduleButton.click();
+        await page.getByRole('button', { name: 'Cancel schedule and replace' }).click();
+        await page.getByText('Scheduled lineup preview').waitFor();
+        await page.waitForFunction(() => document.querySelectorAll('#lineup-schedule_status li').length === 1);
+        assert.match(await schedule.first().innerText(), /Incoming Forward/);
+        assert.deepEqual(await readCounts(), counts);
+        assert.deepEqual(errors, []);
+        console.log(`PASS ${width}px: coverage reoptimization defers the first save and replacement requires confirmation`);
+        await page.close();
+        continue;
+      }
       await page.selectOption('#lineup-preview_stage', '1');
       await signing.waitFor({ state: 'detached' });
       const review = page.locator('#lineup-schedule_preview details');

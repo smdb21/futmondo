@@ -78,6 +78,7 @@ recent_player_points_source <- function(...) list(history = shiny::reactive(fixt
 
 scheduled_fixture <- identical(Sys.getenv('FUTMONDO_EDITOR_SCHEDULE_FIXTURE'), 'true')
 fixture_arrivals <- incoming_clause_empty()
+coverage_fixture <- identical(Sys.getenv('FUTMONDO_EDITOR_COVERAGE_FIXTURE'), 'true')
 if (scheduled_fixture) {
   signing <- fixture_roster[1, ]
   signing$id <- 'p25'; signing$name <- 'Incoming Keeper'; signing$photo <- 'fixture-player.png'
@@ -86,14 +87,29 @@ if (scheduled_fixture) {
     role2='', status='ok', photo=signing$photo, available=TRUE, team=signing$club, logo=signing$logo,
     joins_at=as.POSIXct(Sys.time()+120), timing_error='')
   fixture_arrivals <- rbind(fixture_arrivals,transform(fixture_arrivals,player_id='p26',player_name='After Kickoff',joins_at=Sys.time()+7200))
+  if(coverage_fixture) {
+    fixture_roster <- fixture_roster[fixture_roster$id%in%c(paste0('p',1:7),paste0('p',9:13),'p18','p19'),]
+    fixture_roster$status <- 'ok'
+    fixture_initial$bench <- c('p7','p13','','')
+    fixture_initial$starters[1] <- 'p19'
+    fixture_initial$starters[2] <- 'p18'
+    fixture_initial$starters[7:10] <- paste0('p',3:6)
+    fixture_arrivals <- rbind(fixture_arrivals,transform(fixture_arrivals[1,,drop=FALSE],
+      player_id='p27',player_name='Incoming Forward',role='delantero',joins_at=Sys.time()+240))
+    fixture_history <- rbind(fixture_history, data.frame(player_id='p27',round=1:5,points=225))
+  }
   fixture_job <- NULL
   lineup_schedule_enabled <- function() !identical(Sys.getenv('FUTMONDO_EDITOR_DISABLE_SCHEDULE'), 'true')
   fm_clause_encrypt <- function(auth) structure('encrypted-fixture',credential_id='fixture')
   lineup_schedule_rpc <- function(name,payload,owner='') {
     value <- switch(name, read=fixture_job,
-      admit={
-        fixture_job <<- list(id=payload$p_id,context=rev(payload$p_context),stages=payload$p_stages,
-          stage_index=0L,state='queued',code='',outcomes=list()); TRUE
+      admit_plan={
+        if(!is.null(fixture_job)&&identical(fixture_job$state,'queued')&&!identical(payload$p_confirmed,fixture_job$id))
+          paste0('confirm:',fixture_job$id)
+        else {
+          fixture_job <<- list(id=payload$p_id,context=rev(payload$p_context),stages=payload$p_stages,
+            stage_index=0L,state='queued',code='',outcomes=list()); 'ready'
+        }
       },
       manual_begin={
         if(!identical(payload$p_confirmed,fixture_job$id))paste0('confirm:',fixture_job$id)

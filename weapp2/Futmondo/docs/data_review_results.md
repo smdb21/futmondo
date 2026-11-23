@@ -5533,3 +5533,13 @@ initial load, reusable by normal browser caching. No API or database work,
 reactive redraws, timers, blocking server operations or dependencies are added.
 The icon does not affect mobile layout and contains no animation. Hosted
 browser-tab appearance and deployment remain unverified.
+
+### Coverage-aware reoptimization and schedule replacement
+
+Optimize previously cleared the visible plan before calculating and treated an infeasible early stage as failure for the whole round. The staged preview now retains its previous result on failure. If the round-start squad can meet full coverage, the new plan omits early stages until enough eligible players arrive. The first save uses that arrival time. Local edits and recalculation leave the existing plan active. Confirming a replacement cancels and inserts under one team lock.
+
+The known-answer fixture passed for coverage becoming feasible only after the second signing and for coverage remaining infeasible at kickoff. At 390 and 1440 px, the browser retained the signing in the new preview, deferred the first save, kept the old plan after declining the popup, and replaced it after confirmation. The existing browser run passed manual-save warning and cancellation at both widths. The isolated SQL tests covered exact consent, stale baselines, in-flight dispatch conflicts, one deferred stage, and duplicate requests. The Lineup module suite and Shiny lifecycle passed, including 14 lifecycle checks and eight tabs.
+
+No extra source acquisition or polling was added. Preview work remains one local probe per stage and the three-stage fixture measured 22 ms median. The replacement costs one indexed team admission per click or confirmed retry. The manual save guard also checks for persisted schedules when scheduling is paused and the worker is configured. Local browser counters showed no new source reads or saves during preview and replacement. Production worker latency under load and native submission remain unverified.
+
+Applied `20261123170000_replace_lineup_schedules.sql` as `20261123164123` in production, SHA-256 `f55984d1e6a995c08a60fb65ac7fb969df4bc5196c431d21703d887ccfdbc885`. The security-invoker RPC is executable by the service role and denied to both browser roles. A synthetic invalid admission was rejected without inserting a plan. Before the rollout, production statistics showed worker claims and status reads, with zero recorded admissions and no durable plans.

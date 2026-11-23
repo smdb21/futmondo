@@ -50,13 +50,16 @@ lineup_schedule_preview <- function(roster, arrivals, scores, rules, current, ex
     rows <- lineup_arrival_roster(roster, arrivals[seq_len(i - 1L), , drop = FALSE])
     result <- lineup_optimize(rows, scores, unlist(rules$allowed), current, doubtful,
       rules$bench_enabled, rules$multiposition, excluded_ids = excluded, require_bench_coverage = coverage)
-    if (is.null(result)) return(NULL)
+    if (is.null(result)) {
+      if (!coverage || i == length(stages)) return(NULL)
+      next
+    }
     if (!isTRUE(rules$captain_enabled)) result$draft$captain <- ""
     stages[[i]] <- list(player_id = if (i == 1L) "" else arrivals$player_id[i - 1L],
       due_at = if (i == 1L) NULL else fm_clause_stamp(arrivals$joins_at[i - 1L]), lineup = result$draft)
     current <- result$draft
   }
-  stages
+  Filter(Negate(is.null), stages)
 }
 
 lineup_schedule_draft <- function(value) {

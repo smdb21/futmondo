@@ -27,6 +27,22 @@ preview <- lineup_schedule_preview(roster,unavailable,scores,rules,lineup_empty(
 stopifnot(identical(vapply(preview,function(stage)tail(stage$lineup$starters,1),character(1)),c('owned','owned','keeper2')))
 cat('PASS strict kickoff eligibility, already-owned filtering, deterministic simultaneous arrivals and unavailable players\n')
 
+scarce <- roster[c(1,2:6,8:12,14:15),]
+early <- candidates$rows[1,,drop=FALSE]
+forward <- transform(early, player_id='new-forward', player_name='Incoming forward', role='delantero', joins_at=now+40)
+coverage_scores <- rbind(scores,data.frame(id='new-forward',average=80))
+rules$allowed <- '4-4-2'
+stopifnot(is.null(lineup_schedule_preview(scarce,early,coverage_scores,rules,lineup_empty(),
+  character(),FALSE,TRUE)))
+strict <- lineup_schedule_preview(scarce,rbind(early,forward),coverage_scores,rules,lineup_empty(),
+  character(),FALSE,TRUE)
+stopifnot(length(strict)==1L,strict[[1]]$player_id=='new-forward',
+  identical(strict[[1]]$due_at,fm_clause_stamp(forward$joins_at)),
+  'keeper1'%in%strict[[1]]$lineup$starters,
+  length(lineup_bench_coverage(lineup_arrival_roster(scarce,rbind(early,forward)),strict[[1]]$lineup$bench,TRUE))==3L)
+cat('PASS early stages without full cover are skipped, and the first feasible stage keeps earlier signings\n')
+rules$allowed <- lineup_formations()
+
 runs <- replicate(20,system.time(lineup_schedule_preview(roster,candidates$rows,scores,
   rules,lineup_empty(),character(),FALSE,FALSE))[['elapsed']])
 cat('18 owned + 2 incoming, all formations, three stages median ms:', median(runs)*1000, '\n')
