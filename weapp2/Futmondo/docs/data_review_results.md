@@ -1,5 +1,11 @@
 # Futmondo data review and implementation results
 
+## Player injury and card icons (2026-11-23)
+
+- The player-name regression checked the rendered cross and separate red-card, double-yellow and generic-suspension labels. Lineup and My Team regressions checked the shared display and existing roster reads. The yellow-card code enables the icon but carries no additional eligibility or absence inference. The offline lifecycle passed 14 checks and all eight tabs.
+- Chromium checked the actual name-cell markup with the app stylesheet at 320, 390 and 1440 px in both themes. The cross and card marks fit beside the labels. Both yellow shapes and the red card have opaque fills. Authenticated hosted rendering was outside the checks.
+- The table still builds markup once per distinct observed status. The card glyphs use one span each and CSS pseudo-elements, and the injury cross uses the installed icon font. The change adds no asset requests, reactive dependencies, API or database work, cache entries or timers.
+
 ## Matchday Dream team display (2026-11-23)
 
 - The Classification loading regression decoded a synthetic worker snapshot and checked crests, position codes, ties, zero and negative scores, unavailable data, the official MVP, and reuse after switching tabs. The Classification presets and live regressions passed. The offline lifecycle passed 14 checks and rendered all eight tabs.

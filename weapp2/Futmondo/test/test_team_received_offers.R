@@ -81,15 +81,15 @@ check('empty loading unavailable stale and partial states do not claim verified 
   stopifnot(team_received_offers_state(resource_state(partial))$status=='partial')
 })
 check('only observed non-fit players create rows in the My Team panel',{
-  rows<-data.frame(id=letters[1:12],name=paste('Player',1:12),role='defensa',
-    status=c('ok','fit',NA,'','doubt','injured','injured2','redcard','unavailable','unexpected','injured','doubt'))
-  rows$id[11:12]<-'duplicate'
+  rows<-data.frame(id=letters[1:13],name=paste('Player',1:13),role='defensa',
+    status=c('ok','fit',NA,'','doubt','injured','injured2','redcard','unavailable','unexpected',' YELLOWCARD ','injured','doubt'))
+  rows$id[12:13]<-'duplicate'
   shown<-team_nonfit_roster(rows)
   html<-as.character(team_nonfit_panel(shown,identity))
   stopifnot(identical(shown$id,letters[5:9]),
     all(vapply(c('Players not fit (5)','fm-incoming-panel','fm-incoming-player','nonfit_open_h',
-      'Doubtful','Injured','Long-term injury','Suspended','Unavailable'),grepl,logical(1),x=html,fixed=TRUE)),
-    !grepl('unexpected|duplicate',html),is.null(team_nonfit_panel(team_nonfit_roster(rows[1:4,]),identity)),
+      'Doubtful','Injured','Long-term injury','Red card','Unavailable'),grepl,logical(1),x=html,fixed=TRUE)),
+    !grepl('yellowcard|unexpected|duplicate',html,ignore.case=TRUE),is.null(team_nonfit_panel(team_nonfit_roster(rows[1:4,]),identity)),
     is.null(team_nonfit_panel(team_nonfit_roster(data.frame(id='legacy')), identity)))
 })
 check('top panels use equal responsive columns and stable row links',{

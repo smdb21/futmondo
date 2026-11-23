@@ -21,6 +21,8 @@ The market and catalog captures contain `ok`, `doubt`, `injured`, `injured2` and
 worker observations. The formatter builds each distinct icon once per table
 render from the observed scalar. See the [official comparison](feature_comparison.md).
 
+On 2026-11-23, `player_status_icon()` switched regular injury to a solid red medical cross and distinguished red card, two yellow cards and generic suspension. `redcard` has one filled red card. `yellowcard` has two overlapping filled yellow cards, matching the official status asset. `suspended` has a gavel and its own label. The source status is displayed without inferring a match incident or suspension from the yellow-card icon. The formatter uses the existing status field and stylesheet for the player table, portrait, My Team and lineup views.
+
 ## Maximum clause input — 2026-11-22
 
 In All Players, **Max Clause (M)** accepts a non-negative amount in millions, with a decimal point or comma and an optional `M` suffix. `players_table_clause_cap()` converts the amount to euros. The filter uses the same observed `clause_price` shown by the **Clause Price** column and includes the exact boundary. Blank input and **Clear Filters** remove the cap. Invalid input displays a correction prompt and withholds results until the amount is corrected or cleared. If **Clause within available funds** is enabled, the lower of the supplied limit and verified spending capacity applies.

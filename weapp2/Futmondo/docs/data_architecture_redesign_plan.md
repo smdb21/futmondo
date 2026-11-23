@@ -1,5 +1,11 @@
 # Futmondo data architecture redesign plan
 
+## Player injury and card icons (2026-11-23)
+
+- [x] Show a red medical cross for injury, a filled red card and a pair of filled yellow cards with distinct labels.
+- [x] Verify the shared status displays, browser preview and offline lifecycle. See [data review](data_review_results.md#player-injury-and-card-icons-2026-11-23).
+- [ ] Confirm rendering in the authenticated hosted application.
+
 ## Matchday Dream team display (2026-11-23)
 
 - [x] Show club crests, positions and scores in descending order and emphasize the published MVP.

@@ -802,6 +802,8 @@ team_nonfit_roster <- function(roster) {
   if (!is.data.frame(roster) || !all(c("id","status") %in% names(roster))) return(NULL)
   ids <- as.character(roster$id)
   codes <- unique(roster$status)
+  # The yellow-card asset identifies the display status without establishing unavailability.
+  codes <- codes[!tolower(trimws(as.character(codes))) %in% "yellowcard"]
   known <- !vapply(lapply(codes, player_status_icon, show_unconfirmed=FALSE), is.null, logical(1))
   usable <- !is.na(ids) & nzchar(trimws(ids)) & !duplicated(ids) & !duplicated(ids, fromLast=TRUE)
   roster[usable & roster$status %in% codes[known], , drop=FALSE]

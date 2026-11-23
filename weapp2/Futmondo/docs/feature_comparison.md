@@ -72,6 +72,10 @@ The differences below are **specific implemented additions beyond the workflows 
 
 The official rules document opening the published Best XI from Classification. The public client bundle confirms that the lineup parser receives player roles, club logos, scores and the published MVP. LigaRadar’s existing matchday card now displays those fields in a descending points table and highlights the official MVP. This is a presentation update to the existing Best XI capability. The signed-in official view and any alternative ordering controls were outside the comparison. [Official rules](https://help.futmondo.com/article/91-reglas-del), [official public bundle](https://app.futmondo.com/main.dart.js), [implementation](classification_module.md#dream-team-display-2026-11-23).
 
+### Player injury and card icons — 2026-11-23
+
+The official public client’s `Dy.p` renderer uses the scalar status to select an image. Its public assets show one red card for `redcard`, a pair of yellow cards for `yellowcard` and a separate whistle for `suspended`. The bundle SHA-256 is `08202076259d1678c7557478771d3aa38b5099f42044630569c704fdb7a7cd1c`. The official scoring guide separately documents double yellows and direct red cards as match events. LigaRadar uses solid card shapes and a red medical cross in its existing status displays. Captured market and catalog responses corroborate the red-card status. The yellow-card rendering was verified with a synthetic status and the public asset. [Official bundle](https://app.futmondo.com/main.dart.js), [red asset](https://app.futmondo.com/assets/assets/images/player_status/redcard.png), [yellow asset](https://app.futmondo.com/assets/assets/images/player_status/yellowcard.png), [suspension asset](https://app.futmondo.com/assets/assets/images/player_status/suspended.png), [official scoring guide](https://help.futmondo.com/article/204-modo-prensa-futmondo-liga-ea-sports).
+
 ## Essentials
 
 | Login ID / addition | Official baseline | Specific LigaRadar behavior | Local implementation evidence |

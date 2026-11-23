@@ -329,9 +329,9 @@ are unchanged.
 
 `lineup_status_icon(status)` renders the same observed status beside each
 occupied pitch/bench portrait and beside the name in picker rows. `doubt`
-(and the supported `doubtful` alias) shows a warning triangle, `injured` a minus
-circle, `injured2` a hospital, `redcard`/`suspended` a square, and `unavailable`
-a barred circle. Tooltips and accessible labels distinguish these meanings.
+(and the supported `doubtful` alias) shows a warning triangle, `injured` a red medical cross, `injured2` a hospital,
+`redcard` one filled red card, `yellowcard` two filled yellow cards, `suspended`
+a gavel and `unavailable` a barred circle. Tooltips and accessible labels distinguish these meanings.
 Empty/`ok` statuses add no icon; unrecognized nonempty codes show **Status
 unconfirmed**, never a guessed fitness label. Doubtful players are eligible only when Include doubtful players is checked;
 injured, suspended and unavailable players remain excluded in either state. Status changes only redraw the existing
@@ -344,7 +344,7 @@ statuses. Existing captured responses corroborate `ok`, `doubt`, `injured`,
 `injured2` and `redcard`; no private response bodies or credentials are included
 here. `lineup_roster_records()` already persists `status` in the existing
 context-scoped database lineup snapshot; hydration reuses it without new reads.
-The new icons use the app's existing font icons, adding no image requests.
+The icons use the app's existing font and CSS, adding no image requests.
 
 The requested bottom match-card crests were already implemented in this branch.
 Their observed `h.logo`/`a.logo` mapping, durable worker round-trip and legacy

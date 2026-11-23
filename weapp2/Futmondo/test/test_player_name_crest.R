@@ -44,13 +44,25 @@ check('separate crest keeps source/fallback labels and scrolling names without d
 check('only actionable or unrecognized reported status appears beside the name',{
   stopifnot(isFALSE(columns$status$show),
     grepl('aria-label="Injured"',html[1],fixed=TRUE),
-    grepl('title="Suspended"',html[4],fixed=TRUE),
+    grepl('fa-plus',html[1],fixed=TRUE),
+    grepl('title="Red card"',html[4],fixed=TRUE),
+    grepl('fm-status-card',html[4],fixed=TRUE),
     !any(grepl('fm-player-status|Fit',html[c(2,3)])),
     is.null(player_status_icon(' FIT ')),is.null(player_status_icon('')),
     grepl('Doubtful',as.character(player_status_icon('doubt')),fixed=TRUE),
     grepl('Long-term injury',as.character(player_status_icon('injured2')),fixed=TRUE),
     grepl('Unavailable',as.character(player_status_icon('unavailable')),fixed=TRUE),
     grepl('Status unconfirmed',as.character(player_status_icon('unmapped')),fixed=TRUE))
+})
+check('card indicators distinguish red, two yellows and generic suspension',{
+  sample <- data.frame(name = c("Second Player", "Third Player"), status = c("yellowcard", "suspended"))
+  name_cell <- get_reactable_columns_for_players(sample)$name$cell
+  yellow <- as.character(name_cell(sample$name[1], 1))
+  suspended <- as.character(name_cell(sample$name[2], 2))
+  stopifnot(grepl('aria-label="Two yellow cards"', yellow, fixed = TRUE),
+    grepl('fm-status-card-pair', yellow, fixed = TRUE),
+    grepl('aria-label="Suspended"', suspended, fixed = TRUE),
+    !grepl('fm-status-card', suspended, fixed = TRUE))
 })
 selected_player_Server<-function(...)NULL
 recent_player_points_source<-function(...)list(history=function()data.frame(),status=function()NULL)

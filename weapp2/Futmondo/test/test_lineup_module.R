@@ -164,7 +164,7 @@ shiny::testServer(lineup_Server,args=args,{
  settle(session);session$setInputs(best=1);settle(session);before<-draft();data<-source()
  ids<-c(before$starters[1:2],before$bench[1:3])
  codes<-c('injured','doubt','injured2','redcard','unavailable')
- labels<-c('Injured','Doubtful','Long-term injury','Suspended','Unavailable')
+ labels<-c('Injured','Doubtful','Long-term injury','Red card','Unavailable')
  for(i in seq_along(ids))data$roster[[match(ids[i],vapply(data$roster,`[[`,character(1),'id'))]]$status<-codes[i]
  source(data);settle(session)
  pitch<-xml2::read_html(output$pitch$html)

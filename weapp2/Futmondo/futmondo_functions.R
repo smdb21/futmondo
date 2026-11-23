@@ -829,14 +829,22 @@ player_status_icon <- function(status, class = "fm-player-status", show_unconfir
   if (code %in% c("", "ok", "fit")) return(NULL)
   info <- switch(code,
     doubt = , doubtful = list(label="Doubtful", icon="triangle-exclamation", tone="warning"),
-    injured = list(label="Injured", icon="circle-minus", tone="danger"),
+    injured = list(label="Injured", icon="plus", tone="danger"),
     injured2 = list(label="Long-term injury", icon="hospital", tone="danger"),
-    redcard = , suspended = list(label="Suspended", icon="square", tone="danger"),
+    redcard = list(label="Red card", cards=1L, tone="danger"),
+    yellowcard = list(label="Two yellow cards", cards=2L, tone="warning"),
+    suspended = list(label="Suspended", icon="gavel", tone="danger"),
     unavailable = list(label="Unavailable", icon="ban", tone="muted"),
     if (show_unconfirmed) list(label="Status unconfirmed", icon="circle-question", tone="muted"))
   if (is.null(info)) return(NULL)
+  glyph <- if (is.null(info$cards)) {
+    shiny::icon(info$icon)
+  } else {
+    shiny::tags$span(class = if (info$cards == 2L) "fm-status-card fm-status-card-pair" else "fm-status-card",
+      `aria-hidden` = "true")
+  }
   shiny::span(class=paste(class, paste0(class, "-", info$tone)),
-    `data-status`=code, title=info$label, role="img", `aria-label`=info$label, shiny::icon(info$icon))
+    `data-status`=code, title=info$label, role="img", `aria-label`=info$label, glyph)
 }
 
 get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE, separate_crest = FALSE) {

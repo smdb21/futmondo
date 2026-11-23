@@ -1278,6 +1278,33 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 .fm-player-status-warning { color: var(--fm-warning, #b38012); }
 .fm-player-status-danger { color: var(--fm-danger, #c63c4a); }
 .fm-player-status-muted { color: var(--fm-muted, #647067); }
+.fm-status-card {
+  position: relative;
+  display: inline-block;
+  width: 10px;
+  height: 13px;
+}
+.fm-status-card-pair { width: 15px; height: 15px; }
+.fm-status-card::before, .fm-status-card-pair::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 10px;
+  height: 13px;
+  border-radius: 1px;
+  background: currentColor;
+}
+.fm-status-card-pair::before, .fm-status-card-pair::after {
+  width: 9px;
+  height: 11px;
+  background: #f5c518;
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+.fm-status-card-pair::after {
+  inset: auto auto 0 0;
+  box-shadow: 0 0 0 1px var(--fm-surface, #fff), inset 0 0 0 1px currentColor;
+}
 
 .reactable .fm-team-label,
 .round-best-xi-table .fm-team-label {
