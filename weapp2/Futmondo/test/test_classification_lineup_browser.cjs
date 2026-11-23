@@ -11,7 +11,7 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
       const page = await browser.newPage({viewport:{width,height},isMobile:phone,hasTouch:phone}), errors=[];
       page.on('pageerror', e => errors.push(e.message));
       await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() :
-        route.request().url().endsWith('/fixture-club.png') ? route.fulfill({contentType:'image/svg+xml',
+        /\/fixture-(club|face)\.png$/.test(route.request().url()) ? route.fulfill({contentType:'image/svg+xml',
           body:'<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"><path d="M1 1h12v8l-6 4-6-4z" fill="orange"/></svg>'}) : route.abort());
       await page.goto(`http://127.0.0.1:${process.env.FUTMONDO_LINEUP_TEST_PORT || '8501'}`);
       const table = page.locator('#classification-classification_table');
@@ -64,7 +64,7 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
         await crest.scrollIntoViewIfNeeded();
         await crest.evaluate(n=>n.decode());
         const badge=await crest.boundingBox(),label=await crest.locator('..').locator('.fm-lineup-label').boundingBox();
-        assert.ok(badge&&badge.width===14&&badge.height===14,'Crests remain visible and compact');
+        assert.ok(badge&&badge.width===11&&badge.height===11,'Crests remain visible and compact');
         assert.ok(badge.x+badge.width<=label.x+1,'Crest sits beside the player name');
       }
       assert.deepEqual(await modal.locator('.fm-lineup-bench-row .fm-lineup-player').evaluateAll(nodes=>nodes.map(n=>n.dataset.playerId)),['bench-0','','bench-2','bench-3']);
@@ -72,10 +72,22 @@ const {chromium} = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '
       assert.equal(await modal.locator('.fm-lineup-bench-row .fm-lineup-out').count(),1);
       assert.equal(await modal.locator('[data-player-id="own-3"] .fm-lineup-points').innerText(),'8*');
       assert.equal(await modal.locator('[data-player-id="bench-3"] .fm-lineup-points').innerText(),'-4*');
-      assert.match(await modal.locator('.fm-lineup-legend').innerText(),/Provisional points/);
+      assert.match(await modal.locator('.fm-lineup-legend .fm-info-body').textContent(),/Provisional points/);
       const pitch = await modal.locator('.fm-lineup-pitch').boundingBox();
       assert.ok(pitch.width <= width && pitch.x>=0 && pitch.x+pitch.width<=width);
       await assertLineupLayout(page, modal.locator('.fm-lineup-layout'));
+      const longName = modal.locator('[data-player-id="own-6"] .fm-lineup-label');
+      assert.equal(await longName.getAttribute('title'), 'Eduardo Expósito Carrasquero');
+      assert.ok(await longName.evaluate(n => n.scrollWidth > n.clientWidth), 'Long player name is truncated inside its slot');
+      const portrait = modal.locator('[data-player-id="own-6"] .fm-lineup-portrait > img');
+      await portrait.scrollIntoViewIfNeeded();
+      await portrait.evaluate(n => n.decode());
+      const face = await portrait.boundingBox();
+      assert.ok(face && face.width <= 44 && face.height <= 44, 'Player portraits use the reduced size');
+      await page.evaluate(() => document.documentElement.dataset.fmTheme = 'light');
+      await assertLineupLayout(page, modal.locator('.fm-lineup-layout'));
+      await page.evaluate(() => delete document.documentElement.dataset.fmTheme);
+
       const overflow = await modal.locator('.fm-lineup-player').evaluateAll(nodes => nodes.some(n=>n.scrollWidth>n.clientWidth+1));
       assert.equal(overflow,false);
       await page.screenshot({path:`/tmp/futmondo-round-roster-${width}.png`,fullPage:true});

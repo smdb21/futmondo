@@ -309,7 +309,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       assert.equal(await page.locator('.fm-lineup-crest').count(), 15);
       for (const crest of await page.locator('.fm-lineup-crest').all()) {
         const size=await crest.boundingBox();
-        assert.ok(size && size.width===14 && size.height===14, 'Crests remain visible and compact');
+        assert.ok(size && size.width===11 && size.height===11, 'Crests remain visible and compact');
         const label=await crest.locator('..').locator('.fm-lineup-label').boundingBox();
         assert.ok(size.x+size.width<=label.x+1, 'Crest sits beside the player name');
       }

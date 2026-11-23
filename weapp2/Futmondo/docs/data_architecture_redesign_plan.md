@@ -1,5 +1,11 @@
 # Futmondo data architecture redesign plan
 
+## Compact lineup pitch (2026-11-23)
+
+- [x] Apply single-line names, smaller portraits and crests, a tilted pitch and staggered six-player midfield rows in the phone layout of the editor and round history.
+- [x] Verify responsive geometry, lineup interactions and resize reuse. See [data review](data_review_results.md#compact-lineup-pitch-2026-11-23).
+- [ ] Confirm rendering in the authenticated hosted application.
+
 ## Real Club filter (2026-11-23)
 
 - [x] Add a searchable club filter with alphabetized names, crests and an All clubs default in the shared player tables.

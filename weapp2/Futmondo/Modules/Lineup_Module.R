@@ -3,7 +3,7 @@ lineup_status_icon <- function(status) player_status_icon(status, 'fm-lineup-sta
 
 lineup_UI <- function(id) {
   ns<-shiny::NS(id)
-  shiny::tagList(shiny::tags$style(shiny::HTML(".fm-lineup-controls{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:16px}.fm-lineup-controls .form-group{margin:0}.fm-lineup-optimize-controls{display:flex;gap:12px;align-items:flex-end;flex:0 0 100%;min-width:0}.fm-lineup-optimize-controls .shiny-input-container{flex:1;min-width:0;max-width:180px}.fm-lineup-optimize-controls .btn{flex-shrink:0}.fm-lineup-formation .shiny-input-container{width:180px;max-width:100%;margin-bottom:8px}.fm-lineup-availability{flex:0 0 100%;min-width:0}.fm-lineup-controls .shiny-input-container{width:180px}.fm-lineup-editor{max-width:900px;margin:auto}.fm-lineup-editor .fm-lineup-player{background:transparent;border:0;color:var(--fm-text,#eef6f0);cursor:pointer;padding:6px;min-width:0}.fm-lineup-editor .fm-lineup-player:focus{outline:2px solid var(--fm-warning,#f0c75e)}.fm-lineup-editor .fm-lineup-portrait{margin:auto}.fm-lineup-editor .fm-lineup-name{white-space:normal}.fm-lineup-editor .fm-lineup-portrait img{max-width:48px;max-height:48px}.fm-lineup-note{padding:10px 0;color:var(--fm-muted,#acbdb0)}.fm-lineup-warning{color:var(--fm-warning,#f0c75e)}.fm-lineup-actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.fm-lineup-coverage{display:flex;gap:12px;flex-wrap:wrap}.fm-lineup-editor .fm-lineup-row{display:grid;grid-template-columns:repeat(var(--lineup-count),minmax(0,1fr))}@media(max-width:600px){.fm-lineup-controls .shiny-input-container{width:140px}.fm-lineup-editor .fm-lineup-name{font-size:10px}.fm-lineup-editor .fm-lineup-player{padding:2px}.fm-lineup-editor .fm-lineup-portrait img{max-width:34px;max-height:34px}}")),
+  shiny::tagList(shiny::tags$style(shiny::HTML(".fm-lineup-controls{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:16px}.fm-lineup-controls .form-group{margin:0}.fm-lineup-optimize-controls{display:flex;gap:12px;align-items:flex-end;flex:0 0 100%;min-width:0}.fm-lineup-optimize-controls .shiny-input-container{flex:1;min-width:0;max-width:180px}.fm-lineup-optimize-controls .btn{flex-shrink:0}.fm-lineup-formation .shiny-input-container{width:180px;max-width:100%;margin-bottom:8px}.fm-lineup-availability{flex:0 0 100%;min-width:0}.fm-lineup-controls .shiny-input-container{width:180px}.fm-lineup-editor{max-width:900px;margin:auto}.fm-lineup-editor .fm-lineup-player{background:transparent;border:0;color:var(--fm-text,#eef6f0);cursor:pointer;padding:2px;min-width:0}.fm-lineup-editor .fm-lineup-player:focus{outline:2px solid var(--fm-warning,#f0c75e)}.fm-lineup-note{padding:10px 0;color:var(--fm-muted,#acbdb0)}.fm-lineup-warning{color:var(--fm-warning,#f0c75e)}.fm-lineup-actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.fm-lineup-coverage{display:flex;gap:12px;flex-wrap:wrap}@media(max-width:600px){.fm-lineup-controls .shiny-input-container{width:140px}}")),
     shiny::tags$style(shiny::HTML("
       .fm-lineup-picker-list{max-height:60vh;overflow-y:auto}
       .fm-lineup-choice,.fm-lineup-picker-heading{display:grid;grid-template-columns:26px minmax(0,1fr) 58px 78px;gap:8px;align-items:center;padding:10px 8px}
@@ -464,8 +464,8 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
           if(occupied)lineup_status_icon(row$status)),
         shiny::div(class='fm-lineup-name',`data-position`=position,
           if(nzchar(crest))shiny::tags$img(class='fm-lineup-crest',src=crest,alt=row$club,title=row$club,
-            width=14,height=14,loading='lazy',decoding='async',onerror="this.style.display='none'"),
-          shiny::span(class='fm-lineup-label',if(occupied)lineup_player_label(row$name)else'Empty position'))),
+            width=11,height=11,loading='lazy',decoding='async',onerror="this.style.display='none'"),
+          shiny::span(class='fm-lineup-label',title=if(occupied)row$name else 'Empty position',if(occupied)lineup_player_label(row$name)else'Empty position'))),
         class=paste('fm-lineup-player',if(!occupied)'fm-lineup-empty'),disabled=if(saving())'disabled',
         title=if(occupied)paste('Change',row$name)else paste('Select',role))
     }
@@ -475,7 +475,11 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
         shiny::div(class='fm-lineup-layout',
         shiny::div(class='fm-lineup-pitch',role='group',`aria-label`=paste('Pitch, formation',value$strategy),
           shiny::div(class='fm-lineup-markings',`aria-hidden`='true',shiny::div(class='fm-lineup-circle'),shiny::div(class='fm-lineup-goal-top'),shiny::div(class='fm-lineup-goal-bottom')),
-          lapply(unique(roles),function(role){indices<-which(roles==role);shiny::div(class='fm-lineup-row',style=paste0('--lineup-count:',length(indices)),lapply(indices,function(i)tile(value$starters[i],role,i)))})),
+          lapply(unique(roles),function(role){
+            indices<-which(roles==role)
+            shiny::div(class=lineup_pitch_row_class(role,length(indices)),`data-position`=role,
+              style=paste0('--lineup-count:',length(indices)),lapply(indices,function(i)tile(value$starters[i],role,i)))
+          })),
         if(source()$rules$bench_enabled)shiny::div(class='fm-lineup-bench',shiny::h4('Substitutes · best to worst'),
           shiny::div(class='fm-lineup-bench-row',lapply(seq_len(4L),function(i)tile(value$bench[i],'Substitute',i,TRUE))),
           shiny::div(class='fm-lineup-coverage',lapply(c('DEF','MID','FWD'),function(role){

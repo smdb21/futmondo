@@ -1,5 +1,19 @@
 # Next-round lineup
 
+## Compact lineup pitch (2026-11-23)
+
+The supplied official Futmondo mobile screenshot shows a tapered field,
+single-line name strips and higher wide midfielders in a 3-6-1. The editable and historical lineup views share a tilted grass and markings layer
+with upright player tiles. Names use the existing initial-plus-surname format,
+one line, 1 px vertical padding and an ellipsis if the slot is too narrow. The
+label tooltip carries the full source name. Portraits are 36 px on phones and
+desktop and 44 px at intermediate widths. Club crests beside the names are 11 px.
+
+Both renderers mark each row with its assigned position.
+`lineup_pitch_row_class(role, count)` flags six-player midfield rows. Below
+992 px the outer pair sits 18 px higher and the next pair 9 px higher than the
+center pair. Desktop keeps its horizontal pitch and vertical position columns.
+
 ## Match crests — 2026-11-17
 
 Each home and away club now displays its observed crest beside its name in the
@@ -134,7 +148,7 @@ The pitch supports the twelve official 11-player formations, including 4-6-0. Av
 
 **Clear lineup** empties starters, four substitutes and captain locally, preserving the selected formation, N and doubtful-player toggle. It makes no request and cannot submit an invalid empty XI. **Undo changes** restores the latest lineup loaded from or successfully saved to Futmondo, including a save confirmed by readback. Drafts survive navigation during the session; official successful observations survive restarts through database snapshots. A direct account replacement discards prior private drafts.
 
-Player tiles display a compact club crest beside the name for both starters and substitutes, in the editor and historical round lineups. Names wrap within their slot on narrow screens. The roster parser retains the source `team.logo` (or flat `logo`) in the existing database snapshot; hydration reuses it without new API or database requests. Older snapshots use the existing club-name image lookup until the normal 30-second refresh supplies source metadata. Images load lazily and share browser caching by URL. Position colors underline names without a separate abbreviation; bench colors use the main role only.
+Player tiles display a compact club crest beside the name for both starters and substitutes, in the editor and historical round lineups. Names use the compact pitch labels described above. The roster parser retains the source `team.logo` (or flat `logo`) in the existing database snapshot; hydration reuses it without new API or database requests. Older snapshots use the existing club-name image lookup until the normal 30-second refresh supplies source metadata. Images load lazily and share browser caching by URL. Position colors underline names without a separate abbreviation; bench colors use the main role only.
 
 The **Include doubtful players** checkbox occupies its own full-width row below Optimize and recent-round controls on mobile and desktop. Its label uses the available row width and wraps naturally on narrow screens.
 
@@ -250,9 +264,9 @@ The formation selector sits directly above the pitch, replacing its repeated sta
 
 ## Horizontal desktop lineups — 2026-11-10
 
-At viewport widths of at least 992px, the shared `fm-lineup-layout` wrapper places the bench on the far left and the pitch beside it. Position groups form vertical columns ordered visually as goalkeeper, defenders, midfielders and forwards; the original slot identities and source order remain intact. The field markings and stripes follow the horizontal orientation. Groups with zero players, such as forwards in 4-6-0, do not reserve a blank column. Below 992px the existing vertical pitch and bench underneath remain unchanged.
+At viewport widths of at least 992px, the shared `fm-lineup-layout` wrapper places the bench on the far left and the pitch beside it. Position groups form vertical columns ordered visually as goalkeeper, defenders, midfielders and forwards; the original slot identities and source order remain intact. The field markings and stripes follow the horizontal orientation. Groups with zero players, such as forwards in 4-6-0, do not reserve a blank column. Below 992px the pitch runs vertically with the bench underneath.
 
-Both the editable lineup and `round_lineup_pitch_ui()` use this wrapper. Desktop cards use 48px portraits and content-driven column height so six midfielders and four ordered substitutes stay visible without overlap. This is responsive presentation only: resizing does not fetch, recalculate or save a lineup. Existing acquisition, durable database snapshots, draft validation, player selection and explicit save behavior are unchanged.
+Both the editable lineup and `round_lineup_pitch_ui()` use this wrapper. Desktop cards use compact portraits and content-driven column height so six midfielders and four ordered substitutes stay visible without overlap. This is responsive presentation only: resizing does not fetch, recalculate or save a lineup. Existing acquisition, durable database snapshots, draft validation, player selection and explicit save behavior are unchanged.
 
 
 ## Concise status and observed round schedules — 2026-11-14

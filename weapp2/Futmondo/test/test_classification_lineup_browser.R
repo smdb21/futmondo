@@ -17,7 +17,8 @@ get_round_lineup_snapshot <- function(login,championship_id,user_team_id,round_i
   bench <- lapply(c(3,0,2),function(i)list(id=paste0('bench-',i),position=i,name=paste('Reserve',i),points=i,changed=i==2))
   players <- lapply(players,function(p){p$teamId<-'fixture-club';p$team<-'Fixture Club';p$logo<-'fixture-club.png';p})
   bench <- lapply(bench,function(p){p$teamId<-'fixture-club';p$team<-'Fixture Club';p$logo<-'fixture-club.png';p})
-  players[[6]]$name <- 'Eduardo Expósito'
+  players[[6]]$name <- 'Eduardo Expósito Carrasquero'
+  players[[6]]$photo <- 'fixture-face.png'
   players[[4]]$rated<-TRUE;players[[4]]$role<-'centrocampista';players[[4]]$points<-0;players[[4]]$customPoints<-8
   players[[4]]$detailedPoints<-list(po=list(list(mode='press',r='centrocampista',p=7)))
   bench[[1]]$rated<-TRUE;bench[[1]]$role<-'delantero';bench[[1]]$points<-0;bench[[1]]$customPoints<- -4

@@ -15,19 +15,36 @@ async function assertLineupLayout(page, layout) {
     const markings = pitch.querySelector('.fm-lineup-markings');
     const halfway = getComputedStyle(markings, '::before');
     const players = element => Array.from(element.querySelectorAll('.fm-lineup-player'), rect);
+    const localBox = element => ({
+      left: element.offsetLeft, top: element.offsetTop,
+      right: element.offsetLeft + element.offsetWidth, bottom: element.offsetTop + element.offsetHeight
+    });
     return {
       desktop: window.innerWidth >= 992, viewportWidth: window.innerWidth,
       formation: pitch.getAttribute('aria-label').replace('Pitch, formation ', ''),
       layout: rect(node), pitch: rect(pitch), bench: rect(bench),
       rows: Array.from(pitch.querySelectorAll('.fm-lineup-row'), row => ({ box: rect(row), players: players(row) })),
       benchPlayers: players(bench), allPlayers: players(node),
-      markings: rect(markings), firstGoal: rect(markings.querySelector('.fm-lineup-goal-top')),
-      secondGoal: rect(markings.querySelector('.fm-lineup-goal-bottom')),
+      markings: rect(markings), markingWidth: markings.clientWidth, markingHeight: markings.clientHeight,
+      tilt: new DOMMatrixReadOnly(getComputedStyle(markings).transform).m24,
+      firstGoal: localBox(markings.querySelector('.fm-lineup-goal-top')),
+      secondGoal: localBox(markings.querySelector('.fm-lineup-goal-bottom')),
+      compactLabels: Array.from(node.querySelectorAll('.fm-lineup-label')).every(label => {
+        const style = getComputedStyle(label);
+        const strip = getComputedStyle(label.parentElement);
+        return style.whiteSpace === 'nowrap' && style.textOverflow === 'ellipsis' &&
+          style.overflow === 'hidden' && Boolean(label.title) &&
+          parseFloat(strip.paddingTop) <= 1 && parseFloat(strip.paddingBottom) <= 1;
+      }),
       halfway: { width: parseFloat(halfway.width), height: parseFloat(halfway.height),
         horizontalBorder: parseFloat(halfway.borderTopWidth) + parseFloat(halfway.borderBottomWidth),
         verticalBorder: parseFloat(halfway.borderLeftWidth) + parseFloat(halfway.borderRightWidth) }
     };
   });
+  assert.ok(state.tilt < 0, 'Pitch plane recedes toward the top');
+  assert.ok(state.markings.top >= state.pitch.top - 1 && state.markings.bottom <= state.pitch.bottom + 1,
+    'Projected pitch keeps both end lines visible');
+  assert.ok(state.compactLabels, 'Names keep one tight line with ellipsis and a full name on hover');
   const counts = state.formation.split('-').map(Number);
   const expectedRows = [counts[2], counts[1], counts[0], 1].filter(Boolean);
   assert.deepEqual(state.rows.map(row => row.players.length), expectedRows, 'Every formation keeps its official slot groups');
@@ -61,9 +78,8 @@ async function assertLineupLayout(page, layout) {
         assert.ok(players[i].top >= players[i - 1].bottom - 1, 'Players are ordered vertically without overlap');
       }
     }
-    assert.ok(Math.abs(state.firstGoal.left - state.markings.left) <= 2 &&
-      Math.abs(state.secondGoal.right - state.markings.right) <= 2, 'Desktop goal boxes sit on the left and right touchlines');
-    assert.ok(state.halfway.width <= 2 && state.halfway.height >= state.markings.height * .8 &&
+    assert.ok(state.firstGoal.left <= 1 && Math.abs(state.secondGoal.right - state.markingWidth) <= 1, 'Desktop goal boxes sit on the left and right touchlines');
+    assert.ok(state.halfway.width <= 2 && state.halfway.height >= state.markingHeight * .8 &&
       state.halfway.verticalBorder > 0, 'Desktop halfway line is vertical');
   } else {
     assert.ok(state.bench.top >= state.pitch.bottom - 1, 'Mobile keeps the bench below the pitch');
@@ -73,9 +89,18 @@ async function assertLineupLayout(page, layout) {
       for (let i = 1; i < players.length; i++)
         assert.ok(players[i].left >= players[i - 1].right - 1, 'Mobile players stay in horizontal position rows');
     }
-    assert.ok(Math.abs(state.firstGoal.top - state.markings.top) <= 2 &&
-      Math.abs(state.secondGoal.bottom - state.markings.bottom) <= 2, 'Mobile goal boxes stay at the top and bottom');
-    assert.ok(state.halfway.height <= 2 && state.halfway.width >= state.markings.width * .8 &&
+    for (const { players } of state.rows) {
+      const heights = players.map(player => player.bottom);
+      if (players.length === 6) {
+        assert.ok(heights[0] < heights[1] && heights[1] < heights[2] &&
+          Math.abs(heights[2] - heights[3]) <= 1 && heights[3] > heights[4] && heights[4] > heights[5] &&
+          Math.abs(heights[0] - heights[5]) <= 1, 'Six midfielders rise symmetrically toward the flanks');
+      } else {
+        assert.ok(heights.every(height => Math.abs(height - heights[0]) <= 1), 'Other position rows stay level');
+      }
+    }
+    assert.ok(state.firstGoal.top <= 1 && Math.abs(state.secondGoal.bottom - state.markingHeight) <= 1, 'Mobile goal boxes stay at the top and bottom');
+    assert.ok(state.halfway.height <= 2 && state.halfway.width >= state.markingWidth * .8 &&
       state.halfway.horizontalBorder > 0, 'Mobile halfway line stays horizontal');
   }
 }

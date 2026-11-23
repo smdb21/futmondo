@@ -1,4 +1,8 @@
 # Pure next-round lineup rules and exact historical-score selection.
+lineup_pitch_row_class <- function(role, count) {
+  if (role == "MID" && count == 6L) "fm-lineup-row fm-lineup-row-six-midfielders" else "fm-lineup-row"
+}
+
 lineup_player_label <- function(name) {
   name<-trimws(gsub("[[:space:]]+"," ",as.character(name)))
   sub("^([^[:space:]])[^[:space:]]* (.+)$","\\1. \\2",name)

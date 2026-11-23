@@ -186,8 +186,8 @@ round_lineup_player_ui <- function(player,bench=FALSE,index,point_system="press"
       title=if(occupied)paste0(if(bench)"Main position for substitutions: "else"Lineup position: ",
         if(nzchar(position))switch(position,GK="Goalkeeper",DEF="Defender",MID="Midfielder",FWD="Forward")else"unavailable"),
       if(safe_image(logo))shiny::tags$img(class="fm-lineup-crest",src=logo,alt=club,title=club,
-        width=14,height=14,loading="lazy",decoding="async",onerror="this.style.display='none'"),
-      shiny::span(class="fm-lineup-label",if(occupied)lineup_player_label(label)else label)))
+        width=11,height=11,loading="lazy",decoding="async",onerror="this.style.display='none'"),
+      shiny::span(class="fm-lineup-label",title=label,if(occupied)lineup_player_label(label)else label)))
 }
 round_lineup_pitch_ui <- function(answer) {
   lineup<-normalize_round_lineup(answer)
@@ -197,9 +197,13 @@ round_lineup_pitch_ui <- function(answer) {
     shiny::div(class="fm-lineup-layout",
       shiny::div(class="fm-lineup-pitch",role="group",`aria-label`=paste("Pitch, formation",lineup$strategy),
       shiny::div(class="fm-lineup-markings",`aria-hidden`="true",shiny::div(class="fm-lineup-circle"),shiny::div(class="fm-lineup-goal-top"),shiny::div(class="fm-lineup-goal-bottom")),
-      lapply(which(lineup$rows>0),function(row)shiny::div(class="fm-lineup-row",style=paste0("--lineup-count:",lineup$rows[row]),
-        lapply(seq.int(starts[row],ends[row]),function(i)round_lineup_player_ui(lineup$players[[i]],index=i,
-          point_system=lineup$pointSystem,status=lineup$status,pitch_role=c("FWD","MID","DEF","GK")[row]))))),
+      lapply(which(lineup$rows>0),function(row){
+        role<-c("FWD","MID","DEF","GK")[row]
+        count<-lineup$rows[row]
+        shiny::div(class=lineup_pitch_row_class(role,count),`data-position`=role,style=paste0("--lineup-count:",count),
+          lapply(seq.int(starts[row],ends[row]),function(i)round_lineup_player_ui(lineup$players[[i]],index=i,
+            point_system=lineup$pointSystem,status=lineup$status,pitch_role=role)))
+      })),
     shiny::div(class="fm-lineup-bench",shiny::h4("Substitutes"),shiny::div(class="fm-lineup-bench-row",
       lapply(seq_len(4L),function(i)round_lineup_player_ui(lineup$bench[[i]],bench=TRUE,index=i,
         point_system=lineup$pointSystem,status=lineup$status))))),

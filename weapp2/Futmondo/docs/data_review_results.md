@@ -1,5 +1,11 @@
 # Futmondo data review and implementation results
 
+## Compact lineup pitch (2026-11-23)
+
+- The historical-lineup suite passed 17 checks, and the editor module checks and offline lifecycle passed. The lifecycle exercised 14 checks and all eight application tabs.
+- The historical Chromium fixture checked the two themes, name truncation, portraits and crests, the tilt, six-midfielder spacing, touch close, and resize reuse. Coverage spans phone portrait and landscape, desktop, and resizing across the 992 px breakpoint. The editor fixture covered 320, 390 and 1440 px, including dense and forwardless formations, slot selection and verified synthetic saves. Authenticated hosted rendering remains unverified.
+- With the same historical 3-6-1 fixture, the pitch shrank from 582 to 378 CSS px at 320 px viewport width, from 561 to 378 at 390 px, and from 725 to 509 at 1440 px. The transform affects one static decorative layer, and the layout reuses all existing player nodes and lazy asset URLs. There are no added reactive invalidations, timers, cache entries, API calls or database operations.
+
 ## Real Club filter (2026-11-23)
 
 - The player-table suite passed 19 checks. The new fixtures cover accented names, crest URLs, duplicate and name-only club rows, unknown clubs, combined club/owner filtering, retained choices after snapshot updates and reset on league changes. The offline lifecycle passed 14 checks and rendered all eight tabs.
