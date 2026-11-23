@@ -2376,3 +2376,12 @@ Player-card market and direct-owner offers use the selected row and saved league
 ### Scheduled lineups for confirmed arrivals — implemented locally 2026-11-23
 
 The requested scope authorizes one user-approved immediate lineup and one approved lineup per verified pre-kickoff clause arrival. The elected worker uses separate encrypted access tied to that plan, stores progress durably, and verifies each guarded batch with readback. A confirmed manual save cancels pending stages. The production database migration is installed. Worker rollout and live submission verification are pending. [Lineup contract](lineup_module.md#staged-lineups-for-incoming-signings--2026-11-23).
+
+### LigaRadar browser favicon — implemented locally 2026-11-23
+
+- [x] Add a static field-and-radar SVG favicon and multi-size ICO fallback in the shared document head.
+- [x] Verify local asset delivery, rendered head and offline Shiny lifecycle.
+
+See [branding contract](progressive_loading.md#browser-favicon--2026-11-23) and
+[data review](data_review_results.md#browser-favicon--2026-11-23). Production
+deployment and hosted browser-tab appearance remain unverified.

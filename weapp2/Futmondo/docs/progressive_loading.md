@@ -173,3 +173,13 @@ an unacknowledged write as successful. No source acquisition or refresh cadence
 is changed. Test fixtures block live I/O and retain original persisted-source
 freshness semantics. See `test_welcome_primary_loading.R`,
 `test_worker_renewal_flush.R` and `test_startup_admin_browser_app.R` / `.cjs`.
+
+## Browser favicon — 2026-11-23
+
+The shared document head in `ui.R` declares `www/favicon.svg` and a
+`www/favicon.ico` fallback (16, 32 and 48 px). The static square artwork adapts
+the existing field-and-radar mark with thicker lines and a dark green backdrop
+for small tabs in either browser theme. Relative asset URLs preserve deployment
+subpaths; the version query permits future cache invalidation. Both files ship
+as public static assets, without account data, scripting or external services.
+This is branding only and adds no feature or Welcome inventory entry.

@@ -27,6 +27,10 @@ header <- shinydashboardPlus::dashboardHeader(
 body <- shinydashboard::dashboardBody(
   # Add custom CSS here
   shiny::tags$head(
+    shiny::tags$link(rel = "icon", type = "image/x-icon", sizes = "16x16 32x32 48x48",
+      href = "favicon.ico?v=20261123"),
+    shiny::tags$link(rel = "icon", type = "image/svg+xml", sizes = "any",
+      href = "favicon.svg?v=20261123"),
     shiny::tags$style(shiny::HTML(fm_theme_css())),
     # Embed the current stylesheet: cached legacy CSS must not restore white surfaces.
     shiny::includeCSS("www/custom_style.css"),

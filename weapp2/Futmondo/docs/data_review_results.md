@@ -5516,3 +5516,20 @@ Supabase project `ozhnextrcxxksswpnglt` recorded migration `20261123154622` as `
 The production Welcome markup already listed incoming lineups while the production Lineup markup omitted the control. Supabase statement statistics showed no service-role lineup claims and existing purchase claims. The Lineup code was gating the preview on worker activation and initialized inclusion unchecked. The checkbox and preview now work with the worker flag off and default to including verified pre-kickoff signings. The arrival list uses the same squad and transfer observations as the optimizer, and shows the round-start result. Approvals and automatic saves still require the Dokploy flag.
 
 The offline Lineup and optimizer checks passed. The Shiny lifecycle passed 14 checks and eight tabs. Browser checks at 390 and 1440 px passed with scheduling enabled and disabled, including a verified arrival selected in the XI, a post-kickoff signing excluded, and no source/snapshot calls during preview. Observed local mobile/desktop preview timings were 842/227 ms with scheduling enabled and 829/216 ms with scheduling disabled. The status list adds a bounded render from existing reactive data, with no new source or database calls, background work or timers. The local three-stage fixture took 22 ms median. The reported league's selection requires signed-in validation with its own recorded squad and round data.
+
+## Browser favicon — 2026-11-23
+
+Added a square field-and-radar SVG and a 16/32/48 px ICO fallback in the
+shared application head. Chromium verified both declarations in the actual
+rendered UI, HTTP 200 responses and the correct image content types (862 bytes
+SVG; 15,086 bytes ICO). The existing offline browser fixture does not expose
+`www` automatically; an isolated wrapper enabled that static folder with
+fallthrough routing for the asset check. The rendered SVG preview was inspected.
+ImageMagick confirmed all three ICO sizes. The offline Shiny lifecycle passed
+14 checks and eight tabs; no real account or transaction was used.
+
+Performance review: at most two small same-origin static asset requests on
+initial load, reusable by normal browser caching. No API or database work,
+reactive redraws, timers, blocking server operations or dependencies are added.
+The icon does not affect mobile layout and contains no animation. Hosted
+browser-tab appearance and deployment remain unverified.
