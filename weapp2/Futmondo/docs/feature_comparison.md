@@ -286,3 +286,10 @@ and database observations. See [lineup contract](lineup_module.md).
 ## Dates and times in your timezone (added to login inventory 2026-11-20)
 
 Official app: shows times in device locale; no documented in-app timezone selector was found (verification limited to the public web client). LigaRadar addition: explicit timezone preference applied across kickoffs, deadlines and history.
+
+
+## Explicit league refresh — reviewed 2026-11-22
+
+The official Futmondo [getting-started guide](https://help.futmondo.com/article/90-empieza-a-jugar-a-futmondo) describes buying and selling through the market and reviewing completed signings in the pressroom. Its [market configuration guide](https://help.futmondo.com/article/141-configura-tu-mercado-en-un-campeonato-social) describes direct sale. The [clause guide](https://help.futmondo.com/article/156-que-son-las-clausulas-y-como-activarlas) documents immediate and delayed delivery. The current [official web app](https://app.futmondo.com/) was available as a public shell. Authenticated official UI refresh behavior was not verified.
+
+LigaRadar's Essentials inventory includes **League refresh**. The floating button and confirmed manual trades can request an immediate league-scoped check by LigaRadar's existing worker. The app updates cash, market and squad views from published snapshots and excludes verified incoming clause purchases from the active-clause list.

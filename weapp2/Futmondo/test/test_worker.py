@@ -134,6 +134,45 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(first,again);self.assertEqual(len(self.requests),1)
         self.assertEqual([name for name,_ in self.store.calls][3:],['prepare_source'])
 
+    async def test_league_refresh_checks_source_then_reuses_its_own_checkpoint(self):
+        await self.worker.source(self.job, 'owner', self.message())
+        refresh_job = dict(self.job, league_refresh_at=stamp())
+        fresh = await self.worker.source(refresh_job, 'owner', self.message())
+        self.assertEqual(len(self.requests), 2)
+        await self.worker.publish(refresh_job, 'owner', dict(value={'kind': 'integer', 'values': [200]},
+                                                            observed_at=fresh['observed_at'], status='ok'))
+        manifest = self.store.snapshots[refresh_job['resource_key']]
+        self.assertEqual(unpack_snapshot(manifest, self.store.chunks[manifest['version']])['values'], [200])
+        self.assertEqual(await self.worker.source(refresh_job, 'owner', self.message()), fresh)
+        self.assertEqual(len(self.requests), 2)
+
+    async def test_league_refresh_rejects_earlier_nested_observation(self):
+        child = descriptor('get_user_team_info')
+        old = stamp(time.time() - 30)
+        refresh_job = dict(self.job, league_refresh_at=stamp())
+        self.worker.enqueue_discoveries = AsyncMock()
+        await self.worker.publish(self.job, 'owner', dict(value={'kind': 'integer', 'values': [100]},
+                                                         observed_at=old, status='ok'), child=child)
+        message = dict(type='resource', descriptor=child)
+        self.assertIsNotNone((await self.worker.exchange(self.job, 'owner', message))['value'])
+        self.assertIsNone((await self.worker.exchange(refresh_job, 'owner', message))['value'])
+        await self.worker.publish(refresh_job, 'owner', dict(value={'kind': 'integer', 'values': [200]},
+                                                            observed_at=stamp(), status='ok'), child=child)
+        result = await self.worker.exchange(refresh_job, 'owner', message)
+        self.assertEqual(result['value']['values'], [200])
+
+    async def test_followup_refresh_only_expedites_marked_transfer_candidates(self):
+        refresh_job = dict(self.job, league_refresh_at=stamp())
+        candidate = dict(descriptor('get_player_summary'), transfer_candidate=True,
+                         context=dict(CONTEXT, user_team_id='mine', player_id='candidate'))
+        ordinary = descriptor('get_player_summary', dict(player_id='ordinary'))
+        await self.worker.enqueue_discoveries(refresh_job, 'owner', [candidate, ordinary])
+        writes = [(name, args) for name, args in self.store.calls if name in ('enqueue_batch', 'league_refresh')]
+        self.assertEqual([name for name, _ in writes], ['enqueue_batch', 'league_refresh'])
+        self.assertNotIn('transfer_candidate', writes[0][1]['p_descriptors'][0])
+        self.assertEqual(writes[1][1], dict(p_account='fixture', p_league='l', p_team='mine',
+            p_players=['candidate'], p_core=False, p_observed_request=refresh_job['league_refresh_at']))
+
     async def test_snapshot_chunk_batches_are_bounded_and_publish_last(self):
         value={'kind':'character','values':[os.urandom(750000).hex()]}
         await self.worker.publish(self.job,'owner',dict(value=value,observed_at=stamp(),status='ok'))

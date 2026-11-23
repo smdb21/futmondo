@@ -57,6 +57,16 @@ stopifnot(length(plan)==3L,!anyDuplicated(vapply(plan,function(d)d$resource_key,
 stopifnot(!length(fm_worker_discover('get_players_from_team',roster,rival,auth)))
 cat('PASS roster/history discover incoming and outgoing candidates and do not create redundant rival-team summary scopes\n')
 
+fm_worker_saved_resource<-function(handler,args,context)switch(handler,
+ get_active_championships=active,get_players_from_team=roster,get_championship_pressroom=history,
+ get_championship_players=data.frame(id=c('p1','p2')),NULL)
+plan<-fm_worker_discover('get_championship_players',rbind(players,data.frame(id='new')),league_ctx,auth,league_refresh=TRUE)
+stopifnot(length(plan)==3L,all(vapply(plan,function(d)identical(d$context$player_id,'new'),logical(1))))
+plan<-fm_worker_discover('get_championship_pressroom',history,league_ctx,auth,league_refresh=TRUE)
+stopifnot(length(plan)==2L,all(vapply(plan,function(d)isTRUE(d$transfer_candidate),logical(1))))
+cat('PASS explicit refresh limits catalog rediscovery and marks only pending transfer summaries for follow-up
+')
+
 for(handler in c('get_active_championships','get_notifications','get_notification_unread')){
  a<-fm_worker_descriptor(handler,list(login=auth),ctx)
  b<-fm_worker_descriptor(handler,list(),resource_context(auth))

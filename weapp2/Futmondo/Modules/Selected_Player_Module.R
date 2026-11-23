@@ -1617,7 +1617,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           duration = 5
         )
         invalidate_manual_resources(login,champ_id,team_id,sp$id)
-        if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
+        sync_requested <- fm_worker_refresh_league(login,champ_id,team_id,sp$id)
+        if (!sync_requested && is.function(on_bid_updated)) {
           tryCatch(on_bid_updated(action_type = "clause_paid"), error = function(e) NULL)
         }
       } else {
@@ -1741,7 +1742,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       showNotification(result$message,type=if(isTRUE(result$success)) "message" else "error",duration=8)
       if(isTRUE(result$success) || isTRUE(result$uncertain)) {
         invalidate_manual_resources(login,champ_id,team_id,sp$id)
-        if(is.function(on_bid_updated)) tryCatch(on_bid_updated(
+        sync_requested <- fm_worker_refresh_league(login,champ_id,team_id,sp$id)
+        if(!sync_requested && is.function(on_bid_updated)) tryCatch(on_bid_updated(
           action_type=if(isTRUE(result$success)) "player_sold_direct" else "refresh",
           player_id=sp$id,new_bid_price=NA_real_,is_cancel=FALSE),error=function(e)NULL)
       }
@@ -1862,7 +1864,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           duration = 5
         )
         invalidate_manual_resources(login,champ_id,team_id,sp$id)
-        if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
+        sync_requested <- fm_worker_refresh_league(login,champ_id,team_id,sp$id)
+        if (!sync_requested && is.function(on_bid_updated)) {
           tryCatch(on_bid_updated(action_type = "offer_accepted", player_id = player_id, new_bid_price = NA_real_, is_cancel = TRUE), error = function(e) NULL)
         }
       } else {

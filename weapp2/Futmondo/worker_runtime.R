@@ -570,9 +570,30 @@ fm_worker_session<-function(session,login,leagues=function()list(),source_note=f
 
  invisible(NULL)
 }
-# GUI refresh invalidates its local projections and reads durable observations.
-# Acquisition jobs belong exclusively to the autonomous worker schedule. Manual
-# transaction preflights still execute under the explicit live-read scope.
+# Explicit league refreshes advance existing factual work. Publication flows
+# through the same versioned database read as routine worker updates.
+fm_worker_refresh_league <- function(login, league, team, player=NULL, session=shiny::getDefaultReactiveDomain(), manual=FALSE) {
+ if(!valid_login(login)||!isTRUE(fm_worker_mode(login[['userid']])))return(invisible(FALSE))
+ account<-login[['userid']]
+ payload<-list(p_account=account,p_league=league,p_team=team,
+  p_players=I(if(is.null(player))character()else as.character(player)))
+ report<-function(message,type){
+  if(!is.null(session)&&!session$isClosed())shiny::showNotification(message,type=type,id="league-refresh",session=session)
+ }
+ pending<-tryCatch(fm_worker_rpc('league_refresh',payload),error=promises::promise_reject)
+ promises::then(pending,function(count){
+  if(is.numeric(count)&&length(count)==1L&&isTRUE(count>0)){
+   if(manual)report('League update requested. Balances and players will update as new data arrives.','message')
+  }else report('League sync could not be queued. Check Background sync or try Refresh again.','warning')
+  NULL
+ },function(error){
+  report('The league update could not be queued. Try Refresh again.','warning')
+  NULL
+ })
+ invisible(TRUE)
+}
+
+# Routine invalidation still only rereads durable observations.
 fm_worker_invalidate<-function(account,league,team=NULL,player=NULL){
  if(!fm_worker_configured())return(invisible(NULL))
  s<-fm_worker_account_state(account)

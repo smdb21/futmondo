@@ -26,7 +26,7 @@ fm_pipe_exchange<-function(value){
  }
  answer
 }
-fm_worker_discover<-function(handler,value,context,auth){
+fm_worker_discover<-function(handler,value,context,auth,league_refresh=FALSE){
  # Only the acquisition service creates this durable source plan. Display reads
  # neither register jobs nor alter their recurrence or urgency.
  out<-list()
@@ -35,10 +35,11 @@ fm_worker_discover<-function(handler,value,context,auth){
   if(is.null(read))return(NULL)
   read(fn,args,ctx)
  }
- add<-function(fn,args=list(),ctx=context,interval=fm_worker_interval(fn)){
+ add<-function(fn,args=list(),ctx=context,interval=fm_worker_interval(fn),transfer_candidate=FALSE){
   d<-fm_worker_descriptor(fn,args,ctx);d$interval_seconds<-interval
   previous<-out[[d$resource_key]]
   if(!is.null(previous))d$interval_seconds<-min(previous$interval_seconds,interval)
+  if(transfer_candidate||isTRUE(previous$transfer_candidate))d$transfer_candidate<-TRUE
   out[[d$resource_key]]<<-d
  }
  own_team_value<-NULL
@@ -114,7 +115,12 @@ fm_worker_discover<-function(handler,value,context,auth){
  }
  if(handler=='get_championship_players'&&is.data.frame(value)&&'id'%in%names(value)){
   tid<-context$user_team_id;if(!nzchar(tid))tid<-own_team()
-  if(nzchar(tid))for(id in unique(as.character(value$id))){
+  ids<-unique(as.character(value$id))
+  if(league_refresh){
+   previous<-saved('get_championship_players',list(championship_id=context$championship_id))
+   if(is.data.frame(previous)&&'id'%in%names(previous))ids<-setdiff(ids,as.character(previous$id))
+  }
+  if(nzchar(tid))for(id in ids){
    if(is.na(id)||!nzchar(id))next
    ctx<-context;ctx$user_team_id<-tid;ctx$player_id<-id
    args<-list(championship_id=ctx$championship_id,user_team_id=tid,player_id=id)
@@ -141,10 +147,14 @@ fm_worker_discover<-function(handler,value,context,auth){
    roster<-if(handler=='get_players_from_team')value else saved('get_players_from_team',list(championship_id=context$championship_id,user_team_id=tid))
    history<-if(handler=='get_championship_pressroom')value else saved('get_championship_pressroom',list(championship_id=context$championship_id))
    candidates<-pending_clause_candidates(roster,history,tid)
-   if(is.data.frame(candidates))for(id in unique(as.character(candidates$player_id))){
-    if(is.na(id)||!nzchar(id))next
-    ctx<-context;ctx$user_team_id<-tid;ctx$player_id<-id
-    add('get_player_summary',list(championship_id=ctx$championship_id,user_team_id=tid,player_id=id),ctx,300L)
+   if(is.data.frame(candidates)){
+    clause_flag<-candidates$is_clause %||% rep(NA,nrow(candidates))
+    expedite<-if(league_refresh)tail(unique(as.character(candidates$player_id[!clause_flag%in%FALSE])),64L)else character()
+    for(id in unique(as.character(candidates$player_id))){
+     if(is.na(id)||!nzchar(id))next
+     ctx<-context;ctx$user_team_id<-tid;ctx$player_id<-id
+     add('get_player_summary',list(championship_id=ctx$championship_id,user_team_id=tid,player_id=id),ctx,300L,transfer_candidate=id%in%expedite)
+    }
    }
   }
  }
@@ -545,7 +555,7 @@ fm_worker_run<-function(descriptor){
  deadline<-if(is.numeric(original_deadline)&&length(original_deadline)==1L&&is.finite(original_deadline))
   rival_finance_stamp(as.POSIXct(original_deadline,origin='1970-01-01',tz='UTC'))else NULL
  list(type='result',value=fm_worker_encode(value),observed_at=rival_finance_stamp(observed),checked_at=rival_finance_stamp(),valid_until=deadline,
-  status=status,completeness=completeness,resources=unname(produced[setdiff(names(produced),descriptor$resource_key)]),discoveries=env$fm_worker_discover(handler,value,ctx,auth))
+  status=status,completeness=completeness,resources=unname(produced[setdiff(names(produced),descriptor$resource_key)]),discoveries=env$fm_worker_discover(handler,value,ctx,auth,league_refresh=isTRUE(descriptor$league_refresh)))
 }
 fm_pipe_send(list(type='ready',version=1L))
 repeat{

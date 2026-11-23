@@ -108,12 +108,13 @@ body <- shinydashboard::dashboardBody(
       admin_UI(id = "admin")
     )
   ),
-  # Floating Action Button for global cache refresh
+  # Floating action button for the selected league
   actionButton(
     inputId = "refresh_all",
     label = icon("rotate"),
     class = "btn-refresh-floating",
-    title = "Refresh"
+    title = "Refresh league balances and players",
+    `aria-label` = "Refresh league balances and players"
   )
 )
 

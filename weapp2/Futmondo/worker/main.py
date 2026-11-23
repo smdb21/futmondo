@@ -90,7 +90,7 @@ DB_DIAGNOSTIC_PATHS = FACT_TABLES | frozenset("""worker_accounts worker_jobs wor
 worker_snapshots worker_checkpoints worker_health worker_schedule_policy
 rpc/worker_read rpc/worker_read_cached rpc/worker_checkpoint_ack rpc/worker_claim rpc/worker_guard rpc/worker_prepare_source
 rpc/worker_checkpoint rpc/worker_write_fact rpc/worker_publish rpc/worker_publish_child
-rpc/worker_enqueue_batch rpc/worker_maintenance rpc/worker_cleanup_batch rpc/worker_release rpc/worker_guard_activity rpc/worker_admin_monitor
+rpc/worker_enqueue_batch rpc/worker_league_refresh rpc/worker_maintenance rpc/worker_cleanup_batch rpc/worker_release rpc/worker_guard_activity rpc/worker_admin_monitor
 rpc/clause_observe rpc/clause_cleanup rpc/clause_retire_context rpc/clause_claim
 rival_finance_evidence_latest rival_finance_evidence_versions finance_history_states player_round_dataset""".split())
 
@@ -591,7 +591,10 @@ class Worker:
         body = message['body']
         if isinstance(body, str):
             body = json.loads(body)
-        request_key = hashlib.sha256(canonical(dict(path=url.path, body=body)).encode()).hexdigest()
+        request_identity = dict(path=url.path, body=body)
+        if job.get('league_refresh_at'):
+            request_identity['league_refresh_at'] = job['league_refresh_at']
+        request_key = hashlib.sha256(canonical(request_identity).encode()).hexdigest()
         self.set_activity(owner, 'database', 'rpc/worker_prepare_source', 'POST')
         prepared = await self.store.rpc('prepare_source', p_account=job['account_id'], p_key=job['resource_key'],
             p_owner=owner, p_generation=job['generation'], p_request=request_key)
@@ -775,7 +778,7 @@ class Worker:
             discovery = message['type'] == 'discovery_resource'
             if discovery and descriptor.get('handler') not in (
                     'get_active_championships', 'get_classification_round_catalog',
-                    'get_players_from_team', 'get_championship_pressroom'):
+                    'get_players_from_team', 'get_championship_pressroom', 'get_championship_players'):
                 raise WorkerFailure('resource_context')
             scope = descriptor['context']
             if scope['account_id'] != job['account_id'] or (scope.get('championship_id') and
@@ -809,6 +812,14 @@ class Worker:
                                 'observed_at': manifest['observed_at'], 'discovery_only': True}
                     if datetime.fromisoformat(manifest['valid_until'].replace('Z', '+00:00')).timestamp() <= time.time():
                         continue
+                    refresh_at = job.get('league_refresh_at')
+                    if refresh_at and descriptor['handler'] in {
+                            'get_user_team_info', 'get_market_players', 'get_players_from_team',
+                            'get_championship_pressroom', 'get_championship_players', 'get_roster_bids',
+                            'get_my_market_players', 'get_player_summary', 'get_team_acquisition_capacity',
+                            'get_acquisition_capacity', 'get_financial_snapshot'}:
+                        if datetime.fromisoformat(manifest['observed_at']) < datetime.fromisoformat(refresh_at):
+                            continue
                     value = unpack_snapshot(manifest, item['chunks'])
                     self.source_stamps.setdefault(owner, []).append(manifest['checked_at'])
                     return {'value': value, 'observed_at': manifest['observed_at']}
@@ -920,6 +931,7 @@ class Worker:
         # minutes after their parent lease has ended. Keep each durable write
         # bounded and acknowledged, without mutating helper descriptors.
         batch, size = [], 0
+        candidates = {}
         async def flush():
             self.set_activity(owner, 'publishing', 'rpc/worker_enqueue_batch', 'POST')
             acknowledged = await self.store.rpc('enqueue_batch', p_account=job['account_id'],
@@ -927,6 +939,10 @@ class Worker:
             if type(acknowledged) is not int or not 0 <= acknowledged <= len(batch):
                 raise WorkerFailure('discovery_unacknowledged')
         for descriptor in discoveries:
+            descriptor = dict(descriptor)
+            if descriptor.pop('transfer_candidate', False) and job.get('league_refresh_at'):
+                context = descriptor['context']
+                candidates.setdefault(context['user_team_id'], set()).add(context['player_id'])
             assert_factual(descriptor)
             encoded_size = len(canonical(descriptor).encode())
             if encoded_size > 262144:
@@ -938,6 +954,13 @@ class Worker:
             size += encoded_size
         if batch:
             await flush()
+        for team, players in candidates.items():
+            ids = sorted(players)
+            for start in range(0, len(ids), 64):
+                self.set_activity(owner, 'publishing', 'rpc/worker_league_refresh', 'POST')
+                await self.store.rpc('league_refresh', p_account=job['account_id'],
+                    p_league=job['descriptor']['context']['championship_id'], p_team=team,
+                    p_players=ids[start:start + 64], p_core=False, p_observed_request=job['league_refresh_at'])
 
     async def lane(self, index):
         owner = self.identity + ':' + str(index)
@@ -963,6 +986,8 @@ class Worker:
                         await self.guard(job, owner)
                 renewal = asyncio.create_task(renew())
                 run_descriptor = json.loads(canonical(job['descriptor']))
+                if job.get('league_refresh_at'):
+                    run_descriptor['league_refresh'] = True
                 audit = job.get('last_audit_at')
                 job['_full_audit'] = job['descriptor']['handler'] == 'get_championship_pressroom' and (not audit or
                     time.time() - datetime.fromisoformat(audit.replace('Z', '+00:00')).timestamp() >= 86400)

@@ -18,6 +18,7 @@ resource<-list(key=d$resource_key,manifest=manifest,chunks=list(jsonlite::base64
 rpc<-list()
 fm_worker_rpc<-function(name,payload,owner=''){
  rpc[[length(rpc)+1L]]<<-list(name=name,payload=payload)
+ if(name=='league_refresh')return(promises::promise_resolve(1L))
  stopifnot(name=='read')
  promises::promise_resolve(list(account=s$account,health=NULL,jobs=list(list(key=d$resource_key,error=NULL,pending=FALSE,running=FALSE)),
   resources=if(d$resource_key%in%names(payload$p_versions)&&!identical(payload$p_versions[[d$resource_key]],'v2'))list(resource)else list()))
@@ -36,9 +37,12 @@ shiny::testServer(function(input,output,session){
  s$descriptors[[d$resource_key]]<-item
  stopifnot(d$resource_key%in%fm_worker_live_keys(s))
  s$errors[['unwanted-old-context']]<-'old source failure'
+ stopifnot(fm_worker_refresh_league(auth,'l','t',session=session,manual=TRUE));flush(session)
+ stopifnot(output$cash=='100',length(rpc)==1L,rpc[[1]]$name=='league_refresh',
+   identical(rpc[[1]]$payload,list(p_account=auth[['userid']],p_league='l',p_team='t',p_players=I(character()))))
  fm_worker_poll(auth[['userid']],session$token,TRUE);flush(session)
- stopifnot(output$cash=='200',length(rpc)==1L,rpc[[1]]$name=='read',!length(.fm_transport$tasks),is.null(s$errors[['unwanted-old-context']]))
- cat('PASS a visible source older than two minutes receives and renders a new durable version without refresh, enqueue or source HTTP\n')
+ stopifnot(output$cash=='200',length(rpc)==2L,rpc[[2]]$name=='read',!length(.fm_transport$tasks),is.null(s$errors[['unwanted-old-context']]))
+ cat('PASS explicit refresh queues once, keeps the old balance visible, then renders the new durable version without browser source HTTP\n')
  sibling<-function()FALSE;attr(sibling,'fm_worker_interest')<-'inactive-sibling'
  fm_worker_demand(d,session$token,sibling)
  stopifnot(d$resource_key%in%fm_worker_live_keys(s))

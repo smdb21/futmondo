@@ -2325,7 +2325,7 @@
       "checksum": "f26ac1c78f6de3507c2bc4dd331f3cda"
     },
     "Modules/Login_Module.R": {
-      "checksum": "4b55944fc905751abb3223cb075eefcd"
+      "checksum": "83cb5c0418d4454269d06f353d90f2e5"
     },
     "Modules/Market_Module.R": {
       "checksum": "676429892e2008352ddce0a3a4a2e32b"
@@ -2334,13 +2334,13 @@
       "checksum": "b759b9b900ef519c81613486b78b2d24"
     },
     "Modules/Players_in_Championship_Module.R": {
-      "checksum": "0f2bf39321e7033267e883ff21d1139f"
+      "checksum": "252f766c7e89b506009837a9bf406444"
     },
     "Modules/Players_in_Teams_Module.R": {
       "checksum": "82206d5f469a9204da88499cfb2d77cb"
     },
     "Modules/Players_Table_Module.R": {
-      "checksum": "b71be319c3e5883ba4996c491fdc9f22"
+      "checksum": "004fad1fde7d596b1e4854f1be9c8242"
     },
     "Modules/Plots_Module.R": {
       "checksum": "6eb616af21a125a9a4200a20e5494452"
@@ -2352,7 +2352,7 @@
       "checksum": "67d90ffcc8cbda28d007a6f3bef79f91"
     },
     "Modules/Selected_Player_Module.R": {
-      "checksum": "2f64e1a6e6efd379013001b728f7feda"
+      "checksum": "56fc4d2c2a85cda56035a77227b00e52"
     },
     "Modules/Today_Module.R": {
       "checksum": "589e00cc033412df8a1cc0db1169dee2"
@@ -2388,7 +2388,7 @@
       "checksum": "6941ec3d550551d6c41a20b6a4d2ff3e"
     },
     "server.R": {
-      "checksum": "d4f04c26ea4b42e17249eb53d5b01c67"
+      "checksum": "6484660aaa46c06a6707bbd58d1fc739"
     },
     "supabase_connector.R": {
       "checksum": "f49117c4a21dd8d417a32070c206f2cf"
@@ -2397,7 +2397,7 @@
       "checksum": "d27c0d69c8f1f25be0ca87f5a1912085"
     },
     "ui.R": {
-      "checksum": "db6588b21463077a22fdf009d6e3dc6e"
+      "checksum": "76ae04be142a595573755b907afef8c8"
     },
     "utils.R": {
       "checksum": "b0cc5084b225aaec12a2c150edc1d4e1"
@@ -2406,7 +2406,7 @@
       "checksum": "767c79704fb40aef1a0b75a20ab56a5a"
     },
     "worker_runtime.R": {
-      "checksum": "507074678584164a948773679088a992"
+      "checksum": "6665832984c50aa8ee2d9ce096a6f329"
     },
     "www/custom_style.css": {
       "checksum": "7225a01a8f30f1d396653b724db48b65"
@@ -2415,7 +2415,7 @@
       "checksum": "c857838c71c03ff562f0e6ad2dfa0359"
     },
     "www/release-info.json": {
-      "checksum": "b8b77cf03ed9854419f31d1a61ced90a"
+      "checksum": "6711d7867411d7636b993a839ef3596c"
     },
     "www/remember-login.js": {
       "checksum": "2b037334f8088f5b4a270acbaea52e91"

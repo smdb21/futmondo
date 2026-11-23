@@ -51,7 +51,7 @@ championship_market_prices <- function(players, market_state) {
   players
 }
 
-players_in_championship_Server <- function(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger = NULL) {
+players_in_championship_Server <- function(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger = NULL, clause_transfers_source = NULL) {
   moduleServer(id, function(input, output, session) {
     bind_factual_reads(c("get_championship_players","get_financial_snapshot"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
 
@@ -109,6 +109,9 @@ players_in_championship_Server <- function(id, is_module_active, login_token, ch
       if (length(funds) == 1L && is.finite(funds) && funds >= 0) funds else NA_real_
     })
 
+    incoming_player_ids <- if(is.function(clause_transfers_source))resource_display_source(session,
+      function()sort(unique(as.character(clause_transfers_source()$records$player_id))))else NULL
+
     # Module ----
     ##  players_table_Server Module ----
     selected_player_RV <- players_table_Server(
@@ -122,6 +125,7 @@ players_in_championship_Server <- function(id, is_module_active, login_token, ch
       points_ratio_basis = "clause_price",
       allow_scheduled_clauses = TRUE,
       filter_by_own_team = TRUE,
+      incoming_player_ids = incoming_player_ids,
       refresh_trigger = refresh_trigger,
       is_module_active = is_module_active
     )

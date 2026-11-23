@@ -2298,3 +2298,12 @@ has no runtime/performance effect.
 - See [player-card contract](selected_player_module.md#player-fixture-and-chart-dates--2026-11-19)
   and [verification](data_review_results.md#player-card-match-history--2026-11-19).
   Authenticated hosted verification remains pending.
+
+
+## League refresh after manual transactions — 2026-11-22
+
+- [x] Queue scoped factual acquisition from floating Refresh and successful manual buys/sales.
+- [x] Preserve worker checkpoint and lease rules, publish observed results, and update the balance and player list from stored versions.
+- [ ] Apply the migration in production and verify hosted refresh timing and source publication.
+
+Contract and rollout are in [database-first sync](database_first_sync.md#explicit-league-refresh). Tests and performance limits are in [data review results](data_review_results.md).

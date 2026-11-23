@@ -53,6 +53,10 @@ function(input, output, session) {
   bind_factual_reads("get_active_championships",session,login_token_RV,is_active=function()valid_login(login_token_RV()))
   observeEvent(input$refresh_all, {
     req(valid_login(login_token_RV()))
+    if(isTRUE(fm_worker_mode(login_token_RV()[['userid']]))) {
+      fm_worker_refresh_league(login_token_RV(),championship_id_RV(),user_team_id_RV(),session=session,manual=TRUE)
+      return()
+    }
     invalidate_resources(resource_context(login_token_RV(),isolate(championship_id_RV())),pattern="market|roster|teams|team_info|players|financial|capacity|round|notification|pressroom|history|summary|card",notify_availability=!isTRUE(fm_worker_mode(login_token_RV()[['userid']])))
     history_refresh_trigger(isolate(history_refresh_trigger()) + 1L)
     refresh_trigger(refresh_trigger() + 1)
@@ -353,7 +357,8 @@ players_in_championship_Server(id = "players_in_championship",
                                   championship_id = championship_id_RV,
                                   user_team_id = user_team_id_RV,
                                   user_teams_RV = user_teams_RV,
-                                  refresh_trigger = refresh_trigger)
+                                  refresh_trigger = refresh_trigger,
+                                  clause_transfers_source = clause_transfers_RV)
 
   rivals_Server(id = "rivals",
                 is_module_active = reactive({

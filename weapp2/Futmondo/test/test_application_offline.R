@@ -236,6 +236,22 @@ app_check('same-context loading preserves selection but league changes clear it'
   league('other-league');app_settle(session);stopifnot(is.null(selected_player_RV()),is.null(selected_player_snapshot_RV()))
  });getReactableState<-original_state
 })
+app_check('observed clause arrival removes a pending buy from available league players',{
+ rows<-app_roster[1:2,,drop=FALSE]
+ rows$userteamId<-rows$user_team_id<-rows$owner_team_id<-'rival'
+ rows$clause_price<-2e6;rows$isClause<-TRUE;rows$clause_transferred<-FALSE
+ rows$clause_date<-NA_character_
+ incoming<-reactiveVal(character())
+ shiny::testServer(players_table_Server,args=list(players_table_RV=reactive(rows),user_teams_RV=reactive(app_teams),
+  user_team_id=reactive('team1'),filter_by_own_team=TRUE,incoming_player_ids=incoming),{
+  session$setInputs(active_clause_filter=TRUE);app_settle(session)
+  stopifnot(setequal(players_table_filtered_RV()$id,rows$id))
+  incoming(rows$id[1]);app_settle(session)
+  stopifnot(identical(players_table_filtered_RV()$id,rows$id[2]))
+  session$setInputs(active_clause_filter=FALSE,show_my_team_filter=TRUE);app_settle(session)
+  stopifnot(setequal(players_table_filtered_RV()$id,rows$id))
+ })
+})
 app_check('no HTTP or live database mutation attempts',stopifnot(offline_http_attempts==0L))
 cat('Offline lifecycle:',app_checks,'checks plus 8 tabs passed.\n')
 for(method in c('GET','POST','PUT','PATCH','DELETE'))suppressMessages(untrace(method,where=asNamespace('httr')))

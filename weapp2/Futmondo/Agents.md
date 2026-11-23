@@ -49,6 +49,11 @@ Every time a feature is added or materially expanded, compare its actual behavio
 
 ## Verification
 
+Keep every change as lightweight as possible. Reuse existing results, reads, queues, timers, and UI
+projections. Limit fresh work and redraws to affected data. Compare the expected responsiveness and
+resource cost with the previous path, and measure the affected path when it can materially change
+latency, request volume, database work, memory, or rendering. Record the result and any trade-offs.
+
 Every modification must pass a performance-impact review before it is considered complete. Evaluate each affected data and UI path for API/database request volume, cache reuse and invalidation, blocking work, reactive updates and timers, memory growth, and rendering cost, including on mobile. Keep the app responsive during loading, refreshes, and navigation. For changes that may affect runtime, use the smallest relevant existing check or measurement to verify the impact, and resolve responsiveness regressions before completion. Record the review outcome and verification limits with the change. For documentation-only or other changes with no runtime effect, explicitly record that assessment; no performance tests are required.
 
 Use the smallest meaningful existing tests for each changed behavior. Add focused coverage for uncovered data, cache, isolation, or manual-action risks. Independently verify changed point/history transformations with known-answer fixtures.

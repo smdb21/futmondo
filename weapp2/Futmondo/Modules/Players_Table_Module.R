@@ -355,7 +355,7 @@ players_table_renewal_disabled <- function(settings) {
   length(value)==1L && is.atomic(value) && !is.na(value) && identical(tolower(as.character(value)),"true")
 }
 
-players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL, available_funds_RV = NULL, hide_bid_column = FALSE, refresh_trigger = NULL, is_module_active = function() TRUE, optional_ready = function() TRUE, points_ratio_basis = NULL, own_squad = FALSE, league_settings_source = NULL, departing_player_ids = NULL, filter_by_own_team = FALSE, effective_squad_source = NULL, allow_scheduled_clauses = FALSE) {
+players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL, available_funds_RV = NULL, hide_bid_column = FALSE, refresh_trigger = NULL, is_module_active = function() TRUE, optional_ready = function() TRUE, points_ratio_basis = NULL, own_squad = FALSE, league_settings_source = NULL, departing_player_ids = NULL, filter_by_own_team = FALSE, effective_squad_source = NULL, allow_scheduled_clauses = FALSE, incoming_player_ids = NULL) {
   if (!is.null(points_ratio_basis)) points_ratio_basis <- match.arg(points_ratio_basis, c("value", "clause_price"))
   moduleServer(id, function(input, output, session) {
     bind_factual_reads(c("get_finished_rounds"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
@@ -535,7 +535,11 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       players_table <- players_table_enriched_RV()
       if(is.null(players_table))return(NULL)
       filter_added_fields<-attr(players_table,"filter_added_fields")
-      if(isTRUE(filter_by_own_team)&&!isTRUE(input$show_my_team_filter)) {
+      hide_own_team<-isTRUE(filter_by_own_team)&&!isTRUE(input$show_my_team_filter)
+      active_clause_only<-isTRUE(input$active_clause_filter)
+      if((hide_own_team||active_clause_only)&&is.function(incoming_player_ids))
+        players_table<-players_table[!as.character(players_table$id)%in%incoming_player_ids(),,drop=FALSE]
+      if(hide_own_team) {
         own_team<-table_context_RV()$team
         shiny::validate(shiny::need(nzchar(own_team),"Loading your team…"),errorClass="fm-loading")
         players_table<-players_table[!as.character(players_table$owner_team_id)%in%own_team,,drop=FALSE]
@@ -593,7 +597,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
           players_table <- players_table[is.finite(clause_values) & clause_values > 0 & clause_values <= funds, , drop = FALSE]
         }
       }
-      if(isTRUE(input$active_clause_filter))
+      if(active_clause_only)
         players_table<-players_table[players_table_active_clause(players_table),,drop=FALSE]
       # is_favorite_filter
       if (!is.null(input$is_favorite_filter)) {
