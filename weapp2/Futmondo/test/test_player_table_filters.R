@@ -131,6 +131,17 @@ shiny::testServer(players_table_Server,args=list(players_table_RV=function()posi
  })
 })
 add_recent_points_average<-original_average
+check('clause cap preserves decimal separators and exact euro boundaries', {
+  for (value in list(135, "135", "135,0", "135.0", "135 M"))
+    stopifnot(identical(players_table_clause_cap(value), 135e6))
+  stopifnot(identical(players_table_clause_cap("1,000001"), 1000001),
+    identical(players_table_clause_cap("135,5 M"), 135.5e6),
+    identical(players_table_clause_cap("0"), 0),
+    identical(players_table_clause_cap("  "), Inf),
+    identical(players_table_clause_cap(NULL), Inf))
+  for (value in c("135e", "-135", "135,0.0", "135 MM"))
+    stopifnot(is.na(players_table_clause_cap(value)))
+})
 check('clause eligibility uses price, transfer state and UTC lock times',{
  now<-as.POSIXct('2026-11-01 12:00:00',tz='UTC')
  rows<-data.frame(clause_price=c(10,10,10,10,10,0,10,10),clause_transferred=c(FALSE,FALSE,FALSE,FALSE,TRUE,FALSE,NA,NA),

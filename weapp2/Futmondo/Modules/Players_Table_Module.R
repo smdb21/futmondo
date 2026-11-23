@@ -66,8 +66,12 @@ players_table_UI <- function(id, box_title = NULL,
             div(checkboxInput(inputId = ns("active_clause_filter"), label = players_table_filter_label("Active Clause Only", "lock-open"), value = isTRUE(default_active_clause)), style = "font-weight: 500;", title = "Show only players whose buyout clause is currently payable (lock period has expired)")
           },
           if (filter_by_max_clause_value) {
-            div(numericInput(inputId = ns("max_clause_value_filter"), label = players_table_filter_label("Max Clause (M)", "file-contract"), min = 0,
-              value = NA_real_, step = 0.5, width = "160px"), style = "font-weight: 500;",
+            cap_input <- textInput(ns("max_clause_value_filter"),
+              players_table_filter_label("Max Clause (M)", "file-contract"), width = "160px")
+            cap_input <- htmltools::tagQuery(cap_input)$find("input")$
+              addAttrs(inputmode = "decimal", `aria-describedby` = ns("max_clause_value_feedback"))$allTags()
+            div(cap_input, uiOutput(ns("max_clause_value_feedback"), role = "status"),
+              style = "font-weight: 500;",
               title = "Show only players with a positive release clause at or below this amount")
           },
           if (filter_by_clause_under_available_funds) {
@@ -227,6 +231,19 @@ players_table_filter_fields <- function(rows) {
     rows[[field]]<-if(field%in%names(rows))suppressWarnings(as.logical(as.character(rows[[field]])))else rep(NA,n)
   rows
 }
+# Return the euro cap, Inf for an empty input, or NA for an invalid amount.
+players_table_clause_cap <- function(value) {
+  if (is.null(value) || (length(value) == 1L && is.na(value))) return(Inf)
+  if (length(value) != 1L) return(NA_real_)
+  value <- trimws(as.character(value), whitespace = "[\\h\\v]")
+  if (!nzchar(value)) return(Inf)
+  if (!grepl("^(?:[0-9]+(?:[.,][0-9]+)?|[.,][0-9]+)\\h*[mM]?$", value, perl = TRUE))
+    return(NA_real_)
+  decimal <- chartr(",", ".", sub("\\h*[mM]$", "", value, perl = TRUE))
+  amount <- as.numeric(paste0(trimws(decimal, whitespace = "[\\h\\v]"), "e6"))
+  if (is.finite(amount)) amount else NA_real_
+}
+
 players_table_active_clause <- function(rows,now=Sys.time()) {
   field<-function(key,default)if(key%in%names(rows))rows[[key]]else rep(default,nrow(rows))
   price<-suppressWarnings(as.numeric(as.character(field("clause_price",NA_real_))))
@@ -416,7 +433,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
         updateNumericInput(session, inputId = "max_value_filter", value = NA_real_)
         updateNumericInput(session, inputId = "change_value_filter", value = NA)
         updateCheckboxInput(session, inputId = "active_clause_filter", value = FALSE)
-        updateNumericInput(session, inputId = "max_clause_value_filter", value = NA_real_)
+        updateTextInput(session, inputId = "max_clause_value_filter", value = "")
         updateCheckboxInput(session, inputId = "clause_under_available_funds_filter", value = FALSE)
         updateCheckboxInput(session, inputId = "value_under_available_funds_filter", value = FALSE)
         updateCheckboxInput(session, inputId = "is_favorite_filter", value = FALSE)
@@ -530,6 +547,12 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
     # Coalesce position choices without delaying the visible selection chips.
     position_filter <- shiny::debounce(reactive(input$position_filter), millis = 300)
 
+    maximum_clause <- reactive(players_table_clause_cap(input$max_clause_value_filter))
+    output$max_clause_value_feedback <- renderUI({
+      req(is_module_active(), is.na(maximum_clause()))
+      tags$span(class = "text-danger", "Enter a non-negative amount in millions.")
+    })
+
     ## players_table_filtered_RV ----
     players_table_filtered_RV <- reactive({
       players_table <- players_table_enriched_RV()
@@ -576,26 +599,21 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
         keep <- if (length(funds) == 1L && is.finite(funds) && funds >= 0) is.finite(values) & values <= funds else rep(FALSE, nrow(players_table))
         players_table <- players_table[keep, , drop = FALSE]
       }
-      clause_values <- if ("clause_price" %in% names(players_table)) {
-        suppressWarnings(as.numeric(as.character(players_table$clause_price)))
-      } else rep(NA_real_, nrow(players_table))
-      if (!is.null(input$max_clause_value_filter) && is.finite(input$max_clause_value_filter)) {
-        maximum_clause <- as.numeric(input$max_clause_value_filter) * 1000000
-        players_table <- players_table[is.finite(clause_values) & clause_values > 0 & clause_values <= maximum_clause, , drop = FALSE]
-        clause_values <- clause_values[is.finite(clause_values) & clause_values > 0 & clause_values <= maximum_clause]
-      }
-      if (!is.null(input$clause_under_available_funds_filter) && isTRUE(input$clause_under_available_funds_filter)) {
+      clause_cap <- maximum_clause()
+      if (!is.na(clause_cap) && isTRUE(input$clause_under_available_funds_filter)) {
         funds <- tryCatch({
-          if (is.null(available_funds_RV)) NA_real_ else if (is.reactive(available_funds_RV) || is.function(available_funds_RV)) available_funds_RV() else available_funds_RV
+          if (is.function(available_funds_RV)) available_funds_RV() else available_funds_RV
         }, error = function(e) NA_real_)
         funds <- suppressWarnings(as.numeric(funds)[1])
-        if (!is.finite(funds) || funds < 0) {
-          # Do not guess affordability when the verified financial snapshot is unavailable.
-          players_table <- players_table[0, , drop = FALSE]
-        } else {
-          clause_values <- if ("clause_price" %in% names(players_table)) suppressWarnings(as.numeric(as.character(players_table$clause_price))) else rep(NA_real_, nrow(players_table))
-          players_table <- players_table[is.finite(clause_values) & clause_values > 0 & clause_values <= funds, , drop = FALSE]
-        }
+        # Do not guess affordability when the verified financial snapshot is unavailable.
+        clause_cap <- if (is.finite(funds) && funds >= 0) min(clause_cap, funds) else NA_real_
+      }
+      if (is.na(clause_cap)) {
+        players_table <- players_table[0, , drop = FALSE]
+      } else if (is.finite(clause_cap)) {
+        clause_values <- players_table$clause_price
+        keep <- is.finite(clause_values) & clause_values > 0 & clause_values <= clause_cap
+        players_table <- players_table[keep, , drop = FALSE]
       }
       if(active_clause_only)
         players_table<-players_table[players_table_active_clause(players_table),,drop=FALSE]

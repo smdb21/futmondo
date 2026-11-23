@@ -1,5 +1,11 @@
 # Players Table Module Documentation
 
+## Maximum clause input — 2026-11-22
+
+In All Players, **Max Clause (M)** accepts a non-negative amount in millions, with a decimal point or comma and an optional `M` suffix. `players_table_clause_cap()` converts the amount to euros. The filter uses the same observed `clause_price` shown by the **Clause Price** column and includes the exact boundary. Blank input and **Clear Filters** remove the cap. Invalid input displays a correction prompt and withholds results until the amount is corrected or cleared. If **Clause within available funds** is enabled, the lower of the supplied limit and verified spending capacity applies.
+
+Changing the cap reuses the normalized player rows from the existing database-first catalog. Parsing is reactive to the cap text and the price comparison uses one row mask, including when both clause limits are enabled.
+
 ## Filter label icon placement — 2026-11-17
 
 `players_table_filter_label(text, icon_name)` renders the visible text followed

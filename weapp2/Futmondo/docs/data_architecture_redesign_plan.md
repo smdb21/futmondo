@@ -2317,3 +2317,8 @@ Contract and rollout are in [database-first sync](database_first_sync.md#explici
 - [x] Verify the hosted release marker and both changed source hashes. Reconcile the affected reservation from saved Futmondo observations and verify its durable release.
 
 See [completed market bids](scheduled_clauses.md#completed-market-bids) and [verification](data_review_results.md).
+
+
+### Maximum clause input (2026-11-22, implemented locally)
+
+Fixed decimal-comma entry in the existing All Players maximum clause filter. The table applies the inclusive euro limit to its existing stored clause prices. See [filter contract](players_table_module.md#maximum-clause-input--2026-11-22) and [verification](data_review_results.md#maximum-clause-input--2026-11-22).

@@ -66,6 +66,23 @@ const {chromium}=require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp
     await page.locator(`#${id}-btn_clear_filters`).click();
     await page.waitForFunction(id=>document.getElementById(`${id}-position_filter`).selectize.items.join()==='All',id);
     await expectRows(['Keeper','Defender','Midfielder','Forward','Dual','Unknown']);
+    if(id==='plain'){
+     const cap=page.locator('#plain-max_clause_value_filter');
+     const feedback=page.locator('#plain-max_clause_value_feedback');
+     const begin=Date.now();
+     await cap.fill('135,0');
+     await expectRows(['Keeper','Defender']);
+     const latency=Date.now()-begin;
+     await cap.fill('135.5 M');await expectRows(['Keeper','Defender','Forward']);
+     await cap.fill('135');await expectRows(['Keeper','Defender']);
+     await cap.fill('135e');await feedback.getByText('Enter a non-negative amount in millions.').waitFor();
+     await expectRows([]);
+     await page.locator('#plain-btn_clear_filters').click();
+     await expectRows(['Keeper','Defender','Midfielder','Forward','Dual','Unknown']);
+     assert.equal(await cap.inputValue(),'');
+     assert.equal(await feedback.textContent(),'');
+     console.log(`PASS ${width}px ${theme}: 135M clause cap excludes 328M in ${latency}ms`);
+    }
     // The second table keeps its own selection throughout the first's changes.
     const other=id==='plain'?'squad':'plain';
     assert.deepEqual(await page.locator(`#${other}-position_filter`).evaluate(el=>el.selectize.items.slice()),['All']);
