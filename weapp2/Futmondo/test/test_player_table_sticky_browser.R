@@ -9,7 +9,7 @@ recent_player_points_source<-function(...)list(history=function()data.frame(),st
 rows<-data.frame(id=paste0('p',1:12),name=paste('Synthetic player',1:12),role='Defender / Midfielder',
  team='Athletic Club',logo='athletic',value=2e6,points=1:12,change=rep(c(-20000,0,10000,30000),3),
  average.fitness='2,5,12,12,6',average.averageLastFive=7.4,fav=FALSE,
- price=3e6,clause_price=4e6,rating=7,played=12,userTeam='Fixture team')
+ status=rep(c('injured','ok',NA,'doubt'),3),price=3e6,clause_price=4e6,rating=7,played=12,userTeam='Fixture team')
 ui<-shinydashboard::dashboardPage(shinydashboard::dashboardHeader(title='Table fixture'),
  shinydashboard::dashboardSidebar(disable=TRUE),shinydashboard::dashboardBody(
  shiny::tags$head(shiny::tags$style(shiny::HTML(fm_theme_css())),shiny::includeCSS('www/custom_style.css')),

@@ -13,6 +13,18 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       await page.evaluate(theme=>document.documentElement.dataset.fmTheme=theme,theme);
       const table=page.locator('#fixture-players_table');
       await table.locator('.rt-tbody .fm-player-name').first().waitFor();
+      const marked=table.locator('.rt-tbody .fm-player-name').filter({hasText:/^Synthetic player 1$/});
+      const badge=marked.locator('.fm-player-status');
+      assert.equal(await badge.getAttribute('aria-label'),'Injured');
+      assert.equal(await marked.innerText(),'Synthetic player 1');
+      assert.equal(await table.locator('.rt-tbody .fm-player-name').filter({hasText:/^Synthetic player 2$/}).locator('.fm-player-status').count(),0);
+      assert.equal(await table.locator('.rt-th').filter({hasText:/^Status$/}).count(),0);
+      const placement=await marked.evaluate(cell=>{
+        const label=cell.querySelector('.fm-player-name-with-status > span:first-child').getBoundingClientRect();
+        const badge=cell.querySelector('.fm-player-status').getBoundingClientRect();
+        return badge.left >= label.right && badge.right <= cell.getBoundingClientRect().right;
+      });
+      assert.ok(placement,'status icon sits after the name inside its cell');
       const geometry=()=>table.evaluate(el=>{
         const scroll=el.querySelector('.rt-table');
         const bounds=e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right,width:r.width};};

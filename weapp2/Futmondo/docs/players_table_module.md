@@ -1,5 +1,26 @@
 # Players Table Module Documentation
 
+## Status beside player names (2026-11-22)
+
+The Name cell shows Futmondo's reported injury, doubt, suspension or unavailability
+with an icon, hover label and accessible name. The raw `status` field stays in the
+display projection so a changed observation updates the cell. The Name column
+still sorts and searches by the player's name. A missing, blank, `ok` or `fit`
+status has no glyph. An unfamiliar nonempty status gets a question-mark icon
+labeled **Status unconfirmed**. The separate Status column is hidden.
+
+The existing authenticated JSON POST envelope uses `header.token`,
+`header.userid`, `query` and an empty `answer`. Captured market responses from
+`/1/market/players` carry the scalar `answer[].status` and use the fantasy
+`championshipId`, `userteamId` and `type: "market"` query. Catalog responses from
+`/5/league/championshipplayers` carry `answer.players[].status` and use fantasy
+`championshipId`. The roster adapter reads `answer[].status` from
+`/1/userteam/roster` with the fantasy `championshipId` and `userteamId`.
+The market and catalog captures contain `ok`, `doubt`, `injured`, `injured2` and
+`redcard`. These fields already pass through the existing parsers and persisted
+worker observations. The formatter builds each distinct icon once per table
+render from the observed scalar. See the [official comparison](feature_comparison.md).
+
 ## Maximum clause input — 2026-11-22
 
 In All Players, **Max Clause (M)** accepts a non-negative amount in millions, with a decimal point or comma and an optional `M` suffix. `players_table_clause_cap()` converts the amount to euros. The filter uses the same observed `clause_price` shown by the **Clause Price** column and includes the exact boundary. Blank input and **Clear Filters** remove the cap. Invalid input displays a correction prompt and withholds results until the amount is corrected or cleared. If **Clause within available funds** is enabled, the lower of the supplied limit and verified spending capacity applies.

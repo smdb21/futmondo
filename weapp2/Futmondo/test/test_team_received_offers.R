@@ -21,7 +21,7 @@ check('source identity distinguishes named/ID rivals from system and malformed b
     rows$bidder_team_id[3]=='rival-id',is.na(rows$bid_price[4]),rows$bid_price[5]==0)
 })
 requests<-character()
-player<-list(id='one',name='Player <one>',role='defensa',value=200,change=0,points=4,
+player<-list(id='one',name='Player <one>',role='defensa',status='injured',value=200,change=0,points=4,
   market=list(inMarket=TRUE,price=900,bids=list(system_bid,rival_bid)))
 enrich_player_clubs<-function(players_df,...)players_df
 futmondo_post<-function(url,body,...) {
@@ -80,9 +80,23 @@ check('empty loading unavailable stale and partial states do not claim verified 
   partial<-roster;attr(partial,'received_offers_status')<-'partial'
   stopifnot(team_received_offers_state(resource_state(partial))$status=='partial')
 })
+check('only observed non-fit players create rows in the My Team panel',{
+  rows<-data.frame(id=letters[1:12],name=paste('Player',1:12),role='defensa',
+    status=c('ok','fit',NA,'','doubt','injured','injured2','redcard','unavailable','unexpected','injured','doubt'))
+  rows$id[11:12]<-'duplicate'
+  shown<-team_nonfit_roster(rows)
+  html<-as.character(team_nonfit_panel(shown,identity))
+  stopifnot(identical(shown$id,letters[5:9]),
+    all(vapply(c('Players not fit (5)','fm-incoming-panel','fm-incoming-player','nonfit_open_h',
+      'Doubtful','Injured','Long-term injury','Suspended','Unavailable'),grepl,logical(1),x=html,fixed=TRUE)),
+    !grepl('unexpected|duplicate',html),is.null(team_nonfit_panel(team_nonfit_roster(rows[1:4,]),identity)),
+    is.null(team_nonfit_panel(team_nonfit_roster(data.frame(id='legacy')), identity)))
+})
 check('top panels use equal responsive columns and stable row links',{
   html<-as.character(players_in_teams_UI('team'))
-  stopifnot(grepl('fm-team-panels',html,fixed=TRUE),grepl('repeat(2,minmax(0,1fr))',html,fixed=TRUE),
+  stopifnot(regexpr('team-outgoing_players',html) < regexpr('team-nonfit_players',html),
+    regexpr('team-nonfit_players',html) < regexpr('team-received_offers',html),
+    grepl('fm-team-panels',html,fixed=TRUE),grepl('repeat(2,minmax(0,1fr))',html,fixed=TRUE),
     grepl('@media(max-width:767px)',html,fixed=TRUE),grepl('team-incoming_players',html,fixed=TRUE),
     grepl('team-received_offers',html,fixed=TRUE),
     team_received_offer_input(state$records[1,,drop=FALSE])!=team_received_offer_input(state$records[2,,drop=FALSE]))
@@ -116,7 +130,19 @@ shiny::testServer(players_in_teams_Server,args=list(is_module_active=active,logi
     stopifnot(selected$id=='one',selected$bid_id=='rival',selected$bid_price==300,
       selected$user_team_id=='mine',sum(reads=='get_players_from_team')==1L)
   })
-  check('changing context immediately clears the retained offer selection',{
+  check('the My Team status box shares the roster read and opens the same player card',{
+    rendered<-output$nonfit_players$html
+    stopifnot(grepl('Players not fit (1)',rendered,fixed=TRUE),grepl('Injured',rendered,fixed=TRUE),
+      grepl('Player &lt;one&gt;',rendered,fixed=TRUE))
+    before<-reads
+    session$setInputs(nonfit_open_one=1L);settle(session)
+    selected<-shiny::isolate(card_selection())
+    stopifnot(selected$id=='one',selected$status=='injured',selected$user_team_id=='mine',identical(reads,before))
+    active(FALSE);settle(session)
+    stopifnot(is.null(output$nonfit_players),is.null(shiny::isolate(card_selection())))
+    active(TRUE);settle(session)
+  })
+  check('changing context immediately clears the retained player selection',{
     team('another-team');settle(session)
     stopifnot(is.null(shiny::isolate(card_selection())))
   })

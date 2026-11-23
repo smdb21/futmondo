@@ -1,5 +1,20 @@
 # My team
 
+## Players not fit (2026-11-22)
+
+**Players not fit (N)** follows **Leaving players** in My Team, spans the
+transfer panels on desktop and stacks with them on mobile. The box shares the
+transfer panel's border, row dividers, identity layout, club crest and position
+badges. Each row shows the reported status and links to the existing player card.
+
+`team_nonfit_roster()` selects the current saved roster rows with recognized
+doubt, injury, suspension or unavailable codes and unique player IDs.
+A player with a fit, blank, missing or unrecognized status is outside the
+reported count. `team_nonfit_panel()` returns no box when there are no qualifying
+rows. The saved roster's observation clock continues to apply. The display
+projection reuses the existing roster state and only publishes changed markup.
+The links use the same context-checked modal as transfer and offer links.
+
 ## Current and effective squad totals — 2026-11-14 Pacific
 
 The position breakdown now presents the actual roster count and an adjacent effective purchase count. For example, 18 current players, two bought but not yet arrived and one leaving displays **Total: 18 Players · Effective: 19 Players**. Position badges and squad valuation still describe the actual roster. The count concerns pending transfer commitments, independently of the next-kickoff highlighting cutoff.

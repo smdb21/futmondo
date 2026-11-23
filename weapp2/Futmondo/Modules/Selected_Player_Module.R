@@ -527,8 +527,10 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       resource_timing("card_identity",isolate(card_started()))
       location <- player_card_location_label(sp, get_reactive_val(user_team_id))
       div(class = "player-card-identity", `data-player-id`=as.character(sp$id),`data-paint-generation`=as.character(card_paint_generation()),
-        img(src = photo, class = "player-card-identity-photo", alt = player_name,
-          onerror = paste0("this.src='", SPACER_GIF, "';")),
+        div(class = "player-card-identity-portrait",
+          img(src = photo, class = "player-card-identity-photo", alt = player_name,
+            onerror = paste0("this.src='", SPACER_GIF, "';")),
+          player_status_icon(raw_selected_player()[["status"]])),
         div(class = "player-card-identity-details",
           div(class = "player-card-identity-name", player_name),
           div(class = "player-card-identity-meta",

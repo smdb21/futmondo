@@ -9,7 +9,7 @@ rows<-data.frame(id=paste0('p',1:4),name=c('Vivian','Kike Salas','Unknown club',
   team=c('Athletic Club','Sevilla',NA,'Athletic Club'),
   logo=c('authoritative-club.png',NA,NA,NA),value=2e6,
   average.fitness='2,5,12,12,6',average.averageLastFive=7.4,
-  fav=c(TRUE,FALSE,TRUE,FALSE),owner_team_id='mine',clause_suggestedClause=3e6)
+  status=c('injured','ok',NA,'redcard'),fav=c(TRUE,FALSE,TRUE,FALSE),owner_team_id='mine',clause_suggestedClause=3e6)
 before<-rows
 columns<-get_reactable_columns_for_players(rows)
 html<-vapply(seq_len(nrow(rows)),function(i)as.character(columns$name$cell(rows$name[i],i)),character(1))
@@ -41,6 +41,17 @@ check('separate crest keeps source/fallback labels and scrolling names without d
   identical(separated$team$sticky,'left'),is.null(separated$role$sticky),is.null(separated$name$sticky),
   isFALSE(separated$team$resizable),isFALSE(separated$team$filterable))
 })
+check('only actionable or unrecognized reported status appears beside the name',{
+  stopifnot(isFALSE(columns$status$show),
+    grepl('aria-label="Injured"',html[1],fixed=TRUE),
+    grepl('title="Suspended"',html[4],fixed=TRUE),
+    !any(grepl('fm-player-status|Fit',html[c(2,3)])),
+    is.null(player_status_icon(' FIT ')),is.null(player_status_icon('')),
+    grepl('Doubtful',as.character(player_status_icon('doubt')),fixed=TRUE),
+    grepl('Long-term injury',as.character(player_status_icon('injured2')),fixed=TRUE),
+    grepl('Unavailable',as.character(player_status_icon('unavailable')),fixed=TRUE),
+    grepl('Status unconfirmed',as.character(player_status_icon('unmapped')),fixed=TRUE))
+})
 selected_player_Server<-function(...)NULL
 recent_player_points_source<-function(...)list(history=function()data.frame(),status=function()NULL)
 settle<-function(session){for(i in seq_len(5)){later::run_now(0);session$flushReact()}}
@@ -62,6 +73,7 @@ shiny::testServer(players_table_Server,args=list(players_table_RV=shiny::reactiv
    !any(c('clause_suggestedClause','fav','owner_team_id')%in%names(display)),
    !any(c('clause_suggestedClause','fav','owner_team_id')%in%visible),
    identical(display$average.fitness,rows$average.fitness),
+   identical(display$status,rows$status),isFALSE(definitions$status$show),
    identical(display$name,rows$name),identical(display$team,rows$team),identical(display$logo,rows$logo),
    all(display$recent_points_avg==9),all(display$recent_points_ratio==4.5))
  })

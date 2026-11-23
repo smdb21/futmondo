@@ -25,13 +25,16 @@ async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is
 indices<-function(fn)which(vapply(calls,function(call)identical(call$fn,fn),logical(1)))
 resolve<-function(fn,value){pending[[tail(indices(fn),1L)]]$resolve(value)}
 player<-function(id,owner='')data.frame(id=id,name=paste('Player',id),role='defensa',team='Club',photo='fixture',
- value=1000,change=0,points=-2,user_team_id=owner,price=1000,market_inMarket=TRUE)
+ status=if(id=='p1')'doubt'else'ok',value=1000,change=0,points=-2,user_team_id=owner,price=1000,market_inMarket=TRUE)
 clear_api_cache()
 shiny::testServer(selected_player_Server,args=list(selected_player=selected,login_token=auth,
  championship_id=league,user_team_id=team),{
  opened<-Sys.time();selected(player('p1'));settle(session)
  check('identity renders while every source remains pending',{
-  stopifnot(grepl('Player p1',output$player_identity_summary$html,fixed=TRUE),length(calls)==4L,!length(indices('get_team_acquisition_capacity')),
+  identity<-xml2::read_html(output$player_identity_summary$html)
+  status<-xml2::xml_find_first(identity,"//img[@class='player-card-identity-photo']/following-sibling::span[@data-status='doubt']")
+  stopifnot(xml2::xml_attr(status,'aria-label')=='Doubtful',xml2::xml_attr(status,'title')=='Doubtful',
+   grepl('Player p1',output$player_identity_summary$html,fixed=TRUE),length(calls)==4L,!length(indices('get_team_acquisition_capacity')),
    identical(card_states$lineup()$status,'loading'),identical(card_states$profile()$status,'loading'))
  })
  resolve('get_player_summary',observed_data(list(data=list(id='p1'),championship=list(owner=list(computer=TRUE),season='2026'),
@@ -63,6 +66,7 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
  })
  # Navigation retains a team read even while the clicked player changes.
  selected(player('own1','mine'));settle(session)
+ stopifnot(!grepl('fm-player-status|Fit',output$player_identity_summary$html))
  listing<-tail(indices('get_my_market_players'),1L)
  selected(player('own2','mine'));settle(session)
  check('own-player navigation reuses the pending team lineup and listings',{

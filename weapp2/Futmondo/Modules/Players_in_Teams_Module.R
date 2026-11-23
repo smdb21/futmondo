@@ -3,6 +3,7 @@ players_in_teams_UI <- function(id) {
   ns <- NS(id)
   tagList(tags$style(HTML(".fm-team-panels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-bottom:20px}.fm-team-panels>div{min-width:0}.fm-team-panels .fm-incoming-panel{height:100%;margin-bottom:0}.fm-offer-source{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--fm-border,#315540);border-radius:6px;padding:3px 7px;overflow-wrap:anywhere}.fm-offer-rival{color:var(--fm-warning,#f0c75e);border-color:currentColor;font-weight:600}.fm-team-offer{display:flex;flex-direction:column;gap:7px;padding:12px 0;border-top:1px solid var(--fm-border,#315540)}.fm-team-offer-heading{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}.fm-team-offer-heading>*{min-width:0;overflow-wrap:anywhere}.fm-offer-group-heading{font-size:inherit;margin:12px 0 8px}.fm-system-offers .fm-team-offer{padding:8px 0}.fm-system-offers .fm-team-offer-heading{align-items:center;min-height:28px}@media(max-width:767px){.fm-team-panels{grid-template-columns:minmax(0,1fr);gap:12px}}.fm-incoming-panel{border:1px solid var(--fm-border,#315540);border-radius:8px;padding:16px;margin-bottom:20px}.fm-incoming-panel h3{margin-top:0}.fm-incoming-player{display:flex;gap:16px;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid var(--fm-border,#315540)}.fm-incoming-identity{display:flex;gap:10px;align-items:center;flex-wrap:wrap;min-width:0}.fm-incoming-identity a{overflow-wrap:anywhere}.fm-incoming-arrival{display:flex;flex-direction:column;gap:4px;text-align:right;min-width:0}.fm-incoming-round{font-weight:600}.fm-incoming-round-line{display:grid;grid-template-columns:minmax(0,max-content)28px;gap:4px 6px;align-items:center;justify-content:end;text-align:left}.fm-incoming-round-line>.fm-info{display:contents}.fm-incoming-round-line>.fm-info>summary{grid-column:2;grid-row:1}.fm-incoming-round-line>.fm-info>.fm-info-body{grid-column:1/-1;grid-row:2}.fm-incoming-schedule{color:var(--fm-muted)}.fm-incoming-error{color:var(--fm-warning,#f0c75e);overflow-wrap:anywhere}@media(max-width:600px){.fm-incoming-player{display:flex;flex-direction:column;align-items:stretch;gap:8px}.fm-incoming-arrival{text-align:left}.fm-incoming-round-line{justify-content:start}.fm-incoming-panel{padding:12px}}")),
     tags$div(class="fm-team-panels",uiOutput(ns("incoming_players")),uiOutput(ns("outgoing_players")),
+      uiOutput(ns("nonfit_players"), class="fm-squad-status-output"),
       tags$div(style="grid-column:1/-1",uiOutput(ns("received_offers")))),
     uiOutput(ns("team_value_box")),
     actionButton(ns("btn_put_all_on_market"), "Put All Players on Market", icon=icon("tags")),
@@ -70,6 +71,42 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
     })
     output$incoming_players<-renderUI(incoming_panel_display())
     output$outgoing_players<-renderUI(outgoing_panel_display())
+    open_team_player_card <- function(card_row, key) {
+      force(card_row)
+      incoming_requested(key);incoming_context(current_context());incoming_selected(NULL)
+      showModal(modalDialog(selected_player_UI(ns("incoming_card")),
+        tags$script(HTML(paste0("$(document).off('hidden.bs.modal.fmIncoming','#shiny-modal').on('hidden.bs.modal.fmIncoming','#shiny-modal',function(){Shiny.setInputValue('",ns("incoming_closed"),"',Math.random(),{priority:'event'});});"))),
+        footer=modalButton("Close"),easyClose=TRUE,size="l"))
+      session$onFlushed(function(){
+        if(identical(isolate(current_context()),isolate(incoming_context()))&&identical(isolate(incoming_requested()),key))
+          incoming_selected(card_row)
+      },once=TRUE)
+    }
+
+    nonfit_roster <- reactive({
+      if (!isTRUE(is_module_active())) return(NULL)
+      team_nonfit_roster(roster_state()$data)
+    })
+    nonfit_panel_display <- resource_display_source(session, function() {
+      team_nonfit_panel(nonfit_roster(), ns)
+    })
+    output$nonfit_players <- renderUI(nonfit_panel_display())
+    # The empty grid item is hidden until there is a status to render.
+    outputOptions(output, "nonfit_players", suspendWhenHidden=FALSE)
+    nonfit_ids <- resource_display_source(session, function() as.character(nonfit_roster()$id))
+    nonfit_handlers <- list()
+    observeEvent(nonfit_ids(), {
+      for (handler in nonfit_handlers) handler$destroy()
+      nonfit_handlers <<- lapply(nonfit_ids(), function(player_id) {
+        key <- paste0("nonfit_open_", player_id)
+        observeEvent(input[[key]], {
+          current <- nonfit_roster()
+          row <- current[current$id %in% player_id, , drop=FALSE]
+          req(is.data.frame(row), nrow(row)==1L)
+          open_team_player_card(translate_player_positions(row), key)
+        }, ignoreInit=TRUE)
+      })
+    })
     # Register click handlers once per row identity; remove handlers for old rows.
     incoming_handlers<-list()
     observe({
@@ -80,19 +117,9 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
           current<-incoming()$records
           record<-current[current$player_id%in%player_id,,drop=FALSE]
           req(nrow(record)==1L)
-          incoming_requested(player_id)
-          incoming_context(current_context())
           # Preserve the full cached source row for the existing player card.
           summary<-incoming_clause_cached_summary(login_token(),championship_id(),user_team_id(),record$player_id)
-          card_row<-incoming_clause_card_snapshot(record,summary)
-          incoming_selected(NULL)
-          showModal(modalDialog(selected_player_UI(ns("incoming_card")),
-            tags$script(HTML(paste0("$(document).off('hidden.bs.modal.fmIncoming','#shiny-modal').on('hidden.bs.modal.fmIncoming','#shiny-modal',function(){Shiny.setInputValue('",ns("incoming_closed"),"',Math.random(),{priority:'event'});});"))),
-            footer=modalButton("Close"),easyClose=TRUE,size="l"))
-          session$onFlushed(function(){
-            if(identical(isolate(current_context()),isolate(incoming_context()))&&identical(isolate(incoming_requested()),player_id))
-              incoming_selected(card_row)
-          },once=TRUE)
+          open_team_player_card(incoming_clause_card_snapshot(record,summary), player_id)
         },ignoreInit=TRUE)
       })
     })
@@ -106,17 +133,8 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
           record<-current[current$player_id%in%player_id,,drop=FALSE]
           req(nrow(record)==1L)
           key<-paste0("outgoing:",player_id)
-          incoming_requested(key);incoming_context(current_context())
           summary<-incoming_clause_cached_summary(login_token(),championship_id(),user_team_id(),record$player_id)
-          card_row<-outgoing_clause_card_snapshot(record,summary)
-          incoming_selected(NULL)
-          showModal(modalDialog(selected_player_UI(ns("incoming_card")),
-            tags$script(HTML(paste0("$(document).off('hidden.bs.modal.fmIncoming','#shiny-modal').on('hidden.bs.modal.fmIncoming','#shiny-modal',function(){Shiny.setInputValue('",ns("incoming_closed"),"',Math.random(),{priority:'event'});});"))),
-            footer=modalButton("Close"),easyClose=TRUE,size="l"))
-          session$onFlushed(function(){
-            if(identical(isolate(current_context()),isolate(incoming_context()))&&identical(isolate(incoming_requested()),key))
-              incoming_selected(card_row)
-          },once=TRUE)
+          open_team_player_card(outgoing_clause_card_snapshot(record,summary), key)
         },ignoreInit=TRUE)
       })
     })
@@ -133,14 +151,7 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
           roster<-roster_state()$data
           card_row<-roster[as.character(roster$id)%in%record$id,,drop=FALSE];req(nrow(card_row)==1L)
           for(field in c("bid_price","bid_user","bid_id","bidder_team_id","bid_source"))card_row[[field]]<-record[[field]]
-          incoming_requested(key);incoming_context(current_context());incoming_selected(NULL)
-          showModal(modalDialog(selected_player_UI(ns("incoming_card")),
-            tags$script(HTML(paste0("$(document).off('hidden.bs.modal.fmIncoming','#shiny-modal').on('hidden.bs.modal.fmIncoming','#shiny-modal',function(){Shiny.setInputValue('",ns("incoming_closed"),"',Math.random(),{priority:'event'});});"))),
-            footer=modalButton("Close"),easyClose=TRUE,size="l"))
-          session$onFlushed(function(){
-            if(identical(isolate(current_context()),isolate(incoming_context()))&&identical(isolate(incoming_requested()),key))
-              incoming_selected(card_row)
-          },once=TRUE)
+          open_team_player_card(card_row, key)
         },ignoreInit=TRUE)
       })
     })
@@ -774,6 +785,42 @@ incoming_clause_source <- function(session,login_token,championship_id,user_team
   shiny::reactive(state())
 }
 
+team_panel_player_identity <- function(row, input_id, name) {
+  team <- fm_scalar(row[["team"]], "")
+  logo <- get_team_image_name(team, logo=row[["logo"]])
+  roles <- analytics_player_positions(row, multiposition=TRUE)[[1]]
+  role_names <- c(GK="Goalkeeper", DEF="Defender", MID="Midfielder", FWD="Forward")
+  role <- paste(unname(role_names[roles]), collapse=", ")
+  position <- get_reactable_columns_for_players(data.frame(role=role))$role$cell(role)
+  shiny::tags$div(class="fm-incoming-identity",
+    if (nzchar(logo)) shiny::tags$img(src=paste0(TEAM_LOGO_URL,logo,".png"), alt="", title=team,
+      width=24,height=24,loading="lazy",onerror="this.style.display='none';"),
+    shiny::actionLink(input_id, name), position)
+}
+
+team_nonfit_roster <- function(roster) {
+  if (!is.data.frame(roster) || !all(c("id","status") %in% names(roster))) return(NULL)
+  ids <- as.character(roster$id)
+  codes <- unique(roster$status)
+  known <- !vapply(lapply(codes, player_status_icon, show_unconfirmed=FALSE), is.null, logical(1))
+  usable <- !is.na(ids) & nzchar(trimws(ids)) & !duplicated(ids) & !duplicated(ids, fromLast=TRUE)
+  roster[usable & roster$status %in% codes[known], , drop=FALSE]
+}
+
+team_nonfit_panel <- function(rows, ns) {
+  if (!is.data.frame(rows) || !nrow(rows)) return(NULL)
+  shiny::tags$section(class="fm-incoming-panel fm-squad-status-panel", `aria-labelledby`=ns("nonfit_heading"),
+    shiny::tags$h3(id=ns("nonfit_heading"), paste0("Players not fit (", nrow(rows), ")")),
+    lapply(seq_len(nrow(rows)), function(i) {
+      row <- rows[i, , drop=FALSE]
+      badge <- player_status_icon(row$status)
+      shiny::tags$div(class="fm-incoming-player",
+        team_panel_player_identity(row, ns(paste0("nonfit_open_", row$id)), fm_scalar(row$name, "Player")),
+        shiny::tags$strong(class="fm-squad-status-label",
+          htmltools::tagAppendAttributes(badge, `aria-hidden`="true"), htmltools::tagGetAttribute(badge, "title")))
+    }))
+}
+
 incoming_clause_panel <- function(state,next_round,ns) {
   clause_transfer_panel(state,next_round,ns)
 }
@@ -797,20 +844,13 @@ clause_transfer_panel <- function(state,next_round,ns,outgoing=FALSE) {
     lapply(seq_len(nrow(rows)),function(i) {
       row<-rows[i,,drop=FALSE];at<-if(outgoing)row$leaves_at else row$joins_at
       label<-incoming_clause_round_label(at,next_round)
-      logo<-get_team_image_name(row$team,logo=row$logo)
-      roles<-analytics_player_positions(data.frame(role=row$role),multiposition=TRUE)[[1]]
-      role_names<-c(GK="Goalkeeper",DEF="Defender",MID="Midfielder",FWD="Forward")
-      role<-paste(unname(role_names[roles]),collapse=", ")
-      position<-get_reactable_columns_for_players(data.frame(role=role))$role$cell(role)
       observed_note<-if(isTRUE(state$observations_only)&&"observed_at"%in%names(row)&&!is.na(row$observed_at))
         paste("Observed:",fm_format_datetime(row$observed_at))else NULL
       overdue_note<-if(isTRUE(row$overdue))paste0("Scheduled time has passed; ",if(outgoing)"departure"else"arrival"," is awaiting source confirmation.")else NULL
       timing_note<-if(nzchar(row$timing_error)&&!identical(state$status,"loading"))row$timing_error else NULL
       has_detail<-!all(vapply(list(observed_note,overdue_note,timing_note),is.null,logical(1)))
       shiny::tags$div(class=paste("fm-incoming-player",if(outgoing)"fm-outgoing-player"),
-        shiny::tags$div(class="fm-incoming-identity",
-          if(nzchar(logo))shiny::tags$img(src=paste0(TEAM_LOGO_URL,logo,".png"),alt="",title=row$team,width=24,height=24,loading="lazy",onerror="this.style.display='none';"),
-          shiny::actionLink(ns(paste0(prefix,"_open_",row$player_id)),row$player_name),position),
+        team_panel_player_identity(row, ns(paste0(prefix, "_open_", row$player_id)), row$player_name),
         shiny::tags$div(class="fm-incoming-arrival",
           if(!is.na(at))shiny::tags$strong(paste0(if(outgoing)"Leaves: "else"Joins: ",incoming_clause_time(at)))else
             fm_info(if(identical(state$status,"loading"))paste0("Confirming ",if(outgoing)"departure"else"arrival"," time…")else

@@ -824,6 +824,21 @@ format_table_sale_price <- function(value, acquisition_cost, multiline = FALSE) 
   paste(price,profit)
 }
 
+player_status_icon <- function(status, class = "fm-player-status", show_unconfirmed = TRUE) {
+  code <- tolower(trimws(fm_scalar(status, "")))
+  if (code %in% c("", "ok", "fit")) return(NULL)
+  info <- switch(code,
+    doubt = , doubtful = list(label="Doubtful", icon="triangle-exclamation", tone="warning"),
+    injured = list(label="Injured", icon="circle-minus", tone="danger"),
+    injured2 = list(label="Long-term injury", icon="hospital", tone="danger"),
+    redcard = , suspended = list(label="Suspended", icon="square", tone="danger"),
+    unavailable = list(label="Unavailable", icon="ban", tone="muted"),
+    if (show_unconfirmed) list(label="Status unconfirmed", icon="circle-question", tone="muted"))
+  if (is.null(info)) return(NULL)
+  shiny::span(class=paste(class, paste0(class, "-", info$tone)),
+    `data-status`=code, title=info$label, role="img", `aria-label`=info$label, shiny::icon(info$icon))
+}
+
 get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE, separate_crest = FALSE) {
   columns <- list()
   sale_price <- function(value,index) {
@@ -853,6 +868,12 @@ get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE, s
     width=36, resizable=FALSE, sortable=FALSE, filterable=FALSE,
     sticky="left", class="fm-player-crest", headerClass="fm-player-crest", cell=crest_cell
   ) else colDef(show=FALSE)
+  status_codes <- unique(table[["status"]])
+  status_icons <- lapply(status_codes, player_status_icon)
+  status_index <- match(table[["status"]], status_codes)
+  if ("status" %in% names(table)) {
+    columns[["status"]] <- colDef(show=FALSE, searchable=FALSE, filterable=FALSE)
+  }
   if ("name" %in% names(table)) columns[["name"]] <- colDef(
     name="Name", minWidth=180,
     class=if(isTRUE(separate_crest))"fm-player-name" else NULL,
@@ -860,6 +881,8 @@ get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE, s
     cell=function(value, index) {
       if(is.null(value) || is.na(value) || !nzchar(value)) return("")
       label <- shiny::tags$span(style="min-width: 0; white-space: normal; overflow-wrap: anywhere;",value)
+      status <- if(length(status_index)) status_icons[[status_index[index]]] else NULL
+      if (!is.null(status)) label <- shiny::tags$span(class="fm-player-name-with-status", label, status)
       if(isTRUE(separate_crest)) return(label)
       club <- if("team" %in% names(table)) as.character(table$team[index]) else ""
       if(is.na(club)) club <- ""
@@ -1176,32 +1199,6 @@ get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE, s
           shiny::tags$span(class = "badge-market-listed", format_table_currency(asking_price))
         } else {
           shiny::tags$span(class = "badge-market-listed", "YES")
-        }
-      }
-    )
-  }
-
-  if ("status" %in% colnames(table)) {
-    columns[["status"]] <- colDef(
-      name = "Status",
-      align = "center",
-      cell = function(value) {
-        if (is.na(value) || value == "") {
-          return(shiny::tags$span(style = "color: var(--fm-text); font-weight: 500;", shiny::icon("circle-check"), " Fit"))
-        }
-        val_lower <- tolower(value)
-        if (val_lower == "ok") {
-          shiny::tags$span(style = "color: var(--fm-text); font-weight: 500;", shiny::icon("circle-check"), " Fit")
-        } else if (val_lower == "doubt") {
-          shiny::tags$span(style = "color: var(--fm-warning); font-weight: 500;", shiny::icon("triangle-exclamation"), " Doubt")
-        } else if (val_lower == "injured") {
-          shiny::tags$span(style = "color: var(--fm-danger); font-weight: 500;", shiny::icon("circle-minus"), " Injured")
-        } else if (val_lower == "injured2") {
-          shiny::tags$span(style = "color: var(--fm-text); font-weight: 500;", shiny::icon("hospital"), " Long-term")
-        } else if (val_lower == "redcard") {
-          shiny::tags$span(style = "color: var(--fm-danger); font-weight: 500;", shiny::icon("square"), " Suspended")
-        } else {
-          shiny::tags$span(style = "color: var(--fm-text); font-weight: 500;", shiny::icon("circle-check"), " Fit")
         }
       }
     )

@@ -6,6 +6,8 @@ login_feature_tiers <- function() {
       features = list(
         list(id = "scouting_filters", title = "Combined scouting filters",
           description = "Narrow player tables by owner, multiple positions, value, daily price movement and active clauses. Choose whether to include your own team in All Players."),
+        list(id = "squad_status", title = "Squad status at a glance",
+          description = "See your squad’s reported injuries, doubts, suspensions and unavailable players together in My Team. Open any player’s card from the list."),
         list(id = "round_range_standings", title = "Standings for any round range",
           description = "Choose a stretch of rounds to compare team points and points, position, Best XI and MVP bonuses."),
         list(id = "local_timezone", title = "Dates and times in your timezone",

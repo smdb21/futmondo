@@ -1,5 +1,14 @@
 # Player card
 
+## Status beside the portrait (2026-11-22)
+
+The identity header overlays a small badge on the portrait's lower corner using
+the same `player_status_icon()` mapping as tables and lineup. It uses the selected
+source row's `status` and can display it in the first identity paint while
+optional history and the separate transaction-safety checks are pending.
+Fit and missing statuses have no badge. The portrait remains 58 px on desktop
+and 52 px on mobile.
+
 ## Player fixture and chart dates — 2026-11-19
 
 The card reads player fixtures from the existing durable `get_player_matches`

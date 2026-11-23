@@ -1,5 +1,12 @@
 # Futmondo data architecture redesign plan
 
+## Player status indicators (2026-11-22)
+
+- [x] Show reported non-fit statuses beside player names and portraits and suppress the fit indicator.
+- [x] Add a conditional Players not fit box after Leaving players in My Team using the existing saved roster and player card.
+- [x] Verify the affected offline paths and review rendering and data-access costs. See [verification](data_review_results.md#player-status-indicators-2026-11-22).
+- [ ] Confirm rendering in the authenticated hosted application.
+
 ## Market offer button emphasis (2026-11-19)
 
 - [x] Give the player card's **Make Market Offer** control a distinct border, tint and stronger label.

@@ -1,5 +1,35 @@
 # Futmondo data review and implementation results
 
+## Player status indicators (2026-11-22)
+
+- The focused table and card checks passed with synthetic fit, missing, injury,
+  doubt and suspension states. The status was available in the initial card
+  identity while optional reads were pending. Persisted card browsing and lineup
+  checks also passed.
+- My Team tests covered positive, fit/missing-only and legacy rosters, panel
+  order, safe row links, context changes and exact received-offer selection.
+  My Team used one existing roster read, and opening a status-row link acquired
+  no additional data in the fixture. Outgoing transfer and saved-observation
+  contracts passed.
+- Chromium checked the table at 320, 390 and 1440 px in both themes. The icon
+  stayed inside its name cell, fit players had no icon and the status column was
+  absent. The scroll, selection and heartbeat checks passed in all six runs.
+  A separate browser fixture at the same widths and themes verified that the
+  My Team box matches the Leaving players border and padding, the badge stays
+  on the portrait corner and both conditional indicators disappear on recovery.
+  The empty panel receiver stays active so it can display a later observation.
+  The offline lifecycle passed 14 checks and all eight tabs.
+- On a synthetic 524-row widget with 15% non-fit codes, the median server-side
+  build/serialization over eight runs was 1,108 ms versus 1,626 ms before this
+  change, with 350,277 versus 440,570 bytes of rendered markup. A 25-player
+  roster with three displayed statuses took about 10 ms per panel projection
+  and serialization over 100 iterations. These are isolated local measurements.
+  The panel reuses existing context-scoped roster snapshots and does not
+  republish equal markup. The portrait badge is an overlay within the existing
+  photo dimensions. No additional requests, database writes, timers, history
+  redraw dependencies or persistent caches are required. Hosted rendering was
+  outside the verification.
+
 ## Market offer button emphasis (2026-11-19)
 
 The shared purchase style gave **Make Market Offer** a 0 px border in both themes. A scoped stylesheet rule now applies a 2 px border, tinted fill and bold label to the player card’s opening action. Headless Chromium checked 320, 390 and 1440 px with both themes. The resting border contrast against the card was 9.1:1 in light and 15.0:1 in dark, and label contrast against the fill was 7.6:1 and 10.2:1 respectively. The 45 px control fit at every width, had a visible keyboard focus outline, and opened the offer editor with verification still required before submission. Narrow screenshots were inspected.

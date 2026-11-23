@@ -1,5 +1,22 @@
 # LigaRadar additions to the official Futmondo workflows
 
+## Player status indicators and My Team summary (2026-11-22)
+
+The [official app's public client](https://app.futmondo.com/main.dart.js), inspected
+2026-11-22 (SHA-256 `08202076259d1678c7557478771d3aa38b5099f42044630569c704fdb7a7cd1c`),
+builds status images from the reported player's status and suppresses them for
+blank and `ok` codes. The [official 5.0.5 release notes](https://magazine.futmondo.com/nueva-version-de-la-app-en-futmondo/)
+describe injury, doubt and suspension categories in lineup selection. The
+[official getting-started guide](https://help.futmondo.com/article/90-empieza-a-jugar-a-futmondo)
+describes squad lists and opening player cards from them.
+
+LigaRadar displays the shared status information next to table names and card
+portraits. Its Essentials addition is a conditional My Team summary of affected
+owned players below Leaving players, with links to their cards. The public sources
+do not establish whether the signed-in official app uses this exact summary or
+placement. Current authenticated official screens and hosted LigaRadar rendering
+were outside this comparison.
+
 ## Fixture crests and trailing filter icons — reviewed 2026-11-17
 
 Rechecked the [official app guide](https://magazine.futmondo.com/novedades-en-la-nueva-app-de-futmondo/)
@@ -56,6 +73,7 @@ The differences below are **specific implemented additions beyond the workflows 
 | Login ID / addition | Official baseline | Specific LigaRadar behavior | Local implementation evidence |
 | --- | --- | --- | --- |
 | `scouting_filters` — Combined scouting filters | Player/squad inspection and market table views. | Combine owner, primary/secondary position, value ceiling, daily price-change threshold and active-clause filters in shared player tables. All Players excludes the current team by default and can include it with an unchecked-by-default checkbox, preserving the other filters. | `Modules/Players_Table_Module.R`; [player tables](players_table_module.md). |
+| `squad_status` — Squad status at a glance | Official squad browsing, player cards and reported injuries, doubt and suspension. | My Team groups affected owned players in a conditional box below Leaving players, showing each reason and a direct link to the player card. | [My Team](players_in_teams_module.md#players-not-fit-2026-11-22). |
 | `round_range_standings` — Standings for any round range | Single-round and cumulative standings, plus published Best XI. | Select an inclusive round interval for points and separate points/position/Best XI/MVP reward totals. Incomplete selected-round evidence remains unavailable. | `Modules/Classification_Module.R`; [classification](classification_module.md). |
 | `league_charts` — League comparison charts | Standings and squad values are available. | Combine league squad-value and rank-progression comparisons with a count of fantasy-owned players by real club. Unknown/unowned players are excluded from club counts. | `Modules/Plots_Module.R`; [plots](plots_module.md). |
 

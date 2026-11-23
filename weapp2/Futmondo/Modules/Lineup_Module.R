@@ -1,18 +1,6 @@
-lineup_status_icon <- function(status) {
-  code<-tolower(trimws(fm_scalar(status,'')))
-  if(code%in%c('','ok'))return(NULL)
-  info<-switch(code,
-    doubt=list(label='Doubtful',icon='triangle-exclamation',tone='warning'),
-    doubtful=list(label='Doubtful',icon='triangle-exclamation',tone='warning'),
-    injured=list(label='Injured',icon='circle-minus',tone='danger'),
-    injured2=list(label='Long-term injury',icon='hospital',tone='danger'),
-    redcard=list(label='Suspended',icon='square',tone='danger'),
-    suspended=list(label='Suspended',icon='square',tone='danger'),
-    unavailable=list(label='Unavailable',icon='ban',tone='muted'),
-    list(label='Status unconfirmed',icon='circle-question',tone='muted'))
-  shiny::span(class=paste('fm-lineup-status',paste0('fm-lineup-status-',info$tone)),
-    `data-status`=code,title=info$label,role='img',`aria-label`=info$label,shiny::icon(info$icon))
-}
+
+lineup_status_icon <- function(status) player_status_icon(status, 'fm-lineup-status')
+
 lineup_UI <- function(id) {
   ns<-shiny::NS(id)
   shiny::tagList(shiny::tags$style(shiny::HTML(".fm-lineup-controls{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:16px}.fm-lineup-controls .form-group{margin:0}.fm-lineup-optimize-controls{display:flex;gap:12px;align-items:flex-end;flex:0 0 100%;min-width:0}.fm-lineup-optimize-controls .shiny-input-container{flex:1;min-width:0;max-width:180px}.fm-lineup-optimize-controls .btn{flex-shrink:0}.fm-lineup-formation .shiny-input-container{width:180px;max-width:100%;margin-bottom:8px}.fm-lineup-availability{flex:0 0 100%;min-width:0}.fm-lineup-controls .shiny-input-container{width:180px}.fm-lineup-editor{max-width:900px;margin:auto}.fm-lineup-editor .fm-lineup-player{background:transparent;border:0;color:var(--fm-text,#eef6f0);cursor:pointer;padding:6px;min-width:0}.fm-lineup-editor .fm-lineup-player:focus{outline:2px solid var(--fm-warning,#f0c75e)}.fm-lineup-editor .fm-lineup-portrait{margin:auto}.fm-lineup-editor .fm-lineup-name{white-space:normal}.fm-lineup-editor .fm-lineup-portrait img{max-width:48px;max-height:48px}.fm-lineup-note{padding:10px 0;color:var(--fm-muted,#acbdb0)}.fm-lineup-warning{color:var(--fm-warning,#f0c75e)}.fm-lineup-actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.fm-lineup-coverage{display:flex;gap:12px;flex-wrap:wrap}.fm-lineup-editor .fm-lineup-row{display:grid;grid-template-columns:repeat(var(--lineup-count),minmax(0,1fr))}@media(max-width:600px){.fm-lineup-controls .shiny-input-container{width:140px}.fm-lineup-editor .fm-lineup-name{font-size:10px}.fm-lineup-editor .fm-lineup-player{padding:2px}.fm-lineup-editor .fm-lineup-portrait img{max-width:34px;max-height:34px}}")),
