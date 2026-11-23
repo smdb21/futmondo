@@ -1,5 +1,5 @@
 # Browsing target facts must not activate expired financial worker observations.
-# Explicit editor entry reuses or verifies them before authorizing submission.
+# The draft can reuse a saved league rule without sourcing finances.
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages(source('global.R'))
 fm_worker_configured<-function()TRUE
@@ -8,7 +8,8 @@ auth<-c(userid='availability-recovery-fixture',token='synthetic')
 account<-fm_worker_account_state(auth[['userid']])
 account$known<-TRUE;account$account<-list(enabled=TRUE,auth_status='active')
 record_acquired_resource<-function(...)invisible(TRUE)
-jobs<-list();reads<-list();rpc<-character();writes<-0L
+reads<-list();rpc<-character();modal<-NULL
+showModal<-function(ui,...)modal<<-as.character(ui)
 fm_worker_rpc<-function(name,...){
  rpc<<-c(rpc,name);stopifnot(name=='read')
  promises::promise_resolve(list(account=account$account,resources=list(),jobs=list(),health=NULL))
@@ -17,7 +18,7 @@ capacity<-function(valid=15,status='ok',budget=1000,age=0){
  observed_data(list(status=status,valid_until=as.numeric(now)+valid,
   roster=list(status='ok',count=10,effective_count=10,cap=20),
   funds=list(spendable_budget=budget),outstanding=list(count=0),
-  rules=list(minimum_bid_at_value=FALSE)),observed_at=now-age)
+  rules=list(minimum_bid_at_value=TRUE)),observed_at=now-age)
 }
 put_capacity<-function(value,version,team='mine'){
  ctx<-resource_context(auth,'league',team)
@@ -29,24 +30,15 @@ put_capacity<-function(value,version,team='mine'){
  invisible(d)
 }
 put_capacity(capacity(-30,age=45),'expired')
-real_async<-async_adapter_fetch
 async_adapter_fetch<-function(fn,args=list(),context,worker_bypass=FALSE,is_current=function()TRUE,...){
  reads[[length(reads)+1L]]<<-list(fn=fn,bypass=worker_bypass)
- if(fn=='get_team_acquisition_capacity'){
-  if(worker_bypass)return(promises::promise(function(resolve,reject){
-   jobs[[length(jobs)+1L]]<<-list(resolve=resolve,reject=reject,current=is_current,context=context)
-  }))
-  if(context$user_team_id=='another')return(promises::promise_resolve(NULL))
-  if(identical(fm_worker_mode(context$account_id),FALSE))return(promises::promise_resolve(capacity(budget=800)))
-  return(real_async(fn,args,context,worker_bypass=FALSE,is_current=is_current,...))
- }
+ if(fn=='get_team_acquisition_capacity')stop('An offer draft must not acquire live financial facts')
  value<-switch(fn,get_player_summary=list(data=list(id=context$player_id),championship=list(owner=list(computer=TRUE),clause=list(price=400,transferred=FALSE,date='2026-11-14T00:00:00Z')),market=list(p=150,bids=list()),points=list(),prices=list()),
   get_lineup_from_team=list(pointSystem='fixture'),get_player_full_profile=list(profile=list()),
   get_player_matches=list(matches=list()),get_my_market_players=data.frame(),read_card_round_history=data.frame(),
   read_card_price_history=data.frame(),stop(fn))
  promises::promise_resolve(value)
 }
-buy_clause<-function(...){writes<<-writes+1L;stop('No transaction belongs to verification')}
 player<-data.frame(id='p',name='Fixture',role='delantero',team='Club',value=200,
  price=150,change=0,points=10,user_team_id='rival',market_inMarket=TRUE,
  clause_price=400,clause_transferred=FALSE)
@@ -59,10 +51,9 @@ button<-function(html,id){
  match
 }
 enabled<-function(html,id){tag<-button(html,id);!is.null(tag)&&!grepl('\\bdisabled(?:=|\\s|>)',tag,perl=TRUE)}
-blocked<-function(html,id){tag<-button(html,id);is.null(tag)||grepl('\\bdisabled(?:=|\\s|>)',tag,perl=TRUE)}
 refresh<-reactiveVal(0L)
 reset<-function(value=capacity(-30,age=45)){
- clear_api_cache();jobs<<-list();reads<<-list();rpc<<-character()
+ clear_api_cache();reads<<-list();rpc<<-character()
  rm(list=ls(.fm_worker$values),envir=.fm_worker$values)
  rm(list=auth[['userid']],envir=.fm_worker$accounts)
  account<<-fm_worker_account_state(auth[['userid']])
@@ -74,67 +65,19 @@ args<-list(selected_player=selected,login_token=reactive(auth),championship_id=r
 reset()
 shiny::testServer(selected_player_Server,args=args,{
  settle(session)
- stopifnot(!length(jobs),enabled(output$action_buttons$html,'btn_bid_market'),
-  is.null(button(output$action_buttons$html,'btn_verify_availability')),!length(rpc))
- heartbeat<-FALSE;later::later(function()heartbeat<<-TRUE,0);settle(session);stopifnot(heartbeat)
- now<<-now+90;put_capacity(capacity(-1,age=16),'expired-again');settle(session)
- stopifnot(!length(jobs),enabled(output$action_buttons$html,'btn_bid_market'))
- cat('PASS expired worker capacity and later publications do not start financial checks or delay target controls\n')
+ stopifnot(enabled(output$action_buttons$html,'btn_bid_market'),
+  is.null(button(output$action_buttons$html,'btn_verify_availability')))
+ before <- reads; before_rpc <- rpc
  session$setInputs(btn_bid_market=1L);settle(session)
- stopifnot(length(jobs)==1L,market_offer_dialog_RV()$pending,blocked(output$market_offer_submit$html,'submit_bid'),!length(rpc))
- jobs[[1]]$resolve(capacity());settle(session)
- stopifnot(!market_offer_dialog_RV()$pending,enabled(output$market_offer_submit$html,'submit_bid'),writes==0L)
- session$setInputs(market_offer_closed=as.character(market_offer_dialog_RV()$generation));settle(session)
- selected(NULL);settle(session);selected(player);settle(session)
- stopifnot(length(jobs)==1L,enabled(output$action_buttons$html,'btn_bid_market'))
- session$setInputs(btn_bid_market=2L);settle(session)
- stopifnot(length(jobs)==1L,!market_offer_dialog_RV()$pending)
- cat('PASS explicit editor entry starts one verification; warm reopening reattaches the fresh completed result without another live request\n')
-})
-reset(capacity())
-shiny::testServer(selected_player_Server,args=args,{
- settle(session);stopifnot(!length(jobs))
- session$setInputs(btn_bid_market=1L);settle(session)
- stopifnot(!length(jobs),!market_offer_dialog_RV()$pending,enabled(output$market_offer_submit$html,'submit_bid'),!length(rpc))
- cat('PASS fresh durable worker capacity is reused on editor demand with zero live checks\n')
-})
-reset()
-shiny::testServer(selected_player_Server,args=args,{
- settle(session);session$setInputs(btn_bid_market=1L);settle(session);stopifnot(length(jobs)==1L)
- jobs[[1]]$reject(resource_failure(resource='get_team_acquisition_capacity',category='network'));settle(session)
- stopifnot(blocked(output$market_offer_submit$html,'submit_bid'),enabled(output$action_buttons$html,'btn_bid_market'),length(jobs)==1L)
- for(kind in c('partial','expired','undated','invalid-deadline')){
-  session$setInputs(market_offer_closed=as.character(market_offer_dialog_RV()$generation));settle(session)
-  before<-length(jobs);session$setInputs(btn_bid_market=before+1L);settle(session)
-  value<-capacity()
-  if(kind=='partial'){value$status<-'partial';value$funds$spendable_budget<-NA_real_}
-  if(kind=='expired')value$valid_until<-as.numeric(now)-1
-  if(kind=='undated')value$valid_until<-NULL
-  if(kind=='invalid-deadline')value$valid_until<-NA_real_
-  jobs[[before+1L]]$resolve(value);settle(session)
-  # Only the first never-usable completion can receive a bounded repair.
-  if(length(jobs)>before+1L){jobs[[length(jobs)]]$resolve(value);settle(session)}
-  stopifnot(blocked(output$market_offer_submit$html,'submit_bid'),writes==0L)
- }
- cat('PASS failed/partial/expired/malformed financial responses cannot authorize Submit; explicit reopening remains the retry path\n')
-})
-reset()
-shiny::testServer(selected_player_Server,args=args,{
- settle(session);session$setInputs(btn_bid_market=1L);settle(session)
- stopifnot(length(jobs)==1L,jobs[[1]]$current())
+ stopifnot(identical(before,reads),isTRUE(offer_modal_opened_RV()),
+  grepl('Saved minimum market bid',modal,fixed=TRUE),grepl('value="200"',modal,fixed=TRUE),
+  card_states$capacity()$data$valid_until<as.numeric(now),identical(rpc,before_rpc))
+ cat('PASS a saved rule sets the draft amount without extending its expired capacity deadline or acquiring source data\n')
  team('another');settle(session)
- stopifnot(length(jobs)==1L,!jobs[[1]]$current(),is.null(market_offer_dialog_RV()))
- jobs[[1]]$resolve(capacity(budget=9999));settle(session)
  stopifnot(is.null(market_offer_dialog_RV()))
+ before <- reads
  session$setInputs(btn_bid_market=2L);settle(session)
- stopifnot(length(jobs)==2L,jobs[[2]]$context$user_team_id=='another')
- jobs[[2]]$resolve(capacity());settle(session)
- stopifnot(enabled(output$market_offer_submit$html,'submit_bid'),writes==0L)
- cat('PASS changed team context cancels pending authorization and needs its own explicit editor demand\n')
-})
-reset()
-owned<-observed_data(player,observed_at=now);owned$user_team_id<-'mine';selected(owned)
-shiny::testServer(selected_player_Server,args=args,{
- settle(session);stopifnot(!length(jobs),writes==0L)
- cat('PASS owned-player browsing retains its listing gate without acquisition-capacity work\n')
+ stopifnot(identical(before,reads),grepl('Listed price',modal,fixed=TRUE),
+  grepl('value="150"',modal,fixed=TRUE),is.null(card_states$capacity()$data))
+ cat('PASS a new team uses its own listing and cannot reuse capacity from the previous team\n')
 })

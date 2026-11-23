@@ -2333,3 +2333,7 @@ Fixed decimal-comma entry in the existing All Players maximum clause filter. The
 ### Disconnect dialog (2026-11-22, implemented locally)
 
 Added a branded connection-loss dialog with the static pitch radar and a browser reload button. The button changes to amber during the brief wait before navigation. See [reconnection behavior](docker_deployment.md#mobile-reconnection-retain-the-live-session-for-30-minutes) and [verification](data_review_results.md#disconnect-dialog--2026-11-22).
+
+### Faster manual offers and clause confirmation — implemented locally, 2026-11-22 Pacific
+
+Player-card market and direct-owner offers use the selected row and saved league rules to render immediately and send a single native write on confirmation. Existing database reservations are protected with a scoped dispatch RPC. Native rejections and uncertain results request factual refresh for the captured context. Clause price confirmation uses the card data and retains its submit-time preflight. Local completion criteria include held-response browser checks and isolated database dispatch validation. Hosted schema, latency and account outcome verification are rollout work. See [player-card timing](selected_player_module.md#manual-offer-and-purchase-timing--2026-11-22-pacific).

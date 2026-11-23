@@ -456,7 +456,8 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
         selection_event <- isolate(player_selection_event_RV())
         showModal(modalDialog(
           # title = "Selected player",
-          selected_player_UI(id = ns("selected_player")),
+          selected_player_UI(id = ns("selected_player"),
+            player = selected_player_snapshot_RV(), team = if (is.function(user_team_id)) user_team_id() else user_team_id),
           tags$script(HTML(paste0("$(document).off(\"hidden.bs.modal.fm",gsub("[^a-zA-Z0-9]","",ns("")),"\",\"#shiny-modal\").on(\"hidden.bs.modal.fm",gsub("[^a-zA-Z0-9]","",ns("")),"\",\"#shiny-modal\",function(){Shiny.setInputValue(\"",ns("card_closed"),"\",Math.random(),{priority:\"event\"});});"))),
           footer = div(style = "text-align: center; width: 100%;",
                        modalButton("Close")),

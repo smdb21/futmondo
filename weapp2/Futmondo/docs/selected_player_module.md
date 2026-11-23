@@ -1,5 +1,17 @@
 # Player card
 
+
+## Manual offer and purchase timing — 2026-11-22 Pacific
+
+Offer actions appear immediately below the player's identity when the selected row has a listing or a rival owner. A newer saved summary can update those facts. Opening the market or direct-owner editor renders the input and applicable premiums in the same modal response. A saved league minimum is used as the suggested market amount when available. Otherwise the editor uses the observed listing price and labels it as such. Saved capacity keeps its original source deadline.
+
+A confirmed ordinary offer carries the editor generation and current amount in one Shiny event. The browser keeps the controls visible and disabled and announces that it is waiting for Futmondo. It animates the spinner unless the browser requests reduced motion. The server sends the existing native offer payload once, with zero Futmondo preflight reads. With scheduled purchases enabled, one database RPC records dispatch and protects local reservations. See [manual offer dispatch](scheduled_clauses.md#manual-offer-dispatch) for the database contract. A rejection or missing acknowledgement queues the existing scoped factual refresh. A refresh reads results and existing offers. It cannot resend the offer.
+
+Buy Clause opens its confirmation from the card's observed owner and price. Confirmation retains the purchase preflight and never authorizes a price higher than the amount displayed. Waiting for the purchase result uses the same browser status. The chart widget mounts after identity paint and when the card has points or valuations to plot. Existing mounted charts retain their data while refresh is pending.
+
+The dated offer-editor verification sections below describe earlier behavior. The current path is covered by [the executed verification](data_review_results.md).
+
+
 ## Status beside the portrait (2026-11-22)
 
 The identity header overlays a small badge on the portrait's lower corner using

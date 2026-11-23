@@ -92,7 +92,7 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
   championship_id=reactive('league'),user_team_id=reactive('mine')),{
   settle(session)
   html<-output$action_buttons$html;history<-output$recent_round_points$html
-  stopifnot(player_target_ready(),!player_target_current(),selected_player()$user_team_id=='rival',
+  stopifnot(player_target_ready(),!player_card_recent_table_facts(selected_player()),selected_player()$user_team_id=='rival',
     !blocked(html,'btn_bid_market'),!grepl('Retry availability|btn_verify_availability|not verified',html),
     !grepl('refresh failed',history),grepl('awaiting a newer background observation',history,fixed=TRUE),
     identical(card_history()$points$points,c(0,-2)),!length(source_reads))
@@ -107,26 +107,17 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
   stopifnot(selected_player()$user_team_id=='new-rival',selected_player()$price==175,!length(source_reads))
   cat('PASS newer durable observations update the open card automatically without source requests\n')
   session$setInputs(btn_bid_market=1L);settle(session)
-  stopifnot(identical(sort(source_reads),sort(c('get_player_summary','get_team_acquisition_capacity'))),
-    isTRUE(market_offer_dialog_RV()$pending),blocked(output$market_offer_submit$html,'submit_bid'))
-  info<-list(budget=1000,withheld=0,teamValue=2000,maxBid=2000,configuration=list(maxPlayersInRoster=20,mnmp=.5,mbmv=TRUE))
-  capacity<-calculate_team_acquisition_capacity(info,data.frame(id='owned',value=2000),
-    data.frame(id=character(),player_id=character(),buyer_team_id=character(),seller_team_id=character(),is_clause=logical(),created=character()),
-    data.frame(id=character()),list(),'mine',now=now)
-  pending[['get_team_acquisition_capacity']]$resolve(capacity);settle(session)
-  stopifnot(isTRUE(market_offer_dialog_RV()$pending),blocked(output$market_offer_submit$html,'submit_bid'))
-  pending[['get_player_summary']]$resolve(observed_data(summary('current-rival',180),observed_at=now));settle(session)
-  stopifnot(!market_offer_dialog_RV()$pending,player_target_current(),selected_player()$price==180,
-    market_offer_dialog_RV()$preflight$ok,!blocked(output$market_offer_submit$html,'submit_bid'))
-  cat('PASS only an explicit offer starts live checks; current funds alone cannot enable Submit before current target evidence\n')
+  stopifnot(!length(source_reads), isTRUE(offer_modal_opened_RV()),
+    market_offer_dialog_RV()$player$price == 175)
+  cat('PASS explicit offer opens from the saved player observation without source reads\n')
 })
-cat(sprintf('METRIC initial card plus refresh/update/held manual checks %.3fs\n',proc.time()[['elapsed']]-started))
+cat(sprintf('METRIC initial card plus refresh/update and saved editor %.3fs\n',proc.time()[['elapsed']]-started))
 
 # A new process/session restores database bytes, never the display-only marker.
 restore_all();source_reads<-character();selected(row);league<-shiny::reactiveVal('league')
 shiny::testServer(selected_player_Server,args=list(selected_player=selected,login_token=reactive(auth),
   championship_id=league,user_team_id=reactive('mine')),{
-  settle(session);stopifnot(selected_player()$user_team_id=='new-rival',!player_target_current(),!length(source_reads))
+  settle(session);stopifnot(selected_player()$user_team_id=='new-rival',!player_card_recent_table_facts(selected_player()),!length(source_reads))
   league('another-league');settle(session)
   stopifnot(!player_target_ready(),selected_player()$user_team_id=='old-owner',!length(source_reads))
   league('league');settle(session)

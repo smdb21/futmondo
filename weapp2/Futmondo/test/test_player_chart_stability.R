@@ -1,6 +1,8 @@
 #!/usr/bin/env Rscript
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages(source('global.R'))
+get_sb_url <- function() ''
+get_sb_key <- function() ''
 checks<-0L;check<-function(name,expr){force(expr);checks<<-checks+1L;cat('PASS',name,'\n')}
 settle<-function(session){for(i in seq_len(20L)){later::run_now(0);session$flushReact()}}
 check('initial card shell has no chart widget dependency',{
@@ -24,20 +26,21 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
  settle(session)
  check('identity and safe eligibility display while all sources are pending',{
    stopifnot(grepl('Immediate Player',output$player_identity_summary$html,fixed=TRUE),
-     sum(gregexpr('Checking availability',output$action_buttons$html,fixed=TRUE)[[1]]>0)==1L,
+     grepl('Make Market Offer',output$action_buttons$html,fixed=TRUE),
      identical(card_states$summary()$status,'loading'),length(calls)==4L,!card_chart_ready())
  })
  check('chart waits for the current browser identity paint acknowledgment',{
    generation<-as.character(card_paint_generation())
    session$setInputs(identity_painted=list(player='p1',generation='obsolete'));settle(session);stopifnot(!card_chart_ready())
    session$setInputs(identity_painted=list(player='p1',generation=generation));settle(session)
-   stopifnot(card_chart_ready(),grepl('player_trend_plot',output$player_chart_container$html,fixed=TRUE))
+   stopifnot(card_chart_ready(),is.null(output$player_chart_container))
  })
  summary<-list(championship=list(season='2026',competitionId='domestic'),points=list(list(round=8,points=-2,matchId='match8')))
  pending[['get_player_summary:p1']]$resolve(summary);settle(session)
  check('summary points render before stored history or profile resolves',{
    html<-output$recent_round_points$html
    stopifnot(grepl('-2 pts',html,fixed=TRUE),!grepl('Match association unavailable',html,fixed=TRUE),
+     grepl('player_trend_plot',output$player_chart_container$html,fixed=TRUE),
      identical(card_states$profile()$status,'loading'),!any(grepl('read_card_round_history',calls)))
  })
  pending[['get_lineup_from_team:']]$resolve(list(pointSystem='fixture'));settle(session)

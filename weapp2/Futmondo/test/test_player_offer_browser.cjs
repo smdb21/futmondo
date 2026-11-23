@@ -1,0 +1,60 @@
+const assert = require('node:assert/strict');
+const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/futmondo-review-tools/node_modules') + '/playwright');
+
+(async () => {
+  const browser = await chromium.launch({headless:true, args:['--no-sandbox'],
+    ...(process.env.FUTMONDO_TEST_CHROMIUM ? {executablePath:process.env.FUTMONDO_TEST_CHROMIUM} : {})});
+  try {
+    for (const width of [320, 1440]) {
+      const page = await browser.newPage({viewport:{width, height:780}});
+      const errors = [];
+      page.on('pageerror', error => errors.push(error.message));
+      await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
+      await page.goto('http://127.0.0.1:3895/');
+      await page.waitForFunction(() => Shiny.shinyapp.isConnected());
+      const modal = page.locator('#shiny-modal');
+      const open = async (name, action, control) => {
+        const started = Date.now();
+        await page.getByRole('button', {name, exact:true}).click();
+        await modal.waitFor({state:'visible'});
+        const cardPainted = Date.now();
+        const actionButton = modal.getByRole('button', {name:action});
+        await actionButton.waitFor({state:'visible'});
+        const actionPainted = Date.now();
+        await actionButton.click();
+        await control.waitFor({state:'visible'});
+        return [cardPainted - started, actionPainted - cardPainted, Date.now() - actionPainted];
+      };
+      const confirm = async (button, pending, acknowledgement) => {
+        await modal.getByRole('button', {name:button, exact:true}).click();
+        await modal.getByRole('status').getByText(pending).waitFor();
+        assert.equal(await modal.getByRole('button', {name:button, exact:true}).isDisabled(), true);
+        assert.equal(await modal.getByRole('button', {name:'Cancel', exact:true}).isDisabled(), true);
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(150);
+        assert.equal(await modal.isVisible(), true);
+        assert.equal(await modal.getByRole('status').locator('.fa-spinner').count(), 1);
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2), false);
+        await page.getByText(acknowledgement).waitFor();
+        await modal.waitFor({state:'hidden'});
+      };
+      const field = modal.getByLabel('Your offer amount (EUR):');
+      const market = await open('Open market player', 'Make Market Offer', field);
+      assert.equal(await field.inputValue(), '150');
+      await modal.getByRole('button', {name:'+0.5%', exact:true}).click();
+      assert.equal(await field.inputValue(), '151');
+      await field.fill('999');
+      await confirm('Submit Market Offer', /Sending offer/, /Your squad has reached/);
+      const direct = await open('Open rival player', 'Offer to Rival', modal.getByLabel('Your purchase offer amount (EUR):'));
+      await confirm('Submit Offer', /Sending offer/, /Direct offer of/);
+      const clause = await open('Open rival player', 'Buy Clause', modal.getByText('Confirm Release Clause Buyout'));
+      await confirm('Confirm Clause Buyout', /Sending purchase/, /executed successfully/);
+      await open('Open market player', 'Make Market Offer', field);
+      await page.keyboard.press('Escape');
+      await modal.waitFor({state:'hidden'});
+      assert.deepEqual(errors, []);
+      console.log('PASS ' + width + 'px: click-to-card, card-to-action and action-to-editor ' + [market,direct,clause].map(pair => pair.join('+')).join('/') + ' ms (market/owner/clause); spinner and locked controls remained visible during each delayed response');
+      await page.close();
+    }
+  } finally { await browser.close(); }
+})().catch(error => { console.error(error.stack); process.exitCode = 1; });

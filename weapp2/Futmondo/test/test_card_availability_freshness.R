@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Explicit editor entry must not authorize a slow-history check with expired funds.
+# A slow history response must not extend expired funds used by the capacity adapter.
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages(source('global.R'))
 clock_now<-as.POSIXct('2026-11-05 12:00:00',tz='UTC')
@@ -52,14 +52,20 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
  championship_id=shiny::reactive('league'),user_team_id=shiny::reactive('mine')) ,{
  settle(session);stopifnot(!length(requests))
  session$setInputs(btn_bid_market=1L);settle(session)
+ stopifnot(isTRUE(offer_modal_opened_RV()), !length(requests), capacity_calls==0L)
+ ctx <- resource_context(auth, 'league', 'mine')
+ capacity <- NULL
+ promises::then(async_adapter_fetch('get_team_acquisition_capacity',
+   list(login=auth,championship_id='league',user_team_id='mine'),ctx,intent='manual_action'),
+   function(value) capacity <<- value)
+ settle(session)
  stopifnot(is.function(pending_history),!advanced)
  pending_history();settle(session)
- state<-card_states$capacity();html<-output$action_buttons$html
- stopifnot(!identical(state$status,'loading'),advanced)
-  stopifnot(capacity_calls==1L,identical(state$data$status,'ok'),evaluate_acquisition_preflight(state$data,'offer')$ok,
+ html<-output$action_buttons$html
+ stopifnot(advanced, capacity_calls==1L, identical(capacity$status,'ok'),evaluate_acquisition_preflight(capacity,'offer')$ok,
    !grepl('Checking availability|checks expired',html),!grepl('disabled',html,fixed=TRUE),
-   state$data$valid_until>as.numeric(clock_now))
-  cat('PASS actual card renders verified actions after 31s history with fresh source timestamps.\n')
+   capacity$valid_until>as.numeric(clock_now))
+  cat('PASS the editor opens without checks and a separate capacity read keeps fresh source timestamps after 31s history.\n')
   before<-requests;previous<-selected();selected(NULL);settle(session);selected(previous);settle(session)
   stopifnot(identical(requests,before),!grepl('Checking availability|Retry availability',output$action_buttons$html))
   cat('PASS reopening the fresh card adds zero requests.\n')

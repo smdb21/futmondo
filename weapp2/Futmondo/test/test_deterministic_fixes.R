@@ -372,40 +372,6 @@ cat("\n--- Today helpers ---\n")
 
 
 
-# ---- Pure market-offer open decision ----
-# The shared decision point: preflight fail -> no open; preflight ok -> open;
-# no valid player -> no open (regardless of preflight).
-det_record("market_offer_decision_preflight_fail_blocks_open", {
-  sp <- data.frame(id = "p1", name = "A", stringsAsFactors = FALSE)
-  # Capacity rejection.
-  d1 <- market_offer_decision(sp, list(ok = FALSE, reason = "capacity", message = "full"))
-  stopifnot(isFALSE(d1$open), d1$reason == "capacity")
-  # Funds rejection.
-  d2 <- market_offer_decision(sp, list(ok = FALSE, reason = "funds", message = "no funds"))
-  stopifnot(isFALSE(d2$open), d2$reason == "funds")
-  # Unavailable verification.
-  d3 <- market_offer_decision(sp, list(ok = FALSE, reason = "unavailable", message = "x"))
-  stopifnot(isFALSE(d3$open), d3$reason == "unavailable")
-  # NULL preflight (verification failed to run) fails closed.
-  d4 <- market_offer_decision(sp, NULL)
-  stopifnot(isFALSE(d4$open), d4$reason == "unavailable")
-})
-
-det_record("market_offer_decision_preflight_ok_opens", {
-  sp <- data.frame(id = "p1", name = "A", stringsAsFactors = FALSE)
-  d <- market_offer_decision(sp, list(ok = TRUE, reason = "ok", message = NULL))
-  stopifnot(isTRUE(d$open), d$reason == "ok")
-})
-
-det_record("market_offer_decision_no_player_blocks_open", {
-  # No valid player: blocked even if preflight would pass.
-  d1 <- market_offer_decision(NULL, list(ok = TRUE, reason = "ok", message = NULL))
-  stopifnot(isFALSE(d1$open), d1$reason == "no_player")
-  d2 <- market_offer_decision(data.frame(id = "", name = "A", stringsAsFactors = FALSE),
-                              list(ok = TRUE, reason = "ok", message = NULL))
-  stopifnot(isFALSE(d2$open), d2$reason == "no_player")
-})
-
 # =============================================================================
 # 6. Rivals helpers
 # =============================================================================

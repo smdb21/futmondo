@@ -21,7 +21,7 @@ offer_error_message <- function(result) {
   return("Your squad has reached the league's maximum size. Pending incoming players can also count toward this limit. Complete a sale to free a place, then refresh before making another offer.")
  if(nzchar(message)&&!grepl("^api[.]",message)&&!identical(code,"error"))return(message)
  if(grepl("^api[.]",code)||grepl("^api[.]",message))
-  return("LigaRadar rejected this offer. Refresh the player's details and check the league's buying rules before trying again.")
+  return("Futmondo rejected this offer. Check the league's buying rules before trying again.")
  "The offer could not be confirmed. Refresh and check your active offers before trying again, so you do not submit it twice."
 }
 
@@ -188,7 +188,24 @@ player_card_summary_row <- function(player,summary,observed=FALSE) {
 }
 
 
-selected_player_UI <- function(id) {
+# The selected table row can seed the same draft action that the card later
+# renders from its saved summary. A known own bid waits for the update controls.
+player_card_offer_button <- function(player, team, ns) {
+  if (is.null(player) || !nzchar(fm_scalar(team, "")) || player_card_is_own_player(player, team) ||
+      nzchar(fm_scalar(player$my_bid_id, ""))) return(NULL)
+  if (isTRUE(player$market_inMarket) && is.finite(market_bid_minimum(player, FALSE))) {
+    return(actionButton(ns("btn_bid_market"), tagList(icon("hand-holding-dollar"), " Make Market Offer"),
+      class = "btn btn-buy-market", `data-offer-editor` = "true"))
+  }
+  if (!isTRUE(player$market_inMarket) && player_card_has_rival_owner(player, team)) {
+    owner <- fm_scalar(player$userTeam, fm_scalar(player$teamname, "Owner"))
+    return(actionButton(ns("btn_offer_owner"), tagList(icon("hand-holding-dollar"), paste0(" Offer to ", owner)),
+      class = "btn btn-offer-money", `data-offer-editor` = "true"))
+  }
+  NULL
+}
+
+selected_player_UI <- function(id, player = NULL, team = NULL) {
   ns <- NS(id)
   tagList(
     # renderUI can insert HTML asynchronously after shiny:value. Observe only
@@ -233,17 +250,17 @@ selected_player_UI <- function(id) {
       footer = tagList(
         uiOutput(ns("player_identity_summary")),
         fluidRow(
+          column(12, align = "center", style = "margin-top: 15px; display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;",
+                 div(id = ns("action_buttons"), class = "shiny-html-output",
+                   player_card_offer_button(player, team, ns)))
+        ),
+        fluidRow(
           column(4, uiOutput(ns("player_points_description_box"))),
           column(4, uiOutput(ns("player_last_points_description_box"))),
           column(4, uiOutput(ns("player_value_description_box")))
         ),
         fluidRow(
           column(12, uiOutput(ns("recent_round_points")))
-        ),
-        # Interactive Purchase Row
-        fluidRow(
-          column(12, align = "center", style = "margin-top: 15px; display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;",
-                 uiOutput(ns("action_buttons")))
         ),
         # Plotly History Chart Row (Plot A)
         fluidRow(
@@ -265,27 +282,6 @@ selected_player_UI <- function(id) {
       )
     )
   )
-}
-
-
-# ---- Pure helper: market-offer open decision ----
-# Single decision point shared by the "Make Market Offer" button and the
-# external "market_bid" action event from another player view.
-# Given a selected player row and a preflight result, decide whether the
-# regular market-offer modal should open.
-#   - no valid player            -> open = FALSE, reason = "no_player"
-#   - preflight not ok           -> open = FALSE, reason = <preflight reason>
-#   - valid player + preflight ok-> open = TRUE,  reason = "ok"
-# Returns list(open = TRUE/FALSE, reason = "ok" | "no_player" | <preflight reason>).
-market_offer_decision <- function(sp, preflight) {
-  if (is.null(sp) || is.null(sp$id) || !nzchar(as.character(sp$id))) {
-    return(list(open = FALSE, reason = "no_player"))
-  }
-  if (is.null(preflight) || !isTRUE(preflight$ok)) {
-    reason <- if (!is.null(preflight) && !is.null(preflight$reason)) preflight$reason else "unavailable"
-    return(list(open = FALSE, reason = reason))
-  }
-  return(list(open = TRUE, reason = "ok"))
 }
 
 
@@ -326,19 +322,16 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       row
     })
     player_target_ready<-function(player=selected_player())isTRUE(attr(player,"availability_session_verified"))||player_card_recent_table_facts(player)
-    # Display may use an older successful database observation; an explicitly
-    # opened editor must establish current target facts before enabling Submit.
-    player_target_current<-function(player=selected_player())if(isTRUE(availability_mode()))player_card_recent_table_facts(player)else player_target_ready(player)
 
     active_bid_info_RV <- reactiveVal(NULL)
     modal_bid_info_RV <- reactiveVal(list())
 
 
-    # Includes the immediately shown verification shell. It cannot submit until
-    # the shared capacity read verifies this exact opening's context.
+    # The displayed editor and its confirmation belong to one generation.
     offer_modal_opened_RV <- reactiveVal(FALSE)
     market_offer_dialog_RV <- reactiveVal(NULL)
     market_offer_generation <- 0L
+    submitting_offer <- NULL
 
     # Records whether the release-clause buyout confirmation modal was opened
     # by the shared helper (TRUE) or blocked by the open-state recheck /
@@ -378,6 +371,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       previous_context <- isolate(previous_player_action_context_RV())
       active_bid_info_RV(NULL);modal_context_RV(list());modal_bid_info_RV(list())
       market_offer_dialog_RV(NULL)
+      submitting_offer <<- NULL
       clause_diagnostic_RV(FALSE)
       offer_modal_opened_RV(FALSE);clause_modal_opened_RV(FALSE);modify_modal_opened_RV(FALSE)
       if (player_card_context_changed(previous_context, current_context)) removeModal()
@@ -427,13 +421,12 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     }
 
     # ---- Acquisition capacity preflight (shared by all acquisition paths) ----
-    # Single internal preflight used by market bid, direct-owner offer, clause
-    # buyout, and bid modification. It verifies roster capacity, verified
+    # Shared preflight for clause buyouts and bid modifications.
+    # It verifies roster capacity, verified
     # spendable funds, and (for modify) the existing own bid, then fails closed
     # when verification is unavailable/ambiguous.
     #
-    # mode: "bid" | "offer" | "clause" | "modify"
-    # amount: numeric amount to spend (NULL at modal-open time)
+    # amount: numeric amount to spend (NULL when opening a bid modification)
     # existing_bid_amount: the user's current bid on the target (for "modify")
     #
     # Returns list(ok, reason = "ok"|"unavailable"|"capacity"|"funds"|"minimum_bid", message).
@@ -617,7 +610,6 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         action_buttons <- tagList();target_checked<-FALSE
 
         current_user_team <- get_reactive_val(user_team_id)
-        player_owner_team <- if ("user_team_id" %in% colnames(sp)) sp$user_team_id else NULL
         is_own_player <- player_card_is_own_player(sp,current_user_team)
         has_active_bid <- !is.null(active_bid_info_RV())
 
@@ -734,29 +726,6 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         } else {
           # ---- Player belongs to rival/market AND current user has NO active bid ----
 
-          # Extract effective market price (checking effective_market_price, market_price, and price)
-          eff_market_price <- NA_real_
-          if ("effective_market_price" %in% colnames(sp) && !is.na(sp$effective_market_price) && suppressWarnings(as.numeric(sp$effective_market_price)) > 0) {
-            eff_market_price <- suppressWarnings(as.numeric(sp$effective_market_price))
-          } else if ("market_price" %in% colnames(sp) && !is.na(sp$market_price) && suppressWarnings(as.numeric(sp$market_price)) > 0) {
-            eff_market_price <- suppressWarnings(as.numeric(sp$market_price))
-          } else if ("price" %in% colnames(sp) && !is.na(sp$price) && suppressWarnings(as.numeric(sp$price)) > 0) {
-            eff_market_price <- suppressWarnings(as.numeric(sp$price))
-          }
-
-          # Determine owner name
-          owner_name <- if ("userTeam" %in% colnames(sp) && !is.na(sp$userTeam) && nzchar(trimws(as.character(sp$userTeam)))) {
-            trimws(as.character(sp$userTeam))
-          } else if ("user" %in% colnames(sp) && !is.na(sp$user) && nzchar(trimws(as.character(sp$user)))) {
-            trimws(as.character(sp$user))
-          } else if ("teamname" %in% colnames(sp) && !is.na(sp$teamname) && nzchar(trimws(as.character(sp$teamname)))) {
-            trimws(as.character(sp$teamname))
-          } else if ("owner_teamname" %in% colnames(sp) && !is.na(sp$owner_teamname) && nzchar(trimws(as.character(sp$owner_teamname)))) {
-            trimws(as.character(sp$owner_teamname))
-          } else {
-            NULL
-          }
-
           location_status <- player_card_location_status(sp,current_user_team)
           ownership_badge <- div(
             style = "display: inline-block; padding: 8px 16px; background-color: var(--fm-surface); color: var(--fm-text); border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; font-size: 13px; margin: 5px;",
@@ -787,37 +756,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           clause_status_known<-"clause_transferred"%in%names(sp)&&!is.na(sp$clause_transferred[1])
           is_clause_open <- (clause_price_val > 0) && clause_status_known && !is_clause_transferred && !is_clause_date_locked
 
-          # Option 1: "Make Market Offer" button when player is listed on market
-          # Off-market owner offers have no listing minimum to verify.
-          bid_gate <- passive_acquisition_gate(sp,if(!is.na(eff_market_price) && eff_market_price>0)"bid"else"offer")
-          target_checked<-player_target_ready(sp)
-          can_open_editor<-target_checked
-
-          if (!is.na(eff_market_price) && eff_market_price > 0) {
-            action_buttons <- tagList(
-              action_buttons,
-              actionButton(
-                ns("btn_bid_market"),
-                label = tagList(icon("hand-holding-dollar"), " Make Market Offer"),
-                class = "btn btn-buy-market", disabled=!isTRUE(bid_gate$ok)&&!(can_open_editor&&bid_gate$reason%in%c("unavailable","loading")),
-                title=if(!isTRUE(bid_gate$ok))if(can_open_editor)"Current availability will be checked before submission."else bid_gate$message else NULL
-              )
-            )
-          }
-
-          # Option 2: "Offer to Owner" button when player is owned by a rival user team
-          if (!is.null(player_owner_team) && !is.na(player_owner_team) && player_owner_team != "" && (is.na(eff_market_price) || eff_market_price <= 0)) {
-            owner_name <- if ("userTeam" %in% colnames(sp) && !is.na(sp$userTeam)) sp$userTeam else if ("teamname" %in% colnames(sp) && !is.na(sp$teamname)) sp$teamname else "Owner"
-            action_buttons <- tagList(
-              action_buttons,
-              actionButton(
-                ns("btn_offer_owner"),
-                label = tagList(icon("hand-holding-dollar"), paste0(" Offer to ", owner_name)),
-                class = "btn btn-offer-money", disabled=!isTRUE(bid_gate$ok)&&!(can_open_editor&&bid_gate$reason%in%c("unavailable","loading")),
-                title=if(!isTRUE(bid_gate$ok))if(can_open_editor)"Current availability will be checked before submission."else bid_gate$message else NULL
-              )
-            )
-          }
+          target_checked <- player_target_ready(sp)
+          can_open_editor <- target_checked
+          action_buttons <- tagList(action_buttons, player_card_offer_button(sp, current_user_team, ns))
 
           # Option 3: rival-owned release clause
           has_rival_owner <- player_card_has_rival_owner(sp, current_user_team)
@@ -859,14 +800,14 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           (stored_mode&&player_availability_observed(readiness$data,"listings")))
         if(is_own_player&&!listings_ready&&!identical(readiness$status,"loading")&&!is.null(readiness$data))
           readiness<-resource_state(status="unverified",error=readiness$error)
-        if(!is_own_player && has_active_bid && !summary_unverified)readiness<-resource_state(data=active_bid_info_RV())
+        if(!is_own_player && has_active_bid)readiness<-resource_state(data=active_bid_info_RV())
         if(!is_own_player && !has_active_bid && summary_unverified && identical(card_states$summary()$status,"loading"))readiness<-resource_state(status="loading")
         if(!is_own_player && !has_active_bid && !identical(summary_state$status,"loading")&&summary_unverified)
           readiness<-if(is.null(summary_state$data))summary_state else resource_state(status="unverified",error=summary_state$error)
         {
           disable<-function(tag){
             if(inherits(tag,"shiny.tag")){
-              if(identical(tag$name,"button"))tag$attribs$disabled<-"disabled"
+              if(identical(tag$name,"button")&&is.null(tag$attribs[["data-offer-editor"]]))tag$attribs$disabled<-"disabled"
               tag$children<-lapply(tag$children,disable)
             } else if(is.list(tag))tag<-lapply(tag,disable)
             tag
@@ -883,7 +824,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         } else if(is.null(readiness$data)) {
           action_buttons<-tagList(fm_info(if(stored_mode&&is.null(readiness$error))
             "Player availability has not been saved yet. See Background sync for acquisition status."else
-            resource_failure_message(readiness$error),error=!is.null(readiness$error)))
+            resource_failure_message(readiness$error),error=!is.null(readiness$error)),disable(action_buttons))
         }
         # Keep recovery reachable even when the saved capacity is missing or
         # loading: the ordinary readiness gate disables purchase controls only.
@@ -1095,107 +1036,73 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       }
     })
 
-    # ---- Shared helper: open the regular market-offer modal ----
-    # Single code path for the "Make Market Offer" button and for external
-    # "market_bid" action events from another player view.
-    # Opening reuses verified card facts locally; submission independently runs
-    # the existing current-state preflight. Never block this click on network I/O.
-    market_offer_preflight <- function(sp, state) {
-      if(!player_target_current(sp))return(list(ok=FALSE,reason="unavailable",message="Current player ownership and market status could not be verified."))
-      if(player_card_is_own_player(sp,get_reactive_val(user_team_id))||!isTRUE(sp$market_inMarket)||
-         !is.finite(fm_number(sp$effective_market_price %||% sp$price)))
-        return(list(ok=FALSE,reason="unavailable",message="This player is not available for a market offer."))
-      capacity <- state$data
-      deadline <- capacity$valid_until
-      if (!identical(state$status,"ok") || identical(state$freshness,"stale") ||
-          !is.numeric(deadline) || length(deadline)!=1L || !is.finite(deadline) ||
-          deadline<=as.numeric(Sys.time())) {
-        return(list(ok=FALSE,reason="unavailable",message=if(!is.null(state$error))
-          resource_failure_message(state$error) else acquisition_unavailable_message(capacity)))
-      }
-      minimum <- market_bid_minimum(sp,capacity$rules$minimum_bid_at_value)
-      result <- evaluate_acquisition_preflight(capacity,"bid",minimum_bid=minimum)
-      result$minimum_bid <- minimum
-      result
-    }
-    output$market_offer_body <- renderUI({
-      dialog <- market_offer_dialog_RV();req(dialog)
-      if (isTRUE(dialog$pending)) return(fm_info("Checking availability…",pending=TRUE))
-      if (!isTRUE(dialog$preflight$ok)) return(fm_info(dialog$preflight$message,error=TRUE,inline=TRUE))
-      market_price <- dialog$preflight$minimum_bid
-      tagList(p("Minimum market bid: ",strong(player_card_money(market_price))),
-        numericInput(ns("bid_amount"),label="Your offer amount (EUR):",value=market_price,min=market_price,step=10000),
-        tags$div(role="group", `aria-label`="Choose an offer premium",
-          style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;",
-          lapply(c(0.5, 1, 2, 4, 5, 10), function(pct) tags$button(
-            type="button", class="btn btn-default", paste0("+", pct, "%"),
-            `data-target-input`=ns("bid_amount"),
-            # Add the whole-euro premium separately to avoid 100 * 1.10
-            # becoming 110.000000000000014 and rounding up an extra euro.
-            `data-amount`=format(market_price + ceiling(market_price * pct / 100),
-              scientific=FALSE, trim=TRUE),
-            onclick="var field=document.getElementById(this.dataset.targetInput);if(field){field.value=this.dataset.amount;field.dispatchEvent(new Event('change',{bubbles:true}));}"))),
-        p("Percentages are above the minimum market bid, rounded up to whole euros."),
-        uiOutput(ns("bid_amount_preview")))
-    })
-    output$market_offer_submit <- renderUI({
-      dialog <- market_offer_dialog_RV();req(dialog)
-      actionButton(ns("submit_bid"),"Submit Market Offer",class="btn btn-buy-market",
-        disabled=isTRUE(dialog$pending)||!isTRUE(dialog$preflight$ok))
-    })
-    observeEvent(input$market_offer_closed,{
-      dialog <- market_offer_dialog_RV()
-      if (!is.null(dialog) && identical(fm_scalar(input$market_offer_closed,""),as.character(dialog$generation))) {
-        market_offer_dialog_RV(NULL);offer_modal_opened_RV(FALSE)
-        values <- modal_context_RV();values$bid <- NULL;modal_context_RV(values)
-      }
-    })
-    open_market_offer_modal <- function() {
+    # Render the complete editor from the selected row and available saved rules.
+    # Futmondo validates the actual offer when it receives the explicit submission.
+    offer_dialog_dependency <- htmltools::htmlDependency(
+      "fm-offer-dialog", "1", src = c(file = "www"), script = "offer-dialog.js")
+    open_offer_modal <- function(mode) {
+      req(is.null(submitting_offer))
       sp <- selected_player()
-      context <- player_action_context_RV();req(sp,!is.null(context))
-      state <- card_states$capacity();deadline <- state$data$valid_until
-      if(player_target_current(sp)&&(player_card_is_own_player(sp,get_reactive_val(user_team_id))||!isTRUE(sp$market_inMarket))){
-        show_preflight_failure(market_offer_preflight(sp,state));offer_modal_opened_RV(FALSE)
-        return(invisible(FALSE))
-      }
-      pending <- !player_target_current(sp) || identical(state$status,"loading") || is.null(state$data) ||
-        identical(state$freshness,"stale") || !is.numeric(deadline) || length(deadline)!=1L ||
-        !is.finite(deadline) || deadline<=as.numeric(Sys.time())
-      pf <- if (!pending) market_offer_preflight(sp,state) else NULL
-      if (!pending && !isTRUE(market_offer_decision(sp,pf)$open)) {
-        show_preflight_failure(pf)
-        offer_modal_opened_RV(FALSE)
-        return(invisible(FALSE))
-      }
-      values <- modal_context_RV();values$bid <- NULL;modal_context_RV(values)
-      market_offer_generation <<- market_offer_generation+1L
+      context <- player_action_context_RV()
+      req(sp, !is.null(context), !player_card_is_own_player(sp, context$team), is.null(active_bid_info_RV()))
+      market <- identical(mode, "bid")
+      listing <- market_bid_minimum(sp, FALSE)
+      req(if (market) isTRUE(sp$market_inMarket) && is.finite(listing)
+          else player_card_has_rival_owner(sp, context$team) && !isTRUE(sp$market_inMarket))
+      rule <- card_states$capacity()$data$rules$minimum_bid_at_value
+      minimum <- if (market) market_bid_minimum(sp, rule) else NA_real_
+      amount <- if (market) if (is.finite(minimum)) minimum else listing else fm_number(sp$value)
+      if (!is.finite(amount) || amount <= 0) amount <- NA_real_
+      owner <- fm_scalar(sp$userTeam, fm_scalar(sp$teamname, "Owner"))
+      amount_id <- ns(if (market) "bid_amount" else "owner_offer_amount")
+      preview_id <- if (market) "bid_amount_preview" else "owner_offer_amount_preview"
+      submit_id <- ns(if (market) "submit_bid" else "submit_owner_offer")
+      market_offer_generation <<- market_offer_generation + 1L
       generation <- market_offer_generation
-      auth<-get_reactive_val(login_token)
-      live_check<-FALSE
-      market_offer_dialog_RV(list(context=context,player=sp,generation=generation,pending=pending,preflight=pf,live_check=live_check))
-      if (!pending) remember_action_context("bid")
+      market_offer_dialog_RV(list(context = context, mode = mode, generation = generation, player = sp))
       offer_modal_opened_RV(TRUE)
-      showModal(modalDialog(
-        title = tagList(icon("hand-holding-dollar"), " Place Market Offer"),
-        div(id=ns("market_offer_marker"),p(strong(sp$name)),uiOutput(ns("market_offer_body"))),
-        tags$script(HTML(paste0("(function(){var marker=document.getElementById('",ns("market_offer_marker"),
-          "');var modal=marker&&marker.closest('.modal');if(modal)$(modal).one('hidden.bs.modal',function(){Shiny.setInputValue('",
-          ns("market_offer_closed"),"','",generation,"',{priority:'event'});});})();"))),
-        footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
-                      modalButton("Cancel"),
-                      uiOutput(ns("market_offer_submit"),inline=TRUE)),
-        easyClose = TRUE,
-        size = "s"
-      ))
-      # Join the card's team verification. A pending request is never duplicated
-      # by opening an offer; only a settled expired/failed result needs retry.
-      if(pending)verify_card_availability(current=TRUE)
+      marker <- div(id = ns("market_offer_marker"), class = "fm-offer-dialog",
+        `data-generation` = generation, `data-submit-input` = ns("confirm_player_offer"),
+        `data-closed-input` = ns("market_offer_closed"), `data-amount-id` = amount_id,
+        `data-submit-id` = submit_id,
+        p(strong(sp$name)),
+        if (market) p(if (is.finite(minimum)) "Saved minimum market bid: " else "Listed price: ",
+          strong(player_card_money(amount)))
+        else if (is.finite(amount)) p("Current Market Valuation: ", strong(player_card_money(amount))),
+        numericInput(amount_id, if (market) "Your offer amount (EUR):" else "Your purchase offer amount (EUR):",
+          value = amount, min = 1, step = "any"),
+        if (market) tags$div(role = "group", `aria-label` = "Choose an offer premium",
+          style = "display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;",
+          lapply(c(0.5, 1, 2, 4, 5, 10), function(pct) tags$button(
+            type = "button", class = "btn btn-default", paste0("+", pct, "%"),
+            `data-fm-offer-premium` = format(amount + ceiling(amount * pct / 100), scientific = FALSE, trim = TRUE)))),
+        if (market) p(if (is.finite(minimum)) "Percentages are above the saved minimum market bid, rounded up to whole euros."
+                      else "Percentages are above the listed price, rounded up to whole euros."),
+        uiOutput(ns(preview_id)))
+      dialog <- modalDialog(
+        title = tagList(icon("hand-holding-dollar"),
+          if (market) " Place Market Offer" else paste0(" Offer Money to ", owner)),
+        marker,
+        footer = tagList(
+          tags$div(class = "fm-offer-pending", role = "status", `aria-live` = "polite"),
+          div(style = "display:flex;justify-content:center;gap:10px;flex-wrap:wrap;",
+            modalButton("Cancel"),
+            tags$button(id = submit_id, type = "button",
+              class = if (market) "btn btn-buy-market" else "btn btn-offer-money",
+              if (market) "Submit Market Offer" else "Submit Offer"))),
+        easyClose = TRUE, fade = FALSE, size = "s")
+      showModal(htmltools::attachDependencies(dialog, offer_dialog_dependency, append = TRUE))
       invisible(TRUE)
     }
-
-    # ---- Option 1: Market Offer Modal ----
-    observeEvent(input$btn_bid_market, {
-      open_market_offer_modal()
+    open_market_offer_modal <- function() open_offer_modal("bid")
+    observeEvent(input$btn_bid_market, open_market_offer_modal())
+    observeEvent(input$btn_offer_owner, open_offer_modal("offer"))
+    observeEvent(input$market_offer_closed, {
+      dialog <- market_offer_dialog_RV()
+      if (!is.null(dialog) && identical(fm_scalar(input$market_offer_closed, ""), as.character(dialog$generation))) {
+        market_offer_dialog_RV(NULL)
+        offer_modal_opened_RV(FALSE)
+      }
     })
 
     # ---- Shared received-offer confirmation modal ----
@@ -1254,188 +1161,58 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       }, ignoreNULL = TRUE)
     }
 
-    # ---- Submit Market Offer ----
-    observeEvent(input$submit_bid, {
-      req(consume_action_context("bid"))
-      sp <- selected_player()
+    # The browser sends the displayed generation and the current field value in
+    # one confirmation, so a debounced input or a dismissed dialog cannot send.
+    observeEvent(input$confirm_player_offer, {
+      intent <- input$confirm_player_offer
+      dialog <- market_offer_dialog_RV()
+      req(is.list(intent), !is.null(dialog), is.null(submitting_offer),
+        identical(fm_scalar(intent$generation, ""), as.character(dialog$generation)),
+        identical(dialog$context, player_action_context_RV()))
+      sp <- dialog$player
       login <- get_reactive_val(login_token)
-      champ_id <- get_reactive_val(championship_id)
-      team_id <- get_reactive_val(user_team_id)
-      req(sp, login, champ_id, team_id)
-
-      bid_amount <- input$bid_amount
-      if (is.null(bid_amount) || is.na(bid_amount) || !is.numeric(bid_amount) || bid_amount <= 0) {
-        shiny::showNotification("Please enter a valid numerical price greater than 0 €.", type = "error")
+      champ_id <- dialog$context$championship
+      team_id <- dialog$context$team
+      amount <- fm_number(intent$amount)
+      if (!is.finite(amount) || amount <= 0 || amount > 1e16) {
+        show_preflight_failure(list(message = "Please enter a valid offer amount."))
+        session$sendCustomMessage("fm-offer-unlock", list(id = ns("market_offer_marker"), generation = dialog$generation))
         return()
       }
-
-      # Preflight before write: verify capacity + verified spendable funds.
-      pf <- if(exists("fm_clause_enabled",mode="function")&&fm_clause_enabled())list(ok=TRUE)else run_acquisition_preflight(sp, "bid", amount = bid_amount)
-      if (!isTRUE(pf$ok)) {
-        show_preflight_failure(pf)
-        return()
-      }
-
+      submitting_offer <<- dialog$generation
       player_id <- sp$id
-      player_slug <- if ("slug" %in% colnames(sp) && !is.na(sp$slug)) sp$slug else sp$name
-
-      result <- perform_acquisition("buy_clause", list(
-        login = login,
-        championship_id = champ_id,
-        team_id = team_id,
-        player_id = player_id,
-        player_slug = player_slug,
-        price = bid_amount,
-        isClause = FALSE
-      ), "bid")
-      complete_acquisition(result,function(res){
-
-      is_success <- if (is.list(res)) isTRUE(res$success) else isTRUE(res)
-
-      removeModal()
-
-      if (is_success) {
-        tryCatch({
-          log_market_transaction(
-            player_id = player_id,
-            championship_id = champ_id,
-            buyer_team_id = team_id,
-            seller_team_id = if ("user_team_id" %in% colnames(sp)) sp$user_team_id else NULL,
-            price = bid_amount,
-            is_clause = FALSE
-          )
-        }, error = function(e) {
-          print(paste0("[Supabase] Bid log warning: ", e$message))
-        })
-        shiny::showNotification(
-          paste0("Market offer of ", player_card_money(bid_amount), " submitted successfully for ", sp$name, "!"),
-          type = "message",
-          duration = 5
-        )
-        invalidate_manual_resources(login,champ_id,team_id,sp$id)
-        if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
-          tryCatch(on_bid_updated(action_type = "bid_placed", player_id = player_id, new_bid_price = bid_amount, is_cancel = FALSE), error = function(e) NULL)
-        }
-      } else {
-        err_msg <- offer_error_message(res)
-        shiny::showNotification(
-          tags$div(class = "fm-offer-error", paste0("Offer failed: ", err_msg)),
-          type = "error",
-          duration = NULL
-        )
-      }
+      args <- list(login = login, championship_id = champ_id, team_id = team_id,
+        player_id = player_id, player_slug = fm_scalar(sp$slug, sp$name), price = amount, isClause = FALSE)
+      ctx <- resource_context(login, champ_id, team_id, player_id)
+      current <- function() !session$isClosed() && isolate({
+        identical(dialog$context, player_action_context_RV()) &&
+          identical(dialog$generation, market_offer_dialog_RV()$generation)
       })
-    })
-
-    # ---- Option 2: Direct Offer to Owner Modal ----
-    observeEvent(input$btn_offer_owner, {
-      remember_action_context("owner_offer")
-      sp <- selected_player()
-      req(sp)
-
-      # Preflight: a new direct offer must have roster capacity available.
-      pf <- run_acquisition_preflight(sp, "offer", amount = NULL)
-      if (!isTRUE(pf$ok)) {
-        show_preflight_failure(pf)
-        return()
-      }
-
-      default_offer <- if ("value" %in% colnames(sp) && !is.na(sp$value) && sp$value > 0) sp$value else NA_real_
-      owner_name <- if ("userTeam" %in% colnames(sp) && !is.na(sp$userTeam)) sp$userTeam else if ("teamname" %in% colnames(sp) && !is.na(sp$teamname)) sp$teamname else "Owner"
-      clause_info <- if ("clause_price" %in% colnames(sp) && !is.na(sp$clause_price) && sp$clause_price > 0) paste0(" (Release Clause: ", player_card_money(sp$clause_price), ")") else ""
-
-      showModal(modalDialog(
-        title = tagList(icon("hand-holding-dollar"), paste0(" Offer Money to ", owner_name)),
-        p(strong(sp$name), clause_info),
-        p("Current Market Valuation: ", strong(player_card_money(default_offer))),
-        numericInput(
-          ns("owner_offer_amount"),
-          label = "Your purchase offer amount (EUR):",
-          value = default_offer,
-          min = 1,
-          step = 10000
-        ),
-        uiOutput(ns("owner_offer_amount_preview")),
-        p(style = "color: var(--fm-muted); font-size: 12px;", "This offer will be submitted to the player owner and tracked in market transaction history."),
-        footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
-                     modalButton("Cancel"),
-                     actionButton(ns("submit_owner_offer"), "Submit Offer", class = "btn btn-offer-money")),
-        easyClose = TRUE,
-        size = "s"
-      ))
-    })
-
-    # ---- Submit Direct Offer to Owner ----
-    observeEvent(input$submit_owner_offer, {
-      req(consume_action_context("owner_offer"))
-      sp <- selected_player()
-      login <- get_reactive_val(login_token)
-      champ_id <- get_reactive_val(championship_id)
-      team_id <- get_reactive_val(user_team_id)
-      req(sp, login, champ_id, team_id)
-
-      offer_amount <- input$owner_offer_amount
-      if (is.null(offer_amount) || is.na(offer_amount) || !is.numeric(offer_amount) || offer_amount <= 0) {
-        shiny::showNotification("Please enter a valid numerical price greater than 0 €.", type = "error")
-        return()
-      }
-
-      # Preflight before write: verify capacity + verified spendable funds.
-      pf <- if(exists("fm_clause_enabled",mode="function")&&fm_clause_enabled())list(ok=TRUE)else run_acquisition_preflight(sp, "offer", amount = offer_amount)
-      if (!isTRUE(pf$ok)) {
-        show_preflight_failure(pf)
-        return()
-      }
-
-      player_id <- sp$id
-      player_slug <- if ("slug" %in% colnames(sp) && !is.na(sp$slug)) sp$slug else sp$name
-
-      result <- perform_acquisition("buy_clause", list(
-        login = login,
-        championship_id = champ_id,
-        team_id = team_id,
-        player_id = player_id,
-        player_slug = player_slug,
-        price = offer_amount,
-        isClause = FALSE
-      ), "offer")
-      complete_acquisition(result,function(res){
-
-      is_success <- if (is.list(res)) isTRUE(res$success) else isTRUE(res)
-
-      removeModal()
-
-      if (is_success) {
-        tryCatch({
-          log_market_transaction(
-            player_id = player_id,
-            championship_id = champ_id,
-            buyer_team_id = team_id,
-            seller_team_id = if ("user_team_id" %in% colnames(sp)) sp$user_team_id else NULL,
-            price = offer_amount,
-            is_clause = FALSE
-          )
-        }, error = function(e) {
-          print(paste0("[Supabase] Direct offer log warning: ", e$message))
-        })
-        shiny::showNotification(
-          paste0("Direct offer of ", player_card_money(offer_amount), " submitted successfully for ", sp$name, "!"),
-          type = "message",
-          duration = 5
-        )
-        invalidate_manual_resources(login,champ_id,team_id,sp$id)
-        if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
-          tryCatch(on_bid_updated(action_type = "owner_offer_placed", player_id = player_id, new_bid_price = offer_amount, is_cancel = FALSE), error = function(e) NULL)
+      capacity <- card_states$capacity()$data
+      result <- tryCatch(fm_send_player_offer(args, dialog$mode, sp, capacity, ctx, current),
+        error = function(e) list(success = FALSE, code = "offer_not_sent", message = "The offer could not be queued."))
+      fm_clause_complete(result, function(res) {
+        submitting_offer <<- NULL
+        market_offer_dialog_RV(NULL)
+        offer_modal_opened_RV(FALSE)
+        removeModal()
+        if (!isTRUE(res$success)) {
+          shiny::showNotification(tags$div(class = "fm-offer-error",
+            paste0("Offer failed: ", offer_error_message(res))), type = "error", duration = NULL)
+          if (isTRUE(res$refresh) && !isTRUE(res$refresh_queued) && is.function(on_bid_updated)) {
+            tryCatch(on_bid_updated(action_type = "refresh"), error = function(e) NULL)
+          }
+          return()
         }
-      } else {
-        err_msg <- offer_error_message(res)
-        shiny::showNotification(
-          tags$div(class = "fm-offer-error", paste0("Offer failed: ", err_msg)),
-          type = "error",
-          duration = NULL
-        )
-      }
-      })
+        kind <- if (identical(dialog$mode, "bid")) "Market" else "Direct"
+        shiny::showNotification(paste0(kind, " offer of ", player_card_money(amount),
+          " submitted successfully for ", sp$name, "!"), type = "message", duration = 5)
+        invalidate_manual_resources(login, champ_id, team_id, player_id)
+        if (is.function(on_bid_updated)) {
+          tryCatch(on_bid_updated(action_type = if (identical(dialog$mode, "bid")) "bid_placed" else "owner_offer_placed",
+            player_id = player_id, new_bid_price = amount, is_cancel = FALSE), error = function(e) NULL)
+        }
+      }, current)
     })
 
     if(isTRUE(allow_scheduled_clauses)&&exists('fm_clause_card_observers',mode='function'))
@@ -1483,29 +1260,25 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       # Recompute the clause price locally (single source of truth).
       clause_price <- if ("clause_price" %in% colnames(sp) && !is.na(sp$clause_price)) suppressWarnings(as.numeric(sp$clause_price)) else 0
 
-      # Preflight: clause buyout requires a free roster slot.
-      pf <- run_acquisition_preflight(sp, "clause", amount = NULL)
-      if (!isTRUE(pf$ok)) {
-        show_preflight_failure(pf)
-        clause_modal_opened_RV(FALSE)
-        return(invisible(FALSE))
-      }
-
       remember_action_context("clause")
+      remember_bid("clause", clause_price)
       clause_diagnostic_RV(diagnostic)
       clause_modal_opened_RV(TRUE)
-      showModal(modalDialog(
+      dialog <- modalDialog(
         title = tagList(icon("bolt"), " Confirm Release Clause Buyout"),
-        p(strong(sp$name)),
+        tags$div(class = "fm-offer-dialog", `data-submit-input` = ns("submit_clause"),
+          `data-submit-id` = ns("confirm_clause_button"), `data-operation` = "purchase",
+          p(strong(sp$name))),
         p(if(diagnostic) 'DIAGNOSTIC: This sends one real purchase request while the clause is reported locked. If Futmondo accepts it, the player may be purchased and your balance may become negative. No automatic retry will occur.' else 'This purchases the player for their official release clause. Delivery follows your league settings.'),
         p("Clause price: ", strong(player_card_money(clause_price))),
         p(style = "color: var(--fm-danger); font-size: 13px; font-weight: 600;", "Are you sure you want to trigger this clause buyout?"),
-        footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
-                     modalButton("Cancel"),
-                     actionButton(ns("submit_clause"), "Confirm Clause Buyout", class = "btn btn-buy-clause")),
-        easyClose = TRUE,
-        size = "s"
-      ))
+        footer = tagList(
+          tags$div(class = "fm-offer-pending", role = "status", `aria-live` = "polite"),
+          div(style = "display:flex;justify-content:center;gap:10px;flex-wrap:wrap;",
+            modalButton("Cancel"),
+            tags$button(id = ns("confirm_clause_button"), type = "button", class = "btn btn-buy-clause", "Confirm Clause Buyout"))),
+        easyClose = TRUE, fade = FALSE, size = "s")
+      showModal(htmltools::attachDependencies(dialog, offer_dialog_dependency, append = TRUE))
       invisible(TRUE)
     }
 
@@ -1557,14 +1330,17 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       # Only this clause price is sent to the clause endpoint -- no
       # comparison price (e.g. max(market, clause)) is ever transmitted.
       clause_price <- if ("clause_price" %in% colnames(sp) && !is.na(sp$clause_price)) suppressWarnings(as.numeric(sp$clause_price)) else 0
-      if (is.na(clause_price) || clause_price <= 0) {
-        shiny::showNotification("Release clause price is not available for this player.", type = "error")
+      confirmed_price <- fm_number(modal_bid_info_RV()$clause)
+      if (!is.finite(confirmed_price) || !is.finite(clause_price) || clause_price <= 0 || clause_price > confirmed_price) {
+        removeModal()
+        shiny::showNotification("The release clause price changed or is unavailable. Reopen the player to confirm the current price.", type = "error")
         return()
       }
 
       # Preflight before write: verify roster slot + verified spendable funds.
       pf <- if(exists("fm_clause_enabled",mode="function")&&fm_clause_enabled())list(ok=TRUE)else run_acquisition_preflight(sp, "clause", amount = clause_price)
       if (!isTRUE(pf$ok)) {
+        removeModal()
         show_preflight_failure(pf)
         return()
       }
@@ -2040,8 +1816,6 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       saved<-fm_worker_get(ctx$account_id,descriptor$resource_key)
       if(is.null(saved))NULL else {attr(saved$data,'availability_from_saved')<-TRUE;resource_state(saved$data)}
     }
-    availability_requested<-reactiveVal(NULL)
-    availability_required<-function()!is.null(market_offer_dialog_RV())&&identical(availability_requested(),availability_team_context())
     card_states<-list()
     card_states$resolved<-card_read("card_resolved_context","get_resolved_league_context",auth_args,context=team_card_context,active=function()isTRUE(session$rootScope()$userData$league_context_enabled))
     summary_availability_context<-reactive({
@@ -2068,45 +1842,23 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     context_ready<-function()!identical(card_states$summary()$status,"loading")&&!identical(card_states$lineup()$status,"loading")
     card_states$points<-card_read("card_points","read_card_round_history",function(ctx)list(context=ctx),context=history_context,active=context_ready)
     card_states$valuation<-card_read("card_valuation","read_card_price_history",function(ctx)list(context=ctx),context=history_context,active=context_ready)
-    card_states$capacity<-player_availability_source(session,"team",availability_team_context,availability_login,
-      refresh=global_refresh,
-      active=function()availability_required()&&!is.null(card_context())&&!player_card_is_own_player(selected_player(),get_reactive_val(user_team_id)),
-      stored=function(){
-        ctx<-availability_team_context();saved<-availability_stored("get_team_acquisition_capacity",ctx,if(!is.null(ctx))auth_args(ctx)else list())
-        saved
-      },current_context=availability_team_context,mode=availability_mode,opening=availability_opening,intent=function()'manual_action')
-    manual_capacity_verification<-attr(card_states$capacity,"verification")
-    # Kept as the card's existing recovery seam; it now works in either mode.
-    worker_capacity_verification_available<-function()!is.null(availability_team_context())
-    verify_card_availability<-function(current=FALSE){
-      if(player_card_is_own_player(selected_player(),get_reactive_val(user_team_id))){
-        if(!player_availability_valid(isolate(card_states$listings())$data,"listings"))attr(card_states$listings,"retry")()
-        return(invisible(NULL))
-      }
-      if(if(isTRUE(current))!player_target_current()else!player_target_ready())attr(card_states$summary,"ensure")()
-      if(isTRUE(current)){
-        availability_requested(availability_team_context())
-        attr(card_states$capacity,"ensure")()
-      }
-      invisible(NULL)
-    }
-    observeEvent(input$btn_verify_availability,{
-      if(!isTRUE(availability_mode()))verify_card_availability()
+    # Offer editors use only the existing worker replay. A cold card and an
+    # explicit offer opening never request a second team acquisition check.
+    card_states$capacity <- reactive({
+      ctx <- availability_team_context()
+      if (is.null(ctx)) return(resource_state(status = "unverified"))
+      saved <- availability_stored("get_team_acquisition_capacity", ctx, auth_args(ctx))
+      saved %||% resource_state(status = "unverified")
     })
-    observeEvent(list(card_states$capacity(),selected_player(),card_states$summary()),{
-      dialog <- isolate(market_offer_dialog_RV());state <- card_states$capacity()
-      if (is.null(dialog) || isTRUE(dialog$live_check) || !isTRUE(dialog$pending) ||
-          !identical(dialog$context,isolate(player_action_context_RV()))) return()
-      target<-selected_player()
-      target_unavailable<-player_target_current(target)&&(player_card_is_own_player(target,get_reactive_val(user_team_id))||!isTRUE(target$market_inMarket))
-      if(!target_unavailable&&identical(state$status,"loading"))return()
-      if(!player_target_current(target)&&identical(card_states$summary()$status,"loading"))return()
-      dialog$player<-target
-      dialog$pending <- FALSE
-      dialog$preflight <- market_offer_preflight(dialog$player,state)
-      market_offer_dialog_RV(dialog)
-      if (isTRUE(dialog$preflight$ok)) remember_action_context("bid")
-    },ignoreInit=TRUE)
+    worker_capacity_verification_available <- function() !is.null(availability_team_context())
+    observeEvent(input$btn_verify_availability, {
+      if (isTRUE(availability_mode())) return()
+      if (player_card_is_own_player(selected_player(), get_reactive_val(user_team_id))) {
+        if (!player_availability_valid(card_states$listings()$data, "listings")) attr(card_states$listings, "retry")()
+      } else if (!player_target_ready()) {
+        attr(card_states$summary, "ensure")()
+      }
+    })
     card_states$listings<-player_availability_source(session,"listings",availability_team_context,availability_login,
       active=function()!is.null(card_context())&&player_card_is_own_player(selected_player(),get_reactive_val(user_team_id)),refresh=global_refresh,
       stored=function(){ctx<-availability_team_context();availability_stored("get_my_market_players",ctx,if(!is.null(ctx))auth_args(ctx)else list())},
@@ -2126,11 +1878,13 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     card_paint_generation<-reactiveVal(0L)
     chart_context<-NULL
     chart_data<-reactiveVal(NULL)
+    chart_mounted<-reactiveVal(FALSE)
     observeEvent(card_context(),{
       current<-card_context()
       if(identical(current,chart_context)) return()
       chart_context<<-current
       chart_data(NULL)
+      chart_mounted(FALSE)
       card_started(Sys.time());timed_summary<<-FALSE;timed_history<<-FALSE;timed_availability<<-FALSE;card_chart_ready(FALSE);card_paint_generation(isolate(card_paint_generation())+1L)
 
     },ignoreNULL=FALSE,priority=100)
@@ -2167,7 +1921,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
          identical(fm_scalar(input$identity_painted$generation,""),as.character(card_paint_generation())))card_chart_ready(TRUE)
     })
     output$player_chart_container <- renderUI({
-      if(!isTRUE(card_chart_ready()))return(NULL)
+      if(!isTRUE(chart_mounted()))return(NULL)
       plotly::plotlyOutput(ns("player_trend_plot"),height="340px")
     })
     card_round_details <- reactive({
@@ -2190,10 +1944,13 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       history<-card_history()
       dates<-card_round_details()$dates
       previous<-isolate(chart_data())
-      if(identical(history$status,"loading") && !nrow(history$points) &&
-         !nrow(history$valuation) && !is.null(previous)) return()
+      has_data <- nrow(history$points) > 0L || nrow(history$valuation) > 0L
+      # A cold card with empty history never loads the chart library just to
+      # draw an empty plot. Keep a mounted chart while a refresh is pending.
+      if (!has_data && (is.null(previous) || identical(history$status, "loading"))) return()
       chart_data(list(history=list(points=history$points,valuation=history$valuation,
-        context=history$context,status=if(identical(history$status,"loading") && !nrow(history$points) && !nrow(history$valuation)) "loading" else "ready"),dates=dates))
+        context=history$context,status="ready"),dates=dates))
+      chart_mounted(TRUE)
     })
     output$player_trend_plot <- plotly::renderPlotly({
       req(card_chart_ready())

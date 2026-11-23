@@ -60,19 +60,21 @@ shiny::testServer(players_table_Server,args=list(players_table_RV=source_rows,us
  # An actually expired catalog asks only for this target's authoritative facts.
  session$setInputs(card_closed=2L);settle(session);source_rows(rows(301,'stale-target'));settle(session)
  session$setInputs(fixture_selected=1L);settle(session)
- stopifnot(length(summaries)==2L,!length(financial),blocked(output[['selected_player-action_buttons']]$html,'btn_bid_market'))
+ stopifnot(length(summaries)==2L,!length(financial),!blocked(output[['selected_player-action_buttons']]$html,'btn_bid_market'))
  before<-length(reads);summaries[[2]]$resolve(summary('stale-target'));settle(session)
  html<-output[['selected_player-action_buttons']]$html
  stopifnot(!blocked(html,'btn_offer_owner'),!grepl('Checking availability|Retry availability',html),
   grepl('Verified owner',html,fixed=TRUE),!grepl('Ownership: Free Agent',html,fixed=TRUE),!length(financial))
- cat('PASS an expired catalog refreshes only the target summary; current rival ownership and off-market status replace stale table facts\n')
+ cat('PASS an expired catalog leaves the offer editor reachable while only target summary loads; current rival ownership and off-market status replace stale table facts\n')
  # A previous player's completion cannot change the current target.
  summaries[[1]]$resolve(summary('dani-fixture',price=9999));settle(session)
  stopifnot(!blocked(output[['selected_player-action_buttons']]$html,'btn_offer_owner'),!length(financial))
  # A new league must not inherit a previous session-target marker.
  session$setInputs(card_closed=3L);settle(session);league('other');settle(session)
  session$setInputs(fixture_selected=1L);settle(session)
- stopifnot(length(summaries)==3L,!length(financial),blocked(output[['selected_player-action_buttons']]$html,'btn_offer_owner'))
+ stopifnot(length(summaries)==3L,!length(financial),
+  blocked(output[['selected_player-action_buttons']]$html,'btn_offer_owner'),
+  !blocked(output[['selected_player-action_buttons']]$html,'btn_bid_market'))
  summaries[[3]]$reject(resource_failure(category='network'));settle(session)
  stopifnot(!blocked(output[['selected_player-action_buttons']]$html,'btn_verify_availability'),!length(financial),private_writes==0L)
  cat('PASS target session reuse is league-isolated and failed retrieval remains actionable without financial/history acquisition\n')

@@ -614,6 +614,77 @@ fm_clause_execute_async <- function(handler,args,context,player,is_current,owner
     'The purchase was not sent. Current player facts, offer capacity, funds or database access could not be verified.')
  })
 }
+# An explicit ordinary offer needs only the native submission. If clause
+# scheduling is enabled, the database first claims the shared purchase lane.
+fm_send_player_offer <- function(args, mode, player, capacity, context, is_current) {
+  request <- fm_clause_action_payload("buy_clause", args)
+  guarded <- fm_clause_enabled()
+  id <- if (guarded) fm_clause_id() else NULL
+  admitted <- FALSE
+  sent <- FALSE
+  uncertain <- function() list(success = FALSE, code = "purchase_response_uncertain",
+    message = "Futmondo did not confirm the outcome. Check your active offers before trying again.", refresh = TRUE)
+  blocked <- function(code) list(success = FALSE, code = "offer_not_sent", message = switch(code,
+    clause_team_busy = "The team or player already has an offer or scheduled purchase awaiting resolution.",
+    clause_reservation_capacity_unavailable = "Saved capacity could not verify funds and slots alongside existing reservations.",
+    clause_offer_capacity = "The squad has no offer slot available alongside existing reservations.",
+    clause_offer_funds = "This amount would exceed the funds available alongside existing reservations.",
+    "The offer could not be admitted to the purchase queue."))
+  settle <- function(state, code, result) {
+    if (!admitted) return(result)
+    done <- function(...) { fm_clause_refresh(context$account_id, force = TRUE); NULL }
+    acknowledgement <- tryCatch(fm_clause_rpc("settle", list(p_id = id, p_owner = "", p_state = state, p_code = code)),
+      error = promises::promise_reject)
+    promises::then(acknowledgement, done, done)
+    result
+  }
+  # Admission needs only the numeric totals and their original deadline.
+  if (!is.null(capacity)) capacity <- list(status = capacity$status, valid_until = capacity$valid_until,
+    roster = capacity$roster[c("status", "effective_count", "cap")],
+    outstanding = capacity$outstanding["count"], funds = capacity$funds[c("spendable_budget", "api_bid_limit")])
+  admission <- if (guarded) {
+    fm_clause_rpc("dispatch_manual_offer", list(p_id = id, p_context = fm_clause_scope(context),
+      p_mode = mode, p_player = fm_clause_row_player(player), p_price = args$price, p_capacity = capacity))
+  } else promises::promise_resolve("dispatched")
+  outcome <- promises::then(admission, function(code) {
+    if (!identical(code, "dispatched")) return(blocked(fm_scalar(code, "")))
+    admitted <<- guarded
+    if (!isTRUE(is_current())) return(settle("failed", "dispatch_not_sent", blocked("")))
+    response <- fm_async_http(request$url, "POST", request$body,
+      c(`Content-Type` = "application/json; charset=utf-8"), owner = "", priority = "interactive")
+    sent <<- TRUE
+    promises::then(response, function(value) {
+      if (value$status_code < 200L || value$status_code >= 300L) stop("Offer acknowledgement is uncertain")
+      answer <- jsonlite::fromJSON(rawToChar(value$content), simplifyVector = FALSE)$answer
+      code <- fm_clause_safe_code(answer$code)
+      if (identical(code, API_CODE_OK)) return(settle("accepted", code, list(success = TRUE)))
+      if (grepl("^api[.]error[.]", code) || startsWith(code, "api.market.") || isTRUE(answer$error)) {
+        return(settle("failed", code, list(success = FALSE, code = code,
+          message = answer$msg %||% answer$message %||% code, refresh = TRUE)))
+      }
+      settle("uncertain", code, uncertain())
+    })
+  })
+  outcome <- promises::catch(outcome, function(error) {
+    rejected_by_request_budget <- inherits(error, "futmondo_unavailable") && identical(error$category, "read_budget")
+    if (sent && !rejected_by_request_budget) settle("uncertain", "purchase_response_uncertain", uncertain())
+    else settle("failed", "dispatch_not_sent", blocked(""))
+  })
+  promises::then(outcome, function(result) {
+    if (isTRUE(result$refresh)) {
+      result$refresh_queued <- tryCatch({
+        invalidate_manual_resources(args$login, context$championship_id, context$user_team_id, context$player_id)
+        isTRUE(fm_worker_refresh_league(args$login, context$championship_id, context$user_team_id, context$player_id))
+      }, error = function(e) FALSE)
+    }
+    if (isTRUE(result$success)) {
+      tryCatch(log_market_transaction(args$player_id, args$championship_id, args$team_id, player$user_team_id, args$price),
+        error = function(e) message("[Futmondo] Could not queue the confirmed offer record."))
+    }
+    result
+  })
+}
+
 # Detach callbacks from Shiny's input promise chain so a held request does not
 # suspend navigation or heartbeat inputs in that same browser session.
 fm_clause_complete <- function(result,callback,is_current=function()TRUE) {

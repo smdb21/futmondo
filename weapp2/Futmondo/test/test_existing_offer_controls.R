@@ -16,6 +16,20 @@ capacity <- function() list(status=capacity_status,valid_until=as.numeric(Sys.ti
     pending_outbound_count=0,pending_inbound_count=1),
   funds=list(spendable_budget=10000),outstanding=list(count=1,total_amount=1000),
   rules=list(minimum_bid_at_value=TRUE))
+# Replay the saved team snapshot used by the card's display path.
+fm_worker_configured <- function() TRUE
+fm_clause_enabled <- function() FALSE
+fm_worker_mode <- function(...) TRUE
+fm_worker_rpc <- function(...) promises::promise_resolve(list(resources = list(), jobs = list()))
+ctx <- resource_context(auth, 'league', 'mine')
+capacity_descriptor <- fm_worker_descriptor('get_team_acquisition_capacity',
+  list(login = auth, championship_id = 'league', user_team_id = 'mine'), ctx)
+saved_capacity <- capacity()
+worker_get <- fm_worker_get
+fm_worker_get <- function(account, key) {
+  if (identical(key, capacity_descriptor$resource_key)) return(list(data = saved_capacity))
+  worker_get(account, key)
+}
 get_market_players <- function(...) {market_reads <<- market_reads+1L;manual_rows}
 modify_bid <- function(...) {writes[[length(writes)+1L]] <<- c(list(action='modify'),list(...));TRUE}
 cancel_bid <- function(...) {writes[[length(writes)+1L]] <<- c(list(action='cancel'),list(...));TRUE}

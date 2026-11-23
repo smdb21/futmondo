@@ -333,3 +333,5 @@ See [monitor contracts and limits](docs/admin_worker_monitor.md).
 
 
 Completed market bid reconciliation requires `scripts/migrations/20261122130000_reconcile_completed_market_bids.sql` before the matching app release. Production recorded it as `20261123050735_reconcile_completed_market_bids`. Fresh databases include it in `scripts/schema.sql`. See [completed market bids](docs/scheduled_clauses.md#completed-market-bids).
+
+Player-card market and owner offers send one asynchronous request to Futmondo. Install `scripts/migrations/20261123064300_manual_offer_dispatch.sql` before deploying this version with `FUTMONDO_CLAUSE_SCHEDULING_ENABLED=true`. Fresh databases include the dispatch function in `scripts/schema.sql`. See [manual offer dispatch](docs/scheduled_clauses.md#manual-offer-dispatch).

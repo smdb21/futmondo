@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Full player-card verification through native acquisition/parsing/cache code.
+# A separate capacity request still repairs slow source prerequisites.
 # Only the passive worker snapshot, unrelated card data, HTTP and clock are fake.
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages(source('global.R'))
@@ -87,35 +87,39 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
  capacity_fetcher=function(...)stop('Opening the verified modal must not run a synchronous preflight')) ,{
  settle(session);stopifnot(live_calls==0L,enabled(output$action_buttons$html,'btn_bid_market'))
  session$setInputs(btn_bid_market=1L);settle(session)
- stopifnot(live_calls==1L,is.function(pending[['pressroom:1']]),
-  market_offer_dialog_RV()$pending,!enabled(output$market_offer_submit$html,'submit_bid'))
+ stopifnot(live_calls==0L,isTRUE(offer_modal_opened_RV()),!length(requests))
+ ctx <- resource_context(auth, 'league', 'mine')
+ capacity <- NULL
+ promises::then(async_adapter_fetch('get_team_acquisition_capacity',
+  list(login=auth,championship_id='league',user_team_id='mine'),ctx,intent='manual_action'),
+  function(value) capacity <<- value)
+ settle(session)
+ stopifnot(live_calls==1L,is.function(pending[['pressroom:1']]))
  clock_now<<-clock_now+31;pending[['pressroom:1']]();settle(session)
- stopifnot(is.function(pending[['players:1']]),market_offer_dialog_RV()$pending)
+ stopifnot(is.function(pending[['players:1']]),is.null(capacity))
  session$setInputs(btn_verify_availability=2L);settle(session)
  stopifnot(live_calls==1L)
  clock_now<<-clock_now+20;pending[['players:1']]();settle(session)
- state<-card_states$capacity();html<-output$action_buttons$html
- stopifnot(state$data$status=='ok',evaluate_acquisition_preflight(state$data,'bid',1000)$ok,
+ html<-output$action_buttons$html
+ stopifnot(capacity$status=='ok',evaluate_acquisition_preflight(capacity,'bid',1000)$ok,
   enabled(html,'btn_bid_market'),!grepl('Availability checks expired',html,fixed=TRUE),
   live_calls==1L,writes==0L,counts['information']==2L,counts['players']==1L,
   counts['pressroom']==2L,counts['roster']==2L)
- cat('PASS explicit editor entry routes through native live acquisition, repairs expiry during a 20s market response and enables the market action once\n')
+ cat('PASS editor entry makes no source requests and the separate capacity adapter repairs expired evidence during a 20s market response\n')
 
  epoch<-as.numeric(start_time)
  stopifnot(identical(source_stamps[['team_info_league_mine']]-epoch,c(31,51)),
   identical(source_stamps[['market_league_mine']]-epoch,51),
   identical(source_stamps[['roster_facts_league_mine']]-epoch,c(0,31)),
   identical(source_stamps[['pressroom_league']]-epoch,0),
-  state$data$valid_until==epoch+61,state$data$valid_until-as.numeric(clock_now)==10)
+  capacity$valid_until==epoch+61,capacity$valid_until-as.numeric(clock_now)==10)
  cat('PASS original source clocks remain unchanged; strict capacity deadline is the retained roster expiry, only 10s after completion\n')
 
  before<-requests;session$setInputs(btn_bid_market=2L);settle(session)
- stopifnot(offer_modal_opened_RV(),!market_offer_dialog_RV()$pending,
-  isTRUE(market_offer_dialog_RV()$preflight$ok),
-  enabled(output$market_offer_submit$html,'submit_bid'),identical(requests,before),live_calls==1L,writes==0L)
- cat('PASS immediately opening the verified market editor adds zero source reads and zero transactions\n')
+ stopifnot(offer_modal_opened_RV(),identical(requests,before),live_calls==1L,writes==0L)
+ cat('PASS reopening the market editor adds zero source reads and zero transactions\n')
  before<-requests;row<-selected();selected(NULL);settle(session);selected(row);settle(session)
  stopifnot(identical(requests,before),live_calls==1L,writes==0L,
   enabled(output$action_buttons$html,'btn_bid_market'))
- cat('PASS warm reopening reuses the completed shared verification with zero adapter dispatches or additional source requests\n')
+ cat('PASS reopening the card adds zero financial dispatches or additional source requests\n')
 })
