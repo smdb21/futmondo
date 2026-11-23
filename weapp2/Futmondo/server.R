@@ -361,7 +361,8 @@ players_in_championship_Server(id = "players_in_championship",
                                   user_team_id = user_team_id_RV,
                                   user_teams_RV = user_teams_RV,
                                   refresh_trigger = refresh_trigger,
-                                  clause_transfers_source = clause_transfers_RV)
+                                  clause_transfers_source = clause_transfers_RV,
+                                  team_state_source = primary_team_state)
 
   rivals_Server(id = "rivals",
                 is_module_active = reactive({

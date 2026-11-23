@@ -51,9 +51,9 @@ championship_market_prices <- function(players, market_state) {
   players
 }
 
-players_in_championship_Server <- function(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger = NULL, clause_transfers_source = NULL) {
+players_in_championship_Server <- function(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger = NULL, clause_transfers_source = NULL, team_state_source = NULL) {
   moduleServer(id, function(input, output, session) {
-    bind_factual_reads(c("get_championship_players","get_financial_snapshot"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
+    bind_factual_reads("get_championship_players",session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
 
     market_reader <- factual_read_adapter(session,"get_market_players",login_token,championship_id,user_team_id,
       is_active=is_module_active,refresh_trigger=refresh_trigger,state_only=TRUE)
@@ -96,17 +96,21 @@ players_in_championship_Server <- function(id, is_module_active, login_token, ch
         unify_columns()
       return(players_table)
     })
-    available_funds_RV <- reactive({
-      req(is_module_active() == TRUE, login_token(), championship_id(), user_team_id())
-      if (!is.null(refresh_trigger)) refresh_trigger()
-      finance <- tryCatch(get_financial_snapshot(login_token(), championship_id(), user_team_id()), error = function(e) NULL)
-      if (!is.list(finance) || !identical(finance$status, "ok")) return(NA_real_)
-      funds <- suppressWarnings(as.numeric(finance$spendable_budget))
-      if(exists('fm_clause_enabled',mode='function')&&fm_clause_enabled()&&is.null(finance$scheduled_reservations)){
-        reserved<-fm_clause_reservations(fm_clause_jobs(resource_context(login_token(),championship_id(),user_team_id())))$amount
-        funds<-if(is.finite(reserved))max(0,funds-reserved)else NA_real_
+    if (!is.function(team_state_source)) {
+      team_reader <- factual_read_adapter(session, "get_user_team_info", login_token, championship_id, user_team_id,
+        is_active = is_module_active, refresh_trigger = refresh_trigger, state_only = TRUE)
+      team_state_source <- function() team_reader(login_token(), championship_id(), user_team_id())
+    }
+    available_cash_RV <- reactive({
+      req(is_module_active(), login_token(), championship_id(), user_team_id())
+      state <- team_state_source()
+      if (!is.list(state) || !is.list(state$data) || !identical(state$status, "ok") || !is.null(state$error) ||
+          identical(state$freshness, "stale") ||
+          !isTRUE((attr(state$data, "fetch_status") %||% "ok") == "ok") ||
+          isTRUE(attr(state$data, "worker_completeness") %in% c("partial", "unavailable", "incomplete"))) {
+        return(NA_real_)
       }
-      if (length(funds) == 1L && is.finite(funds) && funds >= 0) funds else NA_real_
+      fm_number(state$data[["budget"]])
     })
 
     incoming_player_ids <- if(is.function(clause_transfers_source))resource_display_source(session,
@@ -121,7 +125,7 @@ players_in_championship_Server <- function(id, is_module_active, login_token, ch
       login_token = login_token,
       championship_id = championship_id,
       user_team_id = user_team_id,
-      available_funds_RV = available_funds_RV,
+      available_cash_RV = available_cash_RV,
       points_ratio_basis = "clause_price",
       allow_scheduled_clauses = TRUE,
       filter_by_own_team = TRUE,

@@ -6,6 +6,11 @@
 - The historical Chromium fixture checked the two themes, name truncation, portraits and crests, the tilt, six-midfielder spacing, touch close, and resize reuse. Coverage spans phone portrait and landscape, desktop, and resizing across the 992 px breakpoint. The editor fixture covered 320, 390 and 1440 px, including dense and forwardless formations, slot selection and verified synthetic saves. Authenticated hosted rendering remains unverified.
 - With the same historical 3-6-1 fixture, the pitch shrank from 582 to 378 CSS px at 320 px viewport width, from 561 to 378 at 390 px, and from 725 to 509 at 1440 px. The transform affects one static decorative layer, and the layout reuses all existing player nodes and lazy asset URLs. There are no added reactive invalidations, timers, cache entries, API calls or database operations.
 
+## Clause filter cash balance (2026-11-23)
+
+- The table regression uses a €2M cash balance and €5M spending limit. It includes a €2M clause, excludes a €2.01M clause, applies a stricter typed cap, and covers zero, negative and unknown cash. The championship module tests verified the shared cash field with an unresolved market read and rejected stale or missing balances. The table suite passed 21 checks, the championship suite passed 12 groups and the offline lifecycle passed 14 checks plus eight tabs.
+- The filter uses the existing account/league/team balance reactive and a single row mask. Typing or toggling filters does not rerun balance acquisition, and the deployed path supplies the already loaded Balance summary source. This removes the full financial snapshot, acquisition-capacity and reservation dependencies from the clause browsing filter. There are no new API/database operations, persistence, timers or image requests. Authenticated hosted behavior was outside these checks.
+
 ## Real Club filter (2026-11-23)
 
 - The player-table suite passed 19 checks. The new fixtures cover accented names, crest URLs, duplicate and name-only club rows, unknown clubs, combined club/owner filtering, retained choices after snapshot updates and reset on league changes. The offline lifecycle passed 14 checks and rendered all eight tabs.

@@ -80,6 +80,10 @@ The official public client’s `Dy.p` renderer uses the scalar status to select 
 
 The official guides document market table views and browsing fantasy-owned players. The official public bundle’s `Hi` → `cHH` → `a8i` path confirms the authenticated `POST /1/league/championshipteams` request with a fantasy `championshipId` and real-club `id`, `name` and `logo` response fields. The inspected bundle SHA-256 is `08202076259d1678c7557478771d3aa38b5099f42044630569c704fdb7a7cd1c`. LigaRadar adds a searchable, alphabetical dropdown with club crests that combines with the existing fantasy-owner and scouting filters. Its Essentials **Combined scouting filters** item now mentions real clubs. An equivalent dropdown in the signed-in official app was outside the verification. [Official feature guide](https://magazine.futmondo.com/novedades-en-la-nueva-app-de-futmondo/), [official onboarding guide](https://help.futmondo.com/article/90-empieza-a-jugar-a-futmondo), [official bundle](https://app.futmondo.com/main.dart.js).
 
+### Cash cap for clause browsing — 2026-11-23
+
+Futmondo documents configurable borrowing in its maximum bid. LigaRadar’s existing clause browsing checkbox now compares each clause with the current Balance, while transaction verification follows the configured league rules. The equivalent signed-in official filter was outside the verification. [Official market configuration guide](https://help.futmondo.com/article/141-configura-tu-mercado-en-un-campeonato-social), [player table contract](players_table_module.md#maximum-clause-input--2026-11-22).
+
 ## Essentials
 
 | Login ID / addition | Official baseline | Specific LigaRadar behavior | Local implementation evidence |

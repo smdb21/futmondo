@@ -169,6 +169,37 @@ shiny::testServer(players_table_Server, args = list(players_table_RV = club_sour
   })
 })
 
+cash_rows <- data.frame(id = c("cheap", "exact", "debt", "missing"), name = c("Cheap", "Exact", "Debt", "Missing"),
+  clause_price = c(1e6, 2e6, 2.01e6, NA_real_), value = c(1e6, 2e6, 2.01e6, NA_real_))
+cash <- reactiveVal(2e6)
+cash_reads <- 0L
+shiny::testServer(players_table_Server, args = list(players_table_RV = reactive(cash_rows),
+  user_teams_RV = reactive(NULL), optional_ready = function() FALSE,
+  available_funds_RV = 5e6, available_cash_RV = function() { cash_reads <<- cash_reads + 1L; cash() }), {
+  settle(session)
+  check("cash cap includes its exact boundary, excludes borrowing and composes with manual cap", {
+    stopifnot(identical(players_table_filtered_RV()$id, cash_rows$id), cash_reads == 0L)
+    session$setInputs(clause_under_available_funds_filter = TRUE)
+    settle(session)
+    stopifnot(identical(players_table_filtered_RV()$id, c("cheap", "exact")), cash_reads == 1L)
+    session$setInputs(max_clause_value_filter = "1.5")
+    settle(session)
+    stopifnot(identical(players_table_filtered_RV()$id, "cheap"), cash_reads == 1L)
+  })
+  check("zero or negative cash excludes all positive clauses and unknown cash is reported", {
+    session$setInputs(max_clause_value_filter = "")
+    for (balance in c(0, -1e6, NA_real_)) {
+      cash(balance)
+      settle(session)
+      stopifnot(nrow(players_table_filtered_RV()) == 0L)
+    }
+    stopifnot(grepl("Current cash balance is unavailable", output$clause_cash_status$html, fixed = TRUE))
+    session$setInputs(clause_under_available_funds_filter = FALSE, value_under_available_funds_filter = TRUE)
+    settle(session)
+    stopifnot(identical(players_table_filtered_RV()$id, c("cheap", "exact", "debt")))
+  })
+})
+
 position_rows<-data.frame(id=c('gk','def','mid','fwd','dual','unknown'),name=c('Keeper','Defender','Midfielder','Forward','Dual','Unknown'),
  role=c('Goalkeeper','Defender','Midfielder','Forward','Midfielder',NA),role2=c('',NA,'Defender','','Forward',NA),value=1e6)
 enrichments<-0L;original_average<-add_recent_points_average

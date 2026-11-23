@@ -6,6 +6,11 @@
 - [x] Verify responsive geometry, lineup interactions and resize reuse. See [data review](data_review_results.md#compact-lineup-pitch-2026-11-23).
 - [ ] Confirm rendering in the authenticated hosted application.
 
+## Clause filter cash balance (2026-11-23)
+
+- [x] Cap the clause browsing filter at the current Balance and reuse the existing team observation.
+- [x] Verify the exact cash boundary, missing and stale balances, combination with the typed clause cap, and offline lifecycle. See [data review](data_review_results.md#clause-filter-cash-balance-2026-11-23).
+
 ## Real Club filter (2026-11-23)
 
 - [x] Add a searchable club filter with alphabetized names, crests and an All clubs default in the shared player tables.

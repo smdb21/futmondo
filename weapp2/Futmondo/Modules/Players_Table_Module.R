@@ -135,8 +135,10 @@ players_table_UI <- function(id, box_title = NULL,
           },
           if (filter_by_clause_under_available_funds) {
             div(checkboxInput(inputId = ns("clause_under_available_funds_filter"),
-              label = players_table_filter_label("Clause within available funds", "wallet"), value = FALSE), style = "font-weight: 500;",
-              title = "Show only release clauses at or below your verified debt-aware spending capacity")
+              label = players_table_filter_label("Clause within available funds", "wallet"), value = FALSE),
+              uiOutput(ns("clause_cash_status"), inline = TRUE, role = "status"),
+              style = "font-weight: 500;",
+              title = "Show clauses priced at or below your current cash balance, excluding borrowing")
           },
           if (filter_by_value_under_available_funds) {
             div(checkboxInput(inputId = ns("value_under_available_funds_filter"),
@@ -432,7 +434,7 @@ players_table_renewal_disabled <- function(settings) {
   length(value)==1L && is.atomic(value) && !is.na(value) && identical(tolower(as.character(value)),"true")
 }
 
-players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL, available_funds_RV = NULL, hide_bid_column = FALSE, refresh_trigger = NULL, is_module_active = function() TRUE, optional_ready = function() TRUE, points_ratio_basis = NULL, own_squad = FALSE, league_settings_source = NULL, departing_player_ids = NULL, filter_by_own_team = FALSE, effective_squad_source = NULL, allow_scheduled_clauses = FALSE, incoming_player_ids = NULL) {
+players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL, available_funds_RV = NULL, hide_bid_column = FALSE, refresh_trigger = NULL, is_module_active = function() TRUE, optional_ready = function() TRUE, points_ratio_basis = NULL, own_squad = FALSE, league_settings_source = NULL, departing_player_ids = NULL, filter_by_own_team = FALSE, effective_squad_source = NULL, allow_scheduled_clauses = FALSE, incoming_player_ids = NULL, available_cash_RV = NULL) {
   if (!is.null(points_ratio_basis)) points_ratio_basis <- match.arg(points_ratio_basis, c("value", "clause_price"))
   moduleServer(id, function(input, output, session) {
     bind_factual_reads(c("get_finished_rounds"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
@@ -642,6 +644,15 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       tags$span(class = "text-danger", "Enter a non-negative amount in millions.")
     })
 
+    available_cash <- reactive({
+      if (!is.function(available_cash_RV)) return(NA_real_)
+      tryCatch(fm_number(available_cash_RV()), error = function(e) NA_real_)
+    })
+    output$clause_cash_status <- renderUI({
+      req(is_module_active(), isTRUE(input$clause_under_available_funds_filter), !is.finite(available_cash()))
+      tags$span(class = "text-muted", "Current cash balance is unavailable.")
+    })
+
     ## players_table_filtered_RV ----
     players_table_filtered_RV <- reactive({
       players_table <- players_table_enriched_RV()
@@ -701,12 +712,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       }
       clause_cap <- maximum_clause()
       if (!is.na(clause_cap) && isTRUE(input$clause_under_available_funds_filter)) {
-        funds <- tryCatch({
-          if (is.function(available_funds_RV)) available_funds_RV() else available_funds_RV
-        }, error = function(e) NA_real_)
-        funds <- suppressWarnings(as.numeric(funds)[1])
-        # Do not guess affordability when the verified financial snapshot is unavailable.
-        clause_cap <- if (is.finite(funds) && funds >= 0) min(clause_cap, funds) else NA_real_
+        clause_cap <- min(clause_cap, available_cash())
       }
       if (is.na(clause_cap)) {
         players_table <- players_table[0, , drop = FALSE]

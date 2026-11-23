@@ -99,14 +99,28 @@ players_table_Server<-function(id,players_table_RV,...) {
 }
 settle<-function(session)for(i in 1:10){later::run_now(0);session$flushReact()}
 auth<-shiny::reactiveVal(c(userid='columns-fixture',token='synthetic'));league<-shiny::reactiveVal('league');refresh<-shiny::reactiveVal(0L)
+team_state <- shiny::reactiveVal(resource_state(observed_data(list(budget = 2e6, maxBid = 5e6))))
 shiny::testServer(players_in_championship_Server,args=list(is_module_active=shiny::reactive(TRUE),login_token=auth,
- championship_id=league,user_team_id=shiny::reactive('mine'),user_teams_RV=shiny::reactive(NULL),refresh_trigger=refresh),{
+ championship_id=league,user_team_id=shiny::reactive('mine'),user_teams_RV=shiny::reactive(NULL),refresh_trigger=refresh,team_state_source=team_state),{
  settle(session)
  check('delayed optional market read leaves the full catalog responsive',{
   stopifnot(nrow(players_table_RV())==3L,all(is.na(players_table_RV()$effective_market_price)),
    grepl('Market prices loading',paste(unlist(output$market_prices_status),collapse=' '),fixed=TRUE),sum(startsWith(calls,'get_market_players:'))==1L)
   output$heartbeat<-shiny::renderText(input$ping)
   session$setInputs(ping='responsive');settle(session);stopifnot(output$heartbeat=='responsive')
+ })
+ check('cash filter source uses the shared team balance before market or capacity resolves',{
+  before <- calls
+  stopifnot(identical(available_cash_RV(), 2e6))
+  team_state(resource_state(observed_data(list(budget = -1e6, maxBid = 5e6))))
+  stopifnot(identical(available_cash_RV(), -1e6))
+  team_state(resource_state(observed_data(list(budget = 0, maxBid = 5e6))))
+  stopifnot(identical(available_cash_RV(), 0))
+  team_state(resource_state(observed_data(list(budget = 2e6, maxBid = 5e6)), status = "stale"))
+  stopifnot(is.na(available_cash_RV()))
+  team_state(resource_state(observed_data(list(maxBid = 5e6))))
+  stopifnot(is.na(available_cash_RV()), identical(calls, before),
+    !any(grepl("get_financial_snapshot|get_user_team_info|get_acquisition_capacity", calls)))
  })
  pending$resolve(market);settle(session)
  check('completed read fills prices, warm redraws reuse it, and date/filter semantics survive',{
