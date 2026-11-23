@@ -34,8 +34,10 @@ clause_transfer_clean_summary <- function(data,scope) {
   if(!nzchar(owner_id))return(NULL)
   transfer_at<-fm_scalar(clause$transferDate,"")
   if(isTRUE(clause$transferred)&&(length(fm_time(transfer_at))!=1L||is.na(fm_time(transfer_at))))return(NULL)
-  clean_profile<-lapply(c("name","role","team","logo"),function(field)fm_scalar(profile[[field]],""))
-  names(clean_profile)<-c("name","role","team","logo");clean_profile<-c(list(id=id),clean_profile)
+  fields<-c("name","role","role2","status","photo","team","logo")
+  clean_profile<-setNames(lapply(fields,function(field)fm_scalar(profile[[field]],"")),fields)
+  if(is.logical(profile$available)&&length(profile$available)==1L&&!is.na(profile$available))clean_profile$available<-profile$available
+  clean_profile<-c(list(id=id),clean_profile)
   list(data=clean_profile,championship=list(owner=list(id=owner_id,name=fm_scalar(owner$name,"")),
     clause=list(transferred=clause$transferred,transferDate=transfer_at)))
 }

@@ -2372,3 +2372,7 @@ Player-card market and direct-owner offers use the selected row and saved league
 - [x] Trace the accepted bid to exact-scope saved own-offer and balance evidence.
 - [x] Reconcile active offers from existing durable observations and make the balance-summary statuses and occupied squad slots explicit.
 - [x] Verify the local observer, database grants and reconciliation, offline lifecycle and responsive summary. Apply the production migration and verify the scoped reservation repair.
+
+### Scheduled lineups for confirmed arrivals — implemented locally 2026-11-23
+
+The requested scope authorizes one user-approved immediate lineup and one approved lineup per verified pre-kickoff clause arrival. The elected worker uses separate encrypted access tied to that plan, stores progress durably, and verifies each guarded batch with readback. A confirmed manual save cancels pending stages. Production migration, rollout and live verification are pending. [Lineup contract](lineup_module.md#staged-lineups-for-incoming-signings--2026-11-23).

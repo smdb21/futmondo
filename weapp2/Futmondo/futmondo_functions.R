@@ -1602,7 +1602,8 @@ pending_clause_candidates <- function(roster_df,pressroom_df,user_team_id,previo
 incoming_clause_empty <- function() {
   data.frame(player_id=character(), player_name=character(), seller_team_id=character(),
     purchased_at=as.POSIXct(character(),tz="UTC"), joins_at=as.POSIXct(character(),tz="UTC"),
-    observed_at=as.POSIXct(character(),tz="UTC"), role=character(), team=character(),logo=character(),
+    observed_at=as.POSIXct(character(),tz="UTC"), role=character(),role2=character(),
+    status=character(),photo=character(),available=logical(),team=character(),logo=character(),
     timing_error=character(), overdue=logical(),stringsAsFactors=FALSE)
 }
 
@@ -1722,8 +1723,10 @@ reconcile_pending_clause_transfers <- function(roster_df,pressroom_df,summaries,
     arrival<-if(valid_time)transfer_at else if(nrow(old))old$joins_at[1]else as.POSIXct(NA,tz="UTC")
     records<-rbind(records,data.frame(player_id=pid,player_name=field("name",fm_scalar(tx$player_name,pid)),
       seller_team_id=fm_scalar(tx$seller_team_id,""),purchased_at=fm_time(tx$created),joins_at=arrival,
-      observed_at=fm_time(stamp),role=field("role",if(nrow(old))old$role[1]else ""),
-      team=field("team",if(nrow(old))old$team[1]else ""),logo=field("logo",if(nrow(old))old$logo[1]else ""),
+      observed_at=fm_time(stamp),role=field("role",fm_scalar(old$role,"")),role2=field("role2",fm_scalar(old$role2,"")),
+      status=field("status",fm_scalar(old$status,"")),photo=field("photo",fm_scalar(old$photo,"")),
+      available=if(is.logical(data$available)&&length(data$available)==1L)data$available else (old$available %||% NA)[1],
+      team=field("team",fm_scalar(old$team,"")),logo=field("logo",fm_scalar(old$logo,"")),
       timing_error=issue,overdue=length(arrival)==1L&&!is.na(arrival)&&arrival<=now,stringsAsFactors=FALSE))
   }
   if(nrow(records))records<-records[order(records$joins_at,records$player_id,na.last=TRUE),,drop=FALSE]

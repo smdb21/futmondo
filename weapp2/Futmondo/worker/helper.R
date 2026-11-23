@@ -428,7 +428,7 @@ fm_worker_run<-function(descriptor){
  finance_tasks<-c('get_rival_finance_seed','get_rival_team_finance_observation',
    'get_rival_round_lineup_observation','get_rival_round_ranking_observation',
    'get_rival_round_notification_page','get_rival_player_ownership_observation','get_rival_ownership_round_catalog')
- for(nm in ls(env)){
+ if(!identical(descriptor$handler,'lineup_schedule_check'))for(nm in ls(env)){
   fn<-env[[nm]]
   if(!is.function(fn)||!startsWith(nm,'get_')||nm%in%finance_tasks||endsWith(nm,'_async')||!'login'%in%names(formals(fn)))next
   local({name<-nm;original<-fn
@@ -498,6 +498,30 @@ fm_worker_run<-function(descriptor){
    }
    formals(wrapper)<-formals(original);assign(name,wrapper,env)
   })
+ }
+ if(identical(descriptor$handler,'lineup_schedule_check')){
+  clear_api_cache()
+  env$Sys.time<-base::Sys.time
+  # The scheduling bridge already acknowledges and reuses the live calendar
+  # responses in its own scoped durable evidence. Avoid a second publication.
+  env$persist_award_calendar_snapshot<-function(data,context)invisible(NULL)
+  read<-function(route,extra=list()){
+   query<-c(list(championshipId=ctx$championship_id,userteamId=ctx$user_team_id),extra)
+   result<-fm_pipe_exchange(list(type='http',url=paste0('https://api.futmondo.com',route),body=list(query=query)))
+   answer<-env$lineup_api_answer(result$body,observed_at=fm_time(result$observed_at))
+   if(route=='/1/userteam/lineup'&&!isTRUE(descriptor$args$readback)&&!nzchar(fm_scalar(answer$pointSystem,'')))
+    env$get_persisted_league_context(ctx$account_id,ctx$championship_id,ctx$competition_id,ctx$season)
+   answer
+  }
+  rounds<-function(){
+   catalog<-env$get_award_round_catalog(auth,ctx$championship_id,refresh=TRUE)
+   if(!isTRUE(catalog$identity_complete)||nzchar(fm_scalar(catalog$reason,''))||
+      !identical(catalog$league_id,ctx$competition_id)||!identical(catalog$user_team_id,ctx$user_team_id))
+     stop('Round identity is unverified')
+   catalog$rounds
+  }
+  result<-env$lineup_schedule_check(ctx,descriptor$args,read,rounds)
+  return(list(type='result',lineup_check=result))
  }
  handler<-descriptor$handler
  if(!grepl('^(get_|read_|fm_worker_finances$)',handler))stop('Unsupported resource')

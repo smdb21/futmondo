@@ -76,17 +76,45 @@ lineup_submit <- function(auth, cid, tid, current, modified, owner, changes = NU
 recent_player_points_source <- function(...) list(history = shiny::reactive(fixture_history),
   status = shiny::reactive(list(pending = 0L, remaining = 0L, failed = 0L, saving = 0L, save_error = NULL)))
 
+scheduled_fixture <- identical(Sys.getenv('FUTMONDO_EDITOR_SCHEDULE_FIXTURE'), 'true')
+fixture_arrivals <- incoming_clause_empty()
+if (scheduled_fixture) {
+  signing <- fixture_roster[1, ]
+  signing$id <- 'p25'; signing$name <- 'Incoming Keeper'; signing$photo <- 'fixture-player.png'
+  fixture_history <- rbind(fixture_history, data.frame(player_id='p25',round=1:5,points=250))
+  fixture_arrivals <- data.frame(player_id='p25', player_name=signing$name, role=signing$role,
+    role2='', status='ok', photo=signing$photo, available=TRUE, team=signing$club, logo=signing$logo,
+    joins_at=as.POSIXct(Sys.time()+120), timing_error='')
+  fixture_job <- NULL
+  lineup_schedule_enabled <- function() TRUE
+  fm_clause_encrypt <- function(auth) structure('encrypted-fixture',credential_id='fixture')
+  lineup_schedule_rpc <- function(name,payload,owner='') {
+    value <- switch(name, read=fixture_job,
+      admit={
+        fixture_job <<- list(id=payload$p_id,context=rev(payload$p_context),stages=payload$p_stages,
+          stage_index=0L,state='queued',code='',outcomes=list()); TRUE
+      },
+      manual_begin={
+        if(!identical(payload$p_confirmed,fixture_job$id))paste0('confirm:',fixture_job$id)
+        else { fixture_job$state <<- 'cancelled';fixture_job$code <<- 'manual_save';'ready' }
+      },
+      manual_end=TRUE)
+    promises::promise_resolve(value)
+  }
+}
+
 ui <- shiny::fluidPage(shiny::tags$head(shiny::tags$style(shiny::HTML(fm_theme_css())),
   shiny::includeCSS('www/custom_style.css')),
   shiny::textOutput('fixture_counts'), lineup_UI('lineup'))
 server <- function(input, output, session) {
   fixture_official <<- fixture_initial
+  if(scheduled_fixture)fixture_job <<- NULL
   fixture_current_wire <<- NULL
   lineup_Server('lineup', shiny::reactive(TRUE),
     shiny::reactive(c(userid = 'fixture-account', token = 'fixture-token')),
     shiny::reactive('fixture-league'), shiny::reactive('fixture-team'),
     shiny::reactive(fixture_rounds), history_refresh_trigger = shiny::reactive(0L),
-    clause_transfers_source = function()list(outgoing_status='ok',outgoing_records=outgoing_clause_empty()))
+    clause_transfers_source = function()list(status='ok',records=fixture_arrivals,outgoing_status='ok',outgoing_records=outgoing_clause_empty()))
   output$fixture_counts <- shiny::renderText({
     shiny::invalidateLater(100, session)
     paste(fixture_reads, fixture_submissions, fixture_db_reads, fixture_db_writes, sep = '/')

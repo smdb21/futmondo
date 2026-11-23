@@ -457,7 +457,7 @@ class Helper:
                     response = await exchange(message)
                 except WorkerFailure as error:
                     # Send fixed codes only; do not convert auth/revocation into optional-source success.
-                    if error.code.startswith('purchase_') or error.code in ('access_revoked', 'source_authentication', 'source_rate_limited',
+                    if error.code.startswith(('purchase_', 'lineup_')) or error.code in ('access_revoked', 'source_authentication', 'source_rate_limited',
                             'context_superseded', 'league_membership_unverified', 'source_context',
                             'source_route_denied', 'credential_in_fact',
                             'snapshot_corrupt', 'snapshot_size', 'snapshot_incomplete') or (error.code == 'source_rejected' and descriptor['handler'] != 'fm_worker_finances') or message['type'] in ('persist', 'progress'):
@@ -1102,6 +1102,10 @@ class Worker:
             from worker.clauses import ClauseScheduler
             scheduler = ClauseScheduler(self, Path(__file__).resolve().parent.parent)
             tasks.append(asyncio.create_task(scheduler.run()))
+        if os.getenv('FUTMONDO_LINEUP_SCHEDULING_ENABLED', 'false').lower() == 'true':
+            from worker.lineups import LineupScheduler
+            lineup_scheduler = LineupScheduler(self, Path(__file__).resolve().parent.parent)
+            tasks.append(asyncio.create_task(lineup_scheduler.run()))
         try:
             await self.stop.wait()
         finally:

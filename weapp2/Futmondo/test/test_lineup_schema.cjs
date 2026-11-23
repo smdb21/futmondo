@@ -13,15 +13,17 @@ const {PGlite}=require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/f
   pass('fresh schema and repeatable forward migration install lineup snapshots and page preference');
   assert.equal((await db.query("SELECT relrowsecurity enabled FROM pg_class WHERE oid='team_lineup_snapshots'::regclass")).rows[0].enabled,true);
   await db.exec('SET ROLE service_role');
-  const insert=`INSERT INTO team_lineup_snapshots(account_id,championship_id,user_team_id,target_round,season,scoring_version,payload,observed_at,expires_at,complete)
-   VALUES($1,'league','team','r6','season','score',$2,$3,$4,true)
-   ON CONFLICT(account_id,championship_id,user_team_id,target_round,season,scoring_version) DO UPDATE SET payload=excluded.payload,observed_at=excluded.observed_at,expires_at=excluded.expires_at`;
+  const insert=`INSERT INTO team_lineup_snapshots(account_id,championship_id,user_team_id,target_round,competition_id,season,scoring_version,payload,observed_at,expires_at,complete)
+   VALUES($1,'league','team','r6','competition','season','score',$2,$3,$4,true)
+   ON CONFLICT(account_id,championship_id,user_team_id,target_round,competition_id,season,scoring_version) DO UPDATE SET payload=excluded.payload,observed_at=excluded.observed_at,expires_at=excluded.expires_at`;
   await db.query(insert,['a',{fixture:'new'},'2026-11-07T01:00:00Z','2026-11-07T01:00:30Z']);
   await db.query(insert,['a',{fixture:'old'},'2026-11-06T01:00:00Z','2026-11-06T01:00:30Z']);
   assert.equal((await db.query("SELECT payload->>'fixture' value FROM team_lineup_snapshots WHERE account_id='a'")).rows[0].value,'new');
   await db.query(insert,['b',{fixture:'other-account'},'2026-11-07T01:00:00Z','2026-11-07T01:00:30Z']);
   assert.equal((await db.query('SELECT count(*)::int n FROM team_lineup_snapshots')).rows[0].n,2);
-  await db.exec("INSERT INTO team_lineup_snapshots SELECT account_id,championship_id,user_team_id,target_round,season,'other-score',payload,observed_at,expires_at,complete FROM team_lineup_snapshots WHERE account_id='a'");
+  await db.exec(`INSERT INTO team_lineup_snapshots(account_id,championship_id,user_team_id,target_round,competition_id,season,scoring_version,payload,observed_at,expires_at,complete)
+   SELECT account_id,championship_id,user_team_id,target_round,competition_id,season,'other-score',payload,observed_at,expires_at,complete
+   FROM team_lineup_snapshots WHERE account_id='a'`);
   assert.equal((await db.query("SELECT count(*)::int n FROM team_lineup_snapshots WHERE account_id='a'")).rows[0].n,2);
   await db.exec("INSERT INTO user_page_preferences(user_id,page,visited_at)VALUES('fixture','lineup',now())");
   await assert.rejects(db.query(insert,['x',{big:'x'.repeat(524289)},'2026-11-07T01:00:00Z','2026-11-07T01:00:30Z']));

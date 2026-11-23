@@ -335,3 +335,7 @@ Completed market bid reconciliation requires `scripts/migrations/20261122130000_
 Player-card market and owner offers send one asynchronous request to Futmondo. Install `scripts/migrations/20261123064300_manual_offer_dispatch.sql` before deploying this version with `FUTMONDO_CLAUSE_SCHEDULING_ENABLED=true`. Fresh databases include the dispatch function in `scripts/schema.sql`. See [manual offer dispatch](docs/scheduled_clauses.md#manual-offer-dispatch).
 
 Active manual offer reconciliation requires `scripts/migrations/20261123071652_reconcile_active_manual_offers.sql` before the matching app release. Production recorded it as `20261123072054_reconcile_active_manual_offers`. Fresh databases include it in `scripts/schema.sql`. See [active manual offers](docs/scheduled_clauses.md#active-manual-offers).
+
+### Scheduled lineups for incoming signings
+
+Install `scripts/migrations/20261123120000_scheduled_lineups.sql` before enabling `FUTMONDO_LINEUP_SCHEDULING_ENABLED=true` in Dokploy. Fresh databases include the schema. The flag defaults to `false` and controls the Lineup option and worker scheduler. It uses the existing confidential database settings, `FUTMONDO_WORKER_KEY`, and Docker-supervised worker. After review and approval, scheduled stages continue after logout. [Lineup scheduling and verification](docs/lineup_module.md#staged-lineups-for-incoming-signings--2026-11-23).
