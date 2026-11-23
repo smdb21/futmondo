@@ -1174,6 +1174,15 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 .round-best-xi-table th:last-child, .round-best-xi-table td:last-child { text-align: right; }
 .round-best-xi-mvp td { font-weight: 800; }
 
+.fm-classification-dreamteam th, .fm-classification-dreamteam td { vertical-align: middle; }
+.fm-classification-dreamteam th:first-child { width: 56px; }
+.fm-classification-dreamteam th:last-child { width: 64px; }
+.fm-classification-dreamteam td:last-child { font-variant-numeric: tabular-nums; }
+.fm-classification-dreamteam .fm-team-label { max-width: 100%; }
+.fm-classification-dreamteam .fm-team-label > span { min-width: 0; }
+.fm-classification-dreamteam .round-best-xi-mvp td { background: var(--fm-highlight); }
+.fm-classification-dreamteam .round-best-xi-mvp td:first-child { box-shadow: inset 3px 0 var(--fm-warning); }
+
 
 /* Player profile and match history use responsive wrapping cards. */
 .player-external-details { color: var(--fm-text); }

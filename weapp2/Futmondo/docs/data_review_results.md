@@ -1,5 +1,11 @@
 # Futmondo data review and implementation results
 
+## Matchday Dream team display (2026-11-23)
+
+- The Classification loading regression decoded a synthetic worker snapshot and checked crests, position codes, ties, zero and negative scores, unavailable data, the official MVP, and reuse after switching tabs. The Classification presets and live regressions passed. The offline lifecycle passed 14 checks and rendered all eight tabs.
+- Isolated Chromium checks applied the app stylesheet and theme tokens to the rendered table at 320, 390 and 1440 px. Both themes kept the crests and long names inside the layout and showed a distinct MVP background, accent and label. Image responses were synthetic. Authenticated production rendering and live crest delivery were outside these checks.
+- On an 11-player fixture the median parse and HTML render took 21.4 ms, up from 7.5 ms, and markup grew from 803 to 5,025 bytes. The work is confined to the selected round’s existing output. Each crest adds a lazy 22 px browser image, with repeated URLs eligible for browser reuse. There are zero added factual API or database calls, writes, timer ticks or cache entries. Settings and standings retain their existing dependencies.
+
 ## Player status indicators (2026-11-22)
 
 - The focused table and card checks passed with synthetic fit, missing, injury,

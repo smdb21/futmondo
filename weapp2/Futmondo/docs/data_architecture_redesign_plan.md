@@ -1,5 +1,11 @@
 # Futmondo data architecture redesign plan
 
+## Matchday Dream team display (2026-11-23)
+
+- [x] Show club crests, positions and scores in descending order and emphasize the published MVP.
+- [x] Verify the saved snapshot path, offline lifecycle and responsive styling. See [classification](classification_module.md#dream-team-display-2026-11-23) and [data review](data_review_results.md#matchday-dream-team-display-2026-11-23).
+- [ ] Confirm rendering in the authenticated hosted application.
+
 ## Player status indicators (2026-11-22)
 
 - [x] Show reported non-fit statuses beside player names and portraits and suppress the fit indicator.

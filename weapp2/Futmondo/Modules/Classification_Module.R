@@ -320,40 +320,65 @@ classification_bonus_gaps <- function(finances, rounds, team_ids) {
 }
 
 classification_dreamteam_rows <- function(answer) {
-  if (is.null(answer) || isTRUE(answer$error) || !length(answer$players)) {
+  if (is.null(answer) || isTRUE(answer$error) || !length(answer[["players"]])) {
     return(data.frame())
   }
-  players <- answer$players
-  if (is.data.frame(players)) {
-    players <- split(players, seq_len(nrow(players)))
-  }
-  scalar <- function(x, default = NA_character_) {
-    if (length(x) == 1L && !is.list(x)) {
-      as.character(x)
-    } else {
-      default
-    }
-  }
-  mvp <- answer$mvp
+  mvp <- answer[["mvp"]]
   if (is.list(mvp)) {
-    mvp <- if (!is.null(mvp$id)) {
-      mvp$id
-    } else {
-      mvp[["_id"]]
-    }
+    mvp <- mvp[["id"]] %||% mvp[["_id"]]
   }
-  bind_rows(lapply(players, function(p) {
-    id <- scalar(if (!is.null(p$id)) {
-      p$id
-    } else {
-      p[["_id"]]
-    })
+  mvp <- mvp_text(mvp)
+  rows <- bind_rows(lapply(mvp_records(answer[["players"]]), function(player) {
+    if (!is.list(player)) {
+      return(NULL)
+    }
+    id <- mvp_text(player[["id"]] %||% player[["_id"]])
     data.frame(
-      player_id = id, player = scalar(p$name), role = scalar(p$role),
-      points = suppressWarnings(as.numeric(scalar(p$points))),
-      mvp = !is.na(id) && id %in% as.character(mvp), stringsAsFactors = FALSE
+      player_id = id, player = mvp_text(player[["name"]], "Unavailable"),
+      role = mvp_text(player[["role"]]), team = mvp_text(player[["team"]]), logo = mvp_text(player[["logo"]]),
+      points = fm_number(mvp_text(player[["points"]])), mvp = nzchar(mvp) && identical(id, mvp),
+      stringsAsFactors = FALSE
     )
   }))
+  if (!nrow(rows)) {
+    return(rows)
+  }
+  rows[order(-rows$points, na.last = TRUE), , drop = FALSE]
+}
+
+classification_dreamteam_table <- function(players) {
+  positions <- analytics_player_positions(players)
+  position_classes <- c(GK = "badge-gk", DEF = "badge-df", MID = "badge-md", FWD = "badge-fw")
+  tags$table(class = "round-best-xi-table fm-classification-dreamteam", `aria-label` = "Published dream team",
+    tags$thead(tags$tr(
+      tags$th(scope = "col", "Pos."),
+      tags$th(scope = "col", "Player"),
+      tags$th(scope = "col", "Points", `aria-sort` = "descending")
+    )),
+    tags$tbody(lapply(seq_len(nrow(players)), function(i) {
+      position <- positions[[i]]
+      crest <- lineup_fixture_crest_url(players$logo[i])
+      tags$tr(class = if (players$mvp[i]) "round-best-xi-mvp",
+        tags$td(if (length(position)) {
+          tags$span(class = unname(position_classes[position]), position)
+        } else if (nzchar(players$role[i])) {
+          players$role[i]
+        } else {
+          tags$span(title = "Position unavailable", `aria-label` = "Position unavailable", "—")
+        }),
+        tags$td(
+          tags$span(class = "fm-team-label",
+            if (nzchar(crest)) tags$img(class = "fm-team-crest", src = crest, width = 22, height = 22,
+              alt = players$team[i], title = if (nzchar(players$team[i])) players$team[i],
+              loading = "lazy", decoding = "async"),
+            tags$span(players$player[i])
+          ),
+          if (players$mvp[i]) tagList(" ", tags$span(class = "round-mvp-badge", "MVP"))
+        ),
+        tags$td(if (is.finite(players$points[i])) format(players$points[i], trim = TRUE) else "Unavailable")
+      )
+    }))
+  )
 }
 
 # Read only the compact persisted ledger projection in the deployed app. The
@@ -1005,18 +1030,7 @@ classification_Server <- function(id, is_module_active, login_token, championshi
       if (!nrow(players)) {
         return(fm_info("The dream team has not been published or is unavailable."))
       }
-      tags$ul(lapply(seq_len(nrow(players)), function(i) {
-        tags$li(
-          players$player[i], " — ", if (is.finite(players$points[i])) {
-            players$points[i]
-          } else {
-            "Unavailable"
-          }, " points",
-          if (isTRUE(players$mvp[i])) {
-            strong(" · MVP")
-          }
-        )
-      }))
+      classification_dreamteam_table(players)
     })
   })
 }

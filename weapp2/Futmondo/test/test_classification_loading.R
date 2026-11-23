@@ -52,11 +52,44 @@ shiny::testServer(classification_Server, args = list(
   settle(session)
   stopifnot(identical(tail(calls, length(calls) - length(before)), "get_round_dreamteam"),
     identical(output$configured_rewards_ui$html, rewards))
-  pending$get_round_dreamteam$resolve(list(mvp = "p", players = list(list(id = "p", name = "Player", points = 9))))
+  answer <- list(mvp = list(`_id` = "p"), players = list(
+    list(id = "g", name = "Goalkeeper", role = "portero", points = 0, team = "Local FC", logo = "local-fc"),
+    list(id = "p", name = "MVP Player", role = "delantero", points = "19", team = "Away FC", logo = "away-fc.png"),
+    list(id = "t", name = "Tied Player", role = "defensa", points = 19,
+      team = "Third FC", logo = "https://example.invalid/third.webp"),
+    list(id = "n", name = "Negative Player", role = "centrocampista", points = -2),
+    list(id = "u", name = "Unknown Player", position = 4, role2 = "delantero", points = "Inf", logo = "../invalid.png")
+  ))
+  saved <- fm_worker_decode(jsonlite::fromJSON(
+    jsonlite::toJSON(fm_worker_encode(answer), auto_unbox = TRUE, null = "null", na = "null", digits = NA),
+    simplifyVector = FALSE))
+  players <- classification_dreamteam_rows(saved)
+  stopifnot(identical(players$player_id, c("p", "t", "g", "n", "u")),
+    identical(players$points, c(19, 19, 0, -2, NA_real_)),
+    identical(players$mvp, c(TRUE, FALSE, FALSE, FALSE, FALSE)))
+  before <- calls
+  pending$get_round_dreamteam$resolve(saved)
   settle(session)
-  stopifnot(grepl("Player", output$dreamteam_box_ui$html, fixed = TRUE),
-    grepl("MVP", output$dreamteam_box_ui$html, fixed = TRUE),
-    identical(output$configured_rewards_ui$html, rewards))
+  html <- xml2::read_html(output$dreamteam_box_ui$html)
+  rows <- xml2::xml_find_all(html, "//tbody/tr")
+  cells <- function(column) xml2::xml_text(xml2::xml_find_all(rows, paste0("td[", column, "]")), trim = TRUE)
+  images <- xml2::xml_find_all(rows, ".//img")
+  stopifnot(identical(cells(1), c("FWD", "DEF", "GK", "MID", "—")),
+    identical(cells(3), c("19", "19", "0", "-2", "Unavailable")),
+    identical(xml2::xml_attr(images, "src"),
+      c(paste0(TEAM_LOGO_URL, "away-fc.png"), "https://example.invalid/third.webp", paste0(TEAM_LOGO_URL, "local-fc.png"))),
+    identical(xml2::xml_attr(images, "alt"), c("Away FC", "Third FC", "Local FC")),
+    identical(xml2::xml_attr(images, "loading"), rep("lazy", 3)),
+    identical(which(xml2::xml_attr(rows, "class") %in% "round-best-xi-mvp"), 1L),
+    length(xml2::xml_find_all(rows[1], ".//span[@class='round-mvp-badge']")) == 1L,
+    identical(xml2::xml_attr(xml2::xml_find_first(html, "//th[@aria-sort]"), "aria-sort"), "descending"),
+    identical(output$configured_rewards_ui$html, rewards), identical(calls, before))
+  # A tab round trip reuses the same resolved snapshot.
+  session$setInputs(classification_view = "partial")
+  settle(session)
+  session$setInputs(classification_view = "rounds")
+  settle(session)
+  stopifnot(identical(calls, before))
   # A real coverage gap stays visible and never becomes a zero.
   attr(ledger, "round_bonus_totals")$amount[2] <- NA_real_
   finance(list(loading = FALSE, cash_ledgers = list(a = ledger),
@@ -72,7 +105,7 @@ shiny::testServer(classification_Server, args = list(
   settle(session)
   stopifnot(sum(calls == "get_user_team_info") == 1L)
 })
-cat("PASS classification: independent settings, one settings read, no capacity/lineup reads, honest coverage status\n")
+cat("PASS classification: independent settings, saved Dream team order, crests, roles, MVP and reuse, honest coverage status\n")
 
 # The application passes the same source used by the League settings page.
 # Configuration is immediately usable without a module-specific information read.

@@ -20,6 +20,12 @@ Live points are labeled provisional and do not generate settled bonuses. Compact
 
 Dream-team requests use the selected round's immutable API ID, and MVP flags come from its published response. Reward configuration comes from `normalize_league_rules()`; no fixed reward amounts or calculated totals are presented as recorded earnings. Reconstructed totals are explicitly labelled separately in the standings.
 
+### Dream team display (2026-11-23)
+
+`classification_dreamteam_rows()` reads the existing round-scoped worker snapshot. The official client posts to `/1/userteam/dreamteam` with the fantasy `championshipId`, `type: "dreamteam"` and the immutable `round` ID in the authenticated envelope. The public client’s `Jm` → `aZX` → `qt` path reads the answer’s `mvp` and the players’ `id`, `name`, `role`, `points`, `team` and `logo`. The numeric `position` field is a formation slot. The app uses `role` for the position badge and the round’s `logo` for the club crest. Existing local captures contained a rejected response for this endpoint, so the successful shape was exercised with a synthetic snapshot through the worker codec. [Official public bundle](https://app.futmondo.com/main.dart.js), inspected 2026-11-23, SHA-256 `08202076259d1678c7557478771d3aa38b5099f42044630569c704fdb7a7cd1c`.
+
+`classification_dreamteam_table()` displays highest points first, with ties retaining source order and unavailable scores at the bottom. Zero and negative scores keep their numeric values. The published MVP ID controls the highlighted row and badge. Crests use the round record so historical views reflect the club reported with the award. A record without a usable logo displays without an image. The existing durable Dream team snapshot supplies all display fields, and browsing adds no catalog or source read.
+
 See [UI reliability contracts](ui_reliability.md) for normalization parameters, input/output shapes, examples and focused tests. Run `Rscript --vanilla test/test_ui_reliability.R` for offline verification.
 
 ## Selected-round bonus totals (2026-11-03)

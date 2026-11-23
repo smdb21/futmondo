@@ -68,6 +68,10 @@ Reviewed 2026-11-14 against the official public material below and the current l
 
 The differences below are **specific implemented additions beyond the workflows described in those sources**. Absence from public documentation alone is not proof of absence from every version of the official app. No authenticated current official UI comparison was performed for this task. The owner reports that their league has no suggested-lineup option. Official documented availability is therefore kept separate from availability in a configured league: administrator settings, league mode or source entitlements may affect visibility, but this task has not verified which setting explains that league. Do not assume the official feature is enabled for every league, or describe the owner’s observed absence as proof of a particular administrator restriction. Entries must be narrowed or removed if an equivalent official implementation is verified. Generic lineups/optimizers, averages, standings, historical player cards, price histories, rival squads, notifications, market bids and clause purchases must not be advertised as exclusive. In particular, the existing official suggested-lineup feature prevents claiming that lineup suggestions in general are new.
 
+### Matchday Dream team presentation — 2026-11-23
+
+The official rules document opening the published Best XI from Classification. The public client bundle confirms that the lineup parser receives player roles, club logos, scores and the published MVP. LigaRadar’s existing matchday card now displays those fields in a descending points table and highlights the official MVP. This is a presentation update to the existing Best XI capability. The signed-in official view and any alternative ordering controls were outside the comparison. [Official rules](https://help.futmondo.com/article/91-reglas-del), [official public bundle](https://app.futmondo.com/main.dart.js), [implementation](classification_module.md#dream-team-display-2026-11-23).
+
 ## Essentials
 
 | Login ID / addition | Official baseline | Specific LigaRadar behavior | Local implementation evidence |
