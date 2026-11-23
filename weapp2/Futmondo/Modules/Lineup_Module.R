@@ -32,7 +32,15 @@ lineup_UI <- function(id) {
       .fm-lineup-fixtures h3{margin-top:0;font-size:20px}
       .fm-lineup-fixtures-note{font-size:12px;color:var(--fm-muted,#647067);overflow-wrap:anywhere}
       .fm-lineup-fixtures-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;list-style:none;padding:0}
-      .fm-lineup-fixture{min-width:0;padding:12px;border:1px solid var(--fm-border,#d8e2da);border-radius:8px}
+      .fm-lineup-fixture{min-width:0}
+      .fm-lineup-match-open{width:100%;padding:12px;border:1px solid var(--fm-border,#d8e2da);border-radius:8px;background:transparent;color:inherit;text-align:left;cursor:pointer}
+      .fm-lineup-match-open:hover{background:var(--fm-surface-hover,rgba(128,160,140,.15))}
+      .fm-lineup-match-open:focus-visible{outline:2px solid var(--fm-warning,#bd8d1e);outline-offset:2px}
+      .fm-match-clubs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+      .fm-match-clubs h4,.fm-match-clubs td:first-child{overflow-wrap:anywhere}
+      .fm-match-clubs td:last-child,.fm-match-clubs th:last-child{text-align:right;font-variant-numeric:tabular-nums}
+      .fm-match-header{font-size:18px;font-weight:600}
+      @media(max-width:600px){.fm-match-clubs{grid-template-columns:minmax(0,1fr)}}
       .fm-lineup-fixture-time{display:block;font-size:12px;color:var(--fm-muted,#647067);margin-bottom:6px}
       .fm-lineup-fixture-teams{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:10px;align-items:center}
       .fm-lineup-fixture-team{display:flex;align-items:center;gap:6px;min-width:0;font-weight:600}
@@ -94,6 +102,17 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
     target<-shiny::reactive(lineup_target(round_catalog()))
     fixture_clubs_read<-factual_read_adapter(session,'get_real_clubs',login_token,championship_id,user_team_id,
       is_active=is_module_active,refresh_trigger=refresh_trigger,state_only=TRUE)
+    match_pick<-shiny::reactiveVal(NULL)
+    match_started<-shiny::reactive({
+      pick<-match_pick()
+      if(is.null(pick))return(FALSE)
+      seconds<-as.numeric(difftime(fm_time(pick$row$kickoff),Sys.time(),units='secs'))
+      if(!is.finite(seconds)||seconds<=0)return(TRUE)
+      shiny::invalidateLater(min(86400000,max(1000,seconds*1000)),session)
+      FALSE
+    })
+    match_read<-factual_read_adapter(session,'get_lineup_match_details',login_token,championship_id,user_team_id,
+      is_active=function()isTRUE(is_module_active())&&match_started(),state_only=TRUE)
     local_transfer_refresh<-shiny::reactive(list(shared=if(is.function(refresh_trigger))refresh_trigger()else 0L,local=reload()))
     transfers<-if(is.function(clause_transfers_source))clause_transfers_source else
       incoming_clause_source(session,login_token,championship_id,user_team_id,is_module_active,local_transfer_refresh)
@@ -432,40 +451,158 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
         paste0('Next scheduled round ',next_round$number),
         if(dirty())shiny::strong(' · Unsaved changes'))
     })
-    output$fixtures<-shiny::renderUI({
+    fixture_views<-shiny::reactive({
       shiny::req(is_module_active());who<-identity();shiny::req(who)
-      next_round<-target()
-      view<-lineup_fixture_view(round_catalog(),next_round,list(account_id=who$account,
-        championship_id=who$championship,competition_id=who$competition,season=who$season),
-        clubs_state=fixture_clubs_read(login=login_token(),championship_id=championship_id()))
-      shiny::tags$section(class='fm-lineup-fixtures',`aria-label`='Next-round matches',
-        shiny::h3(if(is.null(next_round))'Next-round matches'else paste0('Next-round matches · Round ',next_round$number)),
-        shiny::p(class='fm-lineup-fixtures-note','Home team first · Times in ',fm_display_timezone()),
-        if(nzchar(view$message))shiny::p(class='fm-lineup-fixtures-note',role='status',view$message),
-        if(nrow(view$rows))shiny::tags$ul(class='fm-lineup-fixtures-list',lapply(seq_len(nrow(view$rows)),function(i){
-          row<-view$rows[i,,drop=FALSE]
-          home<-if(nzchar(row$home_name))row$home_name else 'Home team unconfirmed'
-          away<-if(nzchar(row$away_name))row$away_name else 'Away team unconfirmed'
-          club<-function(name,logo,away=FALSE){
-            url<-lineup_fixture_crest_url(logo)
-            shiny::span(class=paste('fm-lineup-fixture-team',if(away)'fm-lineup-fixture-away'),
-              `aria-label`=paste(if(away)'Away:'else'Home:',name),
-              if(nzchar(url))shiny::tags$img(class='fm-lineup-fixture-crest',src=url,alt='',`aria-hidden`='true',
-                width=24,height=24,loading='lazy',decoding='async',onerror="this.style.display='none'"),
-              shiny::span(class='fm-lineup-fixture-team-name',name))
-          }
-          shiny::tags$li(class='fm-lineup-fixture',`data-match-id`=row$match_id,
-            shiny::tags$time(class='fm-lineup-fixture-time',datetime=if(nzchar(row$kickoff))row$kickoff,
-              fm_format_datetime(row$kickoff,missing='Kickoff to be confirmed')),
-            shiny::div(class='fm-lineup-fixture-teams',
-              club(home,row$home_logo),
-              shiny::span(class='fm-lineup-fixture-vs','vs'),
-              club(away,row$away_logo,away=TRUE)))
-        })),
-        if(isTRUE(view$crest_stale))shiny::p(class='fm-lineup-fixtures-note',
-          paste0('Club crests updated ',fm_format_datetime(view$crest_observed_at),' · Awaiting sync update')),
-        if(!is.null(view$observed_at))shiny::p(class='fm-lineup-fixtures-note',
-          paste0('Schedule updated ',fm_format_datetime(view$observed_at),if(view$stale)' · Awaiting sync update'else '')))
+      rounds<-round_catalog()
+      refs<-lineup_match_rounds(rounds)
+      scope<-list(account_id=who$account,championship_id=who$championship,
+        competition_id=who$competition,season=who$season)
+      clubs<-fixture_clubs_read(login=login_token(),championship_id=championship_id())
+      lapply(refs,function(ref)list(ref=ref,view=lineup_fixture_view(rounds,ref,scope,clubs_state=clubs)))
+    })
+    output$fixtures<-shiny::renderUI({
+      views<-fixture_views()
+      club<-function(name,logo,away=FALSE){
+        url<-lineup_fixture_crest_url(logo)
+        shiny::span(class=paste('fm-lineup-fixture-team',if(away)'fm-lineup-fixture-away'),
+          `aria-label`=paste(if(away)'Away:'else'Home:',name),
+          if(nzchar(url))shiny::tags$img(class='fm-lineup-fixture-crest',src=url,alt='',`aria-hidden`='true',
+            width=24,height=24,loading='lazy',decoding='async',onerror="this.style.display='none'"),
+          shiny::span(class='fm-lineup-fixture-team-name',name))
+      }
+      section<-function(entry,label){
+        ref<-entry$ref;view<-entry$view
+        shiny::tags$section(class='fm-lineup-fixtures',`aria-label`=label,
+          shiny::h3(if(is.null(ref))label else paste0(label,' · Round ',ref$number)),
+          shiny::p(class='fm-lineup-fixtures-note','Home team first · Times in ',fm_display_timezone()),
+          if(nzchar(view$message))shiny::p(class='fm-lineup-fixtures-note',role='status',view$message),
+          if(nrow(view$rows))shiny::tags$ul(class='fm-lineup-fixtures-list',lapply(seq_len(nrow(view$rows)),function(i){
+            row<-view$rows[i,,drop=FALSE]
+            home<-if(nzchar(row$home_name))row$home_name else 'Home team unconfirmed'
+            away<-if(nzchar(row$away_name))row$away_name else 'Away team unconfirmed'
+            event<-jsonlite::toJSON(list(id=row$match_id,round=row$round_id),auto_unbox=TRUE)
+            click<-paste0('Shiny.setInputValue(',jsonlite::toJSON(session$ns('match_open'),auto_unbox=TRUE),
+              ',',event,',{priority:"event"})')
+            shiny::tags$li(class='fm-lineup-fixture',`data-match-id`=row$match_id,
+              shiny::tags$button(type='button',class='fm-lineup-match-open',`aria-haspopup`='dialog',onclick=click,
+                shiny::tags$time(class='fm-lineup-fixture-time',datetime=if(nzchar(row$kickoff))row$kickoff,
+                  fm_format_datetime(row$kickoff,missing='Kickoff to be confirmed')),
+                shiny::span(class='fm-lineup-fixture-teams',club(home,row$home_logo),
+                  shiny::span(class='fm-lineup-fixture-vs','vs'),club(away,row$away_logo,away=TRUE))))
+          })),
+          if(isTRUE(view$crest_stale))shiny::p(class='fm-lineup-fixtures-note',
+            paste0('Club crests updated ',fm_format_datetime(view$crest_observed_at),' · Awaiting sync update')),
+          if(!is.null(view$observed_at))shiny::p(class='fm-lineup-fixtures-note',
+            paste0('Schedule updated ',fm_format_datetime(view$observed_at),if(view$stale)' · Awaiting sync update'else '')))
+      }
+      shiny::tagList(section(views$next_round,'Next-round matches'),
+        if(!is.null(views$latest))section(views$latest,'Latest started round'))
+    })
+    shiny::observeEvent(input$match_open,{
+      click<-input$match_open
+      shiny::req(is.list(click),is.character(click$id),length(click$id)==1L,
+        is.character(click$round),length(click$round)==1L,!is.na(click$id),!is.na(click$round))
+      matches<-dplyr::bind_rows(lapply(fixture_views(),function(entry)entry$view$rows))
+      row<-matches[matches$match_id==click$id&matches$round_id==click$round,,drop=FALSE]
+      shiny::req(nrow(row)==1L)
+      match_pick(list(row=row,identity=identity()))
+      title_id<-session$ns('match_title')
+      dialog<-shiny::modalDialog(title=shiny::span(id=title_id,paste(row$home_name,'vs',row$away_name)),
+        shiny::uiOutput(session$ns('match_header')),shiny::uiOutput(session$ns('match_mode_control')),
+        shiny::uiOutput(session$ns('match_players')),
+        footer=shiny::actionButton(session$ns('match_close'),'Close'),size='l')
+      shiny::showModal(htmltools::tagAppendAttributes(dialog,role='dialog',`aria-modal`='true',`aria-labelledby`=title_id))
+    })
+    close_match<-function(){
+      match_pick(NULL)
+      shiny::removeModal()
+    }
+    shiny::observeEvent(input$match_close,if(!is.null(match_pick()))close_match())
+    shiny::observe({
+      pick<-match_pick()
+      if(!is.null(pick)&&(!isTRUE(is_module_active())||!identical(pick$identity,identity())))close_match()
+    })
+    match_detail<-shiny::reactive({
+      pick<-match_pick()
+      shiny::req(pick,identical(pick$identity,identity()))
+      if(!match_started())return(list(detail=NULL,waiting=FALSE,upcoming=TRUE))
+      state<-match_read(login=login_token(),championship_id=championship_id())
+      detail<-state$data$matches[[pick$row$match_id]]
+      if(!lineup_match_same_fixture(detail,pick$row))detail<-NULL
+      list(detail=detail,waiting=identical(state$status,'loading'),upcoming=FALSE,
+        stale=!is.null(state$error)||isTRUE(detail$refresh_incomplete))
+    })
+    output$match_header<-shiny::renderUI({
+      pick<-match_pick();shiny::req(pick)
+      value<-match_detail();detail<-value$detail
+      live_stale<-!is.null(detail)&&!identical(detail$status,'F')&&
+        isTRUE(difftime(Sys.time(),fm_time(detail$observed_at),units='secs')>300)
+      shiny::tagList(
+        shiny::div(class='fm-match-header',lineup_match_status(detail,pick$row),
+          if(!is.null(detail)&&all(is.finite(detail$score)))paste(' · ',paste(detail$score,collapse=' – '))),
+        shiny::p(fm_format_datetime(pick$row$kickoff,missing='Kickoff to be confirmed')),
+        if(!is.null(detail))shiny::p(class='fm-lineup-fixtures-note',
+          paste0('Match observed ',fm_format_datetime(detail$observed_at),
+            if(live_stale||isTRUE(value$stale))' · Awaiting sync update'else '')),
+        if(is.null(detail)&&!value$upcoming)shiny::p(role='status',
+          if(value$waiting)'Loading saved match details…'else 'Match details are awaiting background sync.'),
+        if(!is.null(detail)&&!isTRUE(detail$complete))shiny::p(role='status','Some player points are awaiting Futmondo’s update.'))
+    })
+    match_modes<-shiny::reactive({
+      detail<-match_detail()$detail
+      players<-c(detail$home,detail$away)
+      modes<-sort(unique(as.character(unlist(lapply(players,function(p)p$points$mode),use.names=FALSE))))
+      lineup<-source()
+      expected<-match_pick()$identity$scoring
+      defaults<-if(!fm_context_known(expected)||identical(lineup$scoring_version,expected))lineup$source$match_scoring
+      labels<-c(as='AS',marca='Marca',ss='Sofascore',tdj='Tiempo de Juego',stats='Stats',
+        press='Press',presstats='Press + Stats',picas='Picas',goals='Goals',mini='Mini',ff='FF')
+      choices<-stats::setNames(modes,ifelse(modes%in%names(labels),unname(labels[modes]),modes))
+      default<-mvp_text(defaults$mode)
+      if(default=='custom'&&is.list(defaults$custom)&&length(modes))choices<-c('Championship scoring'='custom',choices)
+      list(choices=choices,default=if(default%in%choices)default else if('stats'%in%choices)'stats'else choices[1L],
+        custom=defaults$custom)
+    })
+    # Keep the selector mounted across minute/score updates when modes agree.
+    mode_control<-resource_display_source(session,function(){
+      shiny::req(match_pick())
+      match_modes()[c('choices','default')]
+    })
+    output$match_mode_control<-shiny::renderUI({
+      spec<-mode_control()
+      if(!length(spec$choices))return(NULL)
+      selected<-shiny::isolate(input$match_mode)
+      shiny::selectInput(session$ns('match_mode'),'Scoring mode',spec$choices,
+        selected=if(isTRUE(selected%in%spec$choices))selected else spec$default)
+    })
+    match_player_view<-resource_display_source(session,function(){
+      shiny::req(match_pick())
+      detail<-match_detail()$detail
+      if(is.null(detail))return(NULL)
+      list(teams=detail[c('home','away')],scoring=match_modes())
+    })
+    output$match_players<-shiny::renderUI({
+      pick<-match_pick();shiny::req(pick)
+      view<-match_player_view()
+      if(is.null(view))return(NULL)
+      spec<-view$scoring
+      mode<-input$match_mode
+      if(!isTRUE(mode%in%spec$choices))mode<-unname(spec$default)
+      club_table<-function(label,players){
+        position<-vapply(players,function(p)if(p$participation=='st')p$position else Inf,numeric(1))
+        shiny::div(shiny::h4(label),
+          if(!length(players))shiny::p('Lineup is awaiting sync.')else
+            shiny::tags$table(class='table table-sm',
+              shiny::tags$thead(shiny::tags$tr(shiny::tags$th(scope='col','Player'),shiny::tags$th(scope='col','Points'))),
+              shiny::tags$tbody(lapply(players[order(position)],function(player){
+                value<-lineup_match_points(player,mode,spec$custom)
+                shiny::tags$tr(shiny::tags$td(player$name,
+                  if(player$participation=='bc')shiny::tags$small(' · Sub')),
+                  shiny::tags$td(if(is.finite(value))format(round(value,1),trim=TRUE)else '—'))
+              }))))
+      }
+      shiny::div(class='fm-match-clubs',club_table(pick$row$home_name,view$teams$home),
+        club_table(pick$row$away_name,view$teams$away))
     })
     output$status<-shiny::renderUI({
       shiny::req(is_module_active());status<-history$status();score<-scores()

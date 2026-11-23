@@ -1,5 +1,12 @@
 # Futmondo data architecture redesign plan
 
+## Real club match points below Lineup (2026-11-23)
+
+- [x] Trace the captured official request, identities, completion state and scoring mode through the public client.
+- [x] Implement the rolling worker snapshot and clickable upcoming and latest started fixtures.
+- [x] Verify the finished capture, synthetic live display, scoped storage, retry cap and offline lifecycle.
+- [ ] Verify collection and dialog rendering in the authenticated hosted app after deployment. See [match contract](lineup_module.md#match-points-below-the-lineup-2026-11-23) and [data review](data_review_results.md#real-club-match-points-2026-11-23).
+
 ## Compact lineup pitch (2026-11-23)
 
 - [x] Apply single-line names, smaller portraits and crests, a tilted pitch and staggered six-player midfield rows in the phone layout of the editor and round history.

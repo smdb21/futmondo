@@ -1,5 +1,21 @@
 # LigaRadar additions to the official Futmondo workflows
 
+## Player points on Lineup match cards (2026-11-23)
+
+The official club match cards show both clubs' player scores during and after a
+match, offer scoring-mode selection, and show the lineup on a pitch. The
+recorded official card showed the finished Levante–Elche 1–1 result and the
+championship's custom points. The public client corroborates status, minute
+and the custom scoring calculation. [Official getting-started guide](https://help.futmondo.com/article/90-empieza-a-jugar-a-futmondo) ·
+[Official release notes](https://magazine.futmondo.com/novedades-en-la-nueva-app-de-futmondo/) ·
+[Official public client](https://app.futmondo.com/main.dart.js).
+
+LigaRadar opens these shared facts from the existing Lineup fixture cards. It
+presents the two teams as compact lists, uses saved background observations
+and exposes when they were checked. The local verification covers a captured
+finished match and a synthetic live match. This is the official match-card
+capability presented within LigaRadar's existing workflow.
+
 ## Player status indicators and My Team summary (2026-11-22)
 
 The [official app's public client](https://app.futmondo.com/main.dart.js), inspected

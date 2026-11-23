@@ -287,6 +287,40 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(WorkerFailure,'resource_context'):
             await self.worker.exchange(self.job,'owner',dict(type='discovery_resource',descriptor=dict(d,context=dict(CONTEXT,account_id='foreign'))))
 
+    async def test_match_snapshot_replays_only_its_own_scoped_partial_data(self):
+        match = descriptor('get_lineup_match_details')
+        calendar = descriptor('get_finished_rounds')
+        value = {'kind': 'integer', 'values': [31]}
+        chunks, size, digest = pack_snapshot(value)
+        observed = stamp(time.time() - 120)
+        manifest = dict(context=CONTEXT, handler=match['handler'], resource_key=match['resource_key'],
+                        parts=len(chunks), json_bytes=size, sha256=digest, status='partial',
+                        observed_at=observed, checked_at=observed, valid_until=stamp(time.time() - 60))
+        original = self.store.rpc
+
+        async def rpc(name, **p):
+            if name == 'read':
+                return {'resources': [dict(manifest=manifest, chunks=chunks)]}
+            return await original(name, **p)
+
+        self.store.rpc = rpc
+        job = dict(self.job, descriptor=match, resource_key=match['resource_key'])
+        request = dict(type='discovery_resource', descriptor=match)
+        restored = await self.worker.exchange(job, 'owner', request)
+        self.assertEqual(restored['value'], value)
+        self.assertEqual(restored['observed_at'], observed)
+        with self.assertRaisesRegex(WorkerFailure, 'resource_context'):
+            await self.worker.exchange(self.job, 'owner', request)
+        with self.assertRaisesRegex(WorkerFailure, 'resource_context'):
+            await self.worker.exchange(job, 'owner', dict(request, descriptor=dict(match,
+                                       context=dict(CONTEXT, season='foreign'))))
+        manifest.update(handler=calendar['handler'], resource_key=calendar['resource_key'])
+        request = dict(request, descriptor=calendar)
+        self.assertIsNone((await self.worker.exchange(job, 'owner', request))['value'])
+        manifest['status'] = 'ok'
+        self.assertEqual((await self.worker.exchange(job, 'owner', request))['value'], value)
+        self.assertFalse(self.requests)
+
     async def test_fresh_persisted_child_resource_is_reused(self):
         value={'kind':'double','values':[0,-2,None]}
         chunks,size,digest=pack_snapshot(value)

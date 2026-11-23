@@ -158,6 +158,7 @@ lineup_normalize_bundle <- function(answers,context,target) {
     rules=list(allowed=available,multiposition=official$multiposition,
       bench_enabled=official$enabled,captain_enabled=isTRUE(cfg$cpt)),
     source=list(wire=official$wire,locked=official$locked,status=official$status,block_delayed=isTRUE(cfg$blc),
+      match_scoring=list(mode=official$pointSystem,custom=official$custom),
       fetch_status=observation$fetch_status,worker_replay=observation$worker_replay,
       target_id=target$id %||% '',target_number=target$number %||% NA_real_,
       target_starts=if(is.null(target))''else format(target$starts_at,'%Y-%m-%dT%H:%M:%OSZ',tz='UTC')),

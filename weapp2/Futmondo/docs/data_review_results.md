@@ -1,5 +1,11 @@
 # Futmondo data review and implementation results
 
+## Real club match points (2026-11-23)
+
+- The captured finished Levante–Elche response matched the 1–1 score, minute 90 and all eleven visible home points under the championship's custom formula. The focused regression exercised an in-progress response, scheduled and finished cards, valid zero and negative points, missing scoring components, identity checks, failed refresh retention and bounded retry ordering. A delayed database response populated the dialog without changing the draft or requesting Futmondo. Reopening another card reused the same snapshot. The offline lifecycle passed 14 checks and eight tabs. The fixture, crest, lineup module, lineup snapshot context, autonomous discovery and Python worker suites passed.
+- Parsing the captured match averaged about 32 ms over 30 repetitions on this host. Its normalized snapshot held 31 playing records and used about 35 KiB before compression and 2.1 KiB after compression. The worker performs two scoped snapshot lookups and one rolling publication per successful sweep. It makes up to six source reads for due matches, including retries, through the existing rate limit and worker lanes. It reuses future calendar rows and settled final details. A cycle with no due matches makes zero source calls and still publishes its scoped snapshot. Time-only changes leave fixture cards, the scoring selector and the player tables mounted. Only the open modal projects its selected match.
+- Chromium verified keyboard opening, score-mode switching, closing, scheduled state, and one- or two-column rendering without horizontal overflow at 320, 390 and 1440 px. The capture verifies the finished match. In-progress state and database behavior used local fixtures. Production collection lag and authenticated hosted rendering remain unmeasured.
+
 ## Compact lineup pitch (2026-11-23)
 
 - The historical-lineup suite passed 17 checks, and the editor module checks and offline lifecycle passed. The lifecycle exercised 14 checks and all eight application tabs.

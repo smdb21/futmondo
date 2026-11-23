@@ -30,7 +30,9 @@ mvp_api_answer <- function(login, url, query) {
       if (!grepl("^[a-zA-Z0-9_.-]{0,80}$", code)) code <- ""
       return(mvp_result("rejected", reason=paste0("LigaRadar rejected the request",if(nzchar(code)) paste0(" (",code,")") else "","."), code=code))
     }
-    list(status="ok", answer=answer)
+    result <- list(status="ok", answer=answer)
+    attr(result,"observed_at") <- attr(response,"observed_at")
+    result
   }, error=function(e) {
     # Async HTTP/parser failures arrive as conditions before an httr response.
     failure<-resource_failure(e,resource=url)

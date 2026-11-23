@@ -61,6 +61,7 @@ fm_worker_discover<-function(handler,value,context,auth,league_refresh=FALSE){
   for(fn in c('get_market_players','get_players_from_team','get_user_team_info','get_financial_snapshot',
               'get_my_market_players','get_roster_bids','get_user_team_rounds','get_user_team_moneymovements','fm_worker_finances'))add(fn,args,ctx)
   add('get_team_acquisition_capacity',args,ctx,300L)
+  add('get_lineup_match_details',list(championship_id=cid),ctx,60L)
   add('get_championship_pressroom',list(championship_id=cid),ctx)
   for(route in c('/1/userteam/lineup','/1/userteam/roster','/1/userteam/information','/5/strategy/availables')){
    query<-list(championshipId=cid,userteamId=tid);if(route=='/1/userteam/information')query$type<-'market'
@@ -388,7 +389,9 @@ fm_worker_run<-function(descriptor){
   if(purchase_check&&length(purchase_scopes)){scope<-purchase_scopes[[length(purchase_scopes)]]
    scope$primary<-if(is.null(scope$primary))source_time else min(scope$primary,source_time)}
   content<-charToRaw(as.character(jsonlite::toJSON(result$body,auto_unbox=TRUE,null='null',na='null',digits=NA)))
-  fm_httr_response(list(status_code=as.integer(result$status),content=content,times=c(total=0)),url)
+  response<-fm_httr_response(list(status_code=as.integer(result$status),content=content,times=c(total=0)),url)
+  attr(response,'observed_at')<-source_time
+  response
  }
  env$get_worker_http_read<-function(route,query=list()){
   httr::content(env$futmondo_post(paste0('https://api.futmondo.com',route),body=list(header=list(),query=query,answer=list())))

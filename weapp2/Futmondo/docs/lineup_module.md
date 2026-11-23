@@ -1,5 +1,59 @@
 # Next-round lineup
 
+## Match points below the lineup (2026-11-23)
+
+The fixture cards show the next scheduled round and the latest started round.
+A card opens a keyboard-accessible dialog with the latest saved status, score,
+reported minute and player points for both clubs. Players appear in source
+lineup order followed by substitutes who played. The upcoming card can show its
+saved kickoff immediately. Started matches show the observation time and any
+missing points while background sync catches up. The two club lists stack on
+narrow screens.
+
+The browser capture on 2026-11-23 includes an authenticated POST to
+`https://api.futmondo.com/1/match/list` with
+`query.{championshipId,userteamId,roundId}`, followed by an authenticated POST
+to `https://api.futmondo.com/2/match/fetchmatch` with `query.{matchId}`.
+The former exposes `answer.round._id` and `answer.matches[].id`. The latter
+uses the normal `header.{userid,token}` request envelope and returns
+`answer.match`. The official public bundle checked on the same date uses
+these calls and the same response parser. The archive is local and excluded
+from version control. [Official web client](https://app.futmondo.com/) ·
+[Public bundle](https://app.futmondo.com/main.dart.js)
+(SHA-256 `08202076259d1678c7557478771d3aa38b5099f42044630569c704fdb7a7cd1c`).
+
+LigaRadar reuses the saved `/2/league/matches` calendar for fixture IDs and
+kickoffs. `lineup_match_parse()` cross-checks the returned match, round and
+both club IDs. It retains `st`, `info.min`, `uAt`, `h/a.score` and the
+playing records from `h/a.ps[]`. The nested `p` object gives player ID and
+name. The `s` object gives participation, lineup slot and actual match role.
+The client treats `F` as Finished. For other states LigaRadar shows the
+published minute when available and the scheduled kickoff for future matches.
+
+Published points come from `s.po[].{mode,r,p}`. Standard modes match the
+player's actual match role. For custom scoring, the official client adds the
+configured statistics component to the weighted media components. It looks
+up the same role for the statistics component where available, falls back to
+that mode's first value, and uses the first matching source for each media
+component. LigaRadar uses the saved current championship settings when
+available and shows missing components as unavailable. The recorded eleven
+home scores match the attached screenshot under its custom settings. Other
+matches and in-progress status were exercised with synthetic data.
+
+`get_lineup_match_details()` runs in the existing factual worker and publishes
+one bounded rolling snapshot per account, championship, source competition,
+season and scoring version. The worker reuses the saved calendar and prior
+acknowledged normalized match details. It fetches at most six due matches per
+sweep, gives recent kickoffs priority, and makes no source request for future
+fixtures. Complete final results are reused, checked for corrections at
+six-hour intervals until the first successful check at least 48 hours after
+kickoff, and retained while their round remains in view. The worker retains
+the last successful detail during failed refreshes and retries on later
+sweeps. The collection window follows the two visible rounds. The browser
+subscribes to stored data only for an open started match and shares the
+snapshot across cards. Refresh timing follows the worker's configured cadence
+and queue, including its default 30-minute base interval.
+
 ## Compact lineup pitch (2026-11-23)
 
 The supplied official Futmondo mobile screenshot shows a tapered field,

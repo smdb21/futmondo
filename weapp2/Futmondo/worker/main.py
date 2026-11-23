@@ -34,7 +34,7 @@ READ_PATHS = frozenset('''/1/user/information /2/user/activechampionships /2/cha
 /1/league/championshipteams /1/userteam/information /1/userteam/moneymovements
 /1/notification/list /1/notification/unread /1/ranking/round /1/league/rounds
 /1/league/getdtconfig /1/championship/information /1/league/information
-/1/league/matches /1/league/players /1/userteam/availables /1/match/list /2/league/list /2/league/matches /5/strategy/availables'''.split())
+/1/league/matches /1/league/players /1/userteam/availables /1/match/list /2/match/fetchmatch /2/league/list /2/league/matches /5/strategy/availables'''.split())
 # Database writes are prepared by the existing factual persistence functions only.
 FACT_TABLES = frozenset('''championships real_clubs players user_teams user_team_history player_history
 market_transactions round_dream_team player_daily_snapshots auction_observations bid_observations
@@ -776,13 +776,17 @@ class Worker:
             if message['type'] == 'history_ack' and descriptor.get('handler') != 'get_championship_pressroom':
                 raise WorkerFailure('resource_context')
             discovery = message['type'] == 'discovery_resource'
-            if discovery and descriptor.get('handler') not in (
+            match_snapshot = (discovery and job['descriptor']['handler'] == 'get_lineup_match_details'
+                              and descriptor.get('handler') in ('get_finished_rounds', 'get_lineup_match_details'))
+            if discovery and not match_snapshot and descriptor.get('handler') not in (
                     'get_active_championships', 'get_classification_round_catalog',
                     'get_players_from_team', 'get_championship_pressroom', 'get_championship_players'):
                 raise WorkerFailure('resource_context')
             scope = descriptor['context']
-            if scope['account_id'] != job['account_id'] or (scope.get('championship_id') and
-                    scope['championship_id'] != job['descriptor']['context'].get('championship_id')):
+            job_scope = job['descriptor']['context']
+            if (scope['account_id'] != job['account_id'] or
+                    (scope.get('championship_id') and scope['championship_id'] != job_scope.get('championship_id')) or
+                    (match_snapshot and canonical(scope) != canonical(job_scope))):
                 raise WorkerFailure('resource_context')
             result = await self.store.rpc('read', p_account=job['account_id'],
                 p_versions={descriptor['resource_key']: ''})
@@ -797,7 +801,9 @@ class Worker:
                         value = unpack_snapshot(manifest, item['chunks'])
                         metadata = value.get('meta', {})
                         return {k: metadata[k] for k in ('history_write_ack', 'locker_write_ack') if k in metadata}
-                    if manifest['status'] not in ('ok', 'empty'):
+                    match_replay = (match_snapshot and descriptor['handler'] == 'get_lineup_match_details'
+                                    and descriptor['resource_key'] == job['resource_key'])
+                    if manifest['status'] not in ('ok', 'empty') and not (match_replay and manifest['status'] == 'partial'):
                         continue
                     if discovery:
                         # A past successful roster/calendar still identifies
