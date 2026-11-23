@@ -136,7 +136,8 @@ fm_clause_refresh <- function(account,owner='',force=FALSE) {
   changed<-!s$known||!identical(signature,fm_worker_json(s$jobs))||!is.null(s$error)
   if(changed)for(j in value$jobs){
    previous<-Filter(function(old)identical(old$id,j$id),s$jobs)
-   if(j$state%in%c('accepted','succeeded','uncertain')&&(!length(previous)||!identical(previous[[1]]$state,j$state)))
+   if(j$state%in%c('accepted','succeeded','uncertain')&&!identical(j$result_code,'active_offer_confirmed')&&
+     (!length(previous)||!identical(previous[[1]]$state,j$state)))
     invalidate_resources(structure(j$context,class='futmondo_context'),pattern='acq_capacity|team_info|market_players|financial_snapshot|roster')
   }
   s$jobs<-value$jobs %||% list();s$known<-TRUE;s$error<-NULL;s$health<-value$health;s$more_outcomes<-isTRUE(value$more_outcomes);s$busy<-FALSE
@@ -177,50 +178,84 @@ fm_clause_completed_bid_matches <- function(jobs,history,team,balance_at,history
  matches
 }
 
-fm_clause_reconcile_completed_bids <- function(session,login,league,team,history_state,balance_state) {
+fm_clause_active_offer_matches <- function(jobs,market,balance_at,market_at) {
+ fields<-c('id','bid_id','bid_price')
+ if(!is.data.frame(market)||!all(fields%in%names(market))||
+    length(balance_at)!=1L||length(market_at)!=1L||anyNA(c(balance_at,market_at)))return(list())
+ eligible<-!is.na(market$bid_id)&nzchar(market$bid_id)
+ offers<-as.data.frame(market)[eligible,fields,drop=FALSE]
+ if(!nrow(offers))return(list())
+ prices<-suppressWarnings(as.numeric(offers$bid_price))
+ matches<-list()
+ for(j in head(jobs,64L)){
+  dispatched<-fm_time(j$dispatched_at)
+  if(length(dispatched)!=1L||is.na(dispatched)||min(balance_at,market_at)<=dispatched)next
+  i<-which(offers$id==j$player_id)
+  if(length(i)!=1L||sum(offers$bid_id==offers$bid_id[i])!=1L||!isTRUE(prices[i]==fm_number(j$max_price)))next
+  matches[[length(matches)+1L]]<-list(job_id=j$id,player_id=j$player_id,bid_id=as.character(offers$bid_id[i]),price=prices[i])
+ }
+ matches
+}
+
+fm_clause_reconcile_saved_offers <- function(session,login,league,team,history_state,balance_state,market_state) {
  shiny::observe({
   auth<-login()
   if(!valid_login(auth)||!fm_clause_enabled()||!isTRUE(fm_worker_mode(auth[['userid']])))return()
   ctx<-resource_context(auth,league(),team())
-  jobs<-Filter(function(j)identical(j$kind,'manual')&&identical(j$mode,'bid')&&
+  jobs<-Filter(function(j)identical(j$kind,'manual')&&isTRUE(j$mode%in%c('bid','offer','modify'))&&
    j$state%in%c('accepted','uncertain','dispatched'),fm_clause_jobs(ctx))
   if(!length(jobs))return()
   state<-fm_clause_account(ctx$account_id)
-  if(isTRUE(state$completed_bids_busy)||!is.null(state$completed_bids_retry))return()
+  if(isTRUE(state$saved_offers_busy)||!is.null(state$saved_offers_retry))return()
   saved<-function(handler,state,args){
    if(!is.null(state$error)||isTRUE(state$status%in%c('partial','unavailable'))||
       !identical(attr(state$data,'worker_acquisition_status'),'ok')||
-      identical(attr(state$data,'worker_completeness'),'partial'))return(NULL)
+      isTRUE(attr(state$data,'worker_completeness')%in%c('partial','unavailable','incomplete')))return(NULL)
    d<-fm_worker_descriptor(handler,args,state$context)
    item<-fm_worker_get(ctx$account_id,d$resource_key)
    if(is.null(item)||!identical(fm_time(item$manifest$observed_at),fm_time(state$observed_at)))return(NULL)
    item$manifest
   }
-  history<-history_state();balance<-balance_state()
-  history_manifest<-saved('get_championship_pressroom',history,list(championship_id=ctx$championship_id))
-  balance_manifest<-saved('get_user_team_info',balance,list(championship_id=ctx$championship_id,user_team_id=ctx$user_team_id))
-  if(is.null(history_manifest)||is.null(balance_manifest))return()
-  signature<-list(history_manifest$version,balance_manifest$version,lapply(jobs,`[[`,'id'))
-  if(identical(state$completed_bids_attempted,signature))return()
-  state$completed_bids_attempted<-signature
-  matches<-fm_clause_completed_bid_matches(jobs,history$data,ctx$user_team_id,
-   fm_time(balance_manifest$observed_at),fm_time(history_manifest$observed_at))
-  if(!length(matches))return()
-  state$completed_bids_busy<-TRUE
-  payload<-list(p_context=fm_clause_scope(ctx),p_history_key=history_manifest$resource_key,p_history_version=history_manifest$version,
-   p_balance_key=balance_manifest$resource_key,p_balance_version=balance_manifest$version,p_matches=matches)
-  failed<-function(error){
-   state$completed_bids_busy<-FALSE
-   state$completed_bids_attempted<-NULL
-   state$completed_bids_retry<-as.numeric(Sys.time())+30
-   NULL
+  team_args<-list(championship_id=ctx$championship_id,user_team_id=ctx$user_team_id)
+  balance<-balance_state()
+  balance_manifest<-saved('get_user_team_info',balance,team_args)
+  if(is.null(balance_manifest))return()
+  balance_at<-fm_time(balance_manifest$observed_at)
+  balance_payload<-list(p_context=fm_clause_scope(ctx),p_balance_key=balance_manifest$resource_key,p_balance_version=balance_manifest$version)
+  write_matches<-function(rpc,evidence_name,manifest,candidates,match){
+   signature<-list(manifest$version,balance_manifest$version,lapply(candidates,`[[`,'id'))
+   if(identical(state$saved_offers_attempted[[evidence_name]],signature))return(FALSE)
+   state$saved_offers_attempted[[evidence_name]]<-signature
+   matches<-match()
+   if(!length(matches))return(FALSE)
+   state$saved_offers_busy<-TRUE
+   evidence<-setNames(list(manifest$resource_key,manifest$version),paste0('p_',evidence_name,c('_key','_version')))
+   payload<-c(balance_payload,evidence,list(p_matches=matches))
+   failed<-function(error){
+    state$saved_offers_busy<-FALSE
+    state$saved_offers_attempted[[evidence_name]]<-NULL
+    state$saved_offers_retry<-as.numeric(Sys.time())+30
+    NULL
+   }
+   promises::then(fm_clause_rpc(rpc,payload),function(n){
+    state$saved_offers_busy<-FALSE
+    if(!is.numeric(n)||length(n)!=1L||!is.finite(n))return(failed(NULL))
+    if(n>0)fm_clause_refresh(ctx$account_id,force=TRUE)
+    else state$revision(shiny::isolate(state$revision())+1L)
+    NULL
+   },failed)
+   TRUE
   }
-  promises::then(fm_clause_rpc('reconcile_completed_bids',payload),function(n){
-   state$completed_bids_busy<-FALSE
-   if(!is.numeric(n)||length(n)!=1L||!is.finite(n))return(failed(NULL))
-   if(n>0)fm_clause_refresh(ctx$account_id,force=TRUE)
-   NULL
-  },failed)
+  market<-market_state()
+  market_manifest<-saved('get_market_players',market,team_args)
+  if(!is.null(market_manifest)&&write_matches('reconcile_active_offers','market',market_manifest,jobs,function()
+    fm_clause_active_offer_matches(jobs,market$data,balance_at,fm_time(market_manifest$observed_at))))return()
+  bids<-Filter(function(j)identical(j$mode,'bid'),jobs)
+  if(!length(bids))return()
+  history<-history_state()
+  history_manifest<-saved('get_championship_pressroom',history,team_args['championship_id'])
+  if(!is.null(history_manifest))write_matches('reconcile_completed_bids','history',history_manifest,bids,function()
+   fm_clause_completed_bid_matches(bids,history$data,ctx$user_team_id,balance_at,fm_time(history_manifest$observed_at)))
  },domain=session)
 }
 
@@ -315,8 +350,8 @@ fm_clause_session <- function(session,login) {
      fm_clause_refresh(id)
      if(isTRUE(s$renew_retry)||isTRUE(s$context_retry)){s$renew_retry<-FALSE;s$context_retry<-FALSE;s$revision(shiny::isolate(s$revision())+1L)}
      if(!s$reconcile_busy&&as.numeric(Sys.time())>=s$manual_retry_due){s$manual_retry_due<-Inf;s$revision(shiny::isolate(s$revision())+1L)}
-     if(!is.null(s$completed_bids_retry)&&as.numeric(Sys.time())>=s$completed_bids_retry){
-      s$completed_bids_retry<-NULL;s$revision(shiny::isolate(s$revision())+1L)
+     if(!is.null(s$saved_offers_retry)&&as.numeric(Sys.time())>=s$saved_offers_retry){
+      s$saved_offers_retry<-NULL;s$revision(shiny::isolate(s$revision())+1L)
      }
      s$timer<-later::later(tick,5)
     };tick()
@@ -502,18 +537,26 @@ fm_clause_pending_ui <- function(jobs) {
  amount<-if(is.finite(r$amount))paste0(format(round(r$amount),big.mark='.',decimal.mark=',',scientific=FALSE),' EUR')else'Unavailable'
  pending<-Filter(function(j)j$state%in%c('scheduled','preparing','dispatched','uncertain','accepted'),scheduled %||% list())
  eur<-function(x)if(is.finite(fm_number(x)))paste0(format(round(fm_number(x)),big.mark='.',decimal.mark=',',scientific=FALSE),' EUR')else'Unavailable'
- # Manual offers/clause buys already sent whose outcome is not yet confirmed.
+ # Holds for submitted manual actions, including acknowledged offers.
  manual<-if(is.null(jobs))list()else Filter(function(j)identical(j$kind,'manual')&&j$state%in%c('dispatched','uncertain','accepted'),jobs)
  shiny::tagList(
   shiny::tags$details(class='round-countdown-finance-item',shiny::tags$summary(paste0('Scheduled clause purchases: ',amount,' (',if(is.finite(r$count))r$count else'?',')')),
    if(!length(pending))shiny::tags$p('No scheduled clause purchases.'),
    lapply(pending,function(j)shiny::tags$p(shiny::tags$strong(j$player_name %||% 'Unknown player'),' · ',eur(j$reserved_amount),' · opens ',fm_format_datetime(j$opens_at),' · ',fm_clause_status_text(j))),
    if(length(pending))shiny::actionButton('clause_revoke','Cancel all scheduled purchases and revoke access',style='white-space:normal;max-width:100%;')),
-  if(length(manual))shiny::tags$details(class='round-countdown-finance-item',
-   shiny::tags$summary(paste0('Offers awaiting confirmation: ',eur(sum(vapply(manual,function(j)fm_number(j$reserved_amount),numeric(1)))),' (',length(manual),')')),
-   shiny::tags$p('Sent manually; Futmondo has not yet confirmed the result. The amount is held from Can spend until reconciled.'),
-   lapply(manual,function(j)shiny::tags$p(shiny::tags$strong(j$player_name %||% 'Unknown player'),' · ',eur(j$reserved_amount),' · ',
-    if(identical(j$mode,'clause'))'clause' else 'market offer',' · ',fm_clause_status_text(j)))))
+  lapply(c('unconfirmed','accepted'),function(group){
+   accepted<-identical(group,'accepted')
+   entries<-Filter(function(j)identical(j$state,'accepted')==accepted,manual)
+   if(!length(entries))return(NULL)
+   label<-if(accepted)'Accepted offers awaiting balance update' else 'Offers awaiting confirmation'
+   explanation<-if(accepted)'Futmondo accepted these actions. The amounts are held until the saved financial data accounts for them.'
+    else 'LigaRadar is checking the result. The amounts are held until the outcome is verified.'
+   shiny::tags$details(class='round-countdown-finance-item',
+    shiny::tags$summary(paste0(label,': ',eur(sum(vapply(entries,function(j)fm_number(j$reserved_amount),numeric(1)))),' (',length(entries),')')),
+    shiny::tags$p(explanation),
+    lapply(entries,function(j)shiny::tags$p(shiny::tags$strong(j$player_name %||% 'Unknown player'),' · ',eur(j$reserved_amount),' · ',
+     if(identical(j$mode,'clause'))'Clause purchase' else 'Offer')))
+  }))
 }
 
 # Share the exact native builders with the ordinary synchronous API functions.

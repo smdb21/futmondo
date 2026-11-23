@@ -9,8 +9,9 @@ const { PGlite } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/futm
     await db.exec('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;');
     const migration = fs.readFileSync('scripts/migrations/20261122130000_reconcile_completed_market_bids.sql', 'utf8');
     const schema = fs.readFileSync('scripts/schema.sql', 'utf8');
-    assert.ok(schema.endsWith(migration));
-    await db.exec(schema.slice(0, -migration.length));
+    const functions = migration.slice(migration.indexOf('CREATE FUNCTION'), migration.indexOf('NOTIFY pgrst'));
+    assert.ok(schema.includes(functions));
+    await db.exec(schema.replace(functions, ''));
     await db.exec(migration);
     await db.exec("INSERT INTO worker_accounts(account_id) VALUES('fixture')");
     const job = 'f'.repeat(32);

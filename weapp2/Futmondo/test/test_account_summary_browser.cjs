@@ -46,8 +46,8 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
    await schedule.waitFor({state:'visible'});
    await summary.getByText('Players: 17',{exact:true}).waitFor();
    await summary.getByText('Effective players: 17 / 18',{exact:true}).waitFor();
-   await summary.getByText('Reserved offer slots: 1',{exact:true}).waitFor();
-   await summary.getByText('No more offers allowed.',{exact:true}).waitFor();
+   await summary.getByText('Squad slots held for offers: 1',{exact:true}).waitFor();
+   await summary.getByText('No squad slots free for new offers.',{exact:true}).waitFor();
    // Keep one shell and financial node across navigation and clock updates.
    await summary.evaluate(n=>n.dataset.fixtureIdentity='retained');
    await page.locator('#round_finance_amounts').evaluate(n=>n.dataset.fixtureIdentity='retained');
@@ -68,7 +68,7 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
     assert.equal(await page.locator('#account_finance_summary').count(),1);
     assert.equal(await summary.getAttribute('data-fixture-identity'),'retained');
     assert.equal(await page.locator('#round_finance_amounts').getAttribute('data-fixture-identity'),'retained');
-    await summary.getByText('No more offers allowed.',{exact:true}).waitFor();
+    await summary.getByText('No squad slots free for new offers.',{exact:true}).waitFor();
     const panel=page.locator(`#shiny-tab-${tab} .fm-info-panel`).first();
     if(await panel.isVisible() && await panel.evaluate(n=>n.open))await panel.locator(':scope > summary').click();
     assert.equal(await summary.isVisible(),true);

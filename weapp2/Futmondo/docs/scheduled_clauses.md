@@ -66,7 +66,7 @@ Unused purchase ciphertext is deleted after the final outstanding schedule/recon
 
 ## Temporary diagnostic and rollout
 
-`FUTMONDO_CLAUSE_DIAGNOSTIC_ACCOUNT` defaults to unset. It exposes a separate real-request test only to the configured authenticated account on eligible Championship cards. Confirmation and submission bypass only the future-date condition, preserving current owner, price, transfer, funds, capacity and single-submission checks. A fresh recheck aborts if the advertised future lock changed. The displayed response is a bounded native code, not a raw private response. No automatic retry occurs.
+`FUTMONDO_CLAUSE_DIAGNOSTIC_ACCOUNT` defaults to unset. It exposes a separate real-request test only to the configured authenticated account on eligible Championship cards. Confirmation and submission bypass only the future-date condition, preserving current owner, price, transfer, funds, capacity and single-submission checks. A fresh recheck aborts if the advertised future lock changed. A local preflight stop keeps the available verification or rejection reason visible and says that the request stopped before reaching Futmondo. For a source response, the diagnostic continues to display the bounded response code. No automatic retry occurs.
 
 After the owner captures a native closed-clause rejection, add its exact verified mapping and fixture, then remove the diagnostic UI/date bypass and unset the variable. A timeout requires reconciliation before another test. No automated test uses a real account or transaction.
 
@@ -87,3 +87,31 @@ Database installation is complete. Set `FUTMONDO_CLAUSE_SCHEDULING_ENABLED=true`
 An accepted bid can disappear from active offers before the first readback if Futmondo settles it first. Live reconciliation also accepts a matching completed purchase. Today, My Team, and Players reuse their saved pressroom and team balance observations to reconcile older reservations. The transaction must match the player, buyer, seller and exact bid amount, and be at or after dispatch within the existing two-second timestamp tolerance. A System/Market seller identifies a market purchase. A rival seller requires the source to identify the transfer as non-clause. A balance observed after the purchase is required before releasing the held money and slot.
 
 `clause_reconcile_completed_bids` checks both current worker snapshot versions and full scope, and releases matching manual bid reservations under the existing team lock. It is callable by the service role only. The Shiny observer shares requests across sessions, retries failed writes on the existing poll, and does not acquire source data. Active-offer readback and normal live action safeguards continue to apply.
+
+### Active manual offers
+
+Futmondo can acknowledge a submission immediately while LigaRadar still shows
+the previous balance or market. The balance summary shows accepted actions
+under **Accepted offers awaiting balance update**. **Offers awaiting
+confirmation** applies to a dispatch whose outcome is still being checked.
+
+The existing server observer tries saved active-offer evidence before transfer
+history. The saved team market must contain the exact player and price with
+an unambiguous own bid ID. Both the market and balance observations must
+postdate dispatch, match the account, league, team, competition, season and
+scoring context, and carry successful acquisition metadata. The service-only
+`clause_reconcile_active_offers` RPC verifies the referenced versions and clears
+the duplicate manual cash hold and squad slot under the team lock. The offer
+continues to count through the official market ledger. Missing or inconsistent
+evidence retains the reservation. The reconciler uses the existing account
+poll and existing persisted snapshots without a new acquisition or browser timer.
+
+Source inspection on 2026-11-22 Pacific used the [official Futmondo web
+bundle](https://app.futmondo.com/main.dart.js) (SHA-256
+`08202076259d1678c7557478771d3aa38b5099f42044630569c704fdb7a7cd1c`) and the
+[captured market contract](har_api_reference.md#6-post-1marketplayers).
+The official client requests `/1/market/players` with fantasy championship ID,
+fantasy user-team ID and `type: "market"` in the authenticated POST envelope
+and reads the answer as player rows. Its row parser reads the singular
+`bid.id` and `bid.price`; LigaRadar exposes those as `bid_id` and `bid_price`.
+The live saved market and balance corroborated that mapping for the repaired bid.

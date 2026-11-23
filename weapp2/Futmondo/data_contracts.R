@@ -259,8 +259,8 @@ account_squad_UI <- function(state = NULL) {
   shiny::tags$div(class="fm-account-squad",
     shiny::tags$span(paste0("Players: ",count(state$actual))),
     shiny::tags$span(paste0("Effective players: ",count(state$effective)," / ",count(state$cap))),
-    shiny::tags$span(paste0("Reserved offer slots: ",count(state$reserved))),
-    if(isTRUE(state$full))shiny::tags$strong(class="fm-account-squad-full", "No more offers allowed."),
+    shiny::tags$span(paste0("Squad slots held for offers: ",count(state$reserved))),
+    if(isTRUE(state$full))shiny::tags$strong(class="fm-account-squad-full", "No squad slots free for new offers."),
     fm_info(state$detail,
       shiny::textOutput("account_squad_checked",inline=TRUE),
       source="Squad capacity",pending=pending,error=identical(state$status,"unavailable")))

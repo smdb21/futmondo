@@ -291,9 +291,9 @@ function(input, output, session) {
   clause_transfers_RV <- incoming_clause_source(session,login_token_RV,championship_id_RV,user_team_id_RV,
     reactive(valid_login(login_token_RV())&&isTRUE(input$tabs%in%c("yourteam","today","players_in_championship","lineup"))),
     reactive(list(refresh_trigger(),clause_transfer_revision())),prerequisite_readers=roster_source_readers)
-  fm_clause_reconcile_completed_bids(session,login_token_RV,championship_id_RV,user_team_id_RV,
+  fm_clause_reconcile_saved_offers(session,login_token_RV,championship_id_RV,user_team_id_RV,
     function()roster_source_readers$transactions(login=login_token_RV(),championship_id=championship_id_RV()),
-    primary_team_state)
+    primary_team_state,primary_market_state)
   account_squad_RV <- resource_display_source(session,function(){
     req(account_finance_visible())
     auth<-login_token_RV();league<-championship_id_RV();team<-user_team_id_RV()

@@ -99,7 +99,7 @@ shiny::testServer(function(input,output,session){
  session$setInputs(tabs='today');settle(session)
  original<-output$account_squad;clock<-output$account_squad_checked;shell<-output$account_finance_summary
  stopifnot(grepl('Players: 18',original$html,fixed=TRUE),grepl('Effective players: 19 / 20',original$html,fixed=TRUE),
-  grepl('No more offers allowed.',original$html,fixed=TRUE))
+  grepl('No squad slots free for new offers.',original$html,fixed=TRUE))
  elapsed<-system.time(for(i in 1:10){
   now<<-now+60;roster(state(roster()$data,at=now));info(state(info()$data,at=now));settle(session)
   stopifnot(identical(original,output$account_squad),identical(shell,output$account_finance_summary))
@@ -108,10 +108,10 @@ shiny::testServer(function(input,output,session){
  cat(sprintf('PASS ten squad source-clock updates preserve counts/full warning and shell while clocks advance (%.3fs)\n',elapsed))
  roster(resource_state(status='loading'));transfers(NULL);settle(session)
  stopifnot(grepl('Players: Loading',output$account_squad$html,fixed=TRUE),
-  !grepl('No more offers allowed',output$account_squad$html,fixed=TRUE),identical(shell,output$account_finance_summary))
+  !grepl('No squad slots free for new offers',output$account_squad$html,fixed=TRUE),identical(shell,output$account_finance_summary))
  roster(resource_state(status='unavailable'));transfers(list(status='partial'));settle(session)
  stopifnot(grepl('Players: Unavailable',output$account_squad$html,fixed=TRUE),
-  !grepl('No more offers allowed',output$account_squad$html,fixed=TRUE))
+  !grepl('No squad slots free for new offers',output$account_squad$html,fixed=TRUE))
  session$setInputs(tabs='login');settle(session);stopifnot(is.null(output$account_finance_summary))
  cat('PASS context loading/failure clears private counts and full warning without removing target-page shell; unrelated pages hide it\n')
 })

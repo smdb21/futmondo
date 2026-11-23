@@ -30,9 +30,10 @@ of content, with no dismiss control or additional sticky behavior.
 reserved_slots)` projects existing observations through `team_effective_squad_count()`
 and `effective_squad_count()`: actual ownership, effective ownership after observed
 arrivals/departures, the configured `maxPlayersInRoster`, and offer reservations.
-Actual and effective totals are not added together. **No more offers allowed.**
-appears when effective ownership alone reaches/exceeds the known limit, or when
-known effective ownership plus active offer/pending-purchase slots reaches it.
+**Squad slots held for offers** reports slots already used by active offers and
+unreconciled purchase reservations. **No squad slots free for new offers.**
+appears when effective ownership alone reaches the known limit, or when known
+effective ownership plus offer and purchase holds reaches it.
 Unknown evidence cannot become zero, a fabricated limit or permission to buy.
 Existing-offer edits and final manual-action preflights retain their rules.
 `account_squad_UI(state=NULL)` renders those counts and explanation; the separate

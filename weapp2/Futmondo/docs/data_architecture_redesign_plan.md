@@ -1688,6 +1688,8 @@ Owner-authorized addition: an individually confirmed purchase at a rival's publi
 
 Exit criteria still open: capture the actual closed-clause rejection with the temporary account-scoped diagnostic and install its regression mapping; remove the bypass; apply the additive migration and deploy; verify a controlled hosted execution, restart behavior and Contabo capacity/timing. Synthetic tests do not certify a real purchase or production deployment. Other trading/lineup/coach automation remains outside this exception.
 
+The temporary diagnostic now keeps the local preflight reason visible when verification stops the purchase. The reported attempt stopped before dispatch, so the Futmondo rejection code remains uncaptured.
+
 
 ### Today heading information icon — implemented locally (2026-11-15)
 
@@ -2337,3 +2339,9 @@ Added a branded connection-loss dialog with the static pitch radar and a browser
 ### Faster manual offers and clause confirmation — implemented locally, 2026-11-22 Pacific
 
 Player-card market and direct-owner offers use the selected row and saved league rules to render immediately and send a single native write on confirmation. Existing database reservations are protected with a scoped dispatch RPC. Native rejections and uncertain results request factual refresh for the captured context. Clause price confirmation uses the card data and retains its submit-time preflight. Local completion criteria include held-response browser checks and isolated database dispatch validation. Hosted schema, latency and account outcome verification are rollout work. See [player-card timing](selected_player_module.md#manual-offer-and-purchase-timing--2026-11-22-pacific).
+
+## Active manual offer reconciliation — 2026-11-22 Pacific
+
+- [x] Trace the accepted bid to exact-scope saved own-offer and balance evidence.
+- [x] Reconcile active offers from existing durable observations and make the balance-summary statuses and occupied squad slots explicit.
+- [x] Verify the local observer, database grants and reconciliation, offline lifecycle and responsive summary. Apply the production migration and verify the scoped reservation repair.

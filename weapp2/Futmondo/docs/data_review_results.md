@@ -5411,3 +5411,38 @@ The isolated Chromium run at 320 px and 1440 px measured the initial market acti
 The database guard adds one bounded, indexed admission RPC before the offer when scheduling is enabled. Its existing account/job bounds and team lock limit the work. Settlement and factual refresh proceed asynchronously. The card reuses scoped durable worker results with original deadlines. There are no added polling loops or repeated acquisition reads. Rendering an empty history chart no longer loads Plotly ahead of actions. The offline tests covered loaded chart stability, account/league/player isolation, native capacity reads for other actions, reservation enforcement in isolated PostgreSQL, and the Shiny lifecycle (14 checks plus 8 tabs).
 
 The broad deterministic suite reproduces one pre-existing sealed own-bid capacity fixture failure on the unchanged branch. Browser and database verification used synthetic data. The hosted migration, deployment, real Futmondo latency and real transactions were outside this verification.
+
+## Active manual offer reconciliation — 2026-11-22 Pacific
+
+A reported 38,016,571 EUR manual market bid returned `api.general.ok` and
+was recorded as accepted. The exact-scope team market subsequently contained
+the own bid at that amount, and the newer balance had sufficient withheld
+funds to cover it. The saved-data reconciler only handled completed transfers.
+Until the separate reservation settled, the summary could charge the amount
+and occupy a squad slot through both the active offer and the manual hold.
+
+The focused R fixture verifies exact own-bid matching, stale and ambiguous
+evidence, accepted and unconfirmed wording, and retry after a version race.
+The isolated PostgreSQL check verifies service-only execution, exact scope,
+version and source times, and one-time release. The completed-market-bid R
+and PostgreSQL checks, banner finance (18), unchanged-refresh display, and
+offline Shiny lifecycle (14 checks and eight tabs) passed. The balance summary
+browser fixture passed at 320, 390 and 1440 px in both themes, with navigation
+under 45 ms in that fixture and zero repeated shared reads or live I/O.
+
+With no pending manual actions the observer exits before reading source states.
+While reconciling it reuses already loaded market, balance and optional
+pressroom snapshots, scans a bounded batch of up to 64 reservations, and
+coalesces matching writes per snapshot pair. The indexed database version
+lookups and primary-key job update run in one asynchronous RPC. The existing
+poll handles result delivery and retries. The old broad invalidation is
+skipped when the same saved observations already proved the active offer.
+There are no new source requests, timers or dependencies.
+
+Production migration `20261123072054_reconcile_active_manual_offers` was
+applied and the invoker grant verified. A scoped repair verified the latest
+persisted market and balance digests, found the exact active offer, called the
+same RPC and released one duplicate cash hold and slot. A separate read
+confirmed both reservation values were zero. The existing Futmondo bid was
+still active in the evidence used for repair. No transaction was submitted.
+Hosted authenticated rendering remains outside the verification.

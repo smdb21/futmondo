@@ -33,7 +33,7 @@ check("squad summary uses the existing identity ledger and counts reserved offer
   x<-account_squad_display(resource_state(roster),transfers,team,1,0)
   html<-as.character(account_squad_UI(x))
   stopifnot(x$full,grepl("Players: 18",html,fixed=TRUE),grepl("Effective players: 19 / 20",html,fixed=TRUE),
-    grepl("No more offers allowed.",html,fixed=TRUE))
+    grepl("No squad slots free for new offers.",html,fixed=TRUE))
   stopifnot(account_squad_display(resource_state(roster),transfers,team,0,1)$full,
     account_squad_display(resource_state(roster),transfers,team,2,1)$full)
 })
@@ -50,7 +50,7 @@ check("unknown and partial squad evidence never becomes zero or a false full-squ
   }
   x<-account_squad_display(roster,empty,resource_state(status="loading"),NA_real_,NA_real_)
   stopifnot(is.na(x$cap),is.na(x$reserved),!x$full,
-    !grepl("No more offers allowed",as.character(account_squad_UI(x)),fixed=TRUE))
+    !grepl("No squad slots free for new offers",as.character(account_squad_UI(x)),fixed=TRUE))
   roster<-resource_state(data.frame(id=paste0("p",1:20)))
   stopifnot(account_squad_display(roster,empty,team,NA_real_,NA_real_)$full)
   stopifnot(!account_squad_display(roster,empty,resource_state(list()),0,0)$full)
