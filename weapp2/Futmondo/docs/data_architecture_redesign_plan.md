@@ -2314,6 +2314,6 @@ Contract and rollout are in [database-first sync](database_first_sync.md#explici
 
 - [x] Match completed market purchases during live readback and from saved pressroom and balance versions.
 - [x] Apply and verify the service-only database migration, `20261123050735_reconcile_completed_market_bids`.
-- [ ] Verify the affected reservation clears in the hosted app after the matching release.
+- [x] Verify the hosted release marker and both changed source hashes. Reconcile the affected reservation from saved Futmondo observations and verify its durable release.
 
 See [completed market bids](scheduled_clauses.md#completed-market-bids) and [verification](data_review_results.md).
