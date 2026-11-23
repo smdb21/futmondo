@@ -5598,3 +5598,73 @@ resize listener is replaced on rerender and relayouts only when dimensions diffe
 Its initial readable-size correction and no-overflow behavior passed mobile
 checks. Hosted throughput, real-account historical score revisions and deployed
 appearance remain unverified; this is a local implementation and push.
+
+
+## Standings blank/loading and responsiveness — 2026-11-23
+
+The reported phone screenshot shows the new description with no standings
+curve. The owner also reports unresponsiveness on desktop and phone. Tracing the
+changed code reproduced a serial loading barrier: only the catalog registered
+initially; resolving it registered team A; resolving A registered team B. Any
+pending or failed dependency aborted the complete plot reactive. The prior
+browser fixture replaced bound readers with immediately available getters, so
+its passing result did not exercise this failing path.
+
+The fix captures each read independently, registers all team histories together,
+and shows verified curves without inventing the missing team's scores. Loading
+status remains visible and recovers when saved data arrives. Failures retain safe
+resource references. Ranks are withheld until every team's selected cumulative
+coverage is known. Display projections suppress chart redraws and range resets
+when worker publications change metadata only. Existing DB snapshots, contextual
+isolation, persistence and bounded read batching are reused; source worker
+cadence and HTTP lanes are unchanged.
+
+Executed checks:
+
+- `Rscript test/test_plots_loading.R`: four regression groups passed using real
+  shared adapters, including catalog plus all teams registering while pending,
+  numeric rounds displaying before the ID catalog, a rejected team preserving
+  the other curves, unknown/zero/negative score handling and local range reuse.
+- `Rscript test/test_plots_module.R`: all eight existing score/layout groups
+  passed, with the incomplete-league rank expectation corrected to unknown.
+- `test/test_plots_loading_browser_app.R` +
+  `test/test_plots_loading_browser.cjs`: phone 390 px and desktop 1440 px passed
+  using actual worker descriptors, compressed snapshot restore and full page
+  scripts. Nine verified curves appeared while the first team remained held;
+  all ten appeared after release, and loading status cleared. Three newer saved
+  versions with identical scores caused zero chart publications. The publication
+  counter was verified to be active. Twenty source-crest fixture images rendered,
+  the page did not overflow, and input heartbeats remained responsive.
+  Final measured heartbeats were 18/26/27/77/809/57 ms on phone and
+  20/26/28/44/963/68 ms on desktop. One heartbeat in each run overlapped a
+  publication; these are local fixture timings, not a hosted latency guarantee.
+  Idle browser task work was 2.4/2.6 ms over 1.2 seconds, with bounded DOM size,
+  zero page errors and zero Futmondo source calls.
+- Existing `test/test_plots_browser.cjs`: all five tabs passed again at 320,
+  390 and 1440 px in both light and dark themes, including no overflow, correct
+  labels, crests/colors and range-read reuse.
+- `Rscript test/test_shiny_simulation.R`: final run passed 14 checks and eight
+  tabs, including no HTTP/live database mutation attempts.
+
+Performance review: 100 projections of 20 teams × 38 rounds averaged 8.17 ms,
+with 30,056-byte input and 30,832-byte output. The complete-coverage rank guard
+adds a bounded finite-value check per round. Registering independent interests
+allows one existing coalesced snapshot read instead of a chain of team waits;
+it does not increase source concurrency. Data-only status outputs stay active,
+while inactive charts remain suspended. Identical facts do not republish chart
+widgets, and identical round domains do not reset slider selection. No new
+polling, timer, dependency, database write, migration or retained cache is added.
+
+Read-only production metadata found successful catalog/team-history snapshots
+and no acquisition errors for these handlers, so unavailable source history was
+not established. Public-client inspection of the cached official bundle on
+2026-11-23 reconfirmed `/1/userteam/rounds` with `championshipId` and `userteamId`;
+`ay6` maps each response record through `c5Z`, which reads `id`, `number`,
+`status`, `points` and `negative`. Bundle source:
+https://app.futmondo.com/main.dart.js; SHA-256
+`08202076259d1678c7557478771d3aa38b5099f42044630569c704fdb7a7cd1c`.
+This is parser evidence, not authenticated UI verification. Automatic review
+blocked exporting private compressed response payloads; permission for exact
+hosted-response inspection was requested separately. The reported hosted
+freeze has not been independently reproduced. The local loading defect and
+redraw behavior are verified; hosted acceptance remains outstanding.

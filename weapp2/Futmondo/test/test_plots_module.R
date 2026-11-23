@@ -23,7 +23,7 @@ check('round totals preserve subrounds, revisions, negative and missing points',
   d <- plots_round_totals(rows)
   a <- d[d$team_id=='a',]; b <- d[d$team_id=='b',]
   stopifnot(identical(a$round,c(6,6.2,7,8)), identical(a$points,c(10,15,12,12)),
-    identical(b$points,c(8,NA_real_,NA_real_,NA_real_)), identical(a$rank,c(1,1,1,1)))
+    identical(b$points,c(8,NA_real_,NA_real_,NA_real_)), identical(a$rank,c(1,NA_real_,NA_real_,NA_real_)))
   p <- plotly::plotly_build(plots_round_chart(d))
   stopifnot(p$x$layout$xaxis$type=='category', identical(unlist(p$x$layout$xaxis$categoryarray),c('6','6.2','7','8')),
     length(p$x$data)==2, !is.null(attr(plots_round_chart(d),'fm_info')))

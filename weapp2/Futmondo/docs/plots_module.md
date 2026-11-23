@@ -68,3 +68,37 @@ with `node test/test_plots_browser.cjs` in a separate process. The browser fixtu
 uses synthetic saved observations, blocks external requests except fixture crest
 images, and supports the standard `FUTMONDO_TEST_NODE_MODULES` and
 `FUTMONDO_TEST_CHROMIUM` overrides. No dependency or deployment setup changed.
+
+
+## Independent saved-round loading and redraw reuse — 2026-11-23
+
+The first round-based implementation called the catalog, then each team history
+without capturing pending Shiny read conditions. A pending catalog or team
+aborted the entire reactive, so later teams were not registered until earlier
+reads settled. One missing/failed read could therefore suppress all curves.
+
+`catalog_state()` and `round_state()` now capture each dependency with the
+existing `classification_read_state()` contract. Every known team registers its
+own saved-data interest in the same reactive pass; the existing worker read batch
+coalesces them. Numeric native round numbers can be used while the ID catalog is
+pending. Opaque IDs still require the authoritative catalog. Verified teams render
+independently; a missing team keeps unknown scores. League ranks remain unknown
+for any round without complete comparable scores for every team.
+
+`round_status()` reports pending reads visibly outside the collapsed information
+panel, and reports failed reads through the existing safe failure references.
+The two round status outputs recover even when hidden; they project data without
+building inactive charts. Plot outputs retain normal hidden-tab suspension.
+`round_totals` and `round_domain` use `resource_display_source()` so a changed
+source timestamp/version with identical visible facts does not redraw the chart
+or reset the user's rank range. No new timer, worker job, source call, persistence
+schema or cache layer is introduced; existing scoped durable observations remain
+the source of browsing data.
+
+Regression: `test/test_plots_loading.R` uses the real shared adapters and held or
+rejected reads. `test/test_plots_loading_browser_app.R` with
+`test/test_plots_loading_browser.cjs` uses the real worker descriptor, compressed
+snapshot decoder, page information scripts and actual plots. It checks pending
+and recovered histories, unchanged publications, input heartbeats and bounded idle
+browser work at phone and desktop widths. All fixtures use synthetic data and
+forbid source HTTP. Exact hosted diagnosis is separate from these local checks.

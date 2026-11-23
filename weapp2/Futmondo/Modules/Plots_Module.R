@@ -68,7 +68,8 @@ plots_round_totals <- function(rows) {
   totals$rank <- NA_real_
   for (number in numbers) {
     ix <- which(totals$round == number)
-    totals$rank[ix] <- rank(-totals$points[ix], ties.method="min", na.last="keep")
+    # A league rank is unknown until every team has comparable coverage.
+    if(all(is.finite(totals$points[ix]))) totals$rank[ix] <- rank(-totals$points[ix], ties.method="min")
   }
   totals
 }
@@ -87,7 +88,7 @@ plots_round_chart <- function(totals, metric="points") {
         dtick=if(metric == "rank") 1 else NULL), showlegend=FALSE,
       margin=list(l=55,r=15,t=45,b=55))
   if (any(!is.finite(totals[[metric]]))) attr(plot, "fm_info") <- fm_info(
-    "Some saved round scores are missing. Lines have gaps where a complete cumulative result cannot be calculated.", error=TRUE)
+    "Some saved round scores are missing. Lines have gaps where a complete cumulative result cannot be calculated; ranks require scores for every team.", error=TRUE)
   plot
 }
 
@@ -159,31 +160,69 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
       if(!is.data.frame(d)||!nrow(d)) return(plots_empty("League financial data unavailable"))
       d<-d[order(d$value),,drop=FALSE]; plotly::plot_ly(d,x=~value,y=~reorder(team,value),type="bar",orientation="h",marker=list(color="#608BC1"),hovertemplate=~paste0("<b>",team,"</b><br>",format(value,big.mark=".",decimal.mark=",",scientific=FALSE)," EUR<extra></extra>")) %>% fm_plot_layout(xaxis=list(title="EUR"),yaxis=list(title=""),margin=list(l=115,r=15,t=45,b=45))
     })
-    rank_rows <- shiny::reactive({
-      shiny::req(active(),login_token(),championship_id(),user_teams_RV())
+    # Catch each pending read independently so one team cannot prevent the
+    # other saved histories from being requested or displayed.
+    catalog_state <- shiny::reactive({
+      shiny::req(active(),login_token(),championship_id())
       if(is.function(refresh_trigger)) refresh_trigger()
-      teams <- user_teams_RV()
-      id_col <- c("teamid","id")[c("teamid","id") %in% names(teams)][1]
-      name_col <- c("teamname","name")[c("teamname","name") %in% names(teams)][1]
-      if(is.na(id_col) || is.na(name_col)) return(classification_empty_rows())
-      catalog <- get_classification_round_catalog(login_token(), championship_id())
-      rounds <- catalog$rounds %||% data.frame()
-      rows <- dplyr::bind_rows(c(list(classification_empty_rows()), lapply(seq_len(nrow(teams)),function(i) {
-        d <- classification_round_rows(get_user_team_rounds(login_token(),championship_id(),teams[[id_col]][i]),
-          teams[[id_col]][i],teams[[name_col]][i],rounds)
-        if (!nrow(d)) d <- data.frame(team_id=as.character(teams[[id_col]][i]),
-          team_name=as.character(teams[[name_col]][i]),round=NA_real_,points=NA_real_)
-        d
-      })))
-      attr(rows, "round_numbers") <- rounds$round_number
-      rows
+      classification_read_state(function() get_classification_round_catalog(login_token(),championship_id()))
     })
-    round_totals <- shiny::reactive(plots_round_totals(rank_rows()))
+    round_state <- shiny::reactive({
+      shiny::req(active(),login_token(),championship_id())
+      if(is.function(refresh_trigger)) refresh_trigger()
+      directory <- classification_read_state(user_teams_RV)
+      catalog <- catalog_state()
+      teams <- directory$data
+      rounds <- catalog$data$rounds %||% data.frame()
+      reads <- list(directory,catalog)
+      frames <- list(classification_empty_rows())
+      if(is.data.frame(teams) && nrow(teams)) {
+        id_col <- c("teamid","id")[c("teamid","id") %in% names(teams)][1]
+        name_col <- c("teamname","name")[c("teamname","name") %in% names(teams)][1]
+        if(!is.na(id_col) && !is.na(name_col)) for(i in seq_len(nrow(teams))) {
+          team_id <- as.character(teams[[id_col]][i])
+          team_name <- as.character(teams[[name_col]][i])
+          result <- classification_read_state(function() get_user_team_rounds(
+            login_token(),championship_id(),team_id))
+          d <- classification_round_rows(result$data,team_id,team_name,rounds)
+          if(!nrow(d)) d <- data.frame(team_id=team_id,team_name=team_name,round=NA_real_,points=NA_real_)
+          reads[[length(reads)+1L]] <- result
+          frames[[length(frames)+1L]] <- d
+        }
+      }
+      rows <- dplyr::bind_rows(frames)
+      attr(rows,"round_numbers") <- rounds$round_number
+      list(data=rows,loading=any(vapply(reads,function(x)isTRUE(x$loading),logical(1))),
+        errors=Filter(Negate(is.null),lapply(reads,`[[`,"error")))
+    })
+    rank_rows <- shiny::reactive(round_state()$data)
+    # Metadata-only worker publications must not redraw the same chart.
+    round_totals <- resource_display_source(session,function() plots_round_totals(rank_rows()))
+    round_domain <- resource_display_source(session,function() sort(unique(round_totals()$round)))
     shiny::observe({
-      r <- round_totals()
-      if(nrow(r)) shiny::updateSliderInput(session,"rank_range",min=min(r$round),max=max(r$round),
-        value=range(r$round),step=0.1)
+      numbers <- round_domain()
+      if(length(numbers)) shiny::updateSliderInput(session,"rank_range",min=min(numbers),max=max(numbers),
+        value=range(numbers),step=0.1)
     })
+    round_status <- shiny::reactive({
+      state <- round_state()
+      totals <- round_totals()
+      shiny::tagList(
+        if(state$loading) shiny::div(class="fm-plot-loading",role="status",
+          "Loading saved round scores. Verified history appears as it becomes available."),
+        if(length(state$errors)) fm_info(paste("Some saved round data could not be read.",
+          paste(unique(vapply(state$errors,resource_failure_message,character(1))),collapse=" ")),error=TRUE),
+        if(!state$loading && !length(state$errors) && !nrow(totals)) fm_info("No published round history",error=FALSE),
+        if(nrow(totals) && any(!is.finite(totals$points))) fm_info(
+          "Some saved round scores are missing. Lines have gaps where a complete cumulative result cannot be calculated; ranks require scores for every team.",error=TRUE)
+      )
+    })
+    output$standings_status <- shiny::renderUI(round_status())
+    output$rank_status <- shiny::renderUI(round_status())
+    # Loading disclosures can hide their container. Status must still recover;
+    # it projects data only and does not build charts in inactive tabs.
+    shiny::outputOptions(output,"standings_status",suspendWhenHidden=FALSE)
+    shiny::outputOptions(output,"rank_status",suspendWhenHidden=FALSE)
     rank_plot <- shiny::reactive({
       h <- round_totals()
       z <- input$rank_range
@@ -199,7 +238,7 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
       rank=rank_plot, owned_club=owned_club_plot)
     for (key in names(plot_sources)) local({
       source <- plot_sources[[key]]
-      output[[paste0(key, "_status")]] <- shiny::renderUI(attr(source(), "fm_info"))
+      if(!key %in% c("standings","rank")) output[[paste0(key, "_status")]] <- shiny::renderUI(attr(source(), "fm_info"))
       output[[paste0(key, "_plot")]] <- plotly::renderPlotly(source())
     })
   })

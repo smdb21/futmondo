@@ -2400,3 +2400,19 @@ Local regression, responsive browser and performance results are recorded in
 [data review](data_review_results.md#round-based-league-plots--2026-11-23).
 Hosted rollout and identification of the screenshot's specific native score
 revision remain unverified. No historical source data was changed.
+
+
+### Standings loading and responsiveness follow-up — implemented locally 2026-11-23
+
+- [x] Reproduce the catalog/team sequential loading barrier through real shared
+  adapters and remove it without adding source acquisition.
+- [x] Keep verified curves visible during other pending/failed histories; retain
+  unknown scores and require complete league coverage for ranks.
+- [x] Keep status recovery independent of chart visibility and suppress unchanged
+  fact redraws/range resets across worker publications.
+- [x] Verify delayed/failed reads, snapshot replay, mobile/desktop input
+  responsiveness, idle browser work, existing layouts and the offline lifecycle.
+
+Hosted blank/freeze verification remains separate from the reproduced local
+loading defect. See [plot loading contract](plots_module.md#independent-saved-round-loading-and-redraw-reuse--2026-11-23)
+and the dated verification in `data_review_results.md`.
