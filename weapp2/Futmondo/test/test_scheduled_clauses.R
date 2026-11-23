@@ -46,12 +46,6 @@ capacity$valid_until<-as.numeric(now)-1
 stopifnot(inherits(try(get_scheduled_clause_check(auth,'l','t','p'),silent=TRUE),'try-error'))
 invisible(list2env(old,.GlobalEnv))
 cat('PASS check projection keeps source time, transfer evidence, offer identities and expiry through the R/Python codec\n')
-# The diagnostic is scoped to a configured account and disabled by default.
-before<-Sys.getenv('FUTMONDO_CLAUSE_DIAGNOSTIC_ACCOUNT',unset=NA_character_)
-Sys.unsetenv('FUTMONDO_CLAUSE_DIAGNOSTIC_ACCOUNT');stopifnot(!fm_clause_diagnostic(auth))
-Sys.setenv(FUTMONDO_CLAUSE_DIAGNOSTIC_ACCOUNT='u');stopifnot(fm_clause_diagnostic(auth),!fm_clause_diagnostic(c(userid='other',token='synthetic')))
-if(is.na(before))Sys.unsetenv('FUTMONDO_CLAUSE_DIAGNOSTIC_ACCOUNT')else Sys.setenv(FUTMONDO_CLAUSE_DIAGNOSTIC_ACCOUNT=before)
-cat('PASS temporary diagnostic is disabled by default and isolated to the configured account\n')
 # Hold source acquisition to verify that confirmation yields control, does not
 # enqueue before consent, and rejects a late completion from another context.
 fm_clause_enabled<-function()TRUE

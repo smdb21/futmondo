@@ -7,18 +7,9 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
    const page=await browser.newPage({viewport:{width,height:900}});
    await page.goto('http://127.0.0.1:3914',{waitUntil:'networkidle'});
    const schedule=page.locator('#card-schedule_clause');await schedule.waitFor({state:'visible',timeout:20000});
-   if(width===360){
-    await page.locator('#card-test_locked_clause').click();
-    await page.locator('#card-confirm_clause_button').click();
-    await page.locator('#finish_blocked').dispatchEvent('click');
-    const blocked=page.locator('.shiny-notification').filter({hasText:'Locked-clause test stopped before sending a request to Futmondo.'});
-    await blocked.waitFor();
-    assert.match(await blocked.textContent(),/Amount exceeds verified spendable funds/);
-    assert.equal(await page.getByText('Locked-clause diagnostic response:',{exact:false}).count(),0);
-    await blocked.locator('.shiny-notification-close').click();
-    console.log('PASS the locked-clause diagnostic displays the local funds block at 360px');
-   }
+   assert.equal(await page.locator('#card-test_locked_clause, #card-btn_pay_clause').count(),0);
    await schedule.click();await page.getByText('This schedules a purchase attempt. Success is not guaranteed. The purchase may leave your balance negative.',{exact:true}).waitFor();
+   await page.getByText('If Futmondo rejects the purchase, the attempt ends.',{exact:true}).waitFor();
    await page.waitForFunction(()=>getComputedStyle(document.querySelector('#shiny-modal')).opacity==='1');
    await page.locator('.modal-title').scrollIntoViewIfNeeded();
    await page.screenshot({path:`/tmp/futmondo-scheduled-clause-modal-${width}.png`,fullPage:false});

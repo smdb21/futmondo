@@ -3,8 +3,7 @@ options(futmondo.offline=TRUE)
 suppressPackageStartupMessages(source('global.R'))
 fm_clause_enabled<-function()TRUE
 fm_worker_configured<-function()FALSE
-fm_clause_diagnostic<-function(login) identical(login[['userid']], 'fixture')
-fm_async_http<-function(...) stop('The blocked diagnostic must never dispatch')
+Sys.setenv(FUTMONDO_CLAUSE_DIAGNOSTIC_ACCOUNT='fixture')
 fm_worker_encrypt<-function(auth){x<-'synthetic-ciphertext';attr(x,'credential_id')<-'fixture-binding';x}
 fixture<-new.env(parent=emptyenv());fixture$jobs<-list();fixture$pending<-NULL
 capacity<-function()observed_data(list(status='ok',valid_until=as.numeric(Sys.time())+15,
@@ -29,7 +28,6 @@ fm_clause_rpc<-function(name,payload,owner=''){
 }
 ui<-shiny::fluidPage(shiny::tags$head(shiny::tags$style(shiny::HTML(fm_theme_css())),shiny::includeCSS('www/custom_style.css')),
  shiny::actionButton('heartbeat','Heartbeat'),shiny::textOutput('beats'),shiny::actionButton('finish','Finish verification'),
- shiny::actionButton('finish_blocked','Finish blocked verification'),
  shiny::actionButton('logout','Log out'),shiny::actionButton('login','Log in'),shiny::uiOutput('pending'),shiny::div(style='display:none',shiny::textOutput('fixture_state')),shiny::uiOutput('clause_results'),selected_player_UI('card'))
 server<-function(input,output,session){
  session$userData$league_context_enabled<-TRUE
@@ -51,15 +49,6 @@ server<-function(input,output,session){
  shiny::observeEvent(input$finish,{
   shiny::req(is.function(fixture$pending))
   fixture$pending(list(player=list(id='p',owner_id='rival',owner_verified=TRUE,price=100,transferred=FALSE,opens_at='2066-11-15T12:00:00Z')))
-  fixture$pending<-NULL
- })
- shiny::observeEvent(input$finish_blocked,{
-  shiny::req(is.function(fixture$pending))
-  facts <- capacity()
-  facts$funds$spendable_budget <- 99
-  facts$player <- list(id='p',slug='fixture',owner_id='rival',owner_verified=TRUE,price=100,
-    transferred=FALSE,opens_at='2066-11-15T12:00:00Z')
-  fixture$pending(facts)
   fixture$pending<-NULL
  })
  shiny::observeEvent(input$logout,login(NULL))

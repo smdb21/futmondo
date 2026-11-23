@@ -12,7 +12,7 @@ An asynchronous manual confirmation can spend the first cash observation's valid
 
 Two successful captured market offers in `app.futmondo.com.har` identify the existing `POST /1/market/bid` request. The query contains `championshipId`, `userteamId`, `player_id`, `player_slug`, `price` and `isClause: false`. The empty root `answer` is a JSON object and the response code is `api.general.ok`. `build_market_bid_payload()` preserves that object in both the direct and asynchronous callers.
 
-Implemented locally on 2026-11-15 under the owner's explicit scope exception. Deployment and native closed-rejection evidence remain separate acceptance steps. This authorizes selected one-shot purchases, not general trading automation.
+Implemented locally on 2026-11-15 under the owner's explicit scope exception. This authorizes selected one-shot purchases, not general trading automation.
 
 ## Product behavior
 
@@ -64,14 +64,13 @@ A proven closed-clause rejection can retry at 1, 2, 4, then capped 10-second int
 
 Unused purchase ciphertext is deleted after the final outstanding schedule/reconciliation ends. Revocation prevents new sends; ciphertext needed to reconcile an already-dispatched purchase is retained only for that purpose. Freshly logged-in tokens can renew outstanding authorization without changing its scope or re-enabling revoked consent.
 
-## Temporary diagnostic and rollout
+## Locked-clause rejection evidence and rollout
 
-`FUTMONDO_CLAUSE_DIAGNOSTIC_ACCOUNT` defaults to unset. It exposes a separate real-request test only to the configured authenticated account on eligible Championship cards. Confirmation and submission bypass only the future-date condition, preserving current owner, price, transfer, funds, capacity and single-submission checks. A fresh recheck aborts if the advertised future lock changed. A local preflight stop keeps the available verification or rejection reason visible and says that the request stopped before reaching Futmondo. For a source response, the diagnostic continues to display the bounded response code. No automatic retry occurs.
+On 2026-11-22 Pacific, the owner's second LigaRadar diagnostic showed `api.error.not_found` after an explicitly confirmed request against a player whose clause was reported locked. The diagnostic reads `answer.code` after a 2xx response. The fixture reconstructs just that known code. The screenshot supplies no private response body, precise HTTP status or server-side reason. The same code is documented for unrelated unavailable private reads in `docs/data_review_results.md`.
 
-After the owner captures a native closed-clause rejection, add its exact verified mapping and fixture, then remove the diagnostic UI/date bypass and unset the variable. A timeout requires reconciliation before another test. No automated test uses a real account or transaction.
+The [public Futmondo client bundle](https://app.futmondo.com/main.dart.js), inspected on 2026-11-22 Pacific (SHA-256 `08202076259d1678c7557478771d3aa38b5099f42044630569c704fdb7a7cd1c`), sends the same five query fields through the authenticated POST helper. The clause UI uses the shared response handler, which displays the returned error code. Two existing official web client captures corroborate the route, request shape and `api.general.ok` response. Together this evidence establishes a rejection on the observed request. A lock-specific meaning or transient timing failure remains unverified. The worker settles `api.error.not_found` as failed after one send. The account-scoped diagnostic button and both opening-date bypasses were removed.
 
-Apply the migration before enabling `FUTMONDO_CLAUSE_SCHEDULING_ENABLED=true`, then redeploy the existing Docker image. The default-off flag avoids using an uninstalled schema. Verify source rejection mapping, dispatch lag, restart recovery, overall helper RSS, manual-action latency, mobile rendering, and real database/API request budgets in a controlled hosted acceptance run. Local checks do not certify production migration, deployment, Contabo capacity or real purchase success.
-
+Production PostgREST statistics confirmed the elected worker servicing the existing clause queue on 2026-11-22 Pacific. The existing feature flag remains enabled there. For a new deployment, install the migration before enabling `FUTMONDO_CLAUSE_SCHEDULING_ENABLED=true`. Hosted execution timing, restart recovery, helper RSS and actual purchase success remain separate acceptance checks.
 
 ## Production database migration — 2026-11-16
 
@@ -79,7 +78,7 @@ Applied the exact reviewed `scripts/migrations/20261115075411_scheduled_clause_p
 
 Verified four RLS-enabled server-only tables, all 23 SECURITY INVOKER functions with fixed search paths and restricted execution grants, 11 valid indexes and the enabled `market_transactions` observation trigger. The service-role read smoke check used a synthetic absent account inside a rolled-back transaction; it made no Futmondo request or purchase. The empty due-job lookup used `clause_jobs_deadline` and measured 0.129 ms execution time (2.804 ms planning); this does not establish loaded scheduler throughput or opening-time lag.
 
-Database installation is complete. Set `FUTMONDO_CLAUSE_SCHEDULING_ENABLED=true` in Dokploy with the existing worker settings and redeploy to activate it. This task did not change deployment settings or execute the diagnostic. Actual closed-clause rejection mapping, removal of the temporary diagnostic and controlled hosted execution/restart/resource checks remain open.
+Database installation is complete. The migration smoke check used synthetic data. See the rollout section above for current scheduler status and remaining hosted checks.
 
 
 ## Completed market bids

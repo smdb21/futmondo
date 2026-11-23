@@ -43,6 +43,15 @@ post_pending$reject(resource_failure(resource='source',category='network'));sett
 stopifnot(length(posts)==1L,!value$success,value$code=='purchase_response_uncertain',tail(calls,1)[[1]]$payload$p_state=='uncertain')
 cat('PASS loss of the native response retains uncertainty and never repeats a write\n')
 calls<-posts<-list()
+for (opening in c(fm_clause_stamp(Sys.time()+60), NA_character_)) {
+ p<-fm_clause_execute_async('buy_roster_clause',args,ctx,data.frame(id='p'),function()TRUE)
+ value<-NULL;promises::then(p,function(x)value<<-x)
+ f<-facts();f$player$opens_at<-opening
+ check_pending$resolve(f);settle()
+ stopifnot(!value$success,value$code=='acquisition_verification_unavailable',!length(posts),!length(calls))
+}
+cat('PASS a live-verified future or unknown opening blocks manual purchase before admission or dispatch\n')
+calls<-posts<-list()
 ma<-list(login=auth,championship_id='l',team_id='t',player_id='p',bid_id='own-bid',new_price=70)
 p<-fm_clause_execute_async('modify_bid',ma,ctx,data.frame(id='p',price=50),function()TRUE,action_mode='modify')
 f<-facts();f$offers<-list(list(player_id='p',bid_id='own-bid',price=50));f$outstanding$count<-1L

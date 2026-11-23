@@ -338,7 +338,6 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     # preflight / missing player (FALSE). Exposed so the "clause_buyout"
     # open_action routing can be asserted in tests without a live UI.
     clause_modal_opened_RV <- reactiveVal(FALSE)
-    clause_diagnostic_RV <- reactiveVal(FALSE)
     # Test seam for direct and external active-bid update routing.
     modify_modal_opened_RV <- reactiveVal(FALSE)
 
@@ -372,7 +371,6 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       active_bid_info_RV(NULL);modal_context_RV(list());modal_bid_info_RV(list())
       market_offer_dialog_RV(NULL)
       submitting_offer <<- NULL
-      clause_diagnostic_RV(FALSE)
       offer_modal_opened_RV(FALSE);clause_modal_opened_RV(FALSE);modify_modal_opened_RV(FALSE)
       if (player_card_context_changed(previous_context, current_context)) removeModal()
       previous_player_action_context_RV(current_context)
@@ -468,12 +466,12 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
     complete_acquisition<-function(result,callback){if(exists('fm_clause_complete',mode='function'))fm_clause_complete(result,callback)else callback(result)}
 
-    perform_acquisition <- function(handler,args,mode,diagnostic=FALSE) {
+    perform_acquisition <- function(handler,args,mode) {
       if(!exists('fm_clause_enabled',mode='function')||!fm_clause_enabled())return(do.call(get(handler,.GlobalEnv),args))
       action<-player_action_context_RV();sp<-selected_player()
       ctx<-resource_context(args$login,args$championship_id,args$team_id,args$player_id)
       current<-function()!session$isClosed()&&identical(isolate(player_action_context_RV()),action)
-      result<-fm_clause_execute_async(handler,args,ctx,sp,current,session$token,diagnostic,action_mode=mode)
+      result<-fm_clause_execute_async(handler,args,ctx,sp,current,session$token,action_mode=mode)
       structure(list(result=result,current=current),class='fm_clause_async_action')
     }
 
@@ -787,8 +785,6 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
             ctx<-resource_context(get_reactive_val(login_token),get_reactive_val(championship_id),current_user_team,sp$id)
             player<-fm_clause_row_player(sp)
             action_buttons<-tagList(action_buttons,fm_clause_schedule_ui(ns,player,current_user_team,ctx))
-            if(fm_clause_diagnostic(get_reactive_val(login_token))&&fm_clause_eligible(player,current_user_team))
-              action_buttons<-tagList(action_buttons,actionButton(ns('test_locked_clause'),'Test locked clause (one real request)',class='btn btn-warning',style='white-space:normal;max-width:100%;'))
           }
         }
 
@@ -1230,7 +1226,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     # recomputed clause_price is shown and later executed -- no comparison
     # price (e.g. max(market, clause)) is ever used. Never opens the market
     # bid modal.
-    open_clause_buyout_modal <- function(sp, diagnostic=FALSE) {
+    open_clause_buyout_modal <- function(sp) {
       req(sp)
 
       current_team <- get_reactive_val(user_team_id)
@@ -1245,9 +1241,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
       # Recheck strict open state (fail closed): a stale / locked /
       # transferred clause must not open the buyout confirmation.
-      diagnostic<-isTRUE(diagnostic)&&isTRUE(allow_scheduled_clauses)&&exists('fm_clause_diagnostic',mode='function')&&
-        fm_clause_diagnostic(get_reactive_val(login_token))&&fm_clause_eligible(fm_clause_row_player(sp),current_team)
-      if (!isTRUE(today_is_clause_open(sp))&&!diagnostic) {
+      if (!isTRUE(today_is_clause_open(sp))) {
         shiny::showNotification(
           "This release clause is not currently open (price, transfer lock, or clause date no longer valid). Please refresh and try again.",
           type = "warning",
@@ -1262,14 +1256,13 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
       remember_action_context("clause")
       remember_bid("clause", clause_price)
-      clause_diagnostic_RV(diagnostic)
       clause_modal_opened_RV(TRUE)
       dialog <- modalDialog(
         title = tagList(icon("bolt"), " Confirm Release Clause Buyout"),
         tags$div(class = "fm-offer-dialog", `data-submit-input` = ns("submit_clause"),
           `data-submit-id` = ns("confirm_clause_button"), `data-operation` = "purchase",
           p(strong(sp$name))),
-        p(if(diagnostic) 'DIAGNOSTIC: This sends one real purchase request while the clause is reported locked. If Futmondo accepts it, the player may be purchased and your balance may become negative. No automatic retry will occur.' else 'This purchases the player for their official release clause. Delivery follows your league settings.'),
+        p('This purchases the player for their official release clause. Delivery follows your league settings.'),
         p("Clause price: ", strong(player_card_money(clause_price))),
         p(style = "color: var(--fm-danger); font-size: 13px; font-weight: 600;", "Are you sure you want to trigger this clause buyout?"),
         footer = tagList(
@@ -1289,11 +1282,6 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       open_clause_buyout_modal(sp)
     })
 
-    observeEvent(input$test_locked_clause, {
-      req(isTRUE(allow_scheduled_clauses),fm_clause_diagnostic(get_reactive_val(login_token)))
-      open_clause_buyout_modal(selected_player(),diagnostic=TRUE)
-    })
-
     # ---- Submit Clause Purchase ----
     observeEvent(input$submit_clause, {
       req(consume_action_context("clause"))
@@ -1304,7 +1292,6 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       req(sp, login, champ_id, team_id)
       if (!player_card_has_rival_owner(sp, team_id)) {
         clause_modal_opened_RV(FALSE)
-        clause_diagnostic_RV(FALSE)
         removeModal()
         shiny::showNotification("Release clause purchases require a player owned by a rival team.",
           type = "warning", duration = 5)
@@ -1313,10 +1300,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
       # Recheck strict open state before the write (fail closed): the clause
       # may have locked / transferred between modal-open and submit.
-      diagnostic<-isTRUE(clause_diagnostic_RV())&&isTRUE(allow_scheduled_clauses)&&
-        exists('fm_clause_diagnostic',mode='function')&&fm_clause_diagnostic(login)
-      clause_diagnostic_RV(FALSE)
-      if (!isTRUE(today_is_clause_open(sp))&&!diagnostic) {
+      if (!isTRUE(today_is_clause_open(sp))) {
         removeModal()
         shiny::showNotification(
           "This release clause is no longer open (price, transfer lock, or clause date no longer valid). Please refresh and try again.",
@@ -1345,20 +1329,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         return()
       }
 
-      if(diagnostic&&(!exists("fm_clause_enabled",mode="function")||!fm_clause_enabled())){
-        diagnostic_read_options<-options(futmondo.worker_live=TRUE);on.exit(options(diagnostic_read_options),add=TRUE)
-        invalidate_resources(resource_context(login,champ_id,team_id,sp$id),pattern='player_summary')
-        current<-tryCatch(fm_clause_player(get_player_summary(login,champ_id,team_id,sp$id)),error=function(e)NULL)
-        if(!fm_clause_eligible(current,team_id)||!identical(current$owner_id,player_card_owner_id(sp))||current$price>clause_price){
-          removeModal();showNotification('Diagnostic stopped: the current owner, price or future lock changed.',type='error');return()
-        }
-        clause_price<-current$price
-      }
       player_id <- sp$id
       player_slug <- if ("slug" %in% colnames(sp) && !is.na(sp$slug)) sp$slug else sp$name
 
-      diagnostic_options<-options(futmondo.clause_diagnostic=if(diagnostic)login[['userid']]else NULL)
-      on.exit(options(diagnostic_options),add=TRUE)
       result <- perform_acquisition("buy_roster_clause", list(
         login = login,
         championship_id = champ_id,
@@ -1366,30 +1339,12 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         player_id = player_id,
         player_slug = player_slug,
         price = clause_price
-      ), "clause",diagnostic=diagnostic)
+      ), "clause")
       complete_acquisition(result,function(res){
 
       is_success <- if (is.list(res)) isTRUE(res$success) else isTRUE(res)
 
       removeModal()
-
-      if (diagnostic) {
-        code <- fm_clause_safe_code(if (is.list(res)) res$code else attr(res, 'api_code'))
-        if (code %in% c('acquisition_preflight_blocked', 'acquisition_verification_unavailable')) {
-          shiny::showNotification(
-            paste("Locked-clause test stopped before sending a request to Futmondo.", res$message),
-            type = "error",
-            duration = NULL
-          )
-          return()
-        }
-        shiny::showNotification(
-          paste0("Locked-clause diagnostic response: ", code,
-            ". No retry was sent. Share this code; never share credentials or a raw response."),
-          type = if (is_success) "warning" else "message",
-          duration = NULL
-        )
-      }
 
       if (is_success) {
         tryCatch({

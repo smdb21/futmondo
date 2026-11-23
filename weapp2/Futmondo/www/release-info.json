@@ -1,5 +1,5 @@
 {
-  "release": "completed-market-bid-reconciliation-2026-11-22",
+  "release": "scheduled-clause-diagnostic-retirement-2026-11-22",
   "runtime_sha256": {
     "async_transport.R": "fadd58e2b5f9023c516e92da91443eca40d5b9ace8156fe90b03daf7357592d3",
     "background_runtime.R": "88b9bdfa79dad13398e6b48bff4a39ecc8ed5fabb6b67af085e72ea0f8498906",
@@ -12,7 +12,7 @@
     "Modules/Players_in_Teams_Module.R": "ac199b94aa0e0ce68ab30f50e89e44e478587f362d3ed0cac30a6136f6e865c7",
     "Modules/Players_Table_Module.R": "6d777991c504d01b1a4bd65f766597cd8fb746a0aaa07089762813b5fd163c4d",
     "supabase_connector.R": "d9181b6dfd143f20fae5c1ee6531bf1e32447b4a01e3143fd83b3901f8803c35",
-    "Modules/Selected_Player_Module.R": "fef6d209a12cd9b9eaa4e007ff9da2ef5d3050bebae84dd76b77d1283d15d9a1",
+    "Modules/Selected_Player_Module.R": "0ae4fe3c74a23f164739354a80b7c443f192d6e2e22bde06153cb80f9fe05d78",
     "factual_helpers.R": "810ce0b2dfb2e2609171ea697b3fbcf0164a37261294cf3212d299e2d85eeff8",
     "server.R": "0bf8864d45f3e2bdffa7f9a1bef2a620850f0d770fabc23acbe60b2d6dbb5274",
     "Modules/Classification_Module.R": "0782c9e6f94c2a8dcc1c52d170cf8936af77ad3821756e4adfe6b0e257980272",
@@ -24,11 +24,12 @@
     "round_settlement_runtime.R": "074180388b1f924196fda9e2314c2207047889c1a77286846754b0a9c6001d02",
     "Modules/Lineup_Module.R": "3f5c376f047fdf4317ef59a6ae2647f5361d15f538f80ffaf125468ac8da08bf",
     "lineup_runtime.R": "738f59d948ea06c1e3fd1169058e069ab419fb45c6fd24754747f4676f4726a7",
-    "clause_scheduler.R": "84c2889be5e1d9950eca113312a1b4f5a9b614636c006e1311763b86c0970036",
+    "clause_scheduler.R": "9acef29cb6f3c9daa73859e9d3bdabc22b03025c0db6a20b9890df652ea15634",
     "www/custom_style.css": "394aaaba3c23484f146b5867ce78d2705be7e3622bc974068b1e39f699159e73",
     "Modules/Login_Module.R": "e21ffc3d92c5cc1a9b7ccfa1a247ed360e96c9ec18f4d837f07da087f10b805f",
     "Modules/Players_in_Championship_Module.R": "33344a220be54d68a497a1f3740bc04e7e6177d6f301b604b315ab47db412ea8",
     "ui.R": "99030b0a79220cf1218cc5a60b617926676f59d250d95d3f4276fc432ac97aef",
-    "worker_runtime.R": "d8b1eab89cbbfc28878bd7f259808de7c1e717bb6dcd41f1ae2e508078621bf5"
+    "worker_runtime.R": "d8b1eab89cbbfc28878bd7f259808de7c1e717bb6dcd41f1ae2e508078621bf5",
+    "worker/clauses.py": "f0fedd248d4361ae829ec942121f692f979278b2b0e9e7e4dfa9e846745acbaf"
   }
 }

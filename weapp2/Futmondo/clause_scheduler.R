@@ -1,10 +1,8 @@
 # Explicit, durable purchase authorization; factual acquisition remains read-only.
-# Contracts, rollout and diagnostic lifecycle: docs/scheduled_clauses.md.
+# Contracts and rollout: docs/scheduled_clauses.md.
 .fm_clause <- new.env(parent=emptyenv())
 .fm_clause$accounts <- new.env(parent=emptyenv())
 fm_clause_enabled <- function() identical(tolower(Sys.getenv('FUTMONDO_CLAUSE_SCHEDULING_ENABLED','false')),'true') && fm_worker_configured()
-fm_clause_diagnostic <- function(auth) valid_login(auth) && nzchar(Sys.getenv('FUTMONDO_CLAUSE_DIAGNOSTIC_ACCOUNT')) &&
- identical(as.character(auth[['userid']]),Sys.getenv('FUTMONDO_CLAUSE_DIAGNOSTIC_ACCOUNT'))
 fm_clause_id <- function() paste0(as.character(openssl::rand_bytes(16)),collapse='')
 fm_clause_encrypt <- function(auth) fm_worker_encrypt(c(token=fm_scalar(auth[['token']],''),userid=fm_scalar(auth[['userid']],''),user_name=if('user_name'%in%names(auth))fm_scalar(auth[['user_name']],'')else''))
 fm_clause_stamp <- function(x=Sys.time()) format(fm_time(x),'%Y-%m-%dT%H:%M:%OS3Z',tz='UTC')
@@ -440,7 +438,7 @@ fm_clause_install_guards <- function() {
    mode<-if(handler=='modify_bid')'modify'else if(handler=='buy_roster_clause'||isTRUE(args$isClause %||% TRUE))'clause'else'offer'
    if(mode=='clause'&&(identical(facts$player$owner_id,as.character(args$team_id))||
      !nzchar(fm_scalar(facts$player$owner_id,''))||!isFALSE(facts$player$transferred)||
-     is.na(fm_time(facts$player$opens_at))||fm_time(facts$player$opens_at)>Sys.time()&&!identical(getOption('futmondo.clause_diagnostic'),auth[['userid']])))
+     is.na(fm_time(facts$player$opens_at))||fm_time(facts$player$opens_at)>Sys.time()))
      stop('The current clause ownership or opening could not be verified.')
    price<-if(handler=='modify_bid')args$new_price else args$price
    if(mode=='clause'){
@@ -485,11 +483,11 @@ fm_clause_card_observers <- function(input,session,selected,auth,championship,te
    shiny::p(shiny::strong(player$name)),
    shiny::p('Maximum price: ',player_card_money(player$price)),
    shiny::p('Published opening: ',fm_format_datetime(player$opens_at),' (',fm_display_timezone(),')'),
-   shiny::p('The service targets the opening second and may retry verified timing rejections for five minutes. Verified lock extensions move the schedule. A lower price is accepted; a higher price cancels the job.'),
+   shiny::p('The service targets the opening second. Verified lock extensions move the schedule. A lower price is accepted. A higher price cancels the job.'),
    shiny::p(class='text-warning','This schedules a purchase attempt. Success is not guaranteed. The purchase may leave your balance negative.'),
    shiny::p('This reserves one offer slot and the maximum price in LigaRadar. It is not an official Futmondo offer until execution.'),
    shiny::checkboxInput(session$ns('schedule_clause_consent'),'Authorize this purchase after logout using an encrypted token, independently of Background sync.',FALSE),
-   shiny::div(class='clause-retry-limitation','Automatic retries of closed-clause rejections require a verified native response code. Until that diagnostic is captured, an API rejection ends the attempt.'),
+   shiny::p('If Futmondo rejects the purchase, the attempt ends.'),
    footer=shiny::tagList(shiny::modalButton('Cancel'),shiny::actionButton(session$ns('confirm_scheduled_clause'),'Confirm schedule')),easyClose=FALSE))
  })
  shiny::observeEvent(input$confirm_scheduled_clause,{
@@ -572,7 +570,7 @@ fm_clause_result <- function(value) {
  list(success=isTRUE(value),code=attr(value,'api_code') %||% if(isTRUE(value))API_CODE_OK else'unclassified_response',
   message=attr(value,'failure_message') %||% '')
 }
-fm_clause_execute_async <- function(handler,args,context,player,is_current,owner='',diagnostic=FALSE,action_mode=NULL) {
+fm_clause_execute_async <- function(handler,args,context,player,is_current,owner='',action_mode=NULL) {
  invalidate_resources(context,pattern='acq_capacity|player_summary|market_players|team_info')
  id<-NULL;dispatched<-FALSE;mode<-if(handler=='modify_bid')'modify'else if(handler=='buy_roster_clause'||isTRUE(args$isClause %||% TRUE))'clause'else'offer'
  # A direct owner offer and a market bid share the native write endpoint.
@@ -602,9 +600,9 @@ fm_clause_execute_async <- function(handler,args,context,player,is_current,owner
   if(mode%in%c('bid','offer')&&length(existing))stop('An offer on this player already exists')
   if(mode=='clause'){
    p<-facts$player
+   opens_at<-fm_time(p$opens_at)
    if(!nzchar(p$owner_id)||identical(p$owner_id,as.character(args$team_id))||!isFALSE(p$transferred)||
-    !is.finite(p$price)||p$price>amount||(!diagnostic&&fm_time(p$opens_at)>Sys.time()))stop('Current clause eligibility changed')
-   if(diagnostic&&(!fm_clause_diagnostic(args$login)||!fm_clause_eligible(p,args$team_id)))stop('Diagnostic lock changed')
+    !is.finite(p$price)||p$price>amount||length(opens_at)!=1L||is.na(opens_at)||opens_at>Sys.time())stop('Current clause eligibility changed')
    amount<-args$price<-p$price;args$player_slug<-p$slug
   }
   minimum<-if(mode%in%c('bid','modify'))market_bid_minimum(player,facts$rules$minimum_bid_at_value)else NULL

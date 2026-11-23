@@ -1686,10 +1686,7 @@ No schema, dependency, automation or login inventory expansion is required.
 
 Owner-authorized addition: an individually confirmed purchase at a rival's published clause opening, independent of factual-sync consent. Implemented locally: server-only durable schedules/attempts/evidence, separate encrypted purchase authorization, shared offer reservations, supervised Python execution, cancellation, price caps, lock updates from existing observations and source checks, five-minute expiry, response reconciliation and acknowledged next-login outcomes. See `docs/scheduled_clauses.md`.
 
-Exit criteria still open: capture the actual closed-clause rejection with the temporary account-scoped diagnostic and install its regression mapping; remove the bypass; apply the additive migration and deploy; verify a controlled hosted execution, restart behavior and Contabo capacity/timing. Synthetic tests do not certify a real purchase or production deployment. Other trading/lineup/coach automation remains outside this exception.
-
-The temporary diagnostic now keeps the local preflight reason visible when verification stops the purchase. The reported attempt stopped before dispatch, so the Futmondo rejection code remains uncaptured.
-
+The database migration is applied and live queue claims confirm production scheduling is enabled. The temporary diagnostic captured `api.error.not_found` on a reported-locked clause. That native rejection ends the attempt, and the diagnostic and its opening-date bypass were removed. Enable timing retries only if Futmondo provides evidence that distinguishes a temporary lock from other causes. Controlled hosted purchase, restart, capacity and opening-lag acceptance remain open. See `docs/scheduled_clauses.md`.
 
 ### Today heading information icon — implemented locally (2026-11-15)
 

@@ -94,6 +94,18 @@ class PurchaseTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.store.current['state'],'uncertain')
         self.assertEqual(self.store.current['result_code'],'api.fixture.clause_time')
         self.assertFalse(any(x['p_state']=='scheduled' for x in self.settlements()))
+    async def test_locked_diagnostic_not_found_is_terminal(self):
+        # Minimal response reconstructed from the owner-reported native code.
+        def not_found(request):
+            self.requests.append(request)
+            return httpx.Response(200, json={'answer': {'code': 'api.error.not_found'}})
+        self.client._transport = httpx.MockTransport(not_found)
+        await self.scheduler.execute(job(), 'leader:clause')
+        self.assertEqual(len(self.requests), 1)
+        self.assertEqual(self.store.current['state'], 'failed')
+        self.assertEqual(self.store.current['result_code'], 'api.error.not_found')
+        self.assertFalse(any(result['p_state'] == 'scheduled' for result in self.settlements()))
+
     async def test_verified_rejection_retry_and_expiry(self):
         self.client._transport=httpx.MockTransport(lambda r:httpx.Response(200,json={'answer':{'code':'api.fixture.closed'}}))
         with patch('worker.clauses.CLOSED_CLAUSE_CODES',frozenset({'api.fixture.closed'})):

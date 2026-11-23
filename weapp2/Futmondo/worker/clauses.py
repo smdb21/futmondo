@@ -14,8 +14,8 @@ from urllib.parse import urlparse
 
 import httpx
 
-# Empty until the temporary user-triggered diagnostic establishes a native code.
-# Unknown errors MUST NOT be guessed to mean that no purchase occurred.
+# The locked-clause diagnostic returned api.error.not_found, which does not
+# identify a timing rejection. Keep it terminal alongside other explicit errors.
 CLOSED_CLAUSE_CODES = frozenset()
 ACTIVE = {'scheduled', 'preparing', 'dispatched', 'uncertain', 'accepted'}
 
