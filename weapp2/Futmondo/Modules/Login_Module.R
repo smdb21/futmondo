@@ -22,7 +22,7 @@ login_feature_tiers <- function() {
         list(id = "lineup_optimizer", title = "Best XI + bench optimization",
           description = "Build a lineup from your chosen 1–20 completed rounds, comparing allowed formations, with injury and next-round departure checks. Optionally require bench cover for every outfield position. Review and save it yourself."),
         list(id = "scheduled_lineups", title = "Lineups for incoming signings",
-          description = "When scheduling is enabled, preview and approve an immediate lineup and one automatic update per confirmed clause signing due before kickoff. Incoming players appear in grayscale until they join your squad."),
+          description = "Preview lineups with confirmed clause signings due before kickoff. Incoming players appear in grayscale until they join your squad. Approve each lineup for automatic saving where scheduling is enabled."),
         list(id = "recent_average", title = "Player rankings by last-N average",
           description = "Sort players by their average over your chosen 1–20 recent rounds across market, squad and player tables."),
         list(id = "price_efficiency", title = "Points per million",

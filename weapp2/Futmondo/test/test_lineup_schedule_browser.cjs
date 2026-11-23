@@ -15,13 +15,16 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
       await page.locator('.fm-lineup-pitch .fm-lineup-player').nth(10).waitFor();
       const readCounts = async () => (await page.locator('#fixture_counts').innerText()).trim().split('/').map(Number);
       const counts = await readCounts();
-      await page.getByLabel('Include incoming players').check();
+      assert.ok(await page.getByLabel('Include incoming players').isChecked());
+      await page.getByText('Eligible before kickoff', {exact: false}).waitFor();
+      await page.getByText('Due at or after kickoff', {exact: false}).waitFor();
       const start = performance.now();
       await page.getByRole('button', {name: 'Optimize'}).click();
       const signing = page.locator('.fm-lineup-pitch .fm-lineup-incoming[data-player-id="p25"]');
       await signing.waitFor();
       const rendered = Math.round(performance.now() - start);
       assert.match(await signing.innerText(), /Incoming ·/);
+      await page.getByText(/Incoming Keeper.*Starting XI/).waitFor();
       await page.waitForFunction(() => {
         const incoming = document.querySelector('.fm-lineup-pitch .fm-lineup-incoming img');
         const owned = document.querySelector('.fm-lineup-pitch .fm-lineup-player:not(.fm-lineup-incoming) img');
@@ -33,6 +36,14 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
       const review = page.locator('#lineup-schedule_preview details');
       assert.equal(await review.count(), 2);
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      if (process.env.FUTMONDO_EDITOR_DISABLE_SCHEDULE === 'true') {
+        await page.getByText('Automatic saves are unavailable on this deployment.').waitFor();
+        assert.equal(await page.getByRole('button', {name: 'Save and schedule approved lineups'}).count(), 0);
+        assert.deepEqual(await readCounts(), counts);
+        console.log(`PASS ${width}px: default preview with scheduling disabled (${rendered} ms)`);
+        await page.close();
+        continue;
+      }
       await page.getByRole('button', {name: 'Save and schedule approved lineups'}).click();
       await page.getByText('Approve each lineup before scheduling.').waitFor();
       assert.deepEqual(await readCounts(), counts);

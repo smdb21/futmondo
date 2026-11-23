@@ -85,8 +85,9 @@ if (scheduled_fixture) {
   fixture_arrivals <- data.frame(player_id='p25', player_name=signing$name, role=signing$role,
     role2='', status='ok', photo=signing$photo, available=TRUE, team=signing$club, logo=signing$logo,
     joins_at=as.POSIXct(Sys.time()+120), timing_error='')
+  fixture_arrivals <- rbind(fixture_arrivals,transform(fixture_arrivals,player_id='p26',player_name='After Kickoff',joins_at=Sys.time()+7200))
   fixture_job <- NULL
-  lineup_schedule_enabled <- function() TRUE
+  lineup_schedule_enabled <- function() !identical(Sys.getenv('FUTMONDO_EDITOR_DISABLE_SCHEDULE'), 'true')
   fm_clause_encrypt <- function(auth) structure('encrypted-fixture',credential_id='fixture')
   lineup_schedule_rpc <- function(name,payload,owner='') {
     value <- switch(name, read=fixture_job,

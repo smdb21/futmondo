@@ -56,14 +56,14 @@ lineup_UI <- function(id) {
           shiny::checkboxInput(ns('require_bench_coverage'),shiny::span(
             title='When enabled, Optimize requires separate substitutes covering defender, midfielder and forward. Goalkeeper cover is not required. The starting XI or formation may change to leave this cover on the bench. If no eligible lineup can provide it, your draft is kept.',
             'Require full outfield bench coverage'),FALSE,width='100%'),
-          if(lineup_schedule_enabled())shiny::checkboxInput(ns('include_incoming'),'Include incoming players',FALSE,width='100%'))),
+          shiny::checkboxInput(ns('include_incoming'),'Include incoming players',TRUE,width='100%'))),
       shiny::div(class='fm-lineup-actions',
         shiny::actionButton(ns('clear'),'Clear lineup',icon=shiny::icon('eraser')),
         shiny::actionButton(ns('reset'),'Undo changes',icon=shiny::icon('rotate-left'),
           title='Restore the latest lineup loaded from or successfully saved to LigaRadar'),
         shiny::actionButton(ns('reload'),label=NULL,icon=shiny::icon('rotate'),`aria-label`='Refresh lineup',
           title='Reload the official lineup, squad and rules from LigaRadar; keep your unsaved changes')),
-      shiny::uiOutput(ns('status')),shiny::uiOutput(ns('schedule_status')),shiny::uiOutput(ns('schedule_preview')),
+      shiny::uiOutput(ns('status')),shiny::uiOutput(ns('arrival_status')),shiny::uiOutput(ns('schedule_status')),shiny::uiOutput(ns('schedule_preview')),
       shiny::div(class='fm-lineup-actions',shiny::uiOutput(ns('save_control'))),
       shiny::div(class='fm-lineup-formation',shiny::uiOutput(ns('formation_control'))),
       shiny::uiOutput(ns('pitch')),shiny::uiOutput(ns('captain_control')),
@@ -195,7 +195,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       reload(shiny::isolate(reload())+1L)
     })
     roster<-shiny::reactive(lineup_roster_frame(source()))
-    with_arrivals<-shiny::reactive(lineup_schedule_enabled()&&isTRUE(input$include_incoming))
+    with_arrivals<-shiny::reactive(isTRUE(input$include_incoming))
     arrivals<-shiny::reactive(lineup_arrival_candidates(transfers(),roster(),target()))
     optimization_roster<-shiny::reactive({
       rows<-roster()
@@ -548,6 +548,32 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       ids<-draft()$starters[nzchar(draft()$starters)];rows<-roster()
       shiny::selectInput(session$ns('captain'),'Captain',choices=c('Select captain'='',setNames(ids,rows$name[match(ids,rows$id)])),selected=draft()$captain)
     })
+    output$arrival_status<-shiny::renderUI({
+      shiny::req(is_module_active(),source())
+      transfers_state<-transfers();rows<-transfers_state$records
+      if(!is.data.frame(rows)||!nrow(rows))return(NULL)
+      rows<-rows[!rows$player_id%in%roster()$id,,drop=FALSE]
+      if(!nrow(rows))return(NULL)
+      candidate_ids<-arrivals()$rows$player_id
+      plan<-preview();final<-if(!is.null(plan))tail(plan$stages,1)[[1]]$lineup else NULL
+      pending_round<-target()
+      shiny::div(class='fm-lineup-note',
+        shiny::strong(paste('Incoming players ·',nrow(rows))),
+        shiny::tags$ul(lapply(seq_len(nrow(rows)),function(i){
+          row<-rows[i,,drop=FALSE];id<-row$player_id
+          due<-fm_time(row$joins_at);known_due<-length(due)==1L&&!is.na(due)
+          label<-if(!known_due||nzchar(fm_scalar(row$timing_error,'')))'Arrival unverified'else
+            if(is.null(pending_round))'Kickoff unverified'else
+            if(due>=pending_round$starts_at)'Due at or after kickoff'else
+            if(!with_arrivals())'Excluded by optimizer setting'else
+            if(!is.null(final)&&id%in%plan$arrivals$player_id){
+              selected_row<-plan$rows[plan$rows$id%in%id,,drop=FALSE]
+              if(id%in%final$starters)'Starting XI'else if(id%in%final$bench)'Bench'else
+                if(!isTRUE(lineup_status_eligible(selected_row,plan$request$include)))'Unavailable for optimization'else 'Outside the optimized lineup'
+            }else if(id%in%candidate_ids)'Eligible before kickoff'else 'Waiting for verified transfer details'
+          shiny::tags$li(paste(row$player_name,'·',if(known_due)paste(incoming_clause_time(due),'·'),label))
+        })))
+    })
     schedule_active<-function(job) isTRUE(job$state%in%c('queued','preparing','dispatched','uncertain'))
     schedule_status_code<-function(code){
       labels<-c(kickoff='Round started before the remaining stages could be saved.',
@@ -637,8 +663,10 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
             plan$arrivals$joins_at[match(id,plan$arrivals$player_id)]))))
       }
       show_players<-function(ids)lapply(ids[nzchar(ids)],show_player)
+      choices<-labels;choices[length(choices)]<-paste('Round-start lineup ·',tail(labels,1))
+      scheduling<-lineup_schedule_enabled()
       shiny::tagList(
-        shiny::selectInput(session$ns('preview_stage'),'Preview lineup',choices=setNames(seq_along(labels),labels),
+        shiny::selectInput(session$ns('preview_stage'),'Preview lineup',choices=setNames(seq_along(choices),choices),
           selected=length(labels),selectize=FALSE),
         shiny::div(class='fm-lineup-stage-list',lapply(seq_along(labels),function(i){
           value<-plan$stages[[i]]$lineup
@@ -646,10 +674,11 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
             shiny::div(shiny::strong('Starting XI '),show_players(value$starters)),
             if(any(nzchar(value$bench)))shiny::div(shiny::strong('Bench '),show_players(value$bench)),
             if(nzchar(value$captain))shiny::div(shiny::strong('Captain '),show_player(value$captain)),
-            shiny::checkboxInput(session$ns(approval_id(plan,i)),'Approve this lineup',FALSE,width='100%'))
+            if(scheduling)shiny::checkboxInput(session$ns(approval_id(plan,i)),'Approve this lineup',FALSE,width='100%'))
         })),
+        if(!scheduling)shiny::div(class='fm-lineup-note','Automatic saves are unavailable on this deployment.'),
         shiny::div(class='fm-lineup-actions',
-          shiny::actionButton(session$ns('schedule_confirm'),'Save and schedule approved lineups',disabled=schedule_busy()),
+          if(scheduling)shiny::actionButton(session$ns('schedule_confirm'),'Save and schedule approved lineups',disabled=schedule_busy()),
           shiny::actionButton(session$ns('preview_close'),'Close preview',disabled=schedule_busy())))
     })
     shiny::observeEvent(input$preview_close,{if(!schedule_busy())preview(NULL)})
