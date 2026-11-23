@@ -331,3 +331,19 @@ LigaRadar's Essentials inventory includes **League refresh**. The floating butto
 ## Lineups for incoming signings — reviewed 2026-11-23
 
 Futmondo documents manual pre-kickoff saves, suggested lineups and league-configured clause delivery. LigaRadar adds a preview for confirmed pre-kickoff arrivals, marks incoming players in grayscale, and queues one approved lineup per arrival plus an approved immediate lineup. Its worker uses official squad ownership and the existing lineup save contract. The welcome page lists this workflow under Advanced. Preview is available by default and automatic saves require scheduling to be enabled. The comparison used public guides and the public client bundle, with execution tested through offline fixtures. A signed-in comparison of scheduling controls remains unverified. [Official lineup guide](https://help.futmondo.com/article/92-como-hago-mi-equipo-en-alineacion), [official app feature guide](https://magazine.futmondo.com/novedades-en-la-nueva-app-de-futmondo/), [clause arrival guide](https://help.futmondo.com/article/157-he-fichado-un-jugador-por-clausula-y-no-ha-pasado-a-mi-equipo), [implementation](lineup_module.md#staged-lineups-for-incoming-signings--2026-11-23).
+
+
+## Plot presentation and round history — reviewed 2026-11-23
+
+The current [official app](https://app.futmondo.com/) exposes a public application
+shell. The [official getting-started guide](https://help.futmondo.com/article/90-empieza-a-jugar-a-futmondo)
+(last updated 2021-12-17) documents current/past round classifications, overall
+standings, squad inspection and money movements. These are shared underlying
+capabilities. LigaRadar's existing league plots now show cumulative points once
+per observed round/subround, shorter valuation dates, clearer financial controls,
+and club crests/counts in ownership bars, with explanations on all five charts.
+This refines the existing plot capability and does not add a separate login-tier
+entry. The public guide and shell do not establish today's authenticated official
+chart layout, subround axis formatting or equivalent ownership chart. No absence
+or exclusivity claim is made. Local synthetic browser checks cover LigaRadar;
+signed-in official comparison remains unverified. See [plot contracts](plots_module.md).

@@ -2385,3 +2385,18 @@ The requested scope authorizes one user-approved immediate lineup and one approv
 See [branding contract](progressive_loading.md#browser-favicon--2026-11-23) and
 [data review](data_review_results.md#browser-favicon--2026-11-23). Production
 deployment and hosted browser-tab appearance remain unverified.
+
+
+### Round-based league plots — implemented locally 2026-11-23
+
+- [x] Replace timestamp-based standings snapshots with one cumulative result per
+  published round/subround from existing saved team histories and catalog IDs.
+- [x] Keep missing scores unknown, preserve negative values, and share cumulative
+  projections with rank progression; remove the single-round inspector.
+- [x] Refine valuation dates, financial controls, blue bars, ownership crests and
+  counts, toolbar spacing, and explanations for all five plots.
+
+Local regression, responsive browser and performance results are recorded in
+[data review](data_review_results.md#round-based-league-plots--2026-11-23).
+Hosted rollout and identification of the screenshot's specific native score
+revision remain unverified. No historical source data was changed.

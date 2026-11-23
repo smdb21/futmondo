@@ -5543,3 +5543,58 @@ The known-answer fixture passed for coverage becoming feasible only after the se
 No extra source acquisition or polling was added. Preview work remains one local probe per stage and the three-stage fixture measured 22 ms median. The replacement costs one indexed team admission per click or confirmed retry. The manual save guard also checks for persisted schedules when scheduling is paused and the worker is configured. Local browser counters showed no new source reads or saves during preview and replacement. Production worker latency under load and native submission remain unverified.
 
 Applied `20261123170000_replace_lineup_schedules.sql` as `20261123164123` in production, SHA-256 `f55984d1e6a995c08a60fb65ac7fb969df4bc5196c431d21703d887ccfdbc885`. The security-invoker RPC is executable by the service role and denied to both browser roles. A synthetic invalid admission was rejected without inserting a plan. Before the rollout, production statistics showed worker claims and status reads, with zero recorded admissions and no durable plans.
+
+
+## Round-based league plots — 2026-11-23
+
+Root-cause trace: Standings used `get_league_standings_history()` → persisted
+`user_team_history`/daily rollup → `plots_history(points)` → `recorded_at` x axis.
+It plotted every saved cumulative snapshot, including repeated totals and later
+revisions. The old plot therefore represented changes between observations,
+not per-round history. The screenshot does not prove why a particular native
+score was revised. No source-account data was queried or rewritten for this task.
+
+Standings and rank now use the existing worker-backed, database-persisted team
+round histories and catalog identities, with a shared cumulative projection.
+Numeric subrounds remain distinct; opaque IDs map through the saved catalog.
+Duplicate team/round observations resolve once, negative/zero scores survive,
+and catalog gaps or absent teams never become false zero totals. Missing
+coverage leaves an explicit gap/status. The rank range filters after accumulation.
+Other changes cover date-only valuation ticks/hover, a wider financial-metric
+column, removal of the single-round inspector, muted blue bars, ownership crests
+and counts, toolbar headroom, and descriptions for all five plots.
+
+Executed validation:
+
+- `Rscript test/test_plots_module.R`: eight regression groups, including
+  independently specified known answers for totals, ranks, subround ordering,
+  duplicate revision, negative/zero points, missing-round coverage and absent
+  teams; plus date axes, hover, ownership crests/counts/colors and UI controls.
+- `test/test_plots_browser_app.R` + `test/test_plots_browser.cjs`: passed all five
+  chart tabs at 320, 390 and 1440 px in light and dark themes. Verified round
+  labels and numeric values, hidden inspector, valuation formatting, desktop
+  metric width, no horizontal page overflow, count labels, blue bars, three
+  fixture crest images at readable width and toolbar below the tab bar.
+  Changing the rank range caused no additional saved-data read calls. Inspected
+  the final phone/light and desktop/dark ownership screenshots. Crest fixtures
+  deliberately use synthetic images, not real account content.
+- `Rscript test/test_shiny_simulation.R`: 14 checks and eight tabs passed on the
+  initial and final runs. No real HTTP or live database
+  mutations were attempted.
+
+Performance review: 100 cumulative projections of 20 teams × 38 rounds averaged
+7.35 ms locally; input 30,056 bytes, output 30,832 bytes. One cumulative sum per
+team replaces repeated prefix grouping in rank progression. Both charts reuse
+one reactive result; range changes only filter already computed rows. Standings
+now renders one marker per round/subround rather than every timestamped
+observation. The saved catalog adds one shared context-scoped snapshot read on
+round-data invalidation, not an HTTP request; team-round reads were already
+required by rank progression. No new DB writes, schema, acquisition routes,
+background jobs, dependencies or timers were added. Existing durable snapshots,
+context isolation, completeness/freshness state and worker cadence remain in use.
+Crests reuse exact-ID source logos already present in the saved player snapshot;
+at most one existing static image per club is requested by the browser. The
+resize listener is replaced on rerender and relayouts only when dimensions differ.
+Its initial readable-size correction and no-overflow behavior passed mobile
+checks. Hosted throughput, real-account historical score revisions and deployed
+appearance remain unverified; this is a local implementation and push.
