@@ -2304,6 +2304,7 @@ has no runtime/performance effect.
 
 - [x] Queue scoped factual acquisition from floating Refresh and successful manual buys/sales.
 - [x] Preserve worker checkpoint and lease rules, publish observed results, and update the balance and player list from stored versions.
-- [ ] Apply the migration in production and verify hosted refresh timing and source publication.
+- [x] Apply the production migration, recorded as `20261123045201_worker_league_refresh`, and verify the service-only REST RPC.
+- [ ] Verify authenticated hosted refresh timing and source publication.
 
 Contract and rollout are in [database-first sync](database_first_sync.md#explicit-league-refresh). Tests and performance limits are in [data review results](data_review_results.md).
