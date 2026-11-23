@@ -1371,10 +1371,25 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
       is_success <- if (is.list(res)) isTRUE(res$success) else isTRUE(res)
 
-      if(diagnostic)showNotification(paste0('Locked-clause diagnostic response: ',fm_clause_safe_code(res$code),
-        '. No retry was sent. Share this code; never share credentials or a raw response.'),type=if(isTRUE(res$success))'warning'else'message',duration=NULL)
-
       removeModal()
+
+      if (diagnostic) {
+        code <- fm_clause_safe_code(if (is.list(res)) res$code else attr(res, 'api_code'))
+        if (code %in% c('acquisition_preflight_blocked', 'acquisition_verification_unavailable')) {
+          shiny::showNotification(
+            paste("Locked-clause test stopped before sending a request to Futmondo.", res$message),
+            type = "error",
+            duration = NULL
+          )
+          return()
+        }
+        shiny::showNotification(
+          paste0("Locked-clause diagnostic response: ", code,
+            ". No retry was sent. Share this code; never share credentials or a raw response."),
+          type = if (is_success) "warning" else "message",
+          duration = NULL
+        )
+      }
 
       if (is_success) {
         tryCatch({

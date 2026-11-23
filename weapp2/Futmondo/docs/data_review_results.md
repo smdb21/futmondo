@@ -5446,3 +5446,11 @@ same RPC and released one duplicate cash hold and slot. A separate read
 confirmed both reservation values were zero. The existing Futmondo bid was
 still active in the evidence used for repair. No transaction was submitted.
 Hosted authenticated rendering remains outside the verification.
+
+## Locked-clause diagnostic preflight message — 2026-11-22 Pacific
+
+The owner’s screenshot shows a local acquisition preflight stop. The decision precedes reservation admission and the Futmondo purchase request. The screenshot cannot establish which preflight condition failed. The temporary test now shows the available local reason in a persistent notification when preflight or verification stops a request.
+
+The synthetic 360 px Chromium check confirmed the actual test button and confirmation show a spendable-funds block before dispatch. The existing scheduling flows passed at 360, 390 and 1440 px. The asynchronous purchase checks and the offline Shiny lifecycle (14 checks and eight tabs) passed. No real account or transaction was used. The hosted preflight cause and the native closed-clause response remain unverified.
+
+The local block uses one notification in place of two and reuses the existing preflight result. It adds no acquisition, database operations, cache invalidation, polling, timers or reactive reads.
