@@ -21,6 +21,64 @@ players_table_position_filter_UI <- function(input_id) {
     }")))
 }
 
+players_table_club_filter_UI <- function(input_id, choices, selected) {
+  render_club <- I("(function() {
+    function club(data, escape) {
+      var crest = data.crest ? '<img class=\"fm-team-crest\" src=\"' + escape(data.crest) +
+        '\" alt=\"\" width=\"22\" height=\"22\" loading=\"lazy\" decoding=\"async\">' : '';
+      return '<div class=\"fm-club-filter-option\">' + crest + '<span>' + escape(data.label) + '</span></div>';
+    }
+    return {option: club, item: club};
+  })()")
+  input <- selectizeInput(input_id, players_table_filter_label("Real Club", "shield-halved"),
+    choices = NULL, width = "100%", options = list(sortField = "$order", render = render_club))
+  options <- lapply(seq_len(nrow(choices)), function(i) {
+    tags$option(value = choices$value[i], selected = if (choices$value[i] == selected) NA,
+      `data-crest` = if (nzchar(choices$crest[i])) choices$crest[i], choices$label[i])
+  })
+  htmltools::tagQuery(input)$find("select")$append(tagList(options))$allTags()
+}
+
+# Keys and options come from the same unfiltered player snapshot.
+players_table_clubs <- function(rows) {
+  empty <- data.frame(value = character(), label = character(), crest = character())
+  if (!is.data.frame(rows) || !nrow(rows)) {
+    return(list(keys = character(), choices = empty))
+  }
+  field <- function(name) {
+    value <- rows[[name]]
+    if (is.null(value)) return(rep("", nrow(rows)))
+    value <- trimws(as.character(value))
+    replace(value, is.na(value), "")
+  }
+  ids <- field("teamId")
+  labels <- field("team")
+  name_keys <- tolower(labels)
+  logos <- field("logo")
+  # Market and legacy rows can carry a club name without an ID. Associate it
+  # with an ID only when the same snapshot supplies an unambiguous match.
+  known <- nzchar(ids) & nzchar(name_keys)
+  aliases <- unique(data.frame(name = name_keys[known], id = ids[known]))
+  aliases <- aliases[!duplicated(aliases$name) & !duplicated(aliases$name, fromLast = TRUE), , drop = FALSE]
+  matches <- match(name_keys, aliases$name)
+  inferred <- !nzchar(ids) & !is.na(matches)
+  ids[inferred] <- aliases$id[matches[inferred]]
+
+  keys <- ifelse(nzchar(ids), paste0("club:", ids), ifelse(nzchar(name_keys), paste0("name:", name_keys), ""))
+  named <- which(nzchar(labels))
+  named <- named[!duplicated(keys[named])]
+  logo_values <- unique(logos)
+  crest_urls <- vapply(logo_values, lineup_fixture_crest_url, character(1), USE.NAMES = FALSE)
+  crests <- crest_urls[match(logos, logo_values)]
+  with_crest <- which(nzchar(keys) & nzchar(crests))
+  matched_crest <- crests[with_crest[match(keys[named], keys[with_crest])]]
+  choices <- data.frame(value = keys[named], label = labels[named],
+    crest = replace(matched_crest, is.na(matched_crest), ""))
+  choices <- choices[order(tolower(choices$label), choices$label, choices$value), , drop = FALSE]
+  rownames(choices) <- NULL
+  list(keys = keys, choices = choices)
+}
+
 players_table_UI <- function(id, box_title = NULL,
                              solidHeader = TRUE,
                              status = "primary",
@@ -54,9 +112,10 @@ players_table_UI <- function(id, box_title = NULL,
       fluidRow(class = "player-filter-panel", ...)
     )
   }
-  checkbox_filters <-
-      if (filter_by_own_team || filter_by_active_clause || filter_by_max_clause_value || filter_by_clause_under_available_funds || filter_by_value_under_available_funds || filter_by_is_favorite || filter_by_is_from_futmondo || filter_by_players_with_bid) {
-        fluidRow(
+  club_filter_column <- function(width) {
+    column(width = width, uiOutput(ns("club_filter_ui")))
+  }
+  checkbox_filters <- fluidRow(
           class = "player-checkbox-filters",
           if (filter_by_own_team) {
             div(checkboxInput(ns("show_my_team_filter"),players_table_filter_label("Show players in my team", "house-user"),value=FALSE),
@@ -98,7 +157,6 @@ players_table_UI <- function(id, box_title = NULL,
           },
           div(actionButton(ns("btn_clear_filters"), label = players_table_filter_label("Clear Filters", "eraser"), class = "btn btn-sm btn-outline-secondary"), class = "player-clear-filters", title = "Reset all table filters to default values")
         )
-      }
   tagList(
     shinydashboardPlus::box(
       width = 12,
@@ -112,8 +170,9 @@ players_table_UI <- function(id, box_title = NULL,
           column(width = 7,
                  filter_panel(
                     if (filter_by_position) {
-                      column(width = if(!filter_by_team&&!filter_by_value&&!filter_by_change_value)12 else 4, div(title = "Choose one or more primary or secondary positions. All includes every position.", players_table_position_filter_UI(ns("position_filter"))))
+                      column(width = if(!filter_by_team&&!filter_by_value&&!filter_by_change_value)6 else 4, div(title = "Choose one or more primary or secondary positions. All includes every position.", players_table_position_filter_UI(ns("position_filter"))))
                     },
+                    club_filter_column(if (!filter_by_team && !filter_by_value && !filter_by_change_value) 6 else 4),
                     if (filter_by_team) {
                       column(width = 4, div(title = "Filter players by current user team owner or free agents", selectInput(inputId = ns("team_filter"), label = players_table_filter_label("User Team Owner", "users"), choices = c("All"), width = "100%")))
                     },
@@ -137,8 +196,9 @@ players_table_UI <- function(id, box_title = NULL,
           if (filter_by_position) {
             column(width = 3, div(title = "Choose one or more primary or secondary positions. All includes every position.", players_table_position_filter_UI(ns("position_filter"))))
           },
+          club_filter_column(3),
           if (filter_by_team) {
-            column(width = 3, div(title = "Filter players by current user team owner or free agents", selectInput(inputId = ns("team_filter"), label = players_table_filter_label("User Team Owner", "users"), choices = c("All"), width = "100%")))
+            column(width = 2, div(title = "Filter players by current user team owner or free agents", selectInput(inputId = ns("team_filter"), label = players_table_filter_label("User Team Owner", "users"), choices = c("All"), width = "100%")))
           },
           if (filter_by_value) {
             tagList(
@@ -430,6 +490,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       tryCatch({
         updateSelectInput(session, inputId = "position_filter", selected = "All")
         updateSelectInput(session, inputId = "team_filter", selected = "All")
+        updateSelectizeInput(session, inputId = "club_filter", selected = "All")
         updateNumericInput(session, inputId = "max_value_filter", value = NA_real_)
         updateNumericInput(session, inputId = "change_value_filter", value = NA)
         updateCheckboxInput(session, inputId = "active_clause_filter", value = FALSE)
@@ -512,6 +573,33 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       players_table_RV,is_active=function()isTRUE(is_module_active())&&isTRUE(optional_ready()),
       refresh_trigger=round_history_refresh_trigger(session),required_rounds=function()input$recent_games_n %||% 5L)
 
+    club_projection <- reactive({
+      req(is_module_active())
+      players_table_clubs(players_table_RV())
+    })
+    club_choices <- reactiveVal(NULL)
+    observe({
+      choices <- club_projection()$choices
+      context <- table_context_RV()
+      previous <- isolate(club_choices())
+      same_context <- identical(context, previous$context)
+      if (!same_context || !identical(choices, previous$choices)) {
+        # Version the values so input from the previous league cannot filter
+        # the new table before the browser receives the new options.
+        generation <- (previous$generation %||% 0L) + as.integer(!same_context)
+        club_choices(list(context = context, choices = choices, generation = generation))
+      }
+    })
+    output$club_filter_ui <- renderUI({
+      state <- req(club_choices())
+      choices <- state$choices
+      if (nrow(choices)) choices$value <- paste0(state$generation, "/", choices$value)
+      choices <- rbind(data.frame(value = "All", label = "All clubs", crest = ""), choices)
+      selected <- isolate(input$club_filter)
+      if (!isTRUE(selected %in% choices$value)) selected <- "All"
+      players_table_club_filter_UI(ns("club_filter"), choices, selected)
+    })
+
     # Enrich once per source/history/N change; filters reuse these numeric values.
     players_table_enriched_RV <- reactive({
       req(is_module_active())
@@ -559,6 +647,17 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       players_table <- players_table_enriched_RV()
       if(is.null(players_table))return(NULL)
       filter_added_fields<-attr(players_table,"filter_added_fields")
+      club <- input$club_filter
+      if (length(club) == 1L && !is.na(club) && club != "All") {
+        state <- club_choices()
+        prefix <- paste0(state$generation, "/")
+        key <- substring(club, nchar(prefix) + 1L)
+        if (!is.null(state) && identical(state$context, table_context_RV()) &&
+            startsWith(club, prefix) && key %in% state$choices$value) {
+          keys <- club_projection()$keys
+          players_table <- players_table[keys == key, , drop = FALSE]
+        }
+      }
       hide_own_team<-isTRUE(filter_by_own_team)&&!isTRUE(input$show_my_team_filter)
       active_clause_only<-isTRUE(input$active_clause_filter)
       if((hide_own_team||active_clause_only)&&is.function(incoming_player_ids))

@@ -5,7 +5,7 @@ login_feature_tiers <- function() {
     list(id = "essentials", title = "Essentials", summary = "Explore your league in more detail.",
       features = list(
         list(id = "scouting_filters", title = "Combined scouting filters",
-          description = "Narrow player tables by owner, multiple positions, value, daily price movement and active clauses. Choose whether to include your own team in All Players."),
+          description = "Narrow player tables by real club, fantasy owner, multiple positions, value, daily price movement and active clauses. Choose whether to include your own team in All Players."),
         list(id = "squad_status", title = "Squad status at a glance",
           description = "See your squad’s reported injuries, doubts, suspensions and unavailable players together in My Team. Open any player’s card from the list."),
         list(id = "round_range_standings", title = "Standings for any round range",

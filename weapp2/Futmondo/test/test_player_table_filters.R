@@ -101,6 +101,74 @@ check('filter labels and Clear Filters place decorative icons after their text i
    length(xml2::xml_find_all(icon,"following-sibling::text()[normalize-space()]"))==0L)
  }
 })
+club_rows <- data.frame(
+  id = c("z", "a", "legacy", "bn", "b", "missing"),
+  name = c("Zeta Player", "Alaves Player", "Legacy Player", "Name-Only Player", "Betis Player", "Unknown Player"),
+  teamId = c("z", "a", NA, NA, "b", NA),
+  team = c("Zeta FC", "Álaves", " Álaves ", "Celta & Vigo", "Betis", NA),
+  logo = c("zeta.png", NA, "alaves", "https://example.invalid/celta.webp", "../invalid.png", NA),
+  userteamId = c("rival", "rival", "mine", "", "mine", ""), value = 1e6
+)
+check("club options sort by name, merge proven legacy matches and preserve crest evidence", {
+  clubs <- players_table_clubs(club_rows)
+  stopifnot(identical(clubs$keys, c("club:z", "club:a", "club:a", "name:celta & vigo", "club:b", "")),
+    identical(clubs$choices$label, c("Álaves", "Betis", "Celta & Vigo", "Zeta FC")),
+    identical(clubs$choices$crest, c(paste0(TEAM_LOGO_URL, "alaves.png"), "",
+      "https://example.invalid/celta.webp", paste0(TEAM_LOGO_URL, "zeta.png"))))
+  ambiguous <- data.frame(teamId = c("first", "second", NA), team = "United", logo = "united")
+  stopifnot(identical(players_table_clubs(ambiguous)$keys, c("club:first", "club:second", "name:united")))
+  for (breakdown in c(FALSE, TRUE)) {
+    ui <- htmltools::renderTags(players_table_UI("club", show_position_breakdown = breakdown))$html
+    stopifnot(grepl('id="club-club_filter_ui"', ui, fixed = TRUE))
+  }
+})
+club_source <- reactiveVal(club_rows)
+club_league <- reactiveVal("first")
+shiny::testServer(players_table_Server, args = list(players_table_RV = club_source,
+  championship_id = club_league, user_teams_RV = reactive(NULL), optional_ready = function() FALSE), {
+  settle(session)
+  messages <- list()
+  root <- session$rootScope()
+  root$sendInputMessage <- function(inputId, message) messages[[sub("^.*-", "", inputId)]] <<- message
+  options <- function() xml2::xml_find_all(xml2::read_html(output$club_filter_ui$html), "//option")
+  stopifnot(identical(xml2::xml_text(options()), c("All clubs", "Álaves", "Betis", "Celta & Vigo", "Zeta FC")))
+  first_value <- xml2::xml_attr(options()[2], "value")
+  session$setInputs(club_filter = first_value)
+  settle(session)
+  check("club and fantasy owner filters intersect while the clubs stay available", {
+    stopifnot(identical(players_table_filtered_RV()$id, c("a", "legacy")), length(options()) == 5L)
+    session$setInputs(team_filter = "team:rival")
+    settle(session)
+    stopifnot(identical(players_table_filtered_RV()$id, "a"))
+    before <- output$club_filter_ui$html
+    revised <- club_source()
+    revised$value <- revised$value + 1e6
+    club_source(revised)
+    settle(session)
+    stopifnot(identical(output$club_filter_ui$html, before), identical(players_table_filtered_RV()$id, "a"))
+  })
+  check("clear resets club and stale context inputs cannot filter another league", {
+    session$setInputs(btn_clear_filters = 1L)
+    settle(session)
+    stopifnot(any(vapply(messages, function(m) identical(m$value, "All"), logical(1))),
+      identical(messages[["club_filter"]]$value, "All"))
+    session$setInputs(team_filter = "All")
+    club_league("other")
+    settle(session)
+    stopifnot(identical(players_table_filtered_RV()$id, club_rows$id),
+      identical(xml2::xml_attr(options()[1], "selected"), "selected"),
+      !identical(xml2::xml_attr(options()[2], "value"), first_value))
+    session$setInputs(club_filter = xml2::xml_attr(options()[2], "value"))
+    settle(session)
+    revised <- club_source()
+    revised$team[1] <- "Zeta Athletic"
+    club_source(revised)
+    settle(session)
+    stopifnot(identical(xml2::xml_attr(options()[2], "selected"), "selected"),
+      identical(players_table_filtered_RV()$id, c("a", "legacy")))
+  })
+})
+
 position_rows<-data.frame(id=c('gk','def','mid','fwd','dual','unknown'),name=c('Keeper','Defender','Midfielder','Forward','Dual','Unknown'),
  role=c('Goalkeeper','Defender','Midfielder','Forward','Midfielder',NA),role2=c('',NA,'Defender','','Forward',NA),value=1e6)
 enrichments<-0L;original_average<-add_recent_points_average

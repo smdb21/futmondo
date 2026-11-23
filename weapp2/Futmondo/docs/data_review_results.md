@@ -1,5 +1,11 @@
 # Futmondo data review and implementation results
 
+## Real Club filter (2026-11-23)
+
+- The player-table suite passed 19 checks. The new fixtures cover accented names, crest URLs, duplicate and name-only club rows, unknown clubs, combined club/owner filtering, retained choices after snapshot updates and reset on league changes. The offline lifecycle passed 14 checks and rendered all eight tabs.
+- Chromium exercised both Shiny table layouts at 320, 390 and 1440 px in both themes. It verified alphabetical order, crest rendering in options and the selected item, escaped labels, search, selection, clearing, no dropdown overflow and no control replacement on a price-only update. Fixtures used synthetic data and crest responses. Authenticated hosted behavior remains unverified.
+- For 524 synthetic players across 20 clubs, median local projection time was approximately 2.5 ms. Building and serializing the 20-club control took approximately 7.9 ms and produced 3.7 KB of HTML. Club projection runs once per loaded snapshot change and control markup publishes only when choices or context change. Club selection uses one row mask and search is local to the browser. The control can request one lazy image per distinct crest URL when shown. No additional API/database reads, writes, timers or durable cache entries were introduced.
+
 ## Player injury and card icons (2026-11-23)
 
 - The player-name regression checked the rendered cross and separate red-card, double-yellow and generic-suspension labels. Lineup and My Team regressions checked the shared display and existing roster reads. The yellow-card code enables the icon but carries no additional eligibility or absence inference. The offline lifecycle passed 14 checks and all eight tabs.

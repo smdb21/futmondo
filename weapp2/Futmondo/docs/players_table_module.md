@@ -1,5 +1,13 @@
 # Players Table Module Documentation
 
+## Real Club filter (2026-11-23)
+
+The shared player table’s **Real Club** dropdown lists the clubs represented in the loaded market, catalog or roster, ordered by club name. Each available crest appears in the option and beside the selected club. **All clubs** is the default and includes players whose club is unknown. The selected club combines with the fantasy **User Team Owner** and other filters. **Clear Filters** resets the club. A changed league or team context clears the selection. Ordinary snapshot updates preserve a club that remains available.
+
+`players_table_clubs()` projects club keys and choices from the existing unfiltered player snapshot. It uses the real `teamId` when present, accepts the observed `team` name when there is no ID, and joins those forms only when the snapshot establishes an unambiguous name-to-ID mapping. It takes a usable `logo` from the matched club rows and leaves an option text-only if no observed crest is usable. The roster capture contains `teamId`, `team` and `logo`; market captures contain `team` and `logo`; catalog enrichment already joins the player’s `teamId` to `id`, `name` and `logo` from the real-club catalog. The filter uses these existing saved snapshots. It adds no acquisition, persistence or cache layer.
+
+`players_table_club_filter_UI()` renders escaped names and lazy decorative crests in the single-selection control. Selecting or searching options does not rebuild the dropdown. The table applies a row mask to the loaded rows, and snapshot changes that leave club choices equal do not replace the control.
+
 ## Status beside player names (2026-11-22)
 
 The Name cell shows Futmondo's reported injury, doubt, suspension or unavailability

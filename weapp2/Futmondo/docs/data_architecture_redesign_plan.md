@@ -1,5 +1,11 @@
 # Futmondo data architecture redesign plan
 
+## Real Club filter (2026-11-23)
+
+- [x] Add a searchable club filter with alphabetized names, crests and an All clubs default in the shared player tables.
+- [x] Verify context isolation, interaction with fantasy owner filtering, reset, responsive rendering and snapshot reuse. See [player tables](players_table_module.md#real-club-filter-2026-11-23) and [data review](data_review_results.md#real-club-filter-2026-11-23).
+- [ ] Confirm rendering in the authenticated hosted application.
+
 ## Player injury and card icons (2026-11-23)
 
 - [x] Show a red medical cross for injury, a filled red card and a pair of filled yellow cards with distinct labels.

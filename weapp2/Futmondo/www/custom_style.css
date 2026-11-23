@@ -1354,6 +1354,15 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 }
 .player-filter-disclosure[open] > summary .player-filter-arrow { transform: translateY(-0.25em) rotate(90deg); }
 .player-filter-panel { margin: 0; padding: 0 15px 15px; }
+.fm-club-filter-option {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.fm-club-filter-option .fm-team-crest { flex: 0 0 22px; width: 22px; height: 22px; object-fit: contain; }
+.fm-club-filter-option span { min-width: 0; overflow-wrap: anywhere; }
+
 
 /* Align filter labels and touch targets without Bootstrap checkbox offsets. */
 .player-checkbox-filters {
