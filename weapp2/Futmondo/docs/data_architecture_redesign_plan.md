@@ -4,6 +4,7 @@
 
 - [x] Apply single-line names, smaller portraits and crests, a tilted pitch and staggered six-player midfield rows in the phone layout of the editor and round history.
 - [x] Verify responsive geometry, lineup interactions and resize reuse. See [data review](data_review_results.md#compact-lineup-pitch-2026-11-23).
+- [x] Remove the space after the initial in abbreviated lineup and picker names.
 - [ ] Confirm rendering in the authenticated hosted application.
 
 ## Clause filter cash balance (2026-11-23)

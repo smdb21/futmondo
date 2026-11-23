@@ -4,8 +4,8 @@
 
 The supplied official Futmondo mobile screenshot shows a tapered field,
 single-line name strips and higher wide midfielders in a 3-6-1. The editable and historical lineup views share a tilted grass and markings layer
-with upright player tiles. Names use the existing initial-plus-surname format,
-one line, 1 px vertical padding and an ellipsis if the slot is too narrow. The
+with upright player tiles. The player tiles and picker abbreviate names as `J.Guerra`, with no space after the period.
+Player tiles use one line, 1 px vertical padding and an ellipsis if needed. The
 label tooltip carries the full source name. Portraits are 36 px on phones and
 desktop and 44 px at intermediate widths. Club crests beside the names are 11 px.
 

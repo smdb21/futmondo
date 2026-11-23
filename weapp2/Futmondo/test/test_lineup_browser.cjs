@@ -253,7 +253,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       assert.equal(await choices.count(), 8);
       assert.ok((await choices.evaluateAll(nodes => nodes.map(n => n.dataset.position))).every(role => role === 'FWD'));
       const player17 = modal.locator('.fm-lineup-choice[data-player-id="p17"]');
-      assert.match(await player17.locator('.fm-lineup-choice-name').innerText(), /^P\. 17\nFWD$/);
+      assert.match(await player17.locator('.fm-lineup-choice-name').innerText(), /^P\.17\nFWD$/);
       assert.equal(await player17.getAttribute('title'), 'Player 17');
       assert.equal(await player17.locator('.fm-lineup-status').getAttribute('title'), 'Doubtful');
       const injuredStatus = modal.locator('.fm-lineup-choice[data-player-id="p24"] .fm-lineup-status');
@@ -268,7 +268,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       await page.screenshot({ path: `/tmp/futmondo-lineup-picker-${width}.png`, fullPage: true });
       await player17.click();
       await modal.waitFor({ state: 'detached' });
-      await starter.getByText('P. 17', { exact: true }).waitFor();
+      await starter.getByText('P.17', { exact: true }).waitFor();
       // Removing a starter leaves just that position empty until another click.
       await starter.click();
       await modal.locator('.fm-lineup-choice').first().waitFor();
@@ -283,7 +283,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       assert.equal(await modal.locator('.fm-lineup-remove').count(), 0);
       await modal.locator('.fm-lineup-choice[data-player-id="p17"]').click();
       await modal.waitFor({ state: 'detached' });
-      await starter.getByText('P. 17', { exact: true }).waitFor();
+      await starter.getByText('P.17', { exact: true }).waitFor();
       const benchSlot = page.locator('.fm-lineup-bench-row .fm-lineup-player').first();
       await benchSlot.click();
       await modal.locator('.fm-lineup-choice[aria-pressed="true"]').waitFor();

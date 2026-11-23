@@ -41,7 +41,7 @@ check('position underlines follow pitch slots and only the main bench role, incl
       position('fourth')=='DEF',position('outgoing')=='MID',position('first')=='',
       length(xml2::xml_find_all(nodes,'//*[contains(@class,"fm-lineup-empty")]/*[@data-position!=""]'))==0L,
       length(xml2::xml_find_all(nodes,'//*[@class="fm-lineup-position"]'))==0L,
-      xml2::xml_text(xml2::xml_find_first(nodes,'//*[@data-player-id="striker"]//*[@class="fm-lineup-label"]'))=='P. striker',
+      xml2::xml_text(xml2::xml_find_first(nodes,'//*[@data-player-id="striker"]//*[@class="fm-lineup-label"]'))=='P.striker',
       xml2::xml_attr(xml2::xml_find_first(nodes,'//*[@data-player-id="outgoing"]/*[@class="fm-lineup-name"]'),'title')=='Main position for substitutions: Midfielder',
       grepl('Substitutes can only cover their main position; secondary positions do not count.',html,fixed=TRUE))
   }
