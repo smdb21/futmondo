@@ -2416,3 +2416,17 @@ revision remain unverified. No historical source data was changed.
 Hosted blank/freeze verification remains separate from the reproduced local
 loading defect. See [plot loading contract](plots_module.md#independent-saved-round-loading-and-redraw-reuse--2026-11-23)
 and the dated verification in `data_review_results.md`.
+
+
+### Saved-response review for the blank standings plot — 2026-11-23
+
+- [x] Privately inspect exactly one complete saved team-round response under
+  explicit owner approval; verify integrity, native field mapping and all 13
+  available scores through the real saved-data loading and chart path.
+- [x] Record only non-sensitive findings and remove temporary private files.
+- [ ] Independently reproduce or verify recovery of the reported signed-in
+  hosted blank/freeze. A single successful response does not certify every
+  participant's coverage or hosted browser behavior.
+
+No additional runtime change was required by this response review. See
+`docs/data_review_results.md`, “Approved saved-round response review”.

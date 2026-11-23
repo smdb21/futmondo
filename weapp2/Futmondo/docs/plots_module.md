@@ -102,3 +102,11 @@ snapshot decoder, page information scripts and actual plots. It checks pending
 and recovered histories, unchanged publications, input heartbeats and bounded idle
 browser work at phone and desktop widths. All fixtures use synthetic data and
 forbid source HTTP. Exact hosted diagnosis is separate from these local checks.
+
+
+Approved private-response follow-up (2026-11-23): one actual saved native
+team-round response passed the real codec, adapter and module replay with all
+13 source scores retained. No body/score/identifier fixture was committed.
+See the dated review in `data_review_results.md`. This verifies that response's
+compatibility with the loading fix, without claiming a signed-in hosted freeze
+reproduction or complete league coverage.

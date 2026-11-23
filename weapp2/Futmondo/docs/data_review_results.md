@@ -5668,3 +5668,42 @@ blocked exporting private compressed response payloads; permission for exact
 hosted-response inspection was requested separately. The reported hosted
 freeze has not been independently reproduced. The local loading defect and
 redraw behavior are verified; hosted acceptance remains outstanding.
+
+
+## Approved saved-round response review — 2026-11-23
+
+After the owner explicitly approved opening one complete saved team-round
+response privately, retrieved exactly one most-recent successful
+`get_user_team_rounds` snapshot. No account context, descriptors, directories,
+catalogs, authentication or other teams' response bodies were exported. Verified
+the compressed SHA-256 and decoded byte length before using the existing worker
+codec. No private body, actual source identifiers, team names or score values
+were printed or added to the repository.
+
+The response is an unnamed list of 13 records. Each record has the native
+`id`, `negative`, `number`, `points`, `status` fields. The inspected field
+types are character, logical, integer, integer and character, respectively.
+All 13 round numbers and scores are finite, covering rounds 1–13. The existing
+classification parser retains all 13, and the cumulative projection retains
+13 known results. This response provides no evidence of absent scores or a
+parser/response-shape mismatch.
+
+Verified the actual approved response through synthetic account/league/team
+identities with the real compressed worker restore, factual adapter, module,
+standings renderer and rank-range filter. Standings produced one 13-point curve;
+the selected round range produced five rank points. No live Futmondo or database
+read was needed during this replay. The snapshot itself was not modified or
+republished. Ten local projection/build runs took 16.5 ms median and 98.0 ms
+maximum. These are single-response local measurements, not hosted browser or
+multi-user latency measurements.
+
+The raw and decoded temporary response files were removed after the check.
+This review supports the existing loading-path fix; one successful response does
+not establish complete coverage for every league participant or reproduce the
+reported signed-in production freeze. Hosted acceptance remains outstanding.
+
+Delivery/performance review: documentation-only changes. No runtime code,
+source request volume, DB schema/writes, cache invalidation, timers, UI redraws,
+dependencies or deployment configuration changed. The targeted actual-response
+replay is the applicable verification; the application lifecycle was not repeated
+for this documentation-only record.
