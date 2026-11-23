@@ -78,6 +78,15 @@ can continue. If the phone discards/reloads the page, the container restarts, th
 R process fails, or the window expires, that live state is lost. Remembered login
 is a separate feature for restoring access to a new session.
 
+When Shiny Server displays its final disconnect message, LigaRadar shows a
+modal with the static pitch and radar from `fm_pitch_radar()`. **Refresh page**
+reloads the current browser URL and can start a new session. The host's retry
+countdown and **Try now** link remain available during automatic recovery. The
+dialog closes if the connection becomes available again. Running directly with
+Shiny also shows it on a socket close when Shiny has no reconnect notification.
+The browser assets watch the host's reconnect message and listen for Shiny's
+connection events. [Shiny Server reconnect UI](https://github.com/rstudio/shiny-server-client/blob/master/lib/reconnect-ui.js)
+
 This is a narrowly guarded upstream-source customization, not an
 `app_idle_timeout` change. That directive only keeps an R process with no
 connections warm and does not extend a disconnected session. The build helper

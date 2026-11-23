@@ -2322,3 +2322,7 @@ See [completed market bids](scheduled_clauses.md#completed-market-bids) and [ver
 ### Maximum clause input (2026-11-22, implemented locally)
 
 Fixed decimal-comma entry in the existing All Players maximum clause filter. The table applies the inclusive euro limit to its existing stored clause prices. See [filter contract](players_table_module.md#maximum-clause-input--2026-11-22) and [verification](data_review_results.md#maximum-clause-input--2026-11-22).
+
+### Disconnect dialog (2026-11-22, implemented locally)
+
+Added a branded connection-loss dialog with the static pitch radar and a browser reload button. See [reconnection behavior](docker_deployment.md#mobile-reconnection-retain-the-live-session-for-30-minutes) and [verification](data_review_results.md#disconnect-dialog--2026-11-22).

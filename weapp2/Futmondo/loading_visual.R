@@ -1,10 +1,6 @@
-# Decorative browser-only loading scene. See docs/progressive_loading.md.
-fm_loading_visual <- function(id, compact = FALSE) {
-  shiny::tags$div(
-    id = id,
-    class = paste("fm-loading-visual", if (isTRUE(compact)) "fm-loading-visual--compact"),
-    `data-fm-loading` = "", `aria-hidden` = "true",
-    shiny::HTML(paste0(
+# Static pitch and radar shared by the loader and disconnect dialog.
+fm_pitch_radar <- function() {
+  shiny::HTML(paste0(
       '<svg class="fm-loading-fallback" viewBox="0 0 420 280" focusable="false" aria-hidden="true">',
       '<g fill="none" stroke="currentColor" stroke-width="1.4">',
       '<rect x="48" y="38" width="324" height="204" rx="2"/>',
@@ -21,7 +17,16 @@ fm_loading_visual <- function(id, compact = FALSE) {
       '<circle cx="248" cy="185" r="3"/><circle cx="282" cy="90" r="3"/>',
       '<circle cx="324" cy="143" r="3"/>',
       '</g></svg>'
-    )),
+  ))
+}
+
+# Decorative browser-only loading scene. See docs/progressive_loading.md.
+fm_loading_visual <- function(id, compact = FALSE) {
+  shiny::tags$div(
+    id = id,
+    class = paste("fm-loading-visual", if (isTRUE(compact)) "fm-loading-visual--compact"),
+    `data-fm-loading` = "", `aria-hidden` = "true",
+    fm_pitch_radar(),
     shiny::tags$canvas(class = "fm-loading-canvas", `aria-hidden` = "true")
   )
 }

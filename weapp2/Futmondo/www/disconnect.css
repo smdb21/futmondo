@@ -1,0 +1,59 @@
+#fm-disconnect:not([open]) { display: none; }
+
+#fm-disconnect {
+  box-sizing: border-box;
+  width: min(420px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  margin: auto;
+  padding: clamp(16px, 5vw, 28px);
+  overflow: auto;
+  border: 1px solid var(--fm-border);
+  border-radius: 16px;
+  background: var(--fm-surface);
+  color: var(--fm-text);
+  box-shadow: 0 18px 64px rgb(0 0 0 / .35);
+  font-family: system-ui, sans-serif;
+  text-align: center;
+}
+
+#fm-disconnect::backdrop { background: rgb(5 12 8 / .7); }
+
+.fm-disconnect-visual {
+  width: min(280px, 100%);
+  margin: 0 auto 20px;
+  border: 1px solid var(--fm-border);
+  border-radius: 10px;
+  background: var(--fm-highlight);
+}
+
+.fm-disconnect-visual svg {
+  position: static;
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+#fm-disconnect-title { margin: 0 0 8px; font-size: 24px; font-weight: 700; }
+#fm-disconnect-description { margin: 0 0 24px; color: var(--fm-muted); }
+
+#fm-disconnect-refresh {
+  min-height: 44px;
+  padding: 9px 22px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--fm-text);
+  color: var(--fm-bg);
+  font: inherit;
+  font-weight: 650;
+}
+
+#fm-disconnect-refresh:focus-visible {
+  outline: 2px solid var(--fm-text);
+  outline-offset: 3px;
+}
+
+.fm-disconnect-open #ss-connect-dialog,
+.fm-disconnect-open #ss-overlay,
+.fm-disconnect-open #shiny-disconnected-overlay {
+  display: none !important;
+}

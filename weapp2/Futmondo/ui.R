@@ -33,6 +33,8 @@ body <- shinydashboard::dashboardBody(
     shiny::includeScript("www/theme-switch.js"),
     shiny::includeCSS("www/loading-visual.css"),
     shiny::includeScript("www/loading-visual.js"),
+    shiny::includeCSS("www/disconnect.css"),
+    shiny::includeScript("www/disconnect.js"),
     shiny::includeScript("www/worker-state.js"),
     shiny::includeScript("www/info-disclosures.js"),
     shiny::tags$style(shiny::HTML("
@@ -40,6 +42,14 @@ body <- shinydashboard::dashboardBody(
           z-index: 1;
         }
       "))
+  ),
+  tags$dialog(id = "fm-disconnect", `aria-labelledby` = "fm-disconnect-title",
+    `aria-describedby` = "fm-disconnect-description",
+    tags$div(class = "fm-disconnect-visual", `aria-hidden` = "true", fm_pitch_radar()),
+    tags$h2(id = "fm-disconnect-title", "Connection lost"),
+    tags$p(id = "fm-disconnect-description", "Refresh the page to reconnect to LigaRadar."),
+    tags$button(type = "button", id = "fm-disconnect-refresh", autofocus = "autofocus",
+      "Refresh page")
   ),
   # The server owns page visibility; keep account finances above page notices.
   uiOutput("account_finance_summary",class="fm-summary-output"),
