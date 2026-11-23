@@ -74,3 +74,10 @@ Applied the exact reviewed `scripts/migrations/20261115075411_scheduled_clause_p
 Verified four RLS-enabled server-only tables, all 23 SECURITY INVOKER functions with fixed search paths and restricted execution grants, 11 valid indexes and the enabled `market_transactions` observation trigger. The service-role read smoke check used a synthetic absent account inside a rolled-back transaction; it made no Futmondo request or purchase. The empty due-job lookup used `clause_jobs_deadline` and measured 0.129 ms execution time (2.804 ms planning); this does not establish loaded scheduler throughput or opening-time lag.
 
 Database installation is complete. Set `FUTMONDO_CLAUSE_SCHEDULING_ENABLED=true` in Dokploy with the existing worker settings and redeploy to activate it. This task did not change deployment settings or execute the diagnostic. Actual closed-clause rejection mapping, removal of the temporary diagnostic and controlled hosted execution/restart/resource checks remain open.
+
+
+## Completed market bids
+
+An accepted bid can disappear from active offers before the first readback if Futmondo settles it first. Live reconciliation also accepts a matching completed purchase. Today, My Team, and Players reuse their saved pressroom and team balance observations to reconcile older reservations. The transaction must match the player, buyer, seller and exact bid amount, and be at or after dispatch within the existing two-second timestamp tolerance. A System/Market seller identifies a market purchase. A rival seller requires the source to identify the transfer as non-clause. A balance observed after the purchase is required before releasing the held money and slot.
+
+`clause_reconcile_completed_bids` checks both current worker snapshot versions and full scope, and releases matching manual bid reservations under the existing team lock. It is callable by the service role only. The Shiny observer shares requests across sessions, retries failed writes on the existing poll, and does not acquire source data. Active-offer readback and normal live action safeguards continue to apply.

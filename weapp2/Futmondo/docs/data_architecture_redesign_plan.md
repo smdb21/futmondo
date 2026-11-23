@@ -2308,3 +2308,12 @@ has no runtime/performance effect.
 - [ ] Verify authenticated hosted refresh timing and source publication.
 
 Contract and rollout are in [database-first sync](database_first_sync.md#explicit-league-refresh). Tests and performance limits are in [data review results](data_review_results.md).
+
+
+## Completed market bid slot reconciliation — 2026-11-22 Pacific
+
+- [x] Match completed market purchases during live readback and from saved pressroom and balance versions.
+- [x] Apply and verify the service-only database migration, `20261123050735_reconcile_completed_market_bids`.
+- [ ] Verify the affected reservation clears in the hosted app after the matching release.
+
+See [completed market bids](scheduled_clauses.md#completed-market-bids) and [verification](data_review_results.md).

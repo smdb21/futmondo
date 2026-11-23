@@ -78,7 +78,7 @@ get_scheduled_clause_check <- function(login,championship_id,user_team_id,player
  tx<-unique(rbind(target_tx,recent))
  transactions<-lapply(seq_len(nrow(tx)),function(i)list(player_id=as.character(tx$player_id[i]),
   buyer_team_id=fm_scalar(tx$buyer_team_id[i],''),seller_team_id=fm_scalar(tx$seller_team_id[i],''),
-  price=fm_number(tx$price[i]),created=fm_clause_stamp(tx$created[i])))
+  price=fm_number(tx$price[i]),created=fm_clause_stamp(tx$created[i]),is_clause=if('is_clause'%in%names(tx))as.logical(tx$is_clause[i])else NA))
  market<-capacity$target_rows
  offers<-list()
  if(is.data.frame(market)&&all(c('id','bid_id','bid_price')%in%names(market)))for(i in which(!is.na(market$bid_id)&nzchar(as.character(market$bid_id))))
@@ -153,6 +153,77 @@ fm_clause_jobs <- function(context) {
  Filter(function(j)all(vapply(c('account_id','championship_id','user_team_id','competition_id','season','scoring_version'),
   function(f)identical(fm_scalar(j$context[[f]],''),fm_scalar(context[[f]],'')),logical(1))),s$jobs)
 }
+# A completed bid may leave active offers before the first readback.
+fm_clause_completed_bid_matches <- function(jobs,history,team,balance_at,history_at) {
+ fields<-c('id','player_id','buyer_team_id','seller_team_id','price','created')
+ if(!is.data.frame(history)||!all(fields%in%names(history)))return(list())
+ sellers<-as.character(history$seller_team_id);sellers[is.na(sellers)]<-''
+ market<-sellers=='' | (history$is_clause %||% rep(NA,nrow(history)))%in%FALSE
+ keep<-history$buyer_team_id%in%team & !is.na(history$id) & nzchar(history$id) & market
+ rows<-history[keep,fields,drop=FALSE];sellers<-sellers[keep]
+ created<-fm_time(rows$created);price<-suppressWarnings(as.numeric(rows$price))
+ matches<-list()
+ for(j in head(jobs,64L)){
+  dispatched<-fm_time(j$dispatched_at)
+  if(length(dispatched)!=1L||is.na(dispatched)||balance_at<=dispatched)next
+  seller<-fm_scalar(j$original_owner,'')
+  idx<-which(rows$player_id==j$player_id & sellers==seller & price==fm_number(j$max_price) &
+   created>=dispatched-2 & created<=history_at & created<balance_at)
+  if(length(idx)!=1L)next
+  i<-idx[[1]]
+  matches[[length(matches)+1L]]<-list(job_id=j$id,player_id=j$player_id,buyer_team_id=team,
+   seller_team_id=seller,price=price[i],created=fm_clause_stamp(created[i]))
+ }
+ matches
+}
+
+fm_clause_reconcile_completed_bids <- function(session,login,league,team,history_state,balance_state) {
+ shiny::observe({
+  auth<-login()
+  if(!valid_login(auth)||!fm_clause_enabled()||!isTRUE(fm_worker_mode(auth[['userid']])))return()
+  ctx<-resource_context(auth,league(),team())
+  jobs<-Filter(function(j)identical(j$kind,'manual')&&identical(j$mode,'bid')&&
+   j$state%in%c('accepted','uncertain','dispatched'),fm_clause_jobs(ctx))
+  if(!length(jobs))return()
+  state<-fm_clause_account(ctx$account_id)
+  if(isTRUE(state$completed_bids_busy)||!is.null(state$completed_bids_retry))return()
+  saved<-function(handler,state,args){
+   if(!is.null(state$error)||isTRUE(state$status%in%c('partial','unavailable'))||
+      !identical(attr(state$data,'worker_acquisition_status'),'ok')||
+      identical(attr(state$data,'worker_completeness'),'partial'))return(NULL)
+   d<-fm_worker_descriptor(handler,args,state$context)
+   item<-fm_worker_get(ctx$account_id,d$resource_key)
+   if(is.null(item)||!identical(fm_time(item$manifest$observed_at),fm_time(state$observed_at)))return(NULL)
+   item$manifest
+  }
+  history<-history_state();balance<-balance_state()
+  history_manifest<-saved('get_championship_pressroom',history,list(championship_id=ctx$championship_id))
+  balance_manifest<-saved('get_user_team_info',balance,list(championship_id=ctx$championship_id,user_team_id=ctx$user_team_id))
+  if(is.null(history_manifest)||is.null(balance_manifest))return()
+  signature<-list(history_manifest$version,balance_manifest$version,lapply(jobs,`[[`,'id'))
+  if(identical(state$completed_bids_attempted,signature))return()
+  state$completed_bids_attempted<-signature
+  matches<-fm_clause_completed_bid_matches(jobs,history$data,ctx$user_team_id,
+   fm_time(balance_manifest$observed_at),fm_time(history_manifest$observed_at))
+  if(!length(matches))return()
+  state$completed_bids_busy<-TRUE
+  payload<-list(p_context=fm_clause_scope(ctx),p_history_key=history_manifest$resource_key,p_history_version=history_manifest$version,
+   p_balance_key=balance_manifest$resource_key,p_balance_version=balance_manifest$version,p_matches=matches)
+  failed<-function(error){
+   state$completed_bids_busy<-FALSE
+   state$completed_bids_attempted<-NULL
+   state$completed_bids_retry<-as.numeric(Sys.time())+30
+   NULL
+  }
+  promises::then(fm_clause_rpc('reconcile_completed_bids',payload),function(n){
+   state$completed_bids_busy<-FALSE
+   if(!is.numeric(n)||length(n)!=1L||!is.finite(n))return(failed(NULL))
+   if(n>0)fm_clause_refresh(ctx$account_id,force=TRUE)
+   NULL
+  },failed)
+ },domain=session)
+}
+
 fm_clause_reservations <- function(jobs) {
  if(is.null(jobs))return(list(count=NA_real_,amount=NA_real_))
  active<-Filter(function(j)j$state%in%c('scheduled','preparing','dispatched','uncertain','accepted'),jobs)
@@ -244,6 +315,9 @@ fm_clause_session <- function(session,login) {
      fm_clause_refresh(id)
      if(isTRUE(s$renew_retry)||isTRUE(s$context_retry)){s$renew_retry<-FALSE;s$context_retry<-FALSE;s$revision(shiny::isolate(s$revision())+1L)}
      if(!s$reconcile_busy&&as.numeric(Sys.time())>=s$manual_retry_due){s$manual_retry_due<-Inf;s$revision(shiny::isolate(s$revision())+1L)}
+     if(!is.null(s$completed_bids_retry)&&as.numeric(Sys.time())>=s$completed_bids_retry){
+      s$completed_bids_retry<-NULL;s$revision(shiny::isolate(s$revision())+1L)
+     }
      s$timer<-later::later(tick,5)
     };tick()
    }

@@ -330,3 +330,6 @@ separate shared-process totals. Only the configured administrator can read this
 server-only view. No environment variable or dependency is added. Telemetry uses
 existing worker guard calls; the visible Admin page reads metadata every 15 seconds.
 See [monitor contracts and limits](docs/admin_worker_monitor.md).
+
+
+Completed market bid reconciliation requires `scripts/migrations/20261122130000_reconcile_completed_market_bids.sql` before the matching app release. Production recorded it as `20261123050735_reconcile_completed_market_bids`. Fresh databases include it in `scripts/schema.sql`. See [completed market bids](docs/scheduled_clauses.md#completed-market-bids).

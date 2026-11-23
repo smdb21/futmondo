@@ -2388,7 +2388,7 @@
       "checksum": "6941ec3d550551d6c41a20b6a4d2ff3e"
     },
     "server.R": {
-      "checksum": "6484660aaa46c06a6707bbd58d1fc739"
+      "checksum": "f0babe2b025f7a1f38474f462c79ca34"
     },
     "supabase_connector.R": {
       "checksum": "f49117c4a21dd8d417a32070c206f2cf"
@@ -2415,7 +2415,7 @@
       "checksum": "c857838c71c03ff562f0e6ad2dfa0359"
     },
     "www/release-info.json": {
-      "checksum": "6711d7867411d7636b993a839ef3596c"
+      "checksum": "730a1cb6d366464a7bc7ae87c9a4e338"
     },
     "www/remember-login.js": {
       "checksum": "2b037334f8088f5b4a270acbaea52e91"
@@ -2427,7 +2427,7 @@
       "checksum": "352065cfc635da026087de7a339b4d95"
     },
     "clause_scheduler.R": {
-      "checksum": "1691423d8bd8edfcb96dc90d3c751edb"
+      "checksum": "9c431f2c28d86da30f41d3457a22cb4e"
     }
   },
   "users": null

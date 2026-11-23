@@ -5343,3 +5343,12 @@ Performance review: one asynchronous queue call per explicit action, no new brow
 
 
 Production Supabase applied the migration as `20261123045201_worker_league_refresh` (2026-11-23 UTC, November 22 Pacific). Preflight matched the installed claim function to the expected predecessor. The migration used a five-second lock timeout and made schema changes without backfilling job rows. Post-migration checks confirmed the nullable column, enabled trigger, claim priority, service-only invoker grants and a recent worker heartbeat. The REST RPC returned HTTP 200 with zero queued jobs for a synthetic unmatched account. The security advisor reported no findings for the new migration objects. These checks establish the database rollout; they do not establish an authenticated Futmondo acquisition or hosted end-to-end timing. This documentation update has no runtime cost.
+
+
+## Completed market bid slot reconciliation — 2026-11-22 Pacific
+
+The reported €3,210,413 hold was an accepted manual market bid. A later stored transfer matched the winning team, price and System/Market seller, and a newer balance was present. The old reconciler only checked whether the bid was still active. The app now matches a versioned pressroom purchase and newer balance directly, while live readback handles both applied bids and completed purchases. The legacy transaction row did not supply authoritative season metadata and was not used to release the live reservation.
+
+The isolated R and PostgreSQL checks cover the matching purchase, stale balances, foreign scope, incorrect prices, and a repeated call. Manual-action tests still cover one submission and uncertain outcomes. The offline Shiny lifecycle passed 14 checks and eight tabs. Production migration `20261123050735_reconcile_completed_market_bids` used a five-second lock timeout. Post-migration checks verified the new restricted invoker function, an empty probe that affected zero jobs, and the updated live reconciler. Hosted reservation release remains to be verified.
+
+Performance review: no additional source requests, timers, or subscriptions outside the existing active pages. With a pending manual bid, the observer uses two stored versions already read by the page and performs one bounded, deduplicated async database write per qualifying version pair. Successful repairs reuse the existing clause poll and team lock. The database looks up both snapshot versions by account/key and updates jobs by primary key. No dependencies or settings change.
