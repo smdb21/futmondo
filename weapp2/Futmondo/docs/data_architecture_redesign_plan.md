@@ -2579,3 +2579,8 @@ verified the league's recorded September lineup lock, round 6's three
 fixture stages and the round 8 postponement. Establishing the Best XI
 and MVP recipient cutoff after transfers remains open pending direct
 recipient evidence or a rule clarification from Futmondo.
+
+The [Brugué cross-check](data_review_results.md#brugué-round-6-lineup-and-payout-cross-check--2026-11-24)
+established ownership at the postponed match and settlement, absence
+from the closed lineups, and no corresponding payment to the reference
+team. The original roster cutoff remains a compatible explanation.

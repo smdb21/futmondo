@@ -6289,3 +6289,36 @@ Verification used scoped read-only database observations, local captures
 and the six player fixture reads with at most two in flight. No historical
 eligibility was assigned. This documentation-only change has no runtime
 impact on requests, storage, calculations or rendering.
+
+### Brugué round 6 lineup and payout cross-check · 2026-11-24
+
+The final Best XI included Brugué. The earliest returned ownership
+transition was a September 13 UTC purchase from the Market, after the
+September 3 lock. The market index corroborates the seller
+and effective timestamp. This supports Market ownership at kickoff
+without establishing that the earlier transfer archive is complete.
+Two scoped locker records distinguish the September 25 and October 18
+clause purchase times from their September 28 and October 22 deliveries.
+The reference team held Brugué at the October 21 fixture and at the final
+position settlement at 13:47 UTC on October 22. The onward transfer
+delivered at 22:05 UTC.
+
+Two authenticated `POST /1/userteam/roundlineup` reads for the earliest
+recorded buyer and the reference team returned HTTP 200 and closed
+lineups. Both had eleven starters, four bench entries and `negative=false`.
+Brugué was absent from both and from all nine saved closed round 6
+lineups. As controls, the same saved lookup found both the reference team's
+previously reconciled round 4 award recipient Valles and round 7
+recipient Raphinha in their respective starting XIs.
+
+The reference team's official movement history contains three round 6
+point credits and a position credit, with no Best XI or MVP credit.
+Owning Brugué at the individual kickoff and at settlement was insufficient
+for this payment. The result fits an original roster cutoff or an
+eligibility condition tied to the historical lineup. It leaves the general
+prize rule and the original owner unverified, so no league-wide recipient
+fact was assigned. [Futmondo's bonus guide](https://help.futmondo.com/article/142-configura-las-primas-automaticas-en-un-campeonato-social).
+
+The check reused scoped database observations and made two one-time
+official lineup reads. It changes documentation only and adds no runtime
+requests, database work, calculation changes or redraws.
