@@ -23,7 +23,7 @@
 
 - [x] Project After offers from active offers and display the slots occupied by offers and pending actions.
 - [x] Use persisted transfer and balance evidence to reconcile accepted manual clause holds through the existing team-locked RPC.
-- [ ] Apply the settlement migration and verify the updated application against the affected production observation. See [data review](data_review_results.md#manual-clause-settlement-in-the-balance-summary-2026-11-23).
+- [x] Apply the settlement migration and verify the affected production reservation is cleared against saved Futmondo evidence. See [data review](data_review_results.md#manual-clause-settlement-in-the-balance-summary-2026-11-23).
 
 ## Clause filter cash balance (2026-11-23)
 
