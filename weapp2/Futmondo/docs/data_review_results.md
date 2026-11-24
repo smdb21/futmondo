@@ -5824,3 +5824,9 @@ Chromium checks at 390 and 1440 px entered Lineup from another tab and verified 
 ## Primary-position substitutes · 2026-11-23
 
 The independent exhaustive oracle and targeted MID/FWD case passed with primary-only reserves. All 17 lineup runtime groups, scheduling and module checks passed, as did the offline lifecycle (14 checks and eight tabs). Twenty synthetic 100-player runs across all formations averaged 39.5 ms without required coverage and 70.2 ms with it. The pitch reads primary positions once for its three indicators. No additional source reads, database operations or timers. The account's live XI was not reproduced.
+
+## Editable optimized lineups and expected XI points · 2026-11-23
+
+The lineup module and scheduling checks passed. Known-answer fixtures covered an empty XI (−55), a negative-scoring starter with ten empty positions (−53), missing starter history and exclusion of bench points. Chromium at 390 and 1440 px edited an optimized bench before and after schedule admission, reopened the persisted lineup, exchanged an incoming keeper for an owned player, checked the resulting points difference, and confirmed replacement or cancellation. The scheduling-disabled pitch and all-owned save also passed. The offline lifecycle passed 14 checks and eight tabs.
+
+The total matches at most eleven IDs against the existing score table. Editing a projected lineup recalculates the due time from stored transfer rows and does not run the optimizer. Browser read/write counters stayed flat during local selection changes. The scheduling-enabled fixture rendered its preview in 848 ms on mobile and 219 ms on desktop. Live account behavior and deployment were not verified.

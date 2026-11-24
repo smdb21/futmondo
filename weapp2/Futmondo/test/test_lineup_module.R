@@ -45,6 +45,18 @@ lineup_submit<-function(auth,championship_id,user_team_id,current,modified,owner
 settle<-function(session){for(i in seq_len(30)){later::run_now(0);session$flushReact()}}
 args<-list(is_module_active=function()TRUE,login_token=function()c(userid='fixture',token='synthetic'),championship_id=function()'league',user_team_id=function()'team',round_catalog=function()rounds,clause_transfers_source=function()list(outgoing_status='ok',outgoing_records=outgoing_clause_empty()))
 reset()
+shiny::testServer(lineup_Server,args=args,{
+ settle(session)
+ stopifnot(grepl('−5',output$expected_points,fixed=TRUE),grepl('-55',output$expected_points,fixed=TRUE))
+ value<-draft();value$starters[11]<-'p1';value$bench[1]<-'p20';edit(value)
+ points<-full_history;points$points[points$player_id=='p1']<- -3
+ history_data(points);settle(session)
+ stopifnot(grepl('-53',output$expected_points,fixed=TRUE))
+ history_data(points[points$player_id!='p1',]);settle(session)
+ stopifnot(grepl('missing average for 1 starter',output$expected_points,fixed=TRUE),state$reads==1L,state$submits==0L)
+ cat('PASS empty slots, signed averages, missing starter history and bench exclusion in manual XI total\n')
+})
+reset()
 state$official$roster[[20]]$status<-'injured'
 state$official$roster[[19]]$status<-'doubt'
 state$official$roster[[18]]$status<-'doubtful'

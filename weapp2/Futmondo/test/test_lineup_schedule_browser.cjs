@@ -70,6 +70,19 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
         await page.close();
         continue;
       }
+      const editBench = async () => {
+        const bench = page.locator('#lineup-bench_1');
+        const player = await bench.getAttribute('data-player-id');
+        const expected = await page.locator('#lineup-expected_points').innerText();
+        await bench.click();
+        await page.getByRole('button', {name: 'Remove player'}).click();
+        await page.waitForFunction(() => document.querySelector('#lineup-bench_1').dataset.playerId === '');
+        assert.equal(await page.locator('#lineup-expected_points').innerText(), expected);
+        await bench.click();
+        await page.locator('.modal .fm-lineup-choice[data-player-id="' + player + '"]').click();
+        await page.waitForFunction(id => document.querySelector('#lineup-bench_1').dataset.playerId === id, player);
+      };
+      await editBench();
       await openConfirmation();
       await page.getByRole('button', {name: 'Cancel', exact: true}).click();
       assert.equal(await schedule.count(), 0);
@@ -77,6 +90,7 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
       await openConfirmation();
       await confirm.click();
       await page.getByText('Scheduled lineup · queued').waitFor();
+      await editBench();
       if (coverage) {
         await page.getByLabel('Require full outfield bench coverage').check();
         await page.getByRole('button', {name: 'Optimize'}).click();
@@ -94,9 +108,22 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
         await page.close();
         continue;
       }
-      await page.getByLabel('Include incoming players').uncheck();
-      await page.getByRole('button', {name: 'Optimize'}).click();
-      await page.waitForFunction(() => !document.querySelector('#lineup-save').disabled);
+      await page.getByRole('link', {name: 'Return to manual draft'}).click();
+      await page.getByRole('button', {name: 'Edit scheduled lineup'}).click();
+      await signing.waitFor();
+      const total = page.locator('#lineup-expected_points');
+      const incomingTotal = Number((await total.innerText()).split(' · ')[1]);
+      await signing.click();
+      await page.locator('.modal .fm-lineup-choice[data-player-id="p2"]').click();
+      await page.locator('.fm-lineup-pitch [data-player-id="p2"]').waitFor();
+      const editedTotal = Number((await total.innerText()).split(' · ')[1]);
+      assert.ok(Math.abs(incomingTotal - editedTotal - (250 - 100/3)) < 0.02, `Totals before and after the keeper swap: ${incomingTotal}, ${editedTotal}`);
+      const captain = page.getByLabel('Captain', {exact:true});
+      if (!(await page.locator('#lineup-captain').inputValue())) {
+        await captain.click();
+        await page.locator('.selectize-dropdown .option[data-value="p2"]').click();
+      }
+      await page.waitForFunction(() => !document.querySelector('.fm-lineup-player.fm-lineup-incoming') && !document.querySelector('#lineup-save').disabled);
       await save.click();
       await page.getByRole('button', {name: 'Keep schedule'}).click();
       assert.equal((await readCounts())[1], counts[1]);

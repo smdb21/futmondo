@@ -367,3 +367,7 @@ signed-in official comparison remains unverified. See [plot contracts](plots_mod
 ### Primary-position bench coverage · 2026-11-23
 
 LigaRadar uses the owner-requested primary-position rule for bench selection and coverage indicators. Futmondo lists Buchanan as a primary midfielder with forward eligibility. Its public manual and automatic coach guides describe substitutions using either position for multiposition players. Signed-in substitution behavior for this league was not verified. [Position list](https://help.futmondo.com/article/220-jugadores-multiposicion-en-la-liga-santander), [manual coach](https://help.futmondo.com/article/158-entrenador-manual), [automatic coach](https://help.futmondo.com/article/159-entrenador-automatico).
+
+### Editable lineups and expected XI points · 2026-11-23
+
+Futmondo documents manual editing, an XI estimate based on player averages, and a five-point deduction for each empty position. LigaRadar applies the selected completed-round window and empty-slot penalties to unsaved edits as well as projected squads with incoming signings. Editing can change the date of a proposed submission. The comparison uses public documentation. Equivalence of rounding, captain treatment and scoring windows in a signed-in official app was not verified. [Official lineup features](https://magazine.futmondo.com/novedades-en-la-nueva-app-de-futmondo/), [official empty-position rule](https://help.futmondo.com/article/92-como-hago-mi-equipo-en-alineacion).

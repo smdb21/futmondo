@@ -51,6 +51,10 @@ lineup_schedule_preview <- function(roster, arrivals, scores, rules, current, ex
   if (is.null(result)) return(NULL)
   value <- result$draft
   if (!isTRUE(rules$captain_enabled)) value$captain <- ""
+  lineup_schedule_stages(value, arrivals)
+}
+
+lineup_schedule_stages <- function(value, arrivals) {
   selected <- arrivals[arrivals$player_id %in% c(value$starters, value$bench), , drop = FALSE]
   latest <- if (nrow(selected)) which.max(fm_time(selected$joins_at))
   list(list(player_id = if (length(latest)) selected$player_id[latest] else "",

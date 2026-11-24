@@ -96,16 +96,17 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       assert.match(await coverageLabel.locator('span[title]').getAttribute('title'), /defender, midfielder and forward.*Goalkeeper cover is not required/);
       const coverageBox = await coverageLabel.boundingBox();
       assert.ok(coverageBox.x >= 0 && coverageBox.x + coverageBox.width <= width, 'Coverage checkbox fits the viewport');
-      assert.match(await page.locator('.fm-lineup-fixtures h3').innerText(), /Round 6/);
-      assert.match(await page.locator('.fm-lineup-fixtures').innerText(), /Kickoff to be confirmed/);
-      assert.match(await page.locator('.fm-lineup-fixtures').innerText(), /schedule may be incomplete/);
+      const upcoming = page.getByRole('region', {name: 'Next-round matches', exact: true});
+      assert.match(await upcoming.locator('h3').innerText(), /Round 6/);
+      assert.match(await upcoming.innerText(), /Kickoff to be confirmed/);
+      assert.match(await upcoming.innerText(), /schedule may be incomplete/);
       assert.equal(await page.locator('.fm-lineup-fixture').first().locator('[aria-label^="Home:"]').innerText(), 'Home Club 1');
       assert.equal(await page.locator('.fm-lineup-fixture').first().locator('[aria-label^="Away:"]').innerText(), 'A very long visiting football club name');
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Fixture cards do not overflow');
       const fixtureCrests = page.locator('.fm-lineup-fixture-crest');
       assert.equal(await fixtureCrests.count(), 20);
       for (const crest of await fixtureCrests.all()) {
-        await crest.scrollIntoViewIfNeeded();
+        await crest.evaluate(el => el.scrollIntoView({block: "nearest"}));
         await crest.evaluate(el => el.decode());
         const size = await crest.boundingBox();
         assert.equal(size.width, 24); assert.equal(size.height, 24);
@@ -148,6 +149,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       await page.locator('#lineup-clear').click();
       await page.waitForFunction(() => document.querySelectorAll('.fm-lineup-pitch .fm-lineup-empty').length === 11);
       assert.equal(await page.locator('.fm-lineup-bench-row .fm-lineup-empty').count(), 4);
+      assert.match(await page.locator('#lineup-expected_points').innerText(), /-55.*11 empty/);
       assert.equal(await page.locator('.fm-lineup-crest').count(), 0);
       assert.equal(await page.locator('#lineup-captain').inputValue(), '');
       assert.equal(await page.locator('#lineup-save').isDisabled(), true);
