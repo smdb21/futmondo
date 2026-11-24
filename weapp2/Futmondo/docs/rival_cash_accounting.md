@@ -410,3 +410,26 @@ when the helper is replaying an older source clock. The preparation key keeps
 ownership observation timestamps because an otherwise unchanged history can
 become usable after the final settlement has been observed. The existing
 durable ledger remains the display source until the worker saves a new one.
+
+## Loan markers in owner histories · 2026-11-24
+
+The official player summary can mark an owner-history row with `l=true`.
+`rival_owner_history_rows()` retains the explicit boolean as `is_loan`.
+`player_ownership_history` version 2 carries the flag for all transitions in
+a history containing a loan. All-permanent transition histories keep the
+version-1 payload, and existing version-1 evidence remains readable. Both
+use the same player identity, source clock, coverage and database path.
+
+`rival_resolve_owner_interval()` requires a permanent ownership observation
+before kickoff and no transition through the final settlement. If the last
+prior observation is a loan, the ownership claim remains unresolved. Loan
+entries dated after the award window leave earlier proven ownership intact.
+Missing or invalid loan flags in version-2 records prevent reuse.
+
+Kubo's round 9 evidence was saved separately with user approval so the
+existing ledger can reuse his verified Market status while the parser rolls
+out. `scripts/repair_20261124_kubo_round9.sql` checks the active scope, final
+selection, actual dates, matching Market transfer and absence of conflicting
+ownership before appending the one confirmed fact. The official loans guide
+describes temporary player assignments and their separate pressroom entries.
+[Futmondo loans guide](https://help.futmondo.com/article/240-cesiones).

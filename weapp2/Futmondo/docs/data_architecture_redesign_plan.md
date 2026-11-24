@@ -2566,3 +2566,10 @@ The reference team's 231 source movements now reconcile exactly to its
 official cash observation. The round 4 and 7 native award credits were
 independently reconciled to the observed award tariffs and verified own
 recipients. See [the source-level reconciliation](data_review_results.md#reference-cash-and-combined-award-reconciliation--2026-11-24).
+
+The November 24 official history sweep resolved Kubo's round 9 ownership
+and identified specific source limits for the 18 remaining award entries.
+The approved production evidence is saved and verified. The parser now
+preserves earlier observations in histories containing later loans.
+See [the sweep and verification](data_review_results.md#best-xi-ownership-sweep-and-kubo-evidence--2026-11-24)
+for the remaining evidence and publication checks.

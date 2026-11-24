@@ -9,7 +9,7 @@ summary<-list(owners=owners,owners_received=TRUE)
 rows<-rival_owner_history_rows(summary)
 check('source owner fields are parsed independently of score-history completeness',{
  stopifnot(nrow(rows)==2L,identical(rows$owner_name,c('A','futmondo')),identical(rows$price,c(10,12)))
- for(value in list(list(owners=owners),list(owners_received=TRUE,owners=list()),list(owners_received=TRUE,owners=list(list(n='A',d='bad'))),list(owners_received=TRUE,owners=c(owners,owners[1])),list(owners_received=TRUE,owners=list(list(n='A',d='2026-01-01T00:00:00Z',l=TRUE)))))
+ for(value in list(list(owners=owners),list(owners_received=TRUE,owners=list()),list(owners_received=TRUE,owners=list(list(n='A',d='bad'))),list(owners_received=TRUE,owners=c(owners,owners[1])),list(owners_received=TRUE,owners=list(list(n='A',d='2026-01-01T00:00:00Z',l=NA)))))
   stopifnot(nrow(rival_owner_history_rows(value))==0L)
 })
 resolve<-function(value=rows,begin='2026-02-01T00:00:00Z',end='2026-02-10T00:00:00Z',observed='2026-04-01T00:00:00Z',directory=teams)
@@ -137,6 +137,29 @@ check('historical ownership timestamps remain valid under an older worker source
  result<-worker_resolve(rows,'2026-02-01T00:00:00Z','2026-02-10T00:00:00Z',rival_finance_stamp(stamp),teams)
  stopifnot(result$known,result$team_id=='a',
    length(worker_evidence(list(status='ok',player_id='p1',rows=rows,observed_at=rival_finance_stamp(stamp)),'u','league','unknown'))==1L)
+})
+check('a later loan retains an earlier verified System interval after durable replay',{
+ events<-list(list(n='A',d='2026-01-01T00:00:00Z',p=10,l=FALSE),
+   list(n='futmondo',d='2026-01-15T00:00:00Z',p=12,l=FALSE),
+   list(n='B',d='2026-02-12T00:00:00Z',p=14,l=FALSE),
+   list(n='A',d='2026-03-01T00:00:00Z',p=1,l=TRUE))
+ loan_history<-rival_owner_history_rows(list(owners_received=TRUE,owners=events))
+ stopifnot(identical(loan_history$is_loan,c(FALSE,FALSE,FALSE,TRUE)),
+   resolve(value=loan_history)$unowned,
+   !resolve(value=loan_history,begin='2026-02-25T00:00:00Z',end='2026-03-04T00:00:00Z')$known,
+   !resolve(value=loan_history,begin='2026-03-02T00:00:00Z',end='2026-03-10T00:00:00Z')$known)
+ loaned_player<-rival_ownership_observation_evidence(list(status='ok',player_id='p2',rows=loan_history,
+   observed_at=rival_finance_stamp(stamp)),'u','league','unknown')[[1]]
+ stopifnot(loaned_player$payload$version==2L,
+   owner_record('p1')[[1]]$payload$version==1L)
+ source<-Filter(function(row)!identical(row$payload$player_id,'p2'),records)
+ saved<-rival_evidence_decode(jsonlite::fromJSON(jsonlite::toJSON(c(source,list(loaned_player)),auto_unbox=TRUE,null='null')))
+ recovered<-build(saved)
+ totals<-attr(recovered$cash_ledgers$a,'round_bonus_totals')
+ stopifnot(recovered$team_finances$estimated_cash[1]==170,totals$amount[totals$bonus_type=='dreamteam']==50)
+ missing_flag<-loaned_player
+ missing_flag$payload$rows[[2]]$is_loan<-NULL
+ stopifnot(!length(rival_ownership_evidence_rows(list(missing_flag),'player_ownership_history')))
 })
 cat('Ownership history:',checks,'checks passed.\n')
 # Exercise the actual shared queue, preserving its two-slot bound and durable reuse.

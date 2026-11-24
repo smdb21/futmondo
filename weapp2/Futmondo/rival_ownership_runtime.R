@@ -1,15 +1,16 @@
 # Historical ownership is a bounded source observation, not a complete season roster.
 # Resolve only an unchanged owner across an evidenced round start/settlement interval.
 rival_owner_history_rows <- function(summary) {
-  empty<-data.frame(owner_name=character(),changed_at=character(),price=numeric(),stringsAsFactors=FALSE)
+  empty<-data.frame(owner_name=character(),changed_at=character(),price=numeric(),is_loan=logical(),stringsAsFactors=FALSE)
   if(!is.list(summary)||!isTRUE(summary$owners_received)||!is.list(summary$owners)||
      !length(summary$owners)||length(summary$owners)>500L)return(empty)
   records<-mvp_records(summary$owners)
   rows<-dplyr::bind_rows(lapply(records,function(row){
-    if(!is.list(row)||!all(c("n","d","l")%in%names(row))||!identical(row$l,FALSE))return(NULL)
+    if(!is.list(row)||!all(c("n","d","l")%in%names(row))||
+       !(identical(row$l,FALSE)||identical(row$l,TRUE)))return(NULL)
     name<-mvp_text(row$n);date<-mvp_text(row$d)
     if(!nzchar(name)||is.na(fm_time(date)))return(NULL)
-    data.frame(owner_name=name,changed_at=date,price=fm_number(row$p),stringsAsFactors=FALSE)
+    data.frame(owner_name=name,changed_at=date,price=fm_number(row$p),is_loan=row$l,stringsAsFactors=FALSE)
   }))
   if(nrow(rows)!=length(records)||anyDuplicated(as.numeric(fm_time(rows$changed_at))))return(empty)
   rows<-rows[order(fm_time(rows$changed_at)),,drop=FALSE];rownames(rows)<-NULL
@@ -49,8 +50,16 @@ get_rival_ownership_round_catalog <- function(login,championship_id,user_team_id
 }
 rival_ownership_observation_evidence <- function(result,account_id,championship_id,season,catalog=FALSE) {
   if(!is.list(result)||!identical(result$status,"ok")||!is.data.frame(result$rows)||!nrow(result$rows))return(list())
-  payload<-list(kind=if(catalog)"award_ownership_calendar"else"player_ownership_history",version=1L,
-    rows=lapply(seq_len(nrow(result$rows)),function(i)as.list(result$rows[i,,drop=FALSE])),
+  rows<-result$rows
+  if(!catalog&&"is_loan"%in%names(rows)){
+    if(!is.logical(rows$is_loan)||anyNA(rows$is_loan))return(list())
+    # Keep the existing wire shape for histories containing only purchases
+    # and sales. Older workers cannot use the loan-aware version.
+    if(!any(rows$is_loan))rows$is_loan<-NULL
+  }
+  version<-if(!catalog&&"is_loan"%in%names(rows))2L else 1L
+  payload<-list(kind=if(catalog)"award_ownership_calendar"else"player_ownership_history",version=version,
+    rows=lapply(seq_len(nrow(rows)),function(i)as.list(rows[i,,drop=FALSE])),
     coverage=if(catalog)"observed_round_start_times"else"returned_transitions_only")
   if(!catalog)payload$player_id<-mvp_text(result$player_id)
   if(!catalog&&!nzchar(payload$player_id))return(list())
@@ -67,16 +76,20 @@ rival_ownership_evidence_rows <- function(evidence,kind) {
   }
   Filter(function(row){
     p<-row$payload
-    if(!is.list(p)||!identical(p$kind,kind)||!identical(fm_number(p$version),1)||!is.list(p$rows)||!length(p$rows))return(FALSE)
+    if(!is.list(p)||!identical(p$kind,kind)||!is.list(p$rows)||!length(p$rows))return(FALSE)
+    version<-fm_number(p$version)
+    if(!version%in%(if(kind=="player_ownership_history")c(1,2)else 1))return(FALSE)
     expected<-c("kind","version","rows","coverage",if(kind=="player_ownership_history")"player_id")
     # JSON simplification pads absent fields, including nested scope objects.
     extra<-p[setdiff(names(p),expected)]
     if(!all(expected%in%names(p))||!all(vapply(extra,absent,logical(1))))return(FALSE)
-    count<-length(mvp_records(p$rows))
+    rows<-mvp_records(p$rows)
+    count<-length(rows)
     if(!count)return(FALSE)
     if(kind=="player_ownership_history"){
-
-        nzchar(mvp_text(p$player_id))&&identical(mvp_text(row$source_id),paste0("player-owners:",mvp_text(p$player_id)))&&
+      if(version==2&&(count>500L||!all(vapply(rows,function(row)
+        is.list(row)&&(identical(row$is_loan,TRUE)||identical(row$is_loan,FALSE)),logical(1)))))return(FALSE)
+      nzchar(mvp_text(p$player_id))&&identical(mvp_text(row$source_id),paste0("player-owners:",mvp_text(p$player_id)))&&
         identical(p$coverage,"returned_transitions_only")&&count<=500L
     }else identical(mvp_text(row$source_id),"award-ownership-calendar")&&
       identical(p$coverage,"observed_round_start_times")&&count<=120L
@@ -150,7 +163,12 @@ rival_resolve_owner_interval <- function(rows,begins_at,settles_at,observed_at,t
   rows<-rows[order(dates),,drop=FALSE];dates<-sort(dates)
   previous<-which(dates<begin)
   if(!length(previous)||any(dates>=begin&dates<=end))return(unknown)
-  index<-tail(previous,1L);name<-mvp_text(rows$owner_name[index])
+  index<-tail(previous,1L)
+  # A later loan does not invalidate an earlier settled interval. A loan
+  # as its starting state leaves underlying ownership unverified.
+  loan<-rows[["is_loan"]]
+  if(!is.null(loan)&&(!is.logical(loan)||anyNA(loan)||loan[index]))return(unknown)
+  name<-mvp_text(rows$owner_name[index])
   # A trailing source interval is bounded by this observation, never by infinity.
   if(index==nrow(rows)&&observed<end)return(unknown)
   if(identical(tolower(name),"futmondo")){

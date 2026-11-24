@@ -6178,3 +6178,46 @@ No raw credential, financial response or player response was retained in
 the repository. Verification used two authorized source reads, the existing
 R parser and formula, and scoped database aggregates. This follow-up changes
 documentation only and has no runtime performance effect.
+
+## Best XI ownership sweep and Kubo evidence · 2026-11-24
+
+The 19 requested unresolved player-round entries in rounds 4–7 and 9 were
+resolved to unique player IDs in final award selections. The official
+authenticated `POST /1/player/summary` returned HTTP 200 and the matching
+player for each request. Ten histories started after kickoff, three had
+ownership changes inside the award window, and five returned empty history
+arrays. Those 18 still need ownership or award-cutoff evidence. A scoped
+transfer lookup corroborated the known changes without supplying the missing
+cutoff or earlier owner. Round 8 is still awaiting closure. The round 9
+position discrepancy concerns the rival allocations. The account holder's
+recorded credit and cash already reconcile independently.
+
+Kubo's history was the remaining case. A follow-up field inspection found
+an explicit later loan alongside earlier ordinary transfers. The official
+response shows Futmondo held Kubo from the September 14 sale through the
+October 16–20 round 9 award window. The normalized transfer records agree
+with that sale within one second and show no conflicting move through
+settlement. The old parser dropped the entire response when it encountered
+the November loan. With the user's approval, the guarded SQL repair added
+one scoped, verified unowned fact. The database acknowledged the write.
+Independent readback matched the saved fact exactly and found zero
+conflicts. The next published calculation and signed-in display remain
+separate verification steps.
+
+The revised parser retains loan-marked transitions in version-2 histories.
+A later loan preserves a proven earlier interval. A loan as its starting
+state or an intervening transition leaves eligibility unresolved. Version-1
+histories and existing durable reuse remain supported. The same factual worker
+can acquire and persist these observations through its existing bounded
+queue and checked database write path. The user-authorized one-time sweep
+did not change the normal source acquisition schedule.
+
+The offline ownership suite passed 13 cases, including a mixed version
+JSON round-trip with a later loan, an in-window loan, a loan at the opening
+boundary, and the known-award ledger total. Ranking recovery, pending
+settlement, database-only Classification, deployment and the offline Shiny
+lifecycle passed. The parser averaged 4.34 ms before, 4.45 ms with an
+ordinary history and 4.41 ms with a loan, over 200 runs of eight transitions
+each. There are no new recurring requests, timers, UI redraws or cache
+bounds. Only loan-containing histories add the flag to durable observations.
+The authorized evidence repair was a single scoped write, with readback.
