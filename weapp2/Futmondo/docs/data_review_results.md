@@ -5812,3 +5812,9 @@ Chromium passed the approval, replacement, cancellation and scheduling-disabled 
 The lineup module checks passed. Chromium at 390 and 1440 px verified incoming and owned player styling, the confirmation timestamp against the latest selected signing, cancellation, replacement, disabled scheduling and immediate manual saving for an all-owned XI and bench despite a pending signing. The offline Shiny lifecycle passed 14 checks and eight tabs.
 
 Review reuses the pitch and drops the second player-by-player rendering pass. Opening and cancelling the dialog uses local plan state. Fixture read and write counters stayed flat through preview and scheduling, with the existing admission RPC stubbed. In the scheduling-enabled browser fixture the pitch appeared in 821 ms on mobile and 212 ms on desktop. These are local fixture timings. Hosted scheduling was not exercised.
+
+## Save button visibility in the lineup editor
+
+The reported mobile screen omitted Save above Formation. In the previous version the button existed only after the save_control output rendered. The local prior-version fixture did render it after opening the Lineup tab, so the exact hosted trigger remains unverified. The revised page includes the button in its initial HTML, with its eligibility updated independently of the auxiliary UI output.
+
+Chromium checks at 390 and 1440 px entered Lineup from another tab and verified initial markup, button identity across optimization, scheduled confirmation, cancellation, replacement, disabled scheduling and the all-owned manual save. The lineup module checks passed. The offline lifecycle passed 14 checks and eight tabs. This change shares one reactive validation result and updates the existing button in place. It adds no source requests, database operations or timers. Pitch preview in the scheduling-enabled fixture took 825 ms on mobile and 221 ms on desktop.

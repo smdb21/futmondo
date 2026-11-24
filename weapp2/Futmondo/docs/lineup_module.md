@@ -113,7 +113,7 @@ passed; measurements and hosted verification limits are in
 
 ## Save placement and next-round fixtures — 2026-11-16
 
-The existing Save to LigaRadar control now sits above Formation and the pitch.
+The **Save to LigaRadar** button sits below the editing controls and above Formation and the pitch. The initial page includes the disabled button. The server updates its enabled state in place as the manual draft or incoming plan becomes ready.
 Its validation, live manual-action preflight, duplicate prevention and readback
 remain unchanged. Below the pitch, substitutes and optional Captain selector,
 `lineup_Server` renders `fixtures`: home/away match cards for the same verified

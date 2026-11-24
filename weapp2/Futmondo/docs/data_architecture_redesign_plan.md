@@ -2467,3 +2467,5 @@ See the clause status review in `docs/data_review_results.md`.
 Implemented locally. New plans optimize once over the projected squad and queue one approved lineup at the latest selected arrival. Existing persisted plans continue through the same worker contract. Production deployment is pending.
 
 The pitch now serves as the review surface for an incoming lineup. Save opens a dated scheduling confirmation when the selection includes a signing. All-owned lineups use the manual save. Implemented locally.
+
+Save visibility follow-up (implemented locally). The Lineup page includes the Save button in its initial markup and updates it in place for both manual and scheduled submissions.

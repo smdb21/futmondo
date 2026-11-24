@@ -11,8 +11,14 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
       await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1'
         ? route.continue() : route.fulfill({ status: 200, contentType: 'image/svg+xml',
           body: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><circle cx="8" cy="8" r="8" fill="red"/></svg>' }));
-      await page.goto(`http://127.0.0.1:${process.env.FUTMONDO_EDITOR_TEST_PORT || '8542'}`);
+      const url = `http://127.0.0.1:${process.env.FUTMONDO_EDITOR_TEST_PORT || '8542'}`;
+      const initialHTML = await (await page.request.get(url)).text();
+      assert.match(initialHTML, /<button(?=[^>]*id="lineup-save")(?=[^>]*disabled)[^>]*>/,
+        'Save is present before Shiny delivers its first output');
+      await page.goto(url);
+      await page.locator('a[data-value="Lineup"]').click();
       await page.locator('.fm-lineup-pitch .fm-lineup-player').nth(10).waitFor();
+      const originalSave = await page.locator('#lineup-save').elementHandle();
       const readCounts = async () => (await page.locator('#fixture_counts').innerText()).trim().split('/').map(Number);
       const counts = await readCounts();
       assert.ok(await page.getByLabel('Include incoming players').isChecked());
@@ -43,6 +49,8 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
           getComputedStyle(owned).filter === 'none';
       });
       const save = page.getByRole('button', {name: 'Save to LigaRadar'});
+      assert.ok(await originalSave.evaluate(node => node === document.querySelector('#lineup-save')),
+        'Optimizing preserves the visible Save button');
       const schedule = page.locator('#lineup-schedule_status li');
       const coverage = process.env.FUTMONDO_EDITOR_COVERAGE_FIXTURE === 'true';
       const latest = coverage ? page.locator('.fm-lineup-player[data-player-id="p27"]') : signing;

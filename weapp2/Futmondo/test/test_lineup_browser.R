@@ -123,7 +123,9 @@ if (scheduled_fixture) {
 
 ui <- shiny::fluidPage(shiny::tags$head(shiny::tags$style(shiny::HTML(fm_theme_css())),
   shiny::includeCSS('www/custom_style.css')),
-  shiny::textOutput('fixture_counts'), lineup_UI('lineup'))
+  shiny::textOutput('fixture_counts'),
+  if(scheduled_fixture)shiny::tabsetPanel(shiny::tabPanel('Home'),shiny::tabPanel('Lineup',
+    fm_info_page_UI('Lineup',lineup_UI('lineup'))))else lineup_UI('lineup'))
 server <- function(input, output, session) {
   fixture_official <<- fixture_initial
   if(scheduled_fixture)fixture_job <<- NULL

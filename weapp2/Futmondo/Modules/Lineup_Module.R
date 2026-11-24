@@ -3,7 +3,7 @@ lineup_status_icon <- function(status) player_status_icon(status, 'fm-lineup-sta
 
 lineup_UI <- function(id) {
   ns<-shiny::NS(id)
-  shiny::tagList(shiny::tags$style(shiny::HTML(".fm-lineup-controls{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:16px}.fm-lineup-controls .form-group{margin:0}.fm-lineup-optimize-controls{display:flex;gap:12px;align-items:flex-end;flex:0 0 100%;min-width:0}.fm-lineup-optimize-controls .shiny-input-container{flex:1;min-width:0;max-width:180px}.fm-lineup-optimize-controls .btn{flex-shrink:0}.fm-lineup-formation .shiny-input-container{width:180px;max-width:100%;margin-bottom:8px}.fm-lineup-availability{flex:0 0 100%;min-width:0}.fm-lineup-controls .shiny-input-container{width:180px}.fm-lineup-editor{max-width:900px;margin:auto}.fm-lineup-editor .fm-lineup-player{background:transparent;border:0;color:var(--fm-text,#eef6f0);cursor:pointer;padding:2px;min-width:0}.fm-lineup-editor .fm-lineup-player:focus{outline:2px solid var(--fm-warning,#f0c75e)}.fm-lineup-note{padding:10px 0;color:var(--fm-muted,#acbdb0)}.fm-lineup-warning{color:var(--fm-warning,#f0c75e)}.fm-lineup-actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.fm-lineup-coverage{display:flex;gap:12px;flex-wrap:wrap}@media(max-width:600px){.fm-lineup-controls .shiny-input-container{width:140px}}")),
+  shiny::tagList(shiny::tags$style(shiny::HTML(".fm-lineup-controls{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:16px}.fm-lineup-controls .form-group{margin:0}.fm-lineup-optimize-controls{display:flex;gap:12px;align-items:flex-end;flex:0 0 100%;min-width:0}.fm-lineup-optimize-controls .shiny-input-container{flex:1;min-width:0;max-width:180px}.fm-lineup-optimize-controls .btn{flex-shrink:0}.fm-lineup-formation .shiny-input-container{width:180px;max-width:100%;margin-bottom:8px}.fm-lineup-availability{flex:0 0 100%;min-width:0}.fm-lineup-controls .shiny-input-container{width:180px}.fm-lineup-editor{max-width:900px;margin:auto}.fm-lineup-editor .fm-lineup-player{background:transparent;border:0;color:var(--fm-text,#eef6f0);cursor:pointer;padding:2px;min-width:0}.fm-lineup-editor .fm-lineup-player:focus{outline:2px solid var(--fm-warning,#f0c75e)}.fm-lineup-note{padding:10px 0;color:var(--fm-muted,#acbdb0)}.fm-lineup-warning{color:var(--fm-warning,#f0c75e)}.fm-lineup-actions>.shiny-html-output{flex:1 1 12rem;min-width:0}.fm-lineup-actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.fm-lineup-coverage{display:flex;gap:12px;flex-wrap:wrap}@media(max-width:600px){.fm-lineup-controls .shiny-input-container{width:140px}}")),
     shiny::tags$style(shiny::HTML("
       .fm-lineup-picker-list{max-height:60vh;overflow-y:auto}
       .fm-lineup-choice,.fm-lineup-picker-heading{display:grid;grid-template-columns:26px minmax(0,1fr) 58px 78px;gap:8px;align-items:center;padding:10px 8px}
@@ -69,7 +69,10 @@ lineup_UI <- function(id) {
         shiny::actionButton(ns('reload'),label=NULL,icon=shiny::icon('rotate'),`aria-label`='Refresh lineup',
           title='Reload the official lineup, squad and rules from LigaRadar; keep your unsaved changes')),
       shiny::uiOutput(ns('status')),shiny::uiOutput(ns('schedule_status')),
-      shiny::div(class='fm-lineup-actions',shiny::uiOutput(ns('save_control'))),
+      shiny::div(class='fm-lineup-actions',
+        shiny::actionButton(ns('save'),'Save to LigaRadar',icon=shiny::icon('floppy-disk'),
+          class='btn-primary',disabled=TRUE),
+        shiny::uiOutput(ns('save_control'))),
       shiny::div(class='fm-lineup-formation',shiny::uiOutput(ns('formation_control'))),
       shiny::uiOutput(ns('pitch')),shiny::uiOutput(ns('captain_control')),
       shiny::uiOutput(ns('arrival_status')),shiny::uiOutput(ns('fixtures'))))
@@ -862,19 +865,30 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       shiny::req(pending$id,identical(pending$key,loaded_key),identical(pending$plan_id,preview()$id))
       save_schedule(pending$id)
     })
-    output$save_control<-shiny::renderUI({
+    save_state<-shiny::reactive({
       shiny::req(is_module_active())
       plan<-preview()
-      if(!is.null(plan))return(shiny::tagList(
-        shiny::actionButton(session$ns('save'),'Save to LigaRadar',icon=shiny::icon('floppy-disk'),
-          disabled=isTRUE(plan$confirmed)||schedule_busy()||saving()||loading()||!lineup_schedule_enabled()),
-        shiny::actionLink(session$ns('preview_close'),'Return to manual draft'),
-        if(!lineup_schedule_enabled())fm_info('Automatic saves are unavailable on this deployment.',inline=TRUE)))
+      if(!is.null(plan)){
+        enabled<-lineup_schedule_enabled()
+        return(list(disabled=isTRUE(plan$confirmed)||schedule_busy()||saving()||loading()||!enabled,
+          scheduled=TRUE,issues=if(!enabled)'Automatic saves are unavailable on this deployment.'))
+      }
       issues<-if(is.null(draft())||is.null(source()))'Lineup is loading'else lineup_validate(draft(),roster(),source()$rules)
       if(!is.null(draft()))issues<-c(issues,departure_issues(draft()))
       if(is.null(target()))issues<-c(issues,'Next round is not established')
-      shiny::tagList(shiny::actionButton(session$ns('save'),if(saving())'Saving…'else'Save to LigaRadar',icon=shiny::icon('floppy-disk'),
-        disabled=saving()||loading()||length(issues)>0L||!dirty()),if(length(issues))fm_info(paste(unique(issues),collapse=' · '),error=!loading(),pending=loading(),inline=TRUE))
+      list(disabled=saving()||loading()||length(issues)>0L||!dirty(),scheduled=FALSE,issues=issues)
+    })
+    shiny::observe({
+      state<-save_state()
+      shiny::updateActionButton(session,'save',disabled=state$disabled,
+        label=if(saving())'Saving…'else'Save to LigaRadar')
+    })
+    output$save_control<-shiny::renderUI({
+      state<-save_state()
+      shiny::tagList(
+        if(state$scheduled)shiny::actionLink(session$ns('preview_close'),'Return to manual draft'),
+        if(length(state$issues))fm_info(paste(unique(state$issues),collapse=' · '),
+          error=!state$scheduled&&!loading(),pending=loading(),inline=TRUE))
     })
     save_manual<-function(confirmed=NULL){
       shiny::req(source(),draft(),target(),!saving(),!loading(),!schedule_busy(),is.null(preview()),dirty());value<-draft();baseline<-source();ctx<-context();next_round<-target();key<-loaded_key;g<-generation;auth<-login_token()
