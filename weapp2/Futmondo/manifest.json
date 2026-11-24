@@ -2355,7 +2355,7 @@
       "checksum": "67d90ffcc8cbda28d007a6f3bef79f91"
     },
     "Modules/Selected_Player_Module.R": {
-      "checksum": "56fc4d2c2a85cda56035a77227b00e52"
+      "checksum": "800eaf7dd7e432b84888a139d20d1e56"
     },
     "Modules/Today_Module.R": {
       "checksum": "589e00cc033412df8a1cc0db1169dee2"
@@ -2430,7 +2430,7 @@
       "checksum": "352065cfc635da026087de7a339b4d95"
     },
     "clause_scheduler.R": {
-      "checksum": "9c431f2c28d86da30f41d3457a22cb4e"
+      "checksum": "20aaf6058a272c41e74ddcb2668642de"
     }
   },
   "users": null

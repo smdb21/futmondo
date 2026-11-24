@@ -25,7 +25,17 @@ get_championship_players<-function(login,championship_id)players
 get_lineup_from_team<-function(...)list(pointSystem='fixture')
 get_player_summary<-function(...)list(championship=list(),points=list(),prices=list())
 get_finished_rounds<-function(...)data.frame(round_number=1:5,is_finished=TRUE)
-buy_roster_clause<-function(...){writes<<-writes+1L;mutated<<-TRUE;list(success=TRUE)}
+fm_clause_enabled <- function() TRUE
+fm_clause_jobs <- function(context) list()
+fm_clause_rpc <- function(...) stop("Unexpected purchase reservation RPC")
+fm_async_http <- function(url, method, body, ...) {
+  query <- jsonlite::fromJSON(body)$query
+  stopifnot(url == ROSTER_CLAUSE_URL, method == "POST",
+    query$price == 1200, query$player_id == ids[1])
+  writes <<- writes + 1L
+  mutated <<- TRUE
+  promises::promise(function(resolve, reject) pending$purchase <- resolve)
+}
 log_market_transaction<-function(...)invisible(TRUE)
 persist_recent_points_snapshot<-function(payload,context,on_complete){acks[[length(acks)+1L]]<<-on_complete;TRUE}
 async_adapter_fetch<-function(fn,args=list(),context,...){
@@ -62,6 +72,10 @@ elapsed<-system.time(shiny::testServer(server,{
  before<-calls;before_history<-controller$dataset()$points;before_checks<-controller$entry()$checks
  before_table<-output[['table-players_table']]
  session$setInputs(`table-selected_player-submit_clause`=1L);settle(session)
+ session$setInputs(`table-selected_player-submit_clause`=2L);settle(session)
+ stopifnot(writes == 1L, identical(calls, before))
+ pending$purchase(list(status_code = 200L, content = charToRaw('{"answer":{"code":"api.general.ok"}}')))
+ settle(session)
  check('successful clause refreshes catalog but sends zero historical player requests',{
   added<-tail(calls,length(calls)-length(before))
   stopifnot(writes==1L,refresh()==1L,is.function(pending$catalog),

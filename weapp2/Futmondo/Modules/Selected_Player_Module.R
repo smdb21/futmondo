@@ -755,21 +755,18 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           is_clause_open <- (clause_price_val > 0) && clause_status_known && !is_clause_transferred && !is_clause_date_locked
 
           target_checked <- player_target_ready(sp)
-          can_open_editor <- target_checked
           action_buttons <- tagList(action_buttons, player_card_offer_button(sp, current_user_team, ns))
 
           # Option 3: rival-owned release clause
           has_rival_owner <- player_card_has_rival_owner(sp, current_user_team)
           if (player_card_can_buy_clause(sp,current_user_team,is_clause_open)) {
-            clause_gate <- passive_acquisition_gate(sp,"clause")
             clause_label <- paste0(" Buy Clause: ", player_card_money(clause_price_val))
             action_buttons <- tagList(
               action_buttons,
               actionButton(
                 ns("btn_pay_clause"),
                 label = tagList(icon("bolt"), clause_label),
-                class = "btn btn-buy-clause", disabled=!isTRUE(clause_gate$ok)&&!(can_open_editor&&clause_gate$reason%in%c("unavailable","loading")),
-                title=if(!isTRUE(clause_gate$ok))if(can_open_editor)"Current availability will be checked before submission."else clause_gate$message else NULL
+                class = "btn btn-buy-clause"
               )
             )
           } else if (has_rival_owner && clause_price_val > 0) {
@@ -1194,8 +1191,14 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         identical(dialog$context, player_action_context_RV()) &&
           identical(dialog$generation, market_offer_dialog_RV()$generation)
       })
-      capacity <- card_states$capacity()$data
-      result <- tryCatch(fm_send_player_offer(args, dialog$mode, sp, capacity, ctx, current),
+      conflict <- fm_manual_reservation_conflict(fm_clause_jobs(ctx), player_id, amount, card_states$capacity()$data)
+      if (!is.null(conflict)) {
+        submitting_offer <<- NULL
+        show_preflight_failure(list(message = conflict))
+        session$sendCustomMessage("fm-offer-unlock", list(id = ns("market_offer_marker"), generation = dialog$generation))
+        return()
+      }
+      result <- tryCatch(fm_send_player_offer(args, sp, ctx),
         error = function(e) list(success = FALSE, code = "offer_not_sent", message = "The offer could not be queued."))
       fm_clause_complete(result, function(res) {
         submitting_offer <<- NULL
@@ -1204,7 +1207,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         removeModal()
         if (!isTRUE(res$success)) {
           shiny::showNotification(tags$div(class = "fm-offer-error",
-            paste0("Offer failed: ", offer_error_message(res))), type = "error", duration = NULL)
+            offer_error_message(res)), type = "error", duration = NULL)
           if (isTRUE(res$refresh) && !isTRUE(res$refresh_queued) && is.function(on_bid_updated)) {
             tryCatch(on_bid_updated(action_type = "refresh"), error = function(e) NULL)
           }
@@ -1226,16 +1229,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         function()get_reactive_val(championship_id),function()get_reactive_val(user_team_id),
         remember_action_context,consume_action_context,player_action_context_RV)
 
-    # ---- Shared helper: open the release-clause buyout confirmation modal ----
-    # Single code path for the "Buy Release Clause" button and for external
-    # "clause_buyout" action events (e.g. Today's "Exercise Clause"
-    # recommendation). It RECHECKS the strict open-clause state before
-    # showing (finite positive price, explicitly FALSE clause_transferred,
-    # parseable clause_date <= now) and honors the same
-    # run_acquisition_preflight behavior as the button path. Only the
-    # recomputed clause_price is shown and later executed -- no comparison
-    # price (e.g. max(market, clause)) is ever used. Never opens the market
-    # bid modal.
+    # The card and external clause actions share the same observed player and price.
     open_clause_buyout_modal <- function(sp) {
       req(sp)
 
@@ -1265,7 +1259,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       clause_price <- if ("clause_price" %in% colnames(sp) && !is.na(sp$clause_price)) suppressWarnings(as.numeric(sp$clause_price)) else 0
 
       remember_action_context("clause")
-      remember_bid("clause", clause_price)
+      remember_bid("clause", list(id = sp$id, slug = fm_scalar(sp$slug, sp$name),
+        name = sp$name, seller = sp$user_team_id, price = clause_price))
       clause_modal_opened_RV(TRUE)
       dialog <- modalDialog(
         title = tagList(icon("bolt"), " Confirm Release Clause Buyout"),
@@ -1295,99 +1290,44 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     # ---- Submit Clause Purchase ----
     observeEvent(input$submit_clause, {
       req(consume_action_context("clause"))
-      sp <- selected_player()
+      purchase <- modal_bid_info_RV()$clause
+      action <- player_action_context_RV()
       login <- get_reactive_val(login_token)
-      champ_id <- get_reactive_val(championship_id)
-      team_id <- get_reactive_val(user_team_id)
-      req(sp, login, champ_id, team_id)
-      if (!player_card_has_rival_owner(sp, team_id)) {
-        clause_modal_opened_RV(FALSE)
+      req(purchase, action, login)
+      args <- list(login = login, championship_id = action$championship, team_id = action$team,
+        player_id = purchase$id, player_slug = purchase$slug, price = purchase$price)
+      ctx <- resource_context(login, action$championship, action$team, purchase$id)
+      conflict <- fm_manual_reservation_conflict(fm_clause_jobs(ctx), purchase$id, purchase$price, card_states$capacity()$data)
+      if (!is.null(conflict)) {
         removeModal()
-        shiny::showNotification("Release clause purchases require a player owned by a rival team.",
-          type = "warning", duration = 5)
+        show_preflight_failure(list(message = conflict))
         return()
       }
-
-      # Recheck strict open state before the write (fail closed): the clause
-      # may have locked / transferred between modal-open and submit.
-      if (!isTRUE(today_is_clause_open(sp))) {
-        removeModal()
-        shiny::showNotification(
-          "This release clause is no longer open (price, transfer lock, or clause date no longer valid). Please refresh and try again.",
-          type = "error",
-          duration = 5
-        )
-        return()
-      }
-
-      # Recompute the clause price locally (do not rely on modal-scope state).
-      # Only this clause price is sent to the clause endpoint -- no
-      # comparison price (e.g. max(market, clause)) is ever transmitted.
-      clause_price <- if ("clause_price" %in% colnames(sp) && !is.na(sp$clause_price)) suppressWarnings(as.numeric(sp$clause_price)) else 0
-      confirmed_price <- fm_number(modal_bid_info_RV()$clause)
-      if (!is.finite(confirmed_price) || !is.finite(clause_price) || clause_price <= 0 || clause_price > confirmed_price) {
-        removeModal()
-        shiny::showNotification("The release clause price changed or is unavailable. Reopen the player to confirm the current price.", type = "error")
-        return()
-      }
-
-      # Preflight before write: verify roster slot + verified spendable funds.
-      pf <- if(exists("fm_clause_enabled",mode="function")&&fm_clause_enabled())list(ok=TRUE)else run_acquisition_preflight(sp, "clause", amount = clause_price)
-      if (!isTRUE(pf$ok)) {
-        removeModal()
-        show_preflight_failure(pf)
-        return()
-      }
-
-      player_id <- sp$id
-      player_slug <- if ("slug" %in% colnames(sp) && !is.na(sp$slug)) sp$slug else sp$name
-
-      result <- perform_acquisition("buy_roster_clause", list(
-        login = login,
-        championship_id = champ_id,
-        team_id = team_id,
-        player_id = player_id,
-        player_slug = player_slug,
-        price = clause_price
-      ), "clause")
-      complete_acquisition(result,function(res){
-
-      is_success <- if (is.list(res)) isTRUE(res$success) else isTRUE(res)
-
-      removeModal()
-
-      if (is_success) {
-        tryCatch({
-          log_market_transaction(
-            player_id = player_id,
-            championship_id = champ_id,
-            buyer_team_id = team_id,
-            seller_team_id = if ("user_team_id" %in% colnames(sp)) sp$user_team_id else NULL,
-            price = clause_price,
-            is_clause = TRUE
-          )
-        }, error = function(e) {
-          print(paste0("[Supabase] Clause log warning: ", e$message))
-        })
-        shiny::showNotification(
-          paste0("Release clause buyout of ", player_card_money(clause_price), " executed successfully for ", sp$name, "!"),
-          type = "message",
-          duration = 5
-        )
-        invalidate_manual_resources(login,champ_id,team_id,sp$id)
-        sync_requested <- fm_worker_refresh_league(login,champ_id,team_id,sp$id)
-        if (!sync_requested && is.function(on_bid_updated)) {
-          tryCatch(on_bid_updated(action_type = "clause_paid"), error = function(e) NULL)
+      result <- fm_send_manual_acquisition("buy_roster_clause", args)
+      fm_clause_complete(result, function(res) {
+        uncertain <- identical(res$code, "purchase_response_uncertain")
+        if (isTRUE(res$success)) {
+          tryCatch(log_market_transaction(player_id = purchase$id, championship_id = action$championship,
+            buyer_team_id = action$team, seller_team_id = purchase$seller, price = purchase$price,
+            is_clause = TRUE), error = function(e) message("[Futmondo] Could not record confirmed clause purchase."))
         }
-      } else {
-        if(is.list(res)&&identical(res$code,"api.market.max_number_players_in_roster")) invalidate_manual_resources(login,champ_id,team_id,sp$id)
-        err_msg <- if (is.list(res) && !is.null(res$message) && res$message != "") res$message else "Please verify your funds and try again."
-        shiny::showNotification(
-          paste0("Clause buyout failed: ", err_msg),
-          type = "error",
-          duration = 6
-        )
-      }
+        refresh <- isTRUE(res$success) || uncertain
+        queued <- FALSE
+        if (refresh || identical(res$code, "api.market.max_number_players_in_roster")) {
+          invalidate_manual_resources(login, action$championship, action$team, purchase$id)
+          if (refresh) queued <- fm_worker_refresh_league(login, action$championship, action$team, purchase$id)
+        }
+        if (session$isClosed() || !identical(action, isolate(player_action_context_RV()))) return()
+        removeModal()
+        if (isTRUE(res$success)) {
+          shiny::showNotification(paste0("Release clause buyout of ", player_card_money(purchase$price),
+            " executed successfully for ", purchase$name, "!"), type = "message", duration = 5)
+        } else {
+          shiny::showNotification(res$message, type = if (uncertain) "warning" else "error", duration = 6)
+        }
+        if (refresh && !isTRUE(queued) && is.function(on_bid_updated)) {
+          tryCatch(on_bid_updated(action_type = if (uncertain) "refresh" else "clause_paid"), error = function(e) NULL)
+        }
       })
     })
 
@@ -1843,16 +1783,6 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       active=function()!is.null(card_context())&&player_card_is_own_player(selected_player(),get_reactive_val(user_team_id)),refresh=global_refresh,
       stored=function(){ctx<-availability_team_context();availability_stored("get_my_market_players",ctx,if(!is.null(ctx))auth_args(ctx)else list())},
       current_context=availability_team_context,mode=availability_mode,opening=availability_opening)
-    passive_acquisition_gate<-function(sp,mode){
-      state<-card_states$capacity()
-      if(identical(state$status,"loading"))return(list(ok=FALSE,reason="loading",message=NULL))
-      capacity<-state$data
-      if(exists('fm_clause_enabled',mode='function')&&fm_clause_enabled()){
-        ctx<-resource_context(get_reactive_val(login_token),get_reactive_val(championship_id),get_reactive_val(user_team_id),sp$id)
-        capacity<-fm_clause_adjust_capacity(capacity,fm_clause_jobs(ctx))
-      }
-      evaluate_acquisition_preflight(capacity,mode=if(mode=='clause'&&exists('fm_clause_enabled',mode='function')&&fm_clause_enabled())'offer'else mode,minimum_bid=if(mode=="bid")market_bid_minimum(sp,capacity$rules$minimum_bid_at_value)else NULL)
-    }
     card_started<-reactiveVal(Sys.time());timed_summary<-FALSE;timed_history<-FALSE;timed_availability<-FALSE
     card_chart_ready<-reactiveVal(FALSE)
     card_paint_generation<-reactiveVal(0L)

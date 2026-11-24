@@ -13,7 +13,7 @@ async_adapter_fetch <- function(fn, ...) {
   promises::promise(function(resolve, reject) NULL)
 }
 fm_async_http <- function(url, method, body, ...) {
-  stopifnot(method == 'POST', url == BID_URL)
+  stopifnot(method == 'POST', url %in% c(BID_URL, ROSTER_CLAUSE_URL))
   requests <<- requests + 1L
   price <- jsonlite::fromJSON(body)$query$price
   promises::promise(function(resolve, reject) later::later(function() {
@@ -21,10 +21,6 @@ fm_async_http <- function(url, method, body, ...) {
     resolve(list(status_code = 200L,
       content = charToRaw(jsonlite::toJSON(list(answer = list(code = code)), auto_unbox = TRUE))))
   }, 1))
-}
-buy_roster_clause <- function(...) {
-  requests <<- requests + 1L
-  promises::promise(function(resolve, reject) later::later(function() resolve(list(success = TRUE)), 1))
 }
 row <- data.frame(id = 'player', name = 'Fixture Player', slug = 'fixture', role = 'defensa', team = 'Club',
   value = 200, price = 150, change = 0, points = 10, user_team_id = '', market_inMarket = TRUE)

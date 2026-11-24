@@ -1,5 +1,11 @@
 # Futmondo data review and implementation results
 
+## Session-only scheduled purchase checks for manual actions (2026-11-23)
+
+The scheduling-enabled offline offer and clause fixtures submitted the confirmed player and amount once, with zero pre-submission Futmondo reads or reservation RPCs. Duplicate confirmations did not replay a held request. The offer fixture covered native rejection, lost acknowledgement, a scoped refresh and local conflicts over the target, funds and slots. Inactive reservations skipped the capacity lookup. The clause refresh suite passed all 11 checks, including one catalog refresh and zero player-history reads after success.
+
+The existing account poll supplies scheduled jobs, and saved worker capacity is read from memory only for active reservations on other players. Confirmation adds no timers, database queries or reactive redraw loops. Multiple sessions can briefly disagree between poll updates. Browser tests at 320 and 1440 pixels held each acknowledgement for one second and verified pending controls. The offline lifecycle passed 14 checks and eight tabs. Hosted transaction latency was not measured.
+
 ## Real club match points (2026-11-23)
 
 - The captured finished Levante–Elche response matched the 1–1 score, minute 90 and all eleven visible home points under the championship's custom formula. The focused regression exercised an in-progress response, scheduled and finished cards, valid zero and negative points, missing scoring components, identity checks, failed refresh retention and bounded retry ordering. A delayed database response populated the dialog without changing the draft or requesting Futmondo. Reopening another card reused the same snapshot. The offline lifecycle passed 14 checks and eight tabs. The fixture, crest, lineup module, lineup snapshot context, autonomous discovery and Python worker suites passed.

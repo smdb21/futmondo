@@ -1,5 +1,10 @@
 # Futmondo data architecture redesign plan
 
+## Manual purchase and offer dispatch (2026-11-23)
+
+- [x] Submit manual clause buyouts, market bids and owner offers through one asynchronous native request after checking scheduled reservations in session memory.
+- [ ] Confirm hosted latency after deployment. See [manual dispatch](scheduled_clauses.md#manual-offer-dispatch).
+
 ## Real club match points below Lineup (2026-11-23)
 
 - [x] Trace the captured official request, identities, completion state and scoring mode through the public client.
