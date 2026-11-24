@@ -2533,9 +2533,10 @@ snapshot is pending the updated worker's next normal Pressroom publication.
   calculation during the worker's next publication.
 - [x] Verify the seven previously confirmed award and postponement facts against
   the exact resolved competition and season in read-only production queries.
-- [ ] Apply the scoped evidence repair with explicit approval and verify a
-  newly published production ledger. Resolve remaining conflicting position
-  settlements and missing historical award ownership with source evidence.
+- [x] Apply the approved evidence repair in production and confirm all seven
+  records retain their exact prior payloads and timestamps in the active scope.
+- [ ] Verify a production ledger published after the repair. Resolve remaining
+  conflicting position settlements and historical ownership with source evidence.
 
 See [the verification record](data_review_results.md) for observed production
 coverage, focused regression results and performance.

@@ -6007,3 +6007,29 @@ A separate 100-range UI projection benchmark took 0.400 s with no range
 change I/O. There are no additional browsing requests, polling timers,
 database migrations, cache capacity or widget changes. Local timings
 exclude network, production worker load and mobile hardware.
+
+### Approved production evidence repair · 2026-11-24
+
+The user authorized retrying the seven-record repair. The committed script
+rechecked one exact account, league, competition, season and scoring context,
+found seven eligible records with zero conflicts, and received a successful
+database acknowledgement. A separate readback matched all seven prior payloads
+and observation timestamps exactly. The active season now contains the
+confirmed MVP ownership facts for rounds 4 and 8, the pending final-settlement
+fact for round 8, and four unowned Best XI selections for round 11. The saved
+lineup records identify one owner each for the other seven round-11
+selections. The SQL coverage comparison still found open ownership gaps in
+rounds 4 and 8 within the checked evidence.
+
+The last worker run had completed before the repair. The post-repair probe
+still found the compact calculation observed at 14:21 UTC. The next finance
+job was due at 15:47 UTC under the existing 45-minute cadence. The next
+publication and signed-in Classification display remain unverified.
+
+The focused offline settlement, classification bonuses and compact snapshot
+checks passed. Production readback used 1,848 shared buffer hits with no disk
+reads and took 198 ms database execution plus 49 ms planning. This was a
+one-time write of seven scoped facts and bounded read-only verification.
+The repair adds no recurring source or database requests, UI redraws or
+worker schedule changes. This follow-up changes documentation only and has
+no additional runtime performance impact.

@@ -387,4 +387,7 @@ found under `unknown` competition and season. The scoped repair in
 context and corroborating final selections. It copies seven original facts
 with their original timestamps and provenance when no conflicting target
 exists. Existing winner, roster and settlement checks still govern the ledger.
-The production write requires explicit approval.
+The approved production repair was acknowledged on 2026-11-24. Readback
+matched all seven original payloads and timestamps in the resolved season.
+Classification reflects those facts after the worker saves its next calculation.
+See [the verification record](data_review_results.md).
