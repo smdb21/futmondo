@@ -5846,3 +5846,7 @@ The renderer reuses the existing 180 or 320 particles and the shared 30 FPS cloc
 ## Queued lineup wording · 2026-11-23
 
 Chromium scheduling tests at 390 and 1440 px verified a single full-lineup message with the approved submission time and timezone, including the two-signing fixture and schedule replacement. The status renderer now reads the time directly from the persisted stage, eliminating roster and transfer name lookups and their reactive invalidations. Submission, ownership checks, database work and polling cadence are unchanged. Verification used offline fixtures.
+
+## Half-orbit before the loading close-up · 2026-11-23
+
+The focused Chromium camera check passed on a desktop hero, fullscreen phone and compact phone loader. It sampled the side-on view halfway around the pitch, both teams from the opposite touchline, the midpoint of the slower zoom and the single-player release. With 4× CPU throttling, the 95th-percentile draw time measured 4.4 ms at 1440 px, 4.1 ms at 390 px and 3.8 ms at 320 px. The longer loop spends six more seconds drawing per cycle while loading is active, using the same frame cap, particle pool and visibility controls. The camera adds no network or database work. The offline Shiny lifecycle passed 14 checks and eight tabs. Verification was local.

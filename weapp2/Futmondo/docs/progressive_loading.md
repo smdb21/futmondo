@@ -13,9 +13,9 @@ behavior. The visual follows actual readiness and never delays completion to
 finish an animation. It does not represent real player positions or progress.
 
 The local `www/loading-visual.js` and `www/loading-visual.css` assets animate a
-19.7-second loop: the flat pitch tilts and rotates into perspective, 22 table-football
-figures rise facing their opposing goals. The camera banks toward a near-side
-midfielder and centers the player in close-up. Only that figure dissolves from
+25.7-second loop. The pitch tilts into perspective and 22 table-football figures
+rise facing their opposing goals. The camera flies a half-circle above both
+teams, then moves in for a close-up of the midfielder. Only that figure dissolves from
 head to foot, releasing a flock in its kit colors.
 The flock gathers into radar rings and reveals moving player dots before
 returning to the flat pitch. The component uses the existing `--fm-*` colors and updates on light/dark changes. Its canvas is
@@ -25,14 +25,15 @@ pitch/radar illustration.
 
 The added 3D stage uses a small perspective projection in Canvas 2D rather than
 a separate graphics engine: the pitch rotates from 1.2–3.2 seconds, players rise
-from 2.2–5.2 seconds, with the full formation briefly in view. From 5.45–6.6 seconds the
-camera turns, pans and zooms toward the midfielder as the other figures fade.
-The camera holds still as the close-up particles disperse into the flock from 6.7–8.4 seconds. The formed
+from 2.2–5.2 seconds. The camera orbits the pitch center through 180 degrees
+from 5.45 to 9.25 seconds with both teams in view. From 9.25 to 12.6 seconds
+it gradually centers and enlarges the midfielder as the other figures fade.
+The camera holds still as the close-up particles disperse into the flock from 12.7–14.4 seconds. The formed
 flock moves across the sky for 4.3 seconds. Each particle keeps its body position until release, initially
 travels upward on a curved path, then joins the cloud above the pitch. The
 remaining figure is clipped from the head down in sync with release; the pitch
-and ground shadows fade during departure. Radar assembly starts at 12.7 seconds,
-player detection at 14.7, and the return to the pitch at 17.7. It uses the existing particle budget, local theme
+and ground shadows fade during departure. Radar assembly starts at 18.7 seconds,
+player detection at 20.7, and the return to the pitch at 23.7. It uses the existing particle budget, local theme
 colors and compact-size stroke scaling; no models, textures or network assets
 are required. The extended loop never prolongs loading or changes readiness.
 

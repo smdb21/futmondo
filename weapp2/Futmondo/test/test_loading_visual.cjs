@@ -1,5 +1,6 @@
 // Start test_loading_visual_app.R, then run this file. Add --full-app to both
 // commands for the real offline application startup acceptance checks.
+// --camera-only checks the orbit and close-up at three viewport widths.
 // --fullscreen-only runs the portrait/landscape checks; --clubs-only checks kit variants.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -96,8 +97,8 @@ function instrument() {
         if (Object.values(stats.draws).reduce((sum, n) => sum + n, 0) > before && !stats.capture && stats.samples.length < 10000) {
           const duration = performance.now() - started;
           stats.samples.push(duration);
-          const phase = (timestamp - stats.firstDrawAt + 19700) % 19700;
-          if (phase >= 1800 && phase <= 8400) stats.stageSamples.push(duration);
+          const phase = (timestamp - stats.firstDrawAt + 25700) % 25700;
+          if (phase >= 1800 && phase <= 14400) stats.stageSamples.push(duration);
         }
       }
     });
@@ -363,7 +364,7 @@ function particleMarks(geometry) {
   return geometry.filter(mark => mark.kind === 'fill' && mark.alpha > 0.4 &&
     mark.path.length === 1 && mark.path[0].op === 'ellipse');
 }
-function checkAscent(release, dissolve, rising) {
+function checkAscent({release, dissolve, rising, orbitEnd, approach}) {
   const before = particleMarks(release), after = particleMarks(dissolve);
   assert.ok([180, 320].includes(before.length) && after.length === before.length, 'Dissolve reuses the complete existing particle pool');
   const headRise = before.slice(0, 22).map((mark, i) => mark.path[0].args[1] - after[i].path[0].args[1]);
@@ -377,6 +378,12 @@ function checkAscent(release, dissolve, rising) {
   const heads = marks => marks.filter(mark => mark.kind === 'fill' && mark.path.length === 1 &&
     mark.path[0].op === 'arc' && mark.path[0].args[2] > 1.5);
   assert.equal(heads(rising).length, 22);
+  assert.equal(heads(orbitEnd).length, 22, 'Both teams remain on the field for the half-orbit');
+  const edgeX = geometry => pitchCorners(geometry)[1][0] - pitchCorners(geometry)[0][0];
+  assert.ok(edgeX(rising) > 200 && edgeX(orbitEnd) < -200, 'Camera reaches the opposite touchline before zooming');
+  const midRadius = heads(approach)[7].path[0].args[2];
+  assert.ok(midRadius > 1.5 * heads(orbitEnd)[7].path[0].args[2] &&
+    midRadius < .85 * heads(release)[0].path[0].args[2], 'Zoom is still approaching the player halfway through');
   assert.equal(heads(release).length, 1, 'Camera isolates one intact player before takeoff');
   const [x, y, radius] = heads(release)[0].path[0].args;
   assert.ok(Math.abs(x - 210) < 6 && y < 140 && radius > 3 * heads(rising)[7].path[0].args[2],
@@ -438,20 +445,20 @@ async function fullscreenChecks(browser) {
       assert.deepEqual(teamColors.ids, ['real-madrid', 'barcelona'], 'The main matrix uses a deterministic Madrid/Barcelona pair');
       await checkPairIdentity(page, teamColors.ids);
       const phases = {};
-      for (const [name, at] of [['pitch', 700], ['rising', 5210], ['release', 6650], ['dissolve', 7000], ['morph', 7600], ['flock', 9200], ['lateFlock', 12000], ['radar', 14000], ['players', 16200], ['return', 19000]]) {
+      for (const [name, at] of [['pitch', 700], ['rising', 5210], ['orbitEnd', 9210], ['approach', 10925], ['release', 12650], ['dissolve', 13000], ['morph', 13600], ['flock', 15200], ['lateFlock', 18000], ['radar', 20000], ['players', 22200], ['return', 25000]]) {
         const elapsed = await page.evaluate(() => performance.now() - window.loadingFixture.firstDrawAt);
         await page.waitForTimeout(Math.max(0, at - elapsed));
         phases[name] = await captureGeometry(page);
         if (['rising', 'morph', 'flock'].includes(name))
           await page.screenshot({path: path.join(screenshotDir, `${viewport.width}x${viewport.height}-${theme}-${name}-fullscreen.png`)});
-        if (['release', 'dissolve', 'morph'].includes(name)) {
+        if (['approach', 'release', 'dissolve', 'morph'].includes(name)) {
           checkFullscreenGeometry(particleMarks(phases[name]), layout);
         } else checkFullscreenGeometry(phases[name], layout, name === 'flock');
       }
-      checkAscent(phases.release, phases.dissolve, phases.rising);
+      checkAscent(phases);
       checkTeams(phases, teamColors);
       const seamElapsed = await page.evaluate(() => performance.now() - window.loadingFixture.firstDrawAt);
-      await page.waitForTimeout(Math.max(0, 19800 - seamElapsed));
+      await page.waitForTimeout(Math.max(0, 25800 - seamElapsed));
       assert.deepEqual(await captureGeometry(page), phases.pitch, 'Fullscreen geometry returns to the exact flat loop seam');
       await checkPairIdentity(page, teamColors.ids);
       const normal = await page.evaluate(() => window.loadingFixture.samples);
@@ -471,7 +478,7 @@ async function fullscreenChecks(browser) {
         await waitDraw(page, 'fixture-hero');
         const shortLayout = await checkLaunchLayout(page);
         checkFullscreenGeometry(await captureGeometry(page), shortLayout);
-        for (const [phase, at] of [['rising', 5210], ['radar', 14000], ['players', 16200], ['return', 19000]]) {
+        for (const [phase, at] of [['rising', 5210], ['radar', 20000], ['players', 22200], ['return', 25000]]) {
           const elapsed = await page.evaluate(() => performance.now() - window.loadingFixture.firstDrawAt);
           await page.waitForTimeout(Math.max(0, at - elapsed));
           checkFullscreenGeometry(await captureGeometry(page), shortLayout);
@@ -540,7 +547,7 @@ async function clubChecks(browser) {
       const colors = await readTeamColors(page);
       assert.deepEqual(colors.ids, variant.ids, 'A new document can choose another known club pair');
       const phases = {};
-      for (const [name, at] of [['pitch', 700], ['rising', 5210], ['morph', 7600], ['flock', 9200], ['players', 16200]]) {
+      for (const [name, at] of [['pitch', 700], ['rising', 5210], ['morph', 13600], ['flock', 15200], ['players', 22200]]) {
         const elapsed = await page.evaluate(() => performance.now() - window.loadingFixture.firstDrawAt);
         await page.waitForTimeout(Math.max(0, at - elapsed));
         phases[name] = await captureGeometry(page);
@@ -592,6 +599,31 @@ async function clubChecks(browser) {
   await page.close();
 }
 
+async function cameraChecks(browser) {
+  for (const [width, fullscreen] of [[1440, false], [390, true], [320, false]]) {
+    const {page} = await createPage(browser, width);
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', {rate: 4});
+    await page.goto(origin + (fullscreen ? '/?fullscreen=1' : '/'));
+    await waitDraw(page, 'fixture-hero');
+    const phases = {};
+    const id = width === 320 ? 'fixture-compact' : 'fixture-hero';
+    for (const [name, at] of [['rising', 5210], ['overhead', 7350], ['orbitEnd', 9210],
+      ['approach', 10925], ['release', 12650], ['dissolve', 13000]]) {
+      const elapsed = await page.evaluate(() => performance.now() - window.loadingFixture.firstDrawAt);
+      await page.waitForTimeout(Math.max(0, at - elapsed));
+      phases[name] = await captureGeometry(page, id);
+    }
+    const corners = pitchCorners(phases.overhead);
+    assert.ok(Math.abs(corners[1][1] - corners[0][1]) > 100, 'Camera passes over the end of the pitch mid-orbit');
+    checkAscent(phases);
+    const samples = await page.evaluate(() => window.loadingFixture.stageSamples);
+    assert.ok(samples.length > 100 && p95(samples) < 33.4, 'Camera sequence fits the 30 FPS budget at 4× CPU');
+    console.log(`PASS ${width}px half-orbit, slow approach and release, 4× CPU p95=${p95(samples).toFixed(1)}ms`);
+    await page.close();
+  }
+}
+
 async function visualChecks(browser) {
   for (const width of [1440, 390, 320]) {
     const {page, errors, external} = await createPage(browser, width);
@@ -610,7 +642,7 @@ async function visualChecks(browser) {
       assert.deepEqual(teamColors.ids, ['real-madrid', 'barcelona'], 'The main matrix uses a deterministic Madrid/Barcelona pair');
       await checkPairIdentity(page, teamColors.ids);
       const pictures = [], phases = {};
-      for (const [name, at] of [['pitch', 700], ['tilted', 2400], ['rising', 5210], ['release', 6650], ['dissolve', 7000], ['morph', 7600], ['flock', 9200], ['lateFlock', 12000], ['radar', 14000], ['players', 16200], ['return', 19000]]) {
+      for (const [name, at] of [['pitch', 700], ['tilted', 2400], ['rising', 5210], ['orbitEnd', 9210], ['approach', 10925], ['release', 12650], ['dissolve', 13000], ['morph', 13600], ['flock', 15200], ['lateFlock', 18000], ['radar', 20000], ['players', 22200], ['return', 25000]]) {
         const elapsed = await page.evaluate(() => performance.now() - window.loadingFixture.firstDrawAt);
         await page.waitForTimeout(Math.max(0, at - elapsed));
         phases[name] = await captureGeometry(page);
@@ -626,16 +658,16 @@ async function visualChecks(browser) {
         particleMarks(phases.lateFlock).map(mark => mark.alpha), 'The cloud remains fully formed near the end of its longer stage');
       assert.notDeepEqual(particleMarks(phases.flock), particleMarks(phases.lateFlock), 'The cloud keeps moving throughout the longer stage');
       checkTeams(phases, teamColors);
-      checkAscent(phases.release, phases.dissolve, phases.rising);
+      checkAscent(phases);
       checkGoalFacing(phases.rising, teamColors);
       const seamElapsed = await page.evaluate(() => performance.now() - window.loadingFixture.firstDrawAt);
-      await page.waitForTimeout(Math.max(0, 19800 - seamElapsed));
+      await page.waitForTimeout(Math.max(0, 25800 - seamElapsed));
       const seam = await captureGeometry(page);
       assert.deepEqual(seam, phases.pitch, 'The loop returns to identical field and particle geometry, including mark orientation');
       assert.equal(await page.locator('#fixture-hero canvas').evaluate(canvas => canvas.toDataURL()), pictures[0], 'The complete canvas is identical across the flat loop seam');
       await checkPairIdentity(page, teamColors.ids);
       await noOverflow(page);
-      console.log(`PASS ${width}px ${theme}: eleven loop phases, upward head-first dissolve, 22 solid goal-facing foosball figures, opposed heads and short shoes, eleven players per club, persistent kit colors, exact seam`);
+      console.log(`PASS ${width}px ${theme}: thirteen loop phases, upward head-first dissolve, 22 solid goal-facing foosball figures, opposed heads and short shoes, eleven players per club, persistent kit colors, exact seam`);
     }
     const responseMs = await page.evaluate(() => new Promise(resolve => {
       const start = performance.now();
@@ -648,7 +680,7 @@ async function visualChecks(browser) {
     const normalSamples = await page.evaluate(() => window.loadingFixture.samples.splice(0));
     const normalStageSamples = await page.evaluate(() => window.loadingFixture.stageSamples.splice(0));
     const cdp = await page.context().newCDPSession(page);
-    const untilStage = await page.evaluate(() => (5400 - ((performance.now() - window.loadingFixture.firstDrawAt) % 19700) + 19700) % 19700);
+    const untilStage = await page.evaluate(() => (5400 - ((performance.now() - window.loadingFixture.firstDrawAt) % 25700) + 25700) % 25700);
     await page.waitForTimeout(untilStage);
     await page.evaluate(() => { window.loadingFixture.samples = []; window.loadingFixture.stageSamples = []; });
     await cdp.send('Emulation.setCPUThrottlingRate', {rate: 4});
@@ -808,6 +840,6 @@ async function appChecks(browser) {
 (async () => {
   const executablePath = process.env.FUTMONDO_TEST_CHROMIUM || '/tmp/futmondo-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell';
   const browser = await chromium.launch({headless: true, executablePath, args: ['--no-sandbox']});
-  try { await (fullApp ? appChecks(browser) : process.argv.includes("--fullscreen-only") ? fullscreenChecks(browser) : process.argv.includes("--clubs-only") ? clubChecks(browser) : visualChecks(browser)); }
+  try { await (fullApp ? appChecks(browser) : process.argv.includes("--camera-only") ? cameraChecks(browser) : process.argv.includes("--fullscreen-only") ? fullscreenChecks(browser) : process.argv.includes("--clubs-only") ? clubChecks(browser) : visualChecks(browser)); }
   finally { await browser.close(); }
 })().catch(error => { console.error(error.stack); process.exitCode = 1; });

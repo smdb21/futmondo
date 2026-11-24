@@ -2481,3 +2481,5 @@ Implemented locally: a queued XI opens on the regular editable pitch. The picker
 Implemented locally. Once both teams have risen, the camera approaches a near-side midfielder. That player dissolves into the flock before the radar phase. The same sequence serves compact and fullscreen loaders.
 
 Implemented locally: the queue describes each full lineup submission by its scheduled time. A single submission appears once, including when several signings arrive together.
+
+The camera now completes a wide 180-degree orbit above the two teams before a 3.35-second approach to the midfielder. Implemented locally.

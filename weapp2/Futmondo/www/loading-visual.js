@@ -9,9 +9,11 @@
   var tau = Math.PI * 2;
   // Time to rise and read the figures, then watch the cloud in motion.
   var riseStart = 2.2, riseDuration = 2.6;
-  var takeoffStart = 6.7, takeoffDuration = 1.7;
+  var orbitStart = 5.45, orbitDuration = 3.8;
+  var approachStart = orbitStart + orbitDuration, approachDuration = 3.35;
+  var takeoffStart = approachStart + approachDuration + .1, takeoffDuration = 1.7;
   var flockStart = takeoffStart + takeoffDuration;
-  var radarStart = 12.7, radarDuration = 2;
+  var radarStart = flockStart + 4.3, radarDuration = 2;
   var detectionStart = radarStart + radarDuration;
   var returnStart = detectionStart + 3, returnDuration = 2;
   var loopDuration = returnStart + returnDuration;
@@ -78,21 +80,26 @@
   var sideFace = frontFace.slice(7).concat(backFace.slice(7).reverse());
   var shirtTop = [[-2.5,-2,24],[3,-2,24],[3,2,24],[-2.5,2,24]];
   var footTop = [[-1.6,-3.2,3],[3.2,-3.2,3],[3.2,3.2,3],[-1.6,3.2,3]];
+  function oppositeSide(vertices) { return vertices.map(function (v) { return [v[0],-v[1],v[2]]; }); }
+  var oppositeFace = oppositeSide(sideFace);
   // A stripe on both shirt planes stays readable while players face the goals.
   var frontStripe = [[3,-1.6,14],[3,1.6,14],[3,1.6,23],[3,-1.6,23]];
   var backStripe = frontStripe.map(function (v) { return [-2.5,v[1],v[2]]; });
   var sideStripe = [[-.5,6,16],[1.8,6,16],[1.8,5.5,22],[-.5,5.5,22]];
+  var oppositeStripe = oppositeSide(sideStripe);
   function clamp(x) { return Math.max(0, Math.min(1, x)); }
   function ease(x) { x = clamp(x); return x * x * x * (x * (x * 6 - 15) + 10); }
   function mix(a, b, w) { return a + (b - a) * w; }
   function cameraAt(t, instance) {
     var turn = ease((t-1.2)/2);
-    var approach = ease((t-5.45)/1.15);
-    var yaw = approach*.25 + turn*(-.32 + .54*ease((t-2.6)/1.9));
+    var orbit = ease((t-orbitStart)/orbitDuration);
+    var approach = ease((t-approachStart)/approachDuration);
+    var yaw = orbit*Math.PI + turn*(-.32 + .54*ease((t-2.6)/1.9));
     var tilt = turn*.96 + approach*.16;
     var camera = { cy: Math.cos(yaw), sy: Math.sin(yaw), ct: Math.cos(tilt),
       st: Math.sin(tilt), zoom: 1-.08*turn, lift: 0, pan: 0, approach: approach, turn: turn };
     camera.eyeX = 210+600*camera.sy*camera.st;
+    camera.eyeY = 140+600*camera.cy*camera.st;
     // Fit the board/shadow in short portrait scenes before placing it below
     // the sky. Extra scaling is needed only when perspective exceeds the box.
     var top, bottom;
@@ -110,10 +117,12 @@
     var high = instance.height-instance.offset-7*turn-bottom;
     camera.lift = Math.max(low,Math.min(high,(9+(instance.mobile ? instance.height*.20 : 25))*turn));
     if (approach > 0) {
+      project(camera,subject.x,subject.y,15);
+      var aimX = mix(camera.px,210,approach), aimY = mix(camera.py,140,approach);
       camera.zoom *= mix(1,Math.min(5.5,instance.height/45),approach);
       project(camera,subject.x,subject.y,15);
-      camera.pan = (210-camera.px)*approach;
-      camera.lift += (140-camera.py)*approach;
+      camera.pan = aimX-camera.px;
+      camera.lift += aimY-camera.py;
     }
     return camera;
   }
@@ -164,7 +173,8 @@
         z >= 16 ? mix(6,5.5,(z-16)/8) : z >= 14 ? mix(3.5,6,(z-14)/2) :
         z > 3 ? mix(2.5,3.5,(z-3)/11) : 3.2;
       var bodyY = (((i*.618033989)%1)*2-1)*halfWidth;
-      var bodyX = z > 24 ? Math.sqrt(Math.max(0,halfWidth*halfWidth-bodyY*bodyY)) : frontDepth(bodyY,z);
+      // The half-orbit ends facing the back of the featured midfielder.
+      var bodyX = z > 24 ? -Math.sqrt(Math.max(0,halfWidth*halfWidth-bodyY*bodyY)) : (z <= 3 ? -1.6 : -2.5);
       result.push({ x: mix(segment.a[0], segment.b[0], f), y: mix(segment.a[1], segment.b[1], f),
         bodyX: bodyX, bodyY: bodyY, bodyZ: z, stripe: z >= 16 && z <= 23 && Math.abs(bodyY) < 1.6,
         release: takeoffStart + (1-z/30)*.85,
@@ -255,16 +265,17 @@
       ctx.beginPath(); ctx.ellipse(footX,footY,4*camera.k,1.5*camera.k,0,0,tau); ctx.fill();
       var cut = actor === subject ? 30*(1-clamp((t-takeoffStart)/.85)) : 30;
       if (cut <= 0) continue;
-      // Select the camera-facing X surface, then shade the visible +Y side.
+      // Select the camera-facing X surface, then shade the visible lateral side.
       // This gives opposing teams actual depth rather than rotated billboards.
       var front = (camera.eyeX-actor.x)*actor.facing >= 0;
+      var positiveSide = camera.eyeY >= actor.y;
       var outline = palette.edges[actor.team];
       ctx.strokeStyle = outline || color;
       ctx.lineWidth = .55*markScale;
       ctx.globalAlpha = alpha*rise*.9;
       playerFace(ctx,camera,actor,front ? frontFace : backFace,rise,cut,outline);
       ctx.globalAlpha = alpha*rise*.58;
-      playerFace(ctx,camera,actor,sideFace,rise,cut,outline);
+      playerFace(ctx,camera,actor,positiveSide ? sideFace : oppositeFace,rise,cut,outline);
       ctx.globalAlpha = alpha*rise*.75;
       playerFace(ctx,camera,actor,shirtTop,rise,cut,outline);
       ctx.globalAlpha = alpha*rise*.8;
@@ -273,7 +284,7 @@
         ctx.fillStyle = palette.stripes[actor.team];
         ctx.globalAlpha = alpha*rise*.95;
         playerFace(ctx,camera,actor,front ? frontStripe : backStripe,rise,cut);
-        playerFace(ctx,camera,actor,sideStripe,rise,cut);
+        playerFace(ctx,camera,actor,positiveSide ? sideStripe : oppositeStripe,rise,cut);
         ctx.fillStyle = color;
       }
       if (cut > 24) {
@@ -386,7 +397,7 @@
     var yaw = .18*Math.sin(flockTime*.65), cos = Math.cos(yaw), sin = Math.sin(yaw);
     // Field specks fade as the solid teams rise. Reveal the close-up material
     // only once the camera settles on the midfielder.
-    var material = 1-assemble+ease((t-6.4)/.25);
+    var material = 1-assemble+ease((t-takeoffStart+.3)/.25);
     var particles = instance.particles;
     for (var i = 0; material > .001 && i < particles.length; i++) {
       var p = particles[i];
