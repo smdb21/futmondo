@@ -20,6 +20,17 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
       await page.getByText('Due at or after kickoff', {exact: false}).waitFor();
       const start = performance.now();
       await page.getByRole('button', {name: 'Optimize'}).click();
+      if (process.env.FUTMONDO_EDITOR_OWNED_FIXTURE === 'true') {
+        const save = page.getByRole('button', {name: 'Save to LigaRadar'});
+        await save.click();
+        await page.getByText('Saved to LigaRadar and verified.').waitFor();
+        assert.equal(await page.locator('.fm-lineup-player.fm-lineup-incoming').count(), 0);
+        assert.equal(await page.locator('#lineup-schedule_status li').count(), 0);
+        assert.equal((await readCounts())[1], counts[1] + 1);
+        console.log(`PASS ${width}px: all-owned optimized lineup saves immediately`);
+        await page.close();
+        continue;
+      }
       const signing = page.locator('.fm-lineup-pitch .fm-lineup-incoming[data-player-id="p25"]');
       await signing.waitFor();
       const rendered = Math.round(performance.now() - start);
@@ -31,64 +42,52 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
         return incoming && owned && getComputedStyle(incoming).filter === 'grayscale(1)' &&
           getComputedStyle(owned).filter === 'none';
       });
-      if (process.env.FUTMONDO_EDITOR_COVERAGE_FIXTURE === 'true') {
-        const stageList = page.locator('#lineup-schedule_preview details');
-        const schedule = page.locator('#lineup-schedule_status li');
-        const approveStages = async () => {
-          for (const stage of await stageList.all()) {
-            await stage.getByLabel('Approve this lineup').check();
-          }
-        };
-        const scheduleButton = page.getByRole('button', { name: 'Schedule approved lineup' });
-        assert.equal(await stageList.count(), 1);
-        await approveStages();
-        await scheduleButton.click();
-        await page.getByText('Scheduled lineup preview').waitFor();
-        await schedule.first().waitFor();
-        await page.getByLabel('Require full outfield bench coverage').check();
-        await page.getByRole('button', { name: 'Optimize' }).click();
-        await page.getByText(/Latest arrival in this lineup/).waitFor();
-        await signing.waitFor();
-        assert.equal(await stageList.count(), 1);
-        assert.equal(await schedule.count(), 1);
-        await approveStages();
-        await scheduleButton.click();
-        const keep = page.getByRole('button', { name: 'Keep schedule' });
-        await keep.click();
-        assert.equal(await schedule.count(), 1);
-        await scheduleButton.click();
-        await page.getByRole('button', { name: 'Cancel schedule and replace' }).click();
-        await page.getByText('Scheduled lineup preview').waitFor();
-        await page.waitForFunction(() => document.querySelectorAll('#lineup-schedule_status li').length === 1);
-        assert.match(await schedule.first().innerText(), /Incoming Forward/);
-        assert.deepEqual(await readCounts(), counts);
-        assert.deepEqual(errors, []);
-        console.log(`PASS ${width}px: coverage reoptimization defers the first save and replacement requires confirmation`);
-        await page.close();
-        continue;
-      }
-      const review = page.locator('#lineup-schedule_preview details');
-      assert.equal(await review.count(), 1);
+      const save = page.getByRole('button', {name: 'Save to LigaRadar'});
+      const schedule = page.locator('#lineup-schedule_status li');
+      const coverage = process.env.FUTMONDO_EDITOR_COVERAGE_FIXTURE === 'true';
+      const latest = coverage ? page.locator('.fm-lineup-player[data-player-id="p27"]') : signing;
+      const openConfirmation = async () => {
+        await save.click();
+        const due = (await latest.locator('.fm-lineup-incoming-label').innerText()).replace('Incoming · ', '');
+        await page.getByText(`Your lineup will be scheduled for ${due}.`, {exact: true}).waitFor();
+      };
+      const confirm = page.getByRole('button', {name: 'Schedule lineup', exact: true});
+      assert.equal(await page.getByLabel('Approve this lineup').count(), 0);
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
       if (process.env.FUTMONDO_EDITOR_DISABLE_SCHEDULE === 'true') {
         await page.getByText('Automatic saves are unavailable on this deployment.').waitFor();
-        assert.equal(await page.getByRole('button', {name: 'Schedule approved lineup'}).count(), 0);
+        assert.ok(await save.isDisabled());
         assert.deepEqual(await readCounts(), counts);
-        console.log(`PASS ${width}px: default preview with scheduling disabled (${rendered} ms)`);
+        console.log(`PASS ${width}px: pitch with scheduling disabled (${rendered} ms)`);
         await page.close();
         continue;
       }
-      await page.getByRole('button', {name: 'Schedule approved lineup'}).click();
-      await page.getByText('Approve the lineup before scheduling.').waitFor();
-      assert.deepEqual(await readCounts(), counts);
-      for (const detail of await review.all()) {
-        await detail.getByLabel('Approve this lineup').check();
-      }
-      await page.getByRole('button', {name: 'Schedule approved lineup'}).click();
+      await openConfirmation();
+      await page.getByRole('button', {name: 'Cancel', exact: true}).click();
+      assert.equal(await schedule.count(), 0);
+      await signing.waitFor();
+      await openConfirmation();
+      await confirm.click();
       await page.getByText('Scheduled lineup · queued').waitFor();
+      if (coverage) {
+        await page.getByLabel('Require full outfield bench coverage').check();
+        await page.getByRole('button', {name: 'Optimize'}).click();
+        await openConfirmation();
+        await confirm.click();
+        await page.getByRole('button', {name: 'Keep schedule'}).click();
+        await openConfirmation();
+        await confirm.click();
+        await page.getByRole('button', {name: 'Cancel schedule and replace'}).click();
+        await page.getByText('Lineup scheduled.', {exact: true}).waitFor();
+        assert.match(await schedule.first().innerText(), /Incoming Forward/);
+        assert.deepEqual(await readCounts(), counts);
+        assert.deepEqual(errors, []);
+        console.log(`PASS ${width}px: dated confirmation and schedule replacement`);
+        await page.close();
+        continue;
+      }
       await page.getByLabel('Include incoming players').uncheck();
       await page.getByRole('button', {name: 'Optimize'}).click();
-      const save = page.getByRole('button', {name: 'Save to LigaRadar'});
       await page.waitForFunction(() => !document.querySelector('#lineup-save').disabled);
       await save.click();
       await page.getByRole('button', {name: 'Keep schedule'}).click();
@@ -99,7 +98,7 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
       await page.getByText('Scheduled lineup · cancelled').waitFor();
       assert.equal((await readCounts())[1], counts[1] + 1);
       assert.deepEqual(errors, []);
-      console.log(`PASS ${width}px: preview, grayscale, stage approvals and confirmed manual cancellation (${rendered} ms to preview)`);
+      console.log(`PASS ${width}px: preview, grayscale, dated approval and confirmed manual cancellation (${rendered} ms to preview)`);
       await page.close();
     }
   } finally {

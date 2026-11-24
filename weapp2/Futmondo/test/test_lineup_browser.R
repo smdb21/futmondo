@@ -82,7 +82,8 @@ coverage_fixture <- identical(Sys.getenv('FUTMONDO_EDITOR_COVERAGE_FIXTURE'), 't
 if (scheduled_fixture) {
   signing <- fixture_roster[1, ]
   signing$id <- 'p25'; signing$name <- 'Incoming Keeper'; signing$photo <- 'fixture-player.png'
-  fixture_history <- rbind(fixture_history, data.frame(player_id='p25',round=1:5,points=250))
+  keeper_points <- if(identical(Sys.getenv('FUTMONDO_EDITOR_OWNED_FIXTURE'),'true')) -50 else 250
+  fixture_history <- rbind(fixture_history, data.frame(player_id='p25',round=1:5,points=keeper_points))
   fixture_arrivals <- data.frame(player_id='p25', player_name=signing$name, role=signing$role,
     role2='', status='ok', photo=signing$photo, available=TRUE, team=signing$club, logo=signing$logo,
     joins_at=as.POSIXct(Sys.time()+120), timing_error='')

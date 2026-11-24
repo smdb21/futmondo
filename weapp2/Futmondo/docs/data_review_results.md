@@ -5806,3 +5806,9 @@ Hosted release rendering remains unverified.
 The offline lineup scheduling fixture passed kickoff filtering, simultaneous arrivals, unavailable signings, immediate submission, and a selected substitute arriving after full coverage was already possible. A later unused signing did not delay the save. The 18-owned, two-incoming fixture across all formations took 8 ms median over 20 runs. Planning now makes one optimizer call per request and queues one submission. It reuses existing roster and history reads, status polling, and durable plan storage.
 
 Chromium passed the approval, replacement, cancellation and scheduling-disabled cases at 390 and 1440 px using synthetic fixtures. The offline Shiny lifecycle passed 14 checks and eight tabs. Production submission and real account data were outside these checks.
+
+## Pitch review and dated Save confirmation · 2026-11-23
+
+The lineup module checks passed. Chromium at 390 and 1440 px verified incoming and owned player styling, the confirmation timestamp against the latest selected signing, cancellation, replacement, disabled scheduling and immediate manual saving for an all-owned XI and bench despite a pending signing. The offline Shiny lifecycle passed 14 checks and eight tabs.
+
+Review reuses the pitch and drops the second player-by-player rendering pass. Opening and cancelling the dialog uses local plan state. Fixture read and write counters stayed flat through preview and scheduling, with the existing admission RPC stubbed. In the scheduling-enabled browser fixture the pitch appeared in 821 ms on mobile and 212 ms on desktop. These are local fixture timings. Hosted scheduling was not exercised.

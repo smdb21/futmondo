@@ -2465,3 +2465,5 @@ See the clause status review in `docs/data_review_results.md`.
 ## Round-start lineup submission · 2026-11-23
 
 Implemented locally. New plans optimize once over the projected squad and queue one approved lineup at the latest selected arrival. Existing persisted plans continue through the same worker contract. Production deployment is pending.
+
+The pitch now serves as the review surface for an incoming lineup. Save opens a dated scheduling confirmation when the selection includes a signing. All-owned lineups use the manual save. Implemented locally.
