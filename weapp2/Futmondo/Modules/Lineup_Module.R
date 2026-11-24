@@ -59,7 +59,7 @@ lineup_UI <- function(id) {
             title='Allow doubtful players when optimizing. Injured, suspended and unavailable players are always excluded from the starting XI and bench.',
             'Include doubtful players'),FALSE,width='100%'),
           shiny::checkboxInput(ns('require_bench_coverage'),shiny::span(
-            title='When enabled, Optimize requires separate substitutes covering defender, midfielder and forward. Goalkeeper cover is not required. The starting XI or formation may change to leave this cover on the bench. If no eligible lineup can provide it, your draft is kept.',
+            title='When enabled, Optimize requires separate substitutes covering defender, midfielder and forward. Substitutes cover their primary position only. Goalkeeper cover is not required. The starting XI or formation may change to leave this cover on the bench. If no eligible lineup can provide it, your draft is kept.',
             'Require full outfield bench coverage'),FALSE,width='100%'),
           shiny::checkboxInput(ns('include_incoming'),'Include incoming players',TRUE,width='100%'))),
       shiny::div(class='fm-lineup-actions',
@@ -376,7 +376,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
     output$picker_players<-shiny::renderUI({
       pick<-selected();shiny::req(pick,source(),draft())
       shiny::req(current(pick$generation,pick$key),identical(pick$strategy,draft()$strategy))
-      rows<-roster();positions<-lineup_positions(rows,source()$rules$multiposition);leaving<-departures()$excluded_ids
+      rows<-roster();positions<-lineup_positions(rows,!pick$bench&&source()$rules$multiposition);leaving<-departures()$excluded_ids
       eligible<-if(pick$bench)rep(TRUE,nrow(rows))else vapply(positions,function(p)lineup_slot_roles(draft()$strategy)[pick$index]%in%p,logical(1))
       rows<-rows[eligible,,drop=FALSE];score<-scores();averages<-score$average[match(rows$id,score$id)];positions<-positions[eligible]
       value<-draft();old<-if(pick$bench)value$bench[pick$index]else value$starters[pick$index]
@@ -674,6 +674,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       plan<-preview();value<-draft()
       if(!is.null(plan))value<-plan$stages[[1]]$lineup
       roles<-lineup_slot_roles(value$strategy)
+      covered<-lineup_bench_coverage(if(is.null(plan))roster()else plan$rows,value$bench)
       shiny::div(class='fm-round-lineup',
         shiny::div(class='fm-lineup-layout',
         shiny::div(class='fm-lineup-pitch',role='group',`aria-label`=paste('Pitch, formation',value$strategy),
@@ -686,7 +687,6 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
         if(source()$rules$bench_enabled)shiny::div(class='fm-lineup-bench',shiny::h4('Substitutes · best to worst'),
           shiny::div(class='fm-lineup-bench-row',lapply(seq_len(4L),function(i)tile(value$bench[i],'Substitute',i,TRUE,plan))),
           shiny::div(class='fm-lineup-coverage',lapply(c('DEF','MID','FWD'),function(role){
-            covered<-lineup_bench_coverage(if(is.null(plan))roster()else plan$rows,value$bench,source()$rules$multiposition)
             shiny::span(class=if(!role%in%covered)'fm-lineup-warning',paste(role,if(role%in%covered)'✓'else'—'))})))))
     })
     output$captain_control<-shiny::renderUI({

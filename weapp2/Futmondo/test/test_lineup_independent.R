@@ -29,6 +29,7 @@ oracle_lineup <- function(roster,scores,formations,include_doubtful=FALSE,requir
   score <- setNames(scores$average,scores$id)
   roles <- lapply(seq_len(nrow(roster)),function(i)
     unique(c(canonical(roster$role[i]),if(multiposition)canonical(roster$role2[i]))))
+  primary <- lapply(roster$role,canonical)
   best <- -Inf
   for(strategy in formations) {
     n <- as.integer(strsplit(strategy,'-',fixed=TRUE)[[1]])
@@ -43,7 +44,7 @@ oracle_lineup <- function(roster,scores,formations,include_doubtful=FALSE,requir
     for(d in picks[[1]])for(m in picks[[2]])for(f in picks[[3]])for(g in gk) {
       chosen <- c(d,m,f,g)
       if(anyDuplicated(chosen))next
-      if(require_bench_coverage&&oracle_coverage(roles,setdiff(seq_len(nrow(roster)),chosen))<3L)next
+      if(require_bench_coverage&&oracle_coverage(primary,setdiff(seq_len(nrow(roster)),chosen))<3L)next
       total <- sum(score[roster$id[chosen]])
       if(total>best)best<-total
     }
@@ -51,8 +52,7 @@ oracle_lineup <- function(roster,scores,formations,include_doubtful=FALSE,requir
   best
 }
 brute_bench <- function(roster,scores,size) {
-  role <- lapply(seq_len(nrow(roster)),function(i)
-    unique(c(canonical(roster$role[i]),canonical(roster$role2[i]))))
+  role <- lapply(roster$role,canonical)
   choices <- combn(seq_len(nrow(roster)),size,simplify=FALSE)
   totals <- vapply(choices,function(index)sum(scores$average[match(roster$id[index],scores$id)]),numeric(1))
   covered <- vapply(choices,function(index)oracle_coverage(role,index),integer(1))
@@ -95,8 +95,7 @@ for(multi in c(FALSE,TRUE))for(override in c(FALSE,TRUE))for(shift in 0:2){
   stopifnot(!is.null(actual),actual$total==expected,
     !anyDuplicated(c(actual$draft$starters,actual$draft$bench)),length(actual$coverage)==3L)
   bench_rows<-roster[match(actual$draft$bench[nzchar(actual$draft$bench)],roster$id),]
-  roles<-lapply(seq_len(nrow(bench_rows)),function(i)
-    unique(c(canonical(bench_rows$role[i]),if(multi)canonical(bench_rows$role2[i]))))
+  roles<-lapply(bench_rows$role,canonical)
   stopifnot(oracle_coverage(roles,seq_len(nrow(bench_rows)))==3L)
 }
 cat('PASS constrained XI matches independent exhaustive feasible-lineup oracle for 12 score/eligibility/multiposition cases\n')
@@ -116,6 +115,17 @@ stopifnot(length(bench_actual$ids)==4L,
   identical(as.numeric(bench_scores$average[match(bench_actual$ids,bench_scores$id)]),
     sort(as.numeric(bench_scores$average[match(bench_actual$ids,bench_scores$id)]),decreasing=TRUE)))
 cat('PASS independent exhaustive bench oracle; coverage outranks points and order is best to worst\n')
+
+# Only the MID/FWD player can free a primary forward for the bench.
+primary_fixture <- data.frame(id=c('g',paste0('d',1:5),paste0('m',1:5),'dual','f1','f2'),
+  role=c('GK',rep('DEF',5),rep('MID',6),'FWD','FWD'),role2='',status='ok')
+primary_fixture$role2[primary_fixture$id=='dual'] <- 'FWD'
+primary_scores <- data.frame(id=primary_fixture$id,average=c(0,rep(10,5),rep(7.33,5),9.67,20,19))
+plan <- lineup_optimize(primary_fixture,primary_scores,'4-4-2',require_bench_coverage=TRUE)
+stopifnot(!is.null(plan),'dual'%in%plan$draft$starters[1:2],'f2'%in%plan$draft$bench,
+  identical(lineup_bench_coverage(primary_fixture,c('dual','m1','d1')),c('DEF','MID')),
+  is.null(lineup_optimize(primary_fixture,primary_scores,'4-4-2',multiposition=FALSE,require_bench_coverage=TRUE)))
+cat('PASS primary midfield substitute cannot supply forward coverage, secondary forward can start\n')
 
 # One common window for all players; a running round is ignored, a missing score
 # stays unknown, and a confirmed zero/negative score is retained.

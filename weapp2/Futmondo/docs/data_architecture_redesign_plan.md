@@ -2469,3 +2469,5 @@ Implemented locally. New plans optimize once over the projected squad and queue 
 The pitch now serves as the review surface for an incoming lineup. Save opens a dated scheduling confirmation when the selection includes a signing. All-owned lineups use the manual save. Implemented locally.
 
 Save visibility follow-up (implemented locally). The Lineup page includes the Save button in its initial markup and updates it in place for both manual and scheduled submissions.
+
+Primary-position bench coverage is implemented locally for both current and projected squads. Full-coverage optimization reserves one player of each outfield primary position. The bench picker and pitch indicators show that same role.

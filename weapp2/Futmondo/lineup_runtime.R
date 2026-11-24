@@ -163,6 +163,7 @@ lineup_optimize <- function(roster,scores,allowed,current=NULL,include_doubtful=
   starter_from<-lapply(seq_len(4L),function(role)which(slots<11L&lattice[,role]<maxima[role]))
   # Each coverage bit reserves a distinct remaining player for DEF/MID/FWD.
   # A pass can place this player in the XI or reserve them, never both.
+  if(isTRUE(require_bench_coverage))bench_positions<-lineup_positions(roster,FALSE)
   reserve_from<-if(isTRUE(require_bench_coverage))lapply(c(1L,2L,4L),function(bit)
     which(slots<=11L&bitwAnd(rep(masks,each=base_size),bit)==0L))else list()
   # Equal observed totals favor dual MID/FWD players in midfield; no bonus
@@ -182,7 +183,7 @@ lineup_optimize <- function(roster,scores,allowed,current=NULL,include_doubtful=
       hit<-which(better);if(!length(hit))next
       dest<-to[hit];next_best[dest]<-candidate[hit];next_midfield[dest]<-mids[hit];next_kept[dest]<-kept[hit];prev[i,dest]<-from[hit];chosen[i,dest]<-role
     }
-    if(isTRUE(require_bench_coverage))for(role in which(c('DEF','MID','FWD')%in%positions[[i]])){
+    if(isTRUE(require_bench_coverage))for(role in which(c('DEF','MID','FWD')%in%bench_positions[[i]])){
       from<-reserve_from[[role]];from<-from[is.finite(old[from])];if(!length(from))next
       to<-from+base_size*bitwShiftL(1L,role-1L)
       candidate<-old[from];mids<-old_midfield[from];kept<-old_kept[from]
@@ -211,7 +212,7 @@ lineup_optimize <- function(roster,scores,allowed,current=NULL,include_doubtful=
     incomplete=any(!is.finite(scores$average)),rounds=attr(scores,'rounds'))
 }
 lineup_bench <- function(roster,scores,exclude=character(),size=4L,multiposition=TRUE) {
-  positions<-lineup_positions(roster,multiposition);values<-as.numeric(scores$average[match(roster$id,scores$id)])
+  positions<-lineup_positions(roster,FALSE);values<-as.numeric(scores$average[match(roster$id,scores$id)])
   eligible<-!roster$id%in%exclude&is.finite(values)&vapply(positions,function(p)any(p%in%c('DEF','MID','FWD')),logical(1))
   roster<-roster[eligible,,drop=FALSE];values<-values[eligible];positions<-positions[eligible]
   order_ids<-order(as.character(roster$id));roster<-roster[order_ids,,drop=FALSE];values<-values[order_ids];positions<-positions[order_ids]
@@ -284,8 +285,6 @@ lineup_validate <- function(draft,roster,rules) {
   unique(issues)
 }
 lineup_bench_coverage <- function(roster,ids,multiposition=TRUE) {
-  # Reuse the exact distinct-substitute coverage solver with equal weights.
   rows<-roster[roster$id%in%ids[nzchar(ids)],,drop=FALSE]
-  if(!nrow(rows))return(character())
-  lineup_bench(rows,data.frame(id=rows$id,average=0),size=nrow(rows),multiposition=multiposition)$coverage
+  intersect(c('DEF','MID','FWD'),unlist(lineup_positions(rows,FALSE),use.names=FALSE))
 }
