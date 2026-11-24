@@ -2,8 +2,8 @@ const assert=require('node:assert/strict');
 const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo-review-tools/node_modules')+'/playwright');
 (async()=>{
  const browser=await chromium.launch({headless:true,executablePath:process.env.FUTMONDO_TEST_CHROMIUM||undefined,args:['--no-sandbox']});
- try{for(const width of [390,1440]){
-  const page=await browser.newPage({viewport:{width,height:1000}});
+ try{for(const width of [390,1440])for(const theme of ['light','dark']){
+  const page=await browser.newPage({viewport:{width,height:1000},colorScheme:theme});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.addInitScript(()=>{
    window.plotPublications=0;
@@ -16,6 +16,20 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
   await page.goto('http://127.0.0.1:8571');
   await page.waitForFunction(()=>document.getElementById('plots-standings_plot').data?.filter(x=>x.y?.some(Number.isFinite)).length===9);
   assert.equal(await page.locator('.fm-plot-loading:visible').count(),1);
+  const axis = await page.locator('#plots-standings_plot').evaluate(e=>({
+    ticks:[...e.querySelectorAll('.ytick text')].map(t=>({label:t.textContent,top:t.getBoundingClientRect().top,bottom:t.getBoundingClientRect().bottom})),
+    grids:e.querySelectorAll('.ygrid').length,
+    hasDtick:Object.prototype.hasOwnProperty.call(e.layout.yaxis,'dtick'),
+    nticks:e.layout.yaxis.nticks,
+    opacity:getComputedStyle(e).opacity
+  }));
+  assert.equal(axis.hasDtick,false,'Points axis must omit dtick, including an empty array');
+  assert.equal(axis.nticks,6);
+  assert.ok(axis.ticks.length>=2&&axis.ticks.length<=8,'Readable bounded points tick count');
+  assert.ok(axis.grids<=8);
+  const tickRects=axis.ticks.slice().sort((a,b)=>a.top-b.top);
+  for(let i=1;i<tickRects.length;i++)assert.ok(tickRects[i].top>=tickRects[i-1].bottom+1,'Points labels must not overlap');
+  assert.equal(axis.opacity,'1');
   const heartbeat=async n=>{
    const started=Date.now();await page.evaluate(n=>Shiny.setInputValue('pulse',n,{priority:'event'}),n);
    await page.waitForFunction(n=>document.getElementById('heartbeat').textContent===String(n),n);
@@ -30,7 +44,8 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
   await page.waitForFunction(()=>document.getElementById('plots-standings_plot').data?.filter(x=>x.y?.some(Number.isFinite)).length===10);
   await page.waitForFunction(()=>![...document.querySelectorAll('.fm-plot-loading')].some(e=>e.getClientRects().length));
   const series=await page.locator('#plots-standings_plot').evaluate(e=>e.data.find(x=>x.name==='Team 1'));
-  assert.deepEqual(series.y,[1,3,6,10,15,21,28,36,45,55,66,78,91,105]);
+  assert.deepEqual(series.y,Array.from({length:14},(_,i)=>{const n=i+1;return 5*n*(n+1)+n;}));
+  await page.locator('.fm-information-scope').screenshot({path:'/tmp/plots-points-axis-'+width+'-'+theme+'.png'});
   await page.waitForTimeout(250);
   const before=await page.evaluate(()=>window.plotPublications);assert.ok(before>0,'Chart publication counter is active');
   for(let i=0;i<3;i++){
@@ -49,7 +64,7 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2),false);
   assert.match(await page.locator('#stats').innerText(),/ 0$/,'No source HTTP');
   assert.deepEqual(errors,[]);
-  console.log(`PASS ${width}px: partial then complete saved history, status recovery, no unchanged redraws, 20 crests; heartbeats ${timings.join('/')}ms; idle CPU ${((last.TaskDuration-first.TaskDuration)*1000).toFixed(1)}ms`);
+  console.log(`PASS ${width}px ${theme}: partial then complete saved history, status recovery, no unchanged redraws, 20 crests; heartbeats ${timings.join('/')}ms; idle CPU ${((last.TaskDuration-first.TaskDuration)*1000).toFixed(1)}ms`);
   await page.screenshot({path:`/tmp/plots-loading-recovery-${width}.png`});await page.close();
  }}finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});

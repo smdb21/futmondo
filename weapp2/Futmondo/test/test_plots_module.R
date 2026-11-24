@@ -53,4 +53,14 @@ check('catalog coverage and absent teams never become invented totals', {
  totals <- plots_round_totals(rows)
  stopifnot(identical(totals$round,c(1,2,3,1,2,3)),identical(totals$points,c(10,NA_real_,NA_real_,NA_real_,NA_real_,NA_real_)))
 })
+check('points axes omit empty dtick while rank axes keep integer positions', {
+  rows <- data.frame(team_id='a',team_name='Alpha',round=1:13,points=seq(70,130,length.out=13))
+  totals <- plots_round_totals(rows)
+  points <- plotly::plotly_build(plots_round_chart(totals))
+  ranks <- plotly::plotly_build(plots_round_chart(totals,'rank'))
+  stopifnot(!'dtick' %in% names(points$x$layout$yaxis),
+    points$x$layout$yaxis$tickmode=='auto',points$x$layout$yaxis$nticks==6,
+    ranks$x$layout$yaxis$dtick==1,ranks$x$layout$yaxis$autorange=='reversed',
+    max(points$x$data[[1]]$y)>1000)
+})
 cat('Plots module:', checks, 'checks passed.\n')

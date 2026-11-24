@@ -2437,3 +2437,17 @@ and the dated verification in `data_review_results.md`.
 
 No additional runtime change was required by this response review. See
 `docs/data_review_results.md`, “Approved saved-round response review”.
+
+
+### Points-axis crowding and rendering cost — implemented locally 2026-11-23
+
+- [x] Reproduce the empty-array tick setting that drew labels/gridlines for
+  every individual score and obscured the desktop chart.
+- [x] Omit the invalid points tick step and use a bounded automatic tick hint;
+  retain integer rank positions and all round/subround data.
+- [x] Verify real rendered labels, non-overlap, contrast and responsiveness at
+  390/1440 px in both themes with league-scale totals; retain loading/reuse checks.
+
+The correction concerns rendering rather than missing source observations.
+See the dated points-axis review in `docs/data_review_results.md`.
+Signed-in hosted confirmation remains separate from local browser validation.

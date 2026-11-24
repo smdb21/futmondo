@@ -79,13 +79,21 @@ plots_round_chart <- function(totals, metric="points") {
   labels <- as.character(sort(unique(totals$round)))
   totals$round_label <- as.character(totals$round)
   title <- if (metric == "rank") "Cumulative rank" else "Cumulative points"
+  yaxis <- list(title=title, autorange=if(metric == "rank") "reversed" else TRUE)
+  if(metric == "rank") {
+    yaxis$dtick <- 1
+  } else {
+    # Omit dtick entirely: a NULL list entry serializes as [] and Plotly then
+    # draws a tick/gridline per point, overwhelming the axis at league totals.
+    yaxis$tickmode <- "auto"
+    yaxis$nticks <- 6
+  }
   plot <- plotly::plot_ly(totals, x=~round_label, y=totals[[metric]], color=~team_name,
     colors=plots_team_colors(totals$team_name), type="scatter", mode="lines+markers", connectgaps=FALSE,
     hovertemplate=~paste0("<b>",team_name,"</b><br>Round ",round_label,"<br>",
       title,": ",totals[[metric]],"<extra></extra>")) %>%
     fm_plot_layout(xaxis=list(title="Round", type="category", categoryorder="array", categoryarray=labels),
-      yaxis=list(title=title, autorange=if(metric == "rank") "reversed" else TRUE,
-        dtick=if(metric == "rank") 1 else NULL), showlegend=FALSE,
+      yaxis=yaxis, showlegend=FALSE,
       margin=list(l=55,r=15,t=45,b=55))
   if (any(!is.finite(totals[[metric]]))) attr(plot, "fm_info") <- fm_info(
     "Some saved round scores are missing. Lines have gaps where a complete cumulative result cannot be calculated; ranks require scores for every team.", error=TRUE)

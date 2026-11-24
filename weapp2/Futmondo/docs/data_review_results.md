@@ -5713,3 +5713,65 @@ source request volume, DB schema/writes, cache invalidation, timers, UI redraws,
 dependencies or deployment configuration changed. The targeted actual-response
 replay is the applicable verification; the application lifecycle was not repeated
 for this documentation-only record.
+
+
+## Desktop points-axis crowding — 2026-11-23
+
+The desktop screenshot showed an unreadable points axis and a dense green block
+over much of the chart. Reproduction exposed a rendering defect in the
+round-based chart implementation: the conditional `dtick = NULL` entry became
+`dtick: []` in the browser layout. Plotly used a unit step, creating a score
+label and gridline at every integer instead of choosing a suitable interval.
+
+Before correction, a small fixture with a maximum cumulative score of 105
+produced 119 y-axis labels, visibly overlapping across the chart height.
+A pre-fix browser check using league-scale totals did not settle within its
+30-second wait. This failure is recorded rather than reported as a successful
+timing measurement. The excess SVG work provides a concrete rendering-related
+explanation for the reported browser pauses; a signed-in hosted freeze was not
+independently captured.
+
+The points branch now omits `dtick` completely and requests automatic ticks
+with `nticks = 6`. Rank still uses step 1 and reversed order. The saved-data
+loading path, actual scores, cumulative transformations, unknown values and
+round/subround labels are unchanged. No shared theme or stylesheet changes were
+needed; unrelated working-tree edits to `theme.R` were preserved.
+
+Verification:
+
+- `Rscript test/test_plots_module.R`: nine groups passed, including a
+  >1,000-point fixture asserting no points `dtick` key, automatic ticks and
+  retained integer rank steps.
+- `Rscript test/test_plots_loading.R`: delayed/failed saved-history cases
+  passed, preserving known curves, unknown coverage and local range reuse.
+- Strengthened `test/test_plots_loading_browser.cjs`: 390 and 1440 px, light
+  and dark, passed with ten distinct league-scale score curves. Checks inspect
+  real rendered SVG labels: 2–8 ticks, at most eight gridlines, no overlapping
+  label rectangles, and full chart opacity. Held-history recovery, zero redraws
+  for three unchanged-data publications, 20 crests, input responsiveness,
+  bounded idle DOM/CPU, no horizontal overflow and zero source HTTP also passed.
+  Final phone heartbeats were 48/21/76/93/810/64 ms (light) and
+  47/17/27/93/1058/56 ms (dark). Desktop heartbeats were
+  48/25/27/1010/10/67 ms (light) and 60/27/26/77/976/57 ms (dark).
+  Occasional roughly one-second responses overlapped synthetic snapshot
+  publications; these are local timings, not a hosted performance guarantee.
+- The corrected desktop measurement at 1,190 points produced three tick labels
+  and two gridlines, with 385 chart SVG/DOM descendants and full opacity.
+  Fixture readiness took 4.674 seconds including held/asynchronous saved-read
+  startup; total browser task time was 1.287 seconds, including 0.549 seconds of
+  script and 0.034 seconds of layout. The pre-fix high-scale check timed out, so
+  no numerical speedup ratio is claimed.
+- Inspected the final full-page desktop dark screenshot and chart-only preview.
+  Lines and axis values are readable, and the dense overlay is absent. The
+  full-page snapshot retains a centered Round title.
+- `Rscript test/test_shiny_simulation.R`: 14 checks plus eight tabs passed,
+  including no HTTP/live database mutation attempts.
+
+Performance review: point-axis tick/grid generation is bounded by the automatic
+tick hint rather than growing with the numerical score range. During the final
+idle browser checks, task work was 2.1–2.3 ms over 1.2 seconds with bounded DOM
+size. Server calculations, API/DB read counts, durable snapshot reuse and
+invalidation, worker lanes, timers, queues, cache size, dependencies and memory
+retention are unchanged. The responsive SVG label checks cover phone and desktop.
+No credentials, raw private response bodies or real accounts were used.
+Hosted release/appearance acceptance remains unverified.

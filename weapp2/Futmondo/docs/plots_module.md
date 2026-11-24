@@ -110,3 +110,24 @@ team-round response passed the real codec, adapter and module replay with all
 See the dated review in `data_review_results.md`. This verifies that response's
 compatibility with the loading fix, without claiming a signed-in hosted freeze
 reproduction or complete league coverage.
+
+
+## Readable points axis — 2026-11-23
+
+The points branch of `plots_round_chart()` previously included
+`dtick = NULL` in its y-axis list. The Plotly R layout serialized this entry as
+`dtick: []`. In the browser this produced a unit tick step: one label and
+gridline for every integer score. Even a 105-point synthetic fixture drew 119
+overlapping labels; league totals above 1,000 created much heavier SVG work.
+
+The points axis now omits `dtick` entirely and sets `tickmode = "auto"` with
+`nticks = 6`. Plotly chooses a readable interval; the 1,190-point fixture shows
+three labels (0, 500 and 1,000). Rank keeps `dtick = 1` and reversed ordering.
+Source scores, cumulative sums, completeness handling, subround identities,
+snapshot reuse and loading behavior are unchanged.
+
+The loading browser fixture now uses distinct team totals above 1,000 and checks
+actual rendered tick/grid counts, label separation and opacity on phone/desktop
+in both themes. The R regression checks that points layouts have no `dtick`
+key while rank layouts retain integer steps. This fixes chart rendering and
+reduces browser work without adding API/DB operations or timers.
