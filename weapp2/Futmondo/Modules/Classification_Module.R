@@ -772,7 +772,11 @@ classification_Server <- function(id, is_module_active, login_token, championshi
           p("Historical round scores are loading; available live scores are shown.")
         },
         if (stale) {
-          p("Showing saved round standings while the latest source request is unavailable.")
+          p(if (!is.null(attr(ranking, "fetch_error"))) {
+            "Showing saved round standings because the latest source check failed."
+          } else {
+            "Showing saved round standings while background sync checks for updates."
+          })
         },
         error = length(failures) > 0L || nzchar(mvp_text(finances$finance_error)) ||
           (!bonus_loading && missing_bonus && length(attr(rows, "bonus_completed_rounds")) > 0L)

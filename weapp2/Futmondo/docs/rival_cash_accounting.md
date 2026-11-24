@@ -366,3 +366,25 @@ The archive permits at most 8 MiB of expanded JSON, 6 MiB of compressed data, 64
 `get_rival_finance_saved()` reuses the verified complete durable pressroom baseline before falling back to the older source-identified transaction-table scan. Normal transfer acquisition restores that same baseline after process restart and fetches the source head through the one-day correction overlap; it no longer starts a full-season rescan simply because seven days passed. `get_championship_pressroom(...,full_audit=TRUE)` and `get_locker_clause_payments(...,full_audit=TRUE)` explicitly bypass the display cache and audit full source history. Ordinary Refresh preserves incremental acquisition. Older source revisions/deletions outside the overlap require that explicit audit; a reset/exhausted feed replaces the old complete snapshot as before.
 
 `rival_finance_evidence_delta(old,new)` suppresses unchanged money-movement writes after canonicalizing JSONB field ordering, integer/double differences and missing scalars. The shared source compares against DB-confirmed `stored_movements`, never unacknowledged in-session observations. Refresh reads confirmed state again, so failed writes retry. New/corrected movements append source revisions; balance/coverage observation freshness is retained separately. Captured `app.futmondo.com.finanzas.har` money-movement requests contain only `championshipId` and `userteamId`; no verified delta cursor exists for that endpoint. Its current list still needs acquisition, after which unchanged persisted movements are reused. No unsupported `since` query is invented.
+
+## Classification ranking reuse · 2026-11-24
+
+`rival_saved_rankings()` can consume the scoped
+`classification:<round_id>` observation already persisted by the factual
+worker. Its `payload.kind` is `classification_round_ranking`, with the source
+round number and ranking response fields under `answer`. Native `V` retains
+its original label in storage and requires matching, independently closed team
+histories before it can establish participants. The same check applies to
+finance recovery responses before saving and again on reuse. The finance
+recovery copy retains only team IDs and points within `ranking`. An unknown historical eligibility flag blocks estimates for that round. A
+disagreement between observed position payments and the configured allocation
+for a corroborated ranking preserves the recorded movement and leaves the
+other teams' estimated rewards unresolved for that round.
+
+The prior manual award confirmations and pending-settlement observation were
+found under `unknown` competition and season. The scoped repair in
+`scripts/repair_20261124_bonus_context.sql` requires one verified scoring
+context and corroborating final selections. It copies seven original facts
+with their original timestamps and provenance when no conflicting target
+exists. Existing winner, roster and settlement checks still govern the ledger.
+The production write requires explicit approval.

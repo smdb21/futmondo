@@ -81,6 +81,39 @@ check('official participants restore position rewards without fabricating an abs
  revised<-decoded;revised[[2]]$payload$rounds$points[1]<-11
  stopifnot(length(rival_saved_rankings(c(revised,ranked),teams$teamid))==0L)
 })
+check('reuses the saved native V ranking after closed-score corroboration and reconciles each payment independently',{
+ saved<-e('eligibility','classification:r1',list(kind='classification_round_ranking',round_id='r1',
+  round_number=1,answer=ranking_answer))
+ saved$payload$answer$metadata$status<-'V'
+ archived<-c(decoded,list(saved))
+ restored<-rival_evidence_decode(as.data.frame(jsonlite::fromJSON(jsonlite::toJSON(archived,auto_unbox=TRUE))))
+ accepted<-rival_saved_rankings(restored,teams$teamid)
+ stopifnot(length(accepted)==1L,identical(attr(accepted[[1]],'ranking_rows')$status,rep('closed',2)))
+ make_payment<-function(amount)e('movements','ranking-a',list(id='ranking-a',team_id='a',type='ranking',
+  concept='1',money=amount,date='2026-11-01T12:00:00Z'))
+ known<-rival_historical_components(c(restored,list(make_payment(20))),teams,rules,awards)
+ stopifnot(identical(known$income$amount[known$income$bonus_type=='ranking'],c(20,10)))
+ unknown<-restored
+ unknown[[2]]$payload$rounds$negative[1]<-NA
+ unverified<-rival_historical_components(c(unknown,list(make_payment(20))),teams,rules,awards)
+ stopifnot(!any(unverified$income$bonus_type=='ranking'),nrow(unverified$standings)==2L)
+ foreign<-restored;foreign[[length(foreign)]]$account_id<-'foreign'
+ scoped<-build_rival_cash_dataset(teams,cid,c(foreign,list(make_payment(20))),awards,rules=rules,account_id=account,reference_team_id='a')
+ stopifnot(identical(scoped$team_finances$ranking_prize,c(20,0,0)))
+ disputed<-c(restored,list(make_payment(21)))
+ contested<-rival_historical_components(disputed,teams,rules,awards)
+ stopifnot(!any(contested$income$bonus_type=='ranking'),nrow(contested$standings)==2L)
+ dataset<-build_rival_cash_dataset(teams,cid,disputed,awards,rules=rules,account_id=account,reference_team_id='a')
+ stopifnot(dataset$team_finances$ranking_prize[1]==21)
+ for(kind in c('score','open','round','wrong-id')){
+  changed<-restored
+  if(kind=='score')changed[[2]]$payload$rounds$points[1]<-11
+  if(kind=='open')changed[[2]]$payload$rounds$status[1]<-'running'
+  if(kind=='round')changed[[length(restored)]]$payload$round_number<-2
+  if(kind=='wrong-id')changed[[length(restored)]]$source_id<-'classification:wrong'
+  stopifnot(!length(rival_saved_rankings(changed,teams$teamid)))
+ }
+})
 check('malformed or open ranking responses cannot establish complete historical participants',{
  p<-ranked[[1]]$payload
  for(kind in c('open','duplicate','missing')){
@@ -105,7 +138,15 @@ check('shared recovery persists one missing ranking and reuses saved lineups acr
   promises::promise(function(resolve,reject)later::later(function(){busy<<-busy-1L;resolve(result)},.001))
  }
  settle<-function(session,source){deadline<-Sys.time()+6;repeat{later::run_now(.005);session$flushReact();if(!isTRUE(shiny::isolate(source()$finance_loading)))break;if(Sys.time()>deadline)stop('recovery queue timeout')}}
- for(run in 1:2){
+ for(run in 1:3){
+  if(run==3L){
+   # A later worker can resolve the same ranking from Classification's
+   # durable observation, even without a finance-specific recovery copy.
+   persisted<-Filter(function(row)!identical(row$payload$kind,'round_ranking'),persisted)
+   ranking_answer$metadata$status<-'V'
+   persisted<-c(persisted,list(e('eligibility','classification:r1',list(kind='classification_round_ranking',
+    round_id='r1',round_number=1,answer=ranking_answer))))
+  }
   testServer(function(input,output,session){source<-shared_rival_finance_source(session,function()c(userid=account,token='synthetic'),function()cid,function()'a',function()teams,function()TRUE,function()list(rows=awards,complete=FALSE))},{
    session$flushReact();settle(session,source)
    value<-source();a<-value$team_finances[value$team_finances$teamid=='a',]

@@ -111,6 +111,13 @@ award_calendar_rows_valid <- function(rows) {
     is.numeric(rows$round_number)&&all(is.finite(rows$round_number)&rows$round_number>=1&rows$round_number==floor(rows$round_number))&&
     !anyDuplicated(rows$round_number)&&is.logical(rows$is_finished)&&is.character(rows$status)&&!anyNA(rows$status)
 }
+# Persisted JSONB object keys need not follow R's data-frame column order.
+award_calendar_rows_decode <- function(value) {
+  columns<-c("round_id","round_number","is_finished","status")
+  rows<-tryCatch(dplyr::bind_rows(mvp_records(value)),error=function(e)NULL)
+  if(!is.data.frame(rows)||!setequal(names(rows),columns))return(NULL)
+  rows[,columns,drop=FALSE]
+}
 # The official match-calendar consumer groups rounds[].matches[].info.date.
 # Retain every valid fixture timestamp; a start needs all returned fixtures dated.
 award_fixture_calendar <- function(records) {
@@ -227,8 +234,8 @@ league_fixture_observation <- function(metadata) list(matches=metadata$fixture_m
 get_award_round_metadata <- function(login,championship_id,league_id,refresh=FALSE,current_round_id="",include_matches=FALSE) {
   context<-resource_context(login,championship_id,season=league_stable_season(championship_id,login[["userid"]]))
   scope<-c(context[c("account_id","championship_id","competition_id","season")],list(league_id=as.character(league_id),current_round_id=mvp_text(current_round_id)))
-  same_scope<-function(value)is.list(value)&&identical(names(value),names(scope))&&
-    identical(value[names(scope)!="current_round_id"],scope[names(scope)!="current_round_id"])&&
+  same_scope<-function(value)is.list(value)&&setequal(names(value),names(scope))&&
+    identical(value[setdiff(names(scope),"current_round_id")],scope[setdiff(names(scope),"current_round_id")])&&
     (!nzchar(scope$current_round_id)||identical(value$current_round_id,scope$current_round_id))
   resource<-paste0("award_round_metadata_",championship_id)
   source_id<-paste0("calendar:v1:",as.character(openssl::sha256(as.character(league_id))))
@@ -243,7 +250,7 @@ get_award_round_metadata <- function(login,championship_id,league_id,refresh=FAL
       if(length(saved)==1L){
         row<-saved[[1]];payload<-row$payload
         if(!is.list(payload))payload<-list()
-        restored<-tryCatch(dplyr::bind_rows(mvp_records(payload$rows)),error=function(e)NULL)
+        restored<-award_calendar_rows_decode(payload$rows)
         stamp<-fm_time(row$observed_at);deadline<-fm_number(payload$valid_until);now<-as.numeric(Sys.time())
         if(is.list(payload)&&identical(payload$kind,"league_round_calendar")&&fm_number(payload$version)%in%c(1,2)&&
            same_scope(payload$scope)&&identical(payload$completeness,"complete")&&

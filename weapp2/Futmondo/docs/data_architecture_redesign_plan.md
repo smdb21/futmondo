@@ -2524,3 +2524,18 @@ requests the persisted two-column projection. Existing audited baselines cover
 older snapshots and the reported unavailable path. Offline worker and chart
 checks validate the read and fallback. Hosted validation of the projected
 snapshot is pending the updated worker's next normal Pressroom publication.
+
+## Historical bonus and calendar read recovery · 2026-11-24
+
+- [x] Reuse persisted round rankings that agree with independently closed
+  historical scores and isolate recorded position-payment discrepancies by round.
+- [x] Restore sorted JSONB calendar fields and preserve the existing saved
+  calculation during the worker's next publication.
+- [x] Verify the seven previously confirmed award and postponement facts against
+  the exact resolved competition and season in read-only production queries.
+- [ ] Apply the scoped evidence repair with explicit approval and verify a
+  newly published production ledger. Resolve remaining conflicting position
+  settlements and missing historical award ownership with source evidence.
+
+See [the verification record](data_review_results.md) for observed production
+coverage, focused regression results and performance.

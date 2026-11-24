@@ -5950,3 +5950,60 @@ reads on period changes. The offline Shiny lifecycle passed 14 checks and
 eight tabs. The Python worker suite passed 72 tests and the R worker contract
 passed 20 checks. Production publication and signed-in rendering remain
 unverified.
+
+## Classification bonus evidence and ranking reuse · 2026-11-24
+
+The calculation shown in the report was the finance snapshot saved at
+13:39 UTC. A read-only production check found an active factual worker,
+nine closed team histories, a persisted nine-team ranking with native status
+`V`, and a final 11-player selection for each of rounds 4–9. All nine historical
+scores matched across the two sources in those rounds. The tenth team had
+an empty history. The older finance loader skipped these ranking observations.
+Its fallback participant proof also discarded all affected rounds when a
+recorded position amount differed from the configured calculation in a
+different round.
+
+Recorded position payments agree with the configured nine-team allocation for
+rounds 4–7. Round 9 differs by €666,667 and its earliest saved ranking came
+after payment, so the payment-time ranking is unverified. An unrelated round-12
+comparison also found a payment discrepancy and a score disagreement between
+sources. No final-category payment was saved for round 8. The earlier
+postponement record and six independently confirmed award eligibility records
+are in the unresolved archive scope. A read-only repair preflight verified all
+seven against the active scoring context and final selections, with zero
+target conflicts. Automatic approval review blocked publishing those seven
+because the report asked for investigation. The repair script is staged for
+explicit approval. The source queries here were read-only.
+
+The worker now reuses the standing observations and validates recorded position
+payments round by round when using the native ranking. The ledger still needs
+verified historical ownership and eligibility for several Best XI recipients.
+A recorded combined payment is kept intact until its components reconcile.
+The latest source request investigated separately was the upcoming round 14,
+which had no ranking snapshot and 94 native rejections when sampled. The
+dated calendar already indicated a future kickoff. Tests reproduced the
+persisted JSONB ordering defect that prevented using that calendar. The
+published current round remains usable from the database.
+
+Verification used synthetic or persisted-field projections with no real
+account HTTP in tests. Saved bonus recovery (seven cases), native standings,
+future and award calendars, compact bonus snapshots, partial Classification,
+combined payments, the reference payment gate, ownership (ten cases),
+context isolation (nine cases) and the deployment contract passed. The
+offline Shiny lifecycle passed 14 checks and eight tabs. The pre-existing
+inactive-participant test's last integrated reward assertion fails identically
+against the parent source. Its first five cases pass. The production worker's
+next settled snapshot and signed-in mobile rendering still need verification.
+
+Performance review compared equivalent synthetic ledger preparations across
+13 historical rounds and nine participants with position settlements. Mean
+local time was 201 ms before and 223 ms with reconciliation of the saved
+rankings across 25 runs. The extra work runs in the factual worker using
+existing scoped evidence, and skips redundant source ranking or calendar
+reads when matching records exist. The preparation key causes one recompute
+while the existing durable bonus snapshot remains readable. The compact
+database-view check measured 0.351 s for 100 local read/decode/projections.
+A separate 100-range UI projection benchmark took 0.400 s with no range
+change I/O. There are no additional browsing requests, polling timers,
+database migrations, cache capacity or widget changes. Local timings
+exclude network, production worker load and mobile hardware.

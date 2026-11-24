@@ -169,3 +169,33 @@ publication and authenticated acceptance remain to be verified.
 Checks and measured limits are recorded in `data_review_results.md`. This fixes
 existing bonus loading; it adds no new product capability, login-tier entry,
 dependency, environment setting or database schema.
+
+## Saved ranking and bonus evidence recovery · 2026-11-24
+
+The finance worker now accepts the persisted Classification ranking as an input
+to the shared ledger. A native `V` result needs at least one independent closed
+team history for the same round, with every available team history matching the
+ranking's round number, participants and points. The recording keeps the
+original source status, while the calculation uses a closed participant list
+after corroboration. An available Classification record takes precedence over
+the finance recovery copy. A conflicting recorded position payment blocks
+propagation of the estimated allocation to other teams for that round. The
+actual payment remains in the ledger.
+
+Futmondo's public bundle inspected on 2026-11-24 uses the authenticated
+`POST /1/ranking/round` query `{championshipId, roundNumber: round_id, userteamId}`
+and reads `answer.metadata.status` and `answer.ranking[].id/name/points/live`.
+`round_id` is the opaque source ID. The relevant client parser passes through
+the status. The closed team histories in production establish the interpretation
+used for the reported historical rounds. The bundle SHA-256 was
+`08202076259d1678c7557478771d3aa38b5099f42044630569c704fdb7a7cd1c`.
+[Official Futmondo web bundle](https://app.futmondo.com/main.dart.js).
+[Official automatic bonus guide](https://help.futmondo.com/article/142-configura-las-primas-automaticas-en-un-campeonato-social).
+
+Classification and award calendar reads canonicalize the stored JSONB
+columns and match named scope values regardless of key order. This keeps
+verified pre-kickoff rounds off the source ranking route while the saved
+calendar is valid. An expired standings snapshot describes background checking
+unless an actual failure is attached. Range selection and Refresh still read
+existing database observations. The next worker calculation uses the corrected
+preparation key and publishes through the same durable ledger snapshot.

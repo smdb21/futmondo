@@ -3283,7 +3283,7 @@ classification_saved_future <- function(evidence,context,round_id,round_number,n
   if(!identical(fm_number(p$version),2)||!identical(p$completeness,"complete")||
      !nzchar(mvp_text(p$scope$league_id))||!identical(mvp_text(row$source_id),paste0("calendar:v1:",as.character(openssl::sha256(p$scope$league_id))))||
      stamp>time+5||!is.finite(deadline)||time>=deadline||deadline>stamp+ttl+.001)return(NULL)
-  rows<-tryCatch(dplyr::bind_rows(mvp_records(p$rows)),error=function(e)NULL)
+  rows<-award_calendar_rows_decode(p$rows)
   fixtures<-tryCatch(award_fixture_calendar_decode(p$fixture_rounds),error=function(e)NULL)
   if(!award_calendar_rows_valid(rows)||!award_fixture_calendar_valid(fixtures))return(NULL)
   target<-rows[rows$round_id==round_id&rows$round_number==round_number,,drop=FALSE]

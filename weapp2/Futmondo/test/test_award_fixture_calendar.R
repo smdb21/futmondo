@@ -24,6 +24,10 @@ saved<-NULL
 defer_persistence<-function(fn,args,context,on_complete=NULL,...){saved<<-args[[2]][[1]];if(is.function(on_complete))on_complete(TRUE);TRUE}
 ctx<-resource_context(auth,'championship',season='unknown')
 stopifnot(persist_award_calendar_snapshot(metadata,ctx),saved$payload$version==2L)
+# The Data API returns JSONB object keys ordered by length and then name.
+jsonb_order<-function(x)x[order(nchar(names(x)),names(x))]
+saved$payload$scope<-jsonb_order(saved$payload$scope)
+saved$payload$rows<-lapply(seq_len(nrow(saved$payload$rows)),function(i)jsonb_order(as.list(saved$payload$rows[i,])))
 get_sb_url<-function()'https://database.synthetic.invalid';get_sb_key<-function()'synthetic-test-key'
 supabase_get<-function(...)data.frame(account_id=saved$account_id,championship_id=saved$championship_id,competition_id=saved$competition_id,season=saved$season,
  evidence_type=saved$evidence_type,source_id=saved$source_id,observed_at=saved$observed_at,payload=I(list(saved$payload)))

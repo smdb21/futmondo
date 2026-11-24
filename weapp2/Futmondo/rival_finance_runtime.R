@@ -525,34 +525,77 @@ rival_team_round_rows <- function(answer,team_id) {
 }
 # The official round-ranking endpoint returns the complete historical participant
 # list. Its metadata status must confirm closure before it supplies cash inputs.
-rival_round_ranking_rows <- function(payload) {
+rival_round_ranking_rows <- function(payload, source=NULL) {
   empty<-data.frame(team_id=character(),round_id=character(),round_number=numeric(),points=numeric(),status=character(),negative=logical(),stringsAsFactors=FALSE)
-  if(!is.list(payload)||!round_is_finished(list(status=payload$status))||!nzchar(mvp_text(payload$round_id)))return(empty)
+  if(!is.list(payload)||!nzchar(mvp_text(payload$round_id)))return(empty)
+  number<-fm_number(payload$round_number)
+  if(!is.finite(number)||number<1||number!=floor(number))return(empty)
+  closed<-round_is_finished(list(status=payload$status))
+  verify<-!closed&&identical(mvp_text(payload$status),"V")&&is.data.frame(source)
+  if(!closed&&!verify)return(empty)
   records<-mvp_records(payload$ranking)
-  rows<-dplyr::bind_rows(c(list(empty),lapply(records,function(row){
-    if(!is.list(row))return(NULL)
-    data.frame(team_id=mvp_text(row$id),round_id=mvp_text(payload$round_id),round_number=fm_number(payload$round_number),
-      points=fm_number(row$points),status=mvp_text(payload$status),negative=NA,stringsAsFactors=FALSE)
-  })))
-  if(!length(records)||nrow(rows)!=length(records)||any(!nzchar(rows$team_id))||anyDuplicated(rows$team_id)||any(!is.finite(rows$points)))return(empty)
+  if(!length(records)||length(records)>500L||!all(vapply(records,is.list,logical(1))))return(empty)
+  ids<-vapply(records,function(row)mvp_text(row$id),character(1))
+  points<-vapply(records,function(row)fm_number(row$points),numeric(1))
+  if(any(!nzchar(ids))||anyDuplicated(ids)||any(!is.finite(points)))return(empty)
+  rows<-data.frame(team_id=ids,round_id=mvp_text(payload$round_id),round_number=number,
+    points=points,status=mvp_text(payload$status),negative=NA,stringsAsFactors=FALSE)
+  if(verify){
+    # Require independent closed team histories and agreement on each known score.
+    known<-source[source$round_id%in%payload$round_id,,drop=FALSE]
+    index<-match(known$team_id,rows$team_id)
+    if(!nrow(known)||anyNA(index)||anyDuplicated(known$team_id)||
+       !all(known$round_number%in%number)||
+       any(!is.finite(known$points))||any(known$points!=rows$points[index])||
+       !all(vapply(known$status,function(status)round_is_finished(list(status=status)),logical(1))))return(empty)
+    rows$status<-"closed"
+  }
   rows
 }
 rival_saved_rankings <- function(evidence,teams=NULL,source=NULL) {
   if(is.null(source))source<-rival_saved_rounds(evidence,include_ranking=FALSE)
-  rows<-lapply(rival_evidence_rows(evidence,"round_ranking"),function(record){
-    p<-record$payload;parsed<-rival_round_ranking_rows(p)
-    ids<-if(is.null(teams))as.character(unlist(p$source_teams,use.names=FALSE))else as.character(teams)
-    if(!nrow(parsed)||!length(ids)||!identical(mvp_text(p$signature),rival_ranking_signature(source,mvp_text(p$round_id),ids)))return(NULL)
-    attr(record,"ranking_rows")<-parsed;record
+  candidates<-Filter(function(record){
+    p<-record$payload
+    is.list(p)&&mvp_text(p$kind)%in%c("classification_round_ranking","round_ranking")
+  },rival_evidence_rows(evidence,"eligibility"))
+  rows<-lapply(candidates,function(record){
+    p<-record$payload
+    round<-mvp_text(p$round_id)
+    if(identical(p$kind,"classification_round_ranking")){
+      if(!identical(mvp_text(record$source_id),paste0("classification:",round))||
+         !is.list(p$answer)||isTRUE(p$answer$error)||!is.null(p$answer$code)||
+         !is.list(p$answer$metadata))return(NULL)
+      p$status<-mvp_text(p$answer$metadata$status)
+      p$ranking<-p$answer$ranking
+    }else{
+      ids<-if(is.null(teams))as.character(unlist(p$source_teams,use.names=FALSE))else as.character(teams)
+      if(!identical(mvp_text(record$source_id),paste0("ranking:",round))||
+         !length(ids)||!identical(mvp_text(p$signature),rival_ranking_signature(source,round,ids)))return(NULL)
+    }
+    parsed<-rival_round_ranking_rows(p,source)
+    if(!nrow(parsed))return(NULL)
+    attr(record,"ranking_rows")<-parsed
+    attr(record,"ranking_status")<-mvp_text(p$status)
+    record
   })
-  Filter(Negate(is.null),rows)
+  rows<-Filter(Negate(is.null),rows)
+  if(!length(rows))return(rows)
+  # Classification is the worker's regular source. Its valid observation
+  # takes precedence over a finance recovery copy of the same round.
+  primary<-vapply(rows,function(record)identical(record$payload$kind,"classification_round_ranking"),logical(1))
+  rows<-c(rows[primary],rows[!primary])
+  rounds<-vapply(rows,function(record)mvp_text(record$payload$round_id),character(1))
+  rows[!duplicated(rounds)]
 }
 rival_supplement_rounds <- function(rows,rankings) {
+  key<-paste(rows$team_id,rows$round_id,sep="|")
   for(record in rankings){
     ranking<-attr(record,"ranking_rows")
-    key<-paste(rows$team_id,rows$round_id,sep="|")
-    add<-!paste(ranking$team_id,ranking$round_id,sep="|")%in%key
+    ranking_keys<-paste(ranking$team_id,ranking$round_id,sep="|")
+    add<-!ranking_keys%in%key
+    if(!any(add))next
     rows<-dplyr::bind_rows(rows,ranking[add,,drop=FALSE])
+    key<-c(key,ranking_keys[add])
   }
   rows
 }
@@ -579,12 +622,14 @@ get_rival_round_ranking_observation <- function(login,championship_id,user_team_
     answer=if(identical(response$status,"ok"))response$answer else NULL)
   attr(result,"observed_at")<-Sys.time();result
 }
-rival_ranking_evidence <- function(result,account_id,championship_id,season) {
+rival_ranking_evidence <- function(result,account_id,championship_id,season,source=NULL) {
   answer<-result$answer
-  if(!is.list(answer)||isTRUE(answer$error)||!is.null(answer$code))return(list())
+  if(!is.list(answer)||isTRUE(answer$error)||!is.null(answer$code)||!is.list(answer$metadata))return(list())
   payload<-list(round_id=result$round_id,round_number=result$round_number,status=mvp_text(answer$metadata$status),
     ranking=answer$ranking,signature=result$signature,source_teams=result$source_teams)
-  if(!nrow(rival_round_ranking_rows(payload)))return(list())
+  parsed<-rival_round_ranking_rows(payload,source)
+  if(!nrow(parsed))return(list())
+  payload$ranking<-lapply(seq_len(nrow(parsed)),function(i)list(id=parsed$team_id[i],points=parsed$points[i]))
   list(rival_finance_evidence(account_id,championship_id,season,"round_ranking",result$round_id,payload,
     attr(result,"observed_at") %||% Sys.time()))
 }
@@ -754,6 +799,18 @@ rival_historical_components <- function(evidence,teams,rules,official) {
     }
     if(!is.finite(rate))add_missing(id,"Point reward rule unavailable.")
   }
+  native_ids<-vapply(Filter(function(record)identical(attr(record,"ranking_status"),"V"),saved_rankings),
+    function(record)mvp_text(record$payload$round_id),character(1))
+  paid_ranking<-data.frame()
+  if(length(native_ids)){
+    paid_teams<-unique(vapply(rival_evidence_rows(evidence,"movements"),function(record){
+      p<-record$payload
+      if(mvp_text(p$type)=="ranking"||mvp_text(p$bonus_type)=="ranking")mvp_text(p$team_id)else ""
+    },character(1)))
+    catalog<-unique(rounds[,c("round_id","round_number")])
+    paid_ranking<-dplyr::bind_rows(lapply(paid_teams[nzchar(paid_teams)],function(id)
+      rival_normalize_movements(rival_cash_latest_movements(evidence,id),catalog)))
+  }
   for(round in unique(rounds$round_id)){
     if(is.data.frame(official)&&all(c("round_id","is_finished")%in%names(official))&&
        any(official$round_id%in%round&official$is_finished%in%FALSE)){
@@ -777,9 +834,23 @@ rival_historical_components <- function(evidence,teams,rules,official) {
       position=rank(-rows$points,ties.method="min"),
       tied=duplicated(rows$points)|duplicated(rows$points,fromLast=TRUE)))
     # Negative-start teams do not take part in automatic premiums (FAQ142).
+    # The ranking alone cannot establish historical starting-cash eligibility.
+    if(round%in%native_ids&&anyNA(rows$negative)){
+      for(id in as.character(teams$teamid))add_missing(id,paste("Ranking reward eligibility is unknown for round",rows$round_number[1]))
+      next
+    }
     eligible<-!rows$negative%in%TRUE
     value<-rep(0,nrow(rows));value[eligible]<-rival_ranking_allocations(rows$points[eligible],fm_number(rules$ranking_pool),
       mvp_text(rules$ranking_mode),fm_number(rules$users_to_rank %||% rules$configuration$usersToRank))
+    if(round%in%native_ids&&nrow(paid_ranking)){
+      payments<-paid_ranking[paid_ranking$bonus_type%in%"ranking"&paid_ranking$round_id%in%round,,drop=FALSE]
+      paid<-tapply(payments$money,payments$team_id,sum)
+      expected<-value[match(names(paid),rows$team_id)]
+      if(any(!is.finite(paid)|!is.finite(expected)|abs(paid-expected)>1e-7)){
+        for(id in as.character(teams$teamid))add_missing(id,paste("Recorded ranking reward differs from the configured allocation for round",rows$round_number[1]))
+        next
+      }
+    }
     for(i in seq_len(nrow(rows))){
       if(!is.finite(value[i])){add_missing(rows$team_id[i],"Ranking reward configuration is unavailable or unsupported.");next}
       if(!rows$team_id[i]%in%teams$teamid)next
@@ -1071,7 +1142,7 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
     rows
   }
   official<-scope_frame(official);eligibility<-scope_frame(eligibility)
-  preparation_key<-rival_calculation_hash(list(version=rival_calculation_version,
+  preparation_key<-rival_calculation_hash(list(version=paste0(rival_calculation_version,":saved-rankings-v1"),
     account=account_id,league=championship_id,season=season,reference=reference_team_id,
     teams=teams[,intersect(c("teamid","teamname"),names(teams)),drop=FALSE],
     evidence=rival_calculation_evidence(evidence),official=official,rules=rules,
@@ -1088,7 +1159,8 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
   eligibility<-dplyr::bind_rows(eligibility,history$eligibility,stored_eligibility)
   if(all(c("round_id","player_id","team_id","eligible","verified")%in%names(eligibility)))
     eligibility<-unique(eligibility[,c("round_id","player_id","team_id","eligible","verified"),drop=FALSE])
-  catalog<-unique(dplyr::bind_rows(rival_saved_rounds(evidence)[,c("round_id","round_number"),drop=FALSE],
+  raw_rounds<-rival_saved_rounds(evidence)
+  catalog<-unique(dplyr::bind_rows(raw_rounds[,c("round_id","round_number"),drop=FALSE],
     if(all(c("round_id","round_number")%in%names(official)))official[,c("round_id","round_number"),drop=FALSE]else data.frame()))
   all_movements<-dplyr::bind_rows(lapply(unique(vapply(rival_evidence_rows(evidence,"movements"),function(x)mvp_text(x$payload$team_id),character(1))),function(id)
     rival_normalize_movements(rival_cash_latest_movements(evidence,id),catalog)))
@@ -1106,7 +1178,6 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
     all_movements$bonus_type%in%c("ranking","dreamteam","mvp") &
     is.finite(all_movements$money) & all_movements$money>0 &
     !is.na(fm_time(all_movements$date)) & nzchar(all_movements$round_id)])else character()
-  raw_rounds<-rival_saved_rounds(evidence)
   point_rounds<-dplyr::bind_rows(history$rounds,raw_rounds[!paste(raw_rounds$team_id,raw_rounds$round_id)%in%paste(history$rounds$team_id,history$rounds$round_id),,drop=FALSE])
   point_checks<-rival_point_reconciliation(point_rounds,all_movements,rules,reference_team_id)
   opening<-rival_opening_cash(championship_id,rules,opening_defaults)
@@ -2037,7 +2108,8 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
                 !identical(task$signature,rival_round_signature(current,state$awards$rows))
             }
             rows<-if(superseded_lineup)list()else switch(task$kind,lineup=rival_lineup_evidence(result,auth[["userid"]],cid,state$season),
-              ranking=rival_ranking_evidence(result,auth[["userid"]],cid,state$season),
+              ranking=rival_ranking_evidence(result,auth[["userid"]],cid,state$season,
+                rival_saved_rounds(state$evidence,include_ranking=FALSE)),
               rival_team_evidence(result,auth[["userid"]],cid,state$season))
             if(length(rows)){delta<-rival_finance_evidence_delta(state$stored_movements,rows);state$evidence<-rival_merge_evidence(state$evidence,rows);persist_rival_finance_evidence(delta,ctx)}
             if(superseded_lineup)enqueue_lineups()

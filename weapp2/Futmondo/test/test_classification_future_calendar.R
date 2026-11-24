@@ -13,6 +13,12 @@ future<-read();stopifnot(isTRUE(future$not_started),nrow(future$rows)==0L,identi
 # Preserve the same result through the database's simplified JSON shape.
 json_calendar<-jsonlite::fromJSON(jsonlite::toJSON(calendar,auto_unbox=TRUE,null='null',na='null'))
 stopifnot(isTRUE(read(list(json_calendar))$not_started))
+# PostgreSQL JSONB emits keys in storage order rather than insertion order.
+reordered<-calendar
+reordered$payload$rows<-list(
+ list(status='next',round_id='opaque13',is_finished=NULL,round_number=13),
+ list(status='closed',round_id='opaque12',is_finished=TRUE,round_number=12))
+stopifnot(isTRUE(read(list(reordered))$not_started))
 for(field in c('account_id','championship_id','competition_id','season')){
  bad<-calendar;bad[[field]]<-'foreign';stopifnot(is.null(read(list(bad))))
  bad<-calendar;bad$payload$scope[[field]]<-'foreign';stopifnot(is.null(read(list(bad))))
