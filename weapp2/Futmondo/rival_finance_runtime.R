@@ -1096,7 +1096,11 @@ rival_calculation_version <- "2026-11-10-competition-v6"
 rival_calculation_hash <- function(x) unname(unclass(as.character(openssl::sha256(serialize(x,NULL,version=2)))))
 rival_calculation_evidence <- function(evidence) {
   rows<-Filter(function(x)!rival_snapshot_record(x)&&!x$evidence_type%in%c("team","coverage","rules"),evidence)
-  rows<-lapply(rows,function(x){x$observed_at<-NULL;x$payload$observed_at<-NULL;x})
+  rows<-lapply(rows,function(x){
+    # A later observation of the same transitions can now cover settlement.
+    if(!mvp_text(x$payload$kind)%in%c("player_ownership_history","league_round_calendar"))x$observed_at<-NULL
+    x$payload$observed_at<-NULL;x
+  })
   if(length(rows))rows<-rows[order(vapply(rows,function(x)paste(x$evidence_type,x$source_id,sep=":"),character(1)))]
   rows
 }
@@ -1142,7 +1146,7 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
     rows
   }
   official<-scope_frame(official);eligibility<-scope_frame(eligibility)
-  preparation_key<-rival_calculation_hash(list(version=paste0(rival_calculation_version,":saved-rankings-v1"),
+  preparation_key<-rival_calculation_hash(list(version=paste0(rival_calculation_version,":saved-rankings-v1:ownership-calendar-v1"),
     account=account_id,league=championship_id,season=season,reference=reference_team_id,
     teams=teams[,intersect(c("teamid","teamname"),names(teams)),drop=FALSE],
     evidence=rival_calculation_evidence(evidence),official=official,rules=rules,

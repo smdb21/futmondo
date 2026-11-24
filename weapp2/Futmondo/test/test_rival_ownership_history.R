@@ -75,6 +75,69 @@ check('returned ownership history persists as scoped evidence and drives the one
  points_only<-records;points_only[[length(calendar)+length(histories)+1L]]$payload$type<-'points'
  stopifnot(build(points_only)$team_finances$estimated_cash[1]==110)
 })
+check('the stored historical fixture source unlocks scoped owner histories and one cash ledger',{
+ scope<-list(account_id='fixture-calendar-account',championship_id='fixture-calendar-league',
+   competition_id='fixture-competition',season='fixture-season',league_id='source-league')
+ fields<-c('account_id','championship_id','competition_id','season')
+ remember_league_context(c(scope[fields],list(scoring_version='fixture-scoring',observed_at=rival_finance_stamp(),
+   expires_at=rival_finance_stamp(Sys.time()+300),complete=TRUE,payload=list())))
+ fixture<-ev('eligibility',paste0('calendar:v1:',as.character(openssl::sha256(scope$league_id))),
+   list(kind='league_round_calendar',version=2L,scope=scope,completeness='complete',
+     valid_until=as.numeric(stamp)+300,rows=list(list(status='closed',round_id='r1',is_finished=TRUE,round_number=1)),
+     fixture_rounds=list(list(round_id='r1',begin_process='2026-02-01T00:00:00.000Z',
+       all_fixtures_dated=TRUE,fixture_dates=list('2026-02-01T00:00:00.000Z','2026-02-08T00:00:00Z')))))
+ scoped<-function(row){
+   for(field in fields)row[[field]]<-scope[[field]]
+   row
+ }
+ fixture<-scoped(fixture)
+ inputs<-lapply(Filter(function(row)!identical(row$payload$kind,'award_ownership_calendar'),records),scoped)
+ rebuilt<-function(evidence,cache=NULL){
+   saved<-rival_evidence_decode(jsonlite::fromJSON(jsonlite::toJSON(evidence,auto_unbox=TRUE,null='null')))
+   build_rival_cash_dataset(teams,scope$championship_id,saved,awards,rules=rules,account_id=scope$account_id,
+     season=scope$season,reference_team_id='a',cache=cache)
+ }
+ cash<-function(evidence,cache=NULL)rebuilt(evidence,cache)$team_finances$estimated_cash[1]
+ durable<-c(inputs,list(fixture))
+ known<-rebuilt(durable)
+ stopifnot(cash(inputs)==110,known$team_finances$estimated_cash[1]==175,
+   identical(rebuilt(durable)$cash_ledgers,known$cash_ledgers))
+ for(kind in c('foreign','partial','future','before-kickoff','wrong-source','wrong-number','open','incomplete-dates')){
+   invalid<-fixture
+   if(kind=='foreign')invalid$payload$scope$account_id<-'other'
+   if(kind=='partial')invalid$payload$completeness<-'partial'
+   if(kind=='future')invalid$observed_at<-rival_finance_stamp(Sys.time()+120)
+   if(kind=='before-kickoff')invalid$observed_at<-'2026-01-31T19:00:00Z'
+   if(kind=='wrong-source')invalid$source_id<-'calendar:foreign'
+   if(kind=='wrong-number')invalid$payload$rows[[1]]$round_number<-2
+   if(kind=='open')invalid$payload$rows[[1]]$is_finished<-FALSE
+   if(kind=='incomplete-dates'){
+     invalid$payload$fixture_rounds[[1]]$all_fixtures_dated<-FALSE
+     invalid$payload$fixture_rounds[[1]]$begin_process<-''
+   }
+   stopifnot(cash(c(inputs,list(invalid)))==110)
+ }
+ dedicated<-scoped(calendar[[1]])
+ stopifnot(cash(c(durable,list(dedicated)))==175)
+ dedicated$payload$rows[[1]]$begin_process<-'2026-02-02T00:00:00Z'
+ stopifnot(cash(c(durable,list(dedicated)))==110)
+ early<-lapply(durable,function(row){
+   if(identical(row$payload$kind,'player_ownership_history'))row$observed_at<-'2026-02-05T00:00:00Z'
+   row
+ })
+ cache<-rival_calculation_cache()
+ stopifnot(cash(early,cache)==110,cash(durable,cache)==175)
+})
+check('historical ownership timestamps remain valid under an older worker source clock',{
+ clock<-new.env(parent=environment(rival_resolve_owner_interval))
+ clock$Sys.time<-function()fm_time('2026-02-01T00:00:00Z')
+ worker_resolve<-rival_resolve_owner_interval
+ worker_evidence<-rival_ownership_observation_evidence
+ environment(worker_resolve)<-environment(worker_evidence)<-clock
+ result<-worker_resolve(rows,'2026-02-01T00:00:00Z','2026-02-10T00:00:00Z',rival_finance_stamp(stamp),teams)
+ stopifnot(result$known,result$team_id=='a',
+   length(worker_evidence(list(status='ok',player_id='p1',rows=rows,observed_at=rival_finance_stamp(stamp)),'u','league','unknown'))==1L)
+})
 cat('Ownership history:',checks,'checks passed.\n')
 # Exercise the actual shared queue, preserving its two-slot bound and durable reuse.
 original_async<-async_adapter_fetch;original_defer<-defer_persistence

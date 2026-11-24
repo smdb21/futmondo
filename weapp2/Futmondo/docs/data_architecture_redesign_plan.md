@@ -2542,3 +2542,16 @@ See [the verification record](data_review_results.md) for observed production
 coverage, focused regression results and performance.
 
 The November 24 camera revision carries the half-turn into the close-up in a single banked flight. Pitch framing during the flyby uses the establishing view to remove corner-driven vertical shifts. Implemented locally.
+
+## Round 9 position settlement and saved ownership dates · 2026-11-24
+
+- [x] Compare the round 9 payment with both archived and current official
+  rankings. The archived snapshot reproduces the recorded payment, and the
+  user confirmed the current 6th-place result in Futmondo.
+- [x] Reuse official historical fixture dates and decode stored owner histories
+  on a mixed evidence page. Verify the shared ledger, queue and offline lifecycle.
+- [ ] Corroborate round 9 settlement against a second affected manager's payment
+  or contemporaneous official standings. Verify production publication after the
+  ownership fix and resolve remaining recipients from dated official history.
+
+See [the investigation and checks](data_review_results.md).

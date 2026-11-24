@@ -391,3 +391,22 @@ The approved production repair was acknowledged on 2026-11-24. Readback
 matched all seven original payloads and timestamps in the resolved season.
 Classification reflects those facts after the worker saves its next calculation.
 See [the verification record](data_review_results.md).
+
+## Saved fixture dates for award ownership · 2026-11-24
+
+`rival_ownership_round_intervals()` also uses the durable version-2
+`league_round_calendar` observation already read by the finance worker. It
+checks the source league key and exact account, championship, competition and
+season, then validates the dated fixtures of settled rounds whose official IDs
+and numbers agree with the ledger. A completed round's corroborated historical
+kickoff can be reused after the calendar's live freshness deadline. A
+conflicting kickoff or missing final-category payment leaves the interval open.
+The same interval drives historical ownership acquisition and the ledger.
+
+Mixed PostgREST JSON pages can pad an absent `scope` object with nested missing
+values. Ownership evidence validation tolerates those placeholders and still
+rejects unexpected populated fields. Future timestamp guards use wall time
+when the helper is replaying an older source clock. The preparation key keeps
+ownership observation timestamps because an otherwise unchanged history can
+become usable after the final settlement has been observed. The existing
+durable ledger remains the display source until the worker saves a new one.

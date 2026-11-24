@@ -6039,3 +6039,50 @@ no additional runtime performance impact.
 The former orbit recalculated vertical framing from the rotating pitch bounds. Its yaw and zoom also eased to zero speed at the same intermediate timestamp. The revised shot uses a stable framing reference and one flight parameter for eye distance, heading, bank and aim. Across 726 poses at each of three scene heights, the eye distance and vertical offset decreased monotonically and the pitch and player projections stayed finite.
 
 Local Chromium verified motion on both sides of the former pause and the transition from the centered midfielder into flock particles. At 4× CPU throttling the 95th-percentile draw time for the existing renderer was 4.6 ms on the 1440 px desktop layout, 3.9 ms on the 390 px fullscreen layout and 4.2 ms on the 320 px compact layout. The particle counts, loop duration and frame cap are unchanged. The change adds no network or database work. The offline Shiny lifecycle passed 14 checks and eight tabs.
+
+## Round 9 settlement comparison and historical ownership dates · 2026-11-24
+
+The source recorded a round 9 position credit of €3,333,333 on October 20.
+Both saved rankings have nine participants and the reference team at 72 points.
+In the earlier archived ranking the team was 5th, producing €3,333,333
+under the recorded €30 million lowest-scores-first pool. In the later ranking
+the team was 6th, producing €4,000,000. The user confirmed the current
+official 6th-place result and the team above with 74 points. That team
+had 69 points in the earlier archive. Their expected credits are €4,000,000
+using the earlier standings and €3,333,333 using the current standings.
+The earliest saved ranking and team histories postdate payment, and no
+contemporaneous settings or ranking snapshot was recovered. The archives
+support a standings revision as the explanation. A second recorded credit
+or a contemporaneous official record would corroborate the settlement basis.
+The financial ledger keeps the recorded credit. Futmondo documents that
+post-close score corrections can affect standings without recalculating
+bonuses. [Scoring guide](https://help.futmondo.com/article/204-modo-prensa-futmondo-liga-ea-sports).
+[Automatic bonus guide](https://help.futmondo.com/article/142-configura-las-primas-automaticas-en-un-campeonato-social).
+
+Read-only production evidence had official kickoff dates for rounds 4, 5, 6,
+7 and 9 in the normalized fixture calendar while the dedicated ownership
+calendar lacked them. Round 4's saved owner history supports Robert Navarro
+being unowned through its September 4–8 interval. Manu Sánchez and Ochieng
+lack a saved transition before kickoff. The changed reader reuses scoped
+settled fixture dates and handles nested empty JSON placeholders in mixed
+evidence pages. The wall-time guard also accepts observations that postdate
+the worker's oldest contributing source clock. The proof still requires an
+unchanged, uniquely mapped owner or an explicit System state covering
+the full interval. No production records were written. The newly calculated
+hosted amounts remain unverified.
+
+Offline verification passed the 12 ownership checks, fixture calendar,
+pending settlement, ranking recovery, database-only bonus projection and
+deployment contract. The synthetic fixture exercised mixed JSON round-trip,
+foreign scope, wrong or conflicting round identities and dates, an older
+worker clock, and observation-time invalidation of the existing preparation
+cache. The offline Shiny lifecycle passed 14 checks and eight tabs.
+
+The revised interval preparation averaged 60.19 ms versus 13.56 ms across
+75 repetitions with 13 settled rounds in a 380-fixture synthetic calendar.
+The existing worker calculation bears the extra validation. The source is
+already in the scoped database read, and only relevant settled fixtures are
+validated. Usable saved histories are reused. Unresolved holders can use the
+existing bounded worker acquisition queue once their interval is supported.
+Browsing adds no source or database requests, cache capacity, timers or
+redraws. The comparison excludes network and production worker load.
