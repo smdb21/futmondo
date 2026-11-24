@@ -45,21 +45,16 @@ lineup_arrival_roster <- function(roster, incoming) {
 }
 
 lineup_schedule_preview <- function(roster, arrivals, scores, rules, current, excluded, doubtful, coverage) {
-  stages <- vector("list", nrow(arrivals) + 1L)
-  for (i in seq_along(stages)) {
-    rows <- lineup_arrival_roster(roster, arrivals[seq_len(i - 1L), , drop = FALSE])
-    result <- lineup_optimize(rows, scores, unlist(rules$allowed), current, doubtful,
-      rules$bench_enabled, rules$multiposition, excluded_ids = excluded, require_bench_coverage = coverage)
-    if (is.null(result)) {
-      if (!coverage || i == length(stages)) return(NULL)
-      next
-    }
-    if (!isTRUE(rules$captain_enabled)) result$draft$captain <- ""
-    stages[[i]] <- list(player_id = if (i == 1L) "" else arrivals$player_id[i - 1L],
-      due_at = if (i == 1L) NULL else fm_clause_stamp(arrivals$joins_at[i - 1L]), lineup = result$draft)
-    current <- result$draft
-  }
-  Filter(Negate(is.null), stages)
+  rows <- lineup_arrival_roster(roster, arrivals)
+  result <- lineup_optimize(rows, scores, unlist(rules$allowed), current, doubtful,
+    rules$bench_enabled, rules$multiposition, excluded_ids = excluded, require_bench_coverage = coverage)
+  if (is.null(result)) return(NULL)
+  value <- result$draft
+  if (!isTRUE(rules$captain_enabled)) value$captain <- ""
+  selected <- arrivals[arrivals$player_id %in% c(value$starters, value$bench), , drop = FALSE]
+  latest <- if (nrow(selected)) which.max(fm_time(selected$joins_at))
+  list(list(player_id = if (length(latest)) selected$player_id[latest] else "",
+    due_at = if (length(latest)) fm_clause_stamp(selected$joins_at[latest]) else NULL, lineup = value))
 }
 
 lineup_schedule_draft <- function(value) {

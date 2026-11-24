@@ -2461,3 +2461,7 @@ Signed-in hosted confirmation remains separate from local browser validation.
 - [ ] Verify the updated badge on the hosted release after deployment.
 
 See the clause status review in `docs/data_review_results.md`.
+
+## Round-start lineup submission · 2026-11-23
+
+Implemented locally. New plans optimize once over the projected squad and queue one approved lineup at the latest selected arrival. Existing persisted plans continue through the same worker contract. Production deployment is pending.

@@ -36,27 +36,26 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
         const schedule = page.locator('#lineup-schedule_status li');
         const approveStages = async () => {
           for (const stage of await stageList.all()) {
-            await stage.locator('summary').click();
             await stage.getByLabel('Approve this lineup').check();
           }
         };
-        const scheduleButton = page.getByRole('button', { name: 'Save and schedule approved lineups' });
-        assert.equal(await stageList.count(), 3);
+        const scheduleButton = page.getByRole('button', { name: 'Schedule approved lineup' });
+        assert.equal(await stageList.count(), 1);
         await approveStages();
         await scheduleButton.click();
         await page.getByText('Scheduled lineup preview').waitFor();
-        await schedule.nth(2).waitFor();
+        await schedule.first().waitFor();
         await page.getByLabel('Require full outfield bench coverage').check();
         await page.getByRole('button', { name: 'Optimize' }).click();
-        await page.getByText(/Full bench coverage first becomes possible after Incoming Forward/).waitFor();
+        await page.getByText(/Latest arrival in this lineup/).waitFor();
         await signing.waitFor();
         assert.equal(await stageList.count(), 1);
-        assert.equal(await schedule.count(), 3);
+        assert.equal(await schedule.count(), 1);
         await approveStages();
         await scheduleButton.click();
         const keep = page.getByRole('button', { name: 'Keep schedule' });
         await keep.click();
-        assert.equal(await schedule.count(), 3);
+        assert.equal(await schedule.count(), 1);
         await scheduleButton.click();
         await page.getByRole('button', { name: 'Cancel schedule and replace' }).click();
         await page.getByText('Scheduled lineup preview').waitFor();
@@ -68,27 +67,24 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
         await page.close();
         continue;
       }
-      await page.selectOption('#lineup-preview_stage', '1');
-      await signing.waitFor({ state: 'detached' });
       const review = page.locator('#lineup-schedule_preview details');
-      assert.equal(await review.count(), 2);
+      assert.equal(await review.count(), 1);
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
       if (process.env.FUTMONDO_EDITOR_DISABLE_SCHEDULE === 'true') {
         await page.getByText('Automatic saves are unavailable on this deployment.').waitFor();
-        assert.equal(await page.getByRole('button', {name: 'Save and schedule approved lineups'}).count(), 0);
+        assert.equal(await page.getByRole('button', {name: 'Schedule approved lineup'}).count(), 0);
         assert.deepEqual(await readCounts(), counts);
         console.log(`PASS ${width}px: default preview with scheduling disabled (${rendered} ms)`);
         await page.close();
         continue;
       }
-      await page.getByRole('button', {name: 'Save and schedule approved lineups'}).click();
-      await page.getByText('Approve each lineup before scheduling.').waitFor();
+      await page.getByRole('button', {name: 'Schedule approved lineup'}).click();
+      await page.getByText('Approve the lineup before scheduling.').waitFor();
       assert.deepEqual(await readCounts(), counts);
       for (const detail of await review.all()) {
-        await detail.locator('summary').click();
         await detail.getByLabel('Approve this lineup').check();
       }
-      await page.getByRole('button', {name: 'Save and schedule approved lineups'}).click();
+      await page.getByRole('button', {name: 'Schedule approved lineup'}).click();
       await page.getByText('Scheduled lineup · queued').waitFor();
       await page.getByLabel('Include incoming players').uncheck();
       await page.getByRole('button', {name: 'Optimize'}).click();

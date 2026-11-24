@@ -318,15 +318,13 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
             if(is.null(stages)){
               notice(if(coverage)
                 'No round-start lineup can provide separate defender, midfielder and forward cover. Your previous lineup preview is retained.'
-                else 'No eligible lineup could be formed for every stage. Your previous lineup preview is retained.',error=TRUE);return()
+                else 'No eligible round-start lineup could be formed. Your previous lineup preview is retained.',error=TRUE);return()
             }
             preview(list(id=fm_clause_id(),stages=stages,arrivals=incoming$rows,rows=rows,round=target(),
               baseline=data$official,request=request,departure=departure$excluded_ids,rounds=attr(score,'rounds')))
-            if(nzchar(stages[[1]]$player_id)){
-              first<-match(stages[[1]]$player_id,incoming$rows$player_id)
-              notice(paste0('Full bench coverage first becomes possible after ',incoming$rows$player_name[first],
-                ' joins. The first eligible stage starts at that arrival.'))
-            }else notice('Review the immediate lineup and each arrival stage.')
+            due<-stages[[1]]$due_at
+            notice(if(is.null(due)) 'All selected players are already in your squad.'
+              else paste('Latest arrival in this lineup ·',incoming_clause_time(due)))
             return()
           }
           result<-lineup_optimize(rows,score,unlist(data$rules$allowed),draft(),include,
@@ -665,11 +663,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
     output$pitch<-shiny::renderUI({
       shiny::req(is_module_active(),draft(),source())
       plan<-preview();value<-draft()
-      if(!is.null(plan)){
-        stage<-match(input$preview_stage %||% '',as.character(seq_along(plan$stages)))
-        if(is.na(stage))stage<-length(plan$stages)
-        value<-plan$stages[[stage]]$lineup
-      }
+      if(!is.null(plan))value<-plan$stages[[1]]$lineup
       roles<-lineup_slot_roles(value$strategy)
       shiny::div(class='fm-round-lineup',
         shiny::div(class='fm-lineup-layout',
@@ -792,11 +786,8 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
     approval_id<-function(plan,i)paste0('approve_',plan$request$sequence,'_',i)
     output$schedule_preview<-shiny::renderUI({
       plan<-preview();shiny::req(plan,is_module_active())
-      labels<-vapply(plan$stages,function(stage){
-        if(!nzchar(stage$player_id))return('Immediate lineup')
-        i<-match(stage$player_id,plan$arrivals$player_id)
-        paste(plan$arrivals$player_name[i],'·',incoming_clause_time(plan$arrivals$joins_at[i]))
-      },character(1))
+      stage<-plan$stages[[1]]
+      label<-if(is.null(stage$due_at))'Submit immediately'else paste('Submit',incoming_clause_time(stage$due_at))
       show_player<-function(id){
         row<-plan$rows[match(id,plan$rows$id),,drop=FALSE]
         pending<-id%in%plan$arrivals$player_id&&!id%in%roster()$id
@@ -807,23 +798,19 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
             plan$arrivals$joins_at[match(id,plan$arrivals$player_id)]))))
       }
       show_players<-function(ids)lapply(ids[nzchar(ids)],show_player)
-      choices<-labels;choices[length(choices)]<-paste('Round-start lineup ·',tail(labels,1))
       scheduling<-lineup_schedule_enabled()&&!isTRUE(plan$confirmed)
+      value<-stage$lineup
       shiny::tagList(
-        shiny::selectInput(session$ns('preview_stage'),'Preview lineup',choices=setNames(seq_along(choices),choices),
-          selected=length(labels),selectize=FALSE),
-        shiny::div(class='fm-lineup-stage-list',lapply(seq_along(labels),function(i){
-          value<-plan$stages[[i]]$lineup
-          shiny::tags$details(shiny::tags$summary(paste(labels[i],'·',value$strategy)),
+        shiny::div(class='fm-lineup-stage-list',
+          shiny::tags$details(open=NA,shiny::tags$summary(paste(label,'·',value$strategy)),
             shiny::div(shiny::strong('Starting XI '),show_players(value$starters)),
             if(any(nzchar(value$bench)))shiny::div(shiny::strong('Bench '),show_players(value$bench)),
             if(nzchar(value$captain))shiny::div(shiny::strong('Captain '),show_player(value$captain)),
-            if(scheduling)shiny::checkboxInput(session$ns(approval_id(plan,i)),'Approve this lineup',FALSE,width='100%'))
-        })),
+            if(scheduling)shiny::checkboxInput(session$ns(approval_id(plan,1L)),'Approve this lineup',FALSE,width='100%'))),
         if(isTRUE(plan$confirmed))shiny::div(class='fm-lineup-note','Scheduled lineup preview')
         else if(!scheduling)shiny::div(class='fm-lineup-note','Automatic saves are unavailable on this deployment.'),
         shiny::div(class='fm-lineup-actions',
-          if(scheduling)shiny::actionButton(session$ns('schedule_confirm'),'Save and schedule approved lineups'),
+          if(scheduling)shiny::actionButton(session$ns('schedule_confirm'),'Schedule approved lineup'),
           shiny::actionButton(session$ns('preview_close'),'Close preview')))
     })
     shiny::observeEvent(input$preview_close,{if(!schedule_busy())preview(NULL)})
@@ -841,7 +828,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       plan<-preview()
       shiny::req(plan,!isTRUE(plan$confirmed),lineup_schedule_enabled(),is_module_active(),!schedule_busy(),!saving(),!loading())
       if(is.null(confirmed)&&!all(vapply(seq_along(plan$stages),function(i)isTRUE(input[[approval_id(plan,i)]]),logical(1)))){
-        notice('Approve each lineup before scheduling.',error=TRUE);return()
+        notice('Approve the lineup before scheduling.',error=TRUE);return()
       }
       latest<-arrivals();departure<-current_departures()
       if(!isTRUE(latest$complete)||!identical(lineup_arrival_identity(latest$rows),lineup_arrival_identity(plan$arrivals))||
@@ -895,7 +882,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       shiny::req(is_module_active());issues<-if(is.null(draft())||is.null(source()))'Lineup is loading'else lineup_validate(draft(),roster(),source()$rules)
       if(!is.null(draft()))issues<-c(issues,departure_issues(draft()))
       if(is.null(target()))issues<-c(issues,'Next round is not established')
-      if(!is.null(preview()))issues<-c(issues,'Close the staged preview to save the manual draft.')
+      if(!is.null(preview()))issues<-c(issues,'Close the lineup preview to save the manual draft.')
       shiny::tagList(shiny::actionButton(session$ns('save'),if(saving())'Saving…'else'Save to LigaRadar',icon=shiny::icon('floppy-disk'),
         disabled=saving()||loading()||length(issues)>0L||!dirty()),if(length(issues))fm_info(paste(unique(issues),collapse=' · '),error=!loading(),pending=loading(),inline=TRUE))
     })

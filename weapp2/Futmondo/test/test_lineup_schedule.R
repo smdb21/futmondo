@@ -17,14 +17,12 @@ stopifnot(!lineup_arrival_candidates(list(status='observed',records=invalid),ros
 scores <- data.frame(id = c(roster$id,'keeper1','keeper2'), average = c(seq_len(nrow(roster)),50,60))
 rules <- list(allowed=lineup_formations(),bench_enabled=TRUE,multiposition=TRUE,captain_enabled=TRUE)
 preview <- lineup_schedule_preview(roster,candidates$rows,scores,rules,lineup_empty(),character(),FALSE,FALSE)
-keepers <- vapply(preview,function(stage)tail(stage$lineup$starters,1),character(1))
-stopifnot(identical(keepers,c('owned','keeper1','keeper2')),is.null(preview[[1]]$due_at),
-  identical(preview[[2]]$due_at,preview[[3]]$due_at),
-  length(unique(vapply(preview,function(stage)lineup_identity(stage$lineup),character(1))))==3)
+stopifnot(length(preview)==1L, tail(preview[[1]]$lineup$starters,1)=='keeper2',
+  identical(preview[[1]]$due_at,fm_clause_stamp(now+30)))
 unavailable <- candidates$rows
-unavailable$available <- c(FALSE,TRUE)
-preview <- lineup_schedule_preview(roster,unavailable,scores,rules,lineup_empty(),character(),FALSE,FALSE)
-stopifnot(identical(vapply(preview,function(stage)tail(stage$lineup$starters,1),character(1)),c('owned','owned','keeper2')))
+unavailable$available <- FALSE
+immediate <- lineup_schedule_preview(roster,unavailable,scores,rules,lineup_empty(),character(),FALSE,FALSE)
+stopifnot(length(immediate)==1L,is.null(immediate[[1]]$due_at),immediate[[1]]$player_id=='')
 cat('PASS strict kickoff eligibility, already-owned filtering, deterministic simultaneous arrivals and unavailable players\n')
 
 scarce <- roster[c(1,2:6,8:12,14:15),]
@@ -40,9 +38,16 @@ stopifnot(length(strict)==1L,strict[[1]]$player_id=='new-forward',
   identical(strict[[1]]$due_at,fm_clause_stamp(forward$joins_at)),
   'keeper1'%in%strict[[1]]$lineup$starters,
   length(lineup_bench_coverage(lineup_arrival_roster(scarce,rbind(early,forward)),strict[[1]]$lineup$bench,TRUE))==3L)
-cat('PASS early stages without full cover are skipped, and the first feasible stage keeps earlier signings\n')
+late <- transform(forward,player_id='late-bench',joins_at=now+45)
+unused <- transform(forward,player_id='unused',joins_at=now+50)
+bench_scores <- rbind(coverage_scores,data.frame(id=c('late-bench','unused'),average=c(14.5,-10)))
+plan <- lineup_schedule_preview(scarce,rbind(unused,early,late,forward),bench_scores,rules,lineup_empty(),
+  character(),FALSE,TRUE)
+stopifnot(length(plan)==1L,'late-bench'%in%plan[[1]]$lineup$bench,plan[[1]]$player_id=='late-bench',
+  identical(plan[[1]]$due_at,fm_clause_stamp(late$joins_at)))
+cat('PASS latest selected substitute sets the submission time even after full coverage is feasible\n')
 rules$allowed <- lineup_formations()
 
 runs <- replicate(20,system.time(lineup_schedule_preview(roster,candidates$rows,scores,
   rules,lineup_empty(),character(),FALSE,FALSE))[['elapsed']])
-cat('18 owned + 2 incoming, all formations, three stages median ms:', median(runs)*1000, '\n')
+cat('18 owned + 2 incoming, all formations, one lineup median ms:', median(runs)*1000, '\n')

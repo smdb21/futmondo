@@ -5800,3 +5800,9 @@ I/O, timers, reactive dependencies, or additional widgets are introduced. The
 saved-card regression issued zero source reads while rendering these states.
 The production diagnosis read only a scoped snapshot. No transaction was sent.
 Hosted release rendering remains unverified.
+
+## Round-start lineup submission · 2026-11-23
+
+The offline lineup scheduling fixture passed kickoff filtering, simultaneous arrivals, unavailable signings, immediate submission, and a selected substitute arriving after full coverage was already possible. A later unused signing did not delay the save. The 18-owned, two-incoming fixture across all formations took 8 ms median over 20 runs. Planning now makes one optimizer call per request and queues one submission. It reuses existing roster and history reads, status polling, and durable plan storage.
+
+Chromium passed the approval, replacement, cancellation and scheduling-disabled cases at 390 and 1440 px using synthetic fixtures. The offline Shiny lifecycle passed 14 checks and eight tabs. Production submission and real account data were outside these checks.
