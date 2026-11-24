@@ -19,6 +19,12 @@
 - [x] Remove the space after the initial in abbreviated lineup and picker names.
 - [ ] Confirm rendering in the authenticated hosted application.
 
+## Manual clause settlement in the balance summary (2026-11-23)
+
+- [x] Project After offers from active offers and display the slots occupied by offers and pending actions.
+- [x] Use persisted transfer and balance evidence to reconcile accepted manual clause holds through the existing team-locked RPC.
+- [ ] Apply the settlement migration and verify the updated application against the affected production observation. See [data review](data_review_results.md#manual-clause-settlement-in-the-balance-summary-2026-11-23).
+
 ## Clause filter cash balance (2026-11-23)
 
 - [x] Cap the clause browsing filter at the current Balance and reuse the existing team observation.
@@ -2480,6 +2486,10 @@ Primary-position bench coverage is implemented locally for both current and proj
 Implemented locally: expected XI totals and direct manual edits for current squads, unsaved optimized lineups and approved schedules. Projected edits reuse the existing durable schedule and explicit replacement protocol.
 
 Implemented locally: a queued XI opens on the regular editable pitch. The picker and score table share the projected squad; the optimizer can still explicitly exclude signings. Restoration reuses the existing schedule read and guards local edits and league/round scope.
+
+## LigaRadar header navigation
+
+Implemented locally. Activating the LigaRadar title opens the existing Welcome tab in the current session through the same Shiny tab controller used by the notification bell.
 
 ## Loading animation close-up · 2026-11-23
 

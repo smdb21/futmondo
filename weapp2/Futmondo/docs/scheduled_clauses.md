@@ -116,3 +116,26 @@ fantasy user-team ID and `type: "market"` in the authenticated POST envelope
 and reads the answer as player rows. Its row parser reads the singular
 `bid.id` and `bid.price`; LigaRadar exposes those as `bid_id` and `bid_price`.
 The live saved market and balance corroborated that mapping for the repaired bid.
+
+
+### Completed manual clause purchases (2026-11-23 Pacific)
+
+The official [Futmondo bundle](https://app.futmondo.com/main.dart.js), inspected
+2026-11-23 Pacific (SHA-256
+`08202076259d1678c7557478771d3aa38b5099f42044630569c704fdb7a7cd1c`), and saved
+captures confirm that the authenticated `POST /1/userteam/information` uses
+`championshipId`, `userteamId` and `type: "market"`, and parses
+`answer.budget` and `answer.withheld` separately. The captured
+`POST /1/market/rosterclause` returns `answer.code` on acceptance.
+
+The existing `clause_reconcile_completed_bids` RPC also settles legacy manual
+clause reservations using the saved pressroom and balance versions. The shared
+matcher checks a unique source transfer with the same player, buyer, original
+rival seller, actual paid price and transaction time. The balance observation
+must follow dispatch and the transfer. An uncertain dispatch requires a source
+clause marker. A native acceptance plus an exact transaction match can also
+settle when the source leaves the method unknown. An explicit conflicting method
+keeps the hold. The RPC releases the persisted cash and slot together under the
+existing team lock. The observer reuses persisted snapshots and the shared
+reservation refresh. After offers uses the observed outgoing offer total, and
+reconciled holds stop reducing Can spend and the remaining squad capacity.

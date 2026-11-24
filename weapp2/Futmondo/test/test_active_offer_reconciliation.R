@@ -73,3 +73,38 @@ shiny::testServer(function(input,output,session) {
   stopifnot(length(writes)==2L,!length(account$jobs))
 })
 cat('PASS saved offer observer coalesces writes and retries the latest persisted version after a no-op\n')
+
+clause <- modifyList(job,list(id='clause',mode='clause',state='accepted',result_code=API_CODE_OK,
+ original_owner='rival',actual_price=91657534,reserved_amount=91657534))
+account$jobs <- list(clause)
+account$saved_offers_attempted <- NULL
+writes <- list()
+history <- worker_state(data.frame(id='official',player_id=clause$player_id,
+ buyer_team_id='mine',seller_team_id='rival',price=91657534,created=fm_clause_stamp(at+1),
+ is_clause=TRUE),at+2)
+history_rv <- shiny::reactiveVal(history)
+original_get <- fm_worker_get
+fm_worker_get <- function(account,key) {
+ if(key!='get_championship_pressroom')return(original_get(account,key))
+ value <- history_rv()
+ list(manifest=list(resource_key=key,version='saved-history',observed_at=value$observed_at))
+}
+fm_clause_rpc <- function(name,payload,...) {
+ stopifnot(name=='reconcile_completed_bids')
+ writes[[length(writes)+1L]] <<- payload
+ promises::promise(function(resolve,reject) resolver <<- resolve)
+}
+shiny::testServer(function(input,output,session) {
+ fm_clause_reconcile_saved_offers(session,function()auth,function()ctx$championship_id,
+  function()ctx$user_team_id,history_rv,balance_rv,function()stop('Clause settlement needs no active offers read'))
+}, {
+ flush <- function() for(i in seq_len(5)) {later::run_now(0); session$flushReact()}
+ flush()
+ stopifnot(length(writes)==1L,writes[[1]]$p_history_version=='saved-history',
+  writes[[1]]$p_matches[[1]]$job_id=='clause',isTRUE(writes[[1]]$p_matches[[1]]$is_clause),
+  fm_clause_reservations(account$jobs)$count==1)
+ resolver(1)
+ flush()
+ stopifnot(length(writes)==1L,fm_clause_reservations(account$jobs)$count==0)
+})
+cat('PASS paid manual clause reuses saved history and balance to clear the cash and squad hold\n')

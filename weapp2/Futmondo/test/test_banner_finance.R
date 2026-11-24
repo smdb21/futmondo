@@ -43,6 +43,17 @@ check("squad summary uses the existing identity ledger and counts reserved offer
     grepl("No squad slots free for new offers.",html,fixed=TRUE))
   stopifnot(account_squad_display(resource_state(roster),transfers,team,0,1)$full,
     account_squad_display(resource_state(roster),transfers,team,2,1)$full)
+
+  incoming <- transfers
+  incoming$records <- data.frame(player_id="paid")
+  incoming$outgoing_records <- data.frame(player_id=character())
+  fixture <- account_squad_display(resource_state(roster[-1,,drop=FALSE]),incoming,team,0,1)
+  html <- as.character(account_squad_UI(fixture))
+  stopifnot(grepl("Effective players: 18 / 20",html,fixed=TRUE),
+    grepl("Slots reserved for pending actions: 1",html,fixed=TRUE),
+    grepl("You can buy up to 1 more player.",html,fixed=TRUE))
+  released <- account_squad_display(resource_state(roster[-1,,drop=FALSE]),incoming,team,0,0)
+  stopifnot(grepl("You can buy up to 2 more players.",as.character(account_squad_UI(released)),fixed=TRUE))
 })
 check("unknown and partial squad evidence never becomes zero or a false full-squad message", {
   empty<-list(status="ok",outgoing_status="ok",records=data.frame(player_id=character()),outgoing_records=data.frame(player_id=character()))
@@ -171,7 +182,7 @@ shiny::testServer(app_server,{
     html <- paste(output$round_finance_amounts$html,output$round_finance_status$html)
     stopifnot(grepl("Balance: 1.000 EUR",html,fixed=TRUE),
       grepl("Active offers: 200 EUR (1)",html,fixed=TRUE),
-      grepl("After offers: 700 EUR",html,fixed=TRUE),
+      grepl("After offers: 800 EUR",html,fixed=TRUE),
       grepl("Can spend: 5.500 EUR",html,fixed=TRUE),
       grepl('class="fm-info', html, fixed=TRUE), !grepl('<details[^>]* open', html),
       !grepl("Displayed amounts are saved observations (cached).", html, fixed=TRUE),

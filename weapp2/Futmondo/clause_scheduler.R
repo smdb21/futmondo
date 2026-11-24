@@ -152,26 +152,33 @@ fm_clause_jobs <- function(context) {
  Filter(function(j)all(vapply(c('account_id','championship_id','user_team_id','competition_id','season','scoring_version'),
   function(f)identical(fm_scalar(j$context[[f]],''),fm_scalar(context[[f]],'')),logical(1))),s$jobs)
 }
-# A completed bid may leave active offers before the first readback.
-fm_clause_completed_bid_matches <- function(jobs,history,team,balance_at,history_at) {
+# Saved transfer history can settle a completed bid or a paid clause.
+fm_clause_completed_purchase_matches <- function(jobs,history,team,balance_at,history_at) {
  fields<-c('id','player_id','buyer_team_id','seller_team_id','price','created')
  if(!is.data.frame(history)||!all(fields%in%names(history)))return(list())
  sellers<-as.character(history$seller_team_id);sellers[is.na(sellers)]<-''
- market<-sellers=='' | (history$is_clause %||% rep(NA,nrow(history)))%in%FALSE
- keep<-history$buyer_team_id%in%team & !is.na(history$id) & nzchar(history$id) & market
+ keep<-history$buyer_team_id%in%team & !is.na(history$id) & nzchar(history$id)
  rows<-history[keep,fields,drop=FALSE];sellers<-sellers[keep]
+ is_clause<-(history$is_clause %||% rep(NA,nrow(history)))[keep]
  created<-fm_time(rows$created);price<-suppressWarnings(as.numeric(rows$price))
  matches<-list()
  for(j in head(jobs,64L)){
   dispatched<-fm_time(j$dispatched_at)
   if(length(dispatched)!=1L||is.na(dispatched)||balance_at<=dispatched)next
   seller<-fm_scalar(j$original_owner,'')
-  idx<-which(rows$player_id==j$player_id & sellers==seller & price==fm_number(j$max_price) &
+  clause<-identical(j$mode,'clause')
+  acknowledged<-identical(j$state,'accepted')&&identical(j$result_code,API_CODE_OK)
+  method<-if(clause) nzchar(seller) & (is_clause%in%TRUE | (acknowledged & is.na(is_clause))) else
+   sellers=='' | is_clause%in%FALSE
+  amount<-fm_number(if(clause)j$actual_price %||% j$max_price else j$max_price)
+  idx<-which(method & rows$player_id==j$player_id & sellers==seller & price==amount &
    created>=dispatched-2 & created<=history_at & created<balance_at)
   if(length(idx)!=1L)next
   i<-idx[[1]]
-  matches[[length(matches)+1L]]<-list(job_id=j$id,player_id=j$player_id,buyer_team_id=team,
+  match<-list(job_id=j$id,player_id=j$player_id,buyer_team_id=team,
    seller_team_id=seller,price=price[i],created=fm_clause_stamp(created[i]))
+  if(clause)match$is_clause<-is_clause[i]
+  matches[[length(matches)+1L]]<-match
  }
  matches
 }
@@ -200,7 +207,7 @@ fm_clause_reconcile_saved_offers <- function(session,login,league,team,history_s
   auth<-login()
   if(!valid_login(auth)||!fm_clause_enabled()||!isTRUE(fm_worker_mode(auth[['userid']])))return()
   ctx<-resource_context(auth,league(),team())
-  jobs<-Filter(function(j)identical(j$kind,'manual')&&isTRUE(j$mode%in%c('bid','offer','modify'))&&
+  jobs<-Filter(function(j)identical(j$kind,'manual')&&isTRUE(j$mode%in%c('bid','offer','modify','clause'))&&
    j$state%in%c('accepted','uncertain','dispatched'),fm_clause_jobs(ctx))
   if(!length(jobs))return()
   state<-fm_clause_account(ctx$account_id)
@@ -217,11 +224,12 @@ fm_clause_reconcile_saved_offers <- function(session,login,league,team,history_s
   team_args<-list(championship_id=ctx$championship_id,user_team_id=ctx$user_team_id)
   balance<-balance_state()
   balance_manifest<-saved('get_user_team_info',balance,team_args)
-  if(is.null(balance_manifest))return()
+  if(is.null(balance_manifest)||!is.finite(fm_number(balance$data$budget)))return()
   balance_at<-fm_time(balance_manifest$observed_at)
   balance_payload<-list(p_context=fm_clause_scope(ctx),p_balance_key=balance_manifest$resource_key,p_balance_version=balance_manifest$version)
   write_matches<-function(rpc,evidence_name,manifest,candidates,match){
-   signature<-list(manifest$version,balance_manifest$version,lapply(candidates,`[[`,'id'))
+   signature<-list(manifest$version,balance_manifest$version,lapply(candidates,function(j)
+    j[c('id','state','result_code')]))
    if(identical(state$saved_offers_attempted[[evidence_name]],signature))return(FALSE)
    state$saved_offers_attempted[[evidence_name]]<-signature
    matches<-match()
@@ -244,16 +252,19 @@ fm_clause_reconcile_saved_offers <- function(session,login,league,team,history_s
    },failed)
    TRUE
   }
-  market<-market_state()
-  market_manifest<-saved('get_market_players',market,team_args)
-  if(!is.null(market_manifest)&&write_matches('reconcile_active_offers','market',market_manifest,jobs,function()
-    fm_clause_active_offer_matches(jobs,market$data,balance_at,fm_time(market_manifest$observed_at))))return()
-  bids<-Filter(function(j)identical(j$mode,'bid'),jobs)
-  if(!length(bids))return()
+  offers<-Filter(function(j)j$mode%in%c('bid','offer','modify'),jobs)
+  if(length(offers)){
+   market<-market_state()
+   market_manifest<-saved('get_market_players',market,team_args)
+   if(!is.null(market_manifest)&&write_matches('reconcile_active_offers','market',market_manifest,offers,function()
+     fm_clause_active_offer_matches(offers,market$data,balance_at,fm_time(market_manifest$observed_at))))return()
+  }
+  purchases<-Filter(function(j)j$mode%in%c('bid','clause'),jobs)
+  if(!length(purchases))return()
   history<-history_state()
   history_manifest<-saved('get_championship_pressroom',history,team_args['championship_id'])
-  if(!is.null(history_manifest))write_matches('reconcile_completed_bids','history',history_manifest,bids,function()
-   fm_clause_completed_bid_matches(bids,history$data,ctx$user_team_id,balance_at,fm_time(history_manifest$observed_at)))
+  if(!is.null(history_manifest))write_matches('reconcile_completed_bids','history',history_manifest,purchases,function()
+   fm_clause_completed_purchase_matches(purchases,history$data,ctx$user_team_id,balance_at,fm_time(history_manifest$observed_at)))
  },domain=session)
 }
 
@@ -300,7 +311,7 @@ fm_clause_finance <- function(finance,jobs,team=NULL) {
   }else finance$spendable_budget<-max(0,finance$spendable_budget-r$amount)
   finance$projected_committed_balance<-finance$projected_committed_balance-r$amount
   if(is.finite(finance$projected_committed_balance)&&finance$projected_committed_balance<=0){
-   finance$class<-'round-countdown-warning';finance$message<-'Pending offers and scheduled purchases may leave you without a positive balance at kickoff.'
+   finance$class<-'round-countdown-warning';finance$message<-'Including held funds and pending actions, the projected balance may be nonpositive at kickoff.'
   }
  }
  finance

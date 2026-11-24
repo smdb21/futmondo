@@ -11,8 +11,11 @@ const { PGlite } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/futm
     const schema = fs.readFileSync('scripts/schema.sql', 'utf8');
     const functions = migration.slice(migration.indexOf('CREATE FUNCTION'), migration.indexOf('NOTIFY pgrst'));
     assert.ok(schema.includes(functions));
-    await db.exec(schema.replace(functions, ''));
+    const clauseMigration = fs.readFileSync('scripts/migrations/20261124063514_reconcile_completed_manual_clauses.sql', 'utf8');
+    assert.ok(schema.includes(clauseMigration));
+    await db.exec(schema.replace(clauseMigration, '').replace(functions, ''));
     await db.exec(migration);
+    await db.exec(clauseMigration);
     await db.exec("INSERT INTO worker_accounts(account_id) VALUES('fixture')");
     const job = 'f'.repeat(32);
     const history = 'a'.repeat(64), balance = 'b'.repeat(64);
@@ -45,5 +48,25 @@ const { PGlite } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/futm
     const state = (await query('SELECT state,result_code,reserved_slot,reserved_amount FROM clause_jobs WHERE id=$1',[job]))[0];
     assert.deepEqual(state,{ state:'succeeded',result_code:'market_purchase_confirmed',reserved_slot:0,reserved_amount:'0' });
     console.log('PASS saved market win releases durable cash and slot once, with stale balances and foreign evidence rejected');
+
+    const clauseJob = 'e'.repeat(32);
+    await query(`INSERT INTO clause_jobs(id,account_id,context,kind,mode,player_id,player_slug,player_name,original_owner,
+      max_price,actual_price,reserved_amount,reserved_slot,opens_at,due_at,expires_at,state,result_code,dispatched_at)
+      VALUES($1,'fixture',$2,'manual','clause','clause','clause','Clause','rival',
+      100000000,91657534,91657534,1,now(),now(),now(),'uncertain','purchase_response_uncertain',$3)`,
+      [clauseJob,{...context,player_id:'clause'},times.dispatched]);
+    const clause = {job_id:clauseJob,player_id:'clause',buyer_team_id:'mine',seller_team_id:'rival',
+      price:91657534,created:times.purchased};
+    assert.equal(await apply(context,clause),0);
+    assert.equal(await apply(context,{...clause,is_clause:true,seller_team_id:'other'}),0);
+    await query("UPDATE clause_jobs SET state='accepted',result_code='api.general.ok' WHERE id=$1",[clauseJob]);
+    assert.equal(await apply(context,{...clause,is_clause:false}),0);
+    assert.equal(await apply(context,{...clause,price:100000000}),0);
+    assert.equal(await apply(context,{...clause,created:times.snapshot}),0);
+    assert.equal(await apply(context,clause),1);
+    assert.equal(await apply(context,clause),0);
+    const settled = (await query('SELECT state,result_code,reserved_slot,reserved_amount FROM clause_jobs WHERE id=$1',[clauseJob]))[0];
+    assert.deepEqual(settled,{state:'succeeded',result_code:'clause_purchase_confirmed',reserved_slot:0,reserved_amount:'0'});
+    console.log('PASS manual clause reconciliation checks evidence, amount and source ordering and releases the durable hold once');
   } finally { await db.close(); }
 })().catch(error => { console.error(error.message); process.exitCode = 1; });

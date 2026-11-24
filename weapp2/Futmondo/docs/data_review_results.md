@@ -1,5 +1,12 @@
 # Futmondo data review and implementation results
 
+## Manual clause settlement in the balance summary (2026-11-23)
+
+- A read-only production check found one accepted manual clause reservation whose amount exactly explained the screenshot’s deduction and whose slot explained the reduced capacity. Replaying the matching durable worker snapshots through the existing decoder found a positive balance with zero source-held funds and one qualifying pressroom transfer with an explicit locker clause marker. The source balance was observed after the transfer. The saved reconciler previously excluded manual clause jobs.
+- The offline balance and squad fixtures cover zero active offers, the difference between held funds and active offers, true cash debt, and two free slots at 18 of 20 after settlement. The saved observer, scheduled-clause and isolated PostgreSQL checks cover matching identity and paid price, absent or conflicting method, successful acknowledgement, stale or foreign evidence, and one-time durable release. The Shiny lifecycle passed 14 checks and eight tabs.
+- The summary reuses its existing market scan and current scalar projection. The observer reuses the existing scoped snapshots and reservation poll, skips market lookup for clause-only candidates, and issues one asynchronous settlement RPC for a matching snapshot pair. No added source fetches, timers, retained payloads, or background jobs. Ten timestamp-only updates kept the squad card unchanged, and ten full stale/loading/fresh cycles kept the balance card unchanged. The existing mobile wrapping layout handles the conditional slot labels. Hosted rendering remains unverified.
+- Production snapshot replay was read-only. Automatic approval review blocked applying the production settlement migration without explicit authorization. The migration passed isolated PostgreSQL verification.
+
 ## Session-only scheduled purchase checks for manual actions (2026-11-23)
 
 The scheduling-enabled offline offer and clause fixtures submitted the confirmed player and amount once, with zero pre-submission Futmondo reads or reservation RPCs. Duplicate confirmations did not replay a held request. The offer fixture covered native rejection, lost acknowledgement, a scoped refresh and local conflicts over the target, funds and slots. Inactive reservations skipped the capacity lookup. The clause refresh suite passed all 11 checks, including one catalog refresh and zero player-history reads after success.

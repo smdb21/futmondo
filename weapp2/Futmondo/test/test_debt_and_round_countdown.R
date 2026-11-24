@@ -150,7 +150,7 @@ check("global UI shares primary states and keeps manual capacity checks separate
     grepl('primary_sources = primary_sources',server,fixed=TRUE),
     !grepl('get_financial_snapshot',server,fixed=TRUE),
     grepl('id="round_finance_amounts"',server,fixed=TRUE),is.function(round_finance_amounts_UI),
-    grepl('projected_committed_balance',paste(deparse(body(round_finance_amounts_UI)),collapse=''),fixed=TRUE),
+    grepl('after_offers_balance',paste(deparse(body(round_finance_amounts_UI)),collapse=''),fixed=TRUE),
     grepl('tags$span("In progress")',server,fixed=TRUE),
     grepl("position: sticky",css,fixed=TRUE),grepl("overflow-wrap: anywhere",css,fixed=TRUE))
 })

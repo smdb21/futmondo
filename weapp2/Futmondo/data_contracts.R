@@ -151,6 +151,7 @@ round_finance_display <- function(team_state, market_state) {
       commitments <- sum(prices); offer_count <- nrow(bids)
     }
   }
+  after_offers_balance <- if (usable(team_state) && is.finite(cash) && is.finite(commitments)) cash - commitments else NA_real_
   projected_committed_balance <- spendable <- NA_real_
   if (usable(team_state) && is.finite(cash) && is.finite(withheld) && withheld >= 0 && is.finite(commitments)) {
     projected_committed_balance <- cash - max(withheld, commitments)
@@ -181,19 +182,18 @@ round_finance_display <- function(team_state, market_state) {
     commitments=commitments, active_offer_count=offer_count, offers_loading=loading(market_state),
     offers_stale=market_stale && is.finite(commitments),
     calculations_stale=stale && is.finite(projected_committed_balance),
-    projected_committed_balance=projected_committed_balance, spendable_budget=spendable,
+    after_offers_balance=after_offers_balance, projected_committed_balance=projected_committed_balance, spendable_budget=spendable,
     class=class, message=message)
 }
 
 # Presentation of observed amounts is independent of action freshness. Keep the
 # strict finance contract above; source/error/expiry feedback has its own output.
 round_finance_card_display <- function(finance) {
-  fields<-c("cash","commitments","active_offer_count","projected_committed_balance",
-    "spendable_budget","manual_pending_amount")
+  fields<-c("cash","commitments","active_offer_count","after_offers_balance","spendable_budget")
   card<-finance[intersect(fields,names(finance))]
   card$cash_loading<-!is.finite(finance$cash)&&isTRUE(finance$cash_loading)
   card$offers_loading<-!is.finite(finance$commitments)&&isTRUE(finance$offers_loading)
-  balances<-c(finance$cash,finance$projected_committed_balance)
+  balances<-c(finance$cash,finance$after_offers_balance)
   negative<-any(is.finite(balances)&balances<=0)
   card$class<-if(negative)"round-countdown-warning"else
     if(any(is.finite(c(finance$cash,finance$commitments))))"round-countdown-observed"else "round-countdown-unavailable"
@@ -218,7 +218,7 @@ round_finance_amounts_UI <- function(finance = NULL) {
   shiny::tags$div(class=paste("round-countdown-finance", finance$class %||% "round-countdown-unavailable"),
     shiny::tags$span(class="round-countdown-finance-item", paste0("Balance: ", money(finance$cash, cash_loading))),
     shiny::tags$span(class="round-countdown-finance-item", paste0("Active offers: ", offers)),
-    shiny::tags$span(class="round-countdown-finance-item", paste0("After offers: ", money(finance$projected_committed_balance, cash_loading || offers_loading))),
+    shiny::tags$span(class="round-countdown-finance-item", paste0("After offers: ", money(finance$after_offers_balance, cash_loading || offers_loading))),
     shiny::tags$span(class="round-countdown-finance-item", paste0("Can spend: ", money(finance$spendable_budget, cash_loading || offers_loading))))
 }
 
@@ -247,7 +247,8 @@ account_squad_display <- function(roster_state, transfers, team_state, active_of
     identical(effective$status,"loading")
   observed<-identical(effective$status,"observed")||identical(roster_state$freshness,"stale")||
     identical(team_state$freshness,"stale")||!is.null(team_state$error)
-  list(actual=actual$count,effective=effective$count,cap=cap,reserved=reserved,full=full,
+  list(actual=actual$count,effective=effective$count,cap=cap,reserved=reserved,
+    active_offers=slots[[1]],purchase_reservations=slots[[2]],full=full,
     status=if(loading)"loading"else if(!all(is.finite(c(actual$count,effective$count,cap,reserved))))"unavailable"else if(observed)"observed"else"ok",
     detail=effective$detail,
     roster_observed_at=roster_state$observed_at,team_observed_at=team_state$observed_at)
@@ -265,9 +266,15 @@ account_squad_UI <- function(state = NULL) {
   }else{
     shiny::tags$span(paste0("Remaining squad slots: ",count(remaining)))
   }
+  offer_slots <- fm_number(state$active_offers)
+  purchase_slots <- fm_number(state$purchase_reservations)
   shiny::tags$div(class="fm-account-squad",
     shiny::tags$span(paste0("Players: ",count(state$actual))),
     shiny::tags$span(paste0("Effective players: ",count(state$effective)," / ",count(state$cap))),
+    if (is.finite(offer_slots) && offer_slots > 0)
+      shiny::tags$span(sprintf("Slots used by active offers: %d", as.integer(offer_slots))),
+    if (is.finite(purchase_slots) && purchase_slots > 0)
+      shiny::tags$span(sprintf("Slots reserved for pending actions: %d", as.integer(purchase_slots))),
     capacity,
     fm_info(state$detail,
       shiny::textOutput("account_squad_checked",inline=TRUE),
