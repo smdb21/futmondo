@@ -5424,6 +5424,10 @@ Performance review: one asynchronous queue call per explicit action, no new brow
 Production Supabase applied the migration as `20261123045201_worker_league_refresh` (2026-11-23 UTC, November 22 Pacific). Preflight matched the installed claim function to the expected predecessor. The migration used a five-second lock timeout and made schema changes without backfilling job rows. Post-migration checks confirmed the nullable column, enabled trigger, claim priority, service-only invoker grants and a recent worker heartbeat. The REST RPC returned HTTP 200 with zero queued jobs for a synthetic unmatched account. The security advisor reported no findings for the new migration objects. These checks establish the database rollout; they do not establish an authenticated Futmondo acquisition or hosted end-to-end timing. This documentation update has no runtime cost.
 
 
+## Welcome page league refresh entry
+
+Rendered the Welcome feature inventory and verified that the League refresh title and description are absent while Essentials and Advanced still render. The offline Shiny lifecycle passed 14 checks and eight tabs. Removing one static disclosure reduces initial markup and has no effect on refresh requests, database reads, caching, timers or reactive work.
+
 ## Completed market bid slot reconciliation — 2026-11-22 Pacific
 
 The reported €3,210,413 hold was an accepted manual market bid. A later stored transfer matched the winning team, price and System/Market seller, and a newer balance was present. The old reconciler only checked whether the bid was still active. The app now matches a versioned pressroom purchase and newer balance directly, while live readback handles both applied bids and completed purchases. The legacy transaction row did not supply authoritative season metadata and was not used to release the live reservation.

@@ -12,8 +12,6 @@ login_feature_tiers <- function() {
           description = "Choose a stretch of rounds to compare team points and points, position, Best XI and MVP bonuses."),
         list(id = "local_timezone", title = "Dates and times in your timezone",
           description = "See kickoffs, deadlines and history in your local timezone. You can also choose a different timezone in settings."),
-        list(id = "league_refresh", title = "League refresh",
-          description = "Request updated balances, market and roster data for your selected league. Confirmed transfers also request an update."),
         list(id = "league_charts", title = "League comparison charts",
           description = "Compare squad values and rank progression, and see fantasy-owned players grouped by real club.")
       )),
