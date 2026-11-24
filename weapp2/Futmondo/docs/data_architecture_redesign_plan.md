@@ -2584,3 +2584,8 @@ The [Brugué cross-check](data_review_results.md#brugué-round-6-lineup-and-payo
 established ownership at the postponed match and settlement, absence
 from the closed lineups, and no corresponding payment to the reference
 team. The original roster cutoff remains a compatible explanation.
+
+The [round 4 Market ownership audit](data_review_results.md#manu-sánchez-and-ochieng-round-4-ownership-resolved--2026-11-24)
+reached the official transfer archive's terminal page and verified both
+players' first Market purchases after settlement. Both scoped facts were
+saved and read back. The updated signed-in calculation remains to be verified.

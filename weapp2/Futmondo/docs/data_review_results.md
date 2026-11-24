@@ -6322,3 +6322,36 @@ fact was assigned. [Futmondo's bonus guide](https://help.futmondo.com/article/14
 The check reused scoped database observations and made two one-time
 official lineup reads. It changes documentation only and adds no runtime
 requests, database work, calculation changes or redraws.
+
+### Manu Sánchez and Ochieng round 4 ownership resolved · 2026-11-24
+
+The supplied ownership histories and saved official transfer records
+agree on the first Market purchases. Ochieng first joined a manager's
+squad on September 8 at 21:21 Pacific and Manu Sánchez on September 17
+at 21:21 Pacific. Round 4 opened September 4 at noon Pacific and the
+reference Best XI payment arrived September 8 at 01:58 Pacific.
+
+A one-time scoped `POST /1/locker/pressroom` backfill started at the
+ObjectId upper boundary of the later verified first purchase. It followed
+the existing same-second overlap rule and reached the empty terminal
+page on the seventh request. The 658 unique deliveries covered the
+start of the league through both first purchases. Neither player had
+any earlier delivery, and both first deliveries came from Futmondo.
+The empty opening squads were independently established in the league
+capture. Together these facts verify Market ownership for both players
+through the entire round 4 award interval.
+
+The supported normalized finance writer appended two league-, season-,
+round- and player-scoped verified unowned facts with the source dates,
+archive coverage and first delivery timestamps. The database acknowledged
+both. A separate readback confirmed both statuses and zero contradictory
+verified owners. The saved calculation was older than the new evidence.
+The signed-in display after recalculation remains unverified. The two
+round 4 gaps are resolved in source evidence, leaving 16 of the original
+18 post-Kubo Best XI cases unresolved, including Brugué.
+
+The offline ownership and database-backed Classification checks passed.
+The audit made seven sequential source reads and one scoped batch write.
+Existing evidence reuse supplies the two small records on the next
+calculation. There is no new runtime endpoint, recurring request, redraw
+or cache requirement.
