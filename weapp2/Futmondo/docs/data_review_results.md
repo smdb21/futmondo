@@ -6086,3 +6086,48 @@ validated. Usable saved histories are reused. Unresolved holders can use the
 existing bounded worker acquisition queue once their interval is supported.
 Browsing adds no source or database requests, cache capacity, timers or
 redraws. The comparison excludes network and production worker load.
+
+## Player captures and remaining bonus evidence · 2026-11-24
+
+The two supplied official-client captures were inspected locally. Manu Sánchez's
+capture contains team, roster and market reads. It contains no player-summary
+response. His earliest stored ownership transition is after the round 4
+settlement. Ochieng's `/1/player/summary` returns two owner transitions. Its
+earliest is September 8 at 9:21 p.m. Pacific, after the round 4 morning payout.
+A source-identified System sale was recorded after settlement. The market
+archive had no matching source-identified sale before payout for either player.
+These observations leave the September 4–8 ownership interval open for both.
+The authenticated capture also corroborated the two read contracts in
+[the API inventory](har_api_reference.md#player-season-and-competition-statistics--2026-11-24-pacific).
+
+The user-confirmed current round 9 standings were replayed with the shared
+ledger formula. The recorded €30 million pool, paid lowest-scores-first across
+nine teams, yields €4,000,000 for current 6th place. The actual €3,333,333
+credit matches the earlier 5th-place snapshot. A second dated settlement
+receipt or contemporaneous standings would help establish the payment-time
+allocation for rivals.
+
+The source-level production audit found evidence of the selected MVP's owner
+or System status for each round 4–9. The reference team's combined award
+receipts in rounds 4 and 7 still need separate attribution. Round 8 has a
+verified pending final-settlement record and zero observed position or combined
+award credits. The remaining Best XI ownership gaps by settled round are:
+
+| Round | Players whose historical ownership still needs evidence |
+| --- | --- |
+| 4 | Manu Sánchez, Ochieng |
+| 5 | Álvaro Carreras, Gulácsi, Juan Iglesias |
+| 6 | Aramburu, Brugué, Grimaldo, Ionuț Radu, Jonathan David, Le Normand |
+| 7 | Pablo Durán, Pedrosa, Román |
+| 9 | Dani Requena, Hugo Novoa, Kubo, Maffeo, Pablo Martínez |
+
+All eleven round 11 selections now have lineup or confirmed ownership
+evidence in the source records. These are source-level checks of scoped
+persisted evidence. Coverage on the live Classification screen depends on
+the published calculation.
+
+Verification checked the two HTTP 200 request and response shapes against the
+public client, retained the raw captures outside Git, and reproduced the
+position amounts in the existing R allocator. Performance review found no
+runtime effect from the documentation. The investigation required one-time
+local capture parsing and scoped read-only database comparisons.

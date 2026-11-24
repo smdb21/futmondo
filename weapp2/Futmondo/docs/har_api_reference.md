@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document details all 24 unique API endpoints extracted from four HAR (HTTP Archive) files capturing network traffic from the Futmondo web application (Flutter-based SPA hosted at `https://app.futmondo.com`).
+The original inventory covers 24 API endpoints from four Futmondo web app captures. Dated additions record later captures and their response contracts.
 
 ### Base URL
 
@@ -37,7 +37,7 @@ All POST requests use the following JSON structure:
 ```
 
 - **Content-Type**: `application/json; charset=utf-8`
-- **HTTP Method**: POST (all 24 endpoints)
+- **HTTP Method**: POST for the documented requests
 
 ### Response Envelope
 
@@ -96,6 +96,8 @@ All responses follow a consistent envelope:
 | 22 | `/5/announcement/list` | app.futmondo.com.har | POST | onlyIds | Array of announcement objects |
 | 23 | `/5/league/championshipplayers` | app.futmondo.com.har | POST | championshipId | Object with players array |
 | 24 | `/5/prize/unread` | All 4 | POST | None | Integer (count) |
+| 25 | `/2/player/lastseasons` | Ochieng, 2026-11-24 | POST | playerId | Object with season records |
+| 26 | `/2/player/statistics` | Ochieng, 2026-11-24 | POST | playerId | Object with season and competition statistics |
 
 ---
 
@@ -1888,3 +1890,46 @@ Returns the count of unread prize/promotional notifications for the authenticate
 - Some responses are base64-encoded in the HAR files (specifically `/2/championship/teams` and `/5/announcement/list`); the decoded JSON is shown above.
 - The `query` field in the request can be either an empty string (`""`) for endpoints with no parameters, or an object containing endpoint-specific parameters.
 - Error responses follow the pattern `{"error": true, "code": "<error_code>"}` within the `answer` field.
+## Player season and competition statistics · 2026-11-24 Pacific
+
+The Ochieng capture recorded successful HTTP 200 requests for these two
+authenticated factual reads in parallel with the existing full profile and
+match requests. Both use `POST https://api.futmondo.com` with the route below,
+the standard `header: {token, userid}`, `query: {playerId}` and `answer: {}`
+request envelope, and the result in the response's `answer`. The query ID is
+the player identity. Championship and user-team IDs are absent from this query.
+
+### 25. POST `/2/player/lastseasons`
+
+`answer.seasons[]` includes `id`, `role`, `league`, `points[]` and `teams[]`.
+The enclosing `league` identifies the source competition and carries the
+original `season` label and scoring metadata. Team entries expose `id`,
+`name` and `slug`. Points entries distinguish `mode` and `role`, with
+`t`, `h` and `a` splits carrying `games` and numeric `p` values. The observed
+response has one season record with 22 scoring-mode and role entries.
+Its record `id` differs from the requested player ID, so any future join
+needs to retain both.
+
+### 26. POST `/2/player/statistics`
+
+`answer.statistics[]` contains `role`, `role2`, `league`, `data` and
+`media` in this capture. Both statistics groups are split into total
+(`t`), home (`h`) and away (`a`). `data` includes fields such as
+`match_played`, `mins_played`, `goals`, `goal_assist` and `rating`.
+`media` holds source-specific scoring fields and `match_played`.
+The capture contains two entries sharing a competition ID, with the raw season
+labels `2025-2026` and `2025/2026`. The second entry omits both home splits.
+Keep missing values and raw season labels distinct until their identity is
+established from source evidence. The client parser also permits `id`,
+`points` and `teams`. Those optional fields were absent from these records.
+
+The public client uses `b8V` and `cxX` to parse season records and `b8W`
+and `cxY` to parse statistics records. The current-bundle inspection and the
+authenticated capture establish the routes and observed shapes. One player
+sample cannot establish the coverage of every season, competition or scoring
+mode. This is a reference entry for possible future use. If integrated,
+successful observations should be persisted with their source and freshness
+metadata in the existing database-backed factual flow. Preserve player,
+competition, season, role and scoring scope as applicable.
+[Official Futmondo web bundle](https://app.futmondo.com/main.dart.js).
+SHA-256 `08202076259d1678c7557478771d3aa38b5099f42044630569c704fdb7a7cd1c`.

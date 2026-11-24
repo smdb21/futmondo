@@ -2555,3 +2555,9 @@ The November 24 camera revision carries the half-turn into the close-up in a sin
   ownership fix and resolve remaining recipients from dated official history.
 
 See [the investigation and checks](data_review_results.md).
+
+The November 24 player captures established the
+[past-season and statistics API contracts](har_api_reference.md#player-season-and-competition-statistics--2026-11-24-pacific)
+for reference. The
+[read-only award audit](data_review_results.md#player-captures-and-remaining-bonus-evidence--2026-11-24)
+identifies the remaining historical ownership and settlement evidence.
