@@ -79,8 +79,10 @@ R process fails, or the window expires, that live state is lost. Remembered logi
 is a separate feature for restoring access to a new session.
 
 When Shiny Server displays its final disconnect message, LigaRadar shows a
-modal with the static pitch and radar from `fm_pitch_radar()`. **Refresh page**
-turns amber when pressed, gives the browser 180 ms to show the feedback, then
+modal with a radar beam sweeping across the fixed football pitch. The shared
+`fm_pitch_radar(sweep = TRUE)` illustration rotates the beam every four seconds
+while the modal is open and holds it still when reduced motion is enabled.
+**Refresh page** turns amber when pressed, gives the browser 180 ms to show the feedback, then
 reloads the current URL and can start a new session. The host's retry
 countdown and **Try now** link remain available during automatic recovery. The
 dialog closes if the connection becomes available again. Running directly with

@@ -69,17 +69,45 @@ async function main() {
       const artwork = dialog.locator('svg');
       assert.ok(bounds.x >= 16 && bounds.x + bounds.width <= 344, `${theme} dialog fits 360px`);
       assert.ok((await artwork.boundingBox()).height > 100, `${theme} illustration is visible`);
-      assert.equal(await artwork.locator('rect').count(), 1);
+      assert.equal(await artwork.locator('g > rect').count(), 1);
       assert.equal(await artwork.locator('circle[r="76"]').count(), 1);
       assert.equal(await dialog.locator('canvas, [data-fm-loading]').count(), 0);
       assert.equal(await refresh.isVisible(), true);
       assert.equal(await dialog.evaluate(el => getComputedStyle(el).backgroundColor),
         theme === 'dark' ? 'rgb(11, 18, 13)' : 'rgb(255, 255, 255)');
     }
+    const sweep = page.locator('#fm-disconnect .fm-radar-sweep');
+    assert.equal(await sweep.evaluate(el => el.getAnimations().length), 0, 'reduced motion keeps the radar still');
+    assert.equal(await sweep.isVisible(), true, 'the static sweep remains visible');
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    const motion = await dialog.evaluate(el => {
+      const sweep = el.querySelector('.fm-radar-sweep');
+      const [animation] = sweep.getAnimations();
+      const field = el.querySelector('svg > g > rect');
+      const bounds = field.getBoundingClientRect().toJSON();
+      animation.currentTime = 0;
+      const start = sweep.getCTM();
+      animation.currentTime = 1000;
+      const quarter = sweep.getCTM();
+      const center = new DOMPoint(210, 140);
+      return {
+        duration: animation.effect.getTiming().duration,
+        quarterTurn: Math.hypot(quarter.a + start.b, quarter.b - start.a) < 0.01,
+        centered: center.matrixTransform(start).matrixTransform(quarter.inverse()).toJSON(),
+        fieldStill: JSON.stringify(bounds) === JSON.stringify(field.getBoundingClientRect().toJSON()),
+        animated: el.getAnimations({ subtree: true }).length
+      };
+    });
+    assert.equal(motion.duration, 4000);
+    assert.equal(motion.quarterTurn, true);
+    assert.ok(Math.hypot(motion.centered.x - 210, motion.centered.y - 140) < 0.01, 'sweep pivots at midfield');
+    assert.equal(motion.fieldStill, true);
+    assert.equal(motion.animated, 1, 'only the radar sweep animates');
     assert.equal(requests.length, requestCount, 'dialog and artwork need no requests');
 
     await page.evaluate(() => { document.querySelector('#ss-connect-dialog').style.display = 'none'; });
     await dialog.waitFor({ state: 'hidden' });
+    assert.equal(await sweep.evaluate(el => el.getAnimations().length), 0, 'recovery stops the sweep');
     assert.equal(await page.locator('#login-login_button').evaluate(el => el === document.activeElement), true);
     await page.close();
 
@@ -120,7 +148,7 @@ async function main() {
       await plain.waitForFunction(() => window.Shiny?.shinyapp?.$socket?.readyState === 1);
       assert.equal(await plainDialog.isVisible(), false);
     }
-    console.log('PASS: hosted retry and recovery; mobile radar and focus; socket close, button color in both themes and same-URL reload');
+    console.log('PASS: hosted retry and recovery; mobile radar sweep and reduced motion; focus, socket close, button color and same-URL reload');
   } finally {
     await browser.close();
   }

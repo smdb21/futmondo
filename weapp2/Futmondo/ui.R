@@ -49,7 +49,7 @@ body <- shinydashboard::dashboardBody(
   ),
   tags$dialog(id = "fm-disconnect", `aria-labelledby` = "fm-disconnect-title",
     `aria-describedby` = "fm-disconnect-description",
-    tags$div(class = "fm-disconnect-visual", `aria-hidden` = "true", fm_pitch_radar()),
+    tags$div(class = "fm-disconnect-visual", `aria-hidden` = "true", fm_pitch_radar(sweep = TRUE)),
     tags$h2(id = "fm-disconnect-title", "Connection lost"),
     tags$p(id = "fm-disconnect-description", "Refresh the page to reconnect to LigaRadar."),
     tags$button(type = "button", id = "fm-disconnect-refresh", autofocus = "autofocus",

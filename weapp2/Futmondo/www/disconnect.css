@@ -33,6 +33,23 @@
   height: auto;
 }
 
+.fm-radar-sweep {
+  color: var(--fm-accent);
+  transform-box: view-box;
+  transform-origin: center;
+  transform: rotate(45deg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  #fm-disconnect[open] .fm-radar-sweep {
+    animation: fm-radar-sweep 4s linear infinite;
+  }
+}
+
+@keyframes fm-radar-sweep {
+  to { transform: rotate(405deg); }
+}
+
 #fm-disconnect-title { margin: 0 0 8px; font-size: 24px; font-weight: 700; }
 #fm-disconnect-description { margin: 0 0 24px; color: var(--fm-muted); }
 

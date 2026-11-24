@@ -5438,6 +5438,8 @@ The performance review found about 3.5 kB of inline browser code and styles plus
 
 Refresh button follow-up. Chromium confirmed the amber color on the next animation frame in both themes and the subsequent same-URL reload. One 180 ms timer runs per activation and repeated clicks are ignored while it is pending. The feedback adds no background timers, API or database calls, cache effects or server-side redraws.
 
+Radar sweep follow-up — 2026-11-23. Chromium verified one four-second CSS rotation centered at midfield, a fixed pitch at 360 px, a still sweep under reduced motion and no animation after recovery. The existing button feedback and reload checks passed. The loader fallback retained its original static beam. The offline lifecycle harness passed 14 checks and 8 tabs. Only the small SVG beam group animates while the dialog is open. The sweep adds no canvas, JavaScript animation loop, asset request, API or database work, cache effects or Shiny redraws. Physical-device frame timings were outside this check.
+
 ## Immediate manual offer controls — 2026-11-22 Pacific
 
 The held-source Shiny fixture rendered the full market editor in 11 ms, with zero Futmondo preflight requests and zero database admission requests before confirmation. Each confirmed offer sent one native request. Duplicate and stale confirmations did not dispatch. Simulated rejection and lost acknowledgement each requested one factual refresh for the captured league, team and player. A held database settlement did not delay the confirmed UI result.

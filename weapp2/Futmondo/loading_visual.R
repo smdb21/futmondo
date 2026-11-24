@@ -1,5 +1,16 @@
-# Static pitch and radar shared by the loader and disconnect dialog.
-fm_pitch_radar <- function() {
+# Pitch and radar shared by the loader fallback and disconnect dialog.
+fm_pitch_radar <- function(sweep = FALSE) {
+  beam <- if (sweep) paste0(
+    '<defs><clipPath id="fm-disconnect-pitch-clip">',
+    '<rect x="48" y="38" width="324" height="204" rx="2"/></clipPath></defs>',
+    '<g clip-path="url(#fm-disconnect-pitch-clip)"><g class="fm-radar-sweep" fill="currentColor">',
+    '<path d="M210 140L109 -4A176 176 0 0 1 210 -36Z" opacity=".05"/>',
+    '<path d="M210 140L144 -23A176 176 0 0 1 210 -36Z" opacity=".09"/>',
+    '<path d="M210 140L177 -33A176 176 0 0 1 210 -36Z" opacity=".14"/>',
+    '<path d="M210 140V-36" stroke="currentColor" stroke-width="1.6" opacity=".9"/>',
+    '</g></g>'
+  ) else '<path d="M210 140L286 64" stroke="currentColor" stroke-width="1.4" opacity=".5"/>'
+
   shiny::HTML(paste0(
       '<svg class="fm-loading-fallback" viewBox="0 0 420 280" focusable="false" aria-hidden="true">',
       '<g fill="none" stroke="currentColor" stroke-width="1.4">',
@@ -9,8 +20,7 @@ fm_pitch_radar <- function() {
       '<circle cx="210" cy="140" r="36"/>',
       '<circle cx="210" cy="140" r="76" opacity=".2"/>',
       '<circle cx="210" cy="140" r="108" opacity=".12"/>',
-      '<path d="M210 140L286 64" opacity=".5"/>',
-      '</g><g fill="currentColor">',
+      '</g>', beam, '<g fill="currentColor">',
       '<circle cx="210" cy="140" r="2"/>',
       '<circle cx="82" cy="140" r="3"/><circle cx="138" cy="82" r="3"/>',
       '<circle cx="145" cy="188" r="3"/><circle cx="185" cy="109" r="3"/>',

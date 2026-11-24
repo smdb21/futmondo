@@ -2368,7 +2368,7 @@ Fixed decimal-comma entry in the existing All Players maximum clause filter. The
 
 ### Disconnect dialog (2026-11-22, implemented locally)
 
-Added a branded connection-loss dialog with the static pitch radar and a browser reload button. The button changes to amber during the brief wait before navigation. See [reconnection behavior](docker_deployment.md#mobile-reconnection-retain-the-live-session-for-30-minutes) and [verification](data_review_results.md#disconnect-dialog--2026-11-22).
+Added a branded connection-loss dialog with a radar sweep over a fixed pitch and a browser reload button. The button changes to amber during the brief wait before navigation. See [reconnection behavior](docker_deployment.md#mobile-reconnection-retain-the-live-session-for-30-minutes) and [verification](data_review_results.md#disconnect-dialog--2026-11-22).
 
 ### Faster manual offers and clause confirmation — implemented locally, 2026-11-22 Pacific
 
