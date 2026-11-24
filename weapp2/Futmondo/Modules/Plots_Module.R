@@ -185,19 +185,19 @@ plots_owned_chart <- function(players) {
 
 plots_UI <- function(id) {
   ns <- shiny::NS(id)
-  shiny::tagList(shiny::h2("Plots"), fm_info("League charts optimized for a single full-width view on phones."),
+  shiny::tagList(shiny::h2("Plots"), shiny::uiOutput(ns("chart_status")),
     shiny::tabsetPanel(id=ns("plot_tab"), type="pills",
-      shiny::tabPanel("Standings", shiny::p("Cumulative fantasy-team points after each published round or subround. Repeated daily snapshots are excluded; missing scores remain gaps."), shiny::uiOutput(ns("standings_status")), plotly::plotlyOutput(ns("standings_plot"), height="420px")),
-      shiny::tabPanel("Squad values", shiny::p("Saved squad market valuations over time, in euros."), shiny::uiOutput(ns("values_status")), plotly::plotlyOutput(ns("values_plot"), height="420px")),
-      shiny::tabPanel("Cash & transfers", shiny::p("Compare transfer-only balance estimates, squad purchase spending or transaction volume for the selected dates. Balance estimates exclude round rewards and other cash adjustments."), shiny::fluidRow(shiny::column(4, shiny::dateRangeInput(ns("cash_dates"),"Date range",format="dd/mm/yyyy")), shiny::column(8, shiny::radioButtons(ns("cash_metric"),"Metric",choices=c("Transfer-only balance estimate"="cash","Squad Purchases"="investment","Transaction Volume"="volume"),inline=FALSE))), shiny::uiOutput(ns("cash_status")), plotly::plotlyOutput(ns("cash_plot"), height="420px")),
+      shiny::tabPanel("Standings", shiny::p("Cumulative fantasy-team points after each published round or subround. Repeated daily snapshots are excluded; missing scores remain gaps."), plotly::plotlyOutput(ns("standings_plot"), height="420px")),
+      shiny::tabPanel("Squad values", shiny::p("Saved squad market valuations over time, in euros."), plotly::plotlyOutput(ns("values_plot"), height="420px")),
+      shiny::tabPanel("Cash & transfers", shiny::p("Compare transfer-only balance estimates, squad purchase spending or transaction volume for the selected dates. Balance estimates exclude round rewards and other cash adjustments."), shiny::fluidRow(shiny::column(4, shiny::dateRangeInput(ns("cash_dates"),"Date range",format="dd/mm/yyyy")), shiny::column(8, shiny::radioButtons(ns("cash_metric"),"Metric",choices=c("Transfer-only balance estimate"="cash","Squad Purchases"="investment","Transaction Volume"="volume"),inline=FALSE))), plotly::plotlyOutput(ns("cash_plot"), height="420px")),
       shiny::tabPanel("Money movements",
         shiny::p("Total value of league transfers over time. Each player transfer counts once, including market and clause transfers."),
         shiny::radioButtons(ns("transfer_period"), "Group by",
           choices = c("Day" = "day", "Week" = "week", "Month" = "month"), selected = "week", inline = TRUE),
         shiny::uiOutput(ns("transfers_status")),
         plotly::plotlyOutput(ns("transfers_plot"), height = "420px")),
-      shiny::tabPanel("Rank progression", shiny::p("Each fantasy team's rank from cumulative published round points; first place is at the top. The range selects which rounds are displayed."), shiny::sliderInput(ns("rank_range"),"Rounds",min=1,max=38,value=c(1,38),step=0.1), shiny::uiOutput(ns("rank_status")), plotly::plotlyOutput(ns("rank_plot"), height="420px")),
-      shiny::tabPanel("Owned by real team", shiny::p("Currently fantasy-owned players, grouped by their real football club."), shiny::uiOutput(ns("owned_club_status")), plotly::plotlyOutput(ns("owned_club_plot"), height="520px"))
+      shiny::tabPanel("Rank progression", shiny::p("Each fantasy team's rank from cumulative published round points; first place is at the top. The range selects which rounds are displayed."), shiny::sliderInput(ns("rank_range"),"Rounds",min=1,max=38,value=c(1,38),step=0.1), plotly::plotlyOutput(ns("rank_plot"), height="420px")),
+      shiny::tabPanel("Owned by real team", shiny::p("Currently fantasy-owned players, grouped by their real football club."), plotly::plotlyOutput(ns("owned_club_plot"), height="520px"))
     ))
 }
 
@@ -216,10 +216,33 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
         get_championship_pressroom(login = login_token(), championship_id = championship_id())
       })
     })
-    transfer_days <- shiny::reactive(plots_transfer_days(transfer_history()$data))
+    read_transfer_baseline <- factual_read_adapter(session, "read_persisted_history_baseline",
+      login_token, championship_id, user_team_id,
+      is_active = function() active() && identical(input$plot_tab, "Money movements"),
+      refresh_trigger = refresh_trigger, state_only = TRUE)
+    transfer_chart_history <- shiny::reactive({
+      state <- transfer_history()
+      history <- state$data
+      if (state$loading || (is.data.frame(history) && all(c("created", "price") %in% names(history)) &&
+          !"unavailable" %in% c(attr(history, "fetch_status"), attr(history, "worker_completeness")))) {
+        return(state)
+      }
+      # A worker-read failure need not make a previously audited transfer history unavailable.
+      league <- championship_id()
+      args <- list(championship_id = league)
+      scope <- resource_context(login_token(), league, user_team_id())
+      scope <- fm_worker_resolve_context("get_championship_pressroom", args, scope)
+      fallback <- read_transfer_baseline(resource = paste0("pressroom_", league), context = scope)
+      if (identical(fallback$status, "loading"))
+        return(list(data = NULL, loading = TRUE, error = NULL))
+      if (is.null(fallback$data)) return(state)
+      list(data = observed_data(fallback$data, status = "stale",
+        observed_at = attr(fallback$data, "observed_at")), loading = FALSE, error = NULL)
+    })
+    transfer_days <- shiny::reactive(plots_transfer_days(transfer_chart_history()$data))
     output$transfers_status <- shiny::renderUI({
       shiny::req(input$plot_tab == "Money movements")
-      state <- transfer_history()
+      state <- transfer_chart_history()
       if (state$loading) return(shiny::div(class = "fm-plot-loading", role = "status", "Loading saved transfer history."))
       if (!is.null(state$error)) return(fm_info(resource_failure_message(state$error), error = TRUE, inline = TRUE))
       history <- state$data
@@ -240,7 +263,7 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
     output$transfers_plot <- plotly::renderPlotly({
       shiny::req(input$plot_tab == "Money movements", input$transfer_period %in% c("day", "week", "month"))
       rows <- transfer_days()
-      history <- transfer_history()$data
+      history <- transfer_chart_history()$data
       shiny::req(!is.null(rows), nrow(rows) > 0L,
         !"unavailable" %in% c(attr(history, "fetch_status"), attr(history, "worker_completeness")))
       plots_transfer_chart(plots_transfer_periods(rows, input$transfer_period))
@@ -313,12 +336,6 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
           "Some saved round scores are missing. Lines have gaps where a complete cumulative result cannot be calculated; ranks require scores for every team.",error=TRUE)
       )
     })
-    output$standings_status <- shiny::renderUI(round_status())
-    output$rank_status <- shiny::renderUI(round_status())
-    # Loading disclosures can hide their container. Status must still recover;
-    # it projects data only and does not build charts in inactive tabs.
-    shiny::outputOptions(output,"standings_status",suspendWhenHidden=FALSE)
-    shiny::outputOptions(output,"rank_status",suspendWhenHidden=FALSE)
     rank_plot <- shiny::reactive({
       h <- round_totals()
       z <- input$rank_range
@@ -330,11 +347,21 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
       if(is.function(refresh_trigger)) refresh_trigger()
       plots_owned_chart(get_championship_players(login_token(),championship_id()))
     })
+    # One status follows the selected chart. The page information panel moves
+    # disclosures out of their tab panes, so hidden panes cannot scope them.
+    output$chart_status <- shiny::renderUI({
+      shiny::req(active(), input$plot_tab)
+      switch(input$plot_tab,
+        "Standings" = round_status(),
+        "Rank progression" = round_status(),
+        "Squad values" = attr(values_plot(), "fm_info"),
+        "Cash & transfers" = attr(cash_plot(), "fm_info"),
+        "Owned by real team" = attr(owned_club_plot(), "fm_info"))
+    })
     plot_sources <- list(standings=standings_plot, values=values_plot, cash=cash_plot,
       rank=rank_plot, owned_club=owned_club_plot)
     for (key in names(plot_sources)) local({
       source <- plot_sources[[key]]
-      if(!key %in% c("standings","rank")) output[[paste0(key, "_status")]] <- shiny::renderUI(attr(source(), "fm_info"))
       output[[paste0(key, "_plot")]] <- plotly::renderPlotly(source())
     })
   })

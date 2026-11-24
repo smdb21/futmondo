@@ -36,11 +36,26 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
    const elapsed=Date.now()-started;assert.ok(elapsed<1500,`Heartbeat took ${elapsed}ms`);return elapsed;
   };
   const timings=[await heartbeat(1)];
+  const infoPanel=page.locator('.fm-info-panel');
+  const roundWarning=infoPanel.getByText(/^Some saved round scores are missing\./);
+  const checkRoundWarning=async () => {
+   await infoPanel.waitFor({state:'visible'});
+   await infoPanel.evaluate(panel=>{panel.open=true;});
+   await roundWarning.waitFor();
+   assert.equal(await roundWarning.count(),1);
+  };
+  await checkRoundWarning();
+  await page.getByRole('tab',{name:'Rank progression',exact:true}).click();
+  await page.waitForFunction(()=>document.getElementById('plots-rank_plot').data?.length>0);
+  await checkRoundWarning();
   await page.getByRole('tab',{name:'Squad values',exact:true}).click();
   await page.waitForFunction(()=>document.getElementById('plots-values_plot').data?.length===10);
   timings.push(await heartbeat(2));
   await page.getByRole('tab',{name:'Money movements',exact:true}).click();
   await page.getByText('Loading saved transfer history.',{exact:true}).waitFor();
+  await roundWarning.waitFor({state:'detached'});
+  assert.equal(await page.getByText('League charts optimized for a single full-width view on phones.').count(),0);
+  await page.locator('.fm-plot-loading').filter({hasText:'Loading saved round scores'}).waitFor({state:'detached'});
   timings.push(await heartbeat(3));
   await page.getByRole('button',{name:'Release held history',exact:true}).click();
   const movementPlot=page.locator('#plots-transfers_plot');

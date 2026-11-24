@@ -2488,6 +2488,10 @@ Implemented locally: expected XI totals and direct manual edits for current squa
 
 Implemented locally: a queued XI opens on the regular editable pitch. The picker and score table share the projected squad; the optimizer can still explicitly exclude signings. Restoration reuses the existing schedule read and guards local edits and league/round scope.
 
+## Plots information messages
+
+Implemented locally. One status output supplies messages for the selected chart. Standings and Rank progression share the missing-score warning, and Money movements displays its own transfer status. The generic phone-layout note was removed.
+
 ## Welcome page Essentials copy
 
 Implemented locally. The Squad status description ends with the availability summary. A new Essentials entry describes the existing incoming and leaving clause panels in My Team and their timing relative to next kickoff.

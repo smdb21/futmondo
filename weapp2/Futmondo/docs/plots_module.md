@@ -87,8 +87,12 @@ for any round without complete comparable scores for every team.
 
 `round_status()` reports pending reads visibly outside the collapsed information
 panel, and reports failed reads through the existing safe failure references.
-The two round status outputs recover even when hidden; they project data without
-building inactive charts. Plot outputs retain normal hidden-tab suspension.
+One `chart_status` output selects messages for the active chart. Standings and
+Rank progression share the round status, so each displays a single warning when
+scores are missing. The page information panel receives only the selected
+chart's notices because it collects disclosures outside the individual chart
+tabs. Money movements displays its own transfer status inline. Plot outputs
+retain normal hidden-tab suspension.
 `round_totals` and `round_domain` use `resource_display_source()` so a changed
 source timestamp/version with identical visible facts does not redraw the chart
 or reset the user's rank range. No new timer, worker job, source call, persistence

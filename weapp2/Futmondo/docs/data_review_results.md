@@ -5854,6 +5854,12 @@ Chromium at 390 and 1440 px verified that an eligible incoming player appears in
 
 Restoration uses the existing context-scoped database schedule read and transfer observations. It adds no polling, source requests or database writes. The picker and history reader share the projected roster. Excluding arrivals from optimization can still require reading their stored history for the manual picker. Local edits stayed within fixture read/write counts. The scheduling-enabled fixture took 838 ms on mobile and 220 ms on desktop to display the optimized pitch. Hosted deployment and real account behavior were not verified.
 
+## Plots information messages
+
+The page information panel collected both round status outputs, including the one from the hidden chart tab. Chromium at 390 and 1440 px in both themes verified a single missing-score warning on Standings and Rank progression and its removal on Money movements, where the transfer loading message remained visible. The Plots module and delayed-read checks passed, as did the offline Shiny lifecycle with 14 checks and eight tabs.
+
+The selected-chart status replaces five outputs and reuses the existing plot and status reactives. It adds no source requests, database reads, cache invalidations or timers. Chromium confirmed that unchanged saved facts did not redraw Standings and that transfer grouping still reused the existing reads. Input heartbeats stayed below 1.16 seconds and the idle crest chart used at most 2.1 ms of browser main-thread time in the 1.2-second sample. Checks used local synthetic snapshots.
+
 ## Welcome page Essentials copy
 
 The focused render check and Chromium at 320 and 1440 px verified the shortened Squad status description and the new clause-transfer timing entry under Essentials. Both disclosures expanded, the tiers stacked on mobile and appeared side by side on desktop, and neither viewport overflowed horizontally. The offline Shiny lifecycle passed 14 checks and eight tabs.
