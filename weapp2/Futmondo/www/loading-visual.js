@@ -9,9 +9,8 @@
   var tau = Math.PI * 2;
   // Time to rise and read the figures, then watch the cloud in motion.
   var riseStart = 2.2, riseDuration = 2.6;
-  var orbitStart = 5.45, orbitDuration = 3.8;
-  var approachStart = orbitStart + orbitDuration, approachDuration = 3.35;
-  var takeoffStart = approachStart + approachDuration + .1, takeoffDuration = 1.7;
+  var flightStart = 5.45, flightDuration = 7.25;
+  var takeoffStart = flightStart + flightDuration, takeoffDuration = 1.7;
   var flockStart = takeoffStart + takeoffDuration;
   var radarStart = flockStart + 4.3, radarDuration = 2;
   var detectionStart = radarStart + radarDuration;
@@ -92,14 +91,11 @@
   function mix(a, b, w) { return a + (b - a) * w; }
   function cameraAt(t, instance) {
     var turn = ease((t-1.2)/2);
-    var orbit = ease((t-orbitStart)/orbitDuration);
-    var approach = ease((t-approachStart)/approachDuration);
-    var yaw = orbit*Math.PI + turn*(-.32 + .54*ease((t-2.6)/1.9));
-    var tilt = turn*.96 + approach*.16;
+    var yaw = turn*(-.32 + .54*ease((t-2.6)/1.9));
+    var tilt = turn*.96;
     var camera = { cy: Math.cos(yaw), sy: Math.sin(yaw), ct: Math.cos(tilt),
-      st: Math.sin(tilt), zoom: 1-.08*turn, lift: 0, pan: 0, approach: approach, turn: turn };
-    camera.eyeX = 210+600*camera.sy*camera.st;
-    camera.eyeY = 140+600*camera.cy*camera.st;
+      st: Math.sin(tilt), zoom: 1-.08*turn, lift: 0, approach: 0, turn: turn,
+      aimX: 210, aimY: 140, aimZ: 0, range: 600, rollCos: 1, rollSin: 0 };
     // Fit the board/shadow in short portrait scenes before placing it below
     // the sky. Extra scaling is needed only when perspective exceeds the box.
     var top, bottom;
@@ -116,26 +112,42 @@
     var low = 7*turn-instance.offset-top;
     var high = instance.height-instance.offset-7*turn-bottom;
     camera.lift = Math.max(low,Math.min(high,(9+(instance.mobile ? instance.height*.20 : 25))*turn));
-    if (approach > 0) {
-      project(camera,subject.x,subject.y,15);
-      var aimX = mix(camera.px,210,approach), aimY = mix(camera.py,140,approach);
-      camera.zoom *= mix(1,Math.min(5.5,instance.height/45),approach);
-      project(camera,subject.x,subject.y,15);
-      camera.pan = aimX-camera.px;
-      camera.lift += aimY-camera.py;
+    // Fit only the establishing view. Following the turning board's extreme
+    // corner here would push the camera up and down during the flyby.
+    var flight = ease((t-flightStart)/flightDuration);
+    if (flight > 0) {
+      var approach = flight*flight;
+      var bend = Math.sin(Math.PI*flight);
+      yaw += Math.PI*flight*(2-flight);
+      tilt += .16*flight;
+      camera.cy = Math.cos(yaw); camera.sy = Math.sin(yaw);
+      camera.ct = Math.cos(tilt); camera.st = Math.sin(tilt);
+      // Look ahead along the curved pass, leaning into it before leveling
+      // out. Bringing the eye closer gives near and far players parallax.
+      camera.aimX = mix(210,subject.x,approach) + 46*bend;
+      camera.aimY = mix(140,subject.y,approach) - 20*bend;
+      camera.aimZ = 15*approach;
+      camera.rollCos = Math.cos(.15*bend); camera.rollSin = Math.sin(.15*bend);
+      camera.range = mix(600,240,flight);
+      camera.zoom *= mix(1,Math.min(5.5,instance.height/45)*240/600,approach);
+      camera.lift *= 1-approach;
+      camera.approach = approach;
     }
+    camera.eyeX = camera.aimX+camera.range*camera.sy*camera.st;
+    camera.eyeY = camera.aimY+camera.range*camera.cy*camera.st;
     return camera;
   }
   // Perspective is a small projection of the same 2D pitch coordinates, not a
   // second render engine. Reuse the camera's output slots instead of point arrays.
   function project(camera, x, y, z) {
-    x -= 210; y -= 140;
+    x -= camera.aimX; y -= camera.aimY; z -= camera.aimZ;
     var rx = camera.cy*x-camera.sy*y;
     var ry = camera.sy*x+camera.cy*y;
     var depth = ry*camera.st+z*camera.ct;
-    camera.k = camera.zoom*600/(600-depth);
-    camera.px = 210+camera.pan+rx*camera.k;
-    camera.py = 140+(ry*camera.ct-z*camera.st)*camera.k+camera.lift;
+    camera.k = camera.zoom*600/(camera.range-depth);
+    var vertical = ry*camera.ct-z*camera.st;
+    camera.px = 210+(rx*camera.rollCos-vertical*camera.rollSin)*camera.k;
+    camera.py = 140+(rx*camera.rollSin+vertical*camera.rollCos)*camera.k+camera.lift;
   }
   function readPalette() {
     var style = window.getComputedStyle(root);

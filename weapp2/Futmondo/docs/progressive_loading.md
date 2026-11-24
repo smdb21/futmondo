@@ -14,8 +14,8 @@ finish an animation. It does not represent real player positions or progress.
 
 The local `www/loading-visual.js` and `www/loading-visual.css` assets animate a
 25.7-second loop. The pitch tilts into perspective and 22 table-football figures
-rise facing their opposing goals. The camera flies a half-circle above both
-teams, then moves in for a close-up of the midfielder. Only that figure dissolves from
+rise facing their opposing goals. The camera banks across the formation in a descending
+half-turn that flows directly into a close-up of the midfielder. Only that figure dissolves from
 head to foot, releasing a flock in its kit colors.
 The flock gathers into radar rings and reveals moving player dots before
 returning to the flat pitch. The component uses the existing `--fm-*` colors and updates on light/dark changes. Its canvas is
@@ -25,9 +25,10 @@ pitch/radar illustration.
 
 The added 3D stage uses a small perspective projection in Canvas 2D rather than
 a separate graphics engine: the pitch rotates from 1.2–3.2 seconds, players rise
-from 2.2–5.2 seconds. The camera orbits the pitch center through 180 degrees
-from 5.45 to 9.25 seconds with both teams in view. From 9.25 to 12.6 seconds
-it gradually centers and enlarges the midfielder as the other figures fade.
+from 2.2–5.2 seconds. From 5.45 to 12.7 seconds one continuous flight carries the
+camera forward. Its sightline sweeps across the formation as it leans into
+the turn, closes the distance and levels out on the midfielder. Nearby
+players pass faster in the frame than those across the pitch.
 The camera holds still as the close-up particles disperse into the flock from 12.7–14.4 seconds. The formed
 flock moves across the sky for 4.3 seconds. Each particle keeps its body position until release, initially
 travels upward on a curved path, then joins the cloud above the pitch. The
@@ -38,7 +39,8 @@ colors and compact-size stroke scaling; no models, textures or network assets
 are required. The extended loop never prolongs loading or changes readiness.
 
 The private `cameraAt(t, instance)` helper computes the view once per frame,
-fitting the board and shadow within short portrait canvases. Camera rotation
+fitting the establishing view to the canvas. During flight the framing uses
+that reference view, so a rotating corner cannot shift or rescale the pitch. Camera rotation
 eases to rest at takeoff, so particles leave stable body positions. `project()`
 treats the existing pitch coordinates as the ground plane and positive Z as
 height, reusing the camera's `px`, `py` and perspective-scale slots for projected

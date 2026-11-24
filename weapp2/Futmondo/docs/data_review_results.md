@@ -6033,3 +6033,9 @@ one-time write of seven scoped facts and bounded read-only verification.
 The repair adds no recurring source or database requests, UI redraws or
 worker schedule changes. This follow-up changes documentation only and has
 no additional runtime performance impact.
+
+## Continuous banking flight · 2026-11-24
+
+The former orbit recalculated vertical framing from the rotating pitch bounds. Its yaw and zoom also eased to zero speed at the same intermediate timestamp. The revised shot uses a stable framing reference and one flight parameter for eye distance, heading, bank and aim. Across 726 poses at each of three scene heights, the eye distance and vertical offset decreased monotonically and the pitch and player projections stayed finite.
+
+Local Chromium verified motion on both sides of the former pause and the transition from the centered midfielder into flock particles. At 4× CPU throttling the 95th-percentile draw time for the existing renderer was 4.6 ms on the 1440 px desktop layout, 3.9 ms on the 390 px fullscreen layout and 4.2 ms on the 320 px compact layout. The particle counts, loop duration and frame cap are unchanged. The change adds no network or database work. The offline Shiny lifecycle passed 14 checks and eight tabs.

@@ -364,7 +364,7 @@ function particleMarks(geometry) {
   return geometry.filter(mark => mark.kind === 'fill' && mark.alpha > 0.4 &&
     mark.path.length === 1 && mark.path[0].op === 'ellipse');
 }
-function checkAscent({release, dissolve, rising, orbitEnd, approach}) {
+function checkAscent({release, dissolve, rising, flyby, approach}) {
   const before = particleMarks(release), after = particleMarks(dissolve);
   assert.ok([180, 320].includes(before.length) && after.length === before.length, 'Dissolve reuses the complete existing particle pool');
   const headRise = before.slice(0, 22).map((mark, i) => mark.path[0].args[1] - after[i].path[0].args[1]);
@@ -378,11 +378,11 @@ function checkAscent({release, dissolve, rising, orbitEnd, approach}) {
   const heads = marks => marks.filter(mark => mark.kind === 'fill' && mark.path.length === 1 &&
     mark.path[0].op === 'arc' && mark.path[0].args[2] > 1.5);
   assert.equal(heads(rising).length, 22);
-  assert.equal(heads(orbitEnd).length, 22, 'Both teams remain on the field for the half-orbit');
+  assert.equal(heads(flyby).length, 22, 'Both teams are still drawn during the banking pass');
   const edgeX = geometry => pitchCorners(geometry)[1][0] - pitchCorners(geometry)[0][0];
-  assert.ok(edgeX(rising) > 200 && edgeX(orbitEnd) < -200, 'Camera reaches the opposite touchline before zooming');
+  assert.ok(edgeX(rising) > 200 && edgeX(flyby) < -200, 'The pitch turns through the sweeping pass');
   const midRadius = heads(approach)[7].path[0].args[2];
-  assert.ok(midRadius > 1.5 * heads(orbitEnd)[7].path[0].args[2] &&
+  assert.ok(midRadius > 1.5 * heads(flyby)[7].path[0].args[2] &&
     midRadius < .85 * heads(release)[0].path[0].args[2], 'Zoom is still approaching the player halfway through');
   assert.equal(heads(release).length, 1, 'Camera isolates one intact player before takeoff');
   const [x, y, radius] = heads(release)[0].path[0].args;
@@ -445,13 +445,13 @@ async function fullscreenChecks(browser) {
       assert.deepEqual(teamColors.ids, ['real-madrid', 'barcelona'], 'The main matrix uses a deterministic Madrid/Barcelona pair');
       await checkPairIdentity(page, teamColors.ids);
       const phases = {};
-      for (const [name, at] of [['pitch', 700], ['rising', 5210], ['orbitEnd', 9210], ['approach', 10925], ['release', 12650], ['dissolve', 13000], ['morph', 13600], ['flock', 15200], ['lateFlock', 18000], ['radar', 20000], ['players', 22200], ['return', 25000]]) {
+      for (const [name, at] of [['pitch', 700], ['rising', 5210], ['flyby', 9210], ['approach', 10925], ['release', 12650], ['dissolve', 13000], ['morph', 13600], ['flock', 15200], ['lateFlock', 18000], ['radar', 20000], ['players', 22200], ['return', 25000]]) {
         const elapsed = await page.evaluate(() => performance.now() - window.loadingFixture.firstDrawAt);
         await page.waitForTimeout(Math.max(0, at - elapsed));
         phases[name] = await captureGeometry(page);
         if (['rising', 'morph', 'flock'].includes(name))
           await page.screenshot({path: path.join(screenshotDir, `${viewport.width}x${viewport.height}-${theme}-${name}-fullscreen.png`)});
-        if (['approach', 'release', 'dissolve', 'morph'].includes(name)) {
+        if (['flyby', 'approach', 'release', 'dissolve', 'morph'].includes(name)) {
           checkFullscreenGeometry(particleMarks(phases[name]), layout);
         } else checkFullscreenGeometry(phases[name], layout, name === 'flock');
       }
@@ -608,7 +608,7 @@ async function cameraChecks(browser) {
     await waitDraw(page, 'fixture-hero');
     const phases = {};
     const id = width === 320 ? 'fixture-compact' : 'fixture-hero';
-    for (const [name, at] of [['rising', 5210], ['overhead', 7350], ['orbitEnd', 9210],
+    for (const [name, at] of [['rising', 5210], ['overhead', 7350], ['intoTurn', 9030], ['flyby', 9210], ['outOfTurn', 9390],
       ['approach', 10925], ['release', 12650], ['dissolve', 13000]]) {
       const elapsed = await page.evaluate(() => performance.now() - window.loadingFixture.firstDrawAt);
       await page.waitForTimeout(Math.max(0, at - elapsed));
@@ -616,10 +616,15 @@ async function cameraChecks(browser) {
     }
     const corners = pitchCorners(phases.overhead);
     assert.ok(Math.abs(corners[1][1] - corners[0][1]) > 100, 'Camera passes over the end of the pitch mid-orbit');
+    const corner = phase => pitchCorners(phases[phase])[0];
+    for (const [from, to] of [['intoTurn', 'flyby'], ['flyby', 'outOfTurn']]) {
+      const [x, y] = corner(from), [nextX, nextY] = corner(to);
+      assert.ok(Math.hypot(nextX-x, nextY-y) > 10, 'Forward flight continues across the former pause');
+    }
     checkAscent(phases);
     const samples = await page.evaluate(() => window.loadingFixture.stageSamples);
     assert.ok(samples.length > 100 && p95(samples) < 33.4, 'Camera sequence fits the 30 FPS budget at 4× CPU');
-    console.log(`PASS ${width}px half-orbit, slow approach and release, 4× CPU p95=${p95(samples).toFixed(1)}ms`);
+    console.log(`PASS ${width}px continuous bank, approach and release, 4× CPU p95=${p95(samples).toFixed(1)}ms`);
     await page.close();
   }
 }
@@ -642,7 +647,7 @@ async function visualChecks(browser) {
       assert.deepEqual(teamColors.ids, ['real-madrid', 'barcelona'], 'The main matrix uses a deterministic Madrid/Barcelona pair');
       await checkPairIdentity(page, teamColors.ids);
       const pictures = [], phases = {};
-      for (const [name, at] of [['pitch', 700], ['tilted', 2400], ['rising', 5210], ['orbitEnd', 9210], ['approach', 10925], ['release', 12650], ['dissolve', 13000], ['morph', 13600], ['flock', 15200], ['lateFlock', 18000], ['radar', 20000], ['players', 22200], ['return', 25000]]) {
+      for (const [name, at] of [['pitch', 700], ['tilted', 2400], ['rising', 5210], ['flyby', 9210], ['approach', 10925], ['release', 12650], ['dissolve', 13000], ['morph', 13600], ['flock', 15200], ['lateFlock', 18000], ['radar', 20000], ['players', 22200], ['return', 25000]]) {
         const elapsed = await page.evaluate(() => performance.now() - window.loadingFixture.firstDrawAt);
         await page.waitForTimeout(Math.max(0, at - elapsed));
         phases[name] = await captureGeometry(page);

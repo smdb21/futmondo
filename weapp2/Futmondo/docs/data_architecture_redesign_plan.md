@@ -2540,3 +2540,5 @@ snapshot is pending the updated worker's next normal Pressroom publication.
 
 See [the verification record](data_review_results.md) for observed production
 coverage, focused regression results and performance.
+
+The November 24 camera revision carries the half-turn into the close-up in a single banked flight. Pitch framing during the flyby uses the establishing view to remove corner-driven vertical shifts. Implemented locally.
