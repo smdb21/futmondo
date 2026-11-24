@@ -538,8 +538,8 @@ fm_clause_pending_ui <- function(jobs) {
  # Holds for submitted manual actions, including acknowledged offers.
  manual<-if(is.null(jobs))list()else Filter(function(j)identical(j$kind,'manual')&&j$state%in%c('dispatched','uncertain','accepted'),jobs)
  shiny::tagList(
-  shiny::tags$details(class='round-countdown-finance-item',shiny::tags$summary(paste0('Scheduled clause purchases: ',amount,' (',if(is.finite(r$count))r$count else'?',')')),
-   if(!length(pending))shiny::tags$p('No scheduled clause purchases.'),
+  if(is.null(jobs)||length(pending))shiny::tags$details(class='round-countdown-finance-item',shiny::tags$summary(paste0('Scheduled clause purchases: ',amount,' (',if(is.finite(r$count))r$count else'?',')')),
+   if(is.null(jobs))shiny::tags$p('Scheduled purchase information is unavailable.'),
    lapply(pending,function(j)shiny::tags$p(shiny::tags$strong(j$player_name %||% 'Unknown player'),' · ',eur(j$reserved_amount),' · opens ',fm_format_datetime(j$opens_at),' · ',fm_clause_status_text(j))),
    if(length(pending))shiny::actionButton('clause_revoke','Cancel all scheduled purchases and revoke access',style='white-space:normal;max-width:100%;')),
   lapply(c('unconfirmed','accepted'),function(group){

@@ -256,11 +256,19 @@ account_squad_display <- function(roster_state, transfers, team_state, active_of
 account_squad_UI <- function(state = NULL) {
   pending<-is.null(state)||identical(state$status,"loading")
   count<-function(x)if(is.finite(fm_number(x)))as.character(as.integer(x))else if(pending)"Loading…"else"Unavailable"
+  remaining<-fm_number(state$cap)-fm_number(state$effective)-fm_number(state$reserved)
+  capacity<-if(isTRUE(state$full)){
+    shiny::tags$strong(class="fm-account-squad-full", "No squad slots free for new offers.")
+  }else if(is.finite(remaining)){
+    shiny::tags$span(sprintf("You can buy up to %d more %s.",as.integer(remaining),
+      if(remaining==1)"player"else"players"))
+  }else{
+    shiny::tags$span(paste0("Remaining squad slots: ",count(remaining)))
+  }
   shiny::tags$div(class="fm-account-squad",
     shiny::tags$span(paste0("Players: ",count(state$actual))),
     shiny::tags$span(paste0("Effective players: ",count(state$effective)," / ",count(state$cap))),
-    shiny::tags$span(paste0("Squad slots held for offers: ",count(state$reserved))),
-    if(isTRUE(state$full))shiny::tags$strong(class="fm-account-squad-full", "No squad slots free for new offers."),
+    capacity,
     fm_info(state$detail,
       shiny::textOutput("account_squad_checked",inline=TRUE),
       source="Squad capacity",pending=pending,error=identical(state$status,"unavailable")))

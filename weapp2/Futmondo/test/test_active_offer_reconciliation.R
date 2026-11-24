@@ -16,6 +16,7 @@ accepted <- as.character(fm_clause_pending_ui(list(job)))
 job$state <- 'uncertain'
 uncertain <- as.character(fm_clause_pending_ui(list(job)))
 stopifnot(grepl('Accepted offers awaiting balance update: 38.016.571 EUR (1)',accepted,fixed=TRUE),
+  !grepl('Scheduled clause purchases',accepted,fixed=TRUE),
   !grepl('Offers awaiting confirmation',accepted,fixed=TRUE),
   grepl('Offers awaiting confirmation: 38.016.571 EUR (1)',uncertain,fixed=TRUE))
 cat('PASS exact saved own offer, source clocks, ambiguous rows and acceptance wording\n')

@@ -46,7 +46,6 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
    await schedule.waitFor({state:'visible'});
    await summary.getByText('Players: 17',{exact:true}).waitFor();
    await summary.getByText('Effective players: 17 / 18',{exact:true}).waitFor();
-   await summary.getByText('Squad slots held for offers: 1',{exact:true}).waitFor();
    await summary.getByText('No squad slots free for new offers.',{exact:true}).waitFor();
    // Keep one shell and financial node across navigation and clock updates.
    await summary.evaluate(n=>n.dataset.fixtureIdentity='retained');

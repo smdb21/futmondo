@@ -30,8 +30,9 @@ of content, with no dismiss control or additional sticky behavior.
 reserved_slots)` projects existing observations through `team_effective_squad_count()`
 and `effective_squad_count()`: actual ownership, effective ownership after observed
 arrivals/departures, the configured `maxPlayersInRoster`, and offer reservations.
-**Squad slots held for offers** reports slots already used by active offers and
-unreconciled purchase reservations. **No squad slots free for new offers.**
+The purchase-capacity sentence reports the configured limit less effective ownership,
+active offers and unreconciled purchase reservations. The scheduled purchase disclosure
+appears for pending jobs or unavailable job data. **No squad slots free for new offers.**
 appears when effective ownership alone reaches the known limit, or when known
 effective ownership plus offer and purchase holds reaches it.
 Unknown evidence cannot become zero, a fabricated limit or permission to buy.

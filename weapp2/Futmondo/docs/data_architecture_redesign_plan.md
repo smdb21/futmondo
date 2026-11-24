@@ -2483,3 +2483,5 @@ Implemented locally. Once both teams have risen, the camera approaches a near-si
 Implemented locally: the queue describes each full lineup submission by its scheduled time. A single submission appears once, including when several signings arrive together.
 
 The camera now completes a wide 180-degree orbit above the two teams before a 3.35-second approach to the midfielder. Implemented locally.
+
+The account summary displays remaining purchase capacity from the existing squad ledger and hides the empty scheduled purchase disclosure.

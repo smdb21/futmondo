@@ -30,6 +30,13 @@ check("squad summary uses the existing identity ledger and counts reserved offer
   team<-resource_state(list(configuration=list(maxPlayersInRoster=20)))
   x<-account_squad_display(resource_state(roster),transfers,team,0,0)
   stopifnot(x$actual==18L,x$effective==19L,x$cap==20L,!x$full)
+  stopifnot(grepl("You can buy up to 1 more player.",as.character(account_squad_UI(x)),fixed=TRUE))
+  sold<-transfers
+  sold$records<-data.frame(player_id=character())
+  example<-account_squad_display(resource_state(roster),sold,team,0,0)
+  stopifnot(example$actual==18L,example$effective==17L,
+    grepl("You can buy up to 3 more players.",as.character(account_squad_UI(example)),fixed=TRUE),
+    !grepl("Scheduled clause purchases",as.character(fm_clause_pending_ui(list())),fixed=TRUE))
   x<-account_squad_display(resource_state(roster),transfers,team,1,0)
   html<-as.character(account_squad_UI(x))
   stopifnot(x$full,grepl("Players: 18",html,fixed=TRUE),grepl("Effective players: 19 / 20",html,fixed=TRUE),
