@@ -5854,6 +5854,12 @@ Chromium at 390 and 1440 px verified that an eligible incoming player appears in
 
 Restoration uses the existing context-scoped database schedule read and transfer observations. It adds no polling, source requests or database writes. The picker and history reader share the projected roster. Excluding arrivals from optimization can still require reading their stored history for the manual picker. Local edits stayed within fixture read/write counts. The scheduling-enabled fixture took 838 ms on mobile and 220 ms on desktop to display the optimized pitch. Hosted deployment and real account behavior were not verified.
 
+## Welcome page Essentials copy
+
+The focused render check and Chromium at 320 and 1440 px verified the shortened Squad status description and the new clause-transfer timing entry under Essentials. Both disclosures expanded, the tiers stacked on mobile and appeared side by side on desktop, and neither viewport overflowed horizontally. The offline Shiny lifecycle passed 14 checks and eight tabs.
+
+The addition renders one static disclosure on Welcome. Opening it uses native browser behavior and adds no Shiny events, source or database requests, polling, cache entries or reactive updates. Verification used local fixtures.
+
 ## LigaRadar header navigation
 
 Chromium at 390 and 1440 px confirmed that clicking the title or pressing Enter on it opens Welcome while preserving the signed-in session, with no document reload or horizontal overflow. The offline Shiny lifecycle passed 14 checks and eight tabs. The existing Notifications bell was unavailable in this fixture after opening Welcome, with identical output before and after the change.
