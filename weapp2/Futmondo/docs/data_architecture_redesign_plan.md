@@ -2561,3 +2561,8 @@ The November 24 player captures established the
 for reference. The
 [read-only award audit](data_review_results.md#player-captures-and-remaining-bonus-evidence--2026-11-24)
 identifies the remaining historical ownership and settlement evidence.
+
+The reference team's 231 source movements now reconcile exactly to its
+official cash observation. The round 4 and 7 native award credits were
+independently reconciled to the observed award tariffs and verified own
+recipients. See [the source-level reconciliation](data_review_results.md#reference-cash-and-combined-award-reconciliation--2026-11-24).

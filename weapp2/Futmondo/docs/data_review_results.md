@@ -6131,3 +6131,50 @@ public client, retained the raw captures outside Git, and reproduced the
 position amounts in the existing R allocator. Performance review found no
 runtime effect from the documentation. The investigation required one-time
 local capture parsing and scoped read-only database comparisons.
+
+## Reference cash and combined award reconciliation · 2026-11-24
+
+A scoped, authorized read of the official `/1/userteam/moneymovements` and
+`/1/userteam/information` routes returned HTTP 200 for both. The official
+client uses the authenticated championship and user-team query for each,
+with `type="market"` for information. The existing movement normalizer
+accepted 231 records and produced 231 unique identities, including one
+opening allocation. The ledger summed to €161,786,854, exactly matching
+`answer.budget` from team information. The latest scoped production evidence
+contains the same record count, opening allocation, movement sum and team cash.
+Opening €300,000,000 plus €113,070,000 in awards and −€251,283,146 in net
+transfers reproduces the observed cash. [Official Futmondo web bundle](https://app.futmondo.com/main.dart.js).
+
+The own-team round 9 observed credits are €5,040,000 for 72 points at
+€70,000 per point and €3,333,333 for position. The older nine-participant
+ranking has descending scores 101, 93, 83, 77, 72, 69, 56, 56 and 54.
+The existing allocator reproduces the observed position credit at 5th using
+the verified €30 million lowest-scores-first pool. The two tied 56-point
+teams would receive €5,000,000 each. This archived ranking explains both
+recorded own-team credits. Contemporaneous ranking or other managers'
+receipts are still needed to corroborate rival position amounts.
+[Futmondo bonus guide](https://help.futmondo.com/article/142-configura-las-primas-automaticas-en-un-campeonato-social).
+[Futmondo tie guide](https://help.futmondo.com/article/134-en-caso-de-empate-a-puntos-entre-dos-usuarios-cual-prevalece-en-la-clasificacion).
+
+The reference team's round 4 credits were €6,230,000 for points, €2,666,667
+for position and €500,000 as native `dreamTeam`. Valles was a verified
+eligible Best XI player for the reference team and Boyé was the MVP for
+another eligible team. The recorded amount is entirely the €500,000 XI
+credit under the observed rules. In round 7 the point credit was €5,390,000,
+the position credit was €2,666,667 and the native combined award was
+€1,500,000. Verified eligible Best XI player and MVP Raphinha accounts for
+€500,000 Best XI and €1,000,000 MVP. These are reconciliations of the two
+specific receipts. Other award players still need dated ownership evidence
+for league-wide attribution. The app's automatic classification scope and
+complete-ownership gate remain documented in the cash accounting contract.
+
+The supplied Manu Sánchez screenshot and summary corroborate three owner
+transitions. The first appears September 17 Pacific, after the September
+4–8 round 4 ownership interval. The earliest available Ochieng transition
+also comes after payout. Both players' earlier ownership remains unresolved.
+An explicit System ownership interval can establish no league recipient.
+
+No raw credential, financial response or player response was retained in
+the repository. Verification used two authorized source reads, the existing
+R parser and formula, and scoped database aggregates. This follow-up changes
+documentation only and has no runtime performance effect.
