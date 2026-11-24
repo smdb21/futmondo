@@ -100,6 +100,7 @@ if (scheduled_fixture) {
     fixture_history <- rbind(fixture_history, data.frame(player_id='p27',round=1:5,points=225))
   }
   fixture_job <- NULL
+  fixture_browser <- NULL
   lineup_schedule_enabled <- function() !identical(Sys.getenv('FUTMONDO_EDITOR_DISABLE_SCHEDULE'), 'true')
   fm_clause_encrypt <- function(auth) structure('encrypted-fixture',credential_id='fixture')
   lineup_schedule_rpc <- function(name,payload,owner='') {
@@ -128,7 +129,10 @@ ui <- shiny::fluidPage(shiny::tags$head(shiny::tags$style(shiny::HTML(fm_theme_c
     fm_info_page_UI('Lineup',lineup_UI('lineup'))))else lineup_UI('lineup'))
 server <- function(input, output, session) {
   fixture_official <<- fixture_initial
-  if(scheduled_fixture)fixture_job <<- NULL
+  if(scheduled_fixture&&!identical(fixture_browser,session$request$HTTP_COOKIE)){
+    fixture_job <<- NULL
+    fixture_browser <<- session$request$HTTP_COOKIE
+  }
   fixture_current_wire <<- NULL
   lineup_Server('lineup', shiny::reactive(TRUE),
     shiny::reactive(c(userid = 'fixture-account', token = 'fixture-token')),

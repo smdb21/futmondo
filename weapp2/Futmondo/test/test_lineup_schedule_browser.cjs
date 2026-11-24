@@ -12,6 +12,7 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
         ? route.continue() : route.fulfill({ status: 200, contentType: 'image/svg+xml',
           body: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><circle cx="8" cy="8" r="8" fill="red"/></svg>' }));
       const url = `http://127.0.0.1:${process.env.FUTMONDO_EDITOR_TEST_PORT || '8542'}`;
+      await page.context().addCookies([{name:'fixture_browser',value:String(width),url}]);
       const initialHTML = await (await page.request.get(url)).text();
       assert.match(initialHTML, /<button(?=[^>]*id="lineup-save")(?=[^>]*disabled)[^>]*>/,
         'Save is present before Shiny delivers its first output');
@@ -24,6 +25,12 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
       assert.ok(await page.getByLabel('Include incoming players').isChecked());
       await page.getByText(/Incoming Keeper.*Eligible before kickoff/).waitFor();
       await page.getByText('Due at or after kickoff', {exact: false}).waitFor();
+      await page.getByLabel('Include incoming players').uncheck();
+      await page.locator('#lineup-starter_11').click();
+      await page.locator('.modal .fm-lineup-choice[data-player-id="p25"]').waitFor();
+      assert.equal(await page.locator('.modal .fm-lineup-choice[data-player-id="p26"]').count(), 0);
+      await page.getByRole('button', {name:'Cancel', exact:true}).click();
+      await page.getByLabel('Include incoming players').check();
       const start = performance.now();
       await page.getByRole('button', {name: 'Optimize'}).click();
       if (process.env.FUTMONDO_EDITOR_OWNED_FIXTURE === 'true') {
@@ -108,9 +115,11 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
         await page.close();
         continue;
       }
-      await page.getByRole('link', {name: 'Return to manual draft'}).click();
-      await page.getByRole('button', {name: 'Edit scheduled lineup'}).click();
+      await page.reload();
+      await page.locator('a[data-value="Lineup"]').click();
+      assert.equal(await page.getByRole('button', {name: 'Edit scheduled lineup'}).count(), 0);
       await signing.waitFor();
+      await page.getByLabel('Include incoming players').uncheck();
       const total = page.locator('#lineup-expected_points');
       const incomingTotal = Number((await total.innerText()).split(' · ')[1]);
       await signing.click();

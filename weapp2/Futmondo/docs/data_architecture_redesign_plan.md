@@ -2473,3 +2473,5 @@ Save visibility follow-up (implemented locally). The Lineup page includes the Sa
 Primary-position bench coverage is implemented locally for both current and projected squads. Full-coverage optimization reserves one player of each outfield primary position. The bench picker and pitch indicators show that same role.
 
 Implemented locally: expected XI totals and direct manual edits for current squads, unsaved optimized lineups and approved schedules. Projected edits reuse the existing durable schedule and explicit replacement protocol.
+
+Implemented locally: a queued XI opens on the regular editable pitch. The picker and score table share the projected squad; the optimizer can still explicitly exclude signings. Restoration reuses the existing schedule read and guards local edits and league/round scope.
