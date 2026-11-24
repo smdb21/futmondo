@@ -5775,3 +5775,28 @@ invalidation, worker lanes, timers, queues, cache size, dependencies and memory
 retention are unchanged. The responsive SVG label checks cover phone and desktop.
 No credentials, raw private response bodies or real accounts were used.
 Hosted release/appearance acceptance remains unverified.
+
+### Purchased-clause badge — 2026-11-23 Pacific
+
+The scoped, read-only production summary for the reported card contained the
+past `clause.date`, `transferred: true`, and a future `transferDate`. Its saved
+owner matched the card. The previous badge picked any formatted opening when
+the purchase action was unavailable, which showed an expired lock date even
+though Futmondo had reported a completed purchase with delivery pending. The
+new badge displays the reported purchase and the separately reported delivery
+time in the user's display timezone.
+
+- `Rscript test/test_player_card_database_display.R` passed saved-response
+  checks for open and future-locked clauses, an expired opening with unknown
+  transfer status, and purchases with and without a future transfer time.
+- `Rscript test/test_scheduled_clauses.R` passed eligibility, reservation,
+  explicit consent, deduplication, and outcome checks with artificial records.
+- `Rscript test/test_shiny_simulation.R` passed 14 checks and eight tabs.
+
+Performance review: the existing card badge formats one additional timestamp
+only for a reported purchase. The text wraps in the existing card container.
+No extra API or database requests, new cache entries or invalidations, blocking
+I/O, timers, reactive dependencies, or additional widgets are introduced. The
+saved-card regression issued zero source reads while rendering these states.
+The production diagnosis read only a scoped snapshot. No transaction was sent.
+Hosted release rendering remains unverified.

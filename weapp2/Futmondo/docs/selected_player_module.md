@@ -1,5 +1,25 @@
 # Player card
 
+## Purchased release clauses — 2026-11-23 Pacific
+
+For a rival player, an explicit `championship.clause.transferred` flag shows
+**Release clause purchased**. When `championship.clause.transferDate` is a
+valid future instant, the badge also shows **Transfer scheduled for** with the
+date in the account's display timezone. A missing transfer flag and a past
+opening leave availability unverified. **Release Clause Locked until** applies
+to a future opening. The card reuses its scoped, durable player summary.
+
+The [official Futmondo web bundle](https://app.futmondo.com/main.dart.js),
+inspected on 2026-11-23 Pacific (SHA-256
+`08202076259d1678c7557478771d3aa38b5099f42044630569c704fdb7a7cd1c`),
+uses authenticated `POST /1/player/summary` with `championshipId`,
+`userteamId`, and `playerId`. Its championship parser passes `clause` to
+`cbs`, which reads `date`, `unlockDate`, `transferDate`, and `transferred`
+separately. A scoped production snapshot corroborated that the opening was
+already past and the purchase had a separate future delivery time. The user
+confirmed the same pending transfer in the official app. This corrects the
+existing LigaRadar badge to reflect a shared capability.
+
 
 ## Manual offer and purchase timing — 2026-11-22 Pacific
 

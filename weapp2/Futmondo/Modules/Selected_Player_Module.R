@@ -773,11 +773,21 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
               )
             )
           } else if (has_rival_owner && clause_price_val > 0) {
-            # Release clause exists but is currently LOCKED
-            lock_reason <- if (clause_date_formatted != "") paste0("until ", clause_date_formatted) else "transferred/cooldown"
+            clause_label <- if (is_clause_transferred) {
+              transfer_time <- fm_time(sp$clause_transferDate %||% NA_character_)
+              if (length(transfer_time) == 1L && !is.na(transfer_time) && transfer_time > Sys.time()) {
+                paste("Release clause purchased · Transfer scheduled for", fm_format_datetime(transfer_time))
+              } else {
+                "Release clause purchased"
+              }
+            } else if (is_clause_date_locked) {
+              paste("Release Clause Locked until", clause_date_formatted)
+            } else {
+              "Release clause unavailable · transfer status unverified"
+            }
             locked_badge <- div(
               style = "display: inline-block; padding: 8px 16px; background-color: var(--fm-surface); color: var(--fm-text); border: 1px solid #fde68a; border-radius: 8px; font-weight: 600; font-size: 12px; margin: 5px;",
-              tagList(icon("lock"), paste0(" Release Clause Locked ", lock_reason, " (", player_card_money(clause_price_val), ")"))
+              tagList(icon("lock"), paste0(" ", clause_label, " (", player_card_money(clause_price_val), ")"))
             )
             action_buttons <- tagList(action_buttons, locked_badge)
           }

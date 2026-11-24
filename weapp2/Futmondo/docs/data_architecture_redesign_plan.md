@@ -2451,3 +2451,13 @@ No additional runtime change was required by this response review. See
 The correction concerns rendering rather than missing source observations.
 See the dated points-axis review in `docs/data_review_results.md`.
 Signed-in hosted confirmation remains separate from local browser validation.
+
+### Purchased-clause badge — implemented locally 2026-11-23 Pacific
+
+- [x] Confirm the reported card's past opening and separate pending delivery
+  in its saved production summary.
+- [x] Display the reported purchase and future delivery in the existing card
+  badge, and cover past openings and unknown transfer flags offline.
+- [ ] Verify the updated badge on the hosted release after deployment.
+
+See the clause status review in `docs/data_review_results.md`.

@@ -141,14 +141,15 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
   cat('PASS own-player listings also reuse successful saved observations without a browsing retry\n')
 })
 # Clause pricing can survive a change to System ownership in the source summary.
-clause_summary <- function(owner, opens) {
+clause_summary <- function(owner, opens, transferred = FALSE, transfer_date = NULL) {
   value <- summary(owner)
   value$championship$owner$computer <- !nzchar(owner)
-  value$championship$clause <- list(price=300, transferred=FALSE, date=opens)
+  value$championship$clause <- list(price=300, transferred=transferred, date=opens, transferDate=transfer_date)
   value
 }
-publish_clause <- function(owner, opens) {
-  snapshot('get_player_summary', c(args, list(player_id='player')), clause_summary(owner, opens), age=120L-version)
+publish_clause <- function(owner, opens, transferred = FALSE, transfer_date = NULL) {
+  snapshot('get_player_summary', c(args, list(player_id='player')),
+    clause_summary(owner, opens, transferred, transfer_date), age=120L-version)
   restore(target$resource_key)
 }
 past <- '2026-11-15T12:00:00Z'
@@ -163,6 +164,17 @@ shiny::testServer(selected_player_Server, args=list(selected_player=selected, lo
   publish_clause('rival', future); settle(session)
   stopifnot(grepl('Release Clause Locked', output$action_buttons$html, fixed=TRUE),
     !grepl('btn_pay_clause', output$action_buttons$html, fixed=TRUE))
+  for (transferred in c(TRUE, NA)) {
+    publish_clause('rival', past, transferred); settle(session)
+    html <- output$action_buttons$html
+    reason <- if (isTRUE(transferred)) 'Release clause purchased' else 'transfer status unverified'
+    stopifnot(grepl(reason, html, fixed=TRUE),
+      !grepl('Release Clause Locked|btn_pay_clause|schedule_clause', html), !length(source_reads))
+  }
+  publish_clause('rival', past, TRUE, transfer_date=future); settle(session)
+  html <- output$action_buttons$html
+  stopifnot(grepl(paste('Transfer scheduled for', fm_format_datetime(future)), html, fixed=TRUE),
+    !grepl('Release Clause Locked|btn_pay_clause|schedule_clause', html), !length(source_reads))
   remember_action_context('clause')
   for (opens in c(past, future)) {
     publish_clause('', opens); settle(session)
@@ -178,7 +190,7 @@ shiny::testServer(selected_player_Server, args=list(selected_player=selected, lo
   action('clause_buyout')
   session$setInputs(btn_pay_clause=1L); settle(session)
   stopifnot(!isTRUE(clause_modal_opened_RV()), is.null(modal_context_RV()$clause), !length(source_reads))
-  cat('PASS saved listed free agents keep market offers and reject stale clause entry points; rival clauses still render open and locked states\n')
+  cat('PASS saved rival clauses distinguish open, future lock, transferred and unverified states; listed free agents reject stale clause entry points\n')
 })
 elapsed<-system.time(for(i in 1:1000)player_availability_observed(saved,'summary'))[['elapsed']]
 cat(sprintf('METRIC 1000 display-evidence validations %.3fs; no I/O, timers or additional cache\n',elapsed))
