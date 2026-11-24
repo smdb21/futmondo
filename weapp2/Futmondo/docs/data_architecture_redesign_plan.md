@@ -2475,3 +2475,7 @@ Primary-position bench coverage is implemented locally for both current and proj
 Implemented locally: expected XI totals and direct manual edits for current squads, unsaved optimized lineups and approved schedules. Projected edits reuse the existing durable schedule and explicit replacement protocol.
 
 Implemented locally: a queued XI opens on the regular editable pitch. The picker and score table share the projected squad; the optimizer can still explicitly exclude signings. Restoration reuses the existing schedule read and guards local edits and league/round scope.
+
+## Loading animation close-up · 2026-11-23
+
+Implemented locally. Once both teams have risen, the camera approaches a near-side midfielder. That player dissolves into the flock before the radar phase. The same sequence serves compact and fullscreen loaders.

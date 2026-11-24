@@ -175,7 +175,7 @@ function checkGeometry(phases) {
   assert.ok(polygonArea(tilted) < polygonArea(flat) * 0.85, 'The tilted ground plane is foreshortened');
   for (const geometry of Object.values(phases)) for (const mark of geometry) for (const command of mark.path)
     assert.ok(command.args.every(value => typeof value === 'boolean' || Number.isFinite(value)), 'Canvas coordinates stay finite');
-  for (const name of ['pitch', 'tilted', 'rising', 'morph', 'flock']) for (const mark of phases[name]) for (const command of mark.path) {
+  for (const name of ['pitch', 'tilted', 'rising', 'flock']) for (const mark of phases[name]) for (const command of mark.path) {
     const [x, y] = command.args;
     assert.ok(x >= 0 && x <= 420 && y >= 0 && y <= 280, `Projected marks stay inside the scene (${x}, ${y})`);
   }
@@ -248,7 +248,7 @@ function checkTeams(phases, teamColors) {
     const particles = phases[name].filter(mark => mark.kind === 'fill' && mark.alpha > 0.4 &&
       mark.path.length === 1 && mark.path[0].op === 'ellipse');
     assert.equal(particles.length, expectedParticles, name + ' retains the complete bounded particle pool');
-    const expectedColors = [...new Set([...teamColors, ...teamColors.stripes.filter(Boolean)])].sort();
+    const expectedColors = [...new Set([teamColors[0], ...[teamColors.stripes[0]].filter(Boolean)])].sort();
     assert.deepEqual([...new Set(particles.map(mark => mark.color))].sort(), expectedColors,
       name + ' carries the selected primary and shirt-stripe colors into the transformation');
     for (const particle of particles) {
@@ -369,14 +369,20 @@ function checkAscent(release, dissolve, rising) {
   const headRise = before.slice(0, 22).map((mark, i) => mark.path[0].args[1] - after[i].path[0].args[1]);
   assert.ok(headRise.every(distance => distance > 1), 'Every head-tip particle initially travels toward the sky');
   assert.ok(headRise.reduce((sum, n) => sum + n, 0) / 22 > 2, 'The initial upward motion is visible');
-  // The final two samples per actor are its feet; at this early point those
-  // remain anchored while the head particles are already travelling upward.
+  // Samples descend through the featured player. The lowest points remain
+  // anchored while particles from the head are already travelling upward.
   for (let i = before.length - 22; i < before.length; i++)
     assert.ok(Math.hypot(...before[i].path[0].args.slice(0, 2).map((n, axis) => n - after[i].path[0].args[axis])) < 0.1,
       'Lower foot particles leave after the head particles');
   const heads = marks => marks.filter(mark => mark.kind === 'fill' && mark.path.length === 1 &&
     mark.path[0].op === 'arc' && mark.path[0].args[2] > 1.5);
   assert.equal(heads(rising).length, 22);
+  assert.equal(heads(release).length, 1, 'Camera isolates one intact player before takeoff');
+  const [x, y, radius] = heads(release)[0].path[0].args;
+  assert.ok(Math.abs(x - 210) < 6 && y < 140 && radius > 3 * heads(rising)[7].path[0].args[2],
+    'The camera centers the enlarged midfielder');
+  assert.ok(before.every(mark => Math.abs(mark.path[0].args[0] - x) < 4 * radius &&
+    Math.abs(mark.path[0].args[1] - y) < 12 * radius), 'All flock particles start within one figure');
   assert.equal(heads(dissolve).length, 0, 'The head is dissolved while the lower figure remains');
 }
 async function checkLaunchLayout(page, selector = '#fixture-hero') {
@@ -432,13 +438,15 @@ async function fullscreenChecks(browser) {
       assert.deepEqual(teamColors.ids, ['real-madrid', 'barcelona'], 'The main matrix uses a deterministic Madrid/Barcelona pair');
       await checkPairIdentity(page, teamColors.ids);
       const phases = {};
-      for (const [name, at] of [['pitch', 700], ['rising', 6050], ['release', 6700], ['dissolve', 7000], ['morph', 7600], ['flock', 9200], ['lateFlock', 12000], ['radar', 14000], ['players', 16200], ['return', 19000]]) {
+      for (const [name, at] of [['pitch', 700], ['rising', 5210], ['release', 6650], ['dissolve', 7000], ['morph', 7600], ['flock', 9200], ['lateFlock', 12000], ['radar', 14000], ['players', 16200], ['return', 19000]]) {
         const elapsed = await page.evaluate(() => performance.now() - window.loadingFixture.firstDrawAt);
         await page.waitForTimeout(Math.max(0, at - elapsed));
         phases[name] = await captureGeometry(page);
         if (['rising', 'morph', 'flock'].includes(name))
           await page.screenshot({path: path.join(screenshotDir, `${viewport.width}x${viewport.height}-${theme}-${name}-fullscreen.png`)});
-        checkFullscreenGeometry(phases[name], layout, name === 'flock');
+        if (['release', 'dissolve', 'morph'].includes(name)) {
+          checkFullscreenGeometry(particleMarks(phases[name]), layout);
+        } else checkFullscreenGeometry(phases[name], layout, name === 'flock');
       }
       checkAscent(phases.release, phases.dissolve, phases.rising);
       checkTeams(phases, teamColors);
@@ -463,7 +471,7 @@ async function fullscreenChecks(browser) {
         await waitDraw(page, 'fixture-hero');
         const shortLayout = await checkLaunchLayout(page);
         checkFullscreenGeometry(await captureGeometry(page), shortLayout);
-        for (const [phase, at] of [['rising', 6050], ['radar', 14000], ['players', 16200], ['return', 19000]]) {
+        for (const [phase, at] of [['rising', 5210], ['radar', 14000], ['players', 16200], ['return', 19000]]) {
           const elapsed = await page.evaluate(() => performance.now() - window.loadingFixture.firstDrawAt);
           await page.waitForTimeout(Math.max(0, at - elapsed));
           checkFullscreenGeometry(await captureGeometry(page), shortLayout);
@@ -532,7 +540,7 @@ async function clubChecks(browser) {
       const colors = await readTeamColors(page);
       assert.deepEqual(colors.ids, variant.ids, 'A new document can choose another known club pair');
       const phases = {};
-      for (const [name, at] of [['pitch', 700], ['rising', 6050], ['morph', 7600], ['flock', 9200], ['players', 16200]]) {
+      for (const [name, at] of [['pitch', 700], ['rising', 5210], ['morph', 7600], ['flock', 9200], ['players', 16200]]) {
         const elapsed = await page.evaluate(() => performance.now() - window.loadingFixture.firstDrawAt);
         await page.waitForTimeout(Math.max(0, at - elapsed));
         phases[name] = await captureGeometry(page);
@@ -567,9 +575,9 @@ async function clubChecks(browser) {
   await cdp.send('Emulation.setCPUThrottlingRate', {rate: 4});
   await page.goto(origin + '/?kits=0.75,0.7');
   await waitDraw(page, 'fixture-hero');
-  await page.waitForTimeout(6050);
+  await page.waitForTimeout(5200);
   const worstGeometry = await captureGeometry(page);
-  assert.equal(particleMarks(worstGeometry).length, 320, 'Worst-case outlined capture retains all 320 hero particles');
+  assert.equal(particleMarks(worstGeometry).length, 0, 'Solid formation skips particle draws before the close-up');
   checkGoalFacing(worstGeometry, await readTeamColors(page));
   await page.locator('#fixture-parent').screenshot({path: path.join(screenshotDir, 'juventus-dortmund-light-worstcase.png')});
   await page.waitForTimeout(2200);
@@ -602,7 +610,7 @@ async function visualChecks(browser) {
       assert.deepEqual(teamColors.ids, ['real-madrid', 'barcelona'], 'The main matrix uses a deterministic Madrid/Barcelona pair');
       await checkPairIdentity(page, teamColors.ids);
       const pictures = [], phases = {};
-      for (const [name, at] of [['pitch', 700], ['tilted', 2400], ['rising', 6050], ['release', 6700], ['dissolve', 7000], ['morph', 7600], ['flock', 9200], ['lateFlock', 12000], ['radar', 14000], ['players', 16200], ['return', 19000]]) {
+      for (const [name, at] of [['pitch', 700], ['tilted', 2400], ['rising', 5210], ['release', 6650], ['dissolve', 7000], ['morph', 7600], ['flock', 9200], ['lateFlock', 12000], ['radar', 14000], ['players', 16200], ['return', 19000]]) {
         const elapsed = await page.evaluate(() => performance.now() - window.loadingFixture.firstDrawAt);
         await page.waitForTimeout(Math.max(0, at - elapsed));
         phases[name] = await captureGeometry(page);
@@ -640,11 +648,11 @@ async function visualChecks(browser) {
     const normalSamples = await page.evaluate(() => window.loadingFixture.samples.splice(0));
     const normalStageSamples = await page.evaluate(() => window.loadingFixture.stageSamples.splice(0));
     const cdp = await page.context().newCDPSession(page);
-    const untilStage = await page.evaluate(() => (2000 - ((performance.now() - window.loadingFixture.firstDrawAt) % 19700) + 19700) % 19700);
+    const untilStage = await page.evaluate(() => (5400 - ((performance.now() - window.loadingFixture.firstDrawAt) % 19700) + 19700) % 19700);
     await page.waitForTimeout(untilStage);
     await page.evaluate(() => { window.loadingFixture.samples = []; window.loadingFixture.stageSamples = []; });
     await cdp.send('Emulation.setCPUThrottlingRate', {rate: 4});
-    await page.waitForTimeout(2500);
+    await page.waitForTimeout(2900);
     const throttledSamples = await page.evaluate(() => window.loadingFixture.samples.splice(0));
     const throttledStageSamples = await page.evaluate(() => window.loadingFixture.stageSamples.splice(0));
     await cdp.send('Emulation.setCPUThrottlingRate', {rate: 1});

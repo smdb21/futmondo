@@ -67,6 +67,7 @@
         team: team, facing: team ? -1 : 1, delay: (index % 4)*.12 });
     });
   }
+  var subject = actors[7]; // Near-side midfielder, clear of the opposing formation.
   // Molded table-football body with a short shoe, not a projecting plinth.
   var figurine = [[-2,24],[-5.5,22],[-6,16],[-3.5,14],[-2.5,3],[-3.2,3],
     [-3.2,0],[3.2,0],[3.2,3],[2.5,3],[3.5,14],[6,16],[5.5,22],[2,24]];
@@ -81,18 +82,16 @@
   var frontStripe = [[3,-1.6,14],[3,1.6,14],[3,1.6,23],[3,-1.6,23]];
   var backStripe = frontStripe.map(function (v) { return [-2.5,v[1],v[2]]; });
   var sideStripe = [[-.5,6,16],[1.8,6,16],[1.8,5.5,22],[-.5,5.5,22]];
-  // Sample the same head, shirt and short shoe for the silhouette-to-flock morph.
-  var silhouette = [[0,30],[-2.9,27],[0,24],[2.9,27],[-5.5,22],[5.5,22],
-    [-6,16],[6,16],[-3.5,14],[3.5,14],[-2.5,3],[2.5,3],[-3.2,3],[3.2,3],[-3.2,0],[3.2,0]];
   function clamp(x) { return Math.max(0, Math.min(1, x)); }
   function ease(x) { x = clamp(x); return x * x * x * (x * (x * 6 - 15) + 10); }
   function mix(a, b, w) { return a + (b - a) * w; }
   function cameraAt(t, instance) {
     var turn = ease((t-1.2)/2);
-    var yaw = turn*(-.32 + .54*ease((t-2.6)/1.9));
-    var tilt = turn*.96;
+    var approach = ease((t-5.45)/1.15);
+    var yaw = approach*.25 + turn*(-.32 + .54*ease((t-2.6)/1.9));
+    var tilt = turn*.96 + approach*.16;
     var camera = { cy: Math.cos(yaw), sy: Math.sin(yaw), ct: Math.cos(tilt),
-      st: Math.sin(tilt), zoom: 1-.08*turn, lift: 0, turn: turn };
+      st: Math.sin(tilt), zoom: 1-.08*turn, lift: 0, pan: 0, approach: approach, turn: turn };
     camera.eyeX = 210+600*camera.sy*camera.st;
     // Fit the board/shadow in short portrait scenes before placing it below
     // the sky. Extra scaling is needed only when perspective exceeds the box.
@@ -110,6 +109,12 @@
     var low = 7*turn-instance.offset-top;
     var high = instance.height-instance.offset-7*turn-bottom;
     camera.lift = Math.max(low,Math.min(high,(9+(instance.mobile ? instance.height*.20 : 25))*turn));
+    if (approach > 0) {
+      camera.zoom *= mix(1,Math.min(5.5,instance.height/45),approach);
+      project(camera,subject.x,subject.y,15);
+      camera.pan = (210-camera.px)*approach;
+      camera.lift += (140-camera.py)*approach;
+    }
     return camera;
   }
   // Perspective is a small projection of the same 2D pitch coordinates, not a
@@ -120,7 +125,7 @@
     var ry = camera.sy*x+camera.cy*y;
     var depth = ry*camera.st+z*camera.ct;
     camera.k = camera.zoom*600/(600-depth);
-    camera.px = 210+rx*camera.k;
+    camera.px = 210+camera.pan+rx*camera.k;
     camera.py = 140+(ry*camera.ct-z*camera.st)*camera.k+camera.lift;
   }
   function readPalette() {
@@ -153,19 +158,16 @@
       // Correlating both sequences collapses the cloud into one thin curve.
       var u = (i + .5) / count * 2 - 1;
       var ring = i % 3;
-      var actor = i % actors.length;
-      var samples = Math.floor((count-1-actor)/actors.length)+1;
-      var slot = Math.floor(i/actors.length);
-      // Keep both shoe corners even in the compact eight-sample figures.
-      var body = slot >= samples-2 ? silhouette[silhouette.length-2+slot-(samples-2)] :
-        silhouette[Math.floor(slot/(samples-2)*(silhouette.length-2))];
-      var stripe = body[1] >= 16 && body[1] <= 22 && body[0] > 0;
-      var bodyX = body[1] >= 24 ? 0 : actors[actor].facing*(stripe ? 1 : frontDepth(body[0],body[1]));
-      var bodyY = body[0];
-      if (body[1] === 27 && body[0] > 0) { bodyX = actors[actor].facing*3.8; bodyY = 0; }
+      // Distribute material through the head, shirt, legs and shoe of one figure.
+      var z = 30*(1-(i+.5)/count);
+      var halfWidth = z > 24 ? Math.sqrt(Math.max(0,9-(z-27)*(z-27))) :
+        z >= 16 ? mix(6,5.5,(z-16)/8) : z >= 14 ? mix(3.5,6,(z-14)/2) :
+        z > 3 ? mix(2.5,3.5,(z-3)/11) : 3.2;
+      var bodyY = (((i*.618033989)%1)*2-1)*halfWidth;
+      var bodyX = z > 24 ? Math.sqrt(Math.max(0,halfWidth*halfWidth-bodyY*bodyY)) : frontDepth(bodyY,z);
       result.push({ x: mix(segment.a[0], segment.b[0], f), y: mix(segment.a[1], segment.b[1], f),
-        actor: actor, bodyX: bodyX, bodyY: bodyY, bodyZ: body[1], stripe: stripe,
-        release: takeoffStart + actors[actor].delay*.25 + (1-body[1]/30)*.36,
+        bodyX: bodyX, bodyY: bodyY, bodyZ: z, stripe: z >= 16 && z <= 23 && Math.abs(bodyY) < 1.6,
+        release: takeoffStart + (1-z/30)*.85,
         angle: angle, u: u, radius: Math.sqrt(((i * .754877666) % 1)), ring: 32 + ring * 32,
         ringAngle: Math.floor(i / 3) / Math.ceil(count / 3) * tau, depth: (Math.sin(angle) + 1) * .5 });
     }
@@ -243,14 +245,15 @@
     if (opacity <= .001) return;
     for (var i = 0; i < actors.length; i++) {
       var actor = actors[i], rise = lifts[i];
-      if (rise <= .001) continue;
+      var alpha = actor === subject ? opacity : opacity*(1-camera.approach);
+      if (rise <= .001 || alpha <= .001) continue;
       var color = palette.teams[actor.team];
       project(camera,actor.x,actor.y,0);
       var footX = camera.px, footY = camera.py;
       ctx.fillStyle = color;
-      ctx.globalAlpha = opacity*rise*.14;
+      ctx.globalAlpha = alpha*rise*.14;
       ctx.beginPath(); ctx.ellipse(footX,footY,4*camera.k,1.5*camera.k,0,0,tau); ctx.fill();
-      var cut = 30*(1-clamp((t-takeoffStart-actor.delay*.25)/.36));
+      var cut = actor === subject ? 30*(1-clamp((t-takeoffStart)/.85)) : 30;
       if (cut <= 0) continue;
       // Select the camera-facing X surface, then shade the visible +Y side.
       // This gives opposing teams actual depth rather than rotated billboards.
@@ -258,17 +261,17 @@
       var outline = palette.edges[actor.team];
       ctx.strokeStyle = outline || color;
       ctx.lineWidth = .55*markScale;
-      ctx.globalAlpha = opacity*rise*.9;
+      ctx.globalAlpha = alpha*rise*.9;
       playerFace(ctx,camera,actor,front ? frontFace : backFace,rise,cut,outline);
-      ctx.globalAlpha = opacity*rise*.58;
+      ctx.globalAlpha = alpha*rise*.58;
       playerFace(ctx,camera,actor,sideFace,rise,cut,outline);
-      ctx.globalAlpha = opacity*rise*.75;
+      ctx.globalAlpha = alpha*rise*.75;
       playerFace(ctx,camera,actor,shirtTop,rise,cut,outline);
-      ctx.globalAlpha = opacity*rise*.8;
+      ctx.globalAlpha = alpha*rise*.8;
       playerFace(ctx,camera,actor,footTop,rise,cut,outline);
       if (palette.stripes[actor.team]) {
         ctx.fillStyle = palette.stripes[actor.team];
-        ctx.globalAlpha = opacity*rise*.95;
+        ctx.globalAlpha = alpha*rise*.95;
         playerFace(ctx,camera,actor,front ? frontStripe : backStripe,rise,cut);
         playerFace(ctx,camera,actor,sideStripe,rise,cut);
         ctx.fillStyle = color;
@@ -280,7 +283,7 @@
           ctx.save(); ctx.beginPath(); ctx.rect(0,camera.py,420,420); ctx.clip();
         }
         var headScale = Math.sqrt(markScale);
-        ctx.globalAlpha = opacity*rise*.9;
+        ctx.globalAlpha = alpha*rise*.9;
         project(camera,actor.x,actor.y,27*rise);
         ctx.beginPath(); ctx.arc(camera.px,camera.py,2.9*camera.k*headScale*rise,0,tau); ctx.fill();
         if (outline) ctx.stroke();
@@ -381,8 +384,11 @@
     // Start the same flock motion relative to the figures' takeoff.
     var flockTime = t-takeoffStart+4.5;
     var yaw = .18*Math.sin(flockTime*.65), cos = Math.cos(yaw), sin = Math.sin(yaw);
+    // Field specks fade as the solid teams rise. Reveal the close-up material
+    // only once the camera settles on the midfielder.
+    var material = 1-assemble+ease((t-6.4)/.25);
     var particles = instance.particles;
-    for (var i = 0; i < particles.length; i++) {
+    for (var i = 0; material > .001 && i < particles.length; i++) {
       var p = particles[i];
       var phi = p.angle+flockTime*.48;
       var width = (8+34*Math.sqrt(1-p.u*p.u))*p.radius;
@@ -396,8 +402,8 @@
       var ringAngle = p.ringAngle + .08*Math.sin(t*.8);
       var originX = p.x, originY = p.y;
       if (camera) {
-        var actor = actors[p.actor];
-        project(camera,mix(p.x,actor.x+p.bodyX,assemble),mix(p.y,actor.y+p.bodyY,assemble),p.bodyZ*instance.lifts[p.actor]);
+        var actor = subject;
+        project(camera,mix(p.x,actor.x+p.bodyX,assemble),mix(p.y,actor.y+p.bodyY,assemble),p.bodyZ*assemble);
         originX = camera.px; originY = camera.py;
       }
       var flight = ease((t-p.release)/(flockStart-p.release));
@@ -417,10 +423,10 @@
         y = pitchWeight*originY + flockWeight*flockY + radarWeight*(140+p.ring*radarFit*Math.sin(ringAngle));
       }
       // Keep each particle's color identity through the silhouette/flock morph.
-      var team = actors[p.actor].team;
+      var team = subject.team;
       var stripe = p.stripe && palette.stripes[team];
       ctx.fillStyle = stripe || palette.teams[team];
-      ctx.globalAlpha = (mix(.7,.9,p.depth)*flockWeight + .8*pitchWeight + .22*radarWeight);
+      ctx.globalAlpha = material*(mix(.7,.9,p.depth)*flockWeight + .8*pitchWeight + .22*radarWeight);
       var size = (.75 + flockWeight*(.3+p.depth*.35)) * instance.markScale;
       ctx.beginPath(); ctx.ellipse(x,y,size*(1+flockWeight*.35),size*.6,-.25+flockWeight*Math.sin(phi)*.3,0,tau); ctx.fill();
       var edge = stripe ? palette.particleEdges[team] : palette.light ? palette.edges[team] : null;

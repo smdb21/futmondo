@@ -14,9 +14,9 @@ finish an animation. It does not represent real player positions or progress.
 
 The local `www/loading-visual.js` and `www/loading-visual.css` assets animate a
 19.7-second loop: the flat pitch tilts and rotates into perspective, 22 table-football
-figures face their opposing goals, rise from the surface, dissolve from head to
-foot, and release particles upward into a flowing flock. This dissolve applies
-to every loader size.
+figures rise facing their opposing goals. The camera banks toward a near-side
+midfielder and centers the player in close-up. Only that figure dissolves from
+head to foot, releasing a flock in its kit colors.
 The flock gathers into radar rings and reveals moving player dots before
 returning to the flat pitch. The component uses the existing `--fm-*` colors and updates on light/dark changes. Its canvas is
 hidden from assistive technology; the separate text supplies the loading status.
@@ -25,8 +25,9 @@ pitch/radar illustration.
 
 The added 3D stage uses a small perspective projection in Canvas 2D rather than
 a separate graphics engine: the pitch rotates from 1.2–3.2 seconds, players rise
-from 2.2–5.2 seconds, then stay fully raised for about 1.5 seconds. Their
-silhouette particles disperse into the flock from 6.7–8.4 seconds. The formed
+from 2.2–5.2 seconds, with the full formation briefly in view. From 5.45–6.6 seconds the
+camera turns, pans and zooms toward the midfielder as the other figures fade.
+The camera holds still as the close-up particles disperse into the flock from 6.7–8.4 seconds. The formed
 flock moves across the sky for 4.3 seconds. Each particle keeps its body position until release, initially
 travels upward on a curved path, then joins the cloud above the pitch. The
 remaining figure is clipped from the head down in sync with release; the pitch
@@ -45,16 +46,15 @@ draws 22 anchored foosball figures with round heads, solid shirts, rigid lower
 bodies and short shoes, using cached formation positions and a bounded lift
 array. The first club faces +X toward the right goal; the second faces -X toward
 the left. Shoes are 3 units high and 6.4 wide, spanning -1.6 to +3.2 in local X
-(compared with the previous 5 high, 10 wide, -2.5 to +6 plate). The same shorter
-corners feed the dissolve particles and the ground shadow is smaller. Shirt
+(compared with the previous 5 high, 10 wide, -2.5 to +6 plate). The close-up particles sample the shoe at the same width. Shirt
 width lies across pitch Y, with shallow depth along X,
 short forward-facing shoes and small nose cues. Cached front/back/side/top faces provide
 volume; the camera eye position selects the visible face for each player.
 `playerFace()` clips these faces at the descending local-Z dissolve boundary
 without allocating intermediate vertices; its optional outline uses the current
 stroke style for pale kits. `makeParticles()` assigns each existing
-particle a player and a sample of the same goal-facing 3D silhouette and a release time when the particle
-budget changes, retaining both foot corners even at the smaller particle budget.
+particle a height and lateral position on the featured player and a release time
+when the particle budget changes. The material peels away over 0.85 seconds.
 Viewport-height changes reuse this pool. `radar()` and its particle targets share
 a fit factor for unusually short portrait scenes so the rings and crosshairs
 remain visible. `readPalette()` keeps the field and radar beam on the existing
