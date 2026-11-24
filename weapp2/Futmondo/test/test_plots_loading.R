@@ -46,3 +46,41 @@ shiny::testServer(plots_Server,args=list(
  stopifnot(identical(calls,before),all(unlist(rank$x$layout$xaxis$categoryarray)%in%c('2','2.2')))
  cat('PASS round filtering reuses reads and cumulative totals\n')
 })
+
+# Older databases can have a full baseline before the date/amount projection
+# exists. The application must recover even when the normal worker read fails.
+fm_worker_configured <- function() TRUE
+league_context_metadata <- function(championship_id, account_id, allow_stale = FALSE) {
+  if (identical(championship_id, 'league'))
+    list(competition_id='competition', season='season', scoring_version='score')
+}
+clear_api_cache()
+calls <- character()
+read_args <- list()
+async_adapter_fetch <- function(fn, args=list(), context, ...) {
+  calls <<- c(calls,fn)
+  read_args[[fn]] <<- args
+  if (fn == 'get_championship_transfer_amounts') return(promises::promise_resolve(list()))
+  if (fn == 'get_championship_pressroom') return(promises::promise_reject(simpleError('Synthetic worker failure')))
+  if (fn == 'read_persisted_history_baseline')
+    return(promises::promise_resolve(observed_data(data.frame(
+      created=c('2026-11-14T12:00:00Z','2026-11-15T12:00:00Z'),price=c(125,375)))))
+  promises::promise_resolve(data.frame())
+}
+shiny::testServer(plots_Server,args=list(
+ is_module_active=reactive(TRUE),login_token=reactive(auth),championship_id=reactive('league'),
+ user_team_id=reactive('a'),user_teams_RV=reactive(data.frame(teamid='a',teamname='Alpha'))),{
+ session$setInputs(plot_tab='Money movements',transfer_period='week')
+ settle(session)
+ state <- transfer_chart_history()
+ scope <- read_args[['read_persisted_history_baseline']]$context
+ stopifnot(is.null(state$error), !state$loading, identical(attr(state$data,'fetch_status'),'stale'),
+   identical(scope$account_id,auth[['userid']]), identical(scope$championship_id,'league'),
+   identical(scope$competition_id,'competition'), identical(scope$season,'season'),
+   identical(scope$scoring_version,'score'), identical(plots_transfer_periods(transfer_days(),'week')$amount,500))
+ before <- calls
+ session$setInputs(transfer_period='day')
+ settle(session)
+ stopifnot(identical(calls,before), identical(plots_transfer_periods(transfer_days(),'day')$amount,c(125,375)))
+ cat('PASS failed worker history recovers through one exact-scope audited baseline read\n')
+})

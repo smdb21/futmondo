@@ -70,7 +70,9 @@ check('transfer histogram groups exact amounts in the display timezone across ca
       '2026-03-29T01:00:00Z', 'bad-date', '2026-04-01T10:00:00Z'),
     price = c(100, 200, 300, 400, 0, 5, 6, 20, NA_real_)
   )
-  rows <- plots_transfer_days(history, 'Europe/Madrid')
+  projection <- pressroom_transfer_amounts(transform(history, player_id = 'fixture', bids = 12L))
+  stopifnot(identical(projection, history), identical(names(projection), c('created','price')))
+  rows <- plots_transfer_days(projection, 'Europe/Madrid')
   day <- plots_transfer_periods(rows, 'day')
   week <- plots_transfer_periods(rows, 'week')
   month <- plots_transfer_periods(rows, 'month')

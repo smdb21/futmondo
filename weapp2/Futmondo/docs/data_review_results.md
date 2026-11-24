@@ -5914,3 +5914,39 @@ Plotly object building took 12–13 ms. The resulting 417, 60 and 14 bars used
 about 100, 19 and 6.5 KB of uncompressed widget JSON, respectively. These are
 local measurements, with the weekly view the default. Hosted account data
 and deployment were outside local verification.
+
+## Saved date and amount projection for Money movements · 2026-11-23
+
+The report included `FM-UNKNOWN-000002`. That reference is process-local.
+A read-only production probe found a complete Pressroom baseline and a current
+worker snapshot with 1,273 usable transfers. The stored worker snapshot
+decoded and grouped successfully through the chart code. The exact-scope
+baseline also decoded all 1,273 rows in a 0.62 s database-and-validation
+probe. The separate normalized transaction table lacked matching season
+coverage and reconciled clause rows for the affected championship. Its
+raw count was insufficient to verify a complete replacement.
+
+The histogram reuses current session data and otherwise asks the existing
+worker database read for the date-and-amount snapshot. A confirmed miss
+supports older stored histories through the existing full read and audited
+baseline. An unavailable primary worker read with a persisted baseline was
+reproduced in the offline adapter harness and recovered with a stale notice.
+No authenticated hosted browser session or corresponding server log was
+available to identify which component originally issued the reference.
+
+Replaying the production snapshot showed identical chart inputs after
+projection. The typed JSON shrank from 721,557 to 45,647 bytes. Base64
+snapshot chunks shrank from about 176.5 KB to 17.6 KB, a 90% reduction.
+Projection and compression took 26 ms in the replay. The worker publishes
+one extra small derived snapshot per existing Pressroom acquisition. Browsing
+makes no source calls, reuses the normal DB poll and shared cache, and makes no
+new reads on period changes. Existing snapshots without the new projection
+can temporarily require the legacy fallback. No schema or cadence change.
+
+Focused Plots, worker-provider, context-handoff and baseline-store checks
+passed. Chromium at 390 and 1440 px in both themes verified pending recovery,
+all three groupings, a cold read without the full Pressroom and zero extra
+reads on period changes. The offline Shiny lifecycle passed 14 checks and
+eight tabs. The Python worker suite passed 72 tests and the R worker contract
+passed 20 checks. Production publication and signed-in rendering remain
+unverified.

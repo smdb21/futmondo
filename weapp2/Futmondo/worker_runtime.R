@@ -246,21 +246,24 @@ fm_worker_fetch<-function(handler,args,context,owner=context$session_id %||% '',
  promises::promise(function(resolve,reject){
   if(length(s$waiters)>=128L){reject(simpleError('Background read capacity reached; existing requests are still pending.'));return(invisible(NULL))}
   id<-paste0('w',paste0(openssl::sha256(serialize(list(Sys.time(),runif(1)),NULL))))
-  waiter<-list(key=d$resource_key,owner=owner,current=is_current,resolve=resolve,reject=reject,descriptor=d,direct=direct)
+  waiter<-list(key=d$resource_key,owner=owner,current=is_current,resolve=resolve,reject=reject,descriptor=d,direct=direct,
+   allow_missing=identical(handler,'get_championship_transfer_amounts'))
   waiter$cancel<-later::later(function(){
    if(!is.null(s$waiters[[id]])){s$waiters[[id]]<-NULL;reject(simpleError('Background synchronization is still pending; inspect sync status.'))}
   },120)
   s$waiters[[id]]<-waiter
  })
 }
-fm_worker_settle<-function(s){
+fm_worker_settle<-function(s,read_keys=character()){
  for(id in names(s$waiters)){
   w<-s$waiters[[id]];saved<-fm_worker_get(w$descriptor$context$account_id,w$key)
   cancelled<-!isTRUE(tryCatch(w$current(),error=function(e)FALSE))
   ready<-!is.null(saved)
-  if(cancelled||ready){
+  missing<-isTRUE(w$allow_missing)&&w$key%in%read_keys
+  if(cancelled||ready||missing){
    s$waiters[[id]]<-NULL;if(is.function(w$cancel))w$cancel()
    if(cancelled)w$reject(structure(list(message='Session request cancelled',call=NULL),class=c('fm_async_cancelled','error','condition')))
+   else if(!ready)w$resolve(list())
    else {
     if(!resource_snapshot_unexpired(saved$data))attr(saved$data,'fetch_status')<-'stale'
     w$resolve(saved$data)
@@ -278,6 +281,7 @@ fm_worker_poll<-function(account,owner='',force=FALSE){
   fm_worker_demand(descriptor,owner)
  }
  keys<-fm_worker_live_keys(s)
+ read_keys<-keys
  s$requested_keys<-union(intersect(s$requested_keys,names(s$descriptors)),keys)
  versions<-setNames(lapply(keys,function(k)fm_worker_get(account,k)$manifest$version %||% ''),keys)
  if(!length(versions))versions<-structure(list(),names=character())
@@ -330,7 +334,7 @@ fm_worker_poll<-function(account,owner='',force=FALSE){
    }
   }
   # Polling is read-only: stale/missing observations never alter worker jobs.
-  fm_worker_settle(s);fm_worker_notify(account)
+  fm_worker_settle(s,if(!bootstrap)read_keys else character());fm_worker_notify(account)
   if(length(setdiff(fm_worker_live_keys(s),s$requested_keys)))fm_worker_schedule_read(account,owner)
   NULL
  },function(error){

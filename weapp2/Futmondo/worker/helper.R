@@ -578,6 +578,18 @@ fm_worker_run<-function(descriptor){
  if(!status%in%c('ok','empty','partial','unsupported'))status<-'partial'
  completeness<-if(isTRUE(attr(value,'complete')))'complete'else if(is.list(value)&&identical(value$completeness,'complete'))'complete'else'unknown'
  if(status=='partial')completeness<-'partial'
+ if(handler=='get_championship_pressroom' && status%in%c('ok','empty') &&
+    all(vapply(ctx[c('competition_id','season','scoring_version')],fm_context_known,logical(1)))) {
+  amounts<-pressroom_transfer_amounts(value)
+  if(!is.null(amounts)){
+   projection<-fm_worker_descriptor('get_championship_transfer_amounts',list(championship_id=ctx$championship_id),ctx)
+   wire<-fm_worker_encode(amounts)
+   if(produced_bytes+as.numeric(object.size(wire))<=8*1024^2)
+    produced[[projection$resource_key]]<-list(descriptor=projection,value=wire,
+     observed_at=rival_finance_stamp(observed),checked_at=rival_finance_stamp(observed),
+     status=if(nrow(amounts))'ok'else'empty',completeness='complete')
+  }
+ }
  original_deadline<-attr(value,'valid_until') %||% if(is.list(value))value$valid_until else NULL
  deadline<-if(is.numeric(original_deadline)&&length(original_deadline)==1L&&is.finite(original_deadline))
   rival_finance_stamp(as.POSIXct(original_deadline,origin='1970-01-01',tz='UTC'))else NULL

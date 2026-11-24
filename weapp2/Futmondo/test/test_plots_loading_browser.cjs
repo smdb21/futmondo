@@ -67,6 +67,7 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
   await page.getByText('Loading saved transfer history.',{exact:true}).waitFor({state:'hidden'});
   await heartbeat(4);
   const beforeGrouping=await page.locator('#stats').innerText();
+  assert.match(beforeGrouping,/ 0 0$/,'Cold chart reads only the saved date-and-amount projection');
   for(const [period,amounts] of [['Day',[100,200,300]],['Month',[100,500]],['Week',[300,300]]]){
    await page.getByRole('radio',{name:period,exact:true}).check();
    await waitForAmounts(amounts);
@@ -96,7 +97,7 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
   assert.ok(last.TaskDuration-first.TaskDuration<.5,'Idle chart must not loop on redraw');
   assert.ok(Math.abs(last.Nodes-first.Nodes)<100,'Idle chart DOM must stay bounded');
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2),false);
-  assert.match(await page.locator('#stats').innerText(),/ 0$/,'No source HTTP');
+  assert.match(await page.locator('#stats').innerText(),/ 0 0$/,'No full Pressroom read or source HTTP');
   assert.deepEqual(errors,[]);
   console.log(`PASS ${width}px ${theme}: partial then complete saved history, status recovery, three transfer groupings, no unchanged redraws, 20 crests; heartbeats ${timings.join('/')}ms; idle CPU ${((last.TaskDuration-first.TaskDuration)*1000).toFixed(1)}ms`);
   await page.screenshot({path:`/tmp/plots-loading-recovery-${width}.png`});await page.close();

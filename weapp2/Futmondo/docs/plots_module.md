@@ -174,3 +174,20 @@ on 2026-11-23 (SHA-256
 `08202076259d1678c7557478771d3aa38b5099f42044630569c704fdb7a7cd1c`) and confirms
 the route and pagination arguments. Browser checks use synthetic saved rows
 and the production snapshot codec. See [official comparison](feature_comparison.md#league-transfer-activity-over-time-2026-11-23).
+
+### Date and amount snapshot · 2026-11-23
+
+Money movements reuses a decoded, current Pressroom snapshot when one is
+already loaded. On a cold read it requests `get_championship_transfer_amounts`
+through the normal scoped worker database read. The date-and-amount frame
+has only `created` and `price`. The worker publishes it as a derived child
+of an existing complete Pressroom observation, retaining its scope, observed
+time and validity interval. Projection introduces no new acquisition job,
+Futmondo request, schema or polling timer.
+
+A successful database response with no projection lets the histogram use
+the existing saved Pressroom reader and exact-scope audited baseline.
+The baseline is marked stale while the regular snapshot is unavailable.
+A pending or failed lookup remains distinct from a verified empty history.
+Cash & transfers continues to use the full record because its calculations
+need counterparties. Period controls reuse the loaded date and amount data.

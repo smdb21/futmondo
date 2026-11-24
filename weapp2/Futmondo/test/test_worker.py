@@ -444,6 +444,25 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(datetime.fromisoformat(manifest['valid_until']).timestamp(),
             datetime.fromisoformat(result['observed_at'].replace('Z','+00:00')).timestamp()+60)
 
+    async def test_transfer_projection_inherits_pressroom_freshness_and_failures(self):
+        parent = descriptor('get_championship_pressroom')
+        child = descriptor('get_championship_transfer_amounts')
+        job = dict(self.job, descriptor=parent, resource_key=parent['resource_key'], interval_seconds=2700)
+        observed = '2026-11-13T00:00:00Z'
+        result = dict(value={'kind':'double','values':[100]}, observed_at=observed,
+                      checked_at=observed, status='ok', completeness='complete')
+        await self.worker.publish(job, 'owner', result, child=child)
+        manifest = self.store.snapshots[child['resource_key']]
+        self.assertEqual(manifest['observed_at'], observed)
+        self.assertEqual(datetime.fromisoformat(manifest['valid_until']),
+                         datetime(2026, 11, 13, 0, 45, tzinfo=timezone.utc))
+        self.assertEqual(manifest['completeness'], 'complete')
+        self.worker.source_errors['owner'] = {'source_rejected_1_locker_pressroom'}
+        self.worker.source_stamps['owner'] = [observed]
+        await self.worker.publish(job, 'owner', result, child=child)
+        self.assertEqual(self.store.snapshots[child['resource_key']]['completeness'], 'partial')
+        self.assertEqual(self.requests, [])
+
     async def test_optional_finance_failure_cannot_poison_unrelated_successful_child(self):
         d = descriptor('fm_worker_finances')
         job = dict(self.job, descriptor=d, resource_key=d['resource_key'])

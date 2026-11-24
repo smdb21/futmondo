@@ -2516,3 +2516,11 @@ Implemented locally in Plots. Day, week and month groupings share the existing
 durable championship Pressroom read with Cash & transfers. Calendar boundaries,
 amount totals and local grouping were verified against offline fixtures.
 Verification against the hosted release is pending.
+
+### Money movements saved projection · 2026-11-23
+
+Implemented locally. The chart reuses the saved transfer history in session or
+requests the persisted two-column projection. Existing audited baselines cover
+older snapshots and the reported unavailable path. Offline worker and chart
+checks validate the read and fallback. Hosted validation of the projected
+snapshot is pending the updated worker's next normal Pressroom publication.

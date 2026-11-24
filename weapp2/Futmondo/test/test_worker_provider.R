@@ -60,3 +60,22 @@ x<-settle(fm_worker_fetch('get_clause_transfer_summary',clause_args,clause_ctx))
 stopifnot(is.null(x$error),x$value$data$id=='p',attr(x$value,'fetch_status')=='stale',
  identical(attr(x$value,'observed_at'),attr(old,'observed_at')),!length(s$waiters))
 cat('PASS stored expired clause observation returns immediately with original time and stale status\n')
+
+
+# A confirmed miss for a derived display frame may immediately try an older
+# saved representation. Other factual reads keep waiting for their snapshot.
+scope <- list(championship_id='l')
+projection <- fm_worker_descriptor('get_championship_transfer_amounts',scope,ctx)
+full <- fm_worker_descriptor('get_championship_pressroom',scope,ctx)
+attempted <- FALSE
+fm_worker_rpc <- function(name,payload,owner=''){
+ if(name=='read') attempted <<- projection$resource_key %in% names(payload$p_versions)
+ promises::promise_resolve(list(account=s$account,health=NULL,resources=list(),jobs=list()))
+}
+reading <- fm_worker_fetch(projection$handler,scope,ctx)
+ordinary <- fm_worker_fetch(full$handler,scope,ctx)
+fm_worker_settle(s)
+stopifnot(length(s$waiters)==2L)
+x <- settle(reading)
+stopifnot(attempted,identical(x$value,list()),is.null(x$error),length(s$waiters)==1L)
+cat('PASS an acknowledged projection miss is distinct from a pending full-history read\n')

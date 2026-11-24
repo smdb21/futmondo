@@ -10,6 +10,7 @@ fixture_held <- TRUE
 fixture_version <- 1L
 fixture_reads <- 0L
 fixture_source_calls <- 0L
+fixture_full_pressroom_reads <- 0L
 futmondo_post <- function(...) {fixture_source_calls <<- fixture_source_calls+1L;stop('Unexpected source HTTP')}
 fm_worker_rpc <- function(name,payload,owner='') {
  stopifnot(name=='read')
@@ -19,9 +20,18 @@ fm_worker_rpc <- function(name,payload,owner='') {
  for(key in names(payload$p_versions)) {
   d <- s$descriptors[[key]]$descriptor
   if(is.null(d)) next
-  held <- fixture_held && (d$handler=='get_championship_pressroom' ||
+  if(d$handler=='get_championship_pressroom')fixture_full_pressroom_reads <<- fixture_full_pressroom_reads+1L
+  held <- fixture_held && (d$handler=='get_championship_transfer_amounts' ||
     (d$handler=='get_user_team_rounds' && d$args$user_team_id=='t1'))
   jobs[[length(jobs)+1L]] <- list(key=key,pending=held,running=FALSE,error=NULL)
+  if(held && d$handler=='get_championship_transfer_amounts')
+   return(promises::promise(function(resolve,reject) {
+    wait_for_release <- function() {
+     if (fixture_held) later::later(wait_for_release,.05)
+     else promises::then(fm_worker_rpc(name,payload,owner),resolve,reject)
+    }
+    later::later(wait_for_release,.05)
+   }))
   if(held) next
   version <- as.character(fixture_version)
   if(identical(payload$p_versions[[key]],version)) next
@@ -34,8 +44,7 @@ fm_worker_rpc <- function(name,payload,owner='') {
     recorded_at=rep(format(as.Date('2026-11-01')+0:13,'%Y-%m-%dT12:00:00Z'),10),team_value=seq_len(140)*1000),
    get_championship_players=data.frame(id=paste0('p',1:60),user_team_id='t1',
     teamId=rep(paste0('club',1:20),each=3),team=rep(paste('Club',1:20),each=3),logo='fixture-crest.png'),
-   get_financial_snapshot=list(configuration=list()),get_championship_pressroom=data.frame(
-    id=c('market','rival','locker:clause'),buyer_team_id=c('t1','t2','t1'),seller_team_id=c('','t1','t2'),
+   get_financial_snapshot=list(configuration=list()),get_championship_transfer_amounts=data.frame(
     created=c('2026-01-31T22:00:00Z','2026-01-31T23:00:00Z','2026-02-01T23:00:00Z'),
     price=c(100,200,300)),
    stop('Unexpected fixture handler: ',d$handler))
@@ -64,7 +73,7 @@ server <- function(input,output,session) {
  session$onSessionEnded(function()fm_worker_detach(fixture_auth[['userid']],session$token))
  keys <- ls(.fm_worker$values)
  if(length(keys))rm(list=keys,envir=.fm_worker$values)
- fixture_held <<- TRUE;fixture_version <<- 1L;fixture_reads <<- 0L
+ fixture_held <<- TRUE;fixture_version <<- 1L;fixture_reads <<- 0L;fixture_full_pressroom_reads <<- 0L
  s <- fm_worker_account_state(fixture_auth[['userid']]);s$bootstrap_complete <- TRUE
  fm_worker_set_policy(s,fixture_account)
  auth <- reactive(fixture_auth)
@@ -76,13 +85,12 @@ server <- function(input,output,session) {
  }
  observeEvent(input$release,{
   fixture_held <<- FALSE
-  poll_fixture()
  })
  observeEvent(input$publish,{
   fixture_version <<- fixture_version+1L
   poll_fixture()
  })
  output$heartbeat <- renderText(input$pulse %||% 0L)
- output$stats <- renderText({input$pulse;paste(fixture_reads,fixture_source_calls)})
+ output$stats <- renderText({input$pulse;paste(fixture_reads,fixture_full_pressroom_reads,fixture_source_calls)})
 }
 shiny::runApp(shiny::shinyApp(ui,server),host='127.0.0.1',port=8571,launch.browser=FALSE)

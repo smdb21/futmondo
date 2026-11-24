@@ -890,7 +890,11 @@ class Worker:
         checked = min((observed, checked), key=lambda x: datetime.fromisoformat(x.replace('Z', '+00:00')))
         # Child display projections carry the R resource policy and any stricter
         # original deadline. Publication never renews the source observation.
-        interval = result.get('interval_seconds', 60) if child else job['interval_seconds']
+        transfer_projection = (child is not None and
+                               job['descriptor']['handler'] == 'get_championship_pressroom' and
+                               descriptor['handler'] == 'get_championship_transfer_amounts')
+        interval = (job['interval_seconds'] if not child or transfer_projection
+                    else result.get('interval_seconds', 60))
         if type(interval) not in (int, float) or not 0 < interval <= 2147483647:
             raise WorkerFailure('snapshot_deadline')
         deadline = datetime.fromisoformat(checked.replace('Z', '+00:00')).timestamp() + interval
@@ -904,7 +908,7 @@ class Worker:
         manifest = dict(context=descriptor['context'], version=version, parts=len(parts), json_bytes=size, sha256=digest,
             checked_at=checked, observed_at=observed, valid_until=stamp(deadline),
             completeness=result.get('completeness', 'unknown'), status=result.get('status', 'ok'))
-        if self.source_errors.get(owner) and (not child or resource_key == job['resource_key']):
+        if self.source_errors.get(owner) and (not child or transfer_projection or resource_key == job['resource_key']):
             manifest.update(status='partial', completeness='partial', error=','.join(sorted(self.source_errors[owner])))
         if not child and job['descriptor']['handler'] == 'get_active_championships':
             value = plain(result['value'])

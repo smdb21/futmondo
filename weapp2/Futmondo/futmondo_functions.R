@@ -2790,6 +2790,19 @@ get_championship_pressroom <- function(login, championship_id, full_audit=FALSE)
   }, timeout_sec = if(isTRUE(full_audit))0 else 300, context=resource_context(login=login,championship_id=championship_id))
 }
 
+# Project the same deduplicated transactions used by the full Pressroom.
+pressroom_transfer_amounts <- function(history) {
+  if (!is.data.frame(history) || !all(c("created", "price") %in% names(history))) return(NULL)
+  data.frame(created = history$created, price = history$price)
+}
+
+get_championship_transfer_amounts <- function(login, championship_id) {
+  # Deployed callers use the saved projection published by the Pressroom job.
+  history <- get_championship_pressroom(login, championship_id)
+  observed_data(pressroom_transfer_amounts(history), status = attr(history, "fetch_status"),
+    observed_at = attr(history, "observed_at"))
+}
+
 calculate_league_finances <- function(login, championship_id, user_teams_df, initial_budget = NA_real_) {
   cache_key <- paste0("league_finances_calc_", championship_id)
   get_cached_data(cache_key, {

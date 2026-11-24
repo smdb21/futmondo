@@ -216,22 +216,42 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
         get_championship_pressroom(login = login_token(), championship_id = championship_id())
       })
     })
+    read_transfer_amounts <- factual_read_adapter(session, "get_championship_transfer_amounts",
+      login_token, championship_id, user_team_id,
+      is_active = function() active() && identical(input$plot_tab, "Money movements"),
+      refresh_trigger = refresh_trigger, state_only = TRUE)
     read_transfer_baseline <- factual_read_adapter(session, "read_persisted_history_baseline",
       login_token, championship_id, user_team_id,
       is_active = function() active() && identical(input$plot_tab, "Money movements"),
       refresh_trigger = refresh_trigger, state_only = TRUE)
     transfer_chart_history <- shiny::reactive({
-      state <- transfer_history()
-      history <- state$data
-      if (state$loading || (is.data.frame(history) && all(c("created", "price") %in% names(history)) &&
-          !"unavailable" %in% c(attr(history, "fetch_status"), attr(history, "worker_completeness")))) {
-        return(state)
-      }
-      # A worker-read failure need not make a previously audited transfer history unavailable.
+      shiny::req(active(), login_token(), championship_id(), user_team_id())
+      auth <- login_token()
+      if (!isTRUE(fm_worker_mode(auth[["userid"]]))) return(transfer_history())
       league <- championship_id()
       args <- list(championship_id = league)
-      scope <- resource_context(login_token(), league, user_team_id())
+      scope <- resource_context(auth, league, user_team_id())
       scope <- fm_worker_resolve_context("get_championship_pressroom", args, scope)
+      full <- fm_worker_descriptor("get_championship_pressroom", args, scope)
+      # Read the already decoded history when another page has loaded it.
+      cached <- fm_worker_get(scope$account_id, full$resource_key)
+      if (!is.null(cached) && resource_snapshot_unexpired(cached$data)) return(transfer_history())
+      amounts <- read_transfer_amounts(login = auth, championship_id = league)
+      if (is.data.frame(amounts$data))
+        return(list(data = amounts$data, loading = FALSE, error = NULL))
+      if (identical(amounts$status, "loading")) {
+        if (!is.null(cached)) return(transfer_history())
+        return(list(data = NULL, loading = TRUE, error = NULL))
+      }
+      # Older stored histories may predate the slim projection. Keep the
+      # normal snapshot subscription and recover from the audited baseline.
+      state <- transfer_history()
+      history <- state$data
+      if (is.data.frame(history) && all(c("created", "price") %in% names(history)) &&
+          !"unavailable" %in% c(attr(history, "fetch_status"), attr(history, "worker_completeness")))
+        return(state)
+      if (!all(vapply(scope[c("competition_id", "season", "scoring_version")], fm_context_known, logical(1))))
+        return(state)
       fallback <- read_transfer_baseline(resource = paste0("pressroom_", league), context = scope)
       if (identical(fallback$status, "loading"))
         return(list(data = NULL, loading = TRUE, error = NULL))
