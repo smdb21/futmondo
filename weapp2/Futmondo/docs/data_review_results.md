@@ -6246,3 +6246,46 @@ resolved competition and season context. Those indexed rows cannot certify
 a complete scoped ownership trace for the ten. No additional no-owner cases
 were assigned. This review used sanitized local capture checks and read-only
 metadata and lineup comparisons. The documentation has no runtime effect.
+
+### Round 6 and 8 postponed-match notices · 2026-11-24
+
+Futmondo's round 6 notice identifies the first lock on September 3 at
+21:00 Spain time. Leagues allowing changes had windows on September 15
+from 10:00 to 19:00 and October 21 from 10:00 to 20:00. The original
+starting balance and captain carried forward. The notice scheduled final
+position and Best XI credits for October 22. The reference team's
+saved movements corroborate the three point installments (`6`, `6.1`,
+`6.2`) and one position credit (`6.2`). [Futmondo's round 6 notice](https://magazine.futmondo.com/partido-adelantado-jornada-6-liga-ea-sports-en-futmondo-2/).
+
+For Social leagues with the postponed lineup lock enabled, aligned
+players stay in the original XI even if they change hands. Where changes
+are enabled and Futmondo opens a window, managers choose from their
+squads at reopening. A replacement can only score if his club still has
+its round fixture to play. The scoped `/1/userteam/information` captures
+record `configuration.blc=true` on August 26 and September 14, 16 and
+20, with the same value in the November 24 saved rules. The captures
+bracket the September 15 window. October 21 has no direct setting
+observation. [Futmondo's postponed-match guide](https://help.futmondo.com/article/228-procedimiento-en-partidos-aplazados).
+
+Six one-time `/2/player/matches` reads each returned HTTP 200 and a single
+round 6 fixture matching the saved official calendar. Aramburu and
+Ionuț Radu played in the September 3 Real Sociedad–Celta match. Grimaldo,
+Jonathan David and Le Normand played on September 16 in Atlético–Osasuna.
+Brugué played in the final October 21 match, Levante–Athletic. The published
+lineup rules and award payment dates leave open which dated roster
+determines Best XI and MVP recipients when a player changes hands during
+the round. The six cases remain unresolved. A
+recipient-level award record for a player whose ownership differs between
+the possible cutoffs, or an official clarification, could establish the
+rule. [Futmondo's bonus guide](https://help.futmondo.com/article/142-configura-las-primas-automaticas-en-un-campeonato-social).
+
+Round 8 has nine final fixtures in the saved calendar and one suspended
+fixture, Rayo–Athletic. The reference team's only round 8 credit is for
+points. LaLiga lists the resumption for December 9 at 20:00 Spain time.
+No fixture-specific Futmondo notice was located as of this review. The
+round remains pending for final awards. [LaLiga's round 8 schedule](https://www.laliga.com/laliga-easports/resultados/2026-27/jornada-8).
+
+Verification used scoped read-only database observations, local captures
+and the six player fixture reads with at most two in flight. No historical
+eligibility was assigned. This documentation-only change has no runtime
+impact on requests, storage, calculations or rendering.

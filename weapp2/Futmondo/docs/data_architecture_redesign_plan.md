@@ -2573,3 +2573,9 @@ The approved production evidence is saved and verified. The parser now
 preserves earlier observations in histories containing later loans.
 See [the sweep and verification](data_review_results.md#best-xi-ownership-sweep-and-kubo-evidence--2026-11-24)
 for the remaining evidence and publication checks.
+
+The [postponed-match notice review](data_review_results.md#round-6-and-8-postponed-match-notices--2026-11-24)
+verified the league's recorded September lineup lock, round 6's three
+fixture stages and the round 8 postponement. Establishing the Best XI
+and MVP recipient cutoff after transfers remains open pending direct
+recipient evidence or a rule clarification from Futmondo.
