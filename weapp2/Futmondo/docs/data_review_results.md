@@ -6221,3 +6221,28 @@ ordinary history and 4.41 ms with a loan, over 200 runs of eight transitions
 each. There are no new recurring requests, timers, UI redraws or cache
 bounds. Only loan-containing histories add the flag to durable observations.
 The authorized evidence repair was a single scoped write, with readback.
+
+### Ownership history boundary check · 2026-11-24
+
+Both supplied Kubo responses match the same league, user-team and player
+scope. Their eight `owners` entries are identical and confirm the previously
+saved Market interval through round 9. Neither supplies a history coverage
+boundary. The last transition is the later loan already covered by the parser
+fix. The scoped league's saved rule records assign zero opening players, in
+agreement with the earlier captured opening rosters.
+
+The first listed transition follows kickoff for ten unresolved players.
+Recorded transfers involve five of those players during round 6's award
+window. The saved closed lineups and benches did not supply an earlier
+ownership observation for any of the ten. Starting empty supports tracing
+Market ownership from opening, provided the archive covers all relevant
+ownership-changing events through settlement.
+
+An opening-period official Pressroom capture reached the empty terminal
+page, but its newest event was August 14, before the affected award windows.
+The current database has an exact-scope saved Pressroom baseline. The 1,246
+source-identified rows in the separately queryable transfer index lack
+resolved competition and season context. Those indexed rows cannot certify
+a complete scoped ownership trace for the ten. No additional no-owner cases
+were assigned. This review used sanitized local capture checks and read-only
+metadata and lineup comparisons. The documentation has no runtime effect.
