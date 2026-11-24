@@ -21,7 +21,9 @@ fm_theme_control <- tags$div(class = "fm-theme-control",
         `aria-label` = "Dark", title = "Dark", `aria-pressed` = "false", icon("moon"))))
 
 header <- shinydashboardPlus::dashboardHeader(
-  title = tags$span(class="fm-header-brand",tags$span(class="fm-header-title","LigaRadar"),
+  title = tags$span(class = "fm-header-brand",
+    actionLink("open_welcome", "LigaRadar", class = "fm-header-title",
+      `aria-label` = "LigaRadar — Welcome"),
     uiOutput("notification_bell",inline=TRUE))
 )
 body <- shinydashboard::dashboardBody(

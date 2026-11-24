@@ -5850,6 +5850,12 @@ Chromium at 390 and 1440 px verified that an eligible incoming player appears in
 
 Restoration uses the existing context-scoped database schedule read and transfer observations. It adds no polling, source requests or database writes. The picker and history reader share the projected roster. Excluding arrivals from optimization can still require reading their stored history for the manual picker. Local edits stayed within fixture read/write counts. The scheduling-enabled fixture took 838 ms on mobile and 220 ms on desktop to display the optimized pitch. Hosted deployment and real account behavior were not verified.
 
+## LigaRadar header navigation
+
+Chromium at 390 and 1440 px confirmed that clicking the title or pressing Enter on it opens Welcome while preserving the signed-in session, with no document reload or horizontal overflow. The offline Shiny lifecycle passed 14 checks and eight tabs. The existing Notifications bell was unavailable in this fixture after opening Welcome, with identical output before and after the change.
+
+The new header link sends one Shiny event per activation and uses the existing Welcome tab rendering. It adds no source requests, database operations, cache invalidations, timers or background work. Welcome remains outside the saved-page list. Verification used the local synthetic fixture.
+
 ## Single-player loading animation · 2026-11-23
 
 Local Chromium captures verified the full formation, the isolated player and the head-first release into a moving flock. With 4× CPU throttling, the compact player head radius grew from 4.1 to 22.3 scene units on both 320 and 1440 px viewports. The intermediate frame measured 15.5 and 14.5 units respectively. Stage draw time at the 95th percentile was 4.5 ms and 4.7 ms respectively for the hero and compact loaders combined. During release alone, the corresponding times were 3.2 ms and 3.7 ms. The offline Shiny lifecycle passed 14 checks and eight tabs.

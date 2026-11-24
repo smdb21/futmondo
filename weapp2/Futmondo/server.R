@@ -282,6 +282,7 @@ function(input, output, session) {
       tags$span(class="fm-notification-unread-dot",`aria-hidden`="true")else NULL,
       icon=icon("bell"),class="fm-notification-link",title=label,`aria-label`=label)
   })
+  observeEvent(input$open_welcome, updateTabItems(session, "tabs", "login"))
   observeEvent(input$open_notifications, updateTabItems(session, "tabs", "notifications"))
   refresh_clause_transfers <- function() {
     auth<-isolate(login_token_RV());req(valid_login(auth))
