@@ -1,5 +1,20 @@
 # LigaRadar additions to the official Futmondo workflows
 
+## League transfer activity over time (2026-11-23)
+
+Futmondo documents personal finance movements, including transfers and prizes,
+and player purchase histories with prices and dates. Its public client was
+reviewed on 2026-11-23 and implements both the championship Pressroom and the
+individual team's financial movements. No signed-in official UI was inspected,
+so the current availability of an equivalent league histogram remains unverified.
+[Official rules](https://help.futmondo.com/article/91-reglas-del) ·
+[Official app release notes](https://magazine.futmondo.com/novedades-en-la-nueva-app-de-futmondo/) ·
+[Official public client](https://app.futmondo.com/main.dart.js).
+
+LigaRadar sums each saved league transfer once and displays a histogram by day,
+Monday-start week or calendar month. The Advanced login entry describes this
+league-wide aggregation. [Plots implementation](plots_module.md#money-movements--2026-11-23).
+
 ## Player points on Lineup match cards (2026-11-23)
 
 The official club match cards show both clubs' player scores during and after a
@@ -117,6 +132,7 @@ Futmondo documents configurable borrowing in its maximum bid. LigaRadar’s exis
 | `recent_average` — Player rankings by last-N average | Player averages and a top-five total-points ranking already exist. | Choose 1–20 recent rounds and numerically sort market, squad and all-player tables by that window's average. Table windows and lineup completed-round windows have distinct documented finality contracts. Unknown scores remain unknown; source zero and negative scores count. | `Modules/Players_Table_Module.R`, `factual_helpers.R`; [player tables](players_table_module.md), [score reuse](round_points_matrix.md). |
 | `price_efficiency` — Points per million | Official market/clause prices and player points. | Sort the same recent average divided by market value in Today or clause price in Players, expressed as points per €1M. Missing/nonpositive prices do not produce ratios. | `Modules/Players_Table_Module.R`; [player tables](players_table_module.md#points-to-price-ratios). |
 | `rival_cash` — Reconstructed rival balances | Own financial movements and other teams' squad values. | Reconcile an estimated rival cash balance and running history from opening funds, transfers, configured rewards and available historical eligibility. Estimates, gaps and discrepancies remain labelled. | `Modules/Rivals_Module.R`; [cash accounting](rival_cash_accounting.md), [rivals](rivals_module.md). |
+| `transfer_histogram` — League transfer activity over time | Personal financial movements and dated player transfer history. | Sum recorded transfer amounts across the championship and compare daily, weekly or monthly periods. | [Plots](plots_module.md#money-movements--2026-11-23). |
 | `trading_profit` — Trading profit and wealth comparisons | Player ownership/purchase history and own financial records. | Compare league completed-trade profit and estimated wealth gained; inspect matched purchase/sale cycles and related fees with missing costs kept unavailable. | `Modules/Rivals_Module.R`; [rivals](rivals_module.md#trading-profit-and-overall-wealth-gained--2026-11-06). |
 
 ## Squad/filter follow-up review — 2026-11-14 Pacific

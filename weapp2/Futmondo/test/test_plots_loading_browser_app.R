@@ -19,7 +19,8 @@ fm_worker_rpc <- function(name,payload,owner='') {
  for(key in names(payload$p_versions)) {
   d <- s$descriptors[[key]]$descriptor
   if(is.null(d)) next
-  held <- fixture_held && d$handler=='get_user_team_rounds' && d$args$user_team_id=='t1'
+  held <- fixture_held && (d$handler=='get_championship_pressroom' ||
+    (d$handler=='get_user_team_rounds' && d$args$user_team_id=='t1'))
   jobs[[length(jobs)+1L]] <- list(key=key,pending=held,running=FALSE,error=NULL)
   if(held) next
   version <- as.character(fixture_version)
@@ -33,7 +34,10 @@ fm_worker_rpc <- function(name,payload,owner='') {
     recorded_at=rep(format(as.Date('2026-11-01')+0:13,'%Y-%m-%dT12:00:00Z'),10),team_value=seq_len(140)*1000),
    get_championship_players=data.frame(id=paste0('p',1:60),user_team_id='t1',
     teamId=rep(paste0('club',1:20),each=3),team=rep(paste('Club',1:20),each=3),logo='fixture-crest.png'),
-   get_financial_snapshot=list(configuration=list()),get_championship_pressroom=data.frame(),
+   get_financial_snapshot=list(configuration=list()),get_championship_pressroom=data.frame(
+    id=c('market','rival','locker:clause'),buyer_team_id=c('t1','t2','t1'),seller_team_id=c('','t1','t2'),
+    created=c('2026-01-31T22:00:00Z','2026-01-31T23:00:00Z','2026-02-01T23:00:00Z'),
+    price=c(100,200,300)),
    stop('Unexpected fixture handler: ',d$handler))
   wire <- charToRaw(fm_worker_json(fm_worker_encode(value)))
   compressed <- history_baseline_compress(wire)
@@ -67,13 +71,16 @@ server <- function(input,output,session) {
  read_teams <- factual_read_adapter(session,'get_teams',auth,function()'league',function()'t1')
  teams <- reactive(read_teams(auth(),'league'))
  plots_Server('plots',reactive(TRUE),auth,reactive('league'),reactive('t1'),teams)
+ poll_fixture <- function() {
+  if (s$busy) later::later(poll_fixture, .05) else fm_worker_poll(fixture_auth[['userid']], session$token, TRUE)
+ }
  observeEvent(input$release,{
   fixture_held <<- FALSE
-  fm_worker_poll(fixture_auth[['userid']],session$token,TRUE)
+  poll_fixture()
  })
  observeEvent(input$publish,{
   fixture_version <<- fixture_version+1L
-  fm_worker_poll(fixture_auth[['userid']],session$token,TRUE)
+  poll_fixture()
  })
  output$heartbeat <- renderText(input$pulse %||% 0L)
  output$stats <- renderText({input$pulse;paste(fixture_reads,fixture_source_calls)})

@@ -5859,3 +5859,29 @@ The focused Chromium camera check passed on a desktop hero, fullscreen phone and
 
 The squad summary reuses existing counts and reservations. The change adds scalar arithmetic and skips empty disclosure markup with no additional reads, timers or reactive outputs.
 Offline verification passed on 2026-11-23. Banner finance passed 18 checks and the Shiny lifecycle passed 14 checks plus eight tabs. The unchanged-refresh and active-offer reconciliation suites passed, including scheduled and manual-only cases.
+
+## League transfer activity histogram · 2026-11-23
+
+The focused Plots checks passed with known amounts at local midnight, month and
+Monday boundaries, and across the Madrid daylight-saving change. They cover a
+recorded zero, unknown dates and amounts, true-empty input, and the rendered
+bar values, widths and hover labels. The saved-round loading regression passed. The offline Shiny lifecycle passed 14 checks and eight tabs.
+
+Chromium passed at 390 and 1440 px in light and dark mode with the actual
+worker adapter and snapshot codec. It recovered from a withheld transfer
+snapshot, verified exact totals in all three groupings and detected no extra
+worker database reads on period changes, source HTTP or horizontal overflow.
+
+Cash & transfers and Money movements share one scoped pressroom read. The
+histogram starts from existing worker snapshots and sends grouped bars to the
+browser. Period switches reuse the parsed rows. The chart adds no database
+writes, acquisition jobs or application timers. The existing worker poll and
+cache bounds still apply.
+
+For synthetic histories of 1,000 and 10,000 transfers, median date and amount
+projection took 6.5 and 58.5 ms and retained 16.8 and 157.5 KiB, respectively.
+For 10,000 transfers, grouping took 9 ms daily, 6 ms weekly and 23 ms monthly.
+Plotly object building took 12–13 ms. The resulting 417, 60 and 14 bars used
+about 100, 19 and 6.5 KB of uncompressed widget JSON, respectively. These are
+local measurements, with the weekly view the default. Hosted account data
+and deployment were outside local verification.

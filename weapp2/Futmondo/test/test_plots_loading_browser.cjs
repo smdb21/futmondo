@@ -39,8 +39,27 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
   await page.getByRole('tab',{name:'Squad values',exact:true}).click();
   await page.waitForFunction(()=>document.getElementById('plots-values_plot').data?.length===10);
   timings.push(await heartbeat(2));
-  await page.getByRole('tab',{name:'Standings',exact:true}).click();
+  await page.getByRole('tab',{name:'Money movements',exact:true}).click();
+  await page.getByText('Loading saved transfer history.',{exact:true}).waitFor();
+  timings.push(await heartbeat(3));
   await page.getByRole('button',{name:'Release held history',exact:true}).click();
+  const movementPlot=page.locator('#plots-transfers_plot');
+  const waitForAmounts=async amounts=>page.waitForFunction(amounts=>{
+   const bars=document.getElementById('plots-transfers_plot').data?.[0];
+   return bars?.type==='bar' && JSON.stringify(Array.from(bars.y))===JSON.stringify(amounts);
+  },amounts);
+  await waitForAmounts([300,300]);
+  await page.getByText('Loading saved transfer history.',{exact:true}).waitFor({state:'hidden'});
+  await heartbeat(4);
+  const beforeGrouping=await page.locator('#stats').innerText();
+  for(const [period,amounts] of [['Day',[100,200,300]],['Month',[100,500]],['Week',[300,300]]]){
+   await page.getByRole('radio',{name:period,exact:true}).check();
+   await waitForAmounts(amounts);
+  }
+  await heartbeat(5);
+  assert.equal(await page.locator('#stats').innerText(),beforeGrouping,'Period switches add no worker database reads');
+  assert.equal(await movementPlot.evaluate(el=>el.layout.xaxis.type),'date');
+  await page.getByRole('tab',{name:'Standings',exact:true}).click();
   await page.waitForFunction(()=>document.getElementById('plots-standings_plot').data?.filter(x=>x.y?.some(Number.isFinite)).length===10);
   await page.waitForFunction(()=>![...document.querySelectorAll('.fm-plot-loading')].some(e=>e.getClientRects().length));
   const series=await page.locator('#plots-standings_plot').evaluate(e=>e.data.find(x=>x.name==='Team 1'));
@@ -50,12 +69,12 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
   const before=await page.evaluate(()=>window.plotPublications);assert.ok(before>0,'Chart publication counter is active');
   for(let i=0;i<3;i++){
    await page.getByRole('button',{name:'Publish same saved facts',exact:true}).click();
-   await page.waitForTimeout(350);timings.push(await heartbeat(3+i));
+   await page.waitForTimeout(350);timings.push(await heartbeat(6+i));
   }
   assert.equal(await page.evaluate(()=>window.plotPublications),before,'Unchanged facts must not republish the chart');
   await page.getByRole('tab',{name:'Owned by real team',exact:true}).click();
   await page.waitForFunction(()=>document.querySelectorAll('#plots-owned_club_plot .imagelayer image').length===20);
-  timings.push(await heartbeat(6));
+  timings.push(await heartbeat(9));
   const cdp=await page.context().newCDPSession(page);await cdp.send('Performance.enable');
   const metrics=async()=>Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map(m=>[m.name,m.value]));
   const first=await metrics();await page.waitForTimeout(1200);const last=await metrics();
@@ -64,7 +83,7 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2),false);
   assert.match(await page.locator('#stats').innerText(),/ 0$/,'No source HTTP');
   assert.deepEqual(errors,[]);
-  console.log(`PASS ${width}px ${theme}: partial then complete saved history, status recovery, no unchanged redraws, 20 crests; heartbeats ${timings.join('/')}ms; idle CPU ${((last.TaskDuration-first.TaskDuration)*1000).toFixed(1)}ms`);
+  console.log(`PASS ${width}px ${theme}: partial then complete saved history, status recovery, three transfer groupings, no unchanged redraws, 20 crests; heartbeats ${timings.join('/')}ms; idle CPU ${((last.TaskDuration-first.TaskDuration)*1000).toFixed(1)}ms`);
   await page.screenshot({path:`/tmp/plots-loading-recovery-${width}.png`});await page.close();
  }}finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});

@@ -48,6 +48,53 @@ plots_history <- function(history, metric, title) {
   plot
 }
 
+# Pressroom history already merges clause payments with their eventual delivery.
+plots_transfer_days <- function(history, timezone = fm_display_timezone()) {
+  if (!is.data.frame(history) || !all(c("created", "price") %in% names(history))) return(NULL)
+  # Reuse the vectorized ISO timestamp parser with its legacy-format fallback.
+  dates <- as.Date(player_valuation_time(history$created), tz = timezone)
+  amounts <- suppressWarnings(as.numeric(as.character(history$price)))
+  keep <- is.finite(as.numeric(dates)) & is.finite(amounts)
+  rows <- data.frame(date = dates[keep], amount = amounts[keep])
+  attr(rows, "incomplete") <- any(!keep)
+  rows
+}
+
+plots_transfer_periods <- function(rows, period) {
+  start <- switch(period,
+    day = rows$date,
+    week = rows$date - (as.integer(rows$date) + 3L) %% 7L,
+    month = as.Date(format(rows$date, "%Y-%m-01"))
+  )
+  bars <- rows %>%
+    dplyr::group_by(start = start) %>%
+    dplyr::summarise(amount = sum(amount), transfers = dplyr::n(), .groups = "drop")
+  bars$end <- switch(period,
+    day = bars$start + 1L,
+    week = bars$start + 7L,
+    month = as.Date(format(bars$start + 32L, "%Y-%m-01"))
+  )
+  bars
+}
+
+plots_transfer_chart <- function(bars) {
+  # Civil-date coordinates keep the same buckets in browsers in other timezones.
+  days <- as.numeric(bars$end - bars$start)
+  center <- as.POSIXct(bars$start, tz = "UTC") + days * 43200
+  label <- format(bars$start, "%d %b %Y")
+  multiple_days <- days > 1
+  label[multiple_days] <- paste(label[multiple_days], "–", format(bars$end[multiple_days] - 1L, "%d %b %Y"))
+  amounts <- format(bars$amount, big.mark = ".", decimal.mark = ",", scientific = FALSE, trim = TRUE)
+  plotly::plot_ly(bars) %>%
+    plotly::add_bars(x = format(center, "%Y-%m-%dT%H:%M:%S", tz = "UTC"),
+      y = ~amount, width = days * 86400000 * 0.9, marker = list(color = "#608BC1"),
+      hovertemplate = paste0("<b>", label, "</b><br>", amounts, " EUR<br>",
+        bars$transfers, ifelse(bars$transfers == 1L, " transfer", " transfers"), "<extra></extra>")) %>%
+    fm_plot_layout(xaxis = list(type = "date", nticks = 6),
+      yaxis = list(title = "Transfer value (EUR)", tickmode = "auto", nticks = 6),
+      margin = list(l = 55, r = 15, t = 45, b = 45))
+}
+
 # One cumulative result per observed round; missing coverage stays unknown.
 # Decimal source round numbers are retained as separate, evenly spaced labels.
 plots_round_totals <- function(rows) {
@@ -143,6 +190,12 @@ plots_UI <- function(id) {
       shiny::tabPanel("Standings", shiny::p("Cumulative fantasy-team points after each published round or subround. Repeated daily snapshots are excluded; missing scores remain gaps."), shiny::uiOutput(ns("standings_status")), plotly::plotlyOutput(ns("standings_plot"), height="420px")),
       shiny::tabPanel("Squad values", shiny::p("Saved squad market valuations over time, in euros."), shiny::uiOutput(ns("values_status")), plotly::plotlyOutput(ns("values_plot"), height="420px")),
       shiny::tabPanel("Cash & transfers", shiny::p("Compare transfer-only balance estimates, squad purchase spending or transaction volume for the selected dates. Balance estimates exclude round rewards and other cash adjustments."), shiny::fluidRow(shiny::column(4, shiny::dateRangeInput(ns("cash_dates"),"Date range",format="dd/mm/yyyy")), shiny::column(8, shiny::radioButtons(ns("cash_metric"),"Metric",choices=c("Transfer-only balance estimate"="cash","Squad Purchases"="investment","Transaction Volume"="volume"),inline=FALSE))), shiny::uiOutput(ns("cash_status")), plotly::plotlyOutput(ns("cash_plot"), height="420px")),
+      shiny::tabPanel("Money movements",
+        shiny::p("Total value of league transfers over time. Each player transfer counts once, including market and clause transfers."),
+        shiny::radioButtons(ns("transfer_period"), "Group by",
+          choices = c("Day" = "day", "Week" = "week", "Month" = "month"), selected = "week", inline = TRUE),
+        shiny::uiOutput(ns("transfers_status")),
+        plotly::plotlyOutput(ns("transfers_plot"), height = "420px")),
       shiny::tabPanel("Rank progression", shiny::p("Each fantasy team's rank from cumulative published round points; first place is at the top. The range selects which rounds are displayed."), shiny::sliderInput(ns("rank_range"),"Rounds",min=1,max=38,value=c(1,38),step=0.1), shiny::uiOutput(ns("rank_status")), plotly::plotlyOutput(ns("rank_plot"), height="420px")),
       shiny::tabPanel("Owned by real team", shiny::p("Currently fantasy-owned players, grouped by their real football club."), shiny::uiOutput(ns("owned_club_status")), plotly::plotlyOutput(ns("owned_club_plot"), height="520px"))
     ))
@@ -157,11 +210,46 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
     standings_plot <- shiny::reactive({ plots_round_chart(round_totals(), "points") })
     values_plot <- shiny::reactive({ plots_history(history(),"team_value","Squad valuation (EUR)") })
     shiny::observe({ h<-history(); if(is.data.frame(h)&&nrow(h)&&"recorded_at"%in%names(h)) { d<-as.Date(fm_time(h$recorded_at),tz=fm_display_timezone()); d<-d[!is.na(d)]; if(length(d)) shiny::updateDateRangeInput(session,"cash_dates",start=min(d),end=max(d),min=min(d),max=max(d)) } })
+    transfer_history <- shiny::reactive({
+      shiny::req(active(), login_token(), championship_id(), user_team_id())
+      classification_read_state(function() {
+        get_championship_pressroom(login = login_token(), championship_id = championship_id())
+      })
+    })
+    transfer_days <- shiny::reactive(plots_transfer_days(transfer_history()$data))
+    output$transfers_status <- shiny::renderUI({
+      shiny::req(input$plot_tab == "Money movements")
+      state <- transfer_history()
+      if (state$loading) return(shiny::div(class = "fm-plot-loading", role = "status", "Loading saved transfer history."))
+      if (!is.null(state$error)) return(fm_info(resource_failure_message(state$error), error = TRUE, inline = TRUE))
+      history <- state$data
+      status <- attr(history, "fetch_status")
+      completeness <- attr(history, "worker_completeness")
+      rows <- transfer_days()
+      if (is.null(rows) || "unavailable" %in% c(status, completeness))
+        return(fm_info("Saved transfer history is unavailable.", error = TRUE, inline = TRUE))
+      incomplete <- "partial" %in% c(status, completeness) || isTRUE(attr(rows, "incomplete"))
+      shiny::tagList(
+        if ("stale" %in% status) fm_info("Showing the last saved transfer history.", error = TRUE, inline = TRUE),
+        if (incomplete)
+          fm_info("Saved transfer history is incomplete. Totals use the available dates and amounts.", error = TRUE, inline = TRUE),
+        if (!nrow(rows) && !incomplete && !"stale" %in% status)
+          fm_info("No transfers recorded for this league.", inline = TRUE)
+      )
+    })
+    output$transfers_plot <- plotly::renderPlotly({
+      shiny::req(input$plot_tab == "Money movements", input$transfer_period %in% c("day", "week", "month"))
+      rows <- transfer_days()
+      history <- transfer_history()$data
+      shiny::req(!is.null(rows), nrow(rows) > 0L,
+        !"unavailable" %in% c(attr(history, "fetch_status"), attr(history, "worker_completeness")))
+      plots_transfer_chart(plots_transfer_periods(rows, input$transfer_period))
+    })
     cash_plot <- shiny::reactive({
       shiny::req(active(),login_token(),championship_id(),user_team_id(),user_teams_RV()); if(is.function(refresh_trigger)) refresh_trigger()
       teams<-user_teams_RV(); snap<-tryCatch(get_financial_snapshot(login_token(),championship_id(),user_team_id()),error=function(e)NULL)
       initial<-normalize_league_rules(list(configuration=if(is.list(snap))snap$configuration else list()))$initial_budget
-      press<-tryCatch(get_championship_pressroom(login_token(),championship_id()),error=function(e)data.frame())
+      press<-transfer_history()$data
       if(!is.data.frame(press)||!nrow(press)) return(plots_empty("Observed transfer data unavailable"))
       dates<-input$cash_dates; if(is.null(dates)||length(dates)!=2) return(plots_empty("Choose a date range", error=FALSE))
       d<-rivals_buying_power_values(press,teams,metric=input$cash_metric %||% "cash",start_date=fm_local_midnight(dates[1]),end_date=fm_local_midnight(dates[2]+1)-0.000001,initial_budget=initial)

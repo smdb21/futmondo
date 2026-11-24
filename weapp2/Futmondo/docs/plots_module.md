@@ -1,6 +1,6 @@
 # Plots Module
 
-`plots_UI(id)` and `plots_Server(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger = NULL)` provide the top-level **Plots** page. It presents one full-width, phone-friendly chart at a time: league standings, squad values, cash and transfers, rank progression, and real-team ownership. Chart controls belong to their chart tab and do not alter Classification-table filters.
+`plots_UI(id)` and `plots_Server(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger = NULL)` provide the top-level **Plots** page. It presents one full-width, phone-friendly chart at a time: league standings, squad values, cash and transfers, money movements, rank progression, and real-team ownership. Chart controls belong to their chart tab and do not alter Classification-table filters.
 
 `plots_owned_by_real_team(players)` is a pure helper returning `real_team_id`, `real_team`, and `owned_players`. It counts each immutable player ID once only when both a current fantasy owner ID and a real-team ID/name are present. Free agents and rows with unverifiable club data are excluded. Rows are ordered by descending count then club name.
 
@@ -131,3 +131,42 @@ actual rendered tick/grid counts, label separation and opacity on phone/desktop
 in both themes. The R regression checks that points layouts have no `dtick`
 key while rank layouts retain integer steps. This fixes chart rendering and
 reduces browser work without adding API/DB operations or timers.
+
+
+## Money movements · 2026-11-23
+
+The Money movements tab sums league transfer prices in EUR. It counts each
+saved transfer once, including trades between managers, market transactions
+with a blank counterparty, and clause payments merged with their eventual
+delivery by the existing pressroom parser. The chart covers transfer prices.
+Opening funds, rewards and other finance adjustments are outside that metric.
+
+Cash & transfers and Money movements share a reactive
+`get_championship_pressroom(login, championship_id)` read. In deployed worker
+mode the existing adapter reuses the scoped session result or reads the
+persisted worker snapshot. The saved observation retains its account and
+championship scope, source timestamps, freshness and completeness. The new
+chart adds no acquisition handler, storage schema, timer or API call.
+
+`plots_transfer_days(history, timezone)` projects `created` to the account's
+calendar date and validates the recorded `price`. `plots_transfer_periods(rows,
+period)` groups the projected facts by day, Monday–Sunday week (default), or
+calendar month. It returns inclusive start and exclusive end dates, the sum of
+amounts, and the number of transfers. `plots_transfer_chart(bars)` uses one bar
+per observed bucket on a date axis, retaining the elapsed spacing between
+buckets. Tooltips give the calendar interval, total EUR and transfer count.
+Pending, unavailable, incomplete, stale and confirmed-empty snapshots have
+visible states. A missing date or amount leaves the affected row out and marks
+the displayed totals incomplete.
+
+The source adapter's verified route is
+`POST https://api.futmondo.com/1/locker/pressroom`. The authenticated envelope
+carries `header.token` and `header.userid` with
+`query = {championshipId, from}`. The route takes the fantasy championship ID.
+The parser projects `answer.news[]` from `_id`, `created` and `price` and
+reconciles clause events through the established Locker merge. The current
+[official client bundle](https://app.futmondo.com/main.dart.js) was inspected
+on 2026-11-23 (SHA-256
+`08202076259d1678c7557478771d3aa38b5099f42044630569c704fdb7a7cd1c`) and confirms
+the route and pagination arguments. Browser checks use synthetic saved rows
+and the production snapshot codec. See [official comparison](feature_comparison.md#league-transfer-activity-over-time-2026-11-23).

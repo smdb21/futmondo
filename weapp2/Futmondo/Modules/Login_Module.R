@@ -31,6 +31,8 @@ login_feature_tiers <- function() {
           description = "Inspect estimated rival cash and its running ledger of opening funds, transfers and configured rewards, with missing evidence identified."),
         list(id = "scheduled_clauses", title = "Scheduled clause purchases",
           description = "Authorize a capped purchase attempt at a rival player's published clause opening, with pending-offer reservations, cancellation and saved execution outcomes. Success is not guaranteed."),
+        list(id = "transfer_histogram", title = "League transfer activity over time",
+          description = "See how much money moved through league transfers by day, week or month."),
         list(id = "trading_profit", title = "Trading profit and wealth comparisons",
           description = "Compare league trading profit and estimated wealth gained, and inspect matched player purchases, sales and related fees.")
       ))

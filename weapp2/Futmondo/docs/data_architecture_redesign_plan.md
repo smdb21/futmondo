@@ -2490,3 +2490,10 @@ Implemented locally: the queue describes each full lineup submission by its sche
 The camera now completes a wide 180-degree orbit above the two teams before a 3.35-second approach to the midfielder. Implemented locally.
 
 The account summary displays remaining purchase capacity from the existing squad ledger and hides the empty scheduled purchase disclosure.
+
+## League transfer activity histogram · 2026-11-23
+
+Implemented locally in Plots. Day, week and month groupings share the existing
+durable championship Pressroom read with Cash & transfers. Calendar boundaries,
+amount totals and local grouping were verified against offline fixtures.
+Verification against the hosted release is pending.

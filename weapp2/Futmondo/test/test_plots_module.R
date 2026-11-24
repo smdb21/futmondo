@@ -13,9 +13,9 @@ check('owned real-team aggregation is descending with stable name tie-break', {
   d <- plots_owned_by_real_team(p)
   stopifnot(identical(d$real_team, c('Alpha','Beta')), identical(d$owned_players, c(2L,1L)))
 })
-check('plots UI exposes five factual chart tabs', {
+check('plots UI exposes six factual chart tabs', {
   html <- as.character(plots_UI('plots'))
-  for (id in c('standings_plot','values_plot','cash_plot','rank_plot','owned_club_plot')) stopifnot(grepl(id, html, fixed=TRUE))
+  for (id in c('standings_plot','values_plot','cash_plot','transfers_plot','rank_plot','owned_club_plot')) stopifnot(grepl(id, html, fixed=TRUE))
 })
 check('round totals preserve subrounds, revisions, negative and missing points', {
   rows <- data.frame(team_id=c(rep('a',5),rep('b',3)), team_name=c(rep('Alpha',5),rep('Beta',3)),
@@ -62,5 +62,35 @@ check('points axes omit empty dtick while rank axes keep integer positions', {
     points$x$layout$yaxis$tickmode=='auto',points$x$layout$yaxis$nticks==6,
     ranks$x$layout$yaxis$dtick==1,ranks$x$layout$yaxis$autorange=='reversed',
     max(points$x$data[[1]]$y)>1000)
+})
+check('transfer histogram groups exact amounts in the display timezone across calendar boundaries', {
+  history <- data.frame(
+    created = c('2026-01-31T22:59:00Z', '2026-01-31T23:00:00Z', '2026-02-01T22:58:00Z',
+      '2026-02-01T23:00:00Z', '2026-03-01T23:00:00Z', '2026-03-29T00:59:00Z',
+      '2026-03-29T01:00:00Z', 'bad-date', '2026-04-01T10:00:00Z'),
+    price = c(100, 200, 300, 400, 0, 5, 6, 20, NA_real_)
+  )
+  rows <- plots_transfer_days(history, 'Europe/Madrid')
+  day <- plots_transfer_periods(rows, 'day')
+  week <- plots_transfer_periods(rows, 'week')
+  month <- plots_transfer_periods(rows, 'month')
+  stopifnot(isTRUE(attr(rows, 'incomplete')), nrow(rows) == 7L,
+    identical(as.character(day$start), c('2026-01-31','2026-02-01','2026-02-02','2026-03-02','2026-03-29')),
+    identical(day$amount, c(100,500,400,0,11)),
+    identical(as.character(week$start), c('2026-01-26','2026-02-02','2026-03-02','2026-03-23')),
+    identical(week$amount, c(600,400,0,11)),
+    identical(as.character(month$end), c('2026-02-01','2026-03-01','2026-04-01')),
+    identical(month$amount, c(100,900,11)), identical(month$transfers, c(1L,3L,3L)),
+    nrow(plots_transfer_periods(rows[FALSE, ], 'month')) == 0L,
+    !isTRUE(attr(plots_transfer_days(history[FALSE, ]), 'incomplete')),
+    is.null(plots_transfer_days(data.frame(id = 'malformed')))
+  )
+  utc <- plots_transfer_periods(plots_transfer_days(history, 'UTC'), 'month')
+  stopifnot(identical(utc$amount, c(300,700,11)))
+  chart <- plotly::plotly_build(plots_transfer_chart(month))
+  trace <- chart$x$data[[1]]
+  stopifnot(identical(trace$type, 'bar'), identical(as.numeric(trace$y), c(100,900,11)),
+    identical(as.numeric(trace$width), c(31,28,31) * 86400000 * 0.9), chart$x$layout$xaxis$type == 'date',
+    grepl('28 Feb 2026.*900 EUR.*3 transfers', trace$hovertemplate[2]))
 })
 cat('Plots module:', checks, 'checks passed.\n')
