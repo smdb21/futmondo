@@ -6355,3 +6355,31 @@ The audit made seven sequential source reads and one scoped batch write.
 Existing evidence reuse supplies the two small records on the next
 calculation. There is no new runtime endpoint, recurring request, redraw
 or cache requirement.
+
+### Field participation for Best XI and MVP · 2026-11-24
+
+The account holder confirmed that the award player must have taken the
+field. Based on the final `/1/userteam/roundlineup` field, which includes
+incoming substitutes, all five recorded combined or Best XI credits in
+rounds 1–13 match the reference team's observed award tariffs. Round 6
+has nine corroborated participants, nine final lineups and zero Brugué
+field appearances. Each of the other fifteen formerly outstanding Best
+XI selections in rounds 5, 6, 7 and 9 likewise had zero field appearances
+in nine saved final lineups for its round. These checks use the
+league-confirmed rule. Futmondo's public bonus guide gives no specific
+field condition for other leagues. [Futmondo bonus guide](https://help.futmondo.com/article/142-configura-las-primas-automaticas-en-un-campeonato-social).
+
+One scoped write saved the policy and Brugué's no-recipient fact
+through the normalized finance writer. Independent production readback
+found both and no contradictory verified recipient. The ledger now
+calculates remaining field-based eligibility from the existing final
+lineups. The hosted calculation and signed-in display after the code
+update remain unverified. See [the accounting contract](rival_cash_accounting.md#league-confirmed-field-eligibility--2026-11-24).
+
+The focused Classification and ownership regressions, database-backed
+Classification suite and offline Shiny lifecycle passed. Cold historical
+preparation for thirteen rounds and nine teams averaged about 0.43 s
+with either path. The calculation adds no source or database reads,
+redraws or timers. It reuses the existing lineup storage and skips
+award ownership reads for the confirmed league. Adding the scoped
+policy changes the existing calculation input hash.

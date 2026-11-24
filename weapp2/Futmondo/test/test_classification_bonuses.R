@@ -114,3 +114,53 @@ local({
   stopifnot(all(is.na(project(build_confirmed(c(decoded,list(conflicting))))$best_xi_bonus)))
   cat('PASS explicit unowned confirmations persist and close XI coverage; absent, foreign or conflicting evidence stays unknown\n')
 })
+
+# A league with confirmed field eligibility uses the finalized field, which
+# already contains incoming substitutes, and treats unused bench players as absent.
+local({
+  directory<-data.frame(teamid=c('a','b'),teamname=c('A','B'))
+  scores<-data.frame(team_id=directory$teamid,team_name=directory$teamname,round=1,points=5)
+  histories<-lapply(directory$teamid,function(id)e('team_rounds',id,
+    list(team_id=id,rounds=list(list(id='r1',number=1,points=5,status='closed',negative=FALSE)))))
+  filler<-paste0('unused',seq_len(9))
+  selections<-data.frame(round_id='r1',player_id=c('mvp','bench',filler),is_mvp=c(TRUE,rep(FALSE,10)),is_finished=TRUE)
+  unowned<-data.frame(round_id='r1',player_id=filler,team_id='',eligible=FALSE,verified=TRUE)
+  lineup<-function(id,field,bench=list(),status='closed')e('round_lineup',paste0(id,':r1'),list(
+    team_id=id,round_id='r1',status=status,negative=FALSE,players=as.list(field),bench=bench))
+  policy<-e('eligibility','award-recipient-policy:field',
+    list(kind='award_recipient_policy',require_field=TRUE,verified=TRUE))
+  policy<-rival_evidence_decode(jsonlite::fromJSON(jsonlite::toJSON(list(policy),auto_unbox=TRUE)))[[1]]
+  from_roster<-e('eligibility','owned',list(round_id='r1',player_id='bench',team_id='b',eligible=TRUE,verified=TRUE))
+  reserve_b<-lineup('b','other',list('bench'))
+  on_field_a<-lineup('a','mvp')
+  run<-function(records,cache=NULL){
+    dataset<-build_rival_cash_dataset(directory,cid,c(histories,records),selections,rules=rules,
+      eligibility=unowned,account_id='u',cache=cache)
+    classification_bonus_table(classification_window_table(scores),scores,dataset,c(1,1))
+  }
+  complete<-run(list(policy,on_field_a,reserve_b,from_roster))
+  stopifnot(identical(complete$best_xi_bonus,c(5,0)),identical(complete$mvp_bonus,c(10,0)))
+  for(unavailable in list(NULL,lineup('b','other',list('bench'),status='running'),
+                            lineup('b',c('other','other'),list('bench')))){
+    partial<-run(c(list(policy,on_field_a,from_roster),if(!is.null(unavailable))list(unavailable)))
+    stopifnot(all(is.na(partial$best_xi_bonus)),identical(partial$mvp_bonus,c(10,0)))
+  }
+  entered<-run(list(policy,on_field_a,lineup('b','bench',list('other')),from_roster))
+  stopifnot(identical(entered$best_xi_bonus,c(5,5)),identical(entered$mvp_bonus,c(10,0)))
+  benched_mvp<-run(list(policy,lineup('a','other-a',list('mvp')),reserve_b))
+  stopifnot(identical(benched_mvp$best_xi_bonus,c(0,0)),identical(benched_mvp$mvp_bonus,c(0,0)))
+  duplicate<-run(list(policy,on_field_a,lineup('b','mvp')))
+  stopifnot(all(is.na(duplicate$mvp_bonus)),all(is.na(duplicate$best_xi_bonus)))
+  for(field in c('account_id','championship_id','competition_id','season')){
+    foreign<-policy;foreign[[field]]<-'another'
+    legacy<-run(list(foreign,on_field_a,reserve_b,from_roster))
+    stopifnot(identical(legacy$best_xi_bonus,c(5,5)))
+  }
+  cache<-rival_calculation_cache()
+  legacy_records<-list(on_field_a,reserve_b,from_roster)
+  old_totals<-run(legacy_records,cache)
+  changed_totals<-run(c(list(policy),legacy_records),cache)
+  stopifnot(identical(old_totals$best_xi_bonus,c(5,5)),identical(changed_totals,complete),
+    identical(run(c(list(policy),legacy_records),cache),complete),cache$preparations==2L)
+  cat('PASS scoped field bonuses, substitutes, missing and conflicting lineups, scope isolation and saved policy invalidation\n')
+})

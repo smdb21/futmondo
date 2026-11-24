@@ -433,3 +433,32 @@ selection, actual dates, matching Market transfer and absence of conflicting
 ownership before appending the one confirmed fact. The official loans guide
 describes temporary player assignments and their separate pressroom entries.
 [Futmondo loans guide](https://help.futmondo.com/article/240-cesiones).
+
+## League-confirmed field eligibility · 2026-11-24
+
+Best XI and MVP use the completed fantasy field when the scoped finance
+evidence includes the verified `award-recipient-policy:field` policy.
+Its `award_recipient_policy` payload sets `require_field=true` and is stored
+for the specific account, championship, competition and season. The
+account holder confirmed the rule for this league, and every recorded own-team XI/MVP
+credit in rounds 1–13 reproduced from the saved fields and configured
+tariffs. Futmondo's public bonus guide describes squad membership
+generally and leaves the field requirement unspecified.
+[Futmondo bonus guide](https://help.futmondo.com/article/142-configura-las-primas-automaticas-en-un-campeonato-social).
+
+The official `/1/userteam/roundlineup` response puts incoming substitutes
+in `players`. That final field supplies positive award participation.
+Unused reserves and substituted-out players remain in `bench.players`.
+The shared ledger takes absence as no recipient only when the
+finished round has a complete participant set and final field evidence
+or known negative-start ineligibility for each team. A known field
+appearance with unknown starting-cash eligibility remains unresolved.
+The normal round signatures, settlement gates and recorded cash retain
+their existing precedence. Verified no-recipient facts can still resolve
+individual cases, including Brugué's verified absence from all nine
+round 6 fields. [Historical lineup source contract](lineup_module.md).
+
+The policy is reused with existing finance evidence and invalidates the
+affected calculation through its input hash. Ownership acquisition for
+award attribution is skipped under this rule. The storage format and
+normal historical lineup acquisition are shared with other leagues.

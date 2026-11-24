@@ -52,6 +52,13 @@ rival_evidence_rows <- function(evidence,type) {
     identical(x$evidence_type,"eligibility")&&is.list(x$payload)&&identical(x$payload$kind,type)
     else identical(x$evidence_type,type),evidence)
 }
+rival_award_field_only <- function(evidence) {
+  any(vapply(rival_evidence_rows(evidence,"eligibility"),function(row){
+    p<-row$payload
+    identical(row$source_id,"award-recipient-policy:field")&&is.list(p)&&
+      identical(p$kind,"award_recipient_policy")&&identical(p$require_field,TRUE)&&isTRUE(p$verified)
+  },logical(1)))
+}
 rival_evidence_decode <- function(rows) {
   if(!is.data.frame(rows)||!nrow(rows))return(list())
   # jsonlite simplifies heterogeneous JSON objects to nested data frames. A
@@ -472,7 +479,11 @@ rival_award_estimates <- function(official,team_id,rules,eligibility=data.frame(
     evidence<-if(is.data.frame(eligibility)&&all(c("round_id","player_id","team_id","eligible","verified")%in%names(eligibility)))
       unique(eligibility[eligibility$round_id%in%e$round_id & eligibility$player_id%in%e$player_id & eligibility$verified%in%TRUE,c("team_id","eligible"),drop=FALSE])else data.frame()
     if(nrow(evidence)>1L){missing<-c(missing,paste("Conflicting historical ownership/eligibility for round",e$round_id,"player",e$player_id,"; reward excluded."));next}
-    if(nrow(evidence)!=1L||!is.finite(amount)){missing<-c(missing,paste("Round",e$round_id,"player",e$player_id,": historical ownership (including roster-only recipients), eligibility or reward rule unavailable."));next}
+    if(nrow(evidence)!=1L||!is.finite(amount)){
+      required<-if(isTRUE(rules$award_field_only))"final lineup participation"else"historical ownership (including roster-only recipients)"
+      missing<-c(missing,paste("Round",e$round_id,"player",e$player_id,":",required,"eligibility or reward rule unavailable."))
+      next
+    }
     if(!isTRUE(evidence$eligible)||!identical(as.character(evidence$team_id),as.character(team_id)))next
     e$amount<-amount;e$reason<-if(isTRUE(rule$historical))"Historical rule; payment not observed."else"Assumes current rule; payment not observed."
     out[[length(out)+1L]]<-e
@@ -756,6 +767,22 @@ rival_ranking_round_complete <- function(rows,team_ids) {
   nrow(rows)==length(team_ids)&&setequal(rows$team_id,as.character(team_ids))&&all(is.finite(rows$points))&&
     all(vapply(seq_len(nrow(rows)),function(i)round_is_finished(as.list(rows[i,,drop=FALSE])),logical(1)))
 }
+rival_field_award_eligibility <- function(eligibility,field_lineups,standings,rounds,official) {
+  if(!is.data.frame(official)||!all(c("round_id","player_id","is_finished")%in%names(official)))return(eligibility[FALSE,])
+  round_key<-function(rows)paste(rows$round_id,rows$team_id,sep="|")
+  field_or_ineligible<-c(field_lineups,round_key(rounds[rounds$negative%in%TRUE,,drop=FALSE]))
+  participants<-round_key(standings)
+  covered<-vapply(split(participants,standings$round_id),function(keys)all(keys%in%field_or_ineligible),logical(1))
+  award_key<-function(rows)paste(rows$round_id,rows$player_id,sep="|")
+  ranked<-eligibility$round_id%in%standings$round_id
+  possible<-eligibility[(!ranked|round_key(eligibility)%in%participants)&(!eligibility$verified|eligibility$eligible),,drop=FALSE]
+  uncertain<-award_key(possible[!possible$verified,,drop=FALSE])
+  assigned<-possible[possible$verified&!award_key(possible)%in%uncertain,,drop=FALSE]
+  absent<-unique(official[official$is_finished%in%TRUE&official$round_id%in%names(covered)[covered]&
+    !award_key(official)%in%award_key(possible),c("round_id","player_id"),drop=FALSE])
+  dplyr::bind_rows(assigned,transform(absent,team_id=rep("",nrow(absent)),
+    eligible=rep(FALSE,nrow(absent)),verified=rep(TRUE,nrow(absent))))
+}
 # One preparation pass per publication, shared by all team calculations.
 rival_historical_components <- function(evidence,teams,rules,official) {
   source<-rival_saved_rounds(evidence,include_ranking=FALSE)
@@ -863,6 +890,8 @@ rival_historical_components <- function(evidence,teams,rules,official) {
   if(!nrow(rounds)&&(!is.finite(fm_number(rules$ranking_pool))||fm_number(rules$ranking_pool)!=0))
     for(id in as.character(teams$teamid))add_missing(id,"Historical per-round standings are unavailable for ranking rewards.")
   eligibility<-data.frame(round_id=character(),player_id=character(),team_id=character(),eligible=logical(),verified=logical(),stringsAsFactors=FALSE)
+  field_only<-isTRUE(rules$award_field_only)
+  field_lineups<-character()
   for(record in rival_evidence_rows(evidence,"round_lineup")){
     p<-record$payload;if(!is.list(p))next
     r<-rounds[rounds$team_id%in%mvp_text(p$team_id)&rounds$round_id%in%mvp_text(p$round_id),,drop=FALSE]
@@ -872,11 +901,17 @@ rival_historical_components <- function(evidence,teams,rules,official) {
     if(nzchar(mvp_text(p$signature))&&!identical(mvp_text(p$signature),mvp_text(expected))){
       add_missing(p$team_id,"A changed round is waiting for its historical lineup to refresh.");next
     }
-    players<-unique(as.character(unlist(c(p$players,p$bench),use.names=FALSE)))
+    players<-as.character(unlist(if(field_only)p$players else c(p$players,p$bench),use.names=FALSE))
     if(!length(players))next
+    flag<-rival_flag(p$negative)
+    if(field_only){
+      if(nrow(r)!=1L||!round_is_finished(p)||length(players)>11L||anyNA(players)||any(!nzchar(players))||anyDuplicated(players))next
+      field_lineups<-c(field_lineups,paste(p$round_id,p$team_id,sep="|"))
+    }
+    cash_known<-!is.na(flag)||!is.na(r$negative[1])
     eligibility<-dplyr::bind_rows(eligibility,data.frame(round_id=p$round_id,player_id=players,team_id=p$team_id,
-      eligible=!isTRUE(p$negative)&&!isTRUE(r$negative[1]),verified=TRUE))
-    if(is.na(rival_flag(p$negative))&&is.na(r$negative[1]))add_missing(p$team_id,"Award rewards assume eligible starting cash where the historical flag is absent.")
+      eligible=!isTRUE(if(field_only)flag else p$negative)&&!isTRUE(r$negative[1]),verified=!field_only||cash_known))
+    if(!field_only&&!cash_known)add_missing(p$team_id,"Award rewards assume eligible starting cash where the historical flag is absent.")
   }
   # Closed team histories permit candidate calculations for old award snapshots.
   # In reference mode, final-settlement evidence below gates their paid cash;
@@ -888,6 +923,7 @@ rival_historical_components <- function(evidence,teams,rules,official) {
   },unique(all_rounds$round_id))
   if(is.data.frame(official)&&nrow(official)&&"is_finished"%in%names(official))
     official$is_finished[is.na(official$is_finished)&official$round_id%in%completed]<-TRUE
+  if(field_only)eligibility<-rival_field_award_eligibility(eligibility,field_lineups,standings,rounds,official)
   list(income=income,eligibility=unique(eligibility),official=official,missing=missing,rounds=rounds,standings=standings)
 }
 
@@ -1139,6 +1175,7 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
   if(!nzchar(mvp_text(account_id)))stop("An explicit account is required for rival finance evidence.")
   stable_competition<-league_stable_competition(championship_id,account_id)
   evidence<-Filter(function(x)identical(mvp_text(x$championship_id),as.character(championship_id))&&identical(fm_scalar(x$competition_id,"unknown"),stable_competition)&&identical(mvp_text(x$season,"unknown"),as.character(season))&&(is.null(account_id)||identical(mvp_text(x$account_id),as.character(account_id))),Filter(function(x)!rival_snapshot_record(x),rival_merge_evidence(list(),evidence)))
+  rules$award_field_only<-if(rival_award_field_only(evidence))TRUE else NULL
   scope_frame<-function(rows){
     if(!is.data.frame(rows))return(data.frame())
     expected<-list(championship_id=championship_id,season=season,account_id=account_id)
@@ -1160,7 +1197,10 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
     if(!is.list(p)||!isTRUE(p$verified)||!all(c("round_id","player_id","team_id","eligible")%in%names(p)))return(NULL)
     data.frame(round_id=mvp_text(p$round_id),player_id=mvp_text(p$player_id),team_id=mvp_text(p$team_id),eligible=isTRUE(p$eligible),verified=TRUE)
   }))
-  eligibility<-dplyr::bind_rows(eligibility,history$eligibility,stored_eligibility)
+  ownership_facts<-dplyr::bind_rows(eligibility,stored_eligibility)
+  if(isTRUE(rules$award_field_only)&&nrow(ownership_facts))
+    ownership_facts<-ownership_facts[ownership_facts$team_id%in%""&ownership_facts$eligible%in%FALSE,,drop=FALSE]
+  eligibility<-dplyr::bind_rows(history$eligibility,ownership_facts)
   if(all(c("round_id","player_id","team_id","eligible","verified")%in%names(eligibility)))
     eligibility<-unique(eligibility[,c("round_id","player_id","team_id","eligible","verified"),drop=FALSE])
   raw_rounds<-rival_saved_rounds(evidence)
@@ -1168,10 +1208,12 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
     if(all(c("round_id","round_number")%in%names(official)))official[,c("round_id","round_number"),drop=FALSE]else data.frame()))
   all_movements<-dplyr::bind_rows(lapply(unique(vapply(rival_evidence_rows(evidence,"movements"),function(x)mvp_text(x$payload$team_id),character(1))),function(id)
     rival_normalize_movements(rival_cash_latest_movements(evidence,id),catalog)))
-  ownership<-rival_ownership_eligibility(evidence,teams,official,history$rounds,catalog,all_movements)
-  eligibility<-unique(dplyr::bind_rows(eligibility,ownership))
-  for(id in unique(ownership$team_id[nzchar(ownership$team_id)]))history$missing[[id]]<-unique(c(history$missing[[id]],
-    "Award ownership reconstructed from an unchanged player-summary owner throughout the official round-start to recorded final-settlement interval; historical reward-rule assumptions remain."))
+  if(!isTRUE(rules$award_field_only)){
+    ownership<-rival_ownership_eligibility(evidence,teams,official,history$rounds,catalog,all_movements)
+    eligibility<-unique(dplyr::bind_rows(eligibility,ownership))
+    for(id in unique(ownership$team_id[nzchar(ownership$team_id)]))history$missing[[id]]<-unique(c(history$missing[[id]],
+      "Award ownership reconstructed from an unchanged player-summary owner throughout the official round-start to recorded final-settlement interval; historical reward-rule assumptions remain."))
+  }
   publications<-rival_round_publication_dates(evidence,catalog)
   anchors<-rival_payment_anchors(all_movements)
   reference_payments<-rival_reference_payments(all_movements,reference_team_id)
@@ -1915,6 +1957,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
   enqueue_ownership<-function(){
     # Finish ordinary source reads first so an in-flight lineup is not a gap.
     if(!state$seed_ready||length(state$pending_team_ids)||state$busy>0L||length(state$queue))return(invisible(NULL))
+    if(rival_award_field_only(state$evidence))return(invisible(NULL))
     awards<-state$awards$rows
     if(!is.data.frame(awards)||!nrow(awards)||!all(c("player_id","round_id","is_finished")%in%names(awards)))return(invisible(NULL))
     awards<-awards[awards$is_finished%in%TRUE,,drop=FALSE]

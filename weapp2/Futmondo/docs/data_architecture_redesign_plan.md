@@ -2589,3 +2589,9 @@ The [round 4 Market ownership audit](data_review_results.md#manu-sánchez-and-oc
 reached the official transfer archive's terminal page and verified both
 players' first Market purchases after settlement. Both scoped facts were
 saved and read back. The updated signed-in calculation remains to be verified.
+
+The [field-eligibility review](data_review_results.md#field-participation-for-best-xi-and-mvp--2026-11-24)
+verified the scoped policy and Brugué's absence from every final field.
+All fifteen other flagged award players were absent from their rounds'
+saved fields. The shared ledger uses final lineups for the confirmed
+league. Hosted recalculation remains to be verified.
