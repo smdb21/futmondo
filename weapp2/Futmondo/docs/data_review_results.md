@@ -5842,3 +5842,7 @@ Restoration uses the existing context-scoped database schedule read and transfer
 Local Chromium captures verified the full formation, the isolated player and the head-first release into a moving flock. With 4× CPU throttling, the compact player head radius grew from 4.1 to 22.3 scene units on both 320 and 1440 px viewports. The intermediate frame measured 15.5 and 14.5 units respectively. Stage draw time at the 95th percentile was 4.5 ms and 4.7 ms respectively for the hero and compact loaders combined. During release alone, the corresponding times were 3.2 ms and 3.7 ms. The offline Shiny lifecycle passed 14 checks and eight tabs.
 
 The renderer reuses the existing 180 or 320 particles and the shared 30 FPS clock. It skips particle drawing during the solid-formation hold and skips the other 21 figures once the camera settles. The animation runs entirely on the client. Verification used local Chromium emulation.
+
+## Queued lineup wording · 2026-11-23
+
+Chromium scheduling tests at 390 and 1440 px verified a single full-lineup message with the approved submission time and timezone, including the two-signing fixture and schedule replacement. The status renderer now reads the time directly from the persisted stage, eliminating roster and transfer name lookups and their reactive invalidations. Submission, ownership checks, database work and polling cadence are unchanged. Verification used offline fixtures.

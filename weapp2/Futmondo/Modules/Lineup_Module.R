@@ -777,7 +777,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
     schedule_active<-function(job) isTRUE(job$state%in%c('queued','preparing','dispatched','uncertain'))
     schedule_status_code<-function(code){
       labels<-c(kickoff='Round started before the remaining stages could be saved.',
-        waiting_for_ownership='Waiting for Futmondo to show the signing in your squad.',
+        waiting_for_ownership='Waiting for Futmondo to confirm that all selected players are in your squad.',
         source_unavailable='Waiting for Futmondo to verify lineup eligibility.',
         lineup_changed='The official lineup changed. Remaining stages were cancelled.',
         round_changed='The round schedule changed. Remaining stages were cancelled.',
@@ -819,19 +819,19 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       if(is.null(job))return(NULL)
       ctx<-lineup_schedule_scope(context())
       if(!all(vapply(names(ctx),function(field)identical(job$context[[field]],ctx[[field]]),logical(1))))return(NULL)
-      names_by_id<-setNames(roster()$name,roster()$id)
-      incoming<-transfers()$records
-      if(is.data.frame(incoming)&&nrow(incoming))names_by_id<-c(names_by_id,setNames(incoming$player_name,incoming$player_id))
+      multiple<-length(job$stages)>1L
+      row<-if(multiple)shiny::tags$li else shiny::div
+      submissions<-lapply(seq_along(job$stages),function(i){
+        stage<-job$stages[[i]]
+        timing<-if(is.null(stage$due_at)||!nzchar(stage$player_id))'Full lineup scheduled for immediate submission.'
+          else paste0('Full lineup scheduled for ',incoming_clause_time(stage$due_at),'.')
+        outcome<-if(i<=length(job$outcomes))job$outcomes[[i]]$code else
+          if(!schedule_active(job)||i==job$stage_index+1L)job$state else 'pending'
+        row(class='fm-lineup-submission',timing,if(multiple||!identical(outcome,job$state))paste('·',outcome))
+      })
       shiny::div(class='fm-lineup-note',shiny::strong(paste('Scheduled lineup ·',job$state)),
         if(!is.null(schedule_status_code(job$code)))shiny::div(schedule_status_code(job$code)),
-        shiny::tags$ol(lapply(seq_along(job$stages),function(i){
-          stage<-job$stages[[i]]
-          name<-if(!nzchar(stage$player_id))'Immediate lineup'else paste(fm_scalar(names_by_id[stage$player_id],stage$player_id),
-            '·',incoming_clause_time(stage$due_at))
-          outcome<-if(i<=length(job$outcomes))job$outcomes[[i]]$code else
-            if(!schedule_active(job))job$state else if(i==job$stage_index+1L)job$state else 'pending'
-          shiny::tags$li(paste(name,'·',outcome))
-        })),
+        if(multiple)shiny::tags$ol(submissions)else submissions,
         if(isTRUE(job$state%in%c('queued','preparing')))
           shiny::actionButton(session$ns('cancel_plan'),'Cancel scheduled saves',disabled=schedule_busy()))
     })

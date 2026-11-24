@@ -38,7 +38,7 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
         await save.click();
         await page.getByText('Saved to LigaRadar and verified.').waitFor();
         assert.equal(await page.locator('.fm-lineup-player.fm-lineup-incoming').count(), 0);
-        assert.equal(await page.locator('#lineup-schedule_status li').count(), 0);
+        assert.equal(await page.locator('#lineup-schedule_status .fm-lineup-submission').count(), 0);
         assert.equal((await readCounts())[1], counts[1] + 1);
         console.log(`PASS ${width}px: all-owned optimized lineup saves immediately`);
         await page.close();
@@ -58,7 +58,7 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
       const save = page.getByRole('button', {name: 'Save to LigaRadar'});
       assert.ok(await originalSave.evaluate(node => node === document.querySelector('#lineup-save')),
         'Optimizing preserves the visible Save button');
-      const schedule = page.locator('#lineup-schedule_status li');
+      const schedule = page.locator('#lineup-schedule_status .fm-lineup-submission');
       const coverage = process.env.FUTMONDO_EDITOR_COVERAGE_FIXTURE === 'true';
       const latest = coverage ? page.locator('.fm-lineup-player[data-player-id="p27"]') : signing;
       const openConfirmation = async () => {
@@ -97,6 +97,10 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
       await openConfirmation();
       await confirm.click();
       await page.getByText('Scheduled lineup · queued').waitFor();
+      const due = (await latest.locator('.fm-lineup-incoming-label').innerText()).replace('Incoming · ', '');
+      const queuedMessage = `Full lineup scheduled for ${due}.`;
+      assert.equal(await schedule.count(), 1);
+      assert.equal(await schedule.innerText(), queuedMessage);
       await editBench();
       if (coverage) {
         await page.getByLabel('Require full outfield bench coverage').check();
@@ -108,7 +112,7 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
         await confirm.click();
         await page.getByRole('button', {name: 'Cancel schedule and replace'}).click();
         await page.getByText('Lineup scheduled.', {exact: true}).waitFor();
-        assert.match(await schedule.first().innerText(), /Incoming Forward/);
+        assert.equal(await schedule.innerText(), queuedMessage);
         assert.deepEqual(await readCounts(), counts);
         assert.deepEqual(errors, []);
         console.log(`PASS ${width}px: dated confirmation and schedule replacement`);
