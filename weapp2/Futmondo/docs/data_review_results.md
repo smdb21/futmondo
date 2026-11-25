@@ -6514,6 +6514,25 @@ groups, three deployment checks and the module checksum. The offline Shiny
 lifecycle passed 14 checks and eight tabs with zero live HTTP or database
 mutation attempts. It selects each plot's subtab before checking its output.
 
+## Compact clause transfer groups in My Team
+
+The Incoming and Leaving panels each use one heading per populated timing
+group. Focused fixtures passed 25 incoming, 24 outgoing, and nine departure
+highlight checks. They cover kickoff boundaries, missing schedules and dates,
+and retained transfer and source details. The offline lifecycle passed 14
+checks and eight tabs. Chromium at 320, 360, 390, and 1440 px verified group
+order and membership, player links, keyboard access to timing details, and
+page width. The fixture recorded zero source or database calls.
+
+Grouping is a linear pass over the published transfer rows during panel
+rendering. It reuses the current transfer and round data, resource
+subscriptions, and cache and invalidation paths. The renderer introduces no
+blocking work, timers, acquisition or persistence. With four synthetic
+transfers in each panel and disclosures closed, the before-and-after Chromium
+fixture measured combined panel heights of 1233 and 1061 px at 320 px, 1140 and
+920 px at 390 px, and 424 and 342 px at 1440 px. The shared headings and group
+wrappers added four DOM elements overall. Hosted rendering remains unverified.
+
 ## Compact received-offer rows — 2026-11-25
 
 My Team uses borderless player buttons with a keyboard focus outline and

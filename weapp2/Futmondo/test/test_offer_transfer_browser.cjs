@@ -81,13 +81,24 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
    assert.equal(await table.locator('club').count(),0);
    assert.ok(!(await page.locator('#offers').innerText()).includes('could not be verified'));
    for(const id of ['incoming','outgoing']){
-    const row=page.locator(`#${id} .fm-incoming-round-line`);assert.equal(await row.locator('.fm-info').count(),1);
-    const label=await row.locator('.fm-incoming-round').boundingBox();const trigger=row.locator('.fm-info > summary');const icon=await trigger.boundingBox();
-    assert.ok(icon.x>=label.x+label.width-1,`${width}px ${id}: icon must sit to the label's right`);
-    assert.ok(Math.abs((icon.y+icon.height/2)-(label.y+label.height/2))<3,`${width}px ${id}: icon must share the line`);
+    const panel=page.locator(`#${id}`);
+    const groups=panel.locator('.fm-transfer-group');
+    assert.deepEqual(await groups.getByRole('heading').allTextContents(),['Before round starts','At round start','After round starts']);
+    const suffix=id==='incoming'?'in':'out';
+    for(const [index,players] of [[0,[suffix,`second-${suffix}`]],[1,[`kickoff-${suffix}`]],[2,[`late-${suffix}`]]]){
+     assert.deepEqual(await groups.nth(index).getByRole('link').evaluateAll(links=>links.map(link=>link.id)),players.map(player=>`${id}_open_${player}`));
+    }
+    const row=groups.first().locator('.fm-incoming-player').first();
+    assert.equal(await row.locator('.fm-info').count(),1);
+    const time=row.locator('.fm-transfer-time > strong');
+    assert.match(await time.innerText(),/^(Joins|Leaves): .* (CET|CEST)$/);
+    const timeBox=await time.boundingBox();
+    const trigger=row.locator('.fm-info > summary');const icon=await trigger.boundingBox();
+    assert.ok(icon.x>=timeBox.x+timeBox.width-1,`${width}px ${id}: icon must sit to the right of the transfer time`);
+    assert.ok(Math.abs((icon.y+icon.height/2)-(timeBox.y+timeBox.height/2))<3,`${width}px ${id}: icon must share the line`);
     await trigger.click();assert.equal(await row.locator('.fm-info').getAttribute('open'),'');
     await row.getByText(/Observed:/).waitFor({state:'visible'});
-    const after=await trigger.boundingBox();assert.ok(Math.abs(after.y-icon.y)<2,'expanded info must keep icon beside label');
+    const after=await trigger.boundingBox();assert.ok(Math.abs(after.y-icon.y)<2,'expanded info must keep the icon beside the transfer time');
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2),false);
     await trigger.press('Enter');assert.equal(await row.locator('.fm-info').getAttribute('open'),null);
    }

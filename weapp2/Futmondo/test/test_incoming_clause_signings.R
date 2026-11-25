@@ -71,6 +71,21 @@ check('safe UI text, abbreviated position, authoritative arrival and separate ro
  stopifnot(grepl('Incoming players (1)',html,fixed=TRUE),grepl('&lt;script&gt;',html,fixed=TRUE),
  !grepl('<script>unsafe',html,fixed=TRUE),grepl('MID',html,fixed=TRUE),grepl('20/09/2026 00:00 CEST',html,fixed=TRUE))
 })
+check('unverified transfers stay visible with their timing details',{
+ rows<-result$incoming_records[c(1,1),,drop=FALSE]
+ rows$player_id[2]<-'unknown'
+ rows$joins_at[2]<-NA
+ rows$timing_error[2]<-'Saved arrival details are incomplete.'
+ state<-list(status='partial',records=rows,error=NULL)
+ next_round<-list(available=TRUE,round_number=12,starts_at=rows$joins_at[1]+1)
+ html<-as.character(incoming_clause_panel(state,next_round,identity))
+ stopifnot(grepl('<h4>Before round starts</h4>',html,fixed=TRUE),grepl('<h4>Timing unverified</h4>',html,fixed=TRUE),
+  grepl('incoming_open_unknown',html,fixed=TRUE),grepl('Arrival time could not be verified',html,fixed=TRUE),
+  grepl('Saved arrival details are incomplete.',html,fixed=TRUE))
+ html<-as.character(incoming_clause_panel(state,list(available=FALSE),identity))
+ stopifnot(!grepl('<h4>',html,fixed=TRUE),grepl('Next round schedule is loading or could not be verified.',html,fixed=TRUE),
+  grepl('20/09/2026 00:00 CEST',html,fixed=TRUE),grepl('incoming_open_unknown',html,fixed=TRUE))
+})
 check('incoming card uses authoritative rival ownership and pending clause instead of profile remnants',{
  card_summary<-summary();card_summary$data$userteamId<-'mine';card_summary$data$owner_team_id<-'mine';card_summary$data$clause_transferred<-FALSE
  card<-incoming_clause_card_snapshot(result$incoming_records,card_summary)

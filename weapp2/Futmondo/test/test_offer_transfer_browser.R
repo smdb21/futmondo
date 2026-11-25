@@ -22,11 +22,22 @@ attr(roster,'received_offers')<-rbind(
   normalize_received_offer(list(id='system-bid',price=25271066),'q'),
   normalize_received_offer(list(id='unknown-profit',price=11e6),'r'))
 
+round_context<-list(available=TRUE,round_number=13,starts_at=now+172800)
+arrivals<-record[rep(1L,4L),,drop=FALSE]
+arrivals$player_id<-c('in','kickoff-in','late-in','second-in')
+arrivals$player_name<-c('Incoming player','Kickoff arrival','Late arrival','Second arrival')
+arrivals$joins_at<-round_context$starts_at+c(-86400,0,3600,-82800)
+departures<-out[rep(1L,4L),,drop=FALSE]
+departures$player_id<-c('out','kickoff-out','late-out','second-out')
+departures$player_name<-c('Leaving player','Kickoff departure','Late departure','Second departure')
+departures$leaves_at<-round_context$starts_at+c(-129600,0,3600,-126000)
+
 ui<-shiny::fluidPage(shiny::tags$head(shiny::tags$style(shiny::HTML(fm_theme_css())),
  shiny::includeCSS('www/custom_style.css'),shiny::includeScript('www/info-disclosures.js')),
  shiny::selectInput('tabs','Page',c('My Team'='yourteam','Market'='today','All Players'='players_in_championship')),
- shiny::uiOutput('worker_status'),players_in_teams_UI('styles'),shiny::div(id='incoming',incoming_clause_panel(list(status='observed',records=record,observations_only=TRUE),list(available=TRUE,round_number=13,starts_at=now+172800),identity)),
- shiny::div(id='outgoing',outgoing_clause_panel(list(status='observed',records=out,observations_only=TRUE),list(available=TRUE,round_number=13,starts_at=now+172800),identity)),
+ shiny::uiOutput('worker_status'),players_in_teams_UI('styles'),shiny::div(class='fm-team-panels',
+  shiny::div(id='incoming',incoming_clause_panel(list(status='observed',records=arrivals,observations_only=TRUE),round_context,identity)),
+  shiny::div(id='outgoing',outgoing_clause_panel(list(status='observed',records=departures,observations_only=TRUE),round_context,identity))),
  shiny::uiOutput('offers'),shiny::textOutput('opened_offer'),shiny::actionButton('advance','Advance observed clock'),shiny::actionButton('heartbeat','Heartbeat'),shiny::textOutput('beats'),shiny::textOutput('calls'))
 server<-function(input,output,session){
  state<-shiny::reactiveVal(resource_state(roster))
