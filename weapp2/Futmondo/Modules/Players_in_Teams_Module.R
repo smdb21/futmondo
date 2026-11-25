@@ -1,7 +1,7 @@
 library(reactable)
 players_in_teams_UI <- function(id) {
   ns <- NS(id)
-  tagList(tags$style(HTML(".fm-team-panels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-bottom:20px}.fm-team-panels>div{min-width:0}.fm-team-panels .fm-incoming-panel{height:100%;margin-bottom:0}.fm-offer-source{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--fm-border,#315540);border-radius:6px;padding:3px 7px;overflow-wrap:anywhere}.fm-offer-rival{color:var(--fm-warning,#f0c75e);border-color:currentColor;font-weight:600}.fm-team-offer{display:flex;flex-direction:column;gap:7px;padding:12px 0;border-top:1px solid var(--fm-border,#315540)}.fm-team-offer-heading{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}.fm-team-offer-heading>*{min-width:0;overflow-wrap:anywhere}.fm-offer-group-heading{font-size:inherit;margin:12px 0 8px}.fm-system-offers .fm-team-offer{padding:8px 0}.fm-system-offers .fm-team-offer-heading{align-items:center;min-height:28px}@media(max-width:767px){.fm-team-panels{grid-template-columns:minmax(0,1fr);gap:12px}}.fm-incoming-panel{border:1px solid var(--fm-border,#315540);border-radius:8px;padding:16px;margin-bottom:20px}.fm-incoming-panel h3{margin-top:0}.fm-incoming-player{display:flex;gap:16px;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid var(--fm-border,#315540)}.fm-incoming-identity{display:flex;gap:10px;align-items:center;flex-wrap:wrap;min-width:0}.fm-incoming-identity a{overflow-wrap:anywhere}.fm-incoming-arrival{display:flex;flex-direction:column;gap:4px;text-align:right;min-width:0}.fm-incoming-round{font-weight:600}.fm-incoming-round-line{display:grid;grid-template-columns:minmax(0,max-content)28px;gap:4px 6px;align-items:center;justify-content:end;text-align:left}.fm-incoming-round-line>.fm-info{display:contents}.fm-incoming-round-line>.fm-info>summary{grid-column:2;grid-row:1}.fm-incoming-round-line>.fm-info>.fm-info-body{grid-column:1/-1;grid-row:2}.fm-incoming-schedule{color:var(--fm-muted)}.fm-incoming-error{color:var(--fm-warning,#f0c75e);overflow-wrap:anywhere}@media(max-width:600px){.fm-incoming-player{display:flex;flex-direction:column;align-items:stretch;gap:8px}.fm-incoming-arrival{text-align:left}.fm-incoming-round-line{justify-content:start}.fm-incoming-panel{padding:12px}}")),
+  tagList(tags$style(HTML(".fm-team-panels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-bottom:20px}.fm-team-panels>div{min-width:0}.fm-team-panels .fm-incoming-panel{height:100%;margin-bottom:0}.fm-offer-rival{color:var(--fm-warning,#f0c75e);font-weight:600}@media(max-width:767px){.fm-team-panels{grid-template-columns:minmax(0,1fr);gap:12px}}.fm-incoming-panel{border:1px solid var(--fm-border,#315540);border-radius:8px;padding:16px;margin-bottom:20px}.fm-incoming-panel h3{margin-top:0}.fm-incoming-player{display:flex;gap:16px;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid var(--fm-border,#315540)}.fm-incoming-identity{display:flex;gap:10px;align-items:center;flex-wrap:wrap;min-width:0}.fm-incoming-identity a{overflow-wrap:anywhere}.fm-incoming-arrival{display:flex;flex-direction:column;gap:4px;text-align:right;min-width:0}.fm-incoming-round{font-weight:600}.fm-incoming-round-line{display:grid;grid-template-columns:minmax(0,max-content)28px;gap:4px 6px;align-items:center;justify-content:end;text-align:left}.fm-incoming-round-line>.fm-info{display:contents}.fm-incoming-round-line>.fm-info>summary{grid-column:2;grid-row:1}.fm-incoming-round-line>.fm-info>.fm-info-body{grid-column:1/-1;grid-row:2}.fm-incoming-schedule{color:var(--fm-muted)}.fm-incoming-error{color:var(--fm-warning,#f0c75e);overflow-wrap:anywhere}@media(max-width:600px){.fm-incoming-player{display:flex;flex-direction:column;align-items:stretch;gap:8px}.fm-incoming-arrival{text-align:left}.fm-incoming-round-line{justify-content:start}.fm-incoming-panel{padding:12px}}")),
     tags$div(class="fm-team-panels",uiOutput(ns("incoming_players")),uiOutput(ns("outgoing_players")),
       uiOutput(ns("nonfit_players"), class="fm-squad-status-output"),
       tags$div(style="grid-column:1/-1",uiOutput(ns("received_offers")))),
@@ -38,10 +38,12 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
     shiny::outputOptions(output,"received_offers_source_time",suspendWhenHidden=FALSE)
     offers_panel_display <- resource_display_source(session,function(){
       req(is_module_active())
-      team_received_offers_panel(offers_state(),session$ns,
-        source_note=textOutput(session$ns("received_offers_source_time"),inline=TRUE))
+      state <- offers_state()
+      state$observed_at <- NULL
+      state
     })
-    output$received_offers <- renderUI(offers_panel_display())
+    output$received_offers <- renderUI(team_received_offers_panel(offers_panel_display(), session$ns,
+      source_note=textOutput(session$ns("received_offers_source_time"), inline=TRUE)))
 
     ns <- session$ns
     get_reactive_val <- function(x) if (is.function(x)) x() else x
@@ -393,7 +395,11 @@ team_received_offers_state <- function(roster_state) {
     index<-match(rows$id,as.character(roster$id))
     rows$player_name<-if("name"%in%names(roster))as.character(roster$name[index])else rows$id
     missing<-is.na(rows$player_name)|!nzchar(rows$player_name);rows$player_name[missing]<-rows$id[missing]
-    rows$acquisition_cost<-vapply(index,function(i)current_player_acquisition_cost(roster[i,,drop=FALSE],NULL,NULL),numeric(1))
+    rows$player_club <- if ("team" %in% names(roster)) as.character(roster$team[index]) else rep("", nrow(rows))
+    rows$player_logo <- if ("logo" %in% names(roster)) as.character(roster$logo[index]) else rep("", nrow(rows))
+    players <- unique(index)
+    costs <- vapply(players, function(i) current_player_acquisition_cost(roster[i,,drop=FALSE], NULL, NULL), numeric(1))
+    rows$acquisition_cost <- costs[match(index, players)]
   }else {
     rows$player_name<-character(nrow(rows))
     rows$acquisition_cost<-rep(NA_real_,nrow(rows))
@@ -416,20 +422,49 @@ team_received_offers_state <- function(roster_state) {
   list(records=rows,status=status,error=error,observed_at=stamp,observations_only=observations_only)
 }
 
+team_received_offers_table <- function(rows, ns) {
+  rows <- rows[order(rows$bid_source %in% "system"), , drop=FALSE]
+  bidder <- ifelse(rows$bid_source == "system", "LigaRadar system",
+    ifelse(rows$bid_source == "rival", paste0("Rival · ", rows$bid_user), "Unknown bidder"))
+  offers <- data.frame(player=lineup_player_label(rows$player_name), offer=rows$bid_price,
+    profit=sale_profit_amount(rows$bid_price, rows$acquisition_cost), bidder=bidder)
+  amounts <- format_table_currency(offers$offer)
+  amounts[is.na(offers$offer)] <- "—"
+  icons <- lapply(c(rival="user", system="robot", unknown="circle-question"), shiny::icon)
+  reactable::reactable(offers, elementId=ns("received_offers_table"), class="fm-received-offers-table",
+    compact=TRUE, striped=TRUE, highlight=TRUE, showSortable=TRUE,
+    defaultColDef=reactable::colDef(minWidth=64, vAlign="center", sortNALast=TRUE, na="—"),
+    columns=list(
+      player=reactable::colDef(name="Player", minWidth=76, rowHeader=TRUE, cell=function(value, index) {
+        row <- rows[index, , drop=FALSE]
+        club <- fm_scalar(row$player_club, "")
+        logo <- fm_scalar(row$player_logo, "")
+        if (!nzchar(logo)) logo <- get_team_image_name(club)
+        crest <- lineup_fixture_crest_url(logo)
+        # Send the exact offer event even after Reactable sorts or paginates the cells.
+        label <- if (nzchar(row$bid_id)) shiny::tags$button(type="button", class="btn btn-link",
+          title=row$player_name, `aria-label`=row$player_name,
+          onclick=paste0("Shiny.setInputValue(", jsonlite::toJSON(ns(team_received_offer_input(row)), auto_unbox=TRUE),
+            ",true,{priority:'event'});"), value) else shiny::tags$span(title=row$player_name, value)
+        shiny::tags$span(class="fm-offer-player",
+          if (nzchar(crest)) shiny::tags$img(class="fm-team-crest", src=crest, alt=club,
+            title=club, width=20, height=20, loading="lazy", decoding="async", onerror="this.style.display='none';"),
+          label)
+      }),
+      offer=reactable::colDef(name="Offer", align="right", defaultSortOrder="desc",
+        cell=function(value, index) amounts[index]),
+      profit=reactable::colDef(name="Profit", align="right", defaultSortOrder="desc", cell=format_table_sale_profit),
+      bidder=reactable::colDef(name="From", minWidth=72, cell=function(value, index) {
+        source <- rows$bid_source[index]
+        shiny::tags$span(class=if (source == "rival") "fm-offer-rival",
+          icons[[source]], " ", value)
+      })))
+}
+
 team_received_offers_panel <- function(state,ns,source_note=NULL) {
   rows<-state$records;verified<-state$status%in%c("ok","empty")
   observed<-identical(state$status,"observed")&&isTRUE(state$observations_only)
   rival_count<-sum(rows$bid_source%in%"rival")
-  system_rows<-rows$bid_source%in%"system"
-  render_offer<-function(i) {
-    row<-rows[i,,drop=FALSE];rival<-identical(row$bid_source,"rival")
-    amount<-if(is.finite(row$bid_price))format_table_sale_price(row$bid_price,row$acquisition_cost)else "Amount unavailable"
-    shiny::tags$div(class="fm-team-offer",
-      shiny::tags$div(class="fm-team-offer-heading",if(nzchar(row$bid_id))shiny::actionLink(ns(team_received_offer_input(row)),row$player_name)else shiny::tags$span(row$player_name),shiny::tags$strong(amount)),
-      if(!system_rows[i])shiny::tags$div(shiny::tags$span(class=paste("fm-offer-source",if(rival)"fm-offer-rival"else ""),
-        shiny::icon(if(rival)"user"else "circle-question"),
-        if(rival)paste0("Rival · ",row$bid_user)else "Unknown bidder")))
-  }
   shiny::tags$section(class="fm-incoming-panel fm-offers-panel",`aria-labelledby`=ns("offers_heading"),
     shiny::tags$h3(id=ns("offers_heading"),if(verified)paste0("Offers for your players (",nrow(rows),")")else if(observed)paste0("Offers for your players (",nrow(rows)," observed)")else "Offers for your players"),
     if(rival_count)shiny::tags$p(class="fm-offer-rival",shiny::icon("user"),paste0(" ",rival_count," rival offer",if(rival_count==1L)""else "s")),
@@ -440,11 +475,7 @@ team_received_offers_panel <- function(state,ns,source_note=NULL) {
       if(!is.null(state$error))resource_failure_message(state$error)else "Refresh to retry."),
     if(verified&&!nrow(rows))shiny::tags$p("No offers for your players."),
     if(observed&&!nrow(rows))shiny::tags$p("No offers observed."),
-    lapply(which(!system_rows),render_offer),
-    if(any(system_rows))shiny::tags$section(class="fm-system-offers",`aria-labelledby`=ns("offers_system_heading"),
-      shiny::tags$h4(id=ns("offers_system_heading"),class="fm-offer-group-heading",
-        shiny::tags$span(class="fm-offer-source",shiny::icon("robot"),"LigaRadar system")),
-      lapply(which(system_rows),render_offer)))
+    if (nrow(rows)) team_received_offers_table(rows, ns))
 }
 
 bulk_market_listing_plan <- function(roster, mode = c("value", "closed_clause"), clause_premium_pct = 5,

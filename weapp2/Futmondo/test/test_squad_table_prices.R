@@ -38,12 +38,18 @@ offers<-dplyr::bind_rows(normalize_received_offer(list(id='profit',price=12e6),'
   normalize_received_offer(list(id='unknown',price=12e6),'r'),
   normalize_received_offer(list(id='old-context',price=12e6),'outside'))
 attr(roster,'received_offers')<-offers
-check('received-offer panel joins each current roster cost by player ID',{
+check('received offers keep sortable numeric prices and profit joined to the current roster cost',{
   state<-team_received_offers_state(resource_state(roster))
   html<-team_received_offers_panel(state,identity)
-  stopifnot(nrow(state$records)==3L,has(html,'(+2.50 M€)'),has(html,'(-0.25 M€)'),
-    has(html,'(P/L unavailable)'),!any(state$records$id=='outside'),
-    identical(state$records$acquisition_cost,c(9.5e6,12.25e6,NA_real_)))
+  widget<-team_received_offers_table(state$records,identity)$x$tag$attribs
+  data<-jsonlite::fromJSON(widget$data)
+  profit<-widget$columns[[3]]
+  stopifnot(nrow(state$records)==3L,has(html,'+2.50 M€'),has(html,'-0.25 M€'),
+    !has(html,'(+2.50 M€)'),!any(state$records$id=='outside'),
+    identical(state$records$acquisition_cost,c(9.5e6,12.25e6,NA_real_)),
+    identical(as.numeric(data$offer), rep(12e6,3)),
+    identical(as.numeric(data$profit), c(2.5e6,-0.25e6,NA_real_)),
+    identical(profit$name,'Profit'),identical(profit$type,'numeric'),isTRUE(profit$sortNALast))
 })
 check('renewal flag helper preserves explicit settings and primary precedence',{
   for(value in list(TRUE,'true','TRUE'))stopifnot(players_table_renewal_disabled(list(info=list(configuration=list(ddt=value)))))

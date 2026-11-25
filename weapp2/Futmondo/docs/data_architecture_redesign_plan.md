@@ -1549,6 +1549,10 @@ Implemented locally: share the existing scoped clause-transfer source across My 
 The existing database snapshots, original observation/completeness metadata and bounded queue remain the source of reusable transfer evidence. No new service, schema, dependency or timer. Focused offline, lifecycle and browser verification and performance limits are recorded in `data_review_results.md`; local verification does not claim authenticated hosted acceptance.
 
 
+### November 24: sortable received offers
+
+My Team displays received bids in one sortable table with numeric Offer and Profit columns, club crests and the same compact player names as Lineup. Each name opens its bid. The table uses existing roster observations and keeps the source clock independent of rendering. [Display contract](squad_table_prices.md) and [verification](data_review_results.md).
+
 ### November 14: compact system offers
 
 - Implemented and verified locally: My Team groups system offers under one **Futmondo system** heading with compact rows. Rival/unknown offers retain individual source labels above the system group; every bid, amount, gain/loss, exact-offer link and source-status message is preserved.

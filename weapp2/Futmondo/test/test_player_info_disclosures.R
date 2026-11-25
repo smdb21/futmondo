@@ -17,8 +17,10 @@ check('offer failure details are collapsed and red while amounts and exact offer
   row$player_name<-'Player';row$acquisition_cost<-100000
   panel<-team_received_offers_panel(list(status='partial',records=row,error='Synthetic source failure'),identity)
   html<-as.character(panel);visible<-visible_text(panel)
+  table<-team_received_offers_table(row,identity)$x$tag$attribs
   stopifnot(grepl('fm-info-error',html,fixed=TRUE),grepl('Data unavailable (FM-',html,fixed=TRUE),
-    !grepl('Synthetic source failure|verified|Refresh',visible),grepl('123.456',visible,fixed=TRUE),
+    !grepl('Synthetic source failure|verified|Refresh',visible),
+    grepl('123.456',table$columns[[2]]$cell[[1]],fixed=TRUE),
     grepl(team_received_offer_input(row),html,fixed=TRUE),!grepl('<details[^>]* open',html))
 })
 check('transfer panels omit the shared roster note while preserving schedule and empty-list facts',{

@@ -806,22 +806,31 @@ reorder_player_table_columns <- function(df) {
   return(res)
 }
 
+sale_profit_amount <- function(amount, cost) {
+  profit <- amount - cost
+  valid <- is.finite(amount) & amount > 0 & is.finite(cost) & cost >= 0
+  profit[!valid] <- NA_real_
+  profit
+}
+
+format_table_sale_profit <- function(profit) {
+  if (!is.finite(profit)) return("P/L unavailable")
+  millions <- round(profit / 1e6, 2)
+  if (millions == 0) millions <- 0
+  paste0(if (millions > 0) "+" else "", sprintf("%.2f", millions), " M\u20ac")
+}
+
 # Asking prices/offers stay numeric; this formatter adds a display-only P/L.
 format_table_sale_price <- function(value, acquisition_cost, multiline = FALSE) {
   amount <- suppressWarnings(as.numeric(as.character(value)))
   cost <- suppressWarnings(as.numeric(as.character(acquisition_cost)))
-  if(length(amount)!=1L || !is.finite(amount) || amount<=0)return("")
+  if (length(amount) != 1L || !is.finite(amount) || amount <= 0) return("")
   price <- format_table_currency(amount)
-  profit <- if(length(cost)!=1L || !is.finite(cost) || cost<0) {
-    "(P/L unavailable)"
-  } else {
-    millions <- round((amount-cost)/1e6,2)
-    if(millions==0)millions<-0
-    paste0("(",if(millions>0)"+"else"",sprintf("%.2f",millions)," M\u20ac)")
-  }
-  if(isTRUE(multiline))return(shiny::tags$span(class="fm-sale-price",
-    shiny::tags$span(price),shiny::tags$span(profit)))
-  paste(price,profit)
+  profit <- if (length(cost) == 1L) sale_profit_amount(amount, cost) else NA_real_
+  profit_label <- paste0("(", format_table_sale_profit(profit), ")")
+  if (isTRUE(multiline)) return(shiny::tags$span(class="fm-sale-price",
+    shiny::tags$span(price),shiny::tags$span(profit_label)))
+  paste(price, profit_label)
 }
 
 player_status_icon <- function(status, class = "fm-player-status", show_unconfirmed = TRUE) {

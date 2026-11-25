@@ -60,12 +60,13 @@ check('Selling by is one sortable numeric asking price, distinct from Offer',{
     is.null(get_reactable_columns_for_players(roster)$selling_by))
 })
 state<-team_received_offers_state(resource_state(roster))
-check('panel includes lower rival bids and explicit icons/text with escaped source labels',{
+check('table includes lower rival bids, explicit sources and compact names with full labels',{
   html<-as.character(team_received_offers_panel(state,identity))
   stopifnot(grepl('Offers for your players (3)',html,fixed=TRUE),grepl('2 rival offers',html,fixed=TRUE),
-    grepl('LigaRadar system',html,fixed=TRUE),grepl('Rival · Rival &lt;club&gt;',html,fixed=TRUE),
+    grepl('LigaRadar system',html,fixed=TRUE),grepl('Rival · Rival <club>',html,fixed=TRUE),
     grepl('fa-user',html,fixed=TRUE),grepl('fa-robot',html,fixed=TRUE),
-    grepl('Player &lt;one&gt;',html,fixed=TRUE),grepl('300',html,fixed=TRUE),grepl('400',html,fixed=TRUE))
+    grepl('P.<one>',html,fixed=TRUE),grepl('Player <one>',html,fixed=TRUE),
+    grepl('300',html,fixed=TRUE),grepl('400',html,fixed=TRUE))
 })
 check('empty loading unavailable stale and partial states do not claim verified zero offers',{
   empty<-received_offers_empty();empty$player_name<-character()

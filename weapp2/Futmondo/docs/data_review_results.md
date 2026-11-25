@@ -6401,3 +6401,31 @@ state and coach request budget. The status render follows Lineup visibility,
 with the existing responsive layout and page information panel. API and
 database request volume, snapshot reuse and invalidation, timers, and server
 memory are unaffected by the move. The checks used offline fixtures.
+
+## Sortable received offers — 2026-11-24
+
+The existing My Team offer panel now shows sortable player, amount, profit and
+bidder columns. Profit uses the same recorded roster acquisition cost as the
+squad table. The browser sorts by unrounded euro values and places unavailable
+values last. Player cells use the Lineup label and existing roster club
+metadata. Each button still sends the exact bid identity, including after a
+sort. The existing saved-observation status and clock remain in the panel.
+
+The 24-offer rendering fixture had a median server render time of 78 ms, up
+from 48.5 ms, across 20 local renders of each version. Markup grew from 9.6 to
+24.9 KiB with the widget and crest definitions. Reactable paginates the visible
+rows and sorts in the browser. Ten timestamp-only publications produced zero
+offer-panel renders and zero acquisition or persistence attempts. The table
+shares the existing roster read, which used three cold source reads, zero
+additional panel reads and zero warm reads. The added browser images use the
+existing crest source with lazy loading. The change adds no timers, database
+work or cache invalidation.
+
+Offline Chromium passed at 320, 390 and 1440 px. It verified numeric sorting
+in both directions, exact selection after sorting, compact names, crests,
+literal bidder text, no page overflow and retained sorting after the source
+clock advanced. Heartbeats took 59–61 ms, with zero source or database calls.
+The received-offer, squad-price, disclosure and observation suites passed.
+The full offline lifecycle passed 14 checks plus eight tabs. Deployment
+checks and the three updated file hashes passed. These checks used synthetic
+offers and crests.
