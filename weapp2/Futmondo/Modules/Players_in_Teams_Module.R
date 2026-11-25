@@ -2,8 +2,33 @@ library(reactable)
 players_in_teams_UI <- function(id) {
   ns <- NS(id)
   tagList(tags$style(HTML(".fm-team-panels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-bottom:20px}.fm-team-panels>div{min-width:0}.fm-team-panels .fm-incoming-panel{height:100%;margin-bottom:0}.fm-offer-rival{color:var(--fm-warning,#f0c75e);font-weight:600}@media(max-width:767px){.fm-team-panels{grid-template-columns:minmax(0,1fr);gap:12px}}.fm-incoming-panel{border:1px solid var(--fm-border,#315540);border-radius:8px;padding:16px;margin-bottom:20px}.fm-incoming-panel h3{margin-top:0}.fm-incoming-player{display:flex;gap:16px;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid var(--fm-border,#315540)}.fm-incoming-identity{display:flex;gap:10px;align-items:center;flex-wrap:wrap;min-width:0}.fm-incoming-identity a{overflow-wrap:anywhere}.fm-incoming-arrival{display:flex;flex-direction:column;gap:4px;text-align:right;min-width:0}.fm-incoming-schedule{color:var(--fm-muted)}.fm-incoming-error{color:var(--fm-warning,#f0c75e);overflow-wrap:anywhere}
-    .fm-transfer-group h4 { margin: 8px 0 4px; font-size: 14px; font-weight: 600; }
+    .fm-transfer-group + .fm-transfer-group { margin-top: 12px; }
+    .fm-transfer-group > h4 {
+      margin: 0 0 4px;
+      padding: 5px 8px;
+      border-inline-start: 4px solid var(--fm-muted);
+      border-radius: 4px;
+      background: var(--fm-bg);
+      color: var(--fm-text);
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.35;
+    }
+    .fm-transfer-group[data-timing='before'] > h4 {
+      border-inline-start-color: var(--fm-text);
+      background: var(--fm-highlight);
+    }
+    .fm-transfer-group[data-timing='kickoff'] > h4 {
+      border-inline-start-color: var(--fm-accent);
+      background: color-mix(in srgb, var(--fm-surface), var(--fm-accent) 14%);
+    }
+    .fm-transfer-group[data-timing='after'] > h4 {
+      border-inline-start-color: var(--fm-warning);
+      background: color-mix(in srgb, var(--fm-surface), var(--fm-warning) 17%);
+      color: var(--fm-warning);
+    }
     .fm-transfer-group .fm-incoming-player { padding: 6px 0; }
+    .fm-transfer-group > h4 + .fm-incoming-player { border-top: 0; }
     .fm-transfer-time { display: grid; grid-template-columns: minmax(0,max-content); gap: 0 4px; align-items: center; justify-content: end; }
     .fm-transfer-time > .fm-info { display: contents; }
     .fm-transfer-time > .fm-info > summary { grid-column: 2; grid-row: 1; }
@@ -939,6 +964,7 @@ clause_transfer_panel <- function(state,next_round,ns,outgoing=FALSE) {
   timing<-if(isTRUE(next_round$available))paste0("Round ",next_round$round_number," starts ",incoming_clause_time(next_round$starts_at))else "Next round schedule is loading or could not be verified."
   times <- if (outgoing) rows$leaves_at else rows$joins_at
   labels <- vapply(seq_along(times), function(i) incoming_clause_round_label(times[i], next_round), character(1))
+  groups <- c(before="Before round starts", kickoff="At round start", after="After round starts", unverified="")
   render_row <- function(i) {
     row <- rows[i, , drop=FALSE]
     at <- times[i]
@@ -966,11 +992,12 @@ clause_transfer_panel <- function(state,next_round,ns,outgoing=FALSE) {
     if(!is.null(state$error))fm_info(state$error,error=TRUE,pending=state$status%in%c("loading","refreshing")),
     if(!nrow(rows)&&state$status%in%c("ok","observed"))shiny::tags$p(
       if(outgoing)"No players leaving through a release clause."else"No incoming clause signings."),
-    lapply(c("Before round starts", "At round start", "After round starts", ""), function(label) {
+    lapply(names(groups), function(group) {
+      label <- groups[[group]]
       indices <- which(labels == label)
       if (!length(indices)) return(NULL)
       heading <- if (nzchar(label)) label else if (isTRUE(next_round$available)) "Timing unverified"
-      shiny::tags$div(class="fm-transfer-group", if (!is.null(heading)) shiny::tags$h4(heading),
+      shiny::tags$div(class="fm-transfer-group", `data-timing`=group, if (!is.null(heading)) shiny::tags$h4(heading),
         lapply(indices, render_row))
     }))
 }

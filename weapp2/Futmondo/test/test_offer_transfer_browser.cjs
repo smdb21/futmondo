@@ -3,7 +3,7 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
 (async()=>{
  const browser=await chromium.launch({headless:true,executablePath:process.env.FUTMONDO_TEST_CHROMIUM||undefined,args:['--no-sandbox']});
  try{
-  for(const width of [320,360,390,1440]){
+  for(const [width,theme] of [320,360,390,1440].flatMap(width=>['dark','light'].map(theme=>[width,theme]))){
    const page=await browser.newPage({viewport:{width,height:1100}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
    await page.route('**/*',route=>{
     const url=new URL(route.request().url());
@@ -13,6 +13,7 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
     return route.abort();
    });
    await page.goto('http://127.0.0.1:3892');
+   await page.evaluate(theme=>document.documentElement.setAttribute('data-fm-theme',theme),theme);
    await page.locator('#offers').getByText('Offers for your players (3 observed)',{exact:true}).waitFor();
    const table=page.locator('#received_offers_table');
    const playerNames=async()=>table.locator('.fm-offer-player button').allTextContents();
@@ -84,6 +85,17 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
     const panel=page.locator(`#${id}`);
     const groups=panel.locator('.fm-transfer-group');
     assert.deepEqual(await groups.getByRole('heading').allTextContents(),['Before round starts','At round start','After round starts']);
+    const bands=await groups.evaluateAll(nodes=>nodes.map((group,index)=>{
+     const heading=group.querySelector('h4');
+     const style=getComputedStyle(heading);
+     return {timing:group.dataset.timing,background:style.backgroundColor,accent:style.borderInlineStartColor,
+      spansGroup:Math.abs(heading.getBoundingClientRect().width-group.getBoundingClientRect().width)<1,
+      gap:index?group.getBoundingClientRect().top-nodes[index-1].getBoundingClientRect().bottom:0};
+    }));
+    assert.deepEqual(bands.map(band=>band.timing),['before','kickoff','after']);
+    assert.equal(new Set(bands.map(band=>band.background)).size,3);
+    assert.equal(new Set(bands.map(band=>band.accent)).size,3);
+    assert.ok(bands.every(band=>band.spansGroup)&&bands.slice(1).every(band=>band.gap>=11),`${width}px ${theme} ${id}: timing bands span the panel and have space between groups`);
     const suffix=id==='incoming'?'in':'out';
     for(const [index,players] of [[0,[suffix,`second-${suffix}`]],[1,[`kickoff-${suffix}`]],[2,[`late-${suffix}`]]]){
      assert.deepEqual(await groups.nth(index).getByRole('link').evaluateAll(links=>links.map(link=>link.id)),players.map(player=>`${id}_open_${player}`));
@@ -112,7 +124,7 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
    assert.deepEqual(await playerNames(),['B.Méndez','M.Asensio','Isco'],'Timestamp updates preserve sorted rows');
    const started=Date.now();await page.locator('#heartbeat').click();await page.waitForFunction(()=>document.querySelector('#beats').textContent==='1');
    assert.ok(Date.now()-started<500);assert.equal(await page.locator('#calls').innerText(),'0');assert.deepEqual(errors,[]);
-   console.log(`PASS ${width}px: roster timestamps appear once in the top note on all three pages, sortable offer/profit, single-line borderless rows (${layout.rowHeight}px), full numeric values and Liga Radar, crests, exact keyboard action, safe bidder text and saved status, incoming/leaving icons stay beside timing labels open/closed, keyboard works, no overflow, timestamp advances without panel replacement or I/O; heartbeat ${Date.now()-started}ms`);
+   console.log(`PASS ${width}px ${theme}: distinct transfer heading bands with spacing, timing details stay beside transfer times open/closed, sortable compact offers (${layout.rowHeight}px rows), keyboard actions, no overflow, source timestamps advance without panel replacement or I/O; heartbeat ${Date.now()-started}ms`);
    await page.close();
   }
  }finally{await browser.close();}

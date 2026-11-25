@@ -6533,6 +6533,18 @@ fixture measured combined panel heights of 1233 and 1061 px at 320 px, 1140 and
 920 px at 390 px, and 424 and 342 px at 1440 px. The shared headings and group
 wrappers added four DOM elements overall. Hosted rendering remains unverified.
 
+The follow-up styles each timing group with a distinct full-width heading band
+and 12 px between groups. Chromium verified both themes at 320, 360, 390,
+and 1440 px, including heading colors and spacing, player-link placement,
+open/closed timing details, keyboard access, and horizontal containment.
+Measured heading contrast was at least 5.12:1. A panel with three populated
+groups gained about 46 px of height over the previous styling at 390 and
+1440 px. The styling uses the existing heading elements and adds one timing
+attribute per group. The data, cache, invalidation, and refresh paths are reused.
+The browser fixture recorded zero source and database calls. The 25 incoming
+and 24 outgoing clause checks passed, as did the offline lifecycle with 14 checks
+and eight tabs. Hosted rendering remains unverified.
+
 ## Compact received-offer rows — 2026-11-25
 
 My Team uses borderless player buttons with a keyboard focus outline and
