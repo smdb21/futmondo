@@ -65,15 +65,15 @@ check('fallback directory keeps both metric columns truthfully unavailable',{
     all(is.na(data$`Player transactions`)),
     identical(attrs$selection,'single'))
 })
-check('own team shading follows IDs in full and fallback tables, independently of selection',{
+check('only the selected ID is highlighted in full and fallback tables with duplicate names',{
   same_names<-rows[c(2,1,3,4),];same_names$teamname[1:2]<-'Same name'
   for(data in list(same_names,same_names[,c('teamid','teamname','team_value','points')])){
-    for(own in c('a','b','','missing')){
-      widget<-rivals_finance_table_widget(list(team_finances=data),own_team_id=own,selected_id='c')
+    for(choice in list(NULL,'a','b','missing')){
+      widget<-rivals_finance_table_widget(list(team_finances=data),selected_id=choice)
       attrs<-widget$x$tag$attribs
       ids<-jsonlite::fromJSON(attrs$data)$team_id_hidden
-      marked<-vapply(attrs$rowClass,function(x)identical(x,'fm-own-team-row'),logical(1))
-      stopifnot(identical(unname(marked),ids%in%own))
+      stopifnot(is.null(attrs$rowClass),
+        identical(as.integer(unlist(attrs$defaultSelected)),which(ids%in%choice)-1L))
     }
   }
 })

@@ -427,13 +427,16 @@ outside this comparison. [Official app](https://app.futmondo.com/),
 ### Squad value trends — reviewed 2026-11-25
 
 Futmondo's rules document squad valuations in Administration's Teams section.
-Its price guide describes individual player value movements. LigaRadar puts the
-existing squad value in My Team beside a daily net change and counts of players
-whose values rose or fell. The official public app exposed its application
-shell. The equivalent signed-in aggregation and layout were outside this
-review. [Official web app](https://app.futmondo.com/),
+Its price guide describes individual player value movements. LigaRadar shows team value, the net daily change and counts of
+rising and falling players in My Team and in the selected rival's Current team
+tab. Its Transaction & Financial History tab opens the reconstructed ledger
+for that rival, with an optional per-player view. Futmondo's rules cover
+personal financial movements, and its finance release notes list purchases,
+sales and prizes. The public official app exposed its shell on
+2026-11-25. Its signed-in rival trend and ledger layouts remain unverified. [Official web app](https://app.futmondo.com/),
 [game rules](https://help.futmondo.com/article/91-reglas-del),
-[player price guide](https://help.futmondo.com/article/95-como-fluctua-el-precio-de-los-jugadores).
+[player price guide](https://help.futmondo.com/article/95-como-fluctua-el-precio-de-los-jugadores),
+[finance release notes](https://magazine.futmondo.com/version-1-6-como-van-mis-finanzas/).
 
 ## Best XI and MVP leaders — 2026-11-25
 

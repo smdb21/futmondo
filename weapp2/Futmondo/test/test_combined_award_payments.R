@@ -16,15 +16,62 @@ stopifnot(inflow$mvp==2000000,inflow$dreamteam==1500000,inflow$ranking==32000000
 h<-data.frame(team_id='reference',team_name='Reference',round=c(1,4,7),points=1)
 columns<-classification_bonus_table(data.frame(team_id='reference'),h,x,c(1,11))
 stopifnot(columns$mvp_bonus==2000000,columns$best_xi_bonus==1500000)
-# Execute the actual renderUI expression with a pending position subtotal.
-module_lines<-readLines('Modules/Rivals_Module.R')
-start<-grep('output$rival_transactions_tab_ui <- renderUI',module_lines,fixed=TRUE)
-end<-grep('# Render Transaction Table',module_lines,fixed=TRUE)
-ui_expr<-parse(text=module_lines[start:(end-1)])[[1]][[3]][[2]]
-stopifnot(!is.null(ui_expr))
-rival_moneymovements_raw_RV<-function()ledger;input<-list(tx_pivot_by_player=FALSE);ns<-identity
-html<-htmltools::renderTags(eval(ui_expr))$html
-stopifnot(grepl('Total income',html),grepl('Total expenses',html),grepl('col-sm-6',html),grepl('Financial history',html),inherits(rivals_cash_history_widget(ledger),'reactable'))
+# Exercise the selected rival's actual tab, totals and expandable details.
+published <- shiny::reactiveVal(x)
+fixture_module <- rivals_Server
+environment(fixture_module) <- list2env(list(
+  bind_factual_reads = function(...) NULL,
+  shared_mvp_source = function(...) shiny::reactive(NULL),
+  shared_rival_finance_source = function(...) published,
+  get_user_team_info = function(...) list(),
+  factual_read_adapter = function(...) function(...) list(status = "ready", data = data.frame()),
+  get_league_standings_history = function(...) data.frame(),
+  get_financial_snapshot = function(...) list(),
+  get_championship_pressroom = function(...) data.frame(),
+  players_table_UI = function(...) NULL,
+  players_table_Server = function(...) shiny::reactive(NULL)
+), parent = environment(rivals_Server))
+shiny::testServer(fixture_module, args = list(
+  is_module_active = function() TRUE,
+  login_token = function() c(userid = "account"),
+  championship_id = function() "league",
+  user_team_id = function() "reference",
+  user_teams_RV = function() x$team_finances
+), {
+  session$flushReact()
+  session$setInputs(rival_team_selection = list(id = "reference", context = list(
+    user = "account", championship = "league", team = "reference")))
+  shell <- output$scouted_rival_details_ui$html
+  page <- xml2::read_html(shell)
+  tabs <- xml2::xml_find_all(page, "//ul/li/a[@data-toggle='tab']")
+  stopifnot(identical(xml2::xml_attr(tabs, "data-value"), c("history", "roster")),
+    xml2::xml_attr(xml2::xml_parent(tabs[1]), "class") == "active")
+  anchors <- c("tx_pivot_by_player", "rival_transactions_table", "rival_transactions_tab_ui", "rival_history_breakdown")
+  positions <- vapply(anchors, function(name) as.integer(regexpr(session$ns(name), shell, fixed = TRUE)), integer(1))
+  stopifnot(all(positions > 0), all(diff(positions) > 0),
+    length(xml2::xml_find_all(page, "//details[summary='Income and expense breakdown' and not(@open)]")) == 1)
+  totals <- xml2::read_html(output$rival_transactions_tab_ui$html)
+  stopifnot(identical(xml2::xml_text(xml2::xml_find_all(totals, "//dt")),
+    c("Balance", "Total income", "Total expenses")),
+    xml2::xml_text(xml2::xml_find_first(totals, "//dd")) == ui_financial_amount(52129125))
+  breakdown <- xml2::read_html(output$rival_history_breakdown$html)
+  shown <- setNames(xml2::xml_text(xml2::xml_find_all(breakdown, "//dd")),
+                    xml2::xml_text(xml2::xml_find_all(breakdown, "//dt")))
+  stopifnot(all(c("Starting cash", "Player sales", "Ordinary sales (identified)", "Clause sales (identified)",
+    "Position bonuses", "Point bonuses", "Player purchases", "Ordinary purchases (identified)",
+    "Clause purchases (identified)") %in% names(shown)),
+    shown[["MVP bonuses"]] == ui_financial_amount(2000000),
+    shown[["Best XI bonuses"]] == ui_financial_amount(1500000),
+    grepl("Total income − total expenses = balance", xml2::xml_text(breakdown), fixed = TRUE),
+    inherits(rivals_cash_history_widget(ledger), "reactable"))
+  session$setInputs(rival_tabs = "roster", tx_pivot_by_player = TRUE)
+  renamed <- x
+  renamed$team_finances$teamname <- "New team name"
+  published(renamed)
+  session$flushReact()
+  stopifnot(identical(shell, output$scouted_rival_details_ui$html),
+    identical(output$selected_rival_name, "New team name"))
+})
 # A mismatch preserves actual cash and blocks unverified component attribution.
 bad<-awards;bad$is_mvp<-FALSE
 failed<-build_combined(bad)

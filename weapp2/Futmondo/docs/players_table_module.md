@@ -77,6 +77,14 @@ The Players Table Module provides two exported functions:
 
 ## 2. Parameters
 
+### `show_filters`
+
+The Rivals Current team tab passes `show_filters = FALSE` to both
+`players_table_UI()` and `players_table_Server()`. This omits the filter panel,
+table search and column filters, and skips the owner and club filter updates.
+Sorting, player cards and the recent-round average setting remain available.
+The default for other tables is `TRUE`.
+
 ### `show_position_breakdown`
 
 Boolean parameter in `players_table_UI()`. When set to `TRUE` (enabled on Your Team page), renders a 2-column header layout with a Squad Position Breakdown card next to the filter controls.

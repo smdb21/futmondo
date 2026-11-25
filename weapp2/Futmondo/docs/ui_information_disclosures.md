@@ -148,7 +148,9 @@ Consent and transaction-confirmation controls retain their existing behavior. Fa
   Plots, Notifications, Login, preference feedback and Admin use the same helper.
   Access-setting polling notes and official-lineup provenance/legend are included.
 - `rivals_status_message(message, loading = FALSE, error = FALSE, details = NULL)`
-  accepts extra diagnostic content. `rivals_update_details(rows, timezone = "UTC")`
+  displays pending progress inline above the standings, including the first page load.
+  Settled status, errors and source details use the page information panel.
+  `rivals_update_details(rows, timezone = "UTC")`
   displays per-team source times in that full-width panel; the former timestamp
   table column is hidden rather than forcing expanded text into a narrow cell.
 - `plots_empty(message, error = TRUE)` attaches `fm_info` to its plot result.

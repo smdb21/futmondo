@@ -1,5 +1,13 @@
 # Futmondo data review and implementation results
 
+## Rivals team selection and detail tabs (2026-11-25)
+
+- An offline browser entered Rivals with its saved results held back. The loading message appeared before the first team row and cleared when the directory arrived. Desktop and phone layouts passed at 1600, 1440, 1200, 390 and 360 px, including light/dark hover, mouse and keyboard selection, sorting, the financial pivot, expanded breakdown, roster trend and viewport overflow. A separate browser fixture verified selection through a balance update, reorder and league change.
+- The financial fixture verified the default tab and content order, a €52,129,125 balance, the €2M MVP and €1.5M Best XI income components, and stable tab controls after a same-team update. The running-balance and trading-profit regressions also passed.
+- The roster fixture verified a €24M team with a −€30,000 daily trend, two rising players, one falling player and one unchanged player. It covered stale, partial and confirmed-empty rosters. Opening three squads required three roster reads. Viewing history and reopening a previously loaded squad added none. The table and summary share each scoped observation.
+- Hover is CSS-only. Selection sends one team ID, and finance updates reuse the same ledger. The held-read latency check passed in both response orders with a 5.1 ms event-loop heartbeat and one rebuild each. The offline lifecycle passed 14 checks and rendered eight tabs. The change adds no source endpoint, database writes, timers or deployment dependencies.
+- Verification used synthetic accounts and locally rendered pages. The Rivals assertions in the mixed league-disclosure test passed. Its separate Plots section still references a retired standings output. Hosted rendering and production latency remain unverified.
+
 ## Immediate balance updates for manual offers and clauses (2026-11-25)
 
 - The focused Shiny fixture exercised real confirmation observers with a

@@ -47,30 +47,45 @@ fixture_dataset$team_finances$net_gain_estimated[a] <- TRUE
 
 bind_factual_reads <- function(...) NULL
 shared_mvp_source <- function(...) shiny::reactive(list(rows = data.frame(), complete = FALSE))
-shared_rival_finance_source <- function(...) shiny::reactive(fixture_dataset)
+shared_rival_finance_source <- function(session, ...) shiny::reactive({
+  if (!isTRUE(session$input$fixture_ready)) return(list(team_finances=data.frame(), loading=TRUE))
+  fixture_dataset
+})
 get_user_team_info <- function(login, championship_id, user_team_id, ...) {
   i <- match(user_team_id, fixture_teams$teamid)
   list(teamValue = fixture_teams$teamValue[i], position = i)
 }
-get_players_from_team <- function(...) data.frame()
+factual_read_adapter <- function(session, handler, ...) {
+  stopifnot(identical(handler, "get_players_from_team"))
+  function(login, championship_id, user_team_id, ...) {
+    players <- data.frame(id = paste0(user_team_id, 1:3), name = paste("Player", 1:3),
+      role = c("portero", "defensa", "delantero"), team = "Fixture club", role2 = NA_character_,
+      userteamId = user_team_id, value = c(8, 9, 8) * M, change = c(25000, -10000, 0),
+      points = 1:3, buyPrice = 7 * M, clause_price = 10 * M)
+    resource_state(players, status = "ok")
+  }
+}
 get_financial_snapshot <- function(...) list(configuration = list(budget = 300 * M))
 get_championship_pressroom <- function(...) data.frame()
 get_league_standings_history <- function(...) data.frame()
 calculate_league_finances <- function(...) fixture_dataset
-players_table_Server <- function(...) shiny::reactive(NULL)
-players_table_UI <- function(...) shiny::tags$div()
+# Exercise the real roster table and keep its unrelated player-history reads offline.
+recent_player_points_source <- function(...) list(history = function() data.frame())
+selected_player_Server <- function(...) NULL
 
 fixture_ui <- shinydashboard::dashboardPage(
   shinydashboard::dashboardHeader(title = "Offline Rivals"),
   shinydashboard::dashboardSidebar(
-    shinydashboard::sidebarMenu(
-      shinydashboard::menuItem("Rivals", tabName = "rivals", selected = TRUE))),
+    shinydashboard::sidebarMenu(id = "pages",
+      shinydashboard::menuItem("Start", tabName = "start", selected = TRUE),
+      shinydashboard::menuItem("Rivals", tabName = "rivals"))),
   shinydashboard::dashboardBody(
     shiny::tags$head(shiny::tags$style(shiny::HTML(fm_theme_css())),
-      shiny::includeCSS("www/custom_style.css")),
-    rivals_UI("rivals")))
+      shiny::includeCSS("www/custom_style.css"),shiny::includeScript("www/info-disclosures.js")),
+    shinydashboard::tabItems(shinydashboard::tabItem("start", shiny::p("Fixture home")),
+      shinydashboard::tabItem("rivals", fm_info_page_UI("Rivals", rivals_UI("rivals"))))))
 fixture_server <- function(input, output, session) {
-  rivals_Server("rivals", is_module_active = function() TRUE,
+  rivals_Server("rivals", is_module_active = function() identical(input$pages,"rivals"),
     login_token = function() c(userid = "fixture-account", token = "synthetic"),
     championship_id = function() fixture_league, user_team_id = function() "a",
     user_teams_RV = function() fixture_teams)

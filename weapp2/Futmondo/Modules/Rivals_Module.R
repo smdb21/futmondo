@@ -529,25 +529,34 @@ rivals_calculation_details <- function(summary,ledger,metric=c("wealth","trading
 }
 
 # Keep observed team fields selectable even if financial audit details fail.
-rivals_finance_table_widget <- function(finances_data,on_error=function(error)NULL,timezone=fm_display_timezone(),selected_id=NULL,selection_input=NULL,selection_context=NULL,table_id=NULL,own_team_id=NULL) {
+rivals_finance_table_widget <- function(finances_data,on_error=function(error)NULL,timezone=fm_display_timezone(),selected_id=NULL,selection_input=NULL,selection_context=NULL,table_id=NULL) {
   timezone<-rivals_display_timezone(timezone)
   df<-finances_data$team_finances
   if(!is.data.frame(df)||!nrow(df))return(NULL)
-  own_id<-fm_scalar(own_team_id,"")
-  own_row_class<-function(ids)function(index)if(nzchar(own_id)&&ids[index]%in%own_id)"fm-own-team-row"else NULL
   transaction_counts<-if("player_transactions"%in%names(df))as.numeric(df$player_transactions)else rep(NA_real_,nrow(df))
-  selected<-match(selected_id,as.character(df$teamid));selected<-selected[!is.na(selected)]
+  selected_row<-function(ids){
+    index<-match(selected_id,ids)
+    index[!is.na(index)]
+  }
   click<-"select"
   if(!is.null(selection_input)&&!is.null(table_id)){
-    click<-htmlwidgets::JS(paste0("function(rowInfo,column,state){if(!rowInfo)return;var ids=",
-      jsonlite::toJSON(as.character(df$teamid)),";Reactable.getInstance(",jsonlite::toJSON(table_id,auto_unbox=TRUE),").setRowsSelected([String(rowInfo.index)]);Shiny.setInputValue(",
-      jsonlite::toJSON(selection_input,auto_unbox=TRUE),",{id:ids[rowInfo.index],context:",jsonlite::toJSON(selection_context,auto_unbox=TRUE),
-      ",nonce:Date.now()},{priority:'event'});}"))
+    click<-htmlwidgets::JS(paste0("function(row) {
+      if (!row || row.selected) return;
+      Reactable.getInstance(", jsonlite::toJSON(table_id,auto_unbox=TRUE), ").setRowsSelected([row.id]);
+      Shiny.setInputValue(", jsonlite::toJSON(selection_input,auto_unbox=TRUE), ", {
+        id: row.values.team_id_hidden, context: ", jsonlite::toJSON(selection_context,auto_unbox=TRUE), "
+      }, {priority: 'event'});
+    }"))
   }
   currency<-function(value){value<-fm_number(value);if(is.finite(value))format_table_currency(value)else""}
   public_columns<-function(rows){
     pills<-rivals_points_pills(rows$Points)
-    list(.selection=colDef(show=FALSE),team_id_hidden=colDef(show=FALSE),Team=colDef(name="User Team",align="left",minWidth=130),
+    list(.selection=colDef(show=FALSE),team_id_hidden=colDef(show=FALSE),Team=colDef(name="User Team",align="left",minWidth=130,
+        cell=htmlwidgets::JS("function(cell) {
+          return React.createElement('button', {
+            type: 'button', className: 'rivals-team-button', 'aria-pressed': cell.selected
+          }, cell.value);
+        }")),
       `Overall wealth gained`=colDef(align="right",minWidth=155,cell=function(value,index){
         note<-if(!"net_gain_estimated"%in%names(df)||!identical(df$net_gain_estimated[index],FALSE))"Estimate: cash plus squad value minus starting cash"else "Cash plus squad value minus starting cash"
         tags$span(title=note,style=if(is.finite(value)&&value<0)"color:var(--fm-danger)"else NULL,
@@ -573,8 +582,8 @@ rivals_finance_table_widget <- function(finances_data,on_error=function(error)NU
     rows$`Trading profit`<-rep(NA_real_,nrow(rows))
     rows$`Player transactions`<-transaction_counts[match(directory$teamid,as.character(df$teamid))]
     rows$team_id_hidden<-directory$teamid
-    reactable::reactable(rows,compact=TRUE,striped=TRUE,highlight=TRUE,selection="single",onClick=click,defaultSelected=selected,defaultPageSize=10,
-      rowClass=own_row_class(as.character(rows$team_id_hidden)),
+    reactable::reactable(rows,class="rivals-standings",compact=TRUE,striped=TRUE,highlight=TRUE,selection="single",
+      onClick=click,defaultSelected=selected_row(rows$team_id_hidden),defaultPageSize=10,
       defaultColDef=colDef(sortNALast=TRUE),columns=public_columns(rows))
   }
   widget<-tryCatch({
@@ -585,11 +594,10 @@ rivals_finance_table_widget <- function(finances_data,on_error=function(error)NU
       `Squad Value`=df$team_value,`Last Access`=df$last_access,Points=df$points,
       `Last updated`=df$as_of,check.names=FALSE)
     if(!all(c("teamname","estimated_cash","as_of","team_value","last_access","points")%in%names(df)))stop("Financial directory is incomplete")
-    df_display$team_id_hidden<-df$teamid
+    df_display$team_id_hidden<-as.character(df$teamid)
     df_display$`Last Access`<-as.numeric(fm_time(df_display$`Last Access`))
-    reactable::reactable(df_display,compact=TRUE,striped=TRUE,highlight=TRUE,bordered=FALSE,
-      rowClass=own_row_class(as.character(df_display$team_id_hidden)),
-      selection="single",onClick=click,defaultSelected=selected,defaultPageSize=10,defaultSorted=list(`Balance`="desc"),
+    reactable::reactable(df_display,class="rivals-standings",compact=TRUE,striped=TRUE,highlight=TRUE,bordered=FALSE,
+      selection="single",onClick=click,defaultSelected=selected_row(df_display$team_id_hidden),defaultPageSize=10,defaultSorted=list(`Balance`="desc"),
       defaultColDef=colDef(sortNALast=TRUE),
       columns=c(public_columns(df_display),list(
         `Balance`=colDef(align="right",cell=function(value){
@@ -599,17 +607,10 @@ rivals_finance_table_widget <- function(finances_data,on_error=function(error)NU
   },error=function(error){on_error(error);fallback()})
   if(!is.null(selection_input))widget<-htmlwidgets::onRender(widget,
     "function(el,x,data){
-      if(el._fmRivalOff)el._fmRivalOff();
-      var table=Reactable.getInstance(el.id),index=table.data.findIndex(function(row){return row.team_id_hidden===data.selected;});
+      var table=Reactable.getInstance(el.id);
+      var index=table.data.findIndex(function(row){return row.team_id_hidden===data.selected;});
       table.setRowsSelected(index<0?[]:[String(index)]);
-      var previous=data.selected;
-      el._fmRivalOff=Reactable.onStateChange(el.id,function(state){
-        if(!state.selected||state.selected.length!==1)return;
-        var row=Reactable.getInstance(el.id).data[state.selected[0]],id=row&&row.team_id_hidden;
-        if(!id||id===previous)return;previous=id;
-        Shiny.setInputValue(data.input,{id:id,context:data.context,nonce:Date.now()},{priority:'event'});
-      });
-    }",data=list(input=selection_input,context=selection_context,selected=selected_id))
+    }",data=list(selected=selected_id))
   widget
 }
 
@@ -697,7 +698,10 @@ rivals_summary_values <- function(info, teams, finances, team_id) {
 
 rivals_status_message <- function(message, loading=FALSE, error=FALSE, details=NULL) {
   if(!nzchar(message) && is.null(details))return(NULL)
-  fm_info(message, details, error=error, pending=loading, class=if(loading)"rivals-loading-status"else NULL)
+  if(loading)return(tagList(
+    fm_info(message,inline=TRUE,class="rivals-loading-status"),
+    fm_info(details,error=error)))
+  fm_info(message,details,error=error)
 }
 
 rivals_update_details <- function(rows, timezone=fm_display_timezone()) {
@@ -725,7 +729,7 @@ tagList(
                p(style = "color: var(--fm-muted); font-size: 13px; font-weight: 500; margin-bottom: 12px;",
                  icon("hand-pointer"), " Select a user team from the table below to scout their squad and financial details."),
                tags$div(id=ns("league_finances_status"),class="shiny-html-output",
-                 rivals_status_message("Loading rivals… This may take a moment.",loading=TRUE)),
+                 rivals_status_message("Loading rivals…",loading=TRUE)),
                reactable::reactableOutput(ns("league_finances_table"))
              )
       )
@@ -740,7 +744,7 @@ tagList(
 
 rivals_Server <- function(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger = NULL) {
   moduleServer(id, function(input, output, session) {
-    bind_factual_reads(c("get_user_team_info","get_players_from_team","get_financial_snapshot","get_championship_pressroom","get_league_standings_history","get_user_team_moneymovements"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
+    bind_factual_reads(c("get_user_team_info","get_financial_snapshot","get_championship_pressroom","get_league_standings_history","get_user_team_moneymovements"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
 
     ns <- session$ns
     display_timezone<-reactive(fm_display_timezone())
@@ -834,20 +838,44 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       return(info)
     })
     
-    # Scouted Player list of the rival
+    # Selecting another team remounts the tabs on History. Its roster should
+    # only load after the browser opens Current team for that selection.
+    opened_roster_team <- eventReactive(input$rival_tabs, {
+      if (identical(input$rival_tabs, "roster")) selected_rival_team_id()
+    }, ignoreNULL = FALSE)
+    rival_roster_active <- reactive(isTRUE(is_module_active()) &&
+      !is.null(opened_roster_team()) && identical(opened_roster_team(), selected_rival_team_id()))
+    read_rival_roster <- factual_read_adapter(session, "get_players_from_team",
+      login_token, championship_id, selected_rival_team_id, is_active = rival_roster_active,
+      refresh_trigger = refresh_trigger, state_only = TRUE)
+    rival_roster_state <- reactive({
+      req(rival_roster_active())
+      read_rival_roster(login = login_token(), championship_id = championship_id(),
+        user_team_id = selected_rival_team_id())
+    })
+    rival_team_value_display <- resource_display_source(session, function() {
+      roster <- rival_roster_state()
+      team_id <- selected_rival_team_id()
+      directory <- tryCatch(user_teams_RV(), error = function(e) NULL)
+      team <- if (is.data.frame(directory)) directory[directory$teamid %in% team_id, , drop = FALSE]
+      if (!is.finite(fm_number(team$teamValue))) {
+        rows <- league_table_rows_RV()
+        team <- rows[rows$teamid %in% team_id, , drop = FALSE]
+      }
+      team_value_summary(resource_state(team), roster)
+    })
+    output$rival_team_value_box <- renderUI(team_value_summary_panel(rival_team_value_display(), ns))
+
+    # The same stored observation supplies raw daily trends and displayed players.
     rival_players_table_RV <- reactive({
-      req(is_module_active() == TRUE)
-      if (!is.null(refresh_trigger)) refresh_trigger()
-      req(selected_rival_team_id())
-      
-      players_table <- get_players_from_team(
-        login = login_token(),
-        championship_id = championship_id(),
-        user_team_id = selected_rival_team_id()
-      )
+      state <- rival_roster_state()
+      loading <- identical(state$status, "loading")
+      shiny::validate(shiny::need(!is.null(state$data), if (loading) "Loading squad…" else resource_failure_message(state$error)),
+        errorClass = if (loading) "fm-loading" else character())
+      players_table <- state$data
       
       # Return empty data frame gracefully if roster is empty
-      if (is.null(players_table) || nrow(players_table) == 0) {
+      if (nrow(players_table) == 0) {
         empty_df <- data.frame(
           id = character(0), name = character(0), role = character(0), role2 = character(0),
           value = numeric(0), change = numeric(0), points = numeric(0), buyPrice = numeric(0),
@@ -884,22 +912,22 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
 
 
     output$league_finances_status <- renderUI({
-      req(isTRUE(is_module_active()))
+      req(isTRUE(is_module_active()),cancelOutput=TRUE)
       state<-league_finances_RV();df<-state$team_finances
       count<-if(is.data.frame(df))nrow(df)else 0L
       loading<-isTRUE(state$loading)||isTRUE(state$finance_loading)||
         identical(state$teams_status,"loading")||(is.null(state$teams_status)&&count==0L)
       message<-if(loading){
-        if(count)"Updating balances… Your selected team will stay open."else
-          "Loading rivals… Retrieving league teams and balances. This may take a moment."
+        if(count)"Loading financial details…"else "Loading rivals…"
       }else if(count)paste(count,"league teams loaded.")else state$teams_reason %||% ""
       issues<-Filter(nzchar,c(state$finance_error %||% "",state$reason %||% ""))
       failure<-table_failure_RV()
       if(!is.null(failure))issues<-c(issues,paste("Rival table could not be displayed.",resource_failure_message(failure)))
-      message<-trimws(paste(c(message,unique(issues)),collapse=" "))
-      rivals_status_message(message,loading=loading, error=length(issues)>0L ||
-        (!loading && count==0L && nzchar(state$teams_reason %||% "")),
-        details=rivals_update_details(df, display_timezone()))
+      details<-tagList(if(length(issues))tags$p(paste(unique(issues),collapse=" ")),
+        rivals_update_details(df,display_timezone()))
+      has_error<-!is.null(failure)||nzchar(state$finance_error %||% "")||
+        (!loading && (length(issues)>0L || (count==0L && nzchar(state$teams_reason %||% ""))))
+      rivals_status_message(message,loading=loading,error=has_error,details=details)
     })
 
     # The table is the single selection control for rival scouting.
@@ -911,7 +939,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
         failure<<-isolate(table_failure_RV())
         if(is.null(failure))failure<<-resource_log_failure(resource_failure(error,resource="league_finances_calc",category="schema"))
       },timezone=display_timezone(),selected_id=isolate(selected_rival_id_RV()),
-        selection_input=session$ns("rival_team_selection"),selection_context=rival_context_RV(),table_id=session$ns("league_finances_table"),own_team_id=user_team_id())
+        selection_input=session$ns("rival_team_selection"),selection_context=rival_context_RV(),table_id=session$ns("league_finances_table"))
       table_failure_RV(failure)
       widget
     })
@@ -1188,7 +1216,6 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
     # Render Scouted Rival Details (or empty state prompt if no selection)
     output$scouted_rival_details_ui <- renderUI({
       req(is_module_active() == TRUE)
-      if (!is.null(refresh_trigger)) refresh_trigger()
       rival_id <- selected_rival_team_id()
 
       if (is.null(rival_id) || rival_id == "") {
@@ -1202,33 +1229,38 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
           )
         )
       } else {
-        teams<-tryCatch(league_finances_RV()$team_finances,error=function(e)NULL)
-        rival_name<-if(is.data.frame(teams)&&all(c("teamid","teamname")%in%names(teams)))
-          as.character(teams$teamname[match(rival_id,as.character(teams$teamid))])else NA_character_
         tagList(
           h3(class="fm-selected-rival-title",icon("user"),
-            if(length(rival_name)==1L&&!is.na(rival_name)&&nzchar(rival_name))rival_name else "Selected user team"),
+            textOutput(ns("selected_rival_name"), inline = TRUE)),
           uiOutput(ns("rival_financial_summary_box")),
           tabsetPanel(id = ns("rival_tabs"), type = "pills", selected = "history",
-            tabPanel(title = "Current team", value = "roster", icon = icon("users"),
-              players_table_UI(
-                id = ns("rival_squad_table"),
-                box_title = NULL,
-                filter_by_position = TRUE,
-                filter_by_team = FALSE,
-                filter_by_value = TRUE,
-                filter_by_change_value = TRUE,
-                filter_by_active_clause = TRUE,
-                filter_by_is_favorite = FALSE,
-                filter_by_is_from_futmondo = FALSE
+            tabPanel(title = "Transaction & Financial History", value = "history", icon = icon("receipt"),
+              checkboxInput(ns("tx_pivot_by_player"), "Pivot by Player (Buy/Sell Ledger)",
+                value = isTRUE(isolate(input$tx_pivot_by_player))),
+              h4("Financial history"),
+              reactable::reactableOutput(ns("rival_transactions_table")),
+              div(class = "rivals-history-totals",
+                uiOutput(ns("rival_transactions_tab_ui")),
+                tags$details(
+                  tags$summary("Income and expense breakdown"),
+                  uiOutput(ns("rival_history_breakdown"))
+                )
               )
             ),
-            tabPanel(title = "Transaction & Financial History", value = "history", icon = icon("receipt"),
-              uiOutput(ns("rival_transactions_tab_ui"))
-            ),
+            tabPanel(title = "Current team", value = "roster", icon = icon("users"),
+              uiOutput(ns("rival_team_value_box")),
+              players_table_UI(ns("rival_squad_table"), show_filters = FALSE)
+            )
           )
         )
       }
+    })
+
+    output$selected_rival_name <- renderText({
+      rival_id <- req(selected_rival_team_id())
+      teams <- league_table_rows_RV()
+      name <- teams$teamname[match(rival_id, as.character(teams$teamid))]
+      if (length(name) == 1L && !is.na(name) && nzchar(name)) as.character(name) else "Selected user team"
     })
 
     # ---- Transaction History Reactives ----
@@ -1240,47 +1272,71 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       league_finances_RV()$cash_ledgers[[selected_rival_team_id()]] %||% data.frame()
     })
 
+    rival_history_totals_RV <- reactive({
+      ledger <- rival_moneymovements_raw_RV()
+      list(
+        balance = if (nrow(ledger)) tail(ledger$running_balance, 1L) else NA_real_,
+        missing_amounts = any(ledger$included %in% TRUE & !is.finite(ledger$amount)),
+        inflow = rivals_inflow_totals(ledger),
+        outflow = rivals_outflow_totals(ledger)
+      )
+    })
+
+    history_amount_row <- function(label, value) div(tags$dt(label), tags$dd(ui_financial_amount(value)))
+
     output$rival_transactions_tab_ui <- renderUI({
-      ledger<-rival_moneymovements_raw_RV()
-      inflow<-rivals_inflow_totals(ledger)
-      outflow<-rivals_outflow_totals(ledger)
-      final<-if(is.data.frame(ledger)&&nrow(ledger))tail(ledger$running_balance,1L)else NA_real_
+      totals <- rival_history_totals_RV()
       tagList(
-        checkboxInput(ns("tx_pivot_by_player"),"Pivot by Player (Buy/Sell Ledger)",value=isTRUE(isolate(input$tx_pivot_by_player))),
-        fm_info("Your balance includes starting cash, transfers and paid bonuses."),
-        if(is.data.frame(ledger)&&nrow(ledger)&&any(ledger$included&!is.finite(ledger$amount)))
-          fm_info("Some movement amounts are missing. Balances show the known-amount estimate and exclude those unknown amounts.", error=TRUE),
-        div(class="well",strong("Balance: "),ui_financial_amount(final)),
-        fluidRow(
-        box(width=6,title="Total income",
-          tags$p(strong(ui_financial_amount(inflow$total))),
-          tags$p("Starting cash: ",ui_financial_amount(inflow$opening)),
-          tags$p("Player sales: ",ui_financial_amount(inflow$sales)),
-          tags$p("Ordinary sales (identified): ",ui_financial_amount(inflow$market)),
-          tags$p("Clause sales (identified): ",ui_financial_amount(inflow$clauses)),
-          tags$p("Position bonuses: ",ui_financial_amount(inflow$ranking)),
-          tags$p("MVP bonuses: ",ui_financial_amount(inflow$mvp)),
-          tags$p("Best XI bonuses: ",ui_financial_amount(inflow$dreamteam)),
-          tags$p("Point bonuses: ",ui_financial_amount(inflow$points)),
-          if(isTRUE(is.finite(inflow$bonuses)&&inflow$bonuses!=inflow$points+inflow$ranking+inflow$mvp+inflow$dreamteam))
-            tags$p("Other recorded bonuses: ",ui_financial_amount(inflow$bonuses-inflow$points-inflow$ranking-inflow$mvp-inflow$dreamteam)),
-          if(is.finite(inflow$other)&&inflow$other!=0)tags$p("Other credits: ",ui_financial_amount(inflow$other)),
-          fm_info("Includes starting cash, player sales and paid bonuses.",
-            if(inflow$incomplete)" Pending or unresolved bonuses do not replace the known income shown here.", error=isTRUE(inflow$incomplete))
+        tags$dl(class = "rivals-history-headline",
+          history_amount_row("Balance", totals$balance),
+          history_amount_row("Total income", totals$inflow$total),
+          history_amount_row("Total expenses", totals$outflow$total)
         ),
-        box(width=6,title="Total expenses",
-          tags$p(strong(ui_financial_amount(outflow$total))),
-          tags$p("Player purchases: ",ui_financial_amount(outflow$purchases)),
-          tags$p("Ordinary purchases (identified): ",ui_financial_amount(outflow$market)),
-          tags$p("Clause purchases (identified): ",ui_financial_amount(outflow$clauses)),
-          if(is.finite(outflow$other)&&outflow$other!=0)tags$p("Other debits: ",ui_financial_amount(outflow$other)),
-          if(isTRUE(outflow$incomplete))fm_info("Some amounts are missing; only known expenses are included.", error=TRUE)
-        )),
-        if(is.finite(inflow$unknown)&&is.finite(outflow$unknown)&&(inflow$unknown+outflow$unknown)>0)
-          fm_info(paste0("Transfer type (clause or market) couldn't be verified for ",format_table_currency(inflow$unknown)," of sales and ",format_table_currency(outflow$unknown)," of purchases. These amounts are still included in the totals."), error=TRUE),
-        p(strong("Total income − total expenses = balance: "),ui_financial_amount(inflow$total-outflow$total)),
-        h4("Financial history"),
-        reactable::reactableOutput(ns("rival_transactions_table"))
+        if (totals$missing_amounts)
+          p("Some movement amounts are missing. Balances show the known-amount estimate and exclude those unknown amounts.")
+      )
+    })
+
+    output$rival_history_breakdown <- renderUI({
+      totals <- rival_history_totals_RV()
+      inflow <- totals$inflow
+      outflow <- totals$outflow
+      other_bonuses <- inflow$bonuses - inflow$points - inflow$ranking - inflow$mvp - inflow$dreamteam
+      tagList(
+        p("Balance includes starting cash, transfers and paid bonuses."),
+        fluidRow(
+          column(6,
+            h5("Income"),
+            tags$dl(class = "rivals-history-breakdown",
+              history_amount_row("Starting cash", inflow$opening),
+              history_amount_row("Player sales", inflow$sales),
+              history_amount_row("Ordinary sales (identified)", inflow$market),
+              history_amount_row("Clause sales (identified)", inflow$clauses),
+              history_amount_row("Position bonuses", inflow$ranking),
+              history_amount_row("MVP bonuses", inflow$mvp),
+              history_amount_row("Best XI bonuses", inflow$dreamteam),
+              history_amount_row("Point bonuses", inflow$points),
+              if (is.finite(other_bonuses) && other_bonuses != 0) history_amount_row("Other recorded bonuses", other_bonuses),
+              if (is.finite(inflow$other) && inflow$other != 0) history_amount_row("Other credits", inflow$other)
+            ),
+            p("Income includes starting cash, player sales and paid bonuses.",
+              if (isTRUE(inflow$incomplete)) "Pending or unresolved bonuses do not replace the known income shown here.")
+          ),
+          column(6,
+            h5("Expenses"),
+            tags$dl(class = "rivals-history-breakdown",
+              history_amount_row("Player purchases", outflow$purchases),
+              history_amount_row("Ordinary purchases (identified)", outflow$market),
+              history_amount_row("Clause purchases (identified)", outflow$clauses),
+              if (is.finite(outflow$other) && outflow$other != 0) history_amount_row("Other debits", outflow$other)
+            ),
+            if (isTRUE(outflow$incomplete)) p("Some amounts are missing. Only known expenses are included.")
+          )
+        ),
+        if (is.finite(inflow$unknown) && is.finite(outflow$unknown) && (inflow$unknown + outflow$unknown) > 0)
+          p(paste0("Transfer type (clause or market) couldn't be verified for ", format_table_currency(inflow$unknown),
+            " of sales and ", format_table_currency(outflow$unknown), " of purchases. These amounts are still included in the totals.")),
+        p(strong("Total income − total expenses = balance: "), ui_financial_amount(inflow$total - outflow$total))
       )
     })
 
@@ -1377,6 +1433,8 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       login_token = login_token,
       championship_id = championship_id,
       user_team_id = user_team_id, # Actions execute on the logged-in team only.
+      is_module_active = rival_roster_active,
+      show_filters = FALSE,
       refresh_trigger = refresh_trigger
     )
     

@@ -1,13 +1,15 @@
 > Current contract (2026-10-31): [Rival cash accounting](rival_cash_accounting.md) is authoritative. Summary, league table and transaction history share one reconstructed ledger. Actual dated movements show running cash; all included rewards appear in the main financial history, with source-backed reconstructed dates labelled and unresolved dates kept explicit. Observed official cash is separate. Older implementation descriptions below are historical and superseded by that contract.
 
 
-## Current directory display — 2026-11-02
+## Rivals directory and team details — 2026-11-25
 
-The signed-in team's row has a subtle background tint in both the rival finance table (including its fallback directory) and all standings views. Matching uses the active team ID, independently of scouting selection, names and sorting. The shared CSS adapts to light/dark themes and leaves the selected-row indicator intact. Each table assigns one class per existing row; no API/database reads, caches, timers or additional calculations are introduced.
+Opening Rivals shows a loading message in the directory while league teams and balances are being prepared. Click a row to select a team. The highlight follows that team through sorting and balance updates. Hovering over another row gives it a lighter background across all columns. The signed-in team follows the same selection rules as every other team.
 
-Focused verification: `test_rival_summary_layout.R` covers normal/fallback rendering, duplicate names, missing IDs and selection independence. The rival summary and classification lineup browser checks cover phone/desktop widths, theme changes, sorting and round/partial views. Live hosted testing and the broader suite are deliberately skipped for this presentation change.
+The initial `rivals_UI()` markup includes a visible status before Shiny sends its first update. `rivals_status_message()` keeps loading text beside the table while the page information panel retains timestamps and diagnostics. The full and fallback versions of `rivals_finance_table_widget()` select by team ID, including when names match. Clicking any cell or activating the team-name button selects the row.
 
-Own-team cells must be transparent so the table theme's opaque cell backgrounds do not cover the row tint. Browser regressions check the cell backgrounds in both themes as well as the row class/color; checking the row color alone missed this layering defect. This CSS correction adds no data work or reactive updates.
+The history and roster tabs belong to the selected team. A financial update can refresh the name, figures and history without recreating the tab controls. `rival_history_totals_RV()` calculates the three headline figures and the full breakdown from the same selected cash ledger. The breakdown expands in the browser.
+
+The Current team tab shares one selected-team roster observation between `rival_roster_state()`, the player table and the My Team value panel. The panel uses the directory valuation or saved financial row, with a complete roster's summed player values as a fallback. The trend sums the signed daily euro changes. A zero change adds to neither direction count. The display identifies stale changes and leaves a partial roster's trend and counts unavailable.
 
 The **Player transactions** column counts included purchases and sales, including clause transfers, once per reconciled ledger entry. Bonuses, fees, opening cash and excluded entries are omitted. The numeric count is sortable and covers retrieved history; unavailable history stays unavailable, while a known history containing only bonuses gives zero. Counts are cached with the existing per-team ledger calculation and projected into the table without new requests, persistence or trade matching.
 
@@ -41,17 +43,10 @@ The Rivals Module provides two exported functions:
 
 ### Return Value
 
-Returns a `tagList` containing:
-1. A Net Transfer Profit/Loss KPI box (standalone summary box in the top summary row).
-2. A League Financial Standings & Budget Left table (`reactableOutput`) displaying per-team finances.
-3. A `uiOutput` placeholder (`scouted_rival_details_ui`) for the selected rival details, which renders:
-    - Financial summary cards (Standings Position, Money Left, Trading profit, Squad Investment, Squad valuation and Overall wealth gained).
-- A `tabsetPanel` (type = "pills") with tabs including:
-      - **Tab 1: "Player Roster & Clauses"** -- Contains the `players_table_UI` call for the scouted player roster and purchase breakdown.
-      - **Tab 2: "Transaction & Financial History"** -- Displays all transactions directly (no filter bar). Includes a "Pivot by Player" toggle that switches the view between the full chronological transaction log and a per-player pivot summary.
-      - **Tab 3: "League Cash & Observed Transfers"** -- Contains the league-wide cash/transfer chart, date-range slider, and metric selector for transfer-only balance, squad purchases, or transaction volume.
-      - **Player Buy/Sell Pivot Ledger** -- A paired buy/sell comparison view for each player the rival team has ever acquired, with two-line hover tooltips, re-bought player handling, and Net P/L calculation.
-4. A League Squad Value Evolution chart (`plotlyOutput`) showing historical valuations of all teams, positioned at the bottom of the page below all interactive components.
+The page opens with the league financial standings and team selector. Selecting a team displays its name, its six financial summary cards and two tabs.
+
+1. **Transaction & Financial History** opens first. The Pivot by Player checkbox switches between the chronological ledger and the per-player buy/sell history. Below the table, the balance, total income and total expenses remain visible together. Expand the breakdown for the component amounts, reconciliation and coverage details.
+2. **Current team** opens with team value, total daily change and counts of rising and falling players. The complete roster follows without a filter panel. It shares the [My Team trend calculation](players_in_teams_module.md#team-value-and-daily-trend--2026-11-25).
 
 ### Usage Example
 
@@ -203,7 +198,7 @@ data.frame(
 
 ---
 
-## 4. Tab 2: Transaction History and Finances
+## 4. Transaction History and Finances
 
 When a rival team is selected, the "Historial de Transacciones y Finanzas" tab provides a detailed view of the team's financial movements.
 
@@ -344,7 +339,7 @@ The four financial summary cards rendered above the transaction tab are synchron
    - **Budget**: Falls back to `300000000 - total_spent`.
 4. The "Money Left (Budget)" card can be further overridden by the API-provided `info$budget` from `get_user_team_info()` if the value is available, numeric, and positive. This ensures the summary box matches the official API value when accessible.
 
-**Summary Cards (within Tab 2):**
+**Historical summary cards**
 
 The three KPI cards inside the Transaction History tab (Total Inflow, Total Outflow, Net Cash Flow) are computed from the full dataset (`rival_moneymovements_filtered_RV()`), which now contains all transactions (no user filters). This provides a complete cash-flow overview for the rival.
 

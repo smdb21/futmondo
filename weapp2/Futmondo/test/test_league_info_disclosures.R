@@ -3,19 +3,19 @@
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages(source('global.R'))
 details <- function(tag) xml2::xml_find_all(xml2::read_html(as.character(tag)), '//details[contains(@class,"fm-info")]')
-loading <- details(rivals_status_message('Retrieving saved balances.', loading=TRUE))
+loading <- xml2::read_html(as.character(rivals_status_message('Retrieving saved balances.', loading=TRUE)))
 failed <- details(rivals_status_message('Source read failed.', error=TRUE))
-stopifnot(length(loading)==1L, length(failed)==1L,
-  is.na(xml2::xml_attr(loading,'open')), is.na(xml2::xml_attr(failed,'open')),
-  !grepl('fm-info-error',xml2::xml_attr(loading,'class'),fixed=TRUE),
+stopifnot(length(xml2::xml_find_all(loading,'//details'))==0L, length(failed)==1L,
+  xml2::xml_text(xml2::xml_find_first(loading,'//*[@role="status"]'))=='Retrieving saved balances.',
+  is.na(xml2::xml_attr(failed,'open')),
   grepl('fm-info-error',xml2::xml_attr(failed,'class'),fixed=TRUE),
   trimws(xml2::xml_text(xml2::xml_find_first(failed,'./summary')))=='i',
   grepl('Source read failed.',xml2::xml_text(xml2::xml_find_first(failed,'./div')),fixed=TRUE))
-cat('PASS rival loading and errors remain collapsed with distinct icon states\n')
+cat('PASS rival loading is visible inline and settled errors retain their disclosure\n')
 updates <- rivals_update_details(data.frame(teamname=c('Alpha','Beta'),
   as_of=c('2026-11-14T12:00:00Z',NA_character_)), 'UTC')
 status <- details(rivals_status_message('2 league teams loaded.', details=updates))
-stopifnot(grepl('Alpha:14-1112:00',gsub('[[:space:]]+','',xml2::xml_text(status)),fixed=TRUE),
+stopifnot(grepl('Alpha:14/11/202612:00UTC',gsub('[[:space:]]+','',xml2::xml_text(status)),fixed=TRUE),
   grepl('Beta:Updatetimeunavailable',gsub('[[:space:]]+','',xml2::xml_text(status)),fixed=TRUE))
 cat('PASS per-team update timestamps share the full-width collapsed status\n')
 

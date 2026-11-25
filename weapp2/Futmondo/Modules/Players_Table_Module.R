@@ -98,7 +98,8 @@ players_table_UI <- function(id, box_title = NULL,
                              hide_bid_column = FALSE,
                              default_active_clause = FALSE,
                              default_free_agents = FALSE,
-                             filter_by_own_team = FALSE) {
+                             filter_by_own_team = FALSE,
+                             show_filters = TRUE) {
   ns <- NS(id)
   filter_panel <- function(...) {
     tags$details(
@@ -115,7 +116,7 @@ players_table_UI <- function(id, box_title = NULL,
   club_filter_column <- function(width) {
     column(width = width, uiOutput(ns("club_filter_ui")))
   }
-  checkbox_filters <- fluidRow(
+  checkbox_filters <- if (show_filters) fluidRow(
           class = "player-checkbox-filters",
           if (filter_by_own_team) {
             div(checkboxInput(ns("show_my_team_filter"),players_table_filter_label("Show players in my team", "house-user"),value=FALSE),
@@ -169,7 +170,7 @@ players_table_UI <- function(id, box_title = NULL,
       # Top Filter Bar Grid
       if (show_position_breakdown) {
         fluidRow(
-          column(width = 7,
+          if (show_filters) column(width = 7,
                  filter_panel(
                     if (filter_by_position) {
                       column(width = if(!filter_by_team&&!filter_by_value&&!filter_by_change_value)6 else 4, div(title = "Choose one or more primary or secondary positions. All includes every position.", players_table_position_filter_UI(ns("position_filter"))))
@@ -189,11 +190,11 @@ players_table_UI <- function(id, box_title = NULL,
                     column(width=12, checkbox_filters)
                  )
           ),
-          column(width = 5,
+          column(width = if (show_filters) 5 else 12,
                  uiOutput(ns("position_breakdown_ui"))
           )
         )
-      } else {
+      } else if (show_filters) {
         filter_panel(
           if (filter_by_position) {
             column(width = 3, div(title = "Choose one or more primary or secondary positions. All includes every position.", players_table_position_filter_UI(ns("position_filter"))))
@@ -434,7 +435,7 @@ players_table_renewal_disabled <- function(settings) {
   length(value)==1L && is.atomic(value) && !is.na(value) && identical(tolower(as.character(value)),"true")
 }
 
-players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL, available_funds_RV = NULL, hide_bid_column = FALSE, refresh_trigger = NULL, is_module_active = function() TRUE, optional_ready = function() TRUE, points_ratio_basis = NULL, own_squad = FALSE, league_settings_source = NULL, departing_player_ids = NULL, filter_by_own_team = FALSE, effective_squad_source = NULL, allow_scheduled_clauses = FALSE, incoming_player_ids = NULL, available_cash_RV = NULL) {
+players_table_Server <- function(id, players_table_RV, user_teams_RV, login_token = NULL, championship_id = NULL, user_team_id = NULL, available_funds_RV = NULL, hide_bid_column = FALSE, refresh_trigger = NULL, is_module_active = function() TRUE, optional_ready = function() TRUE, points_ratio_basis = NULL, own_squad = FALSE, league_settings_source = NULL, departing_player_ids = NULL, filter_by_own_team = FALSE, effective_squad_source = NULL, allow_scheduled_clauses = FALSE, incoming_player_ids = NULL, available_cash_RV = NULL, show_filters = TRUE) {
   if (!is.null(points_ratio_basis)) points_ratio_basis <- match.arg(points_ratio_basis, c("value", "clause_price"))
   moduleServer(id, function(input, output, session) {
     bind_factual_reads(c("get_finished_rounds"),session,login_token,championship_id,user_team_id,is_active=is_module_active,refresh_trigger=refresh_trigger)
@@ -479,7 +480,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
 
     # observers ----
     # observe user_teams_RV to update market_player_team_filter ----
-    observeEvent({ req(is_module_active(),optional_ready()); user_teams_RV() }, {
+    observeEvent({ req(show_filters,is_module_active(),optional_ready()); user_teams_RV() }, {
       req(is_module_active())
       teams <- user_teams_RV()
       req(teams)
@@ -581,6 +582,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
     })
     club_choices <- reactiveVal(NULL)
     observe({
+      req(show_filters)
       choices <- club_projection()$choices
       context <- table_context_RV()
       previous <- isolate(club_choices())
@@ -656,7 +658,7 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
     ## players_table_filtered_RV ----
     players_table_filtered_RV <- reactive({
       players_table <- players_table_enriched_RV()
-      if(is.null(players_table))return(NULL)
+      if (is.null(players_table) || !show_filters) return(players_table)
       filter_added_fields<-attr(players_table,"filter_added_fields")
       club <- input$club_filter
       if (length(club) == 1L && !is.na(club) && club != "All") {
@@ -863,8 +865,8 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
                 meta = rendered_meta,
                 rowClass = if(isTRUE(own_squad)&&is.function(departing_player_ids))players_table_departure_class()else NULL,
                 defaultSorted = list(recent_points_avg="desc"),
-                searchable = TRUE,
-                filterable = TRUE,
+                searchable = show_filters,
+                filterable = show_filters,
                 resizable = TRUE,
                 defaultPageSize = 20,
                 pagination = TRUE,

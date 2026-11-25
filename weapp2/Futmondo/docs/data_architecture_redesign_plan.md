@@ -1,5 +1,14 @@
 # Futmondo data architecture redesign plan
 
+## Rivals team selection and detail tabs (2026-11-25)
+
+- [x] Show loading progress and use the clicked team as the directory highlight.
+- [x] Open the financial history first and keep the complete income and expense breakdown below the table.
+- [x] Reuse My Team’s daily value trend on the selected rival’s unfiltered squad.
+- [x] Verify the local interaction at desktop and phone widths. Hosted rollout remains unverified.
+
+See the [Rivals display contract](rivals_module.md#rivals-directory-and-team-details--2026-11-25) and [local verification](data_review_results.md#rivals-team-selection-and-detail-tabs-2026-11-25).
+
 ## Immediate balance updates for manual offers and clauses (2026-11-25)
 
 - [x] Apply recognized native acknowledgements to the existing Balance summary in the originating session.

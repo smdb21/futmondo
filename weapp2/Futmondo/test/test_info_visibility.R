@@ -19,7 +19,9 @@ for(outgoing in c(FALSE,TRUE)){
  stopifnot(!grepl('class="fm-info',html,fixed=TRUE))
 }
 html<-as.character(team_received_offers_panel(list(status='loading',records=received_offers_empty(),error=NULL),identity))
-stopifnot(!grepl('class="fm-info',html,fixed=TRUE),is.null(rivals_status_message('Pending source',loading=TRUE,error=TRUE)))
+rivals_pending<-as.character(rivals_status_message('Pending source',loading=TRUE,error=TRUE))
+stopifnot(!grepl('class="fm-info',html,fixed=TRUE),grepl('role="status"',rivals_pending,fixed=TRUE),
+ !grepl('<details',rivals_pending,fixed=TRUE),!grepl('fm-info-inline-error',rivals_pending,fixed=TRUE))
 cat('PASS incoming/leaving/offers/rival waiting states hide icons; empty source wrappers never create empty boxes\n')
 # Exercise a pending read, then successful data, another pending refresh, and a
 # settled failure in the actual notification module. No real I/O is performed.

@@ -1077,6 +1077,25 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 .table-striped > tbody > tr:nth-of-type(odd), .rt-tr-striped { background: var(--fm-bg) !important; }
 .rt-tr-highlight:hover { background: var(--fm-border) !important; }
 .rt-tr-selected { background: var(--fm-highlight) !important; box-shadow: inset 4px 0 0 var(--fm-accent); font-weight: 700; }
+/* Standings cells have their own backgrounds, so paint the entire visible row. */
+.rivals-standings .rt-tbody .rt-td { cursor: pointer; }
+.rivals-team-button {
+    appearance: none; background: transparent; border: 0; padding: 0;
+    color: inherit; font: inherit; text-align: inherit; cursor: pointer;
+}
+.rivals-team-button:focus-visible { outline-offset: 0; }
+@media (hover: hover) {
+    .rivals-standings .rt-tr-highlight:hover .rt-td {
+        background-color: var(--fm-highlight);
+        background-color: color-mix(in srgb, var(--fm-accent) 9%, var(--fm-surface));
+    }
+}
+.rivals-standings .rt-tbody .rt-tr-selected .rt-td {
+    background-color: var(--fm-border);
+    background-color: color-mix(in srgb, var(--fm-accent) 24%, var(--fm-surface));
+}
+.rivals-standings .rt-tr-selected .rt-td:first-child { box-shadow: inset 4px 0 var(--fm-accent); }
+.rivals-loading-status { margin: 0 0 10px; font-weight: 600; }
 .fm-selected-rival-title { margin: 18px 0 10px; font-weight: 800; color: var(--fm-text); overflow-wrap: anywhere; }
 .fm-selected-rival-title .fa, .fm-selected-rival-title svg { margin-right: 8px; color: var(--fm-muted); }
 .ReactTable, .reactable { font-size: 13px; }
@@ -1481,6 +1500,37 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
   min-width: 0;
   line-height: 1.35;
 }
+
+/* Keep the ledger totals visible and the category breakdown compact when expanded. */
+.rivals-history-totals {
+  margin: 16px 0;
+  padding: 12px 16px;
+  border: 1px solid var(--fm-border);
+  border-radius: 6px;
+}
+.rivals-history-headline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 32px;
+  margin: 0 0 8px;
+}
+.rivals-history-headline > div { min-width: 0; overflow-wrap: anywhere; }
+.rivals-history-totals dt { font-weight: normal; color: var(--fm-muted); }
+.rivals-history-totals dd { margin: 0; font-variant-numeric: tabular-nums; }
+.rivals-history-headline dd { font-size: 1.15em; font-weight: 700; }
+.rivals-history-totals details > summary {
+  display: list-item;
+  list-style-position: inside;
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px 0;
+  cursor: pointer;
+  font-weight: 600;
+}
+.rivals-history-totals h5 { font-weight: 700; }
+.rivals-history-breakdown { margin: 0 0 8px; }
+.rivals-history-breakdown > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 8px; }
+.rivals-history-totals details .shiny-html-output > p:last-child { margin-bottom: 0; }
 
 /* Six financial cards share a desktop row and wrap for smaller screens. */
 .rivals-summary-grid {
