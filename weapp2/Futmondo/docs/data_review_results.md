@@ -6650,3 +6650,10 @@ Eleven MVP groups, eight round award groups, the crest display checks and
 all three deployment checks passed. The offline lifecycle passed 14 checks
 plus eight tabs. The fixed-schema legacy writer was checked independently
 from the full-XI JSON persistence path.
+## Scheduled lineup custom scoring — 2026-11-25
+
+The production schedule passed ownership after all four arrivals, but repeated pre-dispatch attempts ended with `source_unavailable`. The official and approved formations both used 4-5-1. Saved source evidence showed an empty lineup `pointSystem` and matching custom settings in the active-championship response. Offline replay through the actual R bridge reproduced `Lineup scoring context is unavailable`. The bridge's JSON simplification changed the fingerprint of nested persisted settings.
+
+The worker now uses the active-championship evidence from its existing round check and retains the exact nested database payload for fallback. The Python scheduler and R bridge passed three synthetic submission cases with explicit, calendar-derived and persisted scoring. Each case used the same Futmondo request counts with a single simulated save, restart readback, and no blind resend. The calendar case made zero scoring database reads. The fallback reused the existing indexed lookup. The focused lineup snapshot test passed 10 groups and measured 3.05 ms for explicit scoring and 4.07 ms for resolving blank scoring over 100 normalizations each. The offline Shiny lifecycle passed 14 checks plus eight tabs.
+
+The change adds no timer, UI render, source request or additional database write. It reuses the acknowledged calendar evidence and does a bounded normalization when the lineup selector is empty. Nested database rows use list columns, avoiding another JSON round trip. No real lineup submissions were made by the tests. Hosted execution and readback of the already approved job require the updated worker.

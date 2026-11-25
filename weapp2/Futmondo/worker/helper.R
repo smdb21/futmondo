@@ -164,20 +164,23 @@ fm_worker_discover<-function(handler,value,context,auth,league_refresh=FALSE){
 fm_worker_database_rows<-function(table,rows){
  if(!is.list(rows)||!is.null(names(rows)))stop('Invalid database bridge response')
  if(!length(rows))return(data.frame())
- # The finance view has text identity/time columns and one JSON object column.
- # Preserve nested payloads as list columns instead of serializing the entire
- # history a second time and expanding heterogeneous JSON into nested frames.
- if(identical(table,'rival_finance_evidence_latest')){
+ # Preserve nested JSON as list columns. Simplifying league scoring settings
+ # into nested data frames changes their fingerprint and blocks lineup saves.
+ if(table%in%c('rival_finance_evidence_latest','league_context_observations')){
   fields<-names(rows[[1]])
-  allowed<-c('account_id','championship_id','competition_id','season','evidence_type','source_id','observed_at','payload')
+  allowed<-c('account_id','championship_id','competition_id','season','observed_at','payload',
+    if(table=='rival_finance_evidence_latest')c('evidence_type','source_id')else c('scoring_version','expires_at','complete'))
   valid<-length(fields)>0L&&all(fields%in%allowed)&&all(vapply(rows,function(row)
     is.list(row)&&setequal(names(row),fields)&&all(vapply(fields,function(field){
       value<-row[[field]]
-      if(field=='payload')is.list(value)else is.null(value)||is.character(value)&&length(value)==1L
+      if(field=='payload')is.list(value)else if(field=='complete')is.logical(value)&&length(value)==1L
+      else is.null(value)||is.character(value)&&length(value)==1L
     },logical(1))),logical(1)))
   if(valid){
    columns<-setNames(lapply(fields,function(field){
-    if(field=='payload')lapply(rows,`[[`,field)else vapply(rows,function(row)row[[field]] %||% NA_character_,character(1))
+    if(field=='payload')return(lapply(rows,`[[`,field))
+    if(field=='complete')return(vapply(rows,`[[`,logical(1),field))
+    vapply(rows,function(row)row[[field]] %||% NA_character_,character(1))
    }),fields)
    return(structure(columns,class='data.frame',row.names=.set_row_names(length(rows))))
   }
@@ -508,12 +511,26 @@ fm_worker_run<-function(descriptor){
   # The scheduling bridge already acknowledges and reuses the live calendar
   # responses in its own scoped durable evidence. Avoid a second publication.
   env$persist_award_calendar_snapshot<-function(data,context)invisible(NULL)
+  scoring_needed<-FALSE
+  read_calendar<-env$mvp_api_answer
+  env$mvp_api_answer<-function(login,url,query){
+   result<-read_calendar(login,url,query)
+   if(scoring_needed&&identical(url,ACTIVE_CHAMPIONSHIPS_URL)&&identical(result$status,'ok')){
+    stamp<-attr(result,'observed_at')
+    rows<-env$normalize_active_league_contexts(result$answer,ctx$account_id,stamp)
+    selected<-Filter(function(row)isTRUE(row$complete)&&
+      identical(row$championship_id,ctx$championship_id)&&identical(row$competition_id,ctx$competition_id)&&
+      identical(row$season,ctx$season)&&fm_context_known(row$scoring_version),rows)
+    if(length(selected)==1L)env$remember_league_context(selected[[1]])
+   }
+   result
+  }
   read<-function(route,extra=list()){
    query<-c(list(championshipId=ctx$championship_id,userteamId=ctx$user_team_id),extra)
    result<-fm_pipe_exchange(list(type='http',url=paste0('https://api.futmondo.com',route),body=list(query=query)))
    answer<-env$lineup_api_answer(result$body,observed_at=fm_time(result$observed_at))
-   if(route=='/1/userteam/lineup'&&!isTRUE(descriptor$args$readback)&&!nzchar(fm_scalar(answer$pointSystem,'')))
-    env$get_persisted_league_context(ctx$account_id,ctx$championship_id,ctx$competition_id,ctx$season)
+   if(route=='/1/userteam/lineup'&&!isTRUE(descriptor$args$readback))
+    scoring_needed<<-!nzchar(fm_scalar(answer$pointSystem,''))
    answer
   }
   rounds<-function(){
@@ -521,6 +538,8 @@ fm_worker_run<-function(descriptor){
    if(!isTRUE(catalog$identity_complete)||nzchar(fm_scalar(catalog$reason,''))||
       !identical(catalog$league_id,ctx$competition_id)||!identical(catalog$user_team_id,ctx$user_team_id))
      stop('Round identity is unverified')
+   if(scoring_needed&&!fm_context_known(env$league_context_metadata(ctx$championship_id,ctx$account_id)$scoring_version))
+    env$get_persisted_league_context(ctx$account_id,ctx$championship_id,ctx$competition_id,ctx$season)
    catalog$rounds
   }
   result<-env$lineup_schedule_check(ctx,descriptor$args,read,rounds)

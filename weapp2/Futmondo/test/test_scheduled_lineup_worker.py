@@ -14,10 +14,12 @@ from worker.main import encrypt_access, stamp
 
 
 class Store:
-    def __init__(self):
+    def __init__(self, scoring=None):
         self.snapshots = []
         self.evidence = {}
         self.transitions = []
+        self.scoring = scoring
+        self.scoring_reads = 0
 
     async def request(self, method, path, **args):
         if path == 'lineup_schedule_evidence':
@@ -32,7 +34,10 @@ class Store:
                 self.snapshots[:] = [copy.deepcopy(args['json'])]
                 return None
             return self.snapshots
-        if path in ('worker_accounts', 'rival_finance_evidence_latest', 'league_context_observations'):
+        if path == 'league_context_observations':
+            self.scoring_reads += 1
+            return [self.scoring] if self.scoring else []
+        if path in ('worker_accounts', 'rival_finance_evidence_latest'):
             return []
         if path == 'rpc/lineup_schedule_dispatch':
             self.transitions.append('dispatch')
@@ -43,12 +48,16 @@ class Store:
         raise AssertionError(path)
 
 
-async def main():
+async def main(scoring_source):
     import time
     cutoff = stamp(int(time.time()) + 300)
+    custom = dict(media=[dict(media='official', pct=100)], ps=None, stats='fixture')
+    scoring = (dict(point_system='custom', custom=custom) if scoring_source else
+               dict(point_system='source', custom=None))
+    fingerprint = hashlib.sha256(json.dumps(scoring, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
     context = dict(account_id='account', championship_id='league', user_team_id='team',
                    competition_id='competition', season='season',
-                   scoring_version=hashlib.sha256(b'{"custom":null,"point_system":"source"}').hexdigest())
+                   scoring_version=fingerprint)
     roles = ['delantero'] * 2 + ['centrocampista'] * 4 + ['defensa'] * 4 + ['portero']
     roster = [dict(id=f'p{i}', name=f'Player {i}', role=role, status='ok', buyPrice=100) for i, role in enumerate(roles)]
     baseline = dict(strategy='4-4-2', starters=[p['id'] for p in roster], bench=[''] * 4, captain='')
@@ -71,12 +80,17 @@ async def main():
         body = json.loads(request.content)
         calls[path] += 1
         if path == '/1/userteam/lineup':
-            answer = dict(strategy='4-4-2', pointSystem='source',
+            answer = dict(strategy='4-4-2', pointSystem='' if scoring_source else 'source',
                           players=[dict(id=pid, position=i, buyPrice=100) for i, pid in enumerate(official['starters'])])
+            if scoring_source:
+                answer['custom'] = custom
         elif path == '/1/userteam/roster':
             answer = roster + ([dict(id='incoming', name='Signing', role='delantero', status='ok', buyPrice=100)] if arrived else [])
         elif path == '/2/user/activechampionships':
-            answer = dict(championships=[dict(id='league', league='competition', userteam={'id': 'team'})],
+            champ = dict(id='league', league='competition', userteam={'id': 'team'})
+            if scoring_source == 'calendar':
+                champ.update(ps='custom', custom=custom)
+            answer = dict(championships=[champ],
                           leagues=[dict(id='competition', season='season')])
         elif path == '/2/league/list':
             answer = [dict(id='competition', rounds=[dict(id='round', number=1, beginProcess=kickoff, status='next')])]
@@ -101,7 +115,10 @@ async def main():
             answer = {}
         return httpx.Response(200, json={'answer': answer})
 
-    store = Store()
+    stored_scoring = dict(context, observed_at=stamp(), expires_at=cutoff, complete=True,
+                          payload=dict(version=2, scoring_expires_at=cutoff, **scoring))
+    del stored_scoring['user_team_id']
+    store = Store(stored_scoring if scoring_source == 'database' else None)
     async with httpx.AsyncClient(transport=httpx.MockTransport(response)) as client:
         worker = SimpleNamespace(client=client, store=store, identity='worker', key=key, request_count=0,
                                  account_locks={}, connections=asyncio.Semaphore(1), request_interval=0,
@@ -120,15 +137,18 @@ async def main():
             assert store.transitions[-1] == 'saved'
             assert calls['/5/userteam/multichanges'] == 1
             assert store.snapshots[0]['payload']['official']['starters'][0] == 'incoming'
+            assert store.snapshots[0]['scoring_version'] == fingerprint
             assert calls['/2/league/list'] == 1
             await scheduler.execute(job)
             assert store.transitions[-1] == 'lineup_changed'
+            assert (store.scoring_reads > 0) == (scoring_source == 'database')
             assert not unexpected
-            print('PASS worker and R bridge: ownership, scoped checkpoint reuse, one send, restart readback and external edits')
+            print(f'PASS worker and R bridge ({scoring_source or "explicit"} scoring): ownership, scoped checkpoint reuse, one send, restart readback and external edits')
             print('Futmondo fixture requests:', dict(calls))
         finally:
             await scheduler.helper.close()
 
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    for source in (None, 'calendar', 'database'):
+        asyncio.run(main(source))
