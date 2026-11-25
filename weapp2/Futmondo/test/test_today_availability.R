@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Offline regression: Today must use its primary team information for both KPIs.
+# Offline regression: Today’s cash uses the shared primary team information.
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages({
   source('global.R')
@@ -17,7 +17,7 @@ get_user_team_info <- function(...) {
   fixture_snapshot
 }
 auth <- c(userid='today-fixture',token='offline-only')
-check_snapshot <- function(snapshot, cash_label, value_label) {
+check_snapshot <- function(snapshot, cash_label) {
   clear_api_cache()
   fixture_snapshot <<- list(budget=snapshot$cash,teamValue=snapshot$team_value)
   finance_reads <<- 0L
@@ -27,27 +27,24 @@ check_snapshot <- function(snapshot, cash_label, value_label) {
     championship_id=reactive('league'), user_team_id=reactive('team'),
     user_teams_RV=reactive({team_reads <<- team_reads + 1L; stop('Teams unavailable')}),
     refresh_trigger=reactive(0L)), {
-    cash <- valuation <- NULL
     deadline <- Sys.time()+3
-    while ((is.null(cash)||is.null(valuation)||is.null(team_state()$data)) && Sys.time()<deadline) {
+    repeat {
       session$flushReact(); later::run_now(0.01)
       cash <- tryCatch(output$kpi_cash_box, error=function(e)NULL)
-      valuation <- tryCatch(output$kpi_valuation_box, error=function(e)NULL)
+      ready <- grepl(cash_label, paste(unlist(cash),collapse=''), fixed=TRUE)
+      if (ready || Sys.time()>=deadline) break
     }
-    stopifnot(!is.null(cash), !is.null(valuation),
-      grepl(cash_label, paste(unlist(cash),collapse=''), fixed=TRUE),
-      grepl(value_label, paste(unlist(valuation),collapse=''), fixed=TRUE),
-      finance_reads==1L, team_reads==0L)
-    invisible(output$kpi_cash_box); invisible(output$kpi_valuation_box)
+    stopifnot(ready, finance_reads==1L, team_reads==0L)
+    invisible(output$kpi_cash_box)
     session$flushReact()
     stopifnot(finance_reads==1L, team_reads==0L)
   })
 }
-check_snapshot(list(status='partial',cash=142637644,team_value=34000000),
-  '142.637.644 €','34.000.000 €')
-cat('PASS primary team information renders both KPIs despite unavailable league teams; one shared read, zero teams reads\n')
-check_snapshot(list(status='partial',cash=0,team_value=NA_real_), '0 €', 'Unavailable')
-cat('PASS unknown team value stays unavailable while zero cash remains visible\n')
-check_snapshot(list(status='ok',cash=-50,team_value=0), '-50 €', '0 €')
-cat('PASS negative cash and genuine zero team value remain visible\n')
+stopifnot(!grepl('kpi_valuation_box',as.character(today_UI('today')),fixed=TRUE))
+check_snapshot(list(cash=142637644,team_value=34000000), '142.637.644 €')
+cat('PASS Today shows cash only, with one shared read and zero league-team reads\n')
+check_snapshot(list(cash=0,team_value=NA_real_), '0 €')
+cat('PASS zero cash remains visible when the team value is unknown\n')
+check_snapshot(list(cash=-50,team_value=0), '-50 €')
+cat('PASS negative cash remains visible\n')
 cat('TODAY AVAILABILITY: 3 passed / 0 failed\n')

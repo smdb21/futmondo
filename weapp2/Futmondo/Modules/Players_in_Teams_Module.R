@@ -2,17 +2,80 @@ library(reactable)
 players_in_teams_UI <- function(id) {
   ns <- NS(id)
   tagList(tags$style(HTML(".fm-team-panels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-bottom:20px}.fm-team-panels>div{min-width:0}.fm-team-panels .fm-incoming-panel{height:100%;margin-bottom:0}.fm-offer-rival{color:var(--fm-warning,#f0c75e);font-weight:600}@media(max-width:767px){.fm-team-panels{grid-template-columns:minmax(0,1fr);gap:12px}}.fm-incoming-panel{border:1px solid var(--fm-border,#315540);border-radius:8px;padding:16px;margin-bottom:20px}.fm-incoming-panel h3{margin-top:0}.fm-incoming-player{display:flex;gap:16px;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid var(--fm-border,#315540)}.fm-incoming-identity{display:flex;gap:10px;align-items:center;flex-wrap:wrap;min-width:0}.fm-incoming-identity a{overflow-wrap:anywhere}.fm-incoming-arrival{display:flex;flex-direction:column;gap:4px;text-align:right;min-width:0}.fm-incoming-round{font-weight:600}.fm-incoming-round-line{display:grid;grid-template-columns:minmax(0,max-content)28px;gap:4px 6px;align-items:center;justify-content:end;text-align:left}.fm-incoming-round-line>.fm-info{display:contents}.fm-incoming-round-line>.fm-info>summary{grid-column:2;grid-row:1}.fm-incoming-round-line>.fm-info>.fm-info-body{grid-column:1/-1;grid-row:2}.fm-incoming-schedule{color:var(--fm-muted)}.fm-incoming-error{color:var(--fm-warning,#f0c75e);overflow-wrap:anywhere}@media(max-width:600px){.fm-incoming-player{display:flex;flex-direction:column;align-items:stretch;gap:8px}.fm-incoming-arrival{text-align:left}.fm-incoming-round-line{justify-content:start}.fm-incoming-panel{padding:12px}}")),
+    uiOutput(ns("team_value_box")),
     tags$div(class="fm-team-panels",uiOutput(ns("incoming_players")),uiOutput(ns("outgoing_players")),
       uiOutput(ns("nonfit_players"), class="fm-squad-status-output"),
       tags$div(style="grid-column:1/-1",uiOutput(ns("received_offers")))),
-    uiOutput(ns("team_value_box")),
     actionButton(ns("btn_put_all_on_market"), "Put All Players on Market", icon=icon("tags")),
     players_table_UI(ns("players_table_in_teams"), box_title="Players in Team",
       filter_by_team=FALSE, filter_by_value=FALSE, filter_by_change_value=FALSE,
       filter_by_is_favorite=FALSE, filter_by_is_from_futmondo=FALSE,
       show_position_breakdown=TRUE, hide_bid_column=FALSE))
 }
-players_in_teams_Server <- function(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger=NULL, round_catalog=NULL, league_settings_source=NULL, clause_transfers_source=NULL) {
+team_value_summary <- function(team_state, roster_state) {
+  roster <- roster_state$data
+  roster_status <- attr(roster, "worker_acquisition_status") %||% roster_state$status
+  complete_roster <- is.data.frame(roster) &&
+    roster_status %in% c("ok", "empty", "stale", "loading") &&
+    !identical(attr(roster, "worker_completeness"), "partial")
+  known_column <- function(column) {
+    if (!complete_roster) return(NULL)
+    values <- suppressWarnings(as.numeric(as.character(roster[[column]])))
+    if (length(values) == nrow(roster) && all(is.finite(values))) values else NULL
+  }
+  status <- function(amount, state) {
+    if (is.finite(amount)) {
+      if (identical(state$freshness, "stale")) "stale" else "ready"
+    } else if (identical(state$status, "loading")) "loading" else "unavailable"
+  }
+
+  info <- team_state$data
+  value <- fm_number(info$teamValue, fm_number(info$team_value))
+  value_source <- team_state
+  if (!is.finite(value)) {
+    values <- known_column("value")
+    if (!is.null(values)) {
+      value <- sum(values)
+      value_source <- roster_state
+    } else if (identical(roster_state$status, "loading")) {
+      value_source <- roster_state
+    }
+  }
+  changes <- known_column("change")
+  trend <- if (is.null(changes)) NA_real_ else sum(changes)
+  list(value = value, value_status = status(value, value_source),
+    trend = trend, trend_status = status(trend, roster_state),
+    up = if (is.null(changes)) NA_integer_ else sum(changes > 0),
+    down = if (is.null(changes)) NA_integer_ else sum(changes < 0))
+}
+
+team_value_summary_panel <- function(summary, ns) {
+  amount <- function(value, status) {
+    if (identical(status, "loading")) "Loading…" else player_card_money(value)
+  }
+  movement <- function(direction, count, label) {
+    tags$div(class = paste0("fm-team-trend-", direction), title = label,
+      icon(paste0("arrow-", direction)),
+      tags$span(class = "sr-only", paste0(label, " ")),
+      if (is.na(count)) tagList(tags$span(class = "sr-only", "Unavailable"),
+        tags$span(`aria-hidden` = "true", "—")) else count)
+  }
+  tags$section(class = "fm-team-value-summary", `aria-labelledby` = ns("team_value_label"),
+    tags$div(class = "fm-team-value-total",
+      tags$span(id = ns("team_value_label"), "Team value"),
+      tags$strong(amount(summary$value, summary$value_status)),
+      if (identical(summary$value_status, "stale")) tags$small("Last saved")),
+    tags$div(class = "fm-team-value-trend",
+      tags$div(title = "24-hour change in squad market value",
+        if (identical(summary$trend_status, "stale")) "Last saved trend" else "Total trend",
+        tags$strong(paste0(if (isTRUE(summary$trend > 0)) "+" else "",
+          amount(summary$trend, summary$trend_status)))),
+      tags$div(class = "fm-team-trend-counts",
+        movement("up", summary$up, "Players with positive trend"),
+        movement("down", summary$down, "Players with negative trend"))))
+}
+
+players_in_teams_Server <- function(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger=NULL, round_catalog=NULL, league_settings_source=NULL, clause_transfers_source=NULL, team_info_source=NULL) {
   moduleServer(id, function(input, output, session) {
     bind_factual_reads(c("get_players_from_team","get_my_market_players"),session,login_token,championship_id,user_team_id,
       is_active=is_module_active,refresh_trigger=refresh_trigger)
@@ -218,22 +281,12 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
     effective_squad<-resource_display_source(session,function(){
       req(is_module_active());team_effective_squad_count(players_table_RV(),incoming())
     })
-    output$team_value_box <- renderUI({
-      req(is_module_active());roster <- players_table_RV()
-      values <- suppressWarnings(as.numeric(roster$value))
-      total <- if (length(values) && all(is.finite(values))) player_card_money(sum(values)) else "Unavailable"
-      arrivals<-incoming();count<-nrow(arrivals$records)
-      incoming_text<-if(identical(arrivals$status,"loading")) {
-        if(count)paste0(count," incoming (checking)")else "checking incoming"
-      }else if(identical(arrivals$status,"partial")) {
-        if(count)paste0(count," incoming · verification incomplete")else "incoming signings need verification"
-      }else paste0(count," incoming")
-      pending<-arrivals$status%in%c("loading","partial")
-      subtitle<-paste0(nrow(roster)," players in your squad",
-        if(!pending||count>0L)paste0(" · ",count," incoming")else "")
-      box<-shinydashboard::valueBox(total,subtitle,icon=icon("users"),color="green",width=12)
-      if(pending)htmltools::tagAppendChild(box,fm_info(incoming_text,error=identical(arrivals$status,"partial"),pending=identical(arrivals$status,"loading")))else box
+    team_value_display <- resource_display_source(session, function() {
+      req(is_module_active())
+      info <- if (is.function(team_info_source)) team_info_source() else NULL
+      team_value_summary(info, roster_state())
     })
+    output$team_value_box <- renderUI(team_value_summary_panel(team_value_display(), ns))
     # ---- Put All Players on Market Modal ----
     output$bulk_listing_preview <- renderUI({
       req(!is.null(bulk_context()), identical(bulk_context(), current_context()))

@@ -15,7 +15,7 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
    await page.waitForTimeout(1000);
    await page.evaluate(()=>{
     window.renderEvents=[];
-    const ids=['worker_status','today-kpi_cash_box','today-kpi_valuation_box','today-recent_transfers','account_finance_summary','round_finance_amounts','round_countdown','today-market_players-players_table'];
+    const ids=['worker_status','today-kpi_cash_box','today-recent_transfers','account_finance_summary','round_finance_amounts','round_countdown','today-market_players-players_table'];
     $(document).on('shiny:recalculating.fixture shiny:value.fixture',e=>{
      if(ids.includes(e.target.id))window.renderEvents.push({type:e.type,id:e.target.id});
     });

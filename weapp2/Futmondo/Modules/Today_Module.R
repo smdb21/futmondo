@@ -40,7 +40,7 @@ today_transfer_rows <- function(rows, teams=NULL, players=NULL,timezone=fm_displ
 today_UI <- function(id) {
   ns <- NS(id)
   tagList(h2("Today's market"),
-    fluidRow(uiOutput(ns("kpi_cash_box")),uiOutput(ns("kpi_valuation_box"))),
+    fluidRow(uiOutput(ns("kpi_cash_box"))),
     uiOutput(ns("market_status")),
     players_table_UI(ns("market_players"),box_title="Current market listings",filter_by_is_from_futmondo=TRUE,filter_by_value_under_available_funds=TRUE,default_free_agents=TRUE,filter_by_players_with_bid=TRUE),
     h3("League transfers"),uiOutput(ns("transfer_coverage")),reactable::reactableOutput(ns("recent_transfers")))
@@ -123,14 +123,8 @@ today_Server <- function(id,is_module_active,login_token,championship_id,user_te
       if (is.null(state$data) && !is.finite(cash)) return(primary_placeholder(state,"Current balance"))
       shinydashboard::valueBox(player_card_money(cash),"Current balance",icon=icon("wallet"),color="green",width=6)
     })
-    valuation_display<-resource_display_source(session,function(){
-      state<-team_state();if(is.null(state$data))return(NULL)
-      info<-state$data
-      shinydashboard::valueBox(player_card_money(fm_number(info$teamValue %||% info$team_value)),"Team value",icon=icon("users"),color="blue",width=6)
-    })
     output$market_status<-renderUI(market_status_display())
     output$kpi_cash_box<-renderUI(cash_display())
-    output$kpi_valuation_box<-renderUI(valuation_display())
     transfer_rows <- reactive({
       req(is_module_active(),valid_login(login_token()))
       shiny::validate(shiny::need(primary_settled(),"Loading recent transfers…"),errorClass="fm-loading")

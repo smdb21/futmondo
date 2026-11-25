@@ -107,7 +107,7 @@ app_check('full server login, navigation, refresh and logout',{
   app_settle(session) # Finish the synthetic startup DB check before submitting.
   session$setInputs(tabs='login',`login-user_name`='offline@example.invalid',`login-password`='fixture',`login-login_button`=1)
   session$elapse(100);app_settle(session);stopifnot(valid_login(login_token_RV()))
-  tabs<-list(today=c('today-kpi_cash_box','today-kpi_valuation_box','today-market_players-players_table','today-recent_transfers'),
+  tabs<-list(today=c('today-kpi_cash_box','today-market_players-players_table','today-recent_transfers'),
    yourteam=c('players_in_teams-team_value_box','players_in_teams-players_table_in_teams-players_table'),
    players_in_championship='players_in_championship-championship_players_table-players_table',
    rivals=c('rivals-league_finances_table','rivals-league_finances_plot','rivals-team_valuation_history_plot'),
@@ -124,6 +124,10 @@ app_check('full server login, navigation, refresh and logout',{
      session$setInputs(`plots-plot_tab`=unname(subtab[id]));app_settle(session)
     }
     stopifnot(!is.null(output[[id]]))
+   }
+   if(tab=='yourteam') {
+    summary<-output[['players_in_teams-team_value_box']]$html
+    stopifnot(grepl('34.000.000 €',summary,fixed=TRUE),grepl('+170.000 €',summary,fixed=TRUE))
    }
    cat('[PASS] rendered tab:',tab,'\n')
   }

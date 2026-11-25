@@ -6535,3 +6535,26 @@ unaffected. The received-offers checks passed all 10 groups, the offline
 Shiny lifecycle passed 14 checks and eight tabs, and the deployment contract
 passed all three checks. Browser checks used synthetic offers and crests.
 Hosted rollout and physical-phone appearance were outside this verification.
+
+## Team value and daily trend — 2026-11-25
+
+The summary prefers the same saved Futmondo squad value that Today’s Market
+previously displayed. The trend and direction counts use the signed daily
+price changes on the saved roster. The previous My Team value card waited on
+the enriched roster and incoming-transfer state. Its replacement projects
+directly from the existing team and roster states and leaves market listing
+and arrival updates to their own panels. There are no added API or database
+reads or writes, cache entries, invalidations, timers or network assets.
+The 24-player calculation took a median 30 microseconds over five batches
+of 1,000 calls. The card stores only the display amounts, counts and statuses.
+
+Known-answer fixtures verified the official value and complete-roster
+fallback, positive, negative and flat changes, a net-zero trend, verified
+empty rosters, and missing, partial and stale observations. The focused
+My Team, Today cash and received-offer checks passed. The full offline Shiny
+lifecycle passed 14 checks and eight tabs, including the moved value and the
+€170,000 fixture trend. Synthetic Chromium checks passed in both themes at
+320, 390 and 1440 px. The card showed the two stacked arrows without overflow,
+updated for changed trends and retained its DOM when only the observation
+clock changed. Hosted rollout and signed-in official UI were outside
+this verification.

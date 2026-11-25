@@ -99,7 +99,7 @@ function(input, output, session) {
   observe({input$tabs;if(valid_login(login_token_RV()))session$userData$league_context_source()})
   bind_factual_reads(c("get_teams","get_finished_rounds"),session,
     login_token_RV,championship_id_RV,user_team_id_RV,is_active=function()valid_login(login_token_RV())&&isTRUE(startup_primary_ready()),refresh_trigger=refresh_trigger)
-  # Today and the banner consume the exact same account/league/team states.
+  # Today, My Team and the banner share the same account/league/team information.
   # The display never waits for roster, pressroom, lineup or acquisition checks.
   team_retry <- reactiveVal(0L); market_retry <- reactiveVal(0L)
   primary_read <- function(handler, retry) {
@@ -344,7 +344,8 @@ selected_player_RV <- players_in_teams_Server(id = "players_in_teams",
                                                  refresh_trigger = refresh_trigger,
                                                  round_catalog = round_catalog_RV,
                                                  league_settings_source = league_settings_source,
-                                                 clause_transfers_source = clause_transfers_RV)
+                                                 clause_transfers_source = clause_transfers_RV,
+                                                 team_info_source = primary_team_state)
 
   lineup <- lineup_Server("lineup", reactive(identical(input$tabs,"lineup")),
     login_token_RV, championship_id_RV, user_team_id_RV, round_catalog_RV,

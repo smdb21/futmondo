@@ -44,7 +44,7 @@ The module no longer contains lineup forecasts, optimized XI selection, transfer
 
 ## Incoming clause signings
 
-A separate **Incoming players (N)** panel appears above the current roster. The squad-value subtitle also reports current and incoming counts separately (for example, “18 players in your squad · 2 incoming”). Initial verification says “checking incoming”; it never turns an unfinished check into a verified zero. Incoming players are excluded from current squad valuation/counts, lineup inputs and bulk listing actions.
+The **Incoming players (N)** panel above the current roster shows the verified incoming count and its own status while checking. The squad table and capacity summary show current roster counts. Pending arrivals are outside the current roster used for value trends, lineup inputs and bulk listing actions.
 
 Candidate purchases come from the existing shared pressroom transaction history. The existing player-summary response confirms `championship.clause.transferred`, the current owner and the authoritative `transferDate`; `data` supplies the player's name, role and club crest. No league-wide player scan is needed. The reconciliation helper now also returns presentation records: player, seller, purchase instant, scheduled arrival, observation instant and any specific timing issue. Existing capacity reservation outputs keep their strict fail-closed behavior, including overdue transfers.
 
@@ -127,3 +127,27 @@ enqueue source acquisition, write restored observations, or change acquisition
 cadence, persistence acknowledgement, freshness deadlines or manual preflights.
 Clock-only updates change text without replacing the note or transfer panels.
 No new dependency, environment variable, migration or product capability is added.
+
+## Team value and daily trend — 2026-11-25
+
+My Team's first card shows **Team value**, followed by a smaller **Total trend**
+row. The row places the signed euro change to the left of two stacked counts
+with a green up arrow and a red down arrow. Screen readers get the direction
+of each count. Players with a zero change contribute zero to the sum and leave
+both directional counts unchanged.
+
+`players_in_teams_Server(..., team_info_source = NULL)` receives the root's
+existing scoped team-information state. `team_value_summary()` uses the native
+`teamValue` field or its saved `team_value` alias, with the complete roster's
+sum of market values as a fallback. The trend uses the sum of the signed euro
+`change` fields on the same saved roster used for the player table and offers.
+It measures the current roster's 24-hour player price changes. An explicitly
+empty roster yields zero trend and zero counts. Missing changes or incomplete
+roster coverage leave the trend and counts unavailable. Stale values are
+identified as last saved. [Captured team information](har_api_reference.md#12-post-1userteaminformation),
+[captured roster](har_api_reference.md#15-post-1userteamroster).
+
+`team_value_summary_panel()` renders the two rows. The summary reuses the existing
+database-backed team and roster observations, independently of the market and
+incoming-transfer panels. Its reactive projection publishes only when a displayed
+amount, count or status changes. It adds no reads, writes, timers or cache entries.

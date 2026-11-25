@@ -2328,7 +2328,7 @@
       "checksum": "9217ff417b16df93d60992b39fc3474a"
     },
     "Modules/Login_Module.R": {
-      "checksum": "648b8937e5d6471502af279184616ca1"
+      "checksum": "a5338b3f0aeeb853b072a0fc38476ef8"
     },
     "Modules/Market_Module.R": {
       "checksum": "676429892e2008352ddce0a3a4a2e32b"
@@ -2340,7 +2340,7 @@
       "checksum": "252f766c7e89b506009837a9bf406444"
     },
     "Modules/Players_in_Teams_Module.R": {
-      "checksum": "bdda96017ad3889b9b39d591aed9a3f4"
+      "checksum": "4b154d3ea2e9f7ef1462b8b332c98ac0"
     },
     "Modules/Players_Table_Module.R": {
       "checksum": "004fad1fde7d596b1e4854f1be9c8242"
@@ -2358,7 +2358,7 @@
       "checksum": "800eaf7dd7e432b84888a139d20d1e56"
     },
     "Modules/Today_Module.R": {
-      "checksum": "dca1d343fff0f8061c74cd2dcbb49db7"
+      "checksum": "ef7a984757f240cea16478d8c57bcaa8"
     },
     "mvp_runtime.R": {
       "checksum": "4dd6f119f075a7bc48143617c0c4dc2c"
@@ -2391,7 +2391,7 @@
       "checksum": "6941ec3d550551d6c41a20b6a4d2ff3e"
     },
     "server.R": {
-      "checksum": "544a3673efadbdcea34450a772a9f2e2"
+      "checksum": "c49ccfc4e9b083b0e2d71c438546032c"
     },
     "supabase_connector.R": {
       "checksum": "f49117c4a21dd8d417a32070c206f2cf"
@@ -2412,7 +2412,7 @@
       "checksum": "6665832984c50aa8ee2d9ce096a6f329"
     },
     "www/custom_style.css": {
-      "checksum": "4bab97c3c11f5086cbcedd4ed44f6817"
+      "checksum": "3b744bc12bd295c6ec633d02977fa16a"
     },
     "www/info-disclosures.js": {
       "checksum": "c857838c71c03ff562f0e6ad2dfa0359"

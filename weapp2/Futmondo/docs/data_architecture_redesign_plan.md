@@ -2623,3 +2623,12 @@ league. Hosted recalculation remains to be verified.
 
 See [plot contracts](plots_module.md#historical-participation-and-faster-first-curves--2026-11-25)
 and [verification](data_review_results.md#standings-latency-and-historical-participation--2026-11-25).
+
+## Team value and daily trend — 2026-11-25
+
+The value card moved from Today's Market to My Team. Its second row shows the
+net daily change across the current roster, with counts of rising and falling
+players. The app reuses the existing saved team and roster observations. See
+[the display and data contract](players_in_teams_module.md#team-value-and-daily-trend--2026-11-25)
+and [local verification](data_review_results.md#team-value-and-daily-trend--2026-11-25).
+Hosted rollout remains unverified.

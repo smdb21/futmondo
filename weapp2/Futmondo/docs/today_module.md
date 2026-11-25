@@ -17,7 +17,7 @@ Initial primary-settled state is latched per account/league/team, so login-time 
 
 The page heading is **Today's market**. As of 2026-11-15, the introductory information icon and its market/balances/transfers tooltip are omitted at the owner’s request. Its market table starts with **Free Agents Only** checked. This is a table-specific initial setting; users can uncheck it or use Clear Filters to see owned listings too. The navigation label is **Today's market**. The team page appears in navigation as **My team**. No retrieval, financial calculation, action or refresh behavior changed.
 
-The **Current balance** and **Team value** cards use the active theme's text color so both labels and amounts are readable on the themed card background.
+The **Current balance** card uses the active theme's text color. On 2026-11-25, **Team value** moved to My Team, which reuses the same team information for its [value and daily trend card](players_in_teams_module.md#team-value-and-daily-trend--2026-11-25).
 
 ## Recent transfer presentation (2026-11-01)
 

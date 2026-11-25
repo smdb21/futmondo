@@ -10,6 +10,37 @@
 .fm-account-finance:has(.round-countdown-warning) { border-color:var(--fm-danger); }
 @media(max-width:767px) { .fm-account-finance { padding:12px; } .fm-account-finance .round-countdown-finance { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media(max-width:359px) { .fm-account-finance .round-countdown-finance { grid-template-columns:minmax(0,1fr); } }
+.fm-team-value-summary {
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    border: 1px solid var(--fm-border);
+    border-radius: 6px;
+    background: var(--fm-surface);
+    color: var(--fm-text);
+    font-variant-numeric: tabular-nums;
+}
+.fm-team-value-total {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 10px;
+    font-size: clamp(18px, 3vw, 24px);
+}
+.fm-team-value-total small { color: var(--fm-muted); font-size: 12px; }
+.fm-team-value-trend {
+    display: grid;
+    grid-template-columns: minmax(0, max-content) max-content;
+    align-items: center;
+    gap: 12px;
+    margin-top: 4px;
+    font-size: 14px;
+}
+.fm-team-value-trend strong { display: inline-block; margin-left: 6px; }
+.fm-team-trend-counts { display: grid; gap: 2px; line-height: 1.2; }
+.fm-team-trend-counts > div { display: flex; align-items: center; gap: 6px; }
+.fm-team-trend-up { color: var(--fm-text); }
+.fm-team-trend-down { color: var(--fm-danger); }
+
 /* System monospace typography; no external font request. */
 .round-countdown-bar { position: sticky; top: 0; z-index: 1025; display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; margin: 0 0 12px; padding: 9px 14px; border: 1px solid var(--fm-border); border-radius: 3px; background: var(--fm-bg); color: var(--fm-text); font-size: 12px; line-height: 1.4; font-variant-numeric: tabular-nums; }
 .round-countdown-main { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }

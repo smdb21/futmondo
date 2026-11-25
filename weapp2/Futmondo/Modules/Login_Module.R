@@ -27,6 +27,8 @@ login_feature_tiers <- function() {
           description = "Sort players by their average over your chosen 1–20 recent rounds across market, squad and player tables."),
         list(id = "price_efficiency", title = "Points per million",
           description = "Rank recent points relative to market value or clause price to compare player value."),
+        list(id = "squad_value_trend", title = "Squad value trends",
+          description = "See your team’s total daily market-value change and how many players rose or fell in value."),
         list(id = "rival_cash", title = "Reconstructed rival balances",
           description = "Inspect estimated rival cash and its running ledger of opening funds, transfers and configured rewards, with missing evidence identified."),
         list(id = "scheduled_clauses", title = "Scheduled clause purchases",

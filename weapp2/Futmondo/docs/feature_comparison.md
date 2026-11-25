@@ -152,6 +152,7 @@ Futmondo documents configurable borrowing in its maximum bid. LigaRadar’s exis
 | `lineup_optimizer` — Best XI + bench optimization | Suggested lineup and aggregate lineup average already exist; the automatic coach performs post-round substitutions. | An explicit click maximizes observed average totals over a selected 1–20 completed-round window across permitted formations, then chooses substitutes using their primary positions for coverage; an optional full outfield coverage requirement can also constrain the XI and formation. Always excludes injured, suspended and unavailable players and verified departures by next kickoff; doubtful players are optional and excluded by default. It is a LigaRadar calculation independent of opening the official suggested-lineup control, which the owner does not see in their league. Permitted formation entitlements, multiposition, player eligibility and official save preflights still apply. A complete eligible history/check is required; the user reviews and saves the draft. | `Modules/Lineup_Module.R`, `lineup_runtime.R`; [lineup](lineup_module.md). |
 | `recent_average` — Player rankings by last-N average | Player averages and a top-five total-points ranking already exist. | Choose 1–20 recent rounds and numerically sort market, squad and all-player tables by that window's average. Table windows and lineup completed-round windows have distinct documented finality contracts. Unknown scores remain unknown; source zero and negative scores count. | `Modules/Players_Table_Module.R`, `factual_helpers.R`; [player tables](players_table_module.md), [score reuse](round_points_matrix.md). |
 | `price_efficiency` — Points per million | Official market/clause prices and player points. | Sort the same recent average divided by market value in Today or clause price in Players, expressed as points per €1M. Missing/nonpositive prices do not produce ratios. | `Modules/Players_Table_Module.R`; [player tables](players_table_module.md#points-to-price-ratios). |
+| `squad_value_trend` — Squad value trends | Futmondo documents squad valuations and player price movements. | My Team combines the squad value with the total 24-hour change in its players' prices and separate rising and falling player counts. | [My Team](players_in_teams_module.md#team-value-and-daily-trend--2026-11-25). |
 | `rival_cash` — Reconstructed rival balances | Own financial movements and other teams' squad values. | Reconcile an estimated rival cash balance and running history from opening funds, transfers, configured rewards and available historical eligibility. Estimates, gaps and discrepancies remain labelled. | `Modules/Rivals_Module.R`; [cash accounting](rival_cash_accounting.md), [rivals](rivals_module.md). |
 | `transfer_histogram` — League transfer activity over time | Personal financial movements and dated player transfer history. | Sum recorded transfer amounts across the championship and compare daily, weekly or monthly periods. | [Plots](plots_module.md#money-movements--2026-11-23). |
 | `trading_profit` — Trading profit and wealth comparisons | Player ownership/purchase history and own financial records. | Compare league completed-trade profit and estimated wealth gained; inspect matched purchase/sale cycles and related fees with missing costs kept unavailable. | `Modules/Rivals_Module.R`; [rivals](rivals_module.md#trading-profit-and-overall-wealth-gained--2026-11-06). |
@@ -421,3 +422,14 @@ source workflows. Signed-in official chart layout and network latency were
 outside this comparison. [Official app](https://app.futmondo.com/),
 [Futmondo guide](https://help.futmondo.com/article/90-empieza-a-jugar-a-futmondo),
 [implementation](plots_module.md#historical-participation-and-faster-first-curves--2026-11-25).
+
+### Squad value trends — reviewed 2026-11-25
+
+Futmondo's rules document squad valuations in Administration's Teams section.
+Its price guide describes individual player value movements. LigaRadar puts the
+existing squad value in My Team beside a daily net change and counts of players
+whose values rose or fell. The official public app exposed its application
+shell. The equivalent signed-in aggregation and layout were outside this
+review. [Official web app](https://app.futmondo.com/),
+[game rules](https://help.futmondo.com/article/91-reglas-del),
+[player price guide](https://help.futmondo.com/article/95-como-fluctua-el-precio-de-los-jugadores).
