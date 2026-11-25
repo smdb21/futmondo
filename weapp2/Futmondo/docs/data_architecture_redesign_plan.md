@@ -2661,6 +2661,6 @@ player catalog as the round cards. See the [verification results](data_review_re
 
 - [x] Trace the production schedule past roster ownership and reproduce the custom-scoring preflight failure with anonymized evidence.
 - [x] Reuse scoped calendar scoring evidence and preserve nested settings in the persisted fallback.
-- [ ] Confirm the hosted worker reads back the scheduled lineup on the official account.
+- [x] Confirm the hosted worker reads back the scheduled lineup and persists the matching official selection.
 
 See the [scoring contract](lineup_module.md#custom-scoring-in-scheduled-saves--2026-11-25) and [verification results](data_review_results.md#scheduled-lineup-custom-scoring--2026-11-25).
