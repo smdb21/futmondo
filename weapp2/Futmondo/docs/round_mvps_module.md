@@ -46,7 +46,35 @@ players tied at the cutoff. The searchable, sortable table includes every
 selected player and shows their appearances, MVP wins and round share.
 
 The Statistics tab renders on demand from the same scoped award snapshot as the
-round cards. It uses the names in the official selections and needs no player
-catalog, additional database read, or source request. Chart labels and counts
+round cards. It uses official award names and shares the cards’ saved player
+catalog when historical club or position details need a fallback. Chart labels and counts
 are available as text. The charts sit side by side when space permits and
 stack on phones. Source coverage messages accompany partial rankings.
+
+### Club crests and positions — 2026-11-25
+
+Both leader charts and the All award winners table show a crest and position
+beside each name. The crest comes from the most recent counted selection that
+records a club or logo. The club name and logo always come from the same
+appearance. The position label lists the distinct playing roles recorded in
+counted Best XIs in GK, DEF, MID and FWD order. The official numeric
+`position` is a pitch slot and cannot supply a playing role.
+
+`normalize_official_dreamteam()` retains the official player’s `team` and
+`logo` as `award_team` and `award_logo` in the full-XI evidence payload.
+`rival_award_snapshot_rows()` restores these alongside the existing role
+and score. The legacy relational writer projects only its supported columns.
+Older saved revisions remain readable. `round_award_player_stats()`
+projects the club pair and `award_positions` from eligible selections.
+
+`round_award_player_identities()` matches an older selection to the same player ID
+in the saved championship catalog when award metadata is missing. A club name
+recorded in the award limits logo fallback to that club. The labels use the
+existing club-image mapping when only a club name is available. A missing
+historical role can use the catalog’s primary and secondary roles, identified
+in the tooltip. Without a recorded club or position, the name and totals stay
+visible. An unknown position displays a dash and a tooltip.
+
+The Player column keeps its original text for sorting and searching. Only the visible page constructs table labels.
+The charts and table share the resolved club and position fields, and images load lazily. Updating club details reuses the existing
+award counts.

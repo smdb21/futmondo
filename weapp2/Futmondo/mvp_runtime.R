@@ -11,6 +11,8 @@ mvp_result <- function(status, rows = data.frame(), reason = "", code = "", comp
 # Input is the shared, scoped award snapshot with one current revision per round.
 round_award_player_stats <- function(rows, championship_id) {
   players <- data.frame(player_id = character(), player_name = character(), best_xi = integer(), mvp = integer())
+  players$award_positions <- character()
+  players$award_team <- players$award_logo <- character()
   out <- list(players = players, rounds = 0L, unconfirmed_rounds = 0L, incomplete_rounds = 0L,
     unsaved_rounds = 0L, scope_issue = "")
   if (!is.data.frame(rows) || !nrow(rows)) return(out)
@@ -69,9 +71,31 @@ round_award_player_stats <- function(rows, championship_id) {
   names_latest <- names_seen[named][match(players, ids[named])]
   names_latest[is.na(names_latest)] <- players[is.na(names_latest)]
   index <- match(ids, players)
+  # The official player_position is a pitch slot (0–10). Named roles identify
+  # which football positions the player represented in the counted selections.
+  roles <- as.character(rows$player_role[selected])
+  observed_roles <- unique(roles)
+  normalized <- analytics_player_positions(data.frame(role = observed_roles), multiposition = TRUE)
+  positions <- rep(NA_character_, length(players))
+  for (position in c("GK", "DEF", "MID", "FWD")) {
+    raw_roles <- observed_roles[vapply(normalized, function(x) position %in% x, logical(1))]
+    winners <- unique(index[roles %in% raw_roles])
+    previous <- positions[winners]
+    positions[winners] <- ifelse(is.na(previous), position, paste(previous, position, sep = " / "))
+  }
   out$rounds <- sum(states == "counted")
   out$players <- data.frame(player_id = players, player_name = names_latest,
     best_xi = tabulate(index, length(players)), mvp = tabulate(index[is_mvp[selected]], length(players)))
+  # Keep the club label and asset from one awarded appearance, even after a transfer.
+  club_fields <- c("award_team", "award_logo")
+  for (field in setdiff(club_fields, names(rows))) rows[[field]] <- ""
+  clubs <- rows[selected, club_fields, drop = FALSE]
+  clubs[is.na(clubs)] <- ""
+  observed <- which(nzchar(clubs$award_team) | nzchar(clubs$award_logo))
+  latest <- clubs[observed[match(players, ids[observed])], , drop = FALSE]
+  latest[is.na(latest)] <- ""
+  out$players[club_fields] <- latest
+  out$players$award_positions <- positions
   out
 }
 
@@ -461,6 +485,7 @@ normalize_official_dreamteam <- function(answer, championship_id, reference) {
     data.frame(championship_id=as.character(championship_id),round_id=reference$round_id,
       round_number=reference$round_number,player_id=mvp_text(p$id %||% p$`_id`),
       player_name=mvp_text(p$name),player_role=mvp_text(p$role),player_position=mvp_text(p$position),points=fm_number(p$points),
+      award_team=mvp_text(p[["team"]]),award_logo=mvp_text(p[["logo"]]),
       is_mvp=identical(mvp_text(p$id %||% p$`_id`),mid),
       is_finished=if(is.logical(reference$is_finished)&&length(reference$is_finished)==1L)reference$is_finished else NA)
   }))
@@ -587,7 +612,9 @@ mvp_sync_round <- function(login, championship_id, round_id, round_number) {
   counts <- list(status=result$status,fetched=nrow(result$rows),queued=0L,saved=0L,skipped=0L,failed=0L,reason=result$reason)
   if(result$status!="ok") {counts$failed <- 1L; return(counts)}
   if(!is.finite(round_number)) {counts$status <- "partial"; counts$skipped <- counts$fetched; counts$reason <- "Round number unavailable; results cannot be saved."; return(counts)}
-  value <- tryCatch(supabase_post("round_dream_team",result$rows),error=function(e)NULL)
+  # These fields belong to the full-XI evidence payload, outside the legacy table schema.
+  legacy <- result$rows[, setdiff(names(result$rows), c("award_team", "award_logo", "player_position")), drop = FALSE]
+  value <- tryCatch(supabase_post("round_dream_team",legacy),error=function(e)NULL)
   if(isTRUE(value)) {counts$status <- "queued"; counts$queued <- counts$fetched}
   else if(is.numeric(value) && length(value)==1L && !is.na(value) && value>=200 && value<300) {counts$status <- "ok"; counts$saved <- counts$fetched}
   else {counts$status <- "error"; counts$failed <- counts$fetched; counts$reason <- "Official results loaded, but database saving failed."}

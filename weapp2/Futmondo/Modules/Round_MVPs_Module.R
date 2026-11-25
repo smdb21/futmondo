@@ -78,6 +78,79 @@ round_award_card <- function(mvp, xi, players = NULL) {
         }))))
 }
 
+round_award_crest_urls <- function(logos) {
+  keys <- unique(logos)
+  vapply(keys, lineup_fixture_crest_url, character(1), USE.NAMES = FALSE)[match(logos, keys)]
+}
+
+# Resolve the metadata once per winner for both charts and the paginated table.
+round_award_player_identities <- function(players, catalog = NULL) {
+  current <- if (is.data.frame(catalog) && "id" %in% names(catalog))
+    catalog[match(players$player_id, as.character(catalog$id)), , drop = FALSE] else data.frame()
+  field <- function(data, key) {
+    if (!key %in% names(data)) return(rep("", nrow(players)))
+    value <- trimws(as.character(data[[key]]))
+    value[is.na(value)] <- ""
+    value
+  }
+  # Resolve repeated club assets just once. A later club cannot supply the
+  # image for a different club named in the award.
+  team <- field(players, "award_team")
+  crest <- round_award_crest_urls(field(players, "award_logo"))
+  current_team <- field(current, "team")
+  current_crest <- round_award_crest_urls(field(current, "logo"))
+  use_current <- !nzchar(crest) & (!nzchar(team) | tolower(team) == tolower(current_team))
+  crest[use_current] <- current_crest[use_current]
+  fill_team <- !nzchar(team) & (use_current | crest == current_crest)
+  team[fill_team] <- current_team[fill_team]
+  missing <- !nzchar(crest) & nzchar(team)
+  clubs <- unique(team[missing])
+  crest[missing] <- round_award_crest_urls(vapply(clubs, get_team_image_name, character(1)))[match(team[missing], clubs)]
+
+  position <- field(players, "award_positions")
+  fill <- !nzchar(position)
+  position_title <- rep("Positions in confirmed Best XIs", nrow(players))
+  if (any(fill) && nrow(current)) {
+    positions <- lineup_positions(current[fill, , drop = FALSE], multiposition = TRUE)
+    position[fill] <- vapply(positions, paste, collapse = " / ", FUN.VALUE = character(1))
+    position_title[fill] <- "Current catalog positions"
+  }
+  position_title[!nzchar(position)] <- "Position unavailable"
+  position[!nzchar(position)] <- "—"
+
+  players$crest <- crest
+  players$club <- ifelse(nzchar(team), team, "Club crest")
+  players$position <- position
+  players$position_title <- position_title
+  players
+}
+
+round_award_chart_player <- function(player) {
+  tags$span(class = "award-player",
+    if (nzchar(player$crest)) tags$img(class = "fm-team-crest", src = player$crest, alt = player$club,
+      title = player$club, width = 22, height = 22, loading = "lazy", decoding = "async",
+      onerror = "this.style.display='none';"),
+    tags$span(class = "award-player-details", tags$span(player$player_name),
+      tags$small(class = "award-position", `data-position` = player$position, title = player$position_title, player$position)))
+}
+
+# Reactable renders only the visible page. The underlying name remains plain text.
+round_award_name_cell <- htmlwidgets::JS("function(cell) {
+  const row = cell.row;
+  const el = React.createElement;
+  const crest = row.crest && el('img', {key: row.crest, className: 'fm-team-crest', src: row.crest, alt: row.club,
+    title: row.club, width: 22, height: 22, loading: 'lazy', decoding: 'async',
+    onError: function(event) { event.currentTarget.style.display = 'none'; }});
+  return el('span', {className: 'award-player'}, crest,
+    el('span', {className: 'award-player-details'}, el('span', null, cell.value),
+      el('small', {className: 'award-position', 'data-position': row.position, title: row.position_title}, row.position)));
+}")
+
+round_award_catalog_notice <- function(catalog) {
+  if (!is.null(catalog) && is.null(catalog$data) && !identical(catalog$status, "loading"))
+    fm_info(paste("Player team crests:", resource_failure_message(catalog$error)), error = TRUE, class = "round-mvps-empty")
+}
+
 round_award_leaders_plot <- function(players, metric, title, rounds) {
   counts <- players[[metric]]
   ranked <- players[order(-counts, players$player_name, players$player_id, method = "radix"), , drop = FALSE]
@@ -88,7 +161,7 @@ round_award_leaders_plot <- function(players, metric, title, rounds) {
   tags$figure(class = paste("award-chart", paste0("award-chart-", metric)),
     tags$figcaption(title),
     tags$ol(lapply(seq_along(values), function(i) {
-      tags$li(tags$span(class = "award-chart-name", leaders$player_name[i]),
+      tags$li(tags$span(class = "award-chart-name", round_award_chart_player(leaders[i, , drop = FALSE])),
         tags$span(class = "award-chart-count", values[i]),
         tags$span(class = "award-chart-track", `aria-hidden` = "true",
           tags$span(style = sprintf("width: %.2f%%", 100 * values[i] / rounds))))
@@ -99,7 +172,7 @@ round_award_leaders_plot <- function(players, metric, title, rounds) {
       sprintf(ngettext(tied, "%d more player tied at %d.", "%d more players tied at %d."), tied, tail(values, 1L))))
 }
 
-round_award_statistics_view <- function(stats, snapshot) {
+round_award_statistics_view <- function(stats, snapshot, catalog = NULL) {
   reason <- mvp_text(snapshot$reason)
   coverage <- snapshot$coverage
   future_only <- is.data.frame(coverage) && nrow(coverage) > 0L &&
@@ -133,24 +206,27 @@ round_award_statistics_view <- function(stats, snapshot) {
   players <- stats$players
   same_name <- duplicated(players$player_name) | duplicated(players$player_name, fromLast = TRUE)
   players$player_name[same_name] <- paste0(players$player_name[same_name], " (", players$player_id[same_name], ")")
+  players <- round_award_player_identities(players, catalog$data)
   players$share <- players$best_xi / stats$rounds
   metric <- function(value, label) tags$div(tags$dt(label), tags$dd(value))
   tagList(
     tags$dl(class = "award-stats-summary",
       metric(stats$rounds, "Confirmed rounds"), metric(nrow(players), "Best XI players"),
       metric(sum(players$mvp > 0L), "MVP winners")),
-    notice,
+    notice, round_award_catalog_notice(catalog),
     tags$div(class = "award-charts",
       round_award_leaders_plot(players, "best_xi", "Most Best XI appearances", stats$rounds),
       round_award_leaders_plot(players, "mvp", "Most MVP wins", stats$rounds)),
     tags$h4("All award winners"),
     tags$p(class = "award-table-note", "Round share is the percentage of confirmed rounds in which a player made the Best XI. Each MVP win is also a Best XI appearance."),
-    reactable::reactable(players[c("player_name", "best_xi", "mvp", "share")],
+    reactable::reactable(players[c("player_name", "best_xi", "mvp", "share", "club", "crest", "position", "position_title")],
       searchable = TRUE, compact = TRUE, striped = TRUE, defaultPageSize = 10L,
       defaultSorted = list(best_xi = "desc", mvp = "desc", player_name = "asc"),
       defaultColDef = reactable::colDef(headerVAlign = "bottom"),
       columns = list(
-        player_name = reactable::colDef(name = "Player", minWidth = 95),
+        player_name = reactable::colDef(name = "Player", minWidth = 95, cell = round_award_name_cell),
+        club = reactable::colDef(show = FALSE), crest = reactable::colDef(show = FALSE),
+        position = reactable::colDef(show = FALSE), position_title = reactable::colDef(show = FALSE),
         best_xi = reactable::colDef(name = "Best XI", minWidth = 52, align = "right", defaultSortOrder = "desc"),
         mvp = reactable::colDef(name = "MVP", minWidth = 42, align = "right", defaultSortOrder = "desc"),
         share = reactable::colDef(name = "Round share", minWidth = 56, align = "right", defaultSortOrder = "desc",
@@ -175,13 +251,21 @@ round_mvps_Server <- function(id, is_module_active, login_token, championship_id
     player_catalog_read <- factual_read_adapter(session, "get_championship_players", login_token,
       championship_id, is_active = is_module_active, refresh_trigger = refresh_trigger, state_only = TRUE)
     mvp_snapshot <- shared_mvp_source(session,login_token,championship_id,is_module_active,refresh_trigger)
+    player_catalog <- reactive({
+      auth <- login_token()
+      if (valid_login(auth)) player_catalog_read(auth, championship_id())
+    })
+    award_stats <- reactive(round_award_player_stats(mvp_snapshot()$rows, championship_id()))
     output$award_statistics <- renderUI({
       req(isTRUE(is_module_active()))
       snapshot <- mvp_snapshot()
       if (isTRUE(snapshot$loading) || identical(snapshot$status, "loading"))
         return(NULL)
-      stats <- round_award_player_stats(snapshot$rows, championship_id())
-      round_award_statistics_view(stats, snapshot)
+      stats <- award_stats()
+      players <- stats$players
+      catalog <- if (anyNA(players$award_positions) || any(!nzchar(round_award_crest_urls(unique(players$award_logo)))))
+        player_catalog()
+      round_award_statistics_view(stats, snapshot, catalog)
     })
     output$mvp_cards <- renderUI({
       snapshot <- mvp_snapshot()
@@ -194,12 +278,8 @@ round_mvps_Server <- function(id, is_module_active, login_token, championship_id
           return(fm_info("No completed round awards yet."))
         return(notice %||% fm_info("Round awards are unavailable; the reason could not be determined.", error = TRUE))
       }
-      catalog <- if (valid_login(login_token())) player_catalog_read(login_token(), championship_id()) else NULL
-      crest_notice <- if (!is.null(catalog) && is.null(catalog$data)) fm_info(class = "round-mvps-empty",
-        error = !identical(catalog$status, "loading"),pending=identical(catalog$status,"loading"),
-        if (identical(catalog$status, "loading")) "Loading player team crests…" else
-          paste("Player team crests:", resource_failure_message(catalog$error)))
-      tagList(notice, crest_notice, tags$div(class = "round-mvps-grid", lapply(seq_len(nrow(rows)), function(i) {
+      catalog <- player_catalog()
+      tagList(notice, round_award_catalog_notice(catalog), tags$div(class = "round-mvps-grid", lapply(seq_len(nrow(rows)), function(i) {
         row <- rows[i, , drop = FALSE]
         round_award_card(row, round_best_xi_rows(snapshot$rows, championship_id(), row), catalog$data)
       })))

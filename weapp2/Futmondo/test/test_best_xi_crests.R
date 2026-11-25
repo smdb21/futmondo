@@ -27,7 +27,14 @@ missing <- htmltools::renderTags(round_award_card(mvp, xi, players[-1, ]))$html
 stopifnot(grepl('Award player 11', missing, fixed = TRUE),
   length(xml2::xml_find_all(xml2::read_html(missing), '//tbody//img')) == 10L)
 cat('PASS unmatched players retain their official names without invented crests\n')
-rows <- transform(xi, round_number = 1, round_id = 'r1', player_role = 'defensa', is_finished = TRUE)
+rows <- transform(xi, round_number = 1, round_id = 'r1', player_role = 'defensa', is_finished = TRUE, persistence = 'Saved',
+  award_team = '', award_logo = '')
+rows$award_team[2] <- 'Earlier club'
+rows$award_logo[2] <- 'https://club.example/earlier.webp'
+rows$player_role[2] <- 'defensa/delantero'
+rows$player_role[1] <- NA_character_
+players$role <- 'portero'
+players$role2 <- 'centrocampista'
 shared_mvp_source <- function(...) reactiveVal(list(rows = rows, reason = ''))
 state <- reactiveVal(list(data = players, status = 'ready'))
 reads <- 0L
@@ -36,17 +43,35 @@ shiny::testServer(round_mvps_Server, args = list(is_module_active = function() T
   login_token = function() c(userid = 'fixture', token = 'synthetic'), championship_id = function() 'league'), {
   rendered <- output$mvp_cards$html
   stopifnot(length(xml2::xml_find_all(xml2::read_html(rendered), '//tbody//img')) == 11L, reads == 1L)
+  session$setInputs(award_tab = 'statistics')
+  stats_dom <- xml2::read_html(output$award_statistics$html)
+  widget <- jsonlite::fromJSON(xml2::xml_text(xml2::xml_find_first(stats_dom, '//script[@data-for]')), simplifyVector = FALSE)$x$tag$attribs
+  names_in_order <- unlist(widget$data$player_name)
+  mvp_chart <- xml2::xml_find_first(stats_dom, '//figure[contains(@class,"award-chart-mvp")]//li')
+  crest <- xml2::xml_find_first(mvp_chart, './/img')
+  mvp <- match('Award player 2', names_in_order)
+  fallback <- match('Award player 1', names_in_order)
+  stopifnot(xml2::xml_attr(crest, 'src') == 'https://club.example/earlier.webp',
+    xml2::xml_attr(crest, 'alt') == 'Earlier club',
+    xml2::xml_text(xml2::xml_find_first(mvp_chart, './/small')) == 'DEF / FWD',
+    widget$data$crest[[mvp]] == xml2::xml_attr(crest, 'src'), widget$data$club[[mvp]] == 'Earlier club',
+    widget$data$position[[mvp]] == 'DEF / FWD', widget$data$club[[fallback]] == 'Athletic Club',
+    widget$data$position[[fallback]] == 'GK / MID', widget$data$position_title[[fallback]] == 'Current catalog positions',
+    '<unsafe>' %in% names_in_order, !isTRUE(widget$columns[[1]]$html))
   session$flushReact(); stopifnot(reads == 1L)
   state(list(data = NULL, status = 'loading')); session$flushReact()
   rendered <- output$mvp_cards$html
-  stopifnot(!grepl('fm-info-error|Loading player team crests', rendered),
+  stopifnot(grepl('earlier.webp', output$award_statistics$html, fixed = TRUE),
+    !grepl('athletic-authoritative.png', output$award_statistics$html, fixed = TRUE),
+    !grepl('fm-info-error|Loading player team crests', rendered),
     length(xml2::xml_find_all(xml2::read_html(rendered), '//tbody/tr')) == 11L)
   state(list(data = NULL, status = 'error', error = resource_failure(category = 'connection'))); session$flushReact()
   rendered <- output$mvp_cards$html
   stopifnot(grepl('Player team crests:', rendered, fixed = TRUE),
     length(xml2::xml_find_all(xml2::read_html(rendered), '//tbody/tr')) == 11L)
   state(list(data = players, status = 'ready')); session$flushReact()
-  stopifnot(length(xml2::xml_find_all(xml2::read_html(output$mvp_cards$html), '//tbody//img')) == 11L)
+  stopifnot(length(xml2::xml_find_all(xml2::read_html(output$mvp_cards$html), '//tbody//img')) == 11L,
+    grepl('athletic-authoritative.png', output$award_statistics$html, fixed = TRUE))
 })
 cat('PASS one shared catalog read, stable redraws, lineups during loading, visible failure and reactive recovery\n')
 elapsed <- system.time(for (i in 1:38) htmltools::renderTags(round_award_card(mvp, xi, players)))[['elapsed']]

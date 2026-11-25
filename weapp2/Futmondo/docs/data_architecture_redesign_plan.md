@@ -2642,3 +2642,8 @@ charts and searchable table reuse the persisted Best XI and MVP selections.
 See the [statistics contract](round_mvps_module.md#player-award-statistics--2026-11-25)
 and [verification results](data_review_results.md#round-award-player-statistics--2026-11-25).
 Hosted rollout remains unverified.
+
+The [club and position display](round_mvps_module.md#club-crests-and-positions--2026-11-25)
+adds award-time identity to the charts and rankings. New snapshots retain the
+official club and crest fields. Existing selections can use the same saved
+player catalog as the round cards. See the [verification results](data_review_results.md#round-award-crests-and-positions--2026-11-25).

@@ -6616,3 +6616,29 @@ fixture now reflects the existing pending-state behavior, which keeps the
 lineup visible during a catalog read and displays an error if that read fails.
 The login inventory adds one static entry. Signed-in production data and hosted
 rollout were outside the checks.
+
+## Round award crests and positions — 2026-11-25
+
+Offline Chromium verified both leader charts and the paginated table at 320,
+390 and 1440 px. The fixture covered a transferred player, duplicate names
+with different player IDs, a long name, multi-position awards, missing
+metadata and catalog recovery. Crests and positions stayed attached to the
+correct player after searches, numerical sorting in both directions and
+pagination. Switching tabs retained the search and added no catalog or award
+reads. The browser used synthetic assets and records. Hosted rollout remains
+unverified.
+
+The 38-round benchmark with 418 distinct winners and 19 clubs took a median
+2.93 ms to aggregate and 38.00 ms to generate the charts and table, compared
+with 1.59 ms and 22.60 ms before adding player identities. Rendering labels
+only for the visible table page kept the uncompressed output to 74.7 KB.
+The catalog and awards use existing persisted observations and the existing
+refresh cadence. All historical roles and club pairs round-trip through the
+existing full-XI evidence record. One synthetic eleven added 704 uncompressed
+JSON bytes for its club names and logo references, with the same database
+write count.
+
+Eleven MVP groups, eight round award groups, the crest display checks and
+all three deployment checks passed. The offline lifecycle passed 14 checks
+plus eight tabs. The fixed-schema legacy writer was checked independently
+from the full-XI JSON persistence path.

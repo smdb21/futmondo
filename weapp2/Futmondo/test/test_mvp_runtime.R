@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 options(futmondo.offline=TRUE)
-suppressPackageStartupMessages({source('futmondo_functions.R');source('supabase_connector.R');source('background_runtime.R');library(shiny)})
+suppressPackageStartupMessages({source('futmondo_functions.R');source('factual_helpers.R');source('supabase_connector.R');source('background_runtime.R');library(shiny)})
 n <- 0L
 check <- function(name,expr) {force(expr);n <<- n+1L;cat('PASS',name,'\n')}
 active <- list(championships=list(list(id='c',league='l')),rounds=list(list(`_id`='r1',number=1)))
@@ -36,6 +36,53 @@ check('official parsing preserves identity zero and missing scores; rejects erro
   missing <- answer;missing$mvp <- list()
   stopifnot(normalize_official_dreamteam(missing,'c',ref)$status=='unsupported')
 })
+check('official award clubs persist and transferred players retain one round-specific crest identity', {
+  auth <- c(userid = 'fixture-clubs', token = 'synthetic')
+  ctx <- resource_context(auth, 'c', season = 'test-season')
+  save_round <- function(result, reference) award_snapshot_evidence(result, auth, 'c', reference, ctx)
+  restore <- function(snapshots) {
+    wire <- jsonlite::toJSON(snapshots, auto_unbox = TRUE, null = 'null', na = 'null')
+    award_saved_rows(rival_evidence_decode(jsonlite::fromJSON(wire)), 'c', ctx$season, account_id = auth[['userid']])
+  }
+  with_clubs <- answer
+  with_clubs$players[[1]]$team <- 'Earlier Club'
+  with_clubs$players[[1]]$logo <- 'earlier-club.png'
+  with_clubs$players[[2]]$team <- 'Other Club'
+  with_clubs$players[[2]]$logo <- 'https://example.invalid/other.webp'
+  with_clubs$players[[3]]$teamId <- 'club-id-only'
+  parsed <- normalize_official_dreamteam(with_clubs, 'c', ref)
+  first <- save_round(parsed, ref)
+  saved <- restore(list(first))
+  stopifnot(nrow(saved) == 11L, all(saved$persistence == 'Saved'),
+    identical(saved$award_team, parsed$rows$award_team), identical(saved$award_logo, parsed$rows$award_logo),
+    saved$award_logo[saved$player_id == 'q'] == 'https://example.invalid/other.webp',
+    saved$award_team[saved$player_id == 'p3'] == '')
+
+  # A new club without a logo cannot inherit the previous club's image.
+  second_ref <- ref
+  second_ref$round_id <- 'r2'
+  second_ref$round_number <- 2L
+  next_clubs <- with_clubs
+  next_clubs$players[[1]]$team <- 'Later Club'
+  next_clubs$players[[1]]$logo <- NULL
+  next_clubs$players[[2]]$team <- next_clubs$players[[2]]$logo <- NULL
+  later <- normalize_official_dreamteam(next_clubs, 'c', second_ref)
+  saved <- restore(list(save_round(later, second_ref), first))
+  provisional <- transform(saved[saved$round_id == 'r2', ], round_id = 'r3', round_number = 3L,
+    is_finished = FALSE, award_team = 'Unconfirmed', award_logo = 'unconfirmed.png')
+  totals <- round_award_player_stats(rbind(provisional, saved), 'c')$players
+  stopifnot(totals$award_team[totals$player_id == 'p'] == 'Later Club',
+    totals$award_logo[totals$player_id == 'p'] == '', totals$best_xi[totals$player_id == 'p'] == 2L,
+    totals$award_team[totals$player_id == 'q'] == 'Other Club',
+    totals$award_logo[totals$player_id == 'q'] == 'https://example.invalid/other.webp')
+
+  first$payload$players <- lapply(first$payload$players, function(player) {
+    player$award_team <- player$award_logo <- NULL
+    player
+  })
+  legacy <- restore(list(first))
+  stopifnot(nrow(legacy) == 11L, all(legacy$award_team == ''), all(legacy$award_logo == ''))
+})
 eligibility <- data.frame(championship_id='c',round_id='r1',player_id='p',team_id='old-owner',eligible=TRUE,verified=TRUE)
 rewards <- data.frame(championship_id='c',round_id='r1',amount=100,historical=TRUE)
 payments <- data.frame(championship_id='c',round_id='r1',player_id='p',team_id='old-owner',amount=120,bonus_type='mvp')
@@ -68,7 +115,11 @@ check('fund subtotal adds award once and leaves observed cash unchanged', {
 check('sync distinguishes queued confirmed and failed writes', {
   old_fetch <- get_official_dreamteam_result;old_post <- supabase_post
   get_official_dreamteam_result <- function(...) mvp_result('ok',official)
-  supabase_post <- function(...) TRUE
+  supabase_post <- function(table, rows) {
+    stopifnot(identical(table, 'round_dream_team'), !any(c('award_team','award_logo','player_position') %in% names(rows)),
+      identical(rows$player_id, official$player_id))
+    TRUE
+  }
   stopifnot(mvp_sync_round(NULL,'c','r1',1)$queued==1,mvp_sync_round(NULL,'c','r1',1)$saved==0)
   supabase_post <- function(...) 204L
   stopifnot(mvp_sync_round(NULL,'c','r1',1)$saved==1)

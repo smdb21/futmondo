@@ -87,7 +87,11 @@ check('award totals use stable identities, verified finality and one scoring con
   a$player_name[1:2] <- 'Alex'
   b$player_name[1:2] <- 'Alex'
   c$player_name[1:2] <- 'Alex'
+  b$player_role[b$player_id == 'p2'] <- 'centrocampista'
+  c$player_role[c$player_id == 'p12'] <- NA_character_
+  c$player_position[c$player_id == 'p12'] <- '3' # formation slot
   pending <- transform(a, round_id = 'pending', is_finished = FALSE)
+  pending$player_role[pending$player_id == 'p2'] <- 'delantero'
   unknown <- transform(a, round_id = 'unknown', is_finished = NA)
   short <- transform(a[-1, ], round_id = 'short')
   duplicate <- transform(a, round_id = 'duplicate')
@@ -99,6 +103,8 @@ check('award totals use stable identities, verified finality and one scoring con
   p <- result$players
   stopifnot(result$rounds == 3L, result$unconfirmed_rounds == 2L, result$incomplete_rounds == 3L,
     result$unsaved_rounds == 1L, nrow(p) == 12L, sum(p$best_xi) == 33L, sum(p$mvp) == 3L,
+    p$award_positions[p$player_id == 'p1'] == 'GK', p$award_positions[p$player_id == 'p2'] == 'DEF / MID',
+    is.na(p$award_positions[p$player_id == 'p12']),
     sum(p$player_name == 'Alex') == 2L, p$mvp[p$player_id == 'p1'] == 2L,
     p$mvp[p$player_id == 'p2'] == 1L, p$best_xi[p$player_id == 'p11'] == 2L,
     p$best_xi[p$player_id == 'p12'] == 1L, !any(startsWith(p$player_id, 'foreign')))
@@ -106,6 +112,8 @@ check('award totals use stable identities, verified finality and one scoring con
   latest <- round_award_player_stats(rbind(renamed, a), 'league')$players
   stopifnot(latest$player_name[latest$player_id == 'p1'] == 'New p1')
   legacy <- a
+  legacy$player_role <- NULL
+  stopifnot(all(is.na(round_award_player_stats(legacy, 'league')$players$award_positions)))
   legacy$round_id <- NULL
   stopifnot(round_award_player_stats(legacy, 'league')$rounds == 1L)
   legacy$persistence <- NULL

@@ -453,3 +453,10 @@ the selected league with two charts, searchable player totals and round shares
 computed from confirmed selections. Signed-in official navigation and equivalent
 interactive season filters were outside this check.
 [Official 2016–17 season review](https://magazine.futmondo.com/balance-futmondo-123-temporada-16-17/).
+
+The official Dream Team player record supplies a playing role, club and logo.
+LigaRadar displays the club crest and the positions a player held in confirmed
+Best XIs alongside the cross-round chart and table totals. The signed-in
+official season-ranking layout remains unverified.
+[Public client and field mapping](classification_module.md#dream-team-display-2026-11-23),
+[Round awards](round_mvps_module.md#club-crests-and-positions--2026-11-25).
