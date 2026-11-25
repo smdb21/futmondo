@@ -1722,25 +1722,60 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
     padding-left: 7px !important;
 }
 
-.fm-received-offers-table .rt-td {
-    white-space: normal !important;
-    overflow-wrap: anywhere;
+.fm-received-offers-table .rt-td,
+.fm-received-offers-table .rt-th {
+    padding: 4px !important;
+    white-space: nowrap !important;
+}
+.fm-received-offers-table .rt-th-inner,
+.fm-received-offers-table .rt-td-inner {
+    padding: 0 !important;
+}
+.fm-received-offers-table .rt-th .rt-text-content {
+    white-space: nowrap !important;
+}
+.fm-received-offers-table .rt-align-right .rt-td-inner,
+.fm-offer-bidder,
+.fm-offer-player-name {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .fm-offer-player {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 5px;
-    max-width: 100%;
+    gap: 4px;
     min-width: 0;
 }
-.fm-offer-player .fm-team-crest { flex: 0 0 auto; }
-.fm-offer-player .btn-link {
-    min-width: 0;
+.fm-offer-player .fm-team-crest {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+}
+button.fm-offer-player-name {
+    min-height: 24px;
     padding: 0;
-    font-size: inherit;
-    white-space: normal;
-    overflow-wrap: anywhere;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
     text-align: left;
+    cursor: pointer;
+}
+button.fm-offer-player-name:hover {
+    text-decoration: underline;
+}
+button.fm-offer-player-name:focus-visible {
+    outline-offset: 1px;
+}
+@media (max-width: 600px) {
+    .fm-received-offers-table .rt-td,
+    .fm-received-offers-table .rt-th {
+        padding-inline: 2px !important;
+        font-size: 11px !important;
+    }
 }
 
 /* Keep coach details beside the preference; expanded text uses the next row. */

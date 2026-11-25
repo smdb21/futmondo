@@ -13,13 +13,13 @@ out<-outgoing_clause_empty()[NA_integer_,,drop=FALSE]
 for(field in intersect(names(record),names(out)))out[[field]]<-record[[field]]
 out$player_id<-'out';out$player_name<-'Leaving player';out$seller_team_id<-'mine';out$buyer_team_id<-'buyer';out$leaves_at<-now+43200
 roster<-observed_data(data.frame(id=c('p','q','r'),name=c('Marco Asensio','Brais Méndez','Isco'),
-  team=c('Real Madrid','Real Sociedad','Betis'),logo=c('real-madrid.png','',''),buyPrice=c(9.5e6,14e6,NA_real_),
+  team=c('Real Madrid','Real Sociedad','Betis'),logo=c('real-madrid.png','',''),buyPrice=c(9.5e6,54911066,NA_real_),
   value=1000,points=1),status='stale',observed_at=now-1200)
 attr(roster,'worker_acquisition_status')<-'ok';attr(roster,'worker_completeness')<-'unknown'
 attr(roster,'received_offers_status')<-'ok';attr(roster,'received_offers_observed_at')<-now-1200
 attr(roster,'received_offers')<-rbind(
   normalize_received_offer(list(id='rival-bid',price=12e6,userTeam=list(id='r',name='Rival with a long <club> name')),'p'),
-  normalize_received_offer(list(id='system-bid',price=13e6),'q'),
+  normalize_received_offer(list(id='system-bid',price=25271066),'q'),
   normalize_received_offer(list(id='unknown-profit',price=11e6),'r'))
 
 ui<-shiny::fluidPage(shiny::tags$head(shiny::tags$style(shiny::HTML(fm_theme_css())),

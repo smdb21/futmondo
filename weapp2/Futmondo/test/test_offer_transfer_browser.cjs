@@ -3,7 +3,7 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
 (async()=>{
  const browser=await chromium.launch({headless:true,executablePath:process.env.FUTMONDO_TEST_CHROMIUM||undefined,args:['--no-sandbox']});
  try{
-  for(const width of [320,390,1440]){
+  for(const width of [320,360,390,1440]){
    const page=await browser.newPage({viewport:{width,height:1100}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
    await page.route('**/*',route=>{
     const url=new URL(route.request().url());
@@ -25,8 +25,40 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
    const first=table.locator('.rt-tbody [role="row"]').first();
    assert.equal(await first.getByRole('img',{name:'Real Madrid'}).getAttribute('src').then(url=>new URL(url).pathname.split('/').pop()),'real-madrid.png');
    assert.match(await first.innerText(),/\+2\.50 M€/);
-   assert.match(await table.locator('.rt-tbody').innerText(),/-1\.00 M€/);
-   await first.getByRole('button',{name:'Marco Asensio'}).click();
+   const system=table.locator('.fm-offer-bidder[title="Liga Radar"]');
+   assert.deepEqual((await system.allTextContents()).map(label=>label.trim()),['Liga Radar','Liga Radar']);
+   const systemRow=system.first().locator('xpath=ancestor::*[@role="row"]');
+   assert.match(await systemRow.innerText(),/25\.271\.066\s€.*-29\.64 M€/s);
+   const layout=await table.evaluate(el=>{
+    const rows=[...el.querySelectorAll('.rt-tbody [role="row"]')];
+    const oneLine=[...el.querySelectorAll('.rt-th .rt-text-content, .rt-td-inner, .fm-offer-player-name, .fm-offer-bidder')]
+     .every(node=>getComputedStyle(node).whiteSpace==='nowrap');
+    const names=[...el.querySelectorAll('button.fm-offer-player-name')];
+    const hasBorder=names.some(node=>parseFloat(getComputedStyle(node).borderTopWidth)>0);
+    const metrics=[...el.querySelectorAll('.rt-align-right .rt-td-inner span[title]')]
+     .filter(node=>/\d/.test(node.textContent));
+    const clipped=[...metrics.map(node=>node.parentElement),...el.querySelectorAll('.fm-offer-bidder[title="Liga Radar"]')]
+     .filter(node=>node.scrollWidth>node.clientWidth+1).map(node=>node.textContent.trim());
+    const rival=el.querySelector('.fm-offer-rival.fm-offer-bidder');
+    return {oneLine,hasBorder,clipped,rivalOverflow:rival.scrollWidth>rival.clientWidth,
+     rivalEllipsis:getComputedStyle(rival).textOverflow==='ellipsis',
+     rowHeight:Math.max(...rows.map(row=>row.getBoundingClientRect().height))};
+   });
+   assert.equal(layout.oneLine,true,`${width}px: all cells and headers stay on one line`);
+   assert.equal(layout.hasBorder,false,`${width}px: player buttons have no border`);
+   assert.deepEqual(layout.clipped,[],`${width}px: amounts, profit and Liga Radar fit their columns`);
+   assert.ok(layout.rowHeight<=34,`${width}px: compact rows are ${layout.rowHeight}px tall`);
+   if(width<400)assert.ok(layout.rivalOverflow&&layout.rivalEllipsis);
+   const player=first.getByRole('button',{name:'Marco Asensio'});
+   assert.equal(await player.getAttribute('title'),'Marco Asensio');
+   assert.equal(await table.locator('[title="P/L unavailable"]').count(),1);
+   const scrollWidth=await table.locator('.rt-table').evaluate(node=>node.scrollWidth-node.clientWidth);
+   if(width<=360)assert.ok(scrollWidth>0);
+   else assert.ok(scrollWidth<=1);
+   await table.getByRole('columnheader',{name:'From'}).focus();
+   await page.keyboard.press('Tab');
+   assert.equal(await player.evaluate(node=>document.activeElement===node&&getComputedStyle(node).outlineStyle==='solid'),true);
+   await player.press('Enter');
    await page.locator('#opened_offer').getByText('rival-bid',{exact:true}).waitFor();
    await table.getByRole('columnheader',{name:'Profit'}).click();
    assert.deepEqual(await playerNames(),['B.Méndez','M.Asensio','Isco']);
@@ -43,7 +75,9 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
    const rosterStamp=await page.locator('#worker_roster_source_times').innerText();
    await page.locator('#worker_status > details').evaluate(el=>el.dataset.fixtureIdentity='preserved');
 
-   await table.getByText('Rival · Rival with a long <club> name',{exact:true}).waitFor();
+   const rival=table.getByText('Rival · Rival with a long <club> name',{exact:true});
+   await rival.waitFor();
+   assert.equal(await rival.getAttribute('title'),'Rival · Rival with a long <club> name');
    assert.equal(await table.locator('club').count(),0);
    assert.ok(!(await page.locator('#offers').innerText()).includes('could not be verified'));
    for(const id of ['incoming','outgoing']){
@@ -67,7 +101,7 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
    assert.deepEqual(await playerNames(),['B.Méndez','M.Asensio','Isco'],'Timestamp updates preserve sorted rows');
    const started=Date.now();await page.locator('#heartbeat').click();await page.waitForFunction(()=>document.querySelector('#beats').textContent==='1');
    assert.ok(Date.now()-started<500);assert.equal(await page.locator('#calls').innerText(),'0');assert.deepEqual(errors,[]);
-   console.log(`PASS ${width}px: roster timestamps appear once in the top note on all three pages, sortable offer/profit, short names, crests, exact click, safe bidder text and saved status, incoming/leaving icons stay beside timing labels open/closed, keyboard works, no overflow, timestamp advances without panel replacement or I/O; heartbeat ${Date.now()-started}ms`);
+   console.log(`PASS ${width}px: roster timestamps appear once in the top note on all three pages, sortable offer/profit, single-line borderless rows (${layout.rowHeight}px), full numeric values and Liga Radar, crests, exact keyboard action, safe bidder text and saved status, incoming/leaving icons stay beside timing labels open/closed, keyboard works, no overflow, timestamp advances without panel replacement or I/O; heartbeat ${Date.now()-started}ms`);
    await page.close();
   }
  }finally{await browser.close();}

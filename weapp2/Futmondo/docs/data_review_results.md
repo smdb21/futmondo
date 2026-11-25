@@ -6513,3 +6513,25 @@ avoiding reprocessing unchanged team histories brought the same test below
 groups, three deployment checks and the module checksum. The offline Shiny
 lifecycle passed 14 checks and eight tabs with zero live HTTP or database
 mutation attempts. It selects each plot's subtab before checking its output.
+
+## Compact received-offer rows — 2026-11-25
+
+My Team uses borderless player buttons with a keyboard focus outline and
+labels system bidders **Liga Radar**. Headers, names, amounts, profit and
+bidder labels stay on one line. Long values use an ellipsis with the full
+text in a tooltip. Narrow layouts scroll within the table.
+
+Offline Chromium verified 33 px rows at 320, 360, 390 and 1440 px. At each
+width the full fixture amount of 25.271.066 € and loss of -29.64 M€ fit their
+columns alongside Liga Radar. The check covered long rival labels, horizontal
+containment, numeric sorting, keyboard selection of the exact bid after
+sorting, and timestamp updates without replacing the table. Heartbeat
+responses took 60–63 ms with zero source or database calls.
+
+The compact styles apply only to the offers table. The renderer adds a
+tooltip to each displayed metric and bidder. The existing roster reads,
+persisted observations, cache reuse, timers, and reactive dependencies are
+unaffected. The received-offers checks passed all 10 groups, the offline
+Shiny lifecycle passed 14 checks and eight tabs, and the deployment contract
+passed all three checks. Browser checks used synthetic offers and crests.
+Hosted rollout and physical-phone appearance were outside this verification.

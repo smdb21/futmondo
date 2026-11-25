@@ -63,7 +63,7 @@ state<-team_received_offers_state(resource_state(roster))
 check('table includes lower rival bids, explicit sources and compact names with full labels',{
   html<-as.character(team_received_offers_panel(state,identity))
   stopifnot(grepl('Offers for your players (3)',html,fixed=TRUE),grepl('2 rival offers',html,fixed=TRUE),
-    grepl('LigaRadar system',html,fixed=TRUE),grepl('Rival · Rival <club>',html,fixed=TRUE),
+    grepl('Liga Radar',html,fixed=TRUE),grepl('Rival · Rival <club>',html,fixed=TRUE),
     grepl('fa-user',html,fixed=TRUE),grepl('fa-robot',html,fixed=TRUE),
     grepl('P.<one>',html,fixed=TRUE),grepl('Player <one>',html,fixed=TRUE),
     grepl('300',html,fixed=TRUE),grepl('400',html,fixed=TRUE))

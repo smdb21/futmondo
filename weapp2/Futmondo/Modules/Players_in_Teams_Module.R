@@ -424,7 +424,7 @@ team_received_offers_state <- function(roster_state) {
 
 team_received_offers_table <- function(rows, ns) {
   rows <- rows[order(rows$bid_source %in% "system"), , drop=FALSE]
-  bidder <- ifelse(rows$bid_source == "system", "LigaRadar system",
+  bidder <- ifelse(rows$bid_source == "system", "Liga Radar",
     ifelse(rows$bid_source == "rival", paste0("Rival · ", rows$bid_user), "Unknown bidder"))
   offers <- data.frame(player=lineup_player_label(rows$player_name), offer=rows$bid_price,
     profit=sale_profit_amount(rows$bid_price, rows$acquisition_cost), bidder=bidder)
@@ -435,29 +435,33 @@ team_received_offers_table <- function(rows, ns) {
     compact=TRUE, striped=TRUE, highlight=TRUE, showSortable=TRUE,
     defaultColDef=reactable::colDef(minWidth=64, vAlign="center", sortNALast=TRUE, na="—"),
     columns=list(
-      player=reactable::colDef(name="Player", minWidth=76, rowHeader=TRUE, cell=function(value, index) {
+      player=reactable::colDef(name="Player", minWidth=78, rowHeader=TRUE, cell=function(value, index) {
         row <- rows[index, , drop=FALSE]
         club <- fm_scalar(row$player_club, "")
         logo <- fm_scalar(row$player_logo, "")
         if (!nzchar(logo)) logo <- get_team_image_name(club)
         crest <- lineup_fixture_crest_url(logo)
         # Send the exact offer event even after Reactable sorts or paginates the cells.
-        label <- if (nzchar(row$bid_id)) shiny::tags$button(type="button", class="btn btn-link",
+        label <- if (nzchar(row$bid_id)) shiny::tags$button(type="button", class="fm-offer-player-name",
           title=row$player_name, `aria-label`=row$player_name,
           onclick=paste0("Shiny.setInputValue(", jsonlite::toJSON(ns(team_received_offer_input(row)), auto_unbox=TRUE),
-            ",true,{priority:'event'});"), value) else shiny::tags$span(title=row$player_name, value)
+            ",true,{priority:'event'});"), value) else shiny::tags$span(class="fm-offer-player-name", title=row$player_name, value)
         shiny::tags$span(class="fm-offer-player",
           if (nzchar(crest)) shiny::tags$img(class="fm-team-crest", src=crest, alt=club,
             title=club, width=20, height=20, loading="lazy", decoding="async", onerror="this.style.display='none';"),
           label)
       }),
-      offer=reactable::colDef(name="Offer", align="right", defaultSortOrder="desc",
-        cell=function(value, index) amounts[index]),
-      profit=reactable::colDef(name="Profit", align="right", defaultSortOrder="desc", cell=format_table_sale_profit),
-      bidder=reactable::colDef(name="From", minWidth=72, cell=function(value, index) {
+      offer=reactable::colDef(name="Offer", minWidth=92, align="right", defaultSortOrder="desc",
+        cell=function(value, index) shiny::tags$span(title=amounts[index], amounts[index])),
+      profit=reactable::colDef(name="Profit", minWidth=72, align="right", defaultSortOrder="desc",
+        cell=function(value) {
+          label <- format_table_sale_profit(value)
+          shiny::tags$span(title=label, label)
+        }),
+      bidder=reactable::colDef(name="From", minWidth=92, cell=function(value, index) {
         source <- rows$bid_source[index]
-        shiny::tags$span(class=if (source == "rival") "fm-offer-rival",
-          icons[[source]], " ", value)
+        shiny::tags$span(class=if (source == "rival") "fm-offer-bidder fm-offer-rival" else "fm-offer-bidder",
+          title=value, icons[[source]], " ", value)
       })))
 }
 

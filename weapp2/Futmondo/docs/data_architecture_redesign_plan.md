@@ -1560,6 +1560,10 @@ The existing database snapshots, original observation/completeness metadata and 
 
 My Team displays received bids in one sortable table with numeric Offer and Profit columns, club crests and the same compact player names as Lineup. Each name opens its bid. The table uses existing roster observations and keeps the source clock independent of rendering. [Display contract](squad_table_prices.md) and [verification](data_review_results.md).
 
+### November 25: compact received-offer rows
+
+The received-offers table uses borderless player buttons, single-line headers and values, and **Liga Radar** for system bids. Compact column spacing and table-local horizontal scrolling support narrow screens. The existing roster projection supplies all table data. [Verification](data_review_results.md).
+
 ### November 14: compact system offers
 
 - Implemented and verified locally: My Team groups system offers under one **Futmondo system** heading with compact rows. Rival/unknown offers retain individual source labels above the system group; every bid, amount, gain/loss, exact-offer link and source-status message is preserved.
