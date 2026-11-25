@@ -11,13 +11,13 @@ The application server passes `primary_sources` to `today_Server(..., primary_so
 Banner display finances use team information plus normalized own outgoing bids from these states, independently of full acquisition capacity. Missing held funds or market evidence leaves the projected balance unknown. These display calculations never replace the final manual-action preflight.
 
 
-The optional `coach_source` argument supplies Today’s login-only default-enabled coach checkbox and status. The root owns action safety; the module owns a context-keyed localStorage preference handshake and persistence warnings. Initial primary-settled state is latched per account/league/team, so coach confirmation refreshes team/staff/balance without suspending player-table enrichment or reopening startup UI. See [coach_and_round_awards.md](coach_and_round_awards.md).
+Initial primary-settled state is latched per account/league/team, so login-time coach confirmation refreshes team/staff/balance without suspending player-table enrichment or reopening startup UI. The coach preference and status appear on Lineup. See [coach and round awards](coach_and_round_awards.md).
 
 ## Market presentation (2026-11-01)
 
 The page heading is **Today's market**. As of 2026-11-15, the introductory information icon and its market/balances/transfers tooltip are omitted at the owner’s request. Its market table starts with **Free Agents Only** checked. This is a table-specific initial setting; users can uncheck it or use Clear Filters to see owned listings too. The navigation label is **Today's market**. The team page appears in navigation as **My team**. No retrieval, financial calculation, action or refresh behavior changed.
 
-The **Current balance** and **Team value** cards below the coach checkbox use the active theme's text color so both labels and amounts are readable on the themed card background.
+The **Current balance** and **Team value** cards use the active theme's text color so both labels and amounts are readable on the themed card background.
 
 ## Recent transfer presentation (2026-11-01)
 

@@ -1,5 +1,7 @@
 # Next-round lineup
 
+The **Automatically hire coach** checkbox is above the lineup editing controls. The page information panel shows coach status and browser preference warnings. LigaRadar reads the saved preference at sign-in, even while Lineup is hidden. [Login coach behavior](coach_and_round_awards.md#login-coach).
+
 ## Match points below the lineup (2026-11-23)
 
 The fixture cards show the next scheduled round and the latest started round.

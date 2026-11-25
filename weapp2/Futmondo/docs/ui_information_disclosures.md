@@ -68,10 +68,10 @@ This reduces presentation only; it adds no capability or login-tier entry.
 
 ## Coach control and account summary placement — 2026-11-15 Pacific
 
-`today_UI()` groups the existing coach checkbox and `coach_status` output in
+The original Today layout grouped the coach checkbox and `coach_status` output in
 `.fm-coach-control`. A two-column CSS grid places the information trigger beside
 the checkbox label; expanded details span the next row. Native disclosure
-keyboard behavior, pending/empty suppression and coach hiring checks are unchanged.
+keyboard behavior, pending/empty suppression and coach hiring checks are unchanged. The group moved to Lineup on 2026-11-24, where the status appears in the page information panel.
 
 The root `round_countdown` output is the first content output, above startup
 and preference notices and each page body. Its existing server visibility rule

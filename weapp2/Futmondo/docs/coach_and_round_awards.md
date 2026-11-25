@@ -4,7 +4,7 @@ Local implementation, 2026-10-31. Hosted deployment and authenticated historical
 
 ## Login coach
 
-Today contains **Automatically hire coach**, enabled for a new preference. `coach_on_login_source(session, login, championship, user_team, team_state, retry_team)` owns the login action; Today only resolves/presents its preference and status. The account/championship preference is remembered in this browser's localStorage. It does not travel between browsers or devices. The server waits for the browser's context-keyed preference response before acting. Unreadable storage disables the action for that login; failed writes are disclosed beside the control.
+Lineup contains **Automatically hire coach**, enabled for a new preference. `coach_on_login_source(session, login, championship, user_team, team_state, retry_team)` owns the login action. `lineup_Server(..., coach_source=NULL)` resolves the supplied source's browser preference at sign-in, including when Lineup is hidden, and presents its status on Lineup. The account/championship preference is remembered in this browser's localStorage. It does not travel between browsers or devices. The server waits for the browser's context-keyed preference response before acting. Unreadable storage disables the action for that login; failed writes are disclosed in Lineup's page information panel.
 
 The action is restricted to the own team and the league selected at login. Refresh, timers, navigation and switching leagues never create a second attempt. Fresh shared `get_user_team_info` data must report `configuration.enableCoach = "automatic"` and `staff.coach = 0`; a missing/unknown/stale/failed field cannot authorize hiring. `staff.coach = 1` needs no request. Disabling the checkbox prevents an unsubmitted action.
 

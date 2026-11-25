@@ -40,16 +40,12 @@ today_transfer_rows <- function(rows, teams=NULL, players=NULL,timezone=fm_displ
 today_UI <- function(id) {
   ns <- NS(id)
   tagList(h2("Today's market"),
-    coach_preference_script(),
-    tags$div(class="fm-coach-control",
-      checkboxInput(ns("automatically_hire_coach"),"Automatically hire coach",value=TRUE),
-      uiOutput(ns("coach_status"))),
     fluidRow(uiOutput(ns("kpi_cash_box")),uiOutput(ns("kpi_valuation_box"))),
     uiOutput(ns("market_status")),
     players_table_UI(ns("market_players"),box_title="Current market listings",filter_by_is_from_futmondo=TRUE,filter_by_value_under_available_funds=TRUE,default_free_agents=TRUE,filter_by_players_with_bid=TRUE),
     h3("League transfers"),uiOutput(ns("transfer_coverage")),reactable::reactableOutput(ns("recent_transfers")))
 }
-today_Server <- function(id,is_module_active,login_token,championship_id,user_team_id,user_teams_RV,refresh_trigger=NULL,primary_sources=NULL,coach_source=NULL) {
+today_Server <- function(id,is_module_active,login_token,championship_id,user_team_id,user_teams_RV,refresh_trigger=NULL,primary_sources=NULL) {
   moduleServer(id,function(input,output,session) {
     if (is.null(primary_sources)) {
       team_retry<-reactiveVal(0L);market_retry<-reactiveVal(0L)
@@ -66,39 +62,6 @@ today_Server <- function(id,is_module_active,login_token,championship_id,user_te
       market_state <- primary_sources$market_state
       retry_team <- primary_sources$retry_team
       retry_market <- primary_sources$retry_market
-    }
-    if(!is.null(coach_source)){
-      preference_generation<-0L;preference_ready<-reactiveVal(FALSE);preference_warning<-reactiveVal("")
-      observeEvent(coach_source$key(),{
-        preference_generation<<-preference_generation+1L;preference_ready(FALSE)
-        key<-coach_source$key();if(is.null(key))return()
-        session$sendCustomMessage("coach_preference",list(key=key,input=session$ns("coach_preference_ready"),
-          checkbox=session$ns("automatically_hire_coach"),nonce=preference_generation))
-      },ignoreNULL=FALSE)
-      observeEvent(input$coach_preference_ready,{
-        message<-input$coach_preference_ready
-        req(identical(as.integer(message$nonce),preference_generation),identical(message$key,coach_source$key()))
-        if(!isTRUE(message$available)){
-          preference_warning("Saved preference could not be read. Automatic hiring is disabled for this login.")
-          updateCheckboxInput(session,"automatically_hire_coach",value=FALSE)
-          coach_source$set_preference(message$key,FALSE);return()
-        }
-        preference_warning("")
-        if(isTRUE(coach_source$set_preference(message$key,message$enabled)))preference_ready(TRUE)
-      })
-      observeEvent(input$automatically_hire_coach,{
-        req(preference_ready());enabled<-isTRUE(input$automatically_hire_coach)
-        coach_source$set_preference(coach_source$key(),enabled)
-        session$sendCustomMessage("coach_preference_save",list(key=coach_source$key(),enabled=enabled,input=session$ns("coach_preference_saved")))
-      },ignoreInit=TRUE)
-      observeEvent(input$coach_preference_saved,{
-        message<-input$coach_preference_saved;req(identical(message$key,coach_source$key()))
-        preference_warning(if(isTRUE(message$ok))""else "Your choice applies to this login, but this browser could not remember it.")
-      })
-      output$coach_status<-renderUI({
-        message<-paste(coach_source$status(),preference_warning())
-        fm_info(message,error=nzchar(preference_warning())||grepl("could not|unavailable|unsupported",message,ignore.case=TRUE))
-      })
     }
     observeEvent(input$retry_team,retry_team())
     observeEvent(input$retry_market,retry_market())

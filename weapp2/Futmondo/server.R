@@ -340,7 +340,7 @@ selected_player_RV <- players_in_teams_Server(id = "players_in_teams",
   lineup <- lineup_Server("lineup", reactive(identical(input$tabs,"lineup")),
     login_token_RV, championship_id_RV, user_team_id_RV, round_catalog_RV,
     refresh_trigger, history_refresh_trigger, clause_transfers_source=clause_transfers_RV,
-    clause_transfers_refresh=refresh_clause_transfers,round_catalog_state=round_catalog_state_RV)
+    clause_transfers_refresh=refresh_clause_transfers,round_catalog_state=round_catalog_state_RV,coach_source=coach)
 
   today <- today_Server(id = "today",
                is_module_active = reactive({
@@ -351,7 +351,7 @@ selected_player_RV <- players_in_teams_Server(id = "players_in_teams",
                user_team_id = user_team_id_RV,
                user_teams_RV = user_teams_RV,
                refresh_trigger = refresh_trigger,
-               primary_sources = primary_sources,coach_source = coach)
+               primary_sources = primary_sources)
 
 players_in_championship_Server(id = "players_in_championship", 
                                   is_module_active = reactive({

@@ -6383,3 +6383,21 @@ with either path. The calculation adds no source or database reads,
 redraws or timers. It reuses the existing lineup storage and skips
 award ownership reads for the confirmed league. Adding the scoped
 policy changes the existing calculation input hash.
+
+## Coach checkbox on Lineup — 2026-11-24
+
+The full offline browser fixture verified the default checkbox state, saved
+opt-out applied at sign-in while Lineup was hidden, the control absent from
+Today, the disabled status in Lineup's page information panel, and both toggle
+values written to the existing browser key. The nine-page browser check passed
+at 320, 390 and 1440 px with no horizontal overflow or browser errors. The
+offline lifecycle passed 14 checks and eight tabs with no HTTP or live database
+mutation attempts. The coach suites passed 11 and nine checks, the Lineup
+module suite passed, and all three deployment checks and changed file hashes
+passed.
+
+The move uses the same browser storage key, sign-in observers, shared team
+state and coach request budget. The status render follows Lineup visibility,
+with the existing responsive layout and page information panel. API and
+database request volume, snapshot reuse and invalidation, timers, and server
+memory are unaffected by the move. The checks used offline fixtures.

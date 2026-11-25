@@ -48,8 +48,12 @@ lineup_UI <- function(id) {
       .fm-lineup-fixture-vs{font-size:12px;color:var(--fm-muted,#647067)}
       @media(max-width:600px){.fm-lineup-fixtures-list{grid-template-columns:minmax(0,1fr)}}
     ")),
+    coach_preference_script(),
     shiny::div(class='fm-lineup-editor',
       shiny::h2('Lineup'),shiny::uiOutput(ns('heading')),
+      shiny::div(class='fm-coach-control',
+        shiny::checkboxInput(ns('automatically_hire_coach'),'Automatically hire coach',value=TRUE),
+        shiny::uiOutput(ns('coach_status'))),
       shiny::div(class='fm-lineup-controls',
         shiny::div(class='fm-lineup-optimize-controls',
           shiny::actionButton(ns('best'),'Optimize',icon=shiny::icon('wand-magic-sparkles')),
@@ -79,8 +83,43 @@ lineup_UI <- function(id) {
       shiny::uiOutput(ns('arrival_status')),shiny::uiOutput(ns('fixtures'))))
 }
 lineup_Server <- function(id,is_module_active,login_token,championship_id,user_team_id,round_catalog,
-  refresh_trigger=NULL,history_refresh_trigger=NULL,clause_transfers_source=NULL,clause_transfers_refresh=NULL,round_catalog_state=NULL) {
+  refresh_trigger=NULL,history_refresh_trigger=NULL,clause_transfers_source=NULL,clause_transfers_refresh=NULL,round_catalog_state=NULL,
+  coach_source=NULL) {
   shiny::moduleServer(id,function(input,output,session){
+    # Resolve the login preference even while the Lineup tab is hidden.
+    if(!is.null(coach_source)){
+      preference_generation<-0L;preference_ready<-shiny::reactiveVal(FALSE);preference_warning<-shiny::reactiveVal("")
+      shiny::observeEvent(coach_source$key(),{
+        preference_generation<<-preference_generation+1L;preference_ready(FALSE)
+        key<-coach_source$key();if(is.null(key))return()
+        session$sendCustomMessage("coach_preference",list(key=key,input=session$ns("coach_preference_ready"),
+          checkbox=session$ns("automatically_hire_coach"),nonce=preference_generation))
+      },ignoreNULL=FALSE)
+      shiny::observeEvent(input$coach_preference_ready,{
+        message<-input$coach_preference_ready
+        shiny::req(identical(as.integer(message$nonce),preference_generation),identical(message$key,coach_source$key()))
+        if(!isTRUE(message$available)){
+          preference_warning("Saved preference could not be read. Automatic hiring is disabled for this login.")
+          shiny::updateCheckboxInput(session,"automatically_hire_coach",value=FALSE)
+          coach_source$set_preference(message$key,FALSE);return()
+        }
+        preference_warning("")
+        if(isTRUE(coach_source$set_preference(message$key,message$enabled)))preference_ready(TRUE)
+      })
+      shiny::observeEvent(input$automatically_hire_coach,{
+        shiny::req(preference_ready());enabled<-isTRUE(input$automatically_hire_coach)
+        coach_source$set_preference(coach_source$key(),enabled)
+        session$sendCustomMessage("coach_preference_save",list(key=coach_source$key(),enabled=enabled,input=session$ns("coach_preference_saved")))
+      },ignoreInit=TRUE)
+      shiny::observeEvent(input$coach_preference_saved,{
+        message<-input$coach_preference_saved;shiny::req(identical(message$key,coach_source$key()))
+        preference_warning(if(isTRUE(message$ok))""else "Your choice applies to this login, but this browser could not remember it.")
+      })
+      output$coach_status<-shiny::renderUI({
+        message<-paste(coach_source$status(),preference_warning())
+        fm_info(message,error=nzchar(preference_warning())||grepl("could not|unavailable|unsupported",message,ignore.case=TRUE))
+      })
+    }
     source<-shiny::reactiveVal(NULL);draft<-shiny::reactiveVal(NULL);loading<-shiny::reactiveVal(FALSE)
     saving<-shiny::reactiveVal(FALSE);notice_value<-shiny::reactiveVal('');notice_error<-shiny::reactiveVal(FALSE);cache_issue<-shiny::reactiveVal('')
     notice<-function(value,error=FALSE){
