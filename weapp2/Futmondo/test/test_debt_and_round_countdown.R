@@ -146,7 +146,8 @@ check("global UI shares primary states and keeps manual capacity checks separate
   css <- paste(readLines("www/custom_style.css",warn=FALSE),collapse="\n")
   stopifnot(grepl('uiOutput("account_finance_summary"',ui,fixed=TRUE),
     grepl('output$round_countdown <- renderUI',server,fixed=TRUE),
-    grepl('round_finance_display(primary_team_state(), primary_market_state())',server,fixed=TRUE),
+    grepl('states <- list(team = primary_team_state(), market = primary_market_state())',server,fixed=TRUE),
+    grepl('round_finance_display(states$team, states$market)',server,fixed=TRUE),
     grepl('primary_sources = primary_sources',server,fixed=TRUE),
     !grepl('get_financial_snapshot',server,fixed=TRUE),
     grepl('id="round_finance_amounts"',server,fixed=TRUE),is.function(round_finance_amounts_UI),

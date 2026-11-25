@@ -1,5 +1,33 @@
 # Futmondo data review and implementation results
 
+## Immediate balance updates for manual offers and clauses (2026-11-25)
+
+- The focused Shiny fixture exercised real confirmation observers with a
+  held native response and independently published synthetic snapshots. It
+  verified acknowledgement-only changes, unchanged totals when the market
+  arrives first or the balance arrives first, the saved summary of an unlisted
+  offer, league isolation and logout. Clause cases covered immediate cash
+  and Today card updates, a balance published during the POST, conflicting
+  or partial history and a successful handoff to the exact saved transfer.
+  The offline lifecycle passed 14 checks and rendered eight tabs. The
+  balance banner, unchanged-refresh, native offer, clause refresh and saved
+  reconciliation regressions also passed.
+- The 524-listing fixture rendered the updated offer summary in 108 ms from
+  the local acknowledgement through the test's Shiny flushes, with no
+  additional acquisition call on the immediate path. The projection reuses
+  the existing team, market and transaction states. It filters saved history
+  by buyer and pending player before parsing dates. An unlisted offer uses one
+  scoped player-summary interest through the existing bounded snapshot reader.
+  There are no new source endpoints, persistence writes, timers or table
+  redraw dependencies. The unchanged-refresh fixture preserved the monetary
+  card across ten source freshness cycles. The notice reuses the existing
+  information disclosure and the amount cards keep their wrapping layout.
+- Successful bid and buyout captures and the official client support the
+  acknowledgement and accounting fields. The unlisted-offer handoff and
+  delayed-purchase cases were verified with synthetic observations. Hosted
+  transaction latency, reconciliation timing and authenticated rendering
+  remain unverified. [Source comparison](feature_comparison.md#immediate-balance-updates-after-offers-and-clause-purchases-2026-11-25).
+
 ## Manual clause settlement in the balance summary (2026-11-23)
 
 - A read-only production check found one accepted manual clause reservation whose amount exactly explained the screenshot’s deduction and whose slot explained the reduced capacity. Replaying the matching durable worker snapshots through the existing decoder found a positive balance with zero source-held funds and one qualifying pressroom transfer with an explicit locker clause marker. The source balance was observed after the transfer. The saved reconciler previously excluded manual clause jobs.

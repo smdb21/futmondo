@@ -8,6 +8,35 @@ The only business check before submission is for scheduled purchases. `fm_manual
 
 `fm_send_manual_acquisition()` queues one native POST. A recognized rejection is reported to the user. A missing acknowledgement queues a scoped factual refresh and leaves the outcome uncertain. The app never automatically resends the transaction.
 
+### Immediate balance summary (2026-11-25)
+
+`fm_manual_finance_session()` captures the buying context when the user
+confirms. Only the native `answer.code == "api.general.ok"` callback records
+the action in the current browser session. Balance summary on Today, Players
+and My Team includes the outgoing offer in Active offers, After offers and
+Can spend. A paid release clause reduces Balance, After offers and Can spend.
+Today's Current balance box uses the same projected cash. The summary marks
+figures that include confirmations ahead of saved evidence.
+
+Saved market rows replace session offers using the player, own bid identity,
+amount and source time. For an unlisted player, the existing saved player
+summary provides the owned bid identity and price. A verified newer market or
+player response and balance can clear an offer that is no longer active.
+Completed transfers use the existing exact player, buyer, seller, price and
+time matcher. For clause purchases, a balance can arrive before transfer
+history. The display uses the last safe balance and applies the debit once
+until the exact transfer and a subsequent balance are both available. The
+observation time shown is the source time of the balance used. While those
+reads disagree, the projected figures use the saved team valuation and bid
+limit from that balance baseline.
+
+The session records contain the action and a small cash baseline scoped by
+account, championship, team, competition, season and scoring version. Settled
+entries are released and logout clears the ledger. The display reuses persisted
+worker observations and existing automatic polling. Existing source facts,
+transaction logging, scheduled reservations and submission rules retain their
+current contracts.
+
 ## Clause and bid modification verification (2026-11-19)
 
 For bid modifications, an asynchronous manual confirmation can spend the first cash observation's validity window waiting for transfer history. If the live check returns an expired deadline, `fm_clause_execute_async()` starts one more live verification before creating a reservation. Current inputs are reused through the existing resource layer and expired facts are read again. The normal preflight runs on the result, and an expired or unaffordable result prevents admission. SQL admission and dispatch still enforce freshness, context, funds and capacity. A source write or uncertain response cannot trigger this recheck. Before dispatch, the log identifies the mode and failing stage using fixed labels without private payloads.
@@ -91,9 +120,9 @@ An accepted bid can disappear from active offers before the first readback if Fu
 
 ### Active manual offers
 
-Futmondo can acknowledge a submission immediately while LigaRadar still shows
-the previous balance or market. The balance summary shows accepted actions
-under **Accepted offers awaiting balance update**. **Offers awaiting
+The durable reservation path can hold manually submitted actions during
+settlement. The balance summary shows these accepted reservations under
+**Accepted offers awaiting balance update**. **Offers awaiting
 confirmation** applies to a dispatch whose outcome is still being checked.
 
 The existing server observer tries saved active-offer evidence before transfer

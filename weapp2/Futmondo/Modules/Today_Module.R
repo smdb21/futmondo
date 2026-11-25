@@ -116,9 +116,12 @@ today_Server <- function(id,is_module_active,login_token,championship_id,user_te
       fm_info(resource_failure_message(state$error),actionButton(session$ns("retry_market"),"Retry market"),error=TRUE)
     })
     cash_display<-resource_display_source(session,function(){
-      state<-team_state();if(is.null(state$data))return(primary_placeholder(state,"Current balance"))
-      info<-state$data
-      shinydashboard::valueBox(player_card_money(fm_number(info$budget)),"Current balance",icon=icon("wallet"),color="green",width=6)
+      state <- team_state()
+      observed_cash <- fm_number(state$data$budget)
+      cash <- if (is.function(primary_sources$display_cash))
+        tryCatch(primary_sources$display_cash(), error = function(e) observed_cash) else observed_cash
+      if (is.null(state$data) && !is.finite(cash)) return(primary_placeholder(state,"Current balance"))
+      shinydashboard::valueBox(player_card_money(cash),"Current balance",icon=icon("wallet"),color="green",width=6)
     })
     valuation_display<-resource_display_source(session,function(){
       state<-team_state();if(is.null(state$data))return(NULL)

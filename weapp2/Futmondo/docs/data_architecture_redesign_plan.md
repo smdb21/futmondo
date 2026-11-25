@@ -1,5 +1,12 @@
 # Futmondo data architecture redesign plan
 
+## Immediate balance updates for manual offers and clauses (2026-11-25)
+
+- [x] Apply recognized native acknowledgements to the existing Balance summary in the originating session.
+- [x] Reconcile delayed market, balance and transfer observations with the session amounts. Reuse saved player summaries for unlisted offers.
+- [x] Verify acknowledgement timing, both read orders, scope isolation and offline Shiny lifecycle. See [data review](data_review_results.md#immediate-balance-updates-for-manual-offers-and-clauses-2026-11-25).
+- [ ] Verify the summary after an authenticated hosted action following deployment.
+
 ## Manual purchase and offer dispatch (2026-11-23)
 
 - [x] Submit manual clause buyouts, market bids and owner offers through one asynchronous native request after checking scheduled reservations in session memory.

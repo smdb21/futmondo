@@ -154,15 +154,17 @@ fm_clause_jobs <- function(context) {
 }
 # Saved transfer history can settle a completed bid or a paid clause.
 fm_clause_completed_purchase_matches <- function(jobs,history,team,balance_at,history_at) {
+ jobs<-head(jobs,64L)
  fields<-c('id','player_id','buyer_team_id','seller_team_id','price','created')
- if(!is.data.frame(history)||!all(fields%in%names(history)))return(list())
- sellers<-as.character(history$seller_team_id);sellers[is.na(sellers)]<-''
- keep<-history$buyer_team_id%in%team & !is.na(history$id) & nzchar(history$id)
- rows<-history[keep,fields,drop=FALSE];sellers<-sellers[keep]
+ if(!length(jobs)||!is.data.frame(history)||!all(fields%in%names(history)))return(list())
+ players<-vapply(jobs,function(j)fm_scalar(j$player_id,''),character(1))
+ keep<-history$buyer_team_id%in%team & history$player_id%in%players & !is.na(history$id) & nzchar(history$id)
+ rows<-history[keep,fields,drop=FALSE]
+ sellers<-as.character(rows$seller_team_id);sellers[is.na(sellers)]<-''
  is_clause<-(history$is_clause %||% rep(NA,nrow(history)))[keep]
  created<-fm_time(rows$created);price<-suppressWarnings(as.numeric(rows$price))
  matches<-list()
- for(j in head(jobs,64L)){
+ for(j in jobs){
   dispatched<-fm_time(j$dispatched_at)
   if(length(dispatched)!=1L||is.na(dispatched)||balance_at<=dispatched)next
   seller<-fm_scalar(j$original_owner,'')
@@ -200,6 +202,185 @@ fm_clause_active_offer_matches <- function(jobs,market,balance_at,market_at) {
   matches[[length(matches)+1L]]<-list(job_id=j$id,player_id=j$player_id,bid_id=as.character(offers$bid_id[i]),price=prices[i])
  }
  matches
+}
+
+# A saved, successful response remains evidence at its source time after TTL expiry.
+fm_manual_finance_time <- function(state) {
+ if(is.null(state$data)||!is.null(state$error)||!is.null(attr(state$data,'fetch_error'))||
+    state$status%in%c('partial','unavailable')||
+    isTRUE(attr(state$data,'worker_acquisition_status')%in%c('partial','unavailable'))||
+    isTRUE(attr(state$data,'worker_completeness')%in%c('partial','unavailable','incomplete')))return(NA_real_)
+ fm_number(as.numeric(fm_time(state$observed_at)))
+}
+
+fm_manual_finance_session <- function(session,login,league,team,balance_state,history_state) {
+ revision <- shiny::reactiveVal(0L)
+ ledgers <- list()
+ account <- ''
+ generation <- 0L
+ sequence <- 0L
+ account_id <- function() {
+  auth <- login()
+  if(valid_login(auth))fm_scalar(auth[['userid']],'')else ''
+ }
+ shiny::observeEvent(account_id(), {
+  account <<- account_id()
+  generation <<- generation + 1L
+  ledgers <<- list()
+  revision(revision() + 1L)
+ }, priority=100)
+ scope_key <- function(ctx) {
+  ctx$player_id <- ''
+  api_cache_key('manual-finance',context=ctx)
+ }
+ cash_baseline <- function(state) {
+  if(!is.list(state$data))return(state)
+  original <- state$data
+  fields <- c('budget','withheld','teamValue','team_value','maxBid','configuration')
+  state$data <- original[intersect(names(original),fields)]
+  state$data$configuration <- list(mnmp=original$configuration$mnmp)
+  attributes(state$data) <- c(attributes(state$data),attributes(original)[setdiff(names(attributes(original)), 'names')])
+  state
+ }
+ summary_read <- factual_read_adapter(session,'get_player_summary',login,league,team,state_only=TRUE)
+ session$userData$begin_manual_finance_action <- function(ctx,mode,seller,amount) {
+  key <- scope_key(ctx)
+  player <- fm_scalar(ctx$player_id,'')
+  sequence <<- sequence + 1L
+  event <- list(id=as.character(sequence),kind='manual',state='accepted',result_code=API_CODE_OK,mode=mode,
+    player_id=player,original_owner=fm_scalar(seller,''),max_price=amount,dispatched_at=Sys.time())
+  # Capture the known cash before sending. A balance published during the POST
+  # may already include the debit, even if the matching transfer is still pending.
+  baseline <- if(mode=='clause')shiny::isolate(tryCatch(cash_baseline(balance_state()),error=function(e)NULL))else NULL
+  epoch <- generation
+  recorded <- FALSE
+  function() {
+   if(recorded||session$isClosed()||!identical(ctx$account_id,account)||epoch!=generation)return(invisible(NULL))
+   recorded <<- TRUE
+   entry <- ledgers[[key]]
+   event$acknowledged_at <- Sys.time()
+   if(mode!='clause') {
+    previous <- Filter(function(x)x$mode!='clause'&&identical(x$player_id,player),entry$actions)
+    if(any(vapply(previous,function(x)x$dispatched_at>event$dispatched_at,logical(1))))return(invisible(NULL))
+    entry$actions[names(previous)] <- NULL
+   }
+   if(mode=='clause'&&!any(vapply(entry$actions,function(x)
+    x$mode=='clause'&&x$dispatched_at<=event$dispatched_at,logical(1))))entry$baseline <- baseline
+   entry$actions[[event$id]] <- event
+   ledgers[[key]] <<- entry
+   revision(shiny::isolate(revision())+1L)
+  }
+ }
+ session$userData$manual_finance_projection <- function(states) {
+  revision()
+  if(!length(ledgers))return(states)
+  auth <- login()
+  ctx <- resource_context(auth,league(),team())
+  key <- scope_key(ctx)
+  entry <- ledgers[[key]]
+  if(!length(entry$actions))return(states)
+  actions <- entry$actions
+  balance_at <- fm_manual_finance_time(states$team)
+  market_at <- fm_manual_finance_time(states$market)
+  market <- states$market$data
+  market_known <- is.data.frame(market)&&
+   (!nrow(market)||all(c('id','bid_id','bid_price')%in%names(market)))
+  market_offers <- if(market_known&&nrow(market))as.data.frame(market)[
+   !is.na(market$bid_id)&nzchar(as.character(market$bid_id)),c('id','bid_id','bid_price'),drop=FALSE]else
+   data.frame(id=character(),bid_id=character(),bid_price=numeric())
+  clauses <- Filter(function(action)action$mode=='clause',actions)
+  offers <- actions[setdiff(names(actions),names(clauses))]
+  reflected <- if(market_known&&is.finite(market_at))fm_clause_active_offer_matches(offers,market_offers,
+   market_at,market_at)else list()
+  reflected_ids <- vapply(reflected,`[[`,character(1),'job_id')
+  candidates <- Filter(function(action)isTRUE(balance_at>as.numeric(action$dispatched_at)),
+   actions[setdiff(names(actions),reflected_ids)])
+  completed <- character()
+  if(length(candidates)&&is.finite(balance_at)&&is.finite(fm_number(states$team$data$budget))) {
+   history <- history_state()
+   history_at <- fm_manual_finance_time(history)
+   if(is.finite(history_at))completed <- vapply(
+    fm_clause_completed_purchase_matches(candidates,history$data,ctx$user_team_id,balance_at,history_at),
+    `[[`,character(1),'job_id')
+  }
+  # If balance arrives first, keep the known pre-purchase cash and apply the
+  # confirmed debit once until transfer identity and balance chronology agree.
+  clauses_left <- clauses[setdiff(names(clauses),completed)]
+  overlaps <- any(vapply(clauses_left,function(action)
+   !is.finite(balance_at)||balance_at>as.numeric(action$dispatched_at),logical(1)))
+  settled <- if(overlaps)setdiff(completed,names(clauses))else completed
+  if(!overlaps&&length(clauses_left)&&is.finite(fm_number(states$team$data$budget)))entry$baseline <- cash_baseline(states$team)
+  if(overlaps) {
+   if(is.finite(fm_number(entry$baseline$data$budget))) {
+    original <- states$team
+    states$team <- entry$baseline
+    if(!is.null(original$error))states$team$error <- original$error
+   }else states$team <- resource_state(status=states$team$status,error=states$team$error)
+   balance_at <- fm_manual_finance_time(states$team)
+  }
+  debits <- sum(vapply(if(overlaps)clauses else clauses_left,`[[`,numeric(1),'max_price'))
+  if(!is.null(states$team$data)&&debits>0) {
+   states$team$data$budget <- fm_number(states$team$data$budget) - debits
+  }
+  extra_holds <- 0
+  displayed_balance_at <- fm_number(as.numeric(fm_time(states$team$observed_at)))
+  adjusted_market <- FALSE
+  pending_offer <- FALSE
+  for(offer in offers[setdiff(names(offers),settled)]) {
+   matching <- offer$id%in%reflected_ids
+   own <- which(market_offers$id==offer$player_id)
+   if(matching&&isTRUE(balance_at>as.numeric(offer$acknowledged_at))) {
+    settled <- c(settled,offer$id)
+    next
+   }
+   price <- offer$max_price
+   bid_id <- paste0('manual:',offer$id)
+   checked_at <- market_at
+   absent <- market_known&&offer$mode=='bid'&&!length(own)
+   if(!matching&&offer$mode=='offer') {
+    summary <- summary_read(login=auth,championship_id=ctx$championship_id,user_team_id=ctx$user_team_id,player_id=offer$player_id)
+    checked_at <- fm_manual_finance_time(summary)
+    s <- summary$data
+    if(isTRUE(checked_at>as.numeric(offer$acknowledged_at))&&
+       identical(fm_scalar(s$data$`_id` %||% s$data$id,''),offer$player_id)) {
+     saved_id <- fm_scalar(s$my_bid_id,'')
+     saved_price <- fm_number(s$my_bid_price)
+     if(nzchar(saved_id)&&is.finite(saved_price)&&saved_price>0) {
+      bid_id <- saved_id
+      price <- saved_price
+     }
+     absent <- is.list(s$bids)&&!nzchar(saved_id)
+    }
+   }
+   if(absent&&isTRUE(checked_at>as.numeric(offer$acknowledged_at))&&isTRUE(balance_at>=checked_at)) {
+    settled <- c(settled,offer$id)
+    next
+   }
+   if(!matching&&market_known) {
+    market_offers <- rbind(market_offers[setdiff(seq_len(nrow(market_offers)),own),,drop=FALSE],
+     data.frame(id=offer$player_id,bid_id=bid_id,bid_price=price))
+    adjusted_market <- TRUE
+   }
+   if(!matching&&startsWith(bid_id,'manual:'))pending_offer <- TRUE
+   if(isTRUE(displayed_balance_at<=as.numeric(offer$dispatched_at)))extra_holds <- extra_holds + price
+  }
+  if(adjusted_market) {
+   attributes(market_offers) <- c(attributes(market_offers),attributes(market)[
+    setdiff(names(attributes(market)),c('names','row.names','class','.internal.selfref'))])
+   states$market$data <- market_offers
+  }
+  if(!is.null(states$team$data)&&(debits>0||extra_holds>0)) {
+   states$team$data$withheld <- fm_number(states$team$data$withheld) + extra_holds
+   limit <- fm_number(states$team$data$maxBid)
+   if(is.finite(limit))states$team$data$maxBid <- max(0,limit-debits-extra_holds)
+  }
+  entry$actions[settled] <- NULL
+  if(!length(setdiff(names(clauses),settled)))entry$baseline <- NULL
+  ledgers[[key]] <<- if(length(entry$actions))entry else NULL
+  states$confirmed_actions <- debits>0 || extra_holds>0 || pending_offer
+  states
+ }
+ invisible(NULL)
 }
 
 fm_clause_reconcile_saved_offers <- function(session,login,league,team,history_state,balance_state,market_state) {
@@ -688,7 +869,7 @@ fm_manual_reservation_conflict <- function(jobs, player_id, amount, capacity) {
 }
 
 # Each consumed confirmation queues a single native purchase or offer.
-fm_send_manual_acquisition <- function(handler, args) {
+fm_send_manual_acquisition <- function(handler, args, on_confirmed = NULL) {
   clause <- identical(handler, "buy_roster_clause")
   request <- fm_clause_action_payload(handler, args)
   response <- fm_async_http(request$url, "POST", request$body,
@@ -697,7 +878,11 @@ fm_send_manual_acquisition <- function(handler, args) {
     if (value$status_code < 200L || value$status_code >= 300L) stop("Missing purchase acknowledgement")
     answer <- jsonlite::fromJSON(rawToChar(value$content), simplifyVector = FALSE)$answer
     code <- fm_clause_safe_code(answer$code)
-    if (identical(code, API_CODE_OK)) return(list(success = TRUE, code = code))
+    if (identical(code, API_CODE_OK)) {
+      if (is.function(on_confirmed)) tryCatch(on_confirmed(), error = function(e)
+        message("[Futmondo] Could not update the session balance after a confirmed action."))
+      return(list(success = TRUE, code = code))
+    }
     if (startsWith(code, "api.error.") || startsWith(code, "api.market.") || isTRUE(answer$error)) {
       return(list(success = FALSE, code = code,
         message = if (clause) clause_buyout_error_message(code, answer$msg %||% answer$message) else answer$msg %||% answer$message %||% code, refresh = TRUE))
@@ -712,8 +897,8 @@ fm_send_manual_acquisition <- function(handler, args) {
       refresh = TRUE, message = if (clause) "Futmondo did not confirm the purchase. Check your transfers before trying again." else "Futmondo did not confirm the offer. Check your active offers before trying again.")
   })
 }
-fm_send_player_offer <- function(args, player, context) {
-  outcome <- fm_send_manual_acquisition("buy_clause", args)
+fm_send_player_offer <- function(args, player, context, on_confirmed = NULL) {
+  outcome <- fm_send_manual_acquisition("buy_clause", args, on_confirmed)
   promises::then(outcome, function(result) {
     if (isTRUE(result$refresh)) {
       result$refresh_queued <- tryCatch({

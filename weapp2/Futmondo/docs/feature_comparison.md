@@ -1,5 +1,25 @@
 # LigaRadar additions to the official Futmondo workflows
 
+## Immediate balance updates after offers and clause purchases (2026-11-25)
+
+Futmondo documents market bids, clause purchases and personal finance
+movements. The public client reviewed on 2026-11-25 uses the authenticated
+market and team-information queries with fantasy championship and team IDs.
+It reads outgoing `bid` records from market rows and separately parses
+`budget`, `withheld` and `maxBid`. The bundle includes native bid and
+release-clause writes. The checked bundle SHA-256 is
+`08202076259d1678c7557478771d3aa38b5099f42044630569c704fdb7a7cd1c`.
+[Official rules](https://help.futmondo.com/article/91-reglas-del) ·
+[Official release notes](https://magazine.futmondo.com/novedades-en-la-nueva-app-de-futmondo/) ·
+[Official public client](https://app.futmondo.com/main.dart.js).
+
+LigaRadar updates its existing Balance summary on native acknowledgement and
+reconciles the displayed figures with its persisted observations. Captured
+successful bid and clause responses supply `answer.code`. The change corrects
+delivery of the existing offer and purchase workflow. The official signed-in
+refresh timing and hosted LigaRadar rendering remain unverified.
+[Implementation](scheduled_clauses.md#immediate-balance-summary-2026-11-25).
+
 ## League transfer activity over time (2026-11-23)
 
 Futmondo documents personal finance movements, including transfers and prizes,

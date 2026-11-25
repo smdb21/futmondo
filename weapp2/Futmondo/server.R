@@ -127,6 +127,7 @@ function(input, output, session) {
     market_read(login_token_RV(),championship_id_RV(),user_team_id_RV())
   })
   primary_sources <- list(team_state=primary_team_state,market_state=primary_market_state,
+    display_cash=function()round_finance_RV()$cash,
     retry_team=function()team_retry(isolate(team_retry())+1L),
     retry_market=function()market_retry(isolate(market_retry())+1L))
   # The global sync note owns roster/history clocks on the three player pages.
@@ -174,8 +175,13 @@ function(input, output, session) {
   })
   shiny::outputOptions(output,"account_finance_summary",suspendWhenHidden=FALSE)
   round_finance_RV <- resource_display_source(session,function(){
-    finance<-round_finance_display(primary_team_state(), primary_market_state())
-    if(fm_clause_enabled())finance<-fm_clause_finance(finance,fm_clause_jobs(resource_context(login_token_RV(),championship_id_RV(),user_team_id_RV())),primary_team_state()$data)
+    states <- list(team = primary_team_state(), market = primary_market_state())
+    project <- session$userData$manual_finance_projection
+    if (is.function(project) && isTRUE(account_finance_visible())) states <- project(states)
+    finance <- round_finance_display(states$team, states$market)
+    if(fm_clause_enabled())finance<-fm_clause_finance(finance,fm_clause_jobs(resource_context(login_token_RV(),championship_id_RV(),user_team_id_RV())),states$team$data)
+    finance$confirmed_actions <- isTRUE(states$confirmed_actions)
+    finance$balance_observed_at <- states$team$observed_at
     finance
   })
   round_finance_card_RV <- resource_display_source(session,function()round_finance_card_display(round_finance_RV()))
@@ -198,6 +204,7 @@ function(input, output, session) {
     cash<-finance$cash;commitments<-finance$commitments;spendable<-finance$spendable_budget
     fm_info(
       if(!is.null(finance$message))tags$p(finance$message),
+      if(finance$confirmed_actions)tags$p("Includes confirmed offers and purchases while saved figures catch up."),
       if(finance$cash_unverified)tags$p("Balance has not been verified by the latest check."),
       if(finance$cash_stale)tags$p("Balance check is out of date."),
       if(finance$offers_stale)tags$p("Active offers check is out of date."),
@@ -213,10 +220,10 @@ function(input, output, session) {
   # Update source times independently of the countdown/financial card DOM.
   round_finance_checked<-resource_display_source(session,function(){
     if(!valid_login(login_token_RV()))return("")
-    states<-list(balance=primary_team_state(),offers=primary_market_state())
-    text<-vapply(names(states),function(key){
-      stamp<-fm_time(states[[key]]$observed_at)
-      if(is.null(states[[key]]$data)||length(stamp)!=1L||is.na(stamp)||stamp>Sys.time())return("")
+    observations<-list(balance=round_finance_RV()$balance_observed_at,offers=primary_market_state()$observed_at)
+    text<-vapply(names(observations),function(key){
+      stamp<-fm_time(observations[[key]])
+      if(length(stamp)!=1L||is.na(stamp)||stamp>Sys.time())return("")
       paste0(if(key=="balance")"Balance observed: "else"Offers observed: ",fm_format_datetime(stamp))
     },character(1))
     paste(text[nzchar(text)],collapse=" · ")
@@ -295,6 +302,8 @@ function(input, output, session) {
   fm_clause_reconcile_saved_offers(session,login_token_RV,championship_id_RV,user_team_id_RV,
     function()roster_source_readers$transactions(login=login_token_RV(),championship_id=championship_id_RV()),
     primary_team_state,primary_market_state)
+  fm_manual_finance_session(session, login_token_RV, championship_id_RV, user_team_id_RV, primary_team_state,
+    function() roster_source_readers$transactions(login = login_token_RV(), championship_id = championship_id_RV()))
   account_squad_RV <- resource_display_source(session,function(){
     req(account_finance_visible())
     auth<-login_token_RV();league<-championship_id_RV();team<-user_team_id_RV()

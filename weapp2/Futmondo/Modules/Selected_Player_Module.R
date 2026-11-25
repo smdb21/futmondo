@@ -1198,7 +1198,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         session$sendCustomMessage("fm-offer-unlock", list(id = ns("market_offer_marker"), generation = dialog$generation))
         return()
       }
-      result <- tryCatch(fm_send_player_offer(args, sp, ctx),
+      begin_finance <- session$userData$begin_manual_finance_action
+      confirmed <- if (is.function(begin_finance)) begin_finance(ctx, dialog$mode, sp$user_team_id, amount) else NULL
+      result <- tryCatch(fm_send_player_offer(args, sp, ctx, confirmed),
         error = function(e) list(success = FALSE, code = "offer_not_sent", message = "The offer could not be queued."))
       fm_clause_complete(result, function(res) {
         submitting_offer <<- NULL
@@ -1303,7 +1305,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         show_preflight_failure(list(message = conflict))
         return()
       }
-      result <- fm_send_manual_acquisition("buy_roster_clause", args)
+      begin_finance <- session$userData$begin_manual_finance_action
+      confirmed <- if (is.function(begin_finance)) begin_finance(ctx, "clause", purchase$seller, purchase$price) else NULL
+      result <- fm_send_manual_acquisition("buy_roster_clause", args, confirmed)
       fm_clause_complete(result, function(res) {
         uncertain <- identical(res$code, "purchase_response_uncertain")
         if (isTRUE(res$success)) {
