@@ -10,6 +10,7 @@ fixture_held <- TRUE
 fixture_version <- 1L
 fixture_reads <- 0L
 fixture_source_calls <- 0L
+fixture_payloads <- new.env(parent=emptyenv())
 fixture_full_pressroom_reads <- 0L
 futmondo_post <- function(...) {fixture_source_calls <<- fixture_source_calls+1L;stop('Unexpected source HTTP')}
 fm_worker_rpc <- function(name,payload,owner='') {
@@ -22,7 +23,7 @@ fm_worker_rpc <- function(name,payload,owner='') {
   if(is.null(d)) next
   if(d$handler=='get_championship_pressroom')fixture_full_pressroom_reads <<- fixture_full_pressroom_reads+1L
   held <- fixture_held && (d$handler=='get_championship_transfer_amounts' ||
-    (d$handler=='get_user_team_rounds' && d$args$user_team_id=='t1'))
+    (d$handler=='get_user_team_rounds' && d$args$user_team_id=='t2'))
   jobs[[length(jobs)+1L]] <- list(key=key,pending=held,running=FALSE,error=NULL)
   if(held && d$handler=='get_championship_transfer_amounts')
    return(promises::promise(function(resolve,reject) {
@@ -35,11 +36,19 @@ fm_worker_rpc <- function(name,payload,owner='') {
   if(held) next
   version <- as.character(fixture_version)
   if(identical(payload$p_versions[[key]],version)) next
-  value <- switch(d$handler,
-   get_teams=data.frame(teamid=paste0('t',1:10),teamname=paste('Team',1:10)),
+  saved <- fixture_payloads[[key]]
+  if (is.null(saved)) {
+   value <- switch(d$handler,
+   get_teams=data.frame(teamid=paste0('t',1:11),teamname=paste('Team',1:11)),
    get_classification_round_catalog=list(rounds=data.frame(round_id=paste0('r',1:14),round_number=1:14)),
-   get_user_team_rounds=lapply(1:14,function(n) list(id=paste0('r',n),number=n,
-    points=n*10+as.integer(sub('t','',d$args$user_team_id)))),
+   get_user_team_rounds=if(d$args$user_team_id=='t11') list() else lapply(1:14,function(n)
+    list(id=paste0('r',n),number=n,status='closed',points=n*10+as.integer(sub('t','',d$args$user_team_id)))),
+   get_classification_round_ranking={
+    answer <- list(metadata=list(status=if(d$args$round_number%%2==0)'V' else 'P'),
+     ranking=lapply(1:10,function(i)list(id=paste0('t',i),name=paste('Team',i),points=d$args$round_number*10+i)))
+    list(round_id=d$args$round_id,round_number=d$args$round_number,answer=answer,
+     rows=classification_ranking_rows(answer,d$args$round_id,d$args$round_number))
+   },
    get_league_standings_history=data.frame(teamname=rep(paste('Team',1:10),each=14),
     recorded_at=rep(format(as.Date('2026-11-01')+0:13,'%Y-%m-%dT12:00:00Z'),10),team_value=seq_len(140)*1000),
    get_championship_players=data.frame(id=paste0('p',1:60),user_team_id='t1',
@@ -48,14 +57,18 @@ fm_worker_rpc <- function(name,payload,owner='') {
     created=c('2026-01-31T22:00:00Z','2026-01-31T23:00:00Z','2026-02-01T23:00:00Z'),
     price=c(100,200,300)),
    stop('Unexpected fixture handler: ',d$handler))
-  wire <- charToRaw(fm_worker_json(fm_worker_encode(value)))
-  compressed <- history_baseline_compress(wire)
+   wire <- charToRaw(fm_worker_json(fm_worker_encode(value)))
+   compressed <- history_baseline_compress(wire)
+   # The database returns already persisted chunks on subsequent reads.
+   saved <- list(bytes=length(wire),sha256=paste0(openssl::sha256(compressed)),
+    chunks=list(jsonlite::base64_enc(compressed)))
+   fixture_payloads[[key]] <- saved
+  }
   manifest <- list(account_id=fixture_auth[['userid']],resource_key=key,context=d$context,handler=d$handler,
-   version=version,json_bytes=length(wire),parts=1L,sha256=paste0(openssl::sha256(compressed)),
+   version=version,json_bytes=saved$bytes,parts=1L,sha256=saved$sha256,
    observed_at=rival_finance_stamp(Sys.time()-10),checked_at=rival_finance_stamp(),
    valid_until=rival_finance_stamp(Sys.time()+300),status='ok',completeness='complete')
-  resource <- list(key=key,manifest=manifest,chunks=list(jsonlite::base64_enc(compressed)))
-  fm_worker_restore(resource,fixture_auth[['userid']])
+  resource <- list(key=key,manifest=manifest,chunks=saved$chunks)
   resources[[length(resources)+1L]] <- resource
  }
  promises::promise(function(resolve,reject)later::later(function() resolve(list(

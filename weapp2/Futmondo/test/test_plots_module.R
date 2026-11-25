@@ -26,7 +26,7 @@ check('round totals preserve subrounds, revisions, negative and missing points',
     identical(b$points,c(8,NA_real_,NA_real_,NA_real_)), identical(a$rank,c(1,NA_real_,NA_real_,NA_real_)))
   p <- plotly::plotly_build(plots_round_chart(d))
   stopifnot(p$x$layout$xaxis$type=='category', identical(unlist(p$x$layout$xaxis$categoryarray),c('6','6.2','7','8')),
-    length(p$x$data)==2, !is.null(attr(plots_round_chart(d),'fm_info')))
+    length(p$x$data)==2, identical(attr(d, 'missing_rounds'), 6.2))
 })
 check('valuation date axis and hover omit time and year', {
   d <- data.frame(teamname='Alpha', recorded_at=c('2026-11-12T12:00:00Z','2026-11-13T12:00:00Z'),team_value=c(100,110))
@@ -52,6 +52,44 @@ check('catalog coverage and absent teams never become invented totals', {
  attr(rows,'round_numbers') <- c(1,2,3,4)
  totals <- plots_round_totals(rows)
  stopifnot(identical(totals$round,c(1,2,3,1,2,3)),identical(totals$points,c(10,NA_real_,NA_real_,NA_real_,NA_real_,NA_real_)))
+})
+check('saved rankings restore scores and distinguish nonparticipation from unknown', {
+  rows <- data.frame(team_id=c('a','a','b','b','c'), team_name=c('Alpha','Alpha','Beta','Beta','Gamma'),
+    round=c(1,2,1,2,2), points=c(10,5,8,NA,20))
+  ranking <- function(id, number, teams, scores, status='V') {
+    answer <- list(metadata=list(status=status),ranking=lapply(seq_along(teams),function(i)
+      list(id=teams[i],name=teams[i],points=scores[i])))
+    list(round_id=id,round_number=number,answer=answer,rows=classification_ranking_rows(answer,id,number))
+  }
+  native <- data.frame(team_id=c('a','b','a','c'), round_id=rep(c('r1','r2'),each=2),
+    points=c(10,8,5,20), status='closed')
+  r1 <- data.frame(round_id='r1',round_number=1,is_finished=NA)
+  r2 <- data.frame(round_id='r2',round_number=2,is_finished=TRUE)
+  stored_1 <- ranking('r1',1,c('a','b'),c(10,8),'P')
+  stored_2 <- ranking('r2',2,c('a','b','c'),c(5,0,20))
+  recovered <- list(plots_saved_round_ranking(stored_1,r1,native), plots_saved_round_ranking(stored_2,r2,native))
+  stopifnot(all(vapply(recovered,nrow,integer(1))==c(2L,3L)))
+  result <- plots_round_totals(rows,recovered)
+  stopifnot(identical(result$points,c(10,15,8,8,NA_real_,20)),
+    identical(result$rank,c(1,2,2,3,NA_real_,1)), !length(attr(result,'missing_rounds')))
+  stopifnot(is.null(plots_saved_round_ranking(stored_1,transform(r1,round_id='foreign'),native)),
+    is.null(plots_saved_round_ranking(stored_1,r1,transform(native,status='active'))),
+    is.null(plots_saved_round_ranking(structure(stored_1,worker_completeness='partial'),r1,native)),
+    is.null(plots_saved_round_ranking(ranking('r1',1,c('a','b'),c(9,8)),r1,native)),
+    is.null(plots_saved_round_ranking(ranking('r1',1,c('a','b'),c(10,NA)),r1,native)),
+    is.null(plots_saved_round_ranking(ranking('r1',1,c('a','a'),c(10,8)),r1,native)))
+  unknown <- plots_round_totals(rows,recovered[1])
+  stopifnot(identical(attr(unknown,'missing_rounds'),2),
+    is.na(unknown$points[unknown$team_id=='b' & unknown$round==2]))
+  former <- rbind(recovered[[1]],transform(recovered[[1]][1,],team_id='former'))
+  result <- plots_round_totals(rows,list(former,recovered[[2]]))
+  stopifnot(identical(attr(result,'other_participants'),1),all(is.na(result$rank[result$round==1])))
+  # A delayed team snapshot can omit a round already confirmed closed.
+  delayed <- rows[rows$round==1,]
+  attr(delayed, "finished_rounds") <- c(1,2)
+  attr(delayed, "round_numbers") <- c(1,2,3)
+  settled <- plots_round_totals(delayed, list(recovered[[2]][1:2,]))
+  stopifnot(identical(settled$round,c(1,2,1,2)), identical(settled$points,c(10,15,8,8)))
 })
 check('points axes omit empty dtick while rank axes keep integer positions', {
   rows <- data.frame(team_id='a',team_name='Alpha',round=1:13,points=seq(70,130,length.out=13))

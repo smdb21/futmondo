@@ -6429,3 +6429,59 @@ The received-offer, squad-price, disclosure and observation suites passed.
 The full offline lifecycle passed 14 checks plus eight tabs. Deployment
 checks and the three updated file hashes passed. These checks used synthetic
 offers and crests.
+
+## Standings latency and historical participation — 2026-11-25
+
+The reported chart showed intact curves with a missing-scores warning.
+Read-only production aggregates confirmed a ten-team directory and ten saved
+team histories. Nine histories contained a finite, closed score for every
+round from 1 to 13. The tenth history was explicitly empty. Saved native
+Classification rankings listed the same nine participants and matched all
+117 team/round scores, including rounds whose native ranking status was
+`V`. The previous plot treated the directory as the historical participant
+set and used an unknown score for the extra team in every round. This produced
+the warning and withheld the participating teams' ranks. The database checks
+returned aggregate coverage and match counts. They made no writes and exported
+no response bodies, team identifiers or individual scores.
+
+The signed-in team's read now starts with the catalog and directory. Saved
+rankings are requested together only for published rounds with unresolved
+coverage after team history settles. They use the same database-first worker
+descriptors, compression, context and freshness metadata used by
+Classification. Verified closed rankings supply missing observed scores and
+historical participation. A mismatched, incomplete or uncorroborated
+observation leaves a truthful gap. Existing saved source data supplies the
+recovery, with zero additional Futmondo acquisition requests or DB writes.
+
+Complete team histories need no additional database read. Leagues with gaps
+can use one additional coalesced read for the affected saved rankings when
+cold. This runs after the first curves are available. Squad-valuation history
+is deferred while Standings is active. Cached observations are reused through
+the existing bounded worker and session caches. Fact projections keep
+metadata-only updates from rebuilding team round rows or redrawing charts.
+No new timer, schema, job, endpoint or dependency was added.
+
+A known-answer benchmark used 20 teams and 38 rounds. Identical points and
+ranks were confirmed in the complete case. Across five batches of 100 runs,
+median projection cost went from 6.99 ms to 1.88 ms. The new projection with
+one team absent and all 38 rankings supplied took 2.33 ms. The browser tests
+measure synthetic saved-read latency and input responsiveness. Hosted
+first-curve timing and signed-in rollout remain unverified.
+
+The real adapter and compressed-snapshot browser fixture passed at 390 and
+1440 px in light and dark themes. The signed-in team's curve appeared before
+the other team histories, then the closed rankings resolved the nonparticipant
+without creating a missing-score warning. The first curve appeared 0.98–2.51 s
+after opening the local fixture. Input heartbeats took 11–779 ms, including
+bursts that republished all saved histories and rankings. Those bursts produced
+zero unchanged Standings redraws. Idle browser CPU was 1.6–1.9 ms over 1.2 s,
+with no page overflow, JavaScript errors or source HTTP. The ordinary browser
+chart suite also passed in both themes at 320, 390 and 1440 px.
+
+The first recovery implementation took about 3 s to respond during a
+synthetic simultaneous publication. Reusing each round's reactive reader and
+avoiding reprocessing unchanged team histories brought the same test below
+800 ms. The final R checks passed all 11 plot groups, six loading/recovery
+groups, three deployment checks and the module checksum. The offline Shiny
+lifecycle passed 14 checks and eight tabs with zero live HTTP or database
+mutation attempts. It selects each plot's subtab before checking its output.

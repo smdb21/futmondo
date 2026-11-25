@@ -116,7 +116,15 @@ app_check('full server login, navigation, refresh and logout',{
    round_mvps='round_mvps-mvp_cards',notifications=c('notifications-status','notifications-items'))
   for(tab in names(tabs)){
    session$setInputs(tabs=tab);app_settle(session)
-   for(id in tabs[[tab]])stopifnot(!is.null(output[[id]]))
+   for(id in tabs[[tab]]) {
+    if(tab=='plots') {
+     subtab<-c('plots-standings_plot'='Standings','plots-values_plot'='Squad values',
+      'plots-cash_plot'='Cash & transfers','plots-rank_plot'='Rank progression',
+      'plots-owned_club_plot'='Owned by real team')
+     session$setInputs(`plots-plot_tab`=unname(subtab[id]));app_settle(session)
+    }
+    stopifnot(!is.null(output[[id]]))
+   }
    cat('[PASS] rendered tab:',tab,'\n')
   }
   capacity_ctx<-resource_context(app_auth,'champ','team1')

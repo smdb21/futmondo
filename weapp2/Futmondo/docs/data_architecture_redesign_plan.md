@@ -2599,3 +2599,16 @@ verified the scoped policy and Brugué's absence from every final field.
 All fifteen other flagged award players were absent from their rounds'
 saved fields. The shared ledger uses final lineups for the confirmed
 league. Hosted recalculation remains to be verified.
+
+## Standings load time and historical participation — 2026-11-25
+
+- [x] Reconcile the reported warning against saved historical team scores and
+  native rankings without exporting private response bodies.
+- [x] Move the signed-in team's saved history into the initial batch and defer
+  valuation history until its chart or date filter needs it.
+- [x] Reuse official closed round rankings when team histories lack scores or
+  participation evidence. Preserve genuine unknowns and unchanged curves.
+- [ ] Verify signed-in cloud rollout and hosted first-curve latency.
+
+See [plot contracts](plots_module.md#historical-participation-and-faster-first-curves--2026-11-25)
+and [verification](data_review_results.md#standings-latency-and-historical-participation--2026-11-25).

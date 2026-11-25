@@ -13,8 +13,13 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
   });
   await page.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():
    /fixture-crest.png$/.test(route.request().url())?route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><circle cx="12" cy="12" r="11" fill="orange"/></svg>'}):route.abort());
+  const opened=Date.now();
   await page.goto('http://127.0.0.1:8571');
-  await page.waitForFunction(()=>document.getElementById('plots-standings_plot').data?.filter(x=>x.y?.some(Number.isFinite)).length===9);
+  const curves=async count=>page.waitForFunction(n=>document.getElementById('plots-standings_plot').data?.filter(x=>x.y?.some(Number.isFinite)).length===n,count);
+  await curves(1);
+  const firstCurveMs=Date.now()-opened;
+  assert.equal(await page.locator('#plots-standings_plot').evaluate(e=>e.data.find(x=>x.y?.some(Number.isFinite)).name),'Team 1');
+  await curves(9);
   assert.equal(await page.locator('.fm-plot-loading:visible').count(),1);
   const axis = await page.locator('#plots-standings_plot').evaluate(e=>({
     ticks:[...e.querySelectorAll('.ytick text')].map(t=>({label:t.textContent,top:t.getBoundingClientRect().top,bottom:t.getBoundingClientRect().bottom})),
@@ -36,18 +41,11 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
    const elapsed=Date.now()-started;assert.ok(elapsed<1500,`Heartbeat took ${elapsed}ms`);return elapsed;
   };
   const timings=[await heartbeat(1)];
-  const infoPanel=page.locator('.fm-info-panel');
-  const roundWarning=infoPanel.getByText(/^Some saved round scores are missing\./);
-  const checkRoundWarning=async () => {
-   await infoPanel.waitFor({state:'visible'});
-   await infoPanel.evaluate(panel=>{panel.open=true;});
-   await roundWarning.waitFor();
-   assert.equal(await roundWarning.count(),1);
-  };
-  await checkRoundWarning();
+  const roundWarning=page.getByText(/^Some saved round scores are missing/);
+  assert.equal(await roundWarning.count(),0,'Pending reads show only a loading status');
   await page.getByRole('tab',{name:'Rank progression',exact:true}).click();
   await page.waitForFunction(()=>document.getElementById('plots-rank_plot').data?.length>0);
-  await checkRoundWarning();
+  assert.equal(await roundWarning.count(),0);
   await page.getByRole('tab',{name:'Squad values',exact:true}).click();
   await page.waitForFunction(()=>document.getElementById('plots-values_plot').data?.length===10);
   timings.push(await heartbeat(2));
@@ -76,8 +74,14 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
   assert.equal(await page.locator('#stats').innerText(),beforeGrouping,'Period switches add no worker database reads');
   assert.equal(await movementPlot.evaluate(el=>el.layout.xaxis.type),'date');
   await page.getByRole('tab',{name:'Standings',exact:true}).click();
-  await page.waitForFunction(()=>document.getElementById('plots-standings_plot').data?.filter(x=>x.y?.some(Number.isFinite)).length===10);
+  await curves(10);
   await page.waitForFunction(()=>![...document.querySelectorAll('.fm-plot-loading')].some(e=>e.getClientRects().length));
+  assert.equal(await roundWarning.count(),0,'Verified nonparticipation leaves no missing-score warning');
+  await page.getByRole('tab',{name:'Rank progression',exact:true}).click();
+  await page.waitForFunction(()=>document.getElementById('plots-rank_plot').data?.filter(x=>x.y?.some(Number.isFinite)).length===10);
+  const ranks=await page.locator('#plots-rank_plot').evaluate(e=>e.data.find(x=>x.name==='Team 10').y);
+  assert.deepEqual(ranks,Array(14).fill(1),'Only official participants contribute to cumulative ranks');
+  await page.getByRole('tab',{name:'Standings',exact:true}).click();
   const series=await page.locator('#plots-standings_plot').evaluate(e=>e.data.find(x=>x.name==='Team 1'));
   assert.deepEqual(series.y,Array.from({length:14},(_,i)=>{const n=i+1;return 5*n*(n+1)+n;}));
   await page.locator('.fm-information-scope').screenshot({path:'/tmp/plots-points-axis-'+width+'-'+theme+'.png'});
@@ -99,7 +103,7 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2),false);
   assert.match(await page.locator('#stats').innerText(),/ 0 0$/,'No full Pressroom read or source HTTP');
   assert.deepEqual(errors,[]);
-  console.log(`PASS ${width}px ${theme}: partial then complete saved history, status recovery, three transfer groupings, no unchanged redraws, 20 crests; heartbeats ${timings.join('/')}ms; idle CPU ${((last.TaskDuration-first.TaskDuration)*1000).toFixed(1)}ms`);
+  console.log(`PASS ${width}px ${theme}: first curve ${firstCurveMs}ms, partial then complete saved history and verified ranks, three transfer groupings, no unchanged redraws, 20 crests; heartbeats ${timings.join('/')}ms; idle CPU ${((last.TaskDuration-first.TaskDuration)*1000).toFixed(1)}ms`);
   await page.screenshot({path:`/tmp/plots-loading-recovery-${width}.png`});await page.close();
  }}finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});

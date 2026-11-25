@@ -191,3 +191,38 @@ The baseline is marked stale while the regular snapshot is unavailable.
 A pending or failed lookup remains distinct from a verified empty history.
 Cash & transfers continues to use the full record because its calculations
 need counterparties. Period controls reuse the loaded date and amount data.
+
+## Historical participation and faster first curves — 2026-11-25
+
+Standings requests the signed-in team's saved round history in the first
+database batch, alongside the team directory and round catalog. As soon as its
+name and scores arrive it can draw the first curve. The other teams still load
+together as soon as the directory is available. Squad valuations load only
+when selected or needed to initialize the Cash & transfers date controls.
+Returning to Cash & transfers preserves the selected dates when the league and
+history bounds are the same.
+
+After the team histories settle, `ranking_targets()` identifies published rounds
+with a missing score. It reuses the existing scoped database snapshots for
+`get_classification_round_ranking`. That handler's verified first-party request
+is `POST /1/ranking/round` with the fantasy `championshipId`, viewer `userteamId`
+and the opaque round ID in `roundNumber`. The persisted parser output carries
+the exact round ID/number and ranking rows with team identity and points.
+See [Classification's source contract](classification_module.md) and the
+[official public client](https://app.futmondo.com/main.dart.js).
+
+`plots_saved_round_ranking()` validates identities, finite scores, unique
+participants and agreement with known scores. Native metadata `P` or `V` is
+accepted for historical participation only with separate evidence of closure
+from the catalog or matching closed team records. A corroborated ranking can
+supply an unread score or verify a team's absence for that round. An absent team
+has no point or rank marker for that round and can start its curve later.
+Unknown scores still interrupt affected curves and keep incomparable ranks
+unavailable. If a recovered ranking lists teams outside the current directory,
+the ranks in that round require their cumulative history. The warning reports
+the first genuinely uncovered round once reads settle.
+
+The chart reuses persisted ranking payloads, source timestamps and scope
+through the existing database-first read and bounded replay. Its points widget
+is keyed by the visible point series, so newly resolved ranks alone do not
+republish Standings. No browser navigation acquires Futmondo data.

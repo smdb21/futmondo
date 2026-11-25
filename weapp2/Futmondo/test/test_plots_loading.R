@@ -4,6 +4,7 @@ options(futmondo.offline=TRUE)
 suppressPackageStartupMessages(source('global.R'))
 auth <- c(userid='plots-loading-fixture',token='synthetic')
 clear_api_cache()
+directory <- reactiveVal(NULL)
 pending <- new.env(parent=emptyenv())
 calls <- character()
 async_adapter_fetch <- function(fn,args=list(),context,...) {
@@ -14,8 +15,13 @@ async_adapter_fetch <- function(fn,args=list(),context,...) {
 settle <- function(session) for(i in 1:15) {later::run_now(0);session$flushReact()}
 shiny::testServer(plots_Server,args=list(
  is_module_active=reactive(TRUE),login_token=reactive(auth),championship_id=reactive('league'),
- user_team_id=reactive('a'),user_teams_RV=reactive(data.frame(teamid=c('a','b','c'),teamname=c('Alpha','Beta','Gamma')))),{
+ user_team_id=reactive('a'),user_teams_RV=reactive(req(directory()))),{
  session$setInputs(plot_tab='Standings')
+ settle(session)
+ stopifnot(setequal(grep('get_user_team_rounds:', calls, fixed=TRUE, value=TRUE), 'get_user_team_rounds:a'),
+   'get_classification_round_catalog:' %in% calls, !'get_league_standings_history:' %in% calls)
+ cat('PASS signed-in team and catalog read while directory is pending, with no valuation read\n')
+ directory(data.frame(teamid=c('a','b','c'),teamname=c('Alpha','Beta','Gamma')))
  settle(session)
  stopifnot(all(paste0('get_user_team_rounds:',c('a','b','c')) %in% calls),
    'get_classification_round_catalog:' %in% calls,isTRUE(round_state()$loading),
@@ -27,7 +33,7 @@ shiny::testServer(plots_Server,args=list(
  settle(session)
  totals <- round_totals()
  stopifnot(identical(totals$points[totals$team_id=='b'],c(0,5,3)),
-   all(is.na(totals$points[totals$team_id=='a'])),all(is.na(totals$rank)),isTRUE(round_state()$loading))
+   all(is.na(totals$points[totals$team_id=='a'])),all(is.na(totals$rank)),isTRUE(round_state()$loading), !grepl('scores are missing',as.character(round_status())))
  built <- plotly::plotly_build(standings_plot())
  stopifnot(any(vapply(built$x$data,function(x)any(is.finite(x$y)),logical(1))))
  cat('PASS verified curves render while one team and the catalog remain pending; unknown is not zero\n')
@@ -37,6 +43,7 @@ shiny::testServer(plots_Server,args=list(
  settle(session)
  stopifnot(!round_state()$loading,length(round_state()$errors)==1L,
    grepl('Some saved round data could not be read',as.character(round_status()),fixed=TRUE),
+   grepl('The first missing score is in round 1',as.character(round_status()),fixed=TRUE),
    identical(round_totals()$points[round_totals()$team_id=='b'],c(0,5,3)))
  cat('PASS failed team history preserves other curves and produces an explicit failure\n')
  before <- calls

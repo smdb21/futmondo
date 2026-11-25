@@ -388,3 +388,16 @@ LigaRadar uses the owner-requested primary-position rule for bench selection and
 ### Editable lineups and expected XI points · 2026-11-23
 
 Futmondo documents manual editing, an XI estimate based on player averages, and a five-point deduction for each empty position. LigaRadar applies the selected completed-round window and empty-slot penalties to unsaved edits as well as projected squads with incoming signings. The regular player picker includes verified pre-kickoff signings. An approved future lineup opens directly on the pitch, and editing can change its submission date. The comparison uses public documentation. Equivalence of rounding, captain treatment and scoring windows in a signed-in official app was not verified. [Official lineup features](https://magazine.futmondo.com/novedades-en-la-nueva-app-de-futmondo/), [official empty-position rule](https://help.futmondo.com/article/92-como-hago-mi-equipo-en-alineacion).
+
+### Standings load time and historical participation — 2026-11-25
+
+Futmondo's guide documents past/current round rankings and the general
+classification. LigaRadar now reuses those official saved round rankings to
+validate participation and restore missing scores in its existing cumulative
+Standings and Rank progression plots. The first curve can render during the
+remaining saved reads. This refines the existing comparison entry and adds no
+login-tier capability. The public official shell and guide establish the
+source workflows. Signed-in official chart layout and network latency were
+outside this comparison. [Official app](https://app.futmondo.com/),
+[Futmondo guide](https://help.futmondo.com/article/90-empieza-a-jugar-a-futmondo),
+[implementation](plots_module.md#historical-participation-and-faster-first-curves--2026-11-25).
