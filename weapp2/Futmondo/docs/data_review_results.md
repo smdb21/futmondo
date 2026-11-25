@@ -6589,3 +6589,30 @@ lifecycle passed 14 checks and eight tabs, including the moved value and the
 updated for changed trends and retained its DOM when only the observation
 clock changed. Hosted rollout and signed-in official UI were outside
 this verification.
+
+## Round award player statistics — 2026-11-25
+
+The eight Round awards checks passed, including independently calculated
+appearance and MVP counts across rounds with repeated or absent display
+numbers, players sharing a name, and a renamed player. The fixtures excluded
+provisional, incomplete, conflicting, foreign and unacknowledged selections.
+Different seasons and scoring settings could not contribute to a combined
+ranking. A partial observation retained its explanation, and a future-only
+catalog displayed the empty state.
+
+Offline Chromium exercised the full module at 320, 390 and 1440 px across light
+and dark themes. In the 38-round fixture the first player made the Best XI
+38 times and won 12 MVPs. Both charts, numeric sorting, player search, round
+share and narrow-screen containment passed. Chart columns stacked on phones.
+Opening Statistics calculated it once and added zero source or database
+reads. Tab changes preserved the search and reused the calculation. A separate
+38-round benchmark with the maximum 418 distinct winners measured a median
+1.59 ms for aggregation and 22.60 ms to produce the charts and paginated table
+markup. The feature adds no timers, persistence writes or cache entries.
+
+The three Best XI crest groups, ten MVP runtime groups, three deployment
+checks and offline lifecycle (14 checks plus eight tabs) passed. The crest
+fixture now reflects the existing pending-state behavior, which keeps the
+lineup visible during a catalog read and displays an error if that read fails.
+The login inventory adds one static entry. Signed-in production data and hosted
+rollout were outside the checks.

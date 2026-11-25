@@ -2634,3 +2634,11 @@ players. The app reuses the existing saved team and roster observations. See
 [the display and data contract](players_in_teams_module.md#team-value-and-daily-trend--2026-11-25)
 and [local verification](data_review_results.md#team-value-and-daily-trend--2026-11-25).
 Hosted rollout remains unverified.
+
+## Round award player statistics — 2026-11-25
+
+Round awards now includes player rankings across confirmed rounds. Its two
+charts and searchable table reuse the persisted Best XI and MVP selections.
+See the [statistics contract](round_mvps_module.md#player-award-statistics--2026-11-25)
+and [verification results](data_review_results.md#round-award-player-statistics--2026-11-25).
+Hosted rollout remains unverified.

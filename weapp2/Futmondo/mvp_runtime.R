@@ -8,6 +8,73 @@ mvp_result <- function(status, rows = data.frame(), reason = "", code = "", comp
   list(status=status, rows=rows, reason=reason, code=code, complete=complete)
 }
 
+# Input is the shared, scoped award snapshot with one current revision per round.
+round_award_player_stats <- function(rows, championship_id) {
+  players <- data.frame(player_id = character(), player_name = character(), best_xi = integer(), mvp = integer())
+  out <- list(players = players, rounds = 0L, unconfirmed_rounds = 0L, incomplete_rounds = 0L,
+    unsaved_rounds = 0L, scope_issue = "")
+  if (!is.data.frame(rows) || !nrow(rows)) return(out)
+  if ("championship_id" %in% names(rows))
+    rows <- rows[rows$championship_id %in% championship_id, , drop = FALSE]
+  if (!nrow(rows)) return(out)
+
+  if (!all(c("player_id", "player_name", "is_mvp", "is_finished") %in% names(rows)) ||
+      !any(c("round_id", "round_number") %in% names(rows))) {
+    out$scope_issue <- "The saved selections lack the fields needed to verify round awards."
+    return(out)
+  }
+  round_key <- if ("round_id" %in% names(rows)) trimws(as.character(rows$round_id)) else {
+    number <- suppressWarnings(as.numeric(as.character(rows$round_number)))
+    ifelse(is.finite(number), as.character(number), NA_character_)
+  }
+  if (anyNA(round_key) || any(!nzchar(round_key))) out$scope_issue <- "Some award rows have no round identity."
+  round_key[!nzchar(round_key)] <- NA_character_
+  groups <- split(seq_len(nrow(rows)), round_key)
+  player_id <- trimws(as.character(rows$player_id))
+  flag <- function(x) tolower(trimws(as.character(x)))
+  mvp <- flag(rows$is_mvp)
+  is_mvp <- mvp %in% c("true", "t", "1")
+  mvp_known <- is_mvp | mvp %in% c("false", "f", "0")
+  finished <- flag(rows$is_finished) %in% c("true", "t", "1")
+  saved <- if ("persistence" %in% names(rows)) rows$persistence %in% "Saved" else rep(FALSE, nrow(rows))
+  states <- vapply(groups, function(i) {
+    ids <- player_id[i]
+    if (length(i) != 11L || anyNA(ids) || any(!nzchar(ids)) || anyDuplicated(ids) ||
+        !all(mvp_known[i]) || sum(is_mvp[i]) != 1L) return("incomplete")
+    if (!all(finished[i])) return("unconfirmed")
+    if (!all(saved[i])) return("unsaved")
+    "counted"
+  }, character(1))
+  out$incomplete_rounds <- sum(states == "incomplete")
+  out$unconfirmed_rounds <- sum(states == "unconfirmed")
+  out$unsaved_rounds <- sum(states == "unsaved")
+  selected <- unlist(groups[states == "counted"], use.names = FALSE)
+  if (!length(selected)) return(out)
+  for (field in intersect(c("season", "scoring_version"), names(rows))) {
+    if (length(unique(rows[[field]][selected])) > 1L) {
+      out$scope_issue <- "The saved selections span different seasons or scoring settings. A single ranking is unavailable."
+      return(out)
+    }
+  }
+
+  # Prefer the latest numbered selection with a recorded name when labels change.
+  if ("round_number" %in% names(rows)) {
+    number <- suppressWarnings(as.numeric(as.character(rows$round_number[selected])))
+    selected <- selected[order(number, decreasing = TRUE, na.last = TRUE)]
+  }
+  ids <- player_id[selected]
+  names_seen <- trimws(as.character(rows$player_name[selected]))
+  named <- !is.na(names_seen) & nzchar(names_seen)
+  players <- unique(ids)
+  names_latest <- names_seen[named][match(players, ids[named])]
+  names_latest[is.na(names_latest)] <- players[is.na(names_latest)]
+  index <- match(ids, players)
+  out$rounds <- sum(states == "counted")
+  out$players <- data.frame(player_id = players, player_name = names_latest,
+    best_xi = tabulate(index, length(players)), mvp = tabulate(index[is_mvp[selected]], length(players)))
+  out
+}
+
 mvp_records <- function(x) {
   if (is.data.frame(x)) return(lapply(seq_len(nrow(x)), function(i) as.list(x[i,,drop=FALSE])))
   if (is.list(x)) x else list()

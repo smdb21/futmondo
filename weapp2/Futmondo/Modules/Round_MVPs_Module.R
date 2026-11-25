@@ -78,11 +78,96 @@ round_award_card <- function(mvp, xi, players = NULL) {
         }))))
 }
 
+round_award_leaders_plot <- function(players, metric, title, rounds) {
+  counts <- players[[metric]]
+  ranked <- players[order(-counts, players$player_name, players$player_id, method = "radix"), , drop = FALSE]
+  ranked <- ranked[ranked[[metric]] > 0L, , drop = FALSE]
+  leaders <- head(ranked, 5L)
+  values <- leaders[[metric]]
+  tied <- sum(ranked[[metric]] == tail(values, 1L)) - sum(values == tail(values, 1L))
+  tags$figure(class = paste("award-chart", paste0("award-chart-", metric)),
+    tags$figcaption(title),
+    tags$ol(lapply(seq_along(values), function(i) {
+      tags$li(tags$span(class = "award-chart-name", leaders$player_name[i]),
+        tags$span(class = "award-chart-count", values[i]),
+        tags$span(class = "award-chart-track", `aria-hidden` = "true",
+          tags$span(style = sprintf("width: %.2f%%", 100 * values[i] / rounds))))
+    })),
+    tags$div(class = "award-chart-scale", `aria-hidden` = "true", tags$span("0"),
+      tags$span(sprintf(ngettext(rounds, "%d round", "%d rounds"), rounds))),
+    if (tied > 0L) tags$p(class = "award-chart-note",
+      sprintf(ngettext(tied, "%d more player tied at %d.", "%d more players tied at %d."), tied, tail(values, 1L))))
+}
+
+round_award_statistics_view <- function(stats, snapshot) {
+  reason <- mvp_text(snapshot$reason)
+  coverage <- snapshot$coverage
+  future_only <- is.data.frame(coverage) && nrow(coverage) > 0L &&
+    "required" %in% names(coverage) && all(coverage$required %in% FALSE)
+  missing <- if (is.data.frame(coverage) && all(c("required", "selection") %in% names(coverage)))
+    sum(coverage$required %in% TRUE & coverage$selection %in% "Missing") else 0L
+  if (missing > 0L) {
+    reason <- trimws(sub("Some round awards are missing.", "", reason, fixed = TRUE))
+  }
+  issues <- c(if (missing > 0L) sprintf(
+      ngettext(missing, "%d round is missing its award selection.", "%d rounds are missing their award selections."), missing),
+    if (nzchar(reason)) reason,
+    if (nzchar(stats$scope_issue)) stats$scope_issue,
+    if (stats$unsaved_rounds > 0L) sprintf(
+      ngettext(stats$unsaved_rounds, "%d selection awaits a confirmed save.", "%d selections await a confirmed save."),
+      stats$unsaved_rounds),
+    if (stats$unconfirmed_rounds > 0L) sprintf(
+      ngettext(stats$unconfirmed_rounds, "%d selection awaits confirmation.", "%d selections await confirmation."),
+      stats$unconfirmed_rounds),
+    if (stats$incomplete_rounds > 0L) sprintf(
+      ngettext(stats$incomplete_rounds, "%d selection is incomplete.", "%d selections are incomplete."),
+      stats$incomplete_rounds))
+  if (!length(issues) && identical(snapshot$status, "partial") && !future_only)
+    issues <- "Coverage of earlier round awards is unconfirmed."
+  notice <- if (length(issues)) tags$p(class = "award-coverage", paste(issues, collapse = " "))
+  if (!stats$rounds) {
+    return(tagList(tags$p(if (future_only && !length(issues)) "No completed round awards yet." else
+      "No confirmed round awards are available for these rankings."), notice))
+  }
+
+  players <- stats$players
+  same_name <- duplicated(players$player_name) | duplicated(players$player_name, fromLast = TRUE)
+  players$player_name[same_name] <- paste0(players$player_name[same_name], " (", players$player_id[same_name], ")")
+  players$share <- players$best_xi / stats$rounds
+  metric <- function(value, label) tags$div(tags$dt(label), tags$dd(value))
+  tagList(
+    tags$dl(class = "award-stats-summary",
+      metric(stats$rounds, "Confirmed rounds"), metric(nrow(players), "Best XI players"),
+      metric(sum(players$mvp > 0L), "MVP winners")),
+    notice,
+    tags$div(class = "award-charts",
+      round_award_leaders_plot(players, "best_xi", "Most Best XI appearances", stats$rounds),
+      round_award_leaders_plot(players, "mvp", "Most MVP wins", stats$rounds)),
+    tags$h4("All award winners"),
+    tags$p(class = "award-table-note", "Round share is the percentage of confirmed rounds in which a player made the Best XI. Each MVP win is also a Best XI appearance."),
+    reactable::reactable(players[c("player_name", "best_xi", "mvp", "share")],
+      searchable = TRUE, compact = TRUE, striped = TRUE, defaultPageSize = 10L,
+      defaultSorted = list(best_xi = "desc", mvp = "desc", player_name = "asc"),
+      defaultColDef = reactable::colDef(headerVAlign = "bottom"),
+      columns = list(
+        player_name = reactable::colDef(name = "Player", minWidth = 95),
+        best_xi = reactable::colDef(name = "Best XI", minWidth = 52, align = "right", defaultSortOrder = "desc"),
+        mvp = reactable::colDef(name = "MVP", minWidth = 42, align = "right", defaultSortOrder = "desc"),
+        share = reactable::colDef(name = "Round share", minWidth = 56, align = "right", defaultSortOrder = "desc",
+          format = reactable::colFormat(percent = TRUE, digits = 1))),
+      theme = fm_reactable_theme(),
+      language = reactable::reactableLang(searchPlaceholder = "Search players", searchLabel = "Search award winners")))
+}
+
 round_mvps_UI <- function(id) {
   ns <- NS(id)
   fluidRow(box(width = 12, title = "Round awards", status = "primary", solidHeader = TRUE,
-    fm_info("Published official MVPs and Best XI selections.", class = "round-mvps-intro"),
-    uiOutput(ns("mvp_cards"))))
+    tabsetPanel(id = ns("award_tab"), type = "pills", selected = "rounds",
+      tabPanel("By round", value = "rounds",
+        fm_info("Published official MVPs and Best XI selections.", class = "round-mvps-intro"),
+        uiOutput(ns("mvp_cards"))),
+      tabPanel("Statistics", value = "statistics",
+        tags$div(class = "award-statistics", uiOutput(ns("award_statistics")))))))
 }
 
 round_mvps_Server <- function(id, is_module_active, login_token, championship_id, refresh_trigger = NULL) {
@@ -90,6 +175,14 @@ round_mvps_Server <- function(id, is_module_active, login_token, championship_id
     player_catalog_read <- factual_read_adapter(session, "get_championship_players", login_token,
       championship_id, is_active = is_module_active, refresh_trigger = refresh_trigger, state_only = TRUE)
     mvp_snapshot <- shared_mvp_source(session,login_token,championship_id,is_module_active,refresh_trigger)
+    output$award_statistics <- renderUI({
+      req(isTRUE(is_module_active()))
+      snapshot <- mvp_snapshot()
+      if (isTRUE(snapshot$loading) || identical(snapshot$status, "loading"))
+        return(NULL)
+      stats <- round_award_player_stats(snapshot$rows, championship_id())
+      round_award_statistics_view(stats, snapshot)
+    })
     output$mvp_cards <- renderUI({
       snapshot <- mvp_snapshot()
       rows <- round_mvp_rows(snapshot$rows, championship_id())

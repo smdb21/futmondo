@@ -150,6 +150,7 @@ Futmondo documents configurable borrowing in its maximum bid. LigaRadar’s exis
 | Login ID / addition | Official baseline | Specific LigaRadar behavior | Local implementation evidence |
 | --- | --- | --- | --- |
 | `lineup_optimizer` — Best XI + bench optimization | Suggested lineup and aggregate lineup average already exist; the automatic coach performs post-round substitutions. | An explicit click maximizes observed average totals over a selected 1–20 completed-round window across permitted formations, then chooses substitutes using their primary positions for coverage; an optional full outfield coverage requirement can also constrain the XI and formation. Always excludes injured, suspended and unavailable players and verified departures by next kickoff; doubtful players are optional and excluded by default. It is a LigaRadar calculation independent of opening the official suggested-lineup control, which the owner does not see in their league. Permitted formation entitlements, multiposition, player eligibility and official save preflights still apply. A complete eligible history/check is required; the user reviews and saves the draft. | `Modules/Lineup_Module.R`, `lineup_runtime.R`; [lineup](lineup_module.md). |
+| `round_award_rankings` — Best XI and MVP leaders | Published round Best XI and MVP, and historical editorial summaries of award counts. | Two leader charts and a searchable player ranking for the selected championship and season, with each player's share of confirmed rounds and any gaps in coverage. | [Round awards](round_mvps_module.md#player-award-statistics--2026-11-25). |
 | `recent_average` — Player rankings by last-N average | Player averages and a top-five total-points ranking already exist. | Choose 1–20 recent rounds and numerically sort market, squad and all-player tables by that window's average. Table windows and lineup completed-round windows have distinct documented finality contracts. Unknown scores remain unknown; source zero and negative scores count. | `Modules/Players_Table_Module.R`, `factual_helpers.R`; [player tables](players_table_module.md), [score reuse](round_points_matrix.md). |
 | `price_efficiency` — Points per million | Official market/clause prices and player points. | Sort the same recent average divided by market value in Today or clause price in Players, expressed as points per €1M. Missing/nonpositive prices do not produce ratios. | `Modules/Players_Table_Module.R`; [player tables](players_table_module.md#points-to-price-ratios). |
 | `squad_value_trend` — Squad value trends | Futmondo documents squad valuations and player price movements. | My Team combines the squad value with the total 24-hour change in its players' prices and separate rising and falling player counts. | [My Team](players_in_teams_module.md#team-value-and-daily-trend--2026-11-25). |
@@ -433,3 +434,22 @@ shell. The equivalent signed-in aggregation and layout were outside this
 review. [Official web app](https://app.futmondo.com/),
 [game rules](https://help.futmondo.com/article/91-reglas-del),
 [player price guide](https://help.futmondo.com/article/95-como-fluctua-el-precio-de-los-jugadores).
+
+## Best XI and MVP leaders — 2026-11-25
+
+Futmondo documents selecting past rounds and viewing the Best XI. Its release
+notes also describe the MVP for an individual round. The public client inspected
+on November 25 still uses the round-specific dream team request and player/MVP
+fields recorded in the classification contract. The bundle SHA-256 was
+`08202076259d1678c7557478771d3aa38b5099f42044630569c704fdb7a7cd1c`.
+[Getting started](https://help.futmondo.com/article/90-empieza-a-jugar-a-futmondo),
+[official release notes](https://magazine.futmondo.com/version-1-6-como-van-mis-finanzas/),
+[public client](https://app.futmondo.com/main.dart.js),
+[recorded request contract](classification_module.md#dream-team-display-2026-11-23).
+
+Futmondo has also published a season review with cross-round Best XI and MVP
+counts by scoring mode. LigaRadar makes that comparison available directly in
+the selected league with two charts, searchable player totals and round shares
+computed from confirmed selections. Signed-in official navigation and equivalent
+interactive season filters were outside this check.
+[Official 2016–17 season review](https://magazine.futmondo.com/balance-futmondo-123-temporada-16-17/).

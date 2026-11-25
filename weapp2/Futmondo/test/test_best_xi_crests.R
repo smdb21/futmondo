@@ -39,7 +39,7 @@ shiny::testServer(round_mvps_Server, args = list(is_module_active = function() T
   session$flushReact(); stopifnot(reads == 1L)
   state(list(data = NULL, status = 'loading')); session$flushReact()
   rendered <- output$mvp_cards$html
-  stopifnot(grepl('Loading player team crests', rendered, fixed = TRUE),
+  stopifnot(!grepl('fm-info-error|Loading player team crests', rendered),
     length(xml2::xml_find_all(xml2::read_html(rendered), '//tbody/tr')) == 11L)
   state(list(data = NULL, status = 'error', error = resource_failure(category = 'connection'))); session$flushReact()
   rendered <- output$mvp_cards$html
@@ -48,6 +48,6 @@ shiny::testServer(round_mvps_Server, args = list(is_module_active = function() T
   state(list(data = players, status = 'ready')); session$flushReact()
   stopifnot(length(xml2::xml_find_all(xml2::read_html(output$mvp_cards$html), '//tbody//img')) == 11L)
 })
-cat('PASS one shared catalog read, stable redraws, visible loading/failure and reactive recovery\n')
+cat('PASS one shared catalog read, stable redraws, lineups during loading, visible failure and reactive recovery\n')
 elapsed <- system.time(for (i in 1:38) htmltools::renderTags(round_award_card(mvp, xi, players)))[['elapsed']]
 cat(sprintf('PERFORMANCE 38 rounds / 418 player cells with crests: %.3f seconds\n', elapsed))

@@ -78,6 +78,79 @@ elapsed <- system.time({
   htmltools::renderTags(tagList(cards))
 })[['elapsed']]
 cat(sprintf('PERFORMANCE 38 rounds / 418 lineup rows: %.3f s render, zero added requests\n', elapsed))
+check('award totals use stable identities, verified finality and one scoring context', {
+  a <- transform(first, season = 'season', scoring_version = 'standard', persistence = 'Saved')
+  b <- transform(a, round_id = 'r2', round_number = 1, is_mvp = player_id == 'p1')
+  c <- transform(b, round_id = 'r3', round_number = NA_real_)
+  c$player_id[11] <- 'p12'
+  # The duplicate name and the name change must not split or merge player IDs.
+  a$player_name[1:2] <- 'Alex'
+  b$player_name[1:2] <- 'Alex'
+  c$player_name[1:2] <- 'Alex'
+  pending <- transform(a, round_id = 'pending', is_finished = FALSE)
+  unknown <- transform(a, round_id = 'unknown', is_finished = NA)
+  short <- transform(a[-1, ], round_id = 'short')
+  duplicate <- transform(a, round_id = 'duplicate')
+  duplicate$player_id[11] <- duplicate$player_id[1]
+  ambiguous <- transform(a, round_id = 'ambiguous', is_mvp = player_id %in% c('p1', 'p2'))
+  unsaved <- transform(a, round_id = 'save', persistence = 'Save failed')
+  foreign <- transform(a, championship_id = 'elsewhere', player_id = paste0('foreign', player_id))
+  result <- round_award_player_stats(rbind(a, b, c, pending, unknown, short, duplicate, ambiguous, unsaved, foreign), 'league')
+  p <- result$players
+  stopifnot(result$rounds == 3L, result$unconfirmed_rounds == 2L, result$incomplete_rounds == 3L,
+    result$unsaved_rounds == 1L, nrow(p) == 12L, sum(p$best_xi) == 33L, sum(p$mvp) == 3L,
+    sum(p$player_name == 'Alex') == 2L, p$mvp[p$player_id == 'p1'] == 2L,
+    p$mvp[p$player_id == 'p2'] == 1L, p$best_xi[p$player_id == 'p11'] == 2L,
+    p$best_xi[p$player_id == 'p12'] == 1L, !any(startsWith(p$player_id, 'foreign')))
+  renamed <- transform(a, round_id = 'new', round_number = 8, player_name = paste('New', player_id))
+  latest <- round_award_player_stats(rbind(renamed, a), 'league')$players
+  stopifnot(latest$player_name[latest$player_id == 'p1'] == 'New p1')
+  legacy <- a
+  legacy$round_id <- NULL
+  stopifnot(round_award_player_stats(legacy, 'league')$rounds == 1L)
+  legacy$persistence <- NULL
+  stopifnot(round_award_player_stats(legacy, 'league')$unsaved_rounds == 1L)
+  for (field in c('season', 'scoring_version')) {
+    other <- b
+    other[[field]] <- 'other'
+    mixed <- round_award_player_stats(rbind(a, other), 'league')
+    stopifnot(mixed$rounds == 0L, nzchar(mixed$scope_issue))
+  }
+})
+check('statistics tab uses confirmed rounds and the shared snapshot, including on updates', {
+  original <- shared_mvp_source
+  shared_calls <- 0L
+  saved <- rows
+  saved$persistence <- 'Saved'
+  state <- reactiveVal(list(status = 'partial', rows = saved, reason = 'A historical round is missing.'))
+  shared_mvp_source <- function(...) { shared_calls <<- shared_calls + 1L; state }
+  shiny::testServer(round_mvps_Server, args = list(is_module_active = function() TRUE,
+    login_token = function() NULL, championship_id = function() 'league'), {
+    session$setInputs(award_tab = 'statistics')
+    dom <- xml2::read_html(output$award_statistics$html)
+    figures <- xml2::xml_find_all(dom, '//figure')
+    stats <- xml2::xml_text(xml2::xml_find_all(dom, '//dl//dd'))
+    table <- jsonlite::fromJSON(xml2::xml_text(xml2::xml_find_first(dom, '//script[@data-for]')))$x$tag$attribs$data
+    stopifnot(identical(stats, c('3', '11', '1')), length(figures) == 2L,
+      length(xml2::xml_find_all(figures[1], './/li')) == 5L,
+      length(xml2::xml_find_all(figures[2], './/li')) == 1L,
+      grepl('6 more players tied at 3', xml2::xml_text(figures[1]), fixed = TRUE),
+      grepl('2 selections await confirmation', xml2::xml_text(dom), fixed = TRUE),
+      grepl('A historical round is missing.', xml2::xml_text(dom), fixed = TRUE),
+      length(table$player_name) == 11L, sum(table$mvp) == 3L, all(table$share == 1))
+    session$setInputs(award_tab = 'rounds')
+    session$setInputs(award_tab = 'statistics')
+    state(list(rows = data.frame(), status = 'partial', reason = '',
+      coverage = data.frame(required = FALSE)))
+    session$flushReact()
+    stopifnot(grepl('No completed round awards yet.', output$award_statistics$html, fixed = TRUE),
+      !grepl('award-chart', output$award_statistics$html, fixed = TRUE))
+    state(list(rows = data.frame(), status = 'loading', reason = ''))
+    session$flushReact()
+    stopifnot(is.null(output$award_statistics), shared_calls == 1L)
+  })
+  shared_mvp_source <- original
+})
 fixture <- tags$html(tags$head(tags$meta(name = 'viewport', content = 'width=device-width, initial-scale=1'),
   tags$style(HTML(paste(':root { --fm-muted: #aaa; --fm-border: #345; --fm-surface: #0b120d; --fm-text: #eee; --fm-warning: #ffc107; } body { margin: 0; padding: 16px; background: #050805; font-family: monospace; } * { box-sizing: border-box; }',
     paste(readLines('www/custom_style.css', warn = FALSE), collapse = '\n'))))),

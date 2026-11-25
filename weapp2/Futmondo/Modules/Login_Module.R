@@ -23,6 +23,8 @@ login_feature_tiers <- function() {
           description = "Build a lineup from your chosen 1–20 completed rounds, comparing allowed formations, with injury and next-round departure checks. Require primary-position bench cover if needed. Edit any lineup on the pitch and see the XI’s expected points, including empty-slot penalties."),
         list(id = "scheduled_lineups", title = "Lineups for incoming signings",
           description = "Optimize your XI and bench with confirmed signings due before kickoff. Where scheduling is enabled, approve one submission timed for the last selected signing to join."),
+        list(id = "round_award_rankings", title = "Best XI and MVP leaders",
+          description = "See who made the Best XI most often, who won the most MVPs and each player’s share of confirmed rounds."),
         list(id = "recent_average", title = "Player rankings by last-N average",
           description = "Sort players by their average over your chosen 1–20 recent rounds across market, squad and player tables."),
         list(id = "price_efficiency", title = "Points per million",
