@@ -155,7 +155,38 @@ shared_mvp_source <- function(session,login,championship,active,refresh=NULL) {
   }
   state<-root$userData$mvp_shared;state$consumers[[session$ns("mvp_consumer")]]<-active
   enabled<-function()shiny::isolate(any(vapply(state$consumers,function(f)isTRUE(f()),logical(1))))
-  identity<-function(){league_context_revision();auth<-login();if(!valid_login(auth))return("");ctx<-resource_context(auth,championship());paste(ctx$account_id,ctx$championship_id,ctx$competition_id,ctx$season,ctx$scoring_version,sep="|")}
+  database_display<-function()exists("fm_worker_mode",mode="function")&&isTRUE(fm_worker_mode(login()[["userid"]]))
+  catalog_context<-shiny::reactive({
+    league_context_revision()
+    auth<-login()
+    if(!valid_login(auth))return(NULL)
+    cid<-championship()
+    if(!nzchar(fm_scalar(cid,"")))return(NULL)
+    ctx<-resource_context(auth,cid,session_id=root$token)
+    if(!database_display())return(ctx)
+    # Persisted observations keep their identity after the live metadata expires.
+    fields<-c("competition_id","season","scoring_version")
+    known<-vapply(ctx[fields],fm_context_known,logical(1))
+    if(!all(known)){
+      source<-root$userData$league_context_source
+      resolved<-if(is.function(source))tryCatch(source()$data,shiny.silent.error=function(e)NULL)
+      if(identical(resolved$account_id,ctx$account_id)&&identical(resolved$championship_id,ctx$championship_id)&&
+         all(vapply(fields[known],function(field)identical(ctx[[field]],resolved[[field]]),logical(1)))){
+        for(field in fields[!known])if(fm_context_known(resolved[[field]]))ctx[[field]]<-resolved[[field]]
+      }
+      if(!fm_context_known(ctx$competition_id)||!fm_context_known(ctx$season))return(NULL)
+      # A league may omit scoring metadata. Its explicit unknown scope can
+      # resolve to a canonical catalog through the verified worker redirect.
+      if(!fm_context_known(ctx$scoring_version))
+        ctx<-fm_worker_resolve_context("get_mvp_saved_catalog",list(championship_id=cid),ctx)
+    }
+    ctx
+  })
+  identity<-function(){
+    ctx<-catalog_context()
+    if(is.null(ctx))return("")
+    paste(ctx$account_id,ctx$championship_id,ctx$competition_id,ctx$season,ctx$scoring_version,sep="|")
+  }
   current<-function(generation,key) !state$closed&&identical(generation,state$generation)&&identical(key,state$key)&&identical(shiny::isolate(identity()),key)
   publish<-function(){
     coverage<-award_coverage(state$rounds,state$rows,state$failures,state$current_round_number,state$current_round_id)
@@ -208,7 +239,7 @@ shared_mvp_source <- function(session,login,championship,active,refresh=NULL) {
     if(!enabled()||(!is.null(state$acquisition_active)&&!isTRUE(shiny::isolate(state$acquisition_active())))){state$queue<-list()}
     while(length(state$queue)&&state$inflight<2L&&state$writes<2L&&enabled()){
       task<-state$queue[[1]];state$queue<-state$queue[-1];auth<-shiny::isolate(login());cid<-shiny::isolate(championship())
-      generation<-state$generation;key<-state$key;ctx<-resource_context(auth,cid,season=state$season,session_id=root$token)
+      generation<-state$generation;key<-state$key;ctx<-shiny::isolate(catalog_context());ctx$season<-state$season
       if(identical(task$kind,"save")){save_result(task$result,task$reference,auth,cid,ctx,generation,key);next}
       state$inflight<-state$inflight+1L
       # Explicit acquisition bypasses both wrapper and source caches for this round.
@@ -272,7 +303,7 @@ shared_mvp_source <- function(session,login,championship,active,refresh=NULL) {
       # Recheck metadata for every explicit batch, including rounds that closed
       # while Admin stayed open. The numbered catalog/schedule caches are reused.
       auth<-shiny::isolate(login());cid<-shiny::isolate(championship());g<-state$generation;k<-state$key
-      ctx<-resource_context(auth,cid,season=state$season,session_id=root$token)
+      ctx<-shiny::isolate(catalog_context());ctx$season<-state$season
       invalidate_resources(resource_context(auth,cid),resources=paste0(c("mvp_catalog_","award_round_metadata_"),cid));state$loading<-TRUE;publish()
       promises::then(async_adapter_fetch("get_award_round_catalog",list(login=auth,championship_id=cid,saved=state$rows,refresh=TRUE),ctx,is_current=function()current(g,k)),function(catalog){
         if(!current(g,k))return(NULL)
@@ -299,34 +330,65 @@ shared_mvp_source <- function(session,login,championship,active,refresh=NULL) {
     if(!nzchar(key)||(!is.null(state$key)&&!identical(key,state$key))){
       state$generation<-state$generation+1L;state$key<-NULL;state$rows<-data.frame();state$rounds<-empty_finished_rounds()
       state$queue<-list();state$inflight<-state$writes<-0L;state$loading<-state$running<-FALSE;state$unsaved<-state$failures<-list()
-      state$catalog_complete<-state$catalog_identity_complete<-state$saved_complete<-FALSE;state$catalog_reason<-"";state$needs_recheck<-FALSE;publish()
+      state$catalog_complete<-state$catalog_identity_complete<-state$saved_complete<-FALSE;state$catalog_reason<-"";state$needs_recheck<-FALSE
+      state$value(mvp_result("unavailable",reason="Waiting for the league competition and season before reading saved awards."))
     }
     if(!nzchar(key)||!isTRUE(active()))return()
-    if(!league_context_ready(root,login(),championship()))return()
+    stored<-database_display()
+    if(!stored&&!league_context_ready(root,login(),championship()))return()
+    ctx<-catalog_context();auth<-login();cid<-championship()
     publication<-root$userData$round_publication_revision();version<-if(is.function(refresh))refresh()else 0
+    if(stored){
+      descriptor<-fm_worker_descriptor("get_mvp_saved_catalog",list(championship_id=cid),ctx)
+      account<-fm_worker_account_state(ctx$account_id)
+      fm_worker_resource_revision(account,descriptor$resource_key)()
+      version<-list(refresh=version,snapshot=fm_worker_get(ctx$account_id,descriptor$resource_key)$manifest$version)
+      # The pending cold read receives this same publication from the worker poll.
+      if(identical(state$key,key)&&state$loading&&is.list(state$refresh)&&
+         is.null(state$refresh$snapshot)&&identical(state$refresh$refresh,version$refresh))
+        state$refresh<-version
+    }
     if(!identical(state$key,key)||(!state$running&&!identical(state$refresh,version))){
       state$key<-key;state$refresh<-version;state$generation<-state$generation+1L;g<-state$generation
-      state$loading<-TRUE;state$season<-league_stable_season(championship(),login()[["userid"]]);state$catalog_complete<-state$catalog_identity_complete<-state$saved_complete<-FALSE;state$catalog_reason<-"";publish()
-      auth<-login();cid<-championship();ctx<-resource_context(auth,cid,season=state$season,session_id=root$token)
-      promises::then(async_adapter_fetch("get_mvp_saved_catalog",list(login=auth,championship_id=cid),ctx,is_current=function()current(g,key)),function(result){
+      state$loading<-TRUE;state$season<-if(stored)ctx$season else league_stable_season(cid,auth[["userid"]])
+      if(!stored)ctx$season<-state$season
+      if(!stored||!nrow(state$rows)){
+        state$catalog_complete<-state$catalog_identity_complete<-state$saved_complete<-FALSE;state$catalog_reason<-"";publish()
+      }
+      interest<-function()current(g,key)&&(!stored||enabled())
+      attr(interest,"fm_worker_interest")<-paste(root$token,"round-awards",sep="|")
+      promises::then(async_adapter_fetch("get_mvp_saved_catalog",list(login=auth,championship_id=cid),ctx,is_current=interest),function(result){
         if(!current(g,key))return(NULL)
+        if(stored){
+          # The promise and the revision observer can run in either order.
+          latest<-fm_worker_get(ctx$account_id,descriptor$resource_key)
+          if(!is.null(latest)){result<-latest$data;state$refresh$snapshot<-latest$manifest$version}
+        }
         state$loading<-FALSE;state$expected_scoring<-mvp_text(result$expected_scoring,"unknown");state$rows<-result$saved %||% data.frame();state$rounds<-award_catalog_numbers(result$catalog$rounds %||% empty_finished_rounds(),state$rows)
         state$catalog_complete<-isTRUE(result$catalog$complete);state$catalog_identity_complete<-isTRUE(result$catalog$identity_complete %||% result$catalog$complete);state$saved_complete<-isTRUE(result$saved_complete);state$context_unknown<-isTRUE(result$context_unknown);state$catalog_reason<-result$catalog$reason %||% ""
         state$user_team_id<-result$catalog$user_team_id;state$current_round_number<-result$catalog$current_round_number;state$current_round_id<-result$catalog$current_round_id
         # Active-session recovery only; the normal bounded async acquisition and
         # acknowledged persistence path handles these paid-round revisions.
         ids<-intersect(result$settlement_rechecks %||% character(),state$rounds$round_id)
-        if(length(ids)&&enabled()){
+        if(!stored&&length(ids)&&enabled()){
           state$acquisition_active<-active
           state$queue<-lapply(head(unique(ids),120L),function(id){
             row<-state$rounds[state$rounds$round_id%in%id,,drop=FALSE]
             list(kind="round",reference=list(round_id=id,round_number=row$round_number[1],is_finished=TRUE,
               user_team_id=state$user_team_id,current_round_number=state$current_round_number,current_round_id=state$current_round_id))
           })
-          state$running<-TRUE
+          state$running<-TRUE;pump()
+        }else publish()
+        NULL
+      },function(e){
+        if(current(g,key)){
+          state$loading<-FALSE;state$saved_complete<-FALSE
+          state$catalog_reason<-"Saved awards or round catalog could not load. Refresh to retry."
+          if(stored&&!enabled())state$refresh<-NULL
+          publish()
         }
-        publish();pump();NULL
-      },function(e){if(current(g,key)){state$loading<-FALSE;state$catalog_reason<-"Saved awards or round catalog could not load. Refresh to retry.";publish()};NULL})
+        NULL
+      })
     }
     if(!is.null(state$publication)&&!identical(state$publication,publication)){state$needs_recheck<-TRUE;publish()}
     state$publication<-publication

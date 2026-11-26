@@ -1,5 +1,13 @@
 # Futmondo data review and implementation results
 
+## Saved Round awards after league metadata expiry (2026-11-26)
+
+A read-only check decoded the production catalog for the league previously reported here. Its 04:55 PST snapshot contained 38 calendar rounds, 13 completed rounds, and all 143 saved player selections for rounds 1–13, including 13 MVPs. The separate resolved league context had been checked at 04:32 PST. The corrected display uses the verified historical scope when live membership metadata expires after five minutes.
+
+The offline Round awards module reproduced the screenshot on sign-in before it requested any awards. With the fix, the same scenario restored all eleven fixture players from a compressed database snapshot, including the MVP and a negative score. A subsequent saved revision replaced the winner in the rendered lineup. A genuine partial read displayed its saved XI and a coverage warning. Changing to an unresolved or foreign scope cleared the previous lineup. Returning to the league with expired account-scoped membership reused the stored selection.
+
+The focused worker-display fixture measured one catalog read on first display, one for the corrected publication and zero for an unchanged poll. Browsing issued zero source requests or persistence writes, including when the saved catalog contained a settlement recheck. The existing worker poll supplies version changes. The 38-round, 418-player offline render took 0.664 seconds. The award projection, crests, initial catalog, scoring, closed-round, Admin refresh, Admin awards and settlement checks passed. The offline lifecycle passed 14 checks and rendered eight tabs. These rendering checks used synthetic accounts.
+
 ## Public welcome and signed-in Home (2026-11-25)
 
 The welcome inventory review traced the Balance summary to its three active pages and the squad-wide pricing preview to its explicit confirmation in My Team. Public Futmondo sources confirm individual market listings, optional public team balances, suggested XIs and Home navigation. The comparison records the two additional LigaRadar entries and the setting that qualifies the rival-cash comparison. [Source review](feature_comparison.md#welcome-and-home-inventory-2026-11-25)

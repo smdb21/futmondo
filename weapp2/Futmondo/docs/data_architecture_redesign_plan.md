@@ -1,5 +1,11 @@
 # Futmondo data architecture redesign plan
 
+## Saved Round awards after league metadata expiry (2026-11-26)
+
+- [x] Restore saved MVPs and Best XIs using the verified league and scoring context. Follow new persisted catalog versions while an award view is open.
+- [x] Reproduce the reported empty screen and verify corrected rendering, scope isolation and read reuse in the offline Shiny module. [Verification](data_review_results.md#saved-round-awards-after-league-metadata-expiry-2026-11-26)
+- [ ] Confirm the screen in a signed-in hosted session after rollout.
+
 ## Public welcome and signed-in Home (2026-11-25)
 
 - [x] Present the responsive pitch animation, Essentials and Advanced feature lists, and the Futmondo credential dialog.

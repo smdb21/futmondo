@@ -1,5 +1,11 @@
 # Round awards module
 
+## Reading saved awards
+
+In the deployed app, `shared_mvp_source()` opens the persisted `get_mvp_saved_catalog` snapshot for the signed-in account, championship, competition, season and scoring version. An expired league metadata observation can still identify its saved selections. If any scope field is missing, the reader uses the session’s resolved league context only when the account, championship and all known fields agree. The page waits for the competition and season before requesting awards. When the league omits scoring metadata, the existing worker reader can serve the explicit unknown-scoring scope or verify a redirect to its canonical scoring version.
+
+The active award views share one subscription to that catalog. A new stored version updates the round cards and Statistics together. An incomplete evidence read shows its coverage warning alongside the selections that were returned. The factual worker handles settlement rechecks during collection.
+
 Position labels in the official Best XI use the existing background pills: green GK, orange DEF, blue MID and red FWD. Unknown roles stay explicit plain text. This presentation reuses the shared badge CSS without adding source requests or changing award data.
 
 `round_mvps_UI(id)` renders **Round awards**, with a **By round** tab showing the MVP and full official Best XI for each published selection, newest first. Each lineup shows roles and points and highlights the MVP. Unknown scores remain unavailable; zero and negative scores are preserved. `round_mvps_Server(id, is_module_active, login_token, championship_id, refresh_trigger)` consumes the same root-session `shared_mvp_source` as Admin and Rivals. Page navigation loads saved full-XI snapshots; it never triggers a historical backfill.

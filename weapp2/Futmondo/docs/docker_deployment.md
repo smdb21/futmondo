@@ -172,8 +172,10 @@ metadata and is not an authenticated availability check.
 Compare its five hashes against the deployed commit before attributing a hosted
 report to that implementation. An older image has no marker; rebuilding is
 required. This does not certify the private account flow or preserve an old
-browser session across deployment. The previous `release-info.json` is static
-legacy metadata and cannot by itself establish the running R source version.
+browser session across deployment. The release label in `release-info.json`
+is static legacy metadata. Docker writes its `runtime_sha256["award_runtime.R"]`
+entry from the copied R file during the build. Compare that entry with the
+pushed file to verify the Round awards reader in the hosted image.
 
 
 ## Lineup departure runtime fingerprint
