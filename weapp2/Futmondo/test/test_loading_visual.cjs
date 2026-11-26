@@ -302,7 +302,7 @@ function checkGoalFacing(geometry, teamColors) {
   assert.equal(anchors.length, 22);
   assert.equal(feet.length, 22, 'Each molded player has a short forward kicking foot');
   assert.equal(heads.length, 22);
-  assert.equal(noses.length, 22, 'Each head has a visible goal-facing profile');
+  assert.equal(noses.length, 0, 'Round heads have no projecting nose triangles');
   const sides = geometry.filter(mark => mark.kind === 'fill' && Math.abs(mark.alpha - 0.58) < 0.01 &&
     teamColors.includes(mark.color) && mark.path.length >= 8);
   assert.equal(sides.length, 22, 'Every body retains its visible volume side');
@@ -310,7 +310,7 @@ function checkGoalFacing(geometry, teamColors) {
   const goalLength = Math.hypot(...goal);
   for (let i = 0; i < 22; i++) {
     const direction = feet[i].color === teamColors[0] ? 1 : -1;
-    assert.equal(noses[i].color, feet[i].color, 'The head and foot retain the same team identity');
+    assert.equal(heads[i].color, feet[i].color, 'The head and foot retain the same team identity');
     const foot = feet[i].path.map(command => command.args);
     const forward = ((foot[1][0] - foot[0][0]) * goal[0] + (foot[1][1] - foot[0][1]) * goal[1]) / goalLength;
     assert.ok(direction * forward > 2, 'Each short toe points toward its opposing goal');
@@ -329,9 +329,6 @@ function checkGoalFacing(geometry, teamColors) {
     assert.ok(shoeWidth > shoulderWidth * 0.3 && shoeWidth < shoulderWidth * 0.72,
       'The shoe is narrower than the shirt rather than a wide base');
     assert.ok(polygonArea(foot) > 5, 'The shortened foot still has a visible solid top');
-    const tip = noses[i].path[1].args, head = heads[i].path[0].args;
-    const facing = ((tip[0] - head[0]) * goal[0] + (tip[1] - head[1]) * goal[1]) / goalLength;
-    assert.ok(direction * facing > 2, 'The two club teams face opposite goals');
   }
 }
 async function readTeamColors(page) {
@@ -614,6 +611,7 @@ async function cameraChecks(browser) {
       await page.waitForTimeout(Math.max(0, at - elapsed));
       phases[name] = await captureGeometry(page, id);
     }
+    checkGoalFacing(phases.rising, await readTeamColors(page));
     const corners = pitchCorners(phases.overhead);
     assert.ok(Math.abs(corners[1][1] - corners[0][1]) > 100, 'Camera passes over the end of the pitch mid-orbit');
     const corner = phase => pitchCorners(phases[phase])[0];
@@ -672,7 +670,7 @@ async function visualChecks(browser) {
       assert.equal(await page.locator('#fixture-hero canvas').evaluate(canvas => canvas.toDataURL()), pictures[0], 'The complete canvas is identical across the flat loop seam');
       await checkPairIdentity(page, teamColors.ids);
       await noOverflow(page);
-      console.log(`PASS ${width}px ${theme}: thirteen loop phases, upward head-first dissolve, 22 solid goal-facing foosball figures, opposed heads and short shoes, eleven players per club, persistent kit colors, exact seam`);
+      console.log(`PASS ${width}px ${theme}: thirteen loop phases, upward head-first dissolve, 22 solid goal-facing foosball figures, round heads and short shoes, eleven players per club, persistent kit colors, exact seam`);
     }
     const responseMs = await page.evaluate(() => new Promise(resolve => {
       const start = performance.now();

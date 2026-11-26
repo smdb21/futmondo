@@ -50,8 +50,8 @@ bodies and short shoes, using cached formation positions and a bounded lift
 array. The first club faces +X toward the right goal; the second faces -X toward
 the left. Shoes are 3 units high and 6.4 wide, spanning -1.6 to +3.2 in local X
 (compared with the previous 5 high, 10 wide, -2.5 to +6 plate). The close-up particles sample the shoe at the same width. Shirt
-width lies across pitch Y, with shallow depth along X,
-short forward-facing shoes and small nose cues. Cached front/back/side/top faces provide
+width lies across pitch Y, with shallow depth along X. The shoes point toward
+the opposing goal and each head is a plain circle. Cached front/back/side/top faces provide
 volume; the camera eye position selects the visible face for each player.
 `playerFace()` clips these faces at the descending local-Z dissolve boundary
 without allocating intermediate vertices; its optional outline uses the current

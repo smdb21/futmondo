@@ -310,12 +310,6 @@
         project(camera,actor.x,actor.y,27*rise);
         ctx.beginPath(); ctx.arc(camera.px,camera.py,2.9*camera.k*headScale*rise,0,tau); ctx.fill();
         if (outline) ctx.stroke();
-        // A small side-profile nose makes the two goal-facing directions clear.
-        ctx.beginPath();
-        project(camera,actor.x+actor.facing*2.1*headScale,actor.y,28*rise); ctx.moveTo(camera.px,camera.py);
-        project(camera,actor.x+actor.facing*4*headScale,actor.y,27*rise); ctx.lineTo(camera.px,camera.py);
-        project(camera,actor.x+actor.facing*2.1*headScale,actor.y,26*rise); ctx.lineTo(camera.px,camera.py);
-        ctx.closePath(); ctx.fill(); if (outline) ctx.stroke();
         if (clipped) ctx.restore();
       }
     }

@@ -2,7 +2,7 @@
 
 ## Home round status and squad trend (2026-11-26)
 
-- [x] Show round progress and closure across split matchdays, and show the squad’s daily value change and player counts alongside cash using the existing saved observations. [Home overview](page_preferences.md#league-overview-and-saved-destination)
+- [x] Show round progress and closure across split matchdays, and show the squad’s daily value change alongside cash and the rising and falling counts under the squad size using the existing saved observations. [Home overview](page_preferences.md#league-overview-and-saved-destination)
 
 ## Advanced and resumed rounds (2026-11-26)
 
@@ -2698,3 +2698,7 @@ player catalog as the round cards. See the [verification results](data_review_re
 - [x] Confirm the hosted worker reads back the scheduled lineup and persists the matching official selection.
 
 See the [scoring contract](lineup_module.md#custom-scoring-in-scheduled-saves--2026-11-25) and [verification results](data_review_results.md#scheduled-lineup-custom-scoring--2026-11-25).
+
+## Loading animation figurines (2026-11-26)
+
+- [x] Remove the noses from both teams and verify the round heads and goal-facing shoes at desktop and mobile widths. [Browser checks](data_review_results.md#loading-animation-figurines-2026-11-26)
