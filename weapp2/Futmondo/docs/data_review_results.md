@@ -8,6 +8,12 @@ The offline Round awards module reproduced the screenshot on sign-in before it r
 
 The focused worker-display fixture measured one catalog read on first display, one for the corrected publication and zero for an unchanged poll. Browsing issued zero source requests or persistence writes, including when the saved catalog contained a settlement recheck. The existing worker poll supplies version changes. The 38-round, 418-player offline render took 0.664 seconds. The award projection, crests, initial catalog, scoring, closed-round, Admin refresh, Admin awards and settlement checks passed. The offline lifecycle passed 14 checks and rendered eight tabs. These rendering checks used synthetic accounts.
 
+## Floating Home and Refresh controls (2026-11-26)
+
+Home and Refresh share one fixed row on signed-in destination pages. The mobile scroll listener is passive and uses one pending idle timer. Scrolling changes the row's visibility locally. It adds no Shiny input, data acquisition, persistence or recurring polling.
+
+In Chromium, both buttons measured 109.8 × 48 px with matching top edges at 320, 390 and 1440 px. Desktop controls stayed visible in light and dark themes. Phone viewport and nested-table scrolling revealed them. Across the two local runs, the controls were fully hidden after 575–577 ms with reduced motion and 713–724 ms with the fade enabled. Hidden buttons passed taps through. Keyboard focus revealed them, a deliberate Refresh produced exactly one refresh input, and scrolling alone produced zero. The isolated offline lifecycle passed 14 checks and eight tabs. [Navigation behavior](page_preferences.md#floating-home-and-refresh-controls)
+
 ## Public welcome and signed-in Home (2026-11-25)
 
 The welcome inventory review traced the Balance summary to its three active pages and the squad-wide pricing preview to its explicit confirmation in My Team. Public Futmondo sources confirm individual market listings, optional public team balances, suggested XIs and Home navigation. The comparison records the two additional LigaRadar entries and the setting that qualifies the rival-cash comparison. [Source review](feature_comparison.md#welcome-and-home-inventory-2026-11-25)

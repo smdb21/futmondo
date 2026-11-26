@@ -2400,7 +2400,7 @@
       "checksum": "d27c0d69c8f1f25be0ca87f5a1912085"
     },
     "ui.R": {
-      "checksum": "c2c90047dffb3d3a1def96854afb39a0"
+      "checksum": "fc0bdf3f509c9cd1bf25ec76ebc6ba53"
     },
     "utils.R": {
       "checksum": "b0cc5084b225aaec12a2c150edc1d4e1"
@@ -2412,13 +2412,13 @@
       "checksum": "6665832984c50aa8ee2d9ce096a6f329"
     },
     "www/custom_style.css": {
-      "checksum": "99197a10f5559dd0b62ef62ad38728ef"
+      "checksum": "f14e3547f495bc37ff4c566ea481e1b0"
     },
     "www/home.css": {
-      "checksum": "eec193fd0e99241c727fda99c784c6ad"
+      "checksum": "d094db594fd08e5035a2f96cd445b8c2"
     },
     "www/home.js": {
-      "checksum": "1a27f048b2a8a89cb4f4c9f3514a3637"
+      "checksum": "743f9853df0023fcff886793d7b064e3"
     },
     "www/welcome.css": {
       "checksum": "96246fca28b7169cbc24a6d3a03ccd29"

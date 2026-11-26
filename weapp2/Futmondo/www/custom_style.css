@@ -469,34 +469,6 @@ body, .wrapper {
     margin-top: 0;
 }
 
-/* Floating Action Button (Refresh) */
-.btn-refresh-floating {
-    position: fixed !important;
-    bottom: 25px !important;
-    right: 25px !important;
-    width: 56px !important;
-    height: 56px !important;
-    border-radius: 50% !important;
-    background-color: var(--fm-surface) !important; /* Slate Blue Dark */
-    color: var(--fm-text) !important;
-    border: none !important;
-    box-shadow: none;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    z-index: 9999 !important; /* Ensure it stays on top of everything! */
-    font-size: 20px !important;
-    transition: all 0.2s ease !important;
-    cursor: pointer;
-    padding: 0 !important;
-}
-.btn-refresh-floating:hover, .btn-refresh-floating:focus, .btn-refresh-floating:active {
-    background-color: var(--fm-surface) !important;
-    transform: scale(1.05) rotate(45deg) !important;
-    color: var(--fm-text) !important;
-    box-shadow: none;
-}
-
 /* Mobile-friendly Table scrolling and responsiveness */
 .ReactTable {
     width: 100% !important;

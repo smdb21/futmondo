@@ -2,6 +2,16 @@
 
 Both password login and remembered login open Home. The dashboard tab `login` presents Welcome to visitors and Home to signed-in users. Home shows the active league selector, team, round, balance and squad size. It links directly to the main pages. Account settings contains display timezone, factual sync preferences and logout. The page controls adapt to the screen size and the Home control remains reachable with the sidebar collapsed. The server checks administrator access before offering Admin.
 
+## Floating Home and Refresh controls
+
+On signed-in pages other than Home, the lower-right corner holds two labeled buttons, **Home** and **Refresh**. They share a width and a 48 px height and sit inside the device's safe area. Both stay visible on desktop, including when the sidebar is collapsed.
+
+At viewport widths of 767 px or less, scrolling the page or a scrollable area within it reveals both buttons. They fade after scrolling stops. Tabbing to either button reveals the pair and keeps them visible while keyboard focus is inside. Reduced-motion mode changes visibility immediately when the idle delay ends. The public welcome and Home omit the floating row.
+
+Home opens the top of the signed-in dashboard and moves focus to its heading. Refresh requests an update for the selected league and keeps the current page open. [League refresh behavior](database_first_sync.md#explicit-league-refresh)
+
+## League overview and saved destination
+
 The three overview figures update independently from the current account and league's saved observations. The round card uses the shared calendar and the existing browser countdown. `observed_squad_count(roster_state)` counts confirmed roster identities. It preserves the difference between a confirmed empty squad and a missing roster. The balance uses the team observation and the existing manual-finance projection with `cash_only = TRUE`. After an acknowledged clause purchase this can display the confirmed debit against its saved baseline while the transaction is being reconciled. The Home projection requires neither the market listings nor the full financial ledger. A missing, incomplete or outdated figure has its own loading, unavailable or last-observed state.
 
 `page_preferences.R` persists the last visited destination under the authenticated Futmondo `userid`. An allowed saved destination becomes a **Continue to…** shortcut on Home, available across browsers, leagues and new Shiny sessions. New accounts and accounts with obsolete or unauthorized preferences still see the ordinary Home destinations. Returning to Home preserves the last destination. Following a shortcut or choosing a destination uses the same application navigation as the sidebar.

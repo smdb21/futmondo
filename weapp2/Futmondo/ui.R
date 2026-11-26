@@ -133,14 +133,12 @@ body <- shinydashboard::dashboardBody(
       admin_UI(id = "admin")
     )
   ),
-  tags$button(type = "button", class = "fm-home-return", `data-fm-page` = "login",
-    icon("house"), "Home"),
-  actionButton(
-    inputId = "refresh_all",
-    label = icon("rotate"),
-    class = "btn-refresh-floating",
-    title = "Refresh league balances and players",
-    `aria-label` = "Refresh league balances and players"
+  tags$div(class = "fm-page-actions", role = "group", `aria-label` = "Page actions",
+    tags$button(type = "button", class = "btn fm-home-return", `data-fm-page` = "login",
+      icon("house"), "Home"),
+    actionButton("refresh_all", "Refresh", icon = icon("rotate"),
+      title = "Refresh league balances and players",
+      `aria-label` = "Refresh league balances and players")
   )
 )
 
