@@ -30,17 +30,15 @@ fm_async_login<-function(user_name,...){
  fixture_fail_write<<-identical(user_name,"remember-failure@example.invalid")
  promises::promise_resolve(c(token="synthetic-browser-token",userid="synthetic-browser-user",user_name="Fixture"))
 }
-# Real dashboard layout and Login -> Today navigation; synthetic data only.
+# Real welcome, login dialog and signed-in Home shell with synthetic account data.
 fixture_ui<-htmltools::tagList(source("ui.R",local=.GlobalEnv)$value,shiny::textOutput("fixture_heartbeat"))
 fixture_server<-function(input,output,session){
  output$fixture_heartbeat<-shiny::renderText(input$fixture_heartbeat %||% 0L)
- token<-login_Server("login")
+ login_Server("login")
  output$menu<-shinydashboard::renderMenu(shinydashboard::sidebarMenu(id="tabs",
-   shinydashboard::menuItem("Login",tabName="login",selected=TRUE),
+   shinydashboard::menuItem("Home",tabName="login",selected=TRUE),
    shinydashboard::menuItem("Today",tabName="today")))
- shiny::observeEvent(token(),{
-   shiny::updateTabsetPanel(session,"tabs",selected=if(valid_login(token()))"today"else"login")
- },ignoreNULL=FALSE)
+ shiny::outputOptions(output, "menu", suspendWhenHidden=FALSE)
 }
 fixture_app_dir<-tempfile("futmondo-remember-fixture-");dir.create(fixture_app_dir);dir.create(file.path(fixture_app_dir,"www"))
 file.copy("www/remember-login.js",file.path(fixture_app_dir,"www","remember-login.js"))

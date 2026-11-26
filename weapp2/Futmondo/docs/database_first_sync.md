@@ -4,7 +4,7 @@ Approved 2026-11-16. This supersedes optional factual worker enrollment, quiet h
 
 ## Data route
 
-1. Interactive authentication establishes the account identity. The login screen discloses continued encrypted factual sync after logout.
+1. Interactive authentication establishes the account identity. The sign-in dialog discloses continued encrypted factual sync after logout.
 2. `worker_bootstrap(p_account)` returns the existing `worker_read` envelope (sanitized account policy, leader health, resources, redirects and safe job errors), plus `preferred_league: {championship_id, selected_at} | null`. It reads the canonical active-league snapshot and saved preference together, without modifying jobs or source clocks.
 3. R restores the verified league context and schedules one immediate coalesced `worker_read` for the selected team's information/balance, market/offers and roster. Page interests share this batch. A missing interest can read immediately. `fm_worker_preference()` shares bootstrap with league selection; it does not issue another preference GET.
 4. Independent `worker_connect()` acknowledgement enrolls or renews collection. A slow or failed enrollment does not block stored data. The existing Docker-supervised worker acquires source observations, reuses durable results/checkpoints and publishes them to the database. The existing R engine parses and reconciles financial data.

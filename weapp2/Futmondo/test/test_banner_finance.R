@@ -8,9 +8,9 @@ for (expr in expressions) {
 }
 checks <- 0L
 check <- function(name, code) { force(code); checks <<- checks+1L; cat("PASS",name,"\n") }
-check("league selection lives only on Welcome", {
+check("league selection lives only on signed-in Home", {
   stopifnot(length(htmltools::tagQuery(body)$find("#selected_league")$selectedTags()) == 1L,
-    length(htmltools::tagQuery(body)$find("#shiny-tab-login #selected_league")$selectedTags()) == 1L,
+    length(htmltools::tagQuery(body)$find("#shiny-tab-login .fm-home #selected_league")$selectedTags()) == 1L,
     grepl("Welcome", as.character(login_UI("login")), fixed=TRUE))
 })
 check("one summary output leads the page without a second client visibility gate", {
@@ -151,7 +151,7 @@ shiny::testServer(app_server,{
       session$setInputs(tabs=tab);app_settle(session)
       stopifnot(is.null(output$account_finance_summary))
     }
-    stopifnot(grepl("Welcome",output$menu$html,fixed=TRUE))
+    stopifnot(grepl("Home",output$menu$html,fixed=TRUE))
   })
   session$setInputs(tabs="today",refresh_all=1);app_settle(session)
   pending[[team_key]]$resolve(list(budget=-10,withheld=0,teamValue=1000))

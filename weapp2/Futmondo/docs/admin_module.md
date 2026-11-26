@@ -1,6 +1,6 @@
 # Administration
 
-Users manage their own display timezone under **Welcome → Display timezone**, with an automatically detected default and Spain (`Europe/Madrid`) as the fallback when detection is unavailable. The former Admin user-timezone directory and editor have been removed. See [personal timezone contracts and verification](timezone_preferences.md).
+Users manage their own display timezone under **Home → Account settings → Display timezone**, with an automatically detected default and Spain (`Europe/Madrid`) as the fallback when detection is unavailable. The former Admin user-timezone directory and editor have been removed. See [personal timezone contracts and verification](timezone_preferences.md).
 
 `admin_UI(id)` and `admin_Server(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV)` expose explicit database diagnostics to the configured administrator. Every operation rechecks the authenticated account and active module. Reset confirmation captures the current account/league; changing context invalidates it.
 
@@ -134,7 +134,7 @@ The user clarified that timezone choices belong to each user. Admin no longer
 renders the User timezones section or instantiates `fm_admin_timezones()`. This
 also removes its directory request on navigation. The earlier directory-loading
 notes above describe the superseded implementation. Both ordinary users and
-LigaRadar administrators use Welcome → Display timezone for their own account;
+LigaRadar administrators use Home → Account settings → Display timezone for their own account;
 `fm_timezone_store()` rejects every cross-account read or write.
 
 

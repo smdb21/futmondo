@@ -11,6 +11,7 @@ const money = value => `${value.toLocaleString('de-DE')} €`;
       page.on('pageerror', error => errors.push(error.message));
       await page.route('**/*', route => route.request().url().startsWith('http://127.0.0.1:38765/') ? route.continue() : route.abort());
       await page.goto('http://127.0.0.1:38765/');
+      await page.locator('#login-open_login').click();
       await page.locator('#login-user_name').fill('offline@example.invalid');
       await page.locator('#login-password').fill('fixture');
       await page.locator('#login-login_button').click();

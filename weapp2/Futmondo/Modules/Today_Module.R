@@ -58,8 +58,8 @@ today_Server <- function(id,is_module_active,login_token,championship_id,user_te
       team_state <- reactive({req(is_module_active(),valid_login(login_token()),championship_id(),user_team_id());team_read(login_token(),championship_id(),user_team_id())})
       market_state <- reactive({req(is_module_active(),valid_login(login_token()),championship_id(),user_team_id());market_read(login_token(),championship_id(),user_team_id())})
     } else {
-      team_state <- primary_sources$team_state
-      market_state <- primary_sources$market_state
+      team_state <- reactive({req(is_module_active()); primary_sources$team_state()})
+      market_state <- reactive({req(is_module_active()); primary_sources$market_state()})
       retry_team <- primary_sources$retry_team
       retry_market <- primary_sources$retry_market
     }
@@ -83,6 +83,7 @@ today_Server <- function(id,is_module_active,login_token,championship_id,user_te
     })
     observe({
       context<-primary_context();if(is.null(context)){settled_context(NULL);return()}
+      req(is_module_active())
       states<-list(team_state(),market_state())
       if(all(vapply(states,function(s)!identical(s$status,"loading"),logical(1)))&&!identical(isolate(settled_context()),context))settled_context(context)
     })
@@ -125,6 +126,9 @@ today_Server <- function(id,is_module_active,login_token,championship_id,user_te
     })
     output$market_status<-renderUI(market_status_display())
     output$kpi_cash_box<-renderUI(cash_display())
+    # A delayed league can initially leave this floating valueBox at zero
+    # height. Keep its output bound; the page guard still owns data demand.
+    outputOptions(output, "kpi_cash_box", suspendWhenHidden = FALSE)
     transfer_rows <- reactive({
       req(is_module_active(),valid_login(login_token()))
       shiny::validate(shiny::need(primary_settled(),"Loading recent transfers…"),errorClass="fm-loading")

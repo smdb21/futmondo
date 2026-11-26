@@ -26,9 +26,9 @@ check('saved navigation recovers once from a transient response without blocking
  },{
   session$setInputs(tabs='login',logged_in=TRUE);flush(.03,session)
   heartbeat<-FALSE;later::later(function()heartbeat<<-TRUE,.02);flush(.06,session)
-  stopifnot(heartbeat,nav$initial()=='login',length(requests)==1L)
+  stopifnot(heartbeat,is.null(nav$last_page()),input$tabs=='login',length(requests)==1L)
   flush(.3,session)
-  stopifnot(nav$initial()=='yourteam',is.null(output$page_preference_status),length(requests)==2L,
+  stopifnot(nav$last_page()=='yourteam',input$tabs=='login',is.null(output$page_preference_status),length(requests)==2L,
    all(vapply(requests,function(x)x$timeout==8&&x$priority=='interactive',logical(1))))
  })
 })

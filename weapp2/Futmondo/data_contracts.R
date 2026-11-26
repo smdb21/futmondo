@@ -224,12 +224,18 @@ round_finance_amounts_UI <- function(finance = NULL) {
 
 # Descriptive projection of the same identity/offer-slot ledger as preflights.
 # It never authorizes a transaction or assumes a missing count/limit is zero.
-account_squad_display <- function(roster_state, transfers, team_state, active_offers, reserved_slots) {
+observed_squad_count <- function(roster_state) {
   roster<-roster_state$data
   if(!is.null(roster_state$error)||isTRUE(roster_state$status%in%c("partial","unavailable")))roster<-NULL
   empty<-list(status="ok",outgoing_status="ok",records=data.frame(player_id=character()),
     outgoing_records=data.frame(player_id=character()))
-  actual<-team_effective_squad_count(roster,empty)
+  team_effective_squad_count(roster,empty)$count
+}
+
+account_squad_display <- function(roster_state, transfers, team_state, active_offers, reserved_slots) {
+  roster<-roster_state$data
+  if(!is.null(roster_state$error)||isTRUE(roster_state$status%in%c("partial","unavailable")))roster<-NULL
+  actual<-observed_squad_count(roster_state)
   effective<-team_effective_squad_count(roster,transfers)
   cap<-fm_number(team_state$data$configuration$maxPlayersInRoster)
   if(is.null(team_state$data)||isTRUE(team_state$status%in%c("partial","unavailable"))||
@@ -247,9 +253,9 @@ account_squad_display <- function(roster_state, transfers, team_state, active_of
     identical(effective$status,"loading")
   observed<-identical(effective$status,"observed")||identical(roster_state$freshness,"stale")||
     identical(team_state$freshness,"stale")||!is.null(team_state$error)
-  list(actual=actual$count,effective=effective$count,cap=cap,reserved=reserved,
+  list(actual=actual,effective=effective$count,cap=cap,reserved=reserved,
     active_offers=slots[[1]],purchase_reservations=slots[[2]],full=full,
-    status=if(loading)"loading"else if(!all(is.finite(c(actual$count,effective$count,cap,reserved))))"unavailable"else if(observed)"observed"else"ok",
+    status=if(loading)"loading"else if(!all(is.finite(c(actual,effective$count,cap,reserved))))"unavailable"else if(observed)"observed"else"ok",
     detail=effective$detail,
     roster_observed_at=roster_state$observed_at,team_observed_at=team_state$observed_at)
 }

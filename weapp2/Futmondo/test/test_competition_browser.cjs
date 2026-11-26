@@ -11,9 +11,10 @@ const url=`http://127.0.0.1:${process.env.FUTMONDO_COMPETITION_TEST_PORT||'38862
    page.on('pageerror',e=>errors.push(e.message));
    await page.route('**/*',route=>route.request().url().startsWith(url)?route.continue():route.abort());
    await page.goto(url);await page.waitForFunction(()=>window.Shiny&&Shiny.shinyapp?.$socket?.readyState===1);
-   await page.waitForFunction(()=>document.querySelector('#login-login_button')?.dataset.futmondoLoginBound==='true');
+   await page.locator('#login-open_login').click();
    await page.locator('#login-user_name').fill('offline@example.invalid');await page.locator('#login-password').fill('fixture');
    await page.locator('#login-password').blur();await page.waitForTimeout(250);await page.locator('#login-login_button').click();
+   await page.locator('.sidebar-menu a[data-value="today"]').evaluate(link=>link.click());
    await page.locator('#today-market_players-players_table .rt-select-input').first().waitFor();
    return {page,errors};
   };

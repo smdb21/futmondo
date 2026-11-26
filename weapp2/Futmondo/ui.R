@@ -1,9 +1,7 @@
 # Every page owns one information panel, including pages without a former title.
 fm_information_tab <- function(tabName, ...) {
-  titles<-c(notifications="Notifications",login="Welcome",today="Today's market",
-    lineup="Lineup",yourteam="My Team",players_in_championship="Players",
-    rivals="Rivals",plots="Plots",classification="Classification",
-    round_mvps="Round awards",admin="Administration")
+  pages <- fm_navigation_pages(TRUE)
+  titles <- c(login = "Home", setNames(pages$label, pages$tab))
   shinydashboard::tabItem(tabName=tabName,fm_info_page_UI(unname(titles[[tabName]]),...))
 }
 
@@ -43,6 +41,8 @@ body <- shinydashboard::dashboardBody(
     shiny::includeScript("www/disconnect.js"),
     shiny::includeScript("www/worker-state.js"),
     shiny::includeScript("www/info-disclosures.js"),
+    shiny::includeCSS("www/home.css"),
+    shiny::includeScript("www/home.js"),
     shiny::tags$style(shiny::HTML("
         .ReactTable .rt-thead {
           z-index: 1;
@@ -68,20 +68,29 @@ body <- shinydashboard::dashboardBody(
   uiOutput("worker_status"),
   uiOutput("clause_results"),
   shinydashboard::tabItems(
-    fm_information_tab(tabName="notifications", notifications_UI("notifications")),
     fm_information_tab(
       tabName = "login",
-      selectInput("selected_league", "League", choices = character()),
-      uiOutput("league_preference_status"),
-      uiOutput("timezone_settings"),
-      uiOutput("worker_settings"),
-      fluidRow(
-        column(
-          width = 12,
-          login_UI(id = "login")
-        )
+      login_UI("login"),
+      tags$section(class = "fm-home", `aria-label` = "League home",
+        tags$div(class = "fm-home-top",
+          tags$div(class = "fm-home-heading", tags$h1(tabindex = "-1", "Home"),
+            textOutput("home_team", inline = TRUE)),
+          selectInput("selected_league", "League", choices = character())),
+        uiOutput("league_preference_status"),
+        tags$section(class = "fm-home-overview", `aria-label` = "League overview",
+          tags$div(tags$span(class = "fm-home-caption", icon("calendar-days"), "Round"),
+            tags$div(id = "home_round", class = "shiny-html-output fm-summary-output", "Loading…")),
+          tags$div(tags$span(class = "fm-home-caption", icon("wallet"), "Balance"),
+            tags$div(id = "home_balance", class = "shiny-html-output fm-summary-output", "Loading…")),
+          tags$div(tags$span(class = "fm-home-caption", icon("users"), "Squad size"),
+            tags$div(id = "home_squad", class = "shiny-html-output fm-summary-output", "Loading…"))),
+        uiOutput("home_continue"),
+        uiOutput("home_destinations"),
+        tags$details(class = "fm-home-settings", tags$summary(icon("gear"), "Account settings"),
+          uiOutput("timezone_settings"), uiOutput("worker_settings"), login_account_UI("login"))
       )
     ),
+    fm_information_tab(tabName="notifications", notifications_UI("notifications")),
     fm_information_tab(
       tabName = "today",
       today_UI(id = "today")
@@ -124,7 +133,8 @@ body <- shinydashboard::dashboardBody(
       admin_UI(id = "admin")
     )
   ),
-  # Floating action button for the selected league
+  tags$button(type = "button", class = "fm-home-return", `data-fm-page` = "login",
+    icon("house"), "Home"),
   actionButton(
     inputId = "refresh_all",
     label = icon("rotate"),

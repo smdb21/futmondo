@@ -787,20 +787,18 @@ async function appChecks(browser) {
     await page.goto(origin + '/', {waitUntil: 'domcontentloaded'});
     await page.locator('.waiter-overlay .fm-loading-launch').waitFor();
     if (width === 320) await checkLaunchLayout(page, '#fm-launch-visual');
+    const publicId = 'login-welcome_visual';
+    assert.equal(await draws(page, publicId), 0, 'The welcome animation defers to the launch overlay');
     await page.screenshot({path: path.join(screenshotDir, `${width}-app-launch.png`)});
     await page.locator('.waiter-overlay').waitFor({state: 'hidden'});
     const launch = await page.locator('.waiter-overlay [data-fm-loading]').getAttribute('id');
     await stopped(page, [launch]);
-    await page.waitForFunction(() => document.getElementById('login-login_button')?.dataset.futmondoLoginBound === 'true');
-    // The existing app-object fixture loses login_form_visible on the client
-    // (also reproduced independently with the original HEAD spinner/UI).
-    // Drive synthetic credentials through the real Shiny inputs and button;
-    // this test covers startup, not the separate login-form visibility contract.
-    await page.evaluate(() => {
-      Shiny.setInputValue('login-user_name', 'offline@example.invalid');
-      Shiny.setInputValue('login-password', 'fixture');
-      document.getElementById('login-login_button').click();
-    });
+    await waitDraw(page, publicId);
+    await page.locator('#login-open_login').click();
+    await stopped(page, [publicId]);
+    await page.locator('#login-user_name').fill('offline@example.invalid');
+    await page.locator('#login-password').fill('fixture');
+    await page.locator('#login-login_button').click();
     const loading = page.locator('#startup_status [data-fm-loading]');
     await loading.waitFor();
     assert.equal(await loading.evaluate(el => el.closest('details') === null), true, 'Animation is outside the collapsed information disclosure');
@@ -808,6 +806,7 @@ async function appChecks(browser) {
     const startupId = await loading.getAttribute('id');
     await waitDraw(page, startupId);
     await page.screenshot({path: path.join(screenshotDir, `${width}-app-leagues.png`)});
+    await page.locator('.sidebar-menu a[data-value="today"]').evaluate(link=>link.click());
     await page.locator('#startup_status').filter({hasText: "Loading today's market…"}).waitFor();
     await loading.waitFor();
     await page.screenshot({path: path.join(screenshotDir, `${width}-app-market.png`)});

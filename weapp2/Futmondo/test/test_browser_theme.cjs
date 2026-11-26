@@ -9,6 +9,10 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       await page.route('**/*',route => route.request().url().startsWith('http://127.0.0.1:38765/') ? route.continue() : route.abort());
       await page.goto('http://127.0.0.1:38765/');
       // Test the production UI without an extra fixture stylesheet, before login.
+      await page.locator('#login-open_login').waitFor();
+      await page.locator('.waiter-overlay').waitFor({state:'hidden'});
+      await page.screenshot({path:`/tmp/futmondo-public-welcome-${width}.png`});
+      await page.locator('#login-open_login').click();
       await page.locator('#login-user_name').waitFor();
       for (const selector of ['.content-wrapper','.main-header .navbar','.main-sidebar','.box','#login-user_name','#login-password','.selectize-input']) {
         const elements = page.locator(selector);
@@ -23,7 +27,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       await page.locator('#login-user_name').fill('offline@example.invalid');
       await page.locator('#login-password').fill('fixture');
       await page.locator('#login-login_button').click();
-      await page.locator('.sidebar-menu a[data-value="yourteam"]').waitFor();
+      await page.locator('.fm-home-tile[data-fm-page="yourteam"]').waitFor();
       for (const tab of ['today','yourteam','players_in_championship','rivals','classification','notifications','plots','round_mvps']) {
         await page.locator(`.sidebar-menu a[data-value="${tab}"]`).evaluate(el=>el.click());
         await page.waitForTimeout(350);

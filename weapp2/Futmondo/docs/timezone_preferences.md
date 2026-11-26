@@ -1,7 +1,7 @@
 # Personal timezone and uniform dates
 
-Current behavior, corrected 2026-11-15: each user chooses their own timezone in
-**Welcome → Display timezone**. With no explicit personal choice, the browser's
+Each user chooses their own timezone in
+**Home → Account settings → Display timezone**. With no explicit personal choice, the browser's
 IANA timezone is detected automatically. Spain (`Europe/Madrid`, including
 mainland Spain's daylight-saving rules) is the fallback if detection is missing
 or invalid. A saved personal choice always overrides browser detection. The same

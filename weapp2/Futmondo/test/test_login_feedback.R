@@ -2,6 +2,7 @@
 # Fast server coverage; add --browser for real click/keyboard loading-state checks.
 suppressPackageStartupMessages(library(shiny))
 source("data_contracts.R")
+source("loading_visual.R")
 `%||%` <- function(x, y) if (is.null(x)) y else x
 valid_login <- function(x) is.character(x) && length(x) == 3L && all(c("token", "userid", "user_name") %in% names(x))
 clear_api_cache <- function(...) invisible(NULL)
@@ -16,7 +17,9 @@ source("Modules/Login_Module.R")
 login_markup <- as.character(login_UI("login"))
 stopifnot(grepl('id="login-login_progress"', login_markup, fixed = TRUE),
   grepl('role="status"', login_markup, fixed = TRUE),
-  grepl("event.key==='Enter'", login_markup, fixed = TRUE))
+  grepl('aria-haspopup="dialog"', login_markup, fixed = TRUE),
+  grepl('<dialog id="login-login_dialog"', login_markup, fixed = TRUE),
+  !grepl('<dialog[^>]* open=', login_markup))
 
 attempts <- 0L
 login_outcome <- "error"
@@ -51,7 +54,7 @@ testServer(login_Server, args = list(id = "login"), session = mock_session, {
     grepl("Enter your username and password", output$login_feedback$html, fixed = TRUE),
     length(messages) == 1L, identical(messages[[1L]]$payload, list(busy = FALSE)))
 
-  # A failed first login exposes a collapsed red disclosure even when the NULL token does not change.
+  # A failed first login exposes the error inside the dialog even when the NULL token does not change.
   session$setInputs(user_name = "person@example.invalid", password = "wrong")
   session$setInputs(login_button = 2)
   settle(session)
@@ -59,9 +62,9 @@ testServer(login_Server, args = list(id = "login"), session = mock_session, {
   stopifnot(is.null(login_token_RV()), attempts == 1L,
     grepl("Could not authenticate with LigaRadar", html, fixed = TRUE),
     !grepl("private transport detail", html, fixed = TRUE),
-    grepl('fm-info-error', html, fixed = TRUE),
-    grepl('aria-label="Error details"', html, fixed = TRUE),
-    !grepl('<details[^>]* open', html),
+    grepl('fm-info-inline-error', html, fixed = TRUE),
+    grepl('role="alert"', html, fixed = TRUE),
+    !grepl('<details', html),
     length(messages) == 2L, identical(messages[[2L]]$payload, list(busy = FALSE)))
 
   # Invalid endpoint responses also release the browser button.
@@ -88,7 +91,8 @@ cat("LOGIN FEEDBACK: 5 passed / 0 failed\n")
 
 if ("--browser" %in% commandArgs(trailingOnly = TRUE)) {
   markup_path <- tempfile("futmondo-login-feedback-", fileext = ".html")
-  writeLines(login_markup, markup_path)
+  writeLines(as.character(tags$html(tags$body(shiny::includeCSS("www/loading-visual.css"),
+    shiny::includeScript("www/loading-visual.js"), HTML(login_markup)))), markup_path)
   status <- system2("node", c("test/test_login_feedback.cjs", shQuote(markup_path)))
   unlink(markup_path)
   stopifnot(status == 0L)

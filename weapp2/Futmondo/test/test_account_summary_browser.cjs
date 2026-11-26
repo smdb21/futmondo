@@ -13,6 +13,7 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
    await page.goto(url);
    await page.waitForFunction(()=>window.Shiny?.shinyapp?.$socket?.readyState===1);
    await page.evaluate(theme=>document.documentElement.dataset.fmTheme=theme,theme);
+   await page.locator('#login-open_login').click();
    await page.locator('#login-user_name').fill('offline@example.invalid');
    await page.locator('#login-password').fill('fixture');
    await page.locator('#login-login_button').click();

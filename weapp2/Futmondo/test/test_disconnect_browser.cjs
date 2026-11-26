@@ -11,7 +11,7 @@ const url = `${origin}/?fixture=disconnect#current-page`;
 async function connected(page) {
   await page.goto(url);
   await page.waitForFunction(() => window.Shiny?.shinyapp?.$socket?.readyState === 1);
-  await page.locator('#login-login_button').waitFor();
+  await page.locator('#login-open_login').waitFor();
 }
 
 async function main() {
@@ -38,7 +38,7 @@ async function main() {
     const dialog = page.getByRole('dialog', { name: 'Connection lost' });
     const refresh = dialog.getByRole('button', { name: 'Refresh page' });
     assert.equal(await dialog.isVisible(), false);
-    await page.locator('#login-login_button').focus();
+    await page.locator('#login-open_login').focus();
     await page.evaluate(() => {
       const message = document.querySelector('#ss-connect-dialog');
       message.innerHTML = '<label>Reconnect failed. Retrying…</label><a id="ss-reconnect-link" href="#">Try now</a>';
@@ -57,7 +57,7 @@ async function main() {
     assert.equal(await page.locator('#ss-overlay').isVisible(), false);
     assert.equal(await refresh.evaluate(el => el === document.activeElement), true);
     assert.equal(await refresh.evaluate(el => el.matches(':focus-visible')), true);
-    await page.locator('#login-login_button').focus();
+    await page.locator('#login-open_login').focus();
     assert.equal(await refresh.evaluate(el => el === document.activeElement), true);
     await page.keyboard.press('Escape');
     assert.equal(await dialog.isVisible(), true);
@@ -108,7 +108,7 @@ async function main() {
     await page.evaluate(() => { document.querySelector('#ss-connect-dialog').style.display = 'none'; });
     await dialog.waitFor({ state: 'hidden' });
     assert.equal(await sweep.evaluate(el => el.getAnimations().length), 0, 'recovery stops the sweep');
-    assert.equal(await page.locator('#login-login_button').evaluate(el => el === document.activeElement), true);
+    assert.equal(await page.locator('#login-open_login').evaluate(el => el === document.activeElement), true);
     await page.close();
 
     const plain = await browser.newPage();

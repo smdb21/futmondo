@@ -1,8 +1,19 @@
 # Account-wide navigation preferences. See docs/page_preferences.md.
-fm_saved_pages <- function(is_admin = FALSE) {
-  c("notifications", "today", "yourteam", "lineup", "players_in_championship", "rivals",
-    "plots", "classification", "round_mvps", if (isTRUE(is_admin)) "admin")
+fm_navigation_pages <- function(is_admin = FALSE) {
+  pages <- data.frame(
+    tab = c("today", "yourteam", "lineup", "players_in_championship", "rivals",
+      "classification", "plots", "round_mvps", "notifications", "admin"),
+    label = c("Today's market", "My team", "Lineup", "Players", "Rivals",
+      "Classification", "Plots", "Round awards", "Notifications", "Admin"),
+    icon = c("bolt", "users", "futbol", "table", "users-viewfinder", "trophy",
+      "chart-column", "medal", "bell", "gears"),
+    detail = c("Listings and recent transfers", "Squad and offers", "Formation and fixtures",
+      "Compare league players", "Squads and finances", "Standings by round",
+      "League trends and transfers", "Best XI and MVPs", "League activity", "League administration"))
+  pages[pages$tab != "admin" | isTRUE(is_admin), , drop = FALSE]
 }
+
+fm_saved_pages <- function(is_admin = FALSE) fm_navigation_pages(is_admin)$tab
 
 fm_page_store <- function(user_id, page = NULL, visited_at = NULL, owner = "") {
   if (!is.character(user_id) || length(user_id) != 1L || is.na(user_id) ||
@@ -20,8 +31,7 @@ fm_page_store <- function(user_id, page = NULL, visited_at = NULL, owner = "") {
     `Content-Type` = "application/json", Prefer = "resolution=merge-duplicates,return=minimal")
   body <- if (reading) NULL else jsonlite::toJSON(list(user_id = user_id, page = page,
     visited_at = visited_at), auto_unbox = TRUE)
-  # Navigation is needed before the page can load. Use the reserved foreground
-  # socket and the existing bounded retry for this idempotent read only.
+  # One asynchronous, bounded read supplies the Home shortcut.
   request <- if (reading) fm_async_read_http(url, "GET", body, headers,
     owner = owner, timeout = 8, priority = "interactive") else
     fm_async_http(url, "POST", body, headers, owner = owner, timeout = 8)
@@ -44,18 +54,13 @@ fm_page_store <- function(user_id, page = NULL, visited_at = NULL, owner = "") {
 
 fm_page_preferences <- function(session, login_token, page, is_admin,
                                 store = fm_page_store) {
-  initial <- shiny::reactiveVal("login")
+  last_page <- shiny::reactiveVal(NULL)
   issue <- shiny::reactiveVal(NULL)
   generation <- 0L
   closed <- FALSE
   state <- NULL
   current <- function(s) !closed && identical(s$generation, generation)
   report <- function(s, value) if (current(s)) issue(value)
-  select_page <- function(s, value) {
-    s$awaiting <- value
-    initial(value)
-    shinydashboard::updateTabItems(session, "tabs", value)
-  }
   save <- function(s) {
     if (s$inflight || is.null(s$pending)) return(invisible(NULL))
     value <- s$pending
@@ -82,19 +87,17 @@ fm_page_preferences <- function(session, login_token, page, is_admin,
     promises::then(store(s$user_id, owner = session$token), function(row) {
       if (!current(s)) return(NULL)
       s$loading <- FALSE
+      if (s$navigated) return(NULL)
       report(s, NULL)
-      if (s$navigated) return(NULL) # A late read must never move the user back.
       saved <- if (is.list(row)) row$page else NULL
       s$saved <- saved
-      target <- if (is.character(saved) && length(saved) == 1L &&
-        !is.na(saved) && saved %in% fm_saved_pages(shiny::isolate(is_admin()))) saved else "today"
-      select_page(s, target)
+      if (is.character(saved) && length(saved) == 1L && !is.na(saved) &&
+          saved %in% fm_saved_pages(shiny::isolate(is_admin()))) last_page(saved)
       NULL
     }, function(error) {
       if (!current(s)) return(NULL)
       s$loading <- FALSE
-      report(s, "load")
-      if (!s$navigated) select_page(s, "today")
+      if (!s$navigated) report(s, "load")
       NULL
     })
     invisible(NULL)
@@ -105,14 +108,14 @@ fm_page_preferences <- function(session, login_token, page, is_admin,
     if (!is.null(state) && identical(state$user_id, user_id)) return()
     generation <<- generation + 1L
     state <<- NULL
-    initial("login")
+    last_page(NULL)
     issue(NULL)
     if (is.null(user_id)) return()
     s <- new.env(parent = emptyenv())
     s$user_id <- user_id; s$generation <- generation
     s$initial_input <- shiny::isolate(page())
     s$saved <- NULL; s$pending <- NULL; s$inflight <- FALSE
-    s$awaiting <- NULL; s$navigated <- FALSE; s$loading <- FALSE
+    s$navigated <- FALSE; s$loading <- FALSE
     state <<- s
     restore(s)
   }, ignoreNULL = FALSE, priority = 100)
@@ -121,13 +124,9 @@ fm_page_preferences <- function(session, login_token, page, is_admin,
     if (is.null(s) || !valid_login(shiny::isolate(login_token()))) return()
     value <- page()
     if (!value %in% fm_saved_pages(shiny::isolate(is_admin()))) return()
-    if (!is.null(s$awaiting)) {
-      if (!identical(value, s$awaiting)) return()
-      s$awaiting <- NULL
-      return() # Restoring a page adds no database write.
-    }
-    if (s$loading && identical(value, s$initial_input)) return()
+    if (s$loading && !s$navigated && identical(value, s$initial_input)) return()
     s$navigated <- TRUE
+    last_page(value)
     if (identical(value, s$saved) && is.null(s$pending) && !s$inflight) return()
     s$pending <- list(page = value,
       visited_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%OS6Z", tz = "UTC"))
@@ -147,5 +146,5 @@ fm_page_preferences <- function(session, login_token, page, is_admin,
         "Your last page has not been saved yet."),
       shiny::actionButton("retry_page_preference", "Retry"))
   })
-  list(initial = initial)
+  list(last_page = last_page)
 }

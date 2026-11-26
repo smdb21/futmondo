@@ -1,5 +1,21 @@
 # Futmondo data review and implementation results
 
+## Public welcome and signed-in Home (2026-11-25)
+
+The welcome inventory review traced the Balance summary to its three active pages and the squad-wide pricing preview to its explicit confirmation in My Team. Public Futmondo sources confirm individual market listings, optional public team balances, suggested XIs and Home navigation. The comparison records the two additional LigaRadar entries and the setting that qualifies the rival-cash comparison. [Source review](feature_comparison.md#welcome-and-home-inventory-2026-11-25)
+
+An offline R check loaded the shipped inventory and matched all 18 distinct feature IDs to the documented comparisons. It covers seven Essentials and eleven Advanced entries. Only three per tier are initially expanded into view. The inventory and its disclosures use shipped HTML and CSS without any source, database or Shiny request when expanded.
+
+Local browser checks at 320, 390 and 1200 px verified the public layout and login dialog. The animation measured 180 × 120 px on phones and 350 × 233 px on desktop. Pausing stopped canvas draws. Reduced-motion mode shows the static pitch.
+
+Full-app Chromium checks covered 320 px in dark mode, 390 px in light mode and 1440 px in both themes. The fixture showed Round 12, €10,000,000 cash and 17 owned players. All nine ordinary destinations opened from Home. The mobile sidebar closed on selection, and the Home button returned from the bottom of a page. Continue opened the saved destination and logout returned to the public welcome. A warmed return to Home took 34–51 ms and made zero repeat overview reads. Holding the market response open left Home available. An empty league selection kept navigation accessible and all three overview figures explicitly unavailable.
+
+The remembered-login browser suite passed 9/9 with the original proxy and 9/9 with its rewritten-host configuration. Both covered restart and observed zero frames showing credentials during restoration. The offline Shiny lifecycle passed all 14 checks and rendered eight tabs, the Balance banner passed 18/18 checks and the deployment contract passed 3/3. The fixtures made no external HTTP requests or real transactions.
+
+The isolated staged app passed the four-layout Home browser check and the full offline lifecycle. All 15 changed packaged files matched their manifest checksums. The dedicated theme-switching and loading-animation browser checks also passed. Two broader browser suites still expect visible radio buttons or historical player-card data from an older fixture. The standalone UI reliability suite also stops at a pre-existing missing roster-fixture dependency. The Round awards navigation assertion from that suite passed independently.
+
+The screen and login checks use local synthetic accounts. Production deployment, authenticated official screens and physical-device rendering were outside these checks.
+
 ## Rivals team selection and detail tabs (2026-11-25)
 
 - An offline browser entered Rivals with its saved results held back. The loading message appeared before the first team row and cleared when the directory arrived. Desktop and phone layouts passed at 1600, 1440, 1200, 390 and 360 px, including light/dark hover, mouse and keyboard selection, sorting, the financial pivot, expanded breakdown, roster trend and viewport overflow. A separate browser fixture verified selection through a balance update, reorder and league change.

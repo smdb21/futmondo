@@ -2,7 +2,11 @@
 
 `login(user_name=NULL, password=NULL)` and the login module authenticate credentials directly against Futmondo. Passwords are cleared from the form after submission and never persisted. Downstream modules still receive the same three named character fields (`token`, `userid`, `user_name`). Logout clears account caches and pending session work.
 
-Login, welcome, signed-in, authentication-error and startup-loading copy uses LigaRadar branding. The credential notice remains exactly: “Log in with your Futmondo account to authenticate directly with the official Futmondo server.” Authentication endpoints, session keys, remembered access and request counts are unchanged; this is a text-only presentation change.
+## Public welcome and signed-in Home (2026-11-25)
+
+Visitors see the LigaRadar pitch animation above the Essentials and Advanced feature lists. The animation occupies a compact band on a phone and a wider area on desktop, with a pause control. The two lists stack on narrow screens and sit side by side on desktop. Their descriptions come from the local feature inventory.
+
+**Log in with Futmondo** opens a credential dialog. It identifies Futmondo as the authentication provider, explains continued factual synchronization after logout, and offers the existing seven-day remembered-login option when available. Closing the dialog returns to the public welcome. Successful credentials or a valid remembered login open the signed-in Home. A user can open a league page directly from Home or use the sidebar, then return with the Home control. `login_account_UI(id)` supplies the namespaced logout control under Home's Account settings. [Home and saved-page contract](page_preferences.md)
 
 After authentication, `championship_RV()` in `server.R` selects the active league and checks for a playable team with explicit `shiny::validate(shiny::need(...))` calls. Hosting attaches Shiny before loading `global.R`, where JSON parsing imports can mask the unqualified `validate` name. Explicit namespaces keep successful league selection usable and preserve Shiny validation states for accounts with no leagues or no playable team. The offline lifecycle preloads Shiny to reproduce that hosting order; `test/test_competition_onboarding.R` covers all three outcomes and repeated league-result reuse without live I/O.
 
@@ -10,7 +14,7 @@ After authentication, `championship_RV()` in `server.R` selects the active leagu
 
 The optional **Remember me on this device for 7 days** checkbox starts unchecked. It is disabled until the server has opted in and has the configured encryption key, database credentials and `sodium` dependency. A remembered-login-specific failure does not prevent ordinary login after the startup database check passes. A failed startup database check blocks all login.
 
-The login module owns the `remember_feedback` output and retry action, while `ui.R` mounts that output above the page tabs. Remembered-login success and failure therefore remain visible when successful authentication automatically opens Today. Keep this output outside hidden login content when embedding the module; ordinary authentication feedback stays on Login.
+The login module owns the `remember_feedback` output and retry action. The dashboard mounts this feedback outside the credential dialog so cookie status and revocation errors remain accessible after navigation. Credential errors appear inside the dialog.
 
 `remember_login.R` adds create, confirm, restore and revoke operations through a session-bound `registerDataObj` endpoint. The browser calls it using HTTPS, same-origin POST with a random session CSRF header and one-use operation ticket. Requests are serialized in `www/remember-login.js`; stale completions cannot replace a newer login or issue a cookie after logout. Responses contain only operation status, and use `Cache-Control: no-store`. No password, Futmondo token or remembered credential is returned in JSON, browser storage or a URL.
 
@@ -22,7 +26,7 @@ The cookie contains a random 256-bit browser credential. Its attributes are `Sec
 
 ## Restoration and expiry
 
-The login form is hidden in the initial HTML. `login_Server()` publishes unsuspended `login_form_visible` and `signed_in` text outputs (`TRUE`/`FALSE`) for namespaced conditional panels. When remembered login is configured, a session-local `restore_checking` flag keeps credentials hidden until the cookie endpoint or its browser result completes. Missing/invalid cookies, access denial, expiry and recoverable errors expose ordinary login; successful restoration keeps credentials hidden. A restore retry hides the form for the new attempt. Disabled remembered login exposes the form on the first server update. The welcome card remains visible, expands into the available width and contains Logout for authenticated users. Authentication and cookie requests are unchanged; the flag is presentation state, never persisted authentication.
+The credential dialog starts closed. `login_Server()` publishes unsuspended `login_form_visible` and `signed_in` outputs for the browser. A pending remembered-cookie check keeps ordinary sign-in unavailable until restoration settles. Missing or expired cookies, access denial and recoverable restore failures return the visitor to ordinary sign-in. A successful restore opens Home directly. The server retains the database-readiness and admission checks for every authentication path.
 
 Restoration performs one indexed record lookup and one asynchronous Futmondo league-list validation. The validated league result seeds the existing account cache, so normal startup reuses it without a second league request. The coach preference still restores through the existing account/league preference handshake before hiring can run.
 
@@ -41,9 +45,9 @@ See `README.md` for server-only variables and dependency setup. Apply `scripts/m
 Focused verification: `Rscript test/test_remember_login.R`, `node test/test_remember_login_browser.cjs`, `Rscript test/test_login_feedback.R --browser`, and the required offline application lifecycle. The HTTPS browser fixture uses synthetic accounts and temporary JSON persistence with the actual dashboard layout. It checks actual browser closure/reopen, R process restart, changed worker routes, absolute expiry, logout, and visible success/failure at mobile and desktop widths; it never reaches Futmondo or Supabase. Run it again with `FUTMONDO_TEST_PROXY_NO_WS_ORIGIN=true` to exercise the hosted proxy fallback, and add `FUTMONDO_TEST_PROXY_REWRITE_HOST=true` to model a rewritten backend Host. Actual Android persistence and authenticated hosted issuance/restoration require a separate device check.
 
 
-## Public two-tier feature inventory — 2026-11-14
+## Public feature inventory
 
-The welcome panel now includes Essentials and Advanced lists from `login_feature_tiers()` via `login_features_UI(id)`. The inventory is static UI outside `output$text`, so authentication feedback and logout preserve it. Two columns at desktop widths (992px and above) stack on phones/tablets; semantic sections, stable feature IDs, theme tokens and wrapping keep the list accessible. Each item explanation starts hidden in a native `details` element; its clickable/keyboard-operable `summary` title carries a chevron that rotates when expanded. This uses no client handler or server event. There is no subscription language, pricing, feature gating or access-policy change.
+`login_feature_tiers()` supplies both lists to `login_features_UI(id)`. Each tier shows three uses straight away. Its native **More** disclosure contains the remaining entries. All feature IDs remain available in the public markup. Opening a disclosure works with touch, mouse and keyboard. The tier names describe how a manager might use a feature, and both are available under the existing access rules.
 
 [Feature comparison](feature_comparison.md) records official equivalents, exact LigaRadar additions, current implementation evidence and the public-documentation comparison limits. Official suggested lineups and player averages already exist; the list describes the configurable historical optimization/ranking differences specifically. The rendering adds no reactive dependency, request, storage, timer or calculation. Authentication controls and remembered-session behavior are unchanged.
 

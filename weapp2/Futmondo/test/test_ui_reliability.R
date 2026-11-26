@@ -362,11 +362,9 @@ record('round awards UI has dedicated responsive card output', {
     grepl('mvp-mvp_cards', html, fixed = TRUE),
     grepl('Round awards', html, fixed = TRUE)
   )
-  server_source <- paste(readLines('server.R', warn = FALSE), collapse = '\n')
-  stopifnot(
-    grepl('tabName = "round_mvps"', server_source, fixed = TRUE),
-    grepl('menuItem("Round awards"', server_source, fixed = TRUE)
-  )
+  source('page_preferences.R', local = TRUE)
+  pages <- fm_navigation_pages(FALSE)
+  stopifnot(identical(pages$label[pages$tab == 'round_mvps'], 'Round awards'))
 })
 record('dream team preserves actual MVP and missing scores', {
   d <- classification_dreamteam_rows(list(

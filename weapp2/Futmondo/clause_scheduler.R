@@ -271,7 +271,7 @@ fm_manual_finance_session <- function(session,login,league,team,balance_state,hi
    revision(shiny::isolate(revision())+1L)
   }
  }
- session$userData$manual_finance_projection <- function(states) {
+ session$userData$manual_finance_projection <- function(states, cash_only = FALSE) {
   revision()
   if(!length(ledgers))return(states)
   auth <- login()
@@ -296,7 +296,7 @@ fm_manual_finance_session <- function(session,login,league,team,balance_state,hi
   candidates <- Filter(function(action)isTRUE(balance_at>as.numeric(action$dispatched_at)),
    actions[setdiff(names(actions),reflected_ids)])
   completed <- character()
-  if(length(candidates)&&is.finite(balance_at)&&is.finite(fm_number(states$team$data$budget))) {
+  if(!cash_only&&length(candidates)&&is.finite(balance_at)&&is.finite(fm_number(states$team$data$budget))) {
    history <- history_state()
    history_at <- fm_manual_finance_time(history)
    if(is.finite(history_at))completed <- vapply(
@@ -321,6 +321,12 @@ fm_manual_finance_session <- function(session,login,league,team,balance_state,hi
   debits <- sum(vapply(if(overlaps)clauses else clauses_left,`[[`,numeric(1),'max_price'))
   if(!is.null(states$team$data)&&debits>0) {
    states$team$data$budget <- fm_number(states$team$data$budget) - debits
+  }
+  # Home shows cash only. Keep the last confirmed debit against its baseline
+  # until a full finance view verifies the corresponding transfer.
+  if(cash_only) {
+   states$confirmed_actions <- debits > 0
+   return(states)
   }
   extra_holds <- 0
   displayed_balance_at <- fm_number(as.numeric(fm_time(states$team$observed_at)))

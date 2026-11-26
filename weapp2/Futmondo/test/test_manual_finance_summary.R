@@ -119,6 +119,10 @@ shiny::testServer(function(input, output, session) {
   ack(2)
   settle(session)
   payment <- shown(700, 300, 2, 400, 400)
+  reads_before_home <- length(calls)
+  home_cash <- session$userData$manual_finance_projection(list(team=primary_team_state()), cash_only=TRUE)
+  stopifnot(home_cash$team$data$budget == 700, home_cash$confirmed_actions,
+    length(calls) == reads_before_home)
   stopifnot(refreshes == 1L, round_finance_RV()$confirmed_actions,
     grepl("700 €", output[["today-kpi_cash_box"]]$html, fixed = TRUE))
   transfer <- data.frame(id = "tx", player_id = "clause", buyer_team_id = "mine",

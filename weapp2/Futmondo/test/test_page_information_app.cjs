@@ -13,8 +13,10 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
    const coachCheckbox=page.locator('#lineup-automatically_hire_coach');
    assert.equal(await coachCheckbox.isChecked(),true,'New coach preferences default to enabled');
    await page.evaluate(key=>localStorage.setItem(key,'false'),coachKey);
+   await page.locator('#login-open_login').click();
    await page.locator('#login-user_name').fill('offline@example.invalid');await page.locator('#login-password').fill('fixture');
    await page.locator('#login-login_button').click();
+   await page.locator('.sidebar-menu a[data-value="today"]').evaluate(link=>link.click());
    await page.locator('#shiny-tab-today.active').waitFor();
    assert.equal(await page.locator('#shiny-tab-today .fm-coach-control').count(),0);
    assert.equal(await coachCheckbox.isVisible(),false);

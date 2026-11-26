@@ -1,165 +1,123 @@
-# Public, static inventory; comparison evidence lives in docs/feature_comparison.md.
-# Keep higher-value analysis in Advanced without implying access restrictions.
+# The public inventory is compared with official workflows in docs/feature_comparison.md.
 login_feature_tiers <- function() {
+  feature <- function(id, title, description) list(id = id, title = title, description = description)
   list(
-    list(id = "essentials", title = "Essentials", summary = "Explore your league in more detail.",
+    list(id = "essentials", title = "Essentials", icon = "compass",
+      summary = "Find players, check your budget and see what changes before kickoff.",
       features = list(
-        list(id = "scouting_filters", title = "Combined scouting filters",
-          description = "Narrow player tables by real club, fantasy owner, multiple positions, value, daily price movement and active clauses. Choose whether to include your own team in All Players."),
-        list(id = "squad_status", title = "Squad status at a glance",
-          description = "See your squad’s reported injuries, doubts, suspensions and unavailable players together in My Team."),
-        list(id = "clause_transfer_timing", title = "Show incoming and leaving players before or after next round starts",
-          description = "My Team shows each pending clause arrival or departure and its timing relative to the next round’s kickoff."),
-        list(id = "round_range_standings", title = "Standings for any round range",
-          description = "Choose a stretch of rounds to compare team points and points, position, Best XI and MVP bonuses."),
-        list(id = "local_timezone", title = "Dates and times in your timezone",
-          description = "See kickoffs, deadlines and history in your local timezone. You can also choose a different timezone in settings."),
-        list(id = "league_charts", title = "League comparison charts",
-          description = "Compare squad values and rank progression, and see fantasy-owned players grouped by real club.")
+        feature("scouting_filters", "Find players who fit your squad",
+          "Filter by club, fantasy owner, positions, price movement and active clauses in one place."),
+        feature("kickoff_balance", "Check your balance before kickoff",
+          "See how much cash your open offers could use, what you would have left and how much your league lets you spend."),
+        feature("clause_transfer_timing", "See who arrives before kickoff",
+          "Check incoming signings and departures against the next round’s kickoff."),
+        feature("squad_status", "Check squad availability",
+          "Review reported injuries, doubts, suspensions and other absences together in My Team."),
+        feature("round_range_standings", "Compare a stretch of rounds",
+          "Choose a round range to compare teams’ points and their points, position, Best XI and MVP bonuses."),
+        feature("league_charts", "Follow your league over time",
+          "Compare squad values and rank progression, and see which real clubs supply your league’s players."),
+        feature("local_timezone", "Read deadlines in your timezone",
+          "See kickoffs and transfer history in local time or choose a timezone for your account.")
       )),
-    list(id = "advanced", title = "Advanced", summary = "Go deeper into lineups, player value and rival finances.",
+    list(id = "advanced", title = "Advanced", icon = "chart-line",
+      summary = "Compare lineups, measure player value and understand your rivals’ finances.",
       features = list(
-        list(id = "lineup_optimizer", title = "Best XI + bench optimization",
-          description = "Build a lineup from your chosen 1–20 completed rounds, comparing allowed formations, with injury and next-round departure checks. Require primary-position bench cover if needed. Edit any lineup on the pitch and see the XI’s expected points, including empty-slot penalties."),
-        list(id = "scheduled_lineups", title = "Lineups for incoming signings",
-          description = "Optimize your XI and bench with confirmed signings due before kickoff. Where scheduling is enabled, approve one submission timed for the last selected signing to join."),
-        list(id = "round_award_rankings", title = "Best XI and MVP leaders",
-          description = "See who made the Best XI most often, who won the most MVPs and each player’s share of confirmed rounds."),
-        list(id = "recent_average", title = "Player rankings by last-N average",
-          description = "Sort players by their average over your chosen 1–20 recent rounds across market, squad and player tables."),
-        list(id = "price_efficiency", title = "Points per million",
-          description = "Rank recent points relative to market value or clause price to compare player value."),
-        list(id = "squad_value_trend", title = "Squad value trends",
-          description = "See the total daily change in squad value and how many players rose or fell, for your team or any rival."),
-        list(id = "rival_cash", title = "Reconstructed rival balances",
-          description = "Inspect estimated rival cash and its running ledger of opening funds, transfers and configured rewards, with missing evidence identified."),
-        list(id = "scheduled_clauses", title = "Scheduled clause purchases",
-          description = "Authorize a capped purchase attempt at a rival player's published clause opening, with pending-offer reservations, cancellation and saved execution outcomes. Success is not guaranteed."),
-        list(id = "transfer_histogram", title = "League transfer activity over time",
-          description = "See how much money moved through league transfers by day, week or month."),
-        list(id = "trading_profit", title = "Trading profit and wealth comparisons",
-          description = "Compare league trading profit and estimated wealth gained, and inspect matched player purchases, sales and related fees.")
+        feature("lineup_optimizer", "Compare your best XI and bench",
+          "Use 1–20 completed rounds to compare allowed formations. Check bench cover and edit the XI on the pitch to see how its points estimate changes."),
+        feature("price_efficiency", "Find points for your budget",
+          "Compare recent points per million of market value or clause price across players."),
+        feature("rival_cash", "Trace a rival’s estimated balance",
+          "Follow opening cash, transfers and league rewards in a running ledger. See where the evidence is incomplete."),
+        feature("scheduled_lineups", "Prepare for confirmed signings",
+          "Include signings due before kickoff in a draft XI and bench. Where enabled, approve a lineup submission timed for an incoming signing."),
+        feature("round_award_rankings", "Find repeat Best XI and MVP picks",
+          "Compare player award totals and their share of rounds with confirmed selections."),
+        feature("recent_average", "Rank players on recent form",
+          "Choose up to 20 recent rounds and sort players by average points across market and squad tables."),
+        feature("squad_value_trend", "Track daily squad value changes",
+          "See the net change for your squad or a rival’s and how many players rose or fell."),
+        feature("bulk_listing_preview", "Price your squad for the market",
+          "Set a markup on market value or a locked clause. Preview each eligible player’s asking price and the squad total before you confirm the listings."),
+        feature("transfer_histogram", "See when your league is spending",
+          "Compare money moved through league transfers by day, week or month."),
+        feature("trading_profit", "Compare profit on completed deals",
+          "Inspect matched purchases, sales and fees alongside league trading profit and estimated wealth gained."),
+        feature("scheduled_clauses", "Plan a capped clause purchase",
+          "Where enabled, approve a one-time attempt for a rival player’s published opening. Inspect reservations and the recorded outcome or cancel a pending attempt.")
       ))
   )
 }
 
 login_features_UI <- function(id) {
   ns <- NS(id)
-  tags$section(class = "fm-login-features", `aria-labelledby` = ns("features_heading"),
-    h3(id = ns("features_heading"), "More from your Futmondo league"),
-    p(class = "fm-login-features-intro",
-      "LigaRadar adds these workflows beyond the features described in the official Futmondo guides."),
-    div(class = "fm-login-feature-tiers",
-      lapply(login_feature_tiers(), function(tier) {
-        tags$section(class = paste("fm-login-feature-tier", paste0("fm-login-feature-tier-", tier$id)),
-          `aria-labelledby` = ns(paste0("features_", tier$id)),
-          h4(id = ns(paste0("features_", tier$id)), tier$title),
-          p(class = "fm-login-feature-summary", tier$summary),
-          tags$ul(lapply(tier$features, function(feature) {
-            tags$li(`data-feature` = feature$id,
-              tags$details(class = "fm-login-feature",
-                tags$summary(
-                  tags$span(class = "fm-login-feature-toggle", `aria-hidden` = "true"),
-                  tags$span(feature$title)
-                ),
-                p(feature$description)
-              )
-            )
-          }))
-        )
-      })
-    ),
-    p(class = "fm-login-features-note",
-      "Official app options can vary by league configuration. LigaRadar respects permitted formations and player eligibility; analysis depends on source data. Comparison: ",
-      tags$a(href = "https://help.futmondo.com/article/91-reglas-del", "official rules",
-        target = "_blank", rel = "noopener noreferrer"), ", ",
-      tags$a(href = "https://magazine.futmondo.com/novedades-en-la-nueva-app-de-futmondo/",
-        "official app feature guide", target = "_blank", rel = "noopener noreferrer"), ".")
+  feature_row <- function(item) tags$li(`data-feature` = item$id,
+    tags$h4(item$title), tags$p(item$description))
+  tags$section(class = "fm-welcome-tiers", `aria-label` = "LigaRadar features",
+    lapply(login_feature_tiers(), function(tier) {
+      tags$section(class = paste("fm-welcome-tier", paste0("fm-welcome-tier-", tier$id)),
+        `aria-labelledby` = ns(paste0("features_", tier$id)),
+        div(class = "fm-welcome-tier-heading", icon(tier$icon),
+          tags$h2(id = ns(paste0("features_", tier$id)), tier$title)),
+        tags$p(class = "fm-welcome-tier-summary", tier$summary),
+        tags$ul(lapply(head(tier$features, 3L), feature_row)),
+        tags$details(class = "fm-welcome-more",
+          tags$summary(paste("More", tier$title, "features"), icon("chevron-down")),
+          tags$ul(lapply(tail(tier$features, -3L), feature_row)))
+      )
+    })
   )
+}
+
+login_account_UI <- function(id) {
+  actionButton(NS(id, "logout_button"), "Log out", icon = icon("right-from-bracket"))
 }
 
 login_UI <- function(id) {
   ns <- NS(id)
-  div(
-    style = "display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-start;",
-    uiOutput(ns("database_status"), inline = FALSE, container = div,
-      style = "flex: 1 0 100%; min-width: 0;",
-      div(role = "status", `aria-live` = "polite", "Checking database connection…")),
-    conditionalPanel(
-      condition = "output.login_form_visible === 'TRUE'", ns = ns,
-      style = "flex: 1 1 300px; min-width: 0;",
-    shinydashboardPlus::box(
-      width = 12,
-      id = ns("login_box"),
-      title = h4("Welcome"),
-      solidHeader = TRUE,
-      textInput(inputId = ns("user_name"), label = "User name:", placeholder = "User name", value = ""),
-      passwordInput(inputId = ns("password"), label = "Password:", placeholder = "password", value = ""),
-      local({
-        control<-checkboxInput(ns("remember_login"), "Remember me on this device for 7 days", value=FALSE)
-        if(!exists("remember_login_enabled",mode="function")||!remember_login_enabled())
-          control<-htmltools::tagQuery(control)$find("input")$addAttrs(disabled="disabled")$allTags()
-        control
-      }),
-      uiOutput(ns("remember_availability")),
-      singleton(tags$script(src="remember-login.js")),
-      actionButton(inputId = ns("login_button"), label = "Login", disabled = TRUE,
-        `aria-describedby` = ns("database_status")),
-      tags$p(class="fm-info-neutral", "Signing in starts automatic data synchronization, including after logout. Access is encrypted and your password is never saved. Use Disconnect account to stop synchronization."),
-      div(
-        id = ns("login_progress"), class = "login-feedback", style = "display: none;",
-        role = "status", `aria-live` = "polite",
-        icon("spinner", class = "fa-spin"), span("Connecting to LigaRadar…")
-      ),
-      uiOutput(ns("login_feedback")),
-      tags$script(id = ns("login_feedback_script"), HTML(paste0(
-        "(function(){function bindLogin(){",
-        "var login=document.getElementById('", ns("login_button"), "');",
-        "if(!login||login.dataset.futmondoLoginBound)return;",
-        "login.dataset.futmondoLoginBound='true';",
-        "var progress=document.getElementById('", ns("login_progress"), "');",
-        "var feedback=document.getElementById('", ns("login_feedback"), "');",
-        "var logout=document.getElementById('", ns("logout_button"), "');",
-        "var pending=false;var databaseReady=false;var label=login.textContent;",
-        "function setDisabled(){login.disabled=pending||!databaseReady;login.setAttribute('aria-disabled',String(login.disabled));}",
-        "setDisabled();",
-        "function setBusy(busy,message){pending=!!busy;setDisabled();logout.disabled=pending;",
-        "login.setAttribute('aria-busy',String(pending));",
-        "login.textContent=pending?'Logging in…':label;",
-        "progress.querySelector('span').textContent=message||'Connecting to LigaRadar…';progress.style.display=pending?'flex':'none';feedback.style.display=pending?'none':'';}",
-        # Capture runs before Shiny's action-button handler, so feedback is immediate.
-        "login.addEventListener('click',function(event){",
-        "if(pending||!databaseReady){event.preventDefault();event.stopImmediatePropagation();return;}",
-        "setBusy(true);},true);",
-        "['", ns("user_name"), "','", ns("password"), "'].forEach(function(id){",
-        "document.getElementById(id).addEventListener('keydown',function(event){",
-        "if(event.key==='Enter'&&!event.isComposing){event.preventDefault();",
-        "if(!login.disabled)login.click();}});});",
-        "Shiny.addCustomMessageHandler('", ns("login_state"), "',function(message){setBusy(message.busy,message.message);});",
-        "Shiny.addCustomMessageHandler('", ns("database_state"), "',function(message){databaseReady=message.ready===true;setDisabled();});",
-        "}if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',bindLogin,{once:true});}",
-        "else{bindLogin();}})();"
-      ))),
-      fm_info(
-        div(style = "display: flex; align-items: flex-start; gap: 6px;",
-          shiny::tags$i(class = "fa-solid fa-server", style = "color: var(--fm-text); margin-top: 2px;"),
-          span("Log in with your Futmondo account to authenticate directly with the official Futmondo server.")
+  remember <- checkboxInput(ns("remember_login"), "Remember me on this device for 7 days", value = FALSE)
+  if (!exists("remember_login_enabled", mode = "function") || !remember_login_enabled())
+    remember <- htmltools::tagQuery(remember)$find("input")$addAttrs(disabled = "disabled")$allTags()
+  tags$div(class = "fm-welcome", `data-fm-welcome` = ns(""),
+    singleton(shiny::includeCSS("www/welcome.css")),
+    singleton(shiny::includeScript("www/welcome.js")),
+    singleton(tags$script(src = "remember-login.js")),
+    conditionalPanel(condition = "output.signed_in !== 'TRUE'", ns = ns,
+      tags$section(class = "fm-welcome-public", `aria-labelledby` = ns("public_title"),
+        div(class = "fm-welcome-hero",
+          div(class = "fm-welcome-art",
+            fm_loading_visual(ns("welcome_visual")),
+            tags$button(id = ns("toggle_motion"), type = "button", class = "fm-motion-toggle",
+              `aria-label` = "Pause animation", title = "Pause animation",
+              icon("pause"), icon("play"))),
+          tags$h1(id = ns("public_title"), "Welcome to LigaRadar"),
+          tags$p(class = "fm-welcome-intro",
+            "Use your Futmondo league’s results, transfers and prices to choose your XI, compare players and understand rival budgets."),
+          conditionalPanel(condition = "output.login_form_visible === 'TRUE'", ns = ns,
+            tags$button(id = ns("open_login"), type = "button", class = "btn fm-welcome-cta",
+              disabled = "disabled", `aria-haspopup` = "dialog", `aria-controls` = ns("login_dialog"),
+              "Log in with Futmondo", icon("arrow-right"))),
+          uiOutput(ns("database_status"), inline = FALSE, container = div, div(role = "status", `aria-live` = "polite", "Checking database connection…")),
+          uiOutput(ns("access_notice"))
         ),
-        div(style = "display: flex; align-items: flex-start; gap: 6px;",
-          shiny::tags$i(class = "fa-solid fa-shield-halved", style = "color: var(--fm-text); margin-top: 2px;"),
-          span("Your password is never saved or stored anywhere.")
-        )
+        login_features_UI(id)
       )
-    )),
-    div(style = "flex: 2 1 450px; min-width: 0;",
-    shinydashboardPlus::box(
-      id = ns("login_result_box"),
-      width = 12,
-      uiOutput(ns("text")),
-      conditionalPanel(condition = "output.signed_in === 'TRUE'", ns = ns,
-        actionButton(inputId = ns("logout_button"), label = "Logout")),
-      login_features_UI(id)
-    ))
+    ),
+    tags$dialog(id = ns("login_dialog"), class = "fm-login-dialog", `aria-labelledby` = ns("dialog_title"),
+      tags$header(
+        tags$h2(id = ns("dialog_title"), "Log in to LigaRadar"),
+        tags$button(id = ns("close_login"), type = "button", class = "fm-dialog-close",
+          `aria-label` = "Close login", title = "Close login", icon("xmark"))),
+      tags$p("Log in with your Futmondo account to authenticate directly with the official Futmondo server."),
+      textInput(ns("user_name"), "User name", placeholder = "User name"),
+      passwordInput(ns("password"), "Password"),
+      remember, uiOutput(ns("remember_availability")),
+      tags$p(class = "fm-login-sync-notice", "Signing in starts automatic data synchronization, including after logout. Access is encrypted and your password is never saved. Use Disconnect account to stop synchronization."),
+      actionButton(ns("login_button"), "Log in", class = "fm-welcome-cta", disabled = TRUE),
+      div(id = ns("login_progress"), class = "login-feedback", hidden = "hidden",
+        role = "status", `aria-live` = "polite", icon("spinner", class = "fa-spin"), span("Connecting to LigaRadar…")),
+      uiOutput(ns("login_feedback"))
+    )
   )
 }
 
@@ -186,7 +144,11 @@ login_Server <- function(id, user = NULL, password = NULL, database_probe = fm_d
     # Do not move this blocking error into the collapsed information panel.
     output$database_status <- renderUI({
       state <- database_state()
-      if (identical(state, "ready")) return(NULL)
+      if (identical(state, "ready")) {
+        if (restore_checking() && !valid_login(login_token_RV()))
+          return(div(role = "status", `aria-live` = "polite", "Checking saved login…"))
+        return(NULL)
+      }
       if (identical(state, "checking")) return(div(role="status", `aria-live`="polite",
         icon("spinner", class="fa-spin"), " Checking database connection…"))
       div(class="alert alert-danger", role="alert",
@@ -200,17 +162,25 @@ login_Server <- function(id, user = NULL, password = NULL, database_probe = fm_d
     login_feedback_RV <- reactiveVal(NULL)
     output$login_feedback <- renderUI({
       feedback <- login_feedback_RV()
-      if (is.null(feedback)) return(NULL)
-      fm_info(feedback$message, error=identical(feedback$kind, "error"),
+      if (is.null(feedback) || !identical(feedback$kind, "error")) return(NULL)
+      fm_info(feedback$message, error = TRUE, inline = TRUE,
         class=paste("login-feedback", paste0("login-feedback-", feedback$kind)))
+    })
+    outputOptions(output, "login_feedback", suspendWhenHidden = FALSE)
+    # Access can also be revoked while the credentials dialog is closed.
+    access_notice <- reactiveVal(NULL)
+    output$access_notice <- renderUI({
+      message <- access_notice()
+      if (!is.null(message)) fm_info(message, error = TRUE, inline = TRUE)
     })
     remember_retry <- reactiveVal(NULL)
     remember_feedback <- reactiveVal(NULL)
     remembered <- NULL
     output$remember_availability <- renderUI({
       available <- exists("remember_login_enabled",mode="function") && remember_login_enabled()
-      if (!available) fm_info("Remembered login is not enabled on this deployment. You can log in normally.")
+      if (!available) tags$p(class = "fm-login-note", "Remembered login is unavailable on this deployment.")
     })
+    outputOptions(output, "remember_availability", suspendWhenHidden = FALSE)
     output$remember_feedback <- renderUI({
       feedback<-remember_feedback();if(is.null(feedback))return(NULL)
       fm_info(feedback$message,
@@ -230,12 +200,14 @@ login_Server <- function(id, user = NULL, password = NULL, database_probe = fm_d
       session$userData$futmondo_user_id <- NULL
       login_token_RV(NULL)
       login_feedback_RV(NULL)
+      access_notice(NULL)
     }
     deny_access <- function(unavailable = FALSE) {
       signed_out()
-      login_feedback_RV(list(kind="error", message=if (unavailable)
-        "App access could not be verified. Please try logging in again shortly." else
-        "The app is currently restricted to administrators. Please try again when access is reopened."))
+      message <- if (unavailable) "App access could not be verified. Please try logging in again shortly." else
+        "The app is currently restricted to administrators. Please try again when access is reopened."
+      login_feedback_RV(list(kind = "error", message = message))
+      access_notice(message)
     }
     authorize <- function(token, on_allowed) {
       if (closed || !database_ready()) return(promises::promise_resolve(FALSE))
@@ -286,6 +258,7 @@ login_Server <- function(id, user = NULL, password = NULL, database_probe = fm_d
           session$userData$startup_stage("loading_leagues")
           login_feedback_RV(list(kind="success",message="Session restored. Loading your leagues…"))
           login_token_RV(token)
+          session$sendCustomMessage(session$ns("login_admitted"), list())
         })
       },
       on_status=function(kind,message,retry=NULL){remember_feedback(list(kind=kind,message=message));remember_retry(retry)},
@@ -344,7 +317,8 @@ login_Server <- function(id, user = NULL, password = NULL, database_probe = fm_d
         session$sendCustomMessage(session$ns("login_state"),list(busy=FALSE))
         return()
       }
-      if(isTRUE(login_pending_RV()))return()
+      if(isTRUE(login_pending_RV()) || isTRUE(restore_checking()) || valid_login(isolate(login_token_RV()))) return()
+      access_notice(NULL)
       user_name <- trimws(input$user_name %||% "")
       secret <- input$password %||% ""
       updateTextInput(session,"password",value="")
@@ -378,6 +352,7 @@ login_Server <- function(id, user = NULL, password = NULL, database_probe = fm_d
             session$userData$startup_stage("loading_leagues")
             login_feedback_RV(list(kind="success",message="Signed in. Loading your leagues…"))
             login_token_RV(token)
+            session$sendCustomMessage(session$ns("login_admitted"), list())
             remember_feedback(NULL);remember_retry(NULL)
             if(!is.null(remembered))remembered$login(token,isTRUE(isolate(input$remember_login)))
           })
@@ -394,71 +369,6 @@ login_Server <- function(id, user = NULL, password = NULL, database_probe = fm_d
       invisible(NULL)
     })
 
-
-    # Authentication updates replace only this status; feature tiers stay mounted.
-    output$text <- renderUI({
-      div(
-        h3("Welcome to LigaRadar"),
-        p("Explore player form, compare your league and prepare your next lineup.")
-      )
-    })
-
-    # observers ----
-    ## observe login_token ----
-    observeEvent(login_token_RV(),
-      {
-        login_token <- login_token_RV()
-        # if login_token is null
-        if (is.null(login_token) || length(login_token) != 3) {
-          output$text <- renderUI({
-            fm_info(login_feedback_RV()$message %||% "You are signed out.", error=TRUE,
-              class="login-result login-result-error")
-          })
-          updateBox(
-            id = "login_result_box",
-            action = "update",
-            options = list(
-              title = h4("Authentication Status"),
-              status = "danger",
-              solidHeader = TRUE,
-              width = 12,
-              background = NULL,
-              closable = FALSE
-            )
-          )
-          return()
-        }
-        user_name <- login_token[["user_name"]]
-        output$text <- renderUI({
-          div(
-            style = "padding: 10px; text-align: left;",
-            div(
-              style = "display: flex; align-items: center; gap: 12px; margin-bottom: 12px;",
-              shiny::tags$i(class = "fa-solid fa-circle-check", style = "font-size: 28px; color: var(--fm-text);"),
-              div(
-                h3(style = "font-weight: 700; color: var(--fm-text); margin: 0; font-size: 18px;", paste0("Welcome back, ", user_name, "!")),
-                p(style = "color: var(--fm-text); margin: 2px 0 0 0; font-size: 13px;", "Signed in to LigaRadar")
-              )
-            ),
-            fm_info("Signed in. Loading your leagues…",pending=TRUE)
-          )
-        })
-        updateBox(
-          id = "login_result_box",
-          action = "update",
-          options = list(
-            title = h4("Authentication Status"),
-            status = "success",
-            solidHeader = TRUE,
-            width = 12,
-            background = NULL,
-            closable = FALSE
-          )
-        )
-      },
-      ignoreNULL = FALSE,
-      ignoreInit = TRUE
-    )
 
     return(login_token_RV)
   })

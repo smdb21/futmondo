@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/futmondo-review-tools/node_modules', 'playwright'));
 async function openSidebar(page) {
-  if (await page.locator('body').evaluate(el => innerWidth < 768 && !el.classList.contains('sidebar-open'))) {
+  if (await page.locator('body').evaluate(el => document.documentElement.classList.contains('fm-signed-in') && innerWidth < 768 && !el.classList.contains('sidebar-open'))) {
     await page.locator('.sidebar-toggle').click();
   }
   await page.locator('#fm-theme-toggle').scrollIntoViewIfNeeded();
@@ -61,11 +61,11 @@ async function choose(page, mode) {
       await toggle.waitFor();
       assert.equal(await toggle.getAttribute('data-theme-choice'), 'light');
       await theme('light');
-      if (width < 768) await page.locator('.sidebar-toggle').click();
+      await page.locator('#login-open_login').click();
       await page.locator('#login-user_name').fill('offline@example.invalid');
       await page.locator('#login-password').fill('fixture');
       await page.locator('#login-login_button').click();
-      // Wait for initial saved-page restoration before navigating.
+      await page.locator('.sidebar-menu a[data-value="today"]').evaluate(link=>link.click());
       await page.locator('#today-market_players-players_table .rt-td').first().waitFor();
       await page.locator('.sidebar-menu a[data-value="admin"]').waitFor({state: 'attached'});
       assert.equal(await page.locator('.main-header #fm-theme-toggle').count(), 0);

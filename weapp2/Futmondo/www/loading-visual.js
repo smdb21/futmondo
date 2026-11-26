@@ -464,6 +464,11 @@
   }
   function visible(instance) {
     if (!instance.node.isConnected || document.hidden || reduced.matches || !instance.inView || instance.lost) return false;
+    if (instance.node.hasAttribute('data-fm-loading-paused')) return false;
+    if (instance.node.closest('.fm-welcome-art')) {
+      var launch = document.querySelector('.waiter-overlay');
+      if (launch && launch.getClientRects().length) return false;
+    }
     var rect = instance.node.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return false;
     var style = window.getComputedStyle(instance.node);
@@ -612,7 +617,7 @@
       });
       if (changed) scheduleSync();
     });
-    observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['style','class','hidden']});
+    observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['style','class','hidden','data-fm-loading-paused']});
     observer.observe(root,{attributes:true,attributeFilter:['data-fm-theme','style','class','hidden']});
     document.addEventListener('visibilitychange',scheduleSync);
     window.addEventListener('resize',scheduleSync);

@@ -35,7 +35,7 @@ function(input, output, session) {
   startup_primary_ready <- resource_display_source(session,function(){
     if(!valid_login(login_token_RV()))return(FALSE)
     if(is.null(input$tabs))return(FALSE)
-    if(!input$tabs%in%c("login","today"))return(TRUE)
+    if(!identical(input$tabs,"today"))return(TRUE)
     tryCatch(isTRUE(today$primary_settled()),error=function(e)FALSE)
   })
   observeEvent(list(login_token_RV(),refresh_trigger(),input$selected_league),{
@@ -143,9 +143,10 @@ function(input, output, session) {
     valid_login(login_token_RV())&&
       isTRUE(input$tabs%in%c("yourteam","today","players_in_championship","lineup"))
   })
+  home_visible <- reactive(valid_login(login_token_RV()) && identical(input$tabs, "login"))
   roster_source_readers <- lapply(c(roster="get_players_from_team",transactions="get_championship_pressroom"),function(handler)
     factual_read_adapter(session,handler,login_token_RV,championship_id_RV,user_team_id_RV,
-      is_active=roster_sources_active,
+      is_active=function()roster_sources_active() || (identical(handler, "get_players_from_team") && home_visible()),
       refresh_trigger=reactive(list(refresh_trigger(),clause_transfer_revision())),state_only=TRUE))
   roster_source_note <- resource_display_source(session,function(){
     if(!isTRUE(roster_note_active()))return("")
@@ -175,6 +176,7 @@ function(input, output, session) {
   })
   shiny::outputOptions(output,"account_finance_summary",suspendWhenHidden=FALSE)
   round_finance_RV <- resource_display_source(session,function(){
+    req(account_finance_visible())
     states <- list(team = primary_team_state(), market = primary_market_state())
     project <- session$userData$manual_finance_projection
     if (is.function(project) && isTRUE(account_finance_visible())) states <- project(states)
@@ -219,7 +221,7 @@ function(input, output, session) {
   output$round_finance_status<-renderUI(round_finance_status_display())
   # Update source times independently of the countdown/financial card DOM.
   round_finance_checked<-resource_display_source(session,function(){
-    if(!valid_login(login_token_RV()))return("")
+    if(!isTRUE(account_finance_visible()))return("")
     observations<-list(balance=round_finance_RV()$balance_observed_at,offers=primary_market_state()$observed_at)
     text<-vapply(names(observations),function(key){
       stamp<-fm_time(observations[[key]])
@@ -279,18 +281,101 @@ function(input, output, session) {
   })
   is_admin_RV <- reactive(is_authorized_admin(login_token_RV()))
   page_preferences <- fm_page_preferences(session, login_token_RV, reactive(input$tabs), is_admin_RV)
+  destination_pages <- reactive(fm_navigation_pages(is_admin_RV()))
+  output$home_destinations <- renderUI({
+    req(valid_login(login_token_RV()))
+    pages <- destination_pages()
+    tags$nav(class = "fm-home-grid", `aria-label` = "League pages",
+      lapply(seq_len(nrow(pages)), function(i) {
+        p <- pages[i, ]
+        tags$button(type = "button", class = "fm-home-tile", `data-fm-page` = p$tab,
+          tags$span(class = "fm-home-icon", icon(p$icon)),
+          tags$span(class = "fm-home-tile-copy", tags$strong(p$label), tags$small(p$detail)))
+      }))
+  })
+  output$home_continue <- renderUI({
+    req(valid_login(login_token_RV()))
+    pages <- destination_pages()
+    last <- page_preferences$last_page()
+    if (is.null(last) || !last %in% pages$tab) return(NULL)
+    tags$button(type = "button", class = "fm-home-continue", `data-fm-page` = last,
+      paste("Continue to", pages$label[pages$tab == last]), icon("arrow-right"))
+  })
+  output$home_team <- renderText({
+    req(home_visible())
+    tryCatch(fm_scalar(user_team_name_RV(), ""), shiny.silent.error = function(e) "")
+  })
+  # Keep each metric independent while a saved league is being restored.
+  # Settled empty accounts and leagues without a playable team have no metric.
+  home_read <- function(read) {
+    tryCatch(read(), shiny.silent.error = function(e) {
+      leagues <- championship_state()
+      waiting <- identical(leagues$status, "loading") || (!is.null(leagues$data) &&
+        length(fm_filter_league_answer(leagues$data)$championships) > 0L &&
+        is.null(league_preferences$selected()))
+      list(status = if (waiting) "loading" else "unavailable")
+    })
+  }
+  home_observation <- function(state, value = NULL, detail = NULL) {
+    incomplete <- isTRUE(state$status %in% c("partial", "unavailable")) ||
+      any(attr(state$data, "fetch_status") %in% c("partial", "unavailable")) ||
+      any(attr(state$data, "worker_completeness") %in% c("partial", "incomplete", "unavailable")) ||
+      any(attr(state$data, "worker_acquisition_status") %in% c("partial", "failed", "unavailable"))
+    if (is.null(value) || incomplete) return(tags$strong(
+      if (identical(state$status, "loading")) "Loading…" else "Unavailable"))
+    stale <- identical(state$freshness, "stale") || identical(state$status, "stale") ||
+      identical(attr(state$data, "fetch_status"), "stale") || !is.null(state$error)
+    tags$div(tags$strong(value), if (!is.null(detail)) tags$small(detail),
+      if (stale) tags$small("Last observed", fm_format_datetime(state$observed_at, missing = "")))
+  }
+  output$home_round <- renderUI({
+    req(home_visible())
+    state <- home_read(round_catalog_state_RV)
+    upcoming <- next_round_context(state$data)
+    if (isTRUE(upcoming$available)) return(home_observation(state,
+      if (is.finite(upcoming$round_number)) paste("Round", upcoming$round_number) else "Next kickoff",
+      tagList(paste("Kickoff", fm_format_datetime(upcoming$starts_at)),
+        tags$br(), tags$span(class = "fm-browser-countdown", `data-deadline` = as.numeric(upcoming$starts_at),
+          `data-server-now` = as.numeric(Sys.time()), format_round_countdown(upcoming$starts_at)))))
+    current <- current_round_context(state$data)
+    if (isTRUE(current$available)) return(home_observation(state,
+      if (is.finite(current$round_number)) paste("Round", current$round_number) else "Current round", "In progress"))
+    home_observation(state)
+  })
+  output$home_balance <- renderUI({
+    req(home_visible())
+    states <- list(team = home_read(primary_team_state))
+    project <- session$userData$manual_finance_projection
+    if (!is.null(states$team$data) && is.function(project)) states <- project(states, cash_only = TRUE)
+    amount <- fm_number(states$team$data$budget)
+    home_observation(states$team, if (is.finite(amount)) paste(
+      format(round(amount), big.mark = ".", decimal.mark = ",", scientific = FALSE), "EUR"),
+      if (isTRUE(states$confirmed_actions)) "Includes confirmed purchase")
+  })
+  output$home_squad <- renderUI({
+    req(home_visible())
+    state <- home_read(function() roster_source_readers$roster(login = login_token_RV(),
+      championship_id = championship_id_RV(), user_team_id = user_team_id_RV(), teams = NULL))
+    count <- observed_squad_count(state)
+    home_observation(state, if (is.finite(count)) paste(count, if (count == 1L) "player" else "players"))
+  })
   notifications <- notifications_Server("notifications", reactive(input$tabs == "notifications"),
     login_token_RV, championship_id_RV, user_team_id_RV, user_teams_RV, refresh_trigger,
     on_market_event=function(...)refresh_trigger(isolate(refresh_trigger())+1L),startup_ready=startup_primary_ready)
   output$notification_bell <- renderUI({
+    if (!valid_login(login_token_RV())) return(NULL)
     n <- notifications$unread()
     label <- paste0("Notifications",if(is.finite(n))paste0(" (",n," unread)")else "")
     actionLink("open_notifications",label=if(is.finite(n)&&n>0)
       tags$span(class="fm-notification-unread-dot",`aria-hidden`="true")else NULL,
       icon=icon("bell"),class="fm-notification-link",title=label,`aria-label`=label)
   })
+  outputOptions(output, "notification_bell", suspendWhenHidden = FALSE)
   observeEvent(input$open_welcome, updateTabItems(session, "tabs", "login"))
-  observeEvent(input$open_notifications, updateTabItems(session, "tabs", "notifications"))
+  observeEvent(input$open_notifications, {
+    req(valid_login(login_token_RV()))
+    updateTabItems(session, "tabs", "notifications")
+  })
   refresh_clause_transfers <- function() {
     auth<-isolate(login_token_RV());req(valid_login(auth))
     invalidate_saved_clause_transfers(resource_context(auth,isolate(championship_id_RV()),isolate(user_team_id_RV())))
@@ -425,7 +510,7 @@ players_in_championship_Server(id = "players_in_championship",
     if(is.null(state$data)){startup_stage("failed");return()}
     if(!length(fm_filter_league_answer(state$data)$championships)){startup_stage("empty");return()}
     if(!isTRUE(startup_primary_ready())){startup_stage("loading_today");return()}
-    stage<-if(isTRUE(input$tabs%in%c("login","today")))today$primary_status()else "ready"
+    stage<-if(identical(input$tabs,"today"))today$primary_status()else "ready"
     if(!identical(isolate(startup_stage()),stage))resource_timing("today_primary",isolate(startup_started()))
     startup_stage(stage)
   })
@@ -470,36 +555,21 @@ observeEvent(login_token_RV(),
   
   # renders----
   ## render menu ----
-  output$menu <- shinydashboard::renderMenu({
-    # Check if logged-in user matches the admin env var (case-insensitive, trimmed)
-    is_admin <- FALSE
-    admin_env <- trimws(Sys.getenv("admin"))
-    if (admin_env != "" && !is.null(login_token_RV()) && length(login_token_RV()) >= 3) {
-      current_user <- trimws(as.character(login_token_RV()[["user_name"]]))
-      is_admin <- tolower(current_user) == tolower(admin_env)
-    }
-
-    # Standard menu items
-    menu_items <- list(
-      shinydashboard::menuItem("Welcome", tabName = "login", icon = icon("right-to-bracket")),
-      shinydashboard::menuItem("Notifications", tabName = "notifications", icon = icon("bell")),
-      shinydashboard::menuItem("Today's market", tabName = "today", icon = icon("bolt")),
-      shinydashboard::menuItem("My team", tabName = "yourteam", icon = icon("users")),
-      shinydashboard::menuItem("Lineup", tabName = "lineup", icon = icon("futbol")),
-      shinydashboard::menuItem("Players", tabName = "players_in_championship", icon = icon("table")),
-      shinydashboard::menuItem("Rivals", tabName = "rivals", icon = icon("users-viewfinder")),
-      shinydashboard::menuItem("Plots", tabName = "plots", icon = icon("chart-column")),
-      shinydashboard::menuItem("Classification", tabName = "classification", icon = icon("trophy")),
-      shinydashboard::menuItem("Round awards", tabName = "round_mvps", icon = icon("medal"))
-    )
-
-    # Append Admin menu item as the last item if user is admin
-    if (is_admin) {
-      menu_items <- c(menu_items, list(
-        shinydashboard::menuItem("Admin", tabName = "admin", icon = icon("gears"))
-      ))
-    }
-
-    do.call(shinydashboard::sidebarMenu, c(list(id = "tabs", selected = page_preferences$initial()), menu_items))
+  menu_identity <- resource_display_source(session, function() {
+    auth <- login_token_RV()
+    list(account = if (valid_login(auth)) auth[["userid"]] else NULL, admin = is_admin_RV())
   })
+  output$menu <- shinydashboard::renderMenu({
+    identity <- menu_identity()
+    signed_in <- !is.null(identity$account)
+    items <- list(shinydashboard::menuItem(if (signed_in) "Home" else "Welcome",
+      tabName = "login", selected = TRUE, icon = icon("house")))
+    if (signed_in) {
+      pages <- fm_navigation_pages(identity$admin)
+      items <- c(items, lapply(seq_len(nrow(pages)), function(i)
+        shinydashboard::menuItem(pages$label[i], tabName = pages$tab[i], icon = icon(pages$icon[i]))))
+    }
+    do.call(shinydashboard::sidebarMenu, c(list(id = "tabs"), items))
+  })
+  outputOptions(output, "menu", suspendWhenHidden = FALSE)
 }

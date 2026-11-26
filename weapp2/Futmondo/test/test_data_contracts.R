@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 options(futmondo.offline=TRUE)
-suppressPackageStartupMessages({source("futmondo_functions.R");source("supabase_connector.R");library(shiny);source("Modules/Login_Module.R");source("Modules/Admin_Module.R")})
+suppressPackageStartupMessages({source("futmondo_functions.R");source("supabase_connector.R");library(shiny);source("loading_visual.R");source("Modules/Login_Module.R");source("Modules/Admin_Module.R")})
 passed<-0L
 check<-function(name,expr) {force(expr);passed<<-passed+1L;cat("PASS",name,"\n")}
 check("explicit missing, empty and observed data",{
@@ -80,7 +80,7 @@ check("failed acknowledgement does not clear notification cache",{
 })
 check("login markup contains no server credentials",{
   Sys.setenv(user_name="secret-sentinel-email",password="secret-sentinel-password")
-  html<-as.character(login_UI("login"))
+  html<-as.character(tagList(login_UI("login"), login_account_UI("login")))
   stopifnot(!grepl("secret-sentinel",html,fixed=TRUE),grepl("logout_button",html,fixed=TRUE))
 })
 check("admin authority uses verified login and matches only configured account",{

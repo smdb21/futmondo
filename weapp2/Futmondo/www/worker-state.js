@@ -11,11 +11,13 @@
     if (document.hidden) return;
     document.querySelectorAll('.fm-browser-countdown').forEach(function (node) {
       if (!node.dataset.offset) node.dataset.offset = String(Number(node.dataset.serverNow) * 1000 - Date.now());
+      if (!node.getClientRects().length) return;
       var seconds = Math.max(0, Math.floor(Number(node.dataset.deadline) - (Date.now() + Number(node.dataset.offset)) / 1000));
       if (!Number.isFinite(seconds)) return;
       var days = Math.floor(seconds / 86400), hours = Math.floor(seconds / 3600) % 24;
       var mins = Math.floor(seconds / 60) % 60, secs = seconds % 60;
-      node.textContent = (days ? days + 'd ' : '') + String(hours).padStart(2, '0') + ':' + String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+      var label = (days ? days + 'd ' : '') + String(hours).padStart(2, '0') + ':' + String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+      if (node.textContent !== label) node.textContent = label;
     });
   }
   document.addEventListener('toggle', function (event) {

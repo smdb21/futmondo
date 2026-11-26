@@ -1,5 +1,11 @@
 # Futmondo data architecture redesign plan
 
+## Public welcome and signed-in Home (2026-11-25)
+
+- [x] Present the responsive pitch animation, Essentials and Advanced feature lists, and the Futmondo credential dialog.
+- [x] Open Home after password or remembered login. Provide a direct control for each authorized page, a Home button and an explicit saved-page shortcut.
+- [x] Compare feature claims with official sources and verify public and signed-in navigation, the remembered-login lifecycle, and warm return performance at phone and desktop widths. Verification was local. [Feature inventory](feature_comparison.md#welcome-and-home-inventory-2026-11-25) · [Checks and rollout limits](data_review_results.md#public-welcome-and-signed-in-home-2026-11-25)
+
 ## Rivals team selection and detail tabs (2026-11-25)
 
 - [x] Show loading progress and use the clicked team as the directory highlight.

@@ -14,17 +14,17 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
         await page.evaluate(()=>{window.fixtureStats=null;Shiny.setInputValue('fixture_snapshot',Math.random(),{priority:'event'});});
         await page.waitForFunction(()=>window.fixtureStats!==null);return page.evaluate(()=>window.fixtureStats);
       };
-      await page.waitForFunction(()=>document.getElementById('login-login_button')?.dataset.futmondoLoginBound==='true');
+      await page.locator('#login-open_login').click();
       await page.locator('#login-user_name').fill('offline@example.invalid');
       await page.locator('#login-password').fill('fixture');
-      await page.locator('#login-password').blur();
-      await page.waitForTimeout(350);
       const feedbackMs=await page.evaluate(()=>new Promise(resolve=>{
-        const started=performance.now();document.getElementById('login-login_button').click();
+        const started=performance.now();
+        document.getElementById('login-password').dispatchEvent(new KeyboardEvent('keydown', {key:'Enter',bubbles:true}));
         requestAnimationFrame(()=>resolve({ms:performance.now()-started,visible:getComputedStyle(document.getElementById('login-login_progress')).display!=='none'}));
       }));
       assert.ok(feedbackMs.visible && feedbackMs.ms<500,JSON.stringify(feedbackMs));
       await page.locator('#startup_status').filter({hasText:'Signed in. Loading your leagues…'}).waitFor();
+      await page.locator('.fm-home-tile[data-fm-page="today"]').click();
       await page.locator('#startup_status').filter({hasText:"Loading today's market…"}).waitFor();
       await page.locator('#today-kpi_cash_box').getByText('Current balance',{exact:true}).waitFor();
       await page.locator('#today-market_players-players_table .rt-select-input').first().waitFor();
