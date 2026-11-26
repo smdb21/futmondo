@@ -2227,6 +2227,10 @@ its URL. Hosted restart/deployment, subsequent successful history acquisition an
 complete recovery of previously unsaved observations remain unverified.
 
 
+## My Team bulk listing button (2026-11-26)
+
+An offline render of My Team verified that the bulk listing button appears once, immediately after the team value summary and before the grid that starts with Incoming players. All nine offline bulk market checks passed. Reordering the existing HTML adds no requests, observers, timers or DOM nodes.
+
 ## Bulk market listing premiums — 2026-11-10
 
 The bulk listing dialog now accepts a premium for either current market value or a closed clause, with a custom percentage and all six requested quick buttons. Its 0% default preserves an unmarked market-value listing. Preview and submission share the same plan, with explicit base/increase/final amounts and totals over eligible players only. Missing values, ineligible clauses and invalid percentages remain distinct from zero. Whole-euro calculation corrects binary over-rounding for both 100 at 10% and 10,000 at 0.07%, while retaining genuinely fractional increases. Valid confirmation remains single-use and account/league/team scoped; invalid pricing can be corrected in the same dialog.

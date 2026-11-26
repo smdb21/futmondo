@@ -1194,6 +1194,10 @@ Status: **implemented and verified locally; hosted rollout remains unverified**.
 Use a shared responsive pitch/bench wrapper in the editor and historical lineup modal. At desktop widths, place substitutes far left, then goalkeeper, defenders, midfielders and forwards in vertical columns, with matching field markings. Preserve the existing narrow-screen layout, source slot identity and manual actions. Focused geometry, dense/no-forward formation, resize reuse, player editing, phone dismissal and mandatory offline lifecycle checks passed. Performance review and verification limits are recorded in `data_review_results.md`.
 
 
+## My Team bulk listing button (2026-11-26)
+
+Moved **Put All Players on Market** above **Incoming players** in the My Team layout.
+
 ## Bulk market listing premiums — 2026-11-10
 
 Status: **implemented and verified locally; hosted rollout remains unverified**.

@@ -44,7 +44,7 @@ The module no longer contains lineup forecasts, optimized XI selection, transfer
 
 ## Incoming clause signings
 
-The **Incoming players (N)** panel above the current roster shows the verified incoming count and its own status while checking. The squad table and capacity summary show current roster counts. Pending arrivals are outside the current roster used for value trends, lineup inputs and bulk listing actions.
+The **Put All Players on Market** button sits between the team value summary and the transfer panels. The **Incoming players (N)** panel above the current roster shows the verified incoming count and its own status while checking. The squad table and capacity summary show current roster counts. Pending arrivals are outside the current roster used for value trends, lineup inputs and bulk listing actions.
 
 Candidate purchases come from the existing shared pressroom transaction history. The existing player-summary response confirms `championship.clause.transferred`, the current owner and the authoritative `transferDate`; `data` supplies the player's name, role and club crest. No league-wide player scan is needed. The reconciliation helper now also returns presentation records: player, seller, purchase instant, scheduled arrival, observation instant and any specific timing issue. Existing capacity reservation outputs keep their strict fail-closed behavior, including overdue transfers.
 

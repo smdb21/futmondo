@@ -41,10 +41,10 @@ players_in_teams_UI <- function(id) {
       .fm-incoming-panel { padding: 12px; }
     }")),
     uiOutput(ns("team_value_box")),
+    actionButton(ns("btn_put_all_on_market"), "Put All Players on Market", icon=icon("tags")),
     tags$div(class="fm-team-panels",uiOutput(ns("incoming_players")),uiOutput(ns("outgoing_players")),
       uiOutput(ns("nonfit_players"), class="fm-squad-status-output"),
       tags$div(style="grid-column:1/-1",uiOutput(ns("received_offers")))),
-    actionButton(ns("btn_put_all_on_market"), "Put All Players on Market", icon=icon("tags")),
     players_table_UI(ns("players_table_in_teams"), box_title="Players in Team",
       filter_by_team=FALSE, filter_by_value=FALSE, filter_by_change_value=FALSE,
       filter_by_is_favorite=FALSE, filter_by_is_from_futmondo=FALSE,
