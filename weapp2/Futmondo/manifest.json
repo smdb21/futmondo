@@ -2340,7 +2340,7 @@
       "checksum": "252f766c7e89b506009837a9bf406444"
     },
     "Modules/Players_in_Teams_Module.R": {
-      "checksum": "4b154d3ea2e9f7ef1462b8b332c98ac0"
+      "checksum": "e002ae179791863b03d0fd55b37af2be"
     },
     "Modules/Players_Table_Module.R": {
       "checksum": "004fad1fde7d596b1e4854f1be9c8242"
@@ -2361,7 +2361,7 @@
       "checksum": "7e64167ae1800ac09d2cb82ba0c17841"
     },
     "mvp_runtime.R": {
-      "checksum": "4dd6f119f075a7bc48143617c0c4dc2c"
+      "checksum": "99b859171a08453d220abef588beb875"
     },
     "page_preferences.R": {
       "checksum": "00e6f5288aa28324fde9261933533758"
@@ -2391,7 +2391,7 @@
       "checksum": "6941ec3d550551d6c41a20b6a4d2ff3e"
     },
     "server.R": {
-      "checksum": "74c7596e51027abc7beed613cc93dbc7"
+      "checksum": "0212c4a592a79a45b3c2ef03c2f7deb3"
     },
     "supabase_connector.R": {
       "checksum": "f49117c4a21dd8d417a32070c206f2cf"
@@ -2409,13 +2409,13 @@
       "checksum": "767c79704fb40aef1a0b75a20ab56a5a"
     },
     "worker_runtime.R": {
-      "checksum": "6665832984c50aa8ee2d9ce096a6f329"
+      "checksum": "f2fdf415c4ae4f036097be0f6c913a75"
     },
     "www/custom_style.css": {
       "checksum": "f14e3547f495bc37ff4c566ea481e1b0"
     },
     "www/home.css": {
-      "checksum": "d094db594fd08e5035a2f96cd445b8c2"
+      "checksum": "0d80092a68610cb7fe93de0d1d4c1f2e"
     },
     "www/home.js": {
       "checksum": "743f9853df0023fcff886793d7b064e3"

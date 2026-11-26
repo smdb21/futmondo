@@ -335,21 +335,47 @@ function(input, output, session) {
     stale <- identical(state$freshness, "stale") || identical(state$status, "stale") ||
       identical(attr(state$data, "fetch_status"), "stale") || !is.null(state$error)
     tags$div(tags$strong(value), if (!is.null(detail)) tags$small(detail),
-      if (stale) tags$small("Last observed", fm_format_datetime(state$observed_at, missing = "")))
+      if (stale) tags$small("May be out of date"))
   }
+  # Calendar updates and navigation can replace a deadline well before kickoff.
+  home_round_tick <- reactiveVal(NULL)
+  advance_home_round <- function() home_round_tick(Sys.time())
+  home_round_timer <- NULL
+  cancel_home_round_timer <- function() {
+    if (is.function(home_round_timer)) home_round_timer()
+    home_round_timer <<- NULL
+  }
+  session$onSessionEnded(cancel_home_round_timer)
   output$home_round <- renderUI({
+    cancel_home_round_timer()
     req(home_visible())
+    home_round_tick()
     state <- home_read(round_catalog_state_RV)
-    upcoming <- next_round_context(state$data)
-    if (isTRUE(upcoming$available)) return(home_observation(state,
-      if (is.finite(upcoming$round_number)) paste("Round", upcoming$round_number) else "Next kickoff",
-      tagList(paste("Kickoff", fm_format_datetime(upcoming$starts_at)),
-        tags$br(), tags$span(class = "fm-browser-countdown", `data-deadline` = as.numeric(upcoming$starts_at),
-          `data-server-now` = as.numeric(Sys.time()), format_round_countdown(upcoming$starts_at)))))
-    current <- current_round_context(state$data)
-    if (isTRUE(current$available)) return(home_observation(state,
-      if (is.finite(current$round_number)) paste("Round", current$round_number) else "Current round", "In progress"))
-    home_observation(state)
+    now <- Sys.time()
+    rounds <- home_round_context(state$data, now)
+    current <- rounds$current
+    upcoming <- rounds$upcoming
+    if (is.null(current) && is.null(upcoming)) return(home_observation(state))
+    if (!is.null(rounds$changes_at)) {
+      # Use the same session clock as invalidateLater, retaining its cancel handle.
+      delay <- ceiling(as.numeric(difftime(rounds$changes_at, Sys.time(), units = "secs")) * 1000)
+      home_round_timer <<- session$.scheduleTask(max(1, min(delay, .Machine$integer.max)), advance_home_round)
+    }
+    kickoff <- if (!is.null(upcoming)) {
+      label <- if (is.null(current)) "Kickoff" else paste("Next kickoff · Round", upcoming$round_number)
+      tags$span(class = "fm-home-kickoff",
+        tags$span(label, fm_format_datetime(upcoming$starts_at)),
+        tags$span(class = "fm-browser-countdown", `data-deadline` = as.numeric(upcoming$starts_at),
+          `data-server-now` = as.numeric(now), format_round_countdown(upcoming$starts_at, now)))
+    }
+    headline <- if (is.null(current)) upcoming else current
+    home_observation(state, paste("Round", headline$round_number),
+      tagList(if (is.null(current)) "Upcoming" else current$status, kickoff))
+  })
+  home_roster_state <- reactive({
+    req(home_visible())
+    home_read(function() roster_source_readers$roster(login = login_token_RV(),
+      championship_id = championship_id_RV(), user_team_id = user_team_id_RV(), teams = NULL))
   })
   output$home_balance <- renderUI({
     req(home_visible())
@@ -357,14 +383,16 @@ function(input, output, session) {
     project <- session$userData$manual_finance_projection
     if (!is.null(states$team$data) && is.function(project)) states <- project(states, cash_only = TRUE)
     amount <- fm_number(states$team$data$budget)
-    home_observation(states$team, if (is.finite(amount)) paste(
-      format(round(amount), big.mark = ".", decimal.mark = ",", scientific = FALSE), "EUR"),
-      if (isTRUE(states$confirmed_actions)) "Includes confirmed purchase")
+    tagList(
+      home_observation(states$team, if (is.finite(amount)) paste(
+        format(round(amount), big.mark = ".", decimal.mark = ",", scientific = FALSE), "EUR"),
+        if (isTRUE(states$confirmed_actions)) "Includes confirmed purchase"),
+      team_trend_panel(team_value_summary(states$team, home_roster_state()),
+        label = "24h squad trend", show_count_labels = TRUE))
   })
   output$home_squad <- renderUI({
     req(home_visible())
-    state <- home_read(function() roster_source_readers$roster(login = login_token_RV(),
-      championship_id = championship_id_RV(), user_team_id = user_team_id_RV(), teams = NULL))
+    state <- home_roster_state()
     count <- observed_squad_count(state)
     home_observation(state, if (is.finite(count)) paste(count, if (count == 1L) "player" else "players"))
   })

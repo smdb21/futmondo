@@ -192,9 +192,18 @@ async function verify(browser, width, theme) {
     assert.deepEqual(ids.filter(id => id !== 'admin').sort(), pages.slice().sort());
     const positions = await destinations.evaluateAll(links => links.map(el => el.getBoundingClientRect().y));
     assert.equal(positions.filter(y => y === positions[0]).length, width < 768 ? 2 : 3);
-    await page.waitForFunction(() => /12/.test(document.querySelector('#home_round').textContent) &&
-      /10[.,\s]?000[.,\s]?000|10\s*m/i.test(document.querySelector('#home_balance').textContent) &&
-      /17/.test(document.querySelector('#home_squad').textContent));
+    const round = page.locator('#home_round');
+    await round.getByText('Round 11', {exact:true}).waitFor();
+    await round.locator('.fm-browser-countdown').waitFor();
+    assert.match(await round.innerText(), /\bClosed\b/);
+    assert.match(await round.innerText(), /Next kickoff · Round 12/);
+    const balance = page.locator('#home_balance');
+    await balance.getByText('10.000.000 EUR', {exact:true}).waitFor();
+    await balance.getByText('+40.000 €', {exact:true}).waitFor();
+    assert.match(await balance.locator('.fm-team-trend-up').textContent(), /positive trend\s*2/i);
+    assert.match(await balance.locator('.fm-team-trend-down').textContent(), /negative trend\s*1/i);
+    await page.locator('#home_squad').getByText('17 players', {exact:true}).waitFor();
+    assert.doesNotMatch(await overview.innerText(), /last observed/i);
     assert.equal(await overflow(), false);
     await page.screenshot({path:'/tmp/fm-home-' + width + '-' + theme + '.png'});
 

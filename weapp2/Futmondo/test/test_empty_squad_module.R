@@ -7,7 +7,7 @@ for(method in c('GET','POST','PUT','PATCH','DELETE')) {
     tracer=quote(stop('Unexpected HTTP in empty-squad regression')))
 }
 team_info <- resource_state(list(teamValue = 11e6))
-mixed_roster <- data.frame(value = c(2e6, 3e6, 2e6, 3e6),
+mixed_roster <- data.frame(id = letters[1:4], value = c(2e6, 3e6, 2e6, 3e6),
   change = c(120000, -70000, 0, 10000))
 summary <- team_value_summary(team_info, resource_state(mixed_roster))
 stopifnot(summary$value == 11e6, summary$trend == 60000, summary$up == 2L, summary$down == 1L)
@@ -20,7 +20,12 @@ summary <- team_value_summary(team_info,
   resource_state(transform(mixed_roster, change = c(120000, -120000, 0, 0))))
 stopifnot(summary$trend == 0, summary$up == 1L, summary$down == 1L)
 for (state in list(resource_state(transform(mixed_roster, change = c(1, NA, 0, 0))),
-                   resource_state(mixed_roster["value"]),
+                   resource_state(mixed_roster[c("id", "value")]),
+                   resource_state(mixed_roster["change"]),
+                   resource_state(transform(mixed_roster, id = c("a", "a", "b", "c"))),
+                   resource_state(structure(mixed_roster, worker_acquisition_status = "ok", fetch_status = "partial"), status = "ok"),
+                   resource_state(structure(mixed_roster, worker_completeness = "incomplete")),
+                   resource_state(structure(mixed_roster, worker_acquisition_status = "ok"), status = "partial"),
                    resource_state(mixed_roster, status = "partial"))) {
   summary <- team_value_summary(team_info, state)
   stopifnot(summary$value == 11e6, summary$trend_status == "unavailable",

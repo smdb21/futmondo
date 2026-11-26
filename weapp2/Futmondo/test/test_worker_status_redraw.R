@@ -62,3 +62,20 @@ shiny::testServer(function(input,output,session){
  login(NULL);flush(session);stopifnot(is.null(status()))
  cat('PASS account switch/logout drops old status and old-account subscriptions\n')
 })
+
+# Switch pages with an already saved observation and no background poll.
+fm_worker_can_connect <- function() FALSE
+shiny::testServer(function(input, output, session) {
+  fm_worker_session(session, function() auth)
+}, {
+  session$setInputs(tabs='today', worker_visible=FALSE)
+  flush(session)
+  checked <- output$worker_status_checked_at
+  stopifnot(grepl('Oldest displayed data check:', checked, fixed=TRUE))
+  before <- rpc_calls
+  session$setInputs(tabs='login')
+  stopifnot(identical(output$worker_status_checked_at, ''))
+  session$setInputs(tabs='today')
+  stopifnot(identical(output$worker_status_checked_at, checked), rpc_calls==before)
+  cat('PASS Home hides the sync check time and returning to Today reuses the saved check\n')
+})

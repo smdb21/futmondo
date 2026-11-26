@@ -305,6 +305,113 @@ lineup_calendar_windows <- function(rounds,include_partial=FALSE) {
   windows[order(windows$begin,windows$round_id),,drop=FALSE]
 }
 
+# A mid-season break can separate two instalments even when no whole matchday
+# fits between them. Use the saved, fixture-confirmed gap and its actual dates.
+home_round_windows <- function(rounds, matches) {
+  windows <- lineup_calendar_windows(rounds, include_partial=TRUE)
+  gap_ids <- if ("resume_at" %in% names(rounds)) rounds$round_id[is.finite(rounds$resume_at)] else
+    names(award_calendar_gaps(matches))
+  for (id in gap_ids) {
+    games <- matches$rows[matches$rows$round_id %in% id,,drop=FALSE]
+    dates <- fm_time(games$kickoff)
+    final <- games$status %in% "F"
+    if (!any(final) || all(final) || anyNA(dates)) next
+    last <- max(dates[final])
+    resume <- min(dates[!final])
+    i <- which(windows$round_id==id & windows$begin<=last & windows$end>=resume)
+    if (length(i)!=1L || last>=resume) next
+    rest <- windows[i,,drop=FALSE]
+    rest$begin <- resume
+    windows$end[i] <- last
+    windows <- rbind(windows, rest)
+  }
+  windows
+}
+
+home_round_phase <- function(round, window, matches, now) {
+  if (isTRUE(round$is_finished) && !isTRUE(round$partially_played)) return("Closed")
+  games <- matches$rows[matches$rows$round_id %in% round$round_id,,drop=FALSE]
+  dates <- fm_time(games$kickoff)
+  final <- games$status %in% "F"
+  coverage <- matches$rounds
+  complete <- round$round_id %in% coverage$round_id[coverage$complete %in% TRUE]
+  if (complete && length(final) && all(final)) return("Awaiting round closure")
+  in_group <- !is.na(dates) & dates>=window$begin & dates<=window$end
+  if (any(final[in_group])) {
+    if (all(final[in_group]) && any(!final & (is.na(dates) | dates>window$end)))
+      return("Awaiting remaining fixtures")
+    if (any(!final & in_group & dates>now)) return("In progress")
+  }
+  if (isTRUE(round$running)) return("In progress")
+  if (isTRUE(round$partially_played)) return("Awaiting remaining fixtures")
+  "Awaiting round status"
+}
+
+# Home follows fixture groups chronologically. Closed/partial describes the
+# fantasy round; an editable lineup marker alone does not establish play.
+home_round_context <- function(rounds, now=Sys.time()) {
+  result <- list(current=NULL, upcoming=NULL, changes_at=NULL)
+  now <- fm_time(now)
+  if (!is.data.frame(rounds) || !nrow(rounds) || length(now)!=1L || is.na(now) ||
+      !all(c("round_id","round_number","begin_process") %in% names(rounds)) ||
+      anyDuplicated(rounds$round_id)) return(result)
+  status <- tolower(rounds$status %||% rep("",nrow(rounds)))
+  finished <- rounds$is_finished %||% rep(NA,nrow(rounds))
+  partial <- (rounds$partially_played %||% rep(FALSE,nrow(rounds))) %in% TRUE
+  finished <- !partial & (finished %in% TRUE |
+    (is.na(finished) & status %in% c("done","finished","closed","final","completed","complete","ended")))
+  calendar <- attr(rounds,"fixture_calendar",exact=TRUE)
+  windows <- home_round_windows(rounds, calendar$matches)
+  windows <- windows[order(windows$begin,windows$round_id),,drop=FALSE]
+  row <- match(windows$round_id, rounds$round_id)
+  rounds$is_finished <- finished
+  rounds$running <- status %in% c("running","active","playing","in_progress")
+
+  future <- which(windows$begin>now & !finished[row])
+  if (length(future)) {
+    next_group <- future[1L]
+    result$upcoming <- list(round_number=windows$number[next_group], starts_at=windows$begin[next_group])
+    result$changes_at <- result$upcoming$starts_at
+  }
+  undated <- !rounds$round_id %in% windows$round_id & is.finite(rounds$round_number)
+  active <- which(undated & rounds$running & !finished & !partial)
+  started <- unname(which(windows$begin<=now))
+  undated_current <- if (length(active)==1L) list(round_number=rounds$round_number[active], status="In progress")
+  if (!length(started)) {
+    closed <- which(undated & finished)
+    if (length(closed)>1L) closed <- closed[rounds$round_id[closed] %in% calendar$scope$current_round_id]
+    if (!is.null(undated_current)) result$current <- undated_current else if (length(closed)==1L)
+      result$current <- list(round_number=rounds$round_number[closed], status="Closed")
+    return(result)
+  }
+  latest_start <- max(windows$begin[started])
+  # A shorter overlapping round can finish while a regular matchday continues.
+  # Retain only groups whose fixture windows actually overlap the latest start.
+  candidates <- started[windows$begin[started]==latest_start | windows$end[started]>now]
+  phases <- vapply(candidates, function(i) home_round_phase(rounds[row[i],,drop=FALSE],
+    windows[i,,drop=FALSE],calendar$matches,now), character(1))
+  latest <- windows$begin[candidates]==latest_start
+  eligible <- which(phases=="In progress" & (!windows$partial[candidates] | latest))
+  if (!length(eligible)) eligible <- which(latest)
+  # At the same kickoff prefer an otherwise equal source-identified round.
+  marker <- calendar$scope$current_round_id
+  selected <- tail(eligible[order(windows$begin[candidates[eligible]],
+    windows$round_id[candidates[eligible]] %in% marker)],1L)
+  result$current <- list(round_number=windows$number[candidates[selected]], status=phases[selected])
+  # Without a kickoff an old 'running' marker cannot move its round ahead
+  # of a later numbered matchday already observed on the calendar.
+  if (!is.null(undated_current) && phases[selected]!="In progress" &&
+      undated_current$round_number>max(windows$number[started])) result$current <- undated_current
+  # Kickoffs within an overlapping or partly played group can change the
+  # projection too. The caller wakes once at the earliest relevant boundary.
+  games <- calendar$matches$rows
+  dates <- fm_time(games$kickoff[games$round_id %in% windows$round_id[candidates] & !games$status %in% "F"])
+  deadlines <- c(dates[!is.na(dates) & dates>now],windows$end[candidates],result$changes_at)
+  future <- deadlines[deadlines>now]
+  if (length(future)) result$changes_at <- min(future)
+  result
+}
+
 normalize_mvp_catalog <- function(active, leagues, championship_id) {
   unknown <- function(reason) list(status="unsupported",rounds=empty_finished_rounds(),complete=FALSE,reason=reason)
   matches <- Filter(function(x) is.list(x) && identical(mvp_text(x$id %||% x$`_id`),as.character(championship_id)), mvp_records(active$championships))

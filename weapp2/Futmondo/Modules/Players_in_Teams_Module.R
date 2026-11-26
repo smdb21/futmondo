@@ -52,10 +52,10 @@ players_in_teams_UI <- function(id) {
 }
 team_value_summary <- function(team_state, roster_state) {
   roster <- roster_state$data
-  roster_status <- attr(roster, "worker_acquisition_status") %||% roster_state$status
-  complete_roster <- is.data.frame(roster) &&
-    roster_status %in% c("ok", "empty", "stale", "loading") &&
-    !identical(attr(roster, "worker_completeness"), "partial")
+  roster_statuses <- c(roster_state$status, attr(roster, "worker_acquisition_status"), attr(roster, "fetch_status"))
+  complete_roster <- all(roster_statuses %in% c("ok", "empty", "stale", "loading")) &&
+    !any(attr(roster, "worker_completeness") %in% c("partial", "incomplete", "unavailable")) &&
+    is.finite(effective_squad_count(roster, character(), character()))
   known_column <- function(column) {
     if (!complete_roster) return(NULL)
     values <- suppressWarnings(as.numeric(as.character(roster[[column]])))
@@ -63,7 +63,9 @@ team_value_summary <- function(team_state, roster_state) {
   }
   status <- function(amount, state) {
     if (is.finite(amount)) {
-      if (identical(state$freshness, "stale")) "stale" else "ready"
+      stale <- identical(state$freshness, "stale") || identical(attr(state$data, "fetch_status"), "stale") ||
+        !is.null(state$error)
+      if (stale) "stale" else "ready"
     } else if (identical(state$status, "loading")) "loading" else "unavailable"
   }
 
@@ -87,30 +89,32 @@ team_value_summary <- function(team_state, roster_state) {
     down = if (is.null(changes)) NA_integer_ else sum(changes < 0))
 }
 
-team_value_summary_panel <- function(summary, ns) {
-  amount <- function(value, status) {
-    if (identical(status, "loading")) "Loading…" else player_card_money(value)
-  }
-  movement <- function(direction, count, label) {
+team_trend_panel <- function(summary, label = "Total trend", show_count_labels = FALSE) {
+  movement <- function(direction, count, label, count_label) {
     tags$div(class = paste0("fm-team-trend-", direction), title = label,
       icon(paste0("arrow-", direction)),
       tags$span(class = "sr-only", paste0(label, " ")),
       if (is.na(count)) tagList(tags$span(class = "sr-only", "Unavailable"),
-        tags$span(`aria-hidden` = "true", "—")) else count)
+        tags$span(`aria-hidden` = "true", "—")) else count,
+      if (show_count_labels) tags$span(`aria-hidden` = "true", count_label))
   }
+  amount <- if (identical(summary$trend_status, "loading")) "Loading…" else player_card_money(summary$trend)
+  tags$div(class = "fm-team-value-trend",
+    tags$div(title = "24-hour change in squad market value",
+      if (identical(summary$trend_status, "stale")) "Last saved trend" else label,
+      tags$strong(paste0(if (isTRUE(summary$trend > 0)) "+" else "", amount))),
+    tags$div(class = "fm-team-trend-counts",
+      movement("up", summary$up, "Players with positive trend", "rising"),
+      movement("down", summary$down, "Players with negative trend", "falling")))
+}
+
+team_value_summary_panel <- function(summary, ns) {
   tags$section(class = "fm-team-value-summary", `aria-labelledby` = ns("team_value_label"),
     tags$div(class = "fm-team-value-total",
       tags$span(id = ns("team_value_label"), "Team value"),
-      tags$strong(amount(summary$value, summary$value_status)),
+      tags$strong(if (identical(summary$value_status, "loading")) "Loading…" else player_card_money(summary$value)),
       if (identical(summary$value_status, "stale")) tags$small("Last saved")),
-    tags$div(class = "fm-team-value-trend",
-      tags$div(title = "24-hour change in squad market value",
-        if (identical(summary$trend_status, "stale")) "Last saved trend" else "Total trend",
-        tags$strong(paste0(if (isTRUE(summary$trend > 0)) "+" else "",
-          amount(summary$trend, summary$trend_status)))),
-      tags$div(class = "fm-team-trend-counts",
-        movement("up", summary$up, "Players with positive trend"),
-        movement("down", summary$down, "Players with negative trend"))))
+    team_trend_panel(summary))
 }
 
 players_in_teams_Server <- function(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger=NULL, round_catalog=NULL, league_settings_source=NULL, clause_transfers_source=NULL, team_info_source=NULL) {

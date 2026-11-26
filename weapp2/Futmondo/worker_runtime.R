@@ -477,6 +477,7 @@ fm_worker_session<-function(session,login,leagues=function()list(),source_note=f
  status_message<-resource_display_source(session,function()status()$message %||% '')
  status_error<-resource_display_source(session,function()isTRUE(status()$error))
  status_checked<-resource_display_source(session,function(){
+  if(identical(session$input$tabs,'login'))return('')
   checked<-status()$checked_at
   if(is.null(checked))''else paste('Oldest displayed data check:',fm_format_datetime(checked))
  })

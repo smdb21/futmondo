@@ -1,5 +1,13 @@
 # Futmondo data review and implementation results
 
+## Home round status and squad trend (2026-11-26)
+
+The calendar regression replayed an early Round 23 game, the intervening Round 15 while playing and after closure, and the later Round 23 kickoff. It also covered an undated postponement, overlapping matchdays, older calendars and a finished fixture list awaiting official round closure. A 38-round, 380-match season took 2.1–3.1 ms per warm projection across two local runs of 100 iterations. The open Home card uses one replaceable session timer for the next relevant calendar boundary. [Round regression](../test/test_home_round_context.R)
+
+The signed-in Chromium fixture displayed Round 11 closed, the Round 12 kickoff, €10,000,000 cash and a +€40,000 daily squad trend. Two players rose, one fell and fourteen had unchanged prices. The overview fit 320, 390 and 1440 px viewports. A warm return added zero overview reads. The Shiny tests verified that cash and squad size remain readable when a player’s change is missing, and that stale figures and the sync notice on Home omit observation times. Ten unrelated inputs caused zero further reads. Home shared one roster read across both cards. Summarizing 50 players averaged 0.254 ms over 1,000 local calls.
+
+In a separate Shiny session, the scheduled callback fired as the wall clock passed kickoff. Home advanced from Round 11 closed to Round 12 in progress with zero additional calendar reads. The shared My Team and Rivals trend checks, existing round countdown tests and offline lifecycle also passed. The lifecycle covered 14 checks and eight tabs. Verification used synthetic accounts and local Chromium. Hosted rendering remains unverified. [Home behavior](page_preferences.md#league-overview-and-saved-destination)
+
 ## Saved Round awards after league metadata expiry (2026-11-26)
 
 A read-only check decoded the production catalog for the league previously reported here. Its 04:55 PST snapshot contained 38 calendar rounds, 13 completed rounds, and all 143 saved player selections for rounds 1–13, including 13 MVPs. The separate resolved league context had been checked at 04:32 PST. The corrected display uses the verified historical scope when live membership metadata expires after five minutes.

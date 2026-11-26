@@ -19,6 +19,7 @@ login_fixture<-function(session){
 }
 fm_page_store <- function(user_id, page=NULL, ...) promises::promise_resolve(if(is.null(page)) list(page='rivals') else TRUE)
 app_rounds <- data.frame(round_id='next', round_number=12L, begin_process=Sys.time()+86400, is_finished=FALSE)
+app_roster$change <- c(42000, -12000, 4000, rep(0, 14))
 get_market_players <- function(...) app_market
 clear_api_cache()
 shiny::testServer(app_server,{
@@ -28,8 +29,32 @@ shiny::testServer(app_server,{
   grepl('0 EUR',output$home_balance$html),grepl('17 players',output$home_squad$html),
   grepl('Continue to Rivals',output$home_continue$html),grepl('data-fm-page="admin"',output$home_destinations$html),
   !any(c('get_market_players','get_championship_pressroom') %in% calls))
+ balance <- xml2::read_html(output$home_balance$html)
+ stale_card <- as.character(home_observation(list(status='stale', observed_at=as.POSIXct('2001-02-03', tz='UTC')), '17 players'))
+ stopifnot(grepl('May be out of date', stale_card, fixed=TRUE), !grepl('Last observed|2001', stale_card))
+ trend <- xml2::xml_find_first(balance, '//*[@class="fm-team-value-trend"]')
+ count_text <- function(direction) {
+   node <- xml2::xml_find_first(trend, paste0('.//*[@class="fm-team-trend-', direction, '"]'))
+   trimws(gsub('[[:space:]]+', ' ', xml2::xml_text(node)))
+ }
+ stopifnot(grepl('24h squad trend', xml2::xml_text(trend), fixed=TRUE),
+   grepl('+34.000', xml2::xml_text(trend), fixed=TRUE),
+   grepl('2 rising$', count_text('up')), grepl('1 falling$', count_text('down')),
+   sum(calls == 'get_players_from_team') == 1L)
  before<-length(calls);elapsed<-system.time(for(i in 1:10){session$setInputs(fixture_pulse=i);app_settle(session)})[['elapsed']]
  stopifnot(length(calls)==before)
+ local({
+   # Advance the same one-shot callback used at kickoff without a real wait.
+   after_kickoff <- app_rounds$begin_process[1] + 1
+   assign('Sys.time', function() after_kickoff, envir=.GlobalEnv)
+   on.exit(rm('Sys.time', envir=.GlobalEnv))
+   stopifnot(is.function(session$env$home_round_timer))
+   advance_home_round()
+   session$flushReact()
+   stopifnot(grepl('Awaiting round status', output$home_round$html, fixed=TRUE),
+     !grepl('fm-browser-countdown', output$home_round$html, fixed=TRUE),
+     is.null(session$env$home_round_timer), length(calls)==before)
+ })
  session$setInputs(tabs='admin');app_settle(session)
  stopifnot(grepl('30.000.000 EUR',output[['admin-league_settings']]$html,fixed=TRUE))
  session$setInputs(tabs='login');app_settle(session)
@@ -37,8 +62,14 @@ shiny::testServer(app_server,{
  cat(sprintf('PASS Home shows independent factual values with no market/pressroom read; ten unrelated inputs add no reads (%.3fs)\n',elapsed))
 })
 clear_api_cache();hold_market<-TRUE;pending<-list();calls<-character()
+app_roster$change[1] <- NA_real_
 shiny::testServer(app_server,{
  login_fixture(session);stopifnot(startup_stage()=='ready', !length(pending))
+ balance <- xml2::read_html(output$home_balance$html)
+ stopifnot(grepl('0 EUR', output$home_balance$html, fixed=TRUE),
+   grepl('17 players', output$home_squad$html, fixed=TRUE),
+   xml2::xml_text(xml2::xml_find_first(balance, '//*[@class="fm-team-value-trend"]//strong')) == 'Unavailable',
+   length(xml2::xml_find_all(balance, '//*[@class="fm-team-trend-counts"]//span[text()="Unavailable"]')) == 2L)
  session$setInputs(tabs='today');app_settle(session)
  stopifnot(startup_stage()=='loading_today',length(pending)==1L)
  session$setInputs(tabs='login');app_settle(session)

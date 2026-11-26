@@ -42,6 +42,15 @@ html:not(.fm-signed-in) .fm-theme-options:not([hidden]) {
 .fm-home-caption { margin-bottom: 6px; }
 .fm-home-caption i { margin-inline-end: 5px; }
 .fm-home-overview strong { font-size: clamp(15px, 1.8vw, 22px); overflow-wrap: anywhere; }
+.fm-home-kickoff, .fm-home-kickoff > span { display: block; }
+.fm-home-kickoff { margin-top: 4px; }
+.fm-home-kickoff .fm-browser-countdown { font-variant-numeric: tabular-nums; }
+#home_balance .fm-team-value-trend {
+  display: block; margin-top: 6px; color: var(--fm-muted); font-size: 12px; line-height: 1.4;
+}
+#home_balance .fm-team-value-trend strong { font-size: inherit; color: var(--fm-text); }
+#home_balance .fm-team-trend-counts { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 3px; }
+#home_balance .fm-team-trend-counts > div { gap: 4px; }
 .fm-home-continue { border: 0; padding: 8px 0; margin: 0 0 8px; background: transparent; color: var(--fm-text); }
 .fm-home-continue i { margin-inline-start: 6px; }
 .fm-home-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 12px; }
@@ -103,8 +112,9 @@ html:not(.fm-signed-in) .fm-theme-options:not([hidden]) {
   .fm-home-overview > div:first-child { grid-column: 1 / -1; }
   .fm-home-overview > div:nth-child(2) { border-inline-start: 0; }
   .fm-home-overview > div + div { border-top: 1px solid var(--fm-border); }
-  #home_round > div { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+  #home_round > div { display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 3px 8px; }
   #home_round small { text-align: right; }
+  #home_round small + small { grid-column: 1 / -1; }
   .fm-home-caption { font-size: 11px; margin-bottom: 3px; }
   .fm-home-caption i { display: none; }
 }

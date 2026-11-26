@@ -1,5 +1,9 @@
 # Futmondo data architecture redesign plan
 
+## Home round status and squad trend (2026-11-26)
+
+- [x] Show round progress and closure across split matchdays, and show the squad’s daily value change and player counts alongside cash using the existing saved observations. [Home overview](page_preferences.md#league-overview-and-saved-destination)
+
 ## Advanced and resumed rounds (2026-11-26)
 
 - [x] Verify the Round 23 notice and inspect the persisted LaLiga fixture calendar.
