@@ -364,7 +364,8 @@ function(input, output, session) {
     kickoff <- if (!is.null(upcoming)) {
       label <- if (is.null(current)) "Kickoff" else paste("Next kickoff · Round", upcoming$round_number)
       tags$span(class = "fm-home-kickoff",
-        tags$span(label, fm_format_datetime(upcoming$starts_at)),
+        tags$span(paste(label, "at:")),
+        tags$span(fm_format_datetime(upcoming$starts_at)),
         tags$span(class = "fm-browser-countdown", `data-deadline` = as.numeric(upcoming$starts_at),
           `data-server-now` = as.numeric(now), format_round_countdown(upcoming$starts_at, now)))
     }

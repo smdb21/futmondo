@@ -196,7 +196,7 @@ async function verify(browser, width, theme) {
     await round.getByText('Round 11', {exact:true}).waitFor();
     await round.locator('.fm-browser-countdown').waitFor();
     assert.match(await round.innerText(), /\bClosed\b/);
-    assert.match(await round.innerText(), /Next kickoff · Round 12/);
+    assert.match(await round.innerText(), /Next kickoff · Round 12 at:\n\d{2}\/\d{2}\/\d{4} \d{2}:\d{2} \S+/);
     const balance = page.locator('#home_balance');
     await balance.getByText('10.000.000 EUR', {exact:true}).waitFor();
     await balance.getByText('34.000.000 €', {exact:true}).waitFor();

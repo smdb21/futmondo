@@ -1,5 +1,9 @@
 # Futmondo data review and implementation results
 
+## Home kickoff label and timestamp (2026-11-26)
+
+The Home browser fixture checks for a rendered line break between the round label ending in “at:” and the localized timestamp. A separate formatter check converted 20:00 UTC on November 27 to `27/11/2026 12:00 PST` for Los Angeles. The markup adds one span per displayed kickoff and uses the existing block styles, formatter and countdown. It adds no requests, database work, reactive updates or timers. [Browser regression](../test/test_welcome_home_browser.cjs)
+
 ## Home squad value and player count layout (2026-11-26)
 
 The synthetic Home fixture showed a €34,000,000 squad value directly above its +€34,000 daily change. Squad size showed 17 players, two rising and one falling. With a missing player change, the player total and cash still rendered and both direction counts were marked unavailable. Both cards share one reactive summary of the existing saved team and roster. The fixture counted one roster read and zero additional reads across ten unrelated inputs. The layout introduces no acquisition, writes or timers. [Home regression](../test/test_welcome_primary_loading.R)
