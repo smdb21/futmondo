@@ -1,5 +1,11 @@
 # Futmondo data review and implementation results
 
+## Home squad value and player count layout (2026-11-26)
+
+The synthetic Home fixture showed a €34,000,000 squad value directly above its +€34,000 daily change. Squad size showed 17 players, two rising and one falling. With a missing player change, the player total and cash still rendered and both direction counts were marked unavailable. Both cards share one reactive summary of the existing saved team and roster. The fixture counted one roster read and zero additional reads across ten unrelated inputs. The layout introduces no acquisition, writes or timers. [Home regression](../test/test_welcome_primary_loading.R)
+
+Local Chromium verified the order of the value and trend, the count placement, and a page without horizontal overflow at 320, 390 and 1440 px. Returning Home reused the overview reads. The offline lifecycle passed 14 checks and eight tabs. [Browser fixture](../test/test_welcome_home_browser.cjs)
+
 ## Home round status and squad trend (2026-11-26)
 
 The calendar regression replayed an early Round 23 game, the intervening Round 15 while playing and after closure, and the later Round 23 kickoff. It also covered an undated postponement, overlapping matchdays, older calendars and a finished fixture list awaiting official round closure. A 38-round, 380-match season took 2.1–3.1 ms per warm projection across two local runs of 100 iterations. The open Home card uses one replaceable session timer for the next relevant calendar boundary. [Round regression](../test/test_home_round_context.R)

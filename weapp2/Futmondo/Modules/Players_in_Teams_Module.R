@@ -89,7 +89,7 @@ team_value_summary <- function(team_state, roster_state) {
     down = if (is.null(changes)) NA_integer_ else sum(changes < 0))
 }
 
-team_trend_panel <- function(summary, label = "Total trend", show_count_labels = FALSE) {
+team_trend_counts <- function(summary, show_count_labels = FALSE) {
   movement <- function(direction, count, label, count_label) {
     tags$div(class = paste0("fm-team-trend-", direction), title = label,
       icon(paste0("arrow-", direction)),
@@ -98,14 +98,18 @@ team_trend_panel <- function(summary, label = "Total trend", show_count_labels =
         tags$span(`aria-hidden` = "true", "—")) else count,
       if (show_count_labels) tags$span(`aria-hidden` = "true", count_label))
   }
+  tags$div(class = "fm-team-trend-counts",
+    movement("up", summary$up, "Players with positive trend", "rising"),
+    movement("down", summary$down, "Players with negative trend", "falling"))
+}
+
+team_trend_panel <- function(summary, label = "Total trend", counts = team_trend_counts(summary)) {
   amount <- if (identical(summary$trend_status, "loading")) "Loading…" else player_card_money(summary$trend)
   tags$div(class = "fm-team-value-trend",
     tags$div(title = "24-hour change in squad market value",
       if (identical(summary$trend_status, "stale")) "Last saved trend" else label,
       tags$strong(paste0(if (isTRUE(summary$trend > 0)) "+" else "", amount))),
-    tags$div(class = "fm-team-trend-counts",
-      movement("up", summary$up, "Players with positive trend", "rising"),
-      movement("down", summary$down, "Players with negative trend", "falling")))
+    counts)
 }
 
 team_value_summary_panel <- function(summary, ns) {

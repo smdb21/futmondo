@@ -199,10 +199,13 @@ async function verify(browser, width, theme) {
     assert.match(await round.innerText(), /Next kickoff · Round 12/);
     const balance = page.locator('#home_balance');
     await balance.getByText('10.000.000 EUR', {exact:true}).waitFor();
-    await balance.getByText('+40.000 €', {exact:true}).waitFor();
-    assert.match(await balance.locator('.fm-team-trend-up').textContent(), /positive trend\s*2/i);
-    assert.match(await balance.locator('.fm-team-trend-down').textContent(), /negative trend\s*1/i);
-    await page.locator('#home_squad').getByText('17 players', {exact:true}).waitFor();
+    await balance.getByText('34.000.000 €', {exact:true}).waitFor();
+    await balance.locator('.fm-home-squad-value + .fm-team-value-trend').getByText('+40.000 €', {exact:true}).waitFor();
+    const squad = page.locator('#home_squad');
+    await squad.getByText('17 players', {exact:true}).waitFor();
+    assert.equal(await balance.locator('.fm-team-trend-counts').count(), 0);
+    assert.match(await squad.locator('.fm-team-trend-up').textContent(), /positive trend\s*2/i);
+    assert.match(await squad.locator('.fm-team-trend-down').textContent(), /negative trend\s*1/i);
     assert.doesNotMatch(await overview.innerText(), /last observed/i);
     assert.equal(await overflow(), false);
     await page.screenshot({path:'/tmp/fm-home-' + width + '-' + theme + '.png'});

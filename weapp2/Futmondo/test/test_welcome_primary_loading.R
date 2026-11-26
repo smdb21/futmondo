@@ -33,12 +33,17 @@ shiny::testServer(app_server,{
  stale_card <- as.character(home_observation(list(status='stale', observed_at=as.POSIXct('2001-02-03', tz='UTC')), '17 players'))
  stopifnot(grepl('May be out of date', stale_card, fixed=TRUE), !grepl('Last observed|2001', stale_card))
  trend <- xml2::xml_find_first(balance, '//*[@class="fm-team-value-trend"]')
+ squad <- xml2::read_html(output$home_squad$html)
  count_text <- function(direction) {
-   node <- xml2::xml_find_first(trend, paste0('.//*[@class="fm-team-trend-', direction, '"]'))
+   node <- xml2::xml_find_first(squad, paste0('.//*[@class="fm-team-trend-', direction, '"]'))
    trimws(gsub('[[:space:]]+', ' ', xml2::xml_text(node)))
  }
- stopifnot(grepl('24h squad trend', xml2::xml_text(trend), fixed=TRUE),
+ value <- xml2::xml_find_first(trend, 'preceding-sibling::*[1][@class="fm-home-squad-value"]')
+ stopifnot(grepl('Squad value', xml2::xml_text(value), fixed=TRUE),
+   xml2::xml_text(xml2::xml_find_first(value, 'strong')) == '34.000.000 €',
+   grepl('24h squad trend', xml2::xml_text(trend), fixed=TRUE),
    grepl('+34.000', xml2::xml_text(trend), fixed=TRUE),
+   !grepl('fm-team-trend-counts', output$home_balance$html, fixed=TRUE),
    grepl('2 rising$', count_text('up')), grepl('1 falling$', count_text('down')),
    sum(calls == 'get_players_from_team') == 1L)
  before<-length(calls);elapsed<-system.time(for(i in 1:10){session$setInputs(fixture_pulse=i);app_settle(session)})[['elapsed']]
@@ -69,7 +74,7 @@ shiny::testServer(app_server,{
  stopifnot(grepl('0 EUR', output$home_balance$html, fixed=TRUE),
    grepl('17 players', output$home_squad$html, fixed=TRUE),
    xml2::xml_text(xml2::xml_find_first(balance, '//*[@class="fm-team-value-trend"]//strong')) == 'Unavailable',
-   length(xml2::xml_find_all(balance, '//*[@class="fm-team-trend-counts"]//span[text()="Unavailable"]')) == 2L)
+   length(xml2::xml_find_all(xml2::read_html(output$home_squad$html), '//*[@class="fm-team-trend-counts"]//span[text()="Unavailable"]')) == 2L)
  session$setInputs(tabs='today');app_settle(session)
  stopifnot(startup_stage()=='loading_today',length(pending)==1L)
  session$setInputs(tabs='login');app_settle(session)

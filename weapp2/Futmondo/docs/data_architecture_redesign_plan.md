@@ -2,7 +2,7 @@
 
 ## Home round status and squad trend (2026-11-26)
 
-- [x] Show round progress and closure across split matchdays, and show the squad’s daily value change alongside cash and the rising and falling counts under the squad size using the existing saved observations. [Home overview](page_preferences.md#league-overview-and-saved-destination)
+- [x] Show round progress and closure across split matchdays, and show the squad value and its daily change below cash and the rising and falling counts under the squad size using the existing saved observations. [Home overview](page_preferences.md#league-overview-and-saved-destination)
 
 ## Advanced and resumed rounds (2026-11-26)
 

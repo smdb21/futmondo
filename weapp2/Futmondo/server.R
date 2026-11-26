@@ -377,9 +377,12 @@ function(input, output, session) {
     home_read(function() roster_source_readers$roster(login = login_token_RV(),
       championship_id = championship_id_RV(), user_team_id = user_team_id_RV(), teams = NULL))
   })
+  home_team_state <- reactive(home_read(primary_team_state))
+  home_squad_summary <- reactive(team_value_summary(home_team_state(), home_roster_state()))
   output$home_balance <- renderUI({
     req(home_visible())
-    states <- list(team = home_read(primary_team_state))
+    states <- list(team = home_team_state())
+    summary <- home_squad_summary()
     project <- session$userData$manual_finance_projection
     if (!is.null(states$team$data) && is.function(project)) states <- project(states, cash_only = TRUE)
     amount <- fm_number(states$team$data$budget)
@@ -387,14 +390,18 @@ function(input, output, session) {
       home_observation(states$team, if (is.finite(amount)) paste(
         format(round(amount), big.mark = ".", decimal.mark = ",", scientific = FALSE), "EUR"),
         if (isTRUE(states$confirmed_actions)) "Includes confirmed purchase"),
-      team_trend_panel(team_value_summary(states$team, home_roster_state()),
-        label = "24h squad trend", show_count_labels = TRUE))
+      tags$div(class = "fm-home-squad-value",
+        if (identical(summary$value_status, "stale")) "Last saved squad value" else "Squad value",
+        tags$strong(if (identical(summary$value_status, "loading")) "Loading…" else player_card_money(summary$value))),
+      team_trend_panel(summary, label = "24h squad trend", counts = NULL))
   })
   output$home_squad <- renderUI({
     req(home_visible())
     state <- home_roster_state()
     count <- observed_squad_count(state)
-    home_observation(state, if (is.finite(count)) paste(count, if (count == 1L) "player" else "players"))
+    tagList(
+      home_observation(state, if (is.finite(count)) paste(count, if (count == 1L) "player" else "players")),
+      team_trend_counts(home_squad_summary(), show_count_labels = TRUE))
   })
   notifications <- notifications_Server("notifications", reactive(input$tabs == "notifications"),
     login_token_RV, championship_id_RV, user_team_id_RV, user_teams_RV, refresh_trigger,
