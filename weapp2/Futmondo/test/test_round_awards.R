@@ -159,6 +159,77 @@ check('statistics tab uses confirmed rounds and the shared snapshot, including o
   })
   shared_mvp_source <- original
 })
+check('Statistics opens first with player grouping and a club switch', {
+  dom <- xml2::read_html(as.character(round_mvps_UI('awards')))
+  tabs <- xml2::xml_find_all(dom, '//ul[@id="awards-award_tab"]/li/a')
+  toggle <- xml2::xml_find_all(dom, '//div[@data-value="statistics"]//input[@id="awards-group_by_club"]')
+  stopifnot(identical(xml2::xml_text(tabs), c('Statistics', 'By round')),
+    identical(xml2::xml_attr(tabs, 'data-value'), c('statistics', 'rounds')),
+    xml2::xml_attr(xml2::xml_parent(tabs[[1]]), 'class') == 'active',
+    length(toggle) == 1L, is.na(xml2::xml_attr(toggle, 'checked')))
+})
+check('club statistics count each appearance at its recorded club and each represented round once', {
+  a <- transform(first, persistence = 'Saved', award_team = c(rep('East', 6), rep('West', 4), 'South'))
+  b <- transform(a, round_id = 'r2', award_team = c('East', rep('West', 9), ''))
+  # The MVP moves from East to West. One West appearance records only its club crest.
+  a$award_logo <- paste0(a$award_team, '.png')
+  b$award_logo <- ifelse(nzchar(b$award_team), paste0(b$award_team, '.png'), '')
+  b$award_team[3] <- ''
+  incomplete <- transform(a[-1, ], round_id = 'partial', award_team = 'Incomplete XI')
+  state <- reactiveVal(list(rows = rbind(a, b, incomplete), status = 'ok', reason = ''))
+  original_source <- shared_mvp_source
+  original_adapter <- factual_read_adapter
+  source_reads <- 0L
+  shared_mvp_source <- function(...) { source_reads <<- source_reads + 1L; state }
+  factual_read_adapter <- function(...) function(...) list(status = 'ready',
+    data = data.frame(id = a$player_id, team = 'Present-day club', logo = 'present.png'))
+  shiny::testServer(round_mvps_Server, args = list(is_module_active = function() TRUE,
+    login_token = function() c(userid = 'fixture', token = 'synthetic'), championship_id = function() 'league'), {
+    widget_data <- function(dom) {
+      script <- xml2::xml_find_first(dom, '//script[@data-for]')
+      jsonlite::fromJSON(xml2::xml_text(script))$x$tag$attribs$data
+    }
+    player_table <- widget_data(xml2::read_html(output$award_statistics$html))
+    stopifnot(length(player_table$player_name) == 11L, sum(player_table$best_xi) == 22L)
+    session$setInputs(group_by_club = TRUE)
+    dom <- xml2::read_html(output$award_statistics$html)
+    clubs <- widget_data(dom)
+    idx <- match(c('East', 'West', 'South'), clubs$club)
+    figures <- xml2::xml_find_all(dom, '//figure')
+    bars <- xml2::xml_find_all(figures, './/*[@class="award-chart-track"]/span')
+    widths <- as.numeric(sub('^width: *([0-9.]+)%.*$', '\\1', xml2::xml_attr(bars, 'style')))
+    stopifnot(length(clubs$club) == 3L, !anyNA(idx),
+      identical(as.integer(clubs$best_xi[idx]), c(7L, 13L, 1L)),
+      identical(as.integer(clubs$mvp[idx]), c(1L, 1L, 0L)),
+      identical(clubs$share[idx], c(1, 1, 0.5)),
+      identical(xml2::xml_text(xml2::xml_find_all(dom, '//dl//dt')),
+        c('Confirmed rounds', 'Identified Best XI clubs', 'Clubs with an MVP')),
+      identical(xml2::xml_text(xml2::xml_find_all(dom, '//dl//dd')), c('2', '3', '2')),
+      grepl('1 selection is incomplete', xml2::xml_text(dom), fixed = TRUE),
+      grepl('Club unknown for 1 Best XI appearance (0 MVP wins).', xml2::xml_text(dom), fixed = TRUE),
+      length(figures) == 2L, length(widths) == 5L, all(widths > 0 & widths <= 100))
+    session$setInputs(group_by_club = FALSE)
+    stopifnot(identical(widget_data(xml2::read_html(output$award_statistics$html)), player_table),
+      source_reads == 1L)
+    legacy <- rbind(a, b)
+    legacy[legacy$is_mvp, c('award_team', 'award_logo')] <- ''
+    state(list(rows = legacy, status = 'ok', reason = ''))
+    session$setInputs(group_by_club = TRUE)
+    dom <- xml2::read_html(output$award_statistics$html)
+    clubs <- widget_data(dom)
+    stopifnot(sum(clubs$best_xi) == 19L, sum(clubs$mvp) == 0L, source_reads == 1L,
+      grepl('Club unknown for 3 Best XI appearances (2 MVP wins).', xml2::xml_text(dom), fixed = TRUE),
+      grepl('No MVP wins have a recorded club.', xml2::xml_text(dom), fixed = TRUE))
+    legacy$award_team <- legacy$award_logo <- ''
+    state(list(rows = legacy, status = 'ok', reason = ''))
+    session$flushReact()
+    dom <- xml2::read_html(output$award_statistics$html)
+    stopifnot(grepl('Club unknown for 22 Best XI appearances (2 MVP wins).', xml2::xml_text(dom), fixed = TRUE),
+      length(xml2::xml_find_all(dom, '//figure | //script[@data-for]')) == 0L)
+  })
+  shared_mvp_source <- original_source
+  factual_read_adapter <- original_adapter
+})
 fixture <- tags$html(tags$head(tags$meta(name = 'viewport', content = 'width=device-width, initial-scale=1'),
   tags$style(HTML(paste(':root { --fm-muted: #aaa; --fm-border: #345; --fm-surface: #0b120d; --fm-text: #eee; --fm-warning: #ffc107; } body { margin: 0; padding: 16px; background: #050805; font-family: monospace; } * { box-sizing: border-box; }',
     paste(readLines('www/custom_style.css', warn = FALSE), collapse = '\n'))))),

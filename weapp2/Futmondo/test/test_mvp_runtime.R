@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 options(futmondo.offline=TRUE)
-suppressPackageStartupMessages({source('futmondo_functions.R');source('factual_helpers.R');source('supabase_connector.R');source('background_runtime.R');library(shiny)})
+suppressPackageStartupMessages({source('futmondo_functions.R');source('factual_helpers.R');source('supabase_connector.R');source('background_runtime.R');source('lineup_runtime.R');library(shiny)})
 n <- 0L
 check <- function(name,expr) {force(expr);n <<- n+1L;cat('PASS',name,'\n')}
 active <- list(championships=list(list(id='c',league='l')),rounds=list(list(`_id`='r1',number=1)))
@@ -56,7 +56,8 @@ check('official award clubs persist and transferred players retain one round-spe
   stopifnot(nrow(saved) == 11L, all(saved$persistence == 'Saved'),
     identical(saved$award_team, parsed$rows$award_team), identical(saved$award_logo, parsed$rows$award_logo),
     saved$award_logo[saved$player_id == 'q'] == 'https://example.invalid/other.webp',
-    saved$award_team[saved$player_id == 'p3'] == '')
+    saved$award_team[saved$player_id == 'p3'] == '',
+    saved$award_team_id[saved$player_id == 'p3'] == 'club-id-only', identical(saved$award_team_id, parsed$rows$award_team_id))
 
   # A new club without a logo cannot inherit the previous club's image.
   second_ref <- ref
@@ -77,11 +78,34 @@ check('official award clubs persist and transferred players retain one round-spe
     totals$award_logo[totals$player_id == 'q'] == 'https://example.invalid/other.webp')
 
   first$payload$players <- lapply(first$payload$players, function(player) {
-    player$award_team <- player$award_logo <- NULL
+    player$award_team_id <- player$award_team <- player$award_logo <- NULL
     player
   })
   legacy <- restore(list(first))
-  stopifnot(nrow(legacy) == 11L, all(legacy$award_team == ''), all(legacy$award_logo == ''))
+  stopifnot(nrow(legacy) == 11L, all(legacy$award_team_id == ''), all(legacy$award_team == ''), all(legacy$award_logo == ''))
+})
+check('club grouping resolves historical IDs and slugs without merging ambiguous clubs', {
+  appearances <- data.frame(round = c('r1', 'r1', 'r2', 'r2', 'r3', 'r4', 'r4', 'r5', 'r5'),
+    award_team_id = c('club-a', '', 'club-a', 'club-b', '', 'east', 'west', '', ''),
+    award_team = c('club-del-norte', 'club-del-norte', '', 'Southern Club', '',
+      'United', 'United', 'United', ''),
+    award_logo = c('club-del-norte.png', 'club-del-norte.png', '', 'shared.png', 'shared.png',
+      'shared.png', 'west.png', '', ''), is_mvp = c(FALSE, TRUE, TRUE, FALSE, TRUE, FALSE, FALSE, FALSE, FALSE))
+  # A raw club slug can be the entire team field in the official response.
+  catalog <- data.frame(id = 'irrelevant-player', teamId = 'club-a', team = 'Club del Norte',
+    logo = 'club-del-norte.png')
+  initial <- round_award_club_stats(appearances)
+  stopifnot(initial$needs_catalog, 'club-del-norte' %in% initial$clubs$club)
+  result <- round_award_club_stats(appearances, catalog)
+  clubs <- result$clubs
+  at <- match(c('Club del Norte', 'Southern Club', 'United (east)', 'United (west)'), clubs$club)
+  stopifnot(!anyNA(at), nrow(clubs) == 4L, identical(clubs$best_xi[at], c(3L, 1L, 1L, 1L)),
+    identical(clubs$mvp[at], c(2L, 0L, 0L, 0L)), identical(clubs$represented_rounds[at], c(2L, 1L, 1L, 1L)),
+    result$missing_xi == 3L, result$missing_mvp == 1L, !result$needs_catalog,
+    sum(clubs$best_xi) + result$missing_xi == nrow(appearances))
+  id_only <- appearances[3, ]
+  stopifnot(round_award_club_stats(id_only)$needs_catalog,
+    identical(round_award_club_stats(id_only, catalog)$clubs$club, 'Club del Norte'))
 })
 eligibility <- data.frame(championship_id='c',round_id='r1',player_id='p',team_id='old-owner',eligible=TRUE,verified=TRUE)
 rewards <- data.frame(championship_id='c',round_id='r1',amount=100,historical=TRUE)

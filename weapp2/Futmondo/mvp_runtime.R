@@ -13,7 +13,9 @@ round_award_player_stats <- function(rows, championship_id) {
   players <- data.frame(player_id = character(), player_name = character(), best_xi = integer(), mvp = integer())
   players$award_positions <- character()
   players$award_team <- players$award_logo <- character()
-  out <- list(players = players, rounds = 0L, unconfirmed_rounds = 0L, incomplete_rounds = 0L,
+  appearances <- data.frame(round = character(), award_team_id = character(), award_team = character(),
+    award_logo = character(), is_mvp = logical())
+  out <- list(players = players, appearances = appearances, rounds = 0L, unconfirmed_rounds = 0L, incomplete_rounds = 0L,
     unsaved_rounds = 0L, scope_issue = "")
   if (!is.data.frame(rows) || !nrow(rows)) return(out)
   if ("championship_id" %in% names(rows))
@@ -96,7 +98,94 @@ round_award_player_stats <- function(rows, championship_id) {
   latest[is.na(latest)] <- ""
   out$players[club_fields] <- latest
   out$players$award_positions <- positions
+  out$appearances <- data.frame(round = round_key[selected],
+    award_team_id = if ("award_team_id" %in% names(rows)) rows$award_team_id[selected] else "",
+    award_team = clubs$award_team, award_logo = clubs$award_logo, is_mvp = is_mvp[selected])
   out
+}
+
+# Club membership comes from the awarded appearance. The catalog can identify a
+# recorded club ID or crest, including after the player has moved.
+round_award_club_stats <- function(appearances, catalog = NULL) {
+  clubs <- data.frame(club = character(), crest = character(), best_xi = integer(),
+    mvp = integer(), represented_rounds = integer())
+  result <- list(clubs = clubs, missing_xi = 0L, missing_mvp = 0L, needs_catalog = FALSE)
+  if (!nrow(appearances)) return(result)
+
+  field <- function(rows, column) {
+    if (!column %in% names(rows)) return(rep("", NROW(rows)))
+    value <- trimws(as.character(rows[[column]]))
+    value[is.na(value)] <- ""
+    value
+  }
+  facts <- data.frame(id = field(appearances, "award_team_id"), name = field(appearances, "award_team"),
+    logo = field(appearances, "award_logo"))
+  if (is.data.frame(catalog) && nrow(catalog)) {
+    facts <- rbind(facts, unique(data.frame(id = field(catalog, "teamId"), name = field(catalog, "team"),
+      logo = field(catalog, "logo"))))
+  }
+  logos <- unique(facts$logo)
+  crest <- vapply(logos, lineup_fixture_crest_url, character(1), USE.NAMES = FALSE)[match(facts$logo, logos)]
+  # Official selections can carry the crest filename stem in the team field.
+  slug <- nzchar(crest) & facts$name == sub("\\.[[:alnum:]]+$", "", basename(crest)) &
+    facts$name == tolower(facts$name)
+  named <- nzchar(facts$name)
+  has_id <- nzchar(facts$id)
+  name_key <- tolower(facts$name)
+
+  # Blank means no association, NA means contradictory associations.
+  lookup <- function(from, to, query) {
+    keep <- nzchar(from) & nzchar(to)
+    pairs <- unique(data.frame(from = from[keep], to = to[keep]))
+    pairs$to[duplicated(pairs$from) | duplicated(pairs$from, fromLast = TRUE)] <- NA_character_
+    at <- match(query, pairs$from)
+    values <- pairs$to[at]
+    values[is.na(at)] <- ""
+    values
+  }
+
+  key <- ifelse(has_id, paste0("id:", facts$id), "")
+  named_only <- !has_id & named
+  matched_id <- lookup(name_key, key, name_key[named_only])
+  key[named_only] <- ifelse(is.na(matched_id), "", ifelse(nzchar(matched_id), matched_id,
+    paste0("name:", name_key[named_only])))
+
+  # Only unnamed or filename-labeled appearances can borrow another label by
+  # crest. A shared asset cannot combine two distinct explicit club names.
+  anchor <- has_id | (named & !slug)
+  slug_only <- !has_id & slug
+  linked <- lookup(crest[anchor], key[anchor], crest[slug_only])
+  key[slug_only] <- ifelse(is.na(linked), "", ifelse(nzchar(linked), linked, key[slug_only]))
+  crest_only <- !has_id & !named
+  linked <- lookup(crest, key, crest[crest_only])
+  key[crest_only] <- ifelse(is.na(linked), "", linked)
+
+  appearance <- seq_len(nrow(appearances))
+  group <- key[appearance]
+  # Prefer a recorded human-readable name. Award observations precede the
+  # catalog if both supply one. Without a match the recorded slug is retained.
+  labels <- which(named & nzchar(key))
+  labels <- labels[order(slug[labels])]
+  label_at <- labels[match(group, key[labels])]
+  known <- nzchar(group) & !is.na(label_at)
+  result$missing_xi <- sum(!known)
+  result$missing_mvp <- sum(!known & appearances$is_mvp)
+  result$needs_catalog <- is.null(catalog) && any((!known | slug[label_at] %in% TRUE) &
+    (has_id[appearance] | nzchar(crest[appearance])))
+  if (!any(known)) return(result)
+
+  distinct <- unique(group[known])
+  label <- facts$name[labels[match(distinct, key[labels])]]
+  duplicate_label <- duplicated(tolower(label)) | duplicated(tolower(label), fromLast = TRUE)
+  label[duplicate_label] <- paste0(label[duplicate_label], " (", sub("^id:", "", distinct[duplicate_label]), ")")
+  images <- which(nzchar(crest) & nzchar(key))
+  logo_at <- match(distinct, key[images])
+  index <- match(group[known], distinct)
+  represented <- !duplicated(data.frame(index = index, round = appearances$round[known]))
+  result$clubs <- data.frame(club = label, crest = ifelse(is.na(logo_at), "", crest[images[logo_at]]),
+    best_xi = tabulate(index, length(distinct)), mvp = tabulate(index[appearances$is_mvp[known]], length(distinct)),
+    represented_rounds = tabulate(index[represented], length(distinct)))
+  result
 }
 
 mvp_records <- function(x) {
@@ -485,7 +574,7 @@ normalize_official_dreamteam <- function(answer, championship_id, reference) {
     data.frame(championship_id=as.character(championship_id),round_id=reference$round_id,
       round_number=reference$round_number,player_id=mvp_text(p$id %||% p$`_id`),
       player_name=mvp_text(p$name),player_role=mvp_text(p$role),player_position=mvp_text(p$position),points=fm_number(p$points),
-      award_team=mvp_text(p[["team"]]),award_logo=mvp_text(p[["logo"]]),
+      award_team_id=mvp_text(p[["teamId"]]),award_team=mvp_text(p[["team"]]),award_logo=mvp_text(p[["logo"]]),
       is_mvp=identical(mvp_text(p$id %||% p$`_id`),mid),
       is_finished=if(is.logical(reference$is_finished)&&length(reference$is_finished)==1L)reference$is_finished else NA)
   }))
@@ -613,7 +702,7 @@ mvp_sync_round <- function(login, championship_id, round_id, round_number) {
   if(result$status!="ok") {counts$failed <- 1L; return(counts)}
   if(!is.finite(round_number)) {counts$status <- "partial"; counts$skipped <- counts$fetched; counts$reason <- "Round number unavailable; results cannot be saved."; return(counts)}
   # These fields belong to the full-XI evidence payload, outside the legacy table schema.
-  legacy <- result$rows[, setdiff(names(result$rows), c("award_team", "award_logo", "player_position")), drop = FALSE]
+  legacy <- result$rows[, setdiff(names(result$rows), c("award_team_id", "award_team", "award_logo", "player_position")), drop = FALSE]
   value <- tryCatch(supabase_post("round_dream_team",legacy),error=function(e)NULL)
   if(isTRUE(value)) {counts$status <- "queued"; counts$queued <- counts$fetched}
   else if(is.numeric(value) && length(value)==1L && !is.na(value) && value>=200 && value<300) {counts$status <- "ok"; counts$saved <- counts$fetched}

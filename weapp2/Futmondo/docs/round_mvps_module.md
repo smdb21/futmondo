@@ -28,7 +28,7 @@ Best XI player cells reuse the player-table name formatter: the current real-clu
 
 ## Player award statistics — 2026-11-25
 
-**Round awards → Statistics** ranks players for the selected championship and season.
+**Round awards → Statistics** opens by default and ranks players for the selected championship and season.
 A player earns one Best XI appearance per counted round. The official MVP also
 earns one MVP win in that round. Round share divides a player's appearances by
 the number of confirmed rounds included in the ranking.
@@ -84,3 +84,13 @@ visible. An unknown position displays a dash and a tooltip.
 The Player column keeps its original text for sorting and searching. Only the visible page constructs table labels.
 The charts and table share the resolved club and position fields, and images load lazily. Updating club details reuses the existing
 award counts.
+
+### Group by club (2026-11-26)
+
+Statistics is the first tab. **Group by club** switches the summary, both leader charts and the searchable table to real football clubs. Turning it off restores the player rankings. **By round** is the second tab and shows the individual selections.
+
+Each Best XI place and MVP win counts for the club the player represented in that round. A club with three selected players in one round earns three appearances and one represented round. Round share divides represented rounds by all confirmed rounds. The club Best XI chart scales to the leading appearance count. The MVP chart scales to the number of confirmed rounds.
+
+`round_award_player_stats()` retains the counted appearances alongside its player totals. `round_award_club_stats(appearances, catalog)` groups those appearances using the official club ID, name and crest. The full-XI snapshot preserves the official `teamId` as `award_team_id`. Older snapshots can still identify clubs by their recorded names or crests. The existing saved championship catalog can supply a display name for a matching historical ID or crest. A player's present-day club cannot establish which club they represented in an earlier round. Appearances and MVP wins without a club attribution are counted in the coverage notice.
+
+The club projection runs when selected and reuses the same scoped, database-backed award snapshot and player catalog as the player view. Switching adds no source acquisition or persistence writes.

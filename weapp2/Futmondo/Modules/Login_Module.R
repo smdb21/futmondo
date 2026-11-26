@@ -32,7 +32,7 @@ login_feature_tiers <- function() {
         feature("scheduled_lineups", "Prepare for confirmed signings",
           "Include signings due before kickoff in a draft XI and bench. Where enabled, approve a lineup submission timed for an incoming signing."),
         feature("round_award_rankings", "Find repeat Best XI and MVP picks",
-          "Compare player award totals and their share of rounds with confirmed selections."),
+          "Compare Best XI appearances and MVP awards by player or club across confirmed rounds."),
         feature("recent_average", "Rank players on recent form",
           "Choose up to 20 recent rounds and sort players by average points across market and squad tables."),
         feature("squad_value_trend", "Track daily squad value changes",

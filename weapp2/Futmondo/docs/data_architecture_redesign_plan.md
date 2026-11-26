@@ -2670,6 +2670,11 @@ adds award-time identity to the charts and rankings. New snapshots retain the
 official club and crest fields. Existing selections can use the same saved
 player catalog as the round cards. See the [verification results](data_review_results.md#round-award-crests-and-positions--2026-11-25).
 
+## Round award club statistics (2026-11-26)
+
+- [x] Open Statistics first and let users switch between player and real-club rankings across confirmed rounds.
+- [x] Verify award-time club attribution, round share and the tab and switch interactions locally. [Module contract](round_mvps_module.md#group-by-club-2026-11-26) · [Verification](data_review_results.md#round-award-club-statistics-2026-11-26)
+
 ## Scheduled lineup custom scoring — 2026-11-25
 
 - [x] Trace the production schedule past roster ownership and reproduce the custom-scoring preflight failure with anonymized evidence.

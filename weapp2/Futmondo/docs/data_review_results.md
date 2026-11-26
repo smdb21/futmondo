@@ -6655,6 +6655,14 @@ lineup visible during a catalog read and displays an error if that read fails.
 The login inventory adds one static entry. Signed-in production data and hosted
 rollout were outside the checks.
 
+## Round award club statistics (2026-11-26)
+
+Offline Chromium at 320 and 1440 px opened Statistics first in player mode. Switching by mouse and keyboard changed both charts and the searchable table. With 22 selections across two confirmed rounds, the clubs had 12 and 10 Best XI appearances, one MVP each and 100% round share. Opening By round showed both XIs. Returning to Statistics preserved the grouping and search. Both widths fit without horizontal page overflow.
+
+Offline fixtures covered transfers, multiple club selections in one round, missing and ambiguous club identities, and duplicate club names with distinct source IDs. The persisted award snapshot restored the official club ID alongside the name and crest. In the local successful Dream Team capture, all eleven selected players had a club ID, a team slug and a crest matching the club directory. The award, MVP, crest, saved-catalog, scoring and login inventory checks passed locally. The offline Shiny lifecycle passed 14 checks and rendered eight tabs.
+
+On a synthetic 38-round season with 418 Best XI appearances, 160 players and 20 clubs, the first Shiny switch to club rankings took 222 ms and six subsequent switches took 38–41 ms. The module reused one award subscription and made zero catalog reads with this fully attributed fixture. Grouping with catalog enrichment took a median 5 ms across 41 runs. The switch adds no timers, source requests or writes. Browser and Shiny timings used synthetic accounts. Hosted deployment was outside verification.
+
 ## Round award crests and positions — 2026-11-25
 
 Offline Chromium verified both leader charts and the paginated table at 320,

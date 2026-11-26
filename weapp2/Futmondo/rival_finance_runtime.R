@@ -2321,7 +2321,7 @@ rival_award_snapshot_rows <- function(players) {
     if(!is.list(p))return(NULL)
     data.frame(championship_id=mvp_text(p$championship_id),round_id=mvp_text(p$round_id),round_number=fm_number(p$round_number),
       player_id=mvp_text(p$player_id),player_name=mvp_text(p$player_name),player_role=mvp_text(p$player_role),player_position=mvp_text(p$player_position),
-      award_team=mvp_text(p[["award_team"]]),award_logo=mvp_text(p[["award_logo"]]),
+      award_team_id=mvp_text(p[["award_team_id"]]),award_team=mvp_text(p[["award_team"]]),award_logo=mvp_text(p[["award_logo"]]),
       points=fm_number(p$points),is_mvp=isTRUE(p$is_mvp),is_finished=isTRUE(p$is_finished),stringsAsFactors=FALSE)
   }))
 }
