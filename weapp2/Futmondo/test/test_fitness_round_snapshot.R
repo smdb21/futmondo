@@ -43,6 +43,13 @@ check('older subsequence, stale source, conflicting context and flat evidence do
   !length(recent_points_fitness_values('1,Inf,3')),
   nrow(recent_points_fitness_rows(transform(rows,observed_at=NA_character_)))==0L)
 })
+check('an unaffected player cannot label other clubs during a split round',{
+ anchor <- recent_points_fitness_anchor(evidence[1,,drop=FALSE],payload(),ctx)
+ windows <- data.frame(number=c(6:10,23),begin=stamp-6:1,groups=c(rep(1L,5),2L))
+ stopifnot(nrow(recent_points_fitness_observations(evidence,anchor,windows))==0L,
+   identical(unique(recent_points_fitness_observations(evidence,anchor)$player_id),'p1'),
+   nrow(recent_points_fitness_observations(evidence,anchor,windows[1:5,]))==5L*nrow(evidence))
+})
 check('zero, negatives, NULL slots and season boundary keep their positions',{
  anchor<-recent_points_fitness_anchor(evidence[1,,drop=FALSE],payload(),ctx)
  mixed<-evidence[1,,drop=FALSE];mixed$fitness<-'0,-2,NA,9,1'
@@ -76,7 +83,11 @@ saved<-dplyr::bind_rows(lapply(rows$id,function(id)observations(id,c(7,9,10),c(5
 dataset<-list(points=saved,checks=data.frame(),complete=TRUE)
 read_league_round_dataset<-function(...)dataset
 persist_recent_points_snapshot<-function(payload,context,on_complete){recorded[[length(recorded)+1L]]<<-list(payload=payload,ack=on_complete);TRUE}
-defer_persistence<-function(fn,args,context,on_complete){writes[[length(writes)+1L]]<<-list(fn=fn,args=args,context=context,ack=on_complete);TRUE}
+defer_persistence<-function(fn,args,context,on_complete=NULL){
+ if(identical(args[[1]],'player_match_observations'))
+   writes[[length(writes)+1L]]<<-list(fn=fn,args=args,context=context,ack=on_complete)
+ TRUE
+}
 async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is_current=function()TRUE){
  calls<<-c(calls,paste0(fn,':',args$player_id %||% ''))
  if(fn=='get_player_recent_points')return(promises::promise(function(resolve,reject){pending[[args$player_id]]<-list(resolve=resolve,current=is_current)}))
@@ -84,6 +95,7 @@ async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is
 }
 reset<-function(){clear_api_cache();calls<<-character();recorded<<-list();writes<<-list();pending<<-new.env(parent=emptyenv());.persistence_state$queue<-list();.persistence_state$active<-NULL}
 server<-function(input,output,session){
+ session$userData$score_calendar_windows<-function(context)data.frame(number=6:10,begin=stamp-5:1,groups=1L)
  active<-reactiveVal(TRUE);n<-reactiveVal(4L);refresh<-reactiveVal(0L)
  source<-recent_player_points_source(session,reactive(auth),reactive('league'),reactive('team'),reactive(rows[1:3,,drop=FALSE]),active,refresh_trigger=refresh,required_rounds=n)
 }
@@ -213,3 +225,31 @@ shiny::testServer(server,{
  check('older disagreeing fitness never replays or rolls back newer explicit history',stopifnot(!any(grepl('get_player_recent_points',calls)),!length(writes)))
 })
 cat(sprintf('DURABLE FITNESS CORRECTIONS: %d passed / 0 failed\n',checks))
+
+# A stored score for a hidden club establishes the league window after filtering.
+reset()
+split_calendar <- data.frame(number=c(13,14,23,15:22,23),
+ begin=stamp+86400*(seq_len(12)-4),groups=c(1L,1L,2L,rep(1L,8),2L))
+dataset <- list(points=dplyr::bind_rows(observations('p1',13:14,c(9,-2)),
+ observations('p4',c(14,23),c(-2,8))),checks=data.frame(),complete=TRUE)
+scope <- ctx
+scope$player_id <- ''
+stopifnot(identical(recent_points_covered_players(dataset$points,scope,2,split_calendar),'p4'))
+split_server<-function(input,output,session){
+ session$userData$score_calendar_windows<-function(context){
+   stopifnot(context$account_id==auth[['userid']],context$championship_id=='league')
+   split_calendar
+ }
+ source<-recent_player_points_source(session,reactive(auth),reactive('league'),reactive('team'),
+  reactive(rows[1,,drop=FALSE]),publish_interval=0,catalog_scope=FALSE)
+}
+shiny::testServer(split_server,{
+ settle(session)
+ h<-source$history()
+ avg<-add_recent_points_average(rows[1,,drop=FALSE],h,2)
+ check('a different club playing J23 leaves an unaffected visible player partial',{
+   stopifnot(all(h$player_id=='p1'),identical(as.numeric(tail(attr(h,'calendar_order')$number,2)),c(14,23)),
+     is.na(avg$recent_points_avg),avg$recent_points_count==1L,avg$recent_points_status=='partial',
+     length(writes)==0L,sum(grepl('read_league_round_dataset',calls))==1L)
+ })
+})

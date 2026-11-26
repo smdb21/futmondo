@@ -22,12 +22,35 @@ lineup_positions <- function(roster,multiposition=TRUE) {
 }
 lineup_target <- function(rounds,now=Sys.time()) {
   if(!is.data.frame(rounds)||!all(c('round_id','round_number','begin_process')%in%names(rounds)))return(NULL)
-  times<-fm_time(rounds$begin_process);pick<-which(!is.na(times)&times>now)
-  if(!length(pick))return(NULL)
-  i<-pick[which.min(times[pick])]
-  id<-fm_scalar(rounds$round_id[i],'');number<-fm_number(rounds$round_number[i])
-  if(!nzchar(id)||!is.finite(number)||number<1||number!=floor(number))return(NULL)
-  list(id=id,number=number,starts_at=times[i])
+  active <- attr(rounds,'lineup_active',exact=TRUE)
+  if(!is.null(active)){
+    target <- active$target
+    row <- which(rounds$round_id %in% target$id)
+    if(is.null(target) || length(row)!=1L || !identical(as.numeric(rounds$round_number[row]),target$number) ||
+       !isTRUE(target$starts_at>now))return(NULL)
+  }else{
+    # Pre-upgrade snapshots contain compact round starts and may carry the
+    # original active ID in their calendar scope. Live preflight rechecks it.
+    times <- fm_time(rounds$begin_process)
+    pick <- which(!is.na(times) & times>now)
+    anchor <- attr(rounds,'fixture_calendar')$scope$current_round_id
+    if(!is.null(anchor))pick <- pick[rounds$round_id[pick] %in% anchor]
+    if(!length(pick))return(NULL)
+    row <- pick[which.min(times[pick])]
+    id <- mvp_text(rounds$round_id[row])
+    number <- fm_number(rounds$round_number[row])
+    if(!nzchar(id)||!is.finite(number)||number<1||number!=floor(number))return(NULL)
+    target <- list(id=id,number=number,starts_at=times[row])
+  }
+  if(isTRUE(rounds$is_finished[row]))return(NULL)
+  first <- fm_time(rounds$first_kickoff[row])
+  if(!length(first)||is.na(first)){
+    windows <- attr(rounds,'fixture_windows',exact=TRUE)
+    if(is.null(windows))windows <- lineup_fixture_windows(rounds,attr(rounds,'fixture_calendar')$matches)
+    first <- windows$begin[windows$round_id %in% target$id & windows$index==1L]
+  }
+  if(isTRUE(first<=now) || isTRUE(rounds$partially_played[row]))target$reopened <- TRUE
+  target
 }
 # Images use only observed logo values, never inferred club-name filenames.
 lineup_fixture_crest_url <- function(logo) {
@@ -71,6 +94,11 @@ lineup_fixture_view <- function(rounds,target,scope,now=Sys.time(),clubs_state=N
     return(unavailable('The saved match calendar is incomplete. Background sync will retry.'))
   coverage<-calendar$matches$rounds;coverage<-coverage[coverage$round_id==target$id,,drop=FALSE]
   rows<-calendar$matches$rows;rows<-rows[rows$round_id==target$id,,drop=FALSE]
+  if(isTRUE(target$dated_only))rows <- rows[nzchar(rows$kickoff),,drop=FALSE]
+  if(!is.null(target$group)){
+    kickoff <- fm_time(rows$kickoff)
+    rows <- rows[!is.na(kickoff) & kickoff>=target$starts_at & kickoff<=target$ends_at,,drop=FALSE]
+  }
   # Keep direct match logos when supplied. Missing fields in older saved
   # calendars can be recovered from the same catalogue without reacquisition.
   for(side in c('home','away'))if(!paste0(side,'_logo')%in%names(rows))rows[[paste0(side,'_logo')]]<-rep('',nrow(rows))
@@ -118,12 +146,27 @@ lineup_catalog_problem <- function(catalog,state=NULL,expected_context=NULL,now=
   if(identical(attr(catalog,'catalog_complete'),FALSE))return(fm_scalar(attr(catalog,'catalog_reason'),''))
   ''
 }
-lineup_average_scores <- function(roster,history,rounds,n=5L) {
+lineup_completed_window <- function(rounds,n) {
+  if(!is.data.frame(rounds)||!all(c('round_number','is_finished')%in%names(rounds)))return(numeric())
+  done <- rounds[rounds$is_finished %in% TRUE & is.finite(rounds$round_number),,drop=FALSE]
+  if(!nrow(done))return(numeric())
+  done <- done[order(done$round_number),,drop=FALSE]
+  index <- seq_len(nrow(done))
+  if(all(c('round_id','begin_process') %in% names(done))){
+    windows <- lineup_calendar_windows(rounds)
+    last <- windows[windows$index==windows$groups,,drop=FALSE]
+    end <- last$end[match(done$round_id,last$round_id)]
+    # Old catalogues can lack dates. Keep their ordinal fallback for undated
+    # rows while ordering all evidenced dates by the final fixture group.
+    dated <- which(!is.na(end))
+    index[dated] <- dated[order(end[dated],done$round_number[dated])]
+  }
+  tail(unique(as.numeric(done$round_number[index])),max(1L,min(20L,as.integer(n))))
+}
+lineup_average_scores <- function(roster,history,rounds,n=5L,wanted=lineup_completed_window(rounds,n)) {
   n<-max(1L,min(20L,as.integer(n)));ids<-as.character(roster$id)
   result<-data.frame(id=ids,average=rep(NA_real_,length(ids)),coverage=integer(length(ids)),required=integer(length(ids)),status=rep('missing',length(ids)),stringsAsFactors=FALSE)
-  wanted<-if(is.data.frame(rounds)&&all(c('round_number','is_finished')%in%names(rounds)))
-    tail(sort(unique(as.numeric(rounds$round_number[rounds$is_finished%in%TRUE]))),n)else numeric()
-  wanted<-wanted[is.finite(wanted)];result$required<-rep(length(wanted),length(ids));attr(result,'rounds')<-wanted
+  result$required<-rep(length(wanted),length(ids));attr(result,'rounds')<-wanted
   if(!length(wanted)||!is.data.frame(history)||!all(c('player_id','round','points')%in%names(history)))return(result)
   history<-history[as.numeric(history$round)%in%wanted,,drop=FALSE]
   # Shared controller supplies reconciled context-scoped revisions. Keep its

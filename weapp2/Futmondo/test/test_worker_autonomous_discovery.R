@@ -43,6 +43,36 @@ stopifnot(length(plan)==2L,all(handlers(plan)=='get_round_lineup_snapshot'),
  all(vapply(plan,function(d)d$args$user_team_id=='rival',logical(1))),
  sort(vapply(plan,function(d)d$interval_seconds,integer(1)))==c(300L,86400L))
 cat('PASS rival data, historical lineups and award/ranking views are discovered from authoritative team/round identities; future rounds excluded\n')
+ordinary_catalog<-catalog
+catalog<-list(user_team_id='mine',current_round_id='main',rounds=data.frame(
+ round_id=c('main','unplayed','split'),round_number=c(15,16,23),status=c('running','future','running'),
+ is_finished=FALSE,partially_played=c(FALSE,FALSE,TRUE)))
+for(state in c('running','closed')){
+ catalog$rounds$status[3]<-state
+ details<-fm_worker_discover('get_classification_round_catalog',catalog,league_ctx,auth)
+ ids<-vapply(details,function(d)fm_scalar(d$args$round_id %||% d$args$reference,''),character(1))
+ stopifnot(length(details)==4L,setequal(ids,c('main','split')),
+  !any(handlers(details)=='get_official_dreamteam_result'),
+  all(vapply(details[ids=='split'],function(d)d$interval_seconds==if(state=='running')300L else 86400L,logical(1))))
+ original_saved<-fm_worker_saved_resource
+ fm_worker_saved_resource<-function(...)catalog
+ lineups<-fm_worker_discover('get_user_team_rounds',list(),rival,auth)
+ stopifnot(length(lineups)==2L,setequal(vapply(lineups,function(d)d$args$round_id,character(1)),c('main','split')))
+ fm_worker_saved_resource<-original_saved
+}
+catalog$rounds$status[3]<-'running'
+catalog$rounds$slow_from<-c(NA,NA,as.numeric(Sys.time())-3600)
+catalog$rounds$resume_at<-c(NA,NA,as.numeric(Sys.time())+60*86400)
+split_interval<-function(){
+ details<-fm_worker_discover('get_classification_round_catalog',catalog,league_ctx,auth)
+ ranking<-Filter(function(d)d$handler=='get_classification_round_ranking'&&d$args$round_id=='split',details)
+ ranking[[1]]$interval_seconds
+}
+stopifnot(split_interval()==86400L)
+catalog$rounds$status[3]<-'closed';catalog$rounds$resume_at[3]<-as.numeric(Sys.time())-3600
+stopifnot(split_interval()==300L)
+catalog<-ordinary_catalog
+cat('PASS two playing rounds and a closed split phase retain distinct ranking and lineup keys without final awards or intervening queries\n')
 players<-data.frame(id=c('p1','p2','p2'))
 plan<-fm_worker_discover('get_championship_players',players,league_ctx,auth)
 stopifnot(length(plan)==6L,all(vapply(plan,function(d)if(d$handler=='get_player_summary')d$args$user_team_id=='mine'else TRUE,logical(1))),

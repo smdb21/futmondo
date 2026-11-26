@@ -57,8 +57,9 @@ persist_recent_points_snapshot<-function(payload,context,on_complete){
  if(hold_last==0L||write_count<=15L-hold_last)on_complete(TRUE)
  TRUE
 }
-defer_persistence<-function(fn,args,context,on_complete,...){on_complete(TRUE);TRUE}
+defer_persistence<-function(fn,args,context,on_complete=NULL,...){if(is.function(on_complete))on_complete(TRUE);TRUE}
 server<-function(input,output,session){
+ session$userData$score_calendar_windows<-function(context)data.frame(number=6:10,begin=stamp-5:1,groups=1L)
  active<-reactiveVal(TRUE);refresh<-reactiveVal(0L);n<-reactiveVal(if('average.fitness'%in%names(players))4L else 3L)
  session$userData$shared_round_points<-new_shared_round_points_controller(session,publish_interval=60,retry_delays=c(0,0))
  source<-recent_player_points_source(session,reactive(auth),reactive('league'),reactive('team'),reactive(players),active,

@@ -29,12 +29,9 @@ observations. `classification_round_rows()` maps opaque source round IDs through
 the catalog, retains numeric subrounds such as 6.2 and resolves duplicate
 team/round observations to the last supplied revision. The pure projection uses
 one cumulative sum per team, then ranks each round (ties use minimum rank).
-Category axes retain numeric ordering with equal spacing for rounds/subrounds.
+Category axes use the same first-kickoff order as the cumulative calculation. A numeric subround without its own date follows its parent round when both appear.
 
-The `round_numbers` attribute carries catalog coverage through the latest
-observed round, excluding later scheduled rounds. Missing team records, absent
-catalog rounds and explicit unknown scores keep cumulative results unknown from
-that point onward; they never become zero or a sum of fewer rounds. Genuine zero
+The `played_rounds` attribute carries the numbers of observed, active, partially played and finished rounds from the shared standings projection. For 2026–27 LaLiga, J23 can appear between J14 and J15 while J16–J22 are still upcoming. The chart applies the latest observed total for each round once. Later corrections revise that point on the curve. Exact December subtotals require a dated observation from December. Missing team records and explicit unknown scores in a published round keep later cumulative results unknown; they never become zero or a sum of fewer rounds. Genuine zero
 and negative points remain intact. `connectgaps = FALSE` and a status explain
 incomplete saved evidence. Cumulative totals are computed before applying the
 rank display range. The former single-round inspector is removed. The range
@@ -202,8 +199,7 @@ when selected or needed to initialize the Cash & transfers date controls.
 Returning to Cash & transfers preserves the selected dates when the league and
 history bounds are the same.
 
-After the team histories settle, `ranking_targets()` identifies published rounds
-with a missing score. It reuses the existing scoped database snapshots for
+After the team histories settle, `plots_ranking_targets()` selects published rounds with a missing score and no evidence of pending games. An explicitly unfinished or partially played round cannot establish final nonparticipation, even if an interim ranking uses a closure code. It reuses the existing scoped database snapshots for
 `get_classification_round_ranking`. That handler's verified first-party request
 is `POST /1/ranking/round` with the fantasy `championshipId`, viewer `userteamId`
 and the opaque round ID in `roundNumber`. The persisted parser output carries

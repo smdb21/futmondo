@@ -176,6 +176,98 @@ stopifnot(is.null(live$error),live_reads==4L,worker_reads==prior_worker_reads,!i
  identical(league_context_metadata('league',auth[['userid']],allow_stale=TRUE)$observed_at,metadata_clock))
 cat('PASS explicit live preflight bypasses all worker snapshots and preserves the 30-second live policy without inventing source scoring evidence\n')
 
+# Unlike a team-wide lineup read, an explicit save and its readback require a matching
+# live editable round. A change back to J15 must never confirm a J23 submission.
+target <- list(id='r23',number=23,starts_at=fm_time(rounds$begin_process[1]))
+mode <- 'r23'
+raw_transport <- fm_async_read_http
+fm_async_read_http <- function(url,method='GET',body=NULL,headers=character(),...){
+ if(endsWith(url,'/1/match/list')){
+   stopifnot(identical(jsonlite::fromJSON(body)$query$roundId,'r23'))
+   answer <- list(round=list(`_id`='r23'),matches=list(list(date=rounds$begin_process[1])))
+   return(promises::promise_resolve(list(status_code=200L,content=charToRaw(jsonlite::toJSON(list(answer=answer),auto_unbox=TRUE)))))
+ }
+ if(!identical(url,ACTIVE_CHAMPIONSHIPS_URL))return(raw_transport(url,method,body,headers,...))
+ q <- jsonlite::fromJSON(body,simplifyVector=FALSE)$query
+ stopifnot(identical(q,list(excludeGeneral=FALSE,includeProphets=TRUE)))
+ active <- list(championships=list(list(id='league',userteam=list(id='team'),league='competition')),
+   rounds=list(list(`_id`=mode,number=if(mode=='r23')23 else 15,championshipId='competition',
+     beginProcess=rounds$begin_process[1])))
+ promises::promise_resolve(list(status_code=200L,content=charToRaw(jsonlite::toJSON(list(answer=active),auto_unbox=TRUE))))
+}
+same <- resolve(lineup_fetch_live(auth,ctx,target,'fixture'))
+stopifnot(is.null(same$error),identical(same$value$source$target_id,'r23'))
+answers$lineup$status <- 'closed'
+closed <- resolve(lineup_fetch_live(auth,ctx,target,'fixture'))
+readback <- resolve(lineup_fetch_live(auth,ctx,target,'fixture',readback=TRUE))
+stopifnot(inherits(closed$error,'lineup_target_changed'),grepl('closed',conditionMessage(closed$error)),
+  is.null(readback$error),identical(readback$value$source$status,'closed'))
+answers$lineup$status <- NULL
+mode <- 'r15'
+wrong <- resolve(lineup_fetch_live(auth,ctx,target,'fixture',readback=TRUE))
+stopifnot(inherits(wrong$error,'lineup_target_changed'),is.null(wrong$value))
+manual <- lineup_empty()
+manual$starters[1:2] <- c('a','b')
+manual$captain <- 'a'
+reopened <- list(reopened=TRUE)
+baseline <- list(official=manual,source=list(delayed_edits_allowed=TRUE))
+stopifnot(!length(lineup_reopened_issues(baseline,manual,reopened)))
+changed <- manual
+changed$strategy <- '3-4-3'
+changed$captain <- 'b'
+stopifnot(length(lineup_reopened_issues(baseline,changed,reopened))==2L)
+baseline$source$delayed_edits_allowed <- FALSE
+stopifnot(length(lineup_reopened_issues(baseline,manual,reopened))==1L,
+  !length(lineup_reopened_issues(baseline,manual,target)))
+cat('PASS advanced and ordinary active targets, readback isolation, reopened formation, captain and lock settings\n')
+
+league_id <- '504e4f584d8bec9a67000079'
+round_id <- '6a4af7f2ae633549bd0f0471'
+event <- list(id=round_id,number=23,starts_at=fm_time('2027-02-07T16:00:00Z'),reopened=TRUE)
+ids <- c('6a4af7f2ae633549bd0f047a','6a4af7f2ae633549bd0f0474',paste0('remaining-',1:8))
+dates <- c('2026-12-02T18:00:00Z','2026-12-02T20:30:00Z',rep('2027-02-07T16:00:00Z',8))
+fixture <- list(round=list(`_id`=round_id),matches=Map(function(id,date)list(id=id,date=date),ids,dates))
+window <- function(at,target=event,matches=fixture,competition=league_id,opening_only=FALSE)
+  lineup_j23_window_issue(competition,target,matches,fm_time(at),opening_only)
+stopifnot(grepl('10:00 Madrid',window('2027-02-07T08:59:59Z')),
+  !length(window('2027-02-07T09:00:00Z')),
+  length(window('2027-02-07T09:00:00Z',opening_only=TRUE))==1L,
+  length(window('2027-02-07T09:00:00Z',competition='unknown'))==1L,
+  !length(window('2027-02-07T08:00:00Z',competition='other')),
+  !length(window('2027-02-07T08:00:00Z',target=modifyList(event,list(id='other-J23')))))
+opening <- modifyList(event,list(starts_at=fm_time(dates[1]),reopened=FALSE))
+stopifnot(!length(window('2026-11-30T06:00:00Z',opening,opening_only=TRUE)),
+  length(window('2026-12-02T20:00:00Z',modifyList(event,list(starts_at=fm_time(dates[2])))))==1L)
+moved <- fixture
+for(i in 3:10)moved$matches[[i]]$date <- '2027-04-16T18:00:00Z'
+rescheduled <- modifyList(event,list(starts_at=fm_time(moved$matches[[3]]$date)))
+stopifnot(length(window('2027-04-16T12:00:00Z',event,moved))==1L,
+  grepl('10:00 Madrid',window('2027-04-16T07:59:59Z',rescheduled,moved)),
+  !length(window('2027-04-16T08:00:00Z',rescheduled,moved)))
+moved$matches[[3]] <- NULL
+stopifnot(length(window('2027-04-16T09:00:00Z',rescheduled,moved))==1L)
+live_event <- modifyList(event,list(starts_at=Sys.time()+21*86400))
+live_matches <- fixture
+for(i in seq_along(live_matches$matches)){
+  at <- if(i<=2L)Sys.time()-i*86400 else live_event$starts_at
+  live_matches$matches[[i]]$date <- format(at,'%Y-%m-%dT%H:%M:%OS6Z',tz='UTC')
+}
+event_scope <- modifyList(ctx,list(competition_id=league_id,season='2025-2026'))
+event_marker <- list(championships=list(list(id='league',league=league_id,userteam=list(id='team'))),
+  rounds=list(list(`_id`=round_id,number=23,championshipId=league_id,
+    beginProcess=live_matches$matches[[3]]$date)))
+lineup_api_read <- function(route,...){
+  answer <- switch(route,'/1/match/list'=live_matches,'/2/user/activechampionships'=event_marker,
+    '/1/userteam/lineup'=list(strategy='4-4-2',pointSystem='press'),
+    '/1/userteam/information'=list(league=list(id=league_id,season='2025-2026')),
+    answers[[answer_name(route)]])
+  promises::promise_resolve(answer)
+}
+premature <- resolve(lineup_fetch_live(auth,event_scope,live_event,'fixture'))
+stopifnot(inherits(premature$error,'lineup_target_changed'),grepl('10:00 Madrid',conditionMessage(premature$error)))
+lineup_api_read <- real_lineup_api_read
+cat('PASS the LaLiga J23 reopening tracks the actual remaining fixtures, Madrid winter/summer time, and the live deadline\n')
+
 # Bounded CPU comparison for a full 100-player source roster. Both paths use
 # identical already-fetched rows; no cache/API/DB work is introduced by fallback.
 benchmark_answers<-answers
@@ -187,4 +279,4 @@ explicit_time<-system.time(for(i in 1:100)lineup_normalize_bundle(explicit_answe
 omitted_time<-system.time(for(i in 1:100)lineup_normalize_bundle(benchmark_answers,ctx,NULL))[['elapsed']]
 stopifnot(identical(counts_before,c(reads,writes,worker_reads,live_reads,metadata_calls)))
 cat(sprintf('MEASURE 100-player bundle: explicit selector %.3fms/normalization; missing selector with exact evidence %.3fms/normalization (100 runs each); zero added I/O\n',10*explicit_time,10*omitted_time))
-cat('LINEUP SNAPSHOT CONTEXT: 10 groups passed / 0 failed\n')
+cat('LINEUP SNAPSHOT CONTEXT: 11 groups passed / 0 failed\n')

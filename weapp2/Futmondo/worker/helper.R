@@ -43,6 +43,20 @@ fm_worker_discover<-function(handler,value,context,auth,league_refresh=FALSE){
   out[[d$resource_key]]<<-d
  }
  own_team_value<-NULL
+ round_intervals<-function(catalog){
+  rows<-catalog$rounds
+  status<-tolower(rows$status %||% rep('',nrow(rows)))
+  playing<-status%in%c('active','playing','in_progress','running') | rows$round_id%in%fm_scalar(catalog$current_round_id,'')
+  partial<-rows$partially_played %||% rep(FALSE,nrow(rows))
+  intervals<-ifelse(rows$is_finished%in%TRUE,86400L,ifelse(playing,300L,ifelse(partial%in%TRUE,86400L,NA_integer_)))
+  if(all(c('slow_from','resume_at')%in%names(rows))){
+   now<-as.numeric(Sys.time())
+   gap<-partial%in%TRUE & is.finite(rows$slow_from) & is.finite(rows$resume_at)
+   intervals[gap & now>=rows$slow_from & now<rows$resume_at]<-86400L
+   intervals[gap & now>=rows$resume_at & now<=rows$resume_at+2*86400]<-300L
+  }
+  intervals
+ }
  own_team<-function(){
   if(!is.null(own_team_value))return(own_team_value)
   own_team_value<<-''
@@ -92,12 +106,12 @@ fm_worker_discover<-function(handler,value,context,auth,league_refresh=FALSE){
  if(handler%in%c('get_award_round_catalog','get_classification_round_catalog')&&is.data.frame(value$rounds)){
   tid<-fm_scalar(value$user_team_id,context$user_team_id)
   if(!nzchar(tid))tid<-own_team()
+  intervals<-round_intervals(value)
   for(i in seq_len(nrow(value$rounds))){
    row<-value$rounds[i,,drop=FALSE]
-   if(!nzchar(fm_scalar(row$round_id,''))||!is.finite(fm_number(row$round_number)))next
+   if(is.na(intervals[i])||!nzchar(fm_scalar(row$round_id,''))||!is.finite(fm_number(row$round_number)))next
    finished<-isTRUE(row$is_finished)
-   if(!finished&&!identical(fm_scalar(row$round_id,''),fm_scalar(value$current_round_id,'')))next
-   interval<-if(finished)86400L else 300L
+   interval<-intervals[i]
    args<-list(championship_id=context$championship_id,user_team_id=tid,round_id=as.character(row$round_id),round_number=as.numeric(row$round_number))
    if(nzchar(tid))add('get_classification_round_ranking',args,context,interval)
    add('get_round_dreamteam',list(championship_id=context$championship_id,reference=as.character(row$round_id)),context,interval)
@@ -107,11 +121,12 @@ fm_worker_discover<-function(handler,value,context,auth,league_refresh=FALSE){
  }
  if(handler=='get_user_team_rounds'&&nzchar(context$user_team_id)){
   catalog<-saved('get_classification_round_catalog',list(championship_id=context$championship_id))
+  intervals<-if(is.data.frame(catalog$rounds))round_intervals(catalog)else integer()
   if(is.data.frame(catalog$rounds))for(i in seq_len(nrow(catalog$rounds))){
    row<-catalog$rounds[i,,drop=FALSE];id<-fm_scalar(row$round_id,'')
-   if(!nzchar(id)||(!isTRUE(row$is_finished)&&!identical(id,fm_scalar(catalog$current_round_id,''))))next
+   if(!nzchar(id)||is.na(intervals[i]))next
    add('get_round_lineup_snapshot',list(championship_id=context$championship_id,
-    user_team_id=context$user_team_id,round_id=id),context,if(isTRUE(row$is_finished))86400L else 300L)
+    user_team_id=context$user_team_id,round_id=id),context,intervals[i])
   }
  }
  if(handler=='get_championship_players'&&is.data.frame(value)&&'id'%in%names(value)){
@@ -226,9 +241,17 @@ fm_worker_headless_finances<-function(env,auth,ctx,on_update=NULL){
  s<-shiny::MockShinySession$new();on.exit(s$close(),add=TRUE)
  teams<-env$get_teams(auth,ctx$championship_id)
  catalog<-env$get_mvp_saved_catalog(auth,ctx$championship_id)
- rounds<-catalog$catalog$rounds;awards<-catalog$saved
+ rounds<-catalog$catalog$rounds
+ if(NROW(rounds)>0L && !'partially_played'%in%names(rounds) && nzchar(mvp_text(catalog$catalog$league_id)) &&
+    is.null(attr(catalog$catalog,'fixture_calendar'))){
+  # A pre-upgrade saved catalog can precede the already persisted fixture facts.
+  metadata<-env$get_award_round_metadata(auth,ctx$championship_id,catalog$catalog$league_id,current_round_id=catalog$catalog$current_round_id)
+  if(identical(metadata$status,'ok'))rounds<-award_join_calendar(rounds,metadata)$rounds
+ }
+ awards<-award_calendar_selections(catalog$saved,rounds)
  complete<-isTRUE(catalog$catalog$complete)
- if(is.data.frame(rounds)&&nrow(rounds))for(i in which(rounds$is_finished%in%TRUE)){
+ partial<-rounds$partially_played %||% rep(FALSE,NROW(rounds))
+ if(is.data.frame(rounds)&&nrow(rounds))for(i in which(rounds$is_finished%in%TRUE & !(partial%in%TRUE))){
   ref<-round_reference(rounds$round_id[i],rounds$round_number[i]);ref$is_finished<-TRUE
   saved<-if(is.data.frame(awards)&&'round_id'%in%names(awards))awards[awards$round_id%in%ref$round_id,,drop=FALSE]else data.frame()
   checked<-if('checked_at'%in%names(saved))fm_time(saved$checked_at)else as.POSIXct(character())
@@ -240,8 +263,16 @@ fm_worker_headless_finances<-function(env,auth,ctx,on_update=NULL){
     'persistence'%in%names(saved)&&all(saved$persistence%in%'Saved')&&is.finite(age)&&age>=0&&age<86400&&
     !ref$round_id%in%(catalog$settlement_rechecks %||% character())
   if(isTRUE(reusable))next
+  if('final_fixture_at'%in%names(rounds)&&is.finite(rounds$final_fixture_at[i]))ref$final_fixture_at<-rounds$final_fixture_at[i]
   result<-env$get_official_dreamteam_result(auth,ctx$championship_id,ref)
   if(identical(result$status,'ok')){
+   if(!is.null(ref$final_fixture_at)){
+    stamp<-fm_time(attr(result,'observed_at'))
+    if(length(stamp)!=1L||is.na(stamp)||as.numeric(stamp)<ref$final_fixture_at){
+     complete<-FALSE
+     next
+    }
+   }
    if(!isTRUE(env$persist_official_award_snapshot(result,auth,ctx$championship_id,ref,ctx)))stop('Award persistence failed')
    awards<-dplyr::bind_rows(awards[!awards$round_id%in%ref$round_id,,drop=FALSE],result$rows)
   }else complete<-FALSE
@@ -467,6 +498,10 @@ fm_worker_run<-function(descriptor){
       restored<-fm_worker_decode(saved$value)
       valid_scope<-name!='get_mvp_saved_catalog'||!fm_context_known(childctx$season)||
         identical(fm_scalar(restored$season,'unknown'),childctx$season)
+      if(name=='get_official_dreamteam_result'&&!is.null(params$reference$final_fixture_at)){
+       stamp<-fm_time(attr(restored,'observed_at'))
+       valid_scope<-isTRUE(as.numeric(stamp)>=params$reference$final_fixture_at)
+      }
       if(valid_scope){
        stamp<-fm_time(saved$observed_at)
        if(length(stamp)==1L&&!is.na(stamp))source_clock<<-if(is.null(source_clock))stamp else min(source_clock,stamp)
@@ -508,41 +543,30 @@ fm_worker_run<-function(descriptor){
  if(identical(descriptor$handler,'lineup_schedule_check')){
   clear_api_cache()
   env$Sys.time<-base::Sys.time
-  # The scheduling bridge already acknowledges and reuses the live calendar
-  # responses in its own scoped durable evidence. Avoid a second publication.
-  env$persist_award_calendar_snapshot<-function(data,context)invisible(NULL)
   scoring_needed<-FALSE
-  read_calendar<-env$mvp_api_answer
-  env$mvp_api_answer<-function(login,url,query){
-   result<-read_calendar(login,url,query)
-   if(scoring_needed&&identical(url,ACTIVE_CHAMPIONSHIPS_URL)&&identical(result$status,'ok')){
-    stamp<-attr(result,'observed_at')
-    rows<-env$normalize_active_league_contexts(result$answer,ctx$account_id,stamp)
-    selected<-Filter(function(row)isTRUE(row$complete)&&
-      identical(row$championship_id,ctx$championship_id)&&identical(row$competition_id,ctx$competition_id)&&
-      identical(row$season,ctx$season)&&fm_context_known(row$scoring_version),rows)
-    if(length(selected)==1L)env$remember_league_context(selected[[1]])
-   }
-   result
-  }
   read<-function(route,extra=list()){
-   query<-c(list(championshipId=ctx$championship_id,userteamId=ctx$user_team_id),extra)
+   query<-if(route=='/2/user/activechampionships')list(excludeGeneral=FALSE,includeProphets=TRUE)else
+    c(list(championshipId=ctx$championship_id,userteamId=ctx$user_team_id),extra)
    result<-fm_pipe_exchange(list(type='http',url=paste0('https://api.futmondo.com',route),body=list(query=query)))
    answer<-env$lineup_api_answer(result$body,observed_at=fm_time(result$observed_at))
    if(route=='/1/userteam/lineup'&&!isTRUE(descriptor$args$readback))
     scoring_needed<<-!nzchar(fm_scalar(answer$pointSystem,''))
    answer
   }
-  rounds<-function(){
-   catalog<-env$get_award_round_catalog(auth,ctx$championship_id,refresh=TRUE)
-   if(!isTRUE(catalog$identity_complete)||nzchar(fm_scalar(catalog$reason,''))||
-      !identical(catalog$league_id,ctx$competition_id)||!identical(catalog$user_team_id,ctx$user_team_id))
-     stop('Round identity is unverified')
-   if(scoring_needed&&!fm_context_known(env$league_context_metadata(ctx$championship_id,ctx$account_id)$scoring_version))
-    env$get_persisted_league_context(ctx$account_id,ctx$championship_id,ctx$competition_id,ctx$season)
-   catalog$rounds
+  active_target<-function(){
+   active<-read('/2/user/activechampionships')
+   target<-env$lineup_active_target(active,ctx$championship_id,ctx$user_team_id,competition_id=ctx$competition_id)
+   if(!is.null(target)&&scoring_needed){
+    rows<-env$normalize_active_league_contexts(active,ctx$account_id,attr(active,'observed_at'))
+    selected<-Filter(function(row)isTRUE(row$complete)&&
+      identical(row$championship_id,ctx$championship_id)&&identical(row$competition_id,ctx$competition_id)&&
+      identical(row$season,ctx$season)&&fm_context_known(row$scoring_version),rows)
+    if(length(selected)==1L)env$remember_league_context(selected[[1]])
+    else env$get_persisted_league_context(ctx$account_id,ctx$championship_id,ctx$competition_id,ctx$season)
+   }
+   target
   }
-  result<-env$lineup_schedule_check(ctx,descriptor$args,read,rounds)
+  result<-env$lineup_schedule_check(ctx,descriptor$args,read,active_target)
   return(list(type='result',lineup_check=result))
  }
  handler<-descriptor$handler

@@ -338,4 +338,6 @@ Active manual offer reconciliation requires `scripts/migrations/20261123071652_r
 
 ### Scheduled lineups for incoming signings
 
+For existing databases, apply `scripts/migrations/20261126135250_split_round_job_cadence.sql` to let the worker slow round-specific reads during a long break between confirmed fixture groups. Fresh databases include the routine in `scripts/schema.sql`. [Worker scheduling](docs/worker_cadence.md#split-matchdays)
+
 Install `scripts/migrations/20261123120000_scheduled_lineups.sql` and `scripts/migrations/20261123170000_replace_lineup_schedules.sql` before enabling `FUTMONDO_LINEUP_SCHEDULING_ENABLED=true` in Dokploy. Fresh databases include the schema. The flag defaults to `false` and enables approval and automatic submission of the optimized round-start lineup. The Lineup preview is available independently, with incoming players included by default. It uses the existing confidential database settings, `FUTMONDO_WORKER_KEY`, and Docker-supervised worker. After review and approval, the scheduled submission can run after logout. [Lineup scheduling and verification](docs/lineup_module.md#staged-lineups-for-incoming-signings--2026-11-23).

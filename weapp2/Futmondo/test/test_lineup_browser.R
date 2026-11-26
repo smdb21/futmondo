@@ -109,7 +109,7 @@ if (scheduled_fixture) {
         if(!is.null(fixture_job)&&identical(fixture_job$state,'queued')&&!identical(payload$p_confirmed,fixture_job$id))
           paste0('confirm:',fixture_job$id)
         else {
-          fixture_job <<- list(id=payload$p_id,context=rev(payload$p_context),round_id=payload$p_round,stages=payload$p_stages,
+          fixture_job <<- list(id=payload$p_id,context=rev(payload$p_context),round_id=payload$p_round,kickoff=payload$p_kickoff,stages=payload$p_stages,
             stage_index=0L,state='queued',code='',outcomes=list()); 'ready'
         }
       },

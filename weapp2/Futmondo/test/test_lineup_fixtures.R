@@ -81,13 +81,78 @@ data<-rounds;attr(data,'fixture_calendar')<-NULL;stopifnot(!nrow(view(data)$rows
 stopifnot(!nrow(view(target=NULL)$rows))
 cat('PASS unconfirmed kickoff/opponent, duplicates, corrupt counts, old snapshots and failures remain distinct from complete or empty schedules\n')
 
+# Source match order, matchday numbers, calendar chronology and the editable
+# team lineup are independent. The same round ID resumes after other rounds.
+days <- c('2026-11-27T20:00:00Z','2026-12-02T18:00:00Z','2026-12-02T20:30:00Z',
+  '2026-12-04T20:00:00Z','2027-02-07T17:00:00Z')
+test_round <- function(id,game_ids,times)list(`_id`=id,matches=Map(function(game,at)
+  match_record(game,paste('home',game),paste('away',game),at),game_ids,times))
+calendar <- league_fixture_matches(list(test_round('r23',c('feb','second','first'),days[c(5,3,2)]),
+  test_round('r15','regular15',days[4]),test_round('r14','regular14',days[1])))
+split_rounds <- data.frame(round_id=c('r14','r15','r23'),round_number=c(14,15,23),
+  begin_process=c(days[1],days[4],days[2]),is_finished=FALSE)
+attr(split_rounds,'fixture_calendar') <- list(matches=calendar,scope=scope,status='ok',observed_at=now-60,
+  valid_until=as.numeric(now)+900)
+attr(split_rounds,'fixture_windows') <- lineup_fixture_windows(split_rounds,calendar)
+active <- list(championships=list(list(id='league',league='competition',userteam=list(id='team'))),
+  rounds=list(list(`_id`='r14',number=14,championshipId='competition',beginProcess=days[1])))
+target <- function(date)lineup_active_target(active,'league','team',fm_time(date))
+attr(split_rounds,'lineup_active') <- list(target=target(now))
+refs <- lineup_match_rounds(split_rounds,now)
+stopifnot(lineup_target(split_rounds,now)$id=='r14',refs$next_round$id=='r14',refs$upcoming_split$id=='r23',
+  identical(lineup_fixture_view(split_rounds,refs$upcoming_split,scope,now)$rows$match_id,c('first','second')),
+  refs$upcoming_split$groups==2L,refs$upcoming_split$later_start==fm_time(days[5]))
+pending <- split_rounds
+pending$begin_process[pending$round_id=='r23'] <- ''
+partial_calendar <- attr(pending,'fixture_calendar')$matches
+partial_calendar$rows$kickoff[partial_calendar$rows$match_id=='feb'] <- ''
+partial_calendar$rounds$complete[partial_calendar$rounds$round_id=='r23'] <- FALSE
+attr(pending,'fixture_windows') <- lineup_fixture_windows(pending,partial_calendar)
+attr(pending,'fixture_calendar')$matches <- partial_calendar
+early <- lineup_match_rounds(pending,now)$upcoming_split
+partial_view <- lineup_fixture_view(pending,early,scope,now)
+stopifnot(early$id=='r23',early$partial,is.null(early$groups),early$starts_at==fm_time(days[2]),
+  !partial_view$complete,identical(partial_view$rows$match_id,c('first','second')),lineup_target(pending,now)$id=='r14')
+dec <- fm_time('2026-12-01T12:00:00Z')
+stopifnot(is.null(lineup_target(split_rounds,dec)),lineup_match_rounds(split_rounds,dec)$next_round$id=='r23')
+active$rounds[[1]] <- list(`_id`='r23',number=23,championshipId='competition',beginProcess=days[2])
+attr(split_rounds,'lineup_active') <- list(target=target(dec))
+restored <- fm_worker_decode(jsonlite::fromJSON(fm_worker_json(fm_worker_encode(split_rounds)),simplifyVector=FALSE))
+stopifnot(lineup_target(restored,dec)$id=='r23',lineup_target(restored,dec)$starts_at==fm_time(days[2]),
+  is.null(lineup_target(restored,fm_time(days[2]))),is.null(lineup_active_target(active,'league','other',dec)),
+  is.null(lineup_active_target(active,'league','team',dec,competition_id='another-competition')))
+active$rounds <- c(active$rounds,active$rounds)
+stopifnot(is.null(target(dec)))
+feb <- fm_time('2027-02-01T12:00:00Z')
+refs <- lineup_match_rounds(restored,feb)
+stopifnot(refs$next_round$id=='r23',refs$next_round$group==2L,is.null(lineup_target(restored,feb)),
+  identical(lineup_fixture_view(restored,refs$next_round,scope,feb)$rows$match_id,'feb'))
+active$rounds <- list(list(`_id`='r23',number=23,championshipId='competition',beginProcess=days[5]))
+attr(restored,'lineup_active') <- list(target=target(feb))
+stopifnot(isTRUE(lineup_target(restored,feb)$reopened),lineup_target(restored,feb)$starts_at==fm_time(days[5]))
+history <- data.frame(player_id='p',round=c(14,15,23,24),points=c(-1,2,8,0))
+restored$is_finished <- c(TRUE,TRUE,FALSE)
+stopifnot(identical(lineup_completed_window(restored,2),c(14,15)))
+# Another full matchday closed in the interval. J23 enters once, on closure.
+done <- data.frame(round_id=c('r14','r15','r23','r24'),round_number=c(14,15,23,24),is_finished=TRUE,
+  begin_process=c(days[1],days[4],days[2],'2027-01-31T19:00:00Z'))
+attr(done,'fixture_windows') <- attr(restored,'fixture_windows')
+scores <- lineup_average_scores(data.frame(id='p'),history,done,2)
+stopifnot(identical(attr(scores,'rounds'),c(24,23)),scores$average==4,scores$coverage==2L)
+cat('PASS split matchdays retain one round identity, two December fixtures, an independent full-XI deadline and a separate February fixture group across durable replay\n')
+
 # Keep parser/serialization costs bounded at a normal full 380-match season.
 season<-lapply(1:38,function(i)list(`_id`=paste0('r',i),matches=lapply(1:10,function(j)
  match_record(paste0('m',i,'-',j),'Home','Away','2026-12-01T20:00:00Z'))))
 parse_time<-system.time(full<-league_fixture_matches(season))[['elapsed']]
 data<-rounds;attr(data,'fixture_calendar')$matches<-full
+all_rounds <- data.frame(round_id=paste0('r',1:38),round_number=1:38,begin_process='')
+window_time <- system.time(attr(all_rounds,'fixture_windows')<-lineup_fixture_windows(all_rounds,full))[['elapsed']]
+reuse_time <- system.time(for(i in 1:100)lineup_match_rounds(all_rounds,now))[['elapsed']]/100
 selection_time<-system.time(for(i in 1:20)lineup_fixture_view(data,list(id='r12'),scope,now))[['elapsed']]/20
 stopifnot(nrow(full$rows)==380L,league_fixture_matches_valid(full))
 cat(sprintf('MEASURE 380 fixtures: parse %.3fs; selection/validation %.4fs; memory %d bytes; no display I/O\n',
  parse_time,selection_time,as.numeric(object.size(full))))
+cat(sprintf('MEASURE 380-fixture group projection %.3fs, warm window selection %.4fs, %d persisted bytes in this fixture\n',
+  window_time,reuse_time,as.numeric(object.size(attr(all_rounds,'fixture_windows')))))
 cat('LINEUP FIXTURES: all checks passed\n')

@@ -8,7 +8,6 @@ import httpx
 TEAM_READS = {
     '/1/userteam/lineup', '/1/userteam/roster', '/1/userteam/information', '/5/strategy/availables',
 }
-CALENDAR_READS = {'/2/user/activechampionships', '/2/league/list', '/2/league/matches'}
 MAX_READ_BYTES = 8 * 1024 * 1024
 
 
@@ -45,8 +44,7 @@ class LineupScheduler:
         from urllib.parse import urlparse
 
         if message['type'] in ('resource', 'discovery_resource'):
-            # Live eligibility uses the source; only short-lived calendar inputs
-            # can be replayed from the durable evidence below.
+            # Dispatch and reconciliation verify the currently editable round live.
             return {'value': None}
         if message['type'] == 'database':
             if message['table'] in {'league_context_observations', 'rival_finance_evidence_latest'}:
@@ -63,16 +61,15 @@ class LineupScheduler:
         if route in TEAM_READS:
             if query.get('championshipId') != ctx['championship_id'] or query.get('userteamId') != ctx['user_team_id']:
                 raise WorkerFailure('lineup_source_scope')
-        elif route == '/2/league/matches':
-            if query != {'leagueId': ctx['competition_id']}:
+        elif route == '/1/match/list':
+            if query != dict(championshipId=ctx['championship_id'], userteamId=ctx['user_team_id'],
+                             roundId=job['round_id']):
                 raise WorkerFailure('lineup_source_scope')
-        elif route not in CALENDAR_READS:
+        elif route == '/2/user/activechampionships':
+            if query != {'excludeGeneral': False, 'includeProphets': True}:
+                raise WorkerFailure('lineup_source_scope')
+        else:
             raise WorkerFailure('lineup_source_denied')
-        if route in CALENDAR_READS:
-            existing = await self.store.request('GET', 'lineup_schedule_evidence', params={
-                'plan_id': 'eq.' + job['id'], 'resource': 'eq.' + route, 'valid_until': 'gt.' + stamp(), 'limit': '1'})
-            if existing:
-                return existing[0]['payload']
         body = dict(query=query, header={k: auth[k] for k in ('userid', 'token')}, answer={})
         lock = self.worker.account_locks.setdefault(job['account_id'], asyncio.Lock())
         async with lock, self.worker.connections:
@@ -160,6 +157,8 @@ class LineupScheduler:
             return
         result = await self.check(job, auth, readback=True)
         if time.time() >= timestamp(job['kickoff']):
+            await self.settle(job, 'readback_unverified')
+        elif result['code'] == 'readback_unverified':
             await self.settle(job, 'readback_unverified')
         elif result['code'] == 'saved':
             ctx = job['context']

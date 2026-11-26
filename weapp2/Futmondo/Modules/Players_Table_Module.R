@@ -931,7 +931,38 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
   })
 }
 
-# Exact N consecutive source round numbers, with explicit coverage.
+# Keep one position per round. A reopened round moves to its latest played group.
+recent_points_calendar_order <- function(windows, now=Sys.time(), observed=NULL) {
+  if(!is.data.frame(windows)||!all(c("number","begin","groups")%in%names(windows)))return(NULL)
+  if("round_id"%in%names(windows)&&anyDuplicated(unique(windows[c("round_id","number")])$number))return(NULL)
+  windows <- windows[order(windows$begin),,drop=FALSE]
+  dated_numbers <- unique(windows$number)
+  reordered <- is.unsorted(windows$number)
+  windows <- windows[!is.na(windows$begin)&windows$begin<=now,,drop=FALSE]
+  if(!is.null(observed)){
+    reached <- which(windows$number%in%observed)
+    windows <- head(windows,if(length(reached))max(reached)else 0L)
+  }
+  result <- windows[!duplicated(windows$number,fromLast=TRUE),c("number","groups"),drop=FALSE]
+  attr(result,"reordered") <- reordered
+  attr(result,"dated_numbers") <- dated_numbers
+  result
+}
+
+recent_points_window <- function(n,latest,order=NULL) {
+  numbered <- if(length(latest))seq.int(latest-n+1L,latest)else numeric()
+  chronological <- if(is.data.frame(order))tail(order,n)else NULL
+  split <- !is.null(chronological)&&nrow(chronological)>0L&&
+    (any(chronological$groups>1L)||(isTRUE(attr(order,"reordered"))&&
+      !identical(as.numeric(chronological$number),as.numeric(numbered[numbered>=1L]))))
+  if(split){
+    # An undated intervening ordinal could fall inside this window.
+    span <- range(chronological$number)
+    dated <- attr(order,"dated_numbers")
+    numbered <- if(sum(dated>=span[1]&dated<=span[2])==diff(span)+1L)chronological$number else rep(NA_real_,n)
+  }
+  list(rounds=numbered,split=split)
+}
 
 add_recent_points_average <- function(players_df,history_df,n=5L) {
   if(!is.data.frame(players_df))return(players_df)
@@ -942,15 +973,21 @@ add_recent_points_average <- function(players_df,history_df,n=5L) {
   players_df$recent_points_required <- rep(n,count)
   players_df$recent_points_status <- rep("missing",count)
   players_df$recent_points_details <- rep("",count)
+  latest <- attr(history_df,"latest_round",exact=TRUE)
+  if(is.null(latest)&&is.data.frame(history_df)&&"round"%in%names(history_df)){
+    numbered <- suppressWarnings(as.numeric(as.character(history_df$round)))
+    numbered <- numbered[is.finite(numbered)&numbered>=1&numbered==floor(numbered)]
+    if(length(numbered))latest <- max(numbered)
+  }
+  window <- recent_points_window(n,latest,attr(history_df,"calendar_order",exact=TRUE))
+  wanted <- window$rounds
   if(count&&"id"%in%names(players_df)&&is.data.frame(history_df)&&nrow(history_df)&&
       all(c("player_id","round","points")%in%names(history_df))){
-    source_latest_round <- attr(history_df,"latest_round")
     history_df$round <- suppressWarnings(as.numeric(as.character(history_df$round)))
     history_df$points <- suppressWarnings(as.numeric(as.character(history_df$points)))
     history_df <- history_df[is.finite(history_df$round)&history_df$round>=1&
       history_df$round==floor(history_df$round),,drop=FALSE]
     if(nrow(history_df)){
-      latest <- source_latest_round %||% max(history_df$round);wanted <- seq.int(latest-n+1L,latest)
       by_player <- split(history_df,as.character(history_df$player_id))
       for(i in seq_len(count)){
         rows <- by_player[[as.character(players_df$id[i])]]
@@ -969,7 +1006,7 @@ add_recent_points_average <- function(players_df,history_df,n=5L) {
   # The source already supplies its recent-score sequence, oldest first.
   # It can answer a short window even while numbered history is sparse or its
   # anchor is unresolved. Do not assign round IDs or create acquisition checks.
-  if(n<=5L&&"average.fitness"%in%names(players_df)){
+  if(!window$split&&n<=5L&&"average.fitness"%in%names(players_df)){
     missing <- which(!is.finite(players_df$recent_points_avg))
     for(i in missing){
       values <- recent_points_fitness_values(players_df$average.fitness[i])
@@ -983,7 +1020,7 @@ add_recent_points_average <- function(players_df,history_df,n=5L) {
         paste0("- score: ",rev(values),collapse="\n"))
     }
   }
-  if(n==5L&&"average.averageLastFive"%in%names(players_df)){
+  if(!window$split&&n==5L&&"average.averageLastFive"%in%names(players_df)){
     fallback <- suppressWarnings(as.numeric(as.character(players_df$average.averageLastFive)))
     use <- !is.finite(players_df$recent_points_avg)&is.finite(fallback)
     players_df$recent_points_avg[use] <- fallback[use];players_df$recent_points_status[use] <- "reported"
@@ -1059,7 +1096,7 @@ recent_points_saved_players <- function(stored,context,checks=data.frame(),now=S
 # Legacy rows and mapped last-five observations may already cover a longer N.
 # Missing source rows can warrant one acquisition; a stored successful check
 # separately acknowledges any genuine gaps or explicitly unavailable scores.
-recent_points_covered_players <- function(stored,context,n=5L) {
+recent_points_covered_players <- function(stored,context,n=5L,windows=NULL) {
   stored <- history_context_filter(stored,context)
   if(!nrow(stored)||!all(c("player_id","round")%in%names(stored)))return(character())
   rounds <- suppressWarnings(as.numeric(stored$round))
@@ -1068,7 +1105,9 @@ recent_points_covered_players <- function(stored,context,n=5L) {
   if(!length(rounds))return(character())
   latest <- max(rounds)
   if(latest<n)return(character())
-  wanted <- seq.int(latest-n+1L,latest)
+  order <- recent_points_calendar_order(windows,observed=unique(rounds))
+  wanted <- recent_points_window(n,latest,order)$rounds
+  if(length(wanted)!=n||anyNA(wanted))return(character())
   groups <- split(rounds,as.character(stored$player_id))
   names(groups)[vapply(groups,function(x)all(wanted%in%x),logical(1))]
 }
@@ -1172,17 +1211,24 @@ recent_points_fitness_anchor <- function(row,payload,context) {
     all(is.finite(scores[known]))&&all(scores[known]==values[known])
   },logical(1))]
   if(length(matches)!=1L||matches[1]!=latest)return(NULL)
-  list(round=latest,snapshot=row$snapshot,context=context)
+  list(round=latest,snapshot=row$snapshot,player_id=row$player_id,context=context)
 }
 
-recent_points_fitness_observations <- function(rows,anchor) {
+recent_points_fitness_observations <- function(rows,anchor,windows=NULL) {
   if(is.null(anchor)||!nrow(rows))return(data.frame())
   ctx <- anchor$context
   rows <- rows[rows$snapshot==anchor$snapshot,,drop=FALSE]
+  if(is.null(windows))rows <- rows[rows$player_id%in%anchor$player_id,,drop=FALSE]
   for(field in c("championship_id","competition_id","season","scoring_version"))
     if(field%in%names(rows))rows <- rows[is.na(rows[[field]])|!nzchar(rows[[field]])|rows[[field]]==ctx[[field]],,drop=FALSE]
   values <- lapply(rows$fitness,recent_points_fitness_values)
   size <- min(5L,anchor$round)
+  if(!is.null(windows)&&nrow(rows)){
+    order <- recent_points_calendar_order(windows,fm_time(rows$observed_at[1L]))
+    expected <- tail(order,size)
+    if(!identical(as.numeric(expected$number),as.numeric(seq.int(anchor$round-size+1L,anchor$round)))||
+        any(expected$groups>1L))return(data.frame())
+  }
   keep <- lengths(values)==size
   rows <- rows[keep,,drop=FALSE];values <- values[keep]
   if(!nrow(rows))return(data.frame())
@@ -1304,6 +1350,10 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
     }
   }
   context_for <- function(entry){ctx<-entry$context;ctx$season<-entry$season;ctx$scoring_version<-entry$scoring;ctx}
+  score_windows_for <- function(ctx){
+    source <- root$userData$score_calendar_windows
+    if(is.function(source))tryCatch(source(ctx)%||% data.frame(),error=function(e)data.frame())else NULL
+  }
   visible_ids <- function()unique(unlist(lapply(current_clients(),`[[`,"ids"),use.names=FALSE))
   catalog_requested <- function()any(vapply(current_clients(),function(client)!identical(client$catalog_scope,FALSE),logical(1)))
   ids_for <- function(entry)head(unique(c(visible_ids(),if(catalog_requested())entry$catalog_ids)),2000L)
@@ -1334,12 +1384,14 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
   }
   covered_for <- function(entry,n){
     scope<-context_for(entry)[c("championship_id","competition_id","season","scoring_version")];scope$players<-sort(ids_for(entry))
+    windows<-score_windows_for(context_for(entry))
+    scope$windows<-windows
     if(is.null(entry$coverage_cache)||!identical(entry$coverage_cache$scope,scope))
       entry$coverage_cache<-list(scope=scope,by_n=list())
     key<-as.character(n);cached<-entry$coverage_cache$by_n[[key]]
     if(is.null(cached)){
       existing<-dplyr::bind_rows(c(list(entry$points),entry$live))
-      cached<-intersect(recent_points_covered_players(existing,context_for(entry),n),scope$players)
+      cached<-intersect(recent_points_covered_players(existing,context_for(entry),n,windows),scope$players)
       entry$coverage_cache$by_n[[key]]<-cached
       entry$coverage_cache$by_n<-tail(entry$coverage_cache$by_n,20L)
     }
@@ -1394,7 +1446,7 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
       group <- rows[rows$snapshot==snapshot,,drop=FALSE]
       anchor <- entry$fitness_anchors[[snapshot]]
       if(!is.null(anchor)&&identical(anchor$context,ctx)){
-        observations <- recent_points_fitness_observations(group,anchor)
+        observations <- recent_points_fitness_observations(group,anchor,score_windows_for(ctx))
         entry$fitness_ready <- unique(c(entry$fitness_ready,observations$player_id))
         changes <- recent_points_fitness_changes(observations,existing)
         projected <- nrow(entry$points)+sum(vapply(entry$live,nrow,integer(1)))+nrow(changes)
@@ -1526,7 +1578,10 @@ new_shared_round_points_controller <- function(root,publish_interval=5,retry_del
     })
     result<-head(dplyr::bind_rows(rows),50000L)
     rounds<-suppressWarnings(as.numeric(result$round));rounds<-rounds[is.finite(rounds)&rounds>=1]
-    if(length(rounds))attr(result,"latest_round")<-max(rounds)
+    if(length(rounds)){
+      attr(result,"latest_round")<-max(rounds)
+      attr(result,"observed_rounds")<-unique(rounds)
+    }
     entry$assembled_signature<-signature;entry$assembled_points<-result
     result
   }
@@ -2076,8 +2131,12 @@ recent_player_points_source <- function(session,login_token,championship_id,user
     key<-if(valid_login(client$auth))round_points_client_key(client)else NULL
     rows<-if(identical(key,snapshot$key))snapshot$points else data.frame()
     latest<-attr(rows,"latest_round")
+    calendar_source<-root$userData$score_calendar_windows
+    order<-if(client$active&&nrow(rows)&&is.function(calendar_source))
+      recent_points_calendar_order(tryCatch(calendar_source(snapshot$context),error=function(e)NULL),observed=attr(rows,"observed_rounds"))else NULL
     if(nrow(rows))rows<-rows[rows$player_id%in%client$ids,,drop=FALSE]
     if(!is.null(latest))attr(rows,"latest_round")<-latest
+    if(!is.null(order))attr(rows,"calendar_order")<-order
     if(!identical(shiny::isolate(history()),rows))history(rows)
   },priority=-10)
   list(history=history,status=shared$status,states=shiny::reactive(list()),sources=shared$sources,pending=shared$pending)

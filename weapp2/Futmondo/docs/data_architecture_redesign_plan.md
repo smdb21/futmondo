@@ -1,5 +1,13 @@
 # Futmondo data architecture redesign plan
 
+## Advanced and resumed rounds (2026-11-26)
+
+- [x] Verify the Round 23 notice and inspect the persisted LaLiga fixture calendar.
+- [x] Bind lineup edits and readback to the team’s official round and deadline. Reuse the fixture chronology for match groups, standings, recent points and completion.
+- [x] Show the first confirmed point payment under the original round and reconcile the final installment against the same ledger. Keep whole-round bonuses pending until settlement.
+- [x] Apply and verify the production scheduling migration for long gaps between fixture groups.
+- [ ] Verify Futmondo’s December payment and lineup opening and February reopening when those windows occur. [Contract](lineup_module.md#advanced-fixtures-and-the-editable-lineup--2026-11-26) · [Verification](data_review_results.md#advanced-and-resumed-rounds-2026-11-26)
+
 ## Saved Round awards after league metadata expiry (2026-11-26)
 
 - [x] Restore saved MVPs and Best XIs using the verified league and scoring context. Follow new persisted catalog versions while an award view is open.

@@ -199,3 +199,9 @@ calendar is valid. An expired standings snapshot describes background checking
 unless an actual failure is attached. Range selection and Refresh still read
 existing database observations. The next worker calculation uses the corrected
 preparation key and publishes through the same durable ledger snapshot.
+
+## Overlapping matchdays · 2026-11-26
+
+Published team history, a running or partially played fixture schedule, and confirmed closed rounds establish the round buttons. Explicit future team-history placeholders are discarded. A lineup marker by itself does not publish a score. Standings merge each observed ranking by team and round, keep partial rounds selectable after the marker moves back, and exclude the intervening unplayed rounds from score coverage and bonus calculations. Within a selected numeric range only published matchdays contribute. The default round follows kickoff chronology when available. A partial matchday can carry a provisional total and a pending final bonus after the first group of games has finished. The worker and browser use the existing round-specific rankings, durable storage, resource keys and subscription mechanism.
+
+For an open round, Classification shows each team's confirmed point installments from the saved cash ledger. The optional `points_credited` field distinguishes paid amounts, including zero and negative amounts, from provisional calculations. The round and range views use the same projection. Final position, Best XI and MVP columns stay pending until whole-round settlement and sufficient evidence. When the second point payment arrives, the round shows the cumulative credited amount once. An older snapshot can still supply completed-round totals while the worker refreshes the open-round evidence. [Round accounting](rival_cash_accounting.md#point-credits-between-installments-of-a-split-round--2026-11-26)

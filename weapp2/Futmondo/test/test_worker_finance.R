@@ -44,11 +44,16 @@ env$get_official_dreamteam_result<-function(login,championship_id,reference){
  stopifnot(isTRUE(reference$is_finished));requests<<-requests+1L;list(status='ok',rows=saved_awards)
 }
 env$persist_official_award_snapshot<-function(...){writes<<-writes+1L;TRUE}
-env$shared_rival_finance_source<-function(session,...){
+env$shared_rival_finance_source<-function(session,login,championship,team,teams,active,awards,...){
+ consumed_awards<<-awards()$rows
  session$userData$rival_finance_shared<-list(seed_complete=TRUE,busy=0L,queue=list(),ownership_pending=0L)
  shiny::reactive(list(loading=FALSE))
 }
 invisible(fm_worker_headless_finances(env,auth,ctx));stopifnot(requests==0L,writes==0L)
+rounds$partially_played<-TRUE
+invisible(fm_worker_headless_finances(env,auth,ctx))
+stopifnot(!any(consumed_awards$is_finished),requests==0L,writes==0L,all(saved_awards$is_finished))
+rounds$partially_played<-FALSE
 recheck<-'r1';invisible(fm_worker_headless_finances(env,auth,ctx));stopifnot(requests==1L,writes==1L)
 recheck<-character();saved_awards$is_finished<-FALSE
 invisible(fm_worker_headless_finances(env,auth,ctx));stopifnot(requests==2L)
@@ -59,6 +64,35 @@ invisible(fm_worker_headless_finances(env,auth,ctx));stopifnot(requests==4L)
 saved_awards$is_finished<-TRUE;saved_awards$championship_id<-'other'
 invisible(fm_worker_headless_finances(env,auth,ctx));stopifnot(requests==5L)
 cat('PASS persisted final awards avoid refetch; settlement, daily, provisional, missing-finality and foreign-scope data still require acquisition\n')
+
+saved_awards$championship_id<-'l';saved_awards$checked_at<-'2026-12-03T10:00:00Z'
+rounds$partially_played<-NULL;rounds$status<-'closed'
+records<-list(list(`_id`='r1',matches=lapply(1:10,function(i)list(`_id`=paste0('g',i),h=list(`_id`=paste0('h',i)),
+ a=list(`_id`=paste0('a',i)),st=if(i<=2L)'F'else'P',info=list(date=if(i<=2L)'2026-12-02T20:30:00Z'else'2027-02-07T20:00:00Z')))))
+env$get_mvp_saved_catalog<-function(...)list(saved=saved_awards,catalog=list(rounds=rounds,league_id='source-league',complete=TRUE))
+calendar_reads<-0L;observed<-'2026-12-03T10:00:00Z'
+env$get_award_round_metadata<-function(...){
+ calendar_reads<<-calendar_reads+1L
+ value<-list(status='ok',rows=rounds,fixture_matches=league_fixture_matches(records),fixture_rounds=award_fixture_calendar(records))
+ attr(value,'observed_at')<-fm_time(observed);value
+}
+invisible(fm_worker_headless_finances(env,auth,ctx))
+stopifnot(calendar_reads==1L,requests==5L,!any(consumed_awards$is_finished))
+for(i in seq_len(10))records[[1]]$matches[[i]]$st<-'F'
+observed<-'2027-02-08T10:00:00Z'
+award_stamp<-saved_awards$checked_at[1]
+env$get_official_dreamteam_result<-function(login,championship_id,reference){
+ stopifnot(reference$final_fixture_at==as.numeric(fm_time('2027-02-07T20:00:00Z')))
+ requests<<-requests+1L
+ structure(list(status='ok',rows=saved_awards),observed_at=fm_time(award_stamp))
+}
+writes_before<-writes
+invisible(fm_worker_headless_finances(env,auth,ctx))
+stopifnot(requests==6L,writes==writes_before,!any(consumed_awards$is_finished))
+award_stamp<-observed
+invisible(fm_worker_headless_finances(env,auth,ctx))
+stopifnot(requests==7L,writes==writes_before+1L,all(consumed_awards$is_finished))
+cat('PASS a legacy finance catalog checks the same bulk calendar and excludes pre-final XI revisions until post-final source evidence arrives\n')
 
 # Exercise the actual helper progress envelope independently of source latency.
 for(expr in parse('worker/helper.R'))if(is.call(expr)&&identical(expr[[1]],as.name('<-'))&&as.character(expr[[2]])%in%c('fm_worker_run','fm_worker_discover'))eval(expr,.GlobalEnv)

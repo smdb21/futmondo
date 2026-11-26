@@ -84,7 +84,7 @@ check('bounded asynchronous repair persists fresh round eleven and reuses it nex
  persisted<-evidence;counts<-c(a=0L,b=0L);busy<-maximum<-0L;beats<-0L
  persist_rival_finance_evidence<-function(rows,context){persisted<<-rival_merge_evidence(persisted,rows);TRUE}
  async_adapter_fetch<-function(fn,args,context,...){
-  busy<<-busy+1L;maximum<<-max(maximum,busy)
+  if(fn=='read_rival_calculation_snapshot')return(promises::promise_resolve(NULL))
   result<-switch(fn,get_rival_finance_saved=list(evidence=persisted,defaults=NULL),
    get_rival_finance_seed=list(info=NULL,rules=rules,pressroom=data.frame()),
    get_rival_team_finance_observation={
@@ -94,6 +94,7 @@ check('bounded asynchronous repair persists fresh round eleven and reuses it nex
     attr(r,'observed_at')<-stamp+counts[id]
     list(team_id=id,info=NULL,movements=NULL,rounds=r)
    },stop(paste('Unexpected request',fn)))
+  busy<<-busy+1L;maximum<<-max(maximum,busy)
   promises::promise(function(resolve,reject)later::later(function(){busy<<-busy-1L;resolve(result)},.02))
  }
  for(run in 1:3){
@@ -111,5 +112,93 @@ check('bounded asynchronous repair persists fresh round eleven and reuses it nex
  }
  stopifnot(all(counts==2L),beats>2L)
  async_adapter_fetch<-original_adapter;persist_rival_finance_evidence<-original_persist
+})
+check('early J23 instalments in an open round are credited once before the final awards', {
+  scope <- list(account_id='split-test',championship_id='split-league',competition_id='source-league',season='split-season')
+  publish_active_league_contexts(c(userid=scope$account_id,token='synthetic'),list(
+    championships=list(list(id=scope$championship_id,league=scope$competition_id,ps='stats')),
+    leagues=list(list(`_id`=scope$competition_id,season=scope$season))))
+  stamp <- fm_time('2026-12-03T10:00:00Z')
+  observe <- function(type,id,p,at=stamp)rival_finance_evidence(scope$account_id,scope$championship_id,
+    scope$season,type,id,p,at,scope$competition_id)
+  record_round <- function(team,status,points)observe('team_rounds',team,list(team_id=team,
+    rounds=list(list(id='r23',number=23,points=points,status=status,negative=FALSE))))
+  movement <- function(id,label,amount,kind,date)observe('movements',id,list(team_id='a',id=id,
+    type=kind,concept=label,money=amount,date=date))
+  first <- movement('dec','23',20,'points','2026-12-03T09:30:00Z')
+  rates <- list(initial_budget=100,money_per_point=10,ranking_pool=40,ranking_distribution='top',
+    dreamteam_reward=10,mvp_reward=10)
+  spend <- function(ev,at=stamp,cache=NULL,rules=rates)build_rival_cash_dataset(teams,scope$championship_id,ev,
+    rules=rules,account_id=scope$account_id,season=scope$season,reference_team_id='a',now=at,cache=cache)
+  catalog <- data.frame(round_id='r23',round_number=23,is_finished=FALSE,status='future')
+  dates <- c('2026-12-02T18:00:00Z','2026-12-02T20:30:00Z','2027-02-07T15:00:00Z')
+  source <- observe('eligibility',paste0('calendar:v1:',as.character(openssl::sha256(scope$competition_id))),
+    list(kind='league_round_calendar',version=2,completeness='complete',scope=c(scope,list(league_id=scope$competition_id)),
+      rows=catalog,fixture_rounds=list(list(round_id='r23',begin_process=dates[1],all_fixtures_dated=TRUE,
+        fixture_dates=as.list(dates)))),fm_time('2026-11-26T12:00:00Z'))
+  view <- function(x,id)attr(x$cash_ledgers[[id]],'round_bonus_totals')
+  # A real payment can precede the history row, and the November calendar
+  # alone provides the ID mapping. Replays preserve the actual dated cash.
+  x <- spend(list(source,first,first))
+  a <- view(x,'a'); points <- a[a$bonus_type=='points',]
+  stopifnot(x$pending_bonus_rounds==23,points$points_credited,points$round_number==23,points$amount==20,
+    sum(x$cash_ledgers$a$bonus_type=='points')==1L,all(is.na(a$amount[a$bonus_type!='points'])))
+  ev <- list(source,first,record_round('a','running',2),record_round('b','running',4))
+  x <- spend(ev)
+  stopifnot(view(x,'a')$points_credited[1],x$point_reconciliation$status=='unverified_history',
+    !any(x$cash_ledgers$b$bonus_type=='points'))
+  # Futmondo can close an instalment before every fixture finishes.
+  ev <- list(source,first,record_round('a','closed',2),record_round('b','closed',4))
+  x <- spend(ev)
+  b <- view(x,'b');points <- b[b$bonus_type=='points',]
+  stopifnot(x$pending_bonus_rounds==23,points$points_credited,points$amount==40,
+    !any(x$cash_ledgers$b$included & x$cash_ledgers$b$bonus_type %in% c('ranking','dreamteam','mvp')))
+  final <- fm_time('2027-02-08T13:00:00Z')
+  updated <- source
+  updated$observed_at <- rival_finance_stamp(final-7200)
+  stopifnot(spend(c(list(updated),ev),final)$pending_bonus_rounds==23)
+  for(input in list(list(source,updated),list(updated,source)))
+    stopifnot(as.numeric(rival_settlement_calendar(input,final)$observed_at)==as.numeric(final-7200))
+  last <- movement('feb','23.1',40,'points','2027-02-08T12:00:00Z')
+  position <- movement('rank','23.1',20,'ranking','2027-02-08T12:00:10Z')
+  rival_rates <- rates
+  rival_rates[c('ranking_pool','mvp_reward','dreamteam_reward')] <- 0
+  all_final <- updated
+  all_final$payload$fixture_matches <- league_fixture_matches(list(list(id='r23',
+    matches=lapply(seq_along(dates),function(i)list(id=paste0('m',i),h=list(id='h',name='Home'),
+      a=list(id='a',name='Away'),info=list(date=dates[i]),st='F')))))
+  unsettled <- list(all_final,first)
+  stopifnot(!length(spend(unsettled,final,rules=rival_rates)$pending_bonus_rounds),
+    spend(unsettled,final,rules=rates)$pending_bonus_rounds==23)
+  rival_rates$mvp_reward <- NULL
+  stopifnot(spend(unsettled,final,rules=rival_rates)$pending_bonus_rounds==23)
+  rival_rates$mvp_reward <- 0
+  unfinished <- all_final
+  unfinished$payload$fixture_matches$rows$status[3] <- 'S'
+  stopifnot(spend(list(unfinished,first),final,rules=rival_rates)$pending_bonus_rounds==23)
+  cache <- rival_calculation_cache()
+  ev <- list(updated,first,last,position)
+  x <- spend(ev,fm_time('2027-02-08T11:00:00Z'),cache)
+  stopifnot(identical(as.numeric(x$pending_bonus_rounds),23),!any(x$cash_ledgers$a$bonus_type=='ranking'),
+    identical(view(x,'a')$amount[view(x,'a')$bonus_type=='points'],20))
+  x <- spend(ev,final,cache)
+  stopifnot(!length(x$pending_bonus_rounds),view(x,'a')$amount[view(x,'a')$bonus_type=='points']==60)
+  x <- spend(list(source,last,first,last,position,record_round('a','closed',6),record_round('b','closed',8)),final)
+  a <- view(x,'a');b <- view(x,'b')
+  stopifnot(!length(x$pending_bonus_rounds),a$amount[a$bonus_type=='points']==60,b$amount[b$bonus_type=='points']==80,
+    b$points_credited[b$bonus_type=='points'],sum(x$cash_ledgers$a$bonus_type=='points')==2L,
+    sum(x$cash_ledgers$b$bonus_type=='points')==1L)
+  # A calendar observed during an ordinary weekend must not hold rewards
+  # after the last fixture. A cached preparation also crosses this boundary.
+  ordinary <- source
+  dates <- c('2026-12-04T18:00:00Z','2026-12-06T18:00:00Z')
+  ordinary$observed_at <- '2026-12-05T10:00:00Z'
+  ordinary$payload$rows <- data.frame(round_id='r15',round_number=15,is_finished=FALSE,status='running')
+  ordinary$payload$fixture_rounds <- list(list(round_id='r15',begin_process=dates[1],
+    all_fixtures_dated=TRUE,fixture_dates=as.list(dates)))
+  cache <- rival_calculation_cache()
+  stopifnot(spend(list(ordinary),fm_time('2026-12-05T12:00:00Z'),cache)$pending_bonus_rounds==15,
+    !length(spend(list(ordinary),fm_time(dates[2]),cache)$pending_bonus_rounds),cache$preparations==2L,
+    !length(spend(list(ordinary),fm_time(dates[2])+1,cache)$pending_bonus_rounds),cache$preparations==2L)
 })
 cat(sprintf('POINT SETTLEMENTS FINAL: %d passed / 0 failed\n',n))

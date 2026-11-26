@@ -151,3 +151,52 @@ shiny::testServer(lineup_Server,args=list(is_module_active=function()TRUE,login_
   stopifnot(grepl('31′',output$match_header$html),db_match_requests==1L,source_requests==0L)
 })
 cat('PASS match cards and modal restore durable observations, reuse across cards and perform no source calls\n')
+
+# The split fixture list and editable XI advance independently in the module.
+base_time <- now
+split_days <- base_time+c(1,3,3.1,6,66)*86400
+split_rounds <- data.frame(round_id=c('r14','r15','r23'),round_number=c(14,15,23),
+  begin_process=stamp(split_days[c(1,4,2)]),is_finished=FALSE)
+split_games <- league_fixture_matches(list(
+  list(`_id`='r23',matches=list(make_game('feb',split_days[5],'scheduled'),
+    make_game('dec-a',split_days[2],'scheduled'),make_game('dec-b',split_days[3],'scheduled'))),
+  list(`_id`='r14',matches=list(make_game('regular-14',split_days[1],'scheduled'))),
+  list(`_id`='r15',matches=list(make_game('regular-15',split_days[4],'scheduled')))))
+attr(split_rounds,'fixture_calendar') <- list(matches=split_games,status='ok',scope=ctx,
+  observed_at=now-60,valid_until=as.numeric(now)+3600)
+attr(split_rounds,'fixture_windows') <- lineup_fixture_windows(split_rounds,split_games)
+attr(split_rounds,'lineup_active') <- list(target=list(id='r14',number=14,starts_at=split_days[1]))
+split_state <- shiny::reactiveVal(split_rounds)
+factual_read_adapter <- function(...)function(...)list(data=NULL)
+shiny::testServer(lineup_Server,args=list(is_module_active=function()TRUE,login_token=function()auth,
+  championship_id=function()'league',user_team_id=function()'team',round_catalog=split_state,
+  clause_transfers_source=function()list(outgoing_status='ok',outgoing_records=outgoing_clause_empty())),{
+  settle(session)
+  html <- output$fixtures$html
+  stopifnot(target()$id=='r14',grepl('Upcoming split round',html),grepl('Select a full XI',html),
+    grepl('data-match-id="dec-a"',html,fixed=TRUE),grepl('data-match-id="dec-b"',html,fixed=TRUE),
+    !grepl('data-match-id="feb"',html,fixed=TRUE))
+  updated <- split_state()
+  updated$begin_process[updated$round_id=='r14'] <- stamp(now-86400)
+  attr(updated,'fixture_calendar')$matches$rows$kickoff[split_games$rows$round_id=='r14'] <- stamp(now-86400)
+  attr(updated,'fixture_windows') <- lineup_fixture_windows(updated,attr(updated,'fixture_calendar')$matches)
+  attr(updated,'lineup_active') <- list(target=list(id='r23',number=23,starts_at=split_days[2]))
+  split_state(updated);settle(session)
+  stopifnot(grepl('Next scheduled round 23',output$heading$html),target()$id=='r23',
+    !isTRUE(target()$reopened),source_requests==0L)
+  event_league <- '504e4f584d8bec9a67000079'
+  event_round <- '6a4af7f2ae633549bd0f0471'
+  # The replay fixture above already observed membership six hours ahead.
+  now <<- base_time+7*3600
+  publish_active_league_contexts(auth,list(championships=list(list(id='league',league=event_league,ps='stats')),
+    leagues=list(list(`_id`=event_league,season='2025-2026'))))
+  updated$round_id[3] <- event_round
+  updated$first_kickoff <- updated$begin_process
+  updated$first_kickoff[3] <- stamp(now-86400)
+  attr(updated,'lineup_active') <- list(target=list(id=event_round,number=23,starts_at=split_days[5]))
+  split_state(updated);settle(session)
+  heading <- output$heading$html
+  stopifnot(isTRUE(target()$reopened),grepl('10:00 Madrid time',heading),grepl('earns 0 points',heading),
+    grepl('retain their points',heading),source_requests==0L)
+})
+cat('PASS Lineup shows two advanced fixtures during the preceding round and changes the full-XI editor only when Futmondo activates their round\n')

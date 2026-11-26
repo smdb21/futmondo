@@ -68,7 +68,9 @@ lineup_api_read <- function(route,auth,context,owner,extra=list(),worker_live=FA
     args<-list(route=route,query=c(list(championshipId=context$championship_id,userteamId=context$user_team_id),extra))
     return(promises::then(fm_worker_fetch("get_worker_http_read",args,context,owner),function(value)lineup_api_answer(value,worker=TRUE)))
   }
-  body<-jsonlite::toJSON(lineup_api_payload(auth,context$championship_id,context$user_team_id,extra),auto_unbox=TRUE,null='null')
+  payload<-lineup_api_payload(auth,context$championship_id,context$user_team_id,extra)
+  if(route=='/2/user/activechampionships')payload$query<-list(excludeGeneral=FALSE,includeProphets=TRUE)
+  body<-jsonlite::toJSON(payload,auto_unbox=TRUE,null='null')
   promises::then(fm_async_read_http(paste0('https://api.futmondo.com',route),'POST',body,
     c(`Content-Type`='application/json; charset=utf-8'),owner=owner,priority='interactive'),function(response){
       if(length(response$content)>2*1024^2)stop('Lineup response is too large')
@@ -126,14 +128,90 @@ lineup_parse_official <- function(raw) {
     enabled=isTRUE(raw$bench$enabled),multiposition=isTRUE(raw$multiposition),
     status=fm_scalar(raw$status,''),pointSystem=raw$pointSystem,custom=raw$custom)
 }
-lineup_fetch_bundle <- function(auth,context,target,owner,is_current=function()TRUE,worker_live=FALSE) {
+lineup_target_matches <- function(actual, round_id, kickoff, number=NULL) {
+  !is.null(actual) && identical(actual$id, round_id) &&
+    (is.null(number) || isTRUE(actual$number == number)) &&
+    isTRUE(abs(as.numeric(actual$starts_at) - as.numeric(fm_time(kickoff))) < 0.001)
+}
+# The scoped match list returns one round and its real matches, including the
+# dates of games already played. Check it only at explicit submission time.
+lineup_round_started <- function(answer, round_id, now=Sys.time()) {
+  if(!identical(mvp_text(answer$round$`_id`),round_id))return(NA)
+  matches <- mvp_records(answer$matches)
+  if(!length(matches)||length(matches)>50L||!all(vapply(matches,is.list,logical(1))))return(NA)
+  dates <- fm_time(vapply(matches,function(m)mvp_text(m$date),character(1)))
+  finished <- vapply(matches,function(m)identical(mvp_text(m$status),'F'),logical(1))
+  if(any(finished)||any(dates<=now,na.rm=TRUE))return(TRUE)
+  if(anyNA(dates))return(NA)
+  FALSE
+}
+lineup_source_closed <- function(status) identical(tolower(mvp_text(status)), 'closed')
+
+# These public source IDs identify the announced 2026–27 LaLiga round even
+# while the active league metadata retains its previous season label.
+lineup_laliga_j23 <- function(competition_id,target) {
+  if(!identical(target$id,'6a4af7f2ae633549bd0f0471') || !isTRUE(target$number==23))return(FALSE)
+  if(!fm_context_known(competition_id))return(NA)
+  identical(competition_id,'504e4f584d8bec9a67000079')
+}
+lineup_j23_window_issue <- function(competition_id,target,answer,now=Sys.time(),opening_only=FALSE) {
+  scoped <- lineup_laliga_j23(competition_id,target)
+  if(is.na(scoped))return('Futmondo has not confirmed the competition for this round 23 lineup. Your draft is retained.')
+  if(!scoped)return(character())
+  # Real Sociedad–Real Madrid and Barcelona–Atlético are the two advanced
+  # fixtures. The first of the other eight determines the reopening date.
+  advanced <- c('6a4af7f2ae633549bd0f047a','6a4af7f2ae633549bd0f0474')
+  matches <- mvp_records(answer$matches)
+  ids <- vapply(matches,function(m)mvp_text(m$id %||% m$`_id`),character(1))
+  dates <- fm_time(vapply(matches,function(m)mvp_text(m$date),character(1)))
+  unconfirmed <- 'Futmondo has not confirmed the round 23 lineup window. Your draft is retained.'
+  if(!identical(mvp_text(answer$round$`_id`),target$id) || any(!nzchar(ids)) ||
+     anyDuplicated(ids) || !all(advanced %in% ids))return(unconfirmed)
+  early <- dates[ids %in% advanced]
+  if(!isTRUE(target$reopened) && lineup_target_matches(target,target$id,min(early)))return(character())
+  if(opening_only || !isTRUE(target$reopened))return(unconfirmed)
+  remaining <- dates[!ids %in% advanced]
+  if(length(remaining)!=8L || anyNA(remaining) || !lineup_target_matches(target,target$id,min(remaining)))return(unconfirmed)
+  day <- format(min(remaining),'%Y-%m-%d',tz='Europe/Madrid')
+  opens <- as.POSIXct(paste(day,'10:00:00'),tz='Europe/Madrid')
+  if(as.numeric(now)<as.numeric(opens))
+    return(paste('Round 23 reopens at 10:00 Madrid time on',paste0(day,'.'),'Your draft is retained.'))
+  character()
+}
+lineup_fetch_bundle <- function(auth,context,target,owner,is_current=function()TRUE,worker_live=FALSE,readback=FALSE) {
   calls<-list(lineup=lineup_api_read('/1/userteam/lineup',auth,context,owner,worker_live=worker_live),
     roster=lineup_api_read('/1/userteam/roster',auth,context,owner,worker_live=worker_live),
     info=lineup_api_read('/1/userteam/information',auth,context,owner,list(type='market'),worker_live=worker_live),
     strategies=lineup_api_read('/5/strategy/availables',auth,context,owner,worker_live=worker_live))
+  verify_target <- worker_live && !is.null(target)
+  if(verify_target) {
+    calls$active <- lineup_api_read('/2/user/activechampionships',auth,context,owner,worker_live=TRUE)
+    if(!readback) calls$matches <- lineup_api_read('/1/match/list',auth,context,owner,list(roundId=target$id),worker_live=TRUE)
+  }
   promises::then(do.call(promises::promise_all,calls),function(answers){
     if(!isTRUE(is_current()))stop(structure(list(message='Session request cancelled',call=NULL),class=c('fm_async_cancelled','error','condition')))
+    if(verify_target){
+      actual <- lineup_active_target(answers$active,context$championship_id,context$user_team_id,
+        competition_id=if(fm_context_known(context$competition_id))context$competition_id)
+      if(!lineup_target_matches(actual,target$id,target$starts_at,target$number))
+        stop(structure(list(message='Futmondo has not confirmed this lineup round and deadline. Your draft is retained.',call=NULL),
+          class=c('lineup_target_changed','error','condition')))
+    }
+    if(verify_target && !readback){
+      if(lineup_source_closed(answers$lineup$status))
+        stop(structure(list(message='Futmondo has closed lineup changes. Your draft is retained.',call=NULL),
+          class=c('lineup_target_changed','error','condition')))
+      started <- lineup_round_started(answers$matches,target$id)
+      if(is.na(started))stop(structure(list(message='Futmondo has not confirmed which games in this round have started. Your draft is retained.',call=NULL),
+        class=c('lineup_target_changed','error','condition')))
+      target$reopened <- started || isTRUE(target$reopened)
+    }
     data<-lineup_normalize_bundle(answers,context,target)
+    if(verify_target && !readback){
+      issue <- lineup_j23_window_issue(data$competition_id,target,answers$matches)
+      if(length(issue))stop(structure(list(message=issue,call=NULL),
+        class=c('lineup_target_changed','error','condition')))
+    }
     # This direct async bundle does not cross record_acquired_resource. Publish
     # verified scoring only after every component succeeds in its own generation.
     if(!isTRUE(data$source$worker_replay)&&exists('remember_league_scoring',mode='function')){
@@ -158,9 +236,11 @@ lineup_normalize_bundle <- function(answers,context,target) {
     rules=list(allowed=available,multiposition=official$multiposition,
       bench_enabled=official$enabled,captain_enabled=isTRUE(cfg$cpt)),
     source=list(wire=official$wire,locked=official$locked,status=official$status,block_delayed=isTRUE(cfg$blc),
+      delayed_edits_allowed=if(identical(answers$info$championshipMode,'classic'))TRUE else
+        if(identical(answers$info$championshipMode,'social')&&is.logical(cfg$blc)&&length(cfg$blc)==1L)!cfg$blc else NA,
       match_scoring=list(mode=official$pointSystem,custom=official$custom),
       fetch_status=observation$fetch_status,worker_replay=observation$worker_replay,
-      target_id=target$id %||% '',target_number=target$number %||% NA_real_,
+      target_id=target$id %||% '',target_number=target$number %||% NA_real_,reopened=isTRUE(target$reopened),
       target_starts=if(is.null(target))''else format(target$starts_at,'%Y-%m-%dT%H:%M:%OSZ',tz='UTC')),
     competition_id=competition,season=season,scoring_version=fm_scoring_version(official$pointSystem,official$custom),
     observed_at=observation$observed_at,expires_at=observation$expires_at)
@@ -210,6 +290,21 @@ lineup_submit <- function(auth,championship_id,user_team_id,current,modified,own
       result
     })
 }
+# Matchday reopening preserves the formation and permits losing the original captain.
+lineup_reopened_issues <- function(snapshot,draft,target) {
+  if(!isTRUE(target$reopened)&&!isTRUE(snapshot$source$reopened))return(character())
+  if(!isTRUE(snapshot$source$delayed_edits_allowed))return(
+    if(identical(snapshot$source$delayed_edits_allowed,FALSE))'This league keeps the XI saved at the first kickoff.'
+    else 'Waiting for confirmation that this league allows postponed-match edits.')
+  issues <- character()
+  if(!identical(draft$strategy,snapshot$official$strategy))
+    issues <- c(issues,'Keep the formation saved at the start of this round.')
+  if(nzchar(draft$captain)&&!identical(draft$captain,snapshot$official$captain))
+    issues <- c(issues,'A replacement captain cannot be assigned during a reopened round.')
+  if(!any(nzchar(snapshot$official$starters))&&any(nzchar(draft$starters)))
+    issues <- c(issues,'Futmondo cannot refill an empty XI during this reopening.')
+  issues
+}
 lineup_locked_changes <- function(snapshot,draft) {
   locked<-snapshot$source$locked %||% list();issues<-character()
   for(entry in locked){
@@ -252,9 +347,10 @@ lineup_changes <- function(current,modified) {
 }
 
 # Explicit manual-action preflight/readback, compatible with existing offline seams.
-lineup_fetch_live <- function(auth,context,target,owner,is_current=function()TRUE){
+lineup_fetch_live <- function(auth,context,target,owner,is_current=function()TRUE,readback=FALSE){
  args<-list(auth=auth,context=context,target=target,owner=owner,is_current=is_current)
  if('worker_live'%in%names(formals(lineup_fetch_bundle)))args$worker_live<-TRUE
  else if(exists('fm_worker_configured',mode='function')&&fm_worker_configured()&&!identical(fm_worker_mode(auth[['userid']]),FALSE))stop('Live lineup verification is unavailable')
+ if('readback'%in%names(formals(lineup_fetch_bundle)))args$readback<-readback
  do.call(lineup_fetch_bundle,args)
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-options(futmondo.offline=TRUE)
+options(futmondo.offline=TRUE, futmondo.worker_helper=TRUE)
 suppressPackageStartupMessages(source('global.R'))
 source('test/fixtures/classification_cold_source.R')
 clear_api_cache()
@@ -68,8 +68,10 @@ shiny::testServer(fixture_server,{
   fixture_reply(paste0(ROUNDS_URL,':b'),list(list(round='r11',points=9)))
   fixture_settle(session)
   status <- output[['classification-classification_status']]$html
-  stopifnot(grepl('unavailable',status,fixed=TRUE),grepl('missing',status,fixed=TRUE),
-    !grepl('26',output[['classification-classification_table']],fixed=TRUE))
+  rows <- jsonlite::fromJSON(output[['classification-classification_table']])$x$tag$attribs$data
+  stopifnot(grepl('unavailable',status,fixed=TRUE),
+    is.na(suppressWarnings(as.numeric(rows$points[rows$team_name=='Alpha']))),
+    as.numeric(rows$points[rows$team_name=='Beta'])==9)
 })
 cat('PASS independent recovery: pending histories retain live26, General100 uses official cumulative source, historical failure stays unknown, warm ranking reuse\n')
 
@@ -82,7 +84,7 @@ invisible(resource_store(api_cache_key('mvp_catalog_league',context=resource_con
   legacy,resource_context(fixture$auth,'league'),'mvp_catalog_league'))
 invisible(resource_store(api_cache_key('award_round_metadata_league',context=resource_context(fixture$auth,'league')),
   list(status='ok',scope=list(account_id=unname(fixture$auth[['userid']]),championship_id='league',
-    season='unknown',league_id='competition',current_round_id=''),
+    competition_id='unknown',season='unknown',league_id='competition',current_round_id=''),
     rows=data.frame(round_id=paste0('r',1:38),round_number=as.numeric(1:38),
     is_finished=c(rep(TRUE,11),FALSE,rep(NA,26)),status=c(rep('done',11),'running',rep('future',26)))),
   resource_context(fixture$auth,'league'),'award_round_metadata_league'))

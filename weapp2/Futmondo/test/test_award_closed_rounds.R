@@ -9,6 +9,35 @@ fixture$catalog<-list(rounds=data.frame(round_id=paste0('r',1:38),round_number=1
   current_round_number=12,user_team_id='team',complete=FALSE,identity_complete=TRUE,
   reason='Some round numbers or completion states are not confirmed. Retrieve missing awards to check their schedules.')
 xi<-list(players=lapply(1:11,function(i)list(id=paste0('p',i),name=paste('Player',i),points=i)),mvp='p1')
+check('calendar evidence overrides a stale final XI until the final group is acquired',{
+  compact<-data.frame(round_id='r23',round_number=23,is_finished=TRUE,status='done')
+  matches<-lapply(1:10,function(i)list(`_id`=paste0('g',i),h=list(`_id`=paste0('h',i)),a=list(`_id`=paste0('a',i)),
+    st=if(i<=2)'F'else'P',info=list(date=if(i<=2)'2026-12-02T20:30:00Z'else'2027-02-07T20:00:00Z')))
+  records<-list(list(`_id`='r23',matches=matches))
+  calendar<-function(records,stamp){
+    metadata<-list(rows=compact,fixture_matches=league_fixture_matches(records),fixture_rounds=award_fixture_calendar(records))
+    attr(metadata,'observed_at')<-fm_time(stamp)
+    award_join_calendar(compact,metadata)$rounds
+  }
+  split<-calendar(records,'2026-12-03T10:00:00Z')
+  saved<-normalize_official_dreamteam(xi,cid,list(round_id='r23',round_number=23,is_finished=TRUE))$rows
+  saved$checked_at<-'2026-12-03T10:00:00Z';saved$finality<-'final';saved$persistence<-'Saved'
+  current<-award_calendar_selections(saved,split)
+  coverage<-award_coverage(split,saved,current_round_number=24)
+  stopifnot(!coverage$required,coverage$finality=='Provisional / in progress',
+    all(current$finality=='provisional'),all(!current$is_finished),all(saved$is_finished),
+    round_award_player_stats(current,cid)$rounds==0,
+    grepl('Provisional selection',as.character(round_award_card(round_mvp_rows(current,cid),round_best_xi_rows(current,cid,split)))))
+  for(i in seq_along(matches))records[[1]]$matches[[i]]$st<-'F'
+  split<-calendar(records,'2027-02-08T10:00:00Z')
+  stopifnot(!split$partially_played,is.na(split$resume_at),
+    split$final_fixture_at==as.numeric(fm_time('2027-02-07T20:00:00Z')))
+  stale<-award_coverage(split,saved,current_round_number=24)
+  stopifnot(stale$required,stale$finality=='Provisional / in progress')
+  saved$checked_at<-'2027-02-08T10:00:00Z'
+  stopifnot(award_coverage(split,saved,current_round_number=24)$finality=='Confirmed final',
+    round_award_player_stats(award_calendar_selections(saved,split),cid)$rounds==1)
+})
 check('38-round coverage requires 11 closed rounds and labels the other 27 not due',{
   coverage<-award_coverage(fixture$catalog$rounds,data.frame(),
     failures=list(r12='Old request error',r38='Old request error'),current_round_number=12)

@@ -67,21 +67,30 @@ lineup_schedule_draft <- function(value) {
 }
 
 # Runs only in the scheduled-lineup R bridge. Python owns authentication and HTTP.
-lineup_schedule_check <- function(context, args, read, rounds = NULL) {
+lineup_schedule_check <- function(context, args, read, active_target) {
   desired <- lineup_schedule_draft(args$stage$lineup)
   official_answer <- read("/1/userteam/lineup")
   parsed <- lineup_parse_official(official_answer)
   official <- parsed$draft
+  target <- active_target()
+  if (!lineup_target_matches(target, args$round_id, args$kickoff)) {
+    return(list(code = if (isTRUE(args$readback)) "readback_unverified" else "round_changed"))
+  }
   if (isTRUE(args$readback)) return(list(code = if (identical(lineup_identity(official),
     lineup_identity(desired))) "saved" else "readback_mismatch",
     official = official, wire = parsed$wire, locked = parsed$locked))
-  target <- lineup_target(rounds())
-  if (is.null(target) || !identical(target$id, args$round_id) ||
-      abs(as.numeric(target$starts_at) - as.numeric(fm_time(args$kickoff))) > 0.001) {
-    return(list(code = "round_changed"))
-  }
+  if (lineup_source_closed(parsed$status)) return(list(code = "lineup_unavailable"))
   if (!identical(lineup_identity(official), lineup_identity(lineup_schedule_draft(args$baseline)))) {
     return(list(code = "lineup_changed"))
+  }
+  matches <- read("/1/match/list", list(roundId = args$round_id))
+  started <- lineup_round_started(matches, args$round_id)
+  if (is.na(started)) stop("The starting round fixtures are unavailable")
+  if (started) return(list(code = "round_changed"))
+  # Scheduled consent is for the opening XI only, including when a partial
+  # match list omits every completed game and appears entirely in the future.
+  if (length(lineup_j23_window_issue(context$competition_id,target,matches,opening_only=TRUE))) {
+    return(list(code = "round_changed"))
   }
   roster_answer <- read("/1/userteam/roster")
   owned <- lineup_roster_frame(list(roster = lineup_roster_records(roster_answer)))

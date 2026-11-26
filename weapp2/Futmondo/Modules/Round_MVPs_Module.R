@@ -61,6 +61,7 @@ round_award_card <- function(mvp, xi, players = NULL) {
   tags$article(class = "round-mvp-card",
     tags$div(class = "round-mvp-round", if (is.finite(mvp$round_number))
       paste("Round", format(mvp$round_number, trim = TRUE, scientific = FALSE)) else "Round number unavailable"),
+    if(nrow(xi) && any(xi$is_finished %in% FALSE)) tags$div(class = "round-mvp-meta", "Provisional selection"),
     tags$div(class = "round-mvp-player", tags$span(class = "round-mvp-badge", "MVP"), " ", mvp$player_name),
     tags$div(class = "round-mvp-meta", if (is.finite(mvp$points))
       paste(format(mvp$points, trim = TRUE), "points") else "Points unavailable"),

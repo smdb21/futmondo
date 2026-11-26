@@ -73,6 +73,9 @@ async def main(scoring_source):
     lose_response = False
     unexpected = []
     kickoff = cutoff
+    active_round = job['round_id']
+    first_match_finished = False
+    lineup_status = ''
 
     def response(request):
         nonlocal official
@@ -80,7 +83,7 @@ async def main(scoring_source):
         body = json.loads(request.content)
         calls[path] += 1
         if path == '/1/userteam/lineup':
-            answer = dict(strategy='4-4-2', pointSystem='' if scoring_source else 'source',
+            answer = dict(strategy='4-4-2', status=lineup_status, pointSystem='' if scoring_source else 'source',
                           players=[dict(id=pid, position=i, buyPrice=100) for i, pid in enumerate(official['starters'])])
             if scoring_source:
                 answer['custom'] = custom
@@ -90,8 +93,11 @@ async def main(scoring_source):
             champ = dict(id='league', league='competition', userteam={'id': 'team'})
             if scoring_source == 'calendar':
                 champ.update(ps='custom', custom=custom)
-            answer = dict(championships=[champ],
+            answer = dict(championships=[champ], rounds=[dict(_id=active_round, number=23, championshipId='competition', beginProcess=kickoff)],
                           leagues=[dict(id='competition', season='season')])
+        elif path == '/1/match/list':
+            assert body['query']['roundId'] == job['round_id']
+            answer = dict(round=dict(_id=job['round_id']), matches=[dict(date=kickoff, status='F' if first_match_finished else '')])
         elif path == '/2/league/list':
             answer = [dict(id='competition', rounds=[dict(id='round', number=1, beginProcess=kickoff, status='next')])]
         elif path == '/2/league/matches':
@@ -125,23 +131,43 @@ async def main(scoring_source):
                                  last_request={}, is_admitted=lambda *_: True)
         scheduler = LineupScheduler(worker, Path.cwd())
         try:
+            lineup_status = 'closed'
             await scheduler.execute(job)
-            assert store.transitions == ['waiting_for_ownership'], (store.transitions, calls, unexpected)
+            assert store.transitions == ['lineup_unavailable']
+            assert calls['/1/match/list'] == calls['/5/userteam/multichanges'] == 0
+            lineup_status = ''
+            await scheduler.execute(job)
+            assert store.transitions[-1] == 'waiting_for_ownership', (store.transitions, calls, unexpected)
             assert calls['/5/userteam/multichanges'] == 0
             arrived = True
             lose_response = True
             await scheduler.execute(job)
             assert store.transitions[-2:] == ['dispatch', 'uncertain'], (store.transitions, calls, unexpected)
             await scheduler.helper.close()
+            lineup_status = 'closed'
             await scheduler.execute({**job, 'state': 'uncertain', 'dispatched_at': stamp()})
             assert store.transitions[-1] == 'saved'
+            lineup_status = ''
             assert calls['/5/userteam/multichanges'] == 1
             assert store.snapshots[0]['payload']['official']['starters'][0] == 'incoming'
             assert store.snapshots[0]['scoring_version'] == fingerprint
-            assert calls['/2/league/list'] == 1
+            assert calls['/2/league/list'] == calls['/2/league/matches'] == 0
             await scheduler.execute(job)
             assert store.transitions[-1] == 'lineup_changed'
             assert (store.scoring_reads > 0) == (scoring_source == 'database')
+            # A matching XI can belong to the next ordinary matchday after the split opening.
+            active_round = 'round-15'
+            await scheduler.execute(job)
+            assert store.transitions[-1] == 'round_changed'
+            await scheduler.execute({**job, 'state': 'uncertain', 'dispatched_at': stamp()})
+            assert store.transitions[-1] == 'readback_unverified'
+            assert calls['/5/userteam/multichanges'] == 1
+            first_match_finished = True
+            active_round = job['round_id']
+            official = baseline
+            await scheduler.execute(job)
+            assert store.transitions[-1] == 'round_changed'
+            assert calls['/5/userteam/multichanges'] == 1
             assert not unexpected
             print(f'PASS worker and R bridge ({scoring_source or "explicit"} scoring): ownership, scoped checkpoint reuse, one send, restart readback and external edits')
             print('Futmondo fixture requests:', dict(calls))

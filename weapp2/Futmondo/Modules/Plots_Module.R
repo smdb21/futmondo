@@ -99,6 +99,7 @@ plots_transfer_chart <- function(bars) {
 # P/V codes alone do not establish closure. Independently closed team rows
 # can corroborate a historical ranking when the catalog lacks that flag.
 plots_saved_round_ranking <- function(snapshot, round, history) {
+  if(isTRUE(round$partially_played)||identical(round$is_finished,FALSE)||isTRUE(classification_playing_rounds(round)))return(NULL)
   id <- as.character(round$round_id)
   number <- round$round_number
   if (!is.list(snapshot) || !identical(snapshot$round_id, id) ||
@@ -123,12 +124,28 @@ plots_saved_round_ranking <- function(snapshot, round, history) {
   if (closed) ranking else NULL
 }
 
-plots_round_numbers <- function(rows) {
-  observed <- rows$round[is.finite(rows$round)]
-  published <- c(observed, attr(rows, "finished_rounds"))
-  if (!length(published)) return(numeric())
-  catalog <- attr(rows, "round_numbers")
-  sort(unique(c(published, catalog[is.finite(catalog) & catalog <= max(published)])))
+plots_round_numbers <- function(rows, rounds=NULL) {
+  if(!is.null(rounds)){
+    published <- classification_available_rounds(list(rounds=rounds),rows,whole_rounds=FALSE)
+    return(rev(classification_round_order(published,rounds,by_latest_fixture=FALSE)))
+  }
+  played <- attr(rows,"played_rounds",exact=TRUE)
+  if(!is.null(played))return(played)
+  published <- c(rows$round,attr(rows,"finished_rounds",exact=TRUE))
+  sort(unique(published[is.finite(published)]))
+}
+
+plots_ranking_targets <- function(rows,rounds) {
+  unique_ids <- !duplicated(rounds$round_number) & !duplicated(rounds$round_number,fromLast=TRUE)
+  published <- rounds[unique_ids & rounds$round_number%in%plots_round_numbers(rows),,drop=FALSE]
+  if("is_finished"%in%names(published))published <- published[!(published$is_finished%in%FALSE),,drop=FALSE]
+  if("partially_played"%in%names(published))published <- published[!(published$partially_played%in%TRUE),,drop=FALSE]
+  if("status"%in%names(published))published <- published[!classification_playing_rounds(published),,drop=FALSE]
+  known <- unique(rows[is.finite(rows$round)&is.finite(rows$points),c("team_id","round")])
+  covered <- tabulate(match(known$round,published$round_number),nbins=nrow(published))
+  targets <- published[covered<length(unique(rows$team_id)),,drop=FALSE]
+  data.frame(round_id=targets$round_id,round_number=targets$round_number,
+    is_finished=rep_len(targets$is_finished %||% NA,nrow(targets)))
 }
 
 # Numeric subrounds retain distinct labels. Missing observations block later
@@ -182,7 +199,7 @@ plots_round_totals <- function(rows, rankings = list()) {
 
 plots_round_chart <- function(totals, metric="points") {
   if (!nrow(totals)) return(plots_empty("No published round history", error=FALSE))
-  labels <- as.character(sort(unique(totals$round)))
+  labels <- as.character(unique(totals$round))
   totals$round_label <- as.character(totals$round)
   title <- if (metric == "rank") "Cumulative rank" else "Cumulative points"
   yaxis <- list(title=title, autorange=if(metric == "rank") "reversed" else TRUE)
@@ -439,8 +456,7 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
         if (nrow(rows)) rows else data.frame(team_id = team, team_name = name, round = NA_real_, points = NA_real_)
       })
       rows <- dplyr::bind_rows(c(list(classification_empty_rows()), frames))
-      attr(rows, "round_numbers") <- rounds$round_number
-      attr(rows, "finished_rounds") <- rounds$round_number[rounds$is_finished %in% TRUE & is.finite(rounds$round_number)]
+      attr(rows, "played_rounds") <- plots_round_numbers(rows,rounds)
       list(rows = rows, rounds = rounds, reads = inputs$reads, histories = inputs$histories)
     })
     pending_reads <- function(reads) any(vapply(reads, function(x) isTRUE(x$loading), logical(1)))
@@ -450,13 +466,7 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
       rounds <- history$rounds
       if (pending_reads(history$reads) || !isTRUE(fm_worker_mode(login_token()[["userid"]])) ||
           !nrow(rows) || !all(c("round_id", "round_number") %in% names(rounds))) return(NULL)
-      published <- rounds[rounds$round_number %in% plots_round_numbers(rows) &
-        !duplicated(rounds$round_number) & !duplicated(rounds$round_number, fromLast = TRUE), , drop = FALSE]
-      known <- unique(rows[is.finite(rows$round) & is.finite(rows$points), c("team_id", "round")])
-      covered <- tabulate(match(known$round, published$round_number), nbins = nrow(published))
-      targets <- published[covered < length(unique(rows$team_id)), , drop = FALSE]
-      data.frame(round_id = targets$round_id, round_number = targets$round_number,
-        is_finished = rep_len(targets$is_finished %||% NA, nrow(targets)))
+      plots_ranking_targets(rows,rounds)
     })
     ranking_readers <- shiny::reactive({
       targets <- ranking_targets()
@@ -520,7 +530,7 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
           paste(unique(vapply(state$errors,resource_failure_message,character(1))),collapse=" ")),error=TRUE),
         if(!state$loading && !length(state$errors) && !nrow(totals)) fm_info("No published round history",error=FALSE),
         if (!state$loading && length(missing)) fm_info(paste0(
-          "Some saved round scores are missing. The first missing score is in round ", min(missing),
+          "Some saved round scores are missing. The first missing score is in round ", missing[1L],
           ". Affected teams' cumulative results stop at that point."), error = TRUE),
         if (identical(input$plot_tab, "Rank progression") && length(other)) fm_info(
           "Some saved rankings include teams outside the current league directory. Ranks for those rounds need their cumulative scores.", error = TRUE)

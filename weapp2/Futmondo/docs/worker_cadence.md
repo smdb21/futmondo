@@ -46,3 +46,9 @@ on push, so push/deployment is held until the required RPC migration succeeds.
 Update 2026-11-18: after explicitly authorized chunk compaction, the cadence and
 bounded-cleanup migrations succeeded. The earlier migration blocker is resolved;
 see worker_storage_cleanup.md for measurements and deployment limits.
+
+## Split matchdays
+
+`award_calendar_gaps()` records a long break only for an official round with complete fixture identities, kickoff times and statuses. At least one fixture must be final. The earliest remaining kickoff must be at least seven days after the last finished fixture's kickoff. Worker standings, Dream Team display and team-lineup jobs switch to daily cadence starting 24 hours after that earlier kickoff and return to their live cadence 24 hours before the next kickoff. This leaves time to observe the first phase's published scores and payments. The ordinary job floor still applies.
+
+The existing private numbered-calendar observation stores each proven interval under `split_gaps[round_id]` as epoch-second `slow_from` and `resume_at` values. A newer calendar replaces the interval when dates move. `worker_enqueue_batch()` checks the latest stored calendar when one of the three round job types would switch cadence. It checks the official round ID, account, championship, source competition and season through the existing indexed evidence lookup. Ordinary rediscovery keeps the same job keys and performs no additional calendar lookup when intervals agree. A running lease or pending retry retains its due time.

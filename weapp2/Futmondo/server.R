@@ -243,6 +243,15 @@ function(input, output, session) {
     refresh_trigger()
     tryCatch(get_finished_rounds(login_token_RV(), championship_id_RV()), error=function(e) data.frame())
   })
+  score_calendar_windows <- reactive({
+    lineup_calendar_windows(round_catalog_RV())
+  })
+  session$userData$score_calendar_windows <- function(context){
+    active <- resource_context(login_token_RV(),championship_id_RV(),user_team_id_RV())
+    scope <- c("account_id","championship_id","competition_id","season")
+    if(!identical(context[scope],active[scope]))return(data.frame())
+    score_calendar_windows()
+  }
   round_heading_state<-resource_display_source(session,function(){
     if(!isTRUE(account_finance_visible()))return(list(visible=FALSE))
     if(!valid_login(login_token_RV()))return(list(visible=TRUE,logged_in=FALSE))

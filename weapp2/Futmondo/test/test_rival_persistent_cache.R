@@ -100,6 +100,20 @@ mutate_wire<-function(fn){
  bytes<-charToRaw(as.character(jsonlite::toJSON(wire,auto_unbox=TRUE,na='null',null='null',digits=NA)));gzip<-history_baseline_compress(bytes)
  p<-original_payload;p$data<-openssl::base64_encode(gzip);p$json_bytes<-length(bytes);p$sha256<-history_baseline_hash(gzip);p
 }
+payload <- mutate_wire(function(w){
+  old <- rival_snapshot_decode(w$cache)
+  old$prepared$pending_bonus_rounds <- NULL
+  old$prepared$pending_interval <- NULL
+  w$cache <- rival_snapshot_encode(old)
+  w
+})
+prior <- read_rival_calculation_snapshot('u','l','s','a')
+stopifnot(!is.null(prior),identical(prior$team_finances,saved$team_finances),is.null(prior$cache$prepared$pending_bonus_rounds))
+previous_cache <- rival_calculation_cache();invisible(list2env(prior$cache,envir=previous_cache))
+replayed <- do.call(build_rival_cash_dataset,c(fixture(),list(cache=previous_cache)))
+stopifnot(previous_cache$preparations==1L,identical(previous_cache$prepared$pending_bonus_rounds,numeric()),
+  identical(replayed$team_finances,cold$team_finances))
+cat('PASS previous-format full snapshot remains readable and rebuilds the new settlement projection from saved evidence\n')
 for(change in list(function(w){w$scope$version<-'old';w},function(w){w$cache$values[[3]]$values$account_id<-list(type='null');w},function(w){w$summary$values$teamid$values<-list('a','a','c');w})){
  payload<-mutate_wire(change);supabase_get<-function(...)row_frame(payload)
  stopifnot(is.null(read_rival_calculation_snapshot('u','l','s','a')))

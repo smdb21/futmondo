@@ -1,17 +1,32 @@
-# The editor targets the next kickoff. Match browsing also keeps the latest
-# started round reachable, including the interval between matchdays.
+# Browse fixture groups by kickoff independently of which XI can be saved.
 lineup_match_rounds <- function(rounds, now=Sys.time()) {
-  next_round <- lineup_target(rounds,now)
   if(!is.data.frame(rounds)||!all(c('round_id','round_number','begin_process')%in%names(rounds)))
-    return(list(next_round=next_round))
-  starts <- fm_time(rounds$begin_process)
-  started <- which(!is.na(starts)&starts<=now&!is.na(rounds$round_id)&nzchar(rounds$round_id)&is.finite(rounds$round_number))
-  latest <- NULL
-  if(length(started)){
-    i <- started[which.max(starts[started])]
-    latest <- list(id=rounds$round_id[i],number=rounds$round_number[i],starts_at=starts[i])
+    return(list(next_round=NULL))
+  windows <- lineup_calendar_windows(rounds,include_partial=TRUE)
+  ref <- function(i){
+    if(!length(i))return(NULL)
+    x <- windows[i,,drop=FALSE]
+    value <- list(id=x$round_id,number=x$number,starts_at=x$begin)
+    if(x$partial)value$partial <- TRUE
+    if(x$groups>1L){
+      value$ends_at <- x$end
+      value$group <- x$index
+      value$groups <- x$groups
+      value$later_start <- windows$begin[windows$round_id==x$round_id & windows$index==x$index+1L]
+    }
+    value
   }
-  list(next_round=next_round,latest=latest)
+  future <- which(windows$begin>now)
+  result <- list(next_round=ref(head(future,1L)),latest=ref(tail(which(windows$begin<=now),1L)))
+  # Let someone preparing the current matchday see an intervening split round
+  # before the following regular matchday. This adds no editable target.
+  if(length(future)>1L && windows$groups[future[1L]]==1L &&
+     (windows$groups[future[2L]]>1L || (windows$partial[future[2L]] && length(future)>2L &&
+       windows$number[future[2L]]>windows$number[future[3L]]))){
+    result$upcoming_split <- ref(future[2L])
+    if(isTRUE(result$upcoming_split$partial))result$upcoming_split$dated_only <- TRUE
+  }
+  result
 }
 
 lineup_match_parse <- function(match, fixture, observed_at) {
@@ -83,9 +98,16 @@ get_lineup_match_details <- function(login, championship_id) {
        function(field)identical(calendar$scope[[field]],ctx[[field]]),logical(1))))stop('Incomplete source acquisition')
 
   refs <- lineup_match_rounds(rounds,now)
-  ids <- vapply(Filter(Negate(is.null),refs),function(x)x$id,character(1))
   fixtures <- calendar$matches$rows
-  fixtures <- fixtures[fixtures$round_id%in%ids,,drop=FALSE]
+  windows <- Filter(Negate(is.null),refs)
+  kickoff <- fm_time(fixtures$kickoff)
+  visible <- rep(FALSE,nrow(fixtures))
+  for(ref in windows){
+    selected <- fixtures$round_id==ref$id
+    if(!is.null(ref$group))selected <- selected & !is.na(kickoff) & kickoff>=ref$starts_at & kickoff<=ref$ends_at
+    visible <- visible | selected
+  }
+  fixtures <- fixtures[visible,,drop=FALSE]
   fixtures <- fixtures[!duplicated(fixtures$match_id)&!duplicated(fixtures$match_id,fromLast=TRUE),,drop=FALSE]
   prior <- saved('get_lineup_match_details',args,ctx)
   old <- prior$matches

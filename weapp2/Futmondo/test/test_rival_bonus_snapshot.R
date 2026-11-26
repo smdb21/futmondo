@@ -45,6 +45,11 @@ payload<-rival_snapshot_payload(cache,calculated,ctx)
 pending<-do.call(read_rival_calculation_snapshot,ctx)
 stopifnot(identical(as.numeric(pending$pending_bonus_rounds),1),
   all(attr(pending$cash_ledgers$a,'round_bonus_totals')$settlement_pending))
+calculated$pending_bonus_rounds <- 23L
+payload <- rival_snapshot_payload(cache,calculated,ctx)
+early <- do.call(read_rival_bonus_snapshot,ctx)
+stopifnot(identical(early$pending_bonus_rounds,23L),
+  !any(attr(early$cash_ledgers$a,'round_bonus_totals')$round_number==23))
 bad<-expected;bad$a$settlement_pending<-"true";stopifnot(!rival_snapshot_bonus_valid(bad,teams$teamid))
 cat('PASS pending settlement state survives compact storage and malformed flags are rejected\n')
 # Legacy summary-only snapshots stay readable and truthfully have no bonus data.

@@ -73,6 +73,30 @@ award_saved_rows <- function(snapshots,championship_id,season,expected_scoring="
     rows
   }))
 }
+
+# A saved XI records what was published at its observation time. A split round
+# can reopen with the same official ID and a different final selection.
+award_calendar_selections <- function(rows,rounds) {
+  if(!is.data.frame(rows)||!nrow(rows)||!is.data.frame(rounds)||
+      !all(c("round_id","is_finished")%in%names(rows))||!"round_id"%in%names(rounds))return(rows)
+  index <- match(rows$round_id,rounds$round_id)
+  partial <- rounds$partially_played %||% rep(FALSE,nrow(rounds))
+  pending <- partial[index]%in%TRUE
+  if("final_fixture_at"%in%names(rounds)){
+    closed <- which(is.finite(rounds$final_fixture_at[index]))
+    if(length(closed)){
+      checked <- if("checked_at"%in%names(rows))rows$checked_at[closed]else rep(NA_character_,length(closed))
+      distinct <- unique(checked)
+      stamp <- as.numeric(fm_time(distinct))[match(checked,distinct)]
+      pending[closed] <- pending[closed] | is.na(stamp) | stamp<rounds$final_fixture_at[index[closed]]
+    }
+  }
+  if(any(pending)){
+    rows$is_finished[pending] <- FALSE
+    if("finality"%in%names(rows))rows$finality[pending] <- "provisional"
+  }
+  rows
+}
 # A selection captured before settlement can still be provisional even when the
 # catalog called the round closed. Recheck once after a dated final-category payment.
 award_settlement_rechecks <- function(evidence,rows,catalog) {
@@ -88,7 +112,8 @@ award_settlement_rechecks <- function(evidence,rows,catalog) {
     checked<-if(is.data.frame(rows)&&all(c("round_id","checked_at")%in%names(rows)))
       fm_time(rows$checked_at[rows$round_id%in%id])else as.POSIXct(character())
     !length(checked)||anyNA(checked)||min(checked)<max(fm_time(payments$date[payments$round_id%in%id]))
-  },intersect(unique(payments$round_id),catalog$round_id))
+  },setdiff(intersect(unique(payments$round_id),catalog$round_id),
+    c(catalog$round_id[catalog$partially_played%in%TRUE],catalog$round_id[catalog$is_finished%in%FALSE])))
 }
 get_mvp_saved_catalog <- function(login,championship_id) {
   season<-league_stable_season(championship_id,login[["userid"]])
@@ -97,8 +122,14 @@ get_mvp_saved_catalog <- function(login,championship_id) {
   expected<-award_expected_scoring(login,championship_id)
   rows<-award_saved_rows(rival_evidence_rows(saved$evidence,"awards"),championship_id,season,expected,login[["userid"]])
   catalog<-get_award_round_catalog(login,championship_id,rows)
+  rows<-award_calendar_selections(rows,catalog$rounds)
+  recheck<-character()
+  if(nrow(rows)&&"final_fixture_at"%in%names(catalog$rounds)){
+    closed<-catalog$rounds$round_id[is.finite(catalog$rounds$final_fixture_at)]
+    recheck<-intersect(closed,rows$round_id[rows$is_finished%in%FALSE])
+  }
   list(saved=rows,expected_scoring=expected,saved_complete=isTRUE(saved$complete),context_unknown=isTRUE(saved$context_unknown),catalog=catalog,season=season,
-    settlement_rechecks=award_settlement_rechecks(saved$evidence,rows,award_catalog_numbers(catalog$rounds,rows)))
+    settlement_rechecks=union(recheck,award_settlement_rechecks(saved$evidence,rows,award_catalog_numbers(catalog$rounds,rows))))
 }
 award_snapshot_evidence <- function(result,login,championship_id,reference,context) {
   if(!identical(result$status,"ok")||!award_selection_valid(result$rows))return(NULL)
@@ -121,6 +152,7 @@ persist_official_award_snapshot <- function(result,login,championship_id,referen
 # Eligibility for retrieval is separate from finality/credited rewards. A known
 # current or later round is not due unless the source explicitly confirms closure.
 award_round_pending <- function(reference,current_round_number=reference$current_round_number,current_round_id=reference$current_round_id) {
+  if(isTRUE(reference$partially_played))return(TRUE)
   if(isTRUE(reference$is_finished))return(FALSE)
   if(identical(reference$is_finished,FALSE))return(TRUE)
   current_id<-mvp_text(current_round_id)
@@ -130,6 +162,7 @@ award_round_pending <- function(reference,current_round_number=reference$current
 }
 award_coverage <- function(rounds,rows,failures=list(),current_round_number=NA_real_,current_round_id="") {
   if(!is.data.frame(rounds)||!nrow(rounds))return(data.frame())
+  rows<-award_calendar_selections(rows,rounds)
   dplyr::bind_rows(lapply(seq_len(nrow(rounds)),function(i){
     round<-rounds[i,,drop=FALSE];group<-if(is.data.frame(rows)&&"round_id"%in%names(rows))rows[rows$round_id%in%round$round_id,,drop=FALSE]else data.frame()
     required<-!mvp_text(round$status)%in%c("verified_future")&&!award_round_pending(round,current_round_number,current_round_id)
@@ -189,13 +222,14 @@ shared_mvp_source <- function(session,login,championship,active,refresh=NULL) {
   }
   current<-function(generation,key) !state$closed&&identical(generation,state$generation)&&identical(key,state$key)&&identical(shiny::isolate(identity()),key)
   publish<-function(){
+    state$rows<-award_calendar_selections(state$rows,state$rounds)
     coverage<-award_coverage(state$rounds,state$rows,state$failures,state$current_round_number,state$current_round_id)
     required<-if(nrow(coverage))coverage[coverage$required%in%TRUE,,drop=FALSE]else coverage
     # Missing completion flags on future rounds are not missing historical data.
     relevant<-if(nrow(required))match(required$round_id,state$rounds$round_id)else integer()
     scoped_catalog_complete<-isTRUE(state$catalog_identity_complete)&&(!nrow(required)||
       all(is.finite(required$round_number)&(state$rounds$is_finished[relevant]%in%TRUE|required$finality=="Confirmed final")))
-    complete<-nrow(required)>0L&&(isTRUE(state$catalog_complete)||scoped_catalog_complete)&&isTRUE(state$saved_complete)&&all(required$persistence=="Saved")&&all(required$selection=="11 players")
+    complete<-nrow(required)>0L&&(isTRUE(state$catalog_complete)||scoped_catalog_complete)&&isTRUE(state$saved_complete)&&all(required$persistence=="Saved")&&all(required$selection=="11 players")&&!any(required$finality=="Provisional / in progress")
     catalog_reason<-state$catalog_reason
     if(identical(catalog_reason,"Some round numbers or completion states are not confirmed. Retrieve missing awards to check their schedules."))catalog_reason<-""
     reason<-paste(unique(c(catalog_reason,if(!state$saved_complete)if(isTRUE(state$context_unknown))"The league season could not be resolved, so saved awards were not read." else "Saved coverage could not be fully read.",
@@ -369,7 +403,8 @@ shared_mvp_source <- function(session,login,championship,active,refresh=NULL) {
         state$user_team_id<-result$catalog$user_team_id;state$current_round_number<-result$catalog$current_round_number;state$current_round_id<-result$catalog$current_round_id
         # Active-session recovery only; the normal bounded async acquisition and
         # acknowledged persistence path handles these paid-round revisions.
-        ids<-intersect(result$settlement_rechecks %||% character(),state$rounds$round_id)
+        ids<-setdiff(intersect(result$settlement_rechecks %||% character(),state$rounds$round_id),
+          c(state$rounds$round_id[state$rounds$partially_played%in%TRUE],state$rounds$round_id[state$rounds$is_finished%in%FALSE]))
         if(!stored&&length(ids)&&enabled()){
           state$acquisition_active<-active
           state$queue<-lapply(head(unique(ids),120L),function(id){

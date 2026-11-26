@@ -225,6 +225,86 @@ mvp_api_answer <- function(login, url, query) {
   })
 }
 
+# The current lineup write has no round selector. Only the active championship
+# response identifies the round Futmondo has opened for this team.
+lineup_active_target <- function(active, championship_id, user_team_id, now=Sys.time(), competition_id=NULL) {
+  teams <- Filter(function(x) is.list(x) && is.list(x$userteam) &&
+    identical(mvp_text(x$id %||% x$`_id`),mvp_text(championship_id)) &&
+    identical(mvp_text(x$userteam$id %||% x$userteam$`_id`),mvp_text(user_team_id)),
+    mvp_records(active$championships))
+  if(!nzchar(mvp_text(championship_id)) || !nzchar(mvp_text(user_team_id)) || length(teams)!=1L)return(NULL)
+  league <- teams[[1]]$league
+  league_id <- if(is.list(league))mvp_text(league$id %||% league$`_id`) else mvp_text(league)
+  if(!nzchar(league_id) || (!is.null(competition_id) && !identical(league_id,competition_id)))return(NULL)
+  active_rounds <- Filter(function(x) is.list(x) && identical(mvp_text(x$championshipId),league_id),
+    mvp_records(active$rounds))
+  if(length(active_rounds)!=1L)return(NULL)
+  r <- active_rounds[[1]]
+  id <- mvp_text(r$`_id` %||% r$id)
+  number <- fm_number(r$number)
+  starts <- fm_time(mvp_text(r$beginProcess))
+  if(!nzchar(id) || !is.finite(number) || number<1 || number!=floor(number) ||
+     !isTRUE(starts>now))return(NULL)
+  list(id=id,number=number,starts_at=starts)
+}
+
+# A split is observable when a whole other round fits between two kickoffs
+# of this round. Keep the original fixture and round IDs throughout.
+league_fixture_date_groups <- function(times) {
+  empty <- data.frame(round_id=character(),begin=as.POSIXct(character(),tz='UTC'),
+    end=as.POSIXct(character(),tz='UTC'),index=integer(),groups=integer())
+  if(!length(times))return(empty)
+  first <- vapply(times,min,numeric(1))
+  last <- vapply(times,max,numeric(1))
+  dplyr::bind_rows(lapply(names(times),function(id){
+    dates <- sort(unique(times[[id]]))
+    cuts <- vapply(seq_len(length(dates)-1L),function(i)
+      any(first>dates[i] & last<dates[i+1L]),logical(1))
+    start <- c(1L,which(cuts)+1L)
+    stop <- c(which(cuts),length(dates))
+    data.frame(round_id=id,begin=fm_time(dates[start]),end=fm_time(dates[stop]),
+      index=seq_along(start),groups=length(start))
+  }))
+}
+
+lineup_fixture_windows <- function(rounds,matches) {
+  if(!league_fixture_matches_valid(matches))return(league_fixture_date_groups(list()))
+  complete <- intersect(rounds$round_id,matches$rounds$round_id[matches$rounds$complete])
+  rows <- matches$rows[matches$rows$round_id %in% complete,,drop=FALSE]
+  league_fixture_date_groups(split(as.numeric(fm_time(rows$kickoff)),rows$round_id))
+}
+
+lineup_calendar_windows <- function(rounds,include_partial=FALSE) {
+  windows <- attr(rounds,'fixture_windows',exact=TRUE)
+  if(is.null(windows))windows <- lineup_fixture_windows(rounds,attr(rounds,'fixture_calendar')$matches)
+  windows$partial <- rep(FALSE,nrow(windows))
+  if(include_partial){
+    calendar <- attr(rounds,'fixture_calendar')
+    matches <- calendar$matches
+    partial <- matches$rounds$round_id[matches$rounds$complete %in% FALSE]
+    if(length(partial) && identical(calendar$status,'ok') && league_fixture_matches_valid(matches)){
+      # A dated match can be shown even when other matches lack kickoff
+      # times. Its date certifies neither a round deadline nor completion.
+      rows <- matches$rows[matches$rows$round_id %in% partial & nzchar(matches$rows$kickoff),,drop=FALSE]
+      if(nrow(rows)){
+        dates <- split(as.numeric(fm_time(rows$kickoff)),rows$round_id)
+        windows <- rbind(windows,data.frame(round_id=names(dates),begin=fm_time(vapply(dates,min,numeric(1))),
+          end=fm_time(vapply(dates,max,numeric(1))),index=1L,groups=1L,partial=TRUE))
+      }
+    }
+  }
+  # Partial calendars may still have an independently supplied round start.
+  missing <- !rounds$round_id %in% windows$round_id
+  if(any(missing)){
+    starts <- fm_time(rounds$begin_process[missing])
+    windows <- rbind(windows,data.frame(round_id=rounds$round_id[missing],begin=starts,end=starts,index=1L,groups=1L,partial=FALSE))
+  }
+  windows$number <- rounds$round_number[match(windows$round_id,rounds$round_id)]
+  valid <- !is.na(windows$begin) & is.finite(windows$number) & !is.na(windows$round_id) & nzchar(windows$round_id)
+  windows <- windows[valid,,drop=FALSE]
+  windows[order(windows$begin,windows$round_id),,drop=FALSE]
+}
+
 normalize_mvp_catalog <- function(active, leagues, championship_id) {
   unknown <- function(reason) list(status="unsupported",rounds=empty_finished_rounds(),complete=FALSE,reason=reason)
   matches <- Filter(function(x) is.list(x) && identical(mvp_text(x$id %||% x$`_id`),as.character(championship_id)), mvp_records(active$championships))
@@ -258,6 +338,11 @@ normalize_mvp_catalog <- function(active, leagues, championship_id) {
   valid <- nzchar(rows$round_id) & !duplicated(rows$round_id)
   complete <- all(valid) && !anyNA(rows$is_finished)
   rows <- rows[valid,,drop=FALSE]
+  team_id <- mvp_text(champ$userteam$id %||% champ$userteam$`_id`)
+  # Retain the source's editable deadline even when it has already passed.
+  # Consumers compare it to their own clock when restoring a saved catalog.
+  attr(rows,'lineup_active') <- list(target=lineup_active_target(active,championship_id,team_id,
+    now=as.POSIXct(-Inf,origin='1970-01-01',tz='UTC'),competition_id=lid))
   active_details<-Filter(function(round){
     is.list(round)&&mvp_text(round$`_id` %||% round$id)%in%rows$round_id&&
       (!nzchar(mvp_text(round$championshipId))||mvp_text(round$championshipId)%in%c(lid,as.character(championship_id)))
@@ -265,7 +350,7 @@ normalize_mvp_catalog <- function(active, leagues, championship_id) {
   anchors<-unique(vapply(active_details,function(round)fm_number(round$number),numeric(1)))
   anchors<-anchors[is.finite(anchors)&anchors>=1&anchors==floor(anchors)]
   list(status=if(complete) "ok" else "partial",rounds=rows,complete=complete,identity_complete=all(valid),
-    league_id=lid,user_team_id=mvp_text(champ$userteam$id %||% champ$userteam$`_id`),
+    league_id=lid,user_team_id=team_id,
     current_round_id=if(length(active_details)==1L)mvp_text(active_details[[1]]$`_id` %||% active_details[[1]]$id)else "",
     current_round_number=if(length(anchors)==1L)anchors else NA_real_,
     reason=if(!all(valid)) "The round catalog contains missing or duplicate round identities." else if(any(!is.finite(rows$round_number))) "Some round numbers are unavailable." else "")
@@ -411,18 +496,142 @@ league_fixture_matches_decode <- function(value) {
 league_fixture_observation <- function(metadata) list(matches=metadata$fixture_matches,scope=metadata$scope,
   observed_at=attr(metadata,'observed_at'),valid_until=metadata$valid_until,
   status=metadata$status,reason=metadata$reason %||% '')
+
+# A complete fixture set can establish a long idle period in a partly played
+# round. Keep ordinary matchdays and the daily corrections around each phase
+# on their usual cadence.
+award_calendar_gaps <- function(matches) {
+  games <- matches$rows
+  coverage <- matches$rounds
+  if(!is.data.frame(games) || !is.data.frame(coverage) || !nrow(games))return(list())
+  final <- games$status %in% "F"
+  ids <- intersect(intersect(games$round_id[final], games$round_id[!final]),
+    coverage$round_id[coverage$complete %in% TRUE])
+  gaps <- list()
+  for(id in ids){
+    group <- games$round_id==id
+    if(anyNA(games$status[group]) || any(!nzchar(games$status[group])))next
+    previous <- max(as.numeric(fm_time(games$kickoff[group & final])))
+    next_game <- min(as.numeric(fm_time(games$kickoff[group & !final])))
+    if(is.finite(previous) && is.finite(next_game) && next_game-previous>=7*86400)
+      gaps[[id]] <- list(slow_from=previous+86400,resume_at=next_game-86400)
+  }
+  gaps
+}
+
+# The numbered calendar can close the first instalment of a split round.
+# Keep the provider's status and use the games in that same observation to
+# distinguish a published phase from completion of the whole round.
+award_calendar_round_states <- function(metadata) {
+  rows <- metadata$rows
+  if(!is.data.frame(rows) || !all(c("round_id","round_number","status") %in% names(rows)))return(NULL)
+  if(!"is_finished" %in% names(rows))rows$is_finished <- rep(NA,nrow(rows))
+  rows$partially_played <- rep(FALSE,nrow(rows))
+  unfinished <- tolower(rows$status) %in% c("future","next","running","active","playing","in_progress")
+  rows$is_finished[is.na(rows$is_finished) & unfinished] <- FALSE
+  games <- metadata$fixture_matches$rows
+  all_final <- character()
+  if(is.data.frame(games) && nrow(games)){
+    final <- games$status %in% "F"
+    remaining <- !is.na(games$status) & nzchar(games$status) & !final
+    split <- intersect(games$round_id[final], games$round_id[remaining])
+    rows$partially_played <- rows$round_id %in% split
+    rows$is_finished[rows$partially_played] <- FALSE
+    coverage <- metadata$fixture_matches$rounds
+    all_final <- setdiff(coverage$round_id[coverage$complete %in% TRUE],games$round_id[!final])
+  }
+  # Older durable calendars can carry the complete list of fixture dates
+  # without individual match statuses. A phase closure spanning a future
+  # kickoff is not final as of that calendar's original observation.
+  schedule <- metadata$fixture_rounds
+  observed <- fm_time(attr(metadata,"observed_at"))
+  if(is.data.frame(schedule) && length(observed)==1L && !is.na(observed)){
+    candidates <- which(schedule$round_id %in% setdiff(rows$round_id[rows$is_finished %in% TRUE],all_final) &
+      lengths(schedule$fixture_dates)>1L)
+    spanning <- vapply(schedule$fixture_dates[candidates],function(stamps){
+      dates <- fm_time(stamps)
+      any(dates<=observed,na.rm=TRUE) && any(dates>observed,na.rm=TRUE)
+    },logical(1))
+    partial <- rows$round_id %in% schedule$round_id[candidates[spanning]]
+    rows$partially_played[partial] <- TRUE
+    rows$is_finished[partial] <- FALSE
+  }
+  rows
+}
+
+award_join_calendar <- function(rounds,metadata) {
+  states <- award_calendar_round_states(metadata)
+  reason <- if(identical(metadata$complete,FALSE))"The numbered round calendar contains incomplete or conflicting round identities." else ""
+  if(!is.data.frame(states))return(list(rounds=rounds,reason=reason))
+  if(!"partially_played" %in% names(rounds))rounds$partially_played <- rep(FALSE,nrow(rounds))
+  duplicates <- duplicated(states$round_id) | duplicated(states$round_id,fromLast=TRUE)
+  if(any(duplicates))reason <- "The numbered round calendar contains conflicting round identities."
+  detail <- states[!duplicates,,drop=FALSE]
+  index <- match(rounds$round_id,detail$round_id)
+  number <- detail$round_number[index]
+  conflict <- is.finite(number) & is.finite(rounds$round_number) & number!=rounds$round_number
+  if(any(conflict))reason <- "Round numbers conflict with the league catalog."
+  joined <- !is.na(index) & !conflict
+  numbered <- joined & is.finite(number)
+  rounds$round_number[numbered] <- number[numbered]
+  state <- detail$is_finished[index]
+  verified <- joined & !is.na(state)
+  rounds$is_finished[verified] <- state[verified]
+  rounds$partially_played[joined] <- detail$partially_played[index[joined]]
+  status <- detail$status[index]
+  labelled <- joined & !is.na(status) & nzchar(status)
+  if(!"status" %in% names(rounds))rounds$status <- rep("",nrow(rounds))
+  rounds$status[labelled] <- status[labelled]
+  gaps <- award_calendar_gaps(metadata$fixture_matches)
+  rounds$slow_from <- rep(NA_real_,nrow(rounds))
+  rounds$resume_at <- rep(NA_real_,nrow(rounds))
+  for(id in names(gaps)){
+    index <- joined & rounds$round_id==id
+    rounds$slow_from[index] <- gaps[[id]]$slow_from
+    rounds$resume_at[index] <- gaps[[id]]$resume_at
+  }
+  schedule <- metadata$fixture_rounds
+  observed <- fm_time(attr(metadata,"observed_at"))
+  if(is.data.frame(schedule) && all(c("round_id","all_fixtures_dated","begin_process") %in% names(schedule))){
+    dates <- schedule[schedule$all_fixtures_dated %in% TRUE,,drop=FALSE]
+    duplicate <- duplicated(dates$round_id) | duplicated(dates$round_id,fromLast=TRUE)
+    dates <- dates[!duplicate,,drop=FALSE]
+    first <- dates$begin_process[match(rounds$round_id,dates$round_id)]
+    rounds$first_kickoff <- ifelse(joined & !is.na(first),first,"")
+    if(!"begin_process" %in% names(rounds))rounds$begin_process <- rep("",nrow(rounds))
+    missing <- is.na(rounds$begin_process) | !nzchar(rounds$begin_process)
+    rounds$begin_process[missing] <- rounds$first_kickoff[missing]
+    # A pre-kickoff selection cannot be the final XI. The last dated game
+    # remains available after every game is F and the cadence gap has closed.
+    if(is.list(dates$fixture_dates) && length(observed)==1L && !is.na(observed)){
+      last <- vapply(dates$fixture_dates,function(stamps)max(as.numeric(fm_time(stamps))),numeric(1))
+      cutoff <- last[match(rounds$round_id,dates$round_id)]
+      closed <- joined & rounds$is_finished%in%TRUE & is.finite(cutoff) & cutoff<=as.numeric(observed)
+      rounds$final_fixture_at <- ifelse(closed,cutoff,NA_real_)
+    }
+  }
+  games <- metadata$fixture_matches$rows
+  if(is.data.frame(games) && nrow(games) && length(observed)==1L && !is.na(observed)){
+    kickoffs <- as.numeric(fm_time(games$kickoff))
+    played <- which(kickoffs<=as.numeric(observed))
+    last <- tapply(kickoffs[played],games$round_id[played],max)
+    rounds$latest_fixture_at <- as.numeric(last[match(rounds$round_id,names(last))])
+    rounds$latest_fixture_at[!joined] <- NA_real_
+  }
+  list(rounds=rounds,reason=reason)
+}
+
 get_award_round_metadata <- function(login,championship_id,league_id,refresh=FALSE,current_round_id="",include_matches=FALSE) {
   context<-resource_context(login,championship_id,season=league_stable_season(championship_id,login[["userid"]]))
   scope<-c(context[c("account_id","championship_id","competition_id","season")],list(league_id=as.character(league_id),current_round_id=mvp_text(current_round_id)))
-  same_scope<-function(value)is.list(value)&&setequal(names(value),names(scope))&&
+  same_scope<-function(value,check_marker=TRUE)is.list(value)&&setequal(names(value),names(scope))&&
     identical(value[setdiff(names(scope),"current_round_id")],scope[setdiff(names(scope),"current_round_id")])&&
-    (!nzchar(scope$current_round_id)||identical(value$current_round_id,scope$current_round_id))
+    (!check_marker||!nzchar(scope$current_round_id)||identical(value$current_round_id,scope$current_round_id))
   resource<-paste0("award_round_metadata_",championship_id)
   source_id<-paste0("calendar:v1:",as.character(openssl::sha256(as.character(league_id))))
   ttl<-resource_policy(resource)$ttl
-  if(isTRUE(refresh))invalidate_resources(context,resources=resource)
-  result<-get_cached_data(resource,{
-    if(!isTRUE(refresh)&&nzchar(get_sb_url())&&nzchar(get_sb_key())){
+  read_saved<-function(){
+    if(nzchar(get_sb_url())&&nzchar(get_sb_key())){
       query<-list(account_id=paste0("eq.",context$account_id),championship_id=paste0("eq.",championship_id),
         competition_id=paste0("eq.",context$competition_id),season=paste0("eq.",context$season),evidence_type="eq.eligibility",source_id=paste0("eq.",source_id),
         select="account_id,championship_id,competition_id,season,evidence_type,source_id,observed_at,payload",limit=1L)
@@ -433,11 +642,11 @@ get_award_round_metadata <- function(login,championship_id,league_id,refresh=FAL
         restored<-award_calendar_rows_decode(payload$rows)
         stamp<-fm_time(row$observed_at);deadline<-fm_number(payload$valid_until);now<-as.numeric(Sys.time())
         if(is.list(payload)&&identical(payload$kind,"league_round_calendar")&&fm_number(payload$version)%in%c(1,2)&&
-           same_scope(payload$scope)&&identical(payload$completeness,"complete")&&
+           same_scope(payload$scope,FALSE)&&identical(payload$completeness,"complete")&&
            all(vapply(c("account_id","championship_id","competition_id","season"),function(field)identical(mvp_text(row[[field]]),context[[field]]),logical(1)))&&
            identical(mvp_text(row$source_id),source_id)&&identical(row$evidence_type,"eligibility")&&
            length(stamp)==1L&&!is.na(stamp)&&as.numeric(stamp)<=now+5&&is.finite(deadline)&&
-           deadline<=as.numeric(stamp)+ttl+0.001&&now<deadline&&award_calendar_rows_valid(restored)){
+           deadline>as.numeric(stamp)&&deadline<=as.numeric(stamp)+ttl+0.001&&award_calendar_rows_valid(restored)){
           result<-list(status="ok",rows=restored,scope=payload$scope,complete=TRUE,valid_until=deadline,from_saved=TRUE)
           valid_fixtures<-TRUE
           if(identical(fm_number(payload$version),2)){
@@ -458,10 +667,38 @@ get_award_round_metadata <- function(login,championship_id,league_id,refresh=FAL
         }
       }
     }
+    NULL
+  }
+  process<-api_cache_env[[api_cache_key(resource,context=context)]]$data
+  if(isTRUE(refresh))invalidate_resources(context,resources=resource)
+  result<-get_cached_data(resource,{
+    saved<-if(!isTRUE(refresh))read_saved()
+    if(!is.null(saved)&&same_scope(saved$scope)&&as.numeric(Sys.time())<saved$valid_until)return(saved)
+    failed<-function(response){
+      # A source failure cannot undo an observed partial phase. Keep only the
+      # last positive partial IDs and their original clock, never its old final flags.
+      if(isTRUE(refresh))saved<-read_saved()
+      if(is.list(process)&&same_scope(process$scope,FALSE)&&(isTRUE(process$complete)||NROW(process$previous_partial)>0L)&&
+         (is.null(saved)||isTRUE(attr(process,"observed_at")>attr(saved,"observed_at"))))saved<-process
+      if(!is.null(saved)){
+        partial<-saved$previous_partial
+        if(is.null(partial)){
+          states<-award_calendar_round_states(saved)
+          partial<-states[states$partially_played%in%TRUE,c("round_id","round_number"),drop=FALSE]
+        }
+        if(NROW(partial)){
+          response$previous_partial<-partial
+          response$scope<-saved$scope
+          attr(response,"observed_at")<-attr(saved,"observed_at")
+          response$valid_until<-min(saved$valid_until,as.numeric(Sys.time()))
+        }
+      }
+      response
+    }
     response<-mvp_api_answer(login,"https://api.futmondo.com/2/league/matches",list(leagueId=league_id))
-    if(!identical(response$status,"ok"))return(response)
+    if(!identical(response$status,"ok"))return(failed(response))
     records<-mvp_records(response$answer$rounds)
-    if(!length(records)||length(records)>120L)return(mvp_result("unsupported",reason="The numbered round calendar could not be read."))
+    if(!length(records)||length(records)>120L)return(failed(mvp_result("unsupported",reason="The numbered round calendar could not be read.")))
     rows<-dplyr::bind_rows(lapply(records,function(round){
       if(!is.list(round))return(NULL)
       number<-fm_number(round$number)
@@ -503,6 +740,8 @@ persist_award_calendar_snapshot <- function(data,context) {
      length(stamp)!=1L||is.na(fm_time(stamp))||!is.finite(fm_number(data$valid_until)))return(invisible(FALSE))
   payload<-list(kind="league_round_calendar",version=1L,scope=scope,rows=data$rows,
     completeness="complete",valid_until=data$valid_until)
+  gaps<-award_calendar_gaps(data$fixture_matches)
+  if(length(gaps))payload$split_gaps<-gaps
   if(award_fixture_calendar_valid(data$fixture_rounds)){
     payload$version<-2L;payload$fixture_rounds<-lapply(seq_len(nrow(data$fixture_rounds)),function(i){
       row<-as.list(data$fixture_rounds[i,,drop=FALSE]);row$fixture_dates<-as.list(unlist(row$fixture_dates,use.names=FALSE));row
@@ -523,29 +762,34 @@ get_award_round_catalog <- function(login,championship_id,saved=data.frame(),ref
   required_before<-!vapply(seq_len(nrow(rounds)),function(i)award_round_pending(rounds[i,,drop=FALSE],
     catalog$current_round_number,catalog$current_round_id),logical(1))
   unresolved<-any(!is.finite(rounds$round_number[required_before]))||anyNA(rounds$is_finished[required_before])
+  # A later round can close an instalment while earlier rounds are still due.
+  # Verify that unusual closure against its own fixtures before requesting XI.
+  current<-fm_number(catalog$current_round_number)
+  advanced_closed<-which(is.finite(current) & rounds$is_finished%in%TRUE & rounds$round_number>=current)
   metadata_reason<-""
-  if(unresolved&&nzchar(mvp_text(catalog$league_id))){
+  if(nzchar(mvp_text(catalog$league_id))){
+    # Only re-establish this closure from the matching numbered calendar.
+    rounds$is_finished[advanced_closed]<-NA
+    # A previously opened round can still be partial after the source marker
+    # moves past it. Reuse the same scoped, durable bulk calendar for every ID.
     metadata<-get_award_round_metadata(login,championship_id,catalog$league_id,refresh=refresh,current_round_id=catalog$current_round_id)
     attr(catalog,'fixture_calendar')<-league_fixture_observation(metadata)
     attr(catalog,"observed_at")<-attr(metadata,"observed_at")
     attr(catalog,"valid_until")<-metadata$valid_until
     if(identical(metadata$status,"ok")&&is.data.frame(metadata$rows)){
-      if(identical(metadata$complete,FALSE))metadata_reason<-"The numbered round calendar contains incomplete or conflicting round identities."
-      for(i in seq_len(nrow(rounds))){
-        detail<-metadata$rows[metadata$rows$round_id%in%rounds$round_id[i],,drop=FALSE]
-        if(!nrow(detail))next
-        if(nrow(detail)!=1L){metadata_reason<-"The numbered round calendar contains conflicting round identities.";next}
-        number<-fm_number(detail$round_number)
-        if(is.finite(number)){
-          if(is.finite(rounds$round_number[i])&&rounds$round_number[i]!=number){
-            metadata_reason<-"Round numbers conflict with the league catalog.";next
-          }
-          rounds$round_number[i]<-number
-        }
-        if(isTRUE(detail$is_finished))rounds$is_finished[i]<-TRUE
-        else if(is.na(rounds$is_finished[i])&&identical(detail$is_finished,FALSE))rounds$is_finished[i]<-FALSE
+      hydrated<-award_join_calendar(rounds,metadata)
+      rounds<-hydrated$rounds;metadata_reason<-hydrated$reason
+    }else{
+      prior<-metadata$previous_partial
+      if(is.data.frame(prior)&&nrow(prior)){
+        link<-match(rounds$round_id,prior$round_id)
+        phase<-!is.na(link)&(!is.finite(rounds$round_number)|!is.finite(prior$round_number[link])|rounds$round_number==prior$round_number[link])
+        rounds$partially_played<-phase
+        rounds$is_finished[phase]<-FALSE
       }
-    }else metadata_reason<-mvp_text(metadata$reason,"The numbered round calendar could not be loaded.")
+      if(unresolved||length(advanced_closed)||NROW(prior))
+        metadata_reason<-mvp_text(metadata$reason,"The numbered round calendar could not be loaded.")
+    }
   }
   catalog$rounds<-rounds
   current<-which(rounds$round_id%in%mvp_text(catalog$current_round_id))

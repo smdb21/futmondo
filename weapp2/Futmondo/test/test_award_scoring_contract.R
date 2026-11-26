@@ -79,6 +79,9 @@ fm_async_http<-function(url,method='GET',body=NULL,headers=character(),owner='',
       rounds=list(list(`_id`='r1',number=1)))
   }else if(identical(url,'https://api.futmondo.com/2/league/list')){
     answer<-list(list(`_id`='league-source',rounds=list(list(`_id`='r1',number=1,status='done'))))
+  }else if(identical(url,'https://api.futmondo.com/2/league/matches')){
+    stopifnot(identical(sent$query,list(leagueId='league-source')))
+    answer<-list(rounds=list(list(`_id`='r1',number=1,status='closed')))
   }else stop('Unexpected external HTTP route')
   promises::promise_resolve(list(status_code=200L,content=charToRaw(jsonlite::toJSON(list(answer=answer),
     auto_unbox=TRUE,null='null',digits=NA)),times=list(total=0)))
@@ -155,9 +158,9 @@ check('explicit selected retry evicts only scoped source caches and waits for ac
     settle(session,function()!source()$loading)
     stopifnot(source()$complete,nrow(source()$rows)==11L,source()$coverage$persistence=='Saved')
     attr(source,'retrieve')('missing');settle(session,function()!source()$loading&&!source()$running)
-    stopifnot(length(fixture$requests)==before+2L,dreamteam_reads()==before_awards)
+    stopifnot(length(fixture$requests)==before+3L,dreamteam_reads()==before_awards)
   })
-  cat('MEASURE rejected_read=1 selected_retry_dreamteam_reads=1 catalog_reads=4 saved_reuse_award_reads=0 saved_reuse_metadata_reads=2\n')
+  cat('MEASURE rejected_read=1 selected_retry_dreamteam_reads=1 saved_reuse_award_reads=0 explicit_refresh_metadata_reads=3\n')
 })
 get_mvp_saved_catalog<-original_catalog;persist_official_award_snapshot<-original_save
 fm_async_http<-original_http;futmondo_post<-original_post;get_sb_url<-original_url;get_sb_key<-original_key

@@ -49,9 +49,25 @@ check('chart controls have descriptions, wider metric column and no round inspec
 })
 check('catalog coverage and absent teams never become invented totals', {
  rows <- data.frame(team_id=c('a','a','b'),team_name=c('Alpha','Alpha','Beta'),round=c(1,3,NA_real_),points=c(10,5,NA_real_))
- attr(rows,'round_numbers') <- c(1,2,3,4)
+ attr(rows,'finished_rounds') <- c(1,2,3)
  totals <- plots_round_totals(rows)
  stopifnot(identical(totals$round,c(1,2,3,1,2,3)),identical(totals$points,c(10,NA_real_,NA_real_,NA_real_,NA_real_,NA_real_)))
+})
+check('early J23 skips future rounds and preserves the chronological cumulative curve', {
+ rounds <- data.frame(round_id=paste0('r',14:23),round_number=14:23,is_finished=c(TRUE,TRUE,rep(NA,7),FALSE),
+   status=c('closed','closed',rep('future',7),'V'),partially_played=c(rep(FALSE,9),TRUE),
+   first_kickoff=format(as.Date('2026-12-01')+c(0,4,6:12,2)))
+ scores <- data.frame(team_id='a',team_name='Alpha',round=c(14,14.2,23,15),points=c(8,-2,0,4))
+ rounds$latest_fixture_at <- as.numeric(as.POSIXct(rounds$first_kickoff,tz='UTC'))
+ rounds$latest_fixture_at[rounds$round_number==23] <- as.numeric(as.POSIXct('2027-02-07',tz='UTC'))
+ attr(scores,'played_rounds') <- plots_round_numbers(scores,rounds)
+ stopifnot(identical(attr(scores,'played_rounds'),c(14,14.2,23,15)))
+ totals <- plots_round_totals(scores)
+ chart <- plotly::plotly_build(plots_round_chart(totals))
+ stopifnot(identical(totals$points,c(8,6,6,10)),identical(totals$rank,rep(1,4)),
+   identical(unlist(chart$x$layout$xaxis$categoryarray),c('14','14.2','23','15')))
+ scores$points[scores$round%in%c(15,23)] <- NA_real_
+ stopifnot(identical(plots_ranking_targets(scores,rounds)$round_id,'r15'))
 })
 check('saved rankings restore scores and distinguish nonparticipation from unknown', {
   rows <- data.frame(team_id=c('a','a','b','b','c'), team_name=c('Alpha','Alpha','Beta','Beta','Gamma'),
@@ -69,6 +85,10 @@ check('saved rankings restore scores and distinguish nonparticipation from unkno
   stored_2 <- ranking('r2',2,c('a','b','c'),c(5,0,20))
   recovered <- list(plots_saved_round_ranking(stored_1,r1,native), plots_saved_round_ranking(stored_2,r2,native))
   stopifnot(all(vapply(recovered,nrow,integer(1))==c(2L,3L)))
+  phase <- stored_2
+  phase$answer$metadata$status <- 'closed'
+  stopifnot(is.null(plots_saved_round_ranking(phase,transform(r2,is_finished=FALSE),native)),
+    is.null(plots_saved_round_ranking(phase,transform(r2,partially_played=TRUE),native)))
   result <- plots_round_totals(rows,recovered)
   stopifnot(identical(result$points,c(10,15,8,8,NA_real_,20)),
     identical(result$rank,c(1,2,2,3,NA_real_,1)), !length(attr(result,'missing_rounds')))

@@ -61,3 +61,30 @@ preferred <- add_recent_points_average(source_players,known,2)
 stopifnot(preferred$recent_points_avg[1]==25,preferred$recent_points_status[1]=="complete",
   preferred$recent_points_avg[2]==-1)
 cat("SOURCE RECENT WINDOW: 3 additional known-answer checks passed\n")
+
+# The same J23 opens between J14 and J15, then reopens after J22.
+windows <- data.frame(number=c(13:14,23,15:22,23),groups=c(1,1,2,rep(1,8),2),
+  begin=as.POSIXct("2026-12-01",tz="UTC")+86400*(0:11))
+split_players <- data.frame(id=c("early","other"),average.fitness="3,4,5,6,7")
+scores <- data.frame(player_id=c(rep("early",4),rep("other",3)),
+  round=c(13,14,23,15,13,14,15),points=c(3,-2,8,0,3,-2,4))
+attr(scores,"latest_round") <- 23
+order_at <- function(index,seen)recent_points_calendar_order(windows,windows$begin[index],seen)
+attr(scores,"calendar_order") <- order_at(3,c(13,14,23))
+first <- add_recent_points_average(split_players,scores,2)
+stopifnot(identical(first$recent_points_avg,c(3,NA_real_)),
+  identical(first$recent_points_count,c(2L,1L)),
+  first$recent_points_details[1]=="- round 23: 8\n- round 14: -2")
+attr(scores,"calendar_order") <- order_at(4,c(13,14,23,15))
+next_week <- add_recent_points_average(split_players,scores,2)
+stopifnot(identical(next_week$recent_points_avg,c(4,NA_real_)),
+  next_week$recent_points_details[1]=="- round 15: 0\n- round 23: 8")
+feb <- order_at(12,c(13:23))
+stopifnot(identical(as.numeric(tail(feb$number,3)),c(21,22,23)),!anyDuplicated(feb$number))
+# A sparse ordinary calendar cannot remove a missing round from the denominator.
+attr(scores,"latest_round") <- 15
+attr(scores,"calendar_order") <- recent_points_calendar_order(windows[c(1,4),],windows$begin[4],c(13,15))
+stopifnot(add_recent_points_average(split_players,scores,2)$recent_points_avg[2]==1)
+sparse <- add_recent_points_average(split_players["id"],scores[scores$round!=14,],2)
+stopifnot(all(is.na(sparse$recent_points_avg)),identical(sparse$recent_points_count,c(1L,1L)))
+cat("SPLIT ROUND WINDOWS: chronological scores, signed values and missing coverage passed\n")

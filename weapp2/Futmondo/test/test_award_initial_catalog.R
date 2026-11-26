@@ -114,15 +114,20 @@ check('missing calendar metadata remains unavailable and conflicting identities 
   stopifnot(!is.null(completed),!completed$complete,is.na(completed$rounds$round_number[1]),
     grepl('conflicting',completed$reason,fixed=TRUE),completed$rounds$round_number[38]==38)
 })
-check('unknown future finality alone needs no metadata request and produces no warning',{
+check('a resolved compact catalog reuses one calendar read across checks and produces no warning',{
   original_catalog<-get_finished_round_catalog
   known<-normalize_mvp_catalog(active,leagues,cid)
   known$rounds$round_number<-as.numeric(1:38)
   known$rounds$is_finished<-c(rep(TRUE,12),rep(NA,26))
   get_finished_round_catalog<-function(...)known
-  before<-length(fixture$requests)
-  result<-get_award_round_catalog(auth,cid)
-  stopifnot(result$complete,!nzchar(result$reason),length(fixture$requests)==before)
+  fixture$mode<-'ok';clear_api_cache()
+  before<-reads('league/matches$')
+  for(i in 1:2){
+    result<-NULL
+    promises::then(async_adapter_fetch('get_award_round_catalog',list(login=auth,championship_id=cid),resource_context(auth,cid)),function(x)result<<-x)
+    deadline<-Sys.time()+3;while(is.null(result)&&Sys.time()<deadline)later::run_now(.01)
+    stopifnot(!is.null(result),result$complete,!nzchar(result$reason),reads('league/matches$')==before+1L)
+  }
   get_finished_round_catalog<-original_catalog
 })
 cat(sprintf('INITIAL ADMIN AWARDS: %d passed / 0 failed; one cold bulk calendar read, zero warm reads\n',n))

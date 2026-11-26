@@ -47,6 +47,40 @@ stopifnot(
 )
 cat("PASS partial known ledger answers, persisted reuse, independent score gaps and unknown completed evidence\n")
 
+# December and February share a round identity. Only a dated, reconciled
+# point credit can appear during the interval, even on a legacy projection.
+local({
+  finance <- out
+  totals <- attr(out$cash_ledgers$a, "round_bonus_totals")
+  completed <- totals[totals$round_number == 1, c("round_number", "bonus_type", "amount")]
+  completed$points_credited <- FALSE
+  installment <- transform(completed, round_number = 23, points_credited = bonus_type == "points")
+  history <- transform(partial_history, round = c(1, 23))
+  project <- function(single = "all") classification_bonus_table(partial_standings, history, finance,
+    single = single, expected_rounds = c(1, 23))
+  for (paid in c(20, 0, -5)) {
+    installment$amount[installment$bonus_type == "points"] <- paid
+    rows <- rbind(completed, installment)
+    stopifnot(rival_snapshot_bonus_valid(list(a = rows), "a"))
+    wire <- jsonlite::toJSON(rival_snapshot_encode(rows), auto_unbox = TRUE, na = "null", null = "null", digits = NA)
+    attr(finance$cash_ledgers$a, "round_bonus_totals") <- rival_snapshot_decode(jsonlite::fromJSON(wire, simplifyVector = FALSE))
+    mixed <- project()
+    december <- project(23)
+    stopifnot(mixed$points_bonus == 10 + paid, mixed$mvp_bonus == 10,
+      december$points_bonus == paid, attr(december, "bonus_credited_rounds") == 23,
+      all(is.na(december[c("mvp_bonus", "best_xi_bonus", "position_bonus")])))
+  }
+  invalid <- rows
+  invalid$points_credited[invalid$bonus_type == "mvp"] <- TRUE
+  stopifnot(!rival_snapshot_bonus_valid(list(a = invalid), "a"))
+  rows$amount[rows$round_number == 23 & rows$bonus_type == "points"] <- 60
+  attr(finance$cash_ledgers$a, "round_bonus_totals") <- rows
+  history$score_status <- "final"
+  stopifnot(project(23)$points_bonus == 60, project()$points_bonus == 70,
+    project(23)$mvp_bonus == 10, !length(attr(project(), "bonus_pending_rounds")))
+})
+cat("PASS paid point installments, zero and negative cash, pending final rewards and single final total\n")
+
 #' Disable read binding for a synthetic offline module regression
 #' @param ... Unused binding arguments.
 #' @return NULL invisibly; source fixtures are already reactive.
@@ -118,6 +152,16 @@ shiny::testServer(classification_Server, args = list(
     grepl("completed rounds only", output$classification_status$html, fixed = TRUE),
     all(is.finite(unlist(standings_RV()[, c("points_bonus", "mvp_bonus", "best_xi_bonus", "position_bonus")])))
   )
+  paid <- out
+  totals <- attr(paid$cash_ledgers$a, "round_bonus_totals")
+  totals <- totals[totals$round_number == 1, c("round_number", "bonus_type", "amount")]
+  totals$points_credited <- FALSE
+  attr(paid$cash_ledgers$a, "round_bonus_totals") <- rbind(totals,
+    data.frame(round_number = 2, bonus_type = "points", amount = 24, points_credited = TRUE))
+  partial_finances(paid)
+  session$flushReact()
+  stopifnot(standings_RV()$points_bonus == 34, standings_RV()$mvp_bonus == 10,
+    grepl("installments credited", output$classification_status$html, fixed = TRUE))
   # Missing totals are loading while acquisition is pending, not unavailable.
   partial_finances(list(loading = TRUE))
   session$flushReact()

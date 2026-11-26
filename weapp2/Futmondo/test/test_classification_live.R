@@ -161,3 +161,42 @@ shiny::testServer(classification_Server,args=list(is_module_active=reactive(TRUE
     grepl('unavailable',output$classification_status$html,fixed=TRUE))
 })
 cat('PASS known-live failure retains12/unavailable; active12/future13, delayed Latest convergence, General cumulative100, missing whole-round coverage, manual selection, no live double count\n')
+
+# December 2 opens J23 before J15. Both can have published scores when J15 starts.
+schedule <- data.frame(round_id=paste0('r',14:23),round_number=14:23,
+  status=c('closed','playing',rep('future',7),'next'),is_finished=c(TRUE,rep(FALSE,9)),
+  partially_played=c(rep(FALSE,9),TRUE),
+  begin_process=c('2026-11-27T20:00:00Z','2026-12-04T20:00:00Z',rep('',7),'2026-12-02T18:00:00Z'))
+catalog(list(rounds=schedule,current_round_id='r15',current_round_number=15))
+history(list(list(number=14,points=10,status='closed'),list(number=16,points=0,status='future'),
+  list(number=23,points=5,status='running')))
+rank_reads <- character()
+get_classification_round_ranking <- function(login,championship_id,user_team_id,round_id,round_number){
+  rank_reads <<- c(rank_reads,round_id)
+  score <- switch(round_id,r15=0,r23=-2,stop('Unplayed round requested'))
+  list(round_id=round_id,round_number=round_number,rows=data.frame(team_id='a',team_name='Alpha',
+    round=round_number,points=score,score_status=if(round_number==23)'final'else'provisional',players_left=8))
+}
+shiny::testServer(classification_Server,args=list(is_module_active=reactive(TRUE),login_token=reactive(auth),
+  championship_id=reactive(cid),user_team_id=reactive('a'),user_teams_RV=reactive(teams[1,,drop=FALSE])),{
+  session$setInputs(classification_view='rounds')
+  stopifnot(identical(sort(rank_reads),c('r15','r23')),identical(round_numbers_RV(),c(14,15,23)),
+    selected_round_RV()==15,standings_RV()$points==0)
+  session$setInputs(round_button=list(number=23,context=round_buttons_context_RV()))
+  stopifnot(standings_RV()$points== -2,standings_RV()$players_left==8,
+    identical(attr(standings_RV(),'bonus_pending_rounds'),23))
+  session$setInputs(classification_view='partial',round_range_slider=c(15,23))
+  stopifnot(standings_RV()$points== -2, length(rank_reads)==2L)
+})
+cat('PASS published J14, J15 and J23 only, two scoped ranking reads, signed partial scores, J23 settlement pending and no navigation reads\n')
+
+evidence <- list(rows=schedule[,c('round_id','round_number','status','is_finished')],
+  fixture_matches=list(rows=data.frame(round_id=c('r23','r15','r23'),status=c('F','F',''),
+    kickoff=c('2026-12-02T18:00:00Z','2026-12-04T20:00:00Z','2027-02-07T16:00:00Z'))))
+attr(evidence,'observed_at') <- fm_time('2026-12-05T00:00:00Z')
+december <- award_join_calendar(schedule,evidence)$rounds
+attr(evidence,'observed_at') <- fm_time('2027-02-07T16:05:00Z')
+february <- award_join_calendar(schedule,evidence)$rounds
+stopifnot(identical(classification_round_order(c(15,23),december),c(15,23)),
+  identical(classification_round_order(c(15,23),february),c(23,15)))
+cat('PASS resumed J23 follows J15 only once the February kickoff is reached in the source observation\n')

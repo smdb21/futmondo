@@ -194,11 +194,23 @@ get_finished_rounds <- function(login, championship_id) {
     if(is.null(fixtures)||(identical(fixtures$status,'ok')&&!league_fixture_matches_current(fixtures$matches))){
       metadata<-get_award_round_metadata(login,championship_id,catalog$league_id,
         current_round_id=catalog$current_round_id,include_matches=TRUE)
+      if(identical(metadata$status,'ok')){
+        joined <- award_join_calendar(rounds,metadata)
+        rounds <- joined$rounds
+        if(nzchar(joined$reason)){
+          attr(rounds,'complete') <- attr(rounds,'catalog_complete') <- FALSE
+          attr(rounds,'catalog_status') <- 'partial'
+          attr(rounds,'catalog_reason') <- joined$reason
+        }
+      }
       if(!identical(metadata$status,'ok')&&is.list(fixtures)&&league_fixture_matches_valid(fixtures$matches)){
         fixtures$refresh_error<-'Match calendar update failed; showing the saved schedule.'
       }else fixtures<-league_fixture_observation(metadata)
     }
     attr(rounds,"fixture_calendar")<-fixtures
+    if(identical(fixtures$status,'ok')){
+      attr(rounds,'fixture_windows') <- lineup_fixture_windows(rounds,fixtures$matches)
+    }
   }
   rounds
 }
@@ -3237,14 +3249,11 @@ get_user_team_rounds <- function(login, championship_id, user_team_id) {
 # never become the closed-round eligibility evidence consumed by cash ledgers.
 get_classification_round_catalog <- function(login,championship_id) {
   catalog <- get_award_round_catalog(login,championship_id)
-  if(nzchar(mvp_text(catalog$league_id))){
-    metadata <- get_award_round_metadata(login,championship_id,catalog$league_id)
-    if(identical(metadata$status,"ok")&&is.data.frame(metadata$rows)&&nrow(catalog$rounds)){
-      for(i in seq_len(nrow(catalog$rounds))){
-        detail <- metadata$rows[metadata$rows$round_id%in%catalog$rounds$round_id[i],,drop=FALSE]
-        if(nrow(detail)==1L&&nzchar(mvp_text(detail$status)))catalog$rounds$status[i]<-detail$status
-      }
-    }
+  if(nzchar(mvp_text(catalog$league_id)) && is.null(attr(catalog,"fixture_calendar")) &&
+      !"partially_played" %in% names(catalog$rounds)){
+    metadata <- get_award_round_metadata(login,championship_id,catalog$league_id,current_round_id=catalog$current_round_id)
+    if(identical(metadata$status,"ok")&&is.data.frame(metadata$rows)&&nrow(catalog$rounds))
+      catalog$rounds <- award_join_calendar(catalog$rounds,metadata)$rounds
   }
   catalog
 }

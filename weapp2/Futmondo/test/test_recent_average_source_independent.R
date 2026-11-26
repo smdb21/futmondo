@@ -68,7 +68,11 @@ getReactableState<-function(outputId,name,session)switch(name,page=1L,pageSize=2
 updateReactable<-function(...)invisible(NULL)
 record_acquired_resource<-function(...)invisible(TRUE)
 persist_recent_points_snapshot<-function(payload,context,on_complete){saves[[length(saves)+1L]]<<-list(payload=payload,ack=on_complete);TRUE}
-defer_persistence<-function(fn,args,context,on_complete){observation_writes[[length(observation_writes)+1L]]<<-list(fn=fn,args=args);TRUE}
+defer_persistence<-function(fn,args,context,on_complete=NULL){
+ if(identical(args[[1]],'player_match_observations'))
+  observation_writes[[length(observation_writes)+1L]]<<-list(fn=fn,args=args)
+ TRUE
+}
 async_adapter_fetch<-function(fn,args=list(),context,owner=context$session_id,is_current=function()TRUE){
  calls<<-c(calls,paste0(fn,':',args$player_id %||% ''))
  if(fn=='get_player_recent_points')return(promises::promise(function(resolve,reject){pending[[args$player_id]]<-list(resolve=resolve,current=is_current)}))
