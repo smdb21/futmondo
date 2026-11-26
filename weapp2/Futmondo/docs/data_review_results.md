@@ -2239,6 +2239,16 @@ complete recovery of previously unsaved observations remain unverified.
 
 An offline render of My Team verified that the bulk listing button appears once, immediately after the team value summary and before the grid that starts with Incoming players. All nine offline bulk market checks passed. Reordering the existing HTML adds no requests, observers, timers or DOM nodes.
 
+## Bulk listing eligibility and additive premiums (2026-11-26)
+
+The previous preview styled expected exclusions as errors. It also compared offset timestamps as local clock values, and a malformed first date could abort the calculation for the whole squad. The revised plan reports the eligible count for each pricing method. Open clauses and transfers in progress receive separate explanations. Missing data stays unknown. The result identifies unconfirmed players among the requests actually sent.
+
+The 14 focused bulk-pricing checks and four market-action checks passed offline. Fixtures covered mixed and empty selections, unavailable data, UTC offsets, malformed input, exact prices with either base, verified and unconfirmed requests, duplicate confirmation and account context. The offline Shiny lifecycle passed 14 checks and eight tabs. The separate UI reliability script stopped in a player-table fixture on the missing `lineup_fixture_crest_url` helper. Its unmodified baseline also stopped there, and its bulk-listing regression passed in isolation.
+
+Chromium at 320, 390 and 1440 px showed 17 of 17 eligible at market value and 2 of 17 at closed-clause value. Two +1% presses gave 2%. Adding +1% to a typed 1.25% gave 2.25%, which carried across a mode change. The dialog reopened with confirmation enabled even after cancelling at the default 0%. A 1.25% clause submission confirmed one synthetic new listing and one synthetic replacement at €4,050,000 each. With all 17 clauses open, the dialog showed zero eligible and disabled confirmation. The browser used an HTTP-blocked fixture with synthetic transaction handlers.
+
+Each preview reuses the existing persisted roster projection. Premium presses change the numeric input locally and trigger the usual preview render without extra source or database reads. Listing requests remain limited to eligible players on explicit confirmation. In 50 local 30-player renders, market-value previews took 1.83 s versus 1.78 s previously. Closed-clause previews with ten eligible players took 1.04 s versus 0.68 s, including parsing the opening times. These timings cover local calculation and HTML rendering.
+
 ## Bulk market listing premiums — 2026-11-10
 
 The bulk listing dialog now accepts a premium for either current market value or a closed clause, with a custom percentage and all six requested quick buttons. Its 0% default preserves an unmarked market-value listing. Preview and submission share the same plan, with explicit base/increase/final amounts and totals over eligible players only. Missing values, ineligible clauses and invalid percentages remain distinct from zero. Whole-euro calculation corrects binary over-rounding for both 100 at 10% and 10,000 at 0.07%, while retaining genuinely fractional increases. Valid confirmation remains single-use and account/league/team scoped; invalid pricing can be corrected in the same dialog.

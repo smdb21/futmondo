@@ -1200,7 +1200,7 @@ Use a shared responsive pitch/bench wrapper in the editor and historical lineup 
 
 ## My Team bulk listing button (2026-11-26)
 
-Moved **Put All Players on Market** above **Incoming players** in the My Team layout.
+Moved **Put All Players on Market** above **Incoming players** in the My Team layout. Both pricing methods now show how many players qualify, accept cumulative premium buttons, and report confirmed requests separately from exclusions. [Bulk listing contract](market_selling.md#bulk-listing-premium-and-preview--2026-11-10)
 
 ## Bulk market listing premiums — 2026-11-10
 

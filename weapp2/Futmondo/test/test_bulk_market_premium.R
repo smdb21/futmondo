@@ -40,8 +40,12 @@ check('rounding adds no spurious euro and totals sum individual rounded prices',
 check('zero and legacy defaults stay explicit, closed clauses retain eligibility', {
   zero <- bulk_market_listing_plan(roster, 'value', premium_pct = 0)
   stopifnot(identical(zero$entries$price, c(100, 201, 2e6)), all(zero$entries$increase == 0), zero$skipped == 1L)
-  clause <- bulk_market_listing_plan(roster, 'closed_clause', now = now, premium_pct = 10)
-  stopifnot(identical(clause$entries$player_id, 'p1'), clause$entries$price == 110, clause$skipped == 3L)
+  priced <- roster
+  priced$clause_price[1] <- 250
+  at_clause <- bulk_market_listing_plan(priced, 'closed_clause', now = now, premium_pct = 0)
+  clause <- bulk_market_listing_plan(priced, 'closed_clause', now = now, premium_pct = 10)
+  stopifnot(identical(at_clause$entries$price, 250), identical(clause$entries$player_id, 'p1'),
+    identical(clause$entries$price, 275), clause$skipped == 3L)
   stopifnot(bulk_market_listing_plan(roster, 'closed_clause', now = now)$entries$price == 105,
     identical(bulk_market_listing_plan(roster)$entries$price, zero$entries$price))
 })
@@ -60,10 +64,60 @@ check('preview uses the plan exactly, escapes names and discloses skipped player
     grepl('Base: 2.000.301 €', html, fixed = TRUE), grepl('Listing: 2.200.332 €', html, fixed = TRUE),
     grepl('Extra: +10 €', html, fixed = TRUE), grepl('Listing: 110 €', html, fixed = TRUE),
     grepl('&lt;Player&gt;', html, fixed = TRUE), !grepl('<Player>', html, fixed = TRUE),
-    grepl('1 player(s) skipped', html, fixed = TRUE))
+    grepl('Market-value pricing applies to 3 of 4 players.', html, fixed = TRUE))
   invalid <- bulk_market_listing_plan(roster, premium_pct = NULL)
   html <- htmltools::renderTags(bulk_market_listing_preview(invalid, roster))$html
   stopifnot(grepl('Enter a premium', html, fixed = TRUE), !grepl('Total increase', html, fixed = TRUE))
+})
+
+preview_html <- function(plan, squad) as.character(htmltools::renderTags(bulk_market_listing_preview(plan, squad))$html)
+check('clause preview counts each eligible player and explains expected exclusions', {
+  squad <- roster
+  # At the opening instant the second player's clause is already open.
+  squad$clause_date[2] <- '2026-11-10T12:00:00Z'
+  plan <- bulk_market_listing_plan(squad, 'closed_clause', now = now, premium_pct = 0)
+  html <- preview_html(plan, squad)
+  stopifnot(identical(plan$entries$player_id, 'p1'), plan$skipped == 3L,
+    grepl('Closed-clause pricing applies to 1 of 4 players.', html, fixed = TRUE),
+    grepl('Left out 1 player with an open clause.', html, fixed = TRUE),
+    grepl('Left out 1 player with a transfer in progress.', html, fixed = TRUE),
+    grepl('Required listing details are unavailable for 1 player.', html, fixed = TRUE),
+    !grepl('fm-info-error', html, fixed = TRUE))
+
+  open_squad <- squad[2, , drop = FALSE]
+  none <- bulk_market_listing_plan(open_squad, 'closed_clause', now = now, premium_pct = 0)
+  html <- preview_html(none, open_squad)
+  stopifnot(!nrow(none$entries), none$skipped == 1L,
+    grepl('No listings to submit.', html, fixed = TRUE),
+    !grepl('fm-info-error|role="alert"|Error details', html))
+})
+check('clause opening times honor UTC offsets and malformed timestamps stay unknown', {
+  squad <- roster[1:3, ]
+  squad$clause_date <- c('2026-11-10T12:45:00+01:00', '2026-11-10T11:45:00-01:00', 'invalid date')
+  squad$clause_transferred <- FALSE
+  plan <- bulk_market_listing_plan(squad, 'closed_clause', now = now, premium_pct = 0)
+  html <- preview_html(plan, squad)
+  stopifnot(identical(plan$entries$player_id, 'p2'), plan$skipped == 2L,
+    grepl('Left out 1 player with an open clause.', html, fixed = TRUE),
+    grepl('Required listing details are unavailable for 1 player.', html, fixed = TRUE))
+})
+check('verified empty squad is informational and unavailable squad is actionable', {
+  empty <- structure(roster[0, ], fetch_status = 'empty')
+  html <- preview_html(bulk_market_listing_plan(empty, premium_pct = 0), empty)
+  stopifnot(!grepl('fm-info-error|role="alert"|Error details', html),
+    grepl('Your squad is empty. No listings to submit.', html, fixed = TRUE))
+  loading <- bulk_market_roster(function() shiny::validate(shiny::need(FALSE, 'Loading data…'), errorClass='fm-loading'))
+  html <- preview_html(bulk_market_listing_plan(loading, premium_pct = 0), loading)
+  stopifnot(grepl('Checking squad eligibility', html, fixed=TRUE), !grepl('role="alert"', html, fixed=TRUE))
+  failed <- bulk_market_roster(function() shiny::validate(shiny::need(FALSE, 'Unavailable')))
+  stopifnot(bulk_market_listing_plan(failed, premium_pct = 0)$error)
+  for (unverified in list(NULL, structure(roster, worker_completeness = 'partial'),
+                          transform(roster, id = rep('duplicate', nrow(roster))))) {
+    plan <- bulk_market_listing_plan(unverified, premium_pct = 0)
+    html <- preview_html(plan, unverified)
+    stopifnot(!nrow(plan$entries), !grepl('0 of 0 players', html, fixed = TRUE),
+      grepl('role="alert"', html, fixed = TRUE))
+  }
 })
 
 # Exercise the actual event body with deterministic manual-action boundaries.
@@ -78,7 +132,7 @@ find_event <- function(x) {
 }
 handler <- find_event(parse('Modules/Players_in_Teams_Module.R'))
 stopifnot(!is.null(handler))
-make_fixture <- function(pct = 10, expected_context = list(team='team')) {
+make_fixture <- function(pct = 10, expected_context = list(team='team'), reject = character()) {
   env <- new.env(parent = globalenv())
   env$login_token <- 'fixture'; env$championship_id <- 'champ'; env$user_team_id <- 'team'
   env$get_reactive_val <- identity
@@ -89,6 +143,7 @@ make_fixture <- function(pct = 10, expected_context = list(team='team')) {
   env$calls <- list(); env$invalidations <- 0L; env$refreshes <- 0L
   record <- function(kind, login, champ, team, player, price) {
     env$calls[[length(env$calls) + 1L]] <- list(kind=kind, player=player, price=price)
+    if (player %in% reject) return(list(success=FALSE, message='Rejected in fixture'))
     list(success=TRUE)
   }
   env$put_player_on_market <- function(...) record('new', ...)
@@ -99,6 +154,14 @@ make_fixture <- function(pct = 10, expected_context = list(team='team')) {
   env
 }
 session <- shiny::MockShinySession$new()
+session$sendNotification <- function(action, message) {
+  if (identical(action, 'show')) session$userData$notice <- list(type = message$type, text = as.character(message$html))
+}
+submit <- function(fixture) {
+  session$userData$notice <- NULL
+  shiny::withReactiveDomain(session, eval(handler, fixture))
+  session$userData$notice
+}
 check('confirmed prices match preview with one context consumption and one refresh', {
   fixture <- make_fixture()
   expected <- bulk_market_listing_plan(roster[1:2, ], 'value', premium_pct = 10)$entries
@@ -130,6 +193,45 @@ check('closed-clause submission sends exactly the eligible preview prices', {
   shiny::withReactiveDomain(session, eval(handler, fixture))
   stopifnot(identical(vapply(fixture$calls, `[[`, numeric(1), 'price'), expected$price),
     length(fixture$calls) == 2L, fixture$invalidations == 1L, fixture$refreshes == 1L)
+})
+check('expected clause exclusions are separate from unconfirmed listing requests', {
+  squad <- roster
+  squad$clause_date <- c(rep(format(Sys.time() + 86400, '%Y-%m-%dT%H:%M:%SZ', tz='UTC'), 2),
+    rep('2000-01-01T00:00:00Z', 2))
+  squad$clause_transferred <- FALSE
+  squad$clause_price <- c(250, 500, 100, 100)
+  for (reject in list(character(), 'p2', c('p1','p2'))) {
+    fixture <- make_fixture(0, reject = reject)
+    fixture$input$bulk_listing_price_mode <- 'closed_clause'
+    fixture$players_table_RV <- function() squad
+    notice <- submit(fixture)
+    confirmed <- 2L - length(reject)
+    stopifnot(identical(vapply(fixture$calls, `[[`, character(1), 'player'), c('p1','p2')),
+      identical(vapply(fixture$calls, `[[`, numeric(1), 'price'), c(250, 500)),
+      grepl(sprintf('Futmondo confirmed %d of 2 requested listings.', confirmed), notice$text, fixed=TRUE),
+      grepl('Left out 2 players with open clauses.', notice$text, fixed=TRUE),
+      identical(notice$type, if (length(reject)) 'warning' else 'message'),
+      grepl('Check My Team before trying again.', notice$text, fixed=TRUE) == (length(reject) > 0L),
+      fixture$invalidations == as.integer(confirmed > 0L))
+    if (identical(reject, 'p2')) stopifnot(grepl('Unconfirmed for Player 2.', notice$text, fixed=TRUE))
+    if ('p1' %in% reject) stopifnot(grepl('&lt;Player&gt;', notice$text, fixed=TRUE))
+
+    submit(fixture)
+    stopifnot(length(fixture$calls) == 2L)
+  }
+})
+check('a squad with only open clauses makes no listing requests and can switch pricing', {
+  fixture <- make_fixture(0)
+  squad <- roster[1:2, ]
+  squad$clause_date <- '2000-01-01T00:00:00Z'
+  fixture$players_table_RV <- function() squad
+  fixture$input$bulk_listing_price_mode <- 'closed_clause'
+  notice <- submit(fixture)
+  stopifnot(!length(fixture$calls), fixture$invalidations == 0L, fixture$refreshes == 0L,
+    !is.null(fixture$bulk_context()), identical(notice$type, 'message'))
+  fixture$input$bulk_listing_price_mode <- 'value'
+  submit(fixture)
+  stopifnot(identical(vapply(fixture$calls, `[[`, numeric(1), 'price'), c(100, 201)))
 })
 session$close()
 
