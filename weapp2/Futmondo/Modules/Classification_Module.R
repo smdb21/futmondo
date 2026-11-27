@@ -353,6 +353,7 @@ classification_dreamteam_rows <- function(answer) {
     id <- mvp_text(player[["id"]] %||% player[["_id"]])
     data.frame(
       player_id = id, player = mvp_text(player[["name"]], "Unavailable"),
+      match_id = if (is.list(player[["detailedPoints"]])) mvp_text(player[["detailedPoints"]][["m"]]) else "",
       role = mvp_text(player[["role"]]), team = mvp_text(player[["team"]]), logo = mvp_text(player[["logo"]]),
       points = fm_number(mvp_text(player[["points"]])), mvp = nzchar(mvp) && identical(id, mvp),
       stringsAsFactors = FALSE
@@ -1023,7 +1024,15 @@ classification_Server <- function(id, is_module_active, login_token, championshi
       find_name = function(id) {
         players <- dreamteam_players()
         players$player[match(id, players$player_id)]
-      }, catalog = function() card_catalog(login_token(), championship_id()))
+      }, catalog = function() card_catalog(login_token(), championship_id()),
+      find_fixture = function(id) {
+        rows <- dreamteam_players()
+        match_id <- rows$match_id[rows$player_id %in% id]
+        rounds <- rounds_RV()
+        round_id <- rounds$round_id[rounds$round_number %in% as.numeric(single_round_RV())]
+        if (length(match_id) == 1L && nzchar(match_id) && length(round_id) == 1L)
+          list(player_id = id, round_id = round_id, match_id = match_id)
+      })
     output$dreamteam_box_ui <- renderUI({
       req(is_module_active() == TRUE, login_token(), championship_id())
       if (is.null(single_round_RV()) || single_round_RV() == "all") {

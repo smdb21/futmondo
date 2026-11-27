@@ -1,5 +1,13 @@
 # Futmondo data review and implementation results
 
+## Olasagasti player card (2026-11-27)
+
+The saved championship catalog and player summary both contained Olasagasti's portrait, Levante, midfield role, 117 points, €15,379,650 value and +€331,152 change. His last five scores were 5, 4, 9, 10 and 17. The summary held all 14 rounds while the saved player-match feed ended at Round 13. Replaying the stored Best XI and calendar through the revised projection matched his Round 14 score of 17 to Levante–Racing on November 27 at 20:00 UTC. All 14 scores then had dates.
+
+At 390 px, Chromium opened Classification's highlighted MVP with the catalog entry withheld. The card rendered the matching summary's position, club, season points, last-five total and average, value, change and rival ownership without horizontal overflow. The stored-snapshot card test also published a late catalog row while the same ownership summary remained selected. It updated the displayed profile, preserved the asking price and made zero source calls. Eighteen trend checks, eleven award checks, the live Classification regression and the offline lifecycle (14 checks and eight tabs) passed. The authenticated hosted click was not exercised.
+
+The fix reuses the existing summary, Best XI, player-match and calendar observations. It adds no browser acquisition, database query, worker job or timer. Across 500 local projections of the saved player, filling the name-only row averaged 0.61 ms and using the catalog row averaged 0.06 ms. Market decisions continue to use the existing preflights.
+
 ## Page refresh (2026-11-27)
 
 A synthetic queue with 5,000 unrelated jobs took 3.0 ms to make three Classification jobs due for the selected round. Other rounds, Lineup and Notifications stayed idle. Repeating the request preserved its original timestamp. Separate checks covered team-scoped Lineup routes, account notifications, Market, exclusion, backoff, leases, next claim, service-role permissions and consumption of the request marker. This is a local PGlite timing.
@@ -7034,3 +7042,7 @@ An offline Shiny regression reproduced an expired editable marker, two published
 The editor reuses persisted calendar and transfer observations. The additional fallback validation runs on reactive input changes and performs no API or database I/O. On a 380-fixture synthetic calendar, scoped view selection and validation averaged 18 ms and selection of a stored fixture group averaged under 1 ms. The active editor schedules its next clock check at a known kickoff or deadline. Fixture, match detail, scheduling and snapshot preflight checks passed. The offline Shiny lifecycle passed 14 checks and eight tabs. The affected account and a production submission were not exercised.
 
 The public release metadata on ligaradar.com matched the lineup module and fixture helper from commit `43a1fb4` after the automatic deployment on November 27.
+
+## Transparent loading pitch markings · 2026-11-27
+
+Offline Chromium sampled the canvas alpha channel at the halfway line, penalty spot and adjacent grass. The full-size and compact pitches passed in both themes at 390 and 1440 px. Camera checks passed at 320, 390 and 1440 px with p95 draw times of 3.5–3.9 ms at simulated 4× CPU slowdown. The renderer reuses the existing paths and frame loop, drawing the three spots in a single fill. The change adds no layers, requests or timers. The offline Shiny lifecycle passed 14 checks and eight tabs.

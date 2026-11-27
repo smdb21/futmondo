@@ -214,7 +214,7 @@ assemble_player_card_history <- function(summary,lineup,stored,prices,context,pr
 
 # Project the existing durable calendar into fixture identity and round-date
 # evidence. The player endpoint's enclosing league season can be obsolete.
-player_card_fixture_evidence <- function(answer, schedule, context) {
+player_card_fixture_evidence <- function(answer, schedule, context, award = NULL) {
   matches <- normalize_player_matches(answer)
   result <- list(matches=matches, dates=data.frame())
   calendar <- attr(schedule, "fixture_calendar")
@@ -252,6 +252,22 @@ player_card_fixture_evidence <- function(answer, schedule, context) {
   matches$round[verified[numbered]] <- official_number[numbered]
   undated <- verified[is.na(fm_time(matches$occurred_at[verified]))]
   matches$occurred_at[undated] <- valid_games$kickoff[game[undated]]
+  # The Best XI can publish a player's exact match ID before /player/matches.
+  # The scoped calendar verifies the round and supplies the original kickoff.
+  if (is.list(award) && identical(award$player_id, context$player_id) &&
+      nzchar(fm_scalar(award$match_id, "")) && !award$match_id %in% matches$match_id &&
+      all(c("home_name", "away_name", "status") %in% names(valid_games))) {
+    fixture <- valid_games[valid_games$match_id %in% award$match_id &
+      valid_games$round_id %in% award$round_id, , drop=FALSE]
+    number <- schedule$round_number[schedule$round_id %in% award$round_id]
+    if (nrow(fixture) == 1L && length(number) == 1L && is.finite(number) &&
+        !number %in% duplicate_numbers && isTRUE(fm_time(fixture$kickoff) <= stamp)) {
+      matches <- dplyr::bind_rows(matches, data.frame(round=number, occurred_at=fixture$kickoff,
+        home=fixture$home_name, away=fixture$away_name, home_score=NA_real_, away_score=NA_real_,
+        status=fixture$status, match_id=fixture$match_id, round_id=fixture$round_id,
+        season=context$season, competition_id=context$competition_id, fixture_season=context$season))
+    }
+  }
   result$matches <- matches
 
   # When a player has no associated fixture, use the last confirmed kickoff

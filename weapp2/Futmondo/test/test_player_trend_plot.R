@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 options(futmondo.offline=TRUE)
 suppressPackageStartupMessages({library(shiny);library(shinydashboard);library(shinydashboardPlus);library(dplyr);library(plotly)})
-source("futmondo_functions.R");source("theme.R");source("Modules/Selected_Player_Module.R")
+source("futmondo_functions.R");source("theme.R");source("Modules/Selected_Player_Module.R");source("Modules/Classification_Module.R")
 n<-0L;check<-function(name,code){force(code);n<<-n+1L;cat("PASS",name,"\n")}
 find_output<-function(node,target){
  if(is.call(node)&&identical(node[[1]],as.name("<-"))&&identical(paste(deparse(node[[2]]),collapse=""),paste0("output$",target)))return(node[[3]][[2]])
@@ -20,7 +20,7 @@ check("invalid axis inputs stay finite",stopifnot(identical(player_trend_axis_ra
 known<-empty();known$points<-data.frame(round_number=1:4,points=c(4,0,-2,3),date=as.POSIXct(rep(NA_character_,4),tz="UTC"),score_status=c("final","final","final","provisional"))
 check("round scores retain zero negatives missing dates and status",{chart<-render_fixture(known);stopifnot(identical(as.numeric(unlist(chart$data[[1]]$x)),as.numeric(1:4)),identical(as.numeric(unlist(chart$data[[1]]$y)),c(4,0,-2,3)),grepl("provisional",tail(chart$data[[1]]$text,1),fixed=TRUE))})
 check("recent panel preserves points with a single finality explanation",{
- env<-new.env(parent=globalenv());env$selected_player<-function()data.frame(id="p",points=5,value=100)
+ env<-new.env(parent=globalenv());env$display_player<-function()data.frame(id="p",points=5,value=100)
  env$card_history<-function()known
  env$card_states<-list(matches=function()resource_state(list(matches=list())),summary=function()resource_state(list(points=list())))
  env$card_round_details<-function() {
@@ -126,6 +126,31 @@ check("calendar match identity repairs stale league metadata without accepting c
    blocked<-player_card_fixture_evidence(answer,schedule,foreign)
    stopifnot(!nrow(blocked$dates),identical(blocked$matches,normalize_player_matches(answer)))
  }
+})
+check("a Best XI match ID dates a newly scored fixture ahead of player match history", {
+ ctx <- list(account_id="account", championship_id="championship", competition_id="league",
+   season="2026", player_id="midfielder")
+ match <- list(id="game", r=14, st="F", info=list(date="2020-11-27T20:00:00Z"),
+   h=list(id="h",name="Levante",score=2), a=list(id="a",name="Racing",score=1))
+ schedule <- data.frame(round_id="round14", round_number=14, is_finished=FALSE)
+ attr(schedule,"fixture_calendar") <- list(status="ok", scope=ctx, observed_at=fm_time("2020-11-27T22:00:00Z"),
+   valid_until=as.numeric(Sys.time()), matches=league_fixture_matches(list(list(id="round14",matches=list(match)))))
+ xi <- classification_dreamteam_rows(list(mvp="midfielder", players=list(list(id="midfielder",
+   name="Award player", points=17, detailedPoints=list(m="game")))))
+ award <- list(player_id=xi$player_id, match_id=xi$match_id, round_id="round14")
+ evidence <- player_card_fixture_evidence(NULL,schedule,ctx,award)
+ scores <- data.frame(round_number=14,points=17,source="futmondo")
+ groups <- build_player_recent_rounds(scores,evidence$matches,ctx)
+ stopifnot(nrow(groups$rounds[[1]]$fixtures)==1L,groups$rounds[[1]]$fixtures$home=="Levante",
+   groups$rounds[[1]]$points==17,player_trend_points_dates(scores,groups$rounds)[1]==fm_time(match$info$date),
+   is.na(evidence$matches$home_score))
+ for (field in names(award)) {
+   conflict <- award; conflict[[field]] <- "different"
+   stopifnot(!nrow(player_card_fixture_evidence(NULL,schedule,ctx,conflict)$matches))
+ }
+ feed <- list(matches=list(match))
+ full <- player_card_fixture_evidence(feed,schedule,ctx,award)$matches
+ stopifnot(nrow(full)==1L,full$home_score==2,full$away_score==1)
 })
 check("stored undated final scores remain available",{rows<-data.frame(round=c(1,2,3),points=c(0,-2,5),score_status=c("final","final","provisional"));trace<-player_match_points_trace(rows);stopifnot(trace$has_points,identical(trace$points_df$points,c(0,-2)),all(is.na(trace$points_df$date)))})
 check("card exposes refresh and one combined chart",{html<-as.character(selected_player_UI("card"));stopifnot(grepl("refresh_history",html,fixed=TRUE),!grepl("Smart Bid|fis_panel|smart_bid_widget|player_chart_metric",html))})

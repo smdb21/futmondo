@@ -213,8 +213,7 @@
   function pitch(ctx, opacity, markScale, camera) {
     if (opacity <= .001) return;
     ctx.globalAlpha = opacity;
-    ctx.strokeStyle = palette.ink;
-    ctx.lineWidth = .85 * markScale;
+    ctx.lineWidth = 1.5 * markScale;
     ctx.beginPath();
     paths.forEach(function (path, index) {
       for (var i = 0; i < path.length; i++) {
@@ -227,13 +226,21 @@
         ctx.fill();
       }
     });
+    // Cut the markings through the turf before drawing the ball and players.
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = ctx.fillStyle = '#000';
     ctx.stroke();
-    ctx.fillStyle = palette.ink;
+    var spotRadius = 1.25*markScale;
+    ctx.beginPath();
     [88,210,332].forEach(function (x) {
       var y = 140;
       if (camera) { project(camera,x,y,0); x = camera.px; y = camera.py; }
-      ctx.beginPath(); ctx.arc(x,y,1.25,0,tau); ctx.fill();
+      ctx.moveTo(x+spotRadius,y); ctx.arc(x,y,spotRadius,0,tau);
     });
+    ctx.fill();
+    ctx.restore();
   }
   function passProgress(seconds) {
     // Briefly trap the ball at the boot, then let the pass slow on the turf.

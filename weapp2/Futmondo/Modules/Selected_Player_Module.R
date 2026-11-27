@@ -166,6 +166,32 @@ player_card_recent_table_facts <- function(player,now=Sys.time()) {
   length(deadlines)==2L&&all(is.finite(deadlines))&&all(as.numeric(now)<deadlines)
 }
 
+# A tournament award can open before the championship catalog arrives. The
+# matching championship summary also carries the current player display facts.
+player_card_profile <- function(row, summary) {
+  if (!is.data.frame(row) || nrow(row) != 1L || !is.list(summary) || !is.list(summary$data)) return(row)
+  data <- summary$data
+  id <- fm_scalar(data$id %||% data$`_id`, "")
+  if (!nzchar(id) || !identical(id, fm_scalar(row$id, ""))) return(row)
+  missing_field <- function(value) length(value) != 1L || !is.atomic(value) || is.na(value) || !nzchar(as.character(value))
+  fields <- c("name", "role", "team", "logo", "photo", "points", "value", "change",
+              "average.total", "average.averageLastFive")
+  needed <- fields[vapply(fields, function(field) missing_field(row[[field]]), logical(1))]
+  if (isTRUE(attr(row, "award_identity_only"))) needed <- union(needed, "name")
+  if (!length(needed)) return(row)
+  facts <- data[intersect(names(data), c("name", "role", "role2", "team", "logo",
+    "photo", "points", "value", "change", "average"))]
+  if (!length(facts)) return(row)
+  # Raw average.total covers the season. The shared player parser computes
+  # the recent total only when fitness contains a complete sequence of scores.
+  if (is.list(facts$average)) facts$average$total <- NULL
+  profile <- translate_player_positions(parse_player_json(facts))
+  for (field in intersect(needed, names(profile))) {
+    if (!missing_field(profile[[field]])) row[[field]] <- profile[[field]]
+  }
+  row
+}
+
 # Project only evidenced target facts from the existing official summary.
 # An absent owner/market contract never turns into a free agent or no listing.
 player_card_summary_row <- function(player,summary,observed=FALSE) {
@@ -233,7 +259,7 @@ award_player_button <- function(id, name) {
   tags$button(type = "button", class = "fm-award-player-link", `data-award-player` = id, name)
 }
 
-award_player_cards <- function(session, is_active, login, championship, team, refresh, find_name, catalog) {
+award_player_cards <- function(session, is_active, login, championship, team, refresh, find_name, catalog, find_fixture = function(id) NULL) {
   scope <- reactive({
     if (!isTRUE(is_active()) || !valid_login(login()) || !nzchar(fm_scalar(team(), ""))) return(NULL)
     league_context_revision()
@@ -245,9 +271,13 @@ award_player_cards <- function(session, is_active, login, championship, team, re
     if (is.null(target) || !identical(scope(), target$scope)) return(NULL)
     players <- catalog()$data
     i <- match(target$id, as.character(players$id))
-    if (!is.na(i)) return(translate_player_positions(players[i, , drop = FALSE]))
-    row <- data.frame(id = target$id, name = target$name)
-    attr(row, "award_identity_only") <- TRUE
+    if (!is.na(i)) {
+      row <- translate_player_positions(players[i, , drop = FALSE])
+    } else {
+      row <- data.frame(id = target$id, name = target$name)
+      attr(row, "award_identity_only") <- TRUE
+    }
+    attr(row, "award_fixture") <- target$fixture
     row
   })
 
@@ -265,7 +295,7 @@ award_player_cards <- function(session, is_active, login, championship, team, re
       started <<- TRUE
     }
     generation <<- generation + 1L
-    selection(list(id = click$id, name = name, scope = scope()))
+    selection(list(id = click$id, name = name, scope = scope(), fixture = find_fixture(click$id)))
     showModal(modalDialog(selected_player_UI(session$ns("award_card")),
       tags$script(HTML(sprintf(
         "$(document).one('hidden.bs.modal', '#shiny-modal', function(){Shiny.setInputValue('%s', %d, {priority:'event'});});",
@@ -564,8 +594,16 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     output$owner_offer_amount_preview <- renderUI({ render_input_price_preview(input$owner_offer_amount) })
     output$sale_price_input_preview <- renderUI({ render_input_price_preview(input$sale_price_input) })
 
+    display_player <- reactive({
+      row <- raw_selected_player()
+      if (is.null(row) || is.null(card_context())) return(row)
+      state <- card_states$summary()
+      if (isTRUE(state$session_verified) || player_availability_observed(state$data, "summary"))
+        return(player_card_profile(row, state$data))
+      row
+    })
     output$player_identity_summary <- renderUI({
-      sp <- selected_player()
+      sp <- display_player()
       if (is.null(sp)) {
         return(fm_info("Loading player details…",class="player-card-loading",pending=TRUE))
       }
@@ -1764,13 +1802,14 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     card_round_details <- reactive({
       history <- card_history()
       ctx <- history$context %||% list()
-      evidence <- player_card_fixture_evidence(card_states$matches()$data, card_states$calendar()$data, ctx)
+      evidence <- player_card_fixture_evidence(card_states$matches()$data, card_states$calendar()$data, ctx,
+        attr(raw_selected_player(), "award_fixture"))
       rounds <- build_player_recent_rounds(history$points, evidence$matches, ctx, limit=Inf)
       list(rounds=rounds$rounds, unassociated=rounds$unassociated,
         dates=player_trend_points_dates(history$points, rounds$rounds, evidence$dates))
     })
     output$player_chart_info <- renderUI({
-      sp<-selected_player();req(sp)
+      sp<-display_player();req(sp)
       if(!isTRUE(card_chart_ready()))return(fm_info("Loading chart…",pending=TRUE))
       player_trend_information(card_history(),sp)
     })
@@ -1871,7 +1910,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       div(class="player-round-fixture",strong(paste(match$home,score,match$away)),span(class="player-match-date",date))
     }
     output$recent_round_points <- renderUI({
-      sp<-selected_player();req(sp);history<-card_history();match_state<-card_states$matches()
+      sp<-display_player();req(sp);history<-card_history();match_state<-card_states$matches()
       rounds <- card_round_details()
       rounds$rounds <- head(rounds$rounds, 50L)
       rounds$unassociated <- head(rounds$unassociated, 50L)
@@ -1919,14 +1958,14 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     })
 
     output$player_points_description_box <- renderUI({
-      sp <- selected_player()
+      sp <- display_player()
       req(sp)
       points <- fm_number(sp$points)
       tagList(tags$dt("Total points"), tags$dd(if (is.finite(points)) points else "Unavailable"))
     })
 
     output$player_last_points_description_box <- renderUI({
-      sp <- selected_player()
+      sp <- display_player()
       req(sp)
       total <- fm_number(sp$average.total)
       average <- fm_number(sp$average.averageLastFive)
@@ -1936,10 +1975,11 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     })
 
     output$player_value_description_box <- renderUI({
-      sp <- selected_player()
+      sp <- display_player()
       req(sp)
       change <- fm_number(sp$change)
       percent <- fm_number(sp$change_by_value) * 100
+      if (!is.finite(percent) && isTRUE(fm_number(sp$value) > 0)) percent <- 100 * change / fm_number(sp$value)
       change_text <- if (is.finite(change)) add_sign(player_card_money(change)) else "Change unavailable"
       if (is.finite(percent)) change_text <- paste0(change_text, " (", round(percent, 2), "%)")
       direction <- if (is.finite(change) && change != 0) {

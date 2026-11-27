@@ -1,5 +1,13 @@
 # Player card
 
+## Player details from Classification (2026-11-27)
+
+A Best XI click can arrive before the player catalog loads. Formerly the card could remember that name-only row together with the player's market information and keep displaying it after the catalog arrived. Identity and metrics now follow the selected catalog row directly. `player_card_profile()` fills missing fields from the matching championship summary. Its `data` object contains the role, club, portrait, points, value, change and recent scores. The card derives the last-five total from `average.fitness` and reads the reported mean from `average.averageLastFive`. Offer and clause controls retain their own ownership evidence and deadlines.
+
+Classification passes the selected player's `detailedPoints.m` from the saved `/1/userteam/dreamteam` response and the requested round ID to the card. If the player's match list still lacks that match, `player_card_fixture_evidence()` checks the player ID and joins the unique match and round IDs to the calendar in the same account, championship, competition and season. The fixture supplies the opponents and kickoff. The player's match feed supplies the scoreline when published. The championship summary supplies the player's fantasy points.
+
+The official client requests the player summary with championship, user-team and player IDs, and the league calendar with the source league ID. Checked on November 27 against the official bundle and saved Round 14 observations. [Official client](https://app.futmondo.com/main.dart.js) · [Captured summary contract](har_api_reference.md#9-post-1playersummary) · [Verification](data_review_results.md#olasagasti-player-card-2026-11-27)
+
 ## Compact player details (2026-11-26)
 
 The player card shows the portrait, name, position and club first. A single plain-text line gives the owner and market status, including the asking price for a listed squad player when available. Received offers, active bids and locked clauses use text beside their corresponding actions. In dialogs, Close shares the heading with player details and the information disclosure.

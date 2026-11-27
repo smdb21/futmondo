@@ -38,6 +38,10 @@ player detection at 20.7, and the return to the pitch at 23.7. It uses the exist
 colors and compact-size stroke scaling; no models, textures or network assets
 are required. The extended loop never prolongs loading or changes readiness.
 
+The animated pitch has transparent boundaries, boxes, halfway line, center
+circle and spots. The canvas clears those shapes from the turf before drawing
+the ball and players, letting the page background show through in either theme.
+
 The ball starts beside a randomly chosen outfield player’s boot. The page’s
 loaders share a passing sequence for that team. Each player traps the ball
 briefly before a straight pass that slows as it reaches the next player.

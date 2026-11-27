@@ -1,5 +1,9 @@
 # Futmondo data architecture redesign plan
 
+## Olasagasti player card (2026-11-27)
+
+Classification MVP cards now resolve player details from the saved catalog and championship summary, and can date a newly scored match using the exact fixture ID in the Best XI. Verified locally against the reported player's stored observations and a mobile browser fixture. [Card behavior](selected_player_module.md#player-details-from-classification-2026-11-27) · [Checks](data_review_results.md#olasagasti-player-card-2026-11-27)
+
 ## Page refresh (2026-11-27)
 
 The floating Refresh button advances the existing factual jobs that supply the current page. Classification passes its selected round. The Lineup editor follows new published observations and retains local edits. [Page mapping](database_first_sync.md#refreshing-the-current-page) · [Verification](data_review_results.md#page-refresh-2026-11-27)
@@ -2856,3 +2860,7 @@ The buy/sell pivot now displays club crests from the shared transfer ledger. [Ve
 ## Lineup drafts between editable rounds (2026-11-27)
 
 Implemented and tested full-squad optimization from the persisted opening fixture while the next official lineup deadline is pending. Manual and scheduled submission keep their existing target checks. [Lineup behavior](lineup_module.md#drafting-between-editable-rounds-2026-11-27)
+
+## Transparent loading pitch markings · 2026-11-27
+
+Implemented locally. The animated pitch uses transparent field markings in both themes. [Rendering details](progressive_loading.md#pitch-murmuration-and-radar-loading-visual)

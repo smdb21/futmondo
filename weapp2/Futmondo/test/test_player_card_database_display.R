@@ -113,6 +113,41 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,logi
 })
 cat(sprintf('METRIC initial card plus refresh/update and saved editor %.3fs\n',proc.time()[['elapsed']]-started))
 
+# An award card often paints before its catalog. A remembered ownership row
+# has the same summary clock when the full catalog subsequently arrives.
+award_row <- data.frame(id='player', name='Award name')
+attr(award_row, 'award_identity_only') <- TRUE
+profile_summary <- summary('rival', 175)
+profile_summary$data <- list(id='player', name='Saved player', role='centrocampista',
+  team='Levante', photo='fixture.png', points=117, value=15379650, change=331152,
+  average=list(total='117.0', fitness=list(5,4,9,10,17), averageLastFive='9.00'))
+snapshot('get_player_summary', c(args,list(player_id='player')), profile_summary)
+restore_all()
+selected(award_row)
+shiny::testServer(selected_player_Server, args=list(selected_player=selected, login_token=reactive(auth),
+  championship_id=reactive('league'), user_team_id=reactive('mine')), {
+  settle(session)
+  stopifnot(grepl('Midfielder · Levante', output$player_identity_summary$html, fixed=TRUE),
+    grepl('fixture.png', output$player_identity_summary$html, fixed=TRUE),
+    grepl('117', output$player_points_description_box$html),
+    grepl('45', output$player_last_points_description_box$html),
+    grepl('Avg 9', output$player_last_points_description_box$html),
+    grepl('15.379.650', output$player_value_description_box$html, fixed=TRUE),
+    grepl('331.152', output$player_value_description_box$html, fixed=TRUE))
+  selected(transform(row, role='Forward', team='Later club', points=-2, change=0))
+  settle(session)
+  stopifnot(grepl('Forward · Later club', output$player_identity_summary$html, fixed=TRUE),
+    grepl('-2', output$player_points_description_box$html, fixed=TRUE),
+    selected_player()$user_team_id=='rival', selected_player()$price==175, !length(source_reads))
+})
+wrong <- profile_summary
+wrong$data$id <- 'different'
+stopifnot(identical(player_card_profile(award_row, wrong), award_row))
+profile_summary$data$average$fitness <- list(0, NULL, -2)
+stopifnot(is.null(player_card_profile(award_row, profile_summary)$average.total))
+cat('PASS MVP details render from the saved summary and late catalog independently of the retained owner and asking price\n')
+snapshot('get_player_summary', c(args,list(player_id='player')), summary('new-rival',175), age=90)
+
 # A new process/session restores database bytes, never the display-only marker.
 restore_all();source_reads<-character();selected(row);league<-shiny::reactiveVal('league')
 shiny::testServer(selected_player_Server,args=list(selected_player=selected,login_token=reactive(auth),

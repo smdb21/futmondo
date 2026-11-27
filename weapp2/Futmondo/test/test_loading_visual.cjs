@@ -552,6 +552,37 @@ async function fullscreenChecks(browser) {
   }
 }
 
+async function pitchMarkingChecks(browser) {
+  for (const width of [390, 1440]) {
+    const {page} = await createPage(browser, width, {deviceScaleFactor: 2});
+    for (const theme of ['light', 'dark']) {
+      await page.goto(origin);
+      await page.evaluate(theme => localStorage.setItem('futmondo.color-theme',theme), theme);
+      await page.reload({waitUntil: 'domcontentloaded'});
+      await waitDraw(page, 'fixture-hero');
+      for (const id of ['fixture-hero', 'fixture-compact']) {
+        const samples = await page.locator('#'+id+' canvas').evaluate(canvas => {
+          const ctx = canvas.getContext('2d'), m = ctx.getTransform();
+          const pixels = ctx.getImageData(0,0,canvas.width,canvas.height).data;
+          function alpha(x,y) {
+            const col = Math.floor(x*m.a+m.e), row = Math.floor(y*m.d+m.f);
+            return pixels[(row*canvas.width+col)*4+3];
+          }
+          // Animated specks cross individual pixels along the halfway line.
+          const line = Array.from({length: 24}, (_,i) => alpha(210,55+i));
+          return {line: Math.min(...line), spot: alpha(88,140), turf: alpha(92,145),
+            mode: ctx.globalCompositeOperation};
+        });
+        assert.ok(samples.turf > 100 && samples.line < samples.turf*.35 && samples.spot < samples.turf*.35,
+          width+' '+theme+' '+id+' transparent markings amid visible turf '+JSON.stringify(samples));
+        assert.equal(samples.mode, 'source-over', 'Later scene elements use normal drawing');
+      }
+    }
+    await page.close();
+  }
+  console.log('PASS transparent halfway line and penalty spot on desktop and mobile in both themes');
+}
+
 async function ballStartChecks(browser) {
   const {page} = await createPage(browser, 390);
   for (const [seed, expected] of [['0,0,0.25,0.75', [162.56,85.6]], ['0,0,0.75,0.25', [142,160.4]]]) {
@@ -833,6 +864,7 @@ async function visualChecks(browser) {
     await page.close();
     console.log('PASS initial ' + fallback + ': static illustration, no animated draws');
   }
+  await pitchMarkingChecks(browser);
   await ballStartChecks(browser);
   await fullscreenChecks(browser);
   await clubChecks(browser);
@@ -905,6 +937,6 @@ async function appChecks(browser) {
 (async () => {
   const executablePath = process.env.FUTMONDO_TEST_CHROMIUM || '/tmp/futmondo-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell';
   const browser = await chromium.launch({headless: true, executablePath, args: ['--no-sandbox']});
-  try { await (fullApp ? appChecks(browser) : process.argv.includes("--ball-start-only") ? ballStartChecks(browser) : process.argv.includes("--camera-only") ? cameraChecks(browser) : process.argv.includes("--fullscreen-only") ? fullscreenChecks(browser) : process.argv.includes("--clubs-only") ? clubChecks(browser) : visualChecks(browser)); }
+  try { await (fullApp ? appChecks(browser) : process.argv.includes("--markings-only") ? pitchMarkingChecks(browser) : process.argv.includes("--ball-start-only") ? ballStartChecks(browser) : process.argv.includes("--camera-only") ? cameraChecks(browser) : process.argv.includes("--fullscreen-only") ? fullscreenChecks(browser) : process.argv.includes("--clubs-only") ? clubChecks(browser) : visualChecks(browser)); }
   finally { await browser.close(); }
 })().catch(error => { console.error(error.stack); process.exitCode = 1; });
