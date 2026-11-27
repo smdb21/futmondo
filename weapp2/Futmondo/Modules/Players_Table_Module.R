@@ -841,6 +841,9 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
       snapshot<-isolate(table_display_snapshot());players_table<-snapshot$rows;req(players_table)
       rendered_schema<<-schema;rendered_data<<-players_table;rendered_ids<<-snapshot$ids;rendered_meta<<-snapshot$meta
       table_columns <- get_reactable_columns_for_players(players_table,show_sale_profit=own_squad,separate_crest=TRUE)
+      if (isTRUE(own_squad) && !is.null(table_columns$clause_transferDate)) {
+        table_columns$clause_transferDate$name <- "Leaving on"
+      }
       table_columns[[".selection"]]<-reactable::colDef(show=FALSE)
       if("points" %in% names(players_table))table_columns[["points"]]<-reactable::colDef(
         name="Points",align="center",sortNALast=TRUE,minWidth=84,resizable=TRUE,

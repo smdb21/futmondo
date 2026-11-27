@@ -6869,6 +6869,10 @@ The 13 chart checks include known answers for zero, negative scores, an unlisted
 
 The compressed-snapshot browser fixture also exercised the postponed round at 390 px and 1440 px in both themes. All four runs displayed the expected cumulative series and ranks, removed the missing-score notice, and recorded zero source calls. Replaying identical facts caused zero extra Standings chart publications. First curve times ranged from 0.96 to 2.51 seconds locally.
 
+## My Team departure date heading · 2026-11-26
+
+The offline My Team widget rendered **Leaving on**. All eight squad table checks and 12 championship column checks passed. The heading is set once per table render and adds no row processing, reactive dependency or data request.
+
 ## Player table row height · 2026-11-26
 
 At a 390 px viewport, the same 12 synthetic player rows measured 46.19, 57.28 or 62.28 px with the original CSS. Wrapped names and a two-line offer increased the height through the combined outer and inner cell padding. With the new spacing every row measured 46 px. The shared-table Chromium suite passed at 320, 390 and 1440 px in both themes. It checked that both position badges fit side by side, both offer lines fit vertically, and scrolling, column resizing, row selection and data updates still worked.

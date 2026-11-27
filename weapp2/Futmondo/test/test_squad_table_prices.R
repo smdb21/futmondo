@@ -17,6 +17,7 @@ check('sale-price display uses signed millions with two decimals and preserves u
 roster<-data.frame(id=c('p','q','r'),name=c('Profit','Loss','Unknown'),
   user_team_id='mine',buyPrice=c('9500000','12250000',NA_character_),
   value=1,market_inMarket=TRUE,bid_price=12e6,bid_user='Rival',
+  clause_transferDate=c('2026-11-20T10:00:00Z',NA,NA),
   clause_suggestedClause=18e6,stringsAsFactors=FALSE)
 listed<-team_selling_prices(roster,data.frame(id=c('p','q','r'),price=12e6))
 check('listing and offer cells use roster buyPrice, never valuation or asking price',{
@@ -69,6 +70,9 @@ settle<-function(session)for(i in seq_len(5L)){later::run_now(0);session$flushRe
 shiny::testServer(players_table_Server,args=list(players_table_RV=listed_source,
   user_teams_RV=shiny::reactive(NULL),own_squad=TRUE,league_settings_source=settings),{
   session$setInputs(recent_games_n=5L);settle(session)
+  check('own squad labels the departure date Leaving on',{
+    stopifnot(has(output$players_table,'Leaving on'))
+  })
   check('own squad hides internal columns and retains action metadata',{
     stopifnot(!'owner_team_id'%in%names(table_display_data()),
       !'clause_suggestedClause'%in%names(table_display_data()),

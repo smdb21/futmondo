@@ -270,6 +270,8 @@ Performance: at most 20 detail entries per player, prepared only with the existi
 
 ## My Team departure tint — 2026-11-14
 
+My Team labels the pending clause transfer date **Leaving on**.
+
 `players_table_Server(..., departing_player_ids=NULL)` accepts an optional reactive of departure IDs for `own_squad=TRUE`. It maps those IDs to the filtered source row indexes in `meta$departingPlayerIndexes`; `players_table_departure_class()` applies `fm-departing-before-round` using Reactable's original row index, including after browser sorting and filtering. The shared CSS uses theme-aware reddish backgrounds in both themes, with a narrow accent. A native tooltip on affected player names explains the departure; no separate legend is shown. Other player tables retain their prior appearance. Metadata updates reuse the mounted table and preserve selection/pagination; they do not invalidate roster/history enrichment, add columns or fetch data. The My Team projection suppresses timestamp-only updates.
 
 
