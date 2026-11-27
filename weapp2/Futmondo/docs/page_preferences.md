@@ -12,7 +12,7 @@ Home opens the top of the signed-in dashboard and moves focus to its heading. Re
 
 ## League overview and saved destination
 
-Home reads the active account and league's saved calendar, team, roster, market offers and transfer observations. The overview labels stale figures in words and omits observation timestamps. The kickoff label ends in “at:” and the next line shows the date and time in the account’s display timezone.
+Home reads the active account and league's saved calendar, team, roster, market offers and transfer observations. The overview labels stale figures in words and omits observation timestamps. The kickoff label appears in the left column and the date and time in the account’s display timezone appear in the right column. The countdown sits below both.
 
 `home_round_context(rounds, now)` returns the current round, the next scheduled group and the next instant at which the display can change. `home_round_windows()` groups the saved kickoffs and splits a confirmed long gap between completed and outstanding games. `home_round_phase()` uses the match results and the official round status to distinguish **In progress**, **Awaiting remaining fixtures**, **Awaiting round closure** and **Closed**. When play and closure are both unconfirmed, Home shows **Awaiting round status**. An advanced game and the resumed fixtures retain their original round number. Home follows the intervening matchdays during the gap. The next scheduled group has its own kickoff and countdown, including before the season starts.
 

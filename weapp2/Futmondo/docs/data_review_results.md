@@ -16,7 +16,7 @@ Removing the hidden dashboard header also removed its server update. The delayed
 
 ## Home kickoff label and timestamp (2026-11-26)
 
-The Home browser fixture checks for a rendered line break between the round label ending in “at:” and the localized timestamp. A separate formatter check converted 20:00 UTC on November 27 to `27/11/2026 12:00 PST` for Los Angeles. The markup adds one span per displayed kickoff and uses the existing block styles, formatter and countdown. It adds no requests, database work, reactive updates or timers. [Browser regression](../test/test_welcome_home_browser.cjs)
+The Home fixture checks that the kickoff label and localized timestamp start on the same row in separate columns and that the countdown sits below both. Chromium verified the layout at 320, 390 and 1440 px without horizontal overflow. The offline Shiny lifecycle passed 14 checks plus eight tabs. The layout uses CSS on the existing elements and adds no API calls, database reads, reactive updates or timers. [Browser regression](../test/test_welcome_home_browser.cjs)
 
 ## Home squad value and player count layout (2026-11-26)
 

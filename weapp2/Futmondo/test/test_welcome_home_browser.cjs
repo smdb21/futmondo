@@ -196,7 +196,14 @@ async function verify(browser, width, theme) {
     await round.getByText('Round 11', {exact:true}).waitFor();
     await round.locator('.fm-browser-countdown').waitFor();
     assert.match(await round.innerText(), /\bClosed\b/);
-    assert.match(await round.innerText(), /Next kickoff · Round 12 at:\n\d{2}\/\d{2}\/\d{4} \d{2}:\d{2} \S+/);
+    const kickoff = round.locator('.fm-home-kickoff');
+    const label = kickoff.getByText('Next kickoff · Round 12 at:', {exact:true});
+    const timestamp = kickoff.getByText(/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2} \S+$/);
+    const [left, right, countdown] = await Promise.all(
+      [label, timestamp, kickoff.locator('.fm-browser-countdown')].map(el => el.boundingBox()));
+    assert.ok(left && right && countdown);
+    assert.ok(Math.abs(left.y - right.y) < 1 && right.x >= left.x + left.width);
+    assert.ok(countdown.y >= Math.max(left.y + left.height, right.y + right.height));
     const balance = page.locator('#home_balance');
     await balance.getByText('10.000.000 €', {exact:true}).waitFor();
     await balance.getByText('34.000.000 €', {exact:true}).waitFor();
