@@ -220,7 +220,7 @@ rivals_build_pivot_ledger <- function(pressroom_df, rival_id) {
 # Project already matched shared-ledger trades; never recalculate profit from a
 # second transfer feed. Unmatched purchases/sales retain unknown opposite costs.
 rivals_realized_trade_rows <- function(ledger) {
-  empty<-data.frame(Player=character(),PlayerID=character(),Buy_Date=character(),Buy_Type=character(),
+  empty<-data.frame(Player=character(),PlayerID=character(),PlayerCell=character(),Buy_Date=character(),Buy_Type=character(),
     Bought_Price=numeric(),Sell_Date=character(),Sell_Type=character(),Sold_Price=numeric(),Fees=numeric(),Net_PL=numeric())
   if(!is.data.frame(ledger)||!nrow(ledger)||!all(c("id","type","included","amount","date","player_id")%in%names(ledger)))return(empty)
   trades<-attr(ledger,"realized_trades")
@@ -228,8 +228,12 @@ rivals_realized_trade_rows <- function(ledger) {
   included<-ledger$included%in%TRUE
   buys<-which(included & ledger$type%in%c("buy","clause"))
   sells<-which(included & ledger$type%in%c("sell","clause_sell"))
+  club<-ledger$transfer_club %||% rep("",nrow(ledger))
+  logo<-ledger$transfer_logo %||% rep("",nrow(ledger))
+  has_crest<-(!is.na(club) & nzchar(club)) | (!is.na(logo) & nzchar(logo))
   pairs<-trades$pairs
   purchase<-match(pairs$buy_id,ledger$id);sale<-match(pairs$sell_id,ledger$id)
+  crest_buy<-purchase;crest_sell<-sale
   bought<-purchase;sold<-sale
   buy_dates<-ledger$date[purchase];sell_dates<-ledger$date[sale]
   buy_types<-ledger$type[purchase];sell_types<-ledger$type[sale]
@@ -241,6 +245,8 @@ rivals_realized_trade_rows <- function(ledger) {
     si<-match(strsplit(pairs$sell_id[i],",",fixed=TRUE)[[1]],ledger$id)
     bought<-c(bought,bi);sold<-c(sold,si)
     purchase[i]<-bi[1];sale[i]<-si[1]
+    crest_buy[i]<-bi[match(TRUE,has_crest[bi],nomatch=1L)]
+    crest_sell[i]<-si[match(TRUE,has_crest[si],nomatch=1L)]
     buy_dates[i]<-ledger$date[bi[which.min(fm_time(ledger$date[bi]))]]
     sell_dates[i]<-ledger$date[si[which.max(fm_time(ledger$date[si]))]]
     buy_types[i]<-"Grouped purchases; individual order unknown"
@@ -255,7 +261,11 @@ rivals_realized_trade_rows <- function(ledger) {
   ids<-as.character(ledger$player_id[chosen])
   fallback<-is.na(player)|!nzchar(player);player[fallback]<-ids[fallback]
   player[is.na(player)|!nzchar(player)]<-"Unknown player"
+  # Use the club at purchase, then the sale when purchase metadata is missing.
+  paired_crest<-ifelse(has_crest[crest_buy],crest_buy,crest_sell)
+  crest<-c(paired_crest,unsold,unbought)
   rows<-data.frame(Player=player,PlayerID=ids,
+    PlayerCell=rivals_transfer_player_html(player,club[crest],logo[crest],ids),
     Buy_Date=c(buy_dates,ledger$date[unsold],rep(NA_character_,length(unbought))),
     Buy_Type=c(buy_types,ledger$type[unsold],rep(NA_character_,length(unbought))),
     Bought_Price=c(pairs$buy_price,-ledger$amount[unsold],rep(NA_real_,length(unbought))),
@@ -1351,6 +1361,8 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
         ledger <- rivals_realized_trade_rows(rival_moneymovements_raw_RV())
 
         if (!is.null(ledger) && nrow(ledger) > 0) {
+          player_cells <- ledger$PlayerCell
+          ledger$PlayerCell <- NULL
           return(reactable::reactable(
             ledger,
             compact = TRUE,
@@ -1359,7 +1371,8 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
             bordered = FALSE,
             defaultPageSize = 15,
             columns = list(
-              Player = colDef(name = "Player", align = "left", style = list(fontWeight = "600")),
+              Player = colDef(name = "Player", align = "left", minWidth = 140, html = TRUE,
+                cell = function(value, index) player_cells[index], style = list(fontWeight = "600")),
               Bought_Price = colDef(
                 name = "Bought Price",
                 align = "right",

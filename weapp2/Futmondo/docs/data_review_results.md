@@ -7002,3 +7002,7 @@ Offline checks covered the normal accounting entry point, cache reuse and season
 In an offline timing run, checking 130 synthetic closed-lineup records averaged 47 ms per preparation over five runs. Building the four-movement example with its cash observation averaged 1.6 ms over 100 runs. The bonus snapshot, eight point settlement checks and 26 trading profit and wealth checks also passed.
 
 Hosted verification matched the public calculator and Rivals module fingerprints to commit 3879fd5. One authorized refresh on November 27 ran from 19:58:16 to 20:02:35 UTC. The completed standings recorded 20:02:28 UTC and all ten rows agreed with the last balance in their saved ledgers. Each of the five previously negative teams matched the positive result above. Private cash remained unavailable for those five. This records a production snapshot readback.
+
+## Financial History player crests (2026-11-27)
+
+Offline Chromium displayed the selected rival’s pivot at 390 and 1440 pixels. The paired trade kept its crest and escaped player name after sorting. A holding without club metadata remained readable. The test supplied a local image response. Transfer metadata checks covered different purchase and sale clubs, a sale-only crest, grouped trades and older ledgers. The 26 profit and wealth checks and the existing history-tab suite passed. The pivot reuses stored transfer fields and the existing lazy image renderer with one markup template per distinct club/logo pair. It adds no application API or database reads, subscriptions or timers.

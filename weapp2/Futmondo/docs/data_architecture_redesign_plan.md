@@ -2836,3 +2836,7 @@ Implemented the Rivals-specific route from the floating Refresh control to the v
 ## Kickoff cash in rival balances (2026-11-27)
 
 The public rival ledger now uses the latest supported official closed-lineup budget and rolls it forward through subsequent transactions. Its dated cash observation is retained in the existing durable ledger. [Accounting behavior](rival_cash_accounting.md#cash-recorded-at-a-round-lock)
+
+## Financial History player crests (2026-11-27)
+
+The buy/sell pivot now displays club crests from the shared transfer ledger. [Verification](data_review_results.md#financial-history-player-crests-2026-11-27)
