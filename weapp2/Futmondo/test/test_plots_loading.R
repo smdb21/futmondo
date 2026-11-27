@@ -50,13 +50,14 @@ shiny::testServer(plots_Server,args=list(
  session$setInputs(standings_from='2.2', standings_through='2.2')
  settle(session)
  visible <- round_series()$rows
- stopifnot(identical(calls,before), all(visible$round==2.2),
-   identical(visible$points[visible$team_name=='Beta'],3),
-   is.na(visible$points[visible$team_name=='Alpha']))
+ stopifnot(identical(calls,before), identical(unique(visible$round), c('Before 2.2', '2.2')),
+   identical(visible$points[visible$team_name=='Beta'],c(0,-2)),
+   identical(visible$points[visible$team_name=='Alpha'],c(0,NA_real_)),
+   grepl('The first missing score is in round 2.2',as.character(round_status()),fixed=TRUE))
  session$setInputs(standings_from='first', standings_through='latest')
  settle(session)
  stopifnot(identical(round_series()$rows$round, round_totals()$round), identical(calls,before))
- cat('PASS standings subround range preserves cumulative scores and gaps with zero extra reads\n')
+ cat('PASS standings subround range starts from zero and preserves negative and missing scores with zero extra reads\n')
  session$setInputs(standings_from='2',show_ranks=TRUE)
  settle(session)
  rank <- plotly::plotly_build(standings_plot())

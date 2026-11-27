@@ -24,10 +24,10 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/futmon
     const line=document.querySelector('#plots-standings_plot')?.data?.[0];
     return line && JSON.stringify(line.x)===JSON.stringify(x) && JSON.stringify(line.y)===JSON.stringify(y);
    },{x,y});
-   await waitRounds(['6.2','7'],[15,12]);
+   await waitRounds(['Before 6.2','6.2','7'],[0,5,2]);
    assert.deepEqual(await through.locator('option').evaluateAll(opts=>opts.map(o=>o.value)),['latest','6','6.2','7']);
    await through.selectOption('6.2');
-   await waitRounds(['6.2'],[15]);
+   await waitRounds(['Before 6.2','6.2'],[0,5]);
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2),false);
    await through.selectOption('6');
    await page.getByText('Choose an end round at or after the start on the chart.',{exact:true}).waitFor();
@@ -59,7 +59,7 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/futmon
    const before=await page.locator('#counts').innerText();
    await page.getByRole('tab',{name:'Points',exact:true}).click();
    await from.selectOption('6.2');
-   await waitRounds(['6.2','7'],[15,12]);
+   await waitRounds(['Before 6.2','6.2','7'],[0,5,2]);
    await page.getByRole('switch',{name:'Show ranks',exact:true}).check();
    await waitRounds(['6.2','7'],[1,1]);
    const rankAxis=await plot('standings_plot').evaluate(el=>el._fullLayout.yaxis.range);
@@ -67,7 +67,7 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/futmon
    await through.selectOption('6.2');
    await waitRounds(['6.2'],[1]);
    await page.getByRole('switch',{name:'Show ranks',exact:true}).uncheck();
-   await waitRounds(['6.2'],[15]);
+   await waitRounds(['Before 6.2','6.2'],[0,5]);
    await page.getByRole('button',{name:'Measure saved reads'}).click();await page.waitForTimeout(200);
    assert.equal(await page.locator('#counts').innerText(),before,'Range changes reuse saved reads');
    assert.deepEqual(errors,[]);console.log(`PASS ${width}px ${theme}: all plots, subrounds, toolbar, crests, colors, no overflow or extra range reads`);

@@ -4,6 +4,10 @@
 
 Implemented locally. Home displays “Loading…” for incoming transfers until the shared transfer check settles. [Home display behavior](page_preferences.md)
 
+## Points from a selected round (2026-11-26)
+
+- [x] Start each team at zero before the chosen round and include its score in the interval total. Ranks retain season positions. [Plot behavior](plots_module.md#points-and-ranks-2026-11-26)
+
 ## Compact lineup controls (2026-11-26)
 
 Implemented locally. The lineup editor groups view selection, optimization settings and draft actions above a borderless player pitch. [Editor layout](lineup_module.md#lineup-editor-controls-2026-11-26)

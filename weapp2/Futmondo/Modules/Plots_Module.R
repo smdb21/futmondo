@@ -167,7 +167,7 @@ plots_ranking_targets <- function(rows,rounds) {
 # Numeric subrounds retain distinct labels. Missing observations block later
 # totals, while a verified nonparticipant has no point or position for that round.
 plots_round_totals <- function(rows, rankings = list()) {
-  empty <- data.frame(team_id=character(), team_name=character(), round=numeric(), points=numeric(), rank=numeric())
+  empty <- data.frame(team_id=character(), team_name=character(), round=numeric(), round_points=numeric(), absent=logical(), points=numeric(), rank=numeric())
   if (!is.data.frame(rows) || !nrow(rows)) return(empty)
   teams <- unique(rows[c("team_id", "team_name")])
   numbers <- plots_round_numbers(rows)
@@ -209,10 +209,24 @@ plots_round_totals <- function(rows, rankings = list()) {
   # Coverage details are consumed by the status independently of chart rendering.
   totals <- data.frame(team_id = rep(teams$team_id, each = length(numbers)),
     team_name = rep(teams$team_name, each = length(numbers)), round = rep(numbers, nrow(teams)),
+    round_points = as.vector(t(scores)), absent = as.vector(t(absent)),
     points = as.vector(t(cumulative)), rank = as.vector(t(ranks)))
   attr(totals, "missing_rounds") <- numbers[colSums(missing) > 0L]
   attr(totals, "other_participants") <- numbers[other_participants]
   totals
+}
+
+# The opening marker is the interval's starting balance, separate from any round score.
+plots_interval_points <- function(rows) {
+  contribution <- rows$round_points
+  contribution[rows$absent] <- 0
+  rows$points <- ave(contribution, rows$team_id, FUN = cumsum)
+  rows$points[rows$absent] <- NA_real_
+  rows <- rows[c("team_name", "round", "points")]
+  opening <- rows[rows$round == rows$round[1L], , drop = FALSE]
+  opening$round <- paste("Before", opening$round)
+  opening$points <- 0
+  rbind(opening, rows)
 }
 
 plots_round_chart <- function(totals, metric="points") {
@@ -231,7 +245,8 @@ plots_round_chart <- function(totals, metric="points") {
   }
   plot <- plotly::plot_ly(totals, x=~round_label, y=totals[[metric]], color=~team_name,
     colors=plots_team_colors(totals$team_name), type="scatter", mode="lines+markers", connectgaps=FALSE,
-    hovertemplate=~paste0("<b>",team_name,"</b><br>Round ",round_label,"<br>",
+    hovertemplate=~paste0("<b>",team_name,"</b><br>",
+      ifelse(startsWith(round_label, "Before "), sub("Before ", "Before round ", round_label), paste("Round", round_label)), "<br>",
       title,": ",totals[[metric]],"<extra></extra>")) %>%
     fm_plot_layout(xaxis=list(title="Round", type="category", categoryorder="array", categoryarray=labels),
       yaxis=yaxis, showlegend=FALSE,
@@ -280,7 +295,7 @@ plots_UI <- function(id) {
   shiny::tagList(shiny::h2("Trends"), shiny::uiOutput(ns("chart_status")),
     shiny::tabsetPanel(id=ns("plot_tab"), type="pills",
       shiny::tabPanel("Points",
-        shiny::p("Compare season points or league rank after each published round or subround. First place is at the top in Ranks. Missing scores leave gaps."),
+        shiny::p("Choose a starting round to count points from zero, including that round or subround. Ranks show season positions, with first place at the top. Missing scores leave gaps."),
         shiny::fluidRow(
           shiny::column(3, shiny::tags$label(class = "fm-view-switch", "Points",
             shiny::tags$input(id = ns("show_ranks"), type = "checkbox", role = "switch", `aria-label` = "Show ranks"),
@@ -312,19 +327,25 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
       if (is.function(refresh_trigger)) refresh_trigger()
       tryCatch(get_league_standings_history(championship_id()), error = function(e) data.frame())
     })
+    selected_rounds <- shiny::reactive({
+      rounds <- round_domain()
+      if (!length(rounds)) return(rounds)
+      start <- match(input$standings_from %||% "first", rounds, nomatch = 1L)
+      end <- match(input$standings_through %||% "latest", rounds, nomatch = length(rounds))
+      if (start > end) return(NULL)
+      rounds[seq.int(start, end)]
+    })
     round_series <- resource_display_source(session, function() {
       totals <- round_totals()
-      rounds <- round_domain()
-      if (length(rounds)) {
-        start <- match(input$standings_from %||% "first", rounds, nomatch = 1L)
-        end <- match(input$standings_through %||% "latest", rounds, nomatch = length(rounds))
-        shiny::validate(shiny::need(start <= end, "Choose an end round at or after the start on the chart."))
-        rounds <- rounds[seq.int(start, end)]
-      }
+      rounds <- selected_rounds()
+      shiny::validate(shiny::need(!is.null(rounds), "Choose an end round at or after the start on the chart."))
       keep <- totals$round %in% rounds
       metric <- if (isTRUE(input$show_ranks)) "rank" else "points"
-      rows <- data.frame(team_name = totals$team_name[keep], round = totals$round[keep])
-      rows[[metric]] <- totals[[metric]][keep]
+      rows <- if (metric == "points" && length(rounds) && (input$standings_from %||% "first") %in% rounds) {
+        plots_interval_points(totals[keep, , drop = FALSE])
+      } else {
+        totals[keep, c("team_name", "round", metric), drop = FALSE]
+      }
       list(rows = rows, metric = metric)
     })
     standings_plot <- shiny::reactive({
@@ -570,6 +591,7 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
       state <- round_state()
       totals <- round_totals()
       missing <- attr(totals, "missing_rounds")
+      if (!isTRUE(input$show_ranks)) missing <- intersect(missing, selected_rounds())
       other <- attr(totals, "other_participants")
       shiny::tagList(
         if(state$loading) shiny::div(class="fm-plot-loading",role="status",

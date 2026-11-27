@@ -27,6 +27,9 @@ check('round totals preserve subrounds, revisions, negative and missing points',
   a <- d[d$team_id=='a',]; b <- d[d$team_id=='b',]
   stopifnot(identical(a$round,c(6,6.2,7,8)), identical(a$points,c(10,15,12,12)),
     identical(b$points,c(8,NA_real_,NA_real_,NA_real_)), identical(a$rank,c(1,NA_real_,NA_real_,NA_real_)))
+  interval <- plots_interval_points(d[d$round %in% c(7,8),])
+  stopifnot(identical(interval$points[interval$team_name=='Beta'],c(0,4,6)),
+    identical(interval$points[interval$team_name=='Alpha'],c(0,-3,-3)))
   p <- plotly::plotly_build(plots_round_chart(d))
   stopifnot(p$x$layout$xaxis$type=='category', identical(unlist(p$x$layout$xaxis$categoryarray),c('6','6.2','7','8')),
     length(p$x$data)==2, identical(attr(d, 'missing_rounds'), 6.2))
@@ -130,6 +133,9 @@ check('postponed round 8 uses the published stage for cumulative ranks', {
   totals <- plots_round_totals(rows,list(closed7,ranking))
   stopifnot(identical(totals$points,c(7,5,8,4,4,9,NA_real_,NA_real_,6)),
     identical(totals$rank,c(1,1,2,2,2,1,NA_real_,NA_real_,3)), !length(attr(totals,'missing_rounds')))
+  interval <- plots_interval_points(totals[totals$round %in% 8:9,])
+  stopifnot(identical(interval$points[interval$team_name=='C'], c(0,NA_real_,6)),
+    identical(interval$points[interval$team_name=='B'], c(0,0,5)))
   uncertain <- plots_saved_round_ranking(snapshot,stage,native,c('a','b'))
   stopifnot(identical(attr(plots_round_totals(rows,list(closed7,uncertain)),'missing_rounds'),8),
     is.null(plots_saved_round_ranking(snapshot,stage,native[1,])),

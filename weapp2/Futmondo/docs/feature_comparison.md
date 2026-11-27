@@ -6,7 +6,7 @@ Futmondo documents market end-time sorting and offer indicators. Its official cl
 
 ## Points and ranks (2026-11-26)
 
-Futmondo’s guide shows how to view a past round’s ranking and the general classification. LigaRadar’s existing league charts also let managers switch between cumulative points and league rank over the same selected rounds. The public app entry point and guide were reviewed on November 26. Availability of an equivalent chart control in the signed-in official app remains unverified. [Official guide](https://help.futmondo.com/article/90-empieza-a-jugar-a-futmondo) · [Official app](https://app.futmondo.com/)
+Futmondo’s guide shows how to view a past round’s ranking and the general classification. LigaRadar’s existing league charts also let managers switch between cumulative points and league rank over the same selected rounds. Choosing a starting round compares points earned from that round onward against a common zero baseline. The public app entry point and guide were reviewed on November 26. Availability of an equivalent chart control in the signed-in official app remains unverified. [Official guide](https://help.futmondo.com/article/90-empieza-a-jugar-a-futmondo) · [Official app](https://app.futmondo.com/)
 
 ## Round status and squad value changes on Home (2026-11-26)
 
