@@ -600,7 +600,7 @@ rivals_finance_table_widget <- function(finances_data,on_error=function(error)NU
       selection="single",onClick=click,defaultSelected=selected_row(df_display$team_id_hidden),defaultPageSize=10,defaultSorted=list(`Balance`="desc"),
       defaultColDef=colDef(sortNALast=TRUE),
       columns=c(public_columns(df_display),list(
-        `Balance`=colDef(align="right",cell=function(value){
+        `Balance`=colDef(name="Estimated balance",align="right",cell=function(value){
           value<-fm_number(value);if(!is.finite(value))return("")
           tags$span(style=if(value<0)"color: var(--fm-danger); font-weight:700;"else"font-weight:700;",currency(value))
         }),`Last updated`=colDef(show=FALSE))))
@@ -706,7 +706,7 @@ rivals_status_message <- function(message, loading=FALSE, error=FALSE, details=N
 
 rivals_update_details <- function(rows, timezone=fm_display_timezone()) {
   if(!is.data.frame(rows)||!nrow(rows)||!all(c("teamname","as_of")%in%names(rows)))return(NULL)
-  tags$div(tags$strong("Last updated"), tags$ul(lapply(seq_len(nrow(rows)),function(i){
+  tags$div(tags$strong("Latest balance evidence"), tags$ul(lapply(seq_len(nrow(rows)),function(i){
     stamp<-fm_time(mvp_text(rows$as_of[i]))
     tags$li(rows$teamname[i], ": ", if(length(stamp)==1L&&!is.na(stamp))
       fm_format_datetime(stamp,timezone)else"Update time unavailable")

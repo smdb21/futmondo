@@ -2824,3 +2824,7 @@ Implemented locally. The shared pitch animation shows a rolling soccer ball with
 ## Ground passes in the loading animation · 2026-11-26
 
 Implemented locally. Short passes travel between players’ boots on the grass as the camera turns. [Loading pitch renderer](progressive_loading.md#pitch-murmuration-and-radar-loading-visual)
+
+## Rival balance audit (2026-11-27)
+
+Implemented and checked locally. The balance date follows the financial evidence used for each team. The worker can retain and reuse closed standings observed at payment when subsequent classification corrections change cash estimates. The round 12 backfill derives one scorecard from the saved history. Deployment and historical coverage are tracked in the [review results](data_review_results.md#rival-balance-audit-2026-11-27).
