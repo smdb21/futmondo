@@ -455,10 +455,11 @@ function(input, output, session) {
         team_trend_counts(home_squad_summary(), show_count_labels = TRUE)),
       tags$div(class = "fm-home-detail", tags$span("Transfers"),
         tags$div(class = "fm-team-trend-counts",
-          team_direction_count("up", transfers$incoming, "Incoming players", "incoming",
-            missing_label = if (transfers$incoming_loading) "Loading…" else "Unavailable"),
-          team_direction_count("down", transfers$leaving, "Leaving players", "leaving",
-            missing_label = if (transfers$leaving_loading) "Loading…" else "Unavailable"))))
+          if (!transfers$incoming_loading)
+            team_direction_count("up", transfers$incoming, "Incoming players", "incoming", missing_label = "Unavailable"),
+          if (transfers$incoming_loading || transfers$leaving_loading) tags$span("Loading…"),
+          if (!transfers$leaving_loading)
+            team_direction_count("down", transfers$leaving, "Leaving players", "leaving", missing_label = "Unavailable"))))
   })
   notifications <- notifications_Server("notifications", reactive(input$tabs == "notifications"),
     login_token_RV, championship_id_RV, user_team_id_RV, user_teams_RV, refresh_trigger,

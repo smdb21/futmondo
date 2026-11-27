@@ -1,5 +1,9 @@
 # Futmondo data review and implementation results
 
+## Welcome transfer loading label (2026-11-27)
+
+The offline Home fixture checks the entire Transfers value while the history read is pending and expects exactly “Loading…”. Chromium showed exactly that text at 320 and 1440 px, then showed zero incoming and zero leaving. The change renders fewer elements while loading and adds no requests, timers or reactive dependencies.
+
 ## Unresponsive offer submission (2026-11-26)
 
 Public reads against ligaradar.com returned HTTP 404 for `/fm-offer-dialog-2/offer-dialog.js` and served the expected JavaScript at `/offer-dialog.js`. In offline Chromium, reproducing the 404 left Submit Offer enabled with an empty status after a click. Separately, the server fixture reproduced a lost confirmation when a league metadata revision left the selected player and all context IDs unchanged.

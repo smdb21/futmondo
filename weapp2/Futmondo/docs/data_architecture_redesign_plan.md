@@ -1,5 +1,9 @@
 # Futmondo data architecture redesign plan
 
+## Welcome transfer loading label (2026-11-27)
+
+Home uses one “Loading…” label for pending transfer counts. [Home display behavior](page_preferences.md)
+
 ## Manual offer submission (2026-11-26)
 
 Implemented and tested locally. The offer button loads its handler from the shared static URL and retains its confirmation across same-context metadata refreshes. [Offer submission](bid_management.md#offer-submission)

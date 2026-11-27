@@ -47,9 +47,9 @@ transfer_text <- function(html, label) {
 clear_api_cache()
 shiny::testServer(app_server,{
  login_fixture(session)
- stopifnot(grepl('Loading… incoming$', transfer_text(output$home_squad$html, 'Incoming players')), grepl('17 players', output$home_squad$html),
-   grepl('Loading… leaving$', transfer_text(output$home_squad$html, 'Leaving players')),
-   !grepl('Unavailable|—', transfer_text(output$home_squad$html, 'Incoming players')))
+ transfer_row <- xml2::xml_find_first(xml2::read_html(output$home_squad$html),
+   '//div[span[text()="Transfers"]]/div')
+ stopifnot(trimws(xml2::xml_text(transfer_row)) == 'Loading…', grepl('17 players', output$home_squad$html))
  resolve_history(get_championship_pressroom());app_settle(session)
  stopifnot(grepl('1 incoming$', transfer_text(output$home_squad$html, 'Incoming players')), !grepl('Loading', transfer_text(output$home_squad$html, 'Incoming players')))
  stopifnot(valid_login(login_token_RV()),startup_stage()=='ready',is.null(output$startup_status),
