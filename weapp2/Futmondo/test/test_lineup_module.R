@@ -523,6 +523,66 @@ transfer_state<-function(ids=character(),offset=numeric(),status='ok')list(outgo
  outgoing_records=data.frame(player_id=ids,leaves_at=if(length(offset))fm_time(rounds$begin_process[7])+offset else as.POSIXct(character(),tz='UTC')))
 transfers<-shiny::reactiveVal(transfer_state())
 args$clause_transfers_source<-transfers
+# The last editable deadline has passed, but two advanced games already
+# identify the upcoming kickoff. The remaining game's date is still unknown.
+reset()
+split_calendar<-rounds
+split_calendar$round_id[7]<-'r23'
+split_calendar$round_number[7]<-23
+start<-fm_time(rounds$begin_process[7])
+split_calendar$begin_process[7]<-''
+game<-function(id,at)list(`_id`=id,h=list(`_id`='home',name='Home'),a=list(`_id`='away',name='Away'),
+ info=list(date=at),st='scheduled')
+games<-league_fixture_matches(list(list(`_id`='r23',matches=list(game('first',rounds$begin_process[7]),
+ game('second',fm_clause_stamp(start+7200)),game('later','')))))
+attr(split_calendar,'fixture_calendar')<-list(status='ok',matches=games,scope=list(account_id='fixture',
+ championship_id='league',competition_id='unknown',season='unknown'),observed_at=Sys.time()-30,valid_until=as.numeric(start))
+attr(split_calendar,'lineup_active')<-list(target=list(id='r6',number=6,starts_at=fm_time(rounds$begin_process[6])))
+split_state<-shiny::reactiveVal(split_calendar)
+transfer<-transfer_state('p20',0)
+transfer$status<-'ok'
+transfer$records<-data.frame(player_id=c('new-keeper','late'),player_name=c('New keeper','Late keeper'),
+  joins_at=start+c(-60,0),timing_error='',role='portero',status='ok')
+transfers(transfer)
+saved_schedule_enabled<-lineup_schedule_enabled
+saved_schedule_rpc<-lineup_schedule_rpc
+lineup_schedule_enabled<-function()TRUE
+lineup_schedule_rpc<-function(name,...){
+ stopifnot(name=='read')
+ promises::promise_resolve(NULL)
+}
+new_history<-transform(full_history[full_history$player_id=='p1',],player_id='new-keeper',points=100)
+history_data(rbind(full_history,new_history))
+shiny::testServer(lineup_Server,args=utils::modifyList(args,list(round_catalog=split_state)),{
+ settle(session)
+ session$setInputs(best=1,include_incoming=TRUE);settle(session)
+ xi<-displayed();pending<-preview()
+ stopifnot(is.null(target()),draft_round()$id=='r23',draft_round()$starts_at==start,
+   departures()$complete,identical(arrivals()$rows$player_id,'new-keeper'),state$optimizes==1L,
+   all(nzchar(xi$starters)),all(nzchar(xi$bench)),'new-keeper'%in%xi$starters,
+   !'p20'%in%c(xi$starters,xi$bench),pending$round$id=='r23',is.null(best_request()),
+   grepl('aria-busy="false"',output$status$html,fixed=TRUE),save_state()$disabled,
+   any(grepl('confirms the editable round',save_state()$issues)),state$reads==1L,state$submits==0L)
+ session$setInputs(save=1);settle(session)
+ stopifnot(is.null(pending_save()))
+ confirmed<-split_state()
+ attr(confirmed,'lineup_active')<-list(target=list(id='r23',number=23,starts_at=start))
+ split_state(confirmed);settle(session)
+ stopifnot(lineup_target_matches(target(),pending$round$id,pending$round$starts_at,pending$round$number),identical(displayed(),xi),identical(preview(),pending),
+   !save_state()$disabled,state$optimizes==1L,state$reads==1L,state$submits==0L)
+ cat('PASS two published fixtures permit a full draft with verified arrivals and departures before official opening; one calculation, no admission or write, draft retained on opening\n')
+})
+lineup_schedule_enabled<-saved_schedule_enabled
+lineup_schedule_rpc<-saved_schedule_rpc
+reset()
+foreign<-split_calendar
+attr(foreign,'fixture_calendar')$scope$championship_id<-'other'
+shiny::testServer(lineup_Server,args=utils::modifyList(args,list(round_catalog=function()foreign)),{
+ settle(session);before<-draft();session$setInputs(best=1);settle(session)
+ stopifnot(is.null(draft_round()),is.null(best_request()),identical(draft(),before),
+   grepl('published kickoff',notice(),fixed=TRUE),state$optimizes==0L,state$submits==0L)
+ cat('PASS unmatched fixture evidence leaves the draft intact and settles the Optimize button\n')
+})
 reset()
 transfers(transfer_state(c('p20','p19','p18'),c(-1,0,1)))
 history_data(full_history[!full_history$player_id%in%c('p20','p19'),])

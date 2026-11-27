@@ -29,6 +29,19 @@ lineup_match_rounds <- function(rounds, now=Sys.time()) {
   result
 }
 
+# A first fixture supplies a cutoff for a local draft between editable rounds.
+# Reuse the fixture view to validate the stored dates and league scope.
+lineup_fixture_draft_round <- function(rounds,ref,scope,now=Sys.time()) {
+  if(is.null(ref) || !isTRUE(ref$starts_at>now) || isTRUE(ref$group>1L))return(NULL)
+  row<-which(rounds$round_id %in% ref$id)
+  if(length(row)!=1L || isTRUE(rounds$is_finished[row]) || isTRUE(rounds$partially_played[row]) ||
+     isTRUE(fm_time(rounds$first_kickoff[row])<=now))return(NULL)
+  games<-lineup_fixture_view(rounds,ref,scope,now)$rows
+  if(!nrow(games) || any(games$status %in% 'F') ||
+     !any(fm_time(games$kickoff)==ref$starts_at,na.rm=TRUE))return(NULL)
+  ref[c('id','number','starts_at')]
+}
+
 lineup_match_parse <- function(match, fixture, observed_at) {
   if(!is.list(match)||!all(vapply(match[c('r','h','a','info')],is.list,logical(1)))||
      !is.list(match$h$id)||!is.list(match$a$id)||!identical(mvp_text(match$`_id`),fixture$match_id)||

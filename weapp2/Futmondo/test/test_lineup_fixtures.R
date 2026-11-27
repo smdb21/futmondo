@@ -115,6 +115,10 @@ stopifnot(early$id=='r23',early$partial,is.null(early$groups),early$starts_at==f
   !partial_view$complete,identical(partial_view$rows$match_id,c('first','second')),lineup_target(pending,now)$id=='r14')
 dec <- fm_time('2026-12-01T12:00:00Z')
 stopifnot(is.null(lineup_target(split_rounds,dec)),lineup_match_rounds(split_rounds,dec)$next_round$id=='r23')
+opening <- lineup_match_rounds(pending,dec)$next_round
+draft_round <- lineup_fixture_draft_round(pending,opening,scope,dec)
+stopifnot(draft_round$id=='r23',draft_round$starts_at==fm_time(days[2]),
+  is.null(lineup_fixture_draft_round(pending,opening,scope,fm_time(days[2]))))
 active$rounds[[1]] <- list(`_id`='r23',number=23,championshipId='competition',beginProcess=days[2])
 attr(split_rounds,'lineup_active') <- list(target=target(dec))
 restored <- fm_worker_decode(jsonlite::fromJSON(fm_worker_json(fm_worker_encode(split_rounds)),simplifyVector=FALSE))
@@ -126,6 +130,7 @@ stopifnot(is.null(target(dec)))
 feb <- fm_time('2027-02-01T12:00:00Z')
 refs <- lineup_match_rounds(restored,feb)
 stopifnot(refs$next_round$id=='r23',refs$next_round$group==2L,is.null(lineup_target(restored,feb)),
+  is.null(lineup_fixture_draft_round(restored,refs$next_round,scope,feb)),
   identical(lineup_fixture_view(restored,refs$next_round,scope,feb)$rows$match_id,'feb'))
 active$rounds <- list(list(`_id`='r23',number=23,championshipId='competition',beginProcess=days[5]))
 attr(restored,'lineup_active') <- list(target=target(feb))

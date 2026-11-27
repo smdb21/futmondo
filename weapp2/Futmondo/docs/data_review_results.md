@@ -7012,3 +7012,9 @@ Hosted verification matched the public calculator and Rivals module fingerprints
 ## Financial History player crests (2026-11-27)
 
 Offline Chromium displayed the selected rival’s pivot at 390 and 1440 pixels. The paired trade kept its crest and escaped player name after sorting. A holding without club metadata remained readable. The test supplied a local image response. Transfer metadata checks covered different purchase and sale clubs, a sale-only crest, grouped trades and older ledgers. The 26 profit and wealth checks and the existing history-tab suite passed. The pivot reuses stored transfer fields and the existing lazy image renderer with one markup template per distinct club/logo pair. It adds no application API or database reads, subscriptions or timers.
+
+## Lineup optimization between editable rounds (2026-11-27)
+
+An offline Shiny regression reproduced an expired editable marker, two published games in round 23 and an undated later fixture. One Optimize click filled eleven starters and four substitutes. The XI included a signing due one minute before kickoff and excluded a player leaving at kickoff. The spinner cleared. Save remained disabled until publication of the matching official deadline, which preserved the draft without another squad read or calculation. A foreign fixture calendar settled the request and preserved the prior draft.
+
+The editor reuses persisted calendar and transfer observations. The additional fallback validation runs on reactive input changes and performs no API or database I/O. On a 380-fixture synthetic calendar, scoped view selection and validation averaged 18 ms and selection of a stored fixture group averaged under 1 ms. The active editor schedules its next clock check at a known kickoff or deadline. Fixture, match detail, scheduling and snapshot preflight checks passed. The offline Shiny lifecycle passed 14 checks and eight tabs. The affected account and a production submission were not exercised.

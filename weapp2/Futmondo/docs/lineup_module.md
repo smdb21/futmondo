@@ -592,3 +592,11 @@ A manual tap uses the same UI and returns the original observation time whether 
 | `get_squad` | Provider club ID and fixture season | A verified full roster is valid for seven days. |
 
 A local memory miss calls `worker_claim_striker_response`. A valid database hit returns immediately and uses zero credits. Only a miss can claim a 25-second acquisition lease and reserve credits in the same transaction. A concurrent worker waits briefly for the first reader to publish. `worker_save_striker_response` acknowledges one reservation, accepts a repeated write for the same result and rejects superseded writers. The worker retries an unacknowledged save with its original response before another acquisition. A timed-out request can leave its credit reservation intact. A failed provider read is never served as a successful response. [Fixture-date endpoint](https://strikerapi.com/docs/list-games) · [Provider storage terms](https://strikerapi.com/docs/timing-and-rights)
+
+## Drafting between editable rounds (2026-11-27)
+
+After the previous deadline passes, Optimize can prepare the full XI and bench for the next round with a published opening fixture. `lineup_fixture_draft_round()` checks the existing scoped fixture observation, round identity and kickoff. It accepts a calendar with other games still undated. A later group of an already-started round requires the official reopening marker. The draft compares clause departures and optional arrivals to the first scheduled kickoff and uses the selected completed rounds for scoring.
+
+Manual Save and schedule confirmation require an editable round from the existing target resolver and retain their live submission checks. When that round and deadline match the draft, the selections stay on the pitch. An active editor checks the calendar again at the next known kickoff or deadline. If neither an editable deadline nor a published opening kickoff is available, the Optimize click settles with an explanation.
+
+The Docker build records the lineup module and fixture helper hashes in the public `release-info.json` for rollout verification.

@@ -2844,3 +2844,7 @@ The public rival ledger now uses the latest supported official closed-lineup bud
 ## Financial History player crests (2026-11-27)
 
 The buy/sell pivot now displays club crests from the shared transfer ledger. [Verification](data_review_results.md#financial-history-player-crests-2026-11-27)
+
+## Lineup drafts between editable rounds (2026-11-27)
+
+Implemented and tested full-squad optimization from the persisted opening fixture while the next official lineup deadline is pending. Manual and scheduled submission keep their existing target checks. [Lineup behavior](lineup_module.md#drafting-between-editable-rounds-2026-11-27)

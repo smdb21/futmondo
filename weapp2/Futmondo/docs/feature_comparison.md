@@ -510,3 +510,7 @@ Futmondo documents match notifications when lineups are confirmed and manual sub
 ## Player cards from awards (2026-11-27)
 
 Futmondo documents the round Best XI and MVP in Classification and opening player windows by name in the market and squads. LigaRadar now opens its existing player card from the dream team, the by-round awards and the cross-round player rankings. The public app presents a sign-in shell. The exact award-to-card gesture in the signed-in official app remains unverified. This extends navigation within the existing award rankings inventory. [Official app](https://app.futmondo.com/) · [Getting started](https://help.futmondo.com/article/90-empieza-a-jugar-a-futmondo) · [Official release notes](https://magazine.futmondo.com/version-1-6-como-van-mis-finanzas/)
+
+## Optimizing before the round opens (2026-11-27)
+
+Futmondo’s lineup guide ties round start to the first match. Its round 23 announcement places two LaLiga fixtures on December 2 and the remaining eight in February. LigaRadar’s existing lineup optimizer can now draft the full squad during the gap between editable rounds, with clause timing based on the first published kickoff. Offline tests cover the handoff to the official editing window. The existing Advanced lineup entry covers this correction. [Official lineup guide](https://help.futmondo.com/article/92-como-hago-mi-equipo-en-alineacion) · [Round 23 announcement](https://magazine.futmondo.com/partidos-adelantados-de-la-jornada-23-de-laliga-ea-sports-funcionamiento-y-preguntas-frecuentes-en-futmondo/)
