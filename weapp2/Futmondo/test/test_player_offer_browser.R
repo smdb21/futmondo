@@ -23,14 +23,16 @@ fm_async_http <- function(url, method, body, ...) {
   }, 1))
 }
 row <- data.frame(id = 'player', name = 'Fixture Player', slug = 'fixture', role = 'defensa', team = 'Club',
-  value = 200, price = 150, change = 0, points = 10, user_team_id = '', market_inMarket = TRUE)
+  value = 1852568, price = 150, change = -43038, change_by_value = -.0232, points = 66,
+  average.total = 33, average.averageLastFive = 6.6, user_team_id = '', market_inMarket = TRUE)
 rival <- observed_data(transform(row, id = 'rival-player', user_team_id = 'rival', userTeam = 'Rival',
   market_inMarket = FALSE, price = NA_real_, clause_price = 400, clause_transferred = FALSE,
   clause_date = '2026-01-01T00:00:00Z'))
 capacity <- function(...) list(status = 'ok', valid_until = as.numeric(Sys.time()) + 15,
   roster = list(status = 'ok', count = 10, effective_count = 10, cap = 20),
   funds = list(spendable_budget = 1000), outstanding = list(count = 0))
-ui <- fluidPage(tags$head(tags$style(HTML(fm_theme_css())), includeCSS('www/custom_style.css')),
+ui <- fluidPage(tags$head(tags$style(HTML(fm_theme_css())), includeCSS('www/custom_style.css'),
+  includeScript('www/info-disclosures.js')),
   actionButton('open_market', 'Open market player'), actionButton('open_rival', 'Open rival player'),
   tags$script(HTML("$(document).on('hidden.bs.modal', '#shiny-modal', function(){Shiny.setInputValue('fixture_closed', Math.random(), {priority:'event'});});")))
 server <- function(input, output, session) {

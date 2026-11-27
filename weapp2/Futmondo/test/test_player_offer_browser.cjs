@@ -5,7 +5,7 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
   const browser = await chromium.launch({headless:true, args:['--no-sandbox'],
     ...(process.env.FUTMONDO_TEST_CHROMIUM ? {executablePath:process.env.FUTMONDO_TEST_CHROMIUM} : {})});
   try {
-    for (const width of [320, 1440]) {
+    for (const width of [320, 390, 1440]) {
       const page = await browser.newPage({viewport:{width, height:780}});
       const errors = [];
       page.on('pageerror', error => errors.push(error.message));
@@ -38,6 +38,33 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
         await page.getByText(acknowledgement).waitFor();
         await modal.waitFor({state:'hidden'});
       };
+      await page.getByRole('button', {name:'Open market player'}).click();
+      const card = modal.locator('.player-card');
+      const stats = card.locator('.player-card-metrics');
+      await stats.getByText('Avg 6.6').waitFor();
+      await card.getByText(/Ownership: Free Agent/).waitFor();
+      await card.getByRole('status').filter({hasText:'Checking availability…'}).waitFor();
+      assert.equal(await card.getByRole('button', {name:'Checking availability…'}).count(), 0);
+      assert.equal(await modal.getByText('Player details', {exact:true}).count(), 1);
+      assert.equal((await card.innerText()).split('Listed on Market').length - 1, 1);
+      assert.equal(await card.getByText(/Ownership: Free Agent/).evaluate(el =>
+        el.tagName === 'P' && getComputedStyle(el).borderTopStyle === 'none'), true);
+      assert.deepEqual(await stats.locator('dt').allTextContents(), ['Total points', 'Last 5 matches', 'Market value']);
+      assert.match(await stats.innerText(), /1\.852\.568 €[\s\S]*-43\.038 € \(-2\.32%\)/);
+      const [total, recent, value] = await stats.locator('dt').evaluateAll(nodes =>
+        nodes.map(el => el.getBoundingClientRect().top));
+      assert.equal(total, recent);
+      assert.equal(value === total, width > 540);
+      assert.equal(await card.evaluate(el => el.scrollWidth <= el.clientWidth + 1), true);
+      const history = card.getByRole('heading', {name:'Value and points history'});
+      const historyTop = await history.evaluate(el => el.getBoundingClientRect().top);
+      assert.ok(historyTop < 600, 'History heading should fit in the initial viewport');
+      await card.getByRole('button', {name:'Refresh history'}).waitFor();
+      await card.getByText('Recent rounds', {exact:true}).click();
+      assert.equal(await card.locator('.player-recent-rounds').getAttribute('open'), '');
+      console.log('PASS ' + width + 'px: single status, aligned scores, signed valuation; history starts at ' + Math.round(historyTop) + 'px');
+      await card.getByRole('button', {name:'Close player card'}).click();
+      await modal.waitFor({state:'hidden'});
       const field = modal.getByLabel('Your offer amount (EUR):');
       const market = await open('Open market player', 'Make Market Offer', field);
       assert.equal(await field.inputValue(), '150');

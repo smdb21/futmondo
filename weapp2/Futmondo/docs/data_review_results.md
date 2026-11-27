@@ -1,5 +1,11 @@
 # Futmondo data review and implementation results
 
+## Compact player details (2026-11-26)
+
+Local Chromium rendered a listed free agent with 66 points, 33 over the last five matches, a 6.6 average and a €1,852,568 valuation. The signed change appeared with the value. Ownership and listing status appeared once as plain text. The pending availability message used a status role. At 320 and 390 px the scoring figures shared a row, the card fit the viewport and the history heading started within the first 475 px. The desktop layout placed the valuation on the scoring row. The browser exercised Close, Recent rounds and the synthetic market, owner and clause actions. [Browser regression](../test/test_player_offer_browser.cjs)
+
+Removing the hidden dashboard header also removed its server update. The delayed-source fixture counted zero box updates, zero action rebuilds on optional history completion and six existing source reads. The saved-card checks covered database reuse and zero browsing source requests. The UI reliability suite, 17 history checks and offline lifecycle (14 checks and eight tabs) passed locally. Verification used fixture data. [Loading regression](../test/test_player_card_loading_work.R)
+
 ## Home kickoff label and timestamp (2026-11-26)
 
 The Home browser fixture checks for a rendered line break between the round label ending in “at:” and the localized timestamp. A separate formatter check converted 20:00 UTC on November 27 to `27/11/2026 12:00 PST` for Los Angeles. The markup adds one span per displayed kickoff and uses the existing block styles, formatter and countdown. It adds no requests, database work, reactive updates or timers. [Browser regression](../test/test_welcome_home_browser.cjs)

@@ -28,7 +28,7 @@
     // A nested player view is part of its enclosing dialog, not another scope.
     if (panel && panel.closest(scopeSelector) !== root) panel = null;
     if (!panel) {
-      let heading = root.querySelector(':scope > .modal-header');
+      let heading = root.querySelector(':scope > .modal-header') || root.querySelector('.player-card-toolbar');
       if (!heading) {
         heading = document.createElement('div');
         heading.className = 'fm-dialog-information-heading';

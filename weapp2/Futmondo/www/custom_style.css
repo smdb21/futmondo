@@ -1123,11 +1123,23 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
   }
 }
 
-/* The compact identity row replaces userBox's legacy title/image header. */
-[id$='selected_player_box'] .box-header,
-[id$='selected_player_box'] .widget-user-header,
-[id$='selected_player_box'] .widget-user-image { display: none !important; }
-.player-card-identity { display: flex; align-items: center; gap: 12px; padding: 0 0 14px; margin-bottom: 14px; border-bottom: 1px solid var(--fm-border); }
+/* Player details share a single content column and use rules between sections. */
+.player-card { min-width: 0; color: var(--fm-text); }
+.player-card .player-card-toolbar {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px;
+  margin: 0 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--fm-border);
+  background: var(--fm-surface);
+}
+.modal .player-card-toolbar { position: sticky; top: 0; z-index: 5; }
+.modal .player-card-toolbar:has(.fm-info-panel[open]) { position: static; }
+.player-card-toolbar h2 { margin: 0; font-size: 17px; font-weight: 600; }
+.player-card-toolbar > .player-card-close-shortcut {
+  display: none; position: static; padding: 0; margin-left: auto; order: 2;
+}
+.modal .player-card-toolbar > .player-card-close-shortcut { display: flex; }
+.player-card-toolbar .player-card-close-shortcut .btn { width: 48px; min-height: 48px; padding: 0; }
+.player-card-toolbar .fm-info-panel > .fm-info-body { order: 3; }
+.player-card-identity { display: flex; align-items: center; gap: 12px; }
 .player-card-identity-portrait { position: relative; flex: 0 0 auto; }
 .player-card-identity-portrait > .fm-player-status { position: absolute; right: 0; bottom: 0; width: 20px; height: 20px; border-radius: 50%; background: var(--fm-surface, #fff); }
 .player-card-identity-photo { display: block; width: 58px; height: 58px; object-fit: cover; border-radius: 50%; border: 2px solid var(--fm-border); background: var(--fm-bg); }
@@ -1135,22 +1147,38 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 .player-card-identity-name { font-size: 20px; font-weight: 800; color: var(--fm-text); overflow-wrap: anywhere; }
 .player-card-identity-meta { margin-top: 2px; font-size: 13px; color: var(--fm-muted); overflow-wrap: anywhere; }
 .player-card-identity-team-logo { width: 20px; height: 20px; margin-right: 6px; vertical-align: middle; object-fit: contain; background: transparent; }
-.player-card-identity-location { margin-top: 6px; font-size: 12px; font-weight: 700; color: var(--fm-text); overflow-wrap: anywhere; }
-@media (max-width: 768px) { .player-card-identity { gap: 10px; } .player-card-identity-photo { width: 52px; height: 52px; } .player-card-identity-name { font-size: 18px; } }
-
-.player-chart-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 15px; flex-wrap: wrap; }
-.player-chart-heading .shiny-options-group { display: inline-flex; gap: 6px; }
-.player-chart-heading .radio-inline { margin: 0; padding: 6px 10px; border: 1px solid var(--fm-border); border-radius: 3px; font-size: 12px; }
-.player-chart-heading .radio-inline input { margin-right: 4px; }
-@media (max-width: 768px) { .player-chart-heading { align-items: flex-start; } }
-
-.player-recent-rounds {
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid var(--fm-border, #e2e8f0);
+.player-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 6px 0 12px; }
+.player-card-actions > .btn { max-width: 100%; margin: 0; white-space: normal; overflow-wrap: anywhere; }
+.player-card-status, .player-card-note { flex: 0 0 100%; margin: 0; font-size: 13px; overflow-wrap: anywhere; }
+.player-card-status { color: var(--fm-muted); }
+.player-card-note { font-weight: 600; }
+.player-card-metrics {
+  display: grid; grid-template-columns: 1fr 1fr 1.6fr; gap: 10px 16px; margin: 0;
+  padding: 12px 0; border-block: 1px solid var(--fm-border); font-variant-numeric: tabular-nums;
 }
-.player-recent-rounds > summary { cursor: pointer; font-size: 14px; font-weight: 700; }
-.player-recent-rounds[open] > summary { margin-bottom: 10px; }
+.player-card-metrics > div { min-width: 0; overflow-wrap: anywhere; }
+.player-card-metrics dt { color: var(--fm-muted); font-size: 12px; font-weight: 500; }
+.player-card-metrics dd { margin: 2px 0 0; font-size: 19px; line-height: 1.25; font-weight: 700; }
+.player-card-metrics dd small { display: block; color: var(--fm-muted); font-size: 12px; line-height: 1.5; font-weight: 500; }
+.player-card-metrics .player-value-down { color: var(--fm-danger); }
+.player-card-metrics .player-value-up { color: var(--fm-text); }
+@media (max-width: 540px) {
+  .player-card-identity { gap: 10px; }
+  .player-card-identity-photo { width: 46px; height: 46px; }
+  .player-card-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .player-card-valuation { grid-column: 1 / -1; }
+  .player-card-valuation dd { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 10px; }
+}
+
+.player-card-section { padding: 12px 0; border-top: 1px solid var(--fm-border); }
+.player-chart-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; margin-bottom: 8px; }
+.player-chart-heading h3, .player-card-section h4 { margin: 0; font-size: 16px; font-weight: 600; }
+.player-chart-heading .btn { min-width: 44px; min-height: 44px; }
+.player-chart-heading .btn i { margin: 0; }
+.player-recent-rounds > summary { display: flex; align-items: center; justify-content: space-between; min-height: 44px; cursor: pointer; font-size: 14px; font-weight: 600; }
+.player-recent-rounds > summary::-webkit-details-marker { display: none; }
+.player-recent-rounds[open] > summary > .fa-chevron-down { transform: rotate(180deg); }
+.player-recent-rounds[open] { padding-bottom: 10px; }
 .player-recent-rounds-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .player-recent-round-chip {
   flex: 1 1 100px;

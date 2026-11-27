@@ -17,6 +17,7 @@ get_player_card_history <- function(...) {
 get_player_full_profile <- function(...) NULL
 get_player_matches <- function(...) NULL
 get_financial_snapshot <- function(...) list(lineup_rules = list())
+source('lineup_runtime.R') # Club crest projection used by the shared player table.
 source('Modules/Players_Table_Module.R')
 source('Modules/Selected_Player_Module.R')
 source('Modules/Players_in_Teams_Module.R')
@@ -76,11 +77,11 @@ record('player card opens before expensive selected-player outputs are enabled',
     grepl('!isTRUE(selected_player_ready_RV())', source_text, fixed = TRUE)
   )
 })
-record('player card hides the legacy userBox header', {
-  css <- paste(readLines('www/custom_style.css', warn = FALSE), collapse = '\n')
+record('player card uses one summary grid without a duplicate widget header', {
+  card <- xml2::read_html(htmltools::renderTags(selected_player_UI('fixture'))$html)
   stopifnot(
-    grepl("[id$='selected_player_box'] .widget-user-header", css, fixed = TRUE),
-    grepl("[id$='selected_player_box'] .widget-user-image", css, fixed = TRUE)
+    length(xml2::xml_find_all(card, "//dl[@class='player-card-metrics']/div")) == 3L,
+    !length(xml2::xml_find_all(card, "//*[contains(@class,'widget-user')]"))
   )
 })
 record('player card keeps the team logo in the visible identity row', {
@@ -408,7 +409,7 @@ record('all players clause filters respect maximum and verified funds', {
     args = list(
       players_table_RV = players,
       user_teams_RV = reactive(NULL),
-      available_funds_RV = reactive(2000000)
+      available_cash_RV = reactive(2000000)
     ),
     {
       session$setInputs(

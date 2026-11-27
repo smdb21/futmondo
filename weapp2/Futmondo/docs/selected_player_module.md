@@ -1,10 +1,16 @@
 # Player card
 
+## Compact player details (2026-11-26)
+
+The player card shows the portrait, name, position and club first. A single plain-text line gives the owner and market status, including the asking price for a listed squad player when available. Received offers, active bids and locked clauses use text beside their corresponding actions. In dialogs, Close shares the heading with player details and the information disclosure.
+
+On phones, total points and the last five matches share one row. Market value has its own row with the signed change alongside when space permits. Wider layouts show all three measures across one row. Recent rounds expands in place, followed by value and points history.
+
 ## Purchased release clauses — 2026-11-23 Pacific
 
 For a rival player, an explicit `championship.clause.transferred` flag shows
 **Release clause purchased**. When `championship.clause.transferDate` is a
-valid future instant, the badge also shows **Transfer scheduled for** with the
+valid future instant, the clause status also shows **Transfer scheduled for** with the
 date in the account's display timezone. A missing transfer flag and a past
 opening leave availability unverified. **Release Clause Locked until** applies
 to a future opening. The card reuses its scoped, durable player summary.
@@ -18,7 +24,7 @@ uses authenticated `POST /1/player/summary` with `championshipId`,
 separately. A scoped production snapshot corroborated that the opening was
 already past and the purchase had a separate future delivery time. The user
 confirmed the same pending transfer in the official app. This corrects the
-existing LigaRadar badge to reflect a shared capability.
+existing LigaRadar status to reflect a shared capability.
 
 
 ## Manual offer and purchase timing — 2026-11-22 Pacific
@@ -39,7 +45,7 @@ the same `player_status_icon()` mapping as tables and lineup. It uses the select
 source row's `status` and can display it in the first identity paint while
 optional history and the separate transaction-safety checks are pending.
 Fit and missing statuses have no badge. The portrait remains 58 px on desktop
-and 52 px on mobile.
+and 46 px at narrow widths.
 
 ## Player fixture and chart dates — 2026-11-19
 

@@ -230,56 +230,33 @@ selected_player_UI <- function(id, player = NULL, team = NULL) {
       ".on('shiny:value.fmCardPaint",gsub("[^a-zA-Z0-9]","",ns("")),"',function(event){if(event.name===id)setTimeout(painted,0);});",
       "setTimeout(painted,0);})();"
     ))),
-    # The modal footer is below a long card. Keep a large, keyboard-accessible
-    # dismissal control at the top of the scrollable player-card content.
-    div(
-      class = "player-card-close-shortcut",
-      tags$button(type = "button", class = "btn btn-default",
-        `data-dismiss` = "modal", `aria-label` = "Close player card",
-        icon("times"), span("Close player card"))
-    ),
-    userBox(
-      id = ns("selected_player_box"),
-      width = 12,
-      title = userDescription(title = "Player", subtitle = "", type = 1, image = SPACER_GIF),
-      status = "primary",
-      gradient = TRUE,
-      background = "light-blue",
-      boxToolSize = "xl",
-      collapsible = FALSE,
-      footer = tagList(
-        uiOutput(ns("player_identity_summary")),
-        fluidRow(
-          column(12, align = "center", style = "margin-top: 15px; display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;",
-                 div(id = ns("action_buttons"), class = "shiny-html-output",
-                   player_card_offer_button(player, team, ns)))
+    tags$section(id = ns("selected_player_box"), class = "player-card",
+      div(class = "player-card-toolbar",
+        h2("Player details"),
+        div(class = "player-card-close-shortcut",
+          tags$button(type = "button", class = "btn btn-default",
+            `data-dismiss` = "modal", `aria-label` = "Close player card", title = "Close player card",
+            icon("times")))
+      ),
+      uiOutput(ns("player_identity_summary")),
+      div(id = ns("action_buttons"), class = "shiny-html-output player-card-actions",
+        player_card_offer_button(player, team, ns)),
+      tags$dl(class = "player-card-metrics",
+        uiOutput(ns("player_points_description_box")),
+        uiOutput(ns("player_last_points_description_box")),
+        uiOutput(ns("player_value_description_box"), class = "player-card-valuation")
+      ),
+      uiOutput(ns("recent_round_points")),
+      div(class = "player-card-section",
+        div(class = "player-chart-heading",
+          h3("Value and points history"),
+          actionButton(ns("refresh_history"), NULL, icon = icon("rotate"),
+            title = "Refresh history", `aria-label` = "Refresh history")
         ),
-        fluidRow(
-          column(4, uiOutput(ns("player_points_description_box"))),
-          column(4, uiOutput(ns("player_last_points_description_box"))),
-          column(4, uiOutput(ns("player_value_description_box")))
-        ),
-        fluidRow(
-          column(12, uiOutput(ns("recent_round_points")))
-        ),
-        # Plotly History Chart Row (Plot A)
-        fluidRow(
-          style = "margin-top: 25px; padding-top: 20px; border-top: 1px solid #f1f5f9;",
-          column(12,
-                 div(class = "player-chart-heading",
-                   h4(style = "font-weight: 600; color: var(--fm-text); margin: 0;", "Historical Valuation & Performance"),
-                   actionButton(ns("refresh_history"), "Refresh history", icon=icon("rotate"))
-                 ),
-                 uiOutput(ns("player_chart_info")),
-                 uiOutput(ns("player_chart_container"))
-          )
-        ),
-        # Real-competition profile, price history, and completed match metadata.
-        fluidRow(
-          style = "margin-top: 20px; padding-top: 15px; border-top: 1px solid #f1f5f9;",
-          column(12, uiOutput(ns("player_external_details")))
-        )
-      )
+        uiOutput(ns("player_chart_info")),
+        uiOutput(ns("player_chart_container"))
+      ),
+      div(class = "player-card-section", uiOutput(ns("player_external_details")))
     )
   )
 }
@@ -516,7 +493,6 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           onerror = "this.style.display=\"none\";")
       } else NULL
       resource_timing("card_identity",isolate(card_started()))
-      location <- player_card_location_label(sp, get_reactive_val(user_team_id))
       div(class = "player-card-identity", `data-player-id`=as.character(sp$id),`data-paint-generation`=as.character(card_paint_generation()),
         div(class = "player-card-identity-portrait",
           img(src = photo, class = "player-card-identity-photo", alt = player_name,
@@ -526,67 +502,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           div(class = "player-card-identity-name", player_name),
           div(class = "player-card-identity-meta",
             team_logo,
-            span(paste(role, "·", team))),
-          div(class = "player-card-identity-location", icon("location-dot"), " ", location)
+            span(paste(role, "·", team)))
         )
       )
-    })
-
-    # Identity is already available in the selected row. Optional history and
-    # availability completions must not reconstruct the surrounding player box.
-    observeEvent(selected_player(), {
-        sp <- selected_player()
-        req(sp)
-
-        login <- get_reactive_val(login_token)
-        champ_id <- get_reactive_val(championship_id)
-        team_id <- get_reactive_val(user_team_id)
-
-        print(paste0("Selected player: ", sp$name))
-        player_name <- sp$name
-        role_text <- sp$role
-
-        # Dynamically build integrated team logo emblem & name
-        team_logo <- NULL
-        if ("team" %in% colnames(sp) && !is.na(sp$team) && sp$team != "") {
-          team_logo_field <- if ("logo" %in% colnames(sp) && !is.na(sp$logo)) as.character(sp$logo) else NULL
-          team_image_name <- get_team_image_name(sp$team, logo = team_logo_field)
-          
-          logo_tag <- if (team_image_name != "") {
-            img(src = paste0(TEAM_LOGO_URL, team_image_name, ".png"), 
-                style = "height: 18px; width: auto; object-fit: contain; background: transparent;", 
-                alt = sp$team,
-                onerror = "this.style.display='none';")
-          } else {
-            NULL
-          }
-          
-          team_logo <- shiny::tags$div(
-            style = "margin-top: 6px; display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 13px; color: var(--fm-text);",
-            logo_tag,
-            sp$team
-          )
-        }
-
-        sub_title_markup <- tagList(
-          shiny::tags$span(style = "display: block; font-weight: 600; font-size: 13px; color: var(--fm-muted); text-transform: uppercase; letter-spacing: 0.5px;", role_text),
-          team_logo
-        )
-
-        shinydashboardPlus::updateBox(
-          id = "selected_player_box",
-          action = "update",
-          options = list(
-            title = shinydashboardPlus::userDescription(
-              title = player_name, subtitle = sub_title_markup, type = 1,
-              image = paste0(PHOTO_URL, "/", sp$photo)
-            ),
-            status = "red",
-            background = NULL,
-            width = 12
-          )
-        )
-
     })
 
     # Actions need ownership, current bids, and verified acquisition/listing
@@ -640,17 +558,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
             }
           }
 
-          own_badge <- div(
-            style = "display: inline-block; padding: 8px 16px; background-color: var(--fm-surface); color: var(--fm-text); border: 1px solid #bae6fd; border-radius: 8px; font-weight: 600; font-size: 12px; margin: 5px;",
-            tagList(icon("shield-halved"), " Player in Your Squad")
-          )
-
           if (is_listed_on_market) {
-            price_text <- if (!is.na(current_asking_price) && current_asking_price > 0) paste0(" (Asking: ", player_card_money(current_asking_price), ")") else ""
-            listed_badge <- div(
-              style = "display: inline-block; padding: 8px 16px; background-color: var(--fm-surface); color: var(--fm-text); border: 1px solid #fde68a; border-radius: 8px; font-weight: 600; font-size: 12px; margin: 5px;",
-              tagList(icon("tags"), paste0(" Listed on Market", price_text))
-            )
             btn_update_sale <- actionButton(
               ns("btn_put_on_market"),
               label = tagList(icon("pen-to-square"), " Update Listing Price"),
@@ -661,14 +569,14 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
               label = tagList(icon("tag"), " Remove from Market"),
               class = "btn btn-cancel-bid"
             )
-            action_buttons <- tagList(own_badge, listed_badge, btn_update_sale, btn_cancel_sell)
+            action_buttons <- tagList(btn_update_sale, btn_cancel_sell)
           } else {
             btn_put_on_market <- actionButton(
               ns("btn_put_on_market"),
               label = tagList(icon("tags"), " Put on Market for Sale"),
               class = "btn btn-offer-money"
             )
-            action_buttons <- tagList(own_badge, btn_put_on_market)
+            action_buttons <- btn_put_on_market
           }
 
           action_buttons <- tagList(action_buttons, actionButton(ns("btn_direct_sell"),
@@ -688,7 +596,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
           if (has_received_offer) {
             offer_banner <- div(
-              style = "width: 100%; text-align: center; margin-bottom: 10px; padding: 10px 16px; background-color: var(--fm-surface); color: var(--fm-text); border: 1px solid #a7f3d0; border-radius: 8px; font-weight: 700; font-size: 14px;",
+              class = "player-card-note",
               tagList(icon("hand-holding-dollar"), paste0(" Received Offer: ", player_card_money(rec_offer_price), " from ", rec_offer_bidder))
             )
             btn_accept_offer <- actionButton(
@@ -707,7 +615,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           # ---- Player belongs to rival/market AND current user has an active BUY bid ----
           bid_info <- active_bid_info_RV()
           banner <- div(
-            style = "width: 100%; text-align: center; margin-bottom: 10px; padding: 10px 16px; background-color: var(--fm-surface); color: var(--fm-text); border: 1px solid #a7f3d0; border-radius: 8px; font-weight: 700; font-size: 14px;",
+            class = "player-card-note",
             tagList(icon("hand-holding-dollar"), paste0(" Your Active Bid: ", player_card_money(bid_info$price)))
           )
           btn_modify <- actionButton(
@@ -723,15 +631,6 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
           action_buttons <- tagList(banner, btn_modify, btn_cancel)
         } else {
           # ---- Player belongs to rival/market AND current user has NO active bid ----
-
-          location_status <- player_card_location_status(sp,current_user_team)
-          ownership_badge <- div(
-            style = "display: inline-block; padding: 8px 16px; background-color: var(--fm-surface); color: var(--fm-text); border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; font-size: 13px; margin: 5px;",
-            tagList(icon("users"),paste0(" Ownership: ",location_status$ownership)))
-          market_badge <- div(
-            style = "display: inline-block; padding: 8px 16px; background-color: var(--fm-surface); color: var(--fm-text); border: 1px solid #fde68a; border-radius: 8px; font-weight: 600; font-size: 13px; margin: 5px;",
-            tagList(icon("tags"),paste0(" ",location_status$market)))
-          action_buttons <- tagList(ownership_badge,market_badge,action_buttons)
 
           # Extract release clause parameters
           clause_price_val <- if ("clause_price" %in% colnames(sp) && !is.na(sp$clause_price)) suppressWarnings(as.numeric(sp$clause_price)) else 0
@@ -782,11 +681,11 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
             } else {
               "Release clause unavailable · transfer status unverified"
             }
-            locked_badge <- div(
-              style = "display: inline-block; padding: 8px 16px; background-color: var(--fm-surface); color: var(--fm-text); border: 1px solid #fde68a; border-radius: 8px; font-weight: 600; font-size: 12px; margin: 5px;",
+            clause_note <- div(
+              class = "player-card-note",
               tagList(icon("lock"), paste0(" ", clause_label, " (", player_card_money(clause_price_val), ")"))
             )
-            action_buttons <- tagList(action_buttons, locked_badge)
+            action_buttons <- tagList(action_buttons, clause_note)
           }
           if(has_rival_owner&&isTRUE(allow_scheduled_clauses)&&exists('fm_clause_schedule_ui',mode='function')){
             ctx<-resource_context(get_reactive_val(login_token),get_reactive_val(championship_id),current_user_team,sp$id)
@@ -829,20 +728,26 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
             "Player availability has not been saved yet. See Background sync for acquisition status."else
             resource_failure_message(readiness$error),error=!is.null(readiness$error)),disable(action_buttons))
         }
-        # Keep recovery reachable even when the saved capacity is missing or
-        # loading: the ordinary readiness gate disables purchase controls only.
-        if(!stored_mode && !is_own_player && !has_active_bid && worker_capacity_verification_available()) {
-          pending <- summary_unverified&&identical(summary_state$status,"loading")
-          if(summary_unverified)
-            action_buttons <- tagList(action_buttons,actionButton(ns("btn_verify_availability"),
-              if(pending) "Checking availability…" else "Retry availability",
-              class="btn btn-default",disabled=pending))
+        if (!stored_mode) {
+          needs_listing <- is_own_player && !player_availability_valid(card_states$listings()$data, "listings")
+          needs_summary <- !is_own_player && !has_active_bid && summary_unverified && worker_capacity_verification_available()
+          if (needs_listing || needs_summary) {
+            status <- if (needs_listing) card_states$listings()$status else summary_state$status
+            recovery <- if (identical(status, "loading")) {
+              p(class = "player-card-status", role = "status", "Checking availability…")
+            } else {
+              actionButton(ns("btn_verify_availability"), "Retry availability", class = "btn btn-default")
+            }
+            action_buttons <- tagList(action_buttons, recovery)
+          }
         }
-        if(!stored_mode&&is_own_player&&!player_availability_valid(card_states$listings()$data,"listings")){
-          pending<-identical(card_states$listings()$status,"loading")
-          action_buttons<-tagList(action_buttons,actionButton(ns("btn_verify_availability"),
-            if(pending)"Checking availability…"else"Retry availability",class="btn btn-default",disabled=pending))
-        }
+        # The own-listings snapshot can confirm a listing absent from the table row.
+        display_row <- sp
+        if (is_own_player) display_row$market_inMarket <- is_listed_on_market
+        location <- player_card_location_label(display_row, current_user_team)
+        if (is_own_player && is_listed_on_market && is.finite(current_asking_price))
+          location <- paste0(location, " · Asking ", player_card_money(current_asking_price))
+        action_buttons <- tagList(p(class = "player-card-status", location), action_buttons)
         output$action_buttons <- renderUI(action_buttons)
         if(!timed_availability&&!identical(readiness$status,"loading")){timed_availability<<-TRUE;resource_timing("availability_actions",isolate(card_started()))}
       }
@@ -1954,7 +1859,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       rounds$unassociated <- head(rounds$unassociated, 50L)
       notice <- player_round_history_notice(history, rounds, match_state)
       tags$details(class="player-recent-rounds",
-        tags$summary(icon("futbol")," Recent rounds"),
+        tags$summary(span(icon("futbol"), " Recent rounds"), icon("chevron-down")),
         div(class="player-round-boxes",lapply(rounds$rounds,function(round){
           div(class="player-match-card player-round-box",
             div(class="player-round-heading",span(paste("Round",round$round_number)),
@@ -1995,95 +1900,35 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
             fm_info(paste(nrow(prices),"saved values")))else fm_info("Profile valuation history is unavailable.",error=TRUE)))
     })
 
-    ## render player_points_description_box ----
     output$player_points_description_box <- renderUI({
       sp <- selected_player()
       req(sp)
-      ret <- tagList()
-      points <- sp$points
-
-      clean_points <- if (is.null(points) || is.na(points) || points == "NaN" || points == "") {
-        "Unavailable"
-      } else {
-        as.character(points)
-      }
-
-      block <- descriptionBlock(
-        header = clean_points,
-        number = NULL,
-        numberColor = "black",
-        text = "Total Points"
-      )
-      ret <- tagList(
-        ret,
-        block
-      )
-      return(ret)
+      points <- fm_number(sp$points)
+      tagList(tags$dt("Total points"), tags$dd(if (is.finite(points)) points else "Unavailable"))
     })
 
-    ## render player_last_points_description_box ----
     output$player_last_points_description_box <- renderUI({
       sp <- selected_player()
       req(sp)
-      ret <- tagList()
-      total_last_points <- sp$average.total
-      avg_last_points <- sp$average.averageLastFive
-
-      clean_total <- if (is.null(total_last_points) || is.na(total_last_points) || total_last_points == "NaN" || total_last_points == "") {
-        "Unavailable"
-      } else {
-        as.character(total_last_points)
-      }
-
-      # Handle NaN / "NaN" / NA in averages safely -- omit "Avg:" if unavailable
-      if (is.null(avg_last_points) || is.na(avg_last_points) || avg_last_points == "NaN" || avg_last_points == "") {
-        header_text <- clean_total
-      } else {
-        header_text <- paste0(clean_total, " (Avg: ", round(as.numeric(avg_last_points), 1), ")")
-      }
-
-      block <- descriptionBlock(
-        header = header_text,
-        number = NULL,
-        numberColor = "black",
-        text = "Last 5 matches"
-      )
-      ret <- tagList(
-        ret,
-        block
-      )
-      return(ret)
+      total <- fm_number(sp$average.total)
+      average <- fm_number(sp$average.averageLastFive)
+      tagList(tags$dt("Last 5 matches"),
+        tags$dd(if (is.finite(total)) total else "Unavailable",
+          if (is.finite(average)) tags$small(paste("Avg", round(average, 1)))))
     })
 
-    ## render player_value_description_box ----
     output$player_value_description_box <- renderUI({
       sp <- selected_player()
       req(sp)
-      value <- sp$value
-      change <- sp$change
-      change_pct <- sp$change_by_value * 100
-      if (length(change) == 1L && is.finite(change) && change > 0) {
-        icon <- icon("caret-up")
-        number_color = "green"
-      } else if (length(change) == 1L && is.finite(change) && change < 0) {
-        icon <- icon("caret-down")
-        number_color = "red"
-      } else {
-        icon <- NULL
-        number_color = "black"
+      change <- fm_number(sp$change)
+      percent <- fm_number(sp$change_by_value) * 100
+      change_text <- if (is.finite(change)) add_sign(player_card_money(change)) else "Change unavailable"
+      if (is.finite(percent)) change_text <- paste0(change_text, " (", round(percent, 2), "%)")
+      direction <- if (is.finite(change) && change != 0) {
+        if (change > 0) "player-value-up" else "player-value-down"
       }
-      change_text <- if (length(change) == 1L && is.finite(change)) {
-        add_sign(player_card_money(change))
-      } else {
-        "Unavailable"
-      }
-      descriptionBlock(
-        header = player_card_money(value),
-        number = paste0(change_text, " (", round(change_pct, 2), "%)"),
-        numberColor = number_color,
-        numberIcon = icon,
-        text = "Value"
-      )
+      tagList(tags$dt("Market value"),
+        tags$dd(player_card_money(sp$value), tags$small(class = direction, change_text)))
     })
 
     ## render selected_player_table ----
