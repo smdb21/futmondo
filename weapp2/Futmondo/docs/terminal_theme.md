@@ -6,6 +6,8 @@ The application shares light and dark color tokens through `theme.R` and `www/cu
 
 Theme changes run entirely in the browser: no API requests, database writes, server reactive invalidation, or data reload. Existing plots receive one update per effective palette change; no polling or DOM observer is needed.
 
+Market listing, bid, offer and clause actions use a shared 2 px border in the theme text color. Home’s Continue button, interactive team and offer names, and editable lineup slots and choices have compact 1 px borders.
+
 Maintain readable contrast, visible keyboard focus, touch-friendly actions, and responsive layouts at desktop and narrow mobile widths. Hidden or removed recommendation widgets must not dictate new layout behavior.
 
 The isolated browser fixture checks retained tabs and responsive overflow without accessing external services. Actual screenshots/check results belong in [review results](data_review_results.md).

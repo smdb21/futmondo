@@ -1,5 +1,11 @@
 # Futmondo data review and implementation results
 
+## Button visibility (2026-11-26)
+
+Offline Chromium verified all four edges of the squad market-listing confirmation in light and dark themes at 320, 390 and 1440 px. The dialog fit at each width and the synthetic listing flow passed. Opening an individual player from the roster at 390 px also showed a 2 px solid confirmation border in each theme. The same transaction styles cover bids, offers and clause confirmations. The player-card and lineup browser suites passed at all three widths. Received-offer buttons retained keyboard activation and compact rows at 320, 360, 390 and 1440 px in both themes.
+
+The runtime change uses CSS on existing controls. It adds no requests, database work, timers or reactive renders. The offline Shiny lifecycle passed 14 checks and eight tabs. [Listing check](../test/test_bulk_market_premium.cjs) · [Offer table check](../test/test_offer_transfer_browser.cjs)
+
 ## Points and ranks switch (2026-11-26)
 
 Chromium verified that the same two selected rounds showed 15 and 12 cumulative points or ranks 1 and 1 for the leading team. First place appeared at the top. After narrowing Ranks to one subround, switching back to Points showed its 15 season points. Switch and range changes added zero saved reads at 320, 390 and 1440 px in both themes.

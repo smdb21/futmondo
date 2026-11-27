@@ -1620,7 +1620,7 @@ My Team displays received bids in one sortable table with numeric Offer and Prof
 
 ### November 25: compact received-offer rows
 
-The received-offers table uses borderless player buttons, single-line headers and values, and **Liga Radar** for system bids. Compact column spacing and table-local horizontal scrolling support narrow screens. The existing roster projection supplies all table data. [Verification](data_review_results.md).
+The received-offers table uses compact, bordered player buttons, single-line headers and values, and **Liga Radar** for system bids. Compact column spacing and table-local horizontal scrolling support narrow screens. The existing roster projection supplies all table data. [Verification](data_review_results.md).
 
 ### November 14: compact system offers
 

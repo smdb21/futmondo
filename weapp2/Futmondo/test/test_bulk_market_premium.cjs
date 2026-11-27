@@ -33,6 +33,17 @@ const money = value => `${value.toLocaleString('de-DE')} €`;
       assert.equal(await field.inputValue(), '0');
       await preview.getByText('Total increase: +0 €', {exact:true}).waitFor();
       assert.equal(await confirm.isEnabled(), true);
+      for (const theme of ['dark', 'light']) {
+        await page.emulateMedia({colorScheme: theme});
+        await page.waitForFunction(mode => document.documentElement.dataset.fmTheme === mode, theme);
+        const visibleBorder = await confirm.evaluate(button => {
+          const style = getComputedStyle(button);
+          return ['Top', 'Right', 'Bottom', 'Left'].every(side =>
+            style[`border${side}Style`] === 'solid' && parseFloat(style[`border${side}Width`]) >= 1 &&
+            style[`border${side}Color`] === style.color && style.color !== style.backgroundColor);
+        });
+        assert.ok(visibleBorder, `${width}px ${theme} listing confirmation has a visible border`);
+      }
       await modal.getByRole('button', {name:'Cancel',exact:true}).click();
       await modal.waitFor({state:'hidden'});
       await open.click();

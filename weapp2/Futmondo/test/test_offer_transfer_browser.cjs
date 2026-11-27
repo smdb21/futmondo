@@ -35,7 +35,7 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
     const oneLine=[...el.querySelectorAll('.rt-th .rt-text-content, .rt-td-inner, .fm-offer-player-name, .fm-offer-bidder')]
      .every(node=>getComputedStyle(node).whiteSpace==='nowrap');
     const names=[...el.querySelectorAll('button.fm-offer-player-name')];
-    const hasBorder=names.some(node=>parseFloat(getComputedStyle(node).borderTopWidth)>0);
+    const hasBorder=names.length>0&&names.every(node=>getComputedStyle(node).borderStyle==='solid'&&parseFloat(getComputedStyle(node).borderWidth)>0);
     const metrics=[...el.querySelectorAll('.rt-align-right .rt-td-inner span[title]')]
      .filter(node=>/\d/.test(node.textContent));
     const clipped=[...metrics.map(node=>node.parentElement),...el.querySelectorAll('.fm-offer-bidder[title="Liga Radar"]')]
@@ -46,7 +46,7 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp/futmondo
      rowHeight:Math.max(...rows.map(row=>row.getBoundingClientRect().height))};
    });
    assert.equal(layout.oneLine,true,`${width}px: all cells and headers stay on one line`);
-   assert.equal(layout.hasBorder,false,`${width}px: player buttons have no border`);
+   assert.equal(layout.hasBorder,true,`${width}px: each player button has a visible border`);
    assert.deepEqual(layout.clipped,[],`${width}px: amounts, profit and Liga Radar fit their columns`);
    assert.ok(layout.rowHeight<=34,`${width}px: compact rows are ${layout.rowHeight}px tall`);
    if(width<400)assert.ok(layout.rivalOverflow&&layout.rivalEllipsis);
