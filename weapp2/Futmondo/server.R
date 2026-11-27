@@ -422,13 +422,17 @@ function(input, output, session) {
   })
   home_transfer_counts <- resource_display_source(session, function() {
     req(home_visible())
-    transfers <- clause_transfers_RV()
+    transfers <- home_read(function() {
+      req(user_team_id_RV())
+      clause_transfers_RV()
+    })
     count <- function(status, rows) {
       if (isTRUE(status %in% c("ok", "observed")) && !is.null(rows$player_id))
         return(length(unique(rows$player_id)))
       NA_integer_
     }
     list(incoming = count(transfers$status, transfers$records),
+      incoming_loading = isTRUE(transfers$status %in% c("loading", "refreshing")),
       leaving = count(transfers$outgoing_status, transfers$outgoing_records))
   })
   output$home_squad <- renderUI({
@@ -449,7 +453,7 @@ function(input, output, session) {
         team_trend_counts(home_squad_summary(), show_count_labels = TRUE)),
       tags$div(class = "fm-home-detail", tags$span("Transfers"),
         tags$div(class = "fm-team-trend-counts",
-          team_direction_count("up", transfers$incoming, "Incoming players", "incoming"),
+          team_direction_count("up", transfers$incoming, "Incoming players", "incoming", loading = transfers$incoming_loading),
           team_direction_count("down", transfers$leaving, "Leaving players", "leaving"))))
   })
   notifications <- notifications_Server("notifications", reactive(input$tabs == "notifications"),

@@ -6,9 +6,11 @@ for(expr in parse('test/test_application_offline.R')){
 }
 Sys.setenv(admin='offline@example.invalid')
 fm_timezone_store<-function(...)promises::promise_resolve(NULL)
-real_async<-async_adapter_fetch;pending<-list();hold_market<-FALSE;calls<-character()
+real_async<-async_adapter_fetch;pending<-list();hold_market<-FALSE;hold_history<-TRUE;calls<-character()
 async_adapter_fetch<-function(fn,args=list(),context,...){
  calls<<-c(calls,fn)
+ if(identical(fn,'get_championship_pressroom')&&hold_history)
+   return(promises::promise(function(resolve,reject){resolve_history<<-resolve}))
  if(identical(fn,'get_market_players')&&hold_market)return(promises::promise(function(resolve,reject){pending[[length(pending)+1L]]<<-list(resolve=resolve,reject=reject)}))
  real_async(fn,args,context,...)
 }
@@ -38,9 +40,17 @@ incoming_clause_cached_summary <- function(login, championship_id, user_team_id,
     owner=list(id=if(player_id=="p1") "team1" else "team2"),
     clause=list(transferred=TRUE, transferDate=format(Sys.time()+86400,"%Y-%m-%dT%H:%M:%SZ",tz="UTC")))))
 }
+incoming_text <- function(html) {
+  node <- xml2::xml_find_first(xml2::read_html(html), '//*[@title="Incoming players"]')
+  trimws(gsub('[[:space:]]+', ' ', xml2::xml_text(node)))
+}
 clear_api_cache()
 shiny::testServer(app_server,{
  login_fixture(session)
+ stopifnot(grepl('Loading… incoming$', incoming_text(output$home_squad$html)), grepl('17 players', output$home_squad$html),
+   !grepl('Unavailable|—', incoming_text(output$home_squad$html)))
+ resolve_history(get_championship_pressroom());app_settle(session)
+ stopifnot(grepl('1 incoming$', incoming_text(output$home_squad$html)), !grepl('Loading', incoming_text(output$home_squad$html)))
  stopifnot(valid_login(login_token_RV()),startup_stage()=='ready',is.null(output$startup_status),
   grepl('Round 12',output$home_round$html),grepl('fm-browser-countdown',output$home_round$html),
   grepl('Time until kickoff', output$home_round$html, fixed=TRUE),
@@ -67,7 +77,7 @@ shiny::testServer(app_server,{
    grepl('Players value',output$home_squad$html,fixed=TRUE),
    grepl('3 listed · 2 with offers',output$home_squad$html,fixed=TRUE),
    grepl('2 · 350.000 €', output$home_balance$html, fixed=TRUE),
-   identical(home_transfer_counts(),list(incoming=1L, leaving=1L)),
+   home_transfer_counts()$leaving == 1L,
    sum(calls == 'get_players_from_team') == 1L)
  before<-length(calls);elapsed<-system.time(for(i in 1:10){session$setInputs(fixture_pulse=i);app_settle(session)})[['elapsed']]
  stopifnot(length(calls)==before)
@@ -89,13 +99,14 @@ shiny::testServer(app_server,{
  stopifnot(startup_stage()=='ready',is.null(output$startup_status),grepl('Continue to Admin',output$home_continue$html))
  cat(sprintf('PASS Home shows independent factual values from shared roster, offer and transfer reads; ten unrelated inputs add no reads (%.3fs)\n',elapsed))
 })
-clear_api_cache();hold_market<-TRUE;pending<-list();calls<-character()
+clear_api_cache();hold_history<-FALSE;hold_market<-TRUE;pending<-list();calls<-character()
 get_championship_pressroom <- empty_history
 app_roster$change[1] <- NA_real_
 shiny::testServer(app_server,{
  login_fixture(session);stopifnot(startup_stage()=='ready', length(pending)==1L,
    grepl('Loading…', output$home_balance$html,fixed=TRUE),
-   identical(home_transfer_counts(),list(incoming=0L, leaving=0L)))
+   grepl('0 incoming$', incoming_text(output$home_squad$html)),
+   home_transfer_counts()$leaving == 0L)
  balance <- xml2::read_html(output$home_balance$html)
  stopifnot(grepl('0 €', output$home_balance$html, fixed=TRUE),
    grepl('17 players', output$home_squad$html, fixed=TRUE),
@@ -125,6 +136,7 @@ shiny::testServer(app_server,{
  login_fixture(session)
  stopifnot(startup_stage()=='empty', grepl('Unavailable',output$home_balance$html),
   grepl('Unavailable',output$home_squad$html), grepl('Unavailable',output$home_round$html),
+  grepl('Unavailable', incoming_text(output$home_squad$html), fixed=TRUE),
   !grepl('data-fm-page="admin"',output$home_destinations$html))
  cat('PASS an account without a playable league keeps Home navigation and shows truthful empty metrics\n')
 })

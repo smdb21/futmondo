@@ -1,5 +1,9 @@
 # Futmondo data review and implementation results
 
+## Incoming transfers on Home (2026-11-26)
+
+The offline Home fixture held the transfer history response open. The incoming row showed “Loading…” while the squad size was visible, then showed one incoming player when the response arrived. A completed empty history showed zero. The fixture used one roster read and one transfer history read. Ten unrelated inputs added no reads. The label reuses the existing reactive display and adds no timer, database work or source request.
+
 ## Compact lineup controls (2026-11-26)
 
 In the offline editor fixture, the distance from the Lineup heading to the pitch fell from 674 to 354 CSS pixels at a 320 px viewport, from 576 to 354 at 390 px and from 546 to 261 at 1440 px. The four draft actions fit on one row in both themes at all three widths. Keyboard checks covered opening Player options and reaching the first player with a visible focus outline. Selecting Current round hid the editor controls and selecting Upcoming lineup restored them. Expanding and collapsing the options preserved the fixture read and write counts. The native disclosure and responsive styles add no server observers, timers or data requests.

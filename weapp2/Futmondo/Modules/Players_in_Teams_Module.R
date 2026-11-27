@@ -89,11 +89,11 @@ team_value_summary <- function(team_state, roster_state) {
     down = if (is.null(changes)) NA_integer_ else sum(changes < 0))
 }
 
-team_direction_count <- function(direction, count, label, count_label = NULL) {
+team_direction_count <- function(direction, count, label, count_label = NULL, loading = FALSE) {
   tags$div(class = paste0("fm-team-trend-", direction), title = label,
     icon(paste0("arrow-", direction)),
     tags$span(class = "sr-only", paste0(label, " ")),
-    if (is.na(count)) tagList(tags$span(class = "sr-only", "Unavailable"),
+    if (loading) "Loading…" else if (is.na(count)) tagList(tags$span(class = "sr-only", "Unavailable"),
       tags$span(`aria-hidden` = "true", "—")) else count,
     if (!is.null(count_label)) tags$span(`aria-hidden` = "true", count_label))
 }

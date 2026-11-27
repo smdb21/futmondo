@@ -1,5 +1,9 @@
 # Futmondo data architecture redesign plan
 
+## Incoming transfers on Home (2026-11-26)
+
+Implemented locally. Home displays “Loading…” for incoming transfers until the shared transfer check settles. [Home display behavior](page_preferences.md)
+
 ## Compact lineup controls (2026-11-26)
 
 Implemented locally. The lineup editor groups view selection, optimization settings and draft actions above a borderless player pitch. [Editor layout](lineup_module.md#lineup-editor-controls-2026-11-26)
