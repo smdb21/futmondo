@@ -38,6 +38,11 @@ player detection at 20.7, and the return to the pitch at 23.7. It uses the exist
 colors and compact-size stroke scaling; no models, textures or network assets
 are required. The extended loop never prolongs loading or changes readiness.
 
+A netted goal stands at each end of the loading pitch. The posts meet the goal
+line, and the mesh extends behind it. Both goals share the pitch camera and
+fade as it approaches the midfielder. The static illustration shows them from
+above when reduced motion is enabled or the canvas is unavailable.
+
 The animated pitch has transparent boundaries, boxes, halfway line, center
 circle and spots. The canvas clears those shapes from the turf before drawing
 the ball and players, letting the page background show through in either theme.

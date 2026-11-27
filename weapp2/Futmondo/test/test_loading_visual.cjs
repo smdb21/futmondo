@@ -160,6 +160,25 @@ function pitchCorners(geometry) {
   assert.ok(pitch, 'Pitch markings remain a connected projected field');
   return pitch.path.slice(0, 4).map(command => command.args.slice(0, 2));
 }
+function checkGoalFrames(marks) {
+  const corners = pitchCorners(marks);
+  const frames = marks.filter(m => m.kind === 'stroke' && ['#e6eef4','#43566a'].includes(m.color));
+  assert.equal(frames.length, 2, 'Both goal nets and their frames are drawn');
+  const [net, frame] = frames;
+  assert.ok(net.alpha < frame.alpha && net.path.length > 40, 'The mesh is finer than the goal frame');
+  assert.equal(frame.path.length, 8);
+  for (const side of [0,1]) {
+    const [a,b] = side ? [corners[1],corners[2]] : [corners[0],corners[3]];
+    const [x,y] = a, dx = b[0]-x, dy = b[1]-y;
+    const [foot,top,farTop,farFoot] = frame.path.slice(4*side,4*side+4).map(p => p.args);
+    for (const [px,py] of [foot,farFoot]) {
+      assert.ok(Math.abs(dx*(py-y)-dy*(px-x))/Math.hypot(dx,dy) < .01, 'Posts meet the goal line');
+      const u = ((px-x)*dx+(py-y)*dy)/(dx*dx+dy*dy);
+      assert.ok(u > .2 && u < .8, 'Posts stand near the middle of the line');
+    }
+    assert.ok(foot[1]-top[1] > 4 && farFoot[1]-farTop[1] > 4, 'The crossbar rises above both feet');
+  }
+}
 function polygonArea(points) {
   return Math.abs(points.reduce((sum, point, i) => {
     const next = points[(i + 1) % points.length];
@@ -210,6 +229,7 @@ function checkGeometry(phases) {
   const expected = [[50, 40], [370, 40], [370, 240], [50, 240]];
   for (let i = 0; i < 4; i++) for (let axis = 0; axis < 2; axis++)
     assert.ok(Math.abs(flat[i][axis] - expected[i][axis]) < 1, 'Flat pitch retains its known corner positions');
+  checkGoalFrames(phases.rising);
   const tilted = pitchCorners(phases.tilted);
   assert.ok(Math.abs(tilted[0][1] - tilted[1][1]) > 5, 'The rotated pitch edge is visibly sloped');
   assert.ok(polygonArea(tilted) < polygonArea(flat) * 0.85, 'The tilted ground plane is foreshortened');
@@ -703,6 +723,7 @@ async function cameraChecks(browser) {
       await page.waitForTimeout(Math.max(0, at - elapsed));
       phases[name] = await captureGeometry(page, id);
     }
+    checkGoalFrames(phases.rising);
     checkGoalFacing(phases.rising, await readTeamColors(page));
     const corners = pitchCorners(phases.overhead);
     assert.ok(Math.abs(corners[1][1] - corners[0][1]) > 100, 'Camera passes over the end of the pitch mid-orbit');

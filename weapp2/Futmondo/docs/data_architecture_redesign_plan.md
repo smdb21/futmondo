@@ -2864,3 +2864,7 @@ Implemented and tested full-squad optimization from the persisted opening fixtur
 ## Transparent loading pitch markings · 2026-11-27
 
 Implemented locally. The animated pitch uses transparent field markings in both themes. [Rendering details](progressive_loading.md#pitch-murmuration-and-radar-loading-visual)
+
+## Loading pitch goals · 2026-11-27
+
+Implemented locally. Both ends of the animated and static loading pitch have netted goals. [Rendering details](progressive_loading.md#pitch-murmuration-and-radar-loading-visual)

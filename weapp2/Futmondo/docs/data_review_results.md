@@ -7046,3 +7046,9 @@ The public release metadata on ligaradar.com matched the lineup module and fixtu
 ## Transparent loading pitch markings · 2026-11-27
 
 Offline Chromium sampled the canvas alpha channel at the halfway line, penalty spot and adjacent grass. The full-size and compact pitches passed in both themes at 390 and 1440 px. Camera checks passed at 320, 390 and 1440 px with p95 draw times of 3.5–3.9 ms at simulated 4× CPU slowdown. The renderer reuses the existing paths and frame loop, drawing the three spots in a single fill. The change adds no layers, requests or timers. The offline Shiny lifecycle passed 14 checks and eight tabs.
+
+## Loading pitch goals · 2026-11-27
+
+Offline Chromium verified that all four posts meet the projected goal lines and both crossbars rise above the grass at 320, 390 and 1440 px. Screenshots showed both nets in light and dark themes. The reduced-motion illustration included both goals. The existing pixel checks confirmed transparent field markings in both loader sizes.
+
+Both goals share cached geometry, the pitch projection and the frame clock. They add two canvas strokes per visible frame and no requests, timers or external assets. With 4× CPU throttling, camera-stage p95 draw time was 3.4–3.8 ms against the 33.3 ms frame budget. The offline Shiny lifecycle passed 14 checks and eight tabs.

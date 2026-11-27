@@ -43,10 +43,21 @@
     [[50,91],[99,91],[99,189],[50,189]],
     [[370,91],[321,91],[321,189],[370,189]],
     [[50,116],[68,116],[68,164],[50,164]],
-    [[370,116],[352,116],[352,164],[370,164]],
-    [[50,124],[43,124],[43,156],[50,156]],
-    [[370,124],[377,124],[377,156],[370,156]]
+    [[370,116],[352,116],[352,164],[370,164]]
   ];
+  // Local coordinates are outward depth, position across the goal, and height.
+  var goalFrame = [[[0,122,0],[0,122,14],[0,158,14],[0,158,0]]];
+  var goalNet = [
+    [[0,122,0],[12,122,0],[12,158,0],[0,158,0]],
+    [[0,122,14],[8,122,12],[8,158,12],[0,158,14]]
+  ];
+  for (var netY = 122; netY <= 158; netY += 6) {
+    goalNet.push([[0,netY,14],[8,netY,12],[12,netY,0]]);
+  }
+  for (var netRow = 1; netRow <= 2; netRow++) {
+    var depth = 12-4*netRow/3, height = 4*netRow;
+    goalNet.push([[0,122,height],[depth,122,height],[depth,158,height],[0,158,height]]);
+  }
   var circle = [];
   for (var c = 0; c <= 48; c++) circle.push([210 + 36 * Math.cos(c * tau / 48), 140 + 36 * Math.sin(c * tau / 48)]);
   paths.push(circle);
@@ -241,6 +252,34 @@
     });
     ctx.fill();
     ctx.restore();
+  }
+  function goalLines(ctx, lines, camera) {
+    ctx.beginPath();
+    for (var side = -1; side <= 1; side += 2) {
+      var goalX = side < 0 ? 50 : 370;
+      for (var j = 0; j < lines.length; j++) {
+        var line = lines[j];
+        for (var i = 0; i < line.length; i++) {
+          var point = line[i], x = goalX+side*point[0], y = point[1];
+          if (camera) {
+            project(camera,x,y,point[2]*camera.turn);
+            x = camera.px; y = camera.py;
+          }
+          if (i) ctx.lineTo(x,y); else ctx.moveTo(x,y);
+        }
+      }
+    }
+    ctx.stroke();
+  }
+  function goals(ctx, camera, opacity, markScale) {
+    if (opacity <= .001) return;
+    ctx.strokeStyle = palette.light ? '#43566a' : '#e6eef4';
+    ctx.globalAlpha = .46*opacity;
+    ctx.lineWidth = .65*markScale;
+    goalLines(ctx,goalNet,camera);
+    ctx.globalAlpha = opacity;
+    ctx.lineWidth = 1.7*markScale;
+    goalLines(ctx,goalFrame,camera);
   }
   function passProgress(seconds) {
     // Briefly trap the ball at the boot, then let the pass slow on the turf.
@@ -487,6 +526,7 @@
     for (var actorIndex = 0; actorIndex < actors.length; actorIndex++)
       instance.lifts[actorIndex] = ease((t-riseStart-actors[actorIndex].delay)/riseDuration);
     var ballOpacity = camera ? 1-camera.approach : returnPitch;
+    goals(ctx,camera,ballOpacity,instance.markScale);
     var ballDepth;
     if (ballOpacity > .001) {
       var ball = instance.ball;
