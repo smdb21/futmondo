@@ -4,6 +4,8 @@
 
 - [x] Consolidate ownership and market status into one text line and fit scoring and valuation into a responsive summary. [Card layout](selected_player_module.md#compact-player-details-2026-11-26)
 
+- [x] Give the rival offer and clause actions the same visible button boundaries as the market offer on mobile and desktop.
+
 ## Home round status and squad trend (2026-11-26)
 
 - [x] Show round progress and closure across split matchdays, and show the squad value and its daily change below cash and the rising and falling counts under the squad size using the existing saved observations. [Home overview](page_preferences.md#league-overview-and-saved-destination)

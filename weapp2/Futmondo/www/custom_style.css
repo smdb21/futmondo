@@ -406,17 +406,6 @@ body, .content-wrapper, .right-side {
     box-shadow: none;
 }
 
-.btn.btn-buy-market[id$="-btn_bid_market"] {
-    background-color: var(--fm-highlight) !important;
-    border: 2px solid var(--fm-text) !important;
-    font-weight: 700 !important;
-    max-width: calc(100% - 10px);
-    white-space: normal;
-}
-.btn.btn-buy-market[id$="-btn_bid_market"]:hover:not(:disabled) {
-    background-color: color-mix(in srgb, var(--fm-surface), var(--fm-text) 22%) !important;
-}
-
 .btn-buy-clause {
     background-color: var(--fm-surface) !important; /* Amber */
     color: var(--fm-text) !important;
@@ -1148,7 +1137,17 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 .player-card-identity-meta { margin-top: 2px; font-size: 13px; color: var(--fm-muted); overflow-wrap: anywhere; }
 .player-card-identity-team-logo { width: 20px; height: 20px; margin-right: 6px; vertical-align: middle; object-fit: contain; background: transparent; }
 .player-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 6px 0 12px; }
-.player-card-actions > .btn { max-width: 100%; margin: 0; white-space: normal; overflow-wrap: anywhere; }
+.player-card-actions .btn {
+  max-width: 100%; min-height: 44px; margin: 0; padding: 8px 14px !important;
+  white-space: normal; overflow-wrap: anywhere; font-weight: 700 !important;
+  border: 2px solid currentColor !important; background-color: var(--fm-highlight) !important;
+}
+.player-card-actions .btn:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--fm-surface), currentColor 22%) !important;
+}
+@media (max-width: 540px) {
+  .player-card-actions > .btn { width: 100%; text-align: left; }
+}
 .player-card-status, .player-card-note { flex: 0 0 100%; margin: 0; font-size: 13px; overflow-wrap: anywhere; }
 .player-card-status { color: var(--fm-muted); }
 .player-card-note { font-weight: 600; }

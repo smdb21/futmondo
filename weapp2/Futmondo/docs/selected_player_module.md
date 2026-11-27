@@ -4,6 +4,8 @@
 
 The player card shows the portrait, name, position and club first. A single plain-text line gives the owner and market status, including the asking price for a listed squad player when available. Received offers, active bids and locked clauses use text beside their corresponding actions. In dialogs, Close shares the heading with player details and the information disclosure.
 
+The action row gives its buttons, including **Offer to owner** and **Buy Clause**, a 2 px outline and a tinted background in both themes. On narrow screens each button fills a row, with a minimum height of 44 px. Ownership and availability appear as plain text.
+
 On phones, total points and the last five matches share one row. Market value has its own row with the signed change alongside when space permits. Wider layouts show all three measures across one row. Recent rounds expands in place, followed by value and points history.
 
 ## Purchased release clauses — 2026-11-23 Pacific
@@ -91,7 +93,7 @@ There is no new Futmondo request, acquisition job, table, migration or timer.
 
 ## Market offer button emphasis (2026-11-19)
 
-The player card's **Make Market Offer** action uses a 2 px border in the theme’s foreground color, a tinted fill and a bold label. The rule matches the namespaced card action; the caption can wrap within the card on narrow screens. Hover changes the tint and keyboard navigation uses the shared focus outline.
+The player card's **Make Market Offer** action uses a 2 px border in the theme’s foreground color, a tinted fill and a bold label. The caption can wrap within the card on narrow screens. Hover changes the tint and keyboard navigation uses the shared focus outline.
 
 ## Rival ownership for release clause actions (2026-11-19)
 

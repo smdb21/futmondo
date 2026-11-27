@@ -65,6 +65,32 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
       console.log('PASS ' + width + 'px: single status, aligned scores, signed valuation; history starts at ' + Math.round(historyTop) + 'px');
       await card.getByRole('button', {name:'Close player card'}).click();
       await modal.waitFor({state:'hidden'});
+      await page.getByRole('button', {name:'Open rival player'}).click();
+      const offer = card.getByRole('button', {name:'Offer to Rival'});
+      const buyout = card.getByRole('button', {name:'Buy Clause'});
+      await buyout.waitFor();
+      await page.mouse.move(0, 0);
+      for (const theme of ['light', 'dark']) {
+        await page.evaluate(mode => document.documentElement.dataset.fmTheme = mode, theme);
+        for (const button of [offer, buyout]) {
+          const check = await button.evaluate(async el => {
+            await Promise.all(el.getAnimations().map(animation => animation.finished));
+            const style = getComputedStyle(el);
+            const surface = getComputedStyle(el.closest('.modal-content')).backgroundColor;
+            const rect = el.getBoundingClientRect();
+            const area = el.closest('.player-card-actions').getBoundingClientRect();
+            return {
+              outlined: style.borderTopStyle === 'solid' && parseFloat(style.borderTopWidth) >= 2 &&
+                style.borderTopColor !== surface,
+              filled: style.backgroundColor !== surface && style.backgroundColor !== 'rgba(0, 0, 0, 0)',
+              fits: rect.left >= area.left - 1 && rect.right <= area.right + 1 && rect.height >= 44
+            };
+          });
+          assert.deepEqual(check, {outlined:true, filled:true, fits:true}, theme + ' ' + await button.innerText());
+        }
+      }
+      await card.getByRole('button', {name:'Close player card'}).click();
+      await modal.waitFor({state:'hidden'});
       const field = modal.getByLabel('Your offer amount (EUR):');
       const market = await open('Open market player', 'Make Market Offer', field);
       assert.equal(await field.inputValue(), '150');
