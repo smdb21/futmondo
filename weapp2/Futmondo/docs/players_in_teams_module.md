@@ -1,5 +1,15 @@
 # My team
 
+## Listing deadlines and Home market counts (2026-11-26)
+
+My Team displays **Listing expires** beside **Selling by** whenever a squad player is listed. Unlisted players have a blank deadline. Today’s market shows the same sortable deadline. Both tables use the account timezone and the published expiry, including after a player is withdrawn and relisted. An unreported deadline on a listed player displays as unavailable.
+
+`roster_market_listings(roster, listings)` joins the existing authenticated team listings by player ID, including a verified empty response. The roster worker stores the native timestamp and the listing observation time in its existing account- and league-scoped database snapshot. My Team can also join its existing saved listing rows to a roster created before deadlines were included. A newer listing observation supersedes the old expiry. Browsing reuses the saved data.
+
+Both the market players and myplayers POST requests include the fantasy championship ID, user-team ID and market type. Both return `answer[].expirationDate`. The official client parser and existing market and selling captures confirm the field. Explicit roster `market: false` and nested `market.inMarket` supply listing membership when the separate listing snapshot is unavailable. [Official client](https://app.futmondo.com/main.dart.js)
+
+Home uses `team_market_counts()` with its existing roster observation. It counts listed squad players and distinct squad player IDs in the complete received-offer observation. A player with multiple bids counts once. A direct offer on an unlisted player counts toward players with offers. Incomplete offer data can leave the offer count unavailable while the listing count remains visible.
+
 ## Players not fit (2026-11-22)
 
 **Players not fit (N)** follows **Leaving players** in My Team, spans the

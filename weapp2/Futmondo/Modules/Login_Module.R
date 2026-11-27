@@ -11,6 +11,8 @@ login_feature_tiers <- function() {
           "See how much cash your open offers could use, what you would have left and how much your league lets you spend."),
         feature("clause_transfer_timing", "See who arrives before kickoff",
           "Check incoming signings and departures against the next round’s kickoff."),
+        feature("squad_listings", "Track your listed players",
+          "See listing deadlines in My Team and Market. Home counts your listed players and those with incoming offers."),
         feature("squad_status", "Check squad availability",
           "Review reported injuries, doubts, suspensions and other absences together in My Team."),
         feature("round_range_standings", "Compare a stretch of rounds",

@@ -46,6 +46,7 @@ player_availability_deadline <- function(data,resource) {
 player_availability_market_rows <- function(data) {
   if(!is.data.frame(data))return(data)
   data$market_inMarket<-rep(TRUE,nrow(data))
+  if (nrow(data) && is.null(data$expirationDate)) data$expirationDate <- rep(NA_character_, nrow(data))
   attr(data,'availability_owner_valid_until')<-player_availability_deadline(data,'market')
   attr(data,'availability_market_valid_until')<-attr(data,'availability_owner_valid_until')
   attr(data,'availability_market_observed_at')<-attr(data,'observed_at')

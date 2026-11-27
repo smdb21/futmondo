@@ -435,8 +435,15 @@ function(input, output, session) {
     state <- home_roster_state()
     count <- observed_squad_count(state)
     transfers <- home_transfer_counts()
+    market <- team_market_counts(state, count)
+    market_label <- function(n, ready, missing) {
+      if (is.finite(n)) paste(n, ready) else paste(missing, if (identical(state$status, "loading")) "loading…" else "unavailable")
+    }
     tagList(
       home_observation(state, if (is.finite(count)) paste(count, if (count == 1L) "player" else "players")),
+      tags$div(class = "fm-home-detail", tags$span("Market"),
+        tags$span(paste(market_label(market["listed"], "listed", "Listings"),
+          market_label(market["offered"], "with offers", "Offers"), sep = " · "))),
       tags$div(class = "fm-home-detail", tags$span("Players value"),
         team_trend_counts(home_squad_summary(), show_count_labels = TRUE)),
       tags$div(class = "fm-home-detail", tags$span("Transfers"),

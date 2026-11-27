@@ -20,6 +20,12 @@ login_fixture<-function(session){
 fm_page_store <- function(user_id, page=NULL, ...) promises::promise_resolve(if(is.null(page)) list(page='rivals') else TRUE)
 app_rounds <- data.frame(round_id='next', round_number=12L, begin_process=Sys.time()+86400, is_finished=FALSE)
 app_roster$change <- c(42000, -12000, 4000, rep(0, 14))
+app_roster$market_inMarket[1:3] <- TRUE
+attr(app_roster, "received_offers") <- dplyr::bind_rows(
+  normalize_received_offer(list(id = "a", price = 10), "p1"),
+  normalize_received_offer(list(id = "b", price = 20), "p1"),
+  normalize_received_offer(list(id = "c", price = 30), "p4"))
+attr(app_roster, "received_offers_status") <- "ok"
 app_market$bid_id <- c("first", "second", "second")
 app_market$bid_price <- c(200000, 150000, 150000)
 get_market_players <- function(...) app_market
@@ -59,6 +65,7 @@ shiny::testServer(app_server,{
    !grepl('fm-team-trend-counts', output$home_balance$html, fixed=TRUE),
    grepl('2 rising$', count_text('up')), grepl('1 falling$', count_text('down')),
    grepl('Players value',output$home_squad$html,fixed=TRUE),
+   grepl('3 listed · 2 with offers',output$home_squad$html,fixed=TRUE),
    grepl('2 · 350.000 €', output$home_balance$html, fixed=TRUE),
    identical(home_transfer_counts(),list(incoming=1L, leaving=1L)),
    sum(calls == 'get_players_from_team') == 1L)

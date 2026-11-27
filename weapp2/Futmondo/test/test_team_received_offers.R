@@ -29,7 +29,7 @@ futmondo_post<-function(url,body,...) {
   route<-tail(strsplit(url,'/',fixed=TRUE)[[1]],1L);requests<<-c(requests,route)
   answer<-switch(route,roster=list(player),
     rosterbids=list(list(player_id='one',bids=list(system_bid,rival_bid,second_rival))),
-    myplayers=list(list(id='one',name='Player <one>',price=1000)),stop('Unexpected fixture route'))
+    myplayers=list(list(id='one',name='Player <one>',price=1000,expirationDate='2026-11-26T23:30:00Z')),stop('Unexpected fixture route'))
   fm_httr_response(list(status_code=200L,content=charToRaw(jsonlite::toJSON(list(answer=answer),auto_unbox=TRUE)),times=list(total=0)),url)
 }
 clear_api_cache()
@@ -43,6 +43,27 @@ check('one roster acquisition preserves every offer and legacy highest offer',{
   raw_stamp<-attr(api_cache_env[[api_cache_key('roster_payload_league_mine',context=resource_context(auth,'league','mine'))]]$data,'observed_at')
   stopifnot(as.numeric(attr(roster,'received_offers_observed_at'))==as.numeric(raw_stamp))
   cat('MEASURE cold_reads=3 additional_offer_panel_reads=0 warm_reads=0\n')
+})
+check('listing deadlines survive worker replay and follow the exact player through relisting and withdrawal',{
+  offered <- fm_worker_decode(jsonlite::fromJSON(fm_worker_json(fm_worker_encode(roster)),simplifyVector=FALSE))
+  stopifnot(identical(offered$expirationDate,'2026-11-26T23:30:00Z'),
+    identical(team_market_counts(resource_state(offered),1L),c(listed=1L,offered=1L)))
+  squad <- data.frame(id=c('other','one','unknown'),value=1)
+  listings <- data.frame(id=c('unknown','one'),expirationDate=c(NA,'2026-11-26T23:30:00Z'))
+  attr(listings,'observed_at') <- Sys.time()-20
+  view <- team_selling_prices(squad,listings)
+  col <- get_reactable_columns_for_players(view)$expirationDate
+  stopifnot(col$name=='Listing expires',col$cell(NA,1)=='',col$cell(NA,3)=='Unavailable',
+    grepl('27/11/2026 00:30',col$cell(view$expirationDate[2],2),fixed=TRUE))
+  renewed <- listings; renewed$expirationDate[2] <- '2026-11-27T23:30:00Z'
+  attr(renewed,'observed_at') <- Sys.time()-5
+  view <- team_selling_prices(view,renewed)
+  stopifnot(view$expirationDate[2]==renewed$expirationDate[2],
+    identical(team_selling_prices(view,listings)$expirationDate,view$expirationDate),
+    !'expirationDate'%in%names(team_selling_prices(view,data.frame(id=character()))),
+    identical(team_market_counts(resource_state(squad),3L),c(listed=NA_integer_,offered=NA_integer_)))
+  failed <- offered; attr(failed,'received_offers_status') <- 'partial'
+  stopifnot(identical(team_market_counts(resource_state(failed),1L),c(listed=1L,offered=NA_integer_)))
 })
 check('Selling by is one sortable numeric asking price, distinct from Offer',{
   rows<-team_selling_prices(roster,data.frame(id='one',price=1000))

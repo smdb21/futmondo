@@ -278,6 +278,42 @@ highest_received_offers <- function(rows) {
     dplyr::ungroup() %>% as.data.frame()
 }
 
+# Join complete, team-scoped listing observations by player ID. Keep the source
+# clock with the roster so a slower saved response cannot undo a relisting.
+roster_market_listings <- function(roster, listings) {
+  if (!is.data.frame(listings) || !is.null(attr(listings, "fetch_error"))) return(roster)
+  if (nrow(listings) && (is.null(listings$id) || anyNA(listings$id) ||
+      any(!nzchar(as.character(listings$id))) || anyDuplicated(listings$id))) return(roster)
+  status <- fm_scalar(attr(listings, "fetch_status"), "ok")
+  stamp <- fm_time(attr(listings, "observed_at"))
+  previous <- fm_time(attr(roster, "listings_observed_at"))
+  if (isTRUE(stamp < previous) ||
+      isTRUE(attr(listings, "worker_completeness") %in% c("partial", "incomplete", "unavailable")) ||
+      isTRUE(attr(listings, "worker_acquisition_status") %in% c("failed", "partial", "unavailable"))) return(roster)
+  if (!status %in% c("ok", "empty")) {
+    # Expired worker results are usable as dated observations only.
+    if (status != "stale" || !isTRUE(attr(listings, "worker_acquisition_status") %in% c("ok", "empty")) ||
+        !isTRUE(stamp <= Sys.time()) || (!length(previous) && isTRUE(stamp < fm_time(attr(roster, "observed_at")))))
+      return(roster)
+  }
+  index <- match(as.character(roster$id), as.character(listings$id))
+  roster$market_inMarket <- !is.na(index)
+  roster$expirationDate <- listings$expirationDate[index]
+  # Older snapshots may use either of the alternative asking-price fields.
+  prices <- rep(NA_real_, nrow(roster))
+  for (field in intersect(c("price", "market_price", "effective_market_price"), names(listings))) {
+    candidate <- suppressWarnings(as.numeric(as.character(listings[[field]][index])))
+    use <- is.na(prices) & is.finite(candidate) & candidate > 0
+    prices[use] <- candidate[use]
+  }
+  if (any(!is.na(prices))) {
+    if (is.null(roster$market_asking_price)) roster$market_asking_price <- rep(NA_real_, nrow(roster))
+    roster$market_asking_price[!is.na(prices)] <- prices[!is.na(prices)]
+  }
+  attr(roster, "listings_observed_at") <- attr(listings, "observed_at")
+  roster
+}
+
 get_players_from_team <- function(login, championship_id, user_team_id, teams = NULL, facts_only = FALSE) {
   ctx<-resource_context(login=login,championship_id=championship_id,user_team_id=user_team_id)
   if(isTRUE(facts_only)){
@@ -368,6 +404,7 @@ get_players_from_team <- function(login, championship_id, user_team_id, teams = 
       player$clause <- NULL
       ## market ----
       market <- player$market
+      if (identical(market, FALSE)) market <- list(inMarket = FALSE)
       ### bids ----
       bids <- NULL
       if (is.list(market)) {
@@ -430,16 +467,13 @@ get_players_from_team <- function(login, championship_id, user_team_id, teams = 
       get_my_market_players(login = login, championship_id = championship_id, user_team_id = user_team_id)
     }, error = function(e) NULL)
 
-    if (!is.null(my_mkt_df) && nrow(my_mkt_df) > 0 && "id" %in% colnames(my_mkt_df) && "id" %in% colnames(roster)) {
-      mkt_ids <- as.character(my_mkt_df$id)
-      roster$market_inMarket <- as.character(roster$id) %in% mkt_ids
-
-      if ("price" %in% colnames(my_mkt_df)) {
-        mkt_prices <- my_mkt_df %>% dplyr::select(id, market_asking_price = price) %>% dplyr::distinct(id, .keep_all = TRUE)
-        roster <- roster %>% dplyr::left_join(mkt_prices, by = "id")
-        if (!"effective_market_price" %in% colnames(roster)) roster$effective_market_price <- NA_real_
-        roster$effective_market_price <- ifelse(!is.na(roster$market_asking_price) & roster$market_asking_price > 0, roster$market_asking_price, roster$effective_market_price)
-      }
+    roster$expirationDate <- NULL
+    attr(roster, "observed_at") <- roster_metadata$observed_at
+    roster <- roster_market_listings(roster, my_mkt_df)
+    if ("market_asking_price" %in% names(roster)) {
+      if (!"effective_market_price" %in% names(roster)) roster$effective_market_price <- NA_real_
+      use <- is.finite(roster$market_asking_price) & roster$market_asking_price > 0
+      roster$effective_market_price[use] <- roster$market_asking_price[use]
     }
 
     for(field in names(roster_metadata))attr(roster,field)<-roster_metadata[[field]]
@@ -799,11 +833,11 @@ reorder_player_table_columns <- function(df) {
   df_df <- as.data.frame(df)
 
   desired_order <- c(
-    "name", "role", "team", "selling_by", "market_inMarket", "bid_price", "bid_user", "numberOfBids",
+    "name", "role", "team", "selling_by", "expirationDate", "market_inMarket", "bid_price", "bid_user", "numberOfBids",
     "points", "price", "market_price", "effective_market_price",
     "change", "change_by_value", "value",
     "clause_price", "clause_suggestedClause", "clause_date", "clause_transferDate",
-    "creationDate", "expirationDate", "userTeam"
+    "creationDate", "userTeam"
   )
 
   existing_cols <- colnames(df_df)
@@ -1108,12 +1142,11 @@ get_reactable_columns_for_players <- function(table, show_sale_profit = FALSE, s
   }
 
   if ("expirationDate" %in% colnames(table)) {
+    deadlines <- fm_format_datetime(table$expirationDate, missing = "Unavailable")
+    if ("market_inMarket" %in% names(table)) deadlines[table$market_inMarket %in% FALSE] <- ""
     columns[["expirationDate"]] <- colDef(
-      name = "Availability End",
-      align = "center",
-      cell = function(value) {
-        format_table_date(value)
-      }
+      name = "Listing expires", align = "center", minWidth = 172, sortNALast = TRUE,
+      cell = function(value, index) deadlines[index]
     )
   }
 

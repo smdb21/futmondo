@@ -795,6 +795,11 @@ players_table_Server <- function(id, players_table_RV, user_teams_RV, login_toke
         dplyr::select(any_of(c("team","name","role","recent_points_avg","recent_points_ratio","recent_points_trend")),everything())
       # Source timestamps belong to the resource state, not widget equality.
       rows<-as.data.frame(rows)
+      # Sort by the source instant, including dates supplied with a UTC offset.
+      if ("expirationDate" %in% names(rows)) {
+        dates <- unique(rows$expirationDate)
+        rows$expirationDate <- as.numeric(fm_time(dates))[match(rows$expirationDate, dates)]
+      }
       attributes(rows)<-attributes(rows)[intersect(c("names","row.names","class"),names(attributes(rows)))]
       rownames(rows)<-NULL
       # Native JSON and durable replay may encode the same number as integer or

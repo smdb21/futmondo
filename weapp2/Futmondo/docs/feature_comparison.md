@@ -1,5 +1,9 @@
 # LigaRadar additions to the official Futmondo workflows
 
+## Listing deadlines and received-offer counts (2026-11-26)
+
+Futmondo documents market end-time sorting and offer indicators. Its official client reads `expirationDate` from market listings. LigaRadar shows the localized deadline in My Team and Today’s market. The Essentials entry `squad_listings` also describes Home’s compact count of listed players and squad players with incoming offers. The current signed-in official Home layout remains unverified. [Official selling guide](https://help.futmondo.com/article/195-poner-jugadores-a-la-venta-en-el-mercado) · [Official market release notes](https://magazine.futmondo.com/nueva-version-de-la-app-en-futmondo/) · [Official client](https://app.futmondo.com/main.dart.js)
+
 ## Points and ranks (2026-11-26)
 
 Futmondo’s guide shows how to view a past round’s ranking and the general classification. LigaRadar’s existing league charts also let managers switch between cumulative points and league rank over the same selected rounds. The public app entry point and guide were reviewed on November 26. Availability of an equivalent chart control in the signed-in official app remains unverified. [Official guide](https://help.futmondo.com/article/90-empieza-a-jugar-a-futmondo) · [Official app](https://app.futmondo.com/)

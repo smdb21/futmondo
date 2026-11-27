@@ -1,5 +1,13 @@
 # Futmondo data review and implementation results
 
+## Listing deadlines and Home market counts (2026-11-26)
+
+The published expiry was present in all 163 market rows and 32 own-listing rows in the recorded market capture. The My Team roster projection previously kept the asking price but dropped the listing expiry. The shared player table now sorts by the source instant and formats it in the selected account timezone. A known-answer fixture verified a deadline crossing local midnight, withdrawal of the last listing, a changed deadline after relisting, protection against older observations, and the worker snapshot encode/decode round trip.
+
+The received-offer and squad-table suites passed 11 and eight checks respectively. Player availability passed 11 checks, durable team offers passed eight, and the saved-offer observation and five captured response-contract checks passed. The four Home fixtures passed with zero external HTTP or database mutations. Ten unrelated inputs caused zero additional reads. The full Shiny lifecycle passed 14 checks plus eight tabs.
+
+Offline Chromium at 390 and 1440 px showed three listed players and two distinct players with offers, including a direct offer on an unlisted player. Both tables rendered three matching localized expiry cells. Home fit both viewports. The feature uses existing roster, own-listing and market reads. The worker stores one expiry per listed player and a listing observation timestamp alongside roster data. Rendering parses each distinct expiry once per table projection and adds no timers or per-player reads. Production rendering remains unverified. [Implementation contract](players_in_teams_module.md#listing-deadlines-and-home-market-counts-2026-11-26)
+
 ## Received offer decisions (2026-11-26)
 
 The reported rejection exposed a routing defect. LigaRadar sent direct roster offers to the listing-bid endpoint. Both accept and reject now verify the selected offer and use its source collection. The old path could also replace an unidentified bid with the first bid on a player. [Request contract and evidence](market_selling.md#e-accepting-and-rejecting-received-offers-2026-11-26)

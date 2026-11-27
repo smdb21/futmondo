@@ -298,10 +298,6 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
       players_table <- players_table %>%
         unify_columns()
 
-      # Ensure market_inMarket column is always present
-      if (!"market_inMarket" %in% colnames(players_table)) {
-        players_table$market_inMarket <- rep(FALSE, nrow(players_table))
-      }
       # Reconcile only against the authenticated manager's own listings.
       my_mkt_df <- tryCatch({
         get_my_market_players(
@@ -313,12 +309,6 @@ players_in_teams_Server <- function(id, is_module_active, login_token, champions
         print(paste0("[Market check] Fetch warning: ", e$message))
         NULL
       })
-      if (!is.null(my_mkt_df) && "id" %in% colnames(my_mkt_df) &&
-          is.null(attr(my_mkt_df,"fetch_error")) && fm_scalar(attr(my_mkt_df,"fetch_status"),"ok")%in%c("ok","empty")) {
-        mkt_ids <- as.character(my_mkt_df$id)
-        players_table$market_inMarket <- as.character(players_table$id) %in% mkt_ids
-      }
-
       players_table <- team_selling_prices(players_table,my_mkt_df)
       players_table <- preserve_observation_time(players_table)
 
@@ -469,25 +459,35 @@ team_effective_squad_count <- function(roster, transfers) {
 
 # One numeric asking price for My Team; raw fields remain player-card metadata.
 team_selling_prices <- function(roster,listings=NULL) {
+  roster <- roster_market_listings(roster, listings)
+  if (!"market_inMarket" %in% names(roster)) roster$market_inMarket <- rep(NA, nrow(roster))
   prices <- rep(NA_real_,nrow(roster))
   for(field in intersect(c("market_asking_price","effective_market_price","market_price","price"),names(roster))) {
     candidate<-suppressWarnings(as.numeric(as.character(roster[[field]])))
     use<-!is.finite(prices)&is.finite(candidate)&candidate>0;prices[use]<-candidate[use]
   }
-  listed<-if("market_inMarket"%in%names(roster))as.logical(roster$market_inMarket)else rep(NA,nrow(roster))
-  listings_verified<-is.data.frame(listings)&&is.null(attr(listings,"fetch_error"))&&
-    fm_scalar(attr(listings,"fetch_status"),"ok")%in%c("ok","empty")
-  if(isTRUE(listings_verified)&&!nrow(listings))listed[]<-FALSE
-  if(isTRUE(listings_verified)&&"id"%in%names(listings)) {
-    index<-match(as.character(roster$id),as.character(listings$id));listed<-!is.na(index)
-    listing_prices<-rep(NA_real_,nrow(roster))
-    for(field in intersect(c("price","market_price","effective_market_price"),names(listings))) {
-      candidate<-suppressWarnings(as.numeric(as.character(listings[[field]][index])))
-      use<-!is.finite(listing_prices)&is.finite(candidate)&candidate>0;listing_prices[use]<-candidate[use]
-    }
-    use<-is.finite(listing_prices);prices[use]<-listing_prices[use]
-  }
+  listed <- as.logical(roster$market_inMarket)
+  if (!any(listed %in% TRUE)) roster$expirationDate <- NULL
+  else if (is.null(roster$expirationDate)) roster$expirationDate <- rep(NA_character_, nrow(roster))
   prices[is.na(listed)|!listed]<-NA_real_;roster$selling_by<-prices;roster
+}
+
+# Count distinct squad players, including an unlisted player with a direct offer.
+team_market_counts <- function(state, squad_size) {
+  counts <- c(listed = NA_integer_, offered = NA_integer_)
+  roster <- state$data
+  if (!is.finite(squad_size) || !is.data.frame(roster) ||
+      (incoming_clause_source_unverified(state) && !incoming_clause_observed_source(state))) return(counts)
+  if (squad_size == 0L) return(c(listed = 0L, offered = 0L))
+  flags <- as.logical(roster$market_inMarket)
+  if (length(flags) == nrow(roster) && !anyNA(flags)) counts["listed"] <- sum(flags)
+  offers <- attr(roster, "received_offers", exact = TRUE)
+  offer_stamp <- fm_time(attr(roster, "received_offers_observed_at"))
+  if ((!length(offer_stamp) || isTRUE(offer_stamp <= Sys.time())) &&
+      isTRUE(attr(roster, "received_offers_status") %in% c("ok", "empty")) &&
+      is.null(attr(roster, "received_offers_error")) && roster_offer_rows_valid(offers))
+    counts["offered"] <- length(intersect(offers$id, roster$id))
+  counts
 }
 
 team_received_offer_input <- function(row) paste0("offer_open_",digest::digest(

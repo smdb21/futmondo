@@ -1,5 +1,9 @@
 # Futmondo data architecture redesign plan
 
+## Listing deadlines and Home market counts (2026-11-26)
+
+- [x] Surface the published listing expiry in My Team and Today’s market and the listed and offered-player counts on Home. Reuse saved roster, listing and offer observations. [Data and display contract](players_in_teams_module.md#listing-deadlines-and-home-market-counts-2026-11-26)
+
 ## Received offer decisions (2026-11-26)
 
 - [x] Verify the displayed offer against the live player summary on confirmation, use the Futmondo route for its collection, and reconcile stale or uncertain outcomes through the factual worker. Offline verification is recorded in [data review results](data_review_results.md#received-offer-decisions-2026-11-26). Hosted transaction verification remains open.
