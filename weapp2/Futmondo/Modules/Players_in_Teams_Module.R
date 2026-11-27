@@ -89,18 +89,19 @@ team_value_summary <- function(team_state, roster_state) {
     down = if (is.null(changes)) NA_integer_ else sum(changes < 0))
 }
 
+team_direction_count <- function(direction, count, label, count_label = NULL) {
+  tags$div(class = paste0("fm-team-trend-", direction), title = label,
+    icon(paste0("arrow-", direction)),
+    tags$span(class = "sr-only", paste0(label, " ")),
+    if (is.na(count)) tagList(tags$span(class = "sr-only", "Unavailable"),
+      tags$span(`aria-hidden` = "true", "—")) else count,
+    if (!is.null(count_label)) tags$span(`aria-hidden` = "true", count_label))
+}
+
 team_trend_counts <- function(summary, show_count_labels = FALSE) {
-  movement <- function(direction, count, label, count_label) {
-    tags$div(class = paste0("fm-team-trend-", direction), title = label,
-      icon(paste0("arrow-", direction)),
-      tags$span(class = "sr-only", paste0(label, " ")),
-      if (is.na(count)) tagList(tags$span(class = "sr-only", "Unavailable"),
-        tags$span(`aria-hidden` = "true", "—")) else count,
-      if (show_count_labels) tags$span(`aria-hidden` = "true", count_label))
-  }
   tags$div(class = "fm-team-trend-counts",
-    movement("up", summary$up, "Players with positive trend", "rising"),
-    movement("down", summary$down, "Players with negative trend", "falling"))
+    team_direction_count("up", summary$up, "Players with positive trend", if (show_count_labels) "rising"),
+    team_direction_count("down", summary$down, "Players with negative trend", if (show_count_labels) "falling"))
 }
 
 team_trend_panel <- function(summary, label = "Total trend", counts = team_trend_counts(summary)) {

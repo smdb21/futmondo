@@ -10,6 +10,8 @@
 
 - [x] Show round progress and closure across split matchdays, and show the squad value and its daily change below cash and the rising and falling counts under the squad size using the existing saved observations. [Home overview](page_preferences.md#league-overview-and-saved-destination)
 
+- [x] Group the active outgoing offer count and total under Balance, and label daily player value changes and pending arrivals and departures under Squad size. Reuse the shared offer and clause-transfer observations.
+
 - [x] Put the localized Home kickoff timestamp on its own line below the round label.
 
 ## Advanced and resumed rounds (2026-11-26)

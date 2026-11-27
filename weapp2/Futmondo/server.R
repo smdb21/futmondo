@@ -141,12 +141,12 @@ function(input, output, session) {
   # must not deactivate reads still needed by My Team or Lineup.
   roster_sources_active <- reactive({
     valid_login(login_token_RV())&&
-      isTRUE(input$tabs%in%c("yourteam","today","players_in_championship","lineup"))
+      isTRUE(input$tabs%in%c("login","yourteam","today","players_in_championship","lineup"))
   })
   home_visible <- reactive(valid_login(login_token_RV()) && identical(input$tabs, "login"))
   roster_source_readers <- lapply(c(roster="get_players_from_team",transactions="get_championship_pressroom"),function(handler)
     factual_read_adapter(session,handler,login_token_RV,championship_id_RV,user_team_id_RV,
-      is_active=function()roster_sources_active() || (identical(handler, "get_players_from_team") && home_visible()),
+      is_active=roster_sources_active,
       refresh_trigger=reactive(list(refresh_trigger(),clause_transfer_revision())),state_only=TRUE))
   roster_source_note <- resource_display_source(session,function(){
     if(!isTRUE(roster_note_active()))return("")
@@ -382,27 +382,48 @@ function(input, output, session) {
   home_squad_summary <- reactive(team_value_summary(home_team_state(), home_roster_state()))
   output$home_balance <- renderUI({
     req(home_visible())
-    states <- list(team = home_team_state())
+    states <- list(team = home_team_state(), market = home_read(primary_market_state))
     summary <- home_squad_summary()
     project <- session$userData$manual_finance_projection
-    if (!is.null(states$team$data) && is.function(project)) states <- project(states, cash_only = TRUE)
-    amount <- fm_number(states$team$data$budget)
+    if (!is.null(states$team$data) && is.function(project)) states <- project(states)
+    finance <- round_finance_display(states$team, states$market)
+    amount <- finance$cash
+    offers <- if (is.finite(finance$active_offer_count))
+      paste(finance$active_offer_count, "·", player_card_money(finance$commitments))
     tagList(
-      home_observation(states$team, if (is.finite(amount)) paste(
-        format(round(amount), big.mark = ".", decimal.mark = ",", scientific = FALSE), "EUR"),
-        if (isTRUE(states$confirmed_actions)) "Includes confirmed purchase"),
+      home_observation(states$team, if (is.finite(amount)) player_card_money(amount),
+        if (isTRUE(states$confirmed_actions)) "Includes confirmed actions"),
+      tags$div(class = "fm-home-detail fm-home-offers", tags$span("Active offers"),
+        home_observation(states$market, offers)),
       tags$div(class = "fm-home-squad-value",
         if (identical(summary$value_status, "stale")) "Last saved squad value" else "Squad value",
         tags$strong(if (identical(summary$value_status, "loading")) "Loading…" else player_card_money(summary$value))),
       team_trend_panel(summary, label = "24h squad trend", counts = NULL))
   })
+  home_transfer_counts <- resource_display_source(session, function() {
+    req(home_visible())
+    transfers <- clause_transfers_RV()
+    count <- function(status, rows) {
+      if (isTRUE(status %in% c("ok", "observed")) && !is.null(rows$player_id))
+        return(length(unique(rows$player_id)))
+      NA_integer_
+    }
+    list(incoming = count(transfers$status, transfers$records),
+      leaving = count(transfers$outgoing_status, transfers$outgoing_records))
+  })
   output$home_squad <- renderUI({
     req(home_visible())
     state <- home_roster_state()
     count <- observed_squad_count(state)
+    transfers <- home_transfer_counts()
     tagList(
       home_observation(state, if (is.finite(count)) paste(count, if (count == 1L) "player" else "players")),
-      team_trend_counts(home_squad_summary(), show_count_labels = TRUE))
+      tags$div(class = "fm-home-detail", tags$span("Players value"),
+        team_trend_counts(home_squad_summary(), show_count_labels = TRUE)),
+      tags$div(class = "fm-home-detail", tags$span("Transfers"),
+        tags$div(class = "fm-team-trend-counts",
+          team_direction_count("up", transfers$incoming, "Incoming players", "incoming"),
+          team_direction_count("down", transfers$leaving, "Leaving players", "leaving"))))
   })
   notifications <- notifications_Server("notifications", reactive(input$tabs == "notifications"),
     login_token_RV, championship_id_RV, user_team_id_RV, user_teams_RV, refresh_trigger,
@@ -427,7 +448,7 @@ function(input, output, session) {
     clause_transfer_revision(isolate(clause_transfer_revision())+1L)
   }
   clause_transfers_RV <- incoming_clause_source(session,login_token_RV,championship_id_RV,user_team_id_RV,
-    reactive(valid_login(login_token_RV())&&isTRUE(input$tabs%in%c("yourteam","today","players_in_championship","lineup"))),
+    roster_sources_active,
     reactive(list(refresh_trigger(),clause_transfer_revision())),prerequisite_readers=roster_source_readers)
   fm_clause_reconcile_saved_offers(session,login_token_RV,championship_id_RV,user_team_id_RV,
     function()roster_source_readers$transactions(login=login_token_RV(),championship_id=championship_id_RV()),

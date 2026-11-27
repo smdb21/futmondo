@@ -6,6 +6,8 @@ Futmondo’s numbered match calendar recognizes `running` and `closed` rounds. I
 
 LigaRadar Home shows the round’s playing or closed status and accounts for gaps between groups of fixtures in the same round. The Balance box shows the manager’s cash, squad market value and net daily change. Squad size shows how many players rose or fell in value. The existing Advanced welcome item `squad_value_trend` covers this calculation. [Squad value and daily trend](players_in_teams_module.md#team-value-and-daily-trend--2026-11-25)
 
+Futmondo’s guides describe bidding against the league’s spending limit and a configurable delay before a clause signing joins the buyer’s squad. LigaRadar Home brings the existing active outgoing offer count and total into Balance. Squad size pairs daily value changes with pending arrivals and departures. This brings existing finance and transfer views onto Home. The public app entry point and guides were reviewed on November 26. The signed-in official layout remains unverified. [Official app](https://app.futmondo.com/) · [Bidding guide](https://help.futmondo.com/article/103-quiero-pujar-por-un-jugador-del-mercado-y-me-dice-que-no-tengo-saldo-suficiente) · [Clause transfer timing](https://help.futmondo.com/article/104-he-fichado-un-jugador-por-clausula-y-no-ha-pasado-a-mi-equipo)
+
 ## Welcome and Home inventory (2026-11-25)
 
 The public welcome page leads with the decisions a manager can make before kickoff. Its Essentials and Advanced sections now include two existing workflows that had been missing from the inventory.

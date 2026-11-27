@@ -1,5 +1,11 @@
 # Futmondo data review and implementation results
 
+## Home offers and squad movement (2026-11-26)
+
+The signed-in Home fixture counted two distinct outgoing offers worth €350,000 across three market rows with one duplicate bid ID. The 17-player squad showed two rising, one falling, one incoming and one leaving. A complete empty transfer history produced zero arrivals and departures. Holding the market response kept offers pending while cash, squad size and navigation stayed available.
+
+Home now consumes the shared market and transaction-history resources on first display alongside the existing roster read. In production the factual worker supplies these from durable, scoped observations. Transfer verification reuses the existing player-summary reader and bounded queue. The change adds no persistence, polling or per-player UI components. In the synthetic fixture each of the three shared resources was read once and ten unrelated input changes added zero reads in 0.332 s. Chromium confirmed that the layout fit at 320, 390 and 1440 px and that a warm return added zero overview reads. All four Home fixture groups, the manual finance regressions and the offline lifecycle (14 checks and eight tabs) passed with synthetic accounts. [Home regression](../test/test_welcome_primary_loading.R) · [Responsive layout check](../test/test_welcome_home_browser.cjs)
+
 ## Compact player details (2026-11-26)
 
 The rival card’s offer and clause buttons inherited a borderless style. The 320 px browser regression reproduced the missing outline on the owner offer. After the CSS change, Chromium verified a 2 px solid outline, a fill distinct from the modal surface and a minimum 44 px target for both actions at 320, 390 and 1440 px in light and dark themes. Each opened its corresponding editor or confirmation in the offline fixture. The scoped styling uses the existing controls and theme colors and adds no requests, database reads, timers or reactive renders. [Browser regression](../test/test_player_offer_browser.cjs)
