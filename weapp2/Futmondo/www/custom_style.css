@@ -1757,6 +1757,18 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
     background-color: color-mix(in srgb, var(--fm-danger) 14%, var(--fm-surface)) !important;
 }
 
+/* Reserve the usual badge-row height and use that space for two-line cells. */
+.fm-player-table .rt-tbody .rt-tr {
+    min-height: 46px;
+}
+.fm-player-table .rt-tbody .rt-td {
+    align-items: center;
+    padding-block: 0 !important;
+}
+.fm-player-table .rt-tbody .rt-td-inner {
+    padding-block: 0;
+}
+
 /* Crest and scrolling name read as a single cell at the start of each row. */
 .reactable .rt-th.fm-player-crest,
 .reactable .rt-td.fm-player-crest {

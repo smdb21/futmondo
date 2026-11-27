@@ -2748,3 +2748,7 @@ The manual checker stores public schedules by league and UTC date, team sheets b
 ## Home notification count · 2026-11-26
 
 Implemented locally. The Home Notifications button displays the existing account unread count alongside its label. [Notification display](notifications_module.md#home-notifications-button)
+
+## Player table row height · 2026-11-26
+
+Implemented and verified locally. The shared player table keeps single- and dual-position players aligned, including rows with a two-line name or offer. [Browser measurements](data_review_results.md#player-table-row-height--2026-11-26)

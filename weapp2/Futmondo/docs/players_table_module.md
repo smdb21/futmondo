@@ -447,3 +447,7 @@ all bids use star/user-plus/hand-holding-dollar/gavel. All input IDs, label
 associations, defaults, tooltips and filtering/debounce behavior are preserved.
 Icons are hidden from assistive technology so the original text remains the
 accessible name. Existing responsive label wrapping and icon assets are reused.
+
+## Player row height
+
+The shared player table centers body cells within a 46 px minimum row height. Position badges stay side by side. Wrapped player names and two-line offers use the space inside the row. Taller content can still expand the row, including after column resizing.

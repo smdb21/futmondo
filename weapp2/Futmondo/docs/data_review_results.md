@@ -6844,3 +6844,9 @@ With stage reconciliation, each of the nine teams' cumulative totals matched an 
 The 13 chart checks include known answers for zero, negative scores, an unlisted team joining later and conflicting stage evidence. The delayed-read suite and the offline Shiny lifecycle suite passed (14 checks and eight tabs). The affected league needs one additional existing ranking snapshot in the batch of gap lookups. Both charts reuse the result. Browsing adds no Futmondo requests, writes, timers or database schema changes.
 
 The compressed-snapshot browser fixture also exercised the postponed round at 390 px and 1440 px in both themes. All four runs displayed the expected cumulative series and ranks, removed the missing-score notice, and recorded zero source calls. Replaying identical facts caused zero extra Standings chart publications. First curve times ranged from 0.96 to 2.51 seconds locally.
+
+## Player table row height · 2026-11-26
+
+At a 390 px viewport, the same 12 synthetic player rows measured 46.19, 57.28 or 62.28 px with the original CSS. Wrapped names and a two-line offer increased the height through the combined outer and inner cell padding. With the new spacing every row measured 46 px. The shared-table Chromium suite passed at 320, 390 and 1440 px in both themes. It checked that both position badges fit side by side, both offer lines fit vertically, and scrolling, column resizing, row selection and data updates still worked.
+
+The layout uses CSS on existing table body elements. It adds no DOM nodes, reactive work, timers, API calls or database reads. The fixture heartbeat took 259–263 ms across the six browser runs. The offline Shiny lifecycle passed 14 checks and eight tabs. Verification used local synthetic data.

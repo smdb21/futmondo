@@ -19,6 +19,26 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       assert.equal(await marked.innerText(),'Synthetic player 1');
       assert.equal(await table.locator('.rt-tbody .fm-player-name').filter({hasText:/^Synthetic player 2$/}).locator('.fm-player-status').count(),0);
       assert.equal(await table.locator('.rt-th').filter({hasText:/^Status$/}).count(),0);
+      const layouts = await table.locator('.rt-tbody .rt-tr').evaluateAll(rows => rows.map(row => {
+        const cell = row.querySelector('.fm-player-position').getBoundingClientRect();
+        const badges = [...row.querySelectorAll('.fm-player-position span')].map(el => el.getBoundingClientRect());
+        return {
+          height: row.getBoundingClientRect().height,
+          count: badges.length,
+          fit: badges.every(b => b.left >= cell.left && b.right <= cell.right && b.top === badges[0].top)
+        };
+      }));
+      assert.deepEqual([...new Set(layouts.map(row => row.count))].sort(), [1, 2]);
+      assert.ok(layouts.every(row => row.fit), 'position badges fit on one line');
+      assert.equal(new Set(layouts.map(row => row.height)).size, 1, 'mixed position counts, wrapped names and offers share a row height');
+      assert.ok(layouts[0].height <= 47, 'rows retain their compact height');
+      const saleLines = table.locator('.badge-active-bid .fm-sale-price > span');
+      assert.equal(await saleLines.count(), 2);
+      assert.ok(await saleLines.evaluateAll(lines => lines.every(line => {
+        const bounds = line.getBoundingClientRect();
+        const cell = line.closest('.rt-td').getBoundingClientRect();
+        return bounds.height > 0 && bounds.top >= cell.top && bounds.bottom <= cell.bottom;
+      })), 'price and profit both fit inside the offer cell');
       const placement=await marked.evaluate(cell=>{
         const label=cell.querySelector('.fm-player-name-with-status > span:first-child').getBoundingClientRect();
         const badge=cell.querySelector('.fm-player-status').getBoundingClientRect();
