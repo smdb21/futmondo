@@ -15,6 +15,24 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/futmon
    const rounds=await plot('standings_plot').evaluate(el=>({type:el.layout.xaxis.type,x:[...el.data[0].x],y:[...el.data[0].y]}));
    assert.equal(rounds.type,'category');assert.deepEqual(rounds.x,['6','6.2','7']);assert.deepEqual(rounds.y,[10,15,12]);
    assert.equal(await page.locator('[id="plots-rank_round"]').count(),0);
+   const from=page.getByLabel('From round',{exact:true});
+   const through=page.getByLabel('Through round',{exact:true});
+   await from.selectOption('6.2');
+   await through.selectOption('7');
+   const waitRounds=(x,y)=>page.waitForFunction(({x,y})=>{
+    const line=document.querySelector('#plots-standings_plot')?.data?.[0];
+    return line && JSON.stringify(line.x)===JSON.stringify(x) && JSON.stringify(line.y)===JSON.stringify(y);
+   },{x,y});
+   await waitRounds(['6.2','7'],[15,12]);
+   assert.deepEqual(await through.locator('option').evaluateAll(opts=>opts.map(o=>o.value)),['latest','6','6.2','7']);
+   await through.selectOption('6.2');
+   await waitRounds(['6.2'],[15]);
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2),false);
+   await through.selectOption('6');
+   await page.getByText('Choose an end round at or after the start on the chart.',{exact:true}).waitFor();
+   await from.selectOption('first');
+   await through.selectOption('latest');
+   await waitRounds(rounds.x,rounds.y);
    for(const [tab,id] of [['Squad values','values_plot'],['Cash & transfers','cash_plot'],['Rank progression','rank_plot'],['Owned by real team','owned_club_plot']]){
     await page.getByRole('tab',{name:tab,exact:true}).click();await wait(id);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2),false,`${tab} overflow at ${width}`);

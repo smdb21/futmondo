@@ -1,5 +1,11 @@
 # Trends
 
+## Standings round range (2026-11-26)
+
+**From round** and **Through round** select an inclusive interval on the standings chart. The choices follow the chart’s kickoff order, including decimal subrounds and fixtures played early. Choosing the same round at both ends shows one round. The defaults span the first to the latest published round and follow newly published history.
+
+The range filters the existing cumulative point series after season totals are calculated. Both endpoints include earlier rounds’ contributions, and missing scores keep their gaps. Changing the range only updates the Standings view. Rank progression has its own range control.
+
 `plots_UI(id)` and `plots_Server(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger = NULL)` provide the top-level **Trends** page. It presents one full-width, phone-friendly chart at a time: league standings, squad values, cash and transfers, money movements, rank progression, and real-team ownership. Chart controls belong to their chart tab and do not alter Classification-table filters.
 
 `plots_owned_by_real_team(players)` is a pure helper returning `real_team_id`, `real_team`, and `owned_players`. It counts each immutable player ID once only when both a current fantasy owner ID and a real-team ID/name are present. Free agents and rows with unverifiable club data are excluded. Rows are ordered by descending count then club name.

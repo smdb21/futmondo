@@ -1,5 +1,9 @@
 # Futmondo data architecture redesign plan
 
+## Standings round range (2026-11-26)
+
+- [x] Add inclusive start and end controls to the cumulative standings chart using the published round order and existing saved score projection. [Plot behavior](plots_module.md#standings-round-range-2026-11-26)
+
 ## Trends and postponed round scores (2026-11-26)
 
 - [x] Rename the chart destination and reconcile the published round 8 stage against its saved participant ranking and team histories. Verified locally with the scoped league observations. [Trends contract](plots_module.md#published-scores-during-a-postponed-round-2026-11-26)

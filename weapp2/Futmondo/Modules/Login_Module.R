@@ -16,7 +16,7 @@ login_feature_tiers <- function() {
         feature("round_range_standings", "Compare a stretch of rounds",
           "Choose a round range to compare teams’ points and their points, position, Best XI and MVP bonuses."),
         feature("league_charts", "Follow your league over time",
-          "Compare squad values and rank progression, and see which real clubs supply your league’s players."),
+          "Track cumulative points over selected rounds, compare squad values and ranks, and see which real clubs supply your league’s players."),
         feature("local_timezone", "Read deadlines in your timezone",
           "See kickoffs and transfer history in local time or choose a timezone for your account.")
       )),

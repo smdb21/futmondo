@@ -47,6 +47,16 @@ shiny::testServer(plots_Server,args=list(
    identical(round_totals()$points[round_totals()$team_id=='b'],c(0,5,3)))
  cat('PASS failed team history preserves other curves and produces an explicit failure\n')
  before <- calls
+ session$setInputs(standings_from='2.2', standings_through='2.2')
+ settle(session)
+ visible <- standings_rows()
+ stopifnot(identical(calls,before), all(visible$round==2.2),
+   identical(visible$points[visible$team_name=='Beta'],3),
+   is.na(visible$points[visible$team_name=='Alpha']))
+ session$setInputs(standings_from='first', standings_through='latest')
+ settle(session)
+ stopifnot(identical(standings_rows()$round, round_totals()$round), identical(calls,before))
+ cat('PASS standings subround range preserves cumulative scores and gaps with zero extra reads\n')
  session$setInputs(rank_range=c(2,2.2),plot_tab='Rank progression')
  settle(session)
  rank <- plotly::plotly_build(rank_plot())

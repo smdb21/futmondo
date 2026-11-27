@@ -279,7 +279,14 @@ plots_UI <- function(id) {
   ns <- shiny::NS(id)
   shiny::tagList(shiny::h2("Trends"), shiny::uiOutput(ns("chart_status")),
     shiny::tabsetPanel(id=ns("plot_tab"), type="pills",
-      shiny::tabPanel("Standings", shiny::p("Cumulative fantasy-team points after each published round or subround. Repeated daily snapshots are excluded; missing scores remain gaps."), plotly::plotlyOutput(ns("standings_plot"), height="420px")),
+      shiny::tabPanel("Standings",
+        shiny::p("Season points accumulated through each published round or subround. Missing scores leave gaps."),
+        shiny::fluidRow(
+          shiny::column(3, shiny::selectInput(ns("standings_from"), "From round",
+            choices = c("First published" = "first"), selectize = FALSE, width = "100%")),
+          shiny::column(3, shiny::selectInput(ns("standings_through"), "Through round",
+            choices = c("Latest published" = "latest"), selectize = FALSE, width = "100%"))),
+        plotly::plotlyOutput(ns("standings_plot"), height = "420px")),
       shiny::tabPanel("Squad values", shiny::p("Saved squad market valuations over time, in euros."), plotly::plotlyOutput(ns("values_plot"), height="420px")),
       shiny::tabPanel("Cash & transfers", shiny::p("Compare transfer-only balance estimates, squad purchase spending or transaction volume for the selected dates. Balance estimates exclude round rewards and other cash adjustments."), shiny::fluidRow(shiny::column(4, shiny::dateRangeInput(ns("cash_dates"),"Date range",format="dd/mm/yyyy")), shiny::column(8, shiny::radioButtons(ns("cash_metric"),"Metric",choices=c("Transfer-only balance estimate"="cash","Squad Purchases"="investment","Transaction Volume"="volume"),inline=FALSE))), plotly::plotlyOutput(ns("cash_plot"), height="420px")),
       shiny::tabPanel("Money movements",
@@ -305,7 +312,15 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
     })
     standings_rows <- resource_display_source(session, function() {
       totals <- round_totals()
-      data.frame(team_name = totals$team_name, round = totals$round, points = totals$points)
+      rounds <- round_domain()
+      if (length(rounds)) {
+        start <- match(input$standings_from %||% "first", rounds, nomatch = 1L)
+        end <- match(input$standings_through %||% "latest", rounds, nomatch = length(rounds))
+        shiny::validate(shiny::need(start <= end, "Choose an end round at or after the start on the chart."))
+        rounds <- rounds[seq.int(start, end)]
+      }
+      keep <- totals$round %in% rounds
+      data.frame(team_name = totals$team_name[keep], round = totals$round[keep], points = totals$points[keep])
     })
     standings_plot <- shiny::reactive({ plots_round_chart(standings_rows(), "points") })
     values_plot <- shiny::reactive({ plots_history(history(),"team_value","Squad valuation (EUR)") })
@@ -515,6 +530,8 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
       readers <- ranking_readers()
       if (length(readers)) {
         native <- ranking_history()
+        verified_histories <- names(Filter(function(x) isTRUE(attr(x, "valid_response")) &&
+          !any(attr(x, "worker_completeness") %in% c("partial", "unavailable")), history$histories)) %||% character()
         for (reader in readers) {
           read <- reader$read()
           reads[[length(reads) + 1L]] <- read
@@ -525,14 +542,22 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
       list(data = history$rows, rankings = rankings, loading = pending_reads(reads),
         errors = Filter(Negate(is.null), lapply(reads, `[[`, "error")))
     })
-        verified_histories <- names(Filter(function(x) isTRUE(attr(x, "valid_response")) &&
-          !any(attr(x, "worker_completeness") %in% c("partial", "unavailable")), history$histories)) %||% character()
     # Metadata-only worker publications must not redraw the same chart.
     round_totals <- resource_display_source(session, function() {
       state <- round_state()
       plots_round_totals(state$data, state$rankings)
     })
-    round_domain <- resource_display_source(session,function() sort(unique(round_totals()$round)))
+    # Keep the chart's kickoff order, including subrounds and fixtures played early.
+    round_domain <- resource_display_source(session, function() unique(round_totals()$round))
+    shiny::observeEvent(round_domain(), {
+      rounds <- as.character(round_domain())
+      selected <- input$standings_from
+      shiny::updateSelectInput(session, "standings_from", choices = c("First published" = "first", rounds),
+        selected = if (length(selected) && selected %in% rounds) selected else "first")
+      selected <- input$standings_through
+      shiny::updateSelectInput(session, "standings_through", choices = c("Latest published" = "latest", rounds),
+        selected = if (length(selected) && selected %in% rounds) selected else "latest")
+    })
     shiny::observe({
       numbers <- round_domain()
       if(length(numbers)) shiny::updateSliderInput(session,"rank_range",min=min(numbers),max=max(numbers),

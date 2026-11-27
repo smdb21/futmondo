@@ -1,5 +1,13 @@
 # Futmondo data review and implementation results
 
+## Standings round range (2026-11-26)
+
+A separate offline initialization check against revision `165580a` reproduced a startup error in Standings. The verified-history lookup was outside the reactive that defines the team history. Keeping that lookup beside the saved ranking read lets the module initialize and supplies the existing participation evidence to the chart.
+
+In the offline Chromium fixture, rounds 6, 6.2 and 7 had cumulative scores of 10, 15 and 12. Selecting 6.2 through 7 showed 15 and 12. Selecting 6.2 alone showed 15. Restoring both defaults returned all three points. Reversed endpoints displayed a correction prompt. All six combinations of 320, 390 and 1440 px with light and dark themes passed without horizontal overflow.
+
+The delayed-read test preserved an unknown team score and counted zero additional adapter calls when narrowing and restoring the range. The controls reuse the published round list and the shared season totals. Each selection filters the in-memory display rows and redraws the standings plot. All 13 plot checks and the offline lifecycle (14 checks and eight tabs) passed. Verification used synthetic data. [Browser check](../test/test_plots_browser.cjs) · [Read-reuse check](../test/test_plots_loading.R)
+
 ## Home offers and squad movement (2026-11-26)
 
 The signed-in Home fixture counted two distinct outgoing offers worth €350,000 across three market rows with one duplicate bid ID. The 17-player squad showed two rising, one falling, one incoming and one leaving. A complete empty transfer history produced zero arrivals and departures. Holding the market response kept offers pending while cash, squad size and navigation stayed available.
