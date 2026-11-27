@@ -280,7 +280,9 @@ read_rival_calculation_snapshot <- function(account_id,championship_id,season,us
       saved_pending <- cache$prepared$pending_bonus_rounds
       interval <- cache$prepared$pending_interval
       valid_preparation <- identical(names(cache$prepared),old_fields) ||
-        (identical(names(cache$prepared),fields) && rival_snapshot_pending_valid(saved_pending) &&
+        ((identical(names(cache$prepared),fields) ||
+          (identical(names(cache$prepared),c('lineup_cash',fields)) && is.list(cache$prepared$lineup_cash))) &&
+          rival_snapshot_pending_valid(saved_pending) &&
           all(saved_pending %in% cache$prepared$catalog$round_number) &&
           is.numeric(interval) && length(interval)==2L && all(is.na(interval)|is.finite(interval)) &&
           (anyNA(interval)||interval[1]<interval[2]))

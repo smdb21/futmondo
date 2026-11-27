@@ -2832,3 +2832,7 @@ Implemented and checked locally. The balance date follows the financial evidence
 ## Refreshing rival standings (2026-11-27)
 
 Implemented the Rivals-specific route from the floating Refresh control to the verified finance job and its completed calculation timestamp. The existing database publisher and browser subscription deliver the checked standings. [Verification](data_review_results.md#rivals-refresh-2026-11-27)
+
+## Kickoff cash in rival balances (2026-11-27)
+
+The public rival ledger now uses the latest supported official closed-lineup budget and rolls it forward through subsequent transactions. Its dated cash observation is retained in the existing durable ledger. [Accounting behavior](rival_cash_accounting.md#cash-recorded-at-a-round-lock)

@@ -1032,8 +1032,63 @@ rival_cash_entry <- function(id,component,amount,source,type="bonus",date="",cat
     source_type=source_type,source_category=source_category,settlement_label=settlement_label,payment_date_estimated=payment_date_estimated,
     payment_date_source=payment_date_source,source_event_id=source_event_id,stringsAsFactors=FALSE)
 }
-rival_cash_ledger <- function(entries) {
+# The closed native lineup carries the team's absolute cash at lock. A split
+# round can have several locks, so only use a uniquely timed ordinary round.
+rival_lineup_cash_checks <- function(evidence,calendar,movements,now) {
+  if(is.null(calendar))return(list())
+  fixtures <- calendar$fixtures
+  times <- lapply(fixtures$fixture_dates,function(x)as.numeric(fm_time(x)))
+  names(times) <- fixtures$round_id
+  groups <- league_fixture_date_groups(times[fixtures$all_fixtures_dated])
+  ids <- intersect(groups$round_id[groups$groups==1L],calendar$rounds$round_id[calendar$rounds$is_finished %in% TRUE])
+  starts <- setNames(fixtures$begin_process,fixtures$round_id)
+  # Consolidated reward entries are dated at the last installment. A lock
+  # between installments cannot separate the already paid share.
+  if(nrow(movements)){
+    reward <- movements[movements$bonus_type %in% c("points","ranking","dreamteam","mvp"),,drop=FALSE]
+    split_ids <- reward$round_id[grepl("[.]",reward$settlement_label)]
+    ids <- setdiff(ids,split_ids)
+    series <- split(as.numeric(fm_time(reward$date)),paste(reward$round_id,reward$bonus_type))
+    locks <- as.numeric(fm_time(starts[ids]))
+    for(dates in series)if(length(dates)>1L && all(is.finite(dates))){
+      keep <- !(min(dates)<locks & locks<=max(dates))
+      ids <- ids[keep];locks <- locks[keep]
+    }
+  }
+  checks <- list()
+  for(record in rival_evidence_rows(evidence,"round_lineup")){
+    p <- record$payload
+    team <- mvp_text(p$team_id);rid <- mvp_text(p$round_id)
+    if(!rid %in% ids || !nzchar(team) || !identical(record$source_id,paste0("lineup:",team,":",rid)))next
+    raw <- p$raw_lineup
+    if(!is.list(raw))next
+    cash <- raw$budget
+    if(!is.numeric(cash) || length(cash)!=1L || !is.finite(cash) ||
+       !identical(raw$status,"closed") || !identical(p$status,"closed") ||
+       !identical(raw$negative,cash<0) || !identical(p$negative,raw$negative))next
+    lock <- unname(starts[rid])
+    at <- fm_time(record$observed_at)
+    if(length(at)!=1L || is.na(at) || at<fm_time(lock) || at>now)next
+    if(is.null(checks[[team]]) || fm_time(lock)>fm_time(checks[[team]]$date))
+      checks[[team]] <- list(round_id=rid,date=lock,cash=as.numeric(cash))
+  }
+  checks
+}
+rival_cash_ledger <- function(entries,check=NULL) {
   entries$timestamp<-fm_time(entries$date)
+  if(!is.null(check)){
+    activity <- entries$included & !entries$type %in% "opening"
+    lock <- fm_time(check$date)
+    # Unknown dates and events at exactly the lock have ambiguous ordering.
+    if(any(is.na(entries$timestamp[activity]) | entries$timestamp[activity]==lock))check <- NULL
+  }
+  if(!is.null(check)){
+    observation <- rival_cash_entry(paste0("cash-at-lock:",check$round_id),"Recorded round-start cash",
+      NA_real_,"Official closed lineup budget at the round lock.",type="cash observation",
+      date=check$date,round_id=check$round_id,included=FALSE)
+    observation$timestamp <- lock
+    entries <- dplyr::bind_rows(entries,observation)
+  }
   entries$section<-ifelse(entries$type%in%"opening","opening",ifelse(is.na(entries$timestamp),"undated","dated"))
   # IDs break equal-time ties reproducibly, without claiming their true sequence.
   phase<-match(entries$section,c("opening","dated","undated"))
@@ -1044,6 +1099,12 @@ rival_cash_ledger <- function(entries) {
   entries$running_balance<-if(length(opening)==1L&&is.finite(entries$amount[opening]))
     cumsum(ifelse(known,entries$amount,0))else rep(NA_real_,nrow(entries))
   entries$unknown_amounts<-cumsum(entries$included & !is.finite(entries$amount))
+  if(!is.null(check)){
+    index <- match(observation$id,entries$id)
+    after <- seq.int(index,nrow(entries))
+    entries$running_balance[after] <- check$cash+cumsum(ifelse(known[after],entries$amount[after],0))
+    entries$unknown_amounts[after] <- cumsum(entries$included[after] & !is.finite(entries$amount[after]))
+  }
   rownames(entries)<-NULL
   entries
 }
@@ -1224,7 +1285,7 @@ rival_estimate_summary <- function(missing,assumptions=character(),difference=NA
 
 # Public pure accounting interface; every numeric subtotal has an evidence trail.
 # Versioned, context-bound calculation cache. Source records remain authoritative.
-rival_calculation_version <- "2026-11-10-competition-v6"
+rival_calculation_version <- "2026-11-27-lineup-cash-v7"
 rival_calculation_hash <- function(x) unname(unclass(as.character(openssl::sha256(serialize(x,NULL,version=2)))))
 rival_calculation_evidence <- function(evidence) {
   rows<-Filter(function(x)!rival_snapshot_record(x)&&!x$evidence_type%in%c("team","coverage","rules"),evidence)
@@ -1243,7 +1304,7 @@ source("rival_calculation_store.R")
 # private budget is hidden. A cached calculation keeps the original clocks.
 rival_latest_cash_stamp <- function(stamps, now, ledger) {
   times <- fm_time(stamps)
-  times <- c(times,ledger$timestamp[ledger$included])
+  times <- c(times,ledger$timestamp[ledger$included | (if("type" %in% names(ledger))ledger$type %in% "cash observation" else FALSE)])
   valid <- !is.na(times) & times <= now
   if (!any(valid)) return("")
   rival_finance_stamp(max(times[valid]))
@@ -1325,6 +1386,7 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
   catalog <- catalog[!conflicting,,drop=FALSE]
   all_movements<-dplyr::bind_rows(lapply(unique(vapply(rival_evidence_rows(evidence,"movements"),function(x)mvp_text(x$payload$team_id),character(1))),function(id)
     rival_normalize_movements(rival_cash_latest_movements(evidence,id),catalog)))
+  lineup_cash <- rival_lineup_cash_checks(evidence,calendar,all_movements,now)
   final_rates <- vapply(c("ranking_pool","mvp_reward","dreamteam_reward"),function(field)fm_number(rules[[field]]),numeric(1))
   settlement <- rival_pending_settlement_rounds(evidence,catalog,all_movements,now,calendar,with_clock=TRUE,
     zero_final_rewards=all(is.finite(final_rates) & final_rates==0))
@@ -1357,7 +1419,7 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
   opening<-rival_opening_cash(championship_id,rules,opening_defaults)
     if(!is.null(cache)){
       cache$preparation_key<-preparation_key
-      cache$prepared<-mget(c("history","official","eligibility","catalog","all_movements","publications","anchors","reference_payments","final_settlements","pending_bonus_rounds","pending_interval","raw_rounds","point_rounds","point_checks","opening"),inherits=FALSE)
+      cache$prepared<-mget(c("lineup_cash","history","official","eligibility","catalog","all_movements","publications","anchors","reference_payments","final_settlements","pending_bonus_rounds","pending_interval","raw_rounds","point_rounds","point_checks","opening"),inherits=FALSE)
       cache$preparations<-(cache$preparations %||% 0L)+1L
     }
   }
@@ -1392,7 +1454,7 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
     rownames(mov)<-NULL
     key_movements<-mov;key_movements$observed_at<-NULL
     key_coverage<-coverage;key_coverage$observed_at<-NULL
-    team_key<-rival_calculation_hash(list(clock_version=2L,dependencies=dependency_key,team=tid,movements=key_movements,
+    team_key<-rival_calculation_hash(list(clock_version=2L,dependencies=dependency_key,lineup_cash=lineup_cash[[tid]],team=tid,movements=key_movements,
       coverage=key_coverage,transfers=team_transfers,complete=coverage_complete))
     previous<-if(!is.null(cache))cache$teams[[tid]]else NULL
     if(!is.null(cache)&&!identical(previous$key,team_key)&&identical(cache$durable_teams[[tid]]$key,team_key))previous<-cache$durable_teams[[tid]]
@@ -1656,7 +1718,7 @@ build_rival_cash_dataset <- function(teams,championship_id,evidence=list(),offic
       }
     }
     details$component[details$component%in%"Ranking reward"]<-"Position reward"
-    ledger<-rival_cash_ledger(details)
+    ledger<-rival_cash_ledger(details,if(!nrow(mov))lineup_cash[[tid]])
     attr(ledger,"point_rewards_incomplete")<-point_incomplete
     attr(ledger,"pending_bonus_types")<-pending_bonus
     attr(ledger,"award_payment_allocations")<-award_allocations

@@ -353,7 +353,7 @@ rivals_cash_history_rows <- function(ledger,undated=NULL,timezone=fm_display_tim
   }
   date_source<-if("payment_date_source"%in%names(rows))rows$payment_date_source else rep("",nrow(rows))
   output<-data.frame(date=ifelse(rows$section%in%"opening" & is.na(rows$timestamp),"Opening balance",ifelse(date_source%in%c("reference_payment_pending","round_settlement_pending"),"Payment not confirmed",ifelse(is.na(rows$timestamp),"Payment date unknown",fm_format_datetime(rows$timestamp,timezone)))),
-    type=ifelse(rows$component%in%"Best XI/MVP payment","Recorded Best XI/MVP payment",ifelse(rows$estimated,"Bonus",rows$type)),concept=paste0(description,round,round_detail,ifelse(rows$included,""," (excluded)")),money=rows$amount,
+    type=ifelse(rows$component%in%"Best XI/MVP payment","Recorded Best XI/MVP payment",ifelse(rows$estimated,"Bonus",rows$type)),concept=paste0(description,round,round_detail,ifelse(rows$included | rows$type %in% "cash observation",""," (excluded)")),money=rows$amount,
     payment_date_estimated=if("payment_date_estimated"%in%names(rows))rows$payment_date_estimated%in%TRUE else rep(FALSE,nrow(rows)),
     payment_date_source=if("payment_date_source"%in%names(rows))as.character(rows$payment_date_source)else rep("",nrow(rows)),
     running_balance=rows$running_balance,source=rivals_display_text(rows$source),included=rows$included,unknown_amounts=rows$unknown_amounts,
@@ -401,6 +401,7 @@ rivals_cash_history_widget <- function(ledger,undated=NULL,timezone=fm_display_t
         if(identical(display$payment_date_source[index],"league_point_payment"))return("Point bonus")
         if(value=="Recorded Best XI/MVP payment")return(value)
         if(value=="opening")return("Starting cash")
+        if(value=="cash observation")return("Recorded balance")
         if(value%in%c("buy","sell"))return(paste(if(display$category[index]%in%"clause")"Clause"else if(display$category[index]%in%"market")"Ordinary"else"Player",if(value=="buy")"purchase"else"sale"))
         if(display$bonus_type[index]%in%c("ranking","mvp","dreamteam","points"))return(paste0(
           c(ranking="Position bonus",mvp="MVP bonus",dreamteam="Best XI bonus",points="Point bonus")[[display$bonus_type[index]]]))
@@ -409,10 +410,11 @@ rivals_cash_history_widget <- function(ledger,undated=NULL,timezone=fm_display_t
       player=colDef(name="Name",html=TRUE,align="left",minWidth=210,
         style=list(whiteSpace="normal",overflowWrap="anywhere")),buyer=colDef(name="Buyer",align="left"),seller=colDef(name="Seller",align="left"),
       concept=colDef(show=FALSE,name="Concept / Description",align="left",cell=function(value,index){
-        note<-paste(display$source[index],if(!display$included[index])"Not applied to balance."else"",
+        note<-paste(display$source[index],if(!display$included[index] && display$type[index]!="cash observation")"Not applied to balance."else"",
           if(display$unknown_amounts[index]>0)"Balance excludes unknown amounts."else"")
         tags$span(title=note,value)
-      }),money=colDef(name="Price",align="right",cell=function(value){
+      }),money=colDef(name="Price",align="right",cell=function(value,index){
+        if(display$type[index]=="cash observation")return("")
         if(!is.finite(value))return("Unavailable")
         tags$span(style=if(value<0)"color:var(--fm-danger)"else"color:var(--fm-text)",
           paste0(if(value>0)"+"else"",format_table_currency(value)))
