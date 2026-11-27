@@ -2780,3 +2780,7 @@ Implemented and verified locally. The shared player table keeps single- and dual
 ## Loading pitch soccer ball · 2026-11-26
 
 Implemented locally. The shared pitch animation shows a rolling soccer ball with a random starting position and a short fading trail. [Rendering details](progressive_loading.md#pitch-murmuration-and-radar-loading-visual)
+
+## Ground passes in the loading animation · 2026-11-26
+
+Implemented locally. Short passes travel between players’ boots on the grass as the camera turns. [Loading pitch renderer](progressive_loading.md#pitch-murmuration-and-radar-loading-visual)

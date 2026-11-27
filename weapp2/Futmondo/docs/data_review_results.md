@@ -6908,3 +6908,9 @@ The layout uses CSS on existing table body elements. It adds no DOM nodes, react
 Offline Chromium verified two seeded opening positions on both the full-size and compact pitch. At 320, 390 and 1440 px in both themes, the ball stayed connected to eight progressively fainter trail segments, disappeared with the pitch and returned at the loop seam. Reduced motion used the static illustration with zero animated draws.
 
 The ball shares the existing 30 fps renderer, computes a fixed-length trail from scene time and adds no timers, image downloads, API calls or database work. With the full-size and compact loaders visible together, p95 draw time was 1.1–1.3 ms. The pitch stage measured 2.8–3.4 ms at simulated 4× CPU slowdown. Hidden and removed scenes stopped drawing. The offline Shiny lifecycle passed 14 checks and eight tabs.
+
+## Ground passes in the loading animation · 2026-11-26
+
+The previous ball was nearly twice a player's head radius and followed an independent curve across an unfilled pitch. The new pass uses the figurines’ existing boot positions and pitch projection. Offline Chromium verified two seeded starts and a reception beside a shoe, a foreshortened shadow at the trail endpoint, and players drawn on either side of the ball in depth. The 320, 390 and 1440 px runs passed in both themes, including the loop seam. Reduced motion kept the static illustration.
+
+The renderer stores ten pass targets per page and reuses one ball state per canvas. Four trail segments replace eight. The two depth groups each scan the 22 existing players and draw each figure once in total. The change adds no requests or timers. Local p95 draw time with both loaders visible was 1.1–1.3 ms, matching the previous measurement. At simulated 4× CPU slowdown the pitch stage measured 3.0–3.5 ms. The offline Shiny lifecycle passed 14 checks and eight tabs.

@@ -37,7 +37,6 @@
   var opponents = clubs.filter(function (club) { return club.family !== firstClub.family; });
   var selectedClubs = [firstClub,opponents[Math.floor(Math.random()*opponents.length)]];
   var teamIds = selectedClubs.map(function (club) { return club.id; }).join(' ');
-  var ballPhaseX = Math.random()*tau, ballPhaseY = Math.random()*tau;
   var paths = [
     [[50,40],[370,40],[370,240],[50,240],[50,40]],
     [[210,40],[210,240]],
@@ -69,6 +68,21 @@
         team: team, facing: team ? -1 : 1, delay: (index % 4)*.12 });
     });
   }
+  // Start at a random outfield player's boot, then exchange passes within that team.
+  var passOrder = [1,5,8,9,10,7,4,3,6,2];
+  var firstReceiver = Math.floor(Math.random()*passOrder.length);
+  var teamOffset = Math.random() < .5 ? 0 : formation.length;
+  var passRoute = passOrder.map(function (_, i) {
+    var actor = actors[teamOffset+passOrder[(firstReceiver+i)%passOrder.length]];
+    return { x: actor.x+6*actor.facing, y: actor.y };
+  });
+  var travel = 0;
+  passRoute.forEach(function (boot, i) {
+    var next = passRoute[(i+1)%passRoute.length];
+    boot.distance = Math.hypot(next.x-boot.x,next.y-boot.y);
+    boot.startDistance = travel;
+    travel += boot.distance;
+  });
   var subject = actors[7]; // Near-side midfielder, clear of the opposing formation.
   // Molded table-football body with a short shoe, not a projecting plinth.
   var figurine = [[-2,24],[-5.5,22],[-6,16],[-3.5,14],[-2.5,3],[-3.2,3],
@@ -202,11 +216,15 @@
     ctx.strokeStyle = palette.ink;
     ctx.lineWidth = .85 * markScale;
     ctx.beginPath();
-    paths.forEach(function (path) {
+    paths.forEach(function (path, index) {
       for (var i = 0; i < path.length; i++) {
         var x = path[i][0], y = path[i][1];
         if (camera) { project(camera,x,y,0); x = camera.px; y = camera.py; }
         if (i === 0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      }
+      if (index === 0) {
+        ctx.fillStyle = palette.light ? '#8dbb91' : '#286844';
+        ctx.fill();
       }
     });
     ctx.stroke();
@@ -217,31 +235,47 @@
       ctx.beginPath(); ctx.arc(x,y,1.25,0,tau); ctx.fill();
     });
   }
-  function soccerBall(ctx, t, opacity, camera, markScale) {
-    if (opacity <= .001) return;
-    // Sample the same rolling path backwards, projecting each point with the current camera.
-    var elapsed = camera ? Math.max(0,t-1.2) : 0;
-    var steps = 8, tail = Math.min(.48,elapsed);
-    var previousX, previousY, x, y, scale;
-    ctx.strokeStyle = palette.accent;
-    for (var i = tail ? 0 : steps; i <= steps; i++) {
-      var fraction = i/steps, time = elapsed-tail*(1-fraction);
-      x = 210+132*Math.sin(ballPhaseX+.74*time);
-      y = 140+73*Math.sin(ballPhaseY+1.08*time);
-      scale = 1;
-      if (camera) {
-        project(camera,x,y,0);
-        x = camera.px; y = camera.py; scale = camera.k;
+  function passProgress(seconds) {
+    // Briefly trap the ball at the boot, then let the pass slow on the turf.
+    var u = clamp((seconds-.18)/1.47);
+    return u*(1.6-.6*u);
+  }
+  function groundPass(ctx, ball, t, opacity, camera, markScale) {
+    var leg = Math.floor(t/1.65), seconds = t-leg*1.65;
+    var from = passRoute[leg%passRoute.length], to = passRoute[(leg+1)%passRoute.length];
+    var progress = passProgress(seconds);
+    var worldX = mix(from.x,to.x,progress), worldY = mix(from.y,to.y,progress);
+    var worldRadius = 2.7*Math.pow(markScale,.25);
+    project(camera,worldX,worldY,0);
+    var footX = camera.px, footY = camera.py, footprint = worldRadius*camera.k;
+    ball.depth = camera.sy*worldX+camera.cy*worldY;
+    ball.rotation = (from.startDistance+progress*from.distance)/worldRadius;
+    // A short ground trace joins the shadow at the point of contact.
+    if (progress > 0) {
+      ctx.strokeStyle = palette.light ? '#365b40' : '#9fc9a7';
+      var previousX, previousY;
+      for (var i = 0; i <= 4; i++) {
+        var past = passProgress(seconds-.16*(1-i/4));
+        project(camera,mix(from.x,to.x,past),mix(from.y,to.y,past),0);
+        if (i) {
+          ctx.globalAlpha = opacity*.32*i/4;
+          ctx.lineWidth = footprint*(.18+.08*i);
+          ctx.beginPath(); ctx.moveTo(previousX,previousY); ctx.lineTo(camera.px,camera.py); ctx.stroke();
+        }
+        previousX = camera.px; previousY = camera.py;
       }
-      if (previousX !== undefined) {
-        ctx.globalAlpha = opacity*.7*fraction;
-        ctx.lineWidth = scale*markScale*(.6+2*fraction);
-        ctx.beginPath(); ctx.moveTo(previousX,previousY); ctx.lineTo(x,y); ctx.stroke();
-      }
-      previousX = x; previousY = y;
     }
-    var radius = 5.3*scale*Math.sqrt(markScale);
-    if (camera) y -= radius*camera.st;
+    ctx.fillStyle = '#122619';
+    ctx.globalAlpha = opacity*.38;
+    ctx.beginPath();
+    ctx.ellipse(footX,footY,footprint*1.12,footprint*camera.ct*.85,
+      Math.atan2(camera.rollSin,camera.rollCos),0,tau);
+    ctx.fill();
+    project(camera,worldX,worldY,worldRadius);
+    ball.x = camera.px; ball.y = camera.py; ball.radius = worldRadius*camera.k;
+  }
+  function soccerBall(ctx, ball, opacity) {
+    var x = ball.x, y = ball.y, radius = ball.radius;
     ctx.globalAlpha = opacity;
     ctx.fillStyle = '#ffffff';
     ctx.strokeStyle = '#263345';
@@ -250,7 +284,7 @@
     // A rotating pentagon and five rim panels remain readable at compact sizes.
     ctx.fillStyle = ctx.strokeStyle;
     ctx.beginPath();
-    var rotation = elapsed*3;
+    var rotation = ball.rotation;
     for (var j = 0; j < 5; j++) {
       var angle = rotation+j*tau/5;
       var px = x+.44*radius*Math.cos(angle), py = y+.44*radius*Math.sin(angle);
@@ -312,10 +346,11 @@
     }
     if (started) { ctx.closePath(); ctx.fill(); if (outline) ctx.stroke(); }
   }
-  function risingPlayers(ctx, opacity, markScale, camera, lifts, t) {
+  function risingPlayers(ctx, opacity, markScale, camera, lifts, t, ballDepth, foreground) {
     if (opacity <= .001) return;
     for (var i = 0; i < actors.length; i++) {
       var actor = actors[i], rise = lifts[i];
+      if (ballDepth !== undefined && (camera.sy*actor.x+camera.cy*actor.y >= ballDepth) !== foreground) continue;
       var alpha = actor === subject ? opacity : opacity*(1-camera.approach);
       if (rise <= .001 || alpha <= .001) continue;
       var color = palette.teams[actor.team];
@@ -442,10 +477,18 @@
     var board = (1-leave)*.56 + ease((t-detectionStart)/1.2)*(.25+.31*returnPitch);
     if (camera) raisedBoard(ctx,1-leave,instance.markScale,camera);
     pitch(ctx,board,instance.markScale,camera);
-    soccerBall(ctx,t,camera ? 1-camera.approach : returnPitch,camera,instance.markScale);
     for (var actorIndex = 0; actorIndex < actors.length; actorIndex++)
       instance.lifts[actorIndex] = ease((t-riseStart-actors[actorIndex].delay)/riseDuration);
-    if (camera) risingPlayers(ctx,1-leave,instance.markScale,camera,instance.lifts,t);
+    var ballOpacity = camera ? 1-camera.approach : returnPitch;
+    var ballDepth;
+    if (ballOpacity > .001) {
+      var ball = instance.ball;
+      groundPass(ctx,ball,camera ? Math.max(0,t-1.2) : 0,ballOpacity,camera || cameraAt(0,instance),instance.markScale);
+      ballDepth = ball.depth;
+      if (camera) risingPlayers(ctx,1-leave,instance.markScale,camera,instance.lifts,t,ballDepth,false);
+      soccerBall(ctx,ball,ballOpacity);
+    }
+    if (camera) risingPlayers(ctx,1-leave,instance.markScale,camera,instance.lifts,t,ballDepth,true);
     var radarFit = Math.min(1,(instance.height-8)/218);
     radar(ctx,radarWeight,t,instance.markScale,radarFit);
     // Start the same flock motion relative to the figures' takeoff.
@@ -610,7 +653,7 @@
     var ctx;
     try { ctx = canvas && canvas.getContext('2d'); } catch (error) { return; }
     if (!ctx) return;
-    var instance = { node: node, canvas: canvas, ctx: ctx, inView: !intersection, active: false, count: 0, ready: false, lost: false };
+    var instance = { node: node, canvas: canvas, ctx: ctx, ball: {}, inView: !intersection, active: false, count: 0, ready: false, lost: false };
     instance.onLost = function () {
       instance.lost = true;
       instance.active = false;

@@ -174,14 +174,18 @@ function isPlayerHead(mark) {
   return mark.kind === 'fill' && !isBall(mark) && mark.path.length === 1 &&
     mark.path[0].op === 'arc' && mark.path[0].args[2] > 1.5;
 }
+function isContactShadow(mark) {
+  return mark.kind === 'fill' && mark.color === '#122619' && mark.path[0]?.op === 'ellipse';
+}
 function checkBall(phases) {
   const opening = phases.pitch.filter(isBall);
   assert.equal(opening.length, 1);
   const [x, y, radius] = opening[0].path[0].args;
   assert.ok(x-radius > 50 && x+radius < 370 && y-radius > 40 && y+radius < 240);
   const rolling = phases.rising.findIndex(isBall);
-  assert.ok(rolling >= 8);
-  const trail = phases.rising.slice(rolling-8, rolling);
+  const contact = phases.rising.findIndex(isContactShadow);
+  assert.ok(contact >= 4 && contact < rolling);
+  const trail = phases.rising.slice(contact-4, contact);
   for (const [i, segment] of trail.entries()) {
     assert.deepEqual(segment.path.map(command => command.op), ['moveTo', 'lineTo']);
     assert.ok(Math.hypot(...segment.path[1].args.map((value, axis) => value-segment.path[0].args[axis])) > 0);
@@ -192,8 +196,13 @@ function checkBall(phases) {
   }
   const [ballX, ballY, ballRadius] = phases.rising[rolling].path[0].args;
   const [endX, endY] = trail.at(-1).path[1].args;
-  assert.equal(endX, ballX);
-  assert.ok(Math.abs(endY-ballY) <= ballRadius, 'The trail meets the rolling ball');
+  const shadow = phases.rising[contact].path[0].args;
+  assert.deepEqual([endX,endY], shadow.slice(0,2), 'The trail ends at the turf contact point');
+  assert.ok(shadow[3] < shadow[2]*.7, 'The tilted pitch foreshortens the contact shadow');
+  assert.ok(ballY < endY && Math.hypot(endX-ballX,endY-ballY) <= ballRadius*1.05,
+    'The ball touches its shadow as the camera tilts');
+  assert.ok(phases.rising.slice(contact,rolling).some(isPlayerHead) &&
+    phases.rising.slice(rolling+1).some(isPlayerHead), 'The ball sits between the far and near players');
   assert.ok(!phases.flock.some(isBall), 'The ball leaves with the pitch');
 }
 function checkGeometry(phases) {
@@ -211,7 +220,7 @@ function checkGeometry(phases) {
     assert.ok(x >= 0 && x <= 420 && y >= 0 && y <= 280, `Projected marks stay inside the scene (${x}, ${y})`);
   }
   const heads = phases.rising.filter(isPlayerHead).map(mark => mark.path[0].args);
-  const feet = phases.rising.filter(mark => mark.kind === 'fill' && mark.path.length === 1 &&
+  const feet = phases.rising.filter(mark => mark.kind === 'fill' && !isContactShadow(mark) && mark.path.length === 1 &&
     mark.path[0].op === 'ellipse' && mark.path[0].args[2] > 2 && mark.path[0].args[2] < 15).map(mark => mark.path[0].args);
   assert.equal(heads.length, 22, 'Both teams have eleven raised player heads');
   assert.equal(feet.length, 22, 'Every raised player retains one ground anchor');
@@ -404,12 +413,14 @@ function checkAscent({release, dissolve, rising, flyby, approach}) {
   assert.equal(heads(flyby).length, 22, 'Both teams are still drawn during the banking pass');
   const edgeX = geometry => pitchCorners(geometry)[1][0] - pitchCorners(geometry)[0][0];
   assert.ok(edgeX(rising) > 200 && edgeX(flyby) < -200, 'The pitch turns through the sweeping pass');
-  const midRadius = heads(approach)[7].path[0].args[2];
-  assert.ok(midRadius > 1.5 * heads(flyby)[7].path[0].args[2] &&
+  // As the camera approaches, only the featured player's material stays fully opaque.
+  const subjectRadius = marks => heads(marks).reduce((a,b) => a.alpha > b.alpha ? a : b).path[0].args[2];
+  const midRadius = subjectRadius(approach);
+  assert.ok(midRadius > 1.5 * subjectRadius(flyby) &&
     midRadius < .85 * heads(release)[0].path[0].args[2], 'Zoom is still approaching the player halfway through');
   assert.equal(heads(release).length, 1, 'Camera isolates one intact player before takeoff');
   const [x, y, radius] = heads(release)[0].path[0].args;
-  assert.ok(Math.abs(x - 210) < 6 && y < 140 && radius > 3 * heads(rising)[7].path[0].args[2],
+  assert.ok(Math.abs(x - 210) < 6 && y < 140 && radius > 3 * Math.max(...heads(rising).map(mark => mark.path[0].args[2])),
     'The camera centers the enlarged midfielder');
   assert.ok(before.every(mark => Math.abs(mark.path[0].args[0] - x) < 4 * radius &&
     Math.abs(mark.path[0].args[1] - y) < 12 * radius), 'All flock particles start within one figure');
@@ -543,13 +554,24 @@ async function fullscreenChecks(browser) {
 
 async function ballStartChecks(browser) {
   const {page} = await createPage(browser, 390);
-  for (const [seed, expected] of [['0,0,0.25,0.75', [342,67]], ['0,0,0.75,0.25', [78,213]]]) {
+  for (const [seed, expected] of [['0,0,0.25,0.75', [162.56,85.6]], ['0,0,0.75,0.25', [142,160.4]]]) {
     await page.goto(origin + '/?kits=' + seed, {waitUntil: 'domcontentloaded'});
     for (const id of ['fixture-hero', 'fixture-compact']) {
-      const ball = (await captureGeometry(page,id)).find(isBall);
-      assert.deepEqual(ball.path[0].args.slice(0,2), expected, 'Both loaders use the random opening position');
+      const frame = await captureGeometry(page,id);
+      const [x,y] = frame.find(isContactShadow).path[0].args;
+      assert.ok(frame.some(isBall) && Math.hypot(x-expected[0],y-expected[1]) < .01,
+        'The ball starts next to the chosen boot on both loaders');
     }
   }
+  // The second seed starts at the left centre-back, then reaches the central midfielder.
+  const elapsed = await page.evaluate(() => performance.now()-window.loadingFixture.firstDrawAt);
+  await page.waitForTimeout(Math.max(0, 2940-elapsed));
+  const received = await captureGeometry(page);
+  const [contactX,contactY] = received.find(isContactShadow).path[0].args;
+  const shoes = received.filter(mark => mark.kind === 'fill' && mark.path.length === 4 &&
+    mark.path.every(p => p.op === 'moveTo' || p.op === 'lineTo'));
+  assert.ok(shoes.some(shoe => shoe.path.some(p =>
+    Math.hypot(p.args[0]-contactX,p.args[1]-contactY) < 6)), 'The pass arrives within a shoe length of a player');
   await page.close();
   console.log('PASS two seeded starts in both the hero and compact pitch');
 }
