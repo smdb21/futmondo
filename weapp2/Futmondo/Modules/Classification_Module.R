@@ -436,7 +436,7 @@ classification_saved_bonus_source <- function(session, login, championship, user
 }
 
 classification_Server <- function(id, is_module_active, login_token, championship_id, user_team_id,
-                                  user_teams_RV, refresh_trigger = NULL, league_settings_source = NULL) {
+                                  user_teams_RV, refresh_trigger = NULL, league_settings_source = NULL, round_calendar = NULL) {
   moduleServer(id, function(input, output, session) {
     bind_factual_reads(c("get_classification_round_catalog", "get_classification_round_ranking", "get_user_team_rounds", "get_user_team_info", "get_round_dreamteam", "get_round_lineup_snapshot"), session, login_token, championship_id, user_team_id, is_active = is_module_active, refresh_trigger = refresh_trigger)
 
@@ -822,9 +822,22 @@ classification_Server <- function(id, is_module_active, login_token, championshi
         footer = modalButton("Close")
       ), session = session)
     })
+    live_round <- reactive({
+      selected <- selected_lineup_RV()
+      if(!is.function(round_calendar) || !isTRUE(is_module_active()) ||
+         is.null(selected) || !identical(selected$team_id,user_team_id()) ||
+         !identical(selected$context,lineup_context_RV()))return(NULL)
+      rounds <- live_sub_rounds(round_calendar())
+      i <- match(selected$round_id,rounds$round_id)
+      if(is.na(i))return(NULL)
+      list(id=rounds$round_id[i],number=rounds$round_number[i])
+    })
+    live_sub_server("live",function()!is.null(live_round()),login_token,championship_id,user_team_id,
+      live_round,round_calendar)
     output$round_lineup_ui <- renderUI({
       selected <- selected_lineup_RV()
       req(!is.null(selected), identical(selected$context, lineup_context_RV()), is_module_active() == TRUE)
+      if(!is.null(live_round()))return(uiOutput(session$ns("live-pitch")))
       result <- round_lineup_read_state(function() get_round_lineup_snapshot(login_token(), championship_id(), selected$team_id, selected$round_id))
       if (is.null(result$data)) {
         return(fm_info(if (isTRUE(result$loading)) {

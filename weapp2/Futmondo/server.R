@@ -548,7 +548,7 @@ players_in_championship_Server(id = "players_in_championship",
                         championship_id = championship_id_RV,
                         user_team_id = user_team_id_RV,
                         user_teams_RV = user_teams_RV, refresh_trigger = refresh_trigger,
-                        league_settings_source = league_settings_source)
+                        league_settings_source = league_settings_source, round_calendar = round_catalog_RV)
 
   round_mvps_Server(id = "round_mvps",
                     is_module_active = reactive({

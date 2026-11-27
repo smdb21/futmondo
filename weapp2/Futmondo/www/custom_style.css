@@ -1925,3 +1925,8 @@ html[data-fm-theme="light"] .fm-lineup-empty .fm-lineup-name { color: #475569; }
 html[data-fm-theme="light"] .fm-lineup-bench { background: #eef2f7; border-color: #94a3b8; }
 html[data-fm-theme="light"] .fm-lineup-bench h4 { color: #0f172a; }
 html[data-fm-theme="light"] .fm-lineup-order { color: #334155; }
+
+.fm-live-sub-picker { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; margin-block:1rem; }
+.fm-live-sub-picker p { flex-basis:100%; margin:0; }
+.fm-live-sub-reason { display:block; overflow-wrap:anywhere; }
+.fm-round-lineup .fm-lineup-player button { max-width:100%; padding:.25rem .5rem; }

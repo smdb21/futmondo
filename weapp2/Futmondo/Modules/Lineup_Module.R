@@ -50,7 +50,12 @@ lineup_UI <- function(id) {
     ")),
     coach_preference_script(),
     shiny::div(class='fm-lineup-editor',
-      shiny::h2('Lineup'),shiny::uiOutput(ns('heading')),
+      shiny::h2('Lineup'),
+      shiny::radioButtons(ns('view'),'Lineup to view',choices=c('Upcoming lineup'='upcoming','Current round'='current'),
+        selected='upcoming',inline=TRUE),
+      shiny::conditionalPanel("input.view === 'current'",ns=ns,
+        shiny::uiOutput(ns('current_round')),shiny::uiOutput(ns('live-pitch'))),
+      shiny::conditionalPanel("input.view !== 'current'",ns=ns,shiny::uiOutput(ns('heading')),
       shiny::div(class='fm-coach-control',
         shiny::checkboxInput(ns('automatically_hire_coach'),'Automatically hire coach',value=TRUE),
         shiny::uiOutput(ns('coach_status'))),
@@ -80,12 +85,33 @@ lineup_UI <- function(id) {
       shiny::textOutput(ns('expected_points')),
       shiny::div(class='fm-lineup-formation',shiny::uiOutput(ns('formation_control'))),
       shiny::uiOutput(ns('pitch')),shiny::uiOutput(ns('captain_control')),
-      shiny::uiOutput(ns('arrival_status')),shiny::uiOutput(ns('fixtures'))))
+      shiny::uiOutput(ns('arrival_status')),shiny::uiOutput(ns('fixtures')))))
 }
 lineup_Server <- function(id,is_module_active,login_token,championship_id,user_team_id,round_catalog,
   refresh_trigger=NULL,history_refresh_trigger=NULL,clause_transfers_source=NULL,clause_transfers_refresh=NULL,round_catalog_state=NULL,
   coach_source=NULL) {
   shiny::moduleServer(id,function(input,output,session){
+    page_active <- is_module_active
+    live_active <- shiny::reactive(isTRUE(page_active()) && identical(input$view,"current"))
+    is_module_active <- shiny::reactive(isTRUE(page_active()) && !identical(input$view,"current"))
+    live_rounds <- shiny::reactive({shiny::req(live_active()); live_sub_rounds(round_catalog())})
+    output$current_round <- shiny::renderUI({
+      rounds <- live_rounds()
+      if(!nrow(rounds))return(fm_info("No round is confirmed in progress."))
+      if(nrow(rounds)==1L)return(shiny::h3(paste("Round",rounds$round_number[1L])))
+      previous <- shiny::isolate(input$live_round)
+      shiny::selectInput(session$ns("live_round"),"Round in progress",
+        setNames(rounds$round_id,paste("Round",rounds$round_number)),
+        selected=if(isTRUE(previous %in% rounds$round_id))previous else rounds$round_id[1L])
+    })
+    live_round <- shiny::reactive({
+      rounds <- live_rounds()
+      if(!nrow(rounds))return(NULL)
+      i <- if(nrow(rounds)==1L)1L else match(input$live_round %||% "",rounds$round_id)
+      if(is.na(i))return(NULL)
+      list(id=rounds$round_id[i],number=rounds$round_number[i])
+    })
+    live_sub_server("live",live_active,login_token,championship_id,user_team_id,live_round,round_catalog)
     # Resolve the login preference even while the Lineup tab is hidden.
     if(!is.null(coach_source)){
       preference_generation<-0L;preference_ready<-shiny::reactiveVal(FALSE);preference_warning<-shiny::reactiveVal("")

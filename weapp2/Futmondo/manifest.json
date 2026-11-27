@@ -2256,7 +2256,7 @@
       "checksum": "eb12d03aee298c3ec941080efc8d3359"
     },
     "async_transport.R": {
-      "checksum": "8089a36d8e7c335075a10b3bc80c538c"
+      "checksum": "b759ff018cb2f93d2af5c22a03ed8716"
     },
     "award_runtime.R": {
       "checksum": "fa6ed5d7c1af128d9464f22d5990560d"
@@ -2292,7 +2292,7 @@
       "checksum": "08b61cca1fb735adea1f75791a37991c"
     },
     "global.R": {
-      "checksum": "bd69f975b49fd609e90746c52ca6f71c"
+      "checksum": "47ad29ca06c21a8a54e21879fba6c8b8"
     },
     "history_baseline_store.R": {
       "checksum": "fae2bbeb23335fe69729f675970cc655"
@@ -2312,6 +2312,9 @@
     "lineup_schedule.R": {
       "checksum": "729908996e5f1fa7c32bd6e4458d7c17"
     },
+    "live_substitution.R": {
+      "checksum": "f49c6782d54283cb0a30855270b028b6"
+    },
     "lineup_store.R": {
       "checksum": "d00d5455556ebf786b9bf655e2d94948"
     },
@@ -2322,13 +2325,13 @@
       "checksum": "e6906ac6557f9a10edb0e28fe797b84a"
     },
     "Modules/Classification_Module.R": {
-      "checksum": "67672b6df885848174b15d27bdb5bd75"
+      "checksum": "67209bdab5ad1f3d8e67ae56031f944b"
     },
     "Modules/Lineup_Module.R": {
-      "checksum": "9217ff417b16df93d60992b39fc3474a"
+      "checksum": "e228a11ddd742e6033ee726900a50087"
     },
     "Modules/Login_Module.R": {
-      "checksum": "16da0cde9c64cb82e0c17c0290963e2e"
+      "checksum": "179a08a88fbe75e5e4db069b372ae0a7"
     },
     "Modules/Market_Module.R": {
       "checksum": "676429892e2008352ddce0a3a4a2e32b"
@@ -2385,13 +2388,13 @@
       "checksum": "a3492d2e097d27685fc301927f6e6fca"
     },
     "round_lineup_runtime.R": {
-      "checksum": "6fffb35d87e5395f64e3ac5191dba0f6"
+      "checksum": "283db7b3837221d3356e10abf5f24715"
     },
     "round_settlement_runtime.R": {
       "checksum": "6941ec3d550551d6c41a20b6a4d2ff3e"
     },
     "server.R": {
-      "checksum": "0212c4a592a79a45b3c2ef03c2f7deb3"
+      "checksum": "86466fcc3aab948ab6d03f96f9fd88e9"
     },
     "supabase_connector.R": {
       "checksum": "f49117c4a21dd8d417a32070c206f2cf"
@@ -2412,7 +2415,7 @@
       "checksum": "f2fdf415c4ae4f036097be0f6c913a75"
     },
     "www/custom_style.css": {
-      "checksum": "f14e3547f495bc37ff4c566ea481e1b0"
+      "checksum": "677d03897d3c8f3379f5a528b331aafa"
     },
     "www/home.css": {
       "checksum": "0d80092a68610cb7fe93de0d1d4c1f2e"

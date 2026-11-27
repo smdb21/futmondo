@@ -50,6 +50,10 @@ fm_transport_start<-function(id){
     if(identical(task$priority,"interactive")&&!is.null(task$queued_at))resource_timing("availability_queue",task$queued_at)
     # libcurl counts its internal connection queue against both timeouts. Add a
     # handle only when a slot is free, so network timers start at dispatch.
+    if(is.function(task$before_dispatch) && !isTRUE(task$before_dispatch())){
+      fm_transport_finish(id,error=simpleError("The confirmed action expired before dispatch."))
+      return(invisible(NULL))
+    }
     handle<-curl::new_handle();curl::handle_setopt(handle,url=task$url,customrequest=task$method,
       timeout_ms=as.integer(task$timeout*1000),connecttimeout_ms=5000L)
     if(!is.null(task$body))curl::handle_setopt(handle,postfields=as.character(task$body))
@@ -108,7 +112,7 @@ fm_transport_cancel<-function(owner){
   }else fm_transport_schedule()
   invisible(TRUE)
 }
-fm_async_http<-function(url,method="GET",body=NULL,headers=character(),owner="",timeout=15,priority="normal"){
+fm_async_http<-function(url,method="GET",body=NULL,headers=character(),owner="",timeout=15,priority="normal",before_dispatch=NULL){
   priority<-fm_transport_priority(priority)
   if(isTRUE(getOption("futmondo.offline",FALSE)))return(promises::promise_reject(resource_failure(resource=url,category="network")))
   read_key<-.fm_transport$dispatch_read_key
@@ -118,6 +122,7 @@ fm_async_http<-function(url,method="GET",body=NULL,headers=character(),owner="",
     id<-as.character(openssl::sha256(serialize(list(url,Sys.time(),runif(1)),NULL)))
     task<-new.env(parent=emptyenv());task$url<-url;task$method<-method;task$body<-body;task$headers<-headers
     task$owner<-owner;task$timeout<-timeout;task$priority<-priority;task$queued_at<-Sys.time();task$read_key<-if(reserved)read_key else NULL
+    task$before_dispatch<-before_dispatch
     task$active<-FALSE;task$handle<-NULL;task$resolve<-resolve;task$reject<-reject
     .fm_transport$tasks[[id]]<-task
     fm_transport_schedule()

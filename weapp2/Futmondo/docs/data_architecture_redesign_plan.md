@@ -2712,3 +2712,7 @@ See the [scoring contract](lineup_module.md#custom-scoring-in-scheduled-saves--2
 ## Loading animation figurines (2026-11-26)
 
 - [x] Remove the noses from both teams and verify the round heads and goal-facing shoes at desktop and mobile widths. [Browser checks](data_review_results.md#loading-animation-figurines-2026-11-26)
+
+## Live-round bench substitutions · 2026-11-26
+
+Implemented locally. The owned round pitch in Lineup and Classification shares one user-confirmed substitution and readback flow. Browsing reuses the worker calendar and durable round evidence. A successful readback publishes the effective pitch to both views and queues an idempotent database revision. The existing worker cadence and schema support the added fields. A deployed round change and authenticated write acceptance remain unverified. [Implementation contract](lineup_module.md#manual-bench-substitutions-in-a-running-round--2026-11-26)

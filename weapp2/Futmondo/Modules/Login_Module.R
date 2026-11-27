@@ -29,6 +29,8 @@ login_feature_tiers <- function() {
           "Compare recent points per million of market value or clause price across players."),
         feature("rival_cash", "Trace a rival’s estimated balance",
           "Follow opening cash, transfers and league rewards in a running ledger. See where the evidence is incomplete."),
+        feature("live_substitutions", "Review live bench substitutions",
+          "See eligible bench replacements and their kickoff deadline on your locked round pitch. Confirm a swap from Lineup or Classification."),
         feature("scheduled_lineups", "Prepare for confirmed signings",
           "Include signings due before kickoff in a draft XI and bench. Where enabled, approve a lineup submission timed for an incoming signing."),
         feature("round_award_rankings", "Find repeat Best XI and MVP picks",

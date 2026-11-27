@@ -26,7 +26,7 @@ round_lineup_slots <- function(items,size) {
     if(!is.finite(position)||position!=floor(position)||position<0||position>=size||!is.null(slots[[position+1L]]))
       stop("Historical lineup position unavailable")
     # Only the public display fields cross the persistence boundary.
-    clean<-player[intersect(c("id","name","photo","teamId","logo","position","role","points","changed","rated","zeroPointsReason","customPoints"),names(player))]
+    clean<-player[intersect(c("id","name","photo","teamId","logo","position","role","role2","locked","multiposition","points","changed","rated","zeroPointsReason","customPoints"),names(player))]
     if(is.list(player$detailedPoints))clean$detailedPoints<-list(po=lapply(
       round_lineup_records(player$detailedPoints$po),function(score)
         if(is.list(score))score[intersect(c("mode","r","p"),names(score))]else list()))
@@ -51,7 +51,8 @@ normalize_round_lineup <- function(answer) {
 round_lineup_clean_answer <- function(answer) {
   normalized<-normalize_round_lineup(answer)
   list(strategy=normalized$strategy,players=Filter(Negate(is.null),normalized$players),
-    bench=list(players=Filter(Negate(is.null),normalized$bench)),status=normalized$status,
+    bench=c(answer$bench[intersect(c("enabled","change","mode","multiposition"),names(answer$bench))],
+      list(players=Filter(Negate(is.null),normalized$bench))),multiposition=answer$multiposition,status=normalized$status,
     pointSystem=normalized$pointSystem,negative=normalized$negative)
 }
 round_lineup_scope <- function(context) {
@@ -61,7 +62,7 @@ round_lineup_scope <- function(context) {
 # v1 lost score inputs; v2 also discarded the official flat club/crest fields.
 round_lineup_snapshot_id <- function(context,round_id) paste0("rival-cache:round-lineup-v4:",
   as.character(openssl::sha256(serialize(list(team=context$user_team_id,round=round_id,competition=fm_scalar(context$competition_id,"unknown"),season=context$season,scoring=context$scoring_version),NULL,version=2))))
-persist_round_lineup_snapshot <- function(data,context) {
+persist_round_lineup_snapshot <- function(data,context,on_complete=NULL) {
   context$competition_id<-fm_scalar(context$competition_id,"unknown")
   if(!is.list(data)||isTRUE(data$from_saved)||!is.null(attr(data,"fetch_error")))return(invisible(FALSE))
   answer<-tryCatch(round_lineup_clean_answer(data$answer),error=function(e)NULL)
@@ -72,7 +73,8 @@ persist_round_lineup_snapshot <- function(data,context) {
     valid_until=rival_finance_stamp(stamp+300),completeness="complete")
   record<-rival_finance_evidence(context$account_id,context$championship_id,context$season,"eligibility",
     round_lineup_snapshot_id(context,data$round_id),payload,stamp,competition_id=fm_scalar(context$competition_id,"unknown"))
-  persist_rival_finance_evidence(list(record),context)
+  if(is.null(on_complete))persist_rival_finance_evidence(list(record),context) else
+    persist_rival_finance_evidence(list(record),context,on_complete)
 }
 read_saved_round_lineup <- function(context,round_id,now=Sys.time()) {
   context$competition_id<-fm_scalar(context$competition_id,"unknown")
@@ -146,7 +148,7 @@ round_lineup_player_score <- function(player,point_system="press",status="") {
   }
   list(points=points,provisional=is.finite(points)&&(provisional||status%in%c("running","playing")))
 }
-round_lineup_player_ui <- function(player,bench=FALSE,index,point_system="press",status="",pitch_role="") {
+round_lineup_player_ui <- function(player,bench=FALSE,index,point_system="press",status="",pitch_role="",live=FALSE) {
   occupied<-is.list(player)&&nzchar(mvp_text(player$id))
   changed<-occupied&&isTRUE(player$changed)
   # Pitch slots identify the assigned role, including secondary-position starts.
@@ -183,13 +185,13 @@ round_lineup_player_ui <- function(player,bench=FALSE,index,point_system="press"
       if(changed)shiny::span(class="fm-lineup-change",title=if(bench)"Substituted out"else"Substituted in",
         `aria-label`=if(bench)"Substituted out"else"Substituted in",if(bench)"↓"else"↑")),
     shiny::div(class="fm-lineup-name",`data-position`=if(occupied)position else "",
-      title=if(occupied)paste0(if(bench)"Main position for substitutions: "else"Lineup position: ",
+      title=if(occupied)paste0(if(bench && live)"Primary position: "else if(bench)"Main position for substitutions: "else"Lineup position: ",
         if(nzchar(position))switch(position,GK="Goalkeeper",DEF="Defender",MID="Midfielder",FWD="Forward")else"unavailable"),
       if(safe_image(logo))shiny::tags$img(class="fm-lineup-crest",src=logo,alt=club,title=club,
         width=11,height=11,loading="lazy",decoding="async",onerror="this.style.display='none'"),
       shiny::span(class="fm-lineup-label",title=label,if(occupied)lineup_player_label(label)else label)))
 }
-round_lineup_pitch_ui <- function(answer) {
+round_lineup_pitch_ui <- function(answer, starter_control=NULL) {
   lineup<-normalize_round_lineup(answer)
   ends<-cumsum(lineup$rows);starts<-c(1L,head(ends,-1L)+1L)
   shiny::div(class="fm-round-lineup",
@@ -201,11 +203,15 @@ round_lineup_pitch_ui <- function(answer) {
         role<-c("FWD","MID","DEF","GK")[row]
         count<-lineup$rows[row]
         shiny::div(class=lineup_pitch_row_class(role,count),`data-position`=role,style=paste0("--lineup-count:",count),
-          lapply(seq.int(starts[row],ends[row]),function(i)round_lineup_player_ui(lineup$players[[i]],index=i,
-            point_system=lineup$pointSystem,status=lineup$status,pitch_role=role)))
+          lapply(seq.int(starts[row],ends[row]),function(i){
+            tile<-round_lineup_player_ui(lineup$players[[i]],index=i,
+            point_system=lineup$pointSystem,status=lineup$status,pitch_role=role)
+            if(is.function(starter_control))starter_control(tile,i) else tile
+          }))
       })),
     shiny::div(class="fm-lineup-bench",shiny::h4("Substitutes"),shiny::div(class="fm-lineup-bench-row",
       lapply(seq_len(4L),function(i)round_lineup_player_ui(lineup$bench[[i]],bench=TRUE,index=i,
-        point_system=lineup$pointSystem,status=lineup$status))))),
+        point_system=lineup$pointSystem,status=lineup$status,live=is.function(starter_control)))))),
+    if(is.function(starter_control))fm_info(class="fm-lineup-legend","* Provisional points · ↑ Substituted in · ↓ Substituted out · — Points unavailable.") else
     fm_info(class="fm-lineup-legend","* Provisional points · ↑ Substituted in · ↓ Substituted out · — Points unavailable. Bench order is 1–4. Substitutes can only cover their main position; secondary positions do not count."))
 }
