@@ -1,5 +1,9 @@
 # Futmondo data architecture redesign plan
 
+## Clubs label (2026-11-27)
+
+The shared player filter is labeled **Clubs** and the welcome feature description uses the same terminology.
+
 ## Scheduled clause buyouts on Home (2026-11-27)
 
 Home now shows the selected team’s active scheduled clause buyouts below Transfers using the existing reservation list. [Home behavior](page_preferences.md)

@@ -30,7 +30,7 @@ players_table_club_filter_UI <- function(input_id, choices, selected) {
     }
     return {option: club, item: club};
   })()")
-  input <- selectizeInput(input_id, players_table_filter_label("Real Club", "shield-halved"),
+  input <- selectizeInput(input_id, players_table_filter_label("Clubs", "shield-halved"),
     choices = NULL, width = "100%", options = list(sortField = "$order", render = render_club))
   options <- lapply(seq_len(nrow(choices)), function(i) {
     tags$option(value = choices$value[i], selected = if (choices$value[i] == selected) NA,

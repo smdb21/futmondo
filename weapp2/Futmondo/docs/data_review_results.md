@@ -1,5 +1,9 @@
 # Futmondo data review and implementation results
 
+## Clubs label (2026-11-27)
+
+The rendered filter label read “Clubs” and the welcome description used “clubs”. All 21 player filter checks passed. The text uses the existing elements and adds no requests, rendering steps or reactive dependencies.
+
 ## Scheduled clause buyouts on Home (2026-11-27)
 
 Home and the balance summary share the scoped reservation list. Home uses a separate Shiny output so roster updates do not replace an expanded list. The native disclosure expands in the browser. The change adds no polling, source requests or database queries.
