@@ -161,6 +161,7 @@ live_sub_server <- function(id,active,login,championship,team,round_ref,calendar
     })
     worker_read <- factual_read_adapter(session,"get_round_lineup_snapshot",login,championship,team,
       is_active=active,state_only=TRUE)
+    club_sheet <- club_xi_source(session,active,login,championship,scope)
     # The manual readback can be newer than the worker publication after a restart.
     observed_scope <- NULL
     shiny::observeEvent(scope(),{
@@ -264,9 +265,15 @@ live_sub_server <- function(id,active,login,championship,team,round_ref,calendar
       pending <- state$pending
       event <- function(kind,...)list(key=s$key,kind=kind,...)
       button <- function(kind,label,...)live_sub_button(session$ns,event(kind,...),label)
+      feed <- club_sheet()
+      round_fixtures <- fixtures()
       controls <- function(tile,i){
         player <- o$lineup$players[[i]]
         if(is.null(player))return(tile)
+        badge <- club_xi_label(feed,player,round_fixtures)
+        if(!is.null(badge))tile <- htmltools::tagAppendChildren(tile,
+          shiny::tags$small(class=if(badge$warning)"fm-club-xi-warning" else "fm-live-sub-reason",
+            title=badge$title,badge$text))
         issue <- o$slots[[i]]$issue
         if(is.null(issue)&&!length(o$choices[[i]]))issue <- "No eligible substitute"
         htmltools::tagAppendChildren(tile,if(is.null(issue)&&is.null(pending))
@@ -289,6 +296,12 @@ live_sub_server <- function(id,active,login,championship,team,round_ref,calendar
           button("cancel","Cancel"))
       }
       shiny::tagList(if(isTRUE(as.numeric(Sys.time())>=data$valid_until))fm_info("Showing the last synced round lineup."),
+        shiny::div(class="fm-lineup-fixtures-note",switch(feed$status,
+          not_configured="Club XI checks require a StrikerAPI connection.",
+          unsupported="StrikerAPI coverage is not configured for this competition.",
+          calendar_pending="Waiting for the synced fixture calendar.",
+          offline="Club XI checks require factual sync.",loading="Waiting for synced club team sheets.",
+          "Club team sheets · StrikerAPI · Checks begin 90 minutes before kickoff.")),
         round_lineup_pitch_ui(data$answer,controls),chooser,
         if(identical(state$feedback$key,s$key))shiny::div(role="status",state$feedback$message),
         if(identical(pending$key,s$key)&&isTRUE(pending$uncertain))button("verify","Check official lineup"),

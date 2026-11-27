@@ -15,6 +15,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       await live.locator('.fm-lineup-layout').waitFor();
       assert.ok(await live.evaluate(n=>n.scrollWidth <= n.clientWidth+1));
       if(width===390){
+        await live.getByText('On club bench',{exact:true}).waitFor();
         await live.getByRole('button',{name:'Substitute Forward'}).click();
         await live.getByRole('button',{name:'Reserve',exact:true}).click();
         const confirm = live.getByRole('button',{name:'Confirm substitution'});
@@ -32,6 +33,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       await page.getByRole('button',{name:'My team',exact:true}).click();
       const modal = page.locator('.modal');
       await modal.locator('.fm-lineup-pitch [data-player-id="Reserve"]').waitFor();
+      await modal.getByText('Confirmed starter',{exact:true}).waitFor();
       await modal.getByRole('button',{name:'Substitute Reserve'}).waitFor();
       assert.ok(await modal.locator('.fm-lineup-layout').evaluate(n=>n.scrollWidth<=n.clientWidth+1));
       assert.match(await page.locator('#counts').innerText(),/^5 1 2 /);

@@ -22,6 +22,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 import httpx
+from worker.striker import LALIGA, Striker
 from nacl.secret import SecretBox
 
 LOG = logging.getLogger('futmondo.worker')
@@ -392,6 +393,8 @@ class Helper:
         # The helper cannot inherit credentials or source authentication from its parent.
         env = {k: v for k, v in os.environ.items() if k in
                ('PATH', 'LANG', 'LC_ALL', 'R_LIBS', 'R_LIBS_USER', 'R_LIBS_SITE', 'R_HOME', 'TMPDIR', 'OPENBLAS_NUM_THREADS', 'OMP_NUM_THREADS')}
+        # Only public configuration reaches the R helper.
+        env['FUTMONDO_XI_COVERAGE'] = LALIGA if os.getenv('STRIKER_API_KEY') else 'not_configured'
         env['FUTMONDO_WORKER_HELPER'] = 'true'
         env['FUTMONDO_CLAUSE_OBSERVATIONS_ENABLED'] = 'true' if os.getenv('FUTMONDO_CLAUSE_SCHEDULING_ENABLED', 'false').lower() == 'true' else 'false'
         self.process = await asyncio.create_subprocess_exec('Rscript', '--vanilla', str(self.root / 'worker' / 'helper.R'),
@@ -451,7 +454,7 @@ class Helper:
                     safe_diagnostic = isinstance(code, str) and (code in diagnostic_codes or re.fullmatch(
                         r'resource_parse_(?:http|network|parser|schema|read_budget|unknown)_(?:' + resources + r')(?:_[1-5][0-9]{2})?', code, flags=re.ASCII))
                     raise WorkerFailure(code if safe_timeout or safe_diagnostic else 'resource_parse')
-                if message.get('type') not in ('http', 'database', 'persist', 'resource', 'discovery_resource', 'progress', 'history_ack', 'clause_observation'):
+                if message.get('type') not in ('http', 'database', 'persist', 'resource', 'discovery_resource', 'progress', 'history_ack', 'clause_observation', 'club_xi'):
                     raise WorkerFailure('helper_protocol')
                 try:
                     response = await exchange(message)
@@ -488,6 +491,7 @@ def base_interval_seconds():
 class Worker:
     def __init__(self, store, client, key, root):
         self.store, self.client, self.key = store, client, key
+        self.club_xi = Striker(client, os.getenv('STRIKER_API_KEY', ''))
         self.identity = str(uuid.uuid4())
         self.base_interval = base_interval_seconds()
         self.helpers = [Helper(root) for _ in range(max(1, min(2, int(os.getenv('FUTMONDO_WORKER_LANES', '2')))))]
@@ -755,6 +759,13 @@ class Worker:
             if ready:
                 self.progress_ready.add(owner)
             return {'ok': True, 'published': True}
+        if message['type'] == 'club_xi':
+            if job['descriptor']['handler'] != 'get_club_lineups':
+                raise WorkerFailure('source_route_denied')
+            competition = job['descriptor']['context']['competition_id']
+            async with self.connections:
+                return await self.club_xi.check(competition, message['fixture'], message['players'],
+                                                message.get('clubs') or {})
         if message['type'] == 'clause_observation':
             if os.getenv('FUTMONDO_CLAUSE_SCHEDULING_ENABLED', 'false').lower() != 'true':
                 return {'ok': True}
@@ -778,7 +789,14 @@ class Worker:
             discovery = message['type'] == 'discovery_resource'
             match_snapshot = (discovery and job['descriptor']['handler'] == 'get_lineup_match_details'
                               and descriptor.get('handler') in ('get_finished_rounds', 'get_lineup_match_details'))
-            if discovery and not match_snapshot and descriptor.get('handler') not in (
+            xi_snapshot = (discovery and job['descriptor']['handler'] == 'get_club_lineups' and
+                           descriptor.get('handler') in ('get_finished_rounds', 'get_club_lineups', 'get_championship_players'))
+            # Player-only saved profiles can disambiguate a named footballer from the club roster.
+            profile = (discovery and job['descriptor']['handler'] == 'get_club_lineups'
+                       and descriptor.get('handler') == 'get_player_full_profile'
+                       and descriptor['context'].get('player_id') == descriptor['args'].get('player_id')
+                       and not descriptor['context'].get('championship_id'))
+            if discovery and not match_snapshot and not xi_snapshot and not profile and descriptor.get('handler') not in (
                     'get_active_championships', 'get_classification_round_catalog',
                     'get_players_from_team', 'get_championship_pressroom', 'get_championship_players'):
                 raise WorkerFailure('resource_context')
@@ -786,7 +804,7 @@ class Worker:
             job_scope = job['descriptor']['context']
             if (scope['account_id'] != job['account_id'] or
                     (scope.get('championship_id') and scope['championship_id'] != job_scope.get('championship_id')) or
-                    (match_snapshot and canonical(scope) != canonical(job_scope))):
+                    ((match_snapshot or xi_snapshot) and canonical(scope) != canonical(job_scope))):
                 raise WorkerFailure('resource_context')
             result = await self.store.rpc('read', p_account=job['account_id'],
                 p_versions={descriptor['resource_key']: ''})

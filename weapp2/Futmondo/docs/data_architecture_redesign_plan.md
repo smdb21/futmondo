@@ -2716,3 +2716,7 @@ See the [scoring contract](lineup_module.md#custom-scoring-in-scheduled-saves--2
 ## Live-round bench substitutions · 2026-11-26
 
 Implemented locally. The owned round pitch in Lineup and Classification shares one user-confirmed substitution and readback flow. Browsing reuses the worker calendar and durable round evidence. A successful readback publishes the effective pitch to both views and queues an idempotent database revision. The existing worker cadence and schema support the added fields. A deployed round change and authenticated write acceptance remain unverified. [Implementation contract](lineup_module.md#manual-bench-substitutions-in-a-running-round--2026-11-26)
+
+## Announced La Liga club lineups · 2026-11-26
+
+Implemented and checked locally. A dedicated external factual resource reuses scoped calendar, catalog, roster and team-sheet observations for current-round badges. Its SQL deadline affects only the external team-sheet job. The current-round manual-action preflight remains authoritative for both kickoff locks. The cadence migration was applied and verified in production. Live acceptance requires the updated worker, the Dokploy key and an announced La Liga fixture. [Implementation](lineup_module.md#announced-la-liga-starting-elevens) · [Validation](data_review_results.md#la-liga-club-lineup-checker--2026-11-26)

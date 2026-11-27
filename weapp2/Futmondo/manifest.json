@@ -2292,7 +2292,7 @@
       "checksum": "08b61cca1fb735adea1f75791a37991c"
     },
     "global.R": {
-      "checksum": "47ad29ca06c21a8a54e21879fba6c8b8"
+      "checksum": "a169bbcfaccdef552f0353317320788b"
     },
     "history_baseline_store.R": {
       "checksum": "fae2bbeb23335fe69729f675970cc655"
@@ -2306,6 +2306,12 @@
     "lineup_api.R": {
       "checksum": "870ab1f48ffe17b36b6ad9403571e57e"
     },
+    "club_xi.R": {
+      "checksum": "1363ac553e85b28670e15c9414548425"
+    },
+    "lineup_match_runtime.R": {
+      "checksum": "1935e446063bf7fce129b9b6896848f0"
+    },
     "lineup_runtime.R": {
       "checksum": "e814e244d88f8ee9388a642a696b31fd"
     },
@@ -2313,7 +2319,7 @@
       "checksum": "729908996e5f1fa7c32bd6e4458d7c17"
     },
     "live_substitution.R": {
-      "checksum": "f49c6782d54283cb0a30855270b028b6"
+      "checksum": "7d5e513aa74cb301673d64068cbffbae"
     },
     "lineup_store.R": {
       "checksum": "d00d5455556ebf786b9bf655e2d94948"
@@ -2331,7 +2337,7 @@
       "checksum": "e228a11ddd742e6033ee726900a50087"
     },
     "Modules/Login_Module.R": {
-      "checksum": "179a08a88fbe75e5e4db069b372ae0a7"
+      "checksum": "3affe0ccba58f58ac35b06f28bff77c1"
     },
     "Modules/Market_Module.R": {
       "checksum": "676429892e2008352ddce0a3a4a2e32b"
@@ -2415,7 +2421,7 @@
       "checksum": "f2fdf415c4ae4f036097be0f6c913a75"
     },
     "www/custom_style.css": {
-      "checksum": "677d03897d3c8f3379f5a528b331aafa"
+      "checksum": "98bcf10da59706c15d8389c3ef7cbbd0"
     },
     "www/home.css": {
       "checksum": "0d80092a68610cb7fe93de0d1d4c1f2e"

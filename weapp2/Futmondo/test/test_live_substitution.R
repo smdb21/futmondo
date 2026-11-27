@@ -118,6 +118,18 @@ if("--browser" %in% commandArgs(TRUE)){
   fixtures <- league_fixture_matches(list(list(`_id`="live",matches=lapply(matches$matches,function(m)
     list(`_id`=m$id,st=m$status,h=list(id=m$homeTeam$id,name=m$homeTeam$id),
       a=list(id=m$awayTeam$id,name=m$awayTeam$id),info=list(date=m$date))))))
+  # The two pitches consume the same verified, provider-independent player IDs.
+  club_xi_source <- function(...)reactive({
+    sheet <- lapply(seq_len(nrow(fixtures$rows)),function(i){
+      m <- as.list(fixtures$rows[i,,drop=FALSE])
+      m$observed <- as.numeric(clock)
+      m$unix <- as.numeric(fm_time(m$kickoff))
+      m$status <- "confirmed"
+      m$players <- list(Forward="benched",Reserve="starting")
+      m
+    })
+    list(status="ready",matches=setNames(sheet,fixtures$rows$match_id))
+  })
   all_rounds <- rounds[rounds$round_id!="split",]
   all_rounds$begin_process <- stamp(clock+c(-3600,-86400,86400))
   attr(all_rounds,"fixture_calendar") <- list(matches=fixtures,status="ok",scope=ctx,observed_at=clock,valid_until=as.numeric(clock)+300)
