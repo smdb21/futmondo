@@ -26,6 +26,7 @@ class ClubSheets(unittest.IsolatedAsyncioTestCase):
                             home_name='Atlético de Madrid',away_name='Athletic Club')
         self.game = dict(game_id='42',season=2026,starts_at=self.start(),home=dict(team_id='1',name='Atlético Madrid'),
                          away=dict(team_id='2',name='Athletic Club Bilbao'))
+        self.extra_game = None
         self.sides = [dict(team_id=str(t),starting_xi=[player(t,i) for i in range(1,12)],
                            unused_substitutes=[player(t,12)],substitutes_used=[]) for t in (1,2)]
         self.local = [dict(id=str(i),teamId='home',name=f'Angel Garcia {i}',number=i) for i in (1,12,13)]
@@ -47,7 +48,14 @@ class ClubSheets(unittest.IsolatedAsyncioTestCase):
 
     def service(self):
         store = AsyncMock()
-        store.rpc.return_value = 'synthetic-reservation'
+        async def rpc(name, **args):
+            if name == 'claim_striker_response':
+                if not args['p_fetch']:
+                    return {'status':'unavailable'}
+                return {'status':'fetch', 'reservation':'synthetic-reservation'}
+            if name == 'save_striker_response':
+                return True
+        store.rpc.side_effect = rpc
         return Striker(self.client,'fixture-key',store)
 
     def serve(self,req):
@@ -59,8 +67,10 @@ class ClubSheets(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(args['league'],self.expected_league)
         self.calls.append(endpoint)
         if endpoint=='list_games':
-            body = dict(games=[self.game])
+            body = dict(games=[self.game] + ([self.extra_game] if self.extra_game else []))
         elif endpoint=='get_lineups':
+            if self.extra_game and args['game_id'] == self.extra_game['game_id']:
+                return httpx.Response(200,json=dict(data=dict(game=self.extra_game,lineups=[])))
             self.assertEqual(args['game_id'],'42')
             body = (dict(lineups=[], note='Not yet announced') if self.pending_note_only else
                     dict(game=self.game,lineups=self.sides,source='live'))
@@ -76,11 +86,13 @@ class ClubSheets(unittest.IsolatedAsyncioTestCase):
         return await self.provider.check(LALIGA,self.fixture,self.local,clubs or {})
 
     async def test_monthly_limit_is_checked_only_on_cache_misses(self):
-        self.provider.store.rpc.return_value = None
+        normal_rpc = self.provider.store.rpc.side_effect
+        self.provider.store.rpc.side_effect = None
+        self.provider.store.rpc.return_value = {'status':'monthly_limit'}
         result = await self.check()
         self.assertEqual(result['status'], 'monthly_limit')
         self.assertEqual(self.calls, [])
-        self.provider.store.rpc.return_value = 'reservation'
+        self.provider.store.rpc.side_effect = normal_rpc
         await self.check()
         self.assertEqual(len(self.calls), 4)
         self.provider.store.rpc.reset_mock()
@@ -91,11 +103,11 @@ class ClubSheets(unittest.IsolatedAsyncioTestCase):
 
     async def test_refund_retry_keeps_fetched_result(self):
         self.headers = {'X-Credits-Used': '0'}
-        self.provider.store.rpc.side_effect = ['permit', RuntimeError('store offline')]
-        games, _ = await self.provider.read('laliga','list_games', {'date':'2026-11-26'}, 1800)
+        self.provider.store.rpc.side_effect = [{'status':'fetch','reservation':'permit'}, RuntimeError('store offline'), True]
+        games, _ = await self.provider.read('laliga','list_games', {'date':self.start()[:10]}, 1800)
         self.assertEqual(games['games'], [self.game])
         self.assertEqual(self.provider.pending_settlement, ('permit', 0))
-        self.provider.store.rpc.side_effect = [None, None]
+        self.provider.store.rpc.side_effect = [None, {'status':'monthly_limit'}]
         result = await self.check()
         self.assertEqual(result['status'], 'monthly_limit')
         self.assertIn((('settle_striker_call',), {'p_id':'permit','p_used':0}),
@@ -128,10 +140,67 @@ class ClubSheets(unittest.IsolatedAsyncioTestCase):
         self.fixture['fixture_id'] = '42'
         self.assertEqual((await self.check())['status'], 'pending')
         self.assertEqual(self.calls, ['get_lineups'])
-        self.provider.store.rpc.assert_awaited_with('settle_striker_call', p_id='synthetic-reservation', p_used=0)
+        self.provider.store.rpc.assert_any_await('settle_striker_call', p_id='synthetic-reservation', p_used=0)
         self.provider.store.rpc.reset_mock()
         self.assertEqual((await self.check())['status'], 'pending')
         self.provider.store.rpc.assert_not_called()
+
+    async def test_shared_results_survive_restart_and_keep_user_matches_private(self):
+        self.extra_game = dict(self.game,game_id='43',home=dict(team_id='3',name='Valencia'),
+                               away=dict(team_id='4',name='Getafe'))
+        rows, permits = {}, {}
+        saved_args = []
+        async def rpc(name, **args):
+            if name == 'claim_striker_response':
+                key = (args['p_league'], args['p_endpoint'], args['p_lookup'])
+                if key in rows:
+                    return rows[key]
+                permit = str(len(permits) + 1)
+                permits[permit] = key
+                return {'status':'fetch', 'reservation':permit}
+            if name == 'save_striker_response':
+                saved_args.append(args)
+                key = permits[args['p_reservation']]
+                rows[key] = dict(status='hit', observed=args['p_observed'],
+                                 expires=args['p_observed']+120, data=args['p_data'])
+                return True
+        self.provider.store.rpc.side_effect = rpc
+        first = await self.check()
+        self.assertEqual(len(self.calls), 4)
+        self.provider = self.service()
+        self.provider.store.rpc.side_effect = rpc
+        self.local[0]['id'] = 'another-fantasy-player'
+        second = await self.check()
+        self.assertEqual(second['observed'], first['observed'])
+        self.assertIn('another-fantasy-player', second['players'])
+        self.assertNotIn('1', second['players'])
+        self.assertEqual(len(self.calls), 4)
+        self.assertEqual(len(saved_args), 4)
+        self.assertNotIn('another-fantasy-player', json.dumps(saved_args))
+        self.assertNotIn('fixture-key', json.dumps(saved_args))
+        # Another game on the same date starts with the stored schedule, even in a new process.
+        self.provider = self.service()
+        self.provider.store.rpc.side_effect = rpc
+        self.fixture.update(home_name='Valencia',away_name='Getafe',home_id='other_home',away_id='other_away')
+        self.assertEqual((await self.check())['status'], 'pending')
+        self.assertEqual(self.calls, ['list_games','get_lineups','get_squad','get_squad','get_lineups'])
+        self.provider = self.service()
+        self.provider.store.rpc.side_effect = rpc
+        self.assertEqual((await self.check())['status'], 'pending')
+        self.assertEqual(len(self.calls), 5)
+
+    async def test_public_save_retried_without_reacquisition(self):
+        self.provider.store.rpc.side_effect = [{'status':'fetch','reservation':'permit'}, RuntimeError('offline')]
+        args = {'date':self.start()[:10]}
+        with self.assertRaises(RuntimeError):
+            await self.provider.read('laliga','list_games',args,86400)
+        pending = self.provider.pending_save
+        self.assertEqual(self.calls, ['list_games'])
+        self.provider.store.rpc.side_effect = [True,dict(status='hit',data=pending['p_data'],
+            observed=pending['p_observed'],expires=pending['p_observed']+86400)]
+        result, observed = await self.provider.read('laliga','list_games',args,86400)
+        self.assertEqual(observed, pending['p_observed'])
+        self.assertEqual(self.calls, ['list_games'])
 
     async def test_sheet_restart_and_reuse(self):
         result = await self.check()

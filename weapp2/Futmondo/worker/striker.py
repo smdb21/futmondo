@@ -117,6 +117,35 @@ def sheet_rows(data, game):
     return result
 
 
+def public_result_partial(endpoint, args, season, data, empty_sheet):
+    partial = empty_sheet
+    if endpoint == 'list_games':
+        games = data['games']
+        if not isinstance(games, list) or data.get('next_offset') is not None:
+            raise FeedError('incomplete')
+        if len({identifier(g['game_id']) for g in games}) != len(games):
+            raise FeedError('incomplete')
+        for game in games:
+            starts = datetime.fromisoformat(game['starts_at'].replace('Z','+00:00'))
+            if (starts.tzinfo is None or starts.astimezone(timezone.utc).date().isoformat() != args['date'] or
+                    not all(identifier(game[side]['team_id']) and game[side]['name'] for side in ('home','away'))):
+                raise FeedError('incomplete')
+        partial = not games
+    elif endpoint == 'get_squad':
+        entries = data['players']
+        if (data['team_id'] != args['team'] or data['season'] != season or not entries or
+                len(entries) != data['count'] or len({bio(row)['id'] for row in entries}) != len(entries)):
+            raise FeedError('incomplete')
+    elif not empty_sheet:
+        game = data['game']
+        if game['game_id'] != args['game_id']:
+            raise FeedError('fixture_unmatched')
+        if data.get('source') != 'live':
+            raise FeedError('pending')
+        sheet_rows(data, game)
+    return partial
+
+
 class Striker:
     def __init__(self, client, key, store):
         self.client = client
@@ -125,6 +154,7 @@ class Striker:
         self.cache = OrderedDict()
         self.lock = asyncio.Lock()
         self.pending_settlement = None
+        self.pending_save = None
         self.retry_at = 0
         self.retry_status = 'rate_limited'
 
@@ -141,20 +171,50 @@ class Striker:
             # Keep the original reservation and retry before the next paid read.
             pass
 
-    async def read(self, league, endpoint, args, ttl):
-        key = (league, endpoint, tuple(sorted(args.items())))
+    async def save_pending(self):
+        saved = await self.store.rpc('save_striker_response', **self.pending_save)
+        if saved is not True and saved is not False:
+            raise FeedError('unavailable')
+        self.pending_save = None
+        return saved
+
+    def remember(self, key, data, observed, expires):
+        self.cache[key] = (observed, data, expires)
+        self.cache.move_to_end(key)
+        while len(self.cache) > 44:
+            self.cache.popitem(last=False)
+        return data, observed
+
+    async def read(self, league, endpoint, args, ttl, season=None):
+        lookup = str(next(iter(args.values())))
+        if season is not None:
+            lookup += ':' + str(season)
+        key = (league, endpoint, lookup)
         async with self.lock:
+            if self.pending_save is not None:
+                await self.save_pending()
             now = time.time()
             cached = self.cache.get(key)
-            if cached and now < cached[0]+min(ttl,cached[2]):
+            if cached and now < cached[2]:
                 return cached[1], cached[0]
-            if now < self.retry_at:
-                raise FeedError(self.retry_status)
             if self.pending_settlement:
                 await self.settle()
-            reservation = await self.store.rpc('reserve_striker_call', p_endpoint=endpoint)
-            if not reservation:
-                raise FeedError('monthly_limit')
+            claim_args = dict(p_league=league, p_endpoint=endpoint, p_lookup=lookup, p_fetch=now >= self.retry_at)
+            deadline = time.monotonic() + 6
+            while True:
+                claim = await self.store.rpc('claim_striker_response', **claim_args)
+                status = claim['status']
+                if status != 'busy':
+                    break
+                if time.monotonic() >= deadline:
+                    raise FeedError('unavailable')
+                await asyncio.sleep(1)
+            if status == 'hit':
+                return self.remember(key, claim['data'], float(claim['observed']), float(claim['expires']))
+            if status != 'fetch':
+                raise FeedError('monthly_limit' if status == 'monthly_limit' else
+                                self.retry_status if now < self.retry_at else 'unavailable')
+            reservation = claim['reservation']
             async with self.client.stream('POST', BASE+endpoint, json=dict(league=league,**args),
                     headers={'x-api-key':self.key}, follow_redirects=False, timeout=5) as response:
                 used = response.headers.get('x-credits-used', '')
@@ -185,12 +245,11 @@ class Striker:
             empty_sheet = endpoint == 'get_lineups' and data['lineups'] == []
             if charged is None and empty_sheet:
                 await self.adjust_charge(reservation, 0)
-            duration = 120 if empty_sheet else ttl
-            self.cache[key]=(now,data,duration)
-            self.cache.move_to_end(key)
-            while len(self.cache)>44:
-                self.cache.popitem(last=False)
-            return data, now
+            partial = public_result_partial(endpoint, args, season, data, empty_sheet)
+            self.pending_save = dict(p_reservation=reservation,p_observed=now,p_partial=partial,p_data=data)
+            if not await self.save_pending():
+                raise FeedError('unavailable')
+            return self.remember(key, data, now, now + (120 if partial else ttl))
 
     async def check(self, competition, fixture, local, clubs):
         league = LEAGUES.get(competition)
@@ -210,7 +269,7 @@ class Striker:
         fid = fixture.get('fixture_id')
         if not fid:
             date = datetime.fromtimestamp(fixture['unix'],timezone.utc).date().isoformat()
-            schedule,_ = await self.read(league,'list_games',{'date':date},1800)
+            schedule,_ = await self.read(league,'list_games',{'date':date},86400)
             matches = [g for g in schedule['games'] if same_fixture(g,fixture,clubs)]
             if len(matches)!=1:
                 raise FeedError('fixture_unmatched')
@@ -230,7 +289,7 @@ class Striker:
             try:
                 sheets = sheet_rows(data, game)
             except (FeedError, KeyError, TypeError, ValueError):
-                self.cache.pop((league, 'get_lineups', (('game_id', fid),)), None)
+                self.cache.pop((league, 'get_lineups', fid), None)
                 raise
             evidence = dict(observed=observed,season=game['season'],teams={
                 s:identifier(game[s]['team_id']) for s in ('home','away')},rows=sheets)
@@ -245,7 +304,7 @@ class Striker:
                 prior = {}
             roster,checked = prior.get('roster') or [], prior.get('checked') or 0
             if not roster or time.time()-checked>=7*86400:
-                squad,checked = await self.read(league,'get_squad',{'team':tid},7*86400)
+                squad,checked = await self.read(league,'get_squad',{'team':tid},7*86400,season=season)
                 entries = squad['players']
                 if (squad['team_id']!=tid or squad['season']!=season or not entries or
                         len(entries)!=squad['count']):

@@ -6802,3 +6802,11 @@ The substitution and XI R checks passed. Both pitch views passed in Chromium at 
 The public `get_lineups` catalog entry explicitly states that the pre-publication response has an empty lineup and costs zero. An offline check with a previously matched game ID received that response, returned pending and released the five-credit reservation without a charge header. Reading it again from cache produced no database or provider calls. [Public endpoint catalog](https://mcp.strikerapi.com/v1/tools)
 
 All nine focused XI worker tests passed after adding the empty-result contract. The public Dokploy app served the three verified competition mappings from commit `93edfb7` on 2026-11-27 UTC.
+
+## Shared club lineup responses · 2026-11-26
+
+Across fresh worker instances, two users both checked one game and obtained the same source observation time with independent fantasy player IDs. A third check for another game on the same league date retrieved only that game's team sheet. The four initial mocked reads plus that single additional read included exactly one `list_games`. The second game's unpublished result then replayed with zero source reads in another worker. An unacknowledged database save was retried without repeating acquisition.
+
+Full-schema PostgreSQL checks covered lease contention, expiry, idempotent writes, superseded writers, the two-minute pending lifetime, date-list reuse with acquisition disabled, competition isolation and restricted access. The worker and XI suites passed 57 tests. After tightening daily schedule validation, all 11 focused XI tests passed again. The offline Shiny lifecycle passed 14 checks plus eight tabs. A quiet 380-fixture calendar averaged 12.7 ms with zero reads. Browsing adds no traffic. A worker memory hit avoids the database. A durable hit needs one indexed lookup. A fresh response adds one acknowledged database publication and the claim transaction includes the existing credit reservation. No paid calls were made during verification.
+
+Production schema readback confirmed migration `20261127054006_shared_club_lineup_responses`, zero initial public responses, no browser-role table access and two previously recorded credits. No production fixture was requested for verification.

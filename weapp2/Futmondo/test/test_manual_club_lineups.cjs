@@ -79,6 +79,31 @@ const {PGlite} = require('@electric-sql/pglite');
     await q("update striker_credit_reservations set reserved_at=now()-interval '32 days' where endpoint='prior_usage'");
     assert.ok(await reserve('get_lineups'));
     assert.equal((await q("select has_function_privilege('authenticated','worker_reserve_striker_call(text)','execute') as allowed")).allowed,false);
+    const claim=async(league,endpoint,lookup,fetch=true)=>(await q(
+      'select worker_claim_striker_response($1,$2,$3,$4) as reply',[league,endpoint,lookup,fetch])).reply;
+    const save=async(permit,partial,data)=>(await q(
+      'select worker_save_striker_response($1,extract(epoch from now())::float8,$2,$3) as ok',[permit,partial,data])).ok;
+    const schedule=await claim('laliga','list_games','2026-11-26');
+    assert.equal(schedule.status,'fetch');
+    assert.equal((await claim('laliga','list_games','2026-11-26')).status,'busy');
+    assert.equal(await save(schedule.reservation,false,{games:[{game_id:'42'}]}),true);
+    assert.equal(await save(schedule.reservation,false,{games:[]}),true);
+    const before=(await q('select sum(credits) as used from striker_credit_reservations')).used;
+    const stored=await claim('laliga','list_games','2026-11-26',false);
+    assert.equal(stored.data.games[0].game_id,'42');
+    assert.equal(Number(stored.expires)-Number(stored.observed),86400);
+    assert.equal((await q('select sum(credits) as used from striker_credit_reservations')).used,before);
+    assert.equal((await claim('soccer','list_games','2026-11-26')).status,'fetch');
+    const empty=await claim('laliga','get_lineups','42');
+    assert.equal(await save(empty.reservation,true,{lineups:[]}),true);
+    const pending=await claim('laliga','get_lineups','42');
+    assert.equal(Number(pending.expires)-Number(pending.observed),120);
+    await q("update striker_public_responses set expires_at=now()-interval '1 second' where endpoint='get_lineups'");
+    const fresh=await claim('laliga','get_lineups','42');
+    assert.equal(fresh.status,'fetch');
+    assert.equal(await save(empty.reservation,true,{lineups:[]}),false);
+    assert.equal((await q("select has_table_privilege('authenticated','striker_public_responses','SELECT') as access")).access,false);
+    console.log('PASS shared daily schedule, pending expiry, no duplicate reservations and stale-writer protection');
     console.log('PASS two fixture checks, late retry, cross-resource cooldown and global rolling allowance');
     console.log('PASS existing jobs parked, refresh inert, explicit wake, generation and lease guard, single consumption, duplicate click, expiry and restricted role');
   }finally{await db.close();}

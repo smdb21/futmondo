@@ -2732,3 +2732,7 @@ Production migration `20261127050858_club_lineup_fixture_limits` enforces two at
 Production migration `20261127051417_verified_club_lineup_leagues` binds manual permits to the verified membership competition. The published Futmondo catalog and provider endpoint parameters establish mappings for La Liga, the English Premier League and Italian Serie A. Unknown competitions make zero provider requests.
 
 An explicit unpublished XI releases its provider credit reservation and retains the per-user attempt and retry deadline. [Provider contract and verification](data_review_results.md#fixture-limits-and-verified-leagues--2026-11-26)
+
+### Shared StrikerAPI responses · 2026-11-26
+
+The manual checker stores public schedules by league and UTC date, team sheets by league and game ID, and squads by league, club and season. A database hit needs no credit reservation. Cross-worker leases coalesce simultaneous acquisition and preserve each user's private fantasy mappings. [Storage contract](lineup_module.md#shared-provider-responses)
