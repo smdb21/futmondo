@@ -4,7 +4,7 @@ fm_navigation_pages <- function(is_admin = FALSE) {
     tab = c("today", "yourteam", "lineup", "players_in_championship", "rivals",
       "classification", "plots", "round_mvps", "notifications", "admin"),
     label = c("Today's market", "My team", "Lineup", "Players", "Rivals",
-      "Classification", "Plots", "Round awards", "Notifications", "Admin"),
+      "Classification", "Trends", "Round awards", "Notifications", "Admin"),
     icon = c("bolt", "users", "futbol", "table", "users-viewfinder", "trophy",
       "chart-column", "medal", "bell", "gears"),
     detail = c("Listings and recent transfers", "Squad and offers", "Formation and fixtures",

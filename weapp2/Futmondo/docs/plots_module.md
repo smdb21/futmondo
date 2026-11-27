@@ -1,6 +1,6 @@
-# Plots Module
+# Trends
 
-`plots_UI(id)` and `plots_Server(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger = NULL)` provide the top-level **Plots** page. It presents one full-width, phone-friendly chart at a time: league standings, squad values, cash and transfers, money movements, rank progression, and real-team ownership. Chart controls belong to their chart tab and do not alter Classification-table filters.
+`plots_UI(id)` and `plots_Server(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger = NULL)` provide the top-level **Trends** page. It presents one full-width, phone-friendly chart at a time: league standings, squad values, cash and transfers, money movements, rank progression, and real-team ownership. Chart controls belong to their chart tab and do not alter Classification-table filters.
 
 `plots_owned_by_real_team(players)` is a pure helper returning `real_team_id`, `real_team`, and `owned_players`. It counts each immutable player ID once only when both a current fantasy owner ID and a real-team ID/name are present. Free agents and rows with unverifiable club data are excluded. Rows are ordered by descending count then club name.
 
@@ -222,3 +222,9 @@ The chart reuses persisted ranking payloads, source timestamps and scope
 through the existing database-first read and bounded replay. Its points widget
 is keyed by the visible point series, so newly resolved ranks alone do not
 republish Standings. No browser navigation acquires Futmondo data.
+
+## Published scores during a postponed round (2026-11-26)
+
+Trends keeps the saved navigation ID `plots`. Standings and Rank progression use the published scoring stage while a fixture is postponed. The calendar fields `partially_played = TRUE` and `status = "closed"` together identify a candidate. The factual worker already stores the ranking, catalog and team histories for the same league and scoring context.
+
+For a stage, `plots_saved_round_ranking()` requires an exact round match and an independently closed team-history row agreeing with every ranked participant and score. An unranked team's absence counts for that stage only when its successfully retrieved history also has no row for the round. A failed or partial team-history read leaves that team's result unknown. When the worker publishes revised scores, both charts recompute from the new observations. Final round awards continue to follow their own settlement rules.

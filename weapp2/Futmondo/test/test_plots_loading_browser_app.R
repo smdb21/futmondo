@@ -40,8 +40,9 @@ fm_worker_rpc <- function(name,payload,owner='') {
   if (is.null(saved)) {
    value <- switch(d$handler,
    get_teams=data.frame(teamid=paste0('t',1:11),teamname=paste('Team',1:11)),
-   get_classification_round_catalog=list(rounds=data.frame(round_id=paste0('r',1:14),round_number=1:14)),
-   get_user_team_rounds=if(d$args$user_team_id=='t11') list() else lapply(1:14,function(n)
+   get_classification_round_catalog=list(rounds=data.frame(round_id=paste0('r',1:14),round_number=1:14,
+     is_finished=(1:14)!=8, partially_played=(1:14)==8, status='closed')),
+   get_user_team_rounds=if(d$args$user_team_id=='t11') structure(list(),valid_response=TRUE) else lapply(1:14,function(n)
     list(id=paste0('r',n),number=n,status='closed',points=n*10+as.integer(sub('t','',d$args$user_team_id)))),
    get_classification_round_ranking={
     answer <- list(metadata=list(status=if(d$args$round_number%%2==0)'V' else 'P'),
@@ -77,7 +78,7 @@ fm_worker_rpc <- function(name,payload,owner='') {
 get_league_standings_history <- function(championship_id) data.frame(teamname=rep(paste('Team',1:10),each=14),recorded_at=rep(format(as.Date('2026-11-01')+0:13,'%Y-%m-%dT12:00:00Z'),10),team_value=seq_len(140)*1000)
 ui <- shiny::fluidPage(shiny::tags$head(shiny::tags$style(shiny::HTML(fm_theme_css())),
  shiny::includeCSS('www/custom_style.css'),shiny::includeScript('www/theme-switch.js'),shiny::includeScript('www/info-disclosures.js')),
- fm_info_page_UI('Plots',plots_UI('plots')),
+ fm_info_page_UI('Trends',plots_UI('plots')),
  shiny::actionButton('release','Release held history'),shiny::actionButton('publish','Publish same saved facts'),
  shiny::actionButton('pulse','Heartbeat'),shiny::textOutput('heartbeat'),shiny::textOutput('stats'))
 server <- function(input,output,session) {

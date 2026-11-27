@@ -1,5 +1,9 @@
 # Futmondo data architecture redesign plan
 
+## Trends and postponed round scores (2026-11-26)
+
+- [x] Rename the chart destination and reconcile the published round 8 stage against its saved participant ranking and team histories. Verified locally with the scoped league observations. [Trends contract](plots_module.md#published-scores-during-a-postponed-round-2026-11-26)
+
 ## Compact player details (2026-11-26)
 
 - [x] Consolidate ownership and market status into one text line and fit scoring and valuation into a responsive summary. [Card layout](selected_player_module.md#compact-player-details-2026-11-26)

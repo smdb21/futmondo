@@ -98,8 +98,14 @@ plots_transfer_chart <- function(bars) {
 # Use a saved official ranking only for the exact catalog round. The native
 # P/V codes alone do not establish closure. Independently closed team rows
 # can corroborate a historical ranking when the catalog lacks that flag.
-plots_saved_round_ranking <- function(snapshot, round, history) {
-  if(isTRUE(round$partially_played)||identical(round$is_finished,FALSE)||isTRUE(classification_playing_rounds(round)))return(NULL)
+plots_closed_stage <- function(rounds) {
+  rounds$partially_played %in% TRUE & tolower(rounds$status) %in% "closed"
+}
+
+plots_saved_round_ranking <- function(snapshot, round, history, verified_histories = character()) {
+  stage <- isTRUE(plots_closed_stage(round))
+  if (!stage && (isTRUE(round$partially_played) || identical(round$is_finished, FALSE) ||
+      isTRUE(classification_playing_rounds(round)))) return(NULL)
   id <- as.character(round$round_id)
   number <- round$round_number
   if (!is.list(snapshot) || !identical(snapshot$round_id, id) ||
@@ -117,6 +123,14 @@ plots_saved_round_ranking <- function(snapshot, round, history) {
   if (anyNA(index) || any(known$points != ranking$points[index])) return(NULL)
   status <- mvp_text(snapshot$answer$metadata$status)
   closed <- round_is_finished(list(status = status))
+  if (stage) {
+    # A closed scoring stage can have a postponed fixture outstanding. Require
+    # independent closed scores for every listed participant before using it.
+    if (!(closed || status %in% c("P", "V")) || !setequal(known$team_id, ranking$team_id) ||
+        !all(vapply(known$status, function(x) round_is_finished(list(status = x)), logical(1)))) return(NULL)
+    attr(ranking, "stage_history_teams") <- verified_histories
+    return(ranking)
+  }
   if (!closed && status %in% c("P", "V")) {
     closed <- isTRUE(round$is_finished) || (nrow(known) > 0L &&
       all(vapply(known$status, function(x) round_is_finished(list(status = x)), logical(1))))
@@ -138,14 +152,16 @@ plots_round_numbers <- function(rows, rounds=NULL) {
 plots_ranking_targets <- function(rows,rounds) {
   unique_ids <- !duplicated(rounds$round_number) & !duplicated(rounds$round_number,fromLast=TRUE)
   published <- rounds[unique_ids & rounds$round_number%in%plots_round_numbers(rows),,drop=FALSE]
-  if("is_finished"%in%names(published))published <- published[!(published$is_finished%in%FALSE),,drop=FALSE]
-  if("partially_played"%in%names(published))published <- published[!(published$partially_played%in%TRUE),,drop=FALSE]
+  open <- rep(FALSE, nrow(published))
+  if ("is_finished" %in% names(published)) open <- published$is_finished %in% FALSE
+  if ("partially_played" %in% names(published)) open <- open | published$partially_played %in% TRUE
+  if (all(c("status", "partially_played") %in% names(published))) open <- open & !plots_closed_stage(published)
+  published <- published[!open, , drop = FALSE]
   if("status"%in%names(published))published <- published[!classification_playing_rounds(published),,drop=FALSE]
   known <- unique(rows[is.finite(rows$round)&is.finite(rows$points),c("team_id","round")])
   covered <- tabulate(match(known$round,published$round_number),nbins=nrow(published))
   targets <- published[covered<length(unique(rows$team_id)),,drop=FALSE]
-  data.frame(round_id=targets$round_id,round_number=targets$round_number,
-    is_finished=rep_len(targets$is_finished %||% NA,nrow(targets)))
+  targets[, intersect(c("round_id", "round_number", "is_finished", "partially_played", "status"), names(targets)), drop = FALSE]
 }
 
 # Numeric subrounds retain distinct labels. Missing observations block later
@@ -173,6 +189,8 @@ plots_round_totals <- function(rows, rankings = list()) {
     if (any(is.na(matched[known])) || any(scores[known, col] != ranking$points[matched[known]])) next
     scores[!known, col] <- ranking$points[matched[!known]]
     absent[, col] <- !present[, col] & is.na(matched)
+    stage_teams <- attr(ranking, "stage_history_teams", exact = TRUE)
+    if (!is.null(stage_teams)) absent[, col] <- absent[, col] & teams$team_id %in% stage_teams
     other_participants[col] <- any(!ranking$team_id %in% teams$team_id)
   }
   missing <- !absent & !is.finite(scores)
@@ -259,7 +277,7 @@ plots_owned_chart <- function(players) {
 
 plots_UI <- function(id) {
   ns <- shiny::NS(id)
-  shiny::tagList(shiny::h2("Plots"), shiny::uiOutput(ns("chart_status")),
+  shiny::tagList(shiny::h2("Trends"), shiny::uiOutput(ns("chart_status")),
     shiny::tabsetPanel(id=ns("plot_tab"), type="pills",
       shiny::tabPanel("Standings", shiny::p("Cumulative fantasy-team points after each published round or subround. Repeated daily snapshots are excluded; missing scores remain gaps."), plotly::plotlyOutput(ns("standings_plot"), height="420px")),
       shiny::tabPanel("Squad values", shiny::p("Saved squad market valuations over time, in euros."), plotly::plotlyOutput(ns("values_plot"), height="420px")),
@@ -437,7 +455,7 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
           # Keep freshness in the adapters. Top-level snapshot clocks cannot
           # change the round rows consumed by either chart.
           if (is.list(answer)) {
-            keep <- intersect(names(attributes(answer)), c("names", "class", "row.names"))
+            keep <- intersect(names(attributes(answer)), c("names", "class", "row.names", "valid_response", "worker_completeness"))
             attributes(answer) <- attributes(answer)[keep]
           }
           histories[team_id] <- list(answer)
@@ -500,13 +518,15 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
         for (reader in readers) {
           read <- reader$read()
           reads[[length(reads) + 1L]] <- read
-          ranking <- plots_saved_round_ranking(read$data, reader$round, native)
+          ranking <- plots_saved_round_ranking(read$data, reader$round, native, verified_histories)
           if (!is.null(ranking)) rankings[[length(rankings) + 1L]] <- ranking
         }
       }
       list(data = history$rows, rankings = rankings, loading = pending_reads(reads),
         errors = Filter(Negate(is.null), lapply(reads, `[[`, "error")))
     })
+        verified_histories <- names(Filter(function(x) isTRUE(attr(x, "valid_response")) &&
+          !any(attr(x, "worker_completeness") %in% c("partial", "unavailable")), history$histories)) %||% character()
     # Metadata-only worker publications must not redraw the same chart.
     round_totals <- resource_display_source(session, function() {
       state <- round_state()

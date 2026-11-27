@@ -6814,3 +6814,13 @@ Production schema readback confirmed migration `20261127054006_shared_club_lineu
 ## Home notification count · 2026-11-26
 
 Offline Chromium checks at 320, 390 and 1440 pixels verified that the Home badge fits the button, matches the header dot color, exposes “1 unread” in the accessible name and opens the inbox. A synthetic Shiny check changed the unread count to 42, zero, unknown and 3. Both indicators updated from a single adapter read per change. Only the badge output subscribes within the Home grid. The change adds no timer, source request or database query. The offline Shiny lifecycle passed 14 checks and eight tabs.
+
+### Trends round 8 coverage (2026-11-26)
+
+A scoped, read-only replay of persisted worker observations reproduced round 8 as the sole unresolved round. Nine of ten directory teams appeared in the round ranking. All nine scores matched independently closed team histories. The remaining team had a successfully saved empty history. Futmondo marked the published stage closed while the fixture calendar still marked the round partially played. The chart had skipped the ranking before comparing the two sources.
+
+With stage reconciliation, each of the nine teams' cumulative totals matched an independent sum of its saved scores through round 13. Every published round had comparable ranks. The unlisted team had no plotted points or positions. The read used the production snapshot checksum and decoder. The existing observations contained the required evidence. Verification covered local code against those saved observations.
+
+The 13 chart checks include known answers for zero, negative scores, an unlisted team joining later and conflicting stage evidence. The delayed-read suite and the offline Shiny lifecycle suite passed (14 checks and eight tabs). The affected league needs one additional existing ranking snapshot in the batch of gap lookups. Both charts reuse the result. Browsing adds no Futmondo requests, writes, timers or database schema changes.
+
+The compressed-snapshot browser fixture also exercised the postponed round at 390 px and 1440 px in both themes. All four runs displayed the expected cumulative series and ranks, removed the missing-score notice, and recorded zero source calls. Replaying identical facts caused zero extra Standings chart publications. First curve times ranged from 0.96 to 2.51 seconds locally.

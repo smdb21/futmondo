@@ -15,6 +15,8 @@ check('owned real-team aggregation is descending with stable name tie-break', {
 })
 check('plots UI exposes six factual chart tabs', {
   html <- as.character(plots_UI('plots'))
+  pages <- fm_navigation_pages()
+  stopifnot(identical(pages$label[pages$tab == "plots"], "Trends"), grepl("<h2>Trends</h2>", html, fixed=TRUE))
   for (id in c('standings_plot','values_plot','cash_plot','transfers_plot','rank_plot','owned_club_plot')) stopifnot(grepl(id, html, fixed=TRUE))
 })
 check('round totals preserve subrounds, revisions, negative and missing points', {
@@ -110,6 +112,28 @@ check('saved rankings restore scores and distinguish nonparticipation from unkno
   attr(delayed, "round_numbers") <- c(1,2,3)
   settled <- plots_round_totals(delayed, list(recovered[[2]][1:2,]))
   stopifnot(identical(settled$round,c(1,2,1,2)), identical(settled$points,c(10,15,8,8)))
+})
+check('postponed round 8 uses the published stage for cumulative ranks', {
+  catalog <- data.frame(round_id=paste0('r',7:9), round_number=7:9,
+    is_finished=c(TRUE,FALSE,TRUE), partially_played=c(FALSE,TRUE,FALSE), status='closed')
+  rows <- data.frame(team_id=c('a','a','a','b','b','b','c'), team_name=c(rep('A',3),rep('B',3),'C'),
+    round=c(7:9,7:9,9), points=c(7,-2,3,4,0,5,6))
+  native <- data.frame(team_id=c('a','b'), round_id='r8', status='closed', points=c(-2,0))
+  snapshot <- list(round_id='r8', round_number=8, answer=list(metadata=list(status='V')),
+    rows=data.frame(team_id=c('a','b'),round_id='r8',round=8,points=c(-2,0)))
+  targets <- plots_ranking_targets(rows,catalog)
+  stage <- targets[targets$round_number==8,]
+  stopifnot(nrow(stage)==1L, isTRUE(stage$partially_played))
+  ranking <- plots_saved_round_ranking(snapshot,stage,native,c('a','b','c'))
+  closed7 <- data.frame(team_id=c('a','b'), round=7, points=c(7,4))
+  totals <- plots_round_totals(rows,list(closed7,ranking))
+  stopifnot(identical(totals$points,c(7,5,8,4,4,9,NA_real_,NA_real_,6)),
+    identical(totals$rank,c(1,1,2,2,2,1,NA_real_,NA_real_,3)), !length(attr(totals,'missing_rounds')))
+  uncertain <- plots_saved_round_ranking(snapshot,stage,native,c('a','b'))
+  stopifnot(identical(attr(plots_round_totals(rows,list(closed7,uncertain)),'missing_rounds'),8),
+    is.null(plots_saved_round_ranking(snapshot,stage,native[1,])),
+    is.null(plots_saved_round_ranking(snapshot,stage,transform(native,status='active'))),
+    is.null(plots_saved_round_ranking(snapshot,transform(stage,status='playing'),native)))
 })
 check('points axes omit empty dtick while rank axes keep integer positions', {
   rows <- data.frame(team_id='a',team_name='Alpha',round=1:13,points=seq(70,130,length.out=13))
