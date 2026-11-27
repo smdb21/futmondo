@@ -51,7 +51,8 @@ testServer(selected_player_Server, args = list(selected_player = selected, login
   session$setInputs(btn_bid_market = 1L)
   elapsed <- proc.time()[['elapsed']] - started
   stopifnot(identical(before, reads), length(jobs) == 0L, length(rpc) == 0L, grepl('value="150"', modal, fixed = TRUE))
-  for (amount in c(151,152,153,156,158,165)) stopifnot(grepl(paste0('data-fm-offer-premium="', amount, '"'), modal, fixed = TRUE))
+  for (pct in c(1,2,4,5,10)) stopifnot(grepl(paste0('data-fm-offer-premium="', pct, '"'), modal, fixed = TRUE))
+  stopifnot(grepl('data-base="150"', modal, fixed = TRUE), grepl('data-player-value="200"', modal, fixed = TRUE))
   cat(sprintf('PASS cold editor opens with amount and premiums in %.0f ms while all card reads are held\n', elapsed * 1000))
   send <- function(generation, amount, nonce = 1L) {
     session$setInputs(confirm_player_offer = list(generation = generation, amount = amount, nonce = nonce))

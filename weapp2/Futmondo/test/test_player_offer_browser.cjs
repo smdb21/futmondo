@@ -94,8 +94,8 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
       const field = modal.getByLabel('Your offer amount (EUR):');
       const market = await open('Open market player', 'Make Market Offer', field);
       assert.equal(await field.inputValue(), '150');
-      await modal.getByRole('button', {name:'+0.5%', exact:true}).click();
-      assert.equal(await field.inputValue(), '151');
+      await modal.getByRole('button', {name:'+1%', exact:true}).click();
+      assert.equal(await field.inputValue(), '152');
       await field.fill('999');
       await confirm('Submit Market Offer', /Sending offer/, /Your squad has reached/);
       const direct = await open('Open rival player', 'Offer to Rival', modal.getByLabel('Your purchase offer amount (EUR):'));

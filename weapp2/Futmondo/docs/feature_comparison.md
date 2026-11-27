@@ -231,20 +231,11 @@ The [official clause guide](https://help.futmondo.com/article/156-que-son-las-cl
 Advanced login ID `scheduled_clauses` describes LigaRadar's implemented durable authorization for one capped purchase attempt at the published opening, local offer/funds reservation, cancellation, and saved next-login outcomes. This comparison does not claim ordinary clause purchases are exclusive or that official scheduling is absent. The new feature is disabled until the migration, deployment settings and individual consent are in place. The closed-rejection retry branch remains gated on a captured native code; its current absence is disclosed in the confirmation. See [the implementation contract](scheduled_clauses.md).
 
 
-## Market-offer percentage shortcuts — reviewed 2026-11-15
+## Market-offer percentage shortcuts (2026-11-26)
 
-Rechecked the official [getting-started guide](https://help.futmondo.com/article/90-empieza-a-jugar-a-futmondo)
-and [game rules](https://help.futmondo.com/article/91-reglas-del) on 2026-11-15.
-They document entering an offer in a player dialog and budget-limited secret
-market bidding; the rules were last updated on 2021-12-17. These public guides
-do not establish whether the current authenticated official app has percentage
-shortcuts; that UI was not inspected.
+Futmondo’s public guide describes selecting a market player and entering a private bid in the player dialog. The public app entry point and guide were checked on November 26. The current signed-in layout and its percentage controls remain unverified. [Official app](https://app.futmondo.com/) · [Getting-started guide](https://help.futmondo.com/article/90-empieza-a-jugar-a-futmondo)
 
-LigaRadar extends its existing manual market-offer amount editor with the same
-six percentage shortcuts as its sale-listing dialog, based on the verified
-minimum bid and followed by explicit submission. This is a convenience within
-an existing shared market capability, without a new analysis/automation feature
-or exclusivity claim; no new login-tier item is added. Contract: `bid_management.md`.
+LigaRadar’s manual market bid editor adds cumulative shortcuts, a live percentage beside the total and inline feedback for offers below the price or player valuation. These controls refine the existing manual offer workflow. [Bid editor behavior](bid_management.md#market-offer-percentage-buttons-2026-11-26)
 
 ## Consolidated information panels — reviewed 2026-11-15
 

@@ -6,6 +6,8 @@ record_acquired_resource <- function(...) invisible(TRUE)
 log_market_transaction <- function(...) invisible(TRUE)
 get_sb_url <- function() ''
 get_sb_key <- function() ''
+modal <- NULL
+showModal <- function(ui, ...) modal <<- as.character(ui)
 auth <- c(userid='existing-offer-fixture',token='synthetic')
 rows <- data.frame(id='pedrosa',bid_id='own-offer',bid_price=1000,numberOfBids=1L)
 manual_rows <- rows
@@ -63,7 +65,9 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,
     identical(active_bid_info_RV(),list(id='own-offer',price=1000)))
   cat('PASS full-roster card shows its own existing offer with zero additional display reads.\n')
   session$setInputs(btn_modify_bid=1);settle(session)
-  stopifnot(modify_modal_opened_RV(),market_reads==1L)
+  stopifnot(modify_modal_opened_RV(),market_reads==1L,
+    grepl('data-base="1000"',modal,fixed=TRUE),grepl('data-base-label="minimum market bid"',modal,fixed=TRUE),
+    grepl('data-fm-offer-premium="10"',modal,fixed=TRUE))
   session$setInputs(new_bid_amount=1200,submit_modify_bid=1);settle(session)
   stopifnot(length(writes)==1L,writes[[1]]$action=='modify',
     writes[[1]]$bid_id=='own-offer',writes[[1]]$new_price==1200,market_reads==2L)

@@ -499,8 +499,6 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       }
     }
 
-    output$new_bid_amount_preview <- renderUI({ render_input_price_preview(input$new_bid_amount) })
-    output$bid_amount_preview <- renderUI({ render_input_price_preview(input$bid_amount) })
     output$owner_offer_amount_preview <- renderUI({ render_input_price_preview(input$owner_offer_amount) })
     output$sale_price_input_preview <- renderUI({ render_input_price_preview(input$sale_price_input) })
 
@@ -795,6 +793,24 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       }
     )
 
+    offer_dialog_dependency <- htmltools::htmlDependency(
+      "fm-offer-dialog", "2", src = c(file = "www"), script = "offer-dialog.js")
+    market_bid_editor <- function(id, label, amount, base, base_label, player_value, min, step = "any") {
+      editor <- div(class = "fm-market-bid-editor",
+        `data-base` = as.character(base), `data-base-label` = base_label,
+        `data-player-value` = if (is.finite(player_value)) as.character(player_value),
+        numericInput(id, label, value = amount, min = min, step = step),
+        div(class = "fm-offer-presets", role = "group",
+          `aria-label` = paste("Add a percentage of the", base_label),
+          lapply(c(1, 2, 4, 5, 10), function(pct) tags$button(
+            type = "button", class = "btn btn-default", `data-fm-offer-premium` = pct,
+            paste0("+", pct, "%")))),
+        div(id = paste0(id, "_preview"), `aria-live` = "polite",
+          strong(class = "fm-offer-total"), span(class = "fm-offer-percent"),
+          tags$small(class = "fm-offer-warning")))
+      htmltools::attachDependencies(editor, offer_dialog_dependency)
+    }
+
     # ---- Shared helper: verify and open the active-bid update modal ----
     open_modify_bid_modal <- function() {
       sp <- selected_player()
@@ -827,14 +843,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         p(strong(sp$name)),
         p("Current Active Bid: ", strong(player_card_money(bid_info$price))),
         p("Minimum market bid: ", strong(player_card_money(pf$minimum_bid))),
-        numericInput(
-          ns("new_bid_amount"),
-          label = "New Bid Amount (EUR):",
-          value = max(bid_info$price, pf$minimum_bid),
-          min = pf$minimum_bid,
-          step = 10000
-        ),
-        uiOutput(ns("new_bid_amount_preview")),
+        market_bid_editor(ns("new_bid_amount"), "New Bid Amount (EUR):",
+          max(bid_info$price, pf$minimum_bid), pf$minimum_bid, "minimum market bid",
+          fm_number(sp$value), min = pf$minimum_bid, step = 1),
         footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
                      modalButton("Cancel"),
                      actionButton(ns("submit_modify_bid"), "Submit Updated Bid", class = "btn btn-buy-market")),
@@ -1007,8 +1018,6 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
 
     # Render the complete editor from the selected row and available saved rules.
     # Futmondo validates the actual offer when it receives the explicit submission.
-    offer_dialog_dependency <- htmltools::htmlDependency(
-      "fm-offer-dialog", "1", src = c(file = "www"), script = "offer-dialog.js")
     open_offer_modal <- function(mode) {
       req(is.null(submitting_offer))
       sp <- selected_player()
@@ -1024,7 +1033,6 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       if (!is.finite(amount) || amount <= 0) amount <- NA_real_
       owner <- fm_scalar(sp$userTeam, fm_scalar(sp$teamname, "Owner"))
       amount_id <- ns(if (market) "bid_amount" else "owner_offer_amount")
-      preview_id <- if (market) "bid_amount_preview" else "owner_offer_amount_preview"
       submit_id <- ns(if (market) "submit_bid" else "submit_owner_offer")
       market_offer_generation <<- market_offer_generation + 1L
       generation <- market_offer_generation
@@ -1038,16 +1046,11 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         if (market) p(if (is.finite(minimum)) "Saved minimum market bid: " else "Listed price: ",
           strong(player_card_money(amount)))
         else if (is.finite(amount)) p("Current Market Valuation: ", strong(player_card_money(amount))),
-        numericInput(amount_id, if (market) "Your offer amount (EUR):" else "Your purchase offer amount (EUR):",
-          value = amount, min = 1, step = "any"),
-        if (market) tags$div(role = "group", `aria-label` = "Choose an offer premium",
-          style = "display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;",
-          lapply(c(0.5, 1, 2, 4, 5, 10), function(pct) tags$button(
-            type = "button", class = "btn btn-default", paste0("+", pct, "%"),
-            `data-fm-offer-premium` = format(amount + ceiling(amount * pct / 100), scientific = FALSE, trim = TRUE)))),
-        if (market) p(if (is.finite(minimum)) "Percentages are above the saved minimum market bid, rounded up to whole euros."
-                      else "Percentages are above the listed price, rounded up to whole euros."),
-        uiOutput(ns(preview_id)))
+        if (market) market_bid_editor(amount_id, "Your offer amount (EUR):", amount, amount,
+          if (is.finite(minimum)) "saved minimum market bid" else "listed price",
+          fm_number(sp$value), min = 1)
+        else tagList(numericInput(amount_id, "Your purchase offer amount (EUR):",
+          value = amount, min = 1, step = "any"), uiOutput(ns("owner_offer_amount_preview"))))
       dialog <- modalDialog(
         title = tagList(icon("hand-holding-dollar"),
           if (market) " Place Market Offer" else paste0(" Offer Money to ", owner)),

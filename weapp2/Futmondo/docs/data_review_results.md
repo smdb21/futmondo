@@ -1,5 +1,11 @@
 # Futmondo data review and implementation results
 
+## Market bid editor (2026-11-26)
+
+Offline Chromium verified five buttons on one row at 320, 390 and 1440 px in light and dark themes. On a €150 listing, two +1% taps showed €152 (+1.33%) and €153 (+2%). Typing €180 immediately showed +20%, and +10% then showed €195 (+30%). The checks covered below-listing and below-valuation messages, clearing the field, cancellation and reopening. The longest observed Playwright click and preview check was 49 ms across these six runs.
+
+The browser formats the total and percentage locally from the dialog’s existing price and valuation, replacing the server-rendered market bid preview. Editing adds no API calls, database reads, timers or stored observations. The offline opening test measured 19 ms with card reads held. Synthetic new-offer and existing-bid tests verified single submission and context checks. The Shiny lifecycle passed 14 checks and eight tabs. Production UI verification remains open.
+
 ## Incoming transfers on Home (2026-11-26)
 
 The offline Home fixture held the transfer history response open. The incoming row showed “Loading…” while the squad size was visible, then showed one incoming player when the response arrived. A completed empty history showed zero. The fixture used one roster read and one transfer history read. Ten unrelated inputs added no reads. The label reuses the existing reactive display and adds no timer, database work or source request.

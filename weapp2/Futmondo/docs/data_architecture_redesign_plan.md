@@ -1,5 +1,9 @@
 # Futmondo data architecture redesign plan
 
+## Market bid editor (2026-11-26)
+
+Implemented locally. New and existing market bids share cumulative percentage controls, live premium feedback and below-value warnings. [Bid editor behavior](bid_management.md#market-offer-percentage-buttons-2026-11-26)
+
 ## Incoming transfers on Home (2026-11-26)
 
 Implemented locally. Home tracks incoming and leaving transfers independently, including the first database read of the player summaries needed for each direction. [Home display behavior](page_preferences.md)
