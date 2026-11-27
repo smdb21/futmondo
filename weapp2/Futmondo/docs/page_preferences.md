@@ -6,7 +6,7 @@ Both password login and remembered login open Home. The dashboard tab `login` pr
 
 On signed-in pages other than Home, the lower-right corner holds two labeled buttons, **Home** and **Refresh**. They share a width and a 48 px height and sit inside the device's safe area. Both stay visible on desktop, including when the sidebar is collapsed.
 
-At viewport widths of 767 px or less, scrolling the page or a scrollable area within it reveals both buttons. They fade after scrolling stops. Tabbing to either button reveals the pair and keeps them visible while keyboard focus is inside. Reduced-motion mode changes visibility immediately when the idle delay ends. The public welcome and Home omit the floating row.
+At viewport widths of 767 px or less, scrolling the page or a scrollable area within it reveals both buttons. They stay visible for three seconds after the last scroll, then fade. Tabbing to either button reveals the pair and keeps them visible while keyboard focus is inside. Reduced-motion mode changes visibility immediately when the idle delay ends. The public welcome and Home omit the floating row.
 
 Home opens the top of the signed-in dashboard and moves focus to its heading. Refresh requests an update for the selected league and keeps the current page open. [League refresh behavior](database_first_sync.md#explicit-league-refresh)
 

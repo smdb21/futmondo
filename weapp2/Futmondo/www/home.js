@@ -1,7 +1,7 @@
 (function () {
   const root = document.documentElement;
   const mobile = window.matchMedia('(max-width: 767px)');
-  const scrollIdleMs = 550;
+  const scrollIdleMs = 3000;
   let actions, idleTimer = 0, lastScroll = 0, ignoreTopReset = false;
 
   function finishScrolling() {

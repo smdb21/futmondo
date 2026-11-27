@@ -57,16 +57,17 @@ async function verifyFloatingControls(page, width, openPage) {
 
   let idleMs;
   if (mobile) {
-    // A later scroll extends visibility past the initial 550ms idle deadline.
-    await page.waitForTimeout(320);
+    // A second scroll keeps both controls tappable past the first three-second deadline.
+    await page.waitForTimeout(1200);
     const scrollAt = await page.evaluate(() => {
       window.scrollBy(0, 12);
       return performance.now();
     });
-    await page.waitForTimeout(310);
+    await page.waitForTimeout(2300);
     assert.equal(await page.evaluate(floatingControlsMatch, true), true);
     await waitForControls(false);
     idleMs = Math.round(await page.evaluate(() => performance.now()) - scrollAt);
+    assert.ok(idleMs >= 3000, 'the controls stay available for three seconds after the last scroll');
     const stationary = await page.evaluate(() => scrollY);
     // The player table scrolls inside the page on a phone.
     const table = page.locator('#shiny-tab-yourteam .ReactTable:visible').first();
