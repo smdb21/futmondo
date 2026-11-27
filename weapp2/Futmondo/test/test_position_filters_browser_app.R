@@ -13,7 +13,8 @@ ui<-shinydashboard::dashboardPage(shinydashboard::dashboardHeader(title='Positio
  shinydashboard::dashboardSidebar(disable=TRUE),shinydashboard::dashboardBody(
  shiny::tags$head(shiny::tags$style(shiny::HTML(fm_theme_css())),shiny::includeCSS('www/custom_style.css')),
  shiny::actionButton('heartbeat','Heartbeat'),shiny::textOutput('heartbeat_value'),
- players_table_UI('plain',box_title='Standard layout',filter_by_max_clause_value=TRUE),
+ players_table_UI('plain',box_title='Standard layout',filter_by_max_clause_value=TRUE,
+  filter_by_own_team=TRUE,filter_by_clause_under_available_funds=TRUE),
  players_table_UI('squad',box_title='Squad layout',show_position_breakdown=TRUE)))
 server<-function(input,output,session){
  for(id in c('plain','squad'))players_table_Server(id,players_table_RV=function()rows,

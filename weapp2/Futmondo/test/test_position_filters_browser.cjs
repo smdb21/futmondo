@@ -22,20 +22,41 @@ const {chromium}=require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES||'/tmp
     const wrapper=select.locator('..').locator('.selectize-control');
     const items=()=>select.evaluate(el=>el.selectize.items.slice());
     const choose=async value=>{
-     await wrapper.locator('.selectize-input').click();
-     await wrapper.locator(`.selectize-dropdown [data-value="${value}"]`).click();
+     const option = wrapper.locator(`.selectize-dropdown [data-value="${value}"]`);
+     if (!await option.isVisible()) {
+       const field = wrapper.locator('.selectize-input');
+       const bounds = await field.boundingBox();
+       await field.click({position: {x: bounds.width - 4, y: bounds.height - 5}});
+     }
+     await option.click();
     };
     await page.locator(`#${id}-filters summary`).click();
     const labels = await page.locator(`#${id}-filters label, #${id}-btn_clear_filters`).evaluateAll(nodes => nodes.map(node => {
       const icon=node.querySelector('i'); if (!icon) return null;
       const text=document.createRange(); text.selectNodeContents(icon.parentNode); text.setEndBefore(icon);
-      const textRect=text.getBoundingClientRect(), imageRect=icon.getBoundingClientRect();
+      const textRect=Array.from(text.getClientRects()).filter(rect => rect.width > 0).pop(), imageRect=icon.getBoundingClientRect();
       return {text:text.toString().trim(), hidden:icon.getAttribute('aria-hidden'),
         after: imageRect.top >= textRect.bottom - 1 || imageRect.left >= textRect.right - 1,
         fits:imageRect.left >= 0 && imageRect.right <= innerWidth + 1};
     }).filter(Boolean));
     assert.ok(labels.length >= 8 && labels.every(label => label.text && label.hidden === 'true' && label.after && label.fits),
       'Visible filter icons follow their accessible labels and fit the viewport');
+    if (id === 'plain') {
+      const panel = page.locator('#plain-filters');
+      const layout = await panel.evaluate(el => {
+        const fields = el.querySelector('.player-filter-fields');
+        const options = el.querySelector('.player-checkbox-filters');
+        return {
+          fields: getComputedStyle(fields).gridTemplateColumns.split(' ').length,
+          options: getComputedStyle(options).gridTemplateColumns.split(' ').length,
+          height: el.offsetHeight,
+          fits: el.scrollWidth <= el.clientWidth + 1,
+          targets: Array.from(options.querySelectorAll('label')).every(label => label.offsetHeight >= 40)
+        };
+      });
+      assert.ok(layout.fields >= 2 && layout.options >= 2 && layout.fits && layout.targets);
+      if (width <= 390) assert.ok(layout.height <= 500, 'phone filters fit in 500 CSS pixels');
+    }
     assert.deepEqual(await items(),['All']);
     await expectRows(['Keeper','Defender','Midfielder','Forward','Dual','Unknown']);
     await choose('Defender');assert.deepEqual(await items(),['Defender']);

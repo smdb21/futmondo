@@ -1,8 +1,12 @@
 # Players Table Module Documentation
 
+## Compact filter layout (2026-11-27)
+
+The standard and squad layouts share one collapsible filter panel. Selectors and amount limits appear first, with validation beside the relevant amount. A divider separates these fields from the checkboxes and **Clear Filters**. The grid fits its container, including the narrower panel beside the squad breakdown. On phones the fields and options fit in pairs, with wrapping labels and 40 px checkbox targets.
+
 ## Real Club filter (2026-11-23)
 
-The shared player table’s **Real Club** dropdown lists the clubs represented in the loaded market, catalog or roster, ordered by club name. Each available crest appears in the option and beside the selected club. **All clubs** is the default and includes players whose club is unknown. The selected club combines with the fantasy **User Team Owner** and other filters. **Clear Filters** resets the club. A changed league or team context clears the selection. Ordinary snapshot updates preserve a club that remains available.
+The shared player table’s **Real Club** dropdown lists the clubs represented in the loaded market, catalog or roster, ordered by club name. Each available crest appears in the option and beside the selected club. **All clubs** is the default and includes players whose club is unknown. The selected club combines with the fantasy **Team Owner** and other filters. **Clear Filters** resets the club. A changed league or team context clears the selection. Ordinary snapshot updates preserve a club that remains available.
 
 `players_table_clubs()` projects club keys and choices from the existing unfiltered player snapshot. It uses the real `teamId` when present, accepts the observed `team` name when there is no ID, and joins those forms only when the snapshot establishes an unambiguous name-to-ID mapping. It takes a usable `logo` from the matched club rows and leaves an option text-only if no observed crest is usable. The roster capture contains `teamId`, `team` and `logo`; market captures contain `team` and `logo`; catalog enrichment already joins the player’s `teamId` to `id`, `name` and `logo` from the real-club catalog. The filter uses these existing saved snapshots. It adds no acquisition, persistence or cache layer.
 
@@ -33,7 +37,7 @@ On 2026-11-23, `player_status_icon()` switched regular injury to a solid red med
 
 ## Maximum clause input — 2026-11-22
 
-In All Players, **Max Clause (M)** accepts a non-negative amount in millions, with a decimal point or comma and an optional `M` suffix. `players_table_clause_cap()` converts the amount to euros. The filter uses the same observed `clause_price` shown by the **Clause Price** column and includes the exact boundary. Blank input and **Clear Filters** remove the cap. Invalid input displays a correction prompt and withholds results until the amount is corrected or cleared. If **Clause within available funds** is enabled, the lower of the supplied limit and the current **Balance** applies.
+In All Players, **Max Clause (M)** accepts a non-negative amount in millions, with a decimal point or comma and an optional `M` suffix. `players_table_clause_cap()` converts the amount to euros. The filter uses the same observed `clause_price` shown by the **Clause Price** column and includes the exact boundary. Blank input and **Clear Filters** remove the cap. Invalid input displays a correction prompt and withholds results until the amount is corrected or cleared. If **Clause within cash balance** is enabled, the lower of the supplied limit and the current **Balance** applies.
 
 As of 2026-11-23, All Players passes the observed cash balance through `available_cash_RV`. It reads `answer.budget` from the same persisted `get_user_team_info()` observation as Balance summary. The source is the existing authenticated `POST /1/userteam/information` with the fantasy `championshipId`, `userteamId` and `type: "market"`. Captures contain both numeric `budget` and `maxBid` fields with distinct values. The cap uses raw cash before offers and reservations. Positive clauses at or below that amount qualify, so zero or negative cash yields no matches. A missing or stale balance shows an unavailable status and withholds matches. The filter is for browsing. The separate Market valuation filter and purchase preflights continue to use their existing financial contracts.
 
@@ -54,7 +58,7 @@ geometry in both layouts and themes; see [review results](data_review_results.md
 
 ## Own-team inclusion and effective squad count — 2026-11-14 Pacific
 
-`players_table_UI(..., filter_by_own_team=FALSE)` and `players_table_Server(..., filter_by_own_team=FALSE)` opt into the **Show players in my team** checkbox. Only All Players in Championship enables it. It starts unchecked, excluding rows whose normalized `owner_team_id` matches the current explicit `user_team_id`. Checking it includes those rows alongside other owners; owner/position/active-clause/value and other filters still intersect. Missing owner identity stays unknown, not implicitly owned or free; a missing current team produces typed pending validation. Context changes compare the new immutable team identity, not display names. Clear Filters resets the checkbox off. Other tables retain their existing behavior.
+`players_table_UI(..., filter_by_own_team=FALSE)` and `players_table_Server(..., filter_by_own_team=FALSE)` opt into the **Include my team** checkbox. Only All Players in Championship enables it. It starts unchecked, excluding rows whose normalized `owner_team_id` matches the current explicit `user_team_id`. Checking it includes those rows alongside other owners; owner/position/active-clause/value and other filters still intersect. Missing owner identity stays unknown, not implicitly owned or free; a missing current team produces typed pending validation. Context changes compare the new immutable team identity, not display names. Clear Filters resets the checkbox off. Other tables retain their existing behavior.
 
 The server's optional `effective_squad_source` function returns `list(count=<integer or NA>, status=<ok|observed|loading|unavailable>, detail=<tooltip>)`. When supplied, the position card groups **Total: N Players** and **Effective: N Players** beside each other, wrapping on narrow screens. The actual total and primary/secondary position counts continue to use the complete current roster, independently of filters. Complete empty rosters display zero; pending effective data says **Checking…**, and incomplete/error data says **Unavailable**. The effective badge's native tooltip explains current + bought awaiting arrival − leaving and the observed-data qualification. Tables without this source get no extra badge.
 
@@ -146,9 +150,9 @@ cycle. Until then, the card displays a loading message. This keeps API latency
 from delaying click feedback while retaining the selected player ID and table
 context checks.
 
-## 10. User Team Owner Filter
+## 10. Team Owner Filter
 
-The **User Team Owner** selector is built from every league team, even when the
+The **Team Owner** selector is built from every league team, even when the
 player feed omits the team display name. Its labels are team names, but its
 submitted values use the stable `team:<team_id>` form.
 
@@ -178,7 +182,7 @@ Today is the sole market-listing page. Its shared players table includes both Yo
 
 ## Optional filters and initial page defaults (2026-11-01)
 
-`players_table_UI()` accepts `default_active_clause=FALSE` and `default_free_agents=FALSE`. Today opts into Free Agents Only initially; the Players page opts into Active Clause Only initially. Other call sites keep their previous unchecked defaults. Clear Filters continues to clear both checkboxes.
+`players_table_UI()` accepts `default_active_clause=FALSE` and `default_free_agents=FALSE`. Today opts into Free agents initially; the Players page opts into Active Clause Only initially. Other call sites keep their previous unchecked defaults. Clear Filters continues to clear both checkboxes.
 
 `players_table_filter_fields()` supplies typed missing values for source-optional filter fields. These additions are filter-only: the table projection removes newly added placeholders, preserving each endpoint's original displayed columns plus intentional owner/average columns. Missing roles, favorites, offer counts and clause metadata therefore cannot crash the unguarded schema observer, and unknown values are not converted to zero. A genuine zero-row source and a zero-match filter combination retain a renderable empty table and recover when filters change.
 
@@ -279,8 +283,7 @@ My Team labels the pending clause transfer date **Leaving on**.
 
 Both `players_table_UI()` layouts render their existing filter controls inside a
 native `details` element, initially closed, with a **Filters** summary and a
-right/down arrow. The local `filter_panel(...)` UI builder gives each disclosure
-a namespaced `filters` ID and retains the responsive Bootstrap grid. This applies
+right/down arrow. Each disclosure has a namespaced `filters` ID. This applies
 to Today, Market, Players, My Team and rival squad tables. Click, Enter or Space
 toggles the panel; the whole summary is a minimum 44px touch target with a visible
 keyboard focus outline. The decorative arrow is hidden from assistive technology.

@@ -1,5 +1,9 @@
 # Futmondo data architecture redesign plan
 
+## Compact player filters (2026-11-27)
+
+Implemented locally. The shared player table groups selectors and limits together and lays out checkboxes in a responsive grid. [Player table layout](players_table_module.md#compact-filter-layout-2026-11-27)
+
 ## Welcome transfer loading label (2026-11-27)
 
 Home uses one “Loading…” label for pending transfer counts. [Home display behavior](page_preferences.md)

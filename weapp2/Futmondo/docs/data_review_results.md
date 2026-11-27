@@ -1,5 +1,11 @@
 # Futmondo data review and implementation results
 
+## Compact player filters (2026-11-27)
+
+With all five championship checkboxes and the clause cap present, the expanded panel in the offline Chromium fixture shrank from 797 to 445 px at 320 px viewport width, from 795 to 379 px at 390 px, and from 268 to 174 px at 1440 px. Both layouts passed in light and dark themes, including wrapped position chips, accessible labels, cap validation, reset and page overflow checks. Checkbox labels retained at least 40 px of tap height. Fixture heartbeat responses took 67–93 ms.
+
+The change uses static markup and scoped CSS. It adds no data requests, cache work, observers or timers. The player filter suite passed 21 checks, the squad and own-team suite passed eight, and the offline lifecycle passed 14 checks plus eight tabs. Verification used local Chromium and synthetic data.
+
 ## Welcome transfer loading label (2026-11-27)
 
 The offline Home fixture checks the entire Transfers value while the history read is pending and expects exactly “Loading…”. Chromium showed exactly that text at 320 and 1440 px, then showed zero incoming and zero leaving. The change renders fewer elements while loading and adds no requests, timers or reactive dependencies.

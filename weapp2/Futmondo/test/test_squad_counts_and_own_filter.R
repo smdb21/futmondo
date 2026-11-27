@@ -8,7 +8,7 @@ settle<-function(session){session$elapse(350);for(i in 1:10){later::run_now(0);s
 check('championship own-team checkbox exists, starts unchecked, and is absent from other tables',{
  html<-as.character(players_in_championship_UI('all'));id<-'all-championship_players_table-show_my_team_filter'
  input<-regmatches(html,regexpr(paste0('<input[^>]*id="',id,'"[^>]*>'),html))
- stopifnot(length(input)==1L,nzchar(input),!grepl('checked|disabled',input),grepl('Show players in my team',html,fixed=TRUE),
+ stopifnot(length(input)==1L,nzchar(input),!grepl('checked|disabled',input),grepl('Include my team',html,fixed=TRUE),
   !grepl('show_my_team_filter',as.character(players_table_UI('other')),fixed=TRUE))
 })
 rows<-data.frame(id=c('mine','mine-closed','rival','free','unknown'),name=c('Mine','Mine closed','Rival','Free','Unknown'),
