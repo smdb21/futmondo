@@ -43,6 +43,18 @@ stopifnot(is.na(rows$points[1]),rows$points[2]==-2,rows$points[8]==0)
 future_args<-args;future_args$round_id<-'r13';future_args$round_number<-13
 future<-await(async_adapter_fetch('get_classification_round_ranking',future_args,ctx))
 stopifnot(isTRUE(future$not_started),nrow(future$rows)==0L,length(writes)==1L,requests==2L)
+# An explicit page check must beat an otherwise fresh saved ranking.
+clicked <- ctx
+clicked$refresh_after <- rival_finance_stamp()
+answer$ranking[[1]]$points <- 31
+clear_api_cache()
+updated <- await(async_adapter_fetch('get_classification_round_ranking',args,clicked))
+stopifnot(updated$rows$points[1]==31,requests==3L,length(writes)==2L)
+saved$evidence <- writes[2]
+clear_api_cache()
+restored <- await(async_adapter_fetch('get_classification_round_ranking',args,clicked))
+stopifnot(restored$rows$points[1]==31,requests==3L,length(writes)==2L)
+answer$ranking[[1]]$points <- 26
 original_catalog<-get_award_round_catalog;original_metadata<-get_award_round_metadata
 get_award_round_catalog<-function(...)list(league_id='competition',current_round_id='r13',current_round_number=13,
   rounds=data.frame(round_id=paste0('r',11:13),round_number=11:13,is_finished=c(TRUE,FALSE,FALSE),status=c('done','next','future')))
@@ -106,7 +118,8 @@ shiny::testServer(classification_Server,args=list(is_module_active=reactive(TRUE
   stopifnot(max(round_numbers_RV())==11,is.null(picked_round_RV()))
   session$setInputs(round_range_slider=c(11,11))
   ranking(live);session$flushReact()
-  stopifnot(selected_round_RV()==12,max(round_numbers_RV())==12)
+  stopifnot(selected_round_RV()==12,max(round_numbers_RV())==12,
+    identical(session$returned$refresh_selection(),list(round_id='r12',history=FALSE)))
   session$setInputs(round_range_slider=c(12,12))
   stopifnot(identical(standings_RV()$points,c(26,18,15,9,8,6,2,0,0)),all(is.na(standings_RV()$points_bonus)),
     !grepl('provisional|confirmed|complete round',output$classification_status$html),is.null(picked_round_RV()),

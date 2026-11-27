@@ -9,9 +9,11 @@ const { PGlite } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/futm
     await db.exec('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;');
     const migration = fs.readFileSync('scripts/migrations/20261127192443_rival_standings_refresh.sql', 'utf8');
     const schema = fs.readFileSync('scripts/schema.sql', 'utf8');
-    assert.ok(schema.endsWith(migration));
-    await db.exec(schema.slice(0, -migration.length));
+    const pageMigration = fs.readFileSync('scripts/migrations/20261127231747_worker_page_refresh.sql', 'utf8');
+    assert.ok(schema.includes(migration) && schema.includes(pageMigration));
+    await db.exec(schema.slice(0, schema.indexOf(migration)));
     await db.exec(migration);
+    await db.exec(pageMigration);
     const scope = JSON.stringify({
       league: { competition_id: 'competition', season: 'season', scoring_version: 'score' },
       other: { competition_id: 'competition', season: 'season', scoring_version: 'score' }
@@ -92,8 +94,38 @@ const { PGlite } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/futm
     assert.equal((await row(rivals)).due, false);
     const perms = await query("SELECT has_function_privilege('anon','worker_rival_refresh(text,text,text)','execute') AS allowed");
     assert.equal(perms[0].allowed, false);
+    const argsFor = (key, args) => query("UPDATE worker_jobs SET descriptor=jsonb_set(descriptor,'{args}',$2) WHERE resource_key=$1", [key, args]);
+    const page = async (name, round = '', history = false) => (await query(
+      "SELECT worker_page_refresh('mine','league','team',$1,$2,$3) n",[name, round, history]))[0].n;
+    const ranking = await add(23,'get_classification_round_ranking');
+    const xi = await add(24,'get_round_dreamteam',{team:''});
+    const oldXi = await add(25,'get_round_dreamteam',{team:''});
+    const calendar = await add(26,'get_classification_round_catalog',{team:''});
+    await argsFor(ranking,{round_id:'r14'}); await argsFor(xi,{reference:'r14'}); await argsFor(oldXi,{reference:'r13'});
+    const wire = await add(27,'get_worker_http_read',{team:''});
+    const otherWire = await add(28,'get_worker_http_read',{team:''});
+    await argsFor(wire,{route:'/1/userteam/lineup',query:{championshipId:'league',userteamId:'team'}});
+    await argsFor(otherWire,{route:'/1/userteam/lineup',query:{championshipId:'league',userteamId:'other'}});
+    const unread = await add(29,'get_notification_unread',{league:'',team:''});
+    const beforePage = performance.now();
+    assert.equal(await page('classification','r14'),3);
+    console.log('Classification queued three jobs in ' + (performance.now()-beforePage).toFixed(1) + 'ms with 5,000 unrelated jobs.');
+    for(const key of [ranking,xi,calendar]) assert.ok((await row(key)).due);
+    for(const key of [oldXi,wire,otherWire,unread]) assert.equal((await row(key)).league_refresh_at,null);
+    const firstXi = (await row(xi)).request_text;
+    assert.equal(await page('classification','r14'),3);
+    assert.equal((await row(xi)).request_text,firstXi);
+    assert.equal(await page('lineup'),2); // team-scoped wire plus the existing round catalog
+    assert.ok((await row(wire)).due);
+    assert.equal((await row(otherWire)).league_refresh_at,null);
+    assert.equal(await page('notifications'),1);
+    assert.ok((await row(unread)).due);
+    assert.equal(await page('today'),2); // market and information, transfers in backoff
+    assert.equal(await page('unknown'),0);
+    assert.equal((await query("SELECT has_function_privilege('authenticated','worker_page_refresh(text,text,text,text,text,boolean)','EXECUTE') consent"))[0].consent,false);
     await query("UPDATE worker_accounts SET excluded_leagues='[\"league\"]' WHERE account_id='mine'");
     assert.equal(await refresh(['bought']), 0);
+    assert.equal(await page('classification','r14'),0);
     console.log(`PASS scoped queue, deduplication, leases, backoff, next claim and consumption. One six-job request with 5,000 unrelated jobs took ${elapsed.toFixed(1)}ms.`);
   } finally {
     await db.close();

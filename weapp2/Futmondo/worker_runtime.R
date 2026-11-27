@@ -608,7 +608,7 @@ fm_worker_session<-function(session,login,leagues=function()list(),source_note=f
 }
 # Explicit league refreshes advance existing factual work. Publication flows
 # through the same versioned database read as routine worker updates.
-fm_worker_refresh_league <- function(login, league, team, player=NULL, session=shiny::getDefaultReactiveDomain(), manual=FALSE, feedback=NULL, rivals=FALSE) {
+fm_worker_refresh_league <- function(login, league, team, player=NULL, session=shiny::getDefaultReactiveDomain(), manual=FALSE, feedback=NULL, rivals=FALSE, page=NULL, label=NULL, selection=list(), on_queued=NULL) {
  if(!valid_login(login)||!isTRUE(fm_worker_mode(login[['userid']])))return(invisible(FALSE))
  account<-login[['userid']]
  payload<-list(p_account=account,p_league=league,p_team=team,
@@ -618,11 +618,25 @@ fm_worker_refresh_league <- function(login, league, team, player=NULL, session=s
   if(is.function(feedback))feedback(message) else shiny::showNotification(message,type=type,id="league-refresh",session=session)
  }
  rpc <- if(isTRUE(manual)&&isTRUE(rivals))'rival_refresh' else 'league_refresh'
- if(rpc=='rival_refresh')payload$p_players<-NULL
+ if (manual && !is.null(page)) {
+   rpc <- if (identical(page, 'rivals')) 'rival_refresh' else 'page_refresh'
+   if (rpc == 'page_refresh') {
+     payload$p_page <- page
+     payload$p_round <- fm_scalar(selection$round_id, '')
+     payload$p_history <- isTRUE(selection$history)
+   }
+ }
+ if(rpc!='league_refresh')payload$p_players<-NULL
  pending<-tryCatch(fm_worker_rpc(rpc,payload),error=promises::promise_reject)
  promises::then(pending,function(count){
   if(is.numeric(count)&&length(count)==1L&&isTRUE(count>0)){
-   if(manual)report(if(rivals)'Refresh queued. Rival standings will update when the balance calculation finishes.' else 'Refresh queued. Balances and players will update as new data arrives.','message')
+   if(manual) {
+     message <- if (rpc == 'rival_refresh') 'Refresh queued. Rival standings will update when the balance calculation finishes.' else
+       if (rpc == 'page_refresh') paste0('Refresh queued for ', label, '. Updates appear as the worker publishes them.') else
+       'Refresh queued. Balances and players will update as new data arrives.'
+     report(message,'message')
+     if (is.function(on_queued) && !is.null(session) && !session$isClosed()) on_queued()
+   }
   }else report('League sync could not be queued. Check Background sync or try Refresh again.','warning')
   NULL
  },function(error){

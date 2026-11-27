@@ -3380,7 +3380,8 @@ get_classification_round_ranking <- function(login, championship_id, user_team_i
         snapshot <- snapshots[[index[1]]];p <- snapshot$payload
         rows <- classification_ranking_rows(p$answer,round_id,round_number)
         deadline <- stamps[index[1]]+60
-        if(nrow(rows)&&as.numeric(Sys.time())<deadline){
+        after <- fm_time(get0(".futmondo_request_context",inherits=TRUE)$refresh_after)
+        if(nrow(rows)&&as.numeric(Sys.time())<deadline&&(!length(after)||stamps[index[1]]>=as.numeric(after))){
           result <- list(rows=rows,round_id=round_id,round_number=round_number,answer=p$answer,valid_until=deadline,from_saved=TRUE)
           attr(result,"observed_at") <- fm_time(snapshot$observed_at)
           attr(result,"source") <- "saved Futmondo round ranking"

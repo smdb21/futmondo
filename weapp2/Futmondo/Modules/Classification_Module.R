@@ -1046,5 +1046,12 @@ classification_Server <- function(id, is_module_active, login_token, championshi
       }
       card_links(classification_dreamteam_table(players))
     })
+    list(refresh_selection = reactive({
+      rounds <- rounds_RV()
+      number <- if (!partial_view_RV()) selected_round_RV()
+      index <- match(number, rounds$round_number)
+      list(round_id = fm_scalar(rounds$round_id[index], ""),
+        history = partial_view_RV() || isTRUE(rounds$is_finished[index]))
+    }))
   })
 }

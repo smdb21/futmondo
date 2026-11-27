@@ -68,8 +68,17 @@ function(input, output, session) {
         feedback("Your team is unavailable for this league. Try Refresh again when it loads.")
         return()
       }
-      fm_worker_refresh_league(login_token_RV(),league,team,session=session,manual=TRUE,feedback=feedback,
-        rivals=identical(input$tabs,"rivals"))
+      page <- input$tabs
+      pages <- fm_navigation_pages(isTRUE(is_admin_RV()))
+      labels <- c(login = "Home", setNames(pages$label, pages$tab))
+      if (length(page) != 1L || !page %in% names(labels)) {
+        feedback("Choose a page to refresh.")
+        return()
+      }
+      selection <- if (page == "classification") classification$refresh_selection() else list()
+      follow <- if (page == "lineup") lineup$after_refresh() else NULL
+      fm_worker_refresh_league(login_token_RV(), league, team, session=session, manual=TRUE,
+        feedback=feedback, page=page, label=labels[[page]], selection=selection, on_queued=follow)
       return()
     }
     invalidate_resources(resource_context(login_token_RV(),league),pattern="market|roster|teams|team_info|players|financial|capacity|round|notification|pressroom|history|summary|card",notify_availability=!isTRUE(fm_worker_mode(login_token_RV()[['userid']])))
@@ -600,7 +609,7 @@ players_in_championship_Server(id = "players_in_championship",
                user_team_id = user_team_id_RV, user_teams_RV = user_teams_RV,
                refresh_trigger = refresh_trigger)
 
-  classification_Server(id = "classification",
+  classification <- classification_Server(id = "classification",
                         is_module_active = reactive({
                           input$tabs == "classification"
                         }),

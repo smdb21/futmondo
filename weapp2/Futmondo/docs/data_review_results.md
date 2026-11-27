@@ -1,5 +1,13 @@
 # Futmondo data review and implementation results
 
+## Page refresh (2026-11-27)
+
+A synthetic queue with 5,000 unrelated jobs took 3.0 ms to make three Classification jobs due for the selected round. Other rounds, Lineup and Notifications stayed idle. Repeating the request preserved its original timestamp. Separate checks covered team-scoped Lineup routes, account notifications, Market, exclusion, backoff, leases, next claim, service-role permissions and consumption of the request marker. This is a local PGlite timing.
+
+The application button routed clicks from Classification, Market and Lineup. A still-valid ranking from before the click was replaced by one source read and one acknowledged write. Reopening the post-click observation after clearing memory added zero reads or writes. The Lineup module received a new starter through the published bundle, retained an edited bench on the next update and submitted zero lineups. The worker suite passed 46 tests, the worker data contract passed 20 groups, the offline refresh and Classification tests passed, and the Shiny lifecycle passed 14 checks plus eight tabs.
+
+Each explicit refresh uses one queue RPC. The worker reuses its two bounded lanes, source pacing and durable observations. The Lineup editor watches four existing resource revisions while the refreshed view is active and combines publications received in one reactive flush. The polling intervals and mobile layout are unchanged. Production migration `20261127232728_worker_page_refresh` was installed. The anonymous and authenticated database roles cannot execute the RPC. The server role can execute it, and a nonexistent account returned zero eligible jobs. Hosted click-to-display latency was not measured.
+
 ## Round 14 scoring verification (2026-11-27)
 
 At 22:26 UTC the saved Round 14 ranking showed nine zeros. The Best XI snapshot showed Olasagasti on 14 in both `points` and `customPoints`. At 22:59 UTC the ranking showed 19, 17, 15, 13, 8, 8, 4, 0 and 0. Both MVP fields then held 17. The championship and Best XI response used the same custom selector and canonically identical scoring settings. Both worker jobs had a five-minute native interval and a 45-minute effective interval. The precise time of Futmondo’s revision between observations is unknown.

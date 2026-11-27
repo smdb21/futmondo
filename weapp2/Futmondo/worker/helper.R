@@ -308,6 +308,9 @@ fm_worker_run<-function(descriptor){
   if(is.function(f)&&identical(environment(f),.GlobalEnv)){environment(f)<-env;assign(nm,f,env)}
  }
  env$.futmondo_request_context<-ctx
+ if (descriptor$handler %in% c('get_classification_round_ranking','get_classification_round_catalog',
+     'get_finished_rounds','get_mvp_saved_catalog'))
+   env$.futmondo_request_context$refresh_after <- descriptor$refresh_after
  # Bind default identity to this verified job without inventing observed
  # metadata, borrowing another league, or changing explicit archive arguments.
  original_context<-env$resource_context

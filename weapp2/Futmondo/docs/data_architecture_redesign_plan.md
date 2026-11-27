@@ -1,5 +1,9 @@
 # Futmondo data architecture redesign plan
 
+## Page refresh (2026-11-27)
+
+The floating Refresh button advances the existing factual jobs that supply the current page. Classification passes its selected round. The Lineup editor follows new published observations and retains local edits. [Page mapping](database_first_sync.md#refreshing-the-current-page) · [Verification](data_review_results.md#page-refresh-2026-11-27)
+
 ## Round 14 scoring verification (2026-11-27)
 
 Compared the two reported scores with successive database observations and the championship’s configured scoring system. The later publication reached the expected Classification projection. [Verification](data_review_results.md#round-14-scoring-verification-2026-11-27)

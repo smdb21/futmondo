@@ -47,6 +47,34 @@ args<-list(is_module_active=function()TRUE,login_token=function()c(userid='fixtu
 reset()
 shiny::testServer(lineup_Server,args=args,{
  settle(session)
+ ctx <- context()
+ account <- fm_worker_account_state(ctx$account_id)
+ keys <- vapply(lineup_bundle_routes,function(route){
+   query <- c(list(championshipId=ctx$championship_id,userteamId=ctx$user_team_id),lineup_route_extra(route))
+   fm_worker_descriptor('get_worker_http_read',list(route=route,query=query),ctx)$resource_key
+ },character(1))
+ publish <- function(key,version){
+   fm_worker_put(ctx$account_id,key,list(manifest=list(version=version)))
+   rev <- fm_worker_resource_revision(account,key)
+   rev(shiny::isolate(rev())+1L)
+ }
+ for(key in keys)publish(key,'initial')
+ accepted <- after_refresh()
+ accepted();settle(session)
+ stopifnot(state$reads==1L)
+ state$official$official$starters[11] <- 'p1'
+ publish(keys[1],'updated');settle(session)
+ stopifnot(state$reads==2L,draft()$starters[11]=='p1')
+ edited <- draft();edited$bench[1] <- 'p20';edit(edited)
+ state$official$official$starters[11] <- 'p2'
+ publish(keys[1],'revised');settle(session)
+ stopifnot(identical(draft(),edited),source()$official$starters[11]=='p2',
+   state$reads==3L,state$submits==0L)
+ cat('PASS page refresh follows persisted lineup versions, preserves edits and makes zero submissions\n')
+})
+reset()
+shiny::testServer(lineup_Server,args=args,{
+ settle(session)
  stopifnot(grepl('−5',output$expected_points,fixed=TRUE),grepl('-55',output$expected_points,fixed=TRUE))
  value<-draft();value$starters[11]<-'p1';value$bench[1]<-'p20';edit(value)
  points<-full_history;points$points[points$player_id=='p1']<- -3

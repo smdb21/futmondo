@@ -178,11 +178,13 @@ lineup_j23_window_issue <- function(competition_id,target,answer,now=Sys.time(),
     return(paste('Round 23 reopens at 10:00 Madrid time on',paste0(day,'.'),'Your draft is retained.'))
   character()
 }
+lineup_bundle_routes <- c(lineup='/1/userteam/lineup', roster='/1/userteam/roster',
+  info='/1/userteam/information', strategies='/5/strategy/availables')
+lineup_route_extra <- function(route) if(route=='/1/userteam/information')list(type='market')else list()
+
 lineup_fetch_bundle <- function(auth,context,target,owner,is_current=function()TRUE,worker_live=FALSE,readback=FALSE) {
-  calls<-list(lineup=lineup_api_read('/1/userteam/lineup',auth,context,owner,worker_live=worker_live),
-    roster=lineup_api_read('/1/userteam/roster',auth,context,owner,worker_live=worker_live),
-    info=lineup_api_read('/1/userteam/information',auth,context,owner,list(type='market'),worker_live=worker_live),
-    strategies=lineup_api_read('/5/strategy/availables',auth,context,owner,worker_live=worker_live))
+  calls <- lapply(lineup_bundle_routes,function(route)
+    lineup_api_read(route,auth,context,owner,lineup_route_extra(route),worker_live=worker_live))
   verify_target <- worker_live && !is.null(target)
   if(verify_target) {
     calls$active <- lineup_api_read('/2/user/activechampionships',auth,context,owner,worker_live=TRUE)

@@ -108,7 +108,7 @@ async function verifyFloatingControls(page, width, openPage) {
     await refresh.click();
   }
   await page.waitForFunction(() => window.fixtureFloatingRefreshes === 1);
-  assert.equal(await page.evaluate(() => window.fixtureRefreshPending), 'Requesting league refresh…');
+  assert.equal(await page.evaluate(() => window.fixtureRefreshPending), 'Requesting page refresh…');
   const status = page.locator('#league-refresh-status[role="status"]');
   await status.getByText('Refresh started. League balances and players are being reloaded.').waitFor();
   const box = await status.boundingBox();

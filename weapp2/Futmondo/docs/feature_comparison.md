@@ -1,5 +1,9 @@
 # LigaRadar additions to the official Futmondo workflows
 
+## Page refresh (2026-11-27)
+
+Futmondo documents its market, lineup, round classification and ideal XI views. Its public client requests the round ranking and dream team separately. LigaRadar’s Essentials item `page_refresh` describes advancing the worker reads for the page a manager is viewing and displaying the resulting saved observations. The official sources establish the data views. The timing of authenticated official refreshes was not verified. [Official guide](https://help.futmondo.com/article/90-empieza-a-jugar-a-futmondo) · [Official client](https://app.futmondo.com/main.dart.js)
+
 ## Listing deadlines and received-offer counts (2026-11-26)
 
 Futmondo documents market end-time sorting and offer indicators. Its official client reads `expirationDate` from market listings. LigaRadar shows the localized deadline in My Team and Today’s market. The Essentials entry `squad_listings` also describes Home’s compact count of listed players and squad players with incoming offers. The current signed-in official Home layout remains unverified. [Official selling guide](https://help.futmondo.com/article/195-poner-jugadores-a-la-venta-en-el-mercado) · [Official market release notes](https://magazine.futmondo.com/nueva-version-de-la-app-en-futmondo/) · [Official client](https://app.futmondo.com/main.dart.js)

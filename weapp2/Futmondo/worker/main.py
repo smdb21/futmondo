@@ -849,11 +849,13 @@ class Worker:
                     if datetime.fromisoformat(manifest['valid_until'].replace('Z', '+00:00')).timestamp() <= time.time():
                         continue
                     refresh_at = job.get('league_refresh_at')
-                    if refresh_at and descriptor['handler'] in {
+                    if refresh_at and (job['descriptor']['handler'] in {
+                            'get_classification_round_catalog', 'get_finished_rounds', 'get_mvp_saved_catalog'
+                    } or descriptor['handler'] in {
                             'get_user_team_info', 'get_market_players', 'get_players_from_team',
                             'get_championship_pressroom', 'get_championship_players', 'get_roster_bids',
                             'get_my_market_players', 'get_player_summary', 'get_team_acquisition_capacity',
-                            'get_acquisition_capacity', 'get_financial_snapshot'}:
+                            'get_acquisition_capacity', 'get_financial_snapshot'}):
                         if datetime.fromisoformat(manifest['observed_at']) < datetime.fromisoformat(refresh_at):
                             continue
                     value = unpack_snapshot(manifest, item['chunks'])
@@ -1028,6 +1030,7 @@ class Worker:
                 run_descriptor = json.loads(canonical(job['descriptor']))
                 if job.get('league_refresh_at'):
                     run_descriptor['league_refresh'] = True
+                    run_descriptor['refresh_after'] = job['league_refresh_at']
                 audit = job.get('last_audit_at')
                 job['_full_audit'] = job['descriptor']['handler'] == 'get_championship_pressroom' and (not audit or
                     time.time() - datetime.fromisoformat(audit.replace('Z', '+00:00')).timestamp() >= 86400)

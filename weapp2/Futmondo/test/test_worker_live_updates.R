@@ -19,7 +19,7 @@ refresh_queue <- new.env(parent=emptyenv())
 rpc<-list()
 fm_worker_rpc<-function(name,payload,owner=''){
  rpc[[length(rpc)+1L]]<<-list(name=name,payload=payload)
- if(name %in% c('league_refresh','rival_refresh'))return(promises::promise(function(resolve, reject) {
+ if(name %in% c('league_refresh','rival_refresh','page_refresh'))return(promises::promise(function(resolve, reject) {
    refresh_queue$resolve <- resolve
    refresh_queue$reject <- reject
  }))
@@ -66,6 +66,14 @@ shiny::testServer(function(input,output,session){
  stopifnot(queued$name=='rival_refresh',identical(queued$payload,list(p_account=auth[['userid']],p_league='l',p_team='t')))
  refresh_queue$resolve(1L);flush(session)
  stopifnot(grepl('Rival standings',tail(messages,1),fixed=TRUE))
+ follow <- FALSE
+ fm_worker_refresh_league(auth,'l','t',session=session,manual=TRUE,feedback=feedback,page='classification',
+   label='Classification',selection=list(round_id='r14',history=FALSE),on_queued=function()follow<<-TRUE)
+ queued<-tail(rpc,1)[[1]]
+ stopifnot(queued$name=='page_refresh', identical(queued$payload,list(p_account=auth[['userid']],p_league='l',
+   p_team='t',p_page='classification',p_round='r14',p_history=FALSE)),!follow)
+ refresh_queue$resolve(3L);flush(session)
+ stopifnot(follow,startsWith(tail(messages,1),'Refresh queued for Classification'))
  sibling<-function()FALSE;attr(sibling,'fm_worker_interest')<-'inactive-sibling'
  fm_worker_demand(d,session$token,sibling)
  stopifnot(d$resource_key%in%fm_worker_live_keys(s))

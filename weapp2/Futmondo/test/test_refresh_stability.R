@@ -27,6 +27,24 @@ shiny::testServer(app_server,{
  before<-calls;session$setInputs(tabs='today',refresh_all=1);app_settle(session)
  added<-tail(calls,length(calls)-length(before))
  check('explicit Refresh still reloads shared primary resources',stopifnot(sum(added=='get_market_players')==1L,sum(added=='get_user_team_info')==1L))
+ # Exercise the production button branch without starting any source acquisition.
+ saved_mode <- fm_worker_mode
+ saved_refresh <- fm_worker_refresh_league
+ page_calls <- list()
+ fm_worker_mode <<- function(...) TRUE
+ fm_worker_refresh_league <<- function(login,league,team,session,manual,feedback,page,label,selection,on_queued){
+   page_calls[[length(page_calls)+1L]] <<- list(page=page,selection=selection,team=team,follow=is.function(on_queued))
+   invisible(TRUE)
+ }
+ for(tab in c('classification','today','lineup')){
+   session$setInputs(tabs=tab);app_settle(session)
+   count <- length(page_calls)
+   session$setInputs(refresh_all=count+2L);app_settle(session)
+   stopifnot(length(page_calls)==count+1L,identical(page_calls[[count+1L]]$page,tab))
+ }
+ stopifnot(length(page_calls[[1L]]$selection)==2L,page_calls[[3L]]$follow)
+ fm_worker_mode <<- saved_mode
+ fm_worker_refresh_league <<- saved_refresh
 })
 async_adapter_fetch<-original_async
 original_points<-recent_player_points_source;original_update<-updateReactable;original_state<-getReactableState

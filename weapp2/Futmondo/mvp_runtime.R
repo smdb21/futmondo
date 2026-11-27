@@ -780,7 +780,9 @@ get_award_round_metadata <- function(login,championship_id,league_id,refresh=FAL
   if(isTRUE(refresh))invalidate_resources(context,resources=resource)
   result<-get_cached_data(resource,{
     saved<-if(!isTRUE(refresh))read_saved()
-    if(!is.null(saved)&&same_scope(saved$scope)&&as.numeric(Sys.time())<saved$valid_until)return(saved)
+    after <- fm_time(get0(".futmondo_request_context",inherits=TRUE)$refresh_after)
+    if(!is.null(saved)&&same_scope(saved$scope)&&as.numeric(Sys.time())<saved$valid_until&&
+       (!length(after)||isTRUE(attr(saved,"observed_at")>=after)))return(saved)
     failed<-function(response){
       # A source failure cannot undo an observed partial phase. Keep only the
       # last positive partial IDs and their original clock, never its old final flags.

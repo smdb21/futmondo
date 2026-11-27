@@ -45,6 +45,26 @@ Refresh shares the floating control row with Home on signed-in league pages. Scr
 
 A service-only RPC authorizes the account and league, honors exclusions and source backoff, and coalesces rapid repeated clicks. The existing claim lanes prioritize explicitly due jobs and continue using the current pacing and retry limits. The browser keeps its normal persisted-version polling and resource-specific updates. Idle worker polling can add up to 30 seconds before a claim, and visible browser polling can add up to 15 seconds after publication. Queue contention, rate limits, and incomplete source observations can extend this. Apply the league-refresh migration before the matching app/worker version.
 
+## Refreshing the current page
+
+An explicit click on the floating Refresh button sends the signed-in page and selected league/team to the server. Classification also supplies the selected source round ID and whether the view uses team history. The server advances existing factual jobs through `worker_page_refresh`. Rivals retains its accounting-specific request. Ordinary navigation reads saved observations. Confirmed transactions continue to use their separate reconciliation request.
+
+| Page | Worker data requested |
+| --- | --- |
+| Classification | Selected round ranking, Best XI and calendar. Past rounds and ranges also refresh team round histories, the directory and the bonus calculation. A range refresh checks the live ranking jobs. |
+| Today’s market | Current listings, funds, spending capacity and league transfers. |
+| Lineup | Official lineup, roster, team rules, allowed formations, calendar and fixture details. The editor follows the four saved lineup inputs while the refreshed view is visible. Existing edits stay in the draft. |
+| My team | Squad, own listings, offers, team information and transfers. |
+| Players | Championship player catalog, team directory and own team information. |
+| Trends | Team histories, active rankings, calendar, teams, players and transfers. |
+| Round awards | Saved award catalog and championship player catalog. |
+| Rivals | Existing league inputs and the rival balance calculation. |
+| Notifications | The account’s notifications and unread count. |
+| Home | Team information, squad, calendar, spending capacity, transfers and unread count. |
+| Admin | Championship and team settings. |
+
+The RPC makes matching jobs due immediately. An available lane claims them ahead of routine work. A queued click can wait for the idle check (up to 30 seconds), work already running, or source pacing. Visible pages pick up published versions on their existing database check (up to 15 seconds after publication). A retry backoff remains in force. Repeated clicks coalesce pending work and an earlier leased run may need one follow-up. Score observations preceding the request cannot satisfy the requested round ranking. Valid post-request observations can be reused, including after process restart.
+
 ## Performance and rollout
 
 Apply `scripts/migrations/20261116183421_database_first_sync.sql` before deploying the matching R/Python image. The configured production database received it as `20261116213815_database_first_sync`; nine server-only invoker function/grant checks passed. No dependency, secret setting, process count or source concurrency increase is required. `FUTMONDO_WORKER_ENABLED=false` pauses collection and automatic connection while stored-data browsing remains available. An older application can use the compatibility RPCs during rollback, but its previous display behavior is outside this contract.

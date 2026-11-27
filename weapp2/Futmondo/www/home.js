@@ -53,6 +53,7 @@
       status.textContent = '';
     }
     $(document).on('shiny:inputchanged', function (event) {
+      if (event.name === 'tabs') clearStatus();
       if (event.name === 'selected_league' && event.value !== selectedLeague) {
         selectedLeague = event.value;
         clearStatus();
@@ -60,7 +61,7 @@
       if (event.name !== 'refresh_all' || !event.value) return;
       clearStatus();
       request = event.value;
-      status.textContent = 'Requesting league refresh…';
+      status.textContent = 'Requesting page refresh…';
     });
     $(document).on('shiny:disconnected', clearStatus);
     $(document).on('shiny:value', function (event) {

@@ -308,6 +308,46 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
     shiny::observeEvent(list(reload(),if(is.function(refresh_trigger))refresh_trigger()else 0L),{
       if(isTRUE(is_module_active())&&!is.null(identity())&&!isTRUE(saving()))fetch(TRUE)
     },ignoreInit=TRUE)
+    # The editor loads its four saved responses as a bundle. Follow their
+    # publications after a page refresh, retaining local edits on every read.
+    refresh_watch <- shiny::reactiveVal(NULL)
+    bundle_versions <- function(ctx, interest) {
+      state <- fm_worker_account_state(ctx$account_id)
+      vapply(lineup_bundle_routes, function(route) {
+        args <- list(route=route,query=c(list(championshipId=ctx$championship_id,
+          userteamId=ctx$user_team_id),lineup_route_extra(route)))
+        scope <- fm_worker_resolve_context('get_worker_http_read',args,ctx)
+        descriptor <- fm_worker_descriptor('get_worker_http_read',args,scope)
+        fm_worker_demand(descriptor,session$token,interest)
+        fm_worker_resource_revision(state,descriptor$resource_key)()
+        fm_scalar(fm_worker_get(ctx$account_id,descriptor$resource_key)$manifest$version,'')
+      },character(1),USE.NAMES=FALSE)
+    }
+    after_refresh <- function() {
+      who <- identity()
+      key <- key_for(who,draft_round())
+      ctx <- context()
+      interest <- function() !closed && isTRUE(is_module_active()) && identical(loaded_key,key)
+      attr(interest,'fm_worker_interest') <- paste(session$token,'lineup-page',sep='|')
+      before <- bundle_versions(ctx,interest)
+      function() {
+        if (shiny::isolate(interest())) refresh_watch(list(key=key,context=ctx,interest=interest,versions=before))
+      }
+    }
+    shiny::observe({
+      watch <- refresh_watch()
+      if (is.null(watch)) return()
+      if (!isTRUE(is_module_active()) || is.null(identity()) ||
+          !identical(key_for(identity(),draft_round()),watch$key)) {
+        refresh_watch(NULL)
+        return()
+      }
+      versions <- bundle_versions(watch$context,watch$interest)
+      if (any(!nzchar(versions)) || identical(versions,watch$versions) || loading() || saving()) return()
+      watch$versions <- versions
+      refresh_watch(watch)
+      fetch(force=TRUE,follow_official=TRUE)
+    })
     shiny::observeEvent(input$reload,{
       shiny::req(identity());best_request(NULL)
       if(is.function(clause_transfers_refresh))clause_transfers_refresh()else
@@ -1165,7 +1205,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
       shiny::req(pending,identical(pending$key,loaded_key),identical(pending$draft,lineup_identity(draft())))
       save_manual(pending$id)
     })
-    list(draft=shiny::reactive(draft()),official=shiny::reactive(if(is.null(source()))NULL else source()$official),
+    list(after_refresh=after_refresh,draft=shiny::reactive(draft()),official=shiny::reactive(if(is.null(source()))NULL else source()$official),
       source=shiny::reactive(source()),saving=shiny::reactive(saving()),scores=scores)
   })
 }

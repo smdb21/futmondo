@@ -139,8 +139,8 @@ body <- shinydashboard::dashboardBody(
     tags$button(type = "button", class = "btn fm-home-return", `data-fm-page` = "login",
       icon("house"), "Home"),
     actionButton("refresh_all", "Refresh", icon = icon("rotate"),
-      title = "Refresh league balances and players",
-      `aria-label` = "Refresh league balances and players")
+      title = "Refresh data for this page",
+      `aria-label` = "Refresh data for this page")
   )
 )
 
