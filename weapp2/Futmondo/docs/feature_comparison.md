@@ -224,6 +224,10 @@ comparison above and its verification limits still apply. No login-tier entry is
 added.
 
 
+## Scheduled clause buyouts on Home (2026-11-27)
+
+Futmondo documents paying a rival player’s clause from a player or squad card and configuring the delivery time after payment. LigaRadar’s existing Advanced scheduled-purchase feature also lists the selected team’s pending attempts on Home, including the reserved amount, opening time and status. This comparison used the public guide and app entry point. The authenticated official Home screen was not verified. [Official clause guide](https://help.futmondo.com/article/156-que-son-las-clausulas-y-como-activarlas) · [Official web app](https://app.futmondo.com/)
+
 ## Scheduled clause purchases — reviewed 2026-11-15
 
 The [official clause guide](https://help.futmondo.com/article/156-que-son-las-clausulas-y-como-activarlas) documents manual payment from player cards, timed locks/renewals, rival limits and delayed player delivery. The [official borrowing guide](https://help.futmondo.com/article/103-quiero-pujar-por-un-jugador-del-mercado-y-me-dice-que-no-tengo-saldo-suficiente) ties permitted debt to league configuration. Both were retrieved on 2026-11-15; their source publication/update dates do not establish an exhaustive current app specification. No authenticated official-app scheduling comparison was performed.

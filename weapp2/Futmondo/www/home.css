@@ -61,6 +61,8 @@ html:not(.fm-signed-in) .fm-theme-options:not([hidden]) {
 }
 #home_balance .fm-home-offers strong { font-size: inherit; color: var(--fm-text); }
 #home_squad .fm-team-trend-counts > div { gap: 4px; }
+#home_scheduled_buyouts > * { margin-top: 6px; }
+#home_scheduled_buyouts summary { cursor: pointer; }
 .fm-home-continue { border: 1px solid var(--fm-muted); border-radius: 4px; padding: 8px 12px; margin: 0 0 8px; background: var(--fm-surface); color: var(--fm-text); }
 .fm-home-continue i { margin-inline-start: 6px; }
 .fm-home-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 12px; }

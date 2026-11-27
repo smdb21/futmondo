@@ -1,5 +1,11 @@
 # Futmondo data review and implementation results
 
+## Scheduled clause buyouts on Home (2026-11-27)
+
+Home and the balance summary share the scoped reservation list. Home uses a separate Shiny output so roster updates do not replace an expanded list. The native disclosure expands in the browser. The change adds no polling, source requests or database queries.
+
+In the offline Home fixture, one synthetic reservation read supplied two active jobs. Navigating away and back added zero reads. The list excluded a foreign league, manual action and cancelled job, disappeared on a settled empty result, and reported a failed read. Chromium displayed the expanded player, amount, opening and status at 320 and 1440 px. Five welcome groups, 18 finance checks and the Shiny lifecycle (14 checks and eight tabs) passed.
+
 ## Compact player filters (2026-11-27)
 
 With all five championship checkboxes and the clause cap present, the expanded panel in the offline Chromium fixture shrank from 797 to 445 px at 320 px viewport width, from 795 to 379 px at 390 px, and from 268 to 174 px at 1440 px. Both layouts passed in light and dark themes, including wrapped position chips, accessible labels, cap validation, reset and page overflow checks. Checkbox labels retained at least 40 px of tap height. Fixture heartbeat responses took 67–93 ms.

@@ -191,13 +191,18 @@ function(input, output, session) {
       uiOutput("round_finance_status",inline=TRUE))
   })
   shiny::outputOptions(output,"account_finance_summary",suspendWhenHidden=FALSE)
+  selected_clause_jobs <- reactive({
+    req(valid_login(login_token_RV()))
+    league_context_revision()
+    fm_clause_jobs(resource_context(login_token_RV(), championship_id_RV(), user_team_id_RV()))
+  })
   round_finance_RV <- resource_display_source(session,function(){
     req(account_finance_visible())
     states <- list(team = primary_team_state(), market = primary_market_state())
     project <- session$userData$manual_finance_projection
     if (is.function(project) && isTRUE(account_finance_visible())) states <- project(states)
     finance <- round_finance_display(states$team, states$market)
-    if(fm_clause_enabled())finance<-fm_clause_finance(finance,fm_clause_jobs(resource_context(login_token_RV(),championship_id_RV(),user_team_id_RV())),states$team$data)
+    if(fm_clause_enabled())finance<-fm_clause_finance(finance,selected_clause_jobs(),states$team$data)
     finance$confirmed_actions <- isTRUE(states$confirmed_actions)
     finance$balance_observed_at <- states$team$observed_at
     finance
@@ -213,8 +218,16 @@ function(input, output, session) {
   shiny::outputOptions(output,"round_finance_amounts",suspendWhenHidden=FALSE)
   round_clause_pending_display <- resource_display_source(session,function(){
     if(!fm_clause_enabled())return(NULL)
-    req(valid_login(login_token_RV()))
-    fm_clause_pending_ui(fm_clause_jobs(resource_context(login_token_RV(),championship_id_RV(),user_team_id_RV())))
+    fm_clause_pending_ui(selected_clause_jobs())
+  })
+  output$home_scheduled_buyouts <- renderUI({
+    req(home_visible(), fm_clause_enabled())
+    jobs <- selected_clause_jobs()
+    if (is.null(jobs)) {
+      account <- fm_clause_account(login_token_RV()[["userid"]])
+      return(tags$small("Scheduled clause buyouts", if (is.null(account$error)) "· Loading…" else "· Unavailable"))
+    }
+    fm_clause_pending_ui(jobs, home = TRUE)
   })
   output$round_clause_pending <- renderUI(round_clause_pending_display())
   round_finance_status_display <- resource_display_source(session,function(){
@@ -501,7 +514,7 @@ function(input, output, session) {
     req(account_finance_visible())
     auth<-login_token_RV();league<-championship_id_RV();team<-user_team_id_RV()
     roster<-roster_source_readers$roster(login=auth,championship_id=league,user_team_id=team,teams=NULL)
-    jobs<-if(fm_clause_enabled())fm_clause_jobs(resource_context(auth,league,team))else list()
+    jobs<-if(fm_clause_enabled())selected_clause_jobs()else list()
     account_squad_display(roster,clause_transfers_RV(),primary_team_state(),
       active_offers=tryCatch(round_finance_card_RV()$active_offer_count,error=function(e)NA_real_),
       reserved_slots=fm_clause_reservations(jobs)$count)

@@ -1,5 +1,9 @@
 # Futmondo data architecture redesign plan
 
+## Scheduled clause buyouts on Home (2026-11-27)
+
+Home now shows the selected team’s active scheduled clause buyouts below Transfers using the existing reservation list. [Home behavior](page_preferences.md)
+
 ## Compact player filters (2026-11-27)
 
 Implemented locally. The shared player table groups selectors and limits together and lays out checkboxes in a responsive grid. [Player table layout](players_table_module.md#compact-filter-layout-2026-11-27)

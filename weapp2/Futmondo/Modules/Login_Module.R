@@ -48,7 +48,7 @@ login_feature_tiers <- function() {
         feature("trading_profit", "Compare profit on completed deals",
           "Inspect matched purchases, sales and fees alongside league trading profit and estimated wealth gained."),
         feature("scheduled_clauses", "Plan a capped clause purchase",
-          "Where enabled, approve a one-time attempt for a rival player’s published opening. Inspect reservations and the recorded outcome or cancel a pending attempt.")
+          "Where enabled, approve a one-time attempt for a rival player’s published opening. See scheduled buyouts on Home, review the recorded outcome or cancel a pending attempt.")
       ))
   )
 }

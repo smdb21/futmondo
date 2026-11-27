@@ -733,19 +733,22 @@ fm_clause_card_observers <- function(input,session,selected,auth,championship,te
  invisible(NULL)
 }
 
-fm_clause_pending_ui <- function(jobs) {
+fm_clause_pending_ui <- function(jobs, home=FALSE) {
  scheduled<-if(is.null(jobs))NULL else Filter(function(j)j$kind=='scheduled',jobs)
  r<-fm_clause_reservations(scheduled)
  amount<-if(is.finite(r$amount))paste0(format(round(r$amount),big.mark='.',decimal.mark=',',scientific=FALSE),' EUR')else'Unavailable'
  pending<-Filter(function(j)j$state%in%c('scheduled','preparing','dispatched','uncertain','accepted'),scheduled %||% list())
  eur<-function(x)if(is.finite(fm_number(x)))paste0(format(round(fm_number(x)),big.mark='.',decimal.mark=',',scientific=FALSE),' EUR')else'Unavailable'
  # Holds for submitted manual actions, including acknowledged offers.
- manual<-if(is.null(jobs))list()else Filter(function(j)identical(j$kind,'manual')&&j$state%in%c('dispatched','uncertain','accepted'),jobs)
+ if(home&&!length(pending))return(NULL)
+ manual<-if(home||is.null(jobs))list()else Filter(function(j)identical(j$kind,'manual')&&j$state%in%c('dispatched','uncertain','accepted'),jobs)
  shiny::tagList(
-  if(is.null(jobs)||length(pending))shiny::tags$details(class='round-countdown-finance-item',shiny::tags$summary(paste0('Scheduled clause purchases: ',amount,' (',if(is.finite(r$count))r$count else'?',')')),
+  if(is.null(jobs)||length(pending))shiny::tags$details(class='round-countdown-finance-item',shiny::tags$summary(
+    if(home)paste0('Scheduled clause buyouts (',length(pending),')') else
+      paste0('Scheduled clause purchases: ',amount,' (',if(is.finite(r$count))r$count else'?',')')),
    if(is.null(jobs))shiny::tags$p('Scheduled purchase information is unavailable.'),
    lapply(pending,function(j)shiny::tags$p(shiny::tags$strong(j$player_name %||% 'Unknown player'),' · ',eur(j$reserved_amount),' · opens ',fm_format_datetime(j$opens_at),' · ',fm_clause_status_text(j))),
-   if(length(pending))shiny::actionButton('clause_revoke','Cancel all scheduled purchases and revoke access',style='white-space:normal;max-width:100%;')),
+   if(!home&&length(pending))shiny::actionButton('clause_revoke','Cancel all scheduled purchases and revoke access',style='white-space:normal;max-width:100%;')),
   lapply(c('unconfirmed','accepted'),function(group){
    accepted<-identical(group,'accepted')
    entries<-Filter(function(j)identical(j$state,'accepted')==accepted,manual)

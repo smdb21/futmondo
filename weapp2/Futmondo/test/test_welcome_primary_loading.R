@@ -131,6 +131,57 @@ shiny::testServer(app_server,{
  stopifnot(startup_stage()=='ready',is.null(output$startup_status),offline_http_attempts==0L)
  cat('PASS a failed Today market read remains actionable and recovers after scoped retry\n')
 })
+# Drive the existing account reader with synthetic database replies. Skip the
+# scheduler's login/transaction lifecycle so this display test cannot send actions.
+local({
+ old_enabled <- fm_clause_enabled
+ old_session <- fm_clause_session
+ old_rpc <- fm_clause_rpc
+ on.exit({fm_clause_enabled <<- old_enabled; fm_clause_session <<- old_session; fm_clause_rpc <<- old_rpc})
+ fm_clause_enabled <<- function() TRUE
+ fm_clause_session <<- function(...) NULL
+ replies <- list()
+ reads <- 0L
+ fm_clause_rpc <<- function(name, payload, ...) {
+   stopifnot(name == 'read', identical(payload$p_account, app_auth[['userid']]))
+   reads <<- reads + 1L
+   promises::promise_resolve(list(jobs=replies))
+ }
+ clear_api_cache()
+ shiny::testServer(app_server, {
+   login_fixture(session)
+   ctx <- resource_context(login_token_RV(), championship_id_RV(), user_team_id_RV())
+   account <- fm_clause_account(ctx$account_id)
+   stopifnot(grepl('Loading…', output$home_scheduled_buyouts$html, fixed=TRUE))
+   job <- list(id='one', context=ctx, account_id=ctx$account_id, kind='scheduled', mode='clause',
+     player_name='Scheduled Player', player_id='target', state='scheduled',
+     opens_at='2027-01-15T17:30:00Z', reserved_slot=1, reserved_amount=1500)
+   second <- modifyList(job,list(id='two',player_name='Second Player',state='preparing'))
+   foreign <- modifyList(job,list(id='other',player_name='Other League',context=list(championship_id='other')))
+   manual <- modifyList(job,list(id='manual',kind='manual',player_name='Manual Player',state='scheduled'))
+   cancelled <- modifyList(job,list(id='cancelled',player_name='Cancelled Player',state='cancelled'))
+   set_jobs <- function(rows) {
+     replies <<- rows
+     fm_clause_refresh(ctx$account_id,session$token,force=TRUE)
+     app_settle(session)
+   }
+   set_jobs(list(job, second, foreign, manual, cancelled))
+   html <- output$home_scheduled_buyouts$html
+   stopifnot(grepl('Scheduled clause buyouts (2)',html,fixed=TRUE),grepl('Scheduled Player',html),
+     grepl('Second Player',html),grepl('1.500 EUR',html,fixed=TRUE),
+     grepl(fm_format_datetime(job$opens_at),html,fixed=TRUE),grepl('Preparing purchase',html),
+     !grepl('Other League|Manual Player|Cancelled Player|clause_revoke',html),reads==1L)
+   session$setInputs(tabs='today');app_settle(session)
+   session$setInputs(tabs='login');app_settle(session)
+   stopifnot(identical(output$home_scheduled_buyouts$html,html),reads==1L)
+   set_jobs(list(foreign,manual,cancelled))
+   stopifnot(is.null(output$home_scheduled_buyouts),reads==2L)
+   account$error <- 'Fixture read failure'
+   account$revision(account$revision()+1L);app_settle(session)
+   stopifnot(grepl('Unavailable',output$home_scheduled_buyouts$html),reads==2L)
+ })
+})
+cat('PASS Home reads scoped scheduled buyouts, tracks active states and reuses the same saved list on return\n')
 clear_api_cache();Sys.unsetenv('admin')
 get_active_championships<-function(...)list(championships=list(),leagues=list())
 shiny::testServer(app_server,{
@@ -144,4 +195,4 @@ shiny::testServer(app_server,{
   !grepl('data-fm-page="admin"',output$home_destinations$html))
  cat('PASS an account without a playable league keeps Home navigation and shows truthful empty metrics\n')
 })
-cat('WELCOME PRIMARY: 4 groups passed; no live HTTP or database mutations\n')
+cat('WELCOME PRIMARY: 5 groups passed; no live HTTP or database mutations\n')
