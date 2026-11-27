@@ -44,26 +44,18 @@ Updates a listed player by calling the verified single-player endpoints in order
 Queries all players currently listed on the transfer market by the logged-in user via `POST https://api.futmondo.com/1/market/myplayers`.
 * **Returns**: Data frame of the user's listed market players.
 
-### E. `accept_bid(login, championship_id, team_id, player_id, bid_id)`
-Accepts a received offer, selling the player and crediting funds immediately via `POST https://api.futmondo.com/1/market/acceptbid`.
-* **Parameters**:
-  - `login`: Auth token list (`token`, `userid`).
-  - `championship_id`: Active championship ID string.
-  - `team_id`: User team ID string.
-  - `player_id`: Player ID string.
-  - `bid_id`: The ID of the incoming bid to accept.
-* **Returns**: `list(success, code, message)`.
+### E. Accepting and rejecting received offers (2026-11-26)
 
-### F. `reject_bid(login, championship_id, team_id, player_id, bid_id)`
-Rejects a received offer via `POST https://api.futmondo.com/1/market/rejectbid`.
-* **Parameters**:
-  - `login`: Auth token list (`token`, `userid`).
-  - `championship_id`: Active championship ID string.
-  - `team_id`: User team ID string.
-  - `player_id`: Player ID string.
-  - `bid_id`: The ID of the incoming bid to reject.
-* **Returns**: `list(success, code, message)`.
+The card captures the selected bid ID, amount and displayed bidder when the confirmation opens. On confirmation, `accept_bid()` and `reject_bid()` read the current player with `POST /1/player/summary` using `championshipId`, `userteamId` and `playerId`. The owner and player must match. The confirmed bid ID must occur exactly once across the two incoming offer collections. The card also checks the amount, bidder label and any known bidder team ID.
 
+| Player summary collection | Accept route | Reject route |
+| --- | --- | --- |
+| `answer.market.bids[]` | `/1/market/acceptbid` | `/1/market/rejectbid` |
+| `answer.market.direct[]` | `/1/market/acceptrosterbid` | `/1/market/rejectrosterbid` |
+
+Each decision is a single authenticated POST with `query = {championshipId, userteamId, player_id, bid}`. The bid is the selected collection entry’s `id`. The player comes from `answer.data.id` or `_id`. The client builds an empty object for the request’s `answer`. The action checks `answer.code` for `api.general.ok`. An ambiguous acknowledgement triggers a factual update of the affected roster, offers and finances. A concurrent withdrawal or change requires a new confirmation. The previous first-bid fallback could select a different offer.
+
+The public client maps listing and direct arrays through the same bid parser. Its confirmation callbacks dispatch to separate routes according to the array that supplied the row. The inspected bundle had SHA-256 `08202076259d1678c7557478771d3aa38b5099f42044630569c704fdb7a7cd1c`. Existing local read captures corroborate the summary structure and the immutable bid IDs across roster and listing responses. The reported screenshot contains only the rejection code. Its offer type and server-side state remain unknown. [Official Futmondo client](https://app.futmondo.com/main.dart.js)
 
 ## Bulk listing premium and preview — 2026-11-10
 

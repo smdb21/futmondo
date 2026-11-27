@@ -22,8 +22,6 @@ PUT_ALL_ON_MARKET_URL <- "https://api.futmondo.com/5/market/putallonmarket"
 MY_PLAYERS_URL <- "https://api.futmondo.com/1/market/myplayers"
 ROSTER_BIDS_URL <- "https://api.futmondo.com/1/market/rosterbids"
 ROSTER_CLAUSE_URL <- "https://api.futmondo.com/1/market/rosterclause"
-ACCEPT_BID_URL <- "https://api.futmondo.com/1/market/acceptbid"
-REJECT_BID_URL <- "https://api.futmondo.com/1/market/rejectbid"
 API_CODE_OK <- "api.general.ok"
 PHOTO_URL <- "https://static01.mondocore.com/futmondo/img/faces/64"
 LINEUP_URL <- "https://api.futmondo.com/1/userteam/lineup"
@@ -3660,64 +3658,105 @@ get_my_market_players <- function(login, championship_id, user_team_id) {
   }, timeout_sec = 60, context=resource_context(login=login,championship_id=championship_id,user_team_id=user_team_id))
 }
 
-accept_bid <- function(login, championship_id, team_id, player_id, bid_id) {
-  payload <- list(
-    header = list(
-      token = login[["token"]],
-      userid = login[["userid"]]
-    ),
-    query = list(
-      championshipId = as.character(championship_id),
-      userteamId = as.character(team_id),
-      bid = as.character(bid_id),
-      player_id = as.character(player_id)
-    ),
-    answer = list()
-  )
-  headers <- c("Content-Type" = "application/json; charset=utf-8")
-  print(paste0("[API] Accepting offer bid: ", bid_id, " for player: ", player_id))
-  response <- futmondo_post(ACCEPT_BID_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
-  ans <- httr::content(response)
+# Native player summary keeps listing bids and direct roster offers in separate
+# collections. The same bidder can appear in either collection.
+received_offer_collection <- function(summary, team_id, player_id, bid_id, expected) {
+  if (!is.list(summary$data) || !is.list(summary$championship$owner) || isTRUE(summary$championship$owner$computer) ||
+      !identical(fm_scalar(summary$data$id %||% summary$data$`_id`, ""), player_id) ||
+      !identical(fm_scalar(summary$championship$owner$`_id` %||% summary$championship$owner$id, ""), team_id) ||
+      !is.list(summary$market) || !nzchar(bid_id)) return(NULL)
 
-  operation_code <- if (!is.null(ans) && "answer" %in% names(ans) && "code" %in% names(ans$answer)) ans$answer$code else ""
-  err_msg <- if (!is.null(ans) && "answer" %in% names(ans) && "msg" %in% names(ans$answer)) ans$answer$msg else if (!is.null(ans) && "answer" %in% names(ans) && "message" %in% names(ans$answer)) ans$answer$message else operation_code
-
-  is_success <- (operation_code == API_CODE_OK)
-  return(list(
-    success = is_success,
-    code = operation_code,
-    message = err_msg
-  ))
+  matches <- list()
+  for (kind in c("bids", "direct")) {
+    for (bid in summary$market[[kind]]) {
+      if (!is.list(bid) || !identical(fm_scalar(bid$id, ""), bid_id)) next
+      matches[[length(matches) + 1L]] <- list(kind = kind, bid = bid)
+    }
+  }
+  if (length(matches) != 1L) return(NULL)
+  match <- matches[[1L]]
+  if (!is.null(expected)) {
+    row <- normalize_received_offer(match$bid, player_id)
+    if (!identical(row$bid_price, expected$price) ||
+        !identical(offer_bidder_label(row$bid_user, row$bid_source, row$bidder_team_id), expected$label) ||
+        (nzchar(expected$team) && !identical(row$bidder_team_id, expected$team))) return(NULL)
+  }
+  match$kind
 }
 
-reject_bid <- function(login, championship_id, team_id, player_id, bid_id) {
-  payload <- list(
-    header = list(
-      token = login[["token"]],
-      userid = login[["userid"]]
-    ),
-    query = list(
-      championshipId = as.character(championship_id),
-      userteamId = as.character(team_id),
-      bid = as.character(bid_id),
-      player_id = as.character(player_id)
-    ),
-    answer = list()
-  )
-  headers <- c("Content-Type" = "application/json; charset=utf-8")
-  print(paste0("[API] Rejecting offer bid: ", bid_id, " for player: ", player_id))
-  response <- futmondo_post(REJECT_BID_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
-  ans <- httr::content(response)
+received_offer_decision <- function(action, login, championship_id, team_id, player_id, bid_id,
+                                    expected, owner, current) {
+  sent <- FALSE
+  failure <- function(code, message) list(success = FALSE, code = code, message = message)
+  unavailable <- function(error) {
+    if (sent) failure("uncertain", "Futmondo did not confirm the decision. Check your offers and roster before acting again.")
+    else failure("unavailable", "The current offer could not be verified. No decision was sent.")
+  }
+  headers <- c(`Content-Type` = "application/json; charset=utf-8")
+  payload <- build_direct_sell_payload(login, championship_id, team_id, player_id)
+  read_payload <- payload
+  read_payload$query$playerId <- read_payload$query$player_id
+  read_payload$query$player_id <- NULL
+  payload$query$bid <- bid_id
+  encode <- function(x) jsonlite::toJSON(x, auto_unbox = TRUE)
+  decode <- function(response) jsonlite::fromJSON(rawToChar(response$content), simplifyVector = FALSE)
+  parse_result <- function(response) {
+    envelope <- decode(response)
+    answer <- envelope$answer
+    codes <- c(envelope$code, answer$code)
+    if (!length(codes)) return(unavailable(NULL))
+    rejected <- codes[codes != API_CODE_OK]
+    if (length(rejected)) {
+      code <- fm_scalar(rejected[[1]], "")
+      if (!grepl("^api[.][A-Za-z0-9_.-]{1,90}$", code)) return(unavailable(NULL))
+      message <- if (identical(code, "api.error.not_found")) "Futmondo could no longer find this offer."
+        else fm_scalar(answer$msg %||% answer$message, code)
+      return(failure(code, message))
+    }
+    if (!identical(answer$code, API_CODE_OK) || isTRUE(envelope$error) || isTRUE(answer$error)) return(unavailable(NULL))
+    list(success = TRUE, code = API_CODE_OK, message = API_CODE_OK)
+  }
+  dispatch <- function(response) {
+    body <- decode(response)
+    if (isTRUE(body$error) || isTRUE(body$answer$error) ||
+        any(c(body$code, body$answer$code) != API_CODE_OK) || !is.list(body$answer$market)) return(unavailable(NULL))
+    kind <- received_offer_collection(body$answer, team_id, player_id, bid_id, expected)
+    if (is.null(kind)) return(failure("offer_changed", "This offer changed or is no longer available. Review the updated offers."))
+    route <- if (kind == "direct") paste0(action, "rosterbid") else paste0(action, "bid")
+    url <- paste0("https://api.futmondo.com/1/market/", route)
+    verified_at <- Sys.time()
+    guard <- function() {
+      if (!isTRUE(current()) || as.numeric(difftime(Sys.time(), verified_at, units = "secs")) > 15) return(FALSE)
+      sent <<- TRUE
+      TRUE
+    }
+    if (is.null(owner)) {
+      if (!guard()) return(unavailable(NULL))
+      return(parse_result(futmondo_post(url, body = encode(payload), add_headers(.headers = headers))))
+    }
+    promises::then(fm_async_http(url, "POST", encode(payload), headers, owner = owner,
+      priority = "interactive", before_dispatch = guard), parse_result)
+  }
+  tryCatch({
+    if (!valid_login(login) || !all(vapply(list(championship_id, team_id, player_id, bid_id),
+        function(x) nzchar(fm_scalar(x, "")), logical(1)))) return(unavailable(NULL))
+    if (is.null(owner)) return(dispatch(futmondo_post(PLAYER_SUMMARY_URL, body = encode(read_payload),
+      add_headers(.headers = headers))))
+    read <- fm_async_read_http(PLAYER_SUMMARY_URL, "POST", encode(read_payload), headers, owner = owner, priority = "interactive")
+    promises::catch(promises::then(read, dispatch), unavailable)
+  }, error = unavailable)
+}
 
-  operation_code <- if (!is.null(ans) && "answer" %in% names(ans) && "code" %in% names(ans$answer)) ans$answer$code else ""
-  err_msg <- if (!is.null(ans) && "answer" %in% names(ans) && "msg" %in% names(ans$answer)) ans$answer$msg else if (!is.null(ans) && "answer" %in% names(ans) && "message" %in% names(ans$answer)) ans$answer$message else operation_code
+accept_bid <- function(login, championship_id, team_id, player_id, bid_id,
+                       expected = NULL, owner = NULL, current = function() TRUE) {
+  received_offer_decision("accept", login, championship_id, as.character(team_id), as.character(player_id),
+    as.character(bid_id), expected, owner, current)
+}
 
-  is_success <- (operation_code == API_CODE_OK)
-  return(list(
-    success = is_success,
-    code = operation_code,
-    message = err_msg
-  ))
+reject_bid <- function(login, championship_id, team_id, player_id, bid_id,
+                       expected = NULL, owner = NULL, current = function() TRUE) {
+  received_offer_decision("reject", login, championship_id, as.character(team_id), as.character(player_id),
+    as.character(bid_id), expected, owner, current)
 }
 
 # Shared account-aware finance and notification contracts (docs/data_contracts.md).

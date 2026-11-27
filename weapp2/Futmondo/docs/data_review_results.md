@@ -8,6 +8,14 @@ The reported rejection exposed a routing defect. LigaRadar sent direct roster of
 
 My Team offer checks passed (10), durable offer persistence checks passed (8), and the offline Shiny lifecycle passed (14 checks and eight tabs). No live sale or rejection was attempted. Production deployment and the result for the reported offer remain unverified.
 
+## Received offer decisions (2026-11-26)
+
+The reported rejection exposed a routing defect. LigaRadar sent direct roster offers to the listing-bid endpoint. Both accept and reject now verify the selected offer and use its source collection. The old path could also replace an unidentified bid with the first bid on a player. [Request contract and evidence](market_selling.md#e-accepting-and-rejecting-received-offers-2026-11-26)
+
+`test/test_received_offer_decisions.R` passed all four route fixtures and exercised the actual card with a delayed summary, duplicate confirmation, changed price/party/ID, duplicate ID, context switch, explicit rejection, confirmed success and a lost acknowledgement. A normal confirmation makes one asynchronous player-summary read and one single-attempt decision request. Opening the dialog made zero requests. Another event-loop callback completed with the summary still pending. The existing worker refresh reuses the scoped database observation path after decisions. No schema, polling, or dependencies changed.
+
+My Team offer checks passed (10), durable offer persistence checks passed (8), and the offline Shiny lifecycle passed (14 checks and eight tabs). No live sale or rejection was attempted. Production deployment and the result for the reported offer remain unverified.
+
 ## Round schedule wording (2026-11-26)
 
 The Home browser fixture uses a stale saved calendar. Chromium displayed the closed round, the next round’s kickoff with its timezone, a separate “Time until kickoff” row with duration units, and a warning that round status and kickoff times may have changed. The rows fit at 320, 390 and 1440 px. The fresh calendar fixture omitted the warning.

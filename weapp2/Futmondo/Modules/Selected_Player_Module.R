@@ -281,6 +281,11 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         row$user_team_id <- player_card_owner_id(row)
         state<-card_states$summary()
         previous<-player_availability_remember_target(session,identity)
+        # Availability is shared per player. Incoming offers belong to the selected row.
+        if (!is.null(previous)) {
+          for (field in c("bid_price", "bid_user", "bid_id", "bid__id", "bidder_team_id", "bid_source"))
+            previous[[field]] <- row[[field]]
+        }
         latest<-function(value){
           stamps<-c(fm_time(attr(value,"observed_at") %||% if(is.data.frame(value)&&"observed_at"%in%names(value))value$observed_at[1]else NULL),fm_time(attr(value,"availability_market_observed_at")))
           stamps<-stamps[!is.na(stamps)];if(length(stamps))max(as.numeric(stamps))else -Inf
@@ -1014,27 +1019,30 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     })
 
     # ---- Shared received-offer confirmation modal ----
-    open_accept_offer_modal <- function() {
+    received_decision_pending <- FALSE
+    open_received_offer_modal <- function(action) {
       sp <- selected_player()
-      req(sp)
-      rec_offer_price <- if ("bid_price" %in% names(sp)) suppressWarnings(as.numeric(sp$bid_price)) else NA_real_
-      if (length(rec_offer_price) != 1L || !is.finite(rec_offer_price) || rec_offer_price <= 0) {
-        shiny::showNotification("This received offer is no longer available. Please refresh and try again.", type = "warning")
+      req(sp, !received_decision_pending, player_card_is_own_player(sp, get_reactive_val(user_team_id)))
+      id <- fm_scalar(sp$bid_id, "")
+      if (!nzchar(id)) id <- fm_scalar(sp$bid__id, "")
+      offer <- list(id = id, price = fm_number(sp$bid_price), team = fm_scalar(sp$bidder_team_id, ""),
+        label = offer_bidder_label(sp$bid_user, sp$bid_source, sp$bidder_team_id))
+      if (!nzchar(id) || !is.finite(offer$price) || offer$price <= 0) {
+        showNotification("The selected offer is missing its ID or amount. Refresh My Team to check the current offer.", type = "warning")
         return(invisible(FALSE))
       }
-      rec_offer_bidder <- offer_bidder_label(sp$bid_user, sp$bid_source, sp$bidder_team_id)
-      remember_action_context("accept")
+      accept <- identical(action, "accept")
+      title <- if (accept) "Accept Offer" else "Reject Offer"
+      remember_action_context(action)
+      remember_bid(action, offer)
       showModal(modalDialog(
-        title = tagList(icon("circle-check"), paste0(" Accept Offer for ", sp$name)),
-        p(strong(sp$name)),
-        p("Are you sure you want to ACCEPT the received offer of ", strong(player_card_money(rec_offer_price)), " from ", strong(rec_offer_bidder), "?"),
-        p(style = "color: var(--fm-text); font-size: 13px; font-weight: 600;", "The player will be sold and funds added to your budget immediately."),
-        footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
-                     modalButton("Cancel"),
-                     actionButton(ns("submit_accept_offer"), "Confirm Accept Offer", class = "btn btn-offer-money")),
-        easyClose = TRUE,
-        size = "s"
-      ))
+        title = tagList(icon(if (accept) "circle-check" else "circle-xmark"), paste(title, "for", sp$name)),
+        p(paste(if (accept) "Accept" else "Reject", "the offer of "), strong(player_card_money(offer$price)),
+          " from ", strong(offer$label), "?"),
+        if (accept) p("Accepting sells this player and credits your budget."),
+        footer = tagList(modalButton("Cancel"), actionButton(ns(paste0("submit_", action, "_offer")),
+          paste("Confirm", title), class = if (accept) "btn btn-offer-money" else "btn btn-cancel-bid")),
+        easyClose = TRUE, size = "s"))
       invisible(TRUE)
     }
 
@@ -1064,7 +1072,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         } else if (identical(act, "clause_buyout")) {
           open_clause_buyout_modal(sp)
         } else {
-          open_accept_offer_modal()
+          open_received_offer_modal("accept")
         }
       }, ignoreNULL = TRUE)
     }
@@ -1416,159 +1424,46 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
       }
     })
 
-    # ---- Accept Received Offer Modal ----
-    observeEvent(input$btn_accept_offer, open_accept_offer_modal())
+    observeEvent(input$btn_accept_offer, open_received_offer_modal("accept"))
+    observeEvent(input$btn_reject_offer, open_received_offer_modal("reject"))
 
-    # ---- Submit Accept Received Offer ----
-    observeEvent(input$submit_accept_offer, {
-      req(consume_action_context("accept"))
-      sp <- selected_player()
+    submit_received_offer <- function(action) {
+      req(!received_decision_pending, consume_action_context(action))
+      context <- player_action_context_RV()
       login <- get_reactive_val(login_token)
-      champ_id <- get_reactive_val(championship_id)
-      team_id <- get_reactive_val(user_team_id)
-      req(sp, login, champ_id, team_id)
-
-      player_id <- as.character(sp$id)
-      bid_id <- NULL
-
-      if ("bid_id" %in% colnames(sp) && !is.na(sp$bid_id) && sp$bid_id != "") {
-        bid_id <- as.character(sp$bid_id)
-      } else if ("bid__id" %in% colnames(sp) && !is.na(sp$bid__id) && sp$bid__id != "") {
-        bid_id <- as.character(sp$bid__id)
-      } else {
-        sum_res <- tryCatch({
-          get_player_summary(login = login, championship_id = champ_id, user_team_id = team_id, player_id = player_id)
-        }, error = function(e) NULL)
-        if (!is.null(sum_res) && !is.null(sum_res$bids) && is.list(sum_res$bids) && length(sum_res$bids) > 0) {
-          first_b <- sum_res$bids[[1]]
-          if (is.list(first_b) && !is.null(first_b[["id"]])) {
-            bid_id <- as.character(first_b[["id"]])
+      offer <- modal_bid_info_RV()[[action]]
+      player_name <- selected_player()$name
+      req(offer, valid_login(login))
+      current <- function() !session$isClosed() && identical(isolate(player_action_context_RV()), context)
+      received_decision_pending <<- TRUE
+      showModal(modalDialog(title = paste("Checking the offer for", player_name),
+        "Waiting for Futmondo to verify the offer and confirm your decision.", footer = NULL, easyClose = FALSE))
+      decide <- if (action == "accept") accept_bid else reject_bid
+      pending <- decide(login = login, championship_id = context$championship, team_id = context$team,
+        player_id = context$player, bid_id = offer$id, expected = offer, owner = session$token, current = current)
+      promises::then(promises::promise_resolve(pending), function(result) {
+        received_decision_pending <<- FALSE
+        success <- isTRUE(result$success)
+        if (success || result$code %in% c("offer_changed", "uncertain", "api.error.not_found")) {
+          invalidate_manual_resources(login, context$championship, context$team, context$player)
+          queued <- fm_worker_refresh_league(login, context$championship, context$team, context$player)
+          if (!queued && current() && is.function(on_bid_updated)) {
+            event <- if (!success) "refresh" else if (action == "accept") "offer_accepted" else "offer_rejected"
+            tryCatch(on_bid_updated(action_type = event, player_id = context$player,
+              new_bid_price = NA_real_, is_cancel = success), error = function(e) NULL)
           }
         }
-      }
-
-      if (is.null(bid_id) || bid_id == "") {
-        shiny::showNotification("Could not identify the received bid ID. Please try again.", type = "error")
-        return()
-      }
-
-      res <- accept_bid(
-        login = login,
-        championship_id = champ_id,
-        team_id = team_id,
-        player_id = player_id,
-        bid_id = bid_id
-      )
-
-      is_success <- if (is.list(res)) isTRUE(res$success) else isTRUE(res)
-
-      removeModal()
-
-      if (is_success) {
-        shiny::showNotification(
-          paste0("Offer accepted! ", sp$name, " sold successfully."),
-          type = "message",
-          duration = 5
-        )
-        invalidate_manual_resources(login,champ_id,team_id,sp$id)
-        sync_requested <- fm_worker_refresh_league(login,champ_id,team_id,sp$id)
-        if (!sync_requested && is.function(on_bid_updated)) {
-          tryCatch(on_bid_updated(action_type = "offer_accepted", player_id = player_id, new_bid_price = NA_real_, is_cancel = TRUE), error = function(e) NULL)
+        if (current()) {
+          removeModal()
+          message <- if (!success) result$message else if (action == "accept") paste(player_name, "sold successfully.")
+            else paste("Offer rejected for", player_name)
+          showNotification(message, type = if (success) "message" else "warning", duration = 8)
         }
-      } else {
-        err_msg <- if (is.list(res) && !is.null(res$message) && res$message != "") res$message else "Accept failed. Please try again."
-        shiny::showNotification(
-          paste0("Failed to accept offer: ", err_msg),
-          type = "error",
-          duration = 6
-        )
-      }
-    })
-
-    # ---- Reject Received Offer Modal ----
-    observeEvent(input$btn_reject_offer, {
-      remember_action_context("reject")
-      sp <- selected_player()
-      req(sp)
-      rec_offer_price <- suppressWarnings(as.numeric(sp$bid_price))
-      rec_offer_bidder <- offer_bidder_label(sp$bid_user, sp$bid_source, sp$bidder_team_id)
-
-      showModal(modalDialog(
-        title = tagList(icon("circle-xmark"), paste0(" Reject Offer for ", sp$name)),
-        p(strong(sp$name)),
-        p("Are you sure you want to REJECT the received offer of ", strong(player_card_money(rec_offer_price)), " from ", strong(rec_offer_bidder), "?"),
-        footer = div(style = "text-align: center; width: 100%; display: flex; justify-content: center; gap: 10px;",
-                     modalButton("Cancel"),
-                     actionButton(ns("submit_reject_offer"), "Confirm Reject Offer", class = "btn btn-cancel-bid")),
-        easyClose = TRUE,
-        size = "s"
-      ))
-    })
-
-    # ---- Submit Reject Received Offer ----
-    observeEvent(input$submit_reject_offer, {
-      req(consume_action_context("reject"))
-      sp <- selected_player()
-      login <- get_reactive_val(login_token)
-      champ_id <- get_reactive_val(championship_id)
-      team_id <- get_reactive_val(user_team_id)
-      req(sp, login, champ_id, team_id)
-
-      player_id <- as.character(sp$id)
-      bid_id <- NULL
-
-      if ("bid_id" %in% colnames(sp) && !is.na(sp$bid_id) && sp$bid_id != "") {
-        bid_id <- as.character(sp$bid_id)
-      } else if ("bid__id" %in% colnames(sp) && !is.na(sp$bid__id) && sp$bid__id != "") {
-        bid_id <- as.character(sp$bid__id)
-      } else {
-        sum_res <- tryCatch({
-          get_player_summary(login = login, championship_id = champ_id, user_team_id = team_id, player_id = player_id)
-        }, error = function(e) NULL)
-        if (!is.null(sum_res) && !is.null(sum_res$bids) && is.list(sum_res$bids) && length(sum_res$bids) > 0) {
-          first_b <- sum_res$bids[[1]]
-          if (is.list(first_b) && !is.null(first_b[["id"]])) {
-            bid_id <- as.character(first_b[["id"]])
-          }
-        }
-      }
-
-      if (is.null(bid_id) || bid_id == "") {
-        shiny::showNotification("Could not identify the received bid ID. Please try again.", type = "error")
-        return()
-      }
-
-      res <- reject_bid(
-        login = login,
-        championship_id = champ_id,
-        team_id = team_id,
-        player_id = player_id,
-        bid_id = bid_id
-      )
-
-      is_success <- if (is.list(res)) isTRUE(res$success) else isTRUE(res)
-
-      removeModal()
-
-      if (is_success) {
-        shiny::showNotification(
-          paste0("Offer rejected for ", sp$name, "."),
-          type = "message",
-          duration = 5
-        )
-        invalidate_manual_resources(login,champ_id,team_id,sp$id)
-        if (!is.null(on_bid_updated) && is.function(on_bid_updated)) {
-          tryCatch(on_bid_updated(action_type = "offer_rejected", player_id = player_id, new_bid_price = NA_real_, is_cancel = TRUE), error = function(e) NULL)
-        }
-      } else {
-        err_msg <- if (is.list(res) && !is.null(res$message) && res$message != "") res$message else "Reject failed. Please try again."
-        shiny::showNotification(
-          paste0("Failed to reject offer: ", err_msg),
-          type = "error",
-          duration = 6
-        )
-      }
-    })
+        NULL
+      })
+    }
+    observeEvent(input$submit_accept_offer, submit_received_offer("accept"))
+    observeEvent(input$submit_reject_offer, submit_received_offer("reject"))
 
     history_refresh_trigger <- round_history_refresh_trigger(session)
     history_refresh <- reactive(paste(history_refresh_trigger(),input$refresh_history %||% 0L,sep=":"))

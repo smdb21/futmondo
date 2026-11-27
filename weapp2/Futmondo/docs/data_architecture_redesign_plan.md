@@ -4,6 +4,10 @@
 
 - [x] Verify the displayed offer against the live player summary on confirmation, use the Futmondo route for its collection, and reconcile stale or uncertain outcomes through the factual worker. Offline verification is recorded in [data review results](data_review_results.md#received-offer-decisions-2026-11-26). Hosted transaction verification remains open.
 
+## Received offer decisions (2026-11-26)
+
+- [x] Verify the displayed offer against the live player summary on confirmation, use the Futmondo route for its collection, and reconcile stale or uncertain outcomes through the factual worker. Offline verification is recorded in [data review results](data_review_results.md#received-offer-decisions-2026-11-26). Hosted transaction verification remains open.
+
 ## Points and ranks (2026-11-26)
 
 - [x] Combine cumulative points and ranks in the Points tab. Both views reuse the selected published-round interval and season totals. [Plot behavior](plots_module.md#points-and-ranks-2026-11-26)
