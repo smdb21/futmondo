@@ -2736,3 +2736,7 @@ An explicit unpublished XI releases its provider credit reservation and retains 
 ### Shared StrikerAPI responses · 2026-11-26
 
 The manual checker stores public schedules by league and UTC date, team sheets by league and game ID, and squads by league, club and season. A database hit needs no credit reservation. Cross-worker leases coalesce simultaneous acquisition and preserve each user's private fantasy mappings. [Storage contract](lineup_module.md#shared-provider-responses)
+
+## Home notification count · 2026-11-26
+
+Implemented locally. The Home Notifications button displays the existing account unread count alongside its label. [Notification display](notifications_module.md#home-notifications-button)

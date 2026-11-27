@@ -74,6 +74,11 @@ html:not(.fm-signed-in) .fm-theme-options:not([hidden]) {
 }
 .fm-home-tile-copy { overflow-wrap: anywhere; }
 .fm-home-tile-copy strong { display: block; font-size: 16px; line-height: 1.25; }
+.fm-home-unread-count {
+  display: inline-block; min-width: 1.6em; padding: 0 .4em; border-radius: 1em;
+  background: var(--fm-warning); color: var(--fm-surface); text-align: center;
+  font-size: 12px; line-height: 1.6; vertical-align: middle;
+}
 .fm-home-tile-copy small { margin-top: 4px; }
 .fm-home-settings { margin: 22px 0 0; border-top: 1px solid var(--fm-border); padding-top: 6px; }
 .fm-home-settings > summary { cursor: pointer; padding: 14px 2px; width: fit-content; }

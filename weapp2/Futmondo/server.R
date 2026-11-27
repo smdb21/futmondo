@@ -299,7 +299,9 @@ function(input, output, session) {
         p <- pages[i, ]
         tags$button(type = "button", class = "fm-home-tile", `data-fm-page` = p$tab,
           tags$span(class = "fm-home-icon", icon(p$icon)),
-          tags$span(class = "fm-home-tile-copy", tags$strong(p$label), tags$small(p$detail)))
+          tags$span(class = "fm-home-tile-copy",
+            tags$strong(p$label, if (p$tab == "notifications") uiOutput("home_notification_badge", inline = TRUE)),
+            tags$small(p$detail)))
       }))
   })
   output$home_continue <- renderUI({
@@ -428,6 +430,12 @@ function(input, output, session) {
   notifications <- notifications_Server("notifications", reactive(input$tabs == "notifications"),
     login_token_RV, championship_id_RV, user_team_id_RV, user_teams_RV, refresh_trigger,
     on_market_event=function(...)refresh_trigger(isolate(refresh_trigger())+1L),startup_ready=startup_primary_ready)
+  output$home_notification_badge <- renderUI({
+    req(valid_login(login_token_RV()))
+    n <- notifications$unread()
+    if (is.finite(n) && n > 0)
+      tags$span(class = "fm-home-unread-count", n, tags$span(class = "sr-only", " unread"))
+  })
   output$notification_bell <- renderUI({
     if (!valid_login(login_token_RV())) return(NULL)
     n <- notifications$unread()

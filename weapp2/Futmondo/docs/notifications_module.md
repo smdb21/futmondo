@@ -2,7 +2,7 @@
 
 The notification bell and inbox show official Futmondo events, unread counts, filters, and player links. Generated recommendation alerts and model-driven event storage are excluded.
 
-`notifications_UI(id)` creates the view. `notifications_Server()` uses reactive account/league/team context and returns unread state for the header. Opening a player reference uses the same context-scoped player card as the roster and market.
+`notifications_UI(id)` creates the view. `notifications_Server()` uses reactive account/league/team context and returns the account unread count used by the header bell and the Home Notifications button. Opening a player reference uses the same context-scoped player card as the roster and market.
 
 Read state changes only after explicit interaction and successful Futmondo acknowledgement. A failed acknowledgement must leave the item unread. Switching context clears pending event/action state. Notification content is escaped before display.
 
@@ -48,3 +48,7 @@ Expanding or collapsing the box retains selections; notification status and
 cards remain outside it. Input IDs, defaults, filtering, refresh, source reads
 and database-backed reuse are unchanged. No new dependency, observer, timer,
 request, persistent setting or CSS is needed.
+
+## Home Notifications button
+
+Home displays the exact positive unread count beside the Notifications label in the same theme color as the header dot. Screen readers receive the number followed by “unread”. The badge clears when the count is zero or unavailable. The button opens the existing inbox. Only the badge subscribes to count changes, so updates preserve keyboard focus and the other Home buttons.

@@ -30,7 +30,17 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
       const dotBounds = await dot.boundingBox();
       assert.ok(dotBounds && dotBounds.width === 7 && dotBounds.height === 7, 'Unread header dot stays compact');
       assert.equal(await bell.getAttribute('title'), 'Notifications (1 unread)');
-      await bell.click();
+      const tile = page.locator('.fm-home-tile[data-fm-page="notifications"]');
+      const badge = tile.locator('.fm-home-unread-count');
+      await badge.waitFor();
+      assert.match(await badge.textContent(), /^\s*1\s+unread\s*$/);
+      assert.equal(await page.getByRole('button', {name:/Notifications\s+1 unread/}).count(), 1);
+      assert.equal(await badge.evaluate(el => getComputedStyle(el).backgroundColor),
+        await dot.evaluate(el => getComputedStyle(el).backgroundColor));
+      const tileBounds = await tile.boundingBox();
+      const badgeBounds = await badge.boundingBox();
+      assert.ok(badgeBounds.x >= tileBounds.x && badgeBounds.x + badgeBounds.width <= tileBounds.x + tileBounds.width);
+      await tile.click();
       await page.locator('#shiny-tab-notifications.active').waitFor();
       assert.equal(await page.locator('#open_notifications').count(), 1);
       const card = page.locator('#notifications-items .fm-notification-unread');
@@ -59,7 +69,7 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
       }
       assert.deepEqual(errors, []);
       await page.screenshot({path:`/tmp/futmondo-header-notifications-${width}.png`});
-      console.log(`PASS ${width}px: header bell/dot, navigation, full-width unread card, visible message/actions and no horizontal overflow`);
+      console.log(`PASS ${width}px: header bell/dot, Home unread count and navigation, full-width unread card, visible message/actions and no horizontal overflow`);
       await page.close();
     }
   } finally { await browser.close(); }
