@@ -16,23 +16,34 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/futmon
    assert.equal(rounds.type,'category');assert.deepEqual(rounds.x,['6','6.2','7']);assert.deepEqual(rounds.y,[10,15,12]);
    assert.equal(await page.getByRole('switch',{name:'Show ranks',exact:true}).isChecked(),false);
    assert.equal(await page.getByRole('tab',{name:'Rank progression',exact:true}).count(),0);
-   const from=page.getByLabel('From round',{exact:true});
-   const through=page.getByLabel('Through round',{exact:true});
-   await from.selectOption('6.2');
-   await through.selectOption('7');
+   const slider=page.locator('#plots-round_slider');
+   const from=slider.getByRole('slider',{name:'From round'});
+   const through=slider.getByRole('slider',{name:'Through round'});
+   await from.waitFor();
+   assert.deepEqual((await slider.locator('fieldset').getAttribute('data-rounds')).split(','),
+     ['First published','6','6.2','7','Latest published']);
+   async function drag(handle,index){
+    const rail=await handle.boundingBox();
+    const x=position=>rail.x+10+(rail.width-20)*position/4;
+    const y=rail.y+rail.height/2;
+    await page.mouse.move(x(Number(await handle.inputValue())),y);
+    await page.mouse.down();
+    await page.mouse.move(x(index),y,{steps:6});
+    await page.mouse.up();
+   }
+   await drag(from,2);
+   await drag(through,3);
    const waitRounds=(x,y)=>page.waitForFunction(({x,y})=>{
     const line=document.querySelector('#plots-standings_plot')?.data?.[0];
     return line && JSON.stringify(line.x)===JSON.stringify(x) && JSON.stringify(line.y)===JSON.stringify(y);
    },{x,y});
    await waitRounds(['Before 6.2','6.2','7'],[0,5,2]);
-   assert.deepEqual(await through.locator('option').evaluateAll(opts=>opts.map(o=>o.value)),['latest','6','6.2','7']);
-   await through.selectOption('6.2');
+   assert.equal(await from.getAttribute('aria-valuetext'),'6.2');
+   await through.press('ArrowLeft');
    await waitRounds(['Before 6.2','6.2'],[0,5]);
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2),false);
-   await through.selectOption('6');
-   await page.getByText('Choose an end round at or after the start on the chart.',{exact:true}).waitFor();
-   await from.selectOption('first');
-   await through.selectOption('latest');
+   await through.press('End');
+   await from.press('Home');
    await waitRounds(rounds.x,rounds.y);
    for(const [tab,id] of [['Squad values','values_plot'],['Cash & transfers','cash_plot'],['Owned by real team','owned_club_plot']]){
     await page.getByRole('tab',{name:tab,exact:true}).click();await wait(id);
@@ -58,13 +69,13 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/futmon
    await page.getByRole('button',{name:'Measure saved reads'}).click();await page.waitForTimeout(200);
    const before=await page.locator('#counts').innerText();
    await page.getByRole('tab',{name:'Points',exact:true}).click();
-   await from.selectOption('6.2');
+   await drag(from,2);
    await waitRounds(['Before 6.2','6.2','7'],[0,5,2]);
    await page.getByRole('switch',{name:'Show ranks',exact:true}).check();
    await waitRounds(['6.2','7'],[1,1]);
    const rankAxis=await plot('standings_plot').evaluate(el=>el._fullLayout.yaxis.range);
    assert.ok(rankAxis[0]>rankAxis[1],'First place is at the top');
-   await through.selectOption('6.2');
+   await drag(through,2);
    await waitRounds(['6.2'],[1]);
    await page.getByRole('switch',{name:'Show ranks',exact:true}).uncheck();
    await waitRounds(['Before 6.2','6.2'],[0,5]);

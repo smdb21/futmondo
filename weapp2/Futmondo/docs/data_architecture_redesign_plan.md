@@ -1,5 +1,9 @@
 # Futmondo data architecture redesign plan
 
+## Trends round range slider (2026-11-27)
+
+Trends → Points uses one two-handle slider for the published round interval in both Points and Ranks. [Slider behavior](plots_module.md#points-and-ranks-2026-11-26)
+
 ## Welcome shortcut order (2026-11-27)
 
 The signed-in Home shortcut grid starts with Lineup, My team and Today’s market.

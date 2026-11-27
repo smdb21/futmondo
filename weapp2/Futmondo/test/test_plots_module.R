@@ -13,6 +13,15 @@ check('owned real-team aggregation is descending with stable name tie-break', {
   d <- plots_owned_by_real_team(p)
   stopifnot(identical(d$real_team, c('Alpha','Beta')), identical(d$owned_players, c(2L,1L)))
 })
+check('slider handles follow published round identities as the domain changes', {
+  rounds <- c(14,23,15,15.2)
+  stopifnot(identical(plots_round_handles(rounds, NULL), c(0L,5L)),
+    identical(plots_round_handles(rounds,c('23','15')),c(2L,3L)),
+    identical(plots_round_handles(c(12,rounds),c('23','15')),c(3L,4L)),
+    identical(plots_round_handles(c(rounds,16),c('15.2','Latest published')),c(4L,6L)),
+    identical(plots_round_handles(23,c('23','23')),c(1L,1L)),
+    identical(plots_round_handles(rounds,c('15','23')),c(0L,5L)))
+})
 check('plots UI exposes five factual chart tabs and one points/ranks switch', {
   html <- as.character(plots_UI('plots'))
   stopifnot(!grepl('rank_plot|rank_range|Rank progression',html), grepl('data-value="Points"', html, fixed=TRUE))

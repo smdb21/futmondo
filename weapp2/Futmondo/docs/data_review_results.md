@@ -1,5 +1,11 @@
 # Futmondo data review and implementation results
 
+## Trends round range slider (2026-11-27)
+
+The slider projects the saved round list in kickoff order. Dragging updates the endpoint labels in the browser. Releasing a handle sends its round interval to the existing chart projection. The control introduces no runtime dependency, polling or acquisition.
+
+Chromium exercised both handles with drag and keyboard input at 320, 390 and 1440 px in light and dark themes. Selecting rounds 6.2 through 7 produced 0, 5 and 2 points. Selecting only 6.2 produced 0 and 5. Switching to Ranks preserved the interval. The browser recorded zero additional saved reads from these changes. The delayed-data fixture kept the chart responsive during loading. Fourteen chart checks and the deployment manifest check passed offline.
+
 ## Welcome shortcut order (2026-11-27)
 
 The welcome-page fixture checks the first three rendered shortcut labels and their destination IDs. Chromium verified the visible order at 320 and 1440 px and opened both swapped destinations. Home reorders the existing navigation rows once per permission state. The change adds no requests, timers or rendered elements.

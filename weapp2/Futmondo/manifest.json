@@ -2355,7 +2355,7 @@
       "checksum": "004fad1fde7d596b1e4854f1be9c8242"
     },
     "Modules/Plots_Module.R": {
-      "checksum": "d78b168f0a99f5a278ec514b94a752b2"
+      "checksum": "1078b8e9d8ff13c8d4b5b3a67bfa77e3"
     },
     "Modules/Rivals_Module.R": {
       "checksum": "fd9369170b83884cb79e27230f94d202"
@@ -2431,6 +2431,12 @@
     },
     "www/home.js": {
       "checksum": "a90a89f1366c97a48529198f413856c0"
+    },
+    "www/plots-round-range.css": {
+      "checksum": "94ff14deba46135cf4d07287acd9fe38"
+    },
+    "www/plots-round-range.js": {
+      "checksum": "1810a50c94688f95d05999c7cf29033a"
     },
     "www/welcome.css": {
       "checksum": "96246fca28b7169cbc24a6d3a03ccd29"

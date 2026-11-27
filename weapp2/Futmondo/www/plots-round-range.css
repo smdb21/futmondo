@@ -1,0 +1,29 @@
+.fm-round-range { min-width: 0; margin: 0 0 12px; padding: 0; border: 0; }
+.fm-round-range legend { width: auto; margin: 0 0 4px; border: 0; color: inherit; font-size: inherit; font-weight: 600; }
+.fm-round-labels { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.fm-round-labels strong { margin-inline-start: 3px; }
+.fm-round-rail { position: relative; height: 36px; }
+.fm-round-rail::before {
+  content: ""; position: absolute; inset: 16px 10px; border-radius: 4px;
+  background: linear-gradient(to right, var(--fm-border, #89968f) calc(var(--from) * 100%),
+    var(--fm-accent, #258454) calc(var(--from) * 100%) calc(var(--through) * 100%),
+    var(--fm-border, #89968f) calc(var(--through) * 100%));
+}
+.fm-round-rail input[type=range] {
+  position: absolute; inset: 0; width: 100%; height: 100%; margin: 0;
+  appearance: none; background: transparent; cursor: pointer;
+}
+/* Each half of the track routes clicks to its nearest native handle. */
+.fm-round-handle.through { clip-path: inset(0 0 0 calc(10px + (100% - 20px) * (var(--from) + var(--through)) / 2)); }
+.fm-round-handle::-webkit-slider-runnable-track { background: transparent; border: 0; }
+.fm-round-handle::-moz-range-track { background: transparent; border: 0; }
+.fm-round-handle::-webkit-slider-thumb {
+  appearance: none; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--fm-accent, #258454); border: 2px solid var(--fm-surface, white);
+}
+.fm-round-handle::-moz-range-thumb {
+  box-sizing: border-box; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--fm-accent, #258454); border: 2px solid var(--fm-surface, white);
+}
+.fm-round-handle:focus-visible::-webkit-slider-thumb { outline: 2px solid currentColor; }
+.fm-round-handle:focus-visible::-moz-range-thumb { outline: 2px solid currentColor; }

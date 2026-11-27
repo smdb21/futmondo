@@ -290,9 +290,23 @@ plots_owned_chart <- function(players) {
     }")
 }
 
+# Slider positions follow the chart's kickoff order, which can differ from round numbers.
+# The outer stops keep the automatic season start and latest published endpoints.
+plots_round_handles <- function(rounds, selection) {
+  last <- length(rounds) + 1L
+  if (length(selection) != 2L) return(c(0L, last))
+  from <- match(selection[1L], as.character(rounds), nomatch = 0L)
+  through <- match(selection[2L], as.character(rounds), nomatch = last)
+  if (from > through) return(c(0L, last))
+  c(from, through)
+}
+
 plots_UI <- function(id) {
   ns <- shiny::NS(id)
-  shiny::tagList(shiny::h2("Trends"), shiny::uiOutput(ns("chart_status")),
+  shiny::tagList(
+    shiny::singleton(shiny::includeCSS("www/plots-round-range.css")),
+    shiny::singleton(shiny::includeScript("www/plots-round-range.js")),
+    shiny::h2("Trends"), shiny::uiOutput(ns("chart_status")),
     shiny::tabsetPanel(id=ns("plot_tab"), type="pills",
       shiny::tabPanel("Points",
         shiny::p("Choose a starting round to count points from zero, including that round or subround. Ranks show season positions, with first place at the top. Missing scores leave gaps."),
@@ -300,10 +314,7 @@ plots_UI <- function(id) {
           shiny::column(3, shiny::tags$label(class = "fm-view-switch", "Points",
             shiny::tags$input(id = ns("show_ranks"), type = "checkbox", role = "switch", `aria-label` = "Show ranks"),
             "Ranks")),
-          shiny::column(3, shiny::selectInput(ns("standings_from"), "From round",
-            choices = c("First published" = "first"), selectize = FALSE, width = "100%")),
-          shiny::column(3, shiny::selectInput(ns("standings_through"), "Through round",
-            choices = c("Latest published" = "latest"), selectize = FALSE, width = "100%"))),
+          shiny::column(9, shiny::uiOutput(ns("round_slider")))),
         plotly::plotlyOutput(ns("standings_plot"), height = "420px")),
       shiny::tabPanel("Squad values", shiny::p("Saved squad market valuations over time, in euros."), plotly::plotlyOutput(ns("values_plot"), height="420px")),
       shiny::tabPanel("Cash & transfers", shiny::p("Compare transfer-only balance estimates, squad purchase spending or transaction volume for the selected dates. Balance estimates exclude round rewards and other cash adjustments."), shiny::fluidRow(shiny::column(4, shiny::dateRangeInput(ns("cash_dates"),"Date range",format="dd/mm/yyyy")), shiny::column(8, shiny::radioButtons(ns("cash_metric"),"Metric",choices=c("Transfer-only balance estimate"="cash","Squad Purchases"="investment","Transaction Volume"="volume"),inline=FALSE))), plotly::plotlyOutput(ns("cash_plot"), height="420px")),
@@ -327,21 +338,19 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
       if (is.function(refresh_trigger)) refresh_trigger()
       tryCatch(get_league_standings_history(championship_id()), error = function(e) data.frame())
     })
+    round_handles <- shiny::reactive(plots_round_handles(round_domain(), input$standings_range))
     selected_rounds <- shiny::reactive({
       rounds <- round_domain()
       if (!length(rounds)) return(rounds)
-      start <- match(input$standings_from %||% "first", rounds, nomatch = 1L)
-      end <- match(input$standings_through %||% "latest", rounds, nomatch = length(rounds))
-      if (start > end) return(NULL)
-      rounds[seq.int(start, end)]
+      handles <- round_handles()
+      rounds[seq.int(max(1L, handles[1L]), min(length(rounds), handles[2L]))]
     })
     round_series <- resource_display_source(session, function() {
       totals <- round_totals()
       rounds <- selected_rounds()
-      shiny::validate(shiny::need(!is.null(rounds), "Choose an end round at or after the start on the chart."))
       keep <- totals$round %in% rounds
       metric <- if (isTRUE(input$show_ranks)) "rank" else "points"
-      rows <- if (metric == "points" && length(rounds) && (input$standings_from %||% "first") %in% rounds) {
+      rows <- if (metric == "points" && length(rounds) && round_handles()[1L] > 0L) {
         plots_interval_points(totals[keep, , drop = FALSE])
       } else {
         totals[keep, c("team_name", "round", metric), drop = FALSE]
@@ -578,14 +587,24 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
     })
     # Keep the chart's kickoff order, including subrounds and fixtures played early.
     round_domain <- resource_display_source(session, function() unique(round_totals()$round))
-    shiny::observeEvent(round_domain(), {
-      rounds <- as.character(round_domain())
-      selected <- input$standings_from
-      shiny::updateSelectInput(session, "standings_from", choices = c("First published" = "first", rounds),
-        selected = if (length(selected) && selected %in% rounds) selected else "first")
-      selected <- input$standings_through
-      shiny::updateSelectInput(session, "standings_through", choices = c("Latest published" = "latest", rounds),
-        selected = if (length(selected) && selected %in% rounds) selected else "latest")
+    output$round_slider <- shiny::renderUI({
+      rounds <- round_domain()
+      if (!length(rounds)) return(NULL)
+      labels <- c("First published", as.character(rounds), "Latest published")
+      handles <- plots_round_handles(rounds, shiny::isolate(input$standings_range))
+      last <- length(labels) - 1L
+      handle <- function(end, position) shiny::tags$input(
+        type = "range", class = paste("fm-round-handle", end), min = 0L, max = last,
+        step = 1L, value = position, `aria-label` = if (end == "from") "From round" else "Through round",
+        `aria-valuetext` = labels[position + 1L])
+      shiny::tags$fieldset(class = "fm-round-range", `data-input` = session$ns("standings_range"),
+        `data-rounds` = paste(labels, collapse = ","),
+        style = sprintf("--from:%.8f;--through:%.8f", handles[1L] / last, handles[2L] / last),
+        shiny::tags$legend("Round range"),
+        shiny::tags$div(class = "fm-round-labels",
+          shiny::span("From", shiny::tags$strong(labels[handles[1L] + 1L])),
+          shiny::span("Through", shiny::tags$strong(labels[handles[2L] + 1L]))),
+        shiny::tags$div(class = "fm-round-rail", handle("from", handles[1L]), handle("through", handles[2L])))
     })
     round_status <- shiny::reactive({
       state <- round_state()
