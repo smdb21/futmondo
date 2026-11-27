@@ -1,5 +1,11 @@
 # Manual bid management
 
+## Market offer cancellation (2026-11-26)
+
+When a player card opens, `player_card_market_offer()` projects the selected player's outgoing offer from the same account, league and team market observation used by Today. A verified, saved offer is shown as the last recorded bid, including between worker updates. The existing finance ledger supplies the submitted amount immediately after an acknowledged market offer until a newer market observation arrives. Cancel Bid can then look up the native bid ID. A published listing with no own bid clears the display. An arbitrary player-table bid, a bid count or a pending request cannot establish ownership.
+
+The official client sends the authenticated championship and user-team IDs with `type = "market"` to `POST /1/market/players`. The recorded market response carries the player's own offer in `answer[].bid.id` and `bid.price`. Both confirmation steps recheck that source. The final write sends the confirmed native ID as `query.bid` to `POST /1/market/cancelbid`. The asynchronous write is single-attempt and guarded by the player context and live verification deadline. An uncertain acknowledgement triggers a scoped worker refresh. The existing database market snapshots retain their original source time and continue to serve subsequent sessions. Source checked 2026-11-26 against the official bundle with SHA-256 `08202076259d1678c7557478771d3aa38b5099f42044630569c704fdb7a7cd1c` and the captured market field names. [Official client](https://app.futmondo.com/main.dart.js) and [captured market contract](har_api_reference.md#6-post-1marketplayers).
+
 Users enter bid amounts explicitly in the player/market controls. The app validates the current player/listing, selected league/team, available spending capacity, API minimum/maximum, and existing commitments before sending an action.
 
 Submission, modification, and cancellation are separate acknowledged events. An uncertain response requires reconciliation with current Futmondo state; it must not automatically replay a transaction. Successful actions invalidate the affected offers, market/roster, and finances.

@@ -56,6 +56,7 @@ shiny::testServer(function(input, output, session) {
   user_team_id_RV <- reactiveVal("mine")
   primary_team_state <- reactiveVal(observed(team_facts(1000), now - 5))
   primary_market_state <- reactiveVal(observed(offers, now - 5))
+  session$userData$market_offer_state <- primary_market_state
   history <- reactiveVal(observed(data.frame(), now - 5))
   selected <- reactiveVal(market_player)
   fm_manual_finance_session(session, login_token_RV, championship_id_RV, user_team_id_RV,
@@ -94,13 +95,17 @@ shiny::testServer(function(input, output, session) {
     (proc.time()[["elapsed"]] - started) * 1000))
   stopifnot(identical(calls, reads), grepl("Active offers: 300 EUR (2)", after_offer, fixed = TRUE),
     round_finance_RV()$confirmed_actions)
+  stopifnot(grepl("Cancel Bid", output[["card-action_buttons"]]$html, fixed = TRUE),
+    grepl("Your submitted offer", output[["card-action_buttons"]]$html, fixed = TRUE))
   with_bid <- offers
   with_bid$bid_id[2] <- "official-target"
   with_bid$bid_price[2] <- 200
   now <<- now + 5
   primary_market_state(observed(with_bid))
   settle(session)
-  stopifnot(identical(shown(1000, 300, 2, 700, 700), after_offer))
+  stopifnot(grepl("Your last recorded bid", output[["card-action_buttons"]]$html, fixed = TRUE),
+    grepl("Cancel Bid", output[["card-action_buttons"]]$html, fixed = TRUE),
+    identical(shown(1000, 300, 2, 700, 700), after_offer))
   now <<- now + 5
   primary_team_state(observed(team_facts(1000, 300, 700)))
   settle(session)

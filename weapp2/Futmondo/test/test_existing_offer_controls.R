@@ -34,6 +34,10 @@ get_market_players <- function(...) {market_reads <<- market_reads+1L;manual_row
 modify_bid <- function(...) {writes[[length(writes)+1L]] <<- c(list(action='modify'),list(...));TRUE}
 cancel_bid <- function(...) {writes[[length(writes)+1L]] <<- c(list(action='cancel'),list(...));TRUE}
 async_adapter_fetch <- function(fn,args=list(),context,...) {
+  if (fn == 'get_market_players') {
+    stopifnot(identical(list(...)$intent, 'manual_action'), args$user_team_id == 'mine')
+    return(promises::promise_resolve(get_market_players()))
+  }
   if (fn=='get_player_summary' && summary_failed)
     return(promises::promise_reject(simpleError('Synthetic summary failure')))
   value <- switch(fn,get_team_acquisition_capacity=capacity(),
@@ -67,7 +71,19 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,
   stopifnot(length(writes)==1L,market_reads==2L)
   cat('PASS update at capacity targets the confirmed own bid and cannot replay.\n')
   capacity_status <<- 'partial';summary_failed <<- TRUE;refresh(1L);settle(session)
-  stopifnot(grepl('Cancel Bid',output$action_buttons$html,fixed=TRUE),
+  # Market replay remains usable for display after the capacity and market
+  # action deadlines expire. Only the live check can authorize a withdrawal.
+  market <- observed_data(rows, status='stale', observed_at=Sys.time()-90)
+  attr(market,'worker_acquisition_status') <- 'ok'
+  saved_capacity$own_bid_valid_until <<- as.numeric(Sys.time())-60
+  published <- shiny::reactiveVal(resource_state(market))
+  root <- session$rootScope()
+  root$userData$market_offer_state <- published
+  refresh(2L); settle(session)
+  # Reopen the card as a user would after placing an offer.
+  player <- selected(); selected(NULL); settle(session); selected(player); settle(session)
+  stopifnot(grepl('Your last recorded bid',output$action_buttons$html,fixed=TRUE),
+    market_reads==2L, grepl('Cancel Bid',output$action_buttons$html,fixed=TRUE),
     !grepl('disabled',output$action_buttons$html,fixed=TRUE))
   session$setInputs(btn_cancel_bid=1);settle(session)
   session$setInputs(submit_cancel_bid=1);settle(session)
@@ -91,6 +107,8 @@ shiny::testServer(selected_player_Server,args=list(selected_player=selected,
 })
 now <- Sys.time();cap <- capacity();summary <- list(my_bid_id='summary-own',my_bid_price=800)
 cap$target_rows <- rbind(rows,transform(rows,bid_id='ambiguous'))
+stopifnot(is.null(player_card_active_bid(summary,cap,'pedrosa')))
+cap$target_rows <- rbind(rows,transform(rows,id='other-player'))
 stopifnot(is.null(player_card_active_bid(summary,cap,'pedrosa')))
 cap$target_rows <- transform(rows,bid_id=NA_character_,bid_price=NA_real_)
 stopifnot(is.null(player_card_active_bid(summary,cap,'pedrosa')))

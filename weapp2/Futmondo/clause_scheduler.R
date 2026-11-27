@@ -271,6 +271,12 @@ fm_manual_finance_session <- function(session,login,league,team,balance_state,hi
    revision(shiny::isolate(revision())+1L)
   }
  }
+ session$userData$confirmed_market_offer <- function(ctx) {
+  revision()
+  bids <- Filter(function(x) identical(x$mode, 'bid') && identical(x$player_id, ctx$player_id),
+    ledgers[[scope_key(ctx)]]$actions)
+  if(length(bids) == 1L) bids[[1L]]
+ }
  session$userData$manual_finance_projection <- function(states, cash_only = FALSE) {
   revision()
   if(!length(ledgers))return(states)

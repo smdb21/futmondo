@@ -1,5 +1,9 @@
 # Futmondo data architecture redesign plan
 
+## Market offer cancellation (2026-11-26)
+
+- [x] Restore Cancel Bid on market player cards using the saved team market and the current session's acknowledged offer. Verify the native bid before withdrawal. [Offline results](data_review_results.md#market-offer-cancellation-2026-11-26)
+
 ## Listing deadlines and Home market counts (2026-11-26)
 
 - [x] Surface the published listing expiry in My Team and Today’s market and the listed and offered-player counts on Home. Reuse saved roster, listing and offer observations. [Data and display contract](players_in_teams_module.md#listing-deadlines-and-home-market-counts-2026-11-26)

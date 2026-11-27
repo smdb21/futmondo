@@ -141,6 +141,7 @@ function(input, output, session) {
     req(valid_login(login_token_RV()),championship_id_RV(),user_team_id_RV())
     market_read(login_token_RV(),championship_id_RV(),user_team_id_RV())
   })
+  session$userData$market_offer_state <- primary_market_state
   primary_sources <- list(team_state=primary_team_state,market_state=primary_market_state,
     display_cash=function()round_finance_RV()$cash,
     retry_team=function()team_retry(isolate(team_retry())+1L),

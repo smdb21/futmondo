@@ -1,5 +1,13 @@
 # Futmondo data review and implementation results
 
+## Market offer cancellation (2026-11-26)
+
+The previous card lost its controls after the capacity observation's 20-second own-bid deadline, including when the persisted market still showed the offer. A 524-player offline fixture placed a market offer and rendered Cancel Bid on acknowledgement, before the worker published its native bid ID. The card continued to show cancellation after the updated market and balance arrived. A separate card reopened against a 90-second-old saved market, with expired capacity and no usable player summary.
+
+The transport fixture ran the production market parser and cancellation request builder. Display made zero additional source reads. Opening the confirmation and submitting it each made one asynchronous market read. The event loop stayed responsive while verification was pending. Duplicate clicks and a lost acknowledgement produced one withdrawal request in total. A replacement bid, duplicate bid ID, stale live verification and team changes prevented dispatch. The market state and receipt reuse the existing team-scoped sources without new polling or database reads on card opening.
+
+The existing-offer, manual finance, withdrawal transport and UI reliability checks passed offline. The Shiny lifecycle passed 14 checks and eight tabs. Production withdrawal remains unverified. [Source contract](bid_management.md#market-offer-cancellation-2026-11-26)
+
 ## Listing deadlines and Home market counts (2026-11-26)
 
 The published expiry was present in all 163 market rows and 32 own-listing rows in the recorded market capture. The My Team roster projection previously kept the asking price but dropped the listing expiry. The shared player table now sorts by the source instant and formats it in the selected account timezone. A known-answer fixture verified a deadline crossing local midnight, withdrawal of the last listing, a changed deadline after relisting, protection against older observations, and the worker snapshot encode/decode round trip.

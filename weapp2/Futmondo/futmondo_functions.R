@@ -3224,7 +3224,7 @@ modify_bid <- function(login, championship_id, team_id, player_id, bid_id, new_p
   return(structure(operation_code == API_CODE_OK, api_code = operation_code))
 }
 
-cancel_bid <- function(login, championship_id, team_id, bid_id) {
+cancel_bid <- function(login, championship_id, team_id, bid_id, owner = NULL, current = function() TRUE) {
   payload <- list(
     header = list(
       token = login[["token"]],
@@ -3238,6 +3238,18 @@ cancel_bid <- function(login, championship_id, team_id, bid_id) {
     answer = list()
   )
   headers <- c("Content-Type" = "application/json; charset=utf-8")
+  if (!is.null(owner)) {
+    request <- fm_async_http(CANCEL_BID_URL, "POST", toJSON(payload, auto_unbox = TRUE), headers,
+      owner = owner, priority = "interactive", before_dispatch = current)
+    acknowledgement <- promises::then(request, function(response) {
+      envelope <- jsonlite::fromJSON(rawToChar(response$content), simplifyVector = FALSE)
+      response$status_code >= 200L && response$status_code < 300L &&
+        !isTRUE(envelope$error) && !isTRUE(envelope$answer$error) &&
+        all(c(envelope$code, envelope$answer$code) == API_CODE_OK) &&
+        identical(envelope$answer$code, API_CODE_OK)
+    })
+    return(promises::catch(acknowledgement, function(error) FALSE))
+  }
   print(paste0("[API] Sending cancel bid request for bid: ", bid_id))
   response <- futmondo_post(CANCEL_BID_URL, body = toJSON(payload, auto_unbox = TRUE), add_headers(.headers = headers))
   ans <- httr::content(response)

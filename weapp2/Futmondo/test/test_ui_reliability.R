@@ -571,7 +571,9 @@ record('bid cancellation sends the selected ID and explicit action', {
   env$modal_bid_info_RV <- function() {
     list(cancel = list(id = 'own-bid', price = 10))
   }
-  env$verify_active_bid <- function(sp, expected) expected
+  env$check_cancel_bid <- function(expected, callback) callback(expected,
+    list(player = 'selected-player', championship = 'champ', team = 'team'), 'fake', function() TRUE)
+  env$fm_worker_refresh_league <- env$invalidate_manual_resources <- function(...) NULL
   env$consume_action_context <- function(action) identical(action, 'cancel')
   env$cancel_bid <- function(...) {
     stopifnot(list(...)$bid_id == 'own-bid')
@@ -583,7 +585,9 @@ record('bid cancellation sends the selected ID and explicit action', {
     events[[length(events) + 1L]] <<- list(...)
   }
   session <- shiny::MockShinySession$new()
+  env$session <- session
   shiny::withReactiveDomain(session, eval(body, env))
+  later::run_now(0)
   session$close()
   stopifnot(
     length(events) == 1L,
