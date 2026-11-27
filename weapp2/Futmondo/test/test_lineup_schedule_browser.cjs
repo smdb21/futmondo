@@ -22,6 +22,7 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
       const originalSave = await page.locator('#lineup-save').elementHandle();
       const readCounts = async () => (await page.locator('#fixture_counts').innerText()).trim().split('/').map(Number);
       const counts = await readCounts();
+      await page.locator('.fm-lineup-options summary').click();
       assert.ok(await page.getByLabel('Include incoming players').isChecked());
       await page.getByText(/Incoming Keeper.*Eligible before kickoff/).waitFor();
       await page.getByText('Due at or after kickoff', {exact: false}).waitFor();
@@ -123,6 +124,7 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
       await page.locator('a[data-value="Lineup"]').click();
       assert.equal(await page.getByRole('button', {name: 'Edit scheduled lineup'}).count(), 0);
       await signing.waitFor();
+      await page.locator('.fm-lineup-options summary').click();
       await page.getByLabel('Include incoming players').uncheck();
       const total = page.locator('#lineup-expected_points');
       const incomingTotal = Number((await total.innerText()).split(' · ')[1]);

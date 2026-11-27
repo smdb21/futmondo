@@ -1,5 +1,11 @@
 # Futmondo data review and implementation results
 
+## Compact lineup controls (2026-11-26)
+
+In the offline editor fixture, the distance from the Lineup heading to the pitch fell from 674 to 354 CSS pixels at a 320 px viewport, from 576 to 354 at 390 px and from 546 to 261 at 1440 px. The four draft actions fit on one row in both themes at all three widths. Keyboard checks covered opening Player options and reaching the first player with a visible focus outline. Selecting Current round hid the editor controls and selecting Upcoming lineup restored them. Expanding and collapsing the options preserved the fixture read and write counts. The native disclosure and responsive styles add no server observers, timers or data requests.
+
+The editor and scheduled-save browser fixtures exercised formation edits, player selection, optimization, save confirmation and cancellation. The lineup module suite and offline Shiny lifecycle passed (14 lifecycle checks and eight tabs). Verification used synthetic data.
+
 ## Market offer cancellation (2026-11-26)
 
 The previous card lost its controls after the capacity observation's 20-second own-bid deadline, including when the persisted market still showed the offer. A 524-player offline fixture placed a market offer and rendered Cancel Bid on acknowledgement, before the worker published its native bid ID. The card continued to show cancellation after the updated market and balance arrived. A separate card reopened against a 90-second-old saved market, with expired capacity and no usable player summary.

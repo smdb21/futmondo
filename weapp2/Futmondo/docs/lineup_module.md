@@ -313,10 +313,11 @@ Verification: `Rscript test/test_lineup_module.R` passed all 18 groups. The offl
 
 Picker rows now place a compact icon beside the name instead of the long membership/current-slot text: check-circle for a starter, chair for a substitute, and crosshairs for the clicked slot. Unselected players have no mark. Accessible labels and tooltips retain the full membership and numbered bench position; the current slot's tooltip includes both its slot status and membership. A short shared legend explains the marks and that unsaved selections are included. Membership still derives from the displayed draft. No selection, optimizer, save or acquisition behavior changes.
 
-## Lineup control placement — 2026-11-09
+## Lineup editor controls (2026-11-26)
 
-The formation selector sits directly above the pitch, replacing its repeated static formation heading. Optimize and the **Last N rounds** input share a single row, including narrow phones; the input can shrink to fit. The doubtful-player toggle keeps its own full-width row. Input identities, formation entitlements, draft selection and optimization/save behavior are unchanged.
+The Upcoming lineup and Current round selector uses native radio inputs. On the upcoming view, Optimize and Recent rounds share a row. Open **Player options** to change doubtful-player eligibility, outfield bench coverage or incoming-player inclusion. The coach preference stays visible beside the round details when space permits.
 
+Save, Clear, Undo and Refresh share one toolbar. Short phone labels retain their full accessible names. Scheduled submission details appear below the actions. Formation and expected XI points sit together directly above the pitch. Starter and substitute buttons have transparent, borderless backgrounds and a visible keyboard focus outline.
 
 ## Horizontal desktop lineups — 2026-11-10
 
@@ -520,7 +521,7 @@ Futmondo can return an empty `pointSystem` in the lineup while supplying the ful
 
 ## Editing and scoring the displayed XI
 
-The Lineup editor shows expected XI points above Formation for the official lineup, local edits, optimization results and scheduled previews. It sums each starter’s unrounded average from the selected window of completed rounds, then deducts five per vacant starting slot. Each starter counts once, including the captain. The bench contributes zero. With eleven empty slots the total is −55. If a selected player lacks a complete average, the display identifies how many starters still need scores. The final numeric total is rounded to two decimals.
+The Lineup editor shows expected XI points beside Formation for the official lineup, local edits, optimization results and scheduled previews. It sums each starter’s unrounded average from the selected window of completed rounds, then deducts five per vacant starting slot. Each starter counts once, including the captain. The bench contributes zero. With eleven empty slots the total is −55. If a selected player lacks a complete average, the display identifies how many starters still need scores. The final numeric total is rounded to two decimals.
 
 Starters, bench, captain and formation can be edited directly on an optimized or scheduled pitch. Manual edits use the displayed lineup and eligible projected squad. Each changed future submission receives a new request identity. The shared `lineup_schedule_stages()` helper recalculates its due time from the latest selected signing. Removing the last pending signing returns the edited XI to the ordinary manual save flow. Local edits leave an approved job active until the user confirms a replacement or cancellation. When Lineup opens, the existing schedule read restores the active selection for the same team, round and scoring context directly onto the pitch. Restoration waits for the selected players to be available in the projected squad and preserves edits already in progress. The ordinary picker includes verified pre-kickoff arrivals even when the optimizer’s **Include incoming players** option is off.
 

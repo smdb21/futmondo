@@ -1548,6 +1548,62 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
   .rivals-summary-grid h3 { font-size: 20px !important; }
 }
 
+/* Lineup editor */
+.fm-lineup-editor { max-width: 1100px; margin-inline: auto; }
+.fm-lineup-editor h2 { margin-block: 0 8px; }
+.fm-lineup-view > .form-group { width: fit-content; max-width: 100%; margin: 0; }
+.fm-lineup-view .shiny-input-radiogroup > .control-label { position: absolute; }
+.fm-lineup-view .shiny-options-group { display: flex; padding: 3px; border: 1px solid var(--fm-border); border-radius: 6px; }
+.fm-lineup-view .radio-inline { margin: 0; padding: 0; }
+.fm-lineup-view .radio-inline input { position: absolute; width: 1px; height: 1px; margin: 0; opacity: 0; }
+.fm-lineup-view .radio-inline span { display: block; padding: 7px 10px; border-radius: 3px; font-size: 13px; }
+.fm-lineup-view input:checked + span { background: var(--fm-text); color: var(--fm-bg); font-weight: 700; }
+.fm-lineup-view input:focus-visible + span { outline: 2px solid var(--fm-accent); outline-offset: 1px; }
+.fm-lineup-round-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 16px; margin-block: 6px; }
+.fm-lineup-round-meta .fm-coach-control { margin: 0; font-size: 13px; }
+.fm-lineup-note { padding-block: 4px; color: var(--fm-muted); overflow-wrap: anywhere; }
+.fm-lineup-round-meta .fm-lineup-note { font-size: 13px; }
+.fm-lineup-controls { padding-block: 6px; border-block: 1px solid var(--fm-border); }
+.fm-lineup-optimize-controls, .fm-lineup-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.fm-lineup-optimize-controls .form-group, .fm-lineup-formation .form-group {
+  display: flex; align-items: center; gap: 6px; width: auto; max-width: 100%; margin: 0;
+}
+.fm-lineup-optimize-controls label, .fm-lineup-formation label { margin: 0; font-size: 13px; }
+.fm-lineup-optimize-controls { flex-wrap: nowrap; }
+.fm-lineup-optimize-controls input { width: 3.6em; flex-shrink: 0; }
+.fm-lineup-options { margin-top: 2px; }
+.fm-lineup-options summary { width: fit-content; padding: 5px 2px; cursor: pointer; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 7px; min-height: 32px; }
+.fm-lineup-options summary::-webkit-details-marker { display: none; }
+.fm-lineup-options summary::before {
+  content: ''; width: 7px; height: 7px; border: solid currentColor; border-width: 0 1.5px 1.5px 0; transform: rotate(-45deg);
+}
+.fm-lineup-options[open] summary::before { transform: rotate(45deg); }
+.fm-lineup-schedule-note { margin-block: 6px; padding-inline-start: 10px; border-inline-start: 2px solid var(--fm-muted); font-size: 13px; }
+.fm-lineup-schedule-note strong { color: var(--fm-text); }
+.fm-lineup-availability { display: flex; flex-wrap: wrap; gap: 2px 16px; }
+.fm-lineup-availability .form-group { width: auto !important; max-width: 100%; margin: 0; }
+.fm-lineup-availability .checkbox { margin: 0; padding-block: 4px; }
+.fm-lineup-actions { margin-block: 8px 4px; }
+.fm-lineup-actions .btn, .fm-lineup-optimize-controls .btn { min-height: 36px; padding: 5px 9px; }
+.fm-lineup-actions .btn-primary { font-weight: 700; }
+.fm-lineup-summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-block: 8px 4px; }
+.fm-lineup-formation { flex: 0 1 auto; }
+.fm-lineup-formation select { width: auto; max-width: 100%; }
+.fm-lineup-total { flex: 0 1 auto; min-width: 0; font-size: 13px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+.fm-lineup-editor button.fm-lineup-player { background: transparent; border: 0; color: #eef6f0; cursor: pointer; padding: 3px; }
+.fm-lineup-editor .fm-lineup-player:focus-visible { outline: 2px solid var(--fm-warning, #f0c75e); }
+.fm-lineup-warning { color: var(--fm-warning, #b38012); }
+.fm-lineup-coverage { display: flex; gap: 12px; flex-wrap: wrap; }
+@media (max-width: 600px) {
+  .fm-lineup-action-extra, .fm-lineup-actions .btn:not(.btn-primary):has(.action-label) .action-icon { display: none; }
+  .fm-lineup-actions .btn { padding-inline: 7px; }
+  .fm-lineup-formation .form-group { display: block; }
+  .fm-lineup-formation select { width: 7.5em; }
+}
+@media (min-width: 601px) {
+  .fm-lineup-controls { display: flex; align-items: baseline; flex-wrap: wrap; gap: 12px; }
+}
+
 /* Historical round formation: official slot order, with explicit empty places. */
 .fm-round-lineup { max-width: 660px; margin: 0 auto; color: #f0f6ef; }
 .fm-lineup-heading { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 8px 2px 14px; }

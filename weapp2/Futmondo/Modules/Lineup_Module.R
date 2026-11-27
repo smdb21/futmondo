@@ -1,9 +1,13 @@
 
 lineup_status_icon <- function(status) player_status_icon(status, 'fm-lineup-status')
 
+lineup_save_label <- function() {
+  shiny::span('Save',shiny::span(class='fm-lineup-action-extra',' to LigaRadar'))
+}
+
 lineup_UI <- function(id) {
   ns<-shiny::NS(id)
-  shiny::tagList(shiny::tags$style(shiny::HTML(".fm-lineup-controls{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:16px}.fm-lineup-controls .form-group{margin:0}.fm-lineup-optimize-controls{display:flex;gap:12px;align-items:flex-end;flex:0 0 100%;min-width:0}.fm-lineup-optimize-controls .shiny-input-container{flex:1;min-width:0;max-width:180px}.fm-lineup-optimize-controls .btn{flex-shrink:0}.fm-lineup-formation .shiny-input-container{width:180px;max-width:100%;margin-bottom:8px}.fm-lineup-availability{flex:0 0 100%;min-width:0}.fm-lineup-controls .shiny-input-container{width:180px}.fm-lineup-editor{max-width:900px;margin:auto}.fm-lineup-editor button.fm-lineup-player{background:transparent;border:1px solid #c6e0bd;border-radius:4px;color:#eef6f0;cursor:pointer;padding:2px;min-width:0}.fm-lineup-editor .fm-lineup-player:focus{outline:2px solid var(--fm-warning,#f0c75e)}.fm-lineup-note{padding:10px 0;color:var(--fm-muted,#acbdb0)}.fm-lineup-warning{color:var(--fm-warning,#f0c75e)}.fm-lineup-actions>.shiny-html-output{flex:1 1 12rem;min-width:0}.fm-lineup-actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.fm-lineup-coverage{display:flex;gap:12px;flex-wrap:wrap}@media(max-width:600px){.fm-lineup-controls .shiny-input-container{width:140px}}")),
+  shiny::tagList(
     shiny::tags$style(shiny::HTML("
       .fm-lineup-picker-list{max-height:60vh;overflow-y:auto}
       .fm-lineup-choice,.fm-lineup-picker-heading{display:grid;grid-template-columns:26px minmax(0,1fr) 58px 78px;gap:8px;align-items:center;padding:10px 8px}
@@ -51,39 +55,44 @@ lineup_UI <- function(id) {
     coach_preference_script(),
     shiny::div(class='fm-lineup-editor',
       shiny::h2('Lineup'),
-      shiny::radioButtons(ns('view'),'Lineup to view',choices=c('Upcoming lineup'='upcoming','Current round'='current'),
-        selected='upcoming',inline=TRUE),
+      shiny::div(class='fm-lineup-view',
+        shiny::radioButtons(ns('view'),shiny::span(class='sr-only','Lineup to view'),
+          choices=c('Upcoming lineup'='upcoming','Current round'='current'),selected='upcoming',inline=TRUE)),
       shiny::conditionalPanel("input.view === 'current'",ns=ns,
         shiny::uiOutput(ns('current_round')),shiny::uiOutput(ns('live-pitch'))),
-      shiny::conditionalPanel("input.view !== 'current'",ns=ns,shiny::uiOutput(ns('heading')),
-      shiny::div(class='fm-coach-control',
-        shiny::checkboxInput(ns('automatically_hire_coach'),'Automatically hire coach',value=TRUE),
-        shiny::uiOutput(ns('coach_status'))),
+      shiny::conditionalPanel("input.view !== 'current'",ns=ns,
+      shiny::div(class='fm-lineup-round-meta',shiny::uiOutput(ns('heading')),
+        shiny::div(class='fm-coach-control',
+          shiny::checkboxInput(ns('automatically_hire_coach'),'Automatically hire coach',value=TRUE),
+          shiny::uiOutput(ns('coach_status')))),
       shiny::div(class='fm-lineup-controls',
         shiny::div(class='fm-lineup-optimize-controls',
           shiny::actionButton(ns('best'),'Optimize',icon=shiny::icon('wand-magic-sparkles')),
-          shiny::numericInput(ns('recent_n'),'Last N rounds',value=3,min=1,max=20,step=1)),
-        shiny::div(class='fm-lineup-availability',
-          shiny::checkboxInput(ns('include_doubtful'),shiny::span(
-            title='Allow doubtful players when optimizing. Injured, suspended and unavailable players are always excluded from the starting XI and bench.',
-            'Include doubtful players'),FALSE,width='100%'),
-          shiny::checkboxInput(ns('require_bench_coverage'),shiny::span(
-            title='When enabled, Optimize requires separate substitutes covering defender, midfielder and forward. Substitutes cover their primary position only. Goalkeeper cover is not required. The starting XI or formation may change to leave this cover on the bench. If no eligible lineup can provide it, your draft is kept.',
-            'Require full outfield bench coverage'),FALSE,width='100%'),
-          shiny::checkboxInput(ns('include_incoming'),'Include incoming players',TRUE,width='100%'))),
+          shiny::numericInput(ns('recent_n'),'Recent rounds',value=3,min=1,max=20,step=1)),
+        shiny::tags$details(class='fm-lineup-options',shiny::tags$summary('Player options'),
+          shiny::div(class='fm-lineup-availability',
+            shiny::checkboxInput(ns('include_doubtful'),shiny::span(
+              title='Allow doubtful players when optimizing. Injured, suspended and unavailable players are always excluded from the starting XI and bench.',
+              'Include doubtful players'),FALSE,width='100%'),
+            shiny::checkboxInput(ns('require_bench_coverage'),shiny::span(
+              title='When enabled, Optimize requires separate substitutes covering defender, midfielder and forward. Substitutes cover their primary position only. Goalkeeper cover is not required. The starting XI or formation may change to leave this cover on the bench. If no eligible lineup can provide it, your draft is kept.',
+              'Require full outfield bench coverage'),FALSE,width='100%'),
+            shiny::checkboxInput(ns('include_incoming'),'Include incoming players',TRUE,width='100%')))),
       shiny::div(class='fm-lineup-actions',
-        shiny::actionButton(ns('clear'),'Clear lineup',icon=shiny::icon('eraser')),
-        shiny::actionButton(ns('reset'),'Undo changes',icon=shiny::icon('rotate-left'),
+        shiny::actionButton(ns('save'),lineup_save_label(),
+          icon=shiny::icon('floppy-disk'),class='btn-primary',disabled=TRUE,`aria-label`='Save to LigaRadar'),
+        shiny::actionButton(ns('clear'),shiny::span('Clear',shiny::span(class='fm-lineup-action-extra',' lineup')),
+          icon=shiny::icon('eraser'),`aria-label`='Clear lineup',title='Clear lineup'),
+        shiny::actionButton(ns('reset'),shiny::span('Undo',shiny::span(class='fm-lineup-action-extra',' changes')),
+          icon=shiny::icon('rotate-left'),`aria-label`='Undo changes',
           title='Restore the latest lineup loaded from or successfully saved to LigaRadar'),
         shiny::actionButton(ns('reload'),label=NULL,icon=shiny::icon('rotate'),`aria-label`='Refresh lineup',
           title='Reload the official lineup, squad and rules from LigaRadar; keep your unsaved changes')),
       shiny::uiOutput(ns('status')),shiny::uiOutput(ns('schedule_status')),
-      shiny::div(class='fm-lineup-actions',
-        shiny::actionButton(ns('save'),'Save to LigaRadar',icon=shiny::icon('floppy-disk'),
-          class='btn-primary',disabled=TRUE),
-        shiny::uiOutput(ns('save_control'))),
-      shiny::textOutput(ns('expected_points')),
-      shiny::div(class='fm-lineup-formation',shiny::uiOutput(ns('formation_control'))),
+      shiny::uiOutput(ns('save_control')),
+      shiny::div(class='fm-lineup-summary',
+        shiny::div(class='fm-lineup-formation',shiny::uiOutput(ns('formation_control'))),
+        shiny::tagAppendAttributes(shiny::textOutput(ns('expected_points')),class='fm-lineup-total')),
       shiny::uiOutput(ns('pitch')),shiny::uiOutput(ns('captain_control')),
       shiny::uiOutput(ns('arrival_status')),shiny::uiOutput(ns('fixtures')))))
 }
@@ -911,7 +920,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
           if(!schedule_active(job)||i==job$stage_index+1L)job$state else 'pending'
         row(class='fm-lineup-submission',timing,if(multiple||!identical(outcome,job$state))paste('·',outcome))
       })
-      shiny::div(class='fm-lineup-note',shiny::strong(paste('Scheduled lineup ·',job$state)),
+      shiny::div(class='fm-lineup-note fm-lineup-schedule-note',shiny::strong(paste('Scheduled lineup ·',job$state)),
         if(!is.null(schedule_status_code(job$code)))shiny::div(schedule_status_code(job$code)),
         if(multiple)shiny::tags$ol(submissions)else submissions,
         if(isTRUE(job$state%in%c('queued','preparing')))
@@ -1034,7 +1043,7 @@ lineup_Server <- function(id,is_module_active,login_token,championship_id,user_t
     shiny::observe({
       state<-save_state()
       shiny::updateActionButton(session,'save',disabled=state$disabled,
-        label=if(saving())'Saving…'else'Save to LigaRadar')
+        label=if(saving())'Saving…'else lineup_save_label())
     })
     output$save_control<-shiny::renderUI({
       state<-save_state()

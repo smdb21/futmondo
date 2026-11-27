@@ -86,6 +86,13 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
         const portrait = await status.locator('..').boundingBox();
         assert.ok(box.width >= 14 && box.x >= portrait.x && box.x + box.width <= portrait.x + portrait.width + 1, 'Status stays beside the portrait within the slot');
       }
+      const options = page.locator('.fm-lineup-options');
+      assert.equal(await options.getAttribute('open'), null);
+      assert.ok(await page.locator('button.fm-lineup-player').evaluateAll(players => players.every(player =>
+        getComputedStyle(player).borderWidth === '0px' && getComputedStyle(player).boxShadow === 'none')));
+      const summary = options.locator('summary');
+      await summary.focus();
+      await page.keyboard.press('Enter');
       const coverageOption = page.locator('#lineup-require_bench_coverage');
       const doubtOption = page.locator('#lineup-include_doubtful');
       assert.equal(await doubtOption.isChecked(), false);
@@ -305,7 +312,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       assert.equal(await page.locator('#lineup-save').isDisabled(), true);
       await page.locator('#lineup-clear').click();
       await page.waitForFunction(() => document.querySelectorAll('.fm-lineup-pitch .fm-lineup-empty').length === 11);
-      assert.equal(await page.locator('#lineup-reset').innerText(), 'Undo changes');
+      assert.equal(await page.getByRole('button', {name: 'Undo changes', exact: true}).count(), 1);
       await page.locator('#lineup-reset').click();
       await page.waitForFunction(() => document.querySelectorAll('.fm-lineup-pitch .fm-lineup-empty').length === 0);
       assert.equal(await page.locator('.fm-lineup-crest').count(), 15);

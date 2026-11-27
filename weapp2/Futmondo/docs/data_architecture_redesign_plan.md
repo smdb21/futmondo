@@ -1,5 +1,9 @@
 # Futmondo data architecture redesign plan
 
+## Compact lineup controls (2026-11-26)
+
+Implemented locally. The lineup editor groups view selection, optimization settings and draft actions above a borderless player pitch. [Editor layout](lineup_module.md#lineup-editor-controls-2026-11-26)
+
 ## Market offer cancellation (2026-11-26)
 
 - [x] Restore Cancel Bid on market player cards using the saved team market and the current session's acknowledged offer. Verify the native bid before withdrawal. [Offline results](data_review_results.md#market-offer-cancellation-2026-11-26)
