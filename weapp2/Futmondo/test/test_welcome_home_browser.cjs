@@ -35,7 +35,10 @@ async function verifyFloatingControls(page, width, openPage) {
   await page.evaluate(() => {
     window.fixtureFloatingRefreshes = 0;
     $(document).on('shiny:inputchanged.floatingFixture', event => {
-      if (event.name === 'refresh_all') window.fixtureFloatingRefreshes++;
+      if (event.name === 'refresh_all') {
+        window.fixtureFloatingRefreshes++;
+        window.fixtureRefreshPending = document.getElementById('league-refresh-status').textContent;
+      }
     });
   });
 
@@ -105,7 +108,15 @@ async function verifyFloatingControls(page, width, openPage) {
     await refresh.click();
   }
   await page.waitForFunction(() => window.fixtureFloatingRefreshes === 1);
+  assert.equal(await page.evaluate(() => window.fixtureRefreshPending), 'Requesting league refresh…');
+  const status = page.locator('#league-refresh-status[role="status"]');
+  await status.getByText('Refresh started. League balances and players are being reloaded.').waitFor();
+  const box = await status.boundingBox();
+  assert.ok(box && box.x >= 0 && box.x + box.width <= width && box.y >= 0 && box.y + box.height <= a.y);
   if (mobile) {
+    await page.waitForTimeout(3200);
+    assert.equal(await page.evaluate(floatingControlsMatch, true), true, 'the result outlasts the scroll timer');
+    await waitForControls(false);
     // Exercise the floating Home control by touch from scrolled content.
     await page.evaluate(() => window.scrollBy(0, scrollY > 40 ? -24 : 24));
     await waitForControls(true);

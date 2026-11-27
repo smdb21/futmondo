@@ -45,6 +45,33 @@
 
   $(function () {
     actions = document.querySelector('.fm-page-actions');
+    const status = document.getElementById('league-refresh-status');
+    let request = null, dismissTimer = 0, selectedLeague;
+    function clearStatus() {
+      window.clearTimeout(dismissTimer);
+      request = null;
+      status.textContent = '';
+    }
+    $(document).on('shiny:inputchanged', function (event) {
+      if (event.name === 'selected_league' && event.value !== selectedLeague) {
+        selectedLeague = event.value;
+        clearStatus();
+      }
+      if (event.name !== 'refresh_all' || !event.value) return;
+      clearStatus();
+      request = event.value;
+      status.textContent = 'Requesting league refresh…';
+    });
+    $(document).on('shiny:disconnected', clearStatus);
+    $(document).on('shiny:value', function (event) {
+      if (event.name === 'login-signed_in' && event.value !== 'TRUE') clearStatus();
+    });
+    Shiny.addCustomMessageHandler('fm-league-refresh-status', function (result) {
+      if (result.request !== request) return;
+      window.clearTimeout(dismissTimer);
+      status.textContent = result.message;
+      dismissTimer = window.setTimeout(clearStatus, 6000);
+    });
     updateScrollTracking();
     mobile.addEventListener('change', updateScrollTracking);
   });

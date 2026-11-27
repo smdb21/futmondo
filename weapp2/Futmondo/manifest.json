@@ -2400,7 +2400,7 @@
       "checksum": "6941ec3d550551d6c41a20b6a4d2ff3e"
     },
     "server.R": {
-      "checksum": "86466fcc3aab948ab6d03f96f9fd88e9"
+      "checksum": "843482377e36b528c7dc42d1a2205da3"
     },
     "supabase_connector.R": {
       "checksum": "f49117c4a21dd8d417a32070c206f2cf"
@@ -2409,7 +2409,7 @@
       "checksum": "d27c0d69c8f1f25be0ca87f5a1912085"
     },
     "ui.R": {
-      "checksum": "fc0bdf3f509c9cd1bf25ec76ebc6ba53"
+      "checksum": "078be42ec310a4c7f6523d9fd940b288"
     },
     "utils.R": {
       "checksum": "b0cc5084b225aaec12a2c150edc1d4e1"
@@ -2418,7 +2418,7 @@
       "checksum": "767c79704fb40aef1a0b75a20ab56a5a"
     },
     "worker_runtime.R": {
-      "checksum": "f2fdf415c4ae4f036097be0f6c913a75"
+      "checksum": "bf13fae455db3ca3df6788677728c450"
     },
     "www/club-lineup-leagues.json": {
       "checksum": "3abd4b1398bd3a8d670468bd67811796"
@@ -2427,10 +2427,10 @@
       "checksum": "5a2fd5a49d94ae33da5f5950198d999b"
     },
     "www/home.css": {
-      "checksum": "0d80092a68610cb7fe93de0d1d4c1f2e"
+      "checksum": "eea1ada95d2d31261c2fd7f7cc3b0cb6"
     },
     "www/home.js": {
-      "checksum": "5f09b17b12aa5b798ac17de577baf29e"
+      "checksum": "a90a89f1366c97a48529198f413856c0"
     },
     "www/welcome.css": {
       "checksum": "96246fca28b7169cbc24a6d3a03ccd29"

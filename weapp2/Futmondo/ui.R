@@ -134,6 +134,7 @@ body <- shinydashboard::dashboardBody(
     )
   ),
   tags$div(class = "fm-page-actions", role = "group", `aria-label` = "Page actions",
+    tags$div(id = "league-refresh-status", role = "status", `aria-atomic` = "true"),
     tags$button(type = "button", class = "btn fm-home-return", `data-fm-page` = "login",
       icon("house"), "Home"),
     actionButton("refresh_all", "Refresh", icon = icon("rotate"),

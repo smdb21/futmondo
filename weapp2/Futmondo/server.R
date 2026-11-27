@@ -53,13 +53,28 @@ function(input, output, session) {
   bind_factual_reads("get_active_championships",session,login_token_RV,is_active=function()valid_login(login_token_RV()))
   observeEvent(input$refresh_all, {
     req(valid_login(login_token_RV()))
-    if(isTRUE(fm_worker_mode(login_token_RV()[['userid']]))) {
-      fm_worker_refresh_league(login_token_RV(),championship_id_RV(),user_team_id_RV(),session=session,manual=TRUE)
+    request <- as.integer(input$refresh_all)
+    feedback <- function(message) {
+      session$sendCustomMessage("fm-league-refresh-status", list(request = request, message = message))
+    }
+    league <- tryCatch(championship_id_RV(), shiny.silent.error = function(e) NULL)
+    if (!nzchar(fm_scalar(league, ""))) {
+      feedback("Refresh needs a selected league. Choose a league and try again.")
       return()
     }
-    invalidate_resources(resource_context(login_token_RV(),isolate(championship_id_RV())),pattern="market|roster|teams|team_info|players|financial|capacity|round|notification|pressroom|history|summary|card",notify_availability=!isTRUE(fm_worker_mode(login_token_RV()[['userid']])))
+    if(isTRUE(fm_worker_mode(login_token_RV()[['userid']]))) {
+      team <- tryCatch(user_team_id_RV(), shiny.silent.error = function(e) NULL)
+      if (!nzchar(fm_scalar(team, ""))) {
+        feedback("Your team is unavailable for this league. Try Refresh again when it loads.")
+        return()
+      }
+      fm_worker_refresh_league(login_token_RV(),league,team,session=session,manual=TRUE,feedback=feedback)
+      return()
+    }
+    invalidate_resources(resource_context(login_token_RV(),league),pattern="market|roster|teams|team_info|players|financial|capacity|round|notification|pressroom|history|summary|card",notify_availability=!isTRUE(fm_worker_mode(login_token_RV()[['userid']])))
     history_refresh_trigger(isolate(history_refresh_trigger()) + 1L)
     refresh_trigger(refresh_trigger() + 1)
+    feedback("Refresh started. League balances and players are being reloaded.")
   })
   championships_RV <- resource_display_source(session,function(){
     req(valid_login(login_token_RV()))

@@ -91,6 +91,13 @@ html:not(.fm-signed-in) .fm-theme-options:not([hidden]) {
   bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   right: calc(16px + env(safe-area-inset-right, 0px)); z-index: 1000;
 }
+#league-refresh-status {
+  position: absolute; bottom: calc(100% + 8px); right: 0;
+  width: max-content; max-width: min(22rem, calc(100vw - 40px));
+  padding: 10px 14px; border: 1px solid var(--fm-border); border-radius: 8px;
+  background: var(--fm-surface); color: var(--fm-text); line-height: 1.4;
+}
+#league-refresh-status:empty { padding: 0; border: 0; }
 .fm-page-actions > .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   min-height: 48px; margin: 0; padding: 0 14px; border-radius: 24px;
@@ -103,6 +110,7 @@ html:not(.fm-signed-in) .fm-theme-options:not([hidden]) {
 }
 @media (max-width: 767px) {
   .fm-page-actions { opacity: 0; pointer-events: none; transition: opacity 140ms ease-out; }
+  .fm-page-actions:has(#league-refresh-status:not(:empty)),
   .fm-page-actions.is-scrolling, .fm-page-actions:has(:focus-visible), .fm-page-actions:has(button:active) {
     opacity: 1; pointer-events: auto; transition: none;
   }

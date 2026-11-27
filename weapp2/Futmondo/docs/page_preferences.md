@@ -8,7 +8,7 @@ On signed-in pages other than Home, the lower-right corner holds two labeled but
 
 At viewport widths of 767 px or less, scrolling the page or a scrollable area within it reveals both buttons. They stay visible for three seconds after the last scroll, then fade. Tabbing to either button reveals the pair and keeps them visible while keyboard focus is inside. Reduced-motion mode changes visibility immediately when the idle delay ends. The public welcome and Home omit the floating row.
 
-Home opens the top of the signed-in dashboard and moves focus to its heading. Refresh requests an update for the selected league and keeps the current page open. [League refresh behavior](database_first_sync.md#explicit-league-refresh)
+Home opens the top of the signed-in dashboard and moves focus to its heading. Pressing Refresh immediately shows “Requesting league refresh…” above the button and keeps the page open. The result stays visible for six seconds, including when scrolling stops. A queued refresh updates balances and players as new data arrives. If the request fails, the message explains how to retry. [League refresh behavior](database_first_sync.md#explicit-league-refresh)
 
 ## League overview and saved destination
 

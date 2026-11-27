@@ -15,10 +15,14 @@ manifest<-list(account_id=auth[['userid']],resource_key=d$resource_key,context=d
  version='v2',json_bytes=length(wire),parts=1L,sha256=paste0(openssl::sha256(compressed)),
  observed_at=rival_finance_stamp(),checked_at=rival_finance_stamp(),valid_until=rival_finance_stamp(Sys.time()+60),status='ok',completeness='unknown')
 resource<-list(key=d$resource_key,manifest=manifest,chunks=list(jsonlite::base64_enc(compressed)))
+refresh_queue <- new.env(parent=emptyenv())
 rpc<-list()
 fm_worker_rpc<-function(name,payload,owner=''){
  rpc[[length(rpc)+1L]]<<-list(name=name,payload=payload)
- if(name=='league_refresh')return(promises::promise_resolve(1L))
+ if(name=='league_refresh')return(promises::promise(function(resolve, reject) {
+   refresh_queue$resolve <- resolve
+   refresh_queue$reject <- reject
+ }))
  stopifnot(name=='read')
  promises::promise_resolve(list(account=s$account,health=NULL,jobs=list(list(key=d$resource_key,error=NULL,pending=FALSE,running=FALSE)),
   resources=if(d$resource_key%in%names(payload$p_versions)&&!identical(payload$p_versions[[d$resource_key]],'v2'))list(resource)else list()))
@@ -37,12 +41,26 @@ shiny::testServer(function(input,output,session){
  s$descriptors[[d$resource_key]]<-item
  stopifnot(d$resource_key%in%fm_worker_live_keys(s))
  s$errors[['unwanted-old-context']]<-'old source failure'
- stopifnot(fm_worker_refresh_league(auth,'l','t',session=session,manual=TRUE));flush(session)
+ messages <- character()
+ feedback <- function(message) messages <<- c(messages, message)
+ stopifnot(fm_worker_refresh_league(auth,'l','t',session=session,manual=TRUE,feedback=feedback))
+ flush(session)
+ stopifnot(!length(messages))
+ refresh_queue$resolve(1L);flush(session)
+ stopifnot(length(messages)==1L,startsWith(messages,'Refresh queued.'))
  stopifnot(output$cash=='100',length(rpc)==1L,rpc[[1]]$name=='league_refresh',
    identical(rpc[[1]]$payload,list(p_account=auth[['userid']],p_league='l',p_team='t',p_players=I(character()))))
  fm_worker_poll(auth[['userid']],session$token,TRUE);flush(session)
  stopifnot(output$cash=='200',length(rpc)==2L,rpc[[2]]$name=='read',!length(.fm_transport$tasks),is.null(s$errors[['unwanted-old-context']]))
  cat('PASS explicit refresh queues once, keeps the old balance visible, then renders the new durable version without browser source HTTP\n')
+ for (response in list(function() refresh_queue$resolve(0L),
+                       function() refresh_queue$reject(simpleError('offline fixture')))) {
+   messages <- character()
+   stopifnot(fm_worker_refresh_league(auth,'l','t',session=session,manual=TRUE,feedback=feedback))
+   response();flush(session)
+   stopifnot(length(messages)==1L,grepl('could not be queued',messages,fixed=TRUE))
+ }
+ cat('PASS manual refresh reports delayed acceptance, empty queues and failed requests accurately\n')
  sibling<-function()FALSE;attr(sibling,'fm_worker_interest')<-'inactive-sibling'
  fm_worker_demand(d,session$token,sibling)
  stopifnot(d$resource_key%in%fm_worker_live_keys(s))

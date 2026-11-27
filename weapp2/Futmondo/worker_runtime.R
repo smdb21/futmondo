@@ -577,18 +577,19 @@ fm_worker_session<-function(session,login,leagues=function()list(),source_note=f
 }
 # Explicit league refreshes advance existing factual work. Publication flows
 # through the same versioned database read as routine worker updates.
-fm_worker_refresh_league <- function(login, league, team, player=NULL, session=shiny::getDefaultReactiveDomain(), manual=FALSE) {
+fm_worker_refresh_league <- function(login, league, team, player=NULL, session=shiny::getDefaultReactiveDomain(), manual=FALSE, feedback=NULL) {
  if(!valid_login(login)||!isTRUE(fm_worker_mode(login[['userid']])))return(invisible(FALSE))
  account<-login[['userid']]
  payload<-list(p_account=account,p_league=league,p_team=team,
   p_players=I(if(is.null(player))character()else as.character(player)))
  report<-function(message,type){
-  if(!is.null(session)&&!session$isClosed())shiny::showNotification(message,type=type,id="league-refresh",session=session)
+  if(is.null(session)||session$isClosed())return()
+  if(is.function(feedback))feedback(message) else shiny::showNotification(message,type=type,id="league-refresh",session=session)
  }
  pending<-tryCatch(fm_worker_rpc('league_refresh',payload),error=promises::promise_reject)
  promises::then(pending,function(count){
   if(is.numeric(count)&&length(count)==1L&&isTRUE(count>0)){
-   if(manual)report('League update requested. Balances and players will update as new data arrives.','message')
+   if(manual)report('Refresh queued. Balances and players will update as new data arrives.','message')
   }else report('League sync could not be queued. Check Background sync or try Refresh again.','warning')
   NULL
  },function(error){
