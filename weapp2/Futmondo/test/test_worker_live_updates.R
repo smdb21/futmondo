@@ -19,7 +19,7 @@ refresh_queue <- new.env(parent=emptyenv())
 rpc<-list()
 fm_worker_rpc<-function(name,payload,owner=''){
  rpc[[length(rpc)+1L]]<<-list(name=name,payload=payload)
- if(name=='league_refresh')return(promises::promise(function(resolve, reject) {
+ if(name %in% c('league_refresh','rival_refresh'))return(promises::promise(function(resolve, reject) {
    refresh_queue$resolve <- resolve
    refresh_queue$reject <- reject
  }))
@@ -61,6 +61,11 @@ shiny::testServer(function(input,output,session){
    stopifnot(length(messages)==1L,grepl('could not be queued',messages,fixed=TRUE))
  }
  cat('PASS manual refresh reports delayed acceptance, empty queues and failed requests accurately\n')
+ stopifnot(fm_worker_refresh_league(auth,'l','t',session=session,manual=TRUE,rivals=TRUE,feedback=feedback))
+ queued<-tail(rpc,1)[[1]]
+ stopifnot(queued$name=='rival_refresh',identical(queued$payload,list(p_account=auth[['userid']],p_league='l',p_team='t')))
+ refresh_queue$resolve(1L);flush(session)
+ stopifnot(grepl('Rival standings',tail(messages,1),fixed=TRUE))
  sibling<-function()FALSE;attr(sibling,'fm_worker_interest')<-'inactive-sibling'
  fm_worker_demand(d,session$token,sibling)
  stopifnot(d$resource_key%in%fm_worker_live_keys(s))

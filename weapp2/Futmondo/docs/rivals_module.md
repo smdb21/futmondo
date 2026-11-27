@@ -565,3 +565,9 @@ A validated database snapshot remains a labelled preview until seed completion a
 ### Compact financial-history columns — 2026-11-10
 
 `rivals_cash_history_widget()` fixes Date at 112 px, with recorded calendar date and time on separate lines. Unknown/opening/payment-status labels wrap without changing their meaning; raw date values and sorting remain unchanged. Name has a 210 px minimum and wraps full player/bonus labels, including long unbroken words. Wider tables retain horizontal scrolling for remaining columns on narrow screens. Changes are limited to this widget; acquisition, persistence, balances and shared table styles are unchanged.
+
+## Refreshing the Rivals standings (2026-11-27)
+
+Pressing Refresh on Rivals requests the selected league’s accounting job alongside the existing league refresh. The published **Standings last checked** time belongs to a completed calculation. Each team’s **Latest balance evidence** retains the source time used for its estimate. Rechecking the same movements can therefore advance the check time while leaving a team’s amount and evidence date unchanged. A saved legacy result with a hidden budget can recover its evidence date from dated, included ledger entries. An undated opening allocation alone leaves that date unavailable.
+
+The existing worker lane and database snapshot deliver the result to the open table. Duplicate pending requests coalesce. A running job keeps its lease and can receive one follow-up request. Rejection of private rival information and money movements allows a public-history recalculation. Provider rate limits and other errors keep their backoff. [League refresh contract](database_first_sync.md#explicit-league-refresh)

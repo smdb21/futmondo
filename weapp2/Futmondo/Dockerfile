@@ -34,7 +34,7 @@ COPY --chown=shiny:shiny Modules/ ./Modules/
 COPY --chown=shiny:shiny www/ ./www/
 COPY --chown=shiny:shiny worker/ ./worker/
 # Record the bundled award and external lineup readers in the public release metadata.
-RUN python3 -c 'import hashlib,json; from pathlib import Path; p=Path("www/release-info.json"); info=json.loads(p.read_text()); info["runtime_sha256"].update({f:hashlib.sha256(Path(f).read_bytes()).hexdigest() for f in ("award_runtime.R","worker/striker.py")}); p.write_text(json.dumps(info,indent=2)+"\n")'
+RUN python3 -c 'import hashlib,json; from pathlib import Path; p=Path("www/release-info.json"); info=json.loads(p.read_text()); info["runtime_sha256"].update({f:hashlib.sha256(Path(f).read_bytes()).hexdigest() for f in ("award_runtime.R","worker/striker.py","worker/helper.R","worker_runtime.R","Modules/Rivals_Module.R","rival_finance_runtime.R","server.R")}); p.write_text(json.dumps(info,indent=2)+"\n")'
 # Public code-only fingerprints prove which availability implementation shipped.
 RUN python3 -c 'import hashlib,json; from pathlib import Path; files=("Modules/Selected_Player_Module.R","Modules/Players_in_Championship_Module.R","Modules/Market_Module.R","Modules/Today_Module.R","player_availability.R"); Path("www/player-card-runtime.json").write_text(json.dumps({"version":1,"behavior":"target-only-selection","sha256":{f:hashlib.sha256(Path(f).read_bytes()).hexdigest() for f in files}},sort_keys=True)+"\n")'
 # Verify the root/shared-reader fix independently of unrelated card sources.

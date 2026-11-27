@@ -1917,7 +1917,7 @@ shared_rival_finance_source <- function(session,login,championship,user_team,tea
     if(reuse)calculated<-state$calculated
     if(state$finance_ready&&!snapshot_preview&&!reuse)calculated<-tryCatch(build_rival_cash_dataset(state$teams,state$championship,state$evidence,state$awards$rows,
       state$seed$pressroom %||% data.frame(),state$seed$rules %||% list(),state$defaults,
-      coverage_complete=isTRUE(state$awards$complete),account_id=state$account,season=state$season,reference_team_id=shiny::isolate(user_team()),cache=state$calculation_cache),error=function(error){
+      coverage_complete=isTRUE(state$awards$complete),account_id=state$account,season=state$season,reference_team_id=shiny::isolate(user_team()),cache=state$calculation_cache,now=base::Sys.time()),error=function(error){
         if(is.null(state$build_failure))state$build_failure<-resource_log_failure(
           resource_failure(error,resource="league_finances_calc",category="schema"))
         calculated$finance_error<-paste("Financial details could not be prepared.",resource_failure_message(state$build_failure))

@@ -704,9 +704,11 @@ rivals_status_message <- function(message, loading=FALSE, error=FALSE, details=N
   fm_info(message,details,error=error)
 }
 
-rivals_update_details <- function(rows, timezone=fm_display_timezone()) {
+rivals_update_details <- function(rows, timezone=fm_display_timezone(), checked_at=NULL) {
   if(!is.data.frame(rows)||!nrow(rows)||!all(c("teamname","as_of")%in%names(rows)))return(NULL)
-  tags$div(tags$strong("Latest balance evidence"), tags$ul(lapply(seq_len(nrow(rows)),function(i){
+  checked <- fm_time(checked_at)
+  tags$div(if(length(checked)==1L&&!is.na(checked))tags$p("Standings last checked ",fm_format_datetime(checked,timezone)),
+    tags$strong("Latest balance evidence"), tags$ul(lapply(seq_len(nrow(rows)),function(i){
     stamp<-fm_time(mvp_text(rows$as_of[i]))
     tags$li(rows$teamname[i], ": ", if(length(stamp)==1L&&!is.na(stamp))
       fm_format_datetime(stamp,timezone)else"Update time unavailable")
@@ -924,7 +926,7 @@ rivals_Server <- function(id, is_module_active, login_token, championship_id, us
       failure<-table_failure_RV()
       if(!is.null(failure))issues<-c(issues,paste("Rival table could not be displayed.",resource_failure_message(failure)))
       details<-tagList(if(length(issues))tags$p(paste(unique(issues),collapse=" ")),
-        rivals_update_details(df,display_timezone()))
+        rivals_update_details(df,display_timezone(),state$balances_checked_at))
       has_error<-!is.null(failure)||nzchar(state$finance_error %||% "")||
         (!loading && (length(issues)>0L || (count==0L && nzchar(state$teams_reason %||% ""))))
       rivals_status_message(message,loading=loading,error=has_error,details=details)

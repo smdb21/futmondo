@@ -2828,3 +2828,7 @@ Implemented locally. Short passes travel between players’ boots on the grass a
 ## Rival balance audit (2026-11-27)
 
 Implemented and checked locally. The balance date follows the financial evidence used for each team. The worker can retain and reuse closed standings observed at payment when subsequent classification corrections change cash estimates. The round 12 backfill derives one scorecard from the saved history. Deployment and historical coverage are tracked in the [review results](data_review_results.md#rival-balance-audit-2026-11-27).
+
+## Refreshing rival standings (2026-11-27)
+
+Implemented the Rivals-specific route from the floating Refresh control to the verified finance job and its completed calculation timestamp. The existing database publisher and browser subscription deliver the checked standings. [Verification](data_review_results.md#rivals-refresh-2026-11-27)

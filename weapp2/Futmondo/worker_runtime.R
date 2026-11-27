@@ -83,6 +83,21 @@ fm_worker_restore<-function(resource,account){
  if(length(raw)!=m$json_bytes)stop('Worker snapshot length differs')
  value<-fm_worker_decode(jsonlite::fromJSON(rawToChar(raw),simplifyVector=TRUE,simplifyDataFrame=FALSE,simplifyMatrix=FALSE))
  if(identical(m$handler,'get_active_championships'))value<-fm_filter_league_answer(value)
+ # Earlier finance snapshots used a private team-information timestamp even
+ # when no budget was visible. Recover the dated public ledger on first read.
+ if(identical(m$handler,'fm_worker_finances') && is.null(value$balances_checked_at)){
+  rows<-value$team_finances
+  if(is.data.frame(rows)&&all(c('teamid','as_of','observed_cash','observed_cash_at')%in%names(rows))){
+   legacy<-which(!is.finite(rows$observed_cash) & nzchar(rows$as_of) & rows$as_of==rows$observed_cash_at)
+   for(i in legacy){
+    ledger<-value$cash_ledgers[[as.character(rows$teamid[i])]]
+    if(!is.data.frame(ledger)||!all(c('included','timestamp')%in%names(ledger)))next
+    rows$as_of[i]<-rival_latest_cash_stamp(character(),Sys.time(),ledger)
+    rows$observed_cash_at[i]<-""
+   }
+   value$team_finances<-rows
+  }
+ }
  capacity_contract<-identical(m$handler,'get_team_acquisition_capacity')&&identical(m$completeness,'unknown')&&
   identical(m$status,'ok')&&acquisition_capacity_observation_complete(value)
  attr(value,'observed_at')<-fm_time(m$observed_at);attr(value,'fetched_at')<-fm_time(m$checked_at)
@@ -593,7 +608,7 @@ fm_worker_session<-function(session,login,leagues=function()list(),source_note=f
 }
 # Explicit league refreshes advance existing factual work. Publication flows
 # through the same versioned database read as routine worker updates.
-fm_worker_refresh_league <- function(login, league, team, player=NULL, session=shiny::getDefaultReactiveDomain(), manual=FALSE, feedback=NULL) {
+fm_worker_refresh_league <- function(login, league, team, player=NULL, session=shiny::getDefaultReactiveDomain(), manual=FALSE, feedback=NULL, rivals=FALSE) {
  if(!valid_login(login)||!isTRUE(fm_worker_mode(login[['userid']])))return(invisible(FALSE))
  account<-login[['userid']]
  payload<-list(p_account=account,p_league=league,p_team=team,
@@ -602,10 +617,12 @@ fm_worker_refresh_league <- function(login, league, team, player=NULL, session=s
   if(is.null(session)||session$isClosed())return()
   if(is.function(feedback))feedback(message) else shiny::showNotification(message,type=type,id="league-refresh",session=session)
  }
- pending<-tryCatch(fm_worker_rpc('league_refresh',payload),error=promises::promise_reject)
+ rpc <- if(isTRUE(manual)&&isTRUE(rivals))'rival_refresh' else 'league_refresh'
+ if(rpc=='rival_refresh')payload$p_players<-NULL
+ pending<-tryCatch(fm_worker_rpc(rpc,payload),error=promises::promise_reject)
  promises::then(pending,function(count){
   if(is.numeric(count)&&length(count)==1L&&isTRUE(count>0)){
-   if(manual)report('Refresh queued. Balances and players will update as new data arrives.','message')
+   if(manual)report(if(rivals)'Refresh queued. Rival standings will update when the balance calculation finishes.' else 'Refresh queued. Balances and players will update as new data arrives.','message')
   }else report('League sync could not be queued. Check Background sync or try Refresh again.','warning')
   NULL
  },function(error){

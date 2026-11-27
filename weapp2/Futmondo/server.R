@@ -68,7 +68,8 @@ function(input, output, session) {
         feedback("Your team is unavailable for this league. Try Refresh again when it loads.")
         return()
       }
-      fm_worker_refresh_league(login_token_RV(),league,team,session=session,manual=TRUE,feedback=feedback)
+      fm_worker_refresh_league(login_token_RV(),league,team,session=session,manual=TRUE,feedback=feedback,
+        rivals=identical(input$tabs,"rivals"))
       return()
     }
     invalidate_resources(resource_context(login_token_RV(),league),pattern="market|roster|teams|team_info|players|financial|capacity|round|notification|pressroom|history|summary|card",notify_availability=!isTRUE(fm_worker_mode(login_token_RV()[['userid']])))

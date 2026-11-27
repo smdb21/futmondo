@@ -27,6 +27,7 @@ env$async_adapter_fetch<-function(fn,args,context,...){
 updates<-list()
 value<-fm_worker_headless_finances(env,auth,ctx,on_update=function(value)updates[[length(updates)+1L]]<<-value)
 stopifnot(is.data.frame(value$team_finances),nrow(value$team_finances)==1L,!isTRUE(value$loading))
+stopifnot(!is.na(fm_time(value$balances_checked_at)),!any(vapply(updates,function(x)!is.null(x$balances_checked_at),logical(1))))
 encoded<-fm_worker_encode(value)
 cat('PASS actual headless finance controller completed; typed result bytes=',nchar(fm_worker_json(encoded)),'\n')
 
@@ -111,3 +112,40 @@ stopifnot(length(messages)==2L,all(vapply(messages,function(x)x$type=='progress'
  isTRUE(messages[[2]]$result$ready),isTRUE(fm_worker_decode(messages[[1]]$result$value)$loading),!fm_worker_decode(finished$value)$loading)
 stopifnot(sum(fm_worker_decode(messages[[1]]$result$value)$cash_ledgers$t$amount)==90)
 cat('PASS actual helper sends throttled partial/ready envelopes with the same known-answer ledger; final result remains separate\n')
+
+# A reused directory has an older observation than the round request that follows.
+get_teams <- function(login,championship_id)stop("Expected a stored directory")
+get_test_finance_round <- function(login,championship_id,user_team_id){
+  futmondo_post(ROUNDS_URL,body=list(query=list(championshipId=championship_id,userteamId=user_team_id)))
+  rival_finance_stamp(Sys.time())
+}
+old_at <- "2026-11-12T16:18:00Z"
+round_at <- "2026-11-27T18:54:00Z"
+fm_worker_headless_finances <- function(env,auth,ctx,on_update=NULL){
+  prior <- env$get_teams(auth,ctx$championship_id)
+  checked <- env$get_test_finance_round(auth,ctx$championship_id,ctx$user_team_id)
+  stopifnot(fm_time(checked)==fm_time(round_at))
+  list(team_finances=data.frame(),loading=FALSE)
+}
+fm_pipe_exchange <- function(message){
+  if(message$type=="resource" && message$descriptor$handler=="get_teams")
+    return(list(value=fm_worker_encode(teams),observed_at=old_at))
+  if(message$type=="http")return(list(status=200L,observed_at=round_at,body=list(answer=list())))
+  list(ok=TRUE)
+}
+invisible(fm_worker_run(descriptor))
+cat('PASS cached November 12 evidence does not backdate a November 27 child request\n')
+
+legacy <- list(team_finances=data.frame(teamid=c("a","b"),observed_cash=NA_real_,
+  observed_cash_at=old_at,as_of=old_at),cash_ledgers=list(a=data.frame(
+  included=c(TRUE,FALSE),timestamp=fm_time(c(round_at,"2026-11-28T10:00:00Z"))),
+  b=data.frame(included=TRUE,timestamp=unname(fm_time(NA_character_)))))
+wire <- charToRaw(fm_worker_json(fm_worker_encode(legacy)))
+zip <- history_baseline_compress(wire)
+manifest <- list(account_id="u",resource_key="k",handler="fm_worker_finances",json_bytes=length(wire),
+  parts=1L,sha256=paste0(openssl::sha256(zip)),observed_at=round_at,checked_at=round_at,
+  valid_until=round_at,status="partial",completeness="partial")
+readback <- fm_worker_restore(list(manifest=manifest,key="k",chunks=list(jsonlite::base64_enc(zip))),"u")$data
+stopifnot(fm_time(readback$team_finances$as_of[1])==fm_time(round_at),
+  readback$team_finances$as_of[2]=="",is.null(readback$balances_checked_at))
+cat('PASS legacy saved balances recover included ledger dates without inventing a refresh time\n')

@@ -293,6 +293,9 @@ fm_worker_headless_finances<-function(env,auth,ctx,on_update=NULL){
     code=fm_worker_finance_timeout_code(state)),class=c('fm_finance_timeout','error','condition')))
  }
  if(!is.null(result$finance_error))stop('Finance preparation failed')
+ if(is.data.frame(result$team_finances)&&nrow(result$team_finances)&&length(result$cash_ledgers)&&
+    all(result$team_finances$teamid %in% names(result$cash_ledgers)))
+   result$balances_checked_at<-rival_finance_stamp(base::Sys.time())
  result
 }
 fm_worker_run<-function(descriptor){
@@ -473,11 +476,12 @@ fm_worker_run<-function(descriptor){
   if(!is.function(fn)||!startsWith(nm,'get_')||nm%in%finance_tasks||endsWith(nm,'_async')||!'login'%in%names(formals(fn)))next
   local({name<-nm;original<-fn
    wrapper<-function(){
-    if(purchase_check){
+    finance_clock <- identical(descriptor$handler,"fm_worker_finances")
+    if(purchase_check||finance_clock){
      parent_clock<-source_clock;source_clock<<-NULL
-     scope<-new.env(parent=emptyenv());scope$primary<-NULL;purchase_scopes[[length(purchase_scopes)+1L]]<<-scope
+     if(purchase_check){scope<-new.env(parent=emptyenv());scope$primary<-NULL;purchase_scopes[[length(purchase_scopes)+1L]]<<-scope}
      on.exit({stamp<-source_clock;source_clock<<-if(is.null(parent_clock))stamp else if(is.null(stamp))parent_clock else min(parent_clock,stamp)
-      purchase_scopes<<-head(purchase_scopes,-1L)},add=TRUE)
+      if(purchase_check)purchase_scopes<<-head(purchase_scopes,-1L)},add=TRUE)
     }
     params<-lapply(as.list(match.call())[-1L],eval,envir=parent.frame())
     childctx<-env$resource_context(params$login,params$championship_id,params$user_team_id %||% params$team_id,params$player_id)
@@ -487,7 +491,7 @@ fm_worker_run<-function(descriptor){
      if(!is.null(existing)){
       if(!purchase_check||fm_time(existing$valid_until)>base::Sys.time()){
        value<-fm_worker_decode(existing$value)
-       if(purchase_check)source_clock<<-fm_time(existing$observed_at)
+       if(purchase_check||finance_clock)source_clock<<-fm_time(existing$observed_at)
        return(value)
       }
       produced_bytes<<-max(0,produced_bytes-as.numeric(object.size(existing$value)))

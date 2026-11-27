@@ -7,7 +7,7 @@ const { PGlite } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/futm
   const query = async (sql, args = []) => (await db.query(sql, args)).rows;
   try {
     await db.exec('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;');
-    const migration = fs.readFileSync('scripts/migrations/20261122120000_worker_league_refresh.sql', 'utf8');
+    const migration = fs.readFileSync('scripts/migrations/20261127192443_rival_standings_refresh.sql', 'utf8');
     const schema = fs.readFileSync('scripts/schema.sql', 'utf8');
     assert.ok(schema.endsWith(migration));
     await db.exec(schema.slice(0, -migration.length));
@@ -57,6 +57,8 @@ const { PGlite } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/futm
     const row = async key => (await query(`SELECT resource_key,owner,run_id,league_refresh_at,requested_at,
       league_refresh_at::text request_text,due_at<=now() due,last_error FROM worker_jobs WHERE resource_key=$1`, [key]))[0];
     const start = performance.now();
+    const rivals = await add(21, 'fm_worker_finances');
+    const foreignRivals = await add(22, 'fm_worker_finances', {league: 'other'});
     assert.equal(await refresh(), 6);
     const elapsed = performance.now() - start;
     assert.equal(await refresh(), 1); // Immediate repeated click reuses the queued request.
@@ -76,6 +78,20 @@ const { PGlite } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/futm
     assert.ok((await row(roster)).league_refresh_at, 'older leased work preserves the newer refresh');
     await query('UPDATE worker_jobs SET run_id=gen_random_uuid() WHERE resource_key=$1', [claimed.resource_key]);
     assert.equal((await row(claimed.resource_key)).league_refresh_at, null);
+    const rivalRefresh = async () => (await query("SELECT worker_rival_refresh('mine','league','team') n"))[0].n;
+    assert.equal((await row(rivals)).league_refresh_at, null);
+    await query("UPDATE worker_jobs SET last_error='source_rejected_1_userteam_information,source_rejected_1_userteam_moneymovements' WHERE resource_key=$1", [rivals]);
+    assert.equal(await rivalRefresh(), 1);
+    const first = await row(rivals);
+    assert.ok(first.due && first.league_refresh_at);
+    assert.equal(await rivalRefresh(), 1);
+    assert.equal((await row(rivals)).request_text, first.request_text);
+    assert.equal((await row(foreignRivals)).league_refresh_at, null);
+    await query("UPDATE worker_jobs SET last_error='source_rate_limited',league_refresh_at=null,due_at=now()+interval '30 minutes' WHERE resource_key=$1", [rivals]);
+    assert.equal(await rivalRefresh(), 0);
+    assert.equal((await row(rivals)).due, false);
+    const perms = await query("SELECT has_function_privilege('anon','worker_rival_refresh(text,text,text)','execute') AS allowed");
+    assert.equal(perms[0].allowed, false);
     await query("UPDATE worker_accounts SET excluded_leagues='[\"league\"]' WHERE account_id='mine'");
     assert.equal(await refresh(['bought']), 0);
     console.log(`PASS scoped queue, deduplication, leases, backoff, next claim and consumption. One six-job request with 5,000 unrelated jobs took ${elapsed.toFixed(1)}ms.`);
