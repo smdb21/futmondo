@@ -1,5 +1,19 @@
 # Futmondo data review and implementation results
 
+## Received offer decisions (2026-11-26)
+
+The reported rejection exposed a routing defect. LigaRadar sent direct roster offers to the listing-bid endpoint. Both accept and reject now verify the selected offer and use its source collection. The old path could also replace an unidentified bid with the first bid on a player. [Request contract and evidence](market_selling.md#e-accepting-and-rejecting-received-offers-2026-11-26)
+
+`test/test_received_offer_decisions.R` passed all four route fixtures and exercised the actual card with a delayed summary, duplicate confirmation, changed price/party/ID, duplicate ID, context switch, explicit rejection, confirmed success and a lost acknowledgement. A normal confirmation makes one asynchronous player-summary read and one single-attempt decision request. Opening the dialog made zero requests. Another event-loop callback completed with the summary still pending. The existing worker refresh reuses the scoped database observation path after decisions. No schema, polling, or dependencies changed.
+
+My Team offer checks passed (10), durable offer persistence checks passed (8), and the offline Shiny lifecycle passed (14 checks and eight tabs). No live sale or rejection was attempted. Production deployment and the result for the reported offer remain unverified.
+
+## Round schedule wording (2026-11-26)
+
+The Home browser fixture uses a stale saved calendar. Chromium displayed the closed round, the next round’s kickoff with its timezone, a separate “Time until kickoff” row with duration units, and a warning that round status and kickoff times may have changed. The rows fit at 320, 390 and 1440 px. The fresh calendar fixture omitted the warning.
+
+The labels reuse the existing calendar read and browser clock. Ten unrelated inputs caused zero additional reads. The change adds no requests, database writes, reactive timers or per-tick server work. All four Home fixture groups, the 14 debt and countdown checks and the offline lifecycle (14 checks and eight tabs) passed locally. [Home fixtures](../test/test_welcome_primary_loading.R) · [Browser check](../test/test_welcome_home_browser.cjs)
+
 ## Button visibility (2026-11-26)
 
 Offline Chromium verified all four edges of the squad market-listing confirmation in light and dark themes at 320, 390 and 1440 px. The dialog fit at each width and the synthetic listing flow passed. Opening an individual player from the roster at 390 px also showed a 2 px solid confirmation border in each theme. The same transaction styles cover bids, offers and clause confirmations. The player-card and lineup browser suites passed at all three widths. Received-offer buttons retained keyboard activation and compact rows at 320, 360, 390 and 1440 px in both themes.

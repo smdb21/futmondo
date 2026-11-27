@@ -37,6 +37,8 @@ shiny::testServer(app_server,{
  login_fixture(session)
  stopifnot(valid_login(login_token_RV()),startup_stage()=='ready',is.null(output$startup_status),
   grepl('Round 12',output$home_round$html),grepl('fm-browser-countdown',output$home_round$html),
+  grepl('Time until kickoff', output$home_round$html, fixed=TRUE),
+  !grepl('Showing the saved schedule', output$home_round$html, fixed=TRUE),
   grepl('0 €',output$home_balance$html),grepl('17 players',output$home_squad$html),
   grepl('Continue to Rivals',output$home_continue$html),grepl('data-fm-page="admin"',output$home_destinations$html),
   sum(calls=='get_market_players')==1L, sum(calls=='get_championship_pressroom')==1L)

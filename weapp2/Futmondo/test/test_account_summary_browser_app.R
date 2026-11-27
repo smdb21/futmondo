@@ -20,6 +20,7 @@ app_market$bid_price <- c(200000,NA_real_,NA_real_)
 app_rounds <- data.frame(round_id=c('closed','next'),round_number=11:12,
   begin_process=format(Sys.time()+c(-7,1)*86400,'%Y-%m-%dT%H:%M:%SZ',tz='UTC'),
   status=c('closed','next'),is_finished=c(TRUE,FALSE))
+app_rounds <- observed_data(app_rounds, status="stale", observed_at=Sys.time()-86400)
 app_roster$change <- c(30000, 20000, -10000, rep(0, 14))
 fixture_server <- function(input,output,session) {
   app_server(input,output,session)

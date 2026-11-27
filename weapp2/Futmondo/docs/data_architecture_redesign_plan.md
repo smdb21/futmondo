@@ -1,5 +1,9 @@
 # Futmondo data architecture redesign plan
 
+## Received offer decisions (2026-11-26)
+
+- [x] Verify the displayed offer against the live player summary on confirmation, use the Futmondo route for its collection, and reconcile stale or uncertain outcomes through the factual worker. Offline verification is recorded in [data review results](data_review_results.md#received-offer-decisions-2026-11-26). Hosted transaction verification remains open.
+
 ## Points and ranks (2026-11-26)
 
 - [x] Combine cumulative points and ranks in the Points tab. Both views reuse the selected published-round interval and season totals. [Plot behavior](plots_module.md#points-and-ranks-2026-11-26)
@@ -20,7 +24,7 @@
 
 - [x] Group the active outgoing offer count and total under Balance, and label daily player value changes and pending arrivals and departures under Squad size. Reuse the shared offer and clause-transfer observations.
 
-- [x] Display the Home kickoff label and localized timestamp side by side, with the countdown below.
+- [x] Display the Home kickoff label and localized timestamp side by side. Label the countdown below with its purpose and duration units, and identify the saved schedule in the freshness warning.
 
 ## Advanced and resumed rounds (2026-11-26)
 

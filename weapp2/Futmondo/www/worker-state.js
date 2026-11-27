@@ -16,7 +16,7 @@
       if (!Number.isFinite(seconds)) return;
       var days = Math.floor(seconds / 86400), hours = Math.floor(seconds / 3600) % 24;
       var mins = Math.floor(seconds / 60) % 60, secs = seconds % 60;
-      var label = (days ? days + 'd ' : '') + String(hours).padStart(2, '0') + ':' + String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+      var label = (days ? days + 'd ' : '') + hours + 'h ' + String(mins).padStart(2, '0') + 'm ' + String(secs).padStart(2, '0') + 's';
       if (node.textContent !== label) node.textContent = label;
     });
   }

@@ -196,12 +196,18 @@ async function verify(browser, width, theme) {
     await round.getByText('Round 11', {exact:true}).waitFor();
     await round.locator('.fm-browser-countdown').waitFor();
     assert.match(await round.innerText(), /\bClosed\b/);
+    await round.getByText('Showing the saved schedule. Round status and kickoff times may have changed.',
+      {exact:true}).waitFor();
     const kickoff = round.locator('.fm-home-kickoff');
-    const label = kickoff.getByText('Next kickoff · Round 12 at:', {exact:true});
+    const label = kickoff.getByText('Round 12 kickoff', {exact:true});
     const timestamp = kickoff.getByText(/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2} \S+$/);
-    const [left, right, countdown] = await Promise.all(
-      [label, timestamp, kickoff.locator('.fm-browser-countdown')].map(el => el.boundingBox()));
-    assert.ok(left && right && countdown);
+    const clock = kickoff.locator('.fm-browser-countdown');
+    await page.waitForFunction(() => /^(?:\d+d )?\d+h \d{2}m \d{2}s$/.test(
+      document.querySelector('#home_round .fm-browser-countdown')?.textContent));
+    const [left, right, timerLabel, countdown] = await Promise.all(
+      [label, timestamp, kickoff.getByText('Time until kickoff', {exact:true}), clock].map(el => el.boundingBox()));
+    assert.ok(left && right && timerLabel && countdown);
+    assert.ok(Math.abs(timerLabel.y - countdown.y) < 1 && countdown.x >= timerLabel.x + timerLabel.width);
     assert.ok(Math.abs(left.y - right.y) < 1 && right.x >= left.x + left.width);
     assert.ok(countdown.y >= Math.max(left.y + left.height, right.y + right.height));
     const balance = page.locator('#home_balance');

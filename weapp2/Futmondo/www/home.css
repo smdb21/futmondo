@@ -46,7 +46,7 @@ html:not(.fm-signed-in) .fm-theme-options:not([hidden]) {
   display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 8px;
   margin-top: 4px; text-align: start;
 }
-.fm-home-kickoff .fm-browser-countdown { grid-column: 1 / -1; font-variant-numeric: tabular-nums; }
+.fm-home-kickoff .fm-browser-countdown { font-variant-numeric: tabular-nums; }
 .fm-home-detail, #home_balance .fm-home-squad-value, #home_balance .fm-team-value-trend {
   display: block; margin-top: 6px; color: var(--fm-muted); font-size: 12px; line-height: 1.4;
 }
@@ -128,7 +128,7 @@ html:not(.fm-signed-in) .fm-theme-options:not([hidden]) {
   .fm-home-overview > div:nth-child(2) { border-inline-start: 0; }
   .fm-home-overview > div + div { border-top: 1px solid var(--fm-border); }
   #home_round > div { display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 3px 8px; }
-  #home_round small { text-align: right; }
+  #home_round small { text-align: start; }
   #home_round small:has(> .fm-home-kickoff) { display: contents; }
   #home_round .fm-home-kickoff { grid-column: 1 / -1; }
   #home_round small + small { grid-column: 1 / -1; }

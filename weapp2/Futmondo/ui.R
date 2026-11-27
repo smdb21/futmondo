@@ -78,7 +78,7 @@ body <- shinydashboard::dashboardBody(
           selectInput("selected_league", "League", choices = character())),
         uiOutput("league_preference_status"),
         tags$section(class = "fm-home-overview", `aria-label` = "League overview",
-          tags$div(tags$span(class = "fm-home-caption", icon("calendar-days"), "Round"),
+          tags$div(tags$span(class = "fm-home-caption", icon("calendar-days"), "Round schedule"),
             tags$div(id = "home_round", class = "shiny-html-output fm-summary-output", "Loading…")),
           tags$div(tags$span(class = "fm-home-caption", icon("wallet"), "Balance"),
             tags$div(id = "home_balance", class = "shiny-html-output fm-summary-output", "Loading…")),
